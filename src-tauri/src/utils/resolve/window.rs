@@ -1,4 +1,6 @@
+#[cfg(not(target_os = "windows"))]
 use dark_light::{Mode as SystemTheme, detect as detect_system_theme};
+#[cfg(not(target_os = "windows"))]
 use tauri::utils::config::Color;
 use tauri::webview::PageLoadEvent;
 use tauri::{Theme, WebviewWindow};
@@ -6,7 +8,9 @@ use tauri::{Theme, WebviewWindow};
 use crate::{config::Config, core::handle, utils::resolve::window_script::build_window_initial_script};
 use clash_verge_logging::{Type, logging_error};
 
+#[cfg(not(target_os = "windows"))]
 const DARK_BACKGROUND_COLOR: Color = Color(46, 48, 61, 255); // #2E303D
+#[cfg(not(target_os = "windows"))]
 const LIGHT_BACKGROUND_COLOR: Color = Color(245, 245, 245, 255); // #F5F5F5
 const DARK_BACKGROUND_HEX: &str = "#2E303D";
 const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
@@ -42,12 +46,14 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         _ => None,
     };
 
+    #[cfg(not(target_os = "windows"))]
     let prefers_dark_background = match resolved_theme {
         Some(Theme::Dark) => true,
         Some(Theme::Light) => false,
         _ => !matches!(detect_system_theme().ok(), Some(SystemTheme::Light)),
     };
 
+    #[cfg(not(target_os = "windows"))]
     let background_color = if prefers_dark_background {
         DARK_BACKGROUND_COLOR
     } else {
@@ -123,12 +129,12 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
             #[cfg(target_os = "windows")]
             {
-                use window_vibrancy::{apply_blur, apply_mica, apply_acrylic};
+                use window_vibrancy::{apply_acrylic, apply_blur, apply_mica};
                 // 尝试应用毛玻璃/亚克力/Mica效果
-                if let Err(_) = apply_mica(&window, None) {
-                    if let Err(_) = apply_acrylic(&window, Some((0, 0, 0, 0))) {
-                        let _ = apply_blur(&window, Some((0, 0, 0, 0)));
-                    }
+                if apply_mica(&window, None).is_err()
+                    && apply_acrylic(&window, Some((0, 0, 0, 0))).is_err()
+                {
+                    let _ = apply_blur(&window, Some((0, 0, 0, 0)));
                 }
             }
 
