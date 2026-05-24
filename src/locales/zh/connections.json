@@ -14,7 +14,8 @@
       "source": "源地址",
       "destination": "目标地址",
       "destinationPort": "目标端口",
-      "type": "类型"
+      "type": "类型",
+      "actions": "操作"
     },
     "order": {
       "default": "默认",

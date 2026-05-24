@@ -14,7 +14,8 @@
       "source": "送信元アドレス",
       "destination": "宛先アドレス",
       "destinationPort": "宛先ポート",
-      "type": "タイプ"
+      "type": "タイプ",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

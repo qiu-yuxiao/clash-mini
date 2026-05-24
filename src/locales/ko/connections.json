@@ -14,7 +14,8 @@
       "source": "소스",
       "destination": "목적지",
       "destinationPort": "목적지 포트",
-      "type": "유형"
+      "type": "유형",
+      "actions": "Actions"
     },
     "order": {
       "default": "기본",

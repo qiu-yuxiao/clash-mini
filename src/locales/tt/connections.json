@@ -14,7 +14,8 @@
       "source": "Чыганак адресы",
       "destination": "Максат IP-адресы",
       "destinationPort": "Барасы порты",
-      "type": "Төр"
+      "type": "Төр",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

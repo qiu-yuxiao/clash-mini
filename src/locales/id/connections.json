@@ -14,7 +14,8 @@
       "source": "Sumber",
       "destination": "IP Tujuan",
       "destinationPort": "Port Tujuan",
-      "type": "Jenis"
+      "type": "Jenis",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

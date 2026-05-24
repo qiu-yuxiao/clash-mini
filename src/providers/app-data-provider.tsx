@@ -238,7 +238,7 @@ export const AppDataProvider = ({
         // PAC模式：显示我们期望设置的代理地址
         const proxyHost = verge.proxy_host || '127.0.0.1'
         const proxyPort =
-          verge.verge_mixed_port || clashConfig.mixedPort || 7897
+          verge.verge_mixed_port || clashConfig.mixedPort || 10801
         return `${proxyHost}:${proxyPort}`
       } else {
         // HTTP代理模式：优先使用系统地址，但如果格式不正确则使用期望地址
@@ -253,7 +253,7 @@ export const AppDataProvider = ({
           // 系统地址无效，返回期望的代理地址
           const proxyHost = verge.proxy_host || '127.0.0.1'
           const proxyPort =
-            verge.verge_mixed_port || clashConfig.mixedPort || 7897
+            verge.verge_mixed_port || clashConfig.mixedPort || 10801
           return `${proxyHost}:${proxyPort}`
         }
       }

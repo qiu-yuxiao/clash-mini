@@ -14,7 +14,8 @@
       "source": "Kaynak",
       "destination": "Hedef",
       "destinationPort": "Hedef Port",
-      "type": "Tip"
+      "type": "Tip",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

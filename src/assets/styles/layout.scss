@@ -25,7 +25,11 @@
       -moz-user-select: none;
       -ms-user-select: none;
       overflow: hidden;
-      border-right: 1px solid var(--divider-color);
+      border-right: 1px solid var(--aero-border);
+      background: var(--aero-bg) !important;
+      backdrop-filter: blur(24px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+      box-shadow: 2px 0 12px var(--aero-border-outer);
 
       .the-logo {
         position: relative;
@@ -82,10 +86,16 @@
     &__right {
       position: relative;
       flex: 1 1 100%;
-      height: 100%;
+      height: calc(100% - 10px);
+      margin: 0 10px 10px 10px;
+      background: var(--aero-panel-bg) !important;
+      border: 1px solid var(--aero-border) !important;
+      box-shadow: var(--aero-box-shadow-subtle) !important;
+      border-radius: 8px;
+      overflow: hidden;
 
       .the-bar {
-        height: 36px;
+        height: 24px;
         display: flex;
         justify-content: end;
         box-sizing: border-box;
@@ -101,8 +111,8 @@
         position: absolute;
         top: 0;
         left: 0;
-        right: 1px;
-        bottom: 0px;
+        right: 0;
+        bottom: 0;
       }
     }
   }
@@ -119,7 +129,11 @@
       padding: 10px;
       box-sizing: border-box;
       height: 36px;
-      border-bottom: 1px solid var(--divider-color);
+      border-bottom: 1px solid var(--aero-border);
+      background: var(--aero-bg) !important;
+      backdrop-filter: blur(24px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+      box-shadow: 0 1px 4px var(--aero-border-outer);
 
       &-drag-region {
         align-self: stretch;
@@ -152,7 +166,11 @@
       padding: 10px;
       box-sizing: border-box;
       height: 36px;
-      border-bottom: 1px solid var(--divider-color);
+      border-bottom: 1px solid var(--aero-border);
+      background: var(--aero-bg) !important;
+      backdrop-filter: blur(24px) saturate(180%) !important;
+      -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+      box-shadow: 0 1px 4px var(--aero-border-outer);
 
       &-drag-region {
         align-self: stretch;

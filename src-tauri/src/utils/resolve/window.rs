@@ -56,20 +56,46 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     let initial_script = build_window_initial_script(initial_theme_mode, DARK_BACKGROUND_HEX, LIGHT_BACKGROUND_HEX);
 
+    #[cfg(target_os = "windows")]
     let mut builder = tauri::WebviewWindowBuilder::new(
         app_handle,
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("Clash Verge")
+    .title("Clash WinAero")
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
     .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
     .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
-    .visible(false) // 等待主题色准备好后再展示，避免启动色差
+    .visible(false)
+    .transparent(true) // 必须设为 true 以支持透明磨砂玻璃
     .initialization_script(&initial_script)
-    .general_autofill_enabled(false) // 禁用自动填充
+    .general_autofill_enabled(false)
+    .on_page_load(move |window, payload| {
+        if payload.event() != PageLoadEvent::Finished {
+            return;
+        }
+
+        logging_error!(Type::Window, window.show());
+        logging_error!(Type::Window, window.set_focus());
+    });
+
+    #[cfg(not(target_os = "windows"))]
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        app_handle,
+        "main", /* the unique window label */
+        tauri::WebviewUrl::App(start_page.into()),
+    )
+    .title("Clash WinAero")
+    .center()
+    .decorations(DEFAULT_DECORATIONS)
+    .fullscreen(false)
+    .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
+    .visible(false)
+    .initialization_script(&initial_script)
+    .general_autofill_enabled(false)
     .on_page_load(move |window, payload| {
         if payload.event() != PageLoadEvent::Finished {
             return;
@@ -83,11 +109,29 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         builder = builder.theme(Some(theme));
     }
 
-    builder = builder.background_color(background_color);
+    #[cfg(not(target_os = "windows"))]
+    {
+        builder = builder.background_color(background_color);
+    }
 
     match builder.build() {
         Ok(window) => {
-            logging_error!(Type::Window, window.set_background_color(Some(background_color)));
+            #[cfg(not(target_os = "windows"))]
+            {
+                logging_error!(Type::Window, window.set_background_color(Some(background_color)));
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                use window_vibrancy::{apply_blur, apply_mica, apply_acrylic};
+                // 尝试应用毛玻璃/亚克力/Mica效果
+                if let Err(_) = apply_mica(&window, None) {
+                    if let Err(_) = apply_acrylic(&window, Some((0, 0, 0, 0))) {
+                        let _ = apply_blur(&window, Some((0, 0, 0, 0)));
+                    }
+                }
+            }
+
             Ok(window)
         }
         Err(e) => Err(e.to_string()),

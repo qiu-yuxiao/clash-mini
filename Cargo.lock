@@ -1069,8 +1069,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
-name = "clash-verge"
-version = "2.5.2"
+name = "clash-verge-draft"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "criterion",
+ "parking_lot",
+ "tokio",
+]
+
+[[package]]
+name = "clash-verge-i18n"
+version = "0.1.0"
+dependencies = [
+ "rust-i18n",
+ "sys-locale",
+]
+
+[[package]]
+name = "clash-verge-limiter"
+version = "0.1.0"
+
+[[package]]
+name = "clash-verge-logging"
+version = "0.1.0"
+dependencies = [
+ "compact_str",
+ "flexi_logger",
+ "log",
+ "tokio",
+]
+
+[[package]]
+name = "clash-verge-signal"
+version = "0.1.0"
+dependencies = [
+ "clash-verge-logging",
+ "log",
+ "tokio",
+]
+
+[[package]]
+name = "clash-winaero"
+version = "0.0.1"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -1144,50 +1185,10 @@ dependencies = [
  "tokio-util",
  "warp",
  "webpki-roots",
+ "window-vibrancy",
  "windows 0.62.2",
  "winreg 0.56.0",
  "zip 8.6.0",
-]
-
-[[package]]
-name = "clash-verge-draft"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "criterion",
- "parking_lot",
- "tokio",
-]
-
-[[package]]
-name = "clash-verge-i18n"
-version = "0.1.0"
-dependencies = [
- "rust-i18n",
- "sys-locale",
-]
-
-[[package]]
-name = "clash-verge-limiter"
-version = "0.1.0"
-
-[[package]]
-name = "clash-verge-logging"
-version = "0.1.0"
-dependencies = [
- "compact_str",
- "flexi_logger",
- "log",
- "tokio",
-]
-
-[[package]]
-name = "clash-verge-signal"
-version = "0.1.0"
-dependencies = [
- "clash-verge-logging",
- "log",
- "tokio",
 ]
 
 [[package]]

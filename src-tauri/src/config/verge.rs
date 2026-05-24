@@ -419,10 +419,10 @@ impl IVerge {
             verge_tproxy_port: Some(7896),
             #[cfg(target_os = "linux")]
             verge_tproxy_enabled: Some(false),
-            verge_mixed_port: Some(7897),
-            verge_socks_port: Some(7898),
+            verge_mixed_port: Some(10801),
+            verge_socks_port: Some(10802),
             verge_socks_enabled: Some(false),
-            verge_port: Some(7899),
+            verge_port: Some(10803),
             verge_http_enabled: Some(false),
             enable_proxy_guard: Some(false),
             enable_bypass_check: Some(true),

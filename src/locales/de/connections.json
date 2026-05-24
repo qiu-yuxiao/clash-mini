@@ -14,7 +14,8 @@
       "source": "Quelladresse",
       "destination": "Zieladresse",
       "destinationPort": "Zielport",
-      "type": "Typ"
+      "type": "Typ",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

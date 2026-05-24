@@ -75,16 +75,31 @@ export const LayoutItem = (props: Props) => {
               fontWeight: '700',
             },
           },
-          ({ palette: { mode, primary } }) => {
-            const bgcolor =
-              mode === 'light'
-                ? alpha(primary.main, 0.15)
-                : alpha(primary.main, 0.35)
-            const color = mode === 'light' ? '#1f1f1f' : '#ffffff'
+          ({ palette: { mode } }) => {
+            const color = mode === 'light' ? '#003366' : '#ffffff'
+            const crystalBg = mode === 'light'
+              ? 'linear-gradient(to bottom, rgba(14, 144, 255, 0.22) 0%, rgba(14, 144, 255, 0.08) 45%, rgba(14, 144, 255, 0.16) 50%, rgba(14, 144, 255, 0.32) 100%)'
+              : 'linear-gradient(to bottom, rgba(14, 144, 255, 0.4) 0%, rgba(14, 144, 255, 0.15) 45%, rgba(14, 144, 255, 0.25) 50%, rgba(14, 144, 255, 0.48) 100%)'
+            const crystalBorder = mode === 'light'
+              ? '1px solid rgba(14, 144, 255, 0.45)'
+              : '1px solid rgba(14, 144, 255, 0.7)'
+            const crystalShadow = mode === 'light'
+              ? '0 1px 2px rgba(14, 144, 255, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+              : '0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 6px rgba(14, 144, 255, 0.3)'
             return {
-              '&.Mui-selected': { bgcolor },
-              '&.Mui-selected:hover': { bgcolor },
-              '&.Mui-selected .MuiListItemText-primary': { color },
+              '&.Mui-selected': { 
+                background: `${crystalBg} !important`,
+                border: crystalBorder,
+                boxShadow: crystalShadow,
+              },
+              '&.Mui-selected:hover': { 
+                background: `${crystalBg} !important`,
+                filter: 'brightness(1.08)',
+              },
+              '&.Mui-selected .MuiListItemText-primary': { 
+                color,
+                textShadow: mode === 'light' ? '0 1px 1px rgba(255, 255, 255, 0.8)' : '0 1px 2px rgba(0, 0, 0, 0.5)',
+              },
             }
           },
         ]}

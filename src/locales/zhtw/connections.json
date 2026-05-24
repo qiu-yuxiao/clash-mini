@@ -14,7 +14,8 @@
       "source": "來源位址",
       "destination": "目標位址",
       "destinationPort": "目標連接埠",
-      "type": "類型"
+      "type": "類型",
+      "actions": "Actions"
     },
     "order": {
       "default": "預設",

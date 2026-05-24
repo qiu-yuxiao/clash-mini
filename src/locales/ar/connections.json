@@ -14,7 +14,8 @@
       "source": "المصدر",
       "destination": "عنوان IP الوجهة",
       "destinationPort": "ميناء الوجهة",
-      "type": "النوع"
+      "type": "النوع",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

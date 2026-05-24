@@ -14,7 +14,8 @@
       "source": "Dirección de origen",
       "destination": "Dirección de destino",
       "destinationPort": "Puerto de destino",
-      "type": "Tipo"
+      "type": "Tipo",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

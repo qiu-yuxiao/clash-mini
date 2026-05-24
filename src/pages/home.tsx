@@ -32,6 +32,7 @@ import { EnhancedCard } from '@/components/home/enhanced-card'
 import { EnhancedTrafficStats } from '@/components/home/enhanced-traffic-stats'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
+import { SmartRoutingCard } from '@/components/home/smart-routing-card'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { entry_lightweight_mode, openWebUrl } from '@/services/cmds'
@@ -136,6 +137,15 @@ const HomeSettingsDialog = ({
           <FormControlLabel
             control={
               <Checkbox
+                checked={cards.smartRouting || false}
+                onChange={() => handleToggle('smartRouting')}
+              />
+            }
+            label="智能分流中心"
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
                 checked={cards.network || false}
                 onChange={() => handleToggle('network')}
               />
@@ -226,6 +236,7 @@ const HomePage = () => {
       info: false,
       profile: true,
       proxy: true,
+      smartRouting: true,
       network: true,
       mode: true,
       traffic: true,
@@ -291,6 +302,7 @@ const HomePage = () => {
         <HomeProfileCard current={current} onProfileUpdated={mutateProfiles} />,
       ),
       renderCard('proxy', <CurrentProxyCard />),
+      renderCard('smartRouting', <SmartRoutingCard />),
       renderCard('network', <NetworkSettingsCard />),
       renderCard('mode', <ClashModeEnhancedCard />),
     ],

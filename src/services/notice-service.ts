@@ -289,6 +289,12 @@ const baseShowNotice = (
   message: NoticeContent,
   ...extras: NoticeExtra[]
 ): number => {
+  if (typeof window !== 'undefined') {
+    const notificationsEnabled = localStorage.getItem('clash-verge-enable-notification') !== 'false'
+    if (!notificationsEnabled) {
+      return -1
+    }
+  }
   const id = nextId++
   const { params, raw, duration } = parseNoticeExtras(extras)
   const effectiveDuration = resolveDuration(type, duration)

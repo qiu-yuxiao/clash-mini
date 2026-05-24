@@ -22,18 +22,18 @@ notifications:
     body: Профиль яңадан активлаштырылды.
   appQuit:
     title: Чыгар алдыннан
-    body: Clash Verge чыгарга җыена.
+    body: Clash WinAero чыгарга җыена.
   appHidden:
     title: Кушымта яшерелде
-    body: Clash Verge фон режимында эшли.
+    body: Clash WinAero фон режимында эшли.
   updateReady:
-    title: Clash Verge Update
+    title: Clash WinAero Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash Verge хезмәтен урнаштыру өчен администратор хокуклары кирәк.
-  adminUninstallPrompt: Clash Verge хезмәтен бетерү өчен администратор хокуклары кирәк.
+  adminInstallPrompt: Clash WinAero хезмәтен урнаштыру өчен администратор хокуклары кирәк.
+  adminUninstallPrompt: Clash WinAero хезмәтен бетерү өчен администратор хокуклары кирәк.
 tray:
   dashboard: Идарә панеле
   ruleMode: Кагыйдә режимы
@@ -48,7 +48,6 @@ tray:
   systemProxy: Системалы прокси
   tunMode: TUN режимы
   closeAllConnections: Барлык тоташуларны ябу
-  lightweightMode: Җиңел режим
   copyEnv: Мохит үзгәрүчәннәрен күчерү
   confDir: Конфигурация каталогы
   coreDir: Ядро каталогы

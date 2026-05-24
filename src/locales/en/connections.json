@@ -14,7 +14,8 @@
       "source": "Source",
       "destination": "Destination",
       "destinationPort": "Destination Port",
-      "type": "Type"
+      "type": "Type",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

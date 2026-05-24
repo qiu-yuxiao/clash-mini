@@ -1,11 +1,11 @@
 [package]
-name = "clash-verge"
-version = "2.5.2"
+name = "clash-winaero"
+version = "0.0.1"
 description = "clash verge"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
 repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
-default-run = "clash-verge"
+default-run = "clash-winaero"
 build = "build.rs"
 edition = "2024"
 rust-version = "1.95"
@@ -138,6 +138,8 @@ deelevate = { workspace = true }
 runas = "=1.2.0"
 winreg = "0.56.0"
 windows = { version = "0.62.2", features = ["Win32_Globalization"] }
+window-vibrancy = "0.6.0"
+
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2.5.1"

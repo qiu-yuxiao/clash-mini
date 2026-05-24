@@ -57,7 +57,7 @@
         "autoLaunch": "Auto Launch",
         "runningMode": "Running Mode",
         "lastCheckUpdate": "Last Check Update",
-        "vergeVersion": "Verge Version"
+        "vergeVersion": "WinAero Version"
       },
       "actions": {
         "settings": "Settings"
@@ -123,7 +123,7 @@
       "labels": {
         "rule": "Rule",
         "global": "Global",
-        "direct": "Direct"
+        "direct": "Global Direct"
       },
       "descriptions": {
         "rule": "Automatically choose proxies according to the rule set.",

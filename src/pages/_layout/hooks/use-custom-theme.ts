@@ -9,6 +9,24 @@ import { useEffect, useMemo } from 'react'
 import { useVerge } from '@/hooks/use-verge'
 import { defaultDarkTheme, defaultTheme } from '@/pages/_theme'
 import { useSetThemeMode, useThemeMode } from '@/services/states'
+import getSystem from '@/utils/get-system'
+
+const getSystemAccentColor = (): string => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return '#5b5c9d'
+  try {
+    const tempDiv = document.createElement('div')
+    tempDiv.style.color = 'AccentColor'
+    document.body.appendChild(tempDiv)
+    const resolvedColor = window.getComputedStyle(tempDiv).color
+    document.body.removeChild(tempDiv)
+    if (resolvedColor && resolvedColor !== 'rgba(0, 0, 0, 0)' && resolvedColor !== 'transparent' && resolvedColor !== 'rgb(0, 0, 0)') {
+      return resolvedColor
+    }
+  } catch (err) {
+    console.error('Failed to get system accent color:', err)
+  }
+  return '#5b5c9d'
+}
 
 const CSS_INJECTION_SCOPE_ROOT = '[data-css-injection-root]'
 const CSS_INJECTION_SCOPE_LIMIT =
@@ -146,6 +164,8 @@ export const useCustomTheme = () => {
     const dt = mode === 'light' ? defaultTheme : defaultDarkTheme
     let muiTheme: MuiTheme
 
+    const resolvedPrimary = setting.primary_color || (getSystem() === 'windows' ? getSystemAccentColor() : dt.primary_color)
+
     try {
       muiTheme = createTheme({
         breakpoints: {
@@ -153,7 +173,7 @@ export const useCustomTheme = () => {
         },
         palette: {
           mode,
-          primary: { main: setting.primary_color || dt.primary_color },
+          primary: { main: resolvedPrimary },
           secondary: { main: setting.secondary_color || dt.secondary_color },
           info: { main: setting.info_color || dt.info_color },
           error: { main: setting.error_color || dt.error_color },
@@ -164,8 +184,12 @@ export const useCustomTheme = () => {
             secondary: setting.secondary_text || dt.secondary_text,
           },
           background: {
-            paper: dt.background_color,
-            default: dt.background_color,
+            paper: getSystem() === 'windows'
+              ? (mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(30, 36, 56, 0.55)')
+              : dt.background_color,
+            default: getSystem() === 'windows'
+              ? (mode === 'light' ? 'rgba(240, 245, 255, 0.35)' : 'rgba(15, 20, 35, 0.45)')
+              : dt.background_color,
           },
         },
         shadows: Array(25).fill('none') as Shadows,
@@ -173,6 +197,34 @@ export const useCustomTheme = () => {
           fontFamily: setting.font_family
             ? `${setting.font_family}, ${dt.font_family}`
             : dt.font_family,
+          fontSize: 12,
+          htmlFontSize: 14,
+          button: {
+            fontSize: '0.8rem',
+            textTransform: 'none',
+          },
+          body1: {
+            fontSize: '0.85rem',
+            lineHeight: 1.4,
+          },
+          body2: {
+            fontSize: '0.75rem',
+            lineHeight: 1.4,
+          },
+          subtitle1: {
+            fontSize: '0.9rem',
+          },
+          subtitle2: {
+            fontSize: '0.8rem',
+          },
+          h6: {
+            fontSize: '0.95rem',
+            fontWeight: 600,
+          },
+          h5: {
+            fontSize: '1.1rem',
+            fontWeight: 600,
+          },
         },
       })
     } catch (e) {
@@ -183,7 +235,7 @@ export const useCustomTheme = () => {
         },
         palette: {
           mode,
-          primary: { main: dt.primary_color },
+          primary: { main: resolvedPrimary },
           secondary: { main: dt.secondary_color },
           info: { main: dt.info_color },
           error: { main: dt.error_color },
@@ -191,11 +243,19 @@ export const useCustomTheme = () => {
           success: { main: dt.success_color },
           text: { primary: dt.primary_text, secondary: dt.secondary_text },
           background: {
-            paper: dt.background_color,
-            default: dt.background_color,
+            paper: getSystem() === 'windows'
+              ? (mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(30, 36, 56, 0.55)')
+              : dt.background_color,
+            default: getSystem() === 'windows'
+              ? (mode === 'light' ? 'rgba(240, 245, 255, 0.35)' : 'rgba(15, 20, 35, 0.45)')
+              : dt.background_color,
           },
         },
-        typography: { fontFamily: dt.font_family },
+        typography: {
+          fontFamily: dt.font_family,
+          fontSize: 12,
+          htmlFontSize: 14,
+        },
       })
     }
 
@@ -241,6 +301,64 @@ export const useCustomTheme = () => {
           ? String(setting.background_opacity)
           : '1',
       )
+      
+      // Aero Glass Variables
+      rootEle.style.setProperty(
+        '--aero-bg',
+        mode === 'light' ? 'rgba(240, 245, 255, 0.35)' : 'rgba(15, 20, 35, 0.45)'
+      )
+      rootEle.style.setProperty(
+        '--aero-panel-bg',
+        mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(30, 36, 56, 0.55)'
+      )
+      rootEle.style.setProperty(
+        '--aero-border',
+        mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)'
+      )
+      rootEle.style.setProperty(
+        '--aero-border-outer',
+        mode === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.3)'
+      )
+      rootEle.style.setProperty(
+        '--aero-box-shadow',
+        mode === 'light'
+          ? '0 8px 32px 0 rgba(31, 38, 135, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+          : '0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
+      )
+      rootEle.style.setProperty(
+        '--aero-box-shadow-subtle',
+        mode === 'light'
+          ? '0 4px 16px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+          : '0 4px 16px 0 rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+      )
+      rootEle.style.setProperty(
+        '--aero-btn-bg',
+        mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.06)'
+      )
+      rootEle.style.setProperty(
+        '--aero-btn-hover-bg',
+        mode === 'light'
+          ? 'rgba(255, 255, 255, 0.75)'
+          : 'rgba(255, 255, 255, 0.14)'
+      )
+      rootEle.style.setProperty(
+        '--aero-btn-shadow',
+        mode === 'light'
+          ? '0 2px 4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.65)'
+          : '0 2px 4px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.22)'
+      )
+      rootEle.style.setProperty(
+        '--aero-btn-hover-shadow',
+        mode === 'light'
+          ? '0 4px 10px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85)'
+          : '0 4px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.32)'
+      )
+      rootEle.style.setProperty(
+        '--aero-btn-active-shadow',
+        mode === 'light'
+          ? '0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 2px rgba(0, 0, 0, 0.08)'
+          : '0 1px 2px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.25)'
+      )
       rootEle.setAttribute('data-css-injection-root', 'true')
     }
 
@@ -274,7 +392,7 @@ export const useCustomTheme = () => {
 
         /* 背景图处理 */
         body {
-          background-color: var(--background-color);
+          background-color: ${getSystem() === 'windows' ? 'transparent' : 'var(--background-color)'} !important;
           ${
             hasUserBackground
               ? `

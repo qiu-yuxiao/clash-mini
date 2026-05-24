@@ -41,12 +41,13 @@ export const EnhancedCard = forwardRef<HTMLElement, EnhancedCardProps>(
 
     return (
       <Box
+        className="aero-crystal-card"
         sx={{
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
           borderRadius: 2,
-          backgroundColor: isDark ? '#282a36' : '#ffffff',
+          boxShadow: 'var(--aero-box-shadow-subtle)',
         }}
         ref={ref}
       >

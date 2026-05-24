@@ -1,4 +1,4 @@
-import { Box, Button, Snackbar, useTheme } from '@mui/material'
+import { Box, Button, Popover, useTheme, alpha } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import { useImperativeHandle, useState, type Ref } from 'react'
@@ -8,50 +8,69 @@ import { closeConnection } from 'tauri-plugin-mihomo-api'
 import parseTraffic from '@/utils/parse-traffic'
 
 export interface ConnectionDetailRef {
-  open: (detail: IConnectionsItem, closed: boolean) => void
+  open: (detail: IConnectionsItem, closed: boolean, el?: HTMLElement) => void
 }
 
 export function ConnectionDetail({ ref }: { ref?: Ref<ConnectionDetailRef> }) {
   const [open, setOpen] = useState(false)
   const [detail, setDetail] = useState<IConnectionsItem>(null!)
   const [closed, setClosed] = useState(false)
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const theme = useTheme()
 
   useImperativeHandle(ref, () => ({
-    open: (detail: IConnectionsItem, closed: boolean) => {
-      if (open) return
-      setOpen(true)
+    open: (detail: IConnectionsItem, closed: boolean, el?: HTMLElement) => {
       setDetail(detail)
       setClosed(closed)
+      setAnchorEl(el || null)
+      setOpen(true)
     },
   }))
 
-  const onClose = () => setOpen(false)
+  const onClose = () => {
+    setOpen(false)
+    setAnchorEl(null)
+  }
 
   return (
-    <Snackbar
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+    <Popover
       open={open}
+      anchorEl={anchorEl}
       onClose={onClose}
-      sx={{
-        '.MuiSnackbarContent-root': {
-          maxWidth: '520px',
-          maxHeight: '480px',
-          overflowY: 'auto',
-          backgroundColor: theme.palette.background.paper,
-          color: theme.palette.text.primary,
-        },
+      anchorOrigin={{
+        vertical: 'bottom',
+        horizontal: 'left',
       }}
-      message={
-        detail ? (
-          <InnerConnectionDetail
-            data={detail}
-            closed={closed}
-            onClose={onClose}
-          />
-        ) : null
-      }
-    />
+      transformOrigin={{
+        vertical: 'top',
+        horizontal: 'left',
+      }}
+      slotProps={{
+        paper: {
+          sx: {
+            maxWidth: '520px',
+            maxHeight: '480px',
+            overflowY: 'auto',
+            background: (theme: any) => alpha(theme.palette.background.paper, 0.8),
+            backdropFilter: 'blur(12px)',
+            border: '1px solid',
+            borderColor: (theme: any) => alpha(theme.palette.divider, 0.5),
+            boxShadow: (theme: any) => `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,
+            borderRadius: 2,
+            p: 2.5,
+            color: (theme: any) => theme.palette.text.primary,
+          }
+        }
+      }}
+    >
+      {detail ? (
+        <InnerConnectionDetail
+          data={detail}
+          closed={closed}
+          onClose={onClose}
+        />
+      ) : null}
+    </Popover>
   )
 }
 
@@ -126,30 +145,34 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const onDelete = useLockFn(async () => closeConnection(data.id))
 
   return (
-    <Box sx={{ userSelect: 'text', color: theme.palette.text.secondary }}>
+    <Box sx={{ userSelect: 'text', color: theme.palette.text.secondary, fontSize: '12px', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
       {information.map((each) => (
-        <div key={each.label}>
-          <b>{each.label}</b>
+        <Box key={each.label} sx={{ display: 'flex', gap: 1 }}>
+          <b style={{ minWidth: 100, display: 'inline-block' }}>{each.label}:</b>
           <span
             style={{
               wordBreak: 'break-all',
               color: theme.palette.text.primary,
+              flex: 1,
             }}
           >
-            : {each.value}
+            {each.value}
           </span>
-        </div>
+        </Box>
       ))}
 
       {!closed && (
-        <Box sx={{ textAlign: 'right' }}>
+        <Box sx={{ textAlign: 'right', mt: 1.5 }}>
           <Button
             variant="contained"
+            color="error"
+            size="small"
             title={t('connections.components.actions.closeConnection')}
             onClick={() => {
               onDelete()
               onClose?.()
             }}
+            sx={{ textTransform: 'none', borderRadius: 1 }}
           >
             {t('connections.components.actions.closeConnection')}
           </Button>

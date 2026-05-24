@@ -57,7 +57,7 @@
         "autoLaunch": "開機自啟",
         "runningMode": "執行模式",
         "lastCheckUpdate": "最後檢查更新",
-        "vergeVersion": "Verge 版本"
+        "vergeVersion": "WinAero 版本"
       },
       "actions": {
         "settings": "設定"
@@ -123,7 +123,7 @@
       "labels": {
         "rule": "規則",
         "global": "全域",
-        "direct": "直連"
+        "direct": "全局直連"
       },
       "descriptions": {
         "rule": "依照規則自動選擇代理。",

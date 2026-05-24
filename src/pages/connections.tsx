@@ -249,8 +249,8 @@ const ConnectionsPage = () => {
       ) : isTableLayout ? (
         <ConnectionTable
           connections={filterConn}
-          onShowDetail={(detail) =>
-            detailRef.current?.open(detail, connectionsType === 'closed')
+          onShowDetail={(detail, el) =>
+            detailRef.current?.open(detail, connectionsType === 'closed', el)
           }
           columnManagerOpen={isTableLayout && isColumnManagerOpen}
           onCloseColumnManager={() => setIsColumnManagerOpen(false)}
@@ -263,10 +263,11 @@ const ConnectionsPage = () => {
             <ConnectionItem
               value={filterConn[i]}
               closed={connectionsType === 'closed'}
-              onShowDetail={() =>
+              onShowDetail={(el) =>
                 detailRef.current?.open(
                   filterConn[i],
                   connectionsType === 'closed',
+                  el,
                 )
               }
             />

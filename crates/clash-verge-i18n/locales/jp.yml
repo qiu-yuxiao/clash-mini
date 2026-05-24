@@ -22,18 +22,18 @@ notifications:
     body: プロファイルが再有効化されました。
   appQuit:
     title: 終了間近
-    body: Clash Verge はまもなく終了します。
+    body: Clash WinAero はまもなく終了します。
   appHidden:
     title: アプリが非表示
-    body: Clash Verge はバックグラウンドで実行中です。
+    body: Clash WinAero はバックグラウンドで実行中です。
   updateReady:
-    title: Clash Verge Update
+    title: Clash WinAero Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash Verge サービスのインストールには管理者権限が必要です。
-  adminUninstallPrompt: Clash Verge サービスのアンインストールには管理者権限が必要です。
+  adminInstallPrompt: Clash WinAero サービスのインストールには管理者権限が必要です。
+  adminUninstallPrompt: Clash WinAero サービスのアンインストールには管理者権限が必要です。
 tray:
   dashboard: ダッシュボード
   ruleMode: ルールモード
@@ -48,7 +48,6 @@ tray:
   systemProxy: システムプロキシ
   tunMode: TUN モード
   closeAllConnections: すべての接続を閉じる
-  lightweightMode: 軽量モード
   copyEnv: 環境変数をコピー
   confDir: 設定ディレクトリ
   coreDir: コアディレクトリ

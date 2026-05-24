@@ -22,18 +22,18 @@ notifications:
     body: Profile Reactivated.
   appQuit:
     title: About to Exit
-    body: Clash Verge is about to exit.
+    body: Clash WinAero is about to exit.
   appHidden:
     title: Application Hidden
-    body: Clash Verge is running in the background.
+    body: Clash WinAero is running in the background.
   updateReady:
-    title: Clash Verge Update
+    title: Clash WinAero Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Installing the Clash Verge service requires administrator privileges.
-  adminUninstallPrompt: Uninstalling the Clash Verge service requires administrator privileges.
+  adminInstallPrompt: Installing the Clash WinAero service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the Clash WinAero service requires administrator privileges.
 tray:
   dashboard: Dashboard
   ruleMode: Rule Mode
@@ -48,7 +48,6 @@ tray:
   systemProxy: System Proxy
   tunMode: TUN Mode
   closeAllConnections: Close All Connections
-  lightweightMode: Lightweight Mode
   copyEnv: Copy Environment Variables
   confDir: Configuration Directory
   coreDir: Core Directory
@@ -58,7 +57,7 @@ tray:
   coreLog: Core Log
   restartClash: Restart Clash Core
   restartApp: Restart Application
-  vergeVersion: Verge Version
+  vergeVersion: WinAero Version
   more: More
   exit: Exit
   tooltip:

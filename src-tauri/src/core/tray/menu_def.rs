@@ -35,7 +35,6 @@ define_menu! {
     system_proxy => SYSTEM_PROXY, "tray_system_proxy", "tray.systemProxy",
     tun_mode => TUN_MODE, "tray_tun_mode", "tray.tunMode",
     close_all_connections => CLOSE_ALL_CONNECTIONS, "tray_close_all_connections", "tray.closeAllConnections",
-    lightweight_mode => LIGHTWEIGHT_MODE, "tray_lightweight_mode", "tray.lightweightMode",
     copy_env => COPY_ENV, "tray_copy_env", "tray.copyEnv",
     conf_dir => CONF_DIR, "tray_conf_dir", "tray.confDir",
     core_dir => CORE_DIR, "tray_core_dir", "tray.coreDir",

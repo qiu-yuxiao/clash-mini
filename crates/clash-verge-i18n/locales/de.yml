@@ -22,18 +22,18 @@ notifications:
     body: Profil reaktiviert.
   appQuit:
     title: Beenden steht bevor
-    body: Clash Verge wird gleich beendet.
+    body: Clash WinAero wird gleich beendet.
   appHidden:
     title: Anwendung ausgeblendet
-    body: Clash Verge läuft im Hintergrund.
+    body: Clash WinAero läuft im Hintergrund.
   updateReady:
-    title: Clash Verge Update
+    title: Clash WinAero Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Für die Installation des Clash-Verge-Dienstes sind Administratorrechte erforderlich.
-  adminUninstallPrompt: Für die Deinstallation des Clash-Verge-Dienstes sind Administratorrechte erforderlich.
+  adminInstallPrompt: Für die Installation des Clash-WinAero-Dienstes sind Administratorrechte erforderlich.
+  adminUninstallPrompt: Für die Deinstallation des Clash-WinAero-Dienstes sind Administratorrechte erforderlich.
 tray:
   dashboard: Übersicht
   ruleMode: Regelmodus
@@ -48,7 +48,6 @@ tray:
   systemProxy: Systemproxy
   tunMode: TUN-Modus
   closeAllConnections: Alle Verbindungen schließen
-  lightweightMode: Leichtmodus
   copyEnv: Umgebungsvariablen kopieren
   confDir: Konfigurationsverzeichnis
   coreDir: Core-Verzeichnis

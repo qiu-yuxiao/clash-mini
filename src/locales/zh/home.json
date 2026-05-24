@@ -57,7 +57,7 @@
         "autoLaunch": "开机自启",
         "runningMode": "运行模式",
         "lastCheckUpdate": "最后检查更新",
-        "vergeVersion": "Verge 版本"
+        "vergeVersion": "WinAero 版本"
       },
       "actions": {
         "settings": "设置"
@@ -123,7 +123,7 @@
       "labels": {
         "rule": "规则",
         "global": "全局",
-        "direct": "直连"
+        "direct": "全局直连"
       },
       "descriptions": {
         "rule": "基于预设规则智能判断流量走向，提供灵活的代理策略",

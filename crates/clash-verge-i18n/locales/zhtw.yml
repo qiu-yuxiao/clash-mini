@@ -22,18 +22,18 @@ notifications:
     body: 訂閱已啟用。
   appQuit:
     title: 即將退出
-    body: Clash Verge 即將退出。
+    body: Clash WinAero 即將退出。
   appHidden:
     title: 應用已隱藏
-    body: Clash Verge 正在背景執行。
+    body: Clash WinAero 正在背景執行。
   updateReady:
-    title: Clash Verge Update
+    title: Clash WinAero Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: 安裝 Clash Verge 服務需要管理員權限
-  adminUninstallPrompt: 卸载 Clash Verge 服務需要管理員權限
+  adminInstallPrompt: 安裝 Clash WinAero 服務需要管理員權限
+  adminUninstallPrompt: 卸载 Clash WinAero 服務需要管理員權限
 tray:
   dashboard: 儀表板
   ruleMode: 規則模式
@@ -48,7 +48,6 @@ tray:
   systemProxy: 系統代理
   tunMode: 虛擬網路介面卡模式
   closeAllConnections: 關閉所有連線
-  lightweightMode: 輕量模式
   copyEnv: 複製環境變數
   confDir: 設定目錄
   coreDir: 核心目錄
@@ -58,7 +57,7 @@ tray:
   coreLog: 核心日誌
   restartClash: 重新啟動 Clash 核心
   restartApp: 重新啟動應用程式
-  vergeVersion: Verge 版本
+  vergeVersion: WinAero 版本
   more: 更多
   exit: 離開
   tooltip:

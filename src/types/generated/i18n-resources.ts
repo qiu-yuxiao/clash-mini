@@ -15,6 +15,7 @@ export interface TranslationResources {
           title: string
         }
         fields: {
+          actions: string
           chains: string
           destination: string
           destinationPort: string

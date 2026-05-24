@@ -22,18 +22,18 @@ notifications:
     body: Profil diaktifkan kembali.
   appQuit:
     title: Akan Keluar
-    body: Clash Verge akan keluar.
+    body: Clash WinAero akan keluar.
   appHidden:
     title: Aplikasi Disembunyikan
-    body: Clash Verge berjalan di latar belakang.
+    body: Clash WinAero berjalan di latar belakang.
   updateReady:
-    title: Clash Verge Update
+    title: Clash WinAero Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Menginstal layanan Clash Verge memerlukan hak administrator.
-  adminUninstallPrompt: Menghapus instalasi layanan Clash Verge memerlukan hak administrator.
+  adminInstallPrompt: Menginstal layanan Clash WinAero memerlukan hak administrator.
+  adminUninstallPrompt: Menghapus instalasi layanan Clash WinAero memerlukan hak administrator.
 tray:
   dashboard: Dasbor
   ruleMode: Mode Aturan
@@ -48,7 +48,6 @@ tray:
   systemProxy: Proksi Sistem
   tunMode: Mode TUN
   closeAllConnections: Tutup Semua Koneksi
-  lightweightMode: Mode Ringan
   copyEnv: Salin Variabel Lingkungan
   confDir: Direktori Konfigurasi
   coreDir: Direktori Core

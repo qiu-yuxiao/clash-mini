@@ -14,7 +14,8 @@
       "source": "Исходный адрес",
       "destination": "IP-адрес назначения",
       "destinationPort": "Порт назначения",
-      "type": "Тип"
+      "type": "Тип",
+      "actions": "Actions"
     },
     "order": {
       "default": "По умолчанию",

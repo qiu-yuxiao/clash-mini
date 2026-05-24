@@ -1,4 +1,16 @@
-import { Box } from '@mui/material'
+import { Box, Button, IconButton, Menu, MenuItem, useTheme, alpha } from '@mui/material'
+import {
+  CloseRounded,
+  FlashOnRounded,
+  PublicRounded,
+  LinkOffRounded,
+  ContentCopyRounded,
+  InfoOutlined,
+} from '@mui/icons-material'
+import { useLockFn } from 'ahooks'
+import { closeConnection } from 'tauri-plugin-mihomo-api'
+import { addQuickRoutingRule } from '@/utils/quick-routing'
+import { showNotice } from '@/services/notice-service'
 import {
   ColumnDef,
   ColumnOrderState,
@@ -32,7 +44,7 @@ import { truncateStr } from '@/utils/truncate-str'
 
 import { ConnectionColumnManager } from './connection-column-manager'
 
-const ROW_HEIGHT = 40
+const ROW_HEIGHT = 28
 
 type TickListener = () => void
 let _tickNow = Date.now()
@@ -76,6 +88,8 @@ const RelativeTimeCell = memo(function RelativeTimeCell({
   const now = useSyncExternalStore(tickStore.subscribe, tickStore.getSnapshot)
   return <>{dayjs(start).from(now)}</>
 })
+
+
 
 const SX_OUTER: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
@@ -150,7 +164,7 @@ const SX_HEADER_CELL_BASE: React.ComponentProps<typeof Box>['sx'] = {
 const SX_DATA_CELL_BASE: React.ComponentProps<typeof Box>['sx'] = {
   boxSizing: 'border-box',
   px: 1,
-  fontSize: 13,
+  fontSize: '11.5px',
   display: 'flex',
   alignItems: 'center',
   whiteSpace: 'nowrap',
@@ -234,7 +248,8 @@ interface RowComponentProps {
   row: Row<IConnectionsItem>
   virtualStart: number
   virtualSize: number
-  onShowDetail: (data: IConnectionsItem) => void
+  onShowDetail: (data: IConnectionsItem, el?: HTMLElement) => void
+  onContextMenu: (event: React.MouseEvent, row: IConnectionsItem) => void
 }
 
 const RowComponent = memo(
@@ -243,10 +258,18 @@ const RowComponent = memo(
     virtualStart,
     virtualSize,
     onShowDetail,
+    onContextMenu,
   }: RowComponentProps) {
     const handleClick = useCallback(
-      () => onShowDetail(row.original),
+      (e: React.MouseEvent<HTMLDivElement>) => onShowDetail(row.original, e.currentTarget),
       [onShowDetail, row.original],
+    )
+
+    const handleContextMenu = useCallback(
+      (e: React.MouseEvent) => {
+        onContextMenu(e, row.original)
+      },
+      [onContextMenu, row.original],
     )
 
     return (
@@ -256,9 +279,14 @@ const RowComponent = memo(
           {
             height: virtualSize,
             transform: `translateY(${virtualStart}px)`,
+            backgroundColor:
+              row.index % 2 === 0
+                ? 'transparent'
+                : (theme) => alpha(theme.palette.action.hover, 0.4),
           },
         ]}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
       >
         {row.getVisibleCells().map((cell) => {
           const meta = cell.column.columnDef.meta as {
@@ -289,12 +317,13 @@ const RowComponent = memo(
     prev.row === next.row &&
     prev.virtualStart === next.virtualStart &&
     prev.virtualSize === next.virtualSize &&
-    prev.onShowDetail === next.onShowDetail,
+    prev.onShowDetail === next.onShowDetail &&
+    prev.onContextMenu === next.onContextMenu,
 )
 
 interface Props {
   connections: IConnectionsItem[]
-  onShowDetail: (data: IConnectionsItem) => void
+  onShowDetail: (data: IConnectionsItem, el?: HTMLElement) => void
   columnManagerOpen: boolean
   onCloseColumnManager: () => void
 }
@@ -309,10 +338,97 @@ export const ConnectionTable = (props: Props) => {
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
   const onShowDetail = useCallback(
-    (data: IConnectionsItem) => onShowDetailRef.current(data),
+    (data: IConnectionsItem, el?: HTMLElement) => onShowDetailRef.current(data, el),
     [],
   )
   const { t } = useTranslation()
+
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number
+    mouseY: number
+    row: IConnectionsItem
+    anchorEl: HTMLElement
+  } | null>(null)
+
+  const handleContextMenu = useCallback((event: React.MouseEvent, row: IConnectionsItem) => {
+    event.preventDefault()
+    setContextMenu({
+      mouseX: event.clientX + 2,
+      mouseY: event.clientY - 6,
+      row,
+      anchorEl: event.currentTarget as HTMLElement,
+    })
+  }, [])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  const handleDirect = useCallback(async () => {
+    if (!contextMenu) return
+    const { row } = contextMenu
+    const { metadata } = row
+    setContextMenu(null)
+    if (metadata.process) {
+      await addQuickRoutingRule('process', metadata.process, 'DIRECT')
+    } else if (metadata.host) {
+      await addQuickRoutingRule('domain', metadata.host, 'DIRECT')
+    } else if (metadata.destinationIP) {
+      await addQuickRoutingRule('domain', metadata.destinationIP, 'DIRECT')
+    }
+  }, [contextMenu])
+
+  const handleProxy = useCallback(async () => {
+    if (!contextMenu) return
+    const { row } = contextMenu
+    const { metadata } = row
+    setContextMenu(null)
+    if (metadata.process) {
+      await addQuickRoutingRule('process', metadata.process, 'PROXY')
+    } else if (metadata.host) {
+      await addQuickRoutingRule('domain', metadata.host, 'PROXY')
+    } else if (metadata.destinationIP) {
+      await addQuickRoutingRule('domain', metadata.destinationIP, 'PROXY')
+    }
+  }, [contextMenu])
+
+  const handleDisconnect = useCallback(async () => {
+    if (!contextMenu) return
+    const { row } = contextMenu
+    setContextMenu(null)
+    try {
+      await closeConnection(row.id)
+    } catch (err) {
+      console.error(err)
+    }
+  }, [contextMenu])
+
+  const handleCopy = useCallback(async () => {
+    if (!contextMenu) return
+    const { row } = contextMenu
+    setContextMenu(null)
+    const host = row.metadata.host || row.metadata.remoteDestination
+    const port = row.metadata.destinationPort
+    const address = (port ? `${host}:${port}` : host) || ''
+    try {
+      await navigator.clipboard.writeText(address)
+      showNotice.success(
+        'connections.copied',
+        `已复制: ${address}`,
+        2000
+      )
+    } catch (err) {
+      console.error('Failed to copy connection address:', err)
+    }
+  }, [contextMenu])
+
+  const handleDetail = useCallback(() => {
+    if (!contextMenu) return
+    const { row, anchorEl } = contextMenu
+    setContextMenu(null)
+    onShowDetail(row, anchorEl)
+  }, [contextMenu, onShowDetail])
+
   const [columnWidths, setColumnWidths] = useLocalStorage<ColumnSizingState>(
     'connection-table-widths',
     {},
@@ -321,7 +437,16 @@ export const ConnectionTable = (props: Props) => {
   const [columnVisibilityModel, setColumnVisibilityModel] =
     useLocalStorage<VisibilityState>(
       'connection-table-visibility',
-      {},
+      {
+        download: false,
+        upload: false,
+        dlSpeed: false,
+        ulSpeed: false,
+        time: false,
+        source: false,
+        remoteDestination: false,
+        type: false,
+      },
       {
         serializer: JSON.stringify,
         deserializer: (value) => {
@@ -331,7 +456,16 @@ export const ConnectionTable = (props: Props) => {
           } catch (err) {
             console.warn('Failed to parse connection-table-visibility', err)
           }
-          return {}
+          return {
+            download: false,
+            upload: false,
+            dlSpeed: false,
+            ulSpeed: false,
+            time: false,
+            source: false,
+            remoteDestination: false,
+            type: false,
+          }
         },
       },
     )
@@ -712,6 +846,7 @@ export const ConnectionTable = (props: Props) => {
                     virtualStart={virtualRow.start}
                     virtualSize={virtualRow.size}
                     onShowDetail={onShowDetail}
+                    onContextMenu={handleContextMenu}
                   />
                 )
               })}
@@ -726,6 +861,52 @@ export const ConnectionTable = (props: Props) => {
         onOrderChange={handleManagerOrderChange}
         onReset={handleResetColumns}
       />
+
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+        slotProps={{
+          paper: {
+            sx: {
+              background: (theme: any) => alpha(theme.palette.background.paper, 0.8),
+              backdropFilter: 'blur(12px)',
+              border: '1px solid',
+              borderColor: (theme: any) => alpha(theme.palette.divider, 0.5),
+              borderRadius: 1.5,
+              boxShadow: (theme: any) => `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,
+              minWidth: 200,
+              py: 0.5,
+            }
+          }
+        }}
+      >
+        <MenuItem onClick={handleDirect} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+          <FlashOnRounded sx={{ fontSize: 18, color: 'success.main' }} />
+          设为全局直连
+        </MenuItem>
+        <MenuItem onClick={handleProxy} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+          <PublicRounded sx={{ fontSize: 18, color: 'primary.main' }} />
+          设为代理分流
+        </MenuItem>
+        <MenuItem onClick={handleDisconnect} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+          <LinkOffRounded sx={{ fontSize: 18, color: 'error.main' }} />
+          断开此连接
+        </MenuItem>
+        <MenuItem onClick={handleCopy} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+          <ContentCopyRounded sx={{ fontSize: 18, color: 'text.secondary' }} />
+          复制连接地址
+        </MenuItem>
+        <MenuItem onClick={handleDetail} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+          <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary' }} />
+          查看详细信息
+        </MenuItem>
+      </Menu>
     </>
   )
 }

@@ -31,7 +31,7 @@
       "status": {
         "systemProxyEnabled": "Системный прокси включён — приложения используют его для доступа в сеть",
         "systemProxyDisabled": "Системный прокси отключён — большинству пользователей рекомендуется его включить",
-        "tunModeServiceRequired": "Режим TUN требует установленной службы Clash Verge",
+        "tunModeServiceRequired": "Режим TUN требует установленной службы Clash WinAero",
         "tunModeEnabled": "Режим TUN включён — приложения используют виртуальный сетевой интерфейс",
         "tunModeDisabled": "Режим TUN отключён"
       },
@@ -57,7 +57,7 @@
         "autoLaunch": "Автозапуск",
         "runningMode": "Режим работы",
         "lastCheckUpdate": "Последняя проверка обновлений",
-        "vergeVersion": "Версия Clash Verge Rev"
+        "vergeVersion": "Версия Clash WinAero Rev"
       },
       "actions": {
         "settings": "Настройки"

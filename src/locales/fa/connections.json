@@ -14,7 +14,8 @@
       "source": "منبع",
       "destination": "آدرس IP مقصد",
       "destinationPort": "بندر هدف",
-      "type": "نوع"
+      "type": "نوع",
+      "actions": "Actions"
     },
     "order": {
       "default": "Default",

@@ -35,7 +35,7 @@ export const useSystemProxyState = () => {
       return autoproxy.url === `http://${host}:${pacPort}/commands/pac`
     } else {
       if (!sysproxy?.enable) return false
-      const port = verge_mixed_port || clashConfig?.mixedPort || 7897
+      const port = verge_mixed_port || clashConfig?.mixedPort || 10801
       return sysproxy.server === `${host}:${port}`
     }
   })()
