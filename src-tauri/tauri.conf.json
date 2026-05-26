@@ -22,7 +22,7 @@
   "build": {
     "beforeBuildCommand": "pnpm run web:build",
     "frontendDist": "../dist",
-    "beforeDevCommand": "pnpm run web:dev",
+    "beforeDevCommand": "node node_modules/vite/bin/vite.js",
     "devUrl": "http://localhost:3000/",
     "removeUnusedCommands": true
   },

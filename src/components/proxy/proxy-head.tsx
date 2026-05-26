@@ -1,15 +1,13 @@
 import {
-  AccessTimeRounded,
-  MyLocationRounded,
-  NetworkCheckRounded,
-  FilterAltRounded,
-  FilterAltOffRounded,
-  VisibilityRounded,
-  VisibilityOffRounded,
-  WifiTetheringRounded,
-  WifiTetheringOffRounded,
-  SortByAlphaRounded,
-  SortRounded,
+  MyLocationOutlined,
+  BoltOutlined,
+  SortOutlined,
+  AccessTimeOutlined,
+  SortByAlphaOutlined,
+  LinkOutlined,
+  VisibilityOutlined,
+  VisibilityOffOutlined,
+  FilterListOutlined,
 } from '@mui/icons-material'
 import { Box, IconButton, TextField, SxProps } from '@mui/material'
 import { useEffect, useState } from 'react'
@@ -74,14 +72,15 @@ export const ProxyHead = ({
   }, [groupName, testUrl, defaultLatencyUrl, url])
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ...sx }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, borderBottom: (theme) => `1px solid ${theme.palette.divider}`, pb: 0.5, mb: 0.5, ...sx }}>
       <IconButton
         size="small"
         color="inherit"
         title={t('proxies.page.tooltips.locate')}
         onClick={onLocation}
+        sx={{ width: 22, height: 22, p: 0 }}
       >
-        <MyLocationRounded />
+        <MyLocationOutlined sx={{ fontSize: 13 }} />
       </IconButton>
 
       <IconButton
@@ -90,15 +89,15 @@ export const ProxyHead = ({
         title={t('proxies.page.tooltips.delayCheck')}
         onClick={() => {
           debugLog(`[ProxyHead] 点击延迟测试按钮，组: ${groupName}`)
-          // Remind the user that it is custom test url
           if (testUrl?.trim() && textState !== 'filter') {
             debugLog(`[ProxyHead] 使用自定义测试URL: ${testUrl}`)
             onHeadState({ textState: 'url' })
           }
           onCheckDelay()
         }}
+        sx={{ width: 22, height: 22, p: 0 }}
       >
-        <NetworkCheckRounded />
+        <BoltOutlined sx={{ fontSize: 13 }} />
       </IconButton>
 
       <IconButton
@@ -114,10 +113,11 @@ export const ProxyHead = ({
         onClick={() =>
           onHeadState({ sortType: ((sortType + 1) % 3) as ProxySortType })
         }
+        sx={{ width: 22, height: 22, p: 0 }}
       >
-        {sortType !== 1 && sortType !== 2 && <SortRounded />}
-        {sortType === 1 && <AccessTimeRounded />}
-        {sortType === 2 && <SortByAlphaRounded />}
+        {sortType !== 1 && sortType !== 2 && <SortOutlined sx={{ fontSize: 13 }} />}
+        {sortType === 1 && <AccessTimeOutlined sx={{ fontSize: 13 }} />}
+        {sortType === 2 && <SortByAlphaOutlined sx={{ fontSize: 13 }} />}
       </IconButton>
 
       <IconButton
@@ -127,12 +127,9 @@ export const ProxyHead = ({
         onClick={() =>
           onHeadState({ textState: textState === 'url' ? null : 'url' })
         }
+        sx={{ width: 22, height: 22, p: 0 }}
       >
-        {textState === 'url' ? (
-          <WifiTetheringRounded />
-        ) : (
-          <WifiTetheringOffRounded />
-        )}
+        <LinkOutlined sx={{ fontSize: 13, opacity: textState === 'url' ? 1 : 0.6 }} />
       </IconButton>
 
       <IconButton
@@ -144,8 +141,9 @@ export const ProxyHead = ({
             : t('proxies.page.tooltips.showDetail')
         }
         onClick={() => onHeadState({ showType: !showType })}
+        sx={{ width: 22, height: 22, p: 0 }}
       >
-        {showType ? <VisibilityRounded /> : <VisibilityOffRounded />}
+        {showType ? <VisibilityOutlined sx={{ fontSize: 13 }} /> : <VisibilityOffOutlined sx={{ fontSize: 13 }} />}
       </IconButton>
 
       <IconButton
@@ -155,16 +153,13 @@ export const ProxyHead = ({
         onClick={() =>
           onHeadState({ textState: textState === 'filter' ? null : 'filter' })
         }
+        sx={{ width: 22, height: 22, p: 0 }}
       >
-        {textState === 'filter' ? (
-          <FilterAltRounded />
-        ) : (
-          <FilterAltOffRounded />
-        )}
+        <FilterListOutlined sx={{ fontSize: 13, opacity: textState === 'filter' ? 1 : 0.6 }} />
       </IconButton>
 
       {textState === 'filter' && (
-        <Box sx={{ ml: 0.5, flex: '1 1 auto' }}>
+        <Box sx={{ ml: 0.5, flex: '1 1 auto', height: 20, '& input': { py: 0.2, px: 0.5, fontSize: 10 } }}>
           <BaseSearchBox
             autoFocus={autoFocus}
             value={filterText}
@@ -187,16 +182,15 @@ export const ProxyHead = ({
 
       {textState === 'url' && (
         <TextField
-          autoComplete="new-password"
+          autoComplete="off"
           autoFocus={autoFocus}
           hiddenLabel
-          autoSave="off"
           value={testUrl}
           size="small"
           variant="outlined"
           placeholder={t('proxies.page.placeholders.delayCheckUrl')}
           onChange={(e) => onHeadState({ testUrl: e.target.value })}
-          sx={{ ml: 0.5, flex: '1 1 auto', input: { py: 0.65, px: 1 } }}
+          sx={{ ml: 0.5, flex: '1 1 auto', '& input': { py: 0.2, px: 0.5, fontSize: 10, height: 16 } }}
         />
       )}
     </Box>

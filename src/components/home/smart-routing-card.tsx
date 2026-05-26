@@ -10,11 +10,10 @@ import {
   alpha,
   useTheme,
 } from '@mui/material'
-import React, { useEffect, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import yaml from 'js-yaml'
+import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
-import { EnhancedCard } from './enhanced-card'
 import {
   getProfiles,
   readProfileFile,
@@ -25,18 +24,10 @@ import {
 } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
-// 定义规则集模板
-const GFWLIST_PROVIDER_YAML = `rule-providers:
-  gfwlist:
-    type: http
-    behavior: domain
-    url: "https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt"
-    path: ./ruleset/gfwlist.yaml
-    interval: 86400
-`
+import { EnhancedCard } from './enhanced-card'
 
 export const SmartRoutingCard = () => {
-  const { t } = useTranslation()
+  useTranslation()
   const theme = useTheme()
   const [loading, setLoading] = useState(false)
   const [routingMode, setRoutingMode] = useState<string>(() => {
@@ -102,17 +93,20 @@ export const SmartRoutingCard = () => {
         const isChinaRule =
           rule.includes('GEOSITE,cn') ||
           rule.includes('GEOIP,cn') ||
-          rule.includes('MATCH,Proxy')
+          rule.startsWith('MATCH,')
         return !isGfwRule && !isChinaRule
       })
 
       // 3. 根据所选模式生成新的 rules prepend，并调用内核 mode 修改
-      let newPrepend = [...userCustomRules]
+      const newPrepend = [...userCustomRules]
 
       if (mode === 'gfwlist') {
         // GFWList 模式
         await patchClashMode('rule')
         const mainProxyGroup = await findMainProxyGroup()
+        newPrepend.push(`GEOSITE,google,${mainProxyGroup}`)
+        newPrepend.push(`GEOSITE,github,${mainProxyGroup}`)
+        newPrepend.push(`GEOSITE,telegram,${mainProxyGroup}`)
         newPrepend.push(`RULE-SET,gfwlist,${mainProxyGroup}`)
         newPrepend.push('MATCH,DIRECT')
 
@@ -121,25 +115,25 @@ export const SmartRoutingCard = () => {
           const mergeYaml = await readProfileFile('Merge')
           const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
           
-          if (!mergeObj['rule-providers'] || !mergeObj['rule-providers'].gfwlist) {
-            mergeObj['rule-providers'] = mergeObj['rule-providers'] || {}
-            mergeObj['rule-providers'].gfwlist = {
-              type: 'http',
-              behavior: 'domain',
-              url: 'https://raw.githubusercontent.com/Loyalsoldier/clash-rules/release/gfw.txt',
-              path: './ruleset/gfwlist.yaml',
-              interval: 86400,
-            }
-            await saveProfileFile('Merge', yaml.dump(mergeObj))
+          mergeObj['rule-providers'] = mergeObj['rule-providers'] || {}
+          mergeObj['rule-providers'].gfwlist = {
+            type: 'http',
+            behavior: 'domain',
+            url: 'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt',
+            path: './ruleset/gfwlist.yaml',
+            interval: 86400,
           }
+          await saveProfileFile('Merge', yaml.dump(mergeObj))
         } catch (mergeErr) {
           console.warn('Failed to inject rule-providers into Merge:', mergeErr)
         }
       } else if (mode === 'bypass-china') {
         // 绕过大陆模式
         await patchClashMode('rule')
+        const mainProxyGroup = await findMainProxyGroup()
         newPrepend.push('GEOSITE,cn,DIRECT')
         newPrepend.push('GEOIP,cn,DIRECT,no-resolve')
+        newPrepend.push(`MATCH,${mainProxyGroup}`)
       } else if (mode === 'global') {
         // 全局代理
         await patchClashMode('global')
@@ -164,18 +158,11 @@ export const SmartRoutingCard = () => {
     }
   }
 
-  // 同步初始化模式
-  useEffect(() => {
-    // 首次载入时，如果与本地存储不一致，则重新应用一次
-    const stored = localStorage.getItem('verge_smart_routing_mode')
-    if (stored && stored !== routingMode) {
-      setRoutingMode(stored)
-    }
-  }, [])
+
 
   return (
     <EnhancedCard
-      title="智能分流中心"
+      title="智能路由中心"
       icon={<RouterOutlined />}
       iconColor="success"
       action={
@@ -197,7 +184,7 @@ export const SmartRoutingCard = () => {
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', gap: 1.5 }}>
         <Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5, fontSize: 13 }}>
-            系统级智能网络分流，国内流量自动绕过，海外流量及被墙站点智能分流。
+            系统级智能网络路由，国内流量自动绕过，海外流量及被墙站点智能代理。
           </Typography>
 
           <FormControl fullWidth size="small">
@@ -230,7 +217,7 @@ export const SmartRoutingCard = () => {
                 🌐 全局代理模式
               </MenuItem>
               <MenuItem value="direct" sx={{ fontSize: 14, fontWeight: 500 }}>
-                🔌 完全直连模式
+                🔌 全局直连模式
               </MenuItem>
             </Select>
           </FormControl>
@@ -254,8 +241,8 @@ export const SmartRoutingCard = () => {
             状态正常：
             {routingMode === 'bypass-china' && '绕过大陆智能直连生效中'}
             {routingMode === 'gfwlist' && 'GFWList 黑名单过滤已生效'}
-            {routingMode === 'global' && '全局接管中 (不进行分流)'}
-            {routingMode === 'direct' && '直连中 (绕过所有代理)'}
+            {routingMode === 'global' && '全局接管中 (不进行策略分发)'}
+            {routingMode === 'direct' && '全局直连中 (绕过所有代理)'}
           </Typography>
         </Box>
       </Box>

@@ -141,7 +141,7 @@ const HomeSettingsDialog = ({
                 onChange={() => handleToggle('smartRouting')}
               />
             }
-            label="智能分流中心"
+            label="智能路由中心"
           />
           <FormControlLabel
             control={

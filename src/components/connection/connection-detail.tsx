@@ -16,7 +16,6 @@ export function ConnectionDetail({ ref }: { ref?: Ref<ConnectionDetailRef> }) {
   const [detail, setDetail] = useState<IConnectionsItem>(null!)
   const [closed, setClosed] = useState(false)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
-  const theme = useTheme()
 
   useImperativeHandle(ref, () => ({
     open: (detail: IConnectionsItem, closed: boolean, el?: HTMLElement) => {
@@ -51,8 +50,7 @@ export function ConnectionDetail({ ref }: { ref?: Ref<ConnectionDetailRef> }) {
             maxWidth: '520px',
             maxHeight: '480px',
             overflowY: 'auto',
-            background: (theme: any) => alpha(theme.palette.background.paper, 0.8),
-            backdropFilter: 'blur(12px)',
+            background: (theme: any) => theme.palette.background.paper,
             border: '1px solid',
             borderColor: (theme: any) => alpha(theme.palette.divider, 0.5),
             boxShadow: (theme: any) => `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,

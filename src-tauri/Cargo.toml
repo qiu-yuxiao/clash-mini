@@ -24,7 +24,7 @@ clippy = ["tauri/test"]
 tracing = []
 
 [package.metadata.bundle]
-identifier = "io.github.clash-verge-rev.clash-verge-rev"
+identifier = "io.github.clash-winaero.clash-winaero"
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }

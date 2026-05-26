@@ -13,9 +13,9 @@ pub mod network {
         pub const DEFAULT_HTTP: u16 = 10803;
 
         #[cfg(not(feature = "verge-dev"))]
-        pub const SINGLETON_SERVER: u16 = 33332;
+        pub const SINGLETON_SERVER: u16 = 33335;
         #[cfg(feature = "verge-dev")]
-        pub const SINGLETON_SERVER: u16 = 11234;
+        pub const SINGLETON_SERVER: u16 = 33336;
     }
 }
 

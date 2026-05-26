@@ -66,6 +66,7 @@ export interface IRenderItem {
   icon?: string
   provider?: string
   testUrl?: string
+  indexInGroup?: number
 }
 
 type GroupCache = {
@@ -79,14 +80,7 @@ type GroupCache = {
 
 // 优化列布局计算
 const calculateColumns = (width: number, configCol: number): number => {
-  if (configCol > 0 && configCol < 6) return configCol
-
-  if (width > 1920) return 5
-  if (width > 1450) return 4
-  if (width > 1024) return 3
-  if (width > 900) return 2
-  if (width >= 600) return 2
-  return 1
+  return 2
 }
 
 // 优化分组逻辑
@@ -216,13 +210,14 @@ export const useRenderList = (
               provider: proxyCol[0]?.provider,
             }))
           } else {
-            return proxies.map((proxy) => ({
+            return proxies.map((proxy, proxyIdx) => ({
               type: 2,
               key: `chain-${selectedGroup}-${proxy!.name}`,
               group: targetGroup,
               proxy,
               headState: DEFAULT_STATE,
               provider: proxy.provider,
+              indexInGroup: proxyIdx,
             }))
           }
         }
@@ -251,13 +246,14 @@ export const useRenderList = (
             provider: proxyCol[0]?.provider,
           }))
         } else {
-          return proxies.map((proxy) => ({
+          return proxies.map((proxy, proxyIdx) => ({
             type: 2,
             key: `chain-first-${proxy!.name}`,
             group: firstGroup,
             proxy,
             headState: DEFAULT_STATE,
             provider: proxy.provider,
+            indexInGroup: proxyIdx,
           }))
         }
       }
@@ -307,13 +303,14 @@ export const useRenderList = (
           }),
         )
       } else {
-        return proxiesWithDelay.map((proxy) => ({
+        return proxiesWithDelay.map((proxy, proxyIdx) => ({
           type: 2,
           key: `chain-all-${proxy.name}`,
           group: virtualGroup,
           proxy,
           headState: DEFAULT_STATE,
           provider: proxy.provider,
+          indexInGroup: proxyIdx,
         }))
       }
     }
@@ -366,13 +363,14 @@ export const useRenderList = (
           }),
         )
       } else {
-        return proxiesWithDelay.map((proxy) => ({
+        return proxiesWithDelay.map((proxy, proxyIdx) => ({
           type: 2,
           key: `chain-${proxy.name}`,
           group: virtualGroup,
           proxy,
           headState: DEFAULT_STATE,
           provider: proxy.provider,
+          indexInGroup: proxyIdx,
         }))
       }
     }
@@ -403,69 +401,60 @@ export const useRenderList = (
       }
 
       anyChanged = true
-      const ret: IRenderItem[] = [
+      const ret: IRenderItem[] = []
+
+      const proxies = filterSort(
+        group.all,
+        group.name,
+        headState.filterText,
+        headState.sortType,
+        latencyTimeout,
         {
-          type: 0,
-          key: group.name,
-          group,
-          headState,
-          icon: group.icon,
-          testUrl: group.testUrl,
+          matchCase: headState.filterMatchCase,
+          matchWholeWord: headState.filterMatchWholeWord,
+          useRegularExpression: headState.filterUseRegularExpression,
         },
-      ]
+      )
 
-      if (headState?.open || !useRule) {
-        const proxies = filterSort(
-          group.all,
-          group.name,
-          headState.filterText,
-          headState.sortType,
-          latencyTimeout,
-          {
-            matchCase: headState.filterMatchCase,
-            matchWholeWord: headState.filterMatchWholeWord,
-            useRegularExpression: headState.filterUseRegularExpression,
-          },
-        )
+      ret.push({
+        type: 1,
+        key: `head-${group.name}`,
+        group,
+        headState,
+      })
 
+      if (!proxies.length) {
         ret.push({
-          type: 1,
-          key: `head-${group.name}`,
+          type: 3,
+          key: `empty-${group.name}`,
           group,
           headState,
         })
-
-        if (!proxies.length) {
-          ret.push({
-            type: 3,
-            key: `empty-${group.name}`,
+      } else if (col > 1) {
+        ret.push(
+          ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
+            type: 4 as const,
+            key: `col-${group.name}-${proxyCol[0].name}-${colIndex}`,
             group,
             headState,
-          })
-        } else if (col > 1) {
-          ret.push(
-            ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
-              type: 4 as const,
-              key: `col-${group.name}-${proxyCol[0].name}-${colIndex}`,
-              group,
-              headState,
-              col,
-              proxyCol,
-              provider: proxyCol[0].provider,
-            })),
-          )
-        } else {
-          ret.push(
-            ...proxies.map((proxy) => ({
-              type: 2 as const,
-              key: `${group.name}-${proxy!.name}`,
-              group,
-              proxy,
-              headState,
-              provider: proxy.provider,
-            })),
-          )
-        }
+            col,
+            proxyCol,
+            provider: proxyCol[0].provider,
+            indexInGroup: colIndex,
+          })),
+        )
+      } else {
+        ret.push(
+          ...proxies.map((proxy, proxyIdx) => ({
+            type: 2 as const,
+            key: `${group.name}-${proxy!.name}`,
+            group,
+            proxy,
+            headState,
+            provider: proxy.provider,
+            indexInGroup: proxyIdx,
+          })),
+        )
       }
 
       cache.set(group.name, {

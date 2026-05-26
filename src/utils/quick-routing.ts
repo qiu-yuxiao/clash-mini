@@ -1,6 +1,6 @@
 import yaml from 'js-yaml'
+
 import {
-  getProfiles,
   readProfileFile,
   saveProfileFile,
   enhanceProfiles,
@@ -32,13 +32,18 @@ const findMainProxyGroup = async (): Promise<string> => {
 export const addQuickRoutingRule = async (
   type: 'process' | 'domain',
   value: string,
-  target: 'DIRECT' | 'PROXY'
+  target: 'DIRECT' | 'PROXY' | 'REJECT'
 ) => {
   if (!value) return
 
   try {
-    // 1. 获取主代理组名称 (如果设为代理，则需要目标代理组名)
-    const proxyGroup = target === 'PROXY' ? await findMainProxyGroup() : 'DIRECT'
+    // 1. 获取主代理组名称 (如果是代理，则需要目标代理组名；如果是封锁，使用 REJECT；如果是直连，使用 DIRECT)
+    let proxyGroup = 'DIRECT'
+    if (target === 'PROXY') {
+      proxyGroup = await findMainProxyGroup()
+    } else if (target === 'REJECT') {
+      proxyGroup = 'REJECT'
+    }
 
     // 2. 构造 Clash 规则字符串
     let newRule = ''
@@ -99,8 +104,8 @@ export const addQuickRoutingRule = async (
     await enhanceProfiles()
 
     showNotice.success(
-      'home.page.feedback.notifications.profileSwitched',
-      `分流规则已置顶生效: ${newRule}`,
+      'profiles.page.feedback.notifications.profileSwitched',
+      `手动路径控制规则已置顶生效: ${newRule}`,
       2500
     )
   } catch (e: any) {

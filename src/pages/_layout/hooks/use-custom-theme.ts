@@ -185,10 +185,10 @@ export const useCustomTheme = () => {
           },
           background: {
             paper: getSystem() === 'windows'
-              ? (mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(30, 36, 56, 0.55)')
+              ? (mode === 'light' ? '#ffffff' : '#1e2438')
               : dt.background_color,
             default: getSystem() === 'windows'
-              ? (mode === 'light' ? 'rgba(240, 245, 255, 0.35)' : 'rgba(15, 20, 35, 0.45)')
+              ? (mode === 'light' ? '#f0f5ff' : '#0f1423')
               : dt.background_color,
           },
         },
@@ -244,10 +244,10 @@ export const useCustomTheme = () => {
           text: { primary: dt.primary_text, secondary: dt.secondary_text },
           background: {
             paper: getSystem() === 'windows'
-              ? (mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(30, 36, 56, 0.55)')
+              ? (mode === 'light' ? '#ffffff' : '#1e2438')
               : dt.background_color,
             default: getSystem() === 'windows'
-              ? (mode === 'light' ? 'rgba(240, 245, 255, 0.35)' : 'rgba(15, 20, 35, 0.45)')
+              ? (mode === 'light' ? '#f0f5ff' : '#0f1423')
               : dt.background_color,
           },
         },
@@ -302,62 +302,66 @@ export const useCustomTheme = () => {
           : '1',
       )
       
-      // Aero Glass Variables
+      // Aero Glass Variables (Flattened: Opaque, solid, no gloss/glass/skeuomorphism effects)
       rootEle.style.setProperty(
         '--aero-bg',
-        mode === 'light' ? 'rgba(240, 245, 255, 0.35)' : 'rgba(15, 20, 35, 0.45)'
+        mode === 'light' ? '#f0f5ff' : '#0f1423'
       )
       rootEle.style.setProperty(
         '--aero-panel-bg',
-        mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(30, 36, 56, 0.55)'
+        mode === 'light' ? '#ffffff' : '#1e2438'
+      )
+      rootEle.style.setProperty(
+        '--aero-popover-bg',
+        mode === 'light' ? '#ffffff' : '#1e1e23'
       )
       rootEle.style.setProperty(
         '--aero-border',
-        mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)'
+        mode === 'light' ? '#d0d7de' : '#30363d'
+      )
+      rootEle.style.setProperty(
+        '--aero-input-bg',
+        mode === 'light' ? '#ffffff' : '#121824'
+      )
+      rootEle.style.setProperty(
+        '--aero-input-border',
+        mode === 'light' ? '#d0d7de' : '#30363d'
       )
       rootEle.style.setProperty(
         '--aero-border-outer',
-        mode === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.3)'
+        mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.35)'
       )
       rootEle.style.setProperty(
         '--aero-box-shadow',
         mode === 'light'
-          ? '0 8px 32px 0 rgba(31, 38, 135, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-          : '0 8px 32px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
+          ? '0 8px 32px 0 rgba(0, 0, 0, 0.08)'
+          : '0 8px 32px 0 rgba(0, 0, 0, 0.35)'
       )
       rootEle.style.setProperty(
         '--aero-box-shadow-subtle',
         mode === 'light'
-          ? '0 4px 16px 0 rgba(31, 38, 135, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
-          : '0 4px 16px 0 rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+          ? '0 4px 16px 0 rgba(0, 0, 0, 0.05)'
+          : '0 4px 16px 0 rgba(0, 0, 0, 0.22)'
       )
       rootEle.style.setProperty(
         '--aero-btn-bg',
-        mode === 'light' ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.06)'
+        mode === 'light' ? '#f5f5f5' : '#2d3345'
       )
       rootEle.style.setProperty(
         '--aero-btn-hover-bg',
-        mode === 'light'
-          ? 'rgba(255, 255, 255, 0.75)'
-          : 'rgba(255, 255, 255, 0.14)'
+        mode === 'light' ? '#e8e8e8' : '#383e52'
       )
       rootEle.style.setProperty(
         '--aero-btn-shadow',
-        mode === 'light'
-          ? '0 2px 4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.65)'
-          : '0 2px 4px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.22)'
+        'none'
       )
       rootEle.style.setProperty(
         '--aero-btn-hover-shadow',
-        mode === 'light'
-          ? '0 4px 10px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85)'
-          : '0 4px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.32)'
+        'none'
       )
       rootEle.style.setProperty(
         '--aero-btn-active-shadow',
-        mode === 'light'
-          ? '0 1px 2px rgba(0, 0, 0, 0.04), inset 0 1px 2px rgba(0, 0, 0, 0.08)'
-          : '0 1px 2px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(0, 0, 0, 0.25)'
+        'none'
       )
       rootEle.setAttribute('data-css-injection-root', 'true')
     }

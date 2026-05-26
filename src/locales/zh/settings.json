@@ -272,7 +272,7 @@
     "clashPort": {
       "title": "端口设置",
       "fields": {
-        "mixed": "混合代理端口",
+        "mixed": "Mixed Port",
         "socks": "SOCKS 代理端口",
         "http": "HTTP(S) 代理端口",
         "redir": "Redir 透明代理端口",
@@ -604,7 +604,7 @@
         "toggleSystemProxy": "打开/关闭系统代理",
         "toggleTunMode": "打开/关闭 TUN 模式",
         "entryLightweightMode": "进入轻量模式",
-        "direct": "直连模式",
+        "direct": "全局直连",
         "reactivateProfiles": "重新激活订阅"
       }
     },

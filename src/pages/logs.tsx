@@ -23,9 +23,9 @@ import { useLogData } from '@/hooks/use-log-data'
 const LogPage = () => {
   const { t } = useTranslation()
   const [clashLog, setClashLog] = useClashLog()
-  const enableLog = clashLog.enable
-  const logState = clashLog.logFilter
-  const logOrder = clashLog.logOrder ?? 'asc'
+  const enableLog = clashLog?.enable ?? true
+  const logState = clashLog?.logFilter ?? 'all'
+  const logOrder = clashLog?.logOrder ?? 'asc'
   const isDescending = logOrder === 'desc'
 
   const [match, setMatch] = useState(() => (_: string) => true)

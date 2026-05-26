@@ -45,7 +45,7 @@
       "fields": {
         "coreVersion": "内核版本",
         "systemProxyAddress": "系统代理地址",
-        "mixedPort": "混合代理端口",
+        "mixedPort": "Mixed Port",
         "uptime": "运行时间",
         "rulesCount": "规则数量"
       }
@@ -92,7 +92,7 @@
       },
       "labels": {
         "globalMode": "全局模式",
-        "directMode": "直连模式",
+        "directMode": "全局直连",
         "group": "代理组",
         "proxy": "节点",
         "noActiveNode": "暂无激活的代理节点"

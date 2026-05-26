@@ -55,7 +55,7 @@
       "exitNode": "出口"
     },
     "messages": {
-      "directMode": "直连模式"
+      "directMode": "全局直连"
     },
     "title": {
       "default": "代理组",

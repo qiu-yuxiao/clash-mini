@@ -50,8 +50,8 @@ const appendLogs = (
 export const useLogData = () => {
   const queryClient = useQueryClient()
   const [clashLog] = useClashLog()
-  const enableLog = clashLog.enable
-  const logLevel = clashLog.logLevel
+  const enableLog = clashLog?.enable ?? true
+  const logLevel = clashLog?.logLevel ?? 'info'
   const allowedTypes = LOG_LEVEL_FILTERS[logLevel] ?? DEFAULT_LOG_TYPES
   const hasLoadedInitialLogsRef = useRef(false)
 

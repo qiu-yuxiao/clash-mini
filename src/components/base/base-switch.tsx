@@ -8,8 +8,8 @@ export const Switch = styled((props: SwitchProps) => (
     {...props}
   />
 ))(({ theme }) => ({
-  width: 42,
-  height: 26,
+  width: 32,
+  height: 18,
   padding: 0,
   marginRight: 1,
   '& .MuiSwitch-switchBase': {
@@ -17,7 +17,7 @@ export const Switch = styled((props: SwitchProps) => (
     margin: 2,
     transitionDuration: '300ms',
     '&.Mui-checked': {
-      transform: 'translateX(16px)',
+      transform: 'translateX(14px)',
       color: '#fff',
       '& + .MuiSwitch-track': {
         backgroundColor: theme.palette.primary.main,
@@ -44,11 +44,11 @@ export const Switch = styled((props: SwitchProps) => (
   },
   '& .MuiSwitch-thumb': {
     boxSizing: 'border-box',
-    width: 22,
-    height: 22,
+    width: 14,
+    height: 14,
   },
   '& .MuiSwitch-track': {
-    borderRadius: 26 / 2,
+    borderRadius: 18 / 2,
     backgroundColor: theme.palette.mode === 'light' ? '#BBBBBB' : '#39393D',
     opacity: 1,
     transition: theme.transitions.create(['background-color'], {

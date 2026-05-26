@@ -66,40 +66,16 @@ body {
 
 .aero-glass {
   background: var(--aero-bg) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
   border: 1px solid var(--aero-border) !important;
   box-shadow: var(--aero-box-shadow) !important;
   border-radius: var(--border-radius, 8px);
   position: relative;
   overflow: hidden;
-
-  // Diagonal reflections (Aero Glass sheen)
-  &::before {
-    content: '';
-    position: absolute;
-    top: -150%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.03) 40%,
-      rgba(255, 255, 255, 0) 41%,
-      rgba(255, 255, 255, 0) 100%
-    );
-    transform: rotate(-15deg);
-    pointer-events: none;
-    z-index: 0;
-  }
 }
 
 .aero-panel {
   background: var(--aero-panel-bg) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  border: 1px solid var(--aero-border) !important;
+  border: 4px double var(--aero-border) !important;
   box-shadow: var(--aero-box-shadow-subtle) !important;
   border-radius: var(--border-radius, 8px);
 }
@@ -107,142 +83,90 @@ body {
 .aero-crystal-btn {
   background: var(--aero-btn-bg) !important;
   border: 1px solid var(--aero-border) !important;
-  box-shadow: var(--aero-btn-shadow) !important;
   color: var(--text-primary) !important;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
-  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3);
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  transition: all 0.15s ease-in-out !important;
   position: relative;
   overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 
-  // Gloss highlight on top half
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 50%;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
-    pointer-events: none;
-  }
-
-  // Soft hover glow
   &:hover {
     background: var(--aero-btn-hover-bg) !important;
-    box-shadow: var(--aero-btn-hover-shadow) !important;
-    transform: translateY(-1px);
-    
-    // Glowing borders
-    border-color: rgba(255, 255, 255, 0.6) !important;
+    border-color: var(--aero-border) !important;
   }
 
   &:active {
-    transform: translateY(1px) scale(0.97);
-    box-shadow: var(--aero-btn-active-shadow) !important;
-    background: rgba(255, 255, 255, 0.3) !important;
+    background: var(--aero-btn-hover-bg) !important;
+    opacity: 0.8;
   }
-}
-
-// Glowing hover effect (Aero button style)
-@keyframes aero-glow-pulse {
-  0% { box-shadow: 0 0 4px rgba(10, 132, 255, 0.2); }
-  50% { box-shadow: 0 0 12px rgba(10, 132, 255, 0.6); }
-  100% { box-shadow: 0 0 4px rgba(10, 132, 255, 0.2); }
-}
-
-.aero-glow-active {
-  animation: aero-glow-pulse 2s infinite ease-in-out;
 }
 
 // Aero Crystal Input
 .aero-crystal-input {
-  background: rgba(255, 255, 255, 0.25) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.4) !important;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08), 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+  background: var(--aero-input-bg, #ffffff) !important;
+  border: 1px solid var(--aero-input-border, #d0d7de) !important;
   color: var(--text-primary) !important;
   border-radius: 6px !important;
   transition: all 0.2s ease-in-out !important;
 
   &:hover {
-    border-color: rgba(10, 132, 255, 0.5) !important;
-    background: rgba(255, 255, 255, 0.35) !important;
+    border-color: #0a84ff !important;
   }
 
   &.Mui-focused, &:focus-within {
-    border-color: rgba(10, 132, 255, 0.8) !important;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05), 0 0 8px rgba(10, 132, 255, 0.4) !important;
-    background: rgba(255, 255, 255, 0.45) !important;
+    border-color: #0a84ff !important;
+    box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.2) !important;
+    background: var(--aero-input-bg, #ffffff) !important;
+    outline: none !important;
   }
 }
 
-// Aero Crystal Card (3D bevel highlight and diagonal reflections)
+// Aero Crystal Card
 .aero-crystal-card {
   background: var(--aero-panel-bg) !important;
-  backdrop-filter: blur(16px) !important;
   border: 1px solid var(--aero-border) !important;
-  box-shadow: var(--aero-box-shadow-subtle), 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: var(--aero-box-shadow-subtle) !important;
   border-radius: 10px !important;
   position: relative;
   overflow: hidden;
-
-  // Glossy reflection line
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 200%;
-    height: 100%;
-    background: linear-gradient(
-      115deg,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.15) 30%,
-      rgba(255, 255, 255, 0.3) 40%,
-      rgba(255, 255, 255, 0.15) 50%,
-      rgba(255, 255, 255, 0) 80%
-    );
-    transition: all 0.6s ease-in-out;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  &:hover::before {
-    left: 100%;
-  }
 }
 
 // Success (Green) Crystal Button
 .aero-crystal-btn-success {
   @extend .aero-crystal-btn;
-  background: rgba(76, 175, 80, 0.22) !important;
-  border-color: rgba(76, 175, 80, 0.45) !important;
+  background: rgba(76, 175, 80, 0.12) !important;
+  border-color: rgba(76, 175, 80, 0.3) !important;
   color: #2e7d32 !important;
 
   &:hover {
-    background: rgba(76, 175, 80, 0.35) !important;
-    border-color: rgba(76, 175, 80, 0.7) !important;
-    box-shadow: 0 0 8px rgba(76, 175, 80, 0.4) !important;
+    background: rgba(76, 175, 80, 0.22) !important;
+    border-color: rgba(76, 175, 80, 0.5) !important;
   }
 }
 
 // Primary (Blue) Crystal Button
 .aero-crystal-btn-primary {
   @extend .aero-crystal-btn;
-  background: rgba(14, 144, 255, 0.2) !important;
-  border-color: rgba(14, 144, 255, 0.45) !important;
+  background: rgba(14, 144, 255, 0.1) !important;
+  border-color: rgba(14, 144, 255, 0.3) !important;
   color: #0d47a1 !important;
 
   &:hover {
-    background: rgba(14, 144, 255, 0.32) !important;
-    border-color: rgba(14, 144, 255, 0.7) !important;
-    box-shadow: 0 0 8px rgba(14, 144, 255, 0.4) !important;
+    background: rgba(14, 144, 255, 0.2) !important;
+    border-color: rgba(14, 144, 255, 0.5) !important;
   }
+}
+
+/* 强制下拉框、Select 选项、Autocomplete 列表及弹出 Popover/Menu 背景 95%/98% 不透明，且加毛玻璃效果，防止文字穿透重叠 */
+.MuiMenu-paper,
+.MuiPopover-paper,
+.MuiAutocomplete-paper {
+  background: var(--aero-popover-bg) !important;
+  border: 1px solid var(--aero-border) !important;
+  box-shadow: var(--aero-box-shadow-subtle) !important;
 }
 

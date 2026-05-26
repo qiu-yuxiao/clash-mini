@@ -68,14 +68,14 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("Clash WinAero")
+    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗔𝗲𝐫𝗼")
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
     .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
     .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
     .visible(false)
-    .transparent(true) // 必须设为 true 以支持透明磨砂玻璃
+    .transparent(false) // 禁用透明，原生窗口背景完全不透明
     .initialization_script(&initial_script)
     .general_autofill_enabled(false)
     .on_page_load(move |window, payload| {
@@ -93,7 +93,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("Clash WinAero")
+    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗔𝗲𝐫𝗼")
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
@@ -129,13 +129,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
             #[cfg(target_os = "windows")]
             {
-                use window_vibrancy::{apply_acrylic, apply_blur, apply_mica};
-                // 尝试应用毛玻璃/亚克力/Mica效果
-                if apply_mica(&window, None).is_err()
-                    && apply_acrylic(&window, Some((0, 0, 0, 0))).is_err()
-                {
-                    let _ = apply_blur(&window, Some((0, 0, 0, 0)));
-                }
+                // 已彻底禁用毛玻璃/亚克力/Mica效果，保持原生窗口不透明
             }
 
             Ok(window)

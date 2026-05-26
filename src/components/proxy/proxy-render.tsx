@@ -22,7 +22,6 @@ import { useThemeMode } from '@/services/states'
 
 import { ProxyHead } from './proxy-head'
 import { ProxyItem } from './proxy-item'
-import { ProxyItemMini } from './proxy-item-mini'
 import { HeadState } from './use-head-state'
 import type { IRenderItem } from './use-render-list'
 
@@ -68,17 +67,25 @@ export const ProxyRender = (props: RenderProps) => {
       return null
     }
 
-    return proxyCol.map((proxyItem) => (
-      <ProxyItemMini
+    return proxyCol.map((proxyItem, idx) => (
+      <ProxyItem
         key={`${item.key}-${proxyItem?.name ?? 'unknown'}`}
         group={group}
         proxy={proxyItem!}
         selected={group.now === proxyItem?.name}
         showType={showType}
+        indexInGroup={item.indexInGroup}
+        sx={{
+          py: 0,
+          pl: 0,
+          ...(idx === 0 ? {
+            borderRight: (theme) => `5px double ${theme.palette.divider}`,
+          } : {})
+        }}
         onClick={() => onChangeProxy(group, proxyItem!)}
       />
     ))
-  }, [type, proxyCol, item.key, group, showType, onChangeProxy])
+  }, [type, proxyCol, item.key, group, showType, onChangeProxy, item.indexInGroup])
 
   if (type === 0) {
     return (
@@ -184,6 +191,7 @@ export const ProxyRender = (props: RenderProps) => {
         proxy={proxy!}
         selected={group.now === proxy?.name}
         showType={headState?.showType}
+        indexInGroup={item.indexInGroup}
         sx={{ py: 0, pl: 2 }}
         onClick={() => onChangeProxy(group, proxy!)}
       />
@@ -212,13 +220,10 @@ export const ProxyRender = (props: RenderProps) => {
     return (
       <Box
         sx={{
-          height: 56,
+          height: '20px',
           display: 'grid',
-          gap: 1,
+          gridTemplateColumns: '1fr 1fr',
           pl: 2,
-          pr: 2,
-          pb: 1,
-          gridTemplateColumns: `repeat(${item.col! || 2}, 1fr)`,
         }}
       >
         {proxyColItemsMemo}

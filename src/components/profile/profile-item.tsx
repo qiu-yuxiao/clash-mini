@@ -708,8 +708,7 @@ export const ProfileItem = (props: Props) => {
               right: 10,
               bottom: 2,
               zIndex: 10,
-              backdropFilter: 'blur(2px)',
-              backgroundColor: 'rgba(0, 0, 0, 0.1)',
+              backgroundColor: 'rgba(0, 0, 0, 0.15)',
             }}
           >
             <CircularProgress

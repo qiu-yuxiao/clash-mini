@@ -254,6 +254,7 @@ const ActiveNodeStatusCard = () => {
 
 // WinAero Traffic Panel
 const WinAeroTrafficPanel = () => {
+  const mode = useThemeMode()
   const { t } = useTranslation()
   const pageVisible = useVisibility()
   const { response: { data: traffic } } = useTrafficData({ enabled: pageVisible })
@@ -281,49 +282,97 @@ const WinAeroTrafficPanel = () => {
         <EnhancedCanvasTrafficGraph ref={trafficRef} />
       </Box>
 
-      {/* Metrics Row (Single Line Below Graph) */}
+      {/* Metrics Row (Single Line Below Graph - Raised 3D Button style) */}
       <Box sx={{ 
         display: 'flex', 
         width: '100%', 
-        height: '24px', 
+        height: '32px', 
         alignItems: 'center', 
         justifyContent: 'space-around', 
         borderTop: '1px solid var(--aero-border)',
-        mt: 0.5,
-        pt: 0.5,
+        mt: 1,
+        pt: 1,
         boxSizing: 'border-box'
       }}>
         {/* Upload Speed */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <ArrowUpwardRounded sx={{ color: 'secondary.main', fontSize: 14 }} />
-          <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontWeight: 'bold' }}>上传速度:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: 'secondary.main' }}>
-            {upVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: 'gray' }}>{upUnit}/s</span>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 0.75,
+          height: '24px',
+          px: 1.5,
+          borderRadius: '6px',
+          border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
+          bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
+          boxShadow: mode === 'light'
+            ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        }}>
+          <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 13 }} />
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold' }}>上传速度:</Typography>
+          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#D4AF37' }}>
+            {upVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#8c7010' : '#b29645' }}>{upUnit}/s</span>
           </Typography>
         </Box>
 
         {/* Download Speed */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <ArrowDownwardRounded sx={{ color: 'primary.main', fontSize: 14 }} />
-          <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontWeight: 'bold' }}>下载速度:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: 'primary.main' }}>
-            {downVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: 'gray' }}>{downUnit}/s</span>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 0.75,
+          height: '24px',
+          px: 1.5,
+          borderRadius: '6px',
+          border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
+          bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
+          boxShadow: mode === 'light'
+            ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        }}>
+          <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 13 }} />
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold' }}>下载速度:</Typography>
+          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF' }}>
+            {downVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#0052a3' : '#8cd9ff' }}>{downUnit}/s</span>
           </Typography>
         </Box>
 
         {/* Upload Total */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontWeight: 'bold' }}>上传总量:</Typography>
-          <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: 'text.primary' }}>
-            {upTotalVal} <span style={{ fontSize: '9px', color: 'gray', fontWeight: 'normal' }}>{upTotalUnit}</span>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 0.75,
+          height: '24px',
+          px: 1.5,
+          borderRadius: '6px',
+          border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
+          bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
+          boxShadow: mode === 'light'
+            ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        }}>
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold' }}>上传总量:</Typography>
+          <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: '#D4AF37' }}>
+            {upTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#8c7010' : '#b29645', fontWeight: 'normal' }}>{upTotalUnit}</span>
           </Typography>
         </Box>
 
         {/* Download Total */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontWeight: 'bold' }}>下载总量:</Typography>
-          <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: 'text.primary' }}>
-            {downTotalVal} <span style={{ fontSize: '9px', color: 'gray', fontWeight: 'normal' }}>{downTotalUnit}</span>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 0.75,
+          height: '24px',
+          px: 1.5,
+          borderRadius: '6px',
+          border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
+          bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
+          boxShadow: mode === 'light'
+            ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        }}>
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold' }}>下载总量:</Typography>
+          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF' }}>
+            {downTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#0052a3' : '#8cd9ff', fontWeight: 'normal' }}>{downTotalUnit}</span>
           </Typography>
         </Box>
       </Box>
@@ -726,15 +775,15 @@ const Layout = () => {
                 boxSizing: 'border-box',
                 padding: '12px',
                 gap: '12px',
-                background: mode === 'light' ? 'rgba(240, 245, 255, 0.88)' : 'rgba(22, 28, 48, 0.93)',
-                backdropFilter: 'blur(30px) saturate(180%)',
+                background: mode === 'light' ? '#f0f5ff' : '#1e2438',
+                border: '4px double var(--aero-border)',
               }}
             >
-              {/* Left Settings Column (35% width) */}
+              {/* Left Settings Column (200px width) */}
               <Box
                 sx={{
-                  flex: '0 0 35%',
-                  width: '35%',
+                  flex: '0 0 200px',
+                  width: '200px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 1,
@@ -752,11 +801,11 @@ const Layout = () => {
                   <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
                     <TextField
                       className="aero-crystal-input"
-                      placeholder="填入订阅订阅链接 (YAML)"
+                      placeholder="填入订阅链接 (YAML)"
                       size="small"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      slotProps={{ htmlInput: { style: { py: 4, fontSize: 11 } } }}
+                      slotProps={{ htmlInput: { style: { py: 4, fontSize: 11, height: 26, boxSizing: 'border-box' } } }}
                       sx={{ flex: 1 }}
                     />
                     <Button
@@ -833,33 +882,48 @@ const Layout = () => {
                       TUN 网卡
                     </Button>
                   </ButtonGroup>
-                  {/* advanced selection */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
-                    <Typography variant="caption" sx={{ fontSize: '10px', color: 'text.secondary' }}>代理策略</Typography>
-                    <Select
-                      size="small"
-                      value={clashConfig?.mode?.toLowerCase() || 'rule'}
-                      onChange={async (e) => {
-                        await patchClashMode(e.target.value as any)
-                        refreshClashConfig()
-                      }}
-                      sx={{ height: 22, fontSize: 10, minWidth: 80, '> div': { py: 0 } }}
-                    >
-                      <MenuItem value="rule" sx={{ fontSize: 10 }}>规则模式 (推荐)</MenuItem>
-                      <MenuItem value="global" sx={{ fontSize: 10 }}>全局代理</MenuItem>
-                      <MenuItem value="direct" sx={{ fontSize: 10 }}>全局直连</MenuItem>
-                    </Select>
-                  </Box>
+                    {/* advanced selection */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
+                      <Typography variant="caption" sx={{ fontSize: '12px', color: 'text.secondary' }}>代理策略</Typography>
+                      <Select
+                        size="small"
+                        value={clashConfig?.mode?.toLowerCase() || 'rule'}
+                        onChange={async (e) => {
+                          await patchClashMode(e.target.value as any)
+                          refreshClashConfig()
+                        }}
+                        sx={{ height: 22, fontSize: 10, minWidth: 90, '> div': { py: 0 } }}
+                        MenuProps={{
+                          slotProps: {
+                            paper: {
+                              sx: {
+                                minWidth: 100,
+                                '& .MuiMenuItem-root': {
+                                  fontSize: 10,
+                                  minHeight: '24px',
+                                  py: 0.5,
+                                  whiteSpace: 'nowrap',
+                                }
+                              }
+                            }
+                          }
+                        }}
+                      >
+                        <MenuItem value="rule" sx={{ fontSize: 10 }}>规则模式</MenuItem>
+                        <MenuItem value="global" sx={{ fontSize: 10 }}>全局代理</MenuItem>
+                        <MenuItem value="direct" sx={{ fontSize: 10 }}>全局直连</MenuItem>
+                      </Select>
+                    </Box>
                 </Box>
 
                 {/* Section 3: Minimal Settings */}
                 <Box className="aero-crystal-card" sx={{ p: 1, background: 'rgba(255,255,255,0.15)' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '11px' }}>
-                    基础与自适应设置
+                    基础设置
                   </Typography>
                   <List dense sx={{ py: 0 }}>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '10px' }}>开机自动启动</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>开机自动启动</Typography>
                       <Switch
                         size="small"
                         checked={verge?.enable_auto_launch ?? false}
@@ -867,7 +931,7 @@ const Layout = () => {
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '10px' }}>启动时最小化</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>启动时最小化</Typography>
                       <Switch
                         size="small"
                         checked={verge?.enable_silent_start ?? false}
@@ -875,7 +939,7 @@ const Layout = () => {
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '10px' }}>通知弹窗显示</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>通知弹窗显示</Typography>
                       <Switch
                         size="small"
                         checked={notificationsEnabled}
@@ -886,27 +950,43 @@ const Layout = () => {
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '10px' }}>软件界面语言</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>外观主题</Typography>
                       <Select
                         size="small"
-                        value={language ?? 'zh'}
-                        onChange={async (e) => patchVerge({ language: e.target.value })}
-                        sx={{ height: 20, fontSize: 10, minWidth: 80, '> div': { py: 0 } }}
+                        value={verge?.theme_mode ?? 'system'}
+                        onChange={async (e) => patchVerge({ theme_mode: e.target.value as any })}
+                        sx={{ height: 22, fontSize: 12, minWidth: 90, '> div': { py: 0 } }}
+                        MenuProps={{
+                          slotProps: {
+                            paper: {
+                              sx: {
+                                minWidth: 100,
+                                '& .MuiMenuItem-root': {
+                                  fontSize: 12,
+                                  minHeight: '24px',
+                                  py: 0.5,
+                                  whiteSpace: 'nowrap',
+                                }
+                              }
+                            }
+                          }
+                        }}
                       >
-                        <MenuItem value="zh" sx={{ fontSize: 10 }}>简体中文</MenuItem>
-                        <MenuItem value="en" sx={{ fontSize: 10 }}>English</MenuItem>
+                        <MenuItem value="system" sx={{ fontSize: 12 }}>系统默认</MenuItem>
+                        <MenuItem value="light" sx={{ fontSize: 12 }}>浅色模式</MenuItem>
+                        <MenuItem value="dark" sx={{ fontSize: 12 }}>深色模式</MenuItem>
                       </Select>
                     </ListItem>
                     <ListItem sx={{ py: 0.25, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="caption" sx={{ fontSize: '10px' }}>混合监听端口</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '12px' }}>Mixed Port</Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <TextField
                           className="aero-crystal-input"
                           size="small"
-                          type="number"
+                          type="text"
                           value={mixedPortVal}
-                          onChange={(e) => setMixedPortVal(+e.target.value)}
-                          slotProps={{ htmlInput: { style: { py: 2, px: 4, width: 45, fontSize: 10, textAlign: 'center' } } }}
+                          onChange={(e) => setMixedPortVal(e.target.value ? parseInt(e.target.value, 10) || 0 : 0)}
+                          slotProps={{ htmlInput: { style: { py: 2, px: 4, width: 60, fontSize: 11, textAlign: 'center' } } }}
                         />
                         <IconButton size="small" onClick={handleSavePort} sx={{ p: 0.2 }}>
                           <SaveRounded sx={{ fontSize: 13 }} />
@@ -914,34 +994,38 @@ const Layout = () => {
                       </Box>
                     </ListItem>
                   </List>
+                  
+                  {/* Centered Troubleshooting Button */}
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                    <Button
+                      className="aero-crystal-btn"
+                      variant="contained"
+                      size="small"
+                      onClick={() => setLogsOpen(true)}
+                      sx={{ fontSize: 11, height: 26, width: '90%', textTransform: 'none' }}
+                    >
+                      系统调试运行日志
+                    </Button>
+                  </Box>
                 </Box>
-
-                {/* Section 4: Advanced Troubleshooting Button */}
-                <Button
-                  className="aero-crystal-btn"
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setLogsOpen(true)}
-                  sx={{ mt: 'auto', fontSize: 10, py: 0.5 }}
-                >
-                  📝 查看系统运行日志
-                </Button>
               </Box>
 
-              {/* Right Connections column (65% width) */}
+              {/* Right Connections column (自适应 flex: 1) */}
               <Box
                 sx={{
-                  flex: '0 0 65%',
-                  width: '65%',
+                  flex: 1,
+                  minWidth: 0,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.5,
                   height: '100%',
+                  minHeight: 0,
+                  overflow: 'hidden',
                 }}
               >
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', px: 0.5, gap: 0.5 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '11px' }}>
-                    一键分流连接审计中心
+                    手动控制路径（右键点击链接）
                   </Typography>
                   <ButtonGroup size="small" sx={{ transform: 'scale(0.85)' }}>
                     <Button
@@ -1028,15 +1112,14 @@ const Layout = () => {
             </div>
           </div>
 
-          {/* Lower Pane: Constant Traffic Dashboard (20%) */}
+          {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
           <div
             className="aero-crystal-card"
             style={{
-              flex: '20 0 0%',
-              height: '20%',
+              flex: '0 0 178px',
+              height: '178px',
               borderTop: '1px solid var(--aero-border)',
               background: 'var(--aero-panel-bg)',
-              backdropFilter: 'blur(20px)',
               padding: '8px 12px',
               display: 'flex',
               gap: '12px',

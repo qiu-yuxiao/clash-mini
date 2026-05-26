@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
+import yaml from 'js-yaml'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
 import { showNotice } from '@/services/notice-service'
@@ -14,6 +15,71 @@ export async function getProfiles() {
 }
 
 export async function enhanceProfiles() {
+  try {
+    const config = await getProfiles()
+    const activeUid = config.current
+    if (activeUid) {
+      const rawYaml = await readProfileFile(activeUid)
+      if (rawYaml) {
+        const doc = yaml.load(rawYaml) as any
+        if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
+          let modified = false
+
+          // 1. 提取所有原始 proxies 名字
+          const proxies = doc.proxies || []
+          const proxyNames = Array.isArray(proxies)
+            ? proxies.map((p: any) => p && p.name).filter(Boolean)
+            : []
+
+          // 2. 提取所有的 proxy-providers 名字
+          const providers = doc['proxy-providers'] || {}
+          const providerNames = (providers && typeof providers === 'object')
+            ? Object.keys(providers)
+            : []
+
+          // 3. 判断是否需要执行过滤 (组数大于 1，或者唯一组的名字不为 PROXY，或者规则非空)
+          const groups = doc['proxy-groups'] || []
+          const hasMultipleGroups = Array.isArray(groups) && (
+            groups.length > 1 || (groups.length === 1 && groups[0].name !== 'PROXY')
+          )
+          const hasRules = Array.isArray(doc.rules) && doc.rules.length > 0
+
+          if (hasMultipleGroups || hasRules) {
+            // 构造唯一的 PROXY 组
+            const newGroup: any = {
+              name: 'PROXY',
+              type: 'select',
+            }
+            if (proxyNames.length > 0) {
+              newGroup.proxies = proxyNames
+            }
+            if (providerNames.length > 0) {
+              newGroup.use = providerNames
+            }
+            if (proxyNames.length === 0 && providerNames.length === 0) {
+              newGroup.proxies = ['DIRECT']
+            }
+
+            // 只保留唯一的 PROXY 组
+            doc['proxy-groups'] = [newGroup]
+            
+            // 摒弃并清空机场订阅自带的规则列表，完全托管给 Clash WinAero 自身的智能路由
+            doc.rules = []
+            
+            modified = true
+          }
+
+          if (modified) {
+            await saveProfileFile(activeUid, yaml.dump(doc))
+            debugLog(`[ProfileTransformer] Successfully cleaned up profile ${activeUid} to single PROXY group and empty rules`)
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[ProfileTransformer] Failed to clean up profile:', err)
+  }
+
   return (
     (await invoke<ValidationOutcome>('enhance_profiles')).status === 'valid'
   )

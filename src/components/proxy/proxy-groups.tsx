@@ -39,10 +39,6 @@ import { debugLog } from '@/utils/debug'
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
 import { ProxyChain } from './proxy-chain'
-import {
-  DEFAULT_HOVER_DELAY,
-  ProxyGroupNavigator,
-} from './proxy-group-navigator'
 import { ProxyRender } from './proxy-render'
 import type { HeadState } from './use-head-state'
 import { type IRenderItem, useRenderList } from './use-render-list'
@@ -200,7 +196,15 @@ export const ProxyGroups = (props: Props) => {
   const virtualizer = useVirtualizer({
     count: renderList.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 56,
+    estimateSize: (index) => {
+      const item = renderList[index]
+      if (item?.type === 0) return 56
+      if (item?.type === 1) return 40
+      if (item?.type === 2) return 20
+      if (item?.type === 3) return 80
+      if (item?.type === 4) return 20
+      return 56
+    },
     overscan: 15,
     getItemKey: (index) => renderList[index]?.key ?? index,
     rangeExtractor,
@@ -567,17 +571,7 @@ export const ProxyGroups = (props: Props) => {
     <div
       style={{ position: 'relative', height: '100%', willChange: 'transform' }}
     >
-      {/* 代理组导航栏 */}
-      {mode === 'rule' && (
-        <ProxyGroupNavigator
-          proxyGroupNames={proxyGroupNames}
-          onGroupLocation={handleGroupLocationByName}
-          enableHoverJump={verge?.enable_hover_jump_navigator ?? true}
-          hoverDelay={verge?.hover_jump_navigator_delay ?? DEFAULT_HOVER_DELAY}
-        />
-      )}
-
-      {renderProxyList('calc(100% - 14px)')}
+      {renderProxyList('100%')}
       <ScrollTopButton show={showScrollTop} onClick={scrollToTop} />
     </div>
   )
@@ -774,7 +768,16 @@ function ProxyVirtualList({
     theme.palette.mode === 'dark' ? '#1e1f27' : 'var(--background-color)'
 
   return (
-    <div ref={parentRef} style={{ height, overflow: 'auto' }}>
+    <Box
+      ref={parentRef}
+      sx={{
+        height,
+        overflow: 'auto',
+        borderRadius: 1,
+        border: (theme) => `4px solid ${theme.palette.divider}`,
+        backgroundColor: (theme) => theme.palette.background.paper,
+      }}
+    >
       <div style={{ height: totalSize, position: 'relative' }}>
         {virtualItems.map((virtualItem) => (
           <div
@@ -815,7 +818,7 @@ function ProxyVirtualList({
         ))}
         <div style={{ height: 8 }} />
       </div>
-    </div>
+    </Box>
   )
 }
 

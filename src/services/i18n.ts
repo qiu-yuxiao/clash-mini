@@ -2,19 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
 export const supportedLanguages = [
-  'en',
-  'ru',
   'zh',
-  'fa',
-  'tt',
-  'id',
-  'ar',
-  'ko',
-  'tr',
-  'de',
-  'es',
-  'jp',
-  'zhtw',
 ]
 
 export const FALLBACK_LANGUAGE = 'zh'

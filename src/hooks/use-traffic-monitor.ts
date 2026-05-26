@@ -189,46 +189,7 @@ class TrafficWorkerClient {
       },
     }
 
-    if (typeof Worker !== 'undefined') {
-      try {
-        this.worker = new Worker(
-          new URL('../services/traffic-monitor-worker.ts', import.meta.url),
-          { type: 'module' },
-        )
-        this.mode = 'worker'
-
-        this.worker.onmessage = (
-          event: MessageEvent<TrafficWorkerResponseMessage>,
-        ) => {
-          const message = event.data
-          if (message.type === 'snapshot') {
-            this.listeners.forEach((listener) => {
-              listener(message)
-            })
-          }
-        }
-
-        this.worker.onerror = (error) => {
-          debugLog(`[TrafficWorkerClient] Worker error: ${String(error)}`)
-        }
-
-        this.ready = true
-        this.post(initMessage)
-        this.flushQueue()
-        return
-      } catch (error) {
-        debugLog(
-          `[TrafficWorkerClient] Worker initialization failed, falling back to inline sampler: ${String(error)}`,
-        )
-        this.worker = null
-        this.mode = null
-      }
-    } else {
-      debugLog(
-        '[TrafficWorkerClient] Worker not supported, using inline sampler',
-      )
-    }
-
+    debugLog('[TrafficWorkerClient] Hardcoding inline sampler to ensure 100% stability')
     this.startInline(initMessage)
   }
 

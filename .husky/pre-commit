@@ -1,5 +1,25 @@
 #!/bin/bash
 
+# =========================================================================
+# 【修改顺序铁律】唯一协议与代码同步审计
+# =========================================================================
+STAGED_CODE_FILES=$(git diff --cached --name-only | grep -E '\.(ts|tsx|rs)$|tauri\.conf\.json$')
+STAGED_AGREEMENTS_FILE=$(git diff --cached --name-only | grep -E '^clash_winaero_agreements\.md$')
+
+if [ -n "$STAGED_CODE_FILES" ] && [ -z "$STAGED_AGREEMENTS_FILE" ]; then
+  echo "========================================================================="
+  echo "❌ 阻止提交 (Commit Blocked): 【修改顺序铁律】"
+  echo "检测到您修改了代码或配置文件，但未在《唯一协议》中记录对应的修改规范！"
+  echo "修改的代码文件包括:"
+  echo "$STAGED_CODE_FILES"
+  echo ""
+  echo "👉 解决方法: 请首先在 clash_winaero_agreements.md 中记录您的设计与逻辑修改，"
+  echo "   然后使用 'git add clash_winaero_agreements.md' 暂存该文件，再尝试提交。"
+  echo "👉 (如果确实是纯格式化或微小排版且不改变逻辑的提交，可以使用 git commit --no-verify 绕过此限制)"
+  echo "========================================================================="
+  exit 1
+fi
+
 if ! command -v "cargo-make" >/dev/null 2>&1; then
   echo "❌ cargo-make is required for pre-commit checks."
   cargo install --force cargo-make

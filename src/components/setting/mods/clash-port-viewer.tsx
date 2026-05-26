@@ -243,12 +243,14 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <TextField
               size="small"
-              sx={{ width: 80, mr: 0.5, fontSize: 12 }}
+              type="text"
+              sx={{ width: 70, mr: 0.5 }}
               value={mixedPort}
-              onChange={(e) =>
-                setMixedPort(+e.target.value?.replace(/\D+/, '').slice(0, 5))
-              }
-              slotProps={{ htmlInput: { style: { fontSize: 12 } } }}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                setMixedPort(val ? parseInt(val, 10) : 0);
+              }}
+              slotProps={{ htmlInput: { style: { fontSize: 12, textAlign: 'center', padding: '4px 8px' } } }}
             />
             <IconButton
               size="small"
@@ -266,7 +268,7 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
             />
           </div>
         </ListItem>
-
+        
         <ListItem sx={{ padding: '4px 0', minHeight: 36 }}>
           <ListItemText
             primary={t('settings.modals.clashPort.fields.socks')}
@@ -275,13 +277,15 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <TextField
               size="small"
-              sx={{ width: 80, mr: 0.5, fontSize: 12 }}
+              type="text"
+              sx={{ width: 70, mr: 0.5 }}
               value={socksPort}
-              onChange={(e) =>
-                setSocksPort(+e.target.value?.replace(/\D+/, '').slice(0, 5))
-              }
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                setSocksPort(val ? parseInt(val, 10) : 0);
+              }}
               disabled={!socksEnabled}
-              slotProps={{ htmlInput: { style: { fontSize: 12 } } }}
+              slotProps={{ htmlInput: { style: { fontSize: 12, textAlign: 'center', padding: '4px 8px' } } }}
             />
             <IconButton
               size="small"
@@ -309,13 +313,15 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <TextField
               size="small"
-              sx={{ width: 80, mr: 0.5, fontSize: 12 }}
+              type="text"
+              sx={{ width: 70, mr: 0.5 }}
               value={httpPort}
-              onChange={(e) =>
-                setHttpPort(+e.target.value?.replace(/\D+/, '').slice(0, 5))
-              }
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                setHttpPort(val ? parseInt(val, 10) : 0);
+              }}
               disabled={!httpEnabled}
-              slotProps={{ htmlInput: { style: { fontSize: 12 } } }}
+              slotProps={{ htmlInput: { style: { fontSize: 12, textAlign: 'center', padding: '4px 8px' } } }}
             />
             <IconButton
               size="small"
@@ -344,13 +350,15 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <TextField
                 size="small"
-                sx={{ width: 80, mr: 0.5, fontSize: 12 }}
+                type="text"
+                sx={{ width: 70, mr: 0.5 }}
                 value={redirPort}
-                onChange={(e) =>
-                  setRedirPort(+e.target.value?.replace(/\D+/, '').slice(0, 5))
-                }
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                  setRedirPort(val ? parseInt(val, 10) : 0);
+                }}
                 disabled={!redirEnabled}
-                slotProps={{ htmlInput: { style: { fontSize: 12 } } }}
+                slotProps={{ htmlInput: { style: { fontSize: 12, textAlign: 'center', padding: '4px 8px' } } }}
               />
               <IconButton
                 size="small"
@@ -380,13 +388,15 @@ export const ClashPortViewer = forwardRef<ClashPortViewerRef>((_, ref) => {
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <TextField
                 size="small"
-                sx={{ width: 80, mr: 0.5, fontSize: 12 }}
+                type="text"
+                sx={{ width: 70, mr: 0.5 }}
                 value={tproxyPort}
-                onChange={(e) =>
-                  setTproxyPort(+e.target.value?.replace(/\D+/, '').slice(0, 5))
-                }
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                  setTproxyPort(val ? parseInt(val, 10) : 0);
+                }}
                 disabled={!tproxyEnabled}
-                slotProps={{ htmlInput: { style: { fontSize: 12 } } }}
+                slotProps={{ htmlInput: { style: { fontSize: 12, textAlign: 'center', padding: '4px 8px' } } }}
               />
               <IconButton
                 size="small"

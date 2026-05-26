@@ -3,7 +3,6 @@ import type {
   DraggableSyntheticListeners,
 } from '@dnd-kit/core'
 import {
-  alpha,
   ListItem,
   ListItemButton,
   ListItemIcon,

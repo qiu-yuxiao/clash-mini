@@ -1,11 +1,7 @@
-import { CheckCircleOutlineRounded } from '@mui/icons-material'
 import {
   alpha,
   Box,
-  ListItem,
   ListItemButton,
-  ListItemIcon,
-  ListItemText,
   styled,
   SxProps,
   Theme,
@@ -20,30 +16,32 @@ interface Props {
   proxy: IProxyItem
   selected: boolean
   showType?: boolean
+  indexInGroup?: number
   sx?: SxProps<Theme>
   onClick?: (name: string) => void
 }
 
 const Widget = styled(Box)(() => ({
-  padding: '3px 6px',
-  fontSize: 14,
-  borderRadius: '4px',
+  padding: '1px 3px',
+  fontSize: 10,
+  borderRadius: '3px',
 }))
 
 const TypeBox = styled('span')(({ theme }) => ({
   display: 'inline-block',
   border: '1px solid #ccc',
-  borderColor: alpha(theme.palette.text.secondary, 0.36),
-  color: alpha(theme.palette.text.secondary, 0.42),
-  borderRadius: 4,
-  fontSize: 10,
-  marginRight: '4px',
-  padding: '0 2px',
-  lineHeight: 1.25,
+  borderColor: alpha(theme.palette.text.secondary, 0.25),
+  color: alpha(theme.palette.text.secondary, 0.7),
+  borderRadius: 3,
+  fontSize: 9,
+  marginRight: '2px',
+  padding: '0 3px',
+  lineHeight: 1.3,
+  whiteSpace: 'nowrap',
 }))
 
 export const ProxyItem = (props: Props) => {
-  const { group, proxy, selected, showType = true, sx, onClick } = props
+  const { group, proxy, selected, showType = true, indexInGroup = 0, sx, onClick } = props
 
   // -1/<=0 为不显示，-2 为 loading
   const { delayValue, isPreset, timeout, onDelay } = useProxyDelayState(
@@ -52,71 +50,111 @@ export const ProxyItem = (props: Props) => {
   )
 
   return (
-    <ListItem sx={sx}>
-      <ListItemButton
-        dense
-        selected={selected}
-        onClick={() => onClick?.(proxy.name)}
-        sx={[
-          { borderRadius: 1 },
-          ({ palette: { mode, primary } }) => {
-            const bgcolor = mode === 'light' ? '#ffffff' : '#24252f'
-            const selectColor = mode === 'light' ? primary.main : primary.light
-            const showDelay = delayValue > 0
+    <ListItemButton
+      dense
+      selected={selected}
+      onClick={() => onClick?.(proxy.name)}
+      sx={[
+        {
+          borderRadius: 0,
+          height: '20px',
+          minHeight: '20px',
+          py: 0,
+          px: 0,
+          display: 'flex',
+          alignItems: 'center',
+          fontSize: '12px',
+          overflow: 'hidden',
+          borderBottom: (theme) => `2px solid ${theme.palette.divider}`,
+        },
+        ({ palette: { mode, primary } }) => {
+          const isOdd = indexInGroup % 2 !== 0
+          const bgcolor = isOdd
+            ? (mode === 'light' ? 'rgba(0, 120, 215, 0.04)' : 'rgba(50, 100, 180, 0.08)')
+            : 'transparent'
+          const selectColor = mode === 'light' ? primary.main : primary.light
+          const showDelay = delayValue > 0
 
-            return {
-              '&:hover .the-check': { display: !showDelay ? 'block' : 'none' },
-              '&:hover .the-delay': { display: showDelay ? 'block' : 'none' },
-              '&:hover .the-icon': { display: 'none' },
-              '&.Mui-selected': {
-                width: `calc(100% + 3px)`,
-                marginLeft: `-3px`,
-                borderLeft: `3px solid ${selectColor}`,
-                bgcolor:
-                  mode === 'light'
-                    ? alpha(primary.main, 0.15)
-                    : alpha(primary.main, 0.35),
-              },
-              backgroundColor: bgcolor,
-              marginBottom: '8px',
-              height: '40px',
-            }
-          },
-        ]}
-      >
-        <ListItemText
-          title={proxy.name}
-          secondary={
-            <>
-              <Box
-                sx={{
-                  display: 'inline-block',
-                  marginRight: '8px',
-                  fontSize: '14px',
-                  color: 'text.primary',
-                }}
-              >
-                {proxy.name}
-                {showType && proxy.now && ` - ${proxy.now}`}
-              </Box>
-              {showType && !!proxy.provider && (
-                <TypeBox>{proxy.provider}</TypeBox>
-              )}
-              {showType && <TypeBox>{proxy.type}</TypeBox>}
-              {showType && proxy.udp && <TypeBox>UDP</TypeBox>}
-              {showType && proxy.xudp && <TypeBox>XUDP</TypeBox>}
-              {showType && proxy.tfo && <TypeBox>TFO</TypeBox>}
-              {showType && proxy.mptcp && <TypeBox>MPTCP</TypeBox>}
-              {showType && proxy.smux && <TypeBox>SMUX</TypeBox>}
-            </>
+          return {
+            '&:hover .the-check': { display: !showDelay ? 'inline-block' : 'none' },
+            '&:hover .the-delay': { display: showDelay ? 'inline-block' : 'none' },
+            '&:hover .the-icon': { display: 'none' },
+            '&.Mui-selected': {
+              borderLeft: `3px solid ${selectColor}`,
+              bgcolor:
+                mode === 'light'
+                   ? alpha(primary.main, 0.15)
+                   : alpha(primary.main, 0.35),
+            },
+            backgroundColor: bgcolor,
+            transition: 'background-color 0.1s ease',
           }
-        />
-
-        <ListItemIcon
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
+    >
+        {/* Column 1: Name (Flex growth, overflow ellipsis) */}
+        <Box
+          title={`${proxy.name}${proxy.now ? ` - ${proxy.now}` : ''}`}
           sx={{
-            justifyContent: 'flex-end',
-            color: 'primary.main',
-            display: isPreset ? 'none' : '',
+            flex: 1,
+            height: '100%',
+            minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
+            px: 1,
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontSize: '12px',
+            color: 'text.primary',
+            fontWeight: selected ? 'bold' : 'normal',
+            borderRight: (theme) => `2px solid ${theme.palette.divider}`,
+          }}
+        >
+          <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {proxy.name}
+            {showType && proxy.now && (
+              <Box component="span" sx={{ color: 'text.secondary', ml: 0.5, fontSize: '11px' }}>
+                - {proxy.now}
+              </Box>
+            )}
+          </Box>
+        </Box>
+
+        {/* Column 2: Protocol/Type (Width: 60px) */}
+        <Box
+          sx={{
+            width: 60,
+            height: '100%',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            px: 1,
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontSize: '11px',
+            color: 'text.secondary',
+            opacity: 0.85,
+            borderRight: (theme) => `2px solid ${theme.palette.divider}`,
+          }}
+        >
+          {proxy.type}
+        </Box>
+
+        {/* Column 3: Delay (Width: 65px, centered) */}
+        <Box
+          sx={{
+            width: 65,
+            height: '100%',
+            flexShrink: 0,
+            display: isPreset ? 'none' : 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            boxSizing: 'border-box',
           }}
         >
           {delayValue === -2 && (
@@ -126,7 +164,6 @@ export const ProxyItem = (props: Props) => {
           )}
 
           {!proxy.provider && delayValue !== -2 && (
-            // provider 的节点不支持检测
             <Widget
               className="the-check"
               onClick={(e) => {
@@ -135,7 +172,11 @@ export const ProxyItem = (props: Props) => {
                 onDelay()
               }}
               sx={({ palette }) => ({
-                display: 'none', // hover 时显示
+                display: 'none',
+                cursor: 'pointer',
+                fontSize: '11px',
+                border: `1px solid ${alpha(palette.primary.main, 0.3)}`,
+                color: 'primary.main',
                 ':hover': { bgcolor: alpha(palette.primary.main, 0.15) },
               })}
             >
@@ -143,8 +184,7 @@ export const ProxyItem = (props: Props) => {
             </Widget>
           )}
 
-          {delayValue > 0 && (
-            // 显示延迟
+          {delayValue >= 0 && (
             <Widget
               className="the-delay"
               onClick={(e) => {
@@ -155,6 +195,9 @@ export const ProxyItem = (props: Props) => {
               }}
               sx={({ palette }) => ({
                 color: delayManager.formatDelayColor(delayValue, timeout),
+                cursor: proxy.provider ? 'default' : 'pointer',
+                fontSize: '11px',
+                fontWeight: 600,
                 ...(!proxy.provider
                   ? { ':hover': { bgcolor: alpha(palette.primary.main, 0.15) } }
                   : {}),
@@ -163,16 +206,7 @@ export const ProxyItem = (props: Props) => {
               {delayManager.formatDelay(delayValue, timeout)}
             </Widget>
           )}
-
-          {delayValue !== -2 && delayValue <= 0 && selected && (
-            // 展示已选择的 icon
-            <CheckCircleOutlineRounded
-              className="the-icon"
-              sx={{ fontSize: 16 }}
-            />
-          )}
-        </ListItemIcon>
+        </Box>
       </ListItemButton>
-    </ListItem>
   )
 }
