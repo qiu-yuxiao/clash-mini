@@ -605,8 +605,7 @@ const Layout = () => {
             boxSizing: 'border-box',
             height: '36px',
             borderBottom: '1px solid var(--aero-border)',
-            background: 'var(--aero-bg) !important',
-            boxShadow: '0 1px 4px var(--aero-border-outer)',
+            background: 'var(--aero-bg)',
             gap: '8px',
             userSelect: 'none',
           }}
@@ -802,14 +801,13 @@ const Layout = () => {
                 }}
               >
                 {/* Section 1: Subscriptions Import */}
-                <Box className="aero-crystal-card" sx={{ p: 1, background: 'rgba(255,255,255,0.15)' }}>
+                <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     订阅与机场配置
                     {profileLoading && <CircularProgress size={10} />}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
                     <TextField
-                      className="aero-crystal-input"
                       placeholder="填入订阅链接 (YAML)"
                       size="small"
                       value={url}
@@ -819,7 +817,6 @@ const Layout = () => {
                     />
                     <Button
                       variant="contained"
-                      className="aero-crystal-btn-primary"
                       onClick={handleImportProfile}
                       sx={{ fontSize: 11, py: 0, height: 26 }}
                       disabled={profileLoading}
@@ -842,12 +839,13 @@ const Layout = () => {
                             p: '4px 8px',
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            bgcolor: isActive ? 'primary.main' : 'rgba(255,255,255,0.1)',
+                            bgcolor: isActive ? 'primary.main' : 'action.hover',
                             color: isActive ? 'primary.contrastText' : 'text.primary',
-                            border: isActive ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.05)',
+                            border: isActive ? '1px solid' : '1px solid transparent',
+                            borderColor: isActive ? 'primary.light' : 'transparent',
                             transition: 'all 0.2s',
                             '&:hover': {
-                              bgcolor: isActive ? 'primary.main' : 'rgba(255,255,255,0.2)',
+                              bgcolor: isActive ? 'primary.main' : 'action.selected',
                             }
                           }}
                         >
@@ -871,7 +869,7 @@ const Layout = () => {
                 </Box>
 
                 {/* Section 2: Takeover Mode (二选一) */}
-                <Box className="aero-crystal-card" sx={{ p: 1, background: 'rgba(255,255,255,0.15)' }}>
+                <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
                     代理接管模式
                   </Typography>
@@ -926,7 +924,7 @@ const Layout = () => {
                 </Box>
 
                 {/* Section 3: Minimal Settings */}
-                <Box className="aero-crystal-card" sx={{ p: 1, background: 'rgba(255,255,255,0.15)' }}>
+                <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '11px' }}>
                     基础设置
                   </Typography>
@@ -990,7 +988,6 @@ const Layout = () => {
                       <Typography variant="caption" sx={{ fontSize: '12px' }}>Mixed Port</Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <TextField
-                          className="aero-crystal-input"
                           size="small"
                           type="text"
                           value={mixedPortVal}
@@ -1061,7 +1058,6 @@ const Layout = () => {
                   <Button
                     size="small"
                     variant="outlined"
-                    className="aero-crystal-btn"
                     onClick={() => closeAllConnections()}
                     sx={{ fontSize: 10, height: 24, px: 1, minWidth: 'auto' }}
                   >
@@ -1071,7 +1067,6 @@ const Layout = () => {
                     <Button
                       size="small"
                       variant="outlined"
-                      className="aero-crystal-btn"
                       onClick={() => clearClosedConnections()}
                       sx={{ fontSize: 10, height: 24, px: 1, minWidth: 'auto' }}
                     >
@@ -1104,10 +1099,10 @@ const Layout = () => {
                   position: 'absolute',
                   top: 8,
                   right: 8,
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  bgcolor: 'action.hover',
                   p: 0.5,
                   '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.3)',
+                    bgcolor: 'action.selected',
                   }
                 }}
                 size="small"
@@ -1119,12 +1114,12 @@ const Layout = () => {
 
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
           <div
-            className="aero-crystal-card"
             style={{
               flex: '0 0 178px',
               height: '178px',
-              borderTop: '1px solid var(--aero-border)',
-              background: 'var(--aero-panel-bg)',
+              borderTop: '1px solid',
+              borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
+              background: 'inherit',
               padding: '8px 12px',
               display: 'flex',
               gap: '12px',

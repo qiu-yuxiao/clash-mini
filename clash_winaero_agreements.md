@@ -61,6 +61,7 @@
    * **禁用窗口透明与虚化**：在 Rust 窗口配置（`window.rs`）中将 `transparent` 设为 `false`，彻底注释/移除 `apply_mica`、`apply_acrylic` 和 `apply_blur` 等窗口虚化效果的注入，确保原生窗口完全不透明。
    * **清除虚化与半透明**：彻底清除所有 CSS/SCSS 样式文件以及 React 组件属性中的虚化滤镜（包括 `backdrop-filter`、`-webkit-backdrop-filter` 以及 React 的 `backdropFilter` 属性）。废除所有半透明（如 `rgba(...)` 或 `alpha(...)` 比例）悬浮及面板背景设定。将主背景（`--aero-bg`）、设置抽屉与面板（`--aero-panel-bg`）、下拉菜单、弹出对话框、右键上下文菜单及详情面板的背景色全部提升为 **100% 实体纯色不透明**（例如亮色模式使用 `#ffffff` 或 `#f0f5ff`，暗色模式使用 `#1e2438`）。
    * **保留经典分割线结构**：特别保留用于结构分隔的表格 2px 网格线、第一列右侧中缝的 5px double 双实线边框、表格外周的 4px 粗线，以及设置抽屉的 4px double 双实线边框，仅剥离其表面的拟物发光和透光特效。
+   * **【v0.1.3 实施备案】CSS 类彻底清除**：在 `_layout.tsx` 中移除所有 `aero-crystal-card`、`aero-crystal-btn`、`aero-crystal-btn-primary`、`aero-crystal-input` className 引用，三个设置分区卡片背景由 `rgba` 半透明替换为 MUI `divider` 语义边框；订阅列表行、关闭按钮的 `rgba` 背景替换为 `action.hover`/`action.selected`；下方流量图区去除拟物类名与 CSS 变量。在 `index.scss` 中完整删除 `.aero-glass`、`.aero-crystal-btn`、`.aero-crystal-input`、`.aero-crystal-card`、`.aero-crystal-btn-success`、`.aero-crystal-btn-primary` 六个拟物类定义，`.aero-panel` 仅保留结构性 `4px double` 边框。
 6. **流量折线图配色、尺寸同步与防挤压优化**：
    * 流量监控折线图（Canvas 渐变绘制）的上传（琥珀金 `#D4AF37`）与下载（电光蓝 `#0084FF`）必须采用标准十六进制颜色。禁止在动态生成渐变时使用 rgba 字符串做拼接，防止由于 alpha 字段拼接不规范导致 Canvas addColorStop 抛出 SyntaxError 闪退。
    * 为了防止图表在窗口尺寸变化或设置抽屉开关过程中因为渲染休眠（即 `dataStale` 或 `windowFocused` 判定）导致 Canvas 未及时重置尺寸从而被浏览器强行拉伸（如时间轴文字呈现出“瘦长”的异常长宽比），必须简化渲染判定逻辑，仅在 Document 处于 Hidden 状态下休眠。只要窗口可见，即使数据暂时没有更新或窗口未激活，在发生大小变化或重绘调用时也必须保证 Canvas 尺寸与 CSS 属性实时同步。

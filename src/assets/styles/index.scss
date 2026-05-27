@@ -61,105 +61,15 @@ body {
 }
 
 /* ==========================================================================
-   Aero Glass & Crystal Skeuomorphic Themes (Windows 7 Aero inspired)
+   Structural Layout Helpers (WinAero flat design)
    ========================================================================== */
 
-.aero-glass {
-  background: var(--aero-bg) !important;
-  border: 1px solid var(--aero-border) !important;
-  box-shadow: var(--aero-box-shadow) !important;
-  border-radius: var(--border-radius, 8px);
-  position: relative;
-  overflow: hidden;
-}
-
+/* Panel class: structural double border per Agreement II.2 — no glow/shadow */
 .aero-panel {
-  background: var(--aero-panel-bg) !important;
   border: 4px double var(--aero-border) !important;
-  box-shadow: var(--aero-box-shadow-subtle) !important;
   border-radius: var(--border-radius, 8px);
 }
 
-.aero-crystal-btn {
-  background: var(--aero-btn-bg) !important;
-  border: 1px solid var(--aero-border) !important;
-  color: var(--text-primary) !important;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.15s ease-in-out !important;
-  position: relative;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    background: var(--aero-btn-hover-bg) !important;
-    border-color: var(--aero-border) !important;
-  }
-
-  &:active {
-    background: var(--aero-btn-hover-bg) !important;
-    opacity: 0.8;
-  }
-}
-
-// Aero Crystal Input
-.aero-crystal-input {
-  background: var(--aero-input-bg, #ffffff) !important;
-  border: 1px solid var(--aero-input-border, #d0d7de) !important;
-  color: var(--text-primary) !important;
-  border-radius: 6px !important;
-  transition: all 0.2s ease-in-out !important;
-
-  &:hover {
-    border-color: #0a84ff !important;
-  }
-
-  &.Mui-focused, &:focus-within {
-    border-color: #0a84ff !important;
-    box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.2) !important;
-    background: var(--aero-input-bg, #ffffff) !important;
-    outline: none !important;
-  }
-}
-
-// Aero Crystal Card
-.aero-crystal-card {
-  background: var(--aero-panel-bg) !important;
-  border: 1px solid var(--aero-border) !important;
-  box-shadow: var(--aero-box-shadow-subtle) !important;
-  border-radius: 10px !important;
-  position: relative;
-  overflow: hidden;
-}
-
-// Success (Green) Crystal Button
-.aero-crystal-btn-success {
-  @extend .aero-crystal-btn;
-  background: rgba(76, 175, 80, 0.12) !important;
-  border-color: rgba(76, 175, 80, 0.3) !important;
-  color: #2e7d32 !important;
-
-  &:hover {
-    background: rgba(76, 175, 80, 0.22) !important;
-    border-color: rgba(76, 175, 80, 0.5) !important;
-  }
-}
-
-// Primary (Blue) Crystal Button
-.aero-crystal-btn-primary {
-  @extend .aero-crystal-btn;
-  background: rgba(14, 144, 255, 0.1) !important;
-  border-color: rgba(14, 144, 255, 0.3) !important;
-  color: #0d47a1 !important;
-
-  &:hover {
-    background: rgba(14, 144, 255, 0.2) !important;
-    border-color: rgba(14, 144, 255, 0.5) !important;
-  }
-}
 
 /* 强制下拉框、Select 选项、Autocomplete 列表及弹出 Popover/Menu 背景 95%/98% 不透明，且加毛玻璃效果，防止文字穿透重叠 */
 .MuiMenu-paper,
