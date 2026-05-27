@@ -84,6 +84,11 @@
     * 左右纵向双线划分：为突出左右两个节点分列的对称感觉，在一行左右两列正中间（即第一列右侧），使用宽度为 `5px double` 的 vertical 双实线边框（`(theme) => 5px double ${theme.palette.divider}`），其颜色与内部网格线完全一致，实现明显的左右两半隔断感。
     * 延迟列居中对齐与宽度：延迟数值那一列（Column 3）的宽度由原本 of `50px` 调整为 `65px`，以完全容纳 `"Timeout"` 和 `"testing"` 等长文本，对齐方式改为居中对齐（`justifyContent: "center"`）。
     * 外周粗框线：整个节点列表表格的外周包裹线（Box 容器边框）线宽设置为原本的 4 倍，即 `4px solid`，以此突出这是一个完整的 Excel 网格化表格。
+10. **全局滚动条隐藏与无痕滚动**：
+    * 为了最大程度保留界面显示空间、契合 WinLite 极简扁平定位，全局彻底隐藏所有页面的滚动条（包括主页面、设置面板、订阅列表、连接列表等）。
+    * 通过 CSS 的 `::-webkit-scrollbar { display: none !important; }` 和 `scrollbar-width: none !important;` 规则实现无痕隐藏，但必须确保内容区域仍可通过鼠标滚轮、触控板手势、键盘方向键正常滑动。
+    * 同时，移除 `.base-page .base-container > section` 的 `scrollbar-gutter: stable;`，使内容排版充分利用窗口的全部水平宽度，防止右侧留下空白轨道占位。
+
 
 ---
 

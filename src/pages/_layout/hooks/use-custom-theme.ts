@@ -379,19 +379,17 @@ export const useCustomTheme = () => {
         scopedCss = wrapCssInjectionWithScope(setting.css_injection)
       }
       const effectiveInjectedCss = scopedCss ?? setting.css_injection ?? ''
+
       const globalStyles = `
-        /* 修复滚动条样式 */
+        /* 修复滚动条样式为完全隐藏 */
+        * {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
         ::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-          background-color: var(--scrollbar-bg);
-        }
-        ::-webkit-scrollbar-thumb {
-          background-color: var(--scrollbar-thumb);
-          border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-          background-color: ${mode === 'light' ? '#a1a1a1' : '#666666'};
+          display: none !important;
+          width: 0 !important;
+          height: 0 !important;
         }
 
         /* 背景图处理 */

@@ -30,17 +30,14 @@ body {
   background-color: var(--primary-main);
 }
 
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  border-radius: 6px;
-  background-color: var(--scroller-color);
-}
-*::-webkit-scrollbar-corner {
-  background-color: transparent;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 body {
