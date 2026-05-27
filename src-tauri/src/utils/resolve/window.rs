@@ -68,7 +68,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗔𝗲𝐫𝗼")
+    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗟𝗶𝘁𝗲")
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
@@ -93,7 +93,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗔𝗲𝐫𝗼")
+    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗟𝗶𝘁𝗲")
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
