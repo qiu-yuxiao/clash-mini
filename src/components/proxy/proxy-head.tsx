@@ -9,7 +9,7 @@ import {
   VisibilityOffOutlined,
   FilterListOutlined,
 } from '@mui/icons-material'
-import { Box, IconButton, TextField, SxProps } from '@mui/material'
+import { Box, IconButton, TextField, SxProps, Theme } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -22,7 +22,7 @@ import type { ProxySortType } from './use-filter-sort'
 import type { HeadState } from './use-head-state'
 
 interface Props {
-  sx?: SxProps
+  sx?: SxProps<Theme>
   url?: string
   groupName: string
   headState: HeadState
@@ -31,7 +31,7 @@ interface Props {
   onHeadState: (val: Partial<HeadState>) => void
 }
 
-const defaultSx: SxProps = {}
+const defaultSx: SxProps<Theme> = {}
 
 export const ProxyHead = ({
   sx = defaultSx,
@@ -78,9 +78,9 @@ export const ProxyHead = ({
         color="inherit"
         title={t('proxies.page.tooltips.locate')}
         onClick={onLocation}
-        sx={{ width: 22, height: 22, p: 0 }}
+        sx={{ width: 26, height: 26, p: 0 }}
       >
-        <MyLocationOutlined sx={{ fontSize: 13 }} />
+        <MyLocationOutlined sx={{ fontSize: 17 }} />
       </IconButton>
 
       <IconButton
@@ -95,9 +95,9 @@ export const ProxyHead = ({
           }
           onCheckDelay()
         }}
-        sx={{ width: 22, height: 22, p: 0 }}
+        sx={{ width: 26, height: 26, p: 0 }}
       >
-        <BoltOutlined sx={{ fontSize: 13 }} />
+        <BoltOutlined sx={{ fontSize: 17 }} />
       </IconButton>
 
       <IconButton
@@ -113,11 +113,11 @@ export const ProxyHead = ({
         onClick={() =>
           onHeadState({ sortType: ((sortType + 1) % 3) as ProxySortType })
         }
-        sx={{ width: 22, height: 22, p: 0 }}
+        sx={{ width: 26, height: 26, p: 0 }}
       >
-        {sortType !== 1 && sortType !== 2 && <SortOutlined sx={{ fontSize: 13 }} />}
-        {sortType === 1 && <AccessTimeOutlined sx={{ fontSize: 13 }} />}
-        {sortType === 2 && <SortByAlphaOutlined sx={{ fontSize: 13 }} />}
+        {sortType !== 1 && sortType !== 2 && <SortOutlined sx={{ fontSize: 17 }} />}
+        {sortType === 1 && <AccessTimeOutlined sx={{ fontSize: 17 }} />}
+        {sortType === 2 && <SortByAlphaOutlined sx={{ fontSize: 17 }} />}
       </IconButton>
 
       <IconButton
@@ -127,9 +127,9 @@ export const ProxyHead = ({
         onClick={() =>
           onHeadState({ textState: textState === 'url' ? null : 'url' })
         }
-        sx={{ width: 22, height: 22, p: 0 }}
+        sx={{ width: 26, height: 26, p: 0 }}
       >
-        <LinkOutlined sx={{ fontSize: 13, opacity: textState === 'url' ? 1 : 0.6 }} />
+        <LinkOutlined sx={{ fontSize: 17, opacity: textState === 'url' ? 1 : 0.6 }} />
       </IconButton>
 
       <IconButton
@@ -141,9 +141,9 @@ export const ProxyHead = ({
             : t('proxies.page.tooltips.showDetail')
         }
         onClick={() => onHeadState({ showType: !showType })}
-        sx={{ width: 22, height: 22, p: 0 }}
+        sx={{ width: 26, height: 26, p: 0 }}
       >
-        {showType ? <VisibilityOutlined sx={{ fontSize: 13 }} /> : <VisibilityOffOutlined sx={{ fontSize: 13 }} />}
+        {showType ? <VisibilityOutlined sx={{ fontSize: 17 }} /> : <VisibilityOffOutlined sx={{ fontSize: 17 }} />}
       </IconButton>
 
       <IconButton
@@ -153,13 +153,13 @@ export const ProxyHead = ({
         onClick={() =>
           onHeadState({ textState: textState === 'filter' ? null : 'filter' })
         }
-        sx={{ width: 22, height: 22, p: 0 }}
+        sx={{ width: 26, height: 26, p: 0 }}
       >
-        <FilterListOutlined sx={{ fontSize: 13, opacity: textState === 'filter' ? 1 : 0.6 }} />
+        <FilterListOutlined sx={{ fontSize: 17, opacity: textState === 'filter' ? 1 : 0.6 }} />
       </IconButton>
 
       {textState === 'filter' && (
-        <Box sx={{ ml: 0.5, flex: '1 1 auto', height: 20, '& input': { py: 0.2, px: 0.5, fontSize: 10 } }}>
+        <Box sx={{ ml: 0.5, flex: '1 1 auto', height: 24, '& input': { py: 0.3, px: 0.5, fontSize: 11 } }}>
           <BaseSearchBox
             autoFocus={autoFocus}
             value={filterText}
@@ -190,7 +190,7 @@ export const ProxyHead = ({
           variant="outlined"
           placeholder={t('proxies.page.placeholders.delayCheckUrl')}
           onChange={(e) => onHeadState({ testUrl: e.target.value })}
-          sx={{ ml: 0.5, flex: '1 1 auto', '& input': { py: 0.2, px: 0.5, fontSize: 10, height: 16 } }}
+          sx={{ ml: 0.5, flex: '1 1 auto', '& input': { py: 0.3, px: 0.5, fontSize: 11, height: 20 } }}
         />
       )}
     </Box>

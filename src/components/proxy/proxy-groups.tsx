@@ -40,6 +40,7 @@ import { ScrollTopButton } from '../layout/scroll-top-button'
 
 import { ProxyChain } from './proxy-chain'
 import { ProxyRender } from './proxy-render'
+import { ProxyHead } from './proxy-head'
 import type { HeadState } from './use-head-state'
 import { type IRenderItem, useRenderList } from './use-render-list'
 
@@ -133,6 +134,10 @@ export const ProxyGroups = (props: Props) => {
     activeSelectedGroup,
   )
 
+  const filteredRenderList = useMemo(() => {
+    return renderList.filter((item) => item.type !== 1)
+  }, [renderList])
+
   const getGroupHeadState = useCallback(
     (groupName: string) => {
       const headItem = renderList.find(
@@ -172,10 +177,10 @@ export const ProxyGroups = (props: Props) => {
   )
   const stickyGroupIndexes = useMemo(
     () =>
-      renderList.flatMap((item, index) =>
+      filteredRenderList.flatMap((item, index) =>
         item.type === 0 && !item.group.hidden ? [index] : [],
       ),
-    [renderList],
+    [filteredRenderList],
   )
 
   const rangeExtractor = useCallback(
@@ -194,19 +199,18 @@ export const ProxyGroups = (props: Props) => {
   )
 
   const virtualizer = useVirtualizer({
-    count: renderList.length,
+    count: filteredRenderList.length,
     getScrollElement: () => parentRef.current,
     estimateSize: (index) => {
-      const item = renderList[index]
+      const item = filteredRenderList[index]
       if (item?.type === 0) return 56
-      if (item?.type === 1) return 40
       if (item?.type === 2) return 20
       if (item?.type === 3) return 80
       if (item?.type === 4) return 20
       return 56
     },
     overscan: 15,
-    getItemKey: (index) => renderList[index]?.key ?? index,
+    getItemKey: (index) => filteredRenderList[index]?.key ?? index,
     rangeExtractor,
   })
   const virtualItems = virtualizer.getVirtualItems()
@@ -214,7 +218,7 @@ export const ProxyGroups = (props: Props) => {
 
   // 从 localStorage 恢复滚动位置
   useLayoutEffect(() => {
-    if (renderList.length === 0) return
+    if (filteredRenderList.length === 0) return
     const node = parentRef.current
     if (!node) return
     if (
@@ -243,7 +247,7 @@ export const ProxyGroups = (props: Props) => {
       console.error('Error restoring scroll position:', e)
     }
     restoredScrollKeyRef.current = scrollPositionKey
-  }, [pathname, renderList.length, scrollPositionKey])
+  }, [pathname, filteredRenderList.length, scrollPositionKey])
 
   // 改为使用节流函数保存滚动位置
   const saveScrollPosition = useCallback(
@@ -449,7 +453,7 @@ export const ProxyGroups = (props: Props) => {
     if (!group) return
     const { name, now } = group
 
-    const index = renderList.findIndex(
+    const index = filteredRenderList.findIndex(
       (e) =>
         e.group?.name === name &&
         ((e.type === 2 && e.proxy?.name === now) ||
@@ -464,7 +468,7 @@ export const ProxyGroups = (props: Props) => {
   // 定位到指定的代理组
   const handleGroupLocationByName = useCallback(
     (groupName: string) => {
-      const index = renderList.findIndex(
+      const index = filteredRenderList.findIndex(
         (item) => item.type === 0 && item.group?.name === groupName,
       )
 
@@ -472,14 +476,18 @@ export const ProxyGroups = (props: Props) => {
         virtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' })
       }
     },
-    [renderList, virtualizer],
+    [filteredRenderList, virtualizer],
   )
 
   const proxyGroupNames = useMemo(() => {
-    const names = renderList
+    const names = filteredRenderList
       .filter((item) => item.type === 0 && item.group?.name)
       .map((item) => item.group!.name)
     return Array.from(new Set(names))
+  }, [filteredRenderList])
+
+  const activeGroupHeadItem = useMemo(() => {
+    return renderList.find((item) => item.type === 1)
   }, [renderList])
 
   const renderProxyList = (height: string) => (
@@ -488,7 +496,7 @@ export const ProxyGroups = (props: Props) => {
       height={height}
       totalSize={virtualizer.getTotalSize()}
       virtualItems={virtualItems}
-      renderList={renderList}
+      renderList={filteredRenderList}
       activeStickyIndex={activeStickyIndex}
       indent={mode === 'rule' || mode === 'script'}
       isChainMode={isChainMode}
@@ -497,6 +505,7 @@ export const ProxyGroups = (props: Props) => {
       onCheckAll={handleCheckAll}
       onHeadState={onHeadState}
       onChangeProxy={handleChangeProxy}
+      headItem={activeGroupHeadItem}
     />
   )
 
@@ -512,7 +521,7 @@ export const ProxyGroups = (props: Props) => {
     return (
       <>
         <Box sx={{ display: 'flex', height: '100%', gap: 2 }}>
-          <Box sx={{ flex: 1, position: 'relative' }}>
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
             {showRuleHeader && (
               <ChainRuleHeader
                 title={t('proxies.page.rules.title')}
@@ -523,9 +532,9 @@ export const ProxyGroups = (props: Props) => {
               />
             )}
 
-            {renderProxyList(
-              showRuleHeader ? 'calc(100% - 80px)' : 'calc(100% - 14px)',
-            )}
+            <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
+              {renderProxyList('100%')}
+            </Box>
             <ScrollTopButton show={showScrollTop} onClick={scrollToTop} />
           </Box>
 
@@ -568,12 +577,12 @@ export const ProxyGroups = (props: Props) => {
   }
 
   return (
-    <div
-      style={{ position: 'relative', height: '100%', willChange: 'transform' }}
-    >
-      {renderProxyList('100%')}
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        {renderProxyList('100%')}
+      </Box>
       <ScrollTopButton show={showScrollTop} onClick={scrollToTop} />
-    </div>
+    </Box>
   )
 }
 
@@ -601,6 +610,7 @@ interface ProxyVirtualListProps {
     group: IRenderItem['group'],
     proxy: IRenderItem['proxy'] & { name: string },
   ) => void
+  headItem?: IRenderItem | null
 }
 
 interface ProxyGroupOption {
@@ -762,6 +772,7 @@ function ProxyVirtualList({
   onCheckAll,
   onHeadState,
   onChangeProxy,
+  headItem,
 }: ProxyVirtualListProps) {
   const theme = useTheme()
   const stickyBackground =
@@ -769,55 +780,75 @@ function ProxyVirtualList({
 
   return (
     <Box
-      ref={parentRef}
       sx={{
         height,
-        overflow: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
         borderRadius: 1,
         border: (theme) => `4px solid ${theme.palette.divider}`,
         backgroundColor: (theme) => theme.palette.background.paper,
       }}
     >
-      <div style={{ height: totalSize, position: 'relative' }}>
-        {virtualItems.map((virtualItem) => (
-          <div
-            key={virtualItem.key}
-            data-index={virtualItem.index}
-            ref={measureElement}
-            style={{
-              position:
-                virtualItem.index === activeStickyIndex ? 'sticky' : 'absolute',
-              top: 0,
-              left: 0,
-              zIndex: virtualItem.index === activeStickyIndex ? 5 : undefined,
-              display:
-                virtualItem.index === activeStickyIndex
-                  ? 'flow-root'
-                  : undefined,
-              backgroundColor:
-                virtualItem.index === activeStickyIndex
-                  ? stickyBackground
-                  : undefined,
-              width: '100%',
-              transform:
-                virtualItem.index === activeStickyIndex
-                  ? undefined
-                  : `translateY(${virtualItem.start}px)`,
-            }}
-          >
-            <ProxyRender
-              item={renderList[virtualItem.index]}
-              indent={indent}
-              onLocation={onLocation}
-              onCheckAll={onCheckAll}
-              onHeadState={onHeadState}
-              onChangeProxy={onChangeProxy}
-              isChainMode={isChainMode}
-            />
-          </div>
-        ))}
-        <div style={{ height: 8 }} />
-      </div>
+      {headItem && (
+        <ProxyHead
+          sx={{ px: 2, py: 0.5, borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}
+          url={headItem.group.testUrl}
+          groupName={headItem.group.name}
+          headState={headItem.headState!}
+          onLocation={() => onLocation(headItem.group)}
+          onCheckDelay={() => onCheckAll(headItem.group.name)}
+          onHeadState={(p) => onHeadState(headItem.group.name, p)}
+        />
+      )}
+      <Box
+        ref={parentRef}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+        }}
+      >
+        <div style={{ height: totalSize, position: 'relative' }}>
+          {virtualItems.map((virtualItem) => (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={measureElement}
+              style={{
+                position:
+                  virtualItem.index === activeStickyIndex ? 'sticky' : 'absolute',
+                top: 0,
+                left: 0,
+                zIndex: virtualItem.index === activeStickyIndex ? 5 : undefined,
+                display:
+                  virtualItem.index === activeStickyIndex
+                    ? 'flow-root'
+                    : undefined,
+                backgroundColor:
+                  virtualItem.index === activeStickyIndex
+                    ? stickyBackground
+                    : undefined,
+                width: '100%',
+                transform:
+                  virtualItem.index === activeStickyIndex
+                    ? undefined
+                    : `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <ProxyRender
+                item={renderList[virtualItem.index]}
+                indent={indent}
+                onLocation={onLocation}
+                onCheckAll={onCheckAll}
+                onHeadState={onHeadState}
+                onChangeProxy={onChangeProxy}
+                isChainMode={isChainMode}
+              />
+            </div>
+          ))}
+          <div style={{ height: 8 }} />
+        </div>
+      </Box>
     </Box>
   )
 }
