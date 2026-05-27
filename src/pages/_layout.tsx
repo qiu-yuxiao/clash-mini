@@ -214,9 +214,9 @@ const ActiveNodeStatusCard = () => {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 2,
-        background: 'rgba(255, 255, 255, 0.25) !important',
-        border: '1px solid rgba(255, 255, 255, 0.35) !important',
-        boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 6px rgba(0, 0, 0, 0.04) !important',
+        background: 'var(--aero-panel-bg) !important',
+        border: '1px solid var(--aero-border) !important',
+        boxShadow: 'none !important',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -398,7 +398,17 @@ const Layout = () => {
   const [url, setUrl] = useState('')
   const [profileLoading, setProfileLoading] = useState(false)
   const { profiles = {}, mutateProfiles, activateSelected, patchProfiles } = useProfiles()
-  const profileItems = useMemo(() => profiles.items || [], [profiles])
+  const profileItems = useMemo(
+    () =>
+      (profiles.items || []).filter(
+        (item) =>
+          item &&
+          ['local', 'remote'].includes(item.type || '') &&
+          item.name &&
+          item.name.trim() !== '',
+      ),
+    [profiles],
+  )
   const currentProfileUid = profiles.current
 
   // Takeover Mode States
@@ -596,7 +606,6 @@ const Layout = () => {
             height: '36px',
             borderBottom: '1px solid var(--aero-border)',
             background: 'var(--aero-bg) !important',
-            backdropFilter: 'blur(24px) saturate(180%)',
             boxShadow: '0 1px 4px var(--aero-border-outer)',
             gap: '8px',
             userSelect: 'none',
@@ -805,7 +814,7 @@ const Layout = () => {
                       size="small"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      slotProps={{ htmlInput: { style: { py: 4, fontSize: 11, height: 26, boxSizing: 'border-box' } } }}
+                      slotProps={{ htmlInput: { style: { paddingTop: '4px', paddingBottom: '4px', fontSize: '11px', height: '26px', boxSizing: 'border-box' } } }}
                       sx={{ flex: 1 }}
                     />
                     <Button
@@ -986,7 +995,7 @@ const Layout = () => {
                           type="text"
                           value={mixedPortVal}
                           onChange={(e) => setMixedPortVal(e.target.value ? parseInt(e.target.value, 10) || 0 : 0)}
-                          slotProps={{ htmlInput: { style: { py: 2, px: 4, width: 60, fontSize: 11, textAlign: 'center' } } }}
+                          slotProps={{ htmlInput: { style: { paddingTop: '2px', paddingBottom: '2px', paddingLeft: '4px', paddingRight: '4px', width: '60px', fontSize: '11px', textAlign: 'center' } } }}
                         />
                         <IconButton size="small" onClick={handleSavePort} sx={{ p: 0.2 }}>
                           <SaveRounded sx={{ fontSize: 13 }} />
@@ -1144,8 +1153,7 @@ const Layout = () => {
         slotProps={{
           paper: {
             sx: {
-              background: mode === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(25, 30, 50, 0.94)',
-              backdropFilter: 'blur(24px)',
+              background: mode === 'light' ? '#ffffff' : '#1e2438',
             }
           }
         }}

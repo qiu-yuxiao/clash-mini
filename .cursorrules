@@ -1,0 +1,15 @@
+# Clash WinAero - AI Assistant Instructions
+
+## 🚨 【项目命根子：必须第一时间阅读的文件 (CRITICAL MUST-READ FILES ON STARTUP)】
+**Every time you start a session or take over the codebase, you MUST read the following two files before doing anything else:**
+1. **`clash_winaero_agreements.md` (Unique Agreement)**: The sole source of truth for features, layout, and implementation rules.
+2. **`clash_winaero_pitfalls.md` (Mistakes & Pitfalls Log)**: The redline record of historical mistakes and forbidden behaviors (e.g. executing commands without user permission).
+
+## 🚨 【修改顺序铁律 (CRITICAL RULE OF MODIFICATION SEQUENCE)】
+**Before modifying any code (TS/React, Rust, JSON, config files, etc.), you MUST update the project specification agreement first:**
+1. **Read & Check**: Call the view tool to read `clash_winaero_agreements.md` and `clash_winaero_pitfalls.md`.
+2. **Update the agreement**: If your changes involve new features, bug fixes, UI adjustments, or ports allocation, you MUST document the change in `clash_winaero_agreements.md` FIRST.
+3. **Modify code**: Only after the agreement is updated, you may write code. The code implementation must strictly match the rules in `clash_winaero_agreements.md`.
+4. **Dev validation**: Do NOT execute any terminal commands (including `pnpm run dev` or any other tasks) without explicit, oral permission from the user in the chat FIRST. Silent pre-approval in the sandbox is NOT a waiver of this rule.
+
+This rule is strictly checked by git pre-commit hook. Any commits with modified code but without modified `clash_winaero_agreements.md` will be blocked.

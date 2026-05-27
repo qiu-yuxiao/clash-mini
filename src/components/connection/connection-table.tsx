@@ -6,6 +6,7 @@ import {
   LinkOffRounded,
   ContentCopyRounded,
   InfoOutlined,
+  BlockRounded,
 } from '@mui/icons-material'
 import { useLockFn } from 'ahooks'
 import { closeConnection } from 'tauri-plugin-mihomo-api'
@@ -389,6 +390,20 @@ export const ConnectionTable = (props: Props) => {
       await addQuickRoutingRule('domain', metadata.host, 'PROXY')
     } else if (metadata.destinationIP) {
       await addQuickRoutingRule('domain', metadata.destinationIP, 'PROXY')
+    }
+  }, [contextMenu])
+
+  const handleReject = useCallback(async () => {
+    if (!contextMenu) return
+    const { row } = contextMenu
+    const { metadata } = row
+    setContextMenu(null)
+    if (metadata.process) {
+      await addQuickRoutingRule('process', metadata.process, 'REJECT')
+    } else if (metadata.host) {
+      await addQuickRoutingRule('domain', metadata.host, 'REJECT')
+    } else if (metadata.destinationIP) {
+      await addQuickRoutingRule('domain', metadata.destinationIP, 'REJECT')
     }
   }, [contextMenu])
 
@@ -874,12 +889,11 @@ export const ConnectionTable = (props: Props) => {
         slotProps={{
           paper: {
             sx: {
-              background: (theme: any) => alpha(theme.palette.background.paper, 0.8),
-              backdropFilter: 'blur(12px)',
+              background: (theme: any) => theme.palette.background.paper,
               border: '1px solid',
-              borderColor: (theme: any) => alpha(theme.palette.divider, 0.5),
+              borderColor: (theme: any) => theme.palette.divider,
               borderRadius: 1.5,
-              boxShadow: (theme: any) => `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.25)',
               minWidth: 200,
               py: 0.5,
             }
@@ -893,6 +907,10 @@ export const ConnectionTable = (props: Props) => {
         <MenuItem onClick={handleProxy} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
           <PublicRounded sx={{ fontSize: 18, color: 'primary.main' }} />
           设为代理分流
+        </MenuItem>
+        <MenuItem onClick={handleReject} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+          <BlockRounded sx={{ fontSize: 18, color: 'error.main' }} />
+          封锁它 (REJECT)
         </MenuItem>
         <MenuItem onClick={handleDisconnect} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
           <LinkOffRounded sx={{ fontSize: 18, color: 'error.main' }} />
