@@ -965,33 +965,33 @@ const Layout = () => {
                         sx={{ transform: 'scale(0.75)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '11px' }}>主题模式</Typography>
-                      <Select
-                        size="small"
-                        value={verge?.theme_mode ?? 'system'}
-                        onChange={async (e) => patchVerge({ theme_mode: e.target.value as any })}
-                        sx={{ height: 22, fontSize: 11, minWidth: 90, '> div': { py: 0 } }}
-                        MenuProps={{
-                          slotProps: {
-                            paper: {
-                              sx: {
-                                minWidth: 100,
-                                '& .MuiMenuItem-root': {
-                                  fontSize: 11,
-                                  minHeight: '24px',
-                                  py: 0.5,
-                                  whiteSpace: 'nowrap',
-                                }
-                              }
-                            }
-                          }
-                        }}
-                      >
-                        <MenuItem value="system" sx={{ fontSize: 11 }}>系统默认</MenuItem>
-                        <MenuItem value="light" sx={{ fontSize: 11 }}>浅色模式</MenuItem>
-                        <MenuItem value="dark" sx={{ fontSize: 11 }}>深色模式</MenuItem>
-                      </Select>
+                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 0.5 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <Typography variant="caption" sx={{ fontSize: '11px', color: 'text.secondary' }}>主题模式</Typography>
+                      </Box>
+                      <ButtonGroup fullWidth size="small" sx={{ mb: 0.5 }}>
+                        <Button
+                          variant={(verge?.theme_mode ?? 'system') === 'system' ? 'contained' : 'outlined'}
+                          onClick={() => patchVerge({ theme_mode: 'system' })}
+                          sx={{ fontSize: '11px', textTransform: 'none', height: 22, py: 0 }}
+                        >
+                          系统
+                        </Button>
+                        <Button
+                          variant={verge?.theme_mode === 'light' ? 'contained' : 'outlined'}
+                          onClick={() => patchVerge({ theme_mode: 'light' })}
+                          sx={{ fontSize: '11px', textTransform: 'none', height: 22, py: 0 }}
+                        >
+                          浅色
+                        </Button>
+                        <Button
+                          variant={verge?.theme_mode === 'dark' ? 'contained' : 'outlined'}
+                          onClick={() => patchVerge({ theme_mode: 'dark' })}
+                          sx={{ fontSize: '11px', textTransform: 'none', height: 22, py: 0 }}
+                        >
+                          深色
+                        </Button>
+                      </ButtonGroup>
                     </ListItem>
                     <ListItem sx={{ py: 0.25, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography variant="caption" sx={{ fontSize: '11px' }}>Mixed Port</Typography>
