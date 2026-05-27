@@ -288,100 +288,126 @@ const WinLiteTrafficPanel = () => {
         width: '100%', 
         height: '32px', 
         alignItems: 'center', 
-        justifyContent: 'space-around', 
+        justifyContent: 'space-between', 
         borderTop: '1px solid var(--aero-border)',
         mt: 1,
         pt: 1,
+        px: 1,
+        gap: 1,
         boxSizing: 'border-box'
       }}>
-        {/* Upload Speed */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 0.5,
-          height: '24px',
-          px: 1.25,
-          borderRadius: '6px',
-          border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
-          bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
-          boxShadow: mode === 'light'
-            ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-          whiteSpace: 'nowrap',
-          flexShrink: 0
-        }}>
-          <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 13 }} />
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>上传:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#D4AF37', whiteSpace: 'nowrap' }}>
-            {upVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#8c7010' : '#b29645' }}>{upUnit}/s</span>
-          </Typography>
+        {/* Upload Group */}
+        <Box sx={{ display: 'flex', flex: 1, minWidth: 0 }}>
+          {/* Upload Speed */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            flex: 1,
+            gap: 0.5,
+            height: '24px',
+            px: 1.25,
+            borderTopLeftRadius: '6px',
+            borderBottomLeftRadius: '6px',
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
+            border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
+            borderRight: 'none',
+            bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
+            boxShadow: mode === 'light'
+              ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            whiteSpace: 'nowrap'
+          }}>
+            <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 13 }} />
+            <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>上传:</Typography>
+            <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#D4AF37', whiteSpace: 'nowrap' }}>
+              {upVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#8c7010' : '#b29645' }}>{upUnit}/s</span>
+            </Typography>
+          </Box>
+
+          {/* Upload Total */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            flex: 1,
+            gap: 0.5,
+            height: '24px',
+            px: 1.25,
+            borderTopRightRadius: '6px',
+            borderBottomRightRadius: '6px',
+            borderTopLeftRadius: 0,
+            borderBottomLeftRadius: 0,
+            border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
+            bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
+            boxShadow: mode === 'light'
+              ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            whiteSpace: 'nowrap'
+          }}>
+            <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
+            <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: '#D4AF37', whiteSpace: 'nowrap' }}>
+              {upTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#8c7010' : '#b29645', fontWeight: 'normal' }}>{upTotalUnit}</span>
+            </Typography>
+          </Box>
         </Box>
 
-        {/* Upload Total */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 0.5,
-          height: '24px',
-          px: 1.25,
-          borderRadius: '6px',
-          border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
-          bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
-          boxShadow: mode === 'light'
-            ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-          whiteSpace: 'nowrap',
-          flexShrink: 0
-        }}>
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
-          <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: '#D4AF37', whiteSpace: 'nowrap' }}>
-            {upTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#8c7010' : '#b29645', fontWeight: 'normal' }}>{upTotalUnit}</span>
-          </Typography>
-        </Box>
+        {/* Download Group */}
+        <Box sx={{ display: 'flex', flex: 1, minWidth: 0 }}>
+          {/* Download Speed */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            flex: 1,
+            gap: 0.5,
+            height: '24px',
+            px: 1.25,
+            borderTopLeftRadius: '6px',
+            borderBottomLeftRadius: '6px',
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
+            border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
+            borderRight: 'none',
+            bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
+            boxShadow: mode === 'light'
+              ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            whiteSpace: 'nowrap'
+          }}>
+            <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 13 }} />
+            <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>下载:</Typography>
+            <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
+              {downVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#0052a3' : '#8cd9ff' }}>{downUnit}/s</span>
+            </Typography>
+          </Box>
 
-        {/* Download Speed */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 0.5,
-          height: '24px',
-          px: 1.25,
-          borderRadius: '6px',
-          border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
-          bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
-          boxShadow: mode === 'light'
-            ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-          whiteSpace: 'nowrap',
-          flexShrink: 0
-        }}>
-          <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 13 }} />
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>下载:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
-            {downVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#0052a3' : '#8cd9ff' }}>{downUnit}/s</span>
-          </Typography>
-        </Box>
-
-        {/* Download Total */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 0.5,
-          height: '24px',
-          px: 1.25,
-          borderRadius: '6px',
-          border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
-          bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
-          boxShadow: mode === 'light'
-            ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-          whiteSpace: 'nowrap',
-          flexShrink: 0
-        }}>
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
-            {downTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#0052a3' : '#8cd9ff', fontWeight: 'normal' }}>{downTotalUnit}</span>
-          </Typography>
+          {/* Download Total */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            flex: 1,
+            gap: 0.5,
+            height: '24px',
+            px: 1.25,
+            borderTopRightRadius: '6px',
+            borderBottomRightRadius: '6px',
+            borderTopLeftRadius: 0,
+            borderBottomLeftRadius: 0,
+            border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
+            bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
+            boxShadow: mode === 'light'
+              ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            whiteSpace: 'nowrap'
+          }}>
+            <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
+            <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
+              {downTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#0052a3' : '#8cd9ff', fontWeight: 'normal' }}>{downTotalUnit}</span>
+            </Typography>
+          </Box>
         </Box>
       </Box>
     </Box>
