@@ -501,6 +501,19 @@ const Layout = () => {
     }
   }, [language, switchLanguage])
 
+  // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
+  useEffect(() => {
+    if (currentProfileUid) {
+      enhanceProfiles()
+        .then(() => {
+          console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`);
+        })
+        .catch((err) => {
+          console.error(`[Layout] Failed to enhance profile ${currentProfileUid}:`, err);
+        });
+    }
+  }, [currentProfileUid]);
+
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
 
@@ -561,6 +574,9 @@ const Layout = () => {
     try {
       showNotice.info('正在更新订阅...')
       await updateProfile(uid)
+      if (uid === currentProfileUid) {
+        await enhanceProfiles()
+      }
       await mutateProfiles()
       showNotice.success('订阅更新成功')
     } catch (err) {
