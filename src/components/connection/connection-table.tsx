@@ -1,6 +1,5 @@
-import { Box, Button, IconButton, Menu, MenuItem, useTheme, alpha } from '@mui/material'
+import { Box, Menu, MenuItem, alpha } from '@mui/material'
 import {
-  CloseRounded,
   FlashOnRounded,
   PublicRounded,
   LinkOffRounded,
@@ -8,89 +7,28 @@ import {
   InfoOutlined,
   BlockRounded,
 } from '@mui/icons-material'
-import { useLockFn } from 'ahooks'
 import { closeConnection } from 'tauri-plugin-mihomo-api'
 import { addQuickRoutingRule } from '@/utils/quick-routing'
 import { showNotice } from '@/services/notice-service'
 import {
   ColumnDef,
-  ColumnOrderState,
-  ColumnSizingState,
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   Row,
   SortingState,
-  Updater,
   useReactTable,
-  VisibilityState,
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import dayjs from 'dayjs'
-import { useLocalStorage } from 'foxact/use-local-storage'
 import {
   memo,
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
-  type ReactNode,
 } from 'react'
-import { useTranslation } from 'react-i18next'
 
-import parseTraffic from '@/utils/parse-traffic'
-import { truncateStr } from '@/utils/truncate-str'
-
-import { ConnectionColumnManager } from './connection-column-manager'
-
-const ROW_HEIGHT = 28
-
-type TickListener = () => void
-let _tickNow = Date.now()
-const _tickListeners = new Set<TickListener>()
-let _tickTimer: ReturnType<typeof setInterval> | null = null
-
-const _startTick = () => {
-  if (_tickTimer !== null) return
-  _tickTimer = setInterval(() => {
-    _tickNow = Date.now()
-    _tickListeners.forEach((fn) => fn())
-  }, 5000)
-}
-
-const _stopTick = () => {
-  if (_tickListeners.size === 0 && _tickTimer !== null) {
-    clearInterval(_tickTimer)
-    _tickTimer = null
-  }
-}
-
-const tickStore = {
-  subscribe: (listener: TickListener) => {
-    _tickListeners.add(listener)
-    _startTick()
-    return () => {
-      _tickListeners.delete(listener)
-      _stopTick()
-    }
-  },
-  getSnapshot: () => _tickNow,
-}
-
-interface RelativeTimeCellProps {
-  start: string
-}
-
-const RelativeTimeCell = memo(function RelativeTimeCell({
-  start,
-}: RelativeTimeCellProps) {
-  const now = useSyncExternalStore(tickStore.subscribe, tickStore.getSnapshot)
-  return <>{dayjs(start).from(now)}</>
-})
-
-
+const ROW_HEIGHT = 20
 
 const SX_OUTER: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
@@ -104,14 +42,16 @@ const SX_OUTER: React.ComponentProps<typeof Box>['sx'] = {
 const SX_SCROLL_CONTAINER: React.ComponentProps<typeof Box>['sx'] = {
   flex: 1,
   minHeight: 0,
-  overflow: 'auto',
+  overflowY: 'auto',
+  overflowX: 'hidden',
   WebkitOverflowScrolling: 'touch',
   overscrollBehavior: 'contain',
-  borderRadius: 1,
-  border: 'none',
+  scrollbarWidth: 'none',
   '&::-webkit-scrollbar': {
-    height: 8,
+    display: 'none',
   },
+  border: '2px solid var(--aero-border)',
+  borderRadius: '4px',
 }
 
 const SX_HEADER_STICKY: React.ComponentProps<typeof Box>['sx'] = {
@@ -125,27 +65,15 @@ const SX_CELL_CONTENT: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
   alignItems: 'center',
   gap: 0.5,
-  px: 1,
-  py: 1,
-}
-
-const SX_RESIZE_HANDLE: React.ComponentProps<typeof Box>['sx'] = {
-  cursor: 'col-resize',
-  position: 'absolute',
-  right: 0,
-  top: 0,
-  width: 4,
-  height: '100%',
-  transform: 'translateX(50%)',
-  '&:hover': {
-    backgroundColor: (theme) => theme.palette.action.active,
-  },
+  px: 0,
+  py: 0,
 }
 
 const SX_HEADER_ROW: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
-  borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-  backgroundColor: (theme) => theme.palette.background.paper,
+  borderBottom: '2px solid var(--aero-border)',
+  backgroundColor: 'var(--aero-panel-bg)',
+  height: '20px',
 }
 
 const SX_HEADER_CELL_BASE: React.ComponentProps<typeof Box>['sx'] = {
@@ -153,19 +81,19 @@ const SX_HEADER_CELL_BASE: React.ComponentProps<typeof Box>['sx'] = {
   alignItems: 'center',
   position: 'relative',
   boxSizing: 'border-box',
-  fontSize: 13,
+  fontSize: '12px',
   fontWeight: 600,
   color: 'text.secondary',
   userSelect: 'none',
-  '&:hover': {
-    backgroundColor: (theme) => theme.palette.action.hover,
-  },
+  px: 1.5,
+  py: '0.5px',
 }
 
 const SX_DATA_CELL_BASE: React.ComponentProps<typeof Box>['sx'] = {
   boxSizing: 'border-box',
-  px: 1,
-  fontSize: '11.5px',
+  px: 1.5,
+  py: '0.5px',
+  fontSize: '12px',
   display: 'flex',
   alignItems: 'center',
   whiteSpace: 'nowrap',
@@ -179,70 +107,7 @@ const SX_ROW_BASE: React.ComponentProps<typeof Box>['sx'] = {
   left: 0,
   right: 0,
   cursor: 'pointer',
-  borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-  '&:hover': {
-    backgroundColor: (theme) => theme.palette.action.hover,
-  },
-}
-
-const reconcileColumnOrder = (
-  storedOrder: string[],
-  baseFields: string[],
-): string[] => {
-  const filtered = storedOrder.filter((field) => baseFields.includes(field))
-  const missing = baseFields.filter((field) => !filtered.includes(field))
-  return [...filtered, ...missing]
-}
-
-type ColumnField =
-  | 'host'
-  | 'download'
-  | 'upload'
-  | 'dlSpeed'
-  | 'ulSpeed'
-  | 'chains'
-  | 'rule'
-  | 'process'
-  | 'time'
-  | 'source'
-  | 'remoteDestination'
-  | 'type'
-
-const getConnectionCellValue = (field: ColumnField, each: IConnectionsItem) => {
-  const { metadata, rulePayload } = each
-
-  switch (field) {
-    case 'host':
-      return metadata.host
-        ? `${metadata.host}:${metadata.destinationPort}`
-        : `${metadata.remoteDestination}:${metadata.destinationPort}`
-    case 'download':
-      return each.download
-    case 'upload':
-      return each.upload
-    case 'dlSpeed':
-      return each.curDownload
-    case 'ulSpeed':
-      return each.curUpload
-    case 'chains':
-      return [...each.chains].reverse().join(' / ')
-    case 'rule':
-      return rulePayload ? `${each.rule}(${rulePayload})` : each.rule
-    case 'process':
-      return truncateStr(metadata.process || metadata.processPath)
-    case 'time':
-      return each.start
-    case 'source':
-      return `${metadata.sourceIP}:${metadata.sourcePort}`
-    case 'remoteDestination':
-      return metadata.destinationIP
-        ? `${metadata.destinationIP}:${metadata.destinationPort}`
-        : `${metadata.remoteDestination}:${metadata.destinationPort}`
-    case 'type':
-      return `${metadata.type}(${metadata.network})`
-    default:
-      return ''
-  }
+  borderBottom: '2px solid var(--aero-border)',
 }
 
 interface RowComponentProps {
@@ -282,28 +147,29 @@ const RowComponent = memo(
             transform: `translateY(${virtualStart}px)`,
             backgroundColor:
               row.index % 2 === 0
-                ? 'transparent'
-                : (theme) => alpha(theme.palette.action.hover, 0.4),
+                ? 'var(--aero-panel-bg)'
+                : (theme) => theme.palette.mode === 'light' ? '#eef4ff' : '#232b3f',
+            '&:hover': {
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+            },
           },
         ]}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
         {row.getVisibleCells().map((cell) => {
-          const meta = cell.column.columnDef.meta as {
-            align?: 'left' | 'right'
-          }
+          const isChains = cell.column.id === 'chains'
           return (
             <Box
               key={cell.id}
               sx={[
                 SX_DATA_CELL_BASE,
                 {
-                  flex: `0 0 ${cell.column.getSize()}px`,
-                  minWidth: cell.column.columnDef.minSize ?? 80,
-                  maxWidth: cell.column.columnDef.maxSize,
-                  justifyContent:
-                    meta?.align === 'right' ? 'flex-end' : 'flex-start',
+                  flex: isChains ? '0 0 50px' : '1 1 0%',
+                  minWidth: 0,
+                  width: isChains ? '50px' : 'auto',
+                  justifyContent: isChains ? 'center' : 'flex-start',
+                  borderRight: !isChains ? '2px solid var(--aero-border)' : 'none',
                 },
               ]}
             >
@@ -325,16 +191,14 @@ const RowComponent = memo(
 interface Props {
   connections: IConnectionsItem[]
   onShowDetail: (data: IConnectionsItem, el?: HTMLElement) => void
-  columnManagerOpen: boolean
-  onCloseColumnManager: () => void
+  columnManagerOpen?: boolean
+  onCloseColumnManager?: () => void
 }
 
 export const ConnectionTable = (props: Props) => {
   const {
     connections,
     onShowDetail: rawOnShowDetail,
-    columnManagerOpen,
-    onCloseColumnManager,
   } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
@@ -342,7 +206,6 @@ export const ConnectionTable = (props: Props) => {
     (data: IConnectionsItem, el?: HTMLElement) => onShowDetailRef.current(data, el),
     [],
   )
-  const { t } = useTranslation()
 
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number
@@ -444,309 +307,50 @@ export const ConnectionTable = (props: Props) => {
     onShowDetail(row, anchorEl)
   }, [contextMenu, onShowDetail])
 
-  const [columnWidths, setColumnWidths] = useLocalStorage<ColumnSizingState>(
-    'connection-table-widths',
-    {},
-  )
-
-  const [columnVisibilityModel, setColumnVisibilityModel] =
-    useLocalStorage<VisibilityState>(
-      'connection-table-visibility',
-      {
-        download: false,
-        upload: false,
-        dlSpeed: false,
-        ulSpeed: false,
-        time: false,
-        source: false,
-        remoteDestination: false,
-        type: false,
-      },
-      {
-        serializer: JSON.stringify,
-        deserializer: (value) => {
-          try {
-            const parsed = JSON.parse(value)
-            if (parsed && typeof parsed === 'object') return parsed
-          } catch (err) {
-            console.warn('Failed to parse connection-table-visibility', err)
-          }
-          return {
-            download: false,
-            upload: false,
-            dlSpeed: false,
-            ulSpeed: false,
-            time: false,
-            source: false,
-            remoteDestination: false,
-            type: false,
-          }
-        },
-      },
-    )
-
-  const [columnOrder, setColumnOrder] = useLocalStorage<string[]>(
-    'connection-table-order',
-    [],
-    {
-      serializer: JSON.stringify,
-      deserializer: (value) => {
-        try {
-          const parsed = JSON.parse(value)
-          if (Array.isArray(parsed)) return parsed
-        } catch (err) {
-          console.warn('Failed to parse connection-table-order', err)
-        }
-        return []
-      },
-    },
-  )
-
-  interface BaseColumn {
-    field: ColumnField
-    headerName: string
-    width?: number
-    minWidth?: number
-    align?: 'left' | 'right'
-    cell?: (row: IConnectionsItem) => ReactNode
-  }
-
-  const baseColumns = useMemo<BaseColumn[]>(() => {
+  const columnDefs = useMemo<ColumnDef<IConnectionsItem>[]>(() => {
     return [
       {
-        field: 'host',
-        headerName: t('connections.components.fields.host'),
-        width: 180,
-        minWidth: 140,
+        id: 'host',
+        accessorFn: (row) =>
+          row.metadata.host
+            ? `${row.metadata.host}:${row.metadata.destinationPort}`
+            : `${row.metadata.remoteDestination}:${row.metadata.destinationPort}`,
+        header: '链接目标',
+        cell: (ctx) => {
+          const row = ctx.row.original
+          return row.metadata.host
+            ? `${row.metadata.host}:${row.metadata.destinationPort}`
+            : `${row.metadata.remoteDestination}:${row.metadata.destinationPort}`
+        },
       },
       {
-        field: 'download',
-        headerName: t('shared.labels.downloaded'),
-        width: 76,
-        minWidth: 60,
-        align: 'right',
-        cell: (row) => parseTraffic(row.download).join(' '),
-      },
-      {
-        field: 'upload',
-        headerName: t('shared.labels.uploaded'),
-        width: 76,
-        minWidth: 60,
-        align: 'right',
-        cell: (row) => parseTraffic(row.upload).join(' '),
-      },
-      {
-        field: 'dlSpeed',
-        headerName: t('connections.components.fields.dlSpeed'),
-        width: 76,
-        minWidth: 60,
-        align: 'right',
-        cell: (row) => `${parseTraffic(row.curDownload).join(' ')}/s`,
-      },
-      {
-        field: 'ulSpeed',
-        headerName: t('connections.components.fields.ulSpeed'),
-        width: 76,
-        minWidth: 60,
-        align: 'right',
-        cell: (row) => `${parseTraffic(row.curUpload).join(' ')}/s`,
-      },
-      {
-        field: 'chains',
-        headerName: t('connections.components.fields.chains'),
-        width: 280,
-        minWidth: 160,
-      },
-      {
-        field: 'rule',
-        headerName: t('connections.components.fields.rule'),
-        width: 220,
-        minWidth: 160,
-      },
-      {
-        field: 'process',
-        headerName: t('connections.components.fields.process'),
-        width: 180,
-        minWidth: 140,
-      },
-      {
-        field: 'time',
-        headerName: t('connections.components.fields.time'),
-        width: 100,
-        minWidth: 80,
-        align: 'right',
-      },
-      {
-        field: 'source',
-        headerName: t('connections.components.fields.source'),
-        width: 160,
-        minWidth: 120,
-      },
-      {
-        field: 'remoteDestination',
-        headerName: t('connections.components.fields.destination'),
-        width: 160,
-        minWidth: 120,
-      },
-      {
-        field: 'type',
-        headerName: t('connections.components.fields.type'),
-        width: 120,
-        minWidth: 80,
+        id: 'chains',
+        header: '路由',
+        cell: (ctx) => {
+          const row = ctx.row.original
+          const chains = row.chains || []
+          if (chains.length === 0) return '直连'
+          const upperChains = chains.map((c) => c.toUpperCase())
+          if (upperChains.includes('REJECT')) return '封锁'
+          if (upperChains.includes('DIRECT')) return '直连'
+          return '代理'
+        },
       },
     ]
-  }, [t])
-
-  useEffect(() => {
-    setColumnOrder((prevValue) => {
-      const baseFields = baseColumns.map((col) => col.field)
-      const prev = Array.isArray(prevValue) ? prevValue : []
-      const reconciled = reconcileColumnOrder(prev, baseFields)
-      if (
-        reconciled.length === prev.length &&
-        reconciled.every((field, i) => field === prev[i])
-      ) {
-        return prevValue
-      }
-      return reconciled
-    })
-  }, [baseColumns, setColumnOrder])
-
-  const handleColumnVisibilityChange = useCallback(
-    (update: Updater<VisibilityState>) => {
-      setColumnVisibilityModel((prev) => {
-        const current = prev ?? {}
-        const nextState =
-          typeof update === 'function' ? update(current) : update
-
-        const visibleCount = baseColumns.reduce((count, column) => {
-          const isVisible = (nextState[column.field] ?? true) !== false
-          return count + (isVisible ? 1 : 0)
-        }, 0)
-
-        if (visibleCount === 0) {
-          return current
-        }
-
-        const sanitized: VisibilityState = {}
-        baseColumns.forEach((column) => {
-          if (nextState[column.field] === false) {
-            sanitized[column.field] = false
-          }
-        })
-        return sanitized
-      })
-    },
-    [baseColumns, setColumnVisibilityModel],
-  )
-
-  const handleColumnOrderChange = useCallback(
-    (update: Updater<ColumnOrderState>) => {
-      setColumnOrder((prev) => {
-        const current = Array.isArray(prev) ? prev : []
-        const nextState =
-          typeof update === 'function' ? update(current) : update
-        const baseFields = baseColumns.map((col) => col.field)
-        return reconcileColumnOrder(nextState, baseFields)
-      })
-    },
-    [baseColumns, setColumnOrder],
-  )
+  }, [])
 
   const [sorting, setSorting] = useState<SortingState>([])
-
-  // columnDefs no longer depends on relativeNow — time column delegates to RelativeTimeCell
-  const columnDefs = useMemo<ColumnDef<IConnectionsItem>[]>(() => {
-    return baseColumns.map((column) => {
-      let cell: ColumnDef<IConnectionsItem>['cell']
-      if (column.field === 'time') {
-        cell = (ctx) => <RelativeTimeCell start={ctx.row.original.start} />
-      } else if (column.cell) {
-        const renderCell = column.cell
-        cell = (ctx) => renderCell(ctx.row.original)
-      } else {
-        cell = (ctx) =>
-          ctx.row.original
-            ? (getConnectionCellValue(
-                column.field,
-                ctx.row.original,
-              ) as ReactNode)
-            : null
-      }
-
-      return {
-        id: column.field,
-        accessorFn: (row) => getConnectionCellValue(column.field, row),
-        header: column.headerName,
-        size: column.width,
-        minSize: column.minWidth,
-        meta: {
-          align: column.align ?? 'left',
-          field: column.field,
-          label: column.headerName,
-        },
-        cell,
-      } satisfies ColumnDef<IConnectionsItem>
-    })
-  }, [baseColumns])
-
-  const handleColumnSizingChange = useCallback(
-    (updater: Updater<ColumnSizingState>) => {
-      setColumnWidths((prev) => {
-        const prevState = prev ?? {}
-        const nextState =
-          typeof updater === 'function' ? updater(prevState) : updater
-        const sanitized: ColumnSizingState = {}
-        Object.entries(nextState).forEach(([key, size]) => {
-          if (typeof size === 'number' && Number.isFinite(size)) {
-            sanitized[key] = size
-          }
-        })
-        return sanitized
-      })
-    },
-    [setColumnWidths],
-  )
 
   const table = useReactTable({
     data: connections,
     state: {
-      columnVisibility: columnVisibilityModel ?? {},
-      columnSizing: columnWidths,
-      columnOrder,
       sorting,
     },
-    initialState: {
-      columnOrder: baseColumns.map((col) => col.field),
-    },
-    defaultColumn: {
-      minSize: 80,
-      enableResizing: true,
-    },
-    columnResizeMode: 'onChange',
-    enableSortingRemoval: true,
-    getRowId: (row) => row.id,
+    onSortingChange: setSorting,
+    columns: columnDefs,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: sorting.length ? getSortedRowModel() : undefined,
-    onSortingChange: setSorting,
-    onColumnSizingChange: handleColumnSizingChange,
-    onColumnVisibilityChange: handleColumnVisibilityChange,
-    onColumnOrderChange: handleColumnOrderChange,
-    columns: columnDefs,
   })
-
-  const handleManagerOrderChange = useCallback(
-    (order: string[]) => {
-      const baseFields = baseColumns.map((col) => col.field)
-      table.setColumnOrder(reconcileColumnOrder(order, baseFields))
-    },
-    [baseColumns, table],
-  )
-
-  const handleResetColumns = useCallback(() => {
-    table.resetColumnVisibility()
-    table.resetColumnOrder()
-  }, [table])
 
   const rows = table.getRowModel().rows
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
@@ -759,8 +363,6 @@ export const ConnectionTable = (props: Props) => {
 
   const virtualRows = rowVirtualizer.getVirtualItems()
   const totalSize = rowVirtualizer.getTotalSize()
-  const tableWidth = table.getTotalSize()
-  const managerColumns = table.getAllLeafColumns()
 
   return (
     <>
@@ -769,29 +371,24 @@ export const ConnectionTable = (props: Props) => {
           <Box
             sx={{
               minWidth: '100%',
-              width: tableWidth,
+              width: '100%',
             }}
           >
             <Box sx={SX_HEADER_STICKY}>
               {table.getHeaderGroups().map((headerGroup) => (
                 <Box key={headerGroup.id} sx={SX_HEADER_ROW}>
                   {headerGroup.headers.map((header) => {
-                    if (header.isPlaceholder) {
-                      return null
-                    }
-                    const meta = header.column.columnDef.meta as {
-                      align?: 'left' | 'right'
-                      field: string
-                    }
+                    const isChains = header.column.id === 'chains'
                     return (
                       <Box
                         key={header.id}
                         sx={[
                           SX_HEADER_CELL_BASE,
                           {
-                            flex: `0 0 ${header.getSize()}px`,
-                            minWidth: header.column.columnDef.minSize ?? 80,
-                            maxWidth: header.column.columnDef.maxSize,
+                            flex: isChains ? '0 0 50px' : '1 1 0%',
+                            minWidth: 0,
+                            width: isChains ? '50px' : 'auto',
+                            borderRight: !isChains ? '2px solid var(--aero-border)' : 'none',
                           },
                         ]}
                       >
@@ -805,10 +402,7 @@ export const ConnectionTable = (props: Props) => {
                           sx={[
                             SX_CELL_CONTENT,
                             {
-                              justifyContent:
-                                meta?.align === 'right'
-                                  ? 'flex-end'
-                                  : 'flex-start',
+                              justifyContent: isChains ? 'center' : 'flex-start',
                               cursor: header.column.getCanSort()
                                 ? 'pointer'
                                 : 'default',
@@ -820,24 +414,10 @@ export const ConnectionTable = (props: Props) => {
                             header.getContext(),
                           )}
                           {{
-                            asc: '▲',
-                            desc: '▼',
+                            asc: ' ▲',
+                            desc: ' ▼',
                           }[header.column.getIsSorted() as string] ?? null}
                         </Box>
-                        {header.column.getCanResize() && (
-                          <Box
-                            onClick={(event) => event.stopPropagation()}
-                            onMouseDown={(event) => {
-                              event.stopPropagation()
-                              header.getResizeHandler()(event)
-                            }}
-                            onTouchStart={(event) => {
-                              event.stopPropagation()
-                              header.getResizeHandler()(event)
-                            }}
-                            sx={SX_RESIZE_HANDLE}
-                          />
-                        )}
                       </Box>
                     )
                   })}
@@ -869,13 +449,6 @@ export const ConnectionTable = (props: Props) => {
           </Box>
         </Box>
       </Box>
-      <ConnectionColumnManager
-        open={columnManagerOpen}
-        columns={managerColumns}
-        onClose={onCloseColumnManager}
-        onOrderChange={handleManagerOrderChange}
-        onReset={handleResetColumns}
-      />
 
       <Menu
         open={contextMenu !== null}
