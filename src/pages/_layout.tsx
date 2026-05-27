@@ -941,6 +941,7 @@ const Layout = () => {
                         size="small"
                         checked={verge?.enable_auto_launch ?? false}
                         onChange={(_, checked: boolean) => patchVerge({ enable_auto_launch: checked })}
+                        sx={{ transform: 'scale(0.75)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
@@ -949,6 +950,7 @@ const Layout = () => {
                         size="small"
                         checked={verge?.enable_silent_start ?? false}
                         onChange={(_, checked: boolean) => patchVerge({ enable_silent_start: checked })}
+                        sx={{ transform: 'scale(0.75)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
@@ -960,6 +962,7 @@ const Layout = () => {
                           setNotificationsEnabled(checked)
                           localStorage.setItem('clash-verge-enable-notification', checked ? 'true' : 'false')
                         }}
+                        sx={{ transform: 'scale(0.75)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
