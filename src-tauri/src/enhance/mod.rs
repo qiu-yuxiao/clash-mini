@@ -544,6 +544,84 @@ fn cleanup_proxy_groups(mut config: Mapping) -> Mapping {
         }
     }
 
+    let config = rewrite_rules(config, &allowed_names);
+
+    config
+}
+
+fn rewrite_rule_target(rule_str: &str, allowed_names: &HashSet<String>, default_group: &str) -> std::string::String {
+    let parts: Vec<&str> = rule_str.split(',').map(|s| s.trim()).collect();
+    if parts.is_empty() {
+        return rule_str.to_owned();
+    }
+
+    let rule_type = parts[0].to_ascii_uppercase();
+
+    // Determine the index of the target group in the parts array
+    let target_idx = if rule_type == "MATCH" {
+        if parts.len() >= 2 { Some(1) } else { None }
+    } else if parts.len() == 3 {
+        Some(2)
+    } else if parts.len() >= 4 {
+        // e.g. GEOIP,CN,DIRECT,no-resolve -> target is at index 2
+        // Check if the last part is a known option
+        let last_upper = parts[parts.len() - 1].to_ascii_uppercase();
+        if last_upper == "NO-RESOLVE" || last_upper == "FORCE-DNS" {
+            Some(2)
+        } else {
+            Some(parts.len() - 1)
+        }
+    } else {
+        None
+    };
+
+    if let Some(idx) = target_idx {
+        if idx < parts.len() {
+            let current_target = parts[idx];
+            
+            // Check case-insensitive match first
+            let matched_allowed = allowed_names.iter().find(|name| name.as_str().eq_ignore_ascii_case(current_target));
+
+            if let Some(allowed_name) = matched_allowed {
+                if allowed_name.as_str() != current_target {
+                    let mut new_parts = parts;
+                    new_parts[idx] = allowed_name.as_str();
+                    return new_parts.join(",");
+                }
+            } else {
+                // Target not found in allowed_names, fallback to default_group
+                let mut new_parts = parts;
+                new_parts[idx] = default_group;
+                return new_parts.join(",");
+            }
+        }
+    }
+
+    rule_str.to_owned()
+}
+
+fn rewrite_rules(mut config: Mapping, allowed_names: &HashSet<String>) -> Mapping {
+    let default_group = config
+        .get("proxy-groups")
+        .and_then(|v| v.as_sequence())
+        .and_then(|seq| seq.first())
+        .and_then(|item| item.as_mapping())
+        .and_then(|map| map.get("name"))
+        .and_then(Value::as_str)
+        .map(|s| s.to_owned())
+        .unwrap_or_else(|| "PROXY".to_owned());
+
+    let rule_fields = ["rules", "prepend-rules", "append-rules"];
+    for field in rule_fields {
+        if let Some(Value::Sequence(rules)) = config.get_mut(field) {
+            for rule_val in rules.iter_mut() {
+                if let Value::String(rule_str) = rule_val {
+                    let rewritten = rewrite_rule_target(rule_str.as_str(), allowed_names, &default_group);
+                    *rule_val = Value::String(rewritten.into());
+                }
+            }
+        }
+    }
     config
 }
 
