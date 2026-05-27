@@ -22,8 +22,8 @@ async function resolvePortable() {
   if (process.platform !== 'win32') return
 
   const releaseDir = target
-    ? `./src-tauri/target/${target}/release`
-    : `./src-tauri/target/release`
+    ? `./target/${target}/release`
+    : `./target/release`
   const configDir = path.join(releaseDir, '.config')
 
   if (!fs.existsSync(releaseDir)) {
@@ -36,7 +36,7 @@ async function resolvePortable() {
   }
   const zip = new AdmZip()
 
-  zip.addLocalFile(path.join(releaseDir, 'clash-verge.exe'))
+  zip.addLocalFile(path.join(releaseDir, 'clash-winlite.exe'))
   zip.addLocalFile(path.join(releaseDir, 'verge-mihomo.exe'))
   zip.addLocalFile(path.join(releaseDir, 'verge-mihomo-alpha.exe'))
   zip.addLocalFolder(path.join(releaseDir, 'resources'), 'resources')
@@ -45,7 +45,7 @@ async function resolvePortable() {
   const require = createRequire(import.meta.url)
   const packageJson = require('../package.json')
   const { version } = packageJson
-  const zipFile = `Clash.Verge_${version}_${arch}_portable.zip`
+  const zipFile = `Clash.WinLite_${version}_${arch}_portable.zip`
   zip.writeZip(zipFile)
   console.log('[INFO]: create portable zip successfully')
 }

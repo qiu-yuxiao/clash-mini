@@ -103,7 +103,7 @@
    * 智能规则分流 (Rule) 作为唯一核心默认工作模式。全局代理 (Global) 和完全直连 (Direct) 降权为临时排错手段，从主界面核心区移除。
 3. **GFWList 规则源与强规则置顶 (GEOSITE Rules & GFWList Fallback)**：
    * **强规则置顶**：为了 100% 避免国内 DNS 污染并保证核心服务绝对可用，在规则最顶部强制注入 Clash 内核自带的 `GEOSITE` 强域名解析规则，包含 `GEOSITE,google,PROXY`、`GEOSITE,github,PROXY` 和 `GEOSITE,telegram,PROXY`。
-   * **GFWList 兜底**：使用自动更新 of GFWList 规则集作为其他被墙网站的拦截与路由兜底，命中后走 `PROXY` 组。
+   * **GFWList 兜底**：使用自动更新 of GFWList 规则集作为其他被墙网站的拦截与路由兜底，命中后走 `PROXY` 组。为了避免在首次启动时因直连被墙而导致 `gfwlist` 无法下载，硬性在 `gfwlist` rule-provider 中配置 `proxy: PROXY`，强制通过选中的代理节点进行下载。
    * **国内流量直连**：规则最末尾使用 `MATCH,DIRECT` 确保未匹配到上述规则的国内流量默认直连。
 4. **设置页专属表格：手动路径控制（连接管理）双列设计与滚动条高度约束**：
     * **表格双列裁剪与比例伸缩**：彻底裁剪该表格至仅保留「链接目标 (Host)」与「路由 (Chains)」两列。在「路由 (Chains)」列中仅过滤提取并展示该连接对应为「直连」、「代理」或「封锁」三者之一的直接模式。「路由」列采用固定宽度布局（固定为 50px，始终贴 in 最右侧，居中对齐），左侧的「链接目标」列则采用 `flex: 1` 自适应拉伸。

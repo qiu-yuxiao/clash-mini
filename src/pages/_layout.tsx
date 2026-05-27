@@ -598,23 +598,31 @@ const Layout = () => {
   // Takeover actions
   const handleTakeoverModeChange = async (targetMode: 'system' | 'tun') => {
     if (targetMode === 'system') {
-      await patchVerge({ enable_tun_mode: false })
-      await toggleSystemProxy(true)
-      showNotice.success('已切换接管模式为：系统代理')
-    } else {
-      await toggleSystemProxy(false)
-      if (!isTunModeAvailable) {
-        try {
-          showNotice.info('正在自动安装/配置虚拟网卡系统服务...')
-          await installServiceAndRestartCore()
-          await mutateSystemState()
-        } catch (err) {
-          showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
-          return
-        }
+      if (systemProxyIndicator) {
+        await toggleSystemProxy(false)
+        showNotice.success('已关闭接管模式：系统代理')
+      } else {
+        await toggleSystemProxy(true)
+        showNotice.success('已开启接管模式：系统代理')
       }
-      await patchVerge({ enable_tun_mode: true })
-      showNotice.success('已切换接管模式为：TUN 虚拟网卡')
+    } else {
+      if (enable_tun_mode) {
+        await patchVerge({ enable_tun_mode: false })
+        showNotice.success('已关闭接管模式：TUN 虚拟网卡')
+      } else {
+        if (!isTunModeAvailable) {
+          try {
+            showNotice.info('正在自动安装/配置虚拟网卡系统服务...')
+            await installServiceAndRestartCore()
+            await mutateSystemState()
+          } catch (err) {
+            showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
+            return
+          }
+        }
+        await patchVerge({ enable_tun_mode: true })
+        showNotice.success('已开启接管模式：TUN 虚拟网卡')
+      }
     }
   }
 
@@ -990,7 +998,7 @@ const Layout = () => {
                   </Typography>
                   <ButtonGroup fullWidth size="small" sx={{ mb: 1 }}>
                     <Button
-                      variant={!enable_tun_mode && systemProxyIndicator ? 'contained' : 'outlined'}
+                      variant={systemProxyIndicator ? 'contained' : 'outlined'}
                       onClick={() => handleTakeoverModeChange('system')}
                       sx={{ fontSize: '11px', textTransform: 'none', height: 26 }}
                     >
@@ -1004,38 +1012,41 @@ const Layout = () => {
                       TUN 网卡
                     </Button>
                   </ButtonGroup>
-                    {/* advanced selection */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
-                      <Typography variant="caption" sx={{ fontSize: '11px', color: 'text.secondary' }}>代理策略</Typography>
-                      <Select
-                        size="small"
-                        value={clashConfig?.mode?.toLowerCase() || 'rule'}
-                        onChange={async (e) => {
-                          await patchClashMode(e.target.value as any)
-                          refreshClashConfig()
-                        }}
-                        sx={{ height: 22, fontSize: 11, minWidth: 90, '> div': { py: 0 } }}
-                        MenuProps={{
-                          slotProps: {
-                            paper: {
-                              sx: {
-                                minWidth: 100,
-                                '& .MuiMenuItem-root': {
-                                  fontSize: 11,
-                                  minHeight: '24px',
-                                  py: 0.5,
-                                  whiteSpace: 'nowrap',
-                                }
-                              }
-                            }
-                          }
-                        }}
-                      >
-                        <MenuItem value="rule" sx={{ fontSize: 11 }}>规则模式</MenuItem>
-                        <MenuItem value="global" sx={{ fontSize: 11 }}>全局代理</MenuItem>
-                        <MenuItem value="direct" sx={{ fontSize: 11 }}>全局直连</MenuItem>
-                      </Select>
-                    </Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
+                    代理策略
+                  </Typography>
+                  <ButtonGroup fullWidth size="small">
+                    <Button
+                      variant={clashConfig?.mode?.toLowerCase() === 'rule' ? 'contained' : 'outlined'}
+                      onClick={async () => {
+                        await patchClashMode('rule')
+                        refreshClashConfig()
+                      }}
+                      sx={{ fontSize: '11px', textTransform: 'none', height: 26, minWidth: 0, px: 0, whiteSpace: 'nowrap' }}
+                    >
+                      规则模式
+                    </Button>
+                    <Button
+                      variant={clashConfig?.mode?.toLowerCase() === 'global' ? 'contained' : 'outlined'}
+                      onClick={async () => {
+                        await patchClashMode('global')
+                        refreshClashConfig()
+                      }}
+                      sx={{ fontSize: '11px', textTransform: 'none', height: 26, minWidth: 0, px: 0, whiteSpace: 'nowrap' }}
+                    >
+                      全局代理
+                    </Button>
+                    <Button
+                      variant={clashConfig?.mode?.toLowerCase() === 'direct' ? 'contained' : 'outlined'}
+                      onClick={async () => {
+                        await patchClashMode('direct')
+                        refreshClashConfig()
+                      }}
+                      sx={{ fontSize: '11px', textTransform: 'none', height: 26, minWidth: 0, px: 0, whiteSpace: 'nowrap' }}
+                    >
+                      全局直连
+                    </Button>
+                  </ButtonGroup>
                 </Box>
 
                 {/* Section 3: Minimal Settings */}

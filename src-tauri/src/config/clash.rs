@@ -350,7 +350,7 @@ fn test_clash_info() {
         ClashInfo {
             mixed_port: port,
             socks_port: 10802,
-            port: 10803,
+            port: 7899,
             server: server.into(),
             secret: None,
         }

@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "clash-winlite"
-version = "0.2.10"
+version = "0.3.0"
 dependencies = [
  "aes-gcm",
  "anyhow",

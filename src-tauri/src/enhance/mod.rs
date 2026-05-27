@@ -655,6 +655,96 @@ async fn apply_dns_settings(mut config: Mapping, enable_dns_settings: bool) -> M
     config
 }
 
+fn enforce_winlite_agreements(mut config: Mapping) -> Mapping {
+    // 1. Extract all raw proxies from `proxies` sequence
+    let mut proxy_names = Vec::new();
+    if let Some(Value::Sequence(proxies)) = config.get("proxies") {
+        for p in proxies {
+            if let Some(name) = p.as_mapping().and_then(|m| m.get("name")).and_then(Value::as_str) {
+                proxy_names.push(Value::from(name.to_owned()));
+            } else if let Some(name) = p.as_str() {
+                proxy_names.push(Value::from(name.to_owned()));
+            }
+        }
+    }
+
+    // 2. Extract all proxy-provider names from `proxy-providers` mapping
+    let mut provider_names = Vec::new();
+    if let Some(Value::Mapping(providers)) = config.get("proxy-providers") {
+        for (k, _) in providers {
+            if let Some(name) = k.as_str() {
+                provider_names.push(Value::from(name.to_owned()));
+            }
+        }
+    }
+
+    // 3. Construct a single group named "PROXY" with type "select"
+    let mut single_group = Mapping::new();
+    single_group.insert(Value::from("name"), Value::from("PROXY"));
+    single_group.insert(Value::from("type"), Value::from("select"));
+    if !proxy_names.is_empty() {
+        single_group.insert(Value::from("proxies"), Value::from(proxy_names));
+    }
+    if !provider_names.is_empty() {
+        single_group.insert(Value::from("use"), Value::from(provider_names));
+    }
+    // If both are empty, fallback to DIRECT
+    if single_group.get("proxies").is_none() && single_group.get("use").is_none() {
+        single_group.insert(Value::from("proxies"), Value::from(vec![Value::from("DIRECT")]));
+    }
+
+    // Replace the entire proxy-groups sequence
+    config.insert(Value::from("proxy-groups"), Value::from(vec![Value::from(single_group)]));
+
+    // 4. Inject rule-provider for "gfwlist"
+    let mut gfwlist_provider = Mapping::new();
+    gfwlist_provider.insert(Value::from("type"), Value::from("http"));
+    gfwlist_provider.insert(Value::from("behavior"), Value::from("domain"));
+    gfwlist_provider.insert(Value::from("url"), Value::from("https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"));
+    gfwlist_provider.insert(Value::from("path"), Value::from("./ruleset/gfwlist.yaml"));
+    gfwlist_provider.insert(Value::from("interval"), Value::from(86400));
+    gfwlist_provider.insert(Value::from("proxy"), Value::from("PROXY"));
+
+    let mut rule_providers = match config.remove("rule-providers") {
+        Some(Value::Mapping(m)) => m,
+        _ => Mapping::new(),
+    };
+    rule_providers.insert(Value::from("gfwlist"), Value::from(gfwlist_provider));
+    config.insert(Value::from("rule-providers"), Value::from(rule_providers));
+
+    // 5. Construct the rules list
+    let mut final_rules = Vec::new();
+
+    // Add manual rules from prepend-rules
+    if let Some(Value::Sequence(prepend)) = config.remove("prepend-rules") {
+        for rule in prepend {
+            final_rules.push(rule);
+        }
+    }
+
+    // Add GEOSITE strong rules
+    final_rules.push(Value::from("GEOSITE,google,PROXY"));
+    final_rules.push(Value::from("GEOSITE,github,PROXY"));
+    final_rules.push(Value::from("GEOSITE,telegram,PROXY"));
+
+    // Add GFWList fallback rule
+    final_rules.push(Value::from("RULE-SET,gfwlist,PROXY"));
+
+    // Add manual rules from append-rules
+    if let Some(Value::Sequence(append)) = config.remove("append-rules") {
+        for rule in append {
+            final_rules.push(rule);
+        }
+    }
+
+    // Add MATCH,DIRECT as the final rule
+    final_rules.push(Value::from("MATCH,DIRECT"));
+
+    config.insert(Value::from("rules"), Value::from(final_rules));
+
+    config
+}
+
 /// Enhance mode
 /// 返回最终订阅、该订阅包含的键、和script执行的结果
 pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, ResultLog>)> {
@@ -721,6 +811,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     let mut config = apply_builtin_scripts(config, clash_core, enable_builtin).await;
 
     config = cleanup_proxy_groups(config);
+    config = enforce_winlite_agreements(config);
 
     config = use_tun(config, enable_tun);
     config = use_sort(config);
@@ -892,5 +983,78 @@ proxy-groups:
             .expect("proxies should be a sequence");
         assert_eq!(proxies.len(), 1);
         assert_eq!(proxies[0].as_str(), Some("DIRECT"));
+    }
+
+    #[test]
+    fn test_enforce_winlite_agreements_logic() {
+        use super::enforce_winlite_agreements;
+        use serde_yaml_ng::{Mapping, Value};
+
+        let config_str = r#"
+proxies:
+  - name: "node-A"
+    type: ss
+  - name: "node-B"
+    type: vmess
+proxy-providers:
+  providerA:
+    type: http
+    url: https://example.com
+    path: ./providerA.yaml
+proxy-groups:
+  - name: "Group-A"
+    type: select
+    proxies:
+      - "node-A"
+  - name: "Group-B"
+    type: select
+    proxies:
+      - "node-B"
+prepend-rules:
+  - PROCESS-NAME,custom-process,DIRECT
+append-rules:
+  - DOMAIN,custom-domain,REJECT
+"#;
+
+        let mut config: Mapping = serde_yaml_ng::from_str(config_str).unwrap();
+        config = enforce_winlite_agreements(config);
+
+        // 1. Verify single PROXY group
+        let groups = config.get("proxy-groups").and_then(Value::as_sequence).unwrap();
+        assert_eq!(groups.len(), 1);
+        let proxy_group = groups[0].as_mapping().unwrap();
+        assert_eq!(proxy_group.get("name").unwrap().as_str(), Some("PROXY"));
+        assert_eq!(proxy_group.get("type").unwrap().as_str(), Some("select"));
+
+        let group_proxies = proxy_group.get("proxies").and_then(Value::as_sequence).unwrap();
+        assert_eq!(group_proxies.len(), 2);
+        assert_eq!(group_proxies[0].as_str(), Some("node-A"));
+        assert_eq!(group_proxies[1].as_str(), Some("node-B"));
+
+        let group_uses = proxy_group.get("use").and_then(Value::as_sequence).unwrap();
+        assert_eq!(group_uses.len(), 1);
+        assert_eq!(group_uses[0].as_str(), Some("providerA"));
+
+        // 2. Verify gfwlist provider
+        let providers = config.get("rule-providers").and_then(Value::as_mapping).unwrap();
+        let gfwlist = providers.get("gfwlist").and_then(Value::as_mapping).unwrap();
+        assert_eq!(gfwlist.get("type").unwrap().as_str(), Some("http"));
+        assert_eq!(gfwlist.get("behavior").unwrap().as_str(), Some("domain"));
+        assert_eq!(gfwlist.get("url").unwrap().as_str(), Some("https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"));
+        assert_eq!(gfwlist.get("proxy").unwrap().as_str(), Some("PROXY"));
+
+        let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
+        assert_eq!(rules.len(), 7);
+        assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));
+        assert_eq!(rules[1].as_str(), Some("GEOSITE,google,PROXY"));
+        assert_eq!(rules[2].as_str(), Some("GEOSITE,github,PROXY"));
+        assert_eq!(rules[3].as_str(), Some("GEOSITE,telegram,PROXY"));
+        assert_eq!(rules[4].as_str(), Some("RULE-SET,gfwlist,PROXY"));
+        assert_eq!(rules[5].as_str(), Some("DOMAIN,custom-domain,REJECT"));
+        assert_eq!(rules[6].as_str(), Some("MATCH,DIRECT"));
+
+        // Verify prepend-rules and append-rules keys are removed
+        assert!(config.get("prepend-rules").is_none());
+        assert!(config.get("append-rules").is_none());
     }
 }
