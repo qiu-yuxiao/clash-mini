@@ -965,29 +965,36 @@ const Layout = () => {
                         sx={{ transform: 'scale(0.75)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 0.5 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <Typography variant="caption" sx={{ fontSize: '11px', color: 'text.secondary' }}>主题模式</Typography>
-                      </Box>
-                      <ButtonGroup fullWidth size="small" sx={{ mb: 0.5 }}>
+                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" sx={{ fontSize: '11px', flexShrink: 0 }}>主题模式</Typography>
+                      <ButtonGroup
+                        size="small"
+                        sx={{
+                          height: 22,
+                          '& .MuiButton-root': {
+                            fontSize: '10px',
+                            px: 0.5,
+                            minWidth: 32,
+                            py: 0,
+                            textTransform: 'none',
+                          }
+                        }}
+                      >
                         <Button
                           variant={(verge?.theme_mode ?? 'system') === 'system' ? 'contained' : 'outlined'}
                           onClick={() => patchVerge({ theme_mode: 'system' })}
-                          sx={{ fontSize: '11px', textTransform: 'none', height: 22, py: 0 }}
                         >
                           系统
                         </Button>
                         <Button
                           variant={verge?.theme_mode === 'light' ? 'contained' : 'outlined'}
                           onClick={() => patchVerge({ theme_mode: 'light' })}
-                          sx={{ fontSize: '11px', textTransform: 'none', height: 22, py: 0 }}
                         >
                           浅色
                         </Button>
                         <Button
                           variant={verge?.theme_mode === 'dark' ? 'contained' : 'outlined'}
                           onClick={() => patchVerge({ theme_mode: 'dark' })}
-                          sx={{ fontSize: '11px', textTransform: 'none', height: 22, py: 0 }}
                         >
                           深色
                         </Button>
