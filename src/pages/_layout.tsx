@@ -1007,7 +1007,6 @@ const Layout = () => {
                   {/* Centered Troubleshooting Button */}
                   <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
                     <Button
-                      className="aero-crystal-btn"
                       variant="contained"
                       size="small"
                       onClick={() => setLogsOpen(true)}
@@ -1153,31 +1152,36 @@ const Layout = () => {
         slotProps={{
           paper: {
             sx: {
-              background: mode === 'light' ? '#ffffff' : '#1e2438',
+              background: mode === 'light' ? 'var(--background-color)' : '#1e1f27',
+              height: '480px',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxSizing: 'border-box',
+              '& .base-page > header': {
+                pr: 6,
+              },
             }
           }
         }}
       >
-        <Paper
-          className="aero-crystal-card"
+        <IconButton
+          size="small"
+          onClick={() => setLogsOpen(false)}
           sx={{
-            p: 1.5,
-            height: '480px',
-            display: 'flex',
-            flexDirection: 'column',
-            boxSizing: 'border-box',
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            zIndex: 10,
+            color: 'text.secondary',
           }}
         >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>系统运行排错日志</Typography>
-            <IconButton size="small" onClick={() => setLogsOpen(false)}>
-              <CloseRounded fontSize="small" />
-            </IconButton>
-          </Box>
-          <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <LogsPage />
-          </Box>
-        </Paper>
+          <CloseRounded fontSize="small" />
+        </IconButton>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          <LogsPage />
+        </Box>
       </Dialog>
     </ThemeProvider>
   )
