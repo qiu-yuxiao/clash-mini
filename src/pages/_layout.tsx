@@ -897,7 +897,7 @@ const Layout = () => {
                   </ButtonGroup>
                     {/* advanced selection */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.5 }}>
-                      <Typography variant="caption" sx={{ fontSize: '12px', color: 'text.secondary' }}>代理策略</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '11px', color: 'text.secondary' }}>代理策略</Typography>
                       <Select
                         size="small"
                         value={clashConfig?.mode?.toLowerCase() || 'rule'}
@@ -905,14 +905,14 @@ const Layout = () => {
                           await patchClashMode(e.target.value as any)
                           refreshClashConfig()
                         }}
-                        sx={{ height: 22, fontSize: 10, minWidth: 90, '> div': { py: 0 } }}
+                        sx={{ height: 22, fontSize: 11, minWidth: 90, '> div': { py: 0 } }}
                         MenuProps={{
                           slotProps: {
                             paper: {
                               sx: {
                                 minWidth: 100,
                                 '& .MuiMenuItem-root': {
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   minHeight: '24px',
                                   py: 0.5,
                                   whiteSpace: 'nowrap',
@@ -922,9 +922,9 @@ const Layout = () => {
                           }
                         }}
                       >
-                        <MenuItem value="rule" sx={{ fontSize: 10 }}>规则模式</MenuItem>
-                        <MenuItem value="global" sx={{ fontSize: 10 }}>全局代理</MenuItem>
-                        <MenuItem value="direct" sx={{ fontSize: 10 }}>全局直连</MenuItem>
+                        <MenuItem value="rule" sx={{ fontSize: 11 }}>规则模式</MenuItem>
+                        <MenuItem value="global" sx={{ fontSize: 11 }}>全局代理</MenuItem>
+                        <MenuItem value="direct" sx={{ fontSize: 11 }}>全局直连</MenuItem>
                       </Select>
                     </Box>
                 </Box>
@@ -936,7 +936,7 @@ const Layout = () => {
                   </Typography>
                   <List dense sx={{ py: 0 }}>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>开机自动启动</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '11px' }}>开机自动启动</Typography>
                       <Switch
                         size="small"
                         checked={verge?.enable_auto_launch ?? false}
@@ -944,7 +944,7 @@ const Layout = () => {
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>启动时最小化</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '11px' }}>启动时最小化</Typography>
                       <Switch
                         size="small"
                         checked={verge?.enable_silent_start ?? false}
@@ -952,7 +952,7 @@ const Layout = () => {
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>通知弹窗显示</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '11px' }}>通知弹窗显示</Typography>
                       <Switch
                         size="small"
                         checked={notificationsEnabled}
@@ -963,19 +963,19 @@ const Layout = () => {
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13.5px' }}>外观主题</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '11px' }}>外观主题</Typography>
                       <Select
                         size="small"
                         value={verge?.theme_mode ?? 'system'}
                         onChange={async (e) => patchVerge({ theme_mode: e.target.value as any })}
-                        sx={{ height: 22, fontSize: 12, minWidth: 90, '> div': { py: 0 } }}
+                        sx={{ height: 22, fontSize: 11, minWidth: 90, '> div': { py: 0 } }}
                         MenuProps={{
                           slotProps: {
                             paper: {
                               sx: {
                                 minWidth: 100,
                                 '& .MuiMenuItem-root': {
-                                  fontSize: 12,
+                                  fontSize: 11,
                                   minHeight: '24px',
                                   py: 0.5,
                                   whiteSpace: 'nowrap',
@@ -985,13 +985,13 @@ const Layout = () => {
                           }
                         }}
                       >
-                        <MenuItem value="system" sx={{ fontSize: 12 }}>系统默认</MenuItem>
-                        <MenuItem value="light" sx={{ fontSize: 12 }}>浅色模式</MenuItem>
-                        <MenuItem value="dark" sx={{ fontSize: 12 }}>深色模式</MenuItem>
+                        <MenuItem value="system" sx={{ fontSize: 11 }}>系统默认</MenuItem>
+                        <MenuItem value="light" sx={{ fontSize: 11 }}>浅色模式</MenuItem>
+                        <MenuItem value="dark" sx={{ fontSize: 11 }}>深色模式</MenuItem>
                       </Select>
                     </ListItem>
                     <ListItem sx={{ py: 0.25, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="caption" sx={{ fontSize: '12px' }}>Mixed Port</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '11px' }}>Mixed Port</Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <TextField
                           size="small"
@@ -1042,7 +1042,7 @@ const Layout = () => {
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 0.5, width: '100%', justifyContent: 'flex-start' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
-                    手动控制路径（右键点击链接）
+                    路径控制（右键点击链接）
                   </Typography>
                   <ButtonGroup size="small" color="primary" sx={{ transform: 'scale(0.85)', transformOrigin: 'left center' }}>
                     <Button
