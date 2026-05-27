@@ -966,7 +966,7 @@ const Layout = () => {
                       />
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '11px' }}>外观主题</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '11px' }}>主题模式</Typography>
                       <Select
                         size="small"
                         value={verge?.theme_mode ?? 'system'}

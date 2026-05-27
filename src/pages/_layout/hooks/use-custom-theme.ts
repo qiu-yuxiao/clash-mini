@@ -11,23 +11,6 @@ import { defaultDarkTheme, defaultTheme } from '@/pages/_theme'
 import { useSetThemeMode, useThemeMode } from '@/services/states'
 import getSystem from '@/utils/get-system'
 
-const getSystemAccentColor = (): string => {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return '#5b5c9d'
-  try {
-    const tempDiv = document.createElement('div')
-    tempDiv.style.color = 'AccentColor'
-    document.body.appendChild(tempDiv)
-    const resolvedColor = window.getComputedStyle(tempDiv).color
-    document.body.removeChild(tempDiv)
-    if (resolvedColor && resolvedColor !== 'rgba(0, 0, 0, 0)' && resolvedColor !== 'transparent' && resolvedColor !== 'rgb(0, 0, 0)') {
-      return resolvedColor
-    }
-  } catch (err) {
-    console.error('Failed to get system accent color:', err)
-  }
-  return '#5b5c9d'
-}
-
 const CSS_INJECTION_SCOPE_ROOT = '[data-css-injection-root]'
 const CSS_INJECTION_SCOPE_LIMIT =
   ':is(.monaco-editor .view-lines, .monaco-editor .view-line, .monaco-editor .margin, .monaco-editor .margin-view-overlays, .monaco-editor .view-overlays, .monaco-editor [class^="mtk"], .monaco-editor [class*=" mtk"])'
@@ -164,7 +147,7 @@ export const useCustomTheme = () => {
     const dt = mode === 'light' ? defaultTheme : defaultDarkTheme
     let muiTheme: MuiTheme
 
-    const resolvedPrimary = setting.primary_color || (getSystem() === 'windows' ? getSystemAccentColor() : dt.primary_color)
+    const resolvedPrimary = setting.primary_color || dt.primary_color
 
     try {
       muiTheme = createTheme({
@@ -184,12 +167,8 @@ export const useCustomTheme = () => {
             secondary: setting.secondary_text || dt.secondary_text,
           },
           background: {
-            paper: getSystem() === 'windows'
-              ? (mode === 'light' ? '#ffffff' : '#1e2438')
-              : dt.background_color,
-            default: getSystem() === 'windows'
-              ? (mode === 'light' ? '#f0f5ff' : '#0f1423')
-              : dt.background_color,
+            paper: dt.background_color,
+            default: dt.background_color,
           },
         },
         shadows: Array(25).fill('none') as Shadows,
@@ -243,12 +222,8 @@ export const useCustomTheme = () => {
           success: { main: dt.success_color },
           text: { primary: dt.primary_text, secondary: dt.secondary_text },
           background: {
-            paper: getSystem() === 'windows'
-              ? (mode === 'light' ? '#ffffff' : '#1e2438')
-              : dt.background_color,
-            default: getSystem() === 'windows'
-              ? (mode === 'light' ? '#f0f5ff' : '#0f1423')
-              : dt.background_color,
+            paper: dt.background_color,
+            default: dt.background_color,
           },
         },
         typography: {
