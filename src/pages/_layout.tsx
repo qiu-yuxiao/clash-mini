@@ -298,41 +298,22 @@ const WinLiteTrafficPanel = () => {
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
-          gap: 0.75,
+          gap: 0.5,
           height: '24px',
-          px: 1.5,
+          px: 1.25,
           borderRadius: '6px',
           border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
           bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
           boxShadow: mode === 'light'
             ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
             : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
           <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 13 }} />
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold' }}>上传速度:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#D4AF37' }}>
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>上传:</Typography>
+          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#D4AF37', whiteSpace: 'nowrap' }}>
             {upVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#8c7010' : '#b29645' }}>{upUnit}/s</span>
-          </Typography>
-        </Box>
-
-        {/* Download Speed */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 0.75,
-          height: '24px',
-          px: 1.5,
-          borderRadius: '6px',
-          border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
-          bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
-          boxShadow: mode === 'light'
-            ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-        }}>
-          <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 13 }} />
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold' }}>下载速度:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF' }}>
-            {downVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#0052a3' : '#8cd9ff' }}>{downUnit}/s</span>
           </Typography>
         </Box>
 
@@ -340,19 +321,44 @@ const WinLiteTrafficPanel = () => {
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
-          gap: 0.75,
+          gap: 0.5,
           height: '24px',
-          px: 1.5,
+          px: 1.25,
           borderRadius: '6px',
           border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
           bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
           boxShadow: mode === 'light'
             ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
             : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold' }}>上传总量:</Typography>
-          <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: '#D4AF37' }}>
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
+          <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: '#D4AF37', whiteSpace: 'nowrap' }}>
             {upTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#8c7010' : '#b29645', fontWeight: 'normal' }}>{upTotalUnit}</span>
+          </Typography>
+        </Box>
+
+        {/* Download Speed */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 0.5,
+          height: '24px',
+          px: 1.25,
+          borderRadius: '6px',
+          border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
+          bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
+          boxShadow: mode === 'light'
+            ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
+            : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
+        }}>
+          <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 13 }} />
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>下载:</Typography>
+          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
+            {downVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#0052a3' : '#8cd9ff' }}>{downUnit}/s</span>
           </Typography>
         </Box>
 
@@ -360,18 +366,20 @@ const WinLiteTrafficPanel = () => {
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
-          gap: 0.75,
+          gap: 0.5,
           height: '24px',
-          px: 1.5,
+          px: 1.25,
           borderRadius: '6px',
           border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
           bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
           boxShadow: mode === 'light'
             ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
             : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
         }}>
-          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold' }}>下载总量:</Typography>
-          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF' }}>
+          <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
+          <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
             {downTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#0052a3' : '#8cd9ff', fontWeight: 'normal' }}>{downTotalUnit}</span>
           </Typography>
         </Box>
@@ -623,18 +631,18 @@ const Layout = () => {
             size="small"
             onClick={() => setDrawerOpen(!drawerOpen)}
             sx={{
-              color: 'text.primary',
+              color: drawerOpen ? 'primary.main' : 'text.primary',
               p: 0.5,
               mr: 1,
               borderRadius: '6px',
-              border: drawerOpen ? '1px solid rgba(10, 132, 255, 0.5)' : '1px solid transparent',
-              background: drawerOpen ? 'rgba(10, 132, 255, 0.15) !important' : 'transparent',
+              border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+              background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
               '&:hover': {
                 background: 'rgba(255, 255, 255, 0.2) !important',
               }
             }}
           >
-            <SettingsRoundedIcon fontSize="small" />
+            {drawerOpen ? <CloseRounded fontSize="small" /> : <SettingsRoundedIcon fontSize="small" />}
           </IconButton>
           
           <WindowControls ref={windowControlsRef} />
@@ -730,15 +738,15 @@ const Layout = () => {
                 height: '36px',
                 zIndex: 101,
                 borderRadius: 0,
-                color: 'text.primary',
-                border: drawerOpen ? '1px solid rgba(10, 132, 255, 0.5)' : '1px solid transparent',
-                background: drawerOpen ? 'rgba(10, 132, 255, 0.15) !important' : 'transparent',
+                color: drawerOpen ? 'primary.main' : 'text.primary',
+                border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+                background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
                 '&:hover': {
                   background: 'rgba(255, 255, 255, 0.2) !important',
                 }
               }}
             >
-              <SettingsRoundedIcon fontSize="small" />
+              {drawerOpen ? <CloseRounded fontSize="small" /> : <SettingsRoundedIcon fontSize="small" />}
             </IconButton>
           )}
 
@@ -815,59 +823,118 @@ const Layout = () => {
                       slotProps={{ htmlInput: { style: { paddingTop: '4px', paddingBottom: '4px', fontSize: '11px', height: '26px', boxSizing: 'border-box' } } }}
                       sx={{ width: '100%' }}
                     />
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleImportProfile}
-                      sx={{
-                        fontSize: 11,
-                        height: 26,
-                        width: '100%',
-                        textTransform: 'none',
-                      }}
-                      disabled={profileLoading}
-                    >
-                      导入订阅链接（YAML）
-                    </Button>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleImportProfile}
+                        sx={{
+                          fontSize: 11,
+                          height: 26,
+                          textTransform: 'none',
+                          px: 2,
+                        }}
+                        disabled={profileLoading}
+                      >
+                        导入订阅链接（YAML）
+                      </Button>
+                    </Box>
                   </Box>
                   {/* Profiles List */}
                   <Box sx={{ maxHeight: 110, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     {profileItems.map((item) => {
                       const isActive = item.uid === currentProfileUid
+                      const extra = item.extra
+                      const hasExtra = !!extra
+                      const { upload = 0, download = 0, total = 0 } = extra ?? {}
+                      const progress = total > 0 ? Math.min(Math.round(((download + upload) * 100) / (total + 0.01)), 100) : 0
+                      
+                      const formatTraffic = (num?: number) => {
+                        if (typeof num !== 'number') return '-'
+                        const [val, unit] = parseTraffic(num)
+                        return `${val}${unit}`
+                      }
+
+                      const formatExpire = (expire?: number) => {
+                        if (!expire) return '-'
+                        return dayjs(expire * 1000).format('YYYY-MM-DD')
+                      }
+
                       return (
                         <Box
                           key={item.uid}
                           onClick={() => handleSelectProfile(item.uid)}
                           sx={{
                             display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            p: '4px 8px',
+                            flexDirection: 'column',
+                            p: '6px 8px',
+                            mb: 0.5,
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            bgcolor: isActive ? 'primary.main' : 'action.hover',
-                            color: isActive ? 'primary.contrastText' : 'text.primary',
-                            border: isActive ? '1px solid' : '1px solid transparent',
-                            borderColor: isActive ? 'primary.light' : 'transparent',
+                            bgcolor: (theme) => theme.palette.mode === 'light' ? '#ffffff' : '#282A36',
+                            borderLeft: (theme) => `3px solid ${isActive ? theme.palette.primary.main : 'transparent'}`,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                             transition: 'all 0.2s',
                             '&:hover': {
-                              bgcolor: isActive ? 'primary.main' : 'action.selected',
+                              bgcolor: 'action.hover',
                             }
                           }}
                         >
-                          <Typography variant="body2" sx={{ fontSize: '11px', fontWeight: isActive ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-                            {item.name || '未命名配置'}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.25 }}>
-                            {item.type === 'remote' && (
-                              <IconButton size="small" onClick={(e) => handleUpdateProfile(item.uid, e)} sx={{ p: 0.1, color: 'inherit' }}>
-                                <RefreshRounded sx={{ fontSize: 12 }} />
+                          {/* Line 1: Title & Actions */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontSize: '11px',
+                                fontWeight: isActive ? 600 : 400,
+                                color: isActive ? 'primary.main' : 'text.primary',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                maxWidth: '70%'
+                              }}
+                              title={item.name}
+                            >
+                              {item.name || '未命名配置'}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center' }}>
+                              {item.type === 'remote' && (
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => handleUpdateProfile(item.uid, e)}
+                                  sx={{ p: 0.1, color: isActive ? 'primary.main' : 'text.secondary' }}
+                                >
+                                  <RefreshRounded sx={{ fontSize: 12 }} />
+                                </IconButton>
+                              )}
+                              <IconButton
+                                size="small"
+                                onClick={(e) => handleDeleteProfile(item.uid, e)}
+                                sx={{ p: 0.1, color: 'error.main' }}
+                              >
+                                <DeleteRounded sx={{ fontSize: 12 }} />
                               </IconButton>
-                            )}
-                            <IconButton size="small" onClick={(e) => handleDeleteProfile(item.uid, e)} sx={{ p: 0.1, color: isActive ? 'inherit' : 'error.main' }}>
-                              <DeleteRounded sx={{ fontSize: 12 }} />
-                            </IconButton>
+                            </Box>
                           </Box>
+
+                          {/* Line 2: Traffic & Expiration (Only for remote with extra data) */}
+                          {item.type === 'remote' && hasExtra && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.25, fontSize: '9px', color: 'text.secondary' }}>
+                              <span>
+                                {formatTraffic(upload + download)} / {formatTraffic(total)}
+                              </span>
+                              <span>
+                                {extra?.expire ? formatExpire(extra.expire) : '-'}
+                              </span>
+                            </Box>
+                          )}
+
+                          {/* Line 3: Traffic progress bar (Only if total traffic > 0) */}
+                          {item.type === 'remote' && total > 0 && (
+                            <Box sx={{ width: '100%', height: 2, bgcolor: 'action.hover', borderRadius: 1, mt: 0.5, overflow: 'hidden' }}>
+                              <Box sx={{ width: `${progress}%`, height: '100%', bgcolor: 'primary.main' }} />
+                            </Box>
+                          )}
                         </Box>
                       )
                     })}
@@ -1018,17 +1085,17 @@ const Layout = () => {
                   </List>
                   
                   {/* Centered Troubleshooting Button */}
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', mt: 1 }}>
                     <Button
-                      variant="outlined"
+                      variant="contained"
                       color="primary"
                       size="small"
                       onClick={() => setLogsOpen(true)}
                       sx={{
                         fontSize: 11,
                         height: 26,
-                        width: '90%',
                         textTransform: 'none',
+                        px: 2,
                       }}
                     >
                       系统调试运行日志
@@ -1119,24 +1186,6 @@ const Layout = () => {
                   )}
                 </Box>
               </Box>
-
-              {/* Close Button in Settings Panel */}
-              <IconButton
-                onClick={() => setDrawerOpen(false)}
-                sx={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  bgcolor: 'action.hover',
-                  p: 0.5,
-                  '&:hover': {
-                    bgcolor: 'action.selected',
-                  }
-                }}
-                size="small"
-              >
-                <CloseRounded fontSize="small" />
-              </IconButton>
             </div>
           </div>
 
