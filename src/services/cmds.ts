@@ -63,7 +63,7 @@ export async function enhanceProfiles() {
             // 只保留唯一的 PROXY 组
             doc['proxy-groups'] = [newGroup]
             
-            // 摒弃并清空机场订阅自带的规则列表，完全托管给 Clash WinAero 自身的智能路由
+            // 摒弃并清空机场订阅自带的规则列表，完全托管给 Clash WinLite 自身的智能路由
             doc.rules = []
             
             modified = true

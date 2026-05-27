@@ -370,19 +370,19 @@ pub fn init_scheme() -> Result<()> {
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     
-    // Register clash-winaero:// URL protocol
-    let (clash_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winaero")?;
-    clash_wa.set_value("", &"Clash WinAero")?;
-    clash_wa.set_value("URL Protocol", &"Clash WinAero URL Scheme Protocol")?;
-    let (default_icon_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winaero\\DefaultIcon")?;
+    // Register clash-winlite:// URL protocol
+    let (clash_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winlite")?;
+    clash_wa.set_value("", &"Clash WinLite")?;
+    clash_wa.set_value("URL Protocol", &"Clash WinLite URL Scheme Protocol")?;
+    let (default_icon_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winlite\\DefaultIcon")?;
     default_icon_wa.set_value("", &app_exe)?;
-    let (command_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winaero\\Shell\\Open\\Command")?;
+    let (command_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winlite\\Shell\\Open\\Command")?;
     command_wa.set_value("", &format!("{app_exe} \"%1\""))?;
 
     // Register clash:// URL protocol
     let (clash, _) = hkcu.create_subkey("Software\\Classes\\Clash")?;
-    clash.set_value("", &"Clash WinAero")?;
-    clash.set_value("URL Protocol", &"Clash WinAero URL Scheme Protocol")?;
+    clash.set_value("", &"Clash WinLite")?;
+    clash.set_value("URL Protocol", &"Clash WinLite URL Scheme Protocol")?;
     let (default_icon, _) = hkcu.create_subkey("Software\\Classes\\Clash\\DefaultIcon")?;
     default_icon.set_value("", &app_exe)?;
     let (command, _) = hkcu.create_subkey("Software\\Classes\\Clash\\Shell\\Open\\Command")?;
@@ -418,7 +418,7 @@ pub const fn init_scheme() -> Result<()> {
 }
 
 #[cfg(target_os = "linux")]
-const DEEP_LINK_SCHEMES: &[&str] = &["clash", "clash-winaero"];
+const DEEP_LINK_SCHEMES: &[&str] = &["clash", "clash-winlite"];
 
 pub async fn startup_script() -> Result<()> {
     let app_handle = handle::Handle::app_handle();

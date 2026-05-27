@@ -900,33 +900,33 @@ Section Install
 
   ; Remove stale window-state files
   DetailPrint "Removing window-state.json / .window-state.json"
-  Delete "$APPDATA\io.github.clash-winaero.clash-winaero\window-state.json"
-  Delete "$APPDATA\io.github.clash-winaero.clash-winaero\.window-state.json"
+  Delete "$APPDATA\io.github.clash-winlite.clash-winlite\window-state.json"
+  Delete "$APPDATA\io.github.clash-winlite.clash-winlite\.window-state.json"
 
   ; Clean legacy auto-launch registry entries
   StrCpy $R1 "Software\Microsoft\Windows\CurrentVersion\Run"
 
   SetRegView 64
-  ReadRegStr $R2 HKCU "$R1" "Clash WinAero"
+  ReadRegStr $R2 HKCU "$R1" "Clash WinLite"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "Clash WinAero"
+    DeleteRegValue HKCU "$R1" "Clash WinLite"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "Clash WinAero"
+  ReadRegStr $R2 HKLM "$R1" "Clash WinLite"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "Clash WinAero"
+    DeleteRegValue HKLM "$R1" "Clash WinLite"
   ${EndIf}
-  ReadRegStr $R2 HKCU "$R1" "clash-winaero"
+  ReadRegStr $R2 HKCU "$R1" "clash-winlite"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "clash-winaero"
+    DeleteRegValue HKCU "$R1" "clash-winlite"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "clash-winaero"
+  ReadRegStr $R2 HKLM "$R1" "clash-winlite"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "clash-winaero"
+    DeleteRegValue HKLM "$R1" "clash-winlite"
   ${EndIf}
 
   ; Remove legacy executables
-  IfFileExists "$INSTDIR\Clash WinAero.exe" 0 +2
-    Delete "$INSTDIR\Clash WinAero.exe"
+  IfFileExists "$INSTDIR\Clash WinLite.exe" 0 +2
+    Delete "$INSTDIR\Clash WinLite.exe"
 
   !insertmacro SetContext
 
@@ -1074,33 +1074,33 @@ Section Uninstall
   ; Remove cached window state files
   DetailPrint "Removing window-state.json / .window-state.json"
   SetShellVarContext current
-  Delete "$APPDATA\io.github.clash-winaero.clash-winaero\window-state.json"
-  Delete "$APPDATA\io.github.clash-winaero.clash-winaero\.window-state.json"
+  Delete "$APPDATA\io.github.clash-winlite.clash-winlite\window-state.json"
+  Delete "$APPDATA\io.github.clash-winlite.clash-winlite\.window-state.json"
 
   ; Clean legacy auto-launch registry entries
   StrCpy $R1 "Software\Microsoft\Windows\CurrentVersion\Run"
 
   SetRegView 64
-  ReadRegStr $R2 HKCU "$R1" "Clash WinAero"
+  ReadRegStr $R2 HKCU "$R1" "Clash WinLite"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "Clash WinAero"
+    DeleteRegValue HKCU "$R1" "Clash WinLite"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "Clash WinAero"
+  ReadRegStr $R2 HKLM "$R1" "Clash WinLite"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "Clash WinAero"
+    DeleteRegValue HKLM "$R1" "Clash WinLite"
   ${EndIf}
-  ReadRegStr $R2 HKCU "$R1" "clash-winaero"
+  ReadRegStr $R2 HKCU "$R1" "clash-winlite"
   ${If} $R2 != ""
-    DeleteRegValue HKCU "$R1" "clash-winaero"
+    DeleteRegValue HKCU "$R1" "clash-winlite"
   ${EndIf}
-  ReadRegStr $R2 HKLM "$R1" "clash-winaero"
+  ReadRegStr $R2 HKLM "$R1" "clash-winlite"
   ${If} $R2 != ""
-    DeleteRegValue HKLM "$R1" "clash-winaero"
+    DeleteRegValue HKLM "$R1" "clash-winlite"
   ${EndIf}
 
   ; Remove legacy executables
-  IfFileExists "$INSTDIR\Clash WinAero.exe" 0 +2
-    Delete "$INSTDIR\Clash WinAero.exe"
+  IfFileExists "$INSTDIR\Clash WinLite.exe" 0 +2
+    Delete "$INSTDIR\Clash WinLite.exe"
 
   !insertmacro SetContext
 
@@ -1171,8 +1171,8 @@ Section Uninstall
     ${EndIf}
 
     ; Remove legacy public desktop shortcuts
-    Delete "C:\Users\Public\Desktop\Clash WinAero.lnk"
-    Delete "C:\Users\Public\Desktop\clash-winaero.lnk"
+    Delete "C:\Users\Public\Desktop\Clash WinLite.lnk"
+    Delete "C:\Users\Public\Desktop\clash-winlite.lnk"
 
     ; Remove legacy shortcuts from all user desktops
     DetailPrint "Removing ${PRODUCTNAME} shortcuts from all user desktops..."
@@ -1186,8 +1186,8 @@ Section Uninstall
       ReadRegStr $R3 HKLM "SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$R2" "ProfileImagePath"
       ${If} $R3 != ""
         StrCpy $R4 "$R3\Desktop"
-        Delete "$R4\Clash WinAero.lnk"
-        Delete "$R4\clash-winaero.lnk"
+        Delete "$R4\Clash WinLite.lnk"
+        Delete "$R4\clash-winlite.lnk"
       ${EndIf}
       IntOp $R1 $R1 + 1
       Goto LegacyUserLoop
@@ -1196,22 +1196,22 @@ Section Uninstall
 
     ; Remove legacy start menu folders
     SetShellVarContext current
-    RMDir /r /REBOOTOK "$SMPROGRAMS\Clash WinAero"
-    RMDir /r /REBOOTOK "$SMPROGRAMS\clash-winaero"
+    RMDir /r /REBOOTOK "$SMPROGRAMS\Clash WinLite"
+    RMDir /r /REBOOTOK "$SMPROGRAMS\clash-winlite"
     !insertmacro SetContext
-    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Clash WinAero"
-    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\clash-winaero"
+    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Clash WinLite"
+    RMDir /r /REBOOTOK "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\clash-winlite"
 
     ; Clean legacy registry keys
     SetRegView 64
-    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Clash WinAero.exe"
-    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\clash-winaero.exe"
-    DeleteRegKey HKLM "Software\Clash WinAero"
-    DeleteRegKey HKLM "Software\clash-winaero"
-    DeleteRegKey HKCU "Software\Clash WinAero"
-    DeleteRegKey HKCU "Software\clash-winaero"
-    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClashWinAero"
-    DeleteRegKey HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Clash WinAero"
+    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Clash WinLite.exe"
+    DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\clash-winlite.exe"
+    DeleteRegKey HKLM "Software\Clash WinLite"
+    DeleteRegKey HKLM "Software\clash-winlite"
+    DeleteRegKey HKCU "Software\Clash WinLite"
+    DeleteRegKey HKCU "Software\clash-winlite"
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\ClashWinLite"
+    DeleteRegKey HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Clash WinLite"
 
     StrCpy $R1 0
     LegacyUninstallLoop:
@@ -1221,8 +1221,8 @@ Section Uninstall
       ${EndIf}
       ReadRegStr $R3 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$R2" "DisplayName"
       ${If} $R3 != ""
-        StrCmp $R3 "Clash WinAero" 0 +3
-        StrCmp $R3 "clash-winaero" 0 +2
+        StrCmp $R3 "Clash WinLite" 0 +3
+        StrCmp $R3 "clash-winlite" 0 +2
         DeleteRegKey HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$R2"
       ${EndIf}
       IntOp $R1 $R1 + 1

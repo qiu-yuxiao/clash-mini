@@ -8,11 +8,11 @@ use std::process::{Command, Output};
 use windows::Win32::Globalization::{GetACP, GetOEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
-const TASK_NAME_USER: &str = "Clash WinAero";
-const TASK_NAME_ADMIN: &str = "Clash WinAero (Admin)";
+const TASK_NAME_USER: &str = "Clash WinLite";
+const TASK_NAME_ADMIN: &str = "Clash WinLite (Admin)";
 const TASK_XML_DIR: &str = "tasks";
-const TASK_XML_USER: &str = "clash-winaero-task-user.xml";
-const TASK_XML_ADMIN: &str = "clash-winaero-task-admin.xml";
+const TASK_XML_USER: &str = "clash-winlite-task-user.xml";
+const TASK_XML_ADMIN: &str = "clash-winlite-task-admin.xml";
 
 #[derive(Clone, Copy)]
 pub enum TaskMode {
@@ -97,9 +97,13 @@ fn get_startup_dir() -> Result<PathBuf> {
 
 async fn cleanup_legacy_shortcuts() -> Result<()> {
     let startup_dir = get_startup_dir()?;
-    let old_shortcut = startup_dir.join("Clash-WinAero.lnk");
-    let new_shortcut = startup_dir.join("Clash WinAero.lnk");
+    let old_winaero_shortcut = startup_dir.join("Clash-WinAero.lnk");
+    let winaero_shortcut = startup_dir.join("Clash WinAero.lnk");
+    let old_shortcut = startup_dir.join("Clash-WinLite.lnk");
+    let new_shortcut = startup_dir.join("Clash WinLite.lnk");
 
+    old_winaero_shortcut.remove_if_exists().await?;
+    winaero_shortcut.remove_if_exists().await?;
     old_shortcut.remove_if_exists().await?;
     new_shortcut.remove_if_exists().await?;
     Ok(())

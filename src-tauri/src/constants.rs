@@ -32,8 +32,8 @@ pub mod timing {
 }
 
 pub mod files {
-    pub const RUNTIME_CONFIG: &str = "clash-winaero.yaml";
-    pub const CHECK_CONFIG: &str = "clash-winaero-check.yaml";
+    pub const RUNTIME_CONFIG: &str = "clash-winlite.yaml";
+    pub const CHECK_CONFIG: &str = "clash-winlite-check.yaml";
     pub const DNS_CONFIG: &str = "dns_config.yaml";
     pub const WINDOW_STATE: &str = "window_state.json";
 }

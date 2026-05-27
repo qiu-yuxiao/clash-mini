@@ -22,18 +22,18 @@ notifications:
     body: プロファイルが再有効化されました。
   appQuit:
     title: 終了間近
-    body: Clash WinAero はまもなく終了します。
+    body: Clash WinLite はまもなく終了します。
   appHidden:
     title: アプリが非表示
-    body: Clash WinAero はバックグラウンドで実行中です。
+    body: Clash WinLite はバックグラウンドで実行中です。
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash WinAero サービスのインストールには管理者権限が必要です。
-  adminUninstallPrompt: Clash WinAero サービスのアンインストールには管理者権限が必要です。
+  adminInstallPrompt: Clash WinLite サービスのインストールには管理者権限が必要です。
+  adminUninstallPrompt: Clash WinLite サービスのアンインストールには管理者権限が必要です。
 tray:
   dashboard: ダッシュボード
   ruleMode: ルールモード

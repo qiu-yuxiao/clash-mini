@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "identifier": "io.github.clash-winaero.clash-winaero",
+  "identifier": "io.github.clash-winlite.clash-winlite",
   "bundle": {
     "targets": ["nsis"],
     "windows": {

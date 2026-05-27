@@ -9,14 +9,14 @@ use std::{fs, path::PathBuf};
 use tauri::Manager as _;
 
 #[cfg(not(feature = "verge-dev"))]
-pub static APP_ID: &str = "io.github.clash-winaero.clash-winaero";
+pub static APP_ID: &str = "io.github.clash-winlite.clash-winlite";
 #[cfg(not(feature = "verge-dev"))]
-pub static BACKUP_DIR: &str = "clash-winaero-backup";
+pub static BACKUP_DIR: &str = "clash-winlite-backup";
 
 #[cfg(feature = "verge-dev")]
-pub static APP_ID: &str = "io.github.clash-winaero.clash-winaero.dev";
+pub static APP_ID: &str = "io.github.clash-winlite.clash-winlite.dev";
 #[cfg(feature = "verge-dev")]
-pub static BACKUP_DIR: &str = "clash-winaero-backup-dev";
+pub static BACKUP_DIR: &str = "clash-winlite-backup-dev";
 
 pub static PORTABLE_FLAG: OnceCell<bool> = OnceCell::new();
 
@@ -222,18 +222,18 @@ pub fn ensure_mihomo_safe_dir() -> Option<PathBuf> {
 #[cfg(unix)]
 pub fn ipc_path() -> Result<PathBuf> {
     ensure_mihomo_safe_dir()
-        .map(|base_dir| base_dir.join("winaero").join("winaero-mihomo.sock"))
+        .map(|base_dir| base_dir.join("winlite").join("winlite-mihomo.sock"))
         .or_else(|| {
             app_home_dir()
                 .ok()
-                .map(|dir| dir.join("winaero").join("winaero-mihomo.sock"))
+                .map(|dir| dir.join("winlite").join("winlite-mihomo.sock"))
         })
         .ok_or_else(|| anyhow::anyhow!("Failed to determine ipc path"))
 }
 
 #[cfg(target_os = "windows")]
 pub fn ipc_path() -> Result<PathBuf> {
-    Ok(PathBuf::from(r"\\.\pipe\winaero-mihomo"))
+    Ok(PathBuf::from(r"\\.\pipe\winlite-mihomo"))
 }
 #[async_trait]
 pub trait PathBufExec {

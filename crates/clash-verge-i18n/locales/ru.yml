@@ -22,18 +22,18 @@ notifications:
     body: Профиль повторно активирован.
   appQuit:
     title: Скорый выход
-    body: Clash WinAero скоро завершит работу.
+    body: Clash WinLite скоро завершит работу.
   appHidden:
     title: Приложение скрыто
-    body: Clash WinAero работает в фоновом режиме.
+    body: Clash WinLite работает в фоновом режиме.
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Для установки службы Clash WinAero требуются права администратора.
-  adminUninstallPrompt: Для удаления службы Clash WinAero требуются права администратора.
+  adminInstallPrompt: Для установки службы Clash WinLite требуются права администратора.
+  adminUninstallPrompt: Для удаления службы Clash WinLite требуются права администратора.
 tray:
   dashboard: Панель
   ruleMode: Режим правил

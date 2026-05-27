@@ -22,18 +22,18 @@ notifications:
     body: پروفایل دوباره فعال شد.
   appQuit:
     title: در آستانه خروج
-    body: Clash WinAero در آستانه خروج است.
+    body: Clash WinLite در آستانه خروج است.
   appHidden:
     title: برنامه پنهان شد
-    body: Clash WinAero در پس‌زمینه در حال اجراست.
+    body: Clash WinLite در پس‌زمینه در حال اجراست.
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: نصب سرویس Clash WinAero به دسترسی مدیر نیاز دارد.
-  adminUninstallPrompt: حذف سرویس Clash WinAero به دسترسی مدیر نیاز دارد.
+  adminInstallPrompt: نصب سرویس Clash WinLite به دسترسی مدیر نیاز دارد.
+  adminUninstallPrompt: حذف سرویس Clash WinLite به دسترسی مدیر نیاز دارد.
 tray:
   dashboard: داشبورد
   ruleMode: حالت قوانین

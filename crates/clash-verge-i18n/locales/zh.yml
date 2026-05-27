@@ -22,18 +22,18 @@ notifications:
     body: 订阅已激活。
   appQuit:
     title: 即将退出
-    body: Clash WinAero 即将退出。
+    body: Clash WinLite 即将退出。
   appHidden:
     title: 应用已隐藏
-    body: Clash WinAero 正在后台运行。
+    body: Clash WinLite 正在后台运行。
   updateReady:
-    title: Clash WinAero 更新
+    title: Clash WinLite 更新
     body: 新版本 (v{version}) 已下载完成，是否立即安装？
     installNow: 立即安装
     later: 稍后
 service:
-  adminInstallPrompt: 安装 Clash WinAero 服务需要管理员权限
-  adminUninstallPrompt: 卸载 Clash WinAero 服务需要管理员权限
+  adminInstallPrompt: 安装 Clash WinLite 服务需要管理员权限
+  adminUninstallPrompt: 卸载 Clash WinLite 服务需要管理员权限
 tray:
   dashboard: 仪表板
   ruleMode: 规则模式
@@ -57,7 +57,7 @@ tray:
   coreLog: 内核日志
   restartClash: 重启 Clash 内核
   restartApp: 重启应用
-  vergeVersion: WinAero 版本
+  vergeVersion: WinLite 版本
   more: 更多
   exit: 退出
   tooltip:

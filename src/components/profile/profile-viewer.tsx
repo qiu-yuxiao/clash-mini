@@ -293,7 +293,7 @@ export function ProfileViewer({ onChange, ref }: ProfileViewerProps) {
               <TextField
                 {...text}
                 {...field}
-                placeholder={`clash-winaero/v${version}`}
+                placeholder={`clash-winlite/v${version}`}
                 label="User Agent"
               />
             )}

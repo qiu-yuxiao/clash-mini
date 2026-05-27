@@ -22,18 +22,18 @@ notifications:
     body: Profil reaktiviert.
   appQuit:
     title: Beenden steht bevor
-    body: Clash WinAero wird gleich beendet.
+    body: Clash WinLite wird gleich beendet.
   appHidden:
     title: Anwendung ausgeblendet
-    body: Clash WinAero läuft im Hintergrund.
+    body: Clash WinLite läuft im Hintergrund.
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Für die Installation des Clash-WinAero-Dienstes sind Administratorrechte erforderlich.
-  adminUninstallPrompt: Für die Deinstallation des Clash-WinAero-Dienstes sind Administratorrechte erforderlich.
+  adminInstallPrompt: Für die Installation des Clash-WinLite-Dienstes sind Administratorrechte erforderlich.
+  adminUninstallPrompt: Für die Deinstallation des Clash-WinLite-Dienstes sind Administratorrechte erforderlich.
 tray:
   dashboard: Übersicht
   ruleMode: Regelmodus

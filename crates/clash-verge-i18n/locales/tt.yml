@@ -22,18 +22,18 @@ notifications:
     body: Профиль яңадан активлаштырылды.
   appQuit:
     title: Чыгар алдыннан
-    body: Clash WinAero чыгарга җыена.
+    body: Clash WinLite чыгарга җыена.
   appHidden:
     title: Кушымта яшерелде
-    body: Clash WinAero фон режимында эшли.
+    body: Clash WinLite фон режимында эшли.
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash WinAero хезмәтен урнаштыру өчен администратор хокуклары кирәк.
-  adminUninstallPrompt: Clash WinAero хезмәтен бетерү өчен администратор хокуклары кирәк.
+  adminInstallPrompt: Clash WinLite хезмәтен урнаштыру өчен администратор хокуклары кирәк.
+  adminUninstallPrompt: Clash WinLite хезмәтен бетерү өчен администратор хокуклары кирәк.
 tray:
   dashboard: Идарә панеле
   ruleMode: Кагыйдә режимы

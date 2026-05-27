@@ -4,7 +4,7 @@
 # 【修改顺序铁律】唯一协议与代码同步审计
 # =========================================================================
 STAGED_CODE_FILES=$(git diff --cached --name-only | grep -E '\.(ts|tsx|rs)$|tauri\.conf\.json$')
-STAGED_AGREEMENTS_FILE=$(git diff --cached --name-only | grep -E '^clash_winaero_agreements\.md$')
+STAGED_AGREEMENTS_FILE=$(git diff --cached --name-only | grep -E '^clash_winlite_agreements\.md$')
 
 if [ -n "$STAGED_CODE_FILES" ] && [ -z "$STAGED_AGREEMENTS_FILE" ]; then
   echo "========================================================================="
@@ -13,8 +13,8 @@ if [ -n "$STAGED_CODE_FILES" ] && [ -z "$STAGED_AGREEMENTS_FILE" ]; then
   echo "修改的代码文件包括:"
   echo "$STAGED_CODE_FILES"
   echo ""
-  echo "👉 解决方法: 请首先在 clash_winaero_agreements.md 中记录您的设计与逻辑修改，"
-  echo "   然后使用 'git add clash_winaero_agreements.md' 暂存该文件，再尝试提交。"
+  echo "👉 解决方法: 请首先在 clash_winlite_agreements.md 中记录您的设计与逻辑修改，"
+  echo "   然后使用 'git add clash_winlite_agreements.md' 暂存该文件，再尝试提交。"
   echo "👉 (如果确实是纯格式化或微小排版且不改变逻辑的提交，可以使用 git commit --no-verify 绕过此限制)"
   echo "========================================================================="
   exit 1

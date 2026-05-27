@@ -1,11 +1,11 @@
 [package]
-name = "clash-winaero"
-version = "0.0.1"
+name = "clash-winlite"
+version = "0.2.0"
 description = "clash verge"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
 repository = "https://github.com/clash-verge-rev/clash-verge-rev.git"
-default-run = "clash-winaero"
+default-run = "clash-winlite"
 build = "build.rs"
 edition = "2024"
 rust-version = "1.95"
@@ -24,7 +24,7 @@ clippy = ["tauri/test"]
 tracing = []
 
 [package.metadata.bundle]
-identifier = "io.github.clash-winaero.clash-winaero"
+identifier = "io.github.clash-winlite.clash-winlite"
 
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }

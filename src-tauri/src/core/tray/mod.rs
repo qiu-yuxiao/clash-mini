@@ -302,7 +302,7 @@ impl Tray {
         );
 
         let tooltip = format!(
-            "Clash WinAero {}\n{}: {}\n{}: {}\n{}: {}",
+            "Clash WinLite {}\n{}: {}\n{}: {}\n{}: {}",
             reassembled_version,
             sys_proxy_text,
             switch_str(system_proxy),

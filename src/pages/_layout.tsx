@@ -252,8 +252,8 @@ const ActiveNodeStatusCard = () => {
   )
 }
 
-// WinAero Traffic Panel
-const WinAeroTrafficPanel = () => {
+// WinLite Traffic Panel
+const WinLiteTrafficPanel = () => {
   const mode = useThemeMode()
   const { t } = useTranslation()
   const pageVisible = useVisibility()
@@ -806,22 +806,28 @@ const Layout = () => {
                     订阅与机场配置
                     {profileLoading && <CircularProgress size={10} />}
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 0.5, mb: 1 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
                     <TextField
                       placeholder="填入订阅链接 (YAML)"
                       size="small"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       slotProps={{ htmlInput: { style: { paddingTop: '4px', paddingBottom: '4px', fontSize: '11px', height: '26px', boxSizing: 'border-box' } } }}
-                      sx={{ flex: 1 }}
+                      sx={{ width: '100%' }}
                     />
                     <Button
                       variant="contained"
+                      color="primary"
                       onClick={handleImportProfile}
-                      sx={{ fontSize: 11, py: 0, height: 26 }}
+                      sx={{
+                        fontSize: 11,
+                        height: 26,
+                        width: '100%',
+                        textTransform: 'none',
+                      }}
                       disabled={profileLoading}
                     >
-                      导入
+                      导入订阅链接（YAML）
                     </Button>
                   </Box>
                   {/* Profiles List */}
@@ -1004,10 +1010,16 @@ const Layout = () => {
                   {/* Centered Troubleshooting Button */}
                   <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
                     <Button
-                      variant="contained"
+                      variant="outlined"
+                      color="primary"
                       size="small"
                       onClick={() => setLogsOpen(true)}
-                      sx={{ fontSize: 11, height: 26, width: '90%', textTransform: 'none' }}
+                      sx={{
+                        fontSize: 11,
+                        height: 26,
+                        width: '90%',
+                        textTransform: 'none',
+                      }}
                     >
                       系统调试运行日志
                     </Button>
@@ -1032,18 +1044,24 @@ const Layout = () => {
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     手动控制路径（右键点击链接）
                   </Typography>
-                  <ButtonGroup size="small" sx={{ transform: 'scale(0.85)', transformOrigin: 'left center' }}>
+                  <ButtonGroup size="small" color="primary" sx={{ transform: 'scale(0.85)', transformOrigin: 'left center' }}>
                     <Button
                       variant={connectionsType === 'active' ? 'contained' : 'outlined'}
                       onClick={() => setConnectionsType('active')}
-                      sx={{ fontSize: 10, height: 22 }}
+                      sx={{
+                        fontSize: 10,
+                        height: 22,
+                      }}
                     >
                       活跃 ({connectionsData?.activeConnections.length || 0})
                     </Button>
                     <Button
                       variant={connectionsType === 'closed' ? 'contained' : 'outlined'}
                       onClick={() => setConnectionsType('closed')}
-                      sx={{ fontSize: 10, height: 22 }}
+                      sx={{
+                        fontSize: 10,
+                        height: 22,
+                      }}
                     >
                       历史 ({connectionsData?.closedConnections.length || 0})
                     </Button>
@@ -1127,7 +1145,7 @@ const Layout = () => {
               boxSizing: 'border-box',
             }}
           >
-            <WinAeroTrafficPanel />
+            <WinLiteTrafficPanel />
           </div>
         </div>
       </Paper>

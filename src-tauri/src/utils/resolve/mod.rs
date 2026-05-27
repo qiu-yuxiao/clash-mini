@@ -131,7 +131,7 @@ pub(super) async fn init_auto_backup() {
 }
 
 async fn init_silent_updater() {
-    logging!(info, Type::Setup, "Silent updater disabled for Clash WinAero");
+    logging!(info, Type::Setup, "Silent updater disabled for Clash WinLite");
 }
 
 pub fn init_signal() {

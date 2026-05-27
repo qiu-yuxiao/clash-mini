@@ -22,18 +22,18 @@ notifications:
     body: Profil yeniden etkinleştirildi.
   appQuit:
     title: Çıkış Yapılmak Üzere
-    body: Clash WinAero kapanmak üzere.
+    body: Clash WinLite kapanmak üzere.
   appHidden:
     title: Uygulama Gizlendi
-    body: Clash WinAero arka planda çalışıyor.
+    body: Clash WinLite arka planda çalışıyor.
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash WinAero hizmetini kurmak için yönetici ayrıcalıkları gerekir.
-  adminUninstallPrompt: Clash WinAero hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.
+  adminInstallPrompt: Clash WinLite hizmetini kurmak için yönetici ayrıcalıkları gerekir.
+  adminUninstallPrompt: Clash WinLite hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.
 tray:
   dashboard: Gösterge Paneli
   ruleMode: Kural Modu

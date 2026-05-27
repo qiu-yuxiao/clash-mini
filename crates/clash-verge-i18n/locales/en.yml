@@ -22,18 +22,18 @@ notifications:
     body: Profile Reactivated.
   appQuit:
     title: About to Exit
-    body: Clash WinAero is about to exit.
+    body: Clash WinLite is about to exit.
   appHidden:
     title: Application Hidden
-    body: Clash WinAero is running in the background.
+    body: Clash WinLite is running in the background.
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Installing the Clash WinAero service requires administrator privileges.
-  adminUninstallPrompt: Uninstalling the Clash WinAero service requires administrator privileges.
+  adminInstallPrompt: Installing the Clash WinLite service requires administrator privileges.
+  adminUninstallPrompt: Uninstalling the Clash WinLite service requires administrator privileges.
 tray:
   dashboard: Dashboard
   ruleMode: Rule Mode
@@ -57,7 +57,7 @@ tray:
   coreLog: Core Log
   restartClash: Restart Clash Core
   restartApp: Restart Application
-  vergeVersion: WinAero Version
+  vergeVersion: WinLite Version
   more: More
   exit: Exit
   tooltip:

@@ -22,18 +22,18 @@ notifications:
     body: Profil diaktifkan kembali.
   appQuit:
     title: Akan Keluar
-    body: Clash WinAero akan keluar.
+    body: Clash WinLite akan keluar.
   appHidden:
     title: Aplikasi Disembunyikan
-    body: Clash WinAero berjalan di latar belakang.
+    body: Clash WinLite berjalan di latar belakang.
   updateReady:
-    title: Clash WinAero Update
+    title: Clash WinLite Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Menginstal layanan Clash WinAero memerlukan hak administrator.
-  adminUninstallPrompt: Menghapus instalasi layanan Clash WinAero memerlukan hak administrator.
+  adminInstallPrompt: Menginstal layanan Clash WinLite memerlukan hak administrator.
+  adminUninstallPrompt: Menghapus instalasi layanan Clash WinLite memerlukan hak administrator.
 tray:
   dashboard: Dasbor
   ruleMode: Mode Aturan
