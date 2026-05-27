@@ -1031,11 +1031,11 @@ const Layout = () => {
                   overflow: 'hidden',
                 }}
               >
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', px: 0.5, gap: 0.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '11px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 0.5, width: '100%', justifyContent: 'flex-start' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
                     手动控制路径（右键点击链接）
                   </Typography>
-                  <ButtonGroup size="small" sx={{ transform: 'scale(0.85)' }}>
+                  <ButtonGroup size="small" sx={{ transform: 'scale(0.85)', transformOrigin: 'left center' }}>
                     <Button
                       variant={connectionsType === 'active' ? 'contained' : 'outlined'}
                       onClick={() => setConnectionsType('active')}
@@ -1051,9 +1051,6 @@ const Layout = () => {
                       历史 ({connectionsData?.closedConnections.length || 0})
                     </Button>
                   </ButtonGroup>
-                  <Typography variant="caption" sx={{ fontSize: '10px', color: 'text.secondary', textAlign: 'center', mt: 0.25 }}>
-                    💡 右键点击任意连接，可一键进行分流、断开或查看详情
-                  </Typography>
                 </Box>
 
                 {/* Search and Action Row */}
