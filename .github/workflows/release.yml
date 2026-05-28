@@ -252,7 +252,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-rc') }}
           tauriScript: pnpm
           args: --target ${{ matrix.target }}
-          includeUpdaterJson: true
+          includeUpdaterJson: ${{ matrix.os != 'ubuntu-22.04' }}
 
       - name: Attest Windows bundles
         if: matrix.os == 'windows-latest'

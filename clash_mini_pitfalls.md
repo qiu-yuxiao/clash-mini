@@ -83,3 +83,15 @@
     1. **云端发布资产清理必须口头对齐**：绝对禁止直接或间接在后台静默删除或修改任何云端的 Releases、Tags 及其他已发布资产。涉及资产清理，必须先在对话中以文字向用户说明清理范围、目的及潜在风险，并取得用户明确的口头同意后方可调用脚本操作。
     2. **保持生产发布链路独立透明**：遇到构建资产缺失等打包问题，应优先考虑通过触发新 tag 或更新已发布 Release 资产的方式解决，坚决杜绝“一刀切式”清空仓库发布列表的暴力修补行为。
     3. **人机确认门禁是第一要义**：将“向用户陈述现状并获得允许”作为一切涉及云端操作的安全阀，彻底拒绝“做正确的事就可以用不透明手段”的侥幸偏好。
+
+### 9. 【Tauri 构建中 Draft Release 的 API 查询 404 限制】
+*   **犯错场景**：在编写自定义 CI 打包脚本（如 `portable.mjs`）在 Windows 构建阶段将打包资产上传至 GitHub Release 时，如果使用 `github.rest.repos.getReleaseByTag` 查询 Release，因为编译尚未彻底结束，Release 还处于 Draft（草稿）状态，GitHub API 会直接返回 404 Not Found。
+*   **严重后果**：导致便携包等自定义资产的打包上传步骤在第一步直接报错中断，无法上传与安装包一同发布的便携绿色版。
+*   **正确解决方案（踩坑教学）**：
+    1. 在打包脚本中，对于尚未公开的构建时 Release，必须使用 `github.rest.repos.listReleases` 获取当前仓库 of Releases 列表，然后匹配 `tag_name === tag` 以获取正确的 `release_id` 再执行上传。
+
+### 10. 【Linux (Ubuntu) 环境下 Tauri Build 禁用 includeUpdaterJson】
+*   **犯错场景**：在 `.github/workflows/release.yml` 的 `tauri-action` 编译配置中，若全局硬编码设置 `includeUpdaterJson: true`，由于 Linux 下生成的 DEB 和 RPM 包原生不支持签名和更新机制，打包操作在 Linux 节点上结算时会因缺少 updater 签名配置而失败。
+*   **严重后果**：导致 Linux 平台的工作流任务异常中止，使得后续的 `update_tag`（正式发布 Release）和自动更新通道部署任务直接被 GitHub 平台跳过。
+*   **正确解决方案（踩坑教学）**：
+    1. 在 `tauri-action` 的配置中，使用动态条件判定表达式 `includeUpdaterJson: ${{ matrix.os != 'ubuntu-22.04' }}` 控制是否生成更新 JSON，使 Linux 节点编译时强制关闭该参数，避开签名报错。
