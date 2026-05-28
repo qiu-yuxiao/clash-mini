@@ -6,6 +6,8 @@ use std::os::windows::process::CommandExt as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use windows::Win32::Globalization::{GetACP, GetOEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
+use deelevate::{PrivilegeLevel, Token};
+use runas::Command as RunasCommand;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const TASK_NAME_USER: &str = "Clash Mini";
@@ -326,6 +328,30 @@ pub fn remove_task(mode: TaskMode) -> Result<()> {
     ))
 }
 
+pub fn remove_task_elevated(mode: TaskMode) -> Result<()> {
+    let token = Token::with_current_process()?;
+    let level = token.privilege_level()?;
+    match level {
+        PrivilegeLevel::NotPrivileged => {
+            logging!(info, Type::Setup, "Requesting UAC elevation to remove {} auto-launch task", mode.label());
+            let status = RunasCommand::new("schtasks")
+                .arg("/Delete")
+                .arg("/TN")
+                .arg(mode.name())
+                .arg("/F")
+                .show(false)
+                .status()
+                .map_err(|e| anyhow!("failed to run elevated schtasks: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("elevated schtasks failed to delete task (UAC denied or error)"));
+            }
+            logging!(info, Type::Setup, "Elevated removed {} auto-launch task successfully", mode.label());
+            Ok(())
+        }
+        _ => remove_task(mode),
+    }
+}
+
 pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
     let target = if is_admin { TaskMode::Admin } else { TaskMode::User };
     let other = if is_admin { TaskMode::User } else { TaskMode::Admin };
@@ -343,9 +369,7 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
             }
         } else {
             if is_task_enabled(other)? {
-                return Err(anyhow!(
-                    "admin auto-launch task exists; run the app as administrator to remove it before creating a user task"
-                ));
+                remove_task_elevated(other)?;
             }
             create_task(target)?;
         }
@@ -370,9 +394,7 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
 
     remove_task(TaskMode::User)?;
     if is_task_enabled(TaskMode::Admin)? {
-        return Err(anyhow!(
-            "admin auto-launch task exists; run the app as administrator to remove it"
-        ));
+        remove_task_elevated(TaskMode::Admin)?;
     }
 
     Ok(())

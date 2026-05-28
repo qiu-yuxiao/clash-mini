@@ -18,6 +18,10 @@
    * **固化起点**：以当前节点（版本 `0.2.0`，Git 提交 `531ba4ce`，标签 `重新出发`）为绝对固化的基准。
    * **版本递增**：后续任何功能修改、问题修复或协议变动，版本号一律以 `0.0.1` 为单位进行增量递增（例如下一次变更为 `0.2.1`）。
    * **标签与记录**：每次代码修改合并时，必须在 package.json/Tauri 配置中更新版本号，在 Git 中增加相应的版本标签（如 `v0.2.1`），并在《唯一协议》和本归档中作相应记录，以便清晰追踪自“重新出发”以来的所有变更。
+5. **开机自启 UAC 提权与 Switch 状态同步 (BUG-001 修复)**
+   * **修改**：
+     * 前端：在 [`use-verge.ts`](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-verge.ts) 中增加 `try-catch-finally`，确保在设置 PATCH 失败时仍执行 `refetch()`，使 Switch 状态能够回滚回后端真实配置。
+     * 后端：在 [`schtasks.rs`](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/schtasks.rs) 中引入 `deelevate` 与 `runas`，实现 `remove_task_elevated`，在非管理员权限下需要修改或删除已有 Admin 计划任务时能够自动通过 UAC 弹窗进行提权，避免权限不足静默失败。
 
 ---
 

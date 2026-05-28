@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import { getVergeConfig, patchVergeConfig } from '@/services/cmds'
+import { showNotice } from '@/services/notice-service'
 import { getPreloadConfig, setPreloadConfig } from '@/services/preload'
 
 export const useVerge = () => {
@@ -41,8 +42,13 @@ export const useVerge = () => {
 
   const patchVerge = useCallback(
     async (value: Partial<IVergeConfig>) => {
-      await patchVergeConfig(value)
-      await refetch()
+      try {
+        await patchVergeConfig(value)
+      } catch (err) {
+        showNotice.error(err)
+      } finally {
+        await refetch()
+      }
     },
     [refetch],
   )
