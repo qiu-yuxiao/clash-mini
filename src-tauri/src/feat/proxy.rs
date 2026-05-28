@@ -21,9 +21,11 @@ pub async fn toggle_system_proxy() -> bool {
     }
 
     let requested = !current;
+    let tun_patch = if requested { Some(false) } else { None };
     let patch_result = super::patch_verge(
         &IVerge {
             enable_system_proxy: Some(requested),
+            enable_tun_mode: tun_patch,
             ..IVerge::default()
         },
         false,
@@ -47,10 +49,12 @@ pub async fn toggle_system_proxy() -> bool {
 pub async fn toggle_tun_mode(not_save_file: Option<bool>) -> bool {
     let current = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
     let enable = !current;
+    let sysproxy_patch = if enable { Some(false) } else { None };
 
     match super::patch_verge(
         &IVerge {
             enable_tun_mode: Some(enable),
+            enable_system_proxy: sysproxy_patch,
             ..IVerge::default()
         },
         not_save_file.unwrap_or(false),

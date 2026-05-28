@@ -450,6 +450,8 @@ const Layout = () => {
   const { isTunModeAvailable, mutateSystemState } = useSystemState()
   const { installServiceAndRestartCore } = useServiceInstaller()
   const { enable_tun_mode } = verge ?? {}
+  const currentMode = enable_tun_mode ? 'tun' : systemProxyIndicator ? 'system' : 'manual'
+  const activeIndex = currentMode === 'tun' ? 2 : currentMode === 'system' ? 1 : 0
 
   // Port State
   const { clashInfo, patchInfo } = useClashInfo()
@@ -596,32 +598,60 @@ const Layout = () => {
   }
 
   // Takeover actions
-  const handleTakeoverModeChange = async (targetMode: 'system' | 'tun') => {
-    if (targetMode === 'system') {
-      if (systemProxyIndicator) {
-        await toggleSystemProxy(false)
-        showNotice.success('已关闭接管模式：系统代理')
-      } else {
-        await toggleSystemProxy(true)
-        showNotice.success('已开启接管模式：系统代理')
-      }
-    } else {
-      if (enable_tun_mode) {
-        await patchVerge({ enable_tun_mode: false })
-        showNotice.success('已关闭接管模式：TUN 虚拟网卡')
-      } else {
-        if (!isTunModeAvailable) {
-          try {
-            showNotice.info('正在自动安装/配置虚拟网卡系统服务...')
-            await installServiceAndRestartCore()
-            await mutateSystemState()
-          } catch (err) {
-            showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
-            return
-          }
+  const handleTakeoverModeChange = async (targetMode: 'manual' | 'system' | 'tun') => {
+    const currentMode = enable_tun_mode ? 'tun' : systemProxyIndicator ? 'system' : 'manual'
+    if (targetMode === currentMode) return
+
+    if (targetMode === 'manual') {
+      try {
+        if (systemProxyIndicator) {
+          await toggleSystemProxy(false)
         }
+        if (enable_tun_mode) {
+          await patchVerge({ enable_tun_mode: false })
+        }
+        showNotice.success('已切换至手动模式')
+      } catch (err) {
+        showNotice.error(err)
+      }
+    } else if (targetMode === 'system') {
+      try {
+        if (enable_tun_mode) {
+          await patchVerge({ enable_tun_mode: false })
+        }
+        if (!systemProxyIndicator) {
+          await toggleSystemProxy(true)
+        }
+        showNotice.success('已开启系统代理')
+      } catch (err) {
+        showNotice.error(err)
+      }
+    } else if (targetMode === 'tun') {
+      if (systemProxyIndicator) {
+        try {
+          await toggleSystemProxy(false)
+        } catch (err) {
+          showNotice.error(err)
+          return
+        }
+      }
+
+      if (!isTunModeAvailable) {
+        try {
+          showNotice.info('正在自动安装/配置虚拟网卡系统服务...')
+          await installServiceAndRestartCore()
+          await mutateSystemState()
+        } catch (err) {
+          showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
+          return
+        }
+      }
+
+      try {
         await patchVerge({ enable_tun_mode: true })
-        showNotice.success('已开启接管模式：TUN 虚拟网卡')
+        showNotice.success('已开启 TUN 模式')
+      } catch (err) {
+        showNotice.error(err)
       }
     }
   }
@@ -991,27 +1021,108 @@ const Layout = () => {
                   </Box>
                 </Box>
 
-                {/* Section 2: Takeover Mode (二选一) */}
+                {/* Section 2: Takeover Mode (三态互斥单选) */}
                 <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
                     代理接管模式
                   </Typography>
-                  <ButtonGroup fullWidth size="small" sx={{ mb: 1 }}>
-                    <Button
-                      variant={systemProxyIndicator ? 'contained' : 'outlined'}
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      bgcolor: 'action.hover',
+                      borderRadius: '6px',
+                      p: '2px',
+                      mb: 1,
+                      height: 28,
+                      userSelect: 'none',
+                    }}
+                  >
+                    {/* Sliding Background Indicator */}
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: '33.333%',
+                        height: '100%',
+                        zIndex: 0,
+                        transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transform: `translate3d(${activeIndex * 100}%, 0, 0)`,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          height: 'calc(100% - 4px)',
+                          margin: '2px',
+                          bgcolor: 'primary.main',
+                          borderRadius: '4px',
+                          boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.15)',
+                        }}
+                      />
+                    </Box>
+
+                    {/* Manual Mode Option */}
+                    <Box
+                      onClick={() => handleTakeoverModeChange('manual')}
+                      sx={{
+                        flex: 1,
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: activeIndex === 0 ? 'primary.contrastText' : 'text.secondary',
+                        fontSize: '11px',
+                        fontWeight: activeIndex === 0 ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        zIndex: 1,
+                        transition: 'color 0.2s ease',
+                      }}
+                    >
+                      手动模式
+                    </Box>
+
+                    {/* System Proxy Option */}
+                    <Box
                       onClick={() => handleTakeoverModeChange('system')}
-                      sx={{ fontSize: '11px', textTransform: 'none', height: 26 }}
+                      sx={{
+                        flex: 1,
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: activeIndex === 1 ? 'primary.contrastText' : 'text.secondary',
+                        fontSize: '11px',
+                        fontWeight: activeIndex === 1 ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        zIndex: 1,
+                        transition: 'color 0.2s ease',
+                      }}
                     >
                       系统代理
-                    </Button>
-                    <Button
-                      variant={enable_tun_mode ? 'contained' : 'outlined'}
+                    </Box>
+
+                    {/* TUN Mode Option */}
+                    <Box
                       onClick={() => handleTakeoverModeChange('tun')}
-                      sx={{ fontSize: '11px', textTransform: 'none', height: 26 }}
+                      sx={{
+                        flex: 1,
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: activeIndex === 2 ? 'primary.contrastText' : 'text.secondary',
+                        fontSize: '11px',
+                        fontWeight: activeIndex === 2 ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        zIndex: 1,
+                        transition: 'color 0.2s ease',
+                      }}
                     >
-                      TUN 网卡
-                    </Button>
-                  </ButtonGroup>
+                      TUN 模式
+                    </Box>
+                  </Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
                     代理策略
                   </Typography>
