@@ -50,7 +50,7 @@ const SX_SCROLL_CONTAINER: React.ComponentProps<typeof Box>['sx'] = {
   '&::-webkit-scrollbar': {
     display: 'none',
   },
-  border: (theme) => `5px double ${theme.palette.divider}`,
+  border: '5px double var(--theme-border)',
   borderRadius: '4px',
 }
 
@@ -71,7 +71,7 @@ const SX_CELL_CONTENT: React.ComponentProps<typeof Box>['sx'] = {
 
 const SX_HEADER_ROW: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
-  borderBottom: (theme) => `5px double ${theme.palette.divider}`,
+  borderBottom: '5px double var(--theme-border)',
   backgroundColor: (theme) => theme.palette.background.paper,
   height: '20px',
 }

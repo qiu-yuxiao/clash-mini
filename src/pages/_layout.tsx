@@ -321,7 +321,7 @@ const WinLiteTrafficPanel = () => {
           }}>
             <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 13 }} />
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>上传:</Typography>
-            <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#D4AF37', whiteSpace: 'nowrap' }}>
+            <Typography sx={{ fontWeight: 'bold', fontSize: '13px', color: '#D4AF37', whiteSpace: 'nowrap' }}>
               {upVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#8c7010' : '#b29645' }}>{upUnit}/s</span>
             </Typography>
           </Box>
@@ -347,7 +347,7 @@ const WinLiteTrafficPanel = () => {
             whiteSpace: 'nowrap'
           }}>
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
-            <Typography sx={{ fontSize: '11px', fontWeight: 'bold', color: '#D4AF37', whiteSpace: 'nowrap' }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 'bold', color: '#D4AF37', whiteSpace: 'nowrap' }}>
               {upTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#8c7010' : '#b29645', fontWeight: 'normal' }}>{upTotalUnit}</span>
             </Typography>
           </Box>
@@ -378,7 +378,7 @@ const WinLiteTrafficPanel = () => {
           }}>
             <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 13 }} />
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>下载:</Typography>
-            <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
+            <Typography sx={{ fontWeight: 'bold', fontSize: '13px', color: '#0084FF', whiteSpace: 'nowrap' }}>
               {downVal} <span style={{ fontSize: '9px', fontWeight: 'normal', color: mode === 'light' ? '#0052a3' : '#8cd9ff' }}>{downUnit}/s</span>
             </Typography>
           </Box>
@@ -404,7 +404,7 @@ const WinLiteTrafficPanel = () => {
             whiteSpace: 'nowrap'
           }}>
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
-            <Typography sx={{ fontWeight: 'bold', fontSize: '11px', color: '#0084FF', whiteSpace: 'nowrap' }}>
+            <Typography sx={{ fontWeight: 'bold', fontSize: '13px', color: '#0084FF', whiteSpace: 'nowrap' }}>
               {downTotalVal} <span style={{ fontSize: '9px', color: mode === 'light' ? '#0052a3' : '#8cd9ff', fontWeight: 'normal' }}>{downTotalUnit}</span>
             </Typography>
           </Box>
@@ -457,6 +457,13 @@ const Layout = () => {
   const { clashInfo, patchInfo } = useClashInfo()
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
+
+  const modeKey = clashConfig?.mode?.toLowerCase() || 'rule'
+  const policyActiveIndex = modeKey === 'direct' ? 2 : modeKey === 'global' ? 1 : 0
+
+  const themeModeVal = verge?.theme_mode || 'system'
+  const themeActiveIndex = themeModeVal === 'dark' ? 2 : themeModeVal === 'light' ? 1 : 0
+
   const [mixedPortVal, setMixedPortVal] = useState(verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801)
 
   // Minimal Settings States
@@ -1024,7 +1031,7 @@ const Layout = () => {
                 {/* Section 2: Takeover Mode (三态互斥单选) */}
                 <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
-                    代理接管模式
+                    代理模式
                   </Typography>
                   <Box
                     sx={{
@@ -1126,19 +1133,70 @@ const Layout = () => {
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
                     代理策略
                   </Typography>
-                  <ButtonGroup fullWidth size="small">
-                    <Button
-                      variant={clashConfig?.mode?.toLowerCase() === 'rule' ? 'contained' : 'outlined'}
+                  <ButtonGroup fullWidth size="small" sx={{ display: 'none' }}>
+                    {/* Keep old ButtonGroup hidden to avoid refactor side-effects if any */}
+                  </ButtonGroup>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      bgcolor: 'action.hover',
+                      borderRadius: '6px',
+                      p: '2px',
+                      height: 28,
+                      userSelect: 'none',
+                    }}
+                  >
+                    {/* Sliding Background Indicator */}
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: '33.333%',
+                        height: '100%',
+                        zIndex: 0,
+                        transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transform: `translate3d(${policyActiveIndex * 100}%, 0, 0)`,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          height: 'calc(100% - 4px)',
+                          margin: '2px',
+                          bgcolor: 'primary.main',
+                          borderRadius: '4px',
+                          boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.15)',
+                        }}
+                      />
+                    </Box>
+
+                    {/* Rule Option */}
+                    <Box
                       onClick={async () => {
                         await patchClashMode('rule')
                         refreshClashConfig()
                       }}
-                      sx={{ fontSize: '11px', textTransform: 'none', height: 26, minWidth: 0, px: 0, whiteSpace: 'nowrap' }}
+                      sx={{
+                        flex: 1,
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: policyActiveIndex === 0 ? 'primary.contrastText' : 'text.secondary',
+                        fontSize: '11px',
+                        fontWeight: policyActiveIndex === 0 ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        zIndex: 1,
+                        transition: 'color 0.2s ease',
+                      }}
                     >
                       规则模式
-                    </Button>
-                    <Button
-                      variant={clashConfig?.mode?.toLowerCase() === 'global' ? 'contained' : 'outlined'}
+                    </Box>
+
+                    {/* Global Option */}
+                    <Box
                       onClick={async () => {
                         await patchClashMode('global')
                         try {
@@ -1148,21 +1206,46 @@ const Layout = () => {
                         }
                         refreshClashConfig()
                       }}
-                      sx={{ fontSize: '11px', textTransform: 'none', height: 26, minWidth: 0, px: 0, whiteSpace: 'nowrap' }}
+                      sx={{
+                        flex: 1,
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: policyActiveIndex === 1 ? 'primary.contrastText' : 'text.secondary',
+                        fontSize: '11px',
+                        fontWeight: policyActiveIndex === 1 ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        zIndex: 1,
+                        transition: 'color 0.2s ease',
+                      }}
                     >
                       全局代理
-                    </Button>
-                    <Button
-                      variant={clashConfig?.mode?.toLowerCase() === 'direct' ? 'contained' : 'outlined'}
+                    </Box>
+
+                    {/* Direct Option */}
+                    <Box
                       onClick={async () => {
                         await patchClashMode('direct')
                         refreshClashConfig()
                       }}
-                      sx={{ fontSize: '11px', textTransform: 'none', height: 26, minWidth: 0, px: 0, whiteSpace: 'nowrap' }}
+                      sx={{
+                        flex: 1,
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: policyActiveIndex === 2 ? 'primary.contrastText' : 'text.secondary',
+                        fontSize: '11px',
+                        fontWeight: policyActiveIndex === 2 ? 'bold' : 'normal',
+                        cursor: 'pointer',
+                        zIndex: 1,
+                        transition: 'color 0.2s ease',
+                      }}
                     >
                       全局直连
-                    </Button>
-                  </ButtonGroup>
+                    </Box>
+                  </Box>
                 </Box>
 
                 {/* Section 3: Minimal Settings */}
@@ -1201,41 +1284,6 @@ const Layout = () => {
                         sx={{ transform: 'scale(0.75)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="caption" sx={{ fontSize: '11px', flexShrink: 0 }}>主题模式</Typography>
-                      <ButtonGroup
-                        size="small"
-                        sx={{
-                          height: 22,
-                          '& .MuiButton-root': {
-                            fontSize: '10px',
-                            px: 0.5,
-                            minWidth: 32,
-                            py: 0,
-                            textTransform: 'none',
-                          }
-                        }}
-                      >
-                        <Button
-                          variant={(verge?.theme_mode ?? 'system') === 'system' ? 'contained' : 'outlined'}
-                          onClick={() => patchVerge({ theme_mode: 'system' })}
-                        >
-                          系统
-                        </Button>
-                        <Button
-                          variant={verge?.theme_mode === 'light' ? 'contained' : 'outlined'}
-                          onClick={() => patchVerge({ theme_mode: 'light' })}
-                        >
-                          浅色
-                        </Button>
-                        <Button
-                          variant={verge?.theme_mode === 'dark' ? 'contained' : 'outlined'}
-                          onClick={() => patchVerge({ theme_mode: 'dark' })}
-                        >
-                          深色
-                        </Button>
-                      </ButtonGroup>
-                    </ListItem>
                     <ListItem sx={{ py: 0.25, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography variant="caption" sx={{ fontSize: '11px' }}>Mixed Port</Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -1249,6 +1297,106 @@ const Layout = () => {
                         <IconButton size="small" onClick={handleSavePort} sx={{ p: 0.2 }}>
                           <SaveRounded sx={{ fontSize: 13 }} />
                         </IconButton>
+                      </Box>
+                    </ListItem>
+                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="caption" sx={{ fontSize: '11px', flexShrink: 0 }}>主题模式</Typography>
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          bgcolor: 'action.hover',
+                          borderRadius: '4px',
+                          p: '1px',
+                          width: '120px',
+                          height: 22,
+                          userSelect: 'none',
+                        }}
+                      >
+                        {/* Sliding Background Indicator */}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            width: '33.333%',
+                            height: '100%',
+                            zIndex: 0,
+                            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            transform: `translate3d(${themeActiveIndex * 100}%, 0, 0)`,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              height: 'calc(100% - 2px)',
+                              margin: '1px',
+                              bgcolor: 'primary.main',
+                              borderRadius: '3px',
+                              boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.15)',
+                            }}
+                          />
+                        </Box>
+
+                        {/* System Option */}
+                        <Box
+                          onClick={() => patchVerge({ theme_mode: 'system' })}
+                          sx={{
+                            flex: 1,
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: themeActiveIndex === 0 ? 'primary.contrastText' : 'text.secondary',
+                            fontSize: '10px',
+                            fontWeight: themeActiveIndex === 0 ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            zIndex: 1,
+                            transition: 'color 0.2s ease',
+                          }}
+                        >
+                          系统
+                        </Box>
+
+                        {/* Light Option */}
+                        <Box
+                          onClick={() => patchVerge({ theme_mode: 'light' })}
+                          sx={{
+                            flex: 1,
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: themeActiveIndex === 1 ? 'primary.contrastText' : 'text.secondary',
+                            fontSize: '10px',
+                            fontWeight: themeActiveIndex === 1 ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            zIndex: 1,
+                            transition: 'color 0.2s ease',
+                          }}
+                        >
+                          浅色
+                        </Box>
+
+                        {/* Dark Option */}
+                        <Box
+                          onClick={() => patchVerge({ theme_mode: 'dark' })}
+                          sx={{
+                            flex: 1,
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: themeActiveIndex === 2 ? 'primary.contrastText' : 'text.secondary',
+                            fontSize: '10px',
+                            fontWeight: themeActiveIndex === 2 ? 'bold' : 'normal',
+                            cursor: 'pointer',
+                            zIndex: 1,
+                            transition: 'color 0.2s ease',
+                          }}
+                        >
+                          深色
+                        </Box>
                       </Box>
                     </ListItem>
                   </List>

@@ -528,7 +528,7 @@ export const ProxyGroups = (props: Props) => {
               />
             )}
 
-            <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            <Box sx={{ flex: 1, minHeight: 0, position: 'relative', mx: 1, mb: 1 }}>
               {renderProxyList('100%')}
             </Box>
             <ScrollTopButton show={showScrollTop} onClick={scrollToTop} />
@@ -574,7 +574,7 @@ export const ProxyGroups = (props: Props) => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-      <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
+      <Box sx={{ flex: 1, minHeight: 0, position: 'relative', mx: 1, mb: 1 }}>
         {renderProxyList('100%')}
       </Box>
       <ScrollTopButton show={showScrollTop} onClick={scrollToTop} />
@@ -783,8 +783,8 @@ function ProxyVirtualList({
         borderRadius: 1,
         borderTop: (theme) => `4px solid ${theme.palette.divider}`,
         borderBottom: (theme) => `4px solid ${theme.palette.divider}`,
-        borderLeft: (theme) => `5px double ${theme.palette.divider}`,
-        borderRight: (theme) => `5px double ${theme.palette.divider}`,
+        borderLeft: '5px double var(--theme-border)',
+        borderRight: '5px double var(--theme-border)',
         backgroundColor: (theme) => theme.palette.background.paper,
       }}
     >

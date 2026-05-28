@@ -79,7 +79,7 @@ export const ProxyRender = (props: RenderProps) => {
           py: 0,
           pl: 0,
           ...(idx < (col || 3) - 1 ? {
-            borderRight: (theme) => `5px double ${theme.palette.divider}`,
+            borderRight: '5px double var(--theme-border)',
           } : {})
         }}
         onClick={() => onChangeProxy(group, proxyItem!)}
@@ -223,7 +223,7 @@ export const ProxyRender = (props: RenderProps) => {
           height: '20px',
           display: 'grid',
           gridTemplateColumns: `repeat(${col || 3}, 1fr)`,
-          pl: 2,
+          pl: 0,
         }}
       >
         {proxyColItemsMemo}
