@@ -22,18 +22,18 @@ notifications:
     body: تمت إعادة تفعيل الملف التعريفي.
   appQuit:
     title: على وشك الخروج
-    body: Clash WinLite على وشك الخروج.
+    body: Clash Mini على وشك الخروج.
   appHidden:
     title: تم إخفاء التطبيق
-    body: Clash WinLite يعمل في الخلفية.
+    body: Clash Mini يعمل في الخلفية.
   updateReady:
-    title: Clash WinLite Update
+    title: Clash Mini Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: يتطلب تثبيت خدمة Clash WinLite صلاحيات المسؤول.
-  adminUninstallPrompt: يتطلب إلغاء تثبيت خدمة Clash WinLite صلاحيات المسؤول.
+  adminInstallPrompt: يتطلب تثبيت خدمة Clash Mini صلاحيات المسؤول.
+  adminUninstallPrompt: يتطلب إلغاء تثبيت خدمة Clash Mini صلاحيات المسؤول.
 tray:
   dashboard: لوحة التحكم
   ruleMode: وضع القواعد

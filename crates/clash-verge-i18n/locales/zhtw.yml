@@ -22,18 +22,18 @@ notifications:
     body: 訂閱已啟用。
   appQuit:
     title: 即將退出
-    body: Clash WinLite 即將退出。
+    body: Clash Mini 即將退出。
   appHidden:
     title: 應用已隱藏
-    body: Clash WinLite 正在背景執行。
+    body: Clash Mini 正在背景執行。
   updateReady:
-    title: Clash WinLite Update
+    title: Clash Mini Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: 安裝 Clash WinLite 服務需要管理員權限
-  adminUninstallPrompt: 卸载 Clash WinLite 服務需要管理員權限
+  adminInstallPrompt: 安裝 Clash Mini 服務需要管理員權限
+  adminUninstallPrompt: 卸载 Clash Mini 服務需要管理員權限
 tray:
   dashboard: 儀表板
   ruleMode: 規則模式
@@ -57,7 +57,7 @@ tray:
   coreLog: 核心日誌
   restartClash: 重新啟動 Clash 核心
   restartApp: 重新啟動應用程式
-  vergeVersion: WinLite 版本
+  vergeVersion: Mini 版本
   more: 更多
   exit: 離開
   tooltip:

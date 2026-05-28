@@ -1,12 +1,12 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "identifier": "io.github.clash-winlite.clash-winlite",
+  "identifier": "io.github.clash-mini.clash-mini",
   "bundle": {
     "targets": ["deb", "rpm"],
     "linux": {
       "deb": {
         "depends": ["openssl", "libayatana-appindicator3-1"],
-        "desktopTemplate": "./packages/linux/clash-winlite.desktop",
+        "desktopTemplate": "./packages/linux/clash-mini.desktop",
         "provides": ["clash-verge"],
         "conflicts": ["clash-verge"],
         "replaces": ["clash-verge"],
@@ -15,7 +15,7 @@
       },
       "rpm": {
         "depends": ["openssl", "libayatana-appindicator-gtk3"],
-        "desktopTemplate": "./packages/linux/clash-winlite.desktop",
+        "desktopTemplate": "./packages/linux/clash-mini.desktop",
         "provides": ["clash-verge"],
         "conflicts": ["clash-verge"],
         "obsoletes": ["clash-verge"],

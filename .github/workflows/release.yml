@@ -83,7 +83,7 @@ jobs:
           echo "TAG_NAME=$TAG_REF" >> $GITHUB_ENV
           VERSION=$(echo "$TAG_REF" | sed 's/^v//')
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "DOWNLOAD_URL=https://github.com/qiu-yuxiao/clash-winlite/releases/download/$TAG_REF" >> $GITHUB_ENV
+          echo "DOWNLOAD_URL=https://github.com/qiu-yuxiao/clash-mini/releases/download/$TAG_REF" >> $GITHUB_ENV
         shell: bash
 
       - run: |
@@ -104,24 +104,24 @@ jobs:
 
           ### Windows (不再支持Win7)
           #### 正常版本(推荐)
-          - [64位便携包(常用)](${ENCODED_URL_PREFIX}/Clash.WinLite_${{ env.VERSION }}_x64_portable.zip)
-          - [64位安装包](${ENCODED_URL_PREFIX}/Clash.WinLite_${{ env.VERSION }}_x64-setup.exe) | [ARM64安装包](${ENCODED_URL_PREFIX}/Clash.WinLite_${{ env.VERSION }}_arm64-setup.exe)
+          - [64位便携包(常用)](${ENCODED_URL_PREFIX}/Clash.Mini_${{ env.VERSION }}_x64_portable.zip)
+          - [64位安装包](${ENCODED_URL_PREFIX}/Clash.Mini_${{ env.VERSION }}_x64-setup.exe) | [ARM64安装包](${ENCODED_URL_PREFIX}/Clash.Mini_${{ env.VERSION }}_arm64-setup.exe)
 
           #### 内置Webview2版 (体积较大，仅在系统无法安装webview2时使用)
-          - [64位](${ENCODED_URL_PREFIX}/Clash.WinLite_${{ env.VERSION }}_x64_fixed_webview2-setup.exe) | [ARM64](${ENCODED_URL_PREFIX}/Clash.WinLite_${{ env.VERSION }}_arm64_fixed_webview2-setup.exe)
+          - [64位](${ENCODED_URL_PREFIX}/Clash.Mini_${{ env.VERSION }}_x64_fixed_webview2-setup.exe) | [ARM64](${ENCODED_URL_PREFIX}/Clash.Mini_${{ env.VERSION }}_arm64_fixed_webview2-setup.exe)
 
           ### macOS
-          - [Apple M芯片](${ENCODED_URL_PREFIX}/Clash.WinLite_${{ env.VERSION }}_aarch64.dmg) | [Intel芯片](${ENCODED_URL_PREFIX}/Clash.WinLite_${{ env.VERSION }}_x64.dmg)
+          - [Apple M芯片](${ENCODED_URL_PREFIX}/Clash.Mini_${{ env.VERSION }}_aarch64.dmg) | [Intel芯片](${ENCODED_URL_PREFIX}/Clash.Mini_${{ env.VERSION }}_x64.dmg)
 
           ### Linux
           #### DEB包 (Debian/Ubuntu系)
-          - [64位](${ENCODED_URL_PREFIX}/clash-winlite_${{ env.VERSION }}_amd64.deb) | [ARM64](${ENCODED_URL_PREFIX}/clash-winlite_${{ env.VERSION }}_arm64.deb)
+          - [64位](${ENCODED_URL_PREFIX}/clash-mini_${{ env.VERSION }}_amd64.deb) | [ARM64](${ENCODED_URL_PREFIX}/clash-mini_${{ env.VERSION }}_arm64.deb)
 
           #### RPM包 (Redhat/Fedora系)
-          - [64位](${ENCODED_URL_PREFIX}/clash-winlite-${{ env.VERSION }}-1.x86_64.rpm) | [ARM64](${ENCODED_URL_PREFIX}/clash-winlite-${{ env.VERSION }}-1.aarch64.rpm)
+          - [64位](${ENCODED_URL_PREFIX}/clash-mini-${{ env.VERSION }}-1.x86_64.rpm) | [ARM64](${ENCODED_URL_PREFIX}/clash-mini-${{ env.VERSION }}-1.aarch64.rpm)
 
           ### 项目主页
-          - [GitHub 主页](https://github.com/qiu-yuxiao/clash-winlite)
+          - [GitHub 主页](https://github.com/qiu-yuxiao/clash-mini)
 
           Created at ${{ env.BUILDTIME }}.
           EOF
@@ -149,7 +149,7 @@ jobs:
           echo "Publishing release $release_id ($release_url) with $asset_count assets."
 
           gh api --method PATCH repos/{owner}/{repo}/releases/"$release_id" \
-            -f name="Clash WinLite $TAG_NAME" \
+            -f name="Clash Mini $TAG_NAME" \
             -F body=@release.txt \
             -F draft=false \
             -F prerelease="$PRERELEASE" \
@@ -246,7 +246,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Clash WinLite ${{ github.ref_name }}'
+          releaseName: 'Clash Mini ${{ github.ref_name }}'
           releaseBody: 'Draft release, will be updated later.'
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
@@ -413,7 +413,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{env.VERSION}}
-          name: 'Clash WinLite v${{env.VERSION}}'
+          name: 'Clash Mini v${{env.VERSION}}'
           body: 'See release notes for detailed changelog.'
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
@@ -531,7 +531,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{steps.build.outputs.appVersion}}
-          name: 'Clash WinLite v${{steps.build.outputs.appVersion}}'
+          name: 'Clash Mini v${{steps.build.outputs.appVersion}}'
           body: 'See release notes for detailed changelog.'
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: true
@@ -677,23 +677,23 @@ jobs:
 
           ### Windows (不再支持Win7)
           #### 便携绿色版 (免安装)
-          - [64位便携版](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_x64_portable.zip)
+          - [64位便携版](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_x64_portable.zip)
 
           #### 正常安装版本 (推荐)
-          - [64位(常用)](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_x64-setup.exe) | [ARM64(不常用)](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_arm64-setup.exe)
+          - [64位(常用)](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_x64-setup.exe) | [ARM64(不常用)](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_arm64-setup.exe)
 
           #### 内置Webview2版(体积较大，仅在企业版系统或无法安装webview2时使用)
-          - [64位](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_x64_fixed_webview2-setup.exe) | [ARM64](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_arm64_fixed_webview2-setup.exe)
+          - [64位](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_x64_fixed_webview2-setup.exe) | [ARM64](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_arm64_fixed_webview2-setup.exe)
 
           ### macOS
-          - [Apple M芯片](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_aarch64.dmg) | [Intel芯片](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_x64.dmg)
+          - [Apple M芯片](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_aarch64.dmg) | [Intel芯片](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_x64.dmg)
 
           ### Linux
           #### DEB包(Debian系) 使用 apt ./路径 安装
-          - [64位](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_amd64.deb) | [ARM64](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_arm64.deb) | [ARMv7](${{ env.DOWNLOAD_URL }}/Clash.WinLite_${{ env.VERSION }}_armhf.deb)
+          - [64位](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_amd64.deb) | [ARM64](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_arm64.deb) | [ARMv7](${{ env.DOWNLOAD_URL }}/Clash.Mini_${{ env.VERSION }}_armhf.deb)
 
           #### RPM包(Redhat系) 使用 dnf ./路径 安装
-          - [64位](${{ env.DOWNLOAD_URL }}/Clash.WinLite-${{ env.VERSION }}-1.x86_64.rpm) | [ARM64](${{ env.DOWNLOAD_URL }}/Clash.WinLite-${{ env.VERSION }}-1.aarch64.rpm) | [ARMv7](${{ env.DOWNLOAD_URL }}/Clash.WinLite-${{ env.VERSION }}-1.armhfp.rpm)
+          - [64位](${{ env.DOWNLOAD_URL }}/Clash.Mini-${{ env.VERSION }}-1.x86_64.rpm) | [ARM64](${{ env.DOWNLOAD_URL }}/Clash.Mini-${{ env.VERSION }}-1.aarch64.rpm) | [ARMv7](${{ env.DOWNLOAD_URL }}/Clash.Mini-${{ env.VERSION }}-1.armhfp.rpm)
 
           ### FAQ
           - [常见问题](https://clash-verge-rev.github.io/faq/windows.html)

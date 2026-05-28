@@ -1,7 +1,7 @@
 <h1 align="center">
   <img src="./src-tauri/icons/icon.png" alt="Clash" width="128" />
   <br>
-  Clash WinLite
+  Clash Mini
   <br>
 </h1>
 
@@ -28,19 +28,19 @@ A Lightweight, Mutually-Exclusive 3-State Takeover Clash Meta GUI based on <a hr
 
 ## Install
 
-请到发布页面下载对应的安装包：[Release page](https://github.com/qiu-yuxiao/clash-winlite/releases)<br>
-Go to the [Release page](https://github.com/qiu-yuxiao/clash-winlite/releases) to download the corresponding installation package<br>
+请到发布页面下载对应的安装包：[Release page](https://github.com/qiu-yuxiao/clash-mini/releases)<br>
+Go to the [Release page](https://github.com/qiu-yuxiao/clash-mini/releases) to download the corresponding installation package<br>
 Supports Windows (x64) portable ZIP and NSIS setups.
 
 #### 我应当怎样选择发行版
 
 | 版本        | 特征                                     | 链接                                                                                   |
 | :---------- | :--------------------------------------- | :------------------------------------------------------------------------------------- |
-| Stable      | 正式版，高可靠性，适合日常使用。         | [Release](https://github.com/qiu-yuxiao/clash-winlite/releases)                 |
-| Alpha(废弃) | 测试发布流程。                           | [Alpha](https://github.com/qiu-yuxiao/clash-winlite/releases/tag/alpha)         |
-| AutoBuild   | 滚动更新版，适合测试反馈，可能存在缺陷。 | [AutoBuild](https://github.com/qiu-yuxiao/clash-winlite/releases/tag/autobuild) |
+| Stable      | 正式版，高可靠性，适合日常使用。         | [Release](https://github.com/qiu-yuxiao/clash-mini/releases)                 |
+| Alpha(废弃) | 测试发布流程。                           | [Alpha](https://github.com/qiu-yuxiao/clash-mini/releases/tag/alpha)         |
+| AutoBuild   | 滚动更新版，适合测试反馈，可能存在缺陷。 | [AutoBuild](https://github.com/qiu-yuxiao/clash-mini/releases/tag/autobuild) |
 
-#### 安装说明和常见问题，请到 [文档页](https://github.com/qiu-yuxiao/clash-winlite) 查看
+#### 安装说明和常见问题，请到 [文档页](https://github.com/qiu-yuxiao/clash-mini) 查看
 
 ### TG 频道: [@clash_verge_rev](https://t.me/clash_verge_re)
 
@@ -89,7 +89,7 @@ Supports Windows (x64) portable ZIP and NSIS setups.
 
 ### Upstream Project & FAQ
 
-Clash WinLite is a lightweight fork of [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev).
+Clash Mini is a lightweight fork of [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev).
 
 For general settings or FAQs, refer to the [Clash Verge Rev Documentation](https://clash-verge-rev.github.io/).
 

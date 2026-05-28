@@ -1,13 +1,13 @@
-# Clash WinLite 权威开发协议 (Authorized Development Agreements)
+# Clash Mini 权威开发协议 (Authorized Development Agreements)
 
-本协议是 Clash WinLite 项目开发与优化的唯一权威指南。所有功能开发、界面微调和行为逻辑必须严格遵守本协议。本协议将随代码一同进行 Git 版本管理。
+本协议是 Clash Mini 项目开发与优化的唯一权威指南。所有功能开发、界面微调和行为逻辑必须严格遵守本协议。本协议将随代码一同进行 Git 版本管理。
 
 ### 👑 【最高设计基准 (Highest Design Principle)】
 **除本协议特别指定的「两张专属表格」以及「宏观界面布局尺寸」外，所有 UI 元素（包括但不限于按钮的外观/大小/圆角、输入框的高度/填充、选择/切换控件、全局字体与字号、深浅色主题配色体系等）一律沿用原程序 Clash Verge 的默认设计风格与表现，禁止任何别出心裁的自定义设计或硬编码色彩（如硬编码 `#1976d2` 蓝色等样式必须全部移除，统一交由原程序 MUI 主题机制管理）。**
 
 ### 🚨 【修改顺序铁律与避坑把关（开发前必读）】
 **任何针对本项目的功能开发、Bug 修复、UI 细节微调或系统配置变动，必须遵循「协议与避坑查阅优先」的硬性流程：**
-1. **查阅红线**：每次开发前，必须先查阅项目避坑红线文件 [clash_winlite_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_winlite_pitfalls.md)，确保绝对不触犯静默运行命令等底线错误。
+1. **查阅红线**：每次开发前，必须先查阅项目避坑红线文件 [clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md)，确保绝对不触犯静默运行命令等底线错误。
 2. **先改协议**：在触碰任何代码（TS/React、Rust、JSON 等）前，必须首先在《唯一协议》（本文件）的对应章节中，将相关修改的设计规范、端口分配或行为变更写入协议。
 3. **后改代码**：保存协议更新后，方可编写代码。代码的实际实现必须与更新后的协议条款保持 100% 吻合。
 4. **流程审计**：任何未在协议中备案的代码修改，或未经用户在对话中明确允许而执行的代码操作，均视为严重违规。
@@ -16,15 +16,15 @@
 
 ## ⚙️ 一、 项目定位与系统隔离规范
 
-为了保证 Clash WinLite 与原版 Clash Verge 在同一台 Windows 机器上**完美并存、互不干扰、流畅运行**，必须在前端和打包配置中实施彻底的命名和配置隔离，严禁触碰 Rust 后端核心。
+为了保证 Clash Mini 与原版 Clash Verge 在同一台 Windows 机器上**完美并存、互不干扰、流畅运行**，必须在前端和打包配置中实施彻底的命名和配置隔离，严禁触碰 Rust 后端核心。
 
 1. **开发边界**：
    * 主要针对**前端（TypeScript/React）**和打包配置进行修改。当前后项需求产生冲突时，遵循**后项规定优先（后方优先）**方针，允许对 Rust 后端代码（如 `mod.rs`、`menu_def.rs` 等）进行局部调整与重构，但仍需确保不修改后端核心业务架构与内部稳定性。
 2. **显示名字与内部代号**：
-   * 前端所有面向用户的展示界面，软件名称必须精确显示为：**`Clash WinLite`**（注意大小写和空格）。
-   * 程序打包（如 `tauri.conf.json` 中的 product name）也必须使用精确的 `"Clash WinLite"`。
+   * 前端所有面向用户的展示界面，软件名称必须精确显示为：**`Clash Mini`**（注意大小写和空格）。
+   * 程序打包（如 `tauri.conf.json` 中的 product name）也必须使用精确的 `"Clash Mini"`。
 3. **数据与配置文件隔离**：
-   * 必须保证 Clash WinLite 与原版的配置相互独立。配置文件（如 `clash-verge.yaml`）、数据库以及订阅列表（`profiles.yaml`）在用户本地 of `AppData\Roaming\clash-verge` 目录中独立加载（沿用原版后端逻辑，以防破坏后端稳定性）。
+   * 必须保证 Clash Mini 与原版的配置相互独立。配置文件（如 `clash-verge.yaml`）、数据库以及订阅列表（`profiles.yaml`）在用户本地 of `AppData\Roaming\clash-verge` 目录中独立加载（沿用原版后端逻辑，以防破坏后端稳定性）。
 4. **网络端口避让**：
    * 默认 Mixed 混合代理端口设为 `10801`，Controller API 端口设为 `9098`，彻底避让原版默认端口，允许两个客户端同时在线。
 5. **系统服务共享机制**：
@@ -34,7 +34,7 @@
 7. **禁用自动更新**：
    * 彻底禁用检测及提示官方 Clash Verge 新版本的 updater 自动更新机制与接口，防止用户因升级覆盖而损坏项目独立性。
 8. **单实例检测端口隔离**：
-   * 为了彻底实现多客户端完美并存运行，Clash WinLite 的单实例检测端口在 Release 模式下设为 `33335`，在 Dev 模式下设为 `33336`。绝对禁止使用与原版相同的端口（`33332`/`11234`），从而彻底杜绝因单实例检测机制互锁而产生的冲突和闪退。
+   * 为了彻底实现多客户端完美并存运行，Clash Mini 的单实例检测端口在 Release 模式下设为 `33335`，在 Dev 模式下设为 `33336`。绝对禁止使用与原版相同的端口（`33332`/`11234`），从而彻底杜绝因单实例检测机制互锁而产生的冲突和闪退。
 
 ---
 
@@ -90,7 +90,7 @@
     * 表格外周竖边框：表格最外侧的左、右两条竖边框线由原本的单实线变更为 5px double 双实线，与表格内部的纵向双实线分割边框保持一致。
     * 表头固定行显示：顶部的固定操作行（即 `ProxyHead`，包含定位、延迟测试、排序、搜索过滤等图标按钮）在「规则模式」、「全局代理」和「全局直连」模式下均必须保持显示，绝对禁止在非规则模式下隐藏。
 10. **全局滚动条隐藏与无痕滚动**：
-    * 为了最大程度保留界面显示空间、契合 WinLite 极简扁平定位，全局彻底隐藏所有页面的滚动条（包括主页面、设置面板、订阅列表、连接列表等）。
+    * 为了最大程度保留界面显示空间、契合 Mini 极简扁平定位，全局彻底隐藏所有页面的滚动条（包括主页面、设置面板、订阅列表、连接列表等）。
     * 通过 CSS 的 `::-webkit-scrollbar { display: none !important; }` 和 `scrollbar-width: none !important;` 规则实现无痕隐藏，但必须确保内容区域仍可通过鼠标滚轮、触控板手势、键盘方向键正常滑动。
     * 同时，移除 `.base-page .base-container > section` 的 `scrollbar-gutter: stable;`，使内容排版充分利用窗口的全部水平宽度，防止右侧留下空白轨道占位。
 
@@ -120,7 +120,7 @@
     * **滚动与高度约束**：手动路径控制的表格外部容器以及其父容器必须设置 `minHeight: 0` 和 `overflow: "hidden"` 属性，防止表格伸长溢出而导致滚动失效。同时将表格的滚动条完全隐藏（使用 `scrollbarWidth: 'none'` 及 `&::-webkit-scrollbar { display: 'none' }`），保持鼠标滚轮滚动正常。
     * **快捷控制**：右键点击任意连接，弹出快捷分流上下文菜单，选项为：**走直连 (DIRECT)**、**走代理 (PROXY)**、**封锁它 (REJECT)**。
 5. **唯一代理组与去机场规则化 (Single Proxy Group & Anti-Airport Rules)**：
-   * **去机场分组与规则**：Clash WinLite 彻底摒弃并过滤机场订阅配置文件中自带的、复杂且不透明的多级代理分组和非公开分流规则。
+   * **去机场分组与规则**：Clash Mini 彻底摒弃并过滤机场订阅配置文件中自带的、复杂且不透明的多级代理分组和非公开分流规则。
    * **唯一 PROXY 组**：底层的 Clash 配置只保留一个唯一的代理组（命名为 `PROXY`），该组包含且只包含解析出来的原始服务器节点。
    * **主界面节点表格**：主窗口上半层直接展示这一个唯一的 `PROXY` 组下的所有原始服务器节点。用户在表格中选中某一个节点，即代表当前代理出口切换为该节点，所有走代理的流量均以此节点为唯一出口。
 
@@ -131,7 +131,7 @@
 系统托盘图标使用指定的布偶猫咪头像图片，并直接从后端打包嵌入 PNG 字节流，以确保和原版彻底隔离：
 
 1. **手动模式 (Manual)**：
-   * 采用金属质感灰色猫咪头像：`clash_winlite_ragdoll_metal`（`tray-icon.png`）。
+   * 采用金属质感灰色猫咪头像：`clash_mini_ragdoll_metal`（`tray-icon.png`）。
 2. **TUN 模式 (TUN Mode)**：
    * 采用带星星发光质感的蓝色猫咪头像（`tray-icon-tun.png`）。
 3. **系统代理模式 (System Proxy)**：
@@ -165,11 +165,11 @@
 
 ## 📋 六、 版本发布标准作业程序与检查清单 (Release SOP & Checklist)
 
-本章节定义了 Clash WinLite 项目发行新版本的标准流程和自动化检查项。在准备发布新版本时，必须严格按照本清单逐项核对并执行。
+本章节定义了 Clash Mini 项目发行新版本的标准流程和自动化检查项。在准备发布新版本时，必须严格按照本清单逐项核对并执行。
 
 ### 1. 开发与测试期安全规范 (Development & Dev-Run Verification)
 - **开发服务器启动前配置审计**：
-  - 读取并核实开发版配置文件中（`AppData\Local\io.github.clash-winlite.clash-winlite.dev` 或 Roaming 下对应的 `verge.yaml` 和 `config.yaml`），`enable_tun_mode`、`enable_system_proxy` 和 `tun.enable` 均必须为 `false`。
+  - 读取并核实开发版配置文件中（`AppData\Local\io.github.clash-mini.clash-mini.dev` 或 Roaming 下对应的 `verge.yaml` 和 `config.yaml`），`enable_tun_mode`、`enable_system_proxy` 和 `tun.enable` 均必须为 `false`。
   - 确认 Mixed Port 混合代理端口已避让为 `10801`，Controller API 端口已避让为 `9098`，严禁与生产/原版程序冲突。
   - **红线规诫**：严禁以 TUN 模式或系统代理模式启动开发服务器（`pnpm dev`），防止接管宿主机网络导致 AI 助手因断网与云端失联。
 - **后台服务文件锁定状态检查**：
@@ -177,7 +177,7 @@
   - 若出现 `os error 32`（共享占用冲突），必须引导用户在生产版/原版客户端中点击重新安装/修复服务，将 Windows 全局服务路径指回原版的正式安装目录，从而释放开发工作空间的文件锁定。
 - **前端视图一致性校验**：
   - 任何时候如果发现运行测试时界面“退回了旧版”，必须立刻运行 `git status`、`git diff` 和 `git log` 检查本地最近的提交记录，严禁产生“代码存放在别处”的幻觉。
-  - 确认清理了 `node_modules/.vite` 与 `AppData\Local\io.github.clash-winlite.clash-winlite` 的本地缓存后再试，确保看到的是本地最新的代码表现。
+  - 确认清理了 `node_modules/.vite` 与 `AppData\Local\io.github.clash-mini.clash-mini` 的本地缓存后再试，确保看到的是本地最新的代码表现。
 
 ### 2. 编译前安全与合规性检查 (Pre-build Verification)
 - **前端资源独立编译（核心校验）**：
@@ -190,7 +190,7 @@
   - 后端静态校验：运行 `cargo check` 确保 Rust 后端没有编译和语法错误。
   - 版本号一致性：检查 `package.json`、`src-tauri/Cargo.toml` 以及 `src-tauri/tauri.conf.json` 中的版本号已全部同步更新为即将发布的版本（如 `0.3.2`）。
 - **清理本地缓存与私有配置**：
-  - 检查并在打包前，彻底删除编译输出目录（如 `target/release/.config`）中可能遗留的本地运行数据与缓存文件夹（如 `io.github.clash-winlite.clash-winlite` 和 `io.github.clash-winlite.clash-winlite.dev`）。
+  - 检查并在打包前，彻底删除编译输出目录（如 `target/release/.config`）中可能遗留的本地运行数据与缓存文件夹（如 `io.github.clash-mini.clash-mini` 和 `io.github.clash-mini.clash-mini.dev`）。
   - 确保 `.config` 文件夹下仅存在 `PORTABLE` 空标识文件，彻底杜绝个人订阅链接和代理证书泄露。
 - **性能与资源控制审计**：
   - 检查 `src-tauri/src/utils/resolve/window.rs` 中的 Windows WebView 窗口构建配置，确保已注入限制浏览器磁盘缓存大小的命令行参数：`.additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=31457280")`。
@@ -200,7 +200,7 @@
   - 运行 `pnpm build`（即 `tauri build`），将最新的前端构建静态资产（来自已成功生成的 `dist` 目录）与 Rust 后端代码一同编译打包。
   - 必须等待编译进程完全退出且 Exit Code 为 0. 严禁在后台编译尚未结束时抢跑。
 - **便携版绿色打包**：
-  - 编译结束后，运行 `pnpm portable`（它会触发修改后的 `portable.mjs`），将最新的二进制文件 and 完全干净的 `.config` 目录打包成 `Clash.WinLite_[Version]_[Arch]_portable.zip`。
+  - 编译结束后，运行 `pnpm portable`（它会触发修改后的 `portable.mjs`），将最新的二进制文件 and 完全干净的 `.config` 目录打包成 `Clash.Mini_[Version]_[Arch]_portable.zip`。
 - **双重大小与内容复核**：
   - 检查生成的压缩包体积是否正常（纯净包大小通常在 40MB~65MB 之间；如果体积异常增大至 70MB+，代表可能误将本地大缓存打包进去了，必须立即解压复核）。
 - **代码合并与 Git 推送**：

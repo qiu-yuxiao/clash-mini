@@ -78,7 +78,9 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
     .transparent(false) // 禁用透明，原生窗口背景完全不透明
     .initialization_script(&initial_script)
     .general_autofill_enabled(false)
-    .additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=31457280")
+    .additional_browser_args(
+        "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=31457280",
+    )
     .on_page_load(move |window, payload| {
         if payload.event() != PageLoadEvent::Finished {
             return;

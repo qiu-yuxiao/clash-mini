@@ -22,18 +22,18 @@ notifications:
     body: Профиль яңадан активлаштырылды.
   appQuit:
     title: Чыгар алдыннан
-    body: Clash WinLite чыгарга җыена.
+    body: Clash Mini чыгарга җыена.
   appHidden:
     title: Кушымта яшерелде
-    body: Clash WinLite фон режимында эшли.
+    body: Clash Mini фон режимында эшли.
   updateReady:
-    title: Clash WinLite Update
+    title: Clash Mini Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash WinLite хезмәтен урнаштыру өчен администратор хокуклары кирәк.
-  adminUninstallPrompt: Clash WinLite хезмәтен бетерү өчен администратор хокуклары кирәк.
+  adminInstallPrompt: Clash Mini хезмәтен урнаштыру өчен администратор хокуклары кирәк.
+  adminUninstallPrompt: Clash Mini хезмәтен бетерү өчен администратор хокуклары кирәк.
 tray:
   dashboard: Идарә панеле
   ruleMode: Кагыйдә режимы

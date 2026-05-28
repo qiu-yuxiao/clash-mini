@@ -37,8 +37,8 @@ async function resolvePortable() {
 
   // 清理可能遗留的本地私有配置数据，防止敏感信息泄漏
   const privateDirs = [
-    'io.github.clash-winlite.clash-winlite',
-    'io.github.clash-winlite.clash-winlite.dev'
+    'io.github.clash-mini.clash-mini',
+    'io.github.clash-mini.clash-mini.dev'
   ]
   for (const dirName of privateDirs) {
     const dirPath = path.join(configDir, dirName)
@@ -49,7 +49,7 @@ async function resolvePortable() {
 
   const zip = new AdmZip()
 
-  zip.addLocalFile(path.join(releaseDir, 'clash-winlite.exe'))
+  zip.addLocalFile(path.join(releaseDir, 'clash-mini.exe'))
   zip.addLocalFile(path.join(releaseDir, 'verge-mihomo.exe'))
   zip.addLocalFile(path.join(releaseDir, 'verge-mihomo-alpha.exe'))
   zip.addLocalFolder(path.join(releaseDir, 'resources'), 'resources')
@@ -58,7 +58,7 @@ async function resolvePortable() {
   const require = createRequire(import.meta.url)
   const packageJson = require('../package.json')
   const { version } = packageJson
-  const zipFile = `Clash.WinLite_${version}_${arch}_portable.zip`
+  const zipFile = `Clash.Mini_${version}_${arch}_portable.zip`
   zip.writeZip(zipFile)
   console.log('[INFO]: create portable zip successfully')
 }

@@ -22,18 +22,18 @@ notifications:
     body: Профиль повторно активирован.
   appQuit:
     title: Скорый выход
-    body: Clash WinLite скоро завершит работу.
+    body: Clash Mini скоро завершит работу.
   appHidden:
     title: Приложение скрыто
-    body: Clash WinLite работает в фоновом режиме.
+    body: Clash Mini работает в фоновом режиме.
   updateReady:
-    title: Clash WinLite Update
+    title: Clash Mini Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Для установки службы Clash WinLite требуются права администратора.
-  adminUninstallPrompt: Для удаления службы Clash WinLite требуются права администратора.
+  adminInstallPrompt: Для установки службы Clash Mini требуются права администратора.
+  adminUninstallPrompt: Для удаления службы Clash Mini требуются права администратора.
 tray:
   dashboard: Панель
   ruleMode: Режим правил

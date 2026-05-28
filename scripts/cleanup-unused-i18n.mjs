@@ -21,7 +21,7 @@ const DEFAULT_BACKEND_SOURCE_DIRS = [
   path.resolve(__dirname, '../crates'),
 ]
 const EXCLUDE_USAGE_DIRS = [FRONTEND_LOCALES_DIR, BACKEND_LOCALES_DIR]
-const DEFAULT_BASELINE_LANG = 'en'
+const DEFAULT_BASELINE_LANG = 'zh'
 const IGNORE_DIR_NAMES = new Set([
   '.git',
   '.idea',
@@ -1020,7 +1020,7 @@ function loadBackendLocales() {
     const localePath = path.join(BACKEND_LOCALES_DIR, entry.name)
     const name = entry.name.replace(/\.(ya?ml)$/i, '')
     const raw = fs.readFileSync(localePath, 'utf8')
-    let data = {}
+    let data
     try {
       const parsed = yaml.load(raw)
       data = isPlainObject(parsed) ? parsed : {}
@@ -1055,6 +1055,7 @@ function ensureBackup(localePath) {
     } catch (error) {
       throw new Error(
         `Failed to recycle existing backup for ${path.basename(localePath)}: ${error.message}`,
+        { cause: error }
       )
     }
   }

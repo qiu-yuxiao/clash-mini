@@ -369,20 +369,20 @@ pub fn init_scheme() -> Result<()> {
     let app_exe = app_exe.to_string_lossy().into_owned();
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    
-    // Register clash-winlite:// URL protocol
-    let (clash_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winlite")?;
-    clash_wa.set_value("", &"Clash WinLite")?;
-    clash_wa.set_value("URL Protocol", &"Clash WinLite URL Scheme Protocol")?;
-    let (default_icon_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winlite\\DefaultIcon")?;
+
+    // Register clash-mini:// URL protocol
+    let (clash_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-mini")?;
+    clash_wa.set_value("", &"Clash Mini")?;
+    clash_wa.set_value("URL Protocol", &"Clash Mini URL Scheme Protocol")?;
+    let (default_icon_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-mini\\DefaultIcon")?;
     default_icon_wa.set_value("", &app_exe)?;
-    let (command_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-winlite\\Shell\\Open\\Command")?;
+    let (command_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-mini\\Shell\\Open\\Command")?;
     command_wa.set_value("", &format!("{app_exe} \"%1\""))?;
 
     // Register clash:// URL protocol
     let (clash, _) = hkcu.create_subkey("Software\\Classes\\Clash")?;
-    clash.set_value("", &"Clash WinLite")?;
-    clash.set_value("URL Protocol", &"Clash WinLite URL Scheme Protocol")?;
+    clash.set_value("", &"Clash Mini")?;
+    clash.set_value("URL Protocol", &"Clash Mini URL Scheme Protocol")?;
     let (default_icon, _) = hkcu.create_subkey("Software\\Classes\\Clash\\DefaultIcon")?;
     default_icon.set_value("", &app_exe)?;
     let (command, _) = hkcu.create_subkey("Software\\Classes\\Clash\\Shell\\Open\\Command")?;
@@ -392,7 +392,7 @@ pub fn init_scheme() -> Result<()> {
 }
 #[cfg(target_os = "linux")]
 pub fn init_scheme() -> Result<()> {
-    const DESKTOP_FILE: &str = "clash-winlite.desktop";
+    const DESKTOP_FILE: &str = "clash-mini.desktop";
 
     for scheme in DEEP_LINK_SCHEMES {
         let handler = format!("x-scheme-handler/{scheme}");
@@ -418,7 +418,7 @@ pub const fn init_scheme() -> Result<()> {
 }
 
 #[cfg(target_os = "linux")]
-const DEEP_LINK_SCHEMES: &[&str] = &["clash", "clash-winlite"];
+const DEEP_LINK_SCHEMES: &[&str] = &["clash", "clash-mini"];
 
 pub async fn startup_script() -> Result<()> {
     let app_handle = handle::Handle::app_handle();

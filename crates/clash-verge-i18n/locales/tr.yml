@@ -22,18 +22,18 @@ notifications:
     body: Profil yeniden etkinleştirildi.
   appQuit:
     title: Çıkış Yapılmak Üzere
-    body: Clash WinLite kapanmak üzere.
+    body: Clash Mini kapanmak üzere.
   appHidden:
     title: Uygulama Gizlendi
-    body: Clash WinLite arka planda çalışıyor.
+    body: Clash Mini arka planda çalışıyor.
   updateReady:
-    title: Clash WinLite Update
+    title: Clash Mini Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash WinLite hizmetini kurmak için yönetici ayrıcalıkları gerekir.
-  adminUninstallPrompt: Clash WinLite hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.
+  adminInstallPrompt: Clash Mini hizmetini kurmak için yönetici ayrıcalıkları gerekir.
+  adminUninstallPrompt: Clash Mini hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.
 tray:
   dashboard: Gösterge Paneli
   ruleMode: Kural Modu

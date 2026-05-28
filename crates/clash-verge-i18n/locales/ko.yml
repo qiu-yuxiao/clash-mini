@@ -22,18 +22,18 @@ notifications:
     body: 프로필이 다시 활성화되었습니다.
   appQuit:
     title: 곧 종료
-    body: Clash WinLite가 곧 종료됩니다.
+    body: Clash Mini가 곧 종료됩니다.
   appHidden:
     title: 앱이 숨겨짐
-    body: Clash WinLite가 백그라운드에서 실행 중입니다.
+    body: Clash Mini가 백그라운드에서 실행 중입니다.
   updateReady:
-    title: Clash WinLite Update
+    title: Clash Mini Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Clash WinLite 서비스 설치에는 관리자 권한이 필요합니다.
-  adminUninstallPrompt: Clash WinLite 서비스 제거에는 관리자 권한이 필요합니다.
+  adminInstallPrompt: Clash Mini 서비스 설치에는 관리자 권한이 필요합니다.
+  adminUninstallPrompt: Clash Mini 서비스 제거에는 관리자 권한이 필요합니다.
 tray:
   dashboard: 대시보드
   ruleMode: 규칙 모드

@@ -22,18 +22,18 @@ notifications:
     body: Profil diaktifkan kembali.
   appQuit:
     title: Akan Keluar
-    body: Clash WinLite akan keluar.
+    body: Clash Mini akan keluar.
   appHidden:
     title: Aplikasi Disembunyikan
-    body: Clash WinLite berjalan di latar belakang.
+    body: Clash Mini berjalan di latar belakang.
   updateReady:
-    title: Clash WinLite Update
+    title: Clash Mini Update
     body: A new version (v{version}) has been downloaded and is ready to install.
     installNow: Install Now
     later: Later
 service:
-  adminInstallPrompt: Menginstal layanan Clash WinLite memerlukan hak administrator.
-  adminUninstallPrompt: Menghapus instalasi layanan Clash WinLite memerlukan hak administrator.
+  adminInstallPrompt: Menginstal layanan Clash Mini memerlukan hak administrator.
+  adminUninstallPrompt: Menghapus instalasi layanan Clash Mini memerlukan hak administrator.
 tray:
   dashboard: Dasbor
   ruleMode: Mode Aturan

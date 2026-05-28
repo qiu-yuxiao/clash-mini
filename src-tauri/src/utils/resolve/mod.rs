@@ -131,7 +131,7 @@ pub(super) async fn init_auto_backup() {
 }
 
 async fn init_silent_updater() {
-    logging!(info, Type::Setup, "Silent updater disabled for Clash WinLite");
+    logging!(info, Type::Setup, "Silent updater disabled for Clash Mini");
 }
 
 pub fn init_signal() {

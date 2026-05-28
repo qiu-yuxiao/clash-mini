@@ -5,10 +5,7 @@ use crate::module::lightweight;
 use crate::process::AsyncHandler;
 use crate::singleton;
 use crate::utils::window_manager::WindowManager;
-use crate::{
-    Type, cmd, config::Config, feat, logging,
-    utils::dirs::find_target_icons,
-};
+use crate::{Type, cmd, config::Config, feat, logging, utils::dirs::find_target_icons};
 use clash_verge_limiter::{Limiter, SystemClock, SystemLimiter};
 use clash_verge_logging::logging_error;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
@@ -302,7 +299,7 @@ impl Tray {
         );
 
         let tooltip = format!(
-            "Clash WinLite {}\n{}: {}\n{}: {}\n{}: {}",
+            "Clash Mini {}\n{}: {}\n{}: {}\n{}: {}",
             reassembled_version,
             sys_proxy_text,
             switch_str(system_proxy),

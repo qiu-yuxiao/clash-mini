@@ -252,8 +252,8 @@ const ActiveNodeStatusCard = () => {
   )
 }
 
-// WinLite Traffic Panel
-const WinLiteTrafficPanel = () => {
+// Mini Traffic Panel
+const MiniTrafficPanel = () => {
   const mode = useThemeMode()
   const { t } = useTranslation()
   const pageVisible = useVisibility()
@@ -1521,7 +1521,7 @@ const Layout = () => {
               boxSizing: 'border-box',
             }}
           >
-            <WinLiteTrafficPanel />
+            <MiniTrafficPanel />
           </div>
         </div>
       </Paper>

@@ -1,4 +1,4 @@
-# Clash WinLite Memory Checkpoint (记忆整理归档)
+# Clash Mini Memory Checkpoint (记忆整理归档)
 
 本文件是为防止开发测试服务重启或 AI 记忆截断后造成信息丢失而特别整理的记忆存盘。
 
@@ -28,7 +28,7 @@
 ---
 
 ## 🔍 启动前安全参数验证 (Config Validation)
-我们已核实了开发版 AppData 配置（[verge.yaml](file:///C:/Users/sun_y/AppData/Roaming/io.github.clash-winlite.clash-winlite.dev/verge.yaml) 和 [config.yaml](file:///C:/Users/sun_y/AppData/Roaming/io.github.clash-winlite.clash-winlite.dev/config.yaml)）：
+我们已核实了开发版 AppData 配置（[verge.yaml](file:///C:/Users/sun_y/AppData/Roaming/io.github.clash-mini.clash-mini.dev/verge.yaml) 和 [config.yaml](file:///C:/Users/sun_y/AppData/Roaming/io.github.clash-mini.clash-mini.dev/config.yaml)）：
 * **接管状态**：`enable_tun_mode: false`，`enable_system_proxy: false`，`tun.enable: false`（均已关闭，不会劫持宿主机网络）。
 * **端口避让**：`mixed-port` / `verge_mixed_port` 均为 **`10801`**（与宿主机原版 Clash Verge 的默认端口隔离，防止端口占用崩溃）。
 
@@ -37,7 +37,7 @@
 ## 🧹 缓存清理目标 (Cache Purge)
 为解决程序运行沉重（very sluggish/heavy）的问题，我们在重启前需要清理以下缓存：
 1. **Vite 构建缓存**：工作区中的 `node_modules/.vite` 目录。
-2. **WebView2 用户数据缓存 (UDF)**：本地的 `C:\Users\sun_y\AppData\Local\io.github.clash-winlite.clash-winlite` 目录（包含渲染器缓存、GPU 状态、Shader 编译等缓存）。
+2. **WebView2 用户数据缓存 (UDF)**：本地的 `C:\Users\sun_y\AppData\Local\io.github.clash-mini.clash-mini` 目录（包含渲染器缓存、GPU 状态、Shader 编译等缓存）。
 
 ---
 
@@ -46,7 +46,7 @@
 2. **清理缓存**：在工作目录下运行 Powershell 缓存清理命令：
    ```powershell
    Remove-Item -Recurse -Force node_modules/.vite
-   Remove-Item -Recurse -Force C:\Users\sun_y\AppData\Local\io.github.clash-winlite.clash-winlite
+   Remove-Item -Recurse -Force C:\Users\sun_y\AppData\Local\io.github.clash-mini.clash-mini
    ```
 3. **重新启动**：向用户发起确认并运行以下开发调试启动命令：
    ```powershell

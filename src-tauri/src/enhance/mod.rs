@@ -578,9 +578,11 @@ fn rewrite_rule_target(rule_str: &str, allowed_names: &HashSet<String>, default_
     if let Some(idx) = target_idx {
         if idx < parts.len() {
             let current_target = parts[idx];
-            
+
             // Check case-insensitive match first
-            let matched_allowed = allowed_names.iter().find(|name| name.as_str().eq_ignore_ascii_case(current_target));
+            let matched_allowed = allowed_names
+                .iter()
+                .find(|name| name.as_str().eq_ignore_ascii_case(current_target));
 
             if let Some(allowed_name) = matched_allowed {
                 if allowed_name.as_str() != current_target {
@@ -655,7 +657,7 @@ async fn apply_dns_settings(mut config: Mapping, enable_dns_settings: bool) -> M
     config
 }
 
-fn enforce_winlite_agreements(mut config: Mapping) -> Mapping {
+fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
     let mut proxy_names = Vec::new();
     if let Some(Value::Sequence(proxies)) = config.get("proxies") {
@@ -694,13 +696,19 @@ fn enforce_winlite_agreements(mut config: Mapping) -> Mapping {
     }
 
     // Replace the entire proxy-groups sequence
-    config.insert(Value::from("proxy-groups"), Value::from(vec![Value::from(single_group)]));
+    config.insert(
+        Value::from("proxy-groups"),
+        Value::from(vec![Value::from(single_group)]),
+    );
 
     // 4. Inject rule-provider for "gfwlist"
     let mut gfwlist_provider = Mapping::new();
     gfwlist_provider.insert(Value::from("type"), Value::from("http"));
     gfwlist_provider.insert(Value::from("behavior"), Value::from("domain"));
-    gfwlist_provider.insert(Value::from("url"), Value::from("https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"));
+    gfwlist_provider.insert(
+        Value::from("url"),
+        Value::from("https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"),
+    );
     gfwlist_provider.insert(Value::from("path"), Value::from("./ruleset/gfwlist.yaml"));
     gfwlist_provider.insert(Value::from("interval"), Value::from(86400));
     gfwlist_provider.insert(Value::from("proxy"), Value::from("PROXY"));
@@ -811,7 +819,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     let mut config = apply_builtin_scripts(config, clash_core, enable_builtin).await;
 
     config = cleanup_proxy_groups(config);
-    config = enforce_winlite_agreements(config);
+    config = enforce_mini_agreements(config);
 
     config = use_tun(config, enable_tun);
     config = use_sort(config);
@@ -986,8 +994,8 @@ proxy-groups:
     }
 
     #[test]
-    fn test_enforce_winlite_agreements_logic() {
-        use super::enforce_winlite_agreements;
+    fn test_enforce_mini_agreements_logic() {
+        use super::enforce_mini_agreements;
         use serde_yaml_ng::{Mapping, Value};
 
         let config_str = r#"
@@ -1017,7 +1025,7 @@ append-rules:
 "#;
 
         let mut config: Mapping = serde_yaml_ng::from_str(config_str).unwrap();
-        config = enforce_winlite_agreements(config);
+        config = enforce_mini_agreements(config);
 
         // 1. Verify single PROXY group
         let groups = config.get("proxy-groups").and_then(Value::as_sequence).unwrap();
@@ -1040,7 +1048,10 @@ append-rules:
         let gfwlist = providers.get("gfwlist").and_then(Value::as_mapping).unwrap();
         assert_eq!(gfwlist.get("type").unwrap().as_str(), Some("http"));
         assert_eq!(gfwlist.get("behavior").unwrap().as_str(), Some("domain"));
-        assert_eq!(gfwlist.get("url").unwrap().as_str(), Some("https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt"));
+        assert_eq!(
+            gfwlist.get("url").unwrap().as_str(),
+            Some("https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt")
+        );
         assert_eq!(gfwlist.get("proxy").unwrap().as_str(), Some("PROXY"));
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();

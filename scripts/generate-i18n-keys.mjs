@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const ROOT_DIR = path.resolve(__dirname, '..')
-const LOCALE_DIR = path.resolve(ROOT_DIR, 'src/locales/en')
+const LOCALE_DIR = path.resolve(ROOT_DIR, 'src/locales/zh')
 const KEY_OUTPUT = path.resolve(ROOT_DIR, 'src/types/generated/i18n-keys.ts')
 const RESOURCE_OUTPUT = path.resolve(
   ROOT_DIR,
