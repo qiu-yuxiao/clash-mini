@@ -377,10 +377,9 @@ export const useRenderList = (
 
     // 正常模式的渲染逻辑
     const useRule = mode === 'rule' || mode === 'script'
-    const renderGroups =
-      useRule && proxiesData.groups.length
-        ? proxiesData.groups
-        : [proxiesData.global!]
+    const renderGroups = proxiesData.groups.length
+      ? proxiesData.groups
+      : [proxiesData.global!]
 
     const cache = groupCacheRef.current
     let anyChanged = false

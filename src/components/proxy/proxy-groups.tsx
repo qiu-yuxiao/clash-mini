@@ -509,10 +509,6 @@ export const ProxyGroups = (props: Props) => {
     />
   )
 
-  if (mode === 'direct') {
-    return <BaseEmpty textKey="proxies.page.messages.directMode" />
-  }
-
   if (isChainMode) {
     // 获取所有代理组
     const proxyGroups = proxiesData?.groups || []

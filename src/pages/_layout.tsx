@@ -59,7 +59,7 @@ import {
   isPortInUse,
   patchClashMode,
 } from '@/services/cmds'
-import { healthcheckProxyProvider, closeAllConnections } from 'tauri-plugin-mihomo-api'
+import { healthcheckProxyProvider, closeAllConnections, selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 import delayManager from '@/services/delay'
 import parseTraffic from '@/utils/parse-traffic'
 
@@ -1030,6 +1030,11 @@ const Layout = () => {
                       variant={clashConfig?.mode?.toLowerCase() === 'global' ? 'contained' : 'outlined'}
                       onClick={async () => {
                         await patchClashMode('global')
+                        try {
+                          await selectNodeForGroup('GLOBAL', 'PROXY')
+                        } catch (e) {
+                          console.error('Failed to set GLOBAL target to PROXY:', e)
+                        }
                         refreshClashConfig()
                       }}
                       sx={{ fontSize: '11px', textTransform: 'none', height: 26, minWidth: 0, px: 0, whiteSpace: 'nowrap' }}
