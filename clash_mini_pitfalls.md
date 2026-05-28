@@ -109,3 +109,11 @@
     1. 必须将所有用于临时调试和发布辅助的脚本统一存放在特定的 `scratch/` 目录下。
     2. 必须在 `.gitignore` 中配置忽略 `scratch/`，确保该目录下的任何文件绝对不会被 Git 追踪。
     3. 严禁在任何会被提交到仓库的代码文件中硬编码敏感凭证，必须通过环境变量或外部非追踪文件动态加载。
+
+### 13. 【本地运行 updater 脚本必须显式注入环境变量且处理 Changelog 解析错误】
+*   **犯错场景**：在 GitHub Actions 工作流成功完成 Windows、Linux、macOS 编译并发布 release v1.0.0 后，AI 助手尝试本地运行 `pnpm updater` 和 `pnpm updater-fixed-webview2` 生成自动更新 JSON 时报错。错误一是：`Error: context.repo requires a GITHUB_REPOSITORY environment variable like 'owner/repo'`；错误二是：`Error: could not found "v1.0.0" in Changelog.md` 导致 `updater-fixed-webview2` 脚本直接崩溃退出，而未能成功更新 `update-fixed-webview2.json`。
+*   **严重后果**：自动更新数据库中缺失了最新的 WebView2 Fixed 版更新资产数据，导致使用 Fixed WebView2 版本的 Windows 客户端无法收到 1.0.0 版本的更新推送。
+*   **正确解决方案（踩坑教学）**：
+    1. **显式注入环境变量**：在 Actions 环境外本地执行 updater 脚本时，必须使用 PowerShell 显式定义并注入环境上下文，例如：
+       `$env:GITHUB_TOKEN = '...'; $env:GITHUB_REPOSITORY = 'qiu-yuxiao/clash-mini'; pnpm updater`
+    2. **Changelog 解析健壮性**：`updater-fixed-webview2.mjs` 中的 `resolveUpdateLog(tag.name)` 缺乏异常捕获，当 `Changelog.md` 未能同步更新当前发布版本号时会抛出未捕获异常。必须将其修改为与 `updater.mjs` 一致，增加 `.catch(() => resolveUpdateLogDefault().catch(() => 'No changelog available'))` 容错链以读取最新版本的更新日志或兜底文本，保证发布流程正常闭合。
