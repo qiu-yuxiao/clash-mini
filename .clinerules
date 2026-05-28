@@ -1,15 +1,23 @@
 # Clash WinLite - AI Assistant Instructions
 
-## 🚨 【项目命根子：必须第一时间阅读的文件 (CRITICAL MUST-READ FILES ON STARTUP)】
-**Every time you start a session or take over the codebase, you MUST read the following two files before doing anything else:**
-1. **`clash_winlite_agreements.md` (Unique Agreement)**: The sole source of truth for features, layout, and implementation rules.
-2. **`clash_winlite_pitfalls.md` (Mistakes & Pitfalls Log)**: The redline record of historical mistakes and forbidden behaviors (e.g. executing commands without user permission).
+## 🚨 【项目命根子：五合一极简文档架构 (CRITICAL 5-IN-1 DOCUMENT ARCHITECTURE)】
+**Every time you start a session or take over the codebase, you MUST read the following files before doing anything else, strictly following the DRY (Don't Repeat Yourself) principle:**
 
-## 🚨 【修改顺序铁律 (CRITICAL RULE OF MODIFICATION SEQUENCE)】
-**Before modifying any code (TS/React, Rust, JSON, config files, etc.), you MUST update the project specification agreement first:**
-1. **Read & Check**: Call the view tool to read `clash_winlite_agreements.md` and `clash_winlite_pitfalls.md`.
-2. **Update the agreement**: If your changes involve new features, bug fixes, UI adjustments, or ports allocation, you MUST document the change in `clash_winlite_agreements.md` FIRST.
-3. **Modify code**: Only after the agreement is updated, you may write code. The code implementation must strictly match the rules in `clash_winlite_agreements.md`.
-4. **Dev validation**: Do NOT execute any terminal commands (including `pnpm run dev` or any other tasks) without explicit, oral permission from the user in the chat FIRST. Silent pre-approval in the sandbox is NOT a waiver of this rule.
+1. **[.cursorrules](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.cursorrules) / [.clinerules](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.clinerules) (The Meta-Constitution)**: This file. Serves as the entry point and defines meta-rules for document management and modification sequence.
+2. **[clash_winlite_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_winlite_pitfalls.md) (The Law - Behavioral Redlines)**: The sole source of truth for AI behavioral rules, command execution boundaries, system safety guidelines, and historical mistakes.
+3. **[clash_winlite_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_winlite_agreements.md) (The Contract - Product Specs & SOP)**: The sole source of truth for software specifications, port allocations, UI layouts, and the release checklist SOP (Section VI).
+4. **[memory_summary.md](file:///C:/Users/sun_y/.gemini/antigravity/brain/c453492a-295b-4505-ab6d-1555ef293576/memory_summary.md) (The Brain - Session Memory)**: Temporary session-level details, compiler directories, and current environment cache cleaning commands.
+5. **[current_task.md](file:///C:/Users/sun_y/.gemini/antigravity/brain/c453492a-295b-4505-ab6d-1555ef293576/current_task.md) (The Active Task - Lifecycle)**: The active task's lifecycle plan, checklist, and verification walkthrough. Cleared/reset after every milestone release.
 
-This rule is strictly checked by git pre-commit hook. Any commits with modified code but without modified `clash_winlite_agreements.md` will be blocked.
+---
+
+## 🚨 【知识库维护与 DRY 铁律 (DOCUMENT MAINTENANCE & DRY RULES)】
+1. **绝对禁止信息复制**：长期的行为红线和命令禁令只能且必须存在于 [clash_winlite_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_winlite_pitfalls.md)；长期的软件设计指标和发布SOP只能存在于 [clash_winlite_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_winlite_agreements.md)。绝对禁止在其他文件中复制这些规则或参数，一律使用 markdown 链接引用。
+2. **最高红线：发现任何错误必须先报告对齐，绝对禁止偷偷修复**：在发现代码库、更名或配置有任何历史遗留疏忽时，**在动手进行任何代码/配置修改前，必须先在对话中将问题及修复方案公开、坦诚地报告给用户并获得允许**。严禁以任何借口偷偷修改、提交和发布。
+3. **修改顺序铁律**：在改动任何业务代码（TS/React, Rust, JSON 等）前，必须首先在 [clash_winlite_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_winlite_agreements.md) 的对应章节中将相关设计或行为变更写入协议。保存更新后，方可修改代码。
+4. **重大文档重构自我监督机制**：当对核心配置文件或规则文档进行合并、重构或迁移时，Agent 必须在 [current_task.md](file:///C:/Users/sun_y/.gemini/antigravity/brain/c453492a-295b-4505-ab6d-1555ef293576/current_task.md) 中添加包含以下四个维度的显式自检清单：
+   - 编写并运行 `keyword_scan.py`，100% 审计关键端口和 UI 参数的保留状态。
+   - 运行 `git diff` 逐行审计修改。
+   - 开启独立的 `Document Auditor` 子代理对新旧文件执行交叉审计。
+   - 在聊天对话中公开子代理的完整交叉审计报告供用户复核。
+5. **命令执行红线**：启动开发调试服务器或任何接管网络的命令，必须在对话中获得用户口头授权。对于静态校验（如 `pnpm web:build` 或 `cargo check`），Agent 应当主动执行无需频繁打扰用户。
