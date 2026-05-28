@@ -3,6 +3,7 @@ import fsp from 'fs/promises'
 import { createRequire } from 'module'
 import path from 'path'
 
+import { context, getOctokit } from '@actions/github'
 import AdmZip from 'adm-zip'
 
 const target = process.argv.slice(2)[0]
@@ -61,6 +62,41 @@ async function resolvePortable() {
   const zipFile = `Clash.Mini_${version}_${arch}_portable.zip`
   zip.writeZip(zipFile)
   console.log('[INFO]: create portable zip successfully')
+
+  // push release assets
+  if (process.env.GITHUB_TOKEN === undefined) {
+    throw new Error('GITHUB_TOKEN is required')
+  }
+
+  const options = { owner: context.repo.owner, repo: context.repo.repo }
+  const github = getOctokit(process.env.GITHUB_TOKEN)
+  const tag = process.env.TAG_NAME || `v${version}`
+  console.log('[INFO]: upload to ', tag)
+
+  const { data: release } = await github.rest.repos.getReleaseByTag({
+    ...options,
+    tag,
+  })
+
+  const assets = release.assets.filter((x) => {
+    return x.name === zipFile
+  })
+  if (assets.length > 0) {
+    const id = assets[0].id
+    await github.rest.repos.deleteReleaseAsset({
+      ...options,
+      asset_id: id,
+    })
+  }
+
+  console.log(release.name)
+
+  await github.rest.repos.uploadReleaseAsset({
+    ...options,
+    release_id: release.id,
+    name: zipFile,
+    data: zip.toBuffer(),
+  })
 }
 
 resolvePortable().catch(console.error)

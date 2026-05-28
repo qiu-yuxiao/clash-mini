@@ -260,6 +260,12 @@ jobs:
         with:
           subject-path: target/${{ matrix.target }}/release/bundle/nsis/*setup*
 
+      - name: Portable Bundle
+        if: matrix.os == 'windows-latest'
+        run: pnpm portable ${{ matrix.target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Attest macOS bundles
         if: matrix.os == 'macos-latest'
         uses: actions/attest-build-provenance@v4

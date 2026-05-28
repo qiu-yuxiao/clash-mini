@@ -27,8 +27,8 @@ async function resolvePortable() {
   if (process.platform !== 'win32') return
 
   const releaseDir = target
-    ? `./src-tauri/target/${target}/release`
-    : `./src-tauri/target/release`
+    ? `./target/${target}/release`
+    : `./target/release`
 
   const configDir = path.join(releaseDir, '.config')
 
