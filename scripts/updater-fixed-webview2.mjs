@@ -1,7 +1,7 @@
 import { context, getOctokit } from '@actions/github'
 import fetch from 'node-fetch'
 
-import { resolveUpdateLog } from './updatelog.mjs'
+import { resolveUpdateLog, resolveUpdateLogDefault } from './updatelog.mjs'
 
 const UPDATE_TAG_NAME = 'updater'
 const UPDATE_JSON_FILE = 'update-fixed-webview2.json'
@@ -36,7 +36,9 @@ async function resolveUpdater() {
 
   const updateData = {
     name: tag.name,
-    notes: await resolveUpdateLog(tag.name), // use Changelog.md
+    notes: await resolveUpdateLog(tag.name).catch(() =>
+      resolveUpdateLogDefault().catch(() => 'No changelog available'),
+    ), // use Changelog.md
     pub_date: new Date().toISOString(),
     platforms: {
       'windows-x86_64': { signature: '', url: '' },
