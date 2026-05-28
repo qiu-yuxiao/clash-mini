@@ -227,6 +227,7 @@ jobs:
         run: |
           pnpm i
           pnpm run prebuild ${{ matrix.target }}
+          pnpm run web:build
 
       - name: Add Rust Target
         run: |
@@ -331,6 +332,7 @@ jobs:
         run: |
           pnpm i
           pnpm run prebuild ${{ matrix.target }}
+          pnpm run web:build
 
       - name: 'Setup for linux'
         run: |-
@@ -478,6 +480,7 @@ jobs:
         run: |
           pnpm i
           pnpm run prebuild ${{ matrix.target }}
+          pnpm run web:build
 
       - name: Download WebView2 Runtime
         run: |
