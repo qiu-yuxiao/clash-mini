@@ -39,7 +39,7 @@ pub(super) async fn resolve_scheme(param: &str) -> Result<()> {
 }
 
 fn extract_subscription_info(link_parsed: &Url) -> Option<(std::string::String, Option<String>)> {
-    if !matches!(link_parsed.scheme(), "clash" | "clash-verge") {
+    if !matches!(link_parsed.scheme(), "clash" | "clash-verge" | "clash-winlite") {
         return None;
     }
 

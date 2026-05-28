@@ -9,9 +9,9 @@ if [ "$ID" = "deepin" ]; then
     PACKAGE_NAME="$DPKG_MAINTSCRIPT_PACKAGE"
     DESKTOP_FILES=$(dpkg -L "$PACKAGE_NAME" 2>/dev/null | grep "\.desktop$")
     echo "$DESKTOP_FILES" | while IFS= read -r f; do
-        if [ "$(basename "$f")" == "Clash Verge.desktop" ]; then
+        if [ "$(basename "$f" | tr 'A-Z' 'a-z')" = "clash winlite.desktop" ] || [ "$(basename "$f")" = "clash-winlite.desktop" ]; then
             echo "Fixing deepin desktop file"
-            mv -vf "$f" "/usr/share/applications/clash-verge.desktop"
+            mv -vf "$f" "/usr/share/applications/clash-winlite.desktop"
         fi
     done
 fi
