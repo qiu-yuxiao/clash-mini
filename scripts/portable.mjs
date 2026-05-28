@@ -34,6 +34,19 @@ async function resolvePortable() {
   if (!fs.existsSync(path.join(configDir, 'PORTABLE'))) {
     await fsp.writeFile(path.join(configDir, 'PORTABLE'), '')
   }
+
+  // 清理可能遗留的本地私有配置数据，防止敏感信息泄漏
+  const privateDirs = [
+    'io.github.clash-winlite.clash-winlite',
+    'io.github.clash-winlite.clash-winlite.dev'
+  ]
+  for (const dirName of privateDirs) {
+    const dirPath = path.join(configDir, dirName)
+    if (fs.existsSync(dirPath)) {
+      await fsp.rm(dirPath, { recursive: true, force: true })
+    }
+  }
+
   const zip = new AdmZip()
 
   zip.addLocalFile(path.join(releaseDir, 'clash-winlite.exe'))
