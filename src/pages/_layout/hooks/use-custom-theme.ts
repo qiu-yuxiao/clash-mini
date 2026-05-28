@@ -277,65 +277,65 @@ export const useCustomTheme = () => {
           : '1',
       )
       
-      // Aero Glass Variables (Flattened: Opaque, solid, no gloss/glass/skeuomorphism effects)
+      // Theme Glass/Flat Variables (Flattened: Opaque, solid, no gloss/glass/skeuomorphism effects)
       rootEle.style.setProperty(
-        '--aero-bg',
+        '--theme-bg',
         mode === 'light' ? '#f0f5ff' : '#0f1423'
       )
       rootEle.style.setProperty(
-        '--aero-panel-bg',
+        '--theme-panel-bg',
         mode === 'light' ? '#ffffff' : '#1e2438'
       )
       rootEle.style.setProperty(
-        '--aero-popover-bg',
+        '--theme-popover-bg',
         mode === 'light' ? '#ffffff' : '#1e1e23'
       )
       rootEle.style.setProperty(
-        '--aero-border',
+        '--theme-border',
         mode === 'light' ? '#d0d7de' : '#30363d'
       )
       rootEle.style.setProperty(
-        '--aero-input-bg',
+        '--theme-input-bg',
         mode === 'light' ? '#ffffff' : '#121824'
       )
       rootEle.style.setProperty(
-        '--aero-input-border',
+        '--theme-input-border',
         mode === 'light' ? '#d0d7de' : '#30363d'
       )
       rootEle.style.setProperty(
-        '--aero-border-outer',
+        '--theme-border-outer',
         mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.35)'
       )
       rootEle.style.setProperty(
-        '--aero-box-shadow',
+        '--theme-box-shadow',
         mode === 'light'
           ? '0 8px 32px 0 rgba(0, 0, 0, 0.08)'
           : '0 8px 32px 0 rgba(0, 0, 0, 0.35)'
       )
       rootEle.style.setProperty(
-        '--aero-box-shadow-subtle',
+        '--theme-box-shadow-subtle',
         mode === 'light'
           ? '0 4px 16px 0 rgba(0, 0, 0, 0.05)'
           : '0 4px 16px 0 rgba(0, 0, 0, 0.22)'
       )
       rootEle.style.setProperty(
-        '--aero-btn-bg',
+        '--theme-btn-bg',
         mode === 'light' ? '#f5f5f5' : '#2d3345'
       )
       rootEle.style.setProperty(
-        '--aero-btn-hover-bg',
+        '--theme-btn-hover-bg',
         mode === 'light' ? '#e8e8e8' : '#383e52'
       )
       rootEle.style.setProperty(
-        '--aero-btn-shadow',
+        '--theme-btn-shadow',
         'none'
       )
       rootEle.style.setProperty(
-        '--aero-btn-hover-shadow',
+        '--theme-btn-hover-shadow',
         'none'
       )
       rootEle.style.setProperty(
-        '--aero-btn-active-shadow',
+        '--theme-btn-active-shadow',
         'none'
       )
       rootEle.setAttribute('data-css-injection-root', 'true')

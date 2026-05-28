@@ -80,7 +80,7 @@ type GroupCache = {
 
 // 优化列布局计算
 const calculateColumns = (width: number, configCol: number): number => {
-  return 2
+  return 3
 }
 
 // 优化分组逻辑
@@ -467,9 +467,7 @@ export const useRenderList = (
       return ret
     })
 
-    const filtered = !useRule
-      ? retList.slice(1)
-      : retList.filter((item: IRenderItem) => !item.group.hidden)
+    const filtered = retList.filter((item: IRenderItem) => !item.group.hidden)
 
     if (!anyChanged && prevListRef.current.length === filtered.length) {
       return prevListRef.current

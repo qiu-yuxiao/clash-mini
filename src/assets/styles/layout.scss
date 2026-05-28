@@ -25,9 +25,9 @@
       -moz-user-select: none;
       -ms-user-select: none;
       overflow: hidden;
-      border-right: 1px solid var(--aero-border);
-      background: var(--aero-bg) !important;
-      box-shadow: 2px 0 12px var(--aero-border-outer);
+      border-right: 1px solid var(--theme-border);
+      background: var(--theme-bg) !important;
+      box-shadow: 2px 0 12px var(--theme-border-outer);
 
       .the-logo {
         position: relative;
@@ -86,9 +86,9 @@
       flex: 1 1 100%;
       height: calc(100% - 10px);
       margin: 0 10px 10px 10px;
-      background: var(--aero-panel-bg) !important;
-      border: 1px solid var(--aero-border) !important;
-      box-shadow: var(--aero-box-shadow-subtle) !important;
+      background: var(--theme-panel-bg) !important;
+      border: 1px solid var(--theme-border) !important;
+      box-shadow: var(--theme-box-shadow-subtle) !important;
       border-radius: 8px;
       overflow: hidden;
 
@@ -127,9 +127,9 @@
       padding: 10px;
       box-sizing: border-box;
       height: 36px;
-      border-bottom: 1px solid var(--aero-border);
-      background: var(--aero-bg) !important;
-      box-shadow: 0 1px 4px var(--aero-border-outer);
+      border-bottom: 1px solid var(--theme-border);
+      background: var(--theme-bg) !important;
+      box-shadow: 0 1px 4px var(--theme-border-outer);
 
       &-drag-region {
         align-self: stretch;
@@ -162,9 +162,9 @@
       padding: 10px;
       box-sizing: border-box;
       height: 36px;
-      border-bottom: 1px solid var(--aero-border);
-      background: var(--aero-bg) !important;
-      box-shadow: 0 1px 4px var(--aero-border-outer);
+      border-bottom: 1px solid var(--theme-border);
+      background: var(--theme-bg) !important;
+      box-shadow: 0 1px 4px var(--theme-border-outer);
 
       &-drag-region {
         align-self: stretch;

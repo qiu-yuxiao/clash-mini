@@ -123,28 +123,6 @@ export const ProxyItem = (props: Props) => {
           </Box>
         </Box>
 
-        {/* Column 2: Protocol/Type (Width: 60px) */}
-        <Box
-          sx={{
-            width: 60,
-            height: '100%',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            px: 1,
-            boxSizing: 'border-box',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontSize: '11px',
-            color: 'text.secondary',
-            opacity: 0.85,
-            borderRight: (theme) => `2px solid ${theme.palette.divider}`,
-          }}
-        >
-          {proxy.type}
-        </Box>
-
         {/* Column 3: Delay (Width: 65px, centered) */}
         <Box
           sx={{

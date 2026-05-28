@@ -50,7 +50,7 @@ const SX_SCROLL_CONTAINER: React.ComponentProps<typeof Box>['sx'] = {
   '&::-webkit-scrollbar': {
     display: 'none',
   },
-  border: '2px solid var(--aero-border)',
+  border: (theme) => `5px double ${theme.palette.divider}`,
   borderRadius: '4px',
 }
 
@@ -71,8 +71,8 @@ const SX_CELL_CONTENT: React.ComponentProps<typeof Box>['sx'] = {
 
 const SX_HEADER_ROW: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
-  borderBottom: '2px solid var(--aero-border)',
-  backgroundColor: 'var(--aero-panel-bg)',
+  borderBottom: (theme) => `5px double ${theme.palette.divider}`,
+  backgroundColor: (theme) => theme.palette.background.paper,
   height: '20px',
 }
 
@@ -107,7 +107,7 @@ const SX_ROW_BASE: React.ComponentProps<typeof Box>['sx'] = {
   left: 0,
   right: 0,
   cursor: 'pointer',
-  borderBottom: '2px solid var(--aero-border)',
+  borderBottom: (theme) => `2px solid ${theme.palette.divider}`,
 }
 
 interface RowComponentProps {
@@ -147,7 +147,7 @@ const RowComponent = memo(
             transform: `translateY(${virtualStart}px)`,
             backgroundColor:
               row.index % 2 === 0
-                ? 'var(--aero-panel-bg)'
+                ? (theme) => theme.palette.background.paper
                 : (theme) => theme.palette.mode === 'light' ? '#eef4ff' : '#232b3f',
             '&:hover': {
               backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
@@ -169,7 +169,7 @@ const RowComponent = memo(
                   minWidth: 0,
                   width: isChains ? '50px' : 'auto',
                   justifyContent: isChains ? 'center' : 'flex-start',
-                  borderRight: !isChains ? '2px solid var(--aero-border)' : 'none',
+                  borderRight: (theme) => !isChains ? `2px solid ${theme.palette.divider}` : 'none',
                 },
               ]}
             >
@@ -388,7 +388,7 @@ export const ConnectionTable = (props: Props) => {
                             flex: isChains ? '0 0 50px' : '1 1 0%',
                             minWidth: 0,
                             width: isChains ? '50px' : 'auto',
-                            borderRight: !isChains ? '2px solid var(--aero-border)' : 'none',
+                            borderRight: (theme) => !isChains ? `2px solid ${theme.palette.divider}` : 'none',
                           },
                         ]}
                       >

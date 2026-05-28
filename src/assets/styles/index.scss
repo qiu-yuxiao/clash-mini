@@ -62,8 +62,8 @@ body {
    ========================================================================== */
 
 /* Panel class: structural double border per Agreement II.2 — no glow/shadow */
-.aero-panel {
-  border: 4px double var(--aero-border) !important;
+.theme-panel {
+  border: 4px double var(--theme-border) !important;
   border-radius: var(--border-radius, 8px);
 }
 
@@ -72,8 +72,8 @@ body {
 .MuiMenu-paper,
 .MuiPopover-paper,
 .MuiAutocomplete-paper {
-  background: var(--aero-popover-bg) !important;
-  border: 1px solid var(--aero-border) !important;
-  box-shadow: var(--aero-box-shadow-subtle) !important;
+  background: var(--theme-popover-bg) !important;
+  border: 1px solid var(--theme-border) !important;
+  box-shadow: var(--theme-box-shadow-subtle) !important;
 }
 

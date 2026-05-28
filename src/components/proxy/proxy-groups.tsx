@@ -781,7 +781,10 @@ function ProxyVirtualList({
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 1,
-        border: (theme) => `4px solid ${theme.palette.divider}`,
+        borderTop: (theme) => `4px solid ${theme.palette.divider}`,
+        borderBottom: (theme) => `4px solid ${theme.palette.divider}`,
+        borderLeft: (theme) => `5px double ${theme.palette.divider}`,
+        borderRight: (theme) => `5px double ${theme.palette.divider}`,
         backgroundColor: (theme) => theme.palette.background.paper,
       }}
     >

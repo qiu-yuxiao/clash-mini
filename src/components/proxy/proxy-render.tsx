@@ -49,7 +49,7 @@ export const ProxyRender = (props: RenderProps) => {
     onChangeProxy,
     isChainMode: _ = false,
   } = props
-  const { type, group, headState, proxy, proxyCol } = item
+  const { type, group, headState, proxy, proxyCol, col } = item
   const { verge } = useVerge()
   const enable_group_icon = verge?.enable_group_icon ?? true
   const mode = useThemeMode()
@@ -78,14 +78,14 @@ export const ProxyRender = (props: RenderProps) => {
         sx={{
           py: 0,
           pl: 0,
-          ...(idx === 0 ? {
+          ...(idx < (col || 3) - 1 ? {
             borderRight: (theme) => `5px double ${theme.palette.divider}`,
           } : {})
         }}
         onClick={() => onChangeProxy(group, proxyItem!)}
       />
     ))
-  }, [type, proxyCol, item.key, group, showType, onChangeProxy, item.indexInGroup])
+  }, [type, proxyCol, item.key, group, showType, onChangeProxy, item.indexInGroup, col])
 
   if (type === 0) {
     return (
@@ -222,7 +222,7 @@ export const ProxyRender = (props: RenderProps) => {
         sx={{
           height: '20px',
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: `repeat(${col || 3}, 1fr)`,
           pl: 2,
         }}
       >

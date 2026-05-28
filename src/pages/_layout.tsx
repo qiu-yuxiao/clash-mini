@@ -204,7 +204,7 @@ const ActiveNodeStatusCard = () => {
 
   return (
     <Paper
-      className="aero-crystal-card"
+      className="theme-crystal-card"
       sx={{
         m: 1,
         mb: 0.5,
@@ -214,8 +214,8 @@ const ActiveNodeStatusCard = () => {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 2,
-        background: 'var(--aero-panel-bg) !important',
-        border: '1px solid var(--aero-border) !important',
+        background: (theme) => `${theme.palette.background.paper} !important`,
+        border: (theme) => `1px solid ${theme.palette.divider} !important`,
         boxShadow: 'none !important',
       }}
     >
@@ -289,7 +289,7 @@ const WinLiteTrafficPanel = () => {
         height: '32px', 
         alignItems: 'center', 
         justifyContent: 'space-between', 
-        borderTop: '1px solid var(--aero-border)',
+        borderTop: (theme) => `1px solid ${theme.palette.divider}`,
         mt: 1,
         pt: 1,
         px: 1,
@@ -692,8 +692,8 @@ const Layout = () => {
             padding: '10px',
             boxSizing: 'border-box',
             height: '36px',
-            borderBottom: '1px solid var(--aero-border)',
-            background: 'var(--aero-bg)',
+            borderBottom: '1px solid var(--divider-color)',
+            background: 'var(--background-color)',
             gap: '8px',
             userSelect: 'none',
           }}
@@ -855,7 +855,7 @@ const Layout = () => {
 
             {/* Settings Sliding Drawer (slides internal left-downwards) */}
             <div
-              className="aero-panel"
+              className="theme-panel"
               style={{
                 position: 'absolute',
                 top: 0,
@@ -872,7 +872,7 @@ const Layout = () => {
                 padding: '12px',
                 gap: '12px',
                 background: mode === 'light' ? '#f0f5ff' : '#1e2438',
-                border: '4px double var(--aero-border)',
+                border: '4px double var(--divider-color)',
               }}
             >
               {/* Left Settings Column (200px width) */}
@@ -885,7 +885,7 @@ const Layout = () => {
                   gap: 1,
                   overflowY: 'auto',
                   pr: 1,
-                  borderRight: '1px solid var(--aero-border)',
+                  borderRight: (theme) => `1px solid ${theme.palette.divider}`,
                 }}
               >
                 {/* Section 1: Subscriptions Import */}
