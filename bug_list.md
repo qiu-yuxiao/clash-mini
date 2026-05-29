@@ -6,7 +6,19 @@
 
 ## 📌 待处理 Bug 列表 (Pending Bugs)
 
-*   **暂无待处理 Bug (No pending bugs)**
+### 🐛 BUG-002：默认开启 IPv6 且缺乏界面控制的评估与改造待办
+*   **状态**：已对齐方案，待执行 (Plan Aligned, Pending Execution)
+*   **反馈时间**：2026-05-29
+*   **对齐方案**：全局默认关闭 IPv6。
+    1. 在 `src-tauri/src/config/clash.rs` 中，将默认模板的 `ipv6: true` 改为 `ipv6: false`。
+    2. 确保在 `src-tauri/src/enhance/tun.rs` 等其他模块中，当 `ipv6` 字段未定义时默认降级为 `false`。这将在不破坏底层代码兼容性的前提下实现全局默认关闭 IPv6，同时保留高级用户通过 Profile/Merge 注入 `ipv6: true` 的可扩展性。
+
+### 🐛 BUG-003：DNS 覆写默认未开启且缺乏自动优化的评估与改造待办
+*   **状态**：已对齐方案，待执行 (Plan Aligned, Pending Execution)
+*   **反馈时间**：2026-05-29
+*   **对齐方案**：全局默认开启 DNS 覆写，并自动生成黄金级默认 DNS 配置。
+    1. 在 `src-tauri/src/config/verge.rs` 中，将 `enable_dns_settings` 的默认值修改为 `Some(true)`，让程序默认启用 DNS 覆写逻辑。
+    2. 在后端初始化阶段（如 `Config::init_config`），检测如果本地 `dns_config.yaml` 配置文件不存在，则自动写入一份经过中国大陆网络深度优化的默认 DNS 覆写配置文件（包含阿里/腾讯国内高并发解析、DoH 加密解析防污染以及完美的微软连接与局域网过滤规则），保障小白用户开箱即用的极速代理与防泄漏体验，同时保留极客用户手动编辑本地配置文件的自由。
 
 ---
 
