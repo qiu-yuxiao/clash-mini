@@ -4,12 +4,34 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+  background: var(--theme-bg) !important;
+  z-index: 1;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(circle at 30% 30%, rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.18 * var(--vibrancy-factor, 1.0))), transparent 40%),
+      radial-gradient(circle at 70% 70%, rgba(0, 132, 255, calc(0.15 * var(--vibrancy-factor, 1.0))), transparent 40%),
+      radial-gradient(circle at 80% 20%, rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), transparent 35%);
+    animation: aurora-move 25s ease infinite alternate;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+  }
 
   .layout-content {
     /* New container for the flex layout */
     display: flex;
     flex: 1; /* Take remaining height */
     overflow: hidden;
+    z-index: 1;
 
     &__left {
       flex: 1 0 200px;
@@ -26,7 +48,8 @@
       -ms-user-select: none;
       overflow: hidden;
       border-right: 1px solid var(--theme-border);
-      background: var(--theme-bg) !important;
+      background: rgba(var(--theme-bg-base-rgb, 240, 245, 255), calc(1 - 0.2 * var(--depth-factor, 1.0))) !important;
+      backdrop-filter: blur(calc(8px * var(--depth-factor, 1.0)));
       box-shadow: 2px 0 12px var(--theme-border-outer);
 
       .the-logo {
@@ -86,9 +109,14 @@
       flex: 1 1 100%;
       height: calc(100% - 10px);
       margin: 0 10px 10px 10px;
-      background: var(--theme-panel-bg) !important;
+      background: rgba(var(--theme-panel-base-rgb, 255, 255, 255), calc(1 - 0.25 * var(--depth-factor, 1.0))) !important;
+      backdrop-filter: blur(calc(12px * var(--depth-factor, 1.0))) !important;
       border: 1px solid var(--theme-border) !important;
-      box-shadow: var(--theme-box-shadow-subtle) !important;
+      box-shadow: 
+        inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))),
+        inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))),
+        0 calc(4px * var(--depth-factor, 1.0)) calc(16px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.1 * var(--depth-factor, 1.0))),
+        0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.12 * var(--vibrancy-factor, 1.0))) !important;
       border-radius: 8px;
       overflow: hidden;
 
@@ -128,7 +156,8 @@
       box-sizing: border-box;
       height: 36px;
       border-bottom: 1px solid var(--theme-border);
-      background: var(--theme-bg) !important;
+      background: rgba(var(--theme-bg-base-rgb, 240, 245, 255), calc(1 - 0.2 * var(--depth-factor, 1.0))) !important;
+      backdrop-filter: blur(calc(8px * var(--depth-factor, 1.0))) !important;
       box-shadow: 0 1px 4px var(--theme-border-outer);
 
       &-drag-region {
@@ -163,7 +192,8 @@
       box-sizing: border-box;
       height: 36px;
       border-bottom: 1px solid var(--theme-border);
-      background: var(--theme-bg) !important;
+      background: rgba(var(--theme-bg-base-rgb, 240, 245, 255), calc(1 - 0.2 * var(--depth-factor, 1.0))) !important;
+      backdrop-filter: blur(calc(8px * var(--depth-factor, 1.0))) !important;
       box-shadow: 0 1px 4px var(--theme-border-outer);
 
       &-drag-region {
@@ -285,5 +315,17 @@
         }
       }
     }
+  }
+}
+
+@keyframes aurora-move {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translate(-10%, 10%) rotate(180deg) scale(1.1);
+  }
+  100% {
+    transform: translate(10%, -10%) rotate(360deg) scale(1);
   }
 }

@@ -215,9 +215,6 @@ const ActiveNodeStatusCard = () => {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 2,
-        background: (theme) => `${theme.palette.background.paper} !important`,
-        border: (theme) => `1px solid ${theme.palette.divider} !important`,
-        boxShadow: 'none !important',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -920,8 +917,6 @@ const Layout = () => {
                 boxSizing: 'border-box',
                 padding: '12px',
                 gap: '12px',
-                background: mode === 'light' ? '#f0f5ff' : '#1e2438',
-                border: '4px double var(--divider-color)',
               }}
             >
               {/* Left Settings Column (200px width) */}

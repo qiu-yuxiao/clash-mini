@@ -92,6 +92,13 @@
     * 为了最大程度保留界面显示空间、契合 Mini 极简扁平定位，全局彻底隐藏所有页面的滚动条（包括主页面、设置面板、订阅列表、连接列表等）。
     * 通过 CSS 的 `::-webkit-scrollbar { display: none !important; }` 和 `scrollbar-width: none !important;` 规则实现无痕隐藏，但必须确保内容区域仍可通过鼠标滚轮、触控板手势、键盘方向键正常滑动。
     * 同时，移除 `.base-page .base-container > section` 的 `scrollbar-gutter: stable;`，使内容排版充分利用窗口的全部水平宽度，防止右侧留下空白轨道占位。
+11. **极光背景与 3D Bevel 视觉层（阶段三）**：
+    * **极光动态背景**：在 `.layout` 容器底层通过 `::before` 伪元素实现一个 Slow-Motion 慢动作极光背景。极光使用三个径向渐变中心（包含 `--primary-color-rgb` 颜色、电光蓝 `#0084FF` 和琥珀金 `#D4AF37`），通过 `@keyframes` 旋转、缩放与位移动画实现飘逸流转。极光整体的不透明度与发光强度通过 `var(--vibrancy-factor)` 线性缩放（当值为 0.0 时完全不显示，为 2.0 时达到最强视觉发光）。
+    * **毛玻璃材质与 3D 浮雕（Bevel）光影**：
+      * 左侧分栏 `.layout-content__left` 和右侧分栏 `.layout-content__right`，以及设置抽屉 `.theme-panel` 和当前节点卡片 `.theme-crystal-card` 的背景，将分别与 `--depth-factor` 联动变为半透明（使用 `rgba` 与 `--theme-bg-base-rgb` 和 `--theme-panel-base-rgb` 进行计算，当 depth 为 0.0 时 100% 实体纯色，当增加时透明度渐进提高）。
+      * 同时通过 `backdrop-filter: blur(calc(8px * var(--depth-factor)))` 提供磨砂毛玻璃透光材质感。
+      * 所有的卡片、分栏和面板内侧引入由 `--depth-factor` 控制的 `box-shadow` 内发光与内阴影：左上角斜向拉入微弱白高光（`inset calc(1px * var(--depth-factor)) calc(1px * var(--depth-factor)) calc(2px * var(--depth-factor)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor)))`），右下角斜向拉入微弱深阴影（`inset calc(-1px * var(--depth-factor)) calc(-1px * var(--depth-factor)) calc(2px * var(--depth-factor)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor)))`），整体底部渲染跟随 depth 深度比例放大的毛玻璃投射黑影，并由 `var(--vibrancy-factor)` 控制外围霓虹背光（neon glow）效果。
+      * **特别铁律**：所有视觉透明与虚化效果均在保留现有的 2px 网格线、5px double 纵向与外周双实线边框、以及 4px double 抽屉双实线边框的基础之上叠加。不得通过虚化和阴影掩盖或溶解现有的双实线结构边框。
 
 
 ---

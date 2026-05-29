@@ -246,6 +246,19 @@ export const useCustomTheme = () => {
       rootEle.style.setProperty('--selection-color', selectColor)
       rootEle.style.setProperty('--scroller-color', scrollColor)
       rootEle.style.setProperty('--primary-main', muiTheme.palette.primary.main)
+      const primaryHex = muiTheme.palette.primary.main
+      let primaryRgb = '91, 92, 157' // default fallback
+      if (primaryHex && primaryHex.startsWith('#')) {
+        const cleanHex = primaryHex.replace('#', '')
+        if (cleanHex.length === 6) {
+          const r = parseInt(cleanHex.substring(0, 2), 16)
+          const g = parseInt(cleanHex.substring(2, 4), 16)
+          const b = parseInt(cleanHex.substring(4, 6), 16)
+          primaryRgb = `${r}, ${g}, ${b}`
+        }
+      }
+      rootEle.style.setProperty('--primary-color-rgb', primaryRgb)
+
       rootEle.style.setProperty(
         '--background-color-alpha',
         alpha(muiTheme.palette.primary.main, 0.1),
@@ -285,6 +298,14 @@ export const useCustomTheme = () => {
       rootEle.style.setProperty(
         '--theme-panel-bg',
         mode === 'light' ? '#ffffff' : '#1e2438'
+      )
+      rootEle.style.setProperty(
+        '--theme-bg-base-rgb',
+        mode === 'light' ? '240, 245, 255' : '15, 20, 35'
+      )
+      rootEle.style.setProperty(
+        '--theme-panel-base-rgb',
+        mode === 'light' ? '255, 255, 255' : '30, 36, 56'
       )
       rootEle.style.setProperty(
         '--theme-popover-bg',
