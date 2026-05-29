@@ -17,6 +17,7 @@ import {
   Select,
   ListItem,
   ListItemText,
+  Slider,
 } from '@mui/material'
 import { alpha } from '@mui/material'
 import dayjs from 'dayjs'
@@ -415,6 +416,35 @@ const MiniTrafficPanel = () => {
 }
 
 const Layout = () => {
+  // Dual Sliders State (Depth & Vibrancy Factors)
+  const [depthFactor, setDepthFactor] = useState<number>(() => {
+    const saved = localStorage.getItem('clash-mini-depth-factor')
+    return saved !== null ? parseFloat(saved) : 1.0
+  })
+
+  const [vibrancyFactor, setVibrancyFactor] = useState<number>(() => {
+    const saved = localStorage.getItem('clash-mini-vibrancy-factor')
+    return saved !== null ? parseFloat(saved) : 1.0
+  })
+
+  const handleDepthFactorChange = (val: number) => {
+    setDepthFactor(val)
+    localStorage.setItem('clash-mini-depth-factor', val.toString())
+  }
+
+  const handleVibrancyFactorChange = (val: number) => {
+    setVibrancyFactor(val)
+    localStorage.setItem('clash-mini-vibrancy-factor', val.toString())
+  }
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--depth-factor', depthFactor.toString())
+  }, [depthFactor])
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--vibrancy-factor', vibrancyFactor.toString())
+  }, [vibrancyFactor])
+
   const mode = useThemeMode()
   const { t } = useTranslation()
   const { theme } = useCustomTheme()
@@ -1396,6 +1426,40 @@ const Layout = () => {
                           深色
                         </Box>
                       </Box>
+                    </ListItem>
+                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'stretch', mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
+                        <Typography variant="caption" sx={{ fontSize: '11px' }}>立体磨砂 (Depth)</Typography>
+                        <Typography variant="caption" sx={{ fontSize: '10px', color: 'text.secondary', fontWeight: 'bold' }}>
+                          {depthFactor.toFixed(1)}
+                        </Typography>
+                      </Box>
+                      <Slider
+                        size="small"
+                        value={depthFactor}
+                        min={0.0}
+                        max={2.0}
+                        step={0.1}
+                        onChange={(_, val) => handleDepthFactorChange(val as number)}
+                        sx={{ py: 0.5, '& .MuiSlider-thumb': { width: 10, height: 10 } }}
+                      />
+                    </ListItem>
+                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'stretch', mt: 0.5 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
+                        <Typography variant="caption" sx={{ fontSize: '11px' }}>色彩霓虹 (Vibrancy)</Typography>
+                        <Typography variant="caption" sx={{ fontSize: '10px', color: 'text.secondary', fontWeight: 'bold' }}>
+                          {vibrancyFactor.toFixed(1)}
+                        </Typography>
+                      </Box>
+                      <Slider
+                        size="small"
+                        value={vibrancyFactor}
+                        min={0.0}
+                        max={2.0}
+                        step={0.1}
+                        onChange={(_, val) => handleVibrancyFactorChange(val as number)}
+                        sx={{ py: 0.5, '& .MuiSlider-thumb': { width: 10, height: 10 } }}
+                      />
                     </ListItem>
                   </List>
                   
