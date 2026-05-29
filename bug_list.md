@@ -6,19 +6,7 @@
 
 ## 📌 待处理 Bug 列表 (Pending Bugs)
 
-### 🐛 BUG-002：默认开启 IPv6 且缺乏界面控制的评估与改造待办
-*   **状态**：已对齐方案，待执行 (Plan Aligned, Pending Execution)
-*   **反馈时间**：2026-05-29
-*   **对齐方案**：全局默认关闭 IPv6。
-    1. 在 `src-tauri/src/config/clash.rs` 中，将默认模板的 `ipv6: true` 改为 `ipv6: false`。
-    2. 确保在 `src-tauri/src/enhance/tun.rs` 等其他模块中，当 `ipv6` 字段未定义时默认降级为 `false`。这将在不破坏底层代码兼容性的前提下实现全局默认关闭 IPv6，同时保留高级用户通过 Profile/Merge 注入 `ipv6: true` 的可扩展性。
-
-### 🐛 BUG-003：DNS 覆写默认未开启且缺乏自动优化的评估与改造待办
-*   **状态**：已对齐方案，待执行 (Plan Aligned, Pending Execution)
-*   **反馈时间**：2026-05-29
-*   **对齐方案**：全局默认开启 DNS 覆写，并自动生成黄金级默认 DNS 配置。
-    1. 在 `src-tauri/src/config/verge.rs` 中，将 `enable_dns_settings` 的默认值修改为 `Some(true)`，让程序默认启用 DNS 覆写逻辑。
-    2. 在后端初始化阶段（如 `Config::init_config`），检测如果本地 `dns_config.yaml` 配置文件不存在，则自动写入一份经过中国大陆网络深度优化的默认 DNS 覆写配置文件（包含阿里/腾讯国内高并发解析、DoH 加密解析防污染以及完美的微软连接与局域网过滤规则），保障小白用户开箱即用的极速代理与防泄漏体验，同时保留极客用户手动编辑本地配置文件的自由。
+*   *当前无待处理的 Bug。*
 
 ---
 
@@ -26,6 +14,11 @@
 
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 修复方法与说明 |
 | :--- | :--- | :---: | :--- |
+| **BUG-002** | 默认开启 IPv6 且缺乏界面控制，可能导致某些网络环境下 DNS 泄露或代理分流异常。 | v1.0.3 | 在 `clash.rs` 默认模板中将 `ipv6` 设为 `false`；在 `tun.rs` 逻辑中，当 `ipv6` 字段未定义时降级为 `false`。 |
+| **BUG-003** | DNS 覆写默认未开启且缺乏自动优化的评估与改造待办，导致国内直连和防泄露体验不佳。 | v1.0.3 | 将 `enable_dns_settings` 默认值设为 `true`；初始化时如果 `dns_config.yaml` 不存在，则自动写入一份深度优化的 DNS 覆写配置。 |
+| **BUG-011** | 默认未开启代理守护（Proxy Guard）导致系统代理易被篡改或静默失效。 | v1.0.3 | 将 `enable_proxy_guard` 默认值设为 `true`，以在后台自动校验并修复系统代理。 |
+| **BUG-012** | 默认未开启自动轻量化模式（Memory Optimization）导致后台挂机占用内存较高。 | v1.0.3 | 将 `enable_auto_light_weight_mode` 默认值设为 `true`，自动轻量化延迟 `auto_light_weight_minutes` 默认缩短为 `5` 分钟，在最小化挂机时自动销毁 WebView 进程，节省内存。 |
+| **BUG-013** | 自动检查更新选项开启（auto_check_update）引发的冗余后台行为。 | v1.0.3 | 将 `auto_check_update` 默认值设为 `false`，彻底停用冗余的自动检查更新机制。 |
 | **BUG-001** | 开机自启非管理员权限下修改后台静默失败且前端 Switch 状态脱节 | v1.0.2 | 前端 PATCH 失败时执行回滚回刷；后端新增 `create_task_elevated` 和 `remove_task_elevated`，在非管理员权限下注册或删除任务时，通过 Windows `runas` 完美唤起 UAC 提权并完成操作。 |
 | **BUG-004** | 代理模式在非规则模式（如全局、直连）下隐藏表头导致定位、延迟排序按钮丢失 | v0.2.0 | 修改前端组件，使表头操作行在「全局代理」和「全局直连」下保持常驻显示。 |
 | **BUG-005** | 表格最外侧左、右竖边框非 5px double 且左侧表格线缩进空缺十几个像素 | v0.2.0 | 修正表格组件左右纵向边框为双线；调整左边距偏移实现完美闭合。 |
