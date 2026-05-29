@@ -1,13 +1,13 @@
 use crate::utils::dirs::{self, PathBufExec as _};
 use anyhow::{Result, anyhow};
 use clash_verge_logging::{Type, logging};
+use deelevate::{PrivilegeLevel, Token};
+use runas::Command as RunasCommand;
 use std::fs;
 use std::os::windows::process::CommandExt as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use windows::Win32::Globalization::{GetACP, GetOEMCP, MULTI_BYTE_TO_WIDE_CHAR_FLAGS, MultiByteToWideChar};
-use deelevate::{PrivilegeLevel, Token};
-use runas::Command as RunasCommand;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const TASK_NAME_USER: &str = "Clash Mini";
@@ -328,12 +328,64 @@ pub fn remove_task(mode: TaskMode) -> Result<()> {
     ))
 }
 
-pub fn remove_task_elevated(mode: TaskMode) -> Result<()> {
+pub fn create_task_elevated(mode: TaskMode) -> Result<()> {
     let token = Token::with_current_process()?;
     let level = token.privilege_level()?;
     match level {
         PrivilegeLevel::NotPrivileged => {
-            logging!(info, Type::Setup, "Requesting UAC elevation to remove {} auto-launch task", mode.label());
+            let task_xml_path = write_task_xml(mode)?;
+            logging!(
+                info,
+                Type::Setup,
+                "Requesting UAC elevation to create {} auto-launch task",
+                mode.label()
+            );
+            let status = RunasCommand::new("schtasks")
+                .arg("/Create")
+                .arg("/TN")
+                .arg(mode.name())
+                .arg("/XML")
+                .arg(&task_xml_path)
+                .arg("/F")
+                .show(false)
+                .status()
+                .map_err(|e| anyhow!("failed to run elevated schtasks to create task: {}", e))?;
+            if !status.success() {
+                return Err(anyhow!("elevated schtasks failed to create task (UAC denied or error)"));
+            }
+            logging!(
+                info,
+                Type::Setup,
+                "Elevated created {} auto-launch task successfully",
+                mode.label()
+            );
+            Ok(())
+        }
+        _ => create_task(mode),
+    }
+}
+
+pub fn remove_task_elevated(mode: TaskMode) -> Result<()> {
+    if !is_task_enabled(mode)? {
+        logging!(
+            info,
+            Type::Setup,
+            "{} auto-launch task not found, skipping removal",
+            mode.label()
+        );
+        return Ok(());
+    }
+
+    let token = Token::with_current_process()?;
+    let level = token.privilege_level()?;
+    match level {
+        PrivilegeLevel::NotPrivileged => {
+            logging!(
+                info,
+                Type::Setup,
+                "Requesting UAC elevation to remove {} auto-launch task",
+                mode.label()
+            );
             let status = RunasCommand::new("schtasks")
                 .arg("/Delete")
                 .arg("/TN")
@@ -345,7 +397,12 @@ pub fn remove_task_elevated(mode: TaskMode) -> Result<()> {
             if !status.success() {
                 return Err(anyhow!("elevated schtasks failed to delete task (UAC denied or error)"));
             }
-            logging!(info, Type::Setup, "Elevated removed {} auto-launch task successfully", mode.label());
+            logging!(
+                info,
+                Type::Setup,
+                "Elevated removed {} auto-launch task successfully",
+                mode.label()
+            );
             Ok(())
         }
         _ => remove_task(mode),
@@ -371,7 +428,7 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
             if is_task_enabled(other)? {
                 remove_task_elevated(other)?;
             }
-            create_task(target)?;
+            create_task_elevated(target)?;
         }
         return Ok(());
     }
@@ -392,7 +449,9 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
         return Ok(());
     }
 
-    remove_task(TaskMode::User)?;
+    if is_task_enabled(TaskMode::User)? {
+        remove_task_elevated(TaskMode::User)?;
+    }
     if is_task_enabled(TaskMode::Admin)? {
         remove_task_elevated(TaskMode::Admin)?;
     }
