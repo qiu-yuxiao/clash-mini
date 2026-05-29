@@ -137,7 +137,7 @@ export const useProfiles = () => {
         }
 
         const { type, name, now } = group
-        const savedProxy = selectedMap[name]
+        const savedProxy = name === 'GLOBAL' ? 'PROXY' : selectedMap[name]
         const availableProxies = Array.isArray(group.all) ? group.all : []
 
         if (!selectableTypes.has(type)) {

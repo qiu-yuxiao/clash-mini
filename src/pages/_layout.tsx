@@ -516,12 +516,13 @@ const Layout = () => {
       enhanceProfiles()
         .then(() => {
           console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`);
+          activateSelected();
         })
         .catch((err) => {
           console.error(`[Layout] Failed to enhance profile ${currentProfileUid}:`, err);
         });
     }
-  }, [currentProfileUid]);
+  }, [currentProfileUid, activateSelected]);
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
