@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 
@@ -78,7 +79,7 @@ export const useProfiles = () => {
   }
 
   // 根据selected的节点选择
-  const activateSelected = async (profileOverride?: IProfilesConfig) => {
+  const activateSelected = useCallback(async (profileOverride?: IProfilesConfig) => {
     try {
       debugLog('[ActivateSelected] 开始处理代理选择')
 
@@ -214,7 +215,7 @@ export const useProfiles = () => {
         error instanceof Error ? error.message : String(error),
       )
     }
-  }
+  }, [profiles])
 
   return {
     profiles,

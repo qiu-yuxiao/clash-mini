@@ -657,7 +657,7 @@ async fn apply_dns_settings(mut config: Mapping, enable_dns_settings: bool) -> M
     config
 }
 
-fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
+async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
     let mut proxy_names = Vec::new();
     if let Some(Value::Sequence(proxies)) = config.get("proxies") {
@@ -745,8 +745,16 @@ fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         }
     }
 
-    // Add MATCH,DIRECT as the final rule
-    final_rules.push(Value::from("MATCH,DIRECT"));
+    // Read verge config to get the rule fallback type
+    let verge = Config::verge().await.latest_arc();
+    let rule_fallback = verge.rule_fallback.as_deref().unwrap_or("direct");
+
+    // Add MATCH final rule according to the fallback type
+    if rule_fallback == "proxy" {
+        final_rules.push(Value::from("MATCH,PROXY"));
+    } else {
+        final_rules.push(Value::from("MATCH,DIRECT"));
+    }
 
     config.insert(Value::from("rules"), Value::from(final_rules));
 
@@ -819,7 +827,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     let mut config = apply_builtin_scripts(config, clash_core, enable_builtin).await;
 
     config = cleanup_proxy_groups(config);
-    config = enforce_mini_agreements(config);
+    config = enforce_mini_agreements(config).await;
 
     config = use_tun(config, enable_tun);
     config = use_sort(config);
@@ -993,8 +1001,8 @@ proxy-groups:
         assert_eq!(proxies[0].as_str(), Some("DIRECT"));
     }
 
-    #[test]
-    fn test_enforce_mini_agreements_logic() {
+    #[tokio::test]
+    async fn test_enforce_mini_agreements_logic() {
         use super::enforce_mini_agreements;
         use serde_yaml_ng::{Mapping, Value};
 
@@ -1025,7 +1033,7 @@ append-rules:
 "#;
 
         let mut config: Mapping = serde_yaml_ng::from_str(config_str).unwrap();
-        config = enforce_mini_agreements(config);
+        config = enforce_mini_agreements(config).await;
 
         // 1. Verify single PROXY group
         let groups = config.get("proxy-groups").and_then(Value::as_sequence).unwrap();

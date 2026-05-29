@@ -458,8 +458,19 @@ const Layout = () => {
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
 
-  const modeKey = clashConfig?.mode?.toLowerCase() || 'rule'
-  const policyActiveIndex = modeKey === 'direct' ? 2 : modeKey === 'global' ? 1 : 0
+  const policyActiveIndex = verge?.rule_fallback === 'proxy' ? 2 : verge?.rule_fallback === 'adjustable' ? 1 : 0
+
+  const handleRuleFallbackChange = async (fallback: 'direct' | 'adjustable' | 'proxy') => {
+    try {
+      await patchVerge({ rule_fallback: fallback })
+      await patchClashMode('rule')
+      await enhanceProfiles()
+      await activateSelected()
+      await refreshClashConfig()
+    } catch (err: any) {
+      showNotice.error(err?.message || err)
+    }
+  }
 
   const themeModeVal = verge?.theme_mode || 'system'
   const themeActiveIndex = themeModeVal === 'dark' ? 2 : themeModeVal === 'light' ? 1 : 0
@@ -522,8 +533,7 @@ const Layout = () => {
           console.error(`[Layout] Failed to enhance profile ${currentProfileUid}:`, err);
         });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProfileUid]);
+  }, [currentProfileUid, activateSelected]);
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
@@ -1033,7 +1043,7 @@ const Layout = () => {
                 {/* Section 2: Takeover Mode (三态互斥单选) */}
                 <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
-                    代理模式
+                    流量接管模式
                   </Typography>
                   <Box
                     sx={{
@@ -1133,7 +1143,7 @@ const Layout = () => {
                     </Box>
                   </Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '11px' }}>
-                    代理策略
+                    分流策略倾向
                   </Typography>
                   <ButtonGroup fullWidth size="small" sx={{ display: 'none' }}>
                     {/* Keep old ButtonGroup hidden to avoid refactor side-effects if any */}
@@ -1174,12 +1184,9 @@ const Layout = () => {
                       />
                     </Box>
 
-                    {/* Rule Option */}
+                    {/* Direct Fallback Option */}
                     <Box
-                      onClick={async () => {
-                        await patchClashMode('rule')
-                        refreshClashConfig()
-                      }}
+                      onClick={() => handleRuleFallbackChange('direct')}
                       sx={{
                         flex: 1,
                         height: '100%',
@@ -1194,20 +1201,12 @@ const Layout = () => {
                         transition: 'color 0.2s ease',
                       }}
                     >
-                      规则模式
+                      直连兜底
                     </Box>
 
-                    {/* Global Option */}
+                    {/* Rule Adjustable Option */}
                     <Box
-                      onClick={async () => {
-                        await patchClashMode('global')
-                        try {
-                          await selectNodeForGroup('GLOBAL', 'PROXY')
-                        } catch (e) {
-                          console.error('Failed to set GLOBAL target to PROXY:', e)
-                        }
-                        refreshClashConfig()
-                      }}
+                      onClick={() => handleRuleFallbackChange('adjustable')}
                       sx={{
                         flex: 1,
                         height: '100%',
@@ -1222,15 +1221,12 @@ const Layout = () => {
                         transition: 'color 0.2s ease',
                       }}
                     >
-                      全局代理
+                      规则可调
                     </Box>
 
-                    {/* Direct Option */}
+                    {/* Proxy Fallback Option */}
                     <Box
-                      onClick={async () => {
-                        await patchClashMode('direct')
-                        refreshClashConfig()
-                      }}
+                      onClick={() => handleRuleFallbackChange('proxy')}
                       sx={{
                         flex: 1,
                         height: '100%',
@@ -1245,7 +1241,7 @@ const Layout = () => {
                         transition: 'color 0.2s ease',
                       }}
                     >
-                      全局直连
+                      代理兜底
                     </Box>
                   </Box>
                 </Box>

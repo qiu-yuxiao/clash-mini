@@ -257,6 +257,9 @@ pub struct IVerge {
 
     /// 启用外部控制器
     pub enable_external_controller: Option<bool>,
+
+    /// 分流策略倾向 (直连兜底: "direct" | 代理兜底: "proxy" | 规则可调: "adjustable")
+    pub rule_fallback: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -449,6 +452,7 @@ impl IVerge {
             enable_dns_settings: Some(true),
             home_cards: None,
             enable_external_controller: Some(false),
+            rule_fallback: Some("direct".into()),
             ..Self::default()
         }
     }
@@ -554,6 +558,7 @@ impl IVerge {
         patch!(enable_dns_settings);
         patch!(home_cards);
         patch!(enable_external_controller);
+        patch!(rule_fallback);
     }
 
     pub const fn get_singleton_port() -> u16 {
