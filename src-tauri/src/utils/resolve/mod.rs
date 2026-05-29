@@ -130,6 +130,7 @@ pub(super) async fn init_auto_backup() {
     logging_error!(Type::Setup, AutoBackupManager::global().init().await);
 }
 
+#[allow(clippy::unused_async)]
 async fn init_silent_updater() {
     logging!(info, Type::Setup, "Silent updater disabled for Clash Mini");
 }
