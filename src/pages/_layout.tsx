@@ -458,7 +458,7 @@ const Layout = () => {
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
 
-  const policyActiveIndex = verge?.rule_fallback === 'proxy' ? 2 : verge?.rule_fallback === 'adjustable' ? 1 : 0
+  const policyActiveIndex = verge?.rule_fallback === 'direct' ? 0 : verge?.rule_fallback === 'adjustable' ? 1 : 2
 
   const handleRuleFallbackChange = async (fallback: 'direct' | 'adjustable' | 'proxy') => {
     try {

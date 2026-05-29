@@ -410,7 +410,7 @@ impl IVerge {
             enable_silent_start: Some(false),
             enable_hover_jump_navigator: Some(true),
             hover_jump_navigator_delay: Some(280),
-            enable_system_proxy: Some(false),
+            enable_system_proxy: Some(true),
             proxy_auto_config: Some(false),
             pac_file_content: Some(DEFAULT_PAC.into()),
             proxy_host: Some("127.0.0.1".into()),
@@ -452,7 +452,7 @@ impl IVerge {
             enable_dns_settings: Some(true),
             home_cards: None,
             enable_external_controller: Some(false),
-            rule_fallback: Some("direct".into()),
+            rule_fallback: Some("proxy".into()),
             ..Self::default()
         }
     }

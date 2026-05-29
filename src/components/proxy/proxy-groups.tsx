@@ -91,6 +91,7 @@ export const ProxyGroups = (props: Props) => {
     return []
   })
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
+  const [testingGroups, setTestingGroups] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (proxyChain.length > 0) {
@@ -395,6 +396,7 @@ export const ProxyGroups = (props: Props) => {
   const handleCheckAll = useStableCallback(
     useLockFn(async (groupName: string) => {
       debugLog(`[ProxyGroups] 开始测试所有延迟，组: ${groupName}`)
+      setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
       const proxies = renderList
         .filter(
@@ -439,6 +441,7 @@ export const ProxyGroups = (props: Props) => {
       } catch (error) {
         console.error(`[ProxyGroups] 延迟测试出错，组: ${groupName}`, error)
       } finally {
+        setTestingGroups((prev) => ({ ...prev, [groupName]: false }))
         const headState = getGroupHeadState(groupName)
         if (headState?.sortType === 1) {
           onHeadState(groupName, { sortType: headState.sortType })
@@ -506,6 +509,7 @@ export const ProxyGroups = (props: Props) => {
       onHeadState={onHeadState}
       onChangeProxy={handleChangeProxy}
       headItem={activeGroupHeadItem}
+      testingGroups={testingGroups}
     />
   )
 
@@ -607,6 +611,7 @@ interface ProxyVirtualListProps {
     proxy: IRenderItem['proxy'] & { name: string },
   ) => void
   headItem?: IRenderItem | null
+  testingGroups: Record<string, boolean>
 }
 
 interface ProxyGroupOption {
@@ -769,6 +774,7 @@ function ProxyVirtualList({
   onHeadState,
   onChangeProxy,
   headItem,
+  testingGroups,
 }: ProxyVirtualListProps) {
   const theme = useTheme()
   const stickyBackground =
@@ -794,6 +800,7 @@ function ProxyVirtualList({
           url={headItem.group.testUrl}
           groupName={headItem.group.name}
           headState={headItem.headState!}
+          isTesting={testingGroups[headItem.group.name]}
           onLocation={() => onLocation(headItem.group)}
           onCheckDelay={() => onCheckAll(headItem.group.name)}
           onHeadState={(p) => onHeadState(headItem.group.name, p)}
@@ -842,6 +849,7 @@ function ProxyVirtualList({
                 onHeadState={onHeadState}
                 onChangeProxy={onChangeProxy}
                 isChainMode={isChainMode}
+                isTesting={testingGroups[renderList[virtualItem.index].group?.name]}
               />
             </div>
           ))}

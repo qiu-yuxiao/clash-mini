@@ -747,7 +747,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 
     // Read verge config to get the rule fallback type
     let verge = Config::verge().await.latest_arc();
-    let rule_fallback = verge.rule_fallback.as_deref().unwrap_or("direct");
+    let rule_fallback = verge.rule_fallback.as_deref().unwrap_or("proxy");
 
     // Add MATCH final rule according to the fallback type
     if rule_fallback == "proxy" {

@@ -9,7 +9,7 @@ import {
   VisibilityOffOutlined,
   FilterListOutlined,
 } from '@mui/icons-material'
-import { Box, IconButton, TextField, SxProps, Theme } from '@mui/material'
+import { Box, IconButton, TextField, SxProps, Theme, keyframes } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -26,10 +26,30 @@ interface Props {
   url?: string
   groupName: string
   headState: HeadState
+  isTesting?: boolean
   onLocation: () => void
   onCheckDelay: () => void
   onHeadState: (val: Partial<HeadState>) => void
 }
+
+const pulseGlow = keyframes`
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 1px rgba(255, 193, 7, 0.4));
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15) rotate(15deg);
+    filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.85));
+    opacity: 1;
+    color: #ffc107;
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 1px rgba(255, 193, 7, 0.4));
+    opacity: 0.8;
+  }
+`
 
 const defaultSx: SxProps<Theme> = {}
 
@@ -38,6 +58,7 @@ export const ProxyHead = ({
   url,
   groupName,
   headState,
+  isTesting = false,
   onHeadState,
   onLocation,
   onCheckDelay,
@@ -97,7 +118,13 @@ export const ProxyHead = ({
         }}
         sx={{ width: 26, height: 26, p: 0 }}
       >
-        <BoltOutlined sx={{ fontSize: 17 }} />
+        <BoltOutlined
+          sx={{
+            fontSize: 17,
+            animation: isTesting ? `${pulseGlow} 1.2s infinite ease-in-out` : 'none',
+            color: isTesting ? '#ffc107' : 'inherit',
+          }}
+        />
       </IconButton>
 
       <IconButton

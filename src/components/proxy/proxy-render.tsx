@@ -29,6 +29,7 @@ interface RenderProps {
   item: IRenderItem
   indent: boolean
   isChainMode?: boolean
+  isTesting?: boolean
   onLocation: (group: IRenderItem['group']) => void
   onCheckAll: (groupName: string) => void
   onHeadState: (groupName: string, patch: Partial<HeadState>) => void
@@ -177,6 +178,7 @@ export const ProxyRender = (props: RenderProps) => {
         url={group.testUrl}
         groupName={group.name}
         headState={headState!}
+        isTesting={props.isTesting}
         onLocation={() => onLocation(group)}
         onCheckDelay={() => onCheckAll(group.name)}
         onHeadState={(p) => onHeadState(group.name, p)}

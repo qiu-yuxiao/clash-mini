@@ -5,7 +5,35 @@ import {
   styled,
   SxProps,
   Theme,
+  keyframes,
 } from '@mui/material'
+
+const shimmer = keyframes`
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+`
+
+const popIn = keyframes`
+  0% {
+    transform: scale(0.85);
+    filter: brightness(1.4);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.08);
+    filter: brightness(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+    opacity: 1;
+  }
+`
 
 import { BaseLoading } from '@/components/base'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
@@ -69,7 +97,10 @@ export const ProxyItem = (props: Props) => {
         },
         ({ palette: { mode, primary } }) => {
           const isOdd = indexInGroup % 2 !== 0
-          const bgcolor = isOdd
+          const isTesting = delayValue === -2
+          const bgcolor = isTesting
+            ? 'transparent'
+            : isOdd
             ? (mode === 'light' ? 'rgba(0, 120, 215, 0.04)' : 'rgba(50, 100, 180, 0.08)')
             : 'transparent'
           const selectColor = mode === 'light' ? primary.main : primary.light
@@ -87,6 +118,13 @@ export const ProxyItem = (props: Props) => {
                    : alpha(primary.main, 0.35),
             },
             backgroundColor: bgcolor,
+            ...(isTesting ? {
+              backgroundImage: mode === 'light'
+                ? 'linear-gradient(90deg, rgba(255,193,7,0.02) 25%, rgba(255,193,7,0.1) 37%, rgba(255,193,7,0.02) 63%)'
+                : 'linear-gradient(90deg, rgba(255,193,7,0.01) 25%, rgba(255,193,7,0.06) 37%, rgba(255,193,7,0.01) 63%)',
+              backgroundSize: '400% 100%',
+              animation: `${shimmer} 1.5s infinite linear`,
+            } : {}),
             transition: 'background-color 0.1s ease',
           }
         },
@@ -164,6 +202,7 @@ export const ProxyItem = (props: Props) => {
 
           {delayValue >= 0 && (
             <Widget
+              key={delayValue}
               className="the-delay"
               onClick={(e) => {
                 if (proxy.provider) return
@@ -176,6 +215,7 @@ export const ProxyItem = (props: Props) => {
                 cursor: proxy.provider ? 'default' : 'pointer',
                 fontSize: '11px',
                 fontWeight: 600,
+                animation: `${popIn} 0.4s ease-out`,
                 ...(!proxy.provider
                   ? { ':hover': { bgcolor: alpha(palette.primary.main, 0.15) } }
                   : {}),
