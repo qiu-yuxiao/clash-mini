@@ -208,7 +208,7 @@ const ActiveNodeStatusCard = () => {
       sx={{
         m: 1,
         mb: 0.5,
-        mr: decorated ? '44px' : 1, // Avoid overlap with Settings gear button when decorated
+        mr: decorated ? '48px' : 1, // Avoid overlap with Settings gear button when decorated
         p: '6px 12px',
         display: 'flex',
         alignItems: 'center',
@@ -833,8 +833,8 @@ const Layout = () => {
                 position: 'absolute',
                 top: 0,
                 right: 0,
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 zIndex: 101,
                 borderRadius: 0,
                 color: drawerOpen ? 'primary.main' : 'text.primary',
