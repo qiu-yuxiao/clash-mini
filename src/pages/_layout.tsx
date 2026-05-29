@@ -309,13 +309,23 @@ const MiniTrafficPanel = () => {
             borderBottomLeftRadius: '6px',
             borderTopRightRadius: 0,
             borderBottomRightRadius: 0,
-            border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
+            border: `1px solid rgba(212, 175, 55, calc(0.2 * var(--depth-factor, 1.0) + 0.15 * var(--vibrancy-factor, 1.0)))`,
             borderRight: 'none',
-            bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
+            bgcolor: mode === 'light' 
+              ? 'rgba(212, 175, 55, calc(0.04 * var(--depth-factor, 1.0) + 0.04 * var(--vibrancy-factor, 1.0)))' 
+              : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
             boxShadow: mode === 'light'
-              ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-            whiteSpace: 'nowrap'
+              ? '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0)))'
+              : '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.05 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            '&:hover': {
+              transform: 'translateY(-1px)',
+              filter: 'brightness(1.08)',
+              boxShadow: mode === 'light'
+                ? '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0)))'
+                : '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+            }
           }}>
             <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 13 }} />
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>上传:</Typography>
@@ -337,12 +347,22 @@ const MiniTrafficPanel = () => {
             borderBottomRightRadius: '6px',
             borderTopLeftRadius: 0,
             borderBottomLeftRadius: 0,
-            border: `1px solid ${mode === 'light' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(212, 175, 55, 0.5)'}`,
-            bgcolor: mode === 'light' ? 'rgba(212, 175, 55, 0.08)' : 'rgba(212, 175, 55, 0.15)',
+            border: `1px solid rgba(212, 175, 55, calc(0.2 * var(--depth-factor, 1.0) + 0.15 * var(--vibrancy-factor, 1.0)))`,
+            bgcolor: mode === 'light' 
+              ? 'rgba(212, 175, 55, calc(0.04 * var(--depth-factor, 1.0) + 0.04 * var(--vibrancy-factor, 1.0)))' 
+              : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
             boxShadow: mode === 'light'
-              ? '0 1.5px 2px rgba(212, 175, 55, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-            whiteSpace: 'nowrap'
+              ? '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0)))'
+              : '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.05 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            '&:hover': {
+              transform: 'translateY(-1px)',
+              filter: 'brightness(1.08)',
+              boxShadow: mode === 'light'
+                ? '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0)))'
+                : '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+            }
           }}>
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
             <Typography sx={{ fontSize: '13px', fontWeight: 'bold', color: '#D4AF37', whiteSpace: 'nowrap' }}>
@@ -366,13 +386,23 @@ const MiniTrafficPanel = () => {
             borderBottomLeftRadius: '6px',
             borderTopRightRadius: 0,
             borderBottomRightRadius: 0,
-            border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
+            border: `1px solid rgba(0, 132, 255, calc(0.2 * var(--depth-factor, 1.0) + 0.15 * var(--vibrancy-factor, 1.0)))`,
             borderRight: 'none',
-            bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
+            bgcolor: mode === 'light' 
+              ? 'rgba(0, 132, 255, calc(0.03 * var(--depth-factor, 1.0) + 0.03 * var(--vibrancy-factor, 1.0)))' 
+              : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
             boxShadow: mode === 'light'
-              ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-            whiteSpace: 'nowrap'
+              ? '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0)))'
+              : '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.05 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            '&:hover': {
+              transform: 'translateY(-1px)',
+              filter: 'brightness(1.08)',
+              boxShadow: mode === 'light'
+                ? '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0)))'
+                : '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+            }
           }}>
             <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 13 }} />
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>下载:</Typography>
@@ -394,12 +424,22 @@ const MiniTrafficPanel = () => {
             borderBottomRightRadius: '6px',
             borderTopLeftRadius: 0,
             borderBottomLeftRadius: 0,
-            border: `1px solid ${mode === 'light' ? 'rgba(0, 132, 255, 0.3)' : 'rgba(0, 132, 255, 0.5)'}`,
-            bgcolor: mode === 'light' ? 'rgba(0, 132, 255, 0.06)' : 'rgba(0, 132, 255, 0.12)',
+            border: `1px solid rgba(0, 132, 255, calc(0.2 * var(--depth-factor, 1.0) + 0.15 * var(--vibrancy-factor, 1.0)))`,
+            bgcolor: mode === 'light' 
+              ? 'rgba(0, 132, 255, calc(0.03 * var(--depth-factor, 1.0) + 0.03 * var(--vibrancy-factor, 1.0)))' 
+              : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
             boxShadow: mode === 'light'
-              ? '0 1.5px 2px rgba(0, 132, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6)'
-              : '0 1.5px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-            whiteSpace: 'nowrap'
+              ? '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0)))'
+              : '0 calc(1.5px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.05 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            '&:hover': {
+              transform: 'translateY(-1px)',
+              filter: 'brightness(1.08)',
+              boxShadow: mode === 'light'
+                ? '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0)))'
+                : '0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset 0 1px 0 rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+            }
           }}>
             <Typography sx={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
             <Typography sx={{ fontWeight: 'bold', fontSize: '13px', color: '#0084FF', whiteSpace: 'nowrap' }}>

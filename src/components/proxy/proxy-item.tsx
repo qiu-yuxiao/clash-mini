@@ -17,6 +17,15 @@ const shimmer = keyframes`
   }
 `
 
+const hoverSweep = keyframes`
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+`
+
 const popIn = keyframes`
   0% {
     transform: scale(0.85);
@@ -110,6 +119,17 @@ export const ProxyItem = (props: Props) => {
             '&:hover .the-check': { display: !showDelay ? 'inline-block' : 'none' },
             '&:hover .the-delay': { display: showDelay ? 'inline-block' : 'none' },
             '&:hover .the-icon': { display: 'none' },
+            '&:hover': {
+              transform: 'translateY(-1.5px)',
+              boxShadow: mode === 'light'
+                ? '0 3px 8px rgba(0, 0, 0, 0.08)'
+                : '0 3px 8px rgba(0, 0, 0, 0.3)',
+              backgroundImage: isTesting ? undefined : (mode === 'light'
+                ? 'linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 70%)'
+                : 'linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 70%)'),
+              backgroundSize: isTesting ? '400% 100%' : '200% 100%',
+              animation: isTesting ? `${shimmer} 1.5s infinite linear` : `${hoverSweep} 0.6s ease-out`,
+            },
             '&.Mui-selected': {
               borderLeft: `3px solid ${selectColor}`,
               bgcolor:
@@ -125,7 +145,7 @@ export const ProxyItem = (props: Props) => {
               backgroundSize: '400% 100%',
               animation: `${shimmer} 1.5s infinite linear`,
             } : {}),
-            transition: 'background-color 0.1s ease',
+            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
           }
         },
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),

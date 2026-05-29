@@ -98,7 +98,9 @@
       * 左侧分栏 `.layout-content__left` 和右侧分栏 `.layout-content__right`，以及设置抽屉 `.theme-panel` 和当前节点卡片 `.theme-crystal-card` 的背景，将分别与 `--depth-factor` 联动变为半透明（使用 `rgba` 与 `--theme-bg-base-rgb` 和 `--theme-panel-base-rgb` 进行计算，当 depth 为 0.0 时 100% 实体纯色，当增加时透明度渐进提高）。
       * 同时通过 `backdrop-filter: blur(calc(8px * var(--depth-factor)))` 提供磨砂毛玻璃透光材质感。
       * 所有的卡片、分栏和面板内侧引入由 `--depth-factor` 控制的 `box-shadow` 内发光与内阴影：左上角斜向拉入微弱白高光（`inset calc(1px * var(--depth-factor)) calc(1px * var(--depth-factor)) calc(2px * var(--depth-factor)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor)))`），右下角斜向拉入微弱深阴影（`inset calc(-1px * var(--depth-factor)) calc(-1px * var(--depth-factor)) calc(2px * var(--depth-factor)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor)))`），整体底部渲染跟随 depth 深度比例放大的毛玻璃投射黑影，并由 `var(--vibrancy-factor)` 控制外围霓虹背光（neon glow）效果。
-      * **特别铁律**：所有视觉透明与虚化效果均在保留现有的 2px 网格线、5px double 纵向与外周双实线边框、以及 4px double 抽屉双实线边框的基础之上叠加。不得通过虚化和阴影掩盖或溶解现有的双实线结构边框。
+12. **代理节点 Hover 动效与流量卡片 3D 光影（阶段四）**：
+    * **代理节点悬浮动效**：每个代理节点单元格卡片（`ProxyItem`）在鼠标悬停（Hover）时，触发 `transform: translateY(-1.5px)`，并施加由弹性物理曲线（`cubic-bezier(0.175, 0.885, 0.32, 1.275)`）控制的物理回弹与上升手感。同时，触发一次快速扫过的光影扫光（通过 `linear-gradient` 的 background-position 在 0.6s 内完成单次 `hoverSweep` 动画），提升视觉交互深度。
+    * **底栏数据卡片 3D 反射**：底部的四个数据卡片（上传速度、上传总量、下载速度、下载总量）的背景不透明度、边框色彩强度和 3D 立体反射投影参数，通过 CSS 变量 `var(--depth-factor)` 和 `var(--vibrancy-factor)` 进行深度关联与动态比例缩放。在 Hover 时，卡片同样产生微幅抬升（`-1px`）并自动增强发光度与背光阴影，实现奢华仪表盘的触觉交互反馈。
 
 
 ---
