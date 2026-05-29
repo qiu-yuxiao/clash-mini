@@ -522,7 +522,8 @@ const Layout = () => {
           console.error(`[Layout] Failed to enhance profile ${currentProfileUid}:`, err);
         });
     }
-  }, [currentProfileUid, activateSelected]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProfileUid]);
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
