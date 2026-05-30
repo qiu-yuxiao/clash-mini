@@ -13,10 +13,10 @@ export const get3DButtonStyle = (
   let borderColor: string
 
   if (colorType === 'primary') {
-    textColor = isLight ? '#333333' : theme.palette.primary.contrastText
-    borderColor = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.15)'
+    textColor = '#ffffff'
+    borderColor = isLight ? alpha(theme.palette.primary.dark, 0.25) : 'rgba(255, 255, 255, 0.15)'
     backgroundStyle = isLight
-      ? `linear-gradient(to bottom, #ffffff 0%, ${alpha(theme.palette.primary.main, 0.15)} 100%)`
+      ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
       : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`
   } else if (colorType === 'error') {
     textColor = '#ffffff'
@@ -50,34 +50,34 @@ export const get3DButtonStyle = (
       ? `0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.12),
          inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.8),
          inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.08)${
-           colorType === 'primary'
-             ? ', 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.15 * var(--vibrancy-factor, 1.0)))'
-             : ''
-         }`
+            colorType === 'primary'
+              ? ', 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))'
+              : ''
+          }`
       : `0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
          inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
          inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35)${
-           colorType === 'primary'
-             ? ', 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.15 * var(--vibrancy-factor, 1.0)))'
-             : ''
-         }`,
+            colorType === 'primary'
+              ? ', 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))'
+              : ''
+          }`,
     '&:hover': {
       transform: 'translateY(-1.5px)',
       boxShadow: isLight
         ? `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.16),
            inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.9),
            inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1)${
-             colorType === 'primary' || colorType === 'default'
-               ? ', 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.15 * var(--vibrancy-factor, 1.0)))'
-               : ''
-           }`
+              colorType === 'primary' || colorType === 'default'
+                ? ', 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)))'
+                : ''
+            }`
         : `0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
            inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.35),
            inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45)${
-             colorType === 'primary' || colorType === 'default'
-               ? ', 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.15 * var(--vibrancy-factor, 1.0)))'
-               : ''
-           }`,
+              colorType === 'primary' || colorType === 'default'
+                ? ', 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)))'
+                : ''
+            }`,
     },
     '&:active': {
       transform: 'translateY(1px)',
