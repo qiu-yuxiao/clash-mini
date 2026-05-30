@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { closeConnection } from 'tauri-plugin-mihomo-api'
 
 import parseTraffic from '@/utils/parse-traffic'
+import { get3DButtonStyle } from '@/utils/button-styles'
 
 export interface ConnectionDetailRef {
   open: (detail: IConnectionsItem, closed: boolean, el?: HTMLElement) => void
@@ -162,15 +163,15 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
       {!closed && (
         <Box sx={{ textAlign: 'right', mt: 1.5 }}>
           <Button
-            variant="contained"
-            color="error"
             size="small"
             title={t('connections.components.actions.closeConnection')}
             onClick={() => {
               onDelete()
               onClose?.()
             }}
-            sx={{ textTransform: 'none', borderRadius: 1 }}
+            sx={(theme) => ({
+              ...get3DButtonStyle(theme, 'contained', 'error'),
+            })}
           >
             {t('connections.components.actions.closeConnection')}
           </Button>

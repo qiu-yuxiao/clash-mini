@@ -205,6 +205,49 @@ export const useCustomTheme = () => {
             fontWeight: 600,
           },
         },
+        components: {
+          MuiOutlinedInput: {
+            styleOverrides: {
+              root: ({ theme }) => {
+                const isLight = theme.palette.mode === 'light'
+                return {
+                  backgroundColor: 'var(--theme-input-bg)',
+                  borderRadius: 4,
+                  transition: 'all 0.2s ease',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderWidth: '1px',
+                    borderColor: 'var(--theme-input-border)',
+                  },
+                  boxShadow: isLight
+                    ? `inset 0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.08),
+                       inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.06),
+                       0 calc(0.5px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, 0.5)`
+                    : `inset 0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.45),
+                       inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.35),
+                       0 calc(0.5px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, 0.05)`,
+                  '&.Mui-focused': {
+                    boxShadow: isLight
+                      ? `inset 0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.12),
+                         0 0 calc(4px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.2 * var(--vibrancy-factor, 1.0)))`
+                      : `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.6),
+                         0 0 calc(5px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderWidth: '1.5px',
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                  '&:hover:not(.Mui-focused) .MuiOutlinedInput-notchedOutline': {
+                    borderColor: isLight ? 'rgba(0, 0, 0, 0.23)' : 'rgba(255, 255, 255, 0.23)',
+                  },
+                }
+              },
+              input: {
+                padding: '8px 12px',
+                fontSize: '13px',
+              }
+            }
+          }
+        }
       })
     } catch (e) {
       console.error('Error creating MUI theme, falling back to defaults:', e)
@@ -231,6 +274,49 @@ export const useCustomTheme = () => {
           fontSize: 12,
           htmlFontSize: 14,
         },
+        components: {
+          MuiOutlinedInput: {
+            styleOverrides: {
+              root: ({ theme }) => {
+                const isLight = theme.palette.mode === 'light'
+                return {
+                  backgroundColor: 'var(--theme-input-bg)',
+                  borderRadius: 4,
+                  transition: 'all 0.2s ease',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderWidth: '1px',
+                    borderColor: 'var(--theme-input-border)',
+                  },
+                  boxShadow: isLight
+                    ? `inset 0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.08),
+                       inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.06),
+                       0 calc(0.5px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, 0.5)`
+                    : `inset 0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.45),
+                       inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.35),
+                       0 calc(0.5px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, 0.05)`,
+                  '&.Mui-focused': {
+                    boxShadow: isLight
+                      ? `inset 0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.12),
+                         0 0 calc(4px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.2 * var(--vibrancy-factor, 1.0)))`
+                      : `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.6),
+                         0 0 calc(5px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderWidth: '1.5px',
+                      borderColor: theme.palette.primary.main,
+                    },
+                  },
+                  '&:hover:not(.Mui-focused) .MuiOutlinedInput-notchedOutline': {
+                    borderColor: isLight ? 'rgba(0, 0, 0, 0.23)' : 'rgba(255, 255, 255, 0.23)',
+                  },
+                }
+              },
+              input: {
+                padding: '8px 12px',
+                fontSize: '13px',
+              }
+            }
+          }
+        }
       })
     }
 

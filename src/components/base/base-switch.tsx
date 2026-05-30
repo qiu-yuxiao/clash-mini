@@ -23,13 +23,15 @@ export const Switch = styled((props: SwitchProps) => (
         backgroundColor: theme.palette.primary.main,
         opacity: 1,
         border: 0,
+        boxShadow: `inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                    inset 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.5 * var(--vibrancy-factor, 1.0))),
+                    0 0 calc(4px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.15 * var(--vibrancy-factor, 1.0)))`,
       },
       '&.Mui-disabled + .MuiSwitch-track': {
         opacity: 0.5,
       },
     },
     '&.Mui-focusVisible .MuiSwitch-thumb': {
-      color: '#33cf4d',
       border: '6px solid #fff',
     },
     '&.Mui-disabled .MuiSwitch-thumb': {
@@ -46,19 +48,22 @@ export const Switch = styled((props: SwitchProps) => (
     boxSizing: 'border-box',
     width: 14,
     height: 14,
-    boxShadow: '1px 1px 3px rgba(0,0,0,0.35), inset 1.5px 1.5px 1.5px rgba(255,255,255,0.6)',
+    boxShadow: `calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.6)`,
   },
   '& .MuiSwitch-track': {
     borderRadius: 18 / 2,
     backgroundColor: theme.palette.mode === 'light' ? '#BBBBBB' : '#39393D',
     opacity: 1,
-    boxShadow: 'inset 1.5px 1.5px 3px rgba(0,0,0,0.25), inset -1px -1px 1px rgba(255,255,255,0.1)',
+    boxShadow: `inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25),
+                inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.1)`,
     transition: theme.transitions.create(['background-color'], {
       duration: 500,
     }),
   },
   '&:hover .MuiSwitch-thumb': {
     filter: 'brightness(1.15)',
-    boxShadow: '1px 1.5px 4px rgba(0,0,0,0.4), inset 1.5px 1.5px 1.5px rgba(255,255,255,0.7)',
+    boxShadow: `calc(1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.4),
+                inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7)`,
   },
 }))

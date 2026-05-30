@@ -19,8 +19,8 @@ const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
 const DEFAULT_WIDTH: f64 = 640.0;
 const DEFAULT_HEIGHT: f64 = 860.0;
 
-const MINIMAL_WIDTH: f64 = 520.0;
-const MINIMAL_HEIGHT: f64 = 520.0;
+const MINIMAL_WIDTH: f64 = 380.0;
+const MINIMAL_HEIGHT: f64 = 240.0;
 
 #[cfg(target_os = "linux")]
 const DEFAULT_DECORATIONS: bool = false;
@@ -68,7 +68,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗟𝗶𝘁𝗲")
+    .title(get_bold_window_title())
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
@@ -96,7 +96,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title("𝗖𝗹𝗮𝘀𝗵 𝗪𝗶𝗻𝗟𝗶𝘁𝗲")
+    .title(get_bold_window_title())
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
@@ -139,4 +139,20 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         }
         Err(e) => Err(e.to_string()),
     }
+}
+
+// 动态获取 Unicode 数学粗体标题，自动映射 Cargo.toml 中的版本号
+fn get_bold_window_title() -> String {
+    let raw_title = format!("Clash Mini Ver.{}", env!("CARGO_PKG_VERSION"));
+    let mut bold_title = String::new();
+    for c in raw_title.chars() {
+        let bold_char = match c {
+            'A'..='Z' => char::from_u32(c as u32 - 'A' as u32 + 0x1D5E6).unwrap_or(c),
+            'a'..='z' => char::from_u32(c as u32 - 'a' as u32 + 0x1D600).unwrap_or(c),
+            '0'..='9' => char::from_u32(c as u32 - '0' as u32 + 0x1D7EC).unwrap_or(c),
+            _ => c,
+        };
+        bold_title.push(bold_char);
+    }
+    bold_title
 }

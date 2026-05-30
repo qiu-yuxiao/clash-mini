@@ -160,6 +160,25 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, any>>(
 )
 
 // Active Node Card
+const getFriendlyProtocolName = (type?: string) => {
+  if (!type) return ''
+  const map: Record<string, string> = {
+    ss: 'Shadowsocks',
+    ssr: 'ShadowsocksR',
+    vmess: 'VMess',
+    vless: 'VLESS',
+    trojan: 'Trojan',
+    hysteria: 'Hysteria',
+    hysteria2: 'Hysteria 2',
+    tuic: 'TUIC',
+    wireguard: 'WireGuard',
+    shadowsocks: 'Shadowsocks',
+    shadowsocksr: 'ShadowsocksR',
+  }
+  const low = type.toLowerCase()
+  return map[low] || type.toUpperCase()
+}
+
 const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
@@ -213,39 +232,93 @@ const ActiveNodeStatusCard = () => {
         p: '6px 12px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         gap: 2,
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {/* Left Part: Protocol / Type (Hidden on narrow screens) */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
+          '@media (max-width: 560px)': {
+            display: 'none',
+          },
+        }}
+      >
+        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
+          协议:
+        </Typography>
+        <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '11px', color: 'primary.main' }}>
+          {getFriendlyProtocolName(activeNodeRecord?.type) || 'Direct'}
+        </Typography>
+      </Box>
+
+      {/* Center Part: Active Node Name & Delay Chip */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flex: 1 }}>
         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
           当前活跃出口节点：
         </Typography>
-        <Typography variant="body2" sx={{ fontWeight: 'bold', fontSize: '12px', color: 'text.primary' }}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 'bold',
+            fontSize: '12px',
+            color: 'text.primary',
+            maxWidth: { xs: '150px', sm: '300px' },
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {activeNodeName || '未选择节点 (直接连接)'}
         </Typography>
+        {activeNodeName && (
+          <Chip
+            size="small"
+            icon={testing ? <CircularProgress size={10} color="inherit" /> : signalInfo.icon}
+            label={testing ? '测试中...' : delayManager.formatDelay(delay)}
+            color={delayColor}
+            onClick={handleTestDelay}
+            sx={{
+              fontSize: '11px',
+              height: '20px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              bgcolor: testing ? undefined : alpha(signalInfo.color === 'success.main' ? '#4caf50' : signalInfo.color === 'warning.main' ? '#ff9800' : '#f44336', 0.12),
+              color: signalInfo.color === 'text.secondary' ? 'text.secondary' : signalInfo.color,
+              '& .MuiChip-icon': {
+                color: 'inherit',
+                fontSize: '12px',
+              }
+            }}
+          />
+        )}
       </Box>
-      {activeNodeName && (
-        <Chip
-          size="small"
-          icon={testing ? <CircularProgress size={10} color="inherit" /> : signalInfo.icon}
-          label={testing ? '测试中...' : delayManager.formatDelay(delay)}
-          color={delayColor}
-          onClick={handleTestDelay}
-          sx={{
-            fontSize: '11px',
-            height: '20px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            bgcolor: testing ? undefined : alpha(signalInfo.color === 'success.main' ? '#4caf50' : signalInfo.color === 'warning.main' ? '#ff9800' : '#f44336', 0.12),
-            color: signalInfo.color === 'text.secondary' ? 'text.secondary' : signalInfo.color,
-            '& .MuiChip-icon': {
-              color: 'inherit',
-              fontSize: '12px',
-            }
-          }}
-        />
-      )}
+
+      {/* Right Part: IP / Port (Hidden on narrow screens) */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
+          '@media (max-width: 560px)': {
+            display: 'none',
+          },
+        }}
+      >
+        {activeNodeRecord?.server && activeNodeRecord?.port && (
+          <>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
+              地址:
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '11px', color: 'text.primary' }}>
+              {activeNodeRecord.server}:{activeNodeRecord.port}
+            </Typography>
+          </>
+        )}
+      </Box>
     </Paper>
   )
 }

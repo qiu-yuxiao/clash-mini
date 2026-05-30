@@ -6,6 +6,7 @@ import {
 import { Box, Button, IconButton, MenuItem } from '@mui/material'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { get3DButtonStyle } from '@/utils/button-styles'
 
 import {
   BaseEmpty,
@@ -140,10 +141,12 @@ const LogPage = () => {
 
           <Button
             size="small"
-            variant="contained"
             onClick={() => {
               refreshGetClashLog(true)
             }}
+            sx={(theme) => ({
+              ...get3DButtonStyle(theme, 'contained', 'primary'),
+            })}
           >
             {t('shared.actions.clear')}
           </Button>
