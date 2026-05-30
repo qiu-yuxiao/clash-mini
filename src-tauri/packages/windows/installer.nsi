@@ -932,6 +932,7 @@ Section Install
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
+  File "..\..\..\小白必读.txt"
 
   ; Copy resources
   {{#each resources_dirs}}
@@ -1107,6 +1108,7 @@ Section Uninstall
   ; Delete the app directory and its content from disk
   ; Copy main executable
   Delete "$INSTDIR\${MAINBINARYNAME}.exe"
+  Delete "$INSTDIR\小白必读.txt"
 
   ; Delete resources
   {{#each resources}}
