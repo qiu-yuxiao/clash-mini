@@ -24,7 +24,7 @@ const findMainProxyGroup = async (): Promise<string> => {
     return groups[0].name
   } catch (e) {
     console.error('Failed to get main proxy group:', e)
-    return 'Proxy'
+    return 'PROXY'
   }
 }
 
@@ -32,7 +32,7 @@ const findMainProxyGroup = async (): Promise<string> => {
 export const addQuickRoutingRule = async (
   type: 'process' | 'domain',
   value: string,
-  target: 'DIRECT' | 'PROXY' | 'REJECT'
+  target: 'DIRECT' | 'PROXY' | 'REJECT',
 ) => {
   if (!value) return
 
@@ -62,8 +62,11 @@ export const addQuickRoutingRule = async (
         if (parts.length >= 2) {
           const lastPart = parts[parts.length - 1]
           const secondLastPart = parts[parts.length - 2]
-          const isDoubleTld = ['com', 'org', 'net', 'gov', 'edu', 'co'].includes(secondLastPart) && lastPart.length <= 3
-          
+          const isDoubleTld =
+            ['com', 'org', 'net', 'gov', 'edu', 'co'].includes(
+              secondLastPart,
+            ) && lastPart.length <= 3
+
           if (parts.length >= 3 && isDoubleTld) {
             domainSuffix = parts.slice(-3).join('.')
           } else {
@@ -79,7 +82,10 @@ export const addQuickRoutingRule = async (
     try {
       mergeYaml = await readProfileFile('Merge')
     } catch (readErr) {
-      console.warn('Global Merge file not found or failed to read, initializing empty merge:', readErr)
+      console.warn(
+        'Global Merge file not found or failed to read, initializing empty merge:',
+        readErr,
+      )
       mergeYaml = '{}'
     }
     const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
@@ -88,12 +94,13 @@ export const addQuickRoutingRule = async (
     mergeObj['prepend-rules'] = mergeObj['prepend-rules'] || []
 
     // 5. 过滤掉已有的相同属性规则（去重并置顶）
-    const matchPrefix = type === 'process' 
-      ? `PROCESS-NAME,${value},` 
-      : `DOMAIN-SUFFIX,${domainSuffix},`
-      
+    const matchPrefix =
+      type === 'process'
+        ? `PROCESS-NAME,${value},`
+        : `DOMAIN-SUFFIX,${domainSuffix},`
+
     const filteredRules = (mergeObj['prepend-rules'] as string[]).filter(
-      (rule) => !rule.startsWith(matchPrefix) && rule !== newRule
+      (rule) => !rule.startsWith(matchPrefix) && rule !== newRule,
     )
 
     // 置顶写入规则
@@ -106,7 +113,7 @@ export const addQuickRoutingRule = async (
     showNotice.success(
       'profiles.page.feedback.notifications.profileSwitched',
       `手动路径控制规则已置顶生效: ${newRule}`,
-      2500
+      2500,
     )
   } catch (e: any) {
     console.error('Failed to add quick routing rule:', e)
