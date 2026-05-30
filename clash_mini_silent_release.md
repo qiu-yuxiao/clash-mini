@@ -4,9 +4,9 @@
 
 ---
 
-## 🔍 第一阶段：环境就绪预检 (Environmental Pre-Check)
+## 🔍 第一阶段：环境就绪预检与本地验证 (Environmental Pre-Check & Local Verification)
 
-当接收到用户发出的发行/动工指令时，**必须首先在后台静默执行以下三项检测**。严禁不作检测直接修改或编译。
+当接收到用户发出的发行/动工指令时，**必须首先执行以下环境检测、缓存清理与验证流程**。严禁省略此流程直接修改代码或编译发布。
 
 1. **服务锁检测 (Service Lock Check)**：
    - 运行：`powershell -Command "Get-Service clash_verge_service -ErrorAction SilentlyContinue"`
@@ -17,9 +17,13 @@
 3. **端口占用检测 (Port Conflict Check)**：
    - 运行：`powershell -Command "Get-NetTCPConnection -LocalPort 10801, 9098 -ErrorAction SilentlyContinue"`
    - 验证：输出必须为空，目标 Mixed 端口和 API 端口不得被占用。
+4. **【强制】本地清理缓存与真机 Dev 验证核对 (Local Cache Purge & Dev Verification)**：
+   - **清理缓存**：必须首先在工作区运行 `Remove-Item -Recurse -Force node_modules/.vite` 命令清除旧的前端 Vite 编译缓存，确保编译状态为最新。
+   - **Dev 运行**：本地必须使用 `pnpm dev`（安全隔离模式下，TUN 和系统代理为 `false`，端口 10801/9098 隔离）拉起开发调试服务。
+   - **对齐汇报**：Agent 必须在本地对所有修改的 UI 元素（如按钮 3D 样式、卡片折行自适应、组件尺寸等）及后端逻辑进行物理效果与交互核对，并在聊天窗口中向用户提供详实的真机表现文字或状态证据汇报。**获得用户在对话中明确的“确认/同意”指令后，方可进行下一步的 GitHub 编译和发行。** 以后所有的发布，都必须强制走完这个本地双重核对流程，绝对禁止绕过。
 
 ### 📢 反馈警报与放行规则
-- **检测通过**：在聊天窗口向用户输出：**「环境检测通过，接下来的编译与发行环境已完全就绪，我可以独立跑完所有自动化任务，您可以离开了。」** 之后开始后续步骤。
+- **检测通过**：在聊天窗口向用户输出：**「环境检测与缓存清理通过，接下来的编译与验证环境已就绪。我将拉起本地 dev 服务进行第一轮物理效果验证，稍后为您汇报对齐结果，等待您的确认指令。」** 之后开始后续步骤。
 - **检测失败**：立刻终止发行，并在聊天窗口中清晰指出哪一项被占用（如服务未停、端口冲突），并指导用户进行具体的手动操作，清除障碍后再试。
 
 ---
@@ -61,8 +65,19 @@
 
 ---
 
-## 🏁 第四阶段：收尾与Walkthrough归档
+## 🏁 第四阶段：收尾与环境复原 (Wrap-Up & Environment Reset)
 
-- 检查远端构建流水线进度（若适用），并在本地更新 `walkthrough.md` 记录本次发行所涉及的修改细节。
-- 清空或重置 `task.md` 作为下一个里程碑的起点。
+在本地或远程发布构建完成后，**必须依次执行以下收尾清理程序**，将工作区与宿主机状态恢复为最洁净状态，严禁草率交付：
+
+1. **杀灭开发版残留进程 (Kill Resilient Dev Processes)**：
+   - 运行：`powershell -Command "Stop-Process -Name clash-mini, tauri -ErrorAction SilentlyContinue"`
+   - 验证并确保所有后台开发版程序、UI 和内核已被干净清空，将 `10801`、`9098` 端口及系统服务锁完全释放并归还宿主机。
+2. **工作区环境打扫 (Workspace Cleaning)**：
+   - 运行：`powershell -Command "Remove-Item -Recurse -Force node_modules/.vite"` 以彻底清除开发期的 Vite 构建缓存。
+   - 审计：手动检查并删除除 `.gitignore` 中 `scratch/` 目录外的所有在开发期间临时产生或修改过的调试脚本、临时日志、调试 YAML 配置文件等，保证 Git Status 干净。
+3. **缺陷闭环与 Walkthrough 归档 (Defect Tracking & Walkthrough Archive)**：
+   - 缺陷更新：确保 `bug_list.md` 和 `clash_mini_agreements.md` 的 Bug 跟踪清单中，本次修复的缺陷已更新为“已解决”，并详实记录了修复方案。
+   - 编写归档：在本地更新并保存 `walkthrough.md`，详细记录本次改动的物理事实、验证表现与测试结果，作为历史审计凭证。
+4. **任务看板重置 (Task Board Reset)**：
+   - 清空或重置 `task.md`，彻底清除已完成的 checklist 项，为下一个版本迭代的全新起点做好准备。
 - 给用户留下一句简炼的总结消息，报告发行圆满完成。
