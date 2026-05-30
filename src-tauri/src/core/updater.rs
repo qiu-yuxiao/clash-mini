@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{config::Config, singleton, utils::dirs};
 use anyhow::Result;
 use chrono::Utc;

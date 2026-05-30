@@ -932,7 +932,7 @@ Section Install
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
-  File "..\..\..\小白必读.txt"
+  File "${MAINBINARYSRCPATH}\..\..\..\..\小白必读.txt"
 
   ; Copy resources
   {{#each resources_dirs}}

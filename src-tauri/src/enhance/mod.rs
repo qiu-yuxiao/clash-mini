@@ -544,9 +544,7 @@ fn cleanup_proxy_groups(mut config: Mapping) -> Mapping {
         }
     }
 
-    let config = rewrite_rules(config, &allowed_names);
-
-    config
+    rewrite_rules(config, &allowed_names)
 }
 
 fn rewrite_rule_target(rule_str: &str, allowed_names: &HashSet<String>, default_group: &str) -> std::string::String {
@@ -575,27 +573,27 @@ fn rewrite_rule_target(rule_str: &str, allowed_names: &HashSet<String>, default_
         None
     };
 
-    if let Some(idx) = target_idx {
-        if idx < parts.len() {
-            let current_target = parts[idx];
+    if let Some(idx) = target_idx
+        && idx < parts.len()
+    {
+        let current_target = parts[idx];
 
-            // Check case-insensitive match first
-            let matched_allowed = allowed_names
-                .iter()
-                .find(|name| name.as_str().eq_ignore_ascii_case(current_target));
+        // Check case-insensitive match first
+        let matched_allowed = allowed_names
+            .iter()
+            .find(|name| name.as_str().eq_ignore_ascii_case(current_target));
 
-            if let Some(allowed_name) = matched_allowed {
-                if allowed_name.as_str() != current_target {
-                    let mut new_parts = parts;
-                    new_parts[idx] = allowed_name.as_str();
-                    return new_parts.join(",");
-                }
-            } else {
-                // Target not found in allowed_names, fallback to default_group
+        if let Some(allowed_name) = matched_allowed {
+            if allowed_name.as_str() != current_target {
                 let mut new_parts = parts;
-                new_parts[idx] = default_group;
+                new_parts[idx] = allowed_name.as_str();
                 return new_parts.join(",");
             }
+        } else {
+            // Target not found in allowed_names, fallback to default_group
+            let mut new_parts = parts;
+            new_parts[idx] = default_group;
+            return new_parts.join(",");
         }
     }
 
@@ -619,7 +617,7 @@ fn rewrite_rules(mut config: Mapping, allowed_names: &HashSet<String>) -> Mappin
             for rule_val in rules.iter_mut() {
                 if let Value::String(rule_str) = rule_val {
                     let rewritten = rewrite_rule_target(rule_str.as_str(), allowed_names, &default_group);
-                    *rule_val = Value::String(rewritten.into());
+                    *rule_val = Value::String(rewritten);
                 }
             }
         }
