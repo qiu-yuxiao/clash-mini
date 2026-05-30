@@ -46,13 +46,19 @@ export const Switch = styled((props: SwitchProps) => (
     boxSizing: 'border-box',
     width: 14,
     height: 14,
+    boxShadow: '1px 1px 3px rgba(0,0,0,0.35), inset 1.5px 1.5px 1.5px rgba(255,255,255,0.6)',
   },
   '& .MuiSwitch-track': {
     borderRadius: 18 / 2,
     backgroundColor: theme.palette.mode === 'light' ? '#BBBBBB' : '#39393D',
     opacity: 1,
+    boxShadow: 'inset 1.5px 1.5px 3px rgba(0,0,0,0.25), inset -1px -1px 1px rgba(255,255,255,0.1)',
     transition: theme.transitions.create(['background-color'], {
       duration: 500,
     }),
+  },
+  '&:hover .MuiSwitch-thumb': {
+    filter: 'brightness(1.15)',
+    boxShadow: '1px 1.5px 4px rgba(0,0,0,0.4), inset 1.5px 1.5px 1.5px rgba(255,255,255,0.7)',
   },
 }))

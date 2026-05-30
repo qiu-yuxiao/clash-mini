@@ -22,6 +22,12 @@
    * **修改**：
      * 前端：在 [`use-verge.ts`](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-verge.ts) 中增加 `try-catch-finally`，确保在设置 PATCH 失败时仍执行 `refetch()`，使 Switch 状态能够回滚回后端真实配置。
      * 后端：在 [`schtasks.rs`](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/schtasks.rs) 中引入 `deelevate` 与 `runas`，实现 `remove_task_elevated`，在非管理员权限下需要修改或删除已有 Admin 计划任务时能够自动通过 UAC 弹窗进行提权，避免权限不足静默失败。
+6. **VGA 640x860 等比例放大与全场景 3D 浮雕控件 (v1.0.9 修复与视觉强化)**
+   * **修改**：
+     * 前端：从 `_layout.tsx` 的 profile `useEffect` 依赖项中彻底移除 `activateSelected`，并添加 `// eslint-disable-next-line react-hooks/exhaustive-deps` 锁定，消除循环重写配置导致的 WebView2 高 CPU 挂起问题。
+     * 组件等比例放大：将左侧设置抽屉栏宽度增宽至 `240px`；设置标题与设置项标签字号统一调整为 `13px`；订阅项名称及过期时间字号分别放大至 `13px` 和 `11px`；Switch 开关缩小比例放宽至 `scale(0.9)`；主要控制按钮高度升为 `34px`，字体放大至 `13px`；Mixed Port 端口输入框拓宽至 `80px`（13px 字号）。
+     * 3D视觉强化：为流量小卡片补充左上白高光、右下深阴影的双向立体 Bevel 物理反射，外阴影模糊扩展为 `6px`；将三组“三选一”滑动器的背景轨道升级为向内凹陷的 3D 暗槽（内阴影 `inset` 模拟），滑动方块升级为向外凸起的立体滑动滑块；大大小小按钮加入渐变高光与内阴影，Hover 时向上抬升 `1.5px` 并放大投影，点击（Active）时下沉 `1px` 并呈现下陷内阴影；定制 base-switch 让轨道表现为内凹 3D 暗槽，圆形滑块为 3D 悬浮球。
+   * **效果**：不仅彻底消除了启动卡死/高 CPU 缺陷，还使主窗口比例更加协调饱满，控件获得强烈的 3D 物理凹凸与玻璃浮雕质感。
 
 ---
 
