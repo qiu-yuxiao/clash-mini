@@ -239,6 +239,9 @@
 *   **构建输出检查**：打包脚本（`pnpm portable`）必须在前序编译进程完全退出且 Exit Code 为 0 后启动。
 
 ### 2. CI/CD 与 API 限制规避流程：
+*   **【零弹窗】浏览器与接口静默监控机制**：
+    *   在推送 Tag 触发构建后，**必须**将对应的 GitHub Actions Run 网页链接（如 `https://github.com/qiu-yuxiao/clash-mini/actions/runs/<RUN_ID>`）在对话中显式输出给用户，告知用户可通过浏览器直接实时监视。
+    *   同时，Agent 自身应当优先使用静默方式（通过 `read_url_content` 或 `read_browser_page` 后台请求网页/API，配合 `schedule` 计时器定时轮询，加上防缓存时间戳），完全避免使用本地 `gh run watch` 等导致沙箱弹窗的命令行，实现 100% 零打扰的静默监控。
 *   **默认极速发行与全平台指定发行**：
     *   **默认极速发布**：推送以 `v*.*.*` 格式命名的标准 Tag 时，GitHub Actions 云端只编译并发布 Windows x64 便携版（绿色版），以极速缩短发包耗时（约 2-3 分钟），适用于日常 Bug 快速验证与修复迭代。
     *   **全平台指定发布**：若需要完整发行全平台（Windows 各版本及安装包、macOS、Linux 各包），必须推送以 `v*.*.*-full` 或 `v*.*.*-all` 格式命名的 Tag，云端将激活全编译矩阵。

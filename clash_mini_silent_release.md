@@ -73,10 +73,22 @@
 - 该脚本会自动在本地更新三端版本号，提交更改，自动建立对应的 Git Tag，并使用 Git Push 推送 Tag 到 origin，从而在云端触发对应的构建流水线。
 
 ### 4. 远程构建监控与便携包自动拉回 (CI/CD Watch & Auto-Pull)
-- 推送 Tag 后，**必须**使用本地已装的 `gh` CLI 监控编译流进度。在根目录下使用 `github_token.txt` 作为凭证调用：
-  ```powershell
-  powershell -Command "$token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; & 'C:\Program Files\GitHub CLI\gh.exe' run watch --repo qiu-yuxiao/clash-mini"
-  ```
+- 推送 Tag 后，构建过程需要几分钟。为了保证对用户的零弹窗打扰，**必须优先使用「浏览器静默监控」**；只有在必要时才使用「命令行监控」。
+  
+  - **方法 A：浏览器静默监控 (推荐 - 100% 零弹窗)**：
+    1. **输出监控链接**：在启动监控的第一时间，必须将对应的 GitHub Actions Run 网页链接（`https://github.com/qiu-yuxiao/clash-mini/actions/runs/<RUN_ID>`）在对话中打印出来，提示用户可以自主点击该链接在浏览器中实时、直观地监视构建状态，从而无需依赖任何弹窗提醒。
+    2. 访问或在后台使用 `read_url_content` 静默获取 GitHub Run 详情 API：`https://api.github.com/repos/qiu-yuxiao/clash-mini/actions/runs/<RUN_ID>`
+    3. 或获取网页 HTML：`https://github.com/qiu-yuxiao/clash-mini/actions/runs/<RUN_ID>`
+    4. 利用本地 `schedule` 定时器定时唤醒，在后台静默轮询 API/HTML 状态（检查 `"status": "completed"` 或 `streaming-graph-job` 的完成图标）。
+    5. 这种方式完全不执行本地命令行，因此在整个编译监控期间**不会触发任何用户沙箱审批弹窗**。
+  
+  - **方法 B：命令行监控 (备用 - 需用户 Approve 弹窗)**：
+    - 若需要使用本地 `gh` 工具监控，在根目录下使用 `github_token.txt` 作为凭证调用：
+      ```powershell
+      powershell -Command "$token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; & 'C:\Program Files\GitHub CLI\gh.exe' run watch --repo qiu-yuxiao/clash-mini"
+      ```
+      *注意：运行本地命令需要用户在聊天界面点击「Submit」按钮审批。*
+
 - **监控到发行完成后，立刻将 Windows 免安装版拉回指定测试路径**：
   - 运行下载命令将生成的 Windows x64 便携版绿色压缩包下载并覆盖至 `portable_test` 目录：
     ```powershell
