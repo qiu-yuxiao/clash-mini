@@ -1039,39 +1039,41 @@ const Layout = () => {
             }}
           />
           
-          <IconButton
-            size="small"
-            onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
-            sx={{
-              color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
-              width: '28px',
-              height: '28px',
-              p: 0,
-              mr: 0.5,
-              borderRadius: '6px',
-              border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-              background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
-              boxShadow: (theme) => verge?.enable_always_on_top 
-                ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
-                : 'none',
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                background: 'rgba(255, 255, 255, 0.2) !important',
-              }
-            }}
-          >
-            <PushPinRounded
+          {!drawerOpen && (
+            <IconButton
+              size="small"
+              onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
               sx={{
-                fontSize: '20px',
-                color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
-                filter: verge?.enable_always_on_top 
-                  ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
+                width: '28px',
+                height: '28px',
+                p: 0,
+                mr: 0.5,
+                borderRadius: '6px',
+                border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+                background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                boxShadow: (theme) => verge?.enable_always_on_top 
+                  ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
                   : 'none',
-                transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
-                transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.2) !important',
+                }
               }}
-            />
-          </IconButton>
+            >
+              <PushPinRounded
+                sx={{
+                  fontSize: '20px',
+                  color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
+                  filter: verge?.enable_always_on_top 
+                    ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                    : 'none',
+                  transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
+                  transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                }}
+              />
+            </IconButton>
+          )}
 
           <IconButton
             size="small"
@@ -1197,7 +1199,7 @@ const Layout = () => {
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <ActiveNodeStatusCard />
+                {!drawerOpen && <ActiveNodeStatusCard />}
               </div>
               {decorated && (
                 <div
@@ -1209,38 +1211,40 @@ const Layout = () => {
                     flexShrink: 0,
                   }}
                 >
-                  <IconButton
-                    size="small"
-                    onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
-                    sx={{
-                      color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
-                      width: '28px',
-                      height: '28px',
-                      p: 0,
-                      borderRadius: '6px',
-                      border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-                      background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
-                      boxShadow: (theme) => verge?.enable_always_on_top 
-                        ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
-                        : 'none',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        background: 'rgba(255, 255, 255, 0.2) !important',
-                      }
-                    }}
-                  >
-                    <PushPinRounded
+                  {!drawerOpen && (
+                    <IconButton
+                      size="small"
+                      onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
                       sx={{
-                        fontSize: '20px',
-                        color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
-                        filter: verge?.enable_always_on_top 
-                          ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                        color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
+                        width: '28px',
+                        height: '28px',
+                        p: 0,
+                        borderRadius: '6px',
+                        border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+                        background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                        boxShadow: (theme) => verge?.enable_always_on_top 
+                          ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
                           : 'none',
-                        transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
-                        transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          background: 'rgba(255, 255, 255, 0.2) !important',
+                        }
                       }}
-                    />
-                  </IconButton>
+                    >
+                      <PushPinRounded
+                        sx={{
+                          fontSize: '20px',
+                          color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
+                          filter: verge?.enable_always_on_top 
+                            ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                            : 'none',
+                          transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
+                          transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                        }}
+                      />
+                    </IconButton>
+                  )}
 
                   <IconButton
                     size="small"
@@ -1703,15 +1707,6 @@ const Layout = () => {
                           setNotificationsEnabled(checked)
                           localStorage.setItem('clash-verge-enable-notification', checked ? 'true' : 'false')
                         }}
-                        sx={{ transform: 'scale(0.9)', transformOrigin: 'right center' }}
-                      />
-                    </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>窗口始终置顶</Typography>
-                      <Switch
-                        size="small"
-                        checked={verge?.enable_always_on_top ?? false}
-                        onChange={(_, checked: boolean) => patchVerge({ enable_always_on_top: checked })}
                         sx={{ transform: 'scale(0.9)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
