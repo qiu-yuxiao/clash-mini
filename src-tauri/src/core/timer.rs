@@ -49,6 +49,8 @@ pub struct Timer {
 
 singleton!(Timer, TIMER_INSTANCE);
 
+const DEFAULT_UPDATE_INTERVAL_MINUTES: u64 = 1440;
+
 impl Timer {
     fn new() -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
@@ -104,14 +106,14 @@ impl Timer {
                 if let Some(option) = item.option.as_ref()
                     && let Some(allow_auto_update) = option.allow_auto_update
                     && allow_auto_update
-                    && let Some(interval) = option.update_interval
-                    && interval > 0
                     && let Some(uid) = item.uid.as_ref()
                     && let Some(updated) = item.updated
-                    && cur_timestamp - (updated as i64) >= (interval as i64) * 60
                 {
-                    logging!(info, Type::Timer, "Running overdue timer task immediately: uid={}", uid);
-                    let _ = self.command_tx.send(TimerCommand::RunNow(uid.clone()));
+                    let interval = option.update_interval.unwrap_or(DEFAULT_UPDATE_INTERVAL_MINUTES);
+                    if interval > 0 && cur_timestamp - (updated as i64) >= (interval as i64) * 60 {
+                        logging!(info, Type::Timer, "Running overdue timer task immediately: uid={}", uid);
+                        let _ = self.command_tx.send(TimerCommand::RunNow(uid.clone()));
+                    }
                 }
             }
         }
@@ -150,11 +152,13 @@ impl Timer {
             for item in items.iter() {
                 if let Some(option) = item.option.as_ref()
                     && let Some(allow_auto_update) = option.allow_auto_update
-                    && let (Some(interval), Some(uid)) = (option.update_interval, &item.uid)
                     && allow_auto_update
-                    && interval > 0
+                    && let Some(uid) = item.uid.as_ref()
                 {
-                    new_map.insert(uid.clone(), interval);
+                    let interval = option.update_interval.unwrap_or(DEFAULT_UPDATE_INTERVAL_MINUTES);
+                    if interval > 0 {
+                        new_map.insert(uid.clone(), interval);
+                    }
                 }
             }
         }

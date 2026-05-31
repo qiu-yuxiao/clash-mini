@@ -641,3 +641,8 @@ export const isPortInUse = async (port: number) => {
     return false
   }
 }
+
+
+export async function getProxyAddr(name: string, provider?: string) {
+  return invoke<[string, number] | null>('get_proxy_addr', { name, provider })
+}

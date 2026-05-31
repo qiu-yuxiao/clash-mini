@@ -73,6 +73,7 @@ import {
   enhanceProfiles,
   isPortInUse,
   patchClashMode,
+  getProxyAddr,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import parseTraffic from '@/utils/parse-traffic'
@@ -210,6 +211,26 @@ const ActiveNodeStatusCard = () => {
   }, [activeNodeName, primaryGroup, activeNodeRecord])
 
   const [testing, setTesting] = useState(false)
+  const [nodeAddr, setNodeAddr] = useState<string>('')
+
+  useEffect(() => {
+    if (!activeNodeName) {
+      setNodeAddr('')
+      return
+    }
+    getProxyAddr(activeNodeName, activeNodeRecord?.provider)
+      .then((res) => {
+        if (res) {
+          setNodeAddr(`${res[0]}:${res[1]}`)
+        } else {
+          setNodeAddr('')
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to get proxy address:', err)
+        setNodeAddr('')
+      })
+  }, [activeNodeName, activeNodeRecord?.provider])
   const handleTestDelay = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!activeNodeName || !primaryGroup?.name) return
@@ -313,7 +334,7 @@ const ActiveNodeStatusCard = () => {
         />
       )}
 
-      {activeNodeRecord?.server && activeNodeRecord?.port && (
+      {nodeAddr && (
         <Typography
           variant="caption"
           sx={{
@@ -325,7 +346,7 @@ const ActiveNodeStatusCard = () => {
             },
           }}
         >
-          ({activeNodeRecord.server}:{activeNodeRecord.port})
+          ({nodeAddr})
         </Typography>
       )}
     </Paper>
@@ -753,11 +774,16 @@ const Layout = () => {
     if (!profileUid) return
     console.log(`[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest...`)
 
+    pollSessionRef.current += 1
+    const currentSession = pollSessionRef.current
+
     // 1. Wait a bit for Clash core to reload and populate proxies
     await new Promise((resolve) => setTimeout(resolve, 800))
+    if (pollSessionRef.current !== currentSession) return
     
     // Invalidate/refetch proxies data to get the fresh group structure
     const freshProxies = await refreshProxy()
+    if (pollSessionRef.current !== currentSession) return
     
     // 2. Find the PROXY group details
     const groupName = 'PROXY'
@@ -790,7 +816,7 @@ const Layout = () => {
       // Look up first node details to see if it has provider
       const firstNodeName = group.all[0]
       const firstNodeRecord = firstNodeName ? proxiesData?.records?.[firstNodeName] : null
-      
+
       if (firstNodeRecord?.provider) {
         console.log(`[BUG-034] Triggering healthcheck for provider: ${firstNodeRecord.provider}`)
         await healthcheckProxyProvider(firstNodeRecord.provider).catch((err) => {
@@ -803,47 +829,108 @@ const Layout = () => {
           console.error('[BUG-034] checkListDelay failed:', err)
         })
       }
-      
-      // Wait for test results to register (e.g. 1.5 seconds)
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-      
-      // Refetch proxy data to get the test results
-      const testedProxies = await refreshProxy()
-      
-      // 5. Find the fastest node
-      let fastestNodeName = ''
-      let lowestDelay = Infinity
-      
-      const latestData = testedProxies || proxiesData
-      for (const nodeName of group.all) {
-        const nodeRecord = latestData?.records?.[nodeName]
-        if (nodeRecord) {
-          const d = delayManager.getDelayFix(nodeRecord, groupName)
-          if (d > 0 && d < lowestDelay) {
-            lowestDelay = d
-            fastestNodeName = nodeName
+
+      const isDummyNode = (name: string): boolean => {
+        const lower = name.toLowerCase()
+        return (
+          lower.includes('流量') ||
+          lower.includes('过期时间') ||
+          lower.includes('网址') ||
+          lower.includes('官网') ||
+          lower.includes('剩余') ||
+          lower.includes('expire') ||
+          lower.includes('traffic') ||
+          lower.includes('website') ||
+          lower.includes('http') ||
+          lower.includes('https')
+        )
+      }
+
+      const startTime = Date.now()
+      let hasSelected = false
+
+      while (!hasSelected) {
+        if (pollSessionRef.current !== currentSession) {
+          console.log('[BUG-034] Session invalidated, stopping poll.')
+          return
+        }
+
+        const elapsed = (Date.now() - startTime) / 1000
+
+        // Fetch fresh proxy records
+        const testedProxies = await refreshProxy()
+        if (pollSessionRef.current !== currentSession) return
+
+        const latestData = testedProxies || proxiesData
+        const currentGroup = latestData?.groups?.find((g: any) => g.name === groupName) || group
+
+        // Collect healthy scanned nodes
+        const healthyNodes: { name: string; delay: number }[] = []
+        for (const nodeName of currentGroup.all) {
+          if (isDummyNode(nodeName)) continue
+          const nodeRecord = latestData?.records?.[nodeName]
+          if (nodeRecord) {
+            const d = delayManager.getDelayFix(nodeRecord, groupName)
+            if (d > 0) {
+              healthyNodes.push({ name: nodeName, delay: d })
+            }
           }
         }
-      }
-      
-      if (fastestNodeName) {
-        console.log(`[BUG-034] Auto selecting fastest node: ${fastestNodeName} (delay: ${lowestDelay}ms)`)
-        changeProxy(groupName, fastestNodeName, group.now)
-        showNotice.success(`自动测速完成，已切换至最快节点: ${fastestNodeName} (${lowestDelay}ms)`)
-      } else {
-        console.log('[BUG-034] No healthy tested node found, choosing first node as fallback...')
-        const fallbackNode = group.all[0]
-        if (fallbackNode) {
-          changeProxy(groupName, fallbackNode, group.now)
-          showNotice.info(`自动测速未完成，已默认选中节点: ${fallbackNode}`)
+
+        // Sort by delay ascending
+        healthyNodes.sort((a, b) => a.delay - b.delay)
+
+        console.log(`[BUG-034] Polling: elapsed=${elapsed.toFixed(1)}s, healthyNodes count=${healthyNodes.length}`)
+
+        // Rule A: If elapsed < 30s and healthyNodes count >= 5, pick the fastest and connect
+        if (elapsed < 30 && healthyNodes.length >= 5) {
+          const targetNode = healthyNodes[0].name
+          const targetDelay = healthyNodes[0].delay
+          changeProxy(groupName, targetNode, currentGroup.now)
+          showNotice.success(`自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`)
+          hasSelected = true
+          break
         }
+
+        // Rule B & C: If elapsed >= 30s and < 60s
+        if (elapsed >= 30 && elapsed < 60) {
+          if (healthyNodes.length >= 1) {
+            const targetNode = healthyNodes[0].name
+            const targetDelay = healthyNodes[0].delay
+            changeProxy(groupName, targetNode, currentGroup.now)
+            showNotice.success(`自动测速超时降级，已切换至可用最快节点: ${targetNode} (${targetDelay}ms)`)
+            hasSelected = true
+            break
+          }
+        }
+
+        // Rule D: If 60 seconds have elapsed and still no healthy nodes
+        if (elapsed >= 60) {
+          showNotice.error(
+            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+              所有线路都繁忙，请耐心等待。
+            </span>
+          )
+          hasSelected = true
+          break
+        }
+
+        // Wait 500ms before next poll
+        await new Promise((resolve) => setTimeout(resolve, 500))
       }
     } catch (err) {
       console.error('[BUG-034] Error during auto speed test and select:', err)
     }
   }, [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy])
 
-  const lastEnhancedProfileRef = useRef<string | null>(null);
+  const lastEnhancedProfileRef = useRef<string | null>(null)
+  const pollSessionRef = useRef<number>(0)
+
+  useEffect(() => {
+    return () => {
+      pollSessionRef.current += 1
+    }
+  }, [])
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
