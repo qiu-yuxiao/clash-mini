@@ -272,10 +272,9 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     }
     if update_flags.contains(UpdateFlags::ALWAYS_ON_TOP)
         && let Some(always_on_top) = patch.enable_always_on_top
+        && let Some(window) = crate::utils::window_manager::WindowManager::get_main_window()
     {
-        if let Some(window) = crate::utils::window_manager::WindowManager::get_main_window() {
-            let _ = window.set_always_on_top(always_on_top);
-        }
+        let _ = window.set_always_on_top(always_on_top);
     }
     Ok(())
 }
