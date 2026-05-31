@@ -75,7 +75,7 @@ import {
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
-import { get3DButtonStyle, get3DInputStyle } from '@/utils/button-styles'
+import { get3DButtonStyle, get3DInputStyle, get3DSegmentedContainerStyle, get3DSegmentedActiveStyle } from '@/utils/button-styles'
 import getSystem from '@/utils/get-system'
 import parseTraffic from '@/utils/parse-traffic'
 
@@ -483,7 +483,7 @@ const MiniTrafficPanel = () => {
               borderBottomLeftRadius: '6px',
               borderTopRightRadius: 0,
               borderBottomRightRadius: 0,
-              border: `1px solid rgba(212, 175, 55, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              border: `1px solid rgba(212, 175, 55, calc(0.28 * var(--depth-factor, 1.0) + 0.22 * var(--vibrancy-factor, 1.0)))`,
               borderRight: 'none',
               bgcolor:
                 mode === 'light'
@@ -491,17 +491,39 @@ const MiniTrafficPanel = () => {
                   : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
               boxShadow:
                 mode === 'light'
-                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0)))',
+                  ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.2),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.8),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.15)`
+                  : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.25),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.2 * var(--vibrancy-factor, 1.0)))`,
               whiteSpace: 'nowrap',
               transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
               '&:hover': {
-                transform: 'translateY(-1.5px)',
+                transform: 'translateY(-2px)',
                 filter: 'brightness(1.08)',
                 boxShadow:
                   mode === 'light'
-                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+                    ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
+                       inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.9),
+                       inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.12)`
+                    : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
+                       inset calc(1.2px * var(--depth-factor, 1.0)) calc(1.2px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.35),
+                       inset calc(-1.2px * var(--depth-factor, 1.0)) calc(-1.2px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.35),
+                       0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
               },
             }}
           >
@@ -551,24 +573,46 @@ const MiniTrafficPanel = () => {
               borderBottomRightRadius: '6px',
               borderTopLeftRadius: 0,
               borderBottomLeftRadius: 0,
-              border: `1px solid rgba(212, 175, 55, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              border: `1px solid rgba(212, 175, 55, calc(0.28 * var(--depth-factor, 1.0) + 0.22 * var(--vibrancy-factor, 1.0)))`,
               bgcolor:
                 mode === 'light'
                   ? 'rgba(212, 175, 55, calc(0.04 * var(--depth-factor, 1.0) + 0.04 * var(--vibrancy-factor, 1.0)))'
                   : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
               boxShadow:
                 mode === 'light'
-                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0)))',
+                  ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.2),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.8),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.15)`
+                  : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.25),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.2 * var(--vibrancy-factor, 1.0)))`,
               whiteSpace: 'nowrap',
               transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
               '&:hover': {
-                transform: 'translateY(-1.5px)',
+                transform: 'translateY(-2px)',
                 filter: 'brightness(1.08)',
                 boxShadow:
                   mode === 'light'
-                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+                    ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(175, 140, 16, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
+                       inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.9),
+                       inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.12)`
+                    : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(92, 70, 0, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
+                       inset calc(1.2px * var(--depth-factor, 1.0)) calc(1.2px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.35),
+                       inset calc(-1.2px * var(--depth-factor, 1.0)) calc(-1.2px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.35),
+                       0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
               },
             }}
           >
@@ -620,7 +664,7 @@ const MiniTrafficPanel = () => {
               borderBottomLeftRadius: '6px',
               borderTopRightRadius: 0,
               borderBottomRightRadius: 0,
-              border: `1px solid rgba(0, 132, 255, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              border: `1px solid rgba(0, 132, 255, calc(0.28 * var(--depth-factor, 1.0) + 0.22 * var(--vibrancy-factor, 1.0)))`,
               borderRight: 'none',
               bgcolor:
                 mode === 'light'
@@ -628,17 +672,39 @@ const MiniTrafficPanel = () => {
                   : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
               boxShadow:
                 mode === 'light'
-                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+                  ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.2),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.8),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.15)`
+                  : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.25),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0)))`,
               whiteSpace: 'nowrap',
               transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
               '&:hover': {
-                transform: 'translateY(-1.5px)',
+                transform: 'translateY(-2px)',
                 filter: 'brightness(1.08)',
                 boxShadow:
                   mode === 'light'
-                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+                    ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
+                       inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.9),
+                       inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.12)`
+                    : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
+                       inset calc(1.2px * var(--depth-factor, 1.0)) calc(1.2px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.35),
+                       inset calc(-1.2px * var(--depth-factor, 1.0)) calc(-1.2px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.35),
+                       0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
               },
             }}
           >
@@ -688,24 +754,46 @@ const MiniTrafficPanel = () => {
               borderBottomRightRadius: '6px',
               borderTopLeftRadius: 0,
               borderBottomLeftRadius: 0,
-              border: `1px solid rgba(0, 132, 255, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              border: `1px solid rgba(0, 132, 255, calc(0.28 * var(--depth-factor, 1.0) + 0.22 * var(--vibrancy-factor, 1.0)))`,
               bgcolor:
                 mode === 'light'
                   ? 'rgba(0, 132, 255, calc(0.03 * var(--depth-factor, 1.0) + 0.03 * var(--vibrancy-factor, 1.0)))'
                   : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
               boxShadow:
                 mode === 'light'
-                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+                  ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.2),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.8),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.15)`
+                  : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                     0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                     0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.25),
+                     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+                     0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0)))`,
               whiteSpace: 'nowrap',
               transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
               '&:hover': {
-                transform: 'translateY(-1.5px)',
+                transform: 'translateY(-2px)',
                 filter: 'brightness(1.08)',
                 boxShadow:
                   mode === 'light'
-                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+                    ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(0, 100, 200, 0.7),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
+                       inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.9),
+                       inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.12)`
+                    : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(3px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) 0 0 rgba(0, 50, 120, 0.9),
+                       0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
+                       inset calc(1.2px * var(--depth-factor, 1.0)) calc(1.2px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.35),
+                       inset calc(-1.2px * var(--depth-factor, 1.0)) calc(-1.2px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.35),
+                       0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
               },
             }}
           >
@@ -752,52 +840,52 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
     '& .MuiSlider-rail': {
       height: 10,
       opacity: 0.85,
-      bgcolor: isLight ? '#e0e0e0' : '#1e222b',
+      bgcolor: isLight ? '#e0e0e0' : '#101217',
       boxShadow: isLight
-        ? 'inset 1.5px 1.5px 3px rgba(0,0,0,0.2)'
-        : 'inset 2px 2px 4px rgba(0,0,0,0.6)',
-      border: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)'}`,
+        ? 'inset 0 3px 5px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.8)'
+        : 'inset 0 3px 5px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.08)',
+      border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)'}`,
       borderRadius: 5,
     },
     '& .MuiSlider-track': {
       height: 10,
       border: 'none',
       borderRadius: 5,
-      background: isLight ? '#bdbdbd' : '#39393d',
-      boxShadow: 'none',
+      background: isLight
+        ? 'linear-gradient(to bottom, #bdbdbd 0%, #a6a6a6 100%)'
+        : 'linear-gradient(to bottom, #39393d 0%, #1e1e21 100%)',
+      boxShadow: isLight
+        ? 'inset 0 1px 0 rgba(255,255,255,0.4)'
+        : 'inset 0 1px 0 rgba(255,255,255,0.08)',
     },
     '& .MuiSlider-thumb': {
-      width: 10,
-      height: 10,
+      width: 14,
+      height: 14,
       top: '50%',
       transform: 'translate(-50%, -50%)',
-      border: `1px solid ${isLight ? alpha(theme.palette.primary.dark, 0.25) : 'rgba(255, 255, 255, 0.15)'}`,
+      border: `1px solid ${isLight ? alpha(theme.palette.primary.dark, 0.3) : 'rgba(255, 255, 255, 0.25)'}`,
       background: isLight
-        ? `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.light} 70%, ${theme.palette.primary.main} 100%)`
-        : `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.main} 70%, ${theme.palette.primary.dark} 100%)`,
+        ? `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.light} 55%, ${theme.palette.primary.main} 100%)`
+        : `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.main} 55%, ${theme.palette.primary.dark} 100%)`,
       boxShadow: isLight
-        ? `0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.12),
-           inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.8),
-           inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.08),
+        ? `0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25),
+           inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.8),
            0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
-        : `0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
-           inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
-           inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
+        : `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.6),
+           inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.4),
+           0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.3 * var(--vibrancy-factor, 1.0)))`,
       transition:
         'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
       '&:hover, &.Mui-focusVisible': {
         transform: 'translate(-50%, -50%) scale(1.2)',
         filter: 'brightness(1.15)',
         boxShadow: isLight
-          ? `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.16),
-             inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.9),
-             inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
-             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
-          : `0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
-             inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.35),
-             inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
-             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`,
+          ? `0 calc(5px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+             inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.9),
+             0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
+          : `0 calc(6px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) rgba(0,0,0,0.7),
+             inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.5),
+             0 0 calc(14px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.4 * var(--vibrancy-factor, 1.0)))`,
       },
       '&.Mui-active': {
         transform: 'translate(-50%, -50%) scale(0.92)',
@@ -1992,7 +2080,7 @@ const Layout = () => {
                     流量接管模式
                   </Typography>
                   <Box
-                    sx={{
+                    sx={(theme) => ({
                       position: 'relative',
                       display: 'flex',
                       alignItems: 'center',
@@ -2002,13 +2090,8 @@ const Layout = () => {
                       mb: 1,
                       height: 26,
                       userSelect: 'none',
-                      boxShadow: (theme) =>
-                        theme.palette.mode === 'light'
-                          ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                          : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                    }}
+                      ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                    })}
                   >
                     {/* Sliding Background Indicator */}
                     <Box
@@ -2024,28 +2107,7 @@ const Layout = () => {
                         transform: `translate3d(${activeIndex * 100}%, 0, 0)`,
                       }}
                     >
-                      <Box
-                        sx={{
-                          height: 'calc(100% - 4px)',
-                          margin: '2px',
-                          bgcolor: 'primary.main',
-                          borderRadius: '3px',
-                          background: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                              : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                          boxShadow: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
-                               0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
-                              : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                               0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
-                        }}
-                      />
+                      <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
                     </Box>
 
                     {/* Manual Mode Option */}
@@ -2124,7 +2186,7 @@ const Layout = () => {
                     分流策略倾向
                   </Typography>
                   <Box
-                    sx={{
+                    sx={(theme) => ({
                       position: 'relative',
                       display: 'flex',
                       alignItems: 'center',
@@ -2133,13 +2195,8 @@ const Layout = () => {
                       p: '1px',
                       height: 26,
                       userSelect: 'none',
-                      boxShadow: (theme) =>
-                        theme.palette.mode === 'light'
-                          ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                          : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                    }}
+                      ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                    })}
                   >
                     {/* Sliding Background Indicator */}
                     <Box
@@ -2155,28 +2212,7 @@ const Layout = () => {
                         transform: `translate3d(${policyActiveIndex * 100}%, 0, 0)`,
                       }}
                     >
-                      <Box
-                        sx={{
-                          height: 'calc(100% - 4px)',
-                          margin: '2px',
-                          bgcolor: 'primary.main',
-                          borderRadius: '3px',
-                          background: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                              : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                          boxShadow: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
-                               0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
-                              : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                               0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
-                        }}
-                      />
+                      <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
                     </Box>
 
                     {/* Direct Fallback Option */}
@@ -2405,7 +2441,7 @@ const Layout = () => {
                         主题模式
                       </Typography>
                       <Box
-                        sx={{
+                        sx={(theme) => ({
                           position: 'relative',
                           display: 'flex',
                           alignItems: 'center',
@@ -2415,13 +2451,8 @@ const Layout = () => {
                           width: '120px',
                           height: 26,
                           userSelect: 'none',
-                          boxShadow: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                              : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
-                          border: '1px solid',
-                          borderColor: 'divider',
-                        }}
+                          ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                        })}
                       >
                         {/* Sliding Background Indicator */}
                         <Box
@@ -2437,28 +2468,7 @@ const Layout = () => {
                             transform: `translate3d(${themeActiveIndex * 100}%, 0, 0)`,
                           }}
                         >
-                          <Box
-                            sx={{
-                              height: 'calc(100% - 4px)',
-                              margin: '2px',
-                              bgcolor: 'primary.main',
-                              borderRadius: '3px',
-                              background: (theme) =>
-                                theme.palette.mode === 'light'
-                                  ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                                  : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                              boxShadow: (theme) =>
-                                theme.palette.mode === 'light'
-                                  ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
-                                   inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                                   inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
-                                   0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
-                                  : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                                   inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
-                                   inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                                   0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
-                            }}
-                          />
+                          <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
                         </Box>
 
                         {/* System Option */}
@@ -2681,7 +2691,7 @@ const Layout = () => {
                     路径控制（右键点击链接）
                   </Typography>
                   <Box
-                    sx={{
+                    sx={(theme) => ({
                       position: 'relative',
                       display: 'flex',
                       alignItems: 'center',
@@ -2691,13 +2701,8 @@ const Layout = () => {
                       width: '140px',
                       height: 24,
                       userSelect: 'none',
-                      boxShadow: (theme) =>
-                        theme.palette.mode === 'light'
-                          ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                          : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                    }}
+                      ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                    })}
                   >
                     {/* Sliding Background Indicator */}
                     <Box
@@ -2713,28 +2718,7 @@ const Layout = () => {
                         transform: `translate3d(${connectionsType === 'active' ? 0 : 100}%, 0, 0)`,
                       }}
                     >
-                      <Box
-                        sx={{
-                          height: 'calc(100% - 4px)',
-                          margin: '2px',
-                          bgcolor: 'primary.main',
-                          borderRadius: '3px',
-                          background: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                              : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                          boxShadow: (theme) =>
-                            theme.palette.mode === 'light'
-                              ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
-                               0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
-                              : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-                               0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
-                        }}
-                      />
+                      <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
                     </Box>
 
                     {/* Active Option */}

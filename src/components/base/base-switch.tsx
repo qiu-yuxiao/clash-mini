@@ -22,8 +22,20 @@ export const Switch = styled((props: SwitchProps) => (
         transform: 'translateX(14px)',
         color: '#fff',
         '& + .MuiSwitch-track': {
-          background: isLight ? '#bdbdbd' : '#39393d',
+          background: isLight
+            ? `linear-gradient(to bottom, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`
+            : `linear-gradient(to bottom, #0f121a 0%, #1c202a 100%)`,
           opacity: 0.85,
+          boxShadow: isLight
+            ? `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.8)`
+            : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.8),
+               0 1px 0 rgba(255, 255, 255, 0.08),
+               inset 0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.4)}`,
+        },
+        '& .MuiSwitch-thumb': {
+          background: isLight
+            ? `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.light} 55%, ${theme.palette.primary.main} 100%)`
+            : `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.main} 55%, ${theme.palette.primary.dark} 100%)`,
         },
         '&.Mui-disabled + .MuiSwitch-track': {
           opacity: 0.5,
@@ -43,21 +55,19 @@ export const Switch = styled((props: SwitchProps) => (
       boxSizing: 'border-box',
       width: 14,
       height: 14,
-      border: `1px solid ${isLight ? alpha(theme.palette.primary.dark, 0.25) : 'rgba(255, 255, 255, 0.15)'}`,
+      border: `1px solid ${isLight ? alpha(theme.palette.primary.dark, 0.3) : 'rgba(255, 255, 255, 0.25)'}`,
       background: isLight
-        ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-        : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
+        ? `radial-gradient(circle at 35% 35%, #ffffff 0%, #dbdbdb 45%, #a6a6a6 100%)`
+        : `radial-gradient(circle at 35% 35%, #ffffff 0%, #3e4859 45%, #181d26 100%)`,
       boxShadow: isLight
-        ? `0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.12),
-           inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.8),
-           inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.08),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
-        : `0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
-           inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
-           inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
+        ? `0 calc(2.5px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25),
+           inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.8),
+           inset 0 calc(-1px * var(--depth-factor, 1.0)) 0 rgba(0,0,0,0.15)`
+        : `0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0,0,0,0.5),
+           inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.4),
+           inset 0 calc(-1.5px * var(--depth-factor, 1.0)) 0 rgba(0,0,0,0.55)`,
       transition:
-        'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
+        'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out, background 0.1s ease-out',
     },
     '& .MuiSwitch-track': {
       borderRadius: 7,
@@ -65,8 +75,8 @@ export const Switch = styled((props: SwitchProps) => (
       opacity: 0.85,
       border: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)'}`,
       boxShadow: isLight
-        ? 'inset 1.5px 1.5px 3px rgba(0,0,0,0.2)'
-        : 'inset 2px 2px 4px rgba(0,0,0,0.6)',
+        ? 'inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.8)'
+        : 'inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.08)',
       transition: theme.transitions.create(['background-color'], {
         duration: 500,
       }),
@@ -75,13 +85,13 @@ export const Switch = styled((props: SwitchProps) => (
       transform: 'scale(1.2)',
       filter: 'brightness(1.15)',
       boxShadow: isLight
-        ? `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.16),
-           inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.9),
-           inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
+        ? `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+           inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.9),
+           inset 0 calc(-1px * var(--depth-factor, 1.0)) 0 rgba(0,0,0,0.1),
            0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
-        : `0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
-           inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.35),
-           inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
+        : `0 calc(5px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.65),
+           inset 0 calc(1.2px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.5),
+           inset 0 calc(-1.5px * var(--depth-factor, 1.0)) 0 rgba(0,0,0,0.45),
            0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`,
     },
   }
