@@ -1273,87 +1273,89 @@ const Layout = () => {
               flexDirection: 'column',
             }}
           >
-            {/*置顶当前节点与快捷控制栏*/}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '8px 8px 4px 8px',
-                position: 'relative',
-                zIndex: 110,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {!drawerOpen && <ActiveNodeStatusCard />}
-              </div>
-              {decorated && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    marginLeft: '8px',
-                    flexShrink: 0,
+            {/* 右上角独立控制按钮（齿轮/关闭） */}
+            {decorated && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  zIndex: 120,
+                }}
+              >
+                <IconButton
+                  size="small"
+                  onClick={() => setDrawerOpen(!drawerOpen)}
+                  sx={{
+                    color: drawerOpen ? 'primary.main' : 'text.primary',
+                    width: '28px',
+                    height: '28px',
+                    p: 0,
+                    borderRadius: '6px',
+                    border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+                    background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                    '&:hover': {
+                      background: 'rgba(255, 255, 255, 0.2) !important',
+                    }
                   }}
                 >
-                  {!drawerOpen && (
-                    <IconButton
-                      size="small"
-                      onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
-                      sx={{
-                        color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
-                        width: '28px',
-                        height: '28px',
-                        p: 0,
-                        borderRadius: '6px',
-                        border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-                        background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
-                        boxShadow: (theme) => verge?.enable_always_on_top 
-                          ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
-                          : 'none',
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.2) !important',
-                        }
-                      }}
-                    >
-                      <PushPinRounded
-                        sx={{
-                          fontSize: '20px',
-                          color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
-                          filter: verge?.enable_always_on_top 
-                            ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
-                            : 'none',
-                          transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
-                          transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
-                        }}
-                      />
-                    </IconButton>
-                  )}
+                  {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '20px' }} />}
+                </IconButton>
+              </div>
+            )}
 
+            {/*置顶当前节点与快捷控制栏（仅在未打开设置时渲染）*/}
+            {!drawerOpen && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '8px 44px 4px 8px', // 右侧留出 44px 避让右上角绝对定位按钮
+                  position: 'relative',
+                  zIndex: 110,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <ActiveNodeStatusCard />
+                </div>
+                {decorated && (
                   <IconButton
                     size="small"
-                    onClick={() => setDrawerOpen(!drawerOpen)}
+                    onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
                     sx={{
-                      color: drawerOpen ? 'primary.main' : 'text.primary',
+                      color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
                       width: '28px',
                       height: '28px',
                       p: 0,
                       borderRadius: '6px',
-                      border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-                      background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                      border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+                      background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                      boxShadow: (theme) => verge?.enable_always_on_top 
+                        ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
+                        : 'none',
+                      transition: 'all 0.2s ease',
                       '&:hover': {
                         background: 'rgba(255, 255, 255, 0.2) !important',
                       }
                     }}
                   >
-                    {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '20px' }} />}
+                    <PushPinRounded
+                      sx={{
+                        fontSize: '20px',
+                        color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
+                        filter: verge?.enable_always_on_top 
+                          ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                          : 'none',
+                        transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
+                        transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                      }}
+                    />
                   </IconButton>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/*节点组选择列表*/}
             <div style={{ flex: 1, overflow: 'hidden' }}>
