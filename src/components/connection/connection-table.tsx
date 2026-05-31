@@ -1,4 +1,3 @@
-import { Box, Menu, MenuItem, alpha } from '@mui/material'
 import {
   FlashOnRounded,
   PublicRounded,
@@ -7,9 +6,7 @@ import {
   InfoOutlined,
   BlockRounded,
 } from '@mui/icons-material'
-import { closeConnection } from 'tauri-plugin-mihomo-api'
-import { addQuickRoutingRule } from '@/utils/quick-routing'
-import { showNotice } from '@/services/notice-service'
+import { Box, Menu, MenuItem, alpha } from '@mui/material'
 import {
   ColumnDef,
   flexRender,
@@ -27,6 +24,10 @@ import {
   useRef,
   useState,
 } from 'react'
+import { closeConnection } from 'tauri-plugin-mihomo-api'
+
+import { showNotice } from '@/services/notice-service'
+import { addQuickRoutingRule } from '@/utils/quick-routing'
 
 const ROW_HEIGHT = 20
 
@@ -46,10 +47,13 @@ const SX_SCROLL_CONTAINER: React.ComponentProps<typeof Box>['sx'] = {
   overflowX: 'hidden',
   WebkitOverflowScrolling: 'touch',
   overscrollBehavior: 'contain',
-  scrollbarWidth: 'none',
+  scrollbarWidth: 'none !important' as any,
+  msOverflowStyle: 'none !important',
   '&::-webkit-scrollbar': {
-    display: 'none',
-  },
+    display: 'none !important',
+    width: '0 !important',
+    height: '0 !important',
+  } as any,
   border: '5px double var(--theme-border)',
   borderRadius: '4px',
 }
@@ -233,12 +237,12 @@ export const ConnectionTable = (props: Props) => {
     const { row } = contextMenu
     const { metadata } = row
     setContextMenu(null)
-    if (metadata.process) {
-      await addQuickRoutingRule('process', metadata.process, 'DIRECT')
-    } else if (metadata.host) {
+    if (metadata.host) {
       await addQuickRoutingRule('domain', metadata.host, 'DIRECT')
     } else if (metadata.destinationIP) {
       await addQuickRoutingRule('domain', metadata.destinationIP, 'DIRECT')
+    } else if (metadata.process) {
+      await addQuickRoutingRule('process', metadata.process, 'DIRECT')
     }
   }, [contextMenu])
 
@@ -247,12 +251,12 @@ export const ConnectionTable = (props: Props) => {
     const { row } = contextMenu
     const { metadata } = row
     setContextMenu(null)
-    if (metadata.process) {
-      await addQuickRoutingRule('process', metadata.process, 'PROXY')
-    } else if (metadata.host) {
+    if (metadata.host) {
       await addQuickRoutingRule('domain', metadata.host, 'PROXY')
     } else if (metadata.destinationIP) {
       await addQuickRoutingRule('domain', metadata.destinationIP, 'PROXY')
+    } else if (metadata.process) {
+      await addQuickRoutingRule('process', metadata.process, 'PROXY')
     }
   }, [contextMenu])
 
@@ -261,12 +265,12 @@ export const ConnectionTable = (props: Props) => {
     const { row } = contextMenu
     const { metadata } = row
     setContextMenu(null)
-    if (metadata.process) {
-      await addQuickRoutingRule('process', metadata.process, 'REJECT')
-    } else if (metadata.host) {
+    if (metadata.host) {
       await addQuickRoutingRule('domain', metadata.host, 'REJECT')
     } else if (metadata.destinationIP) {
       await addQuickRoutingRule('domain', metadata.destinationIP, 'REJECT')
+    } else if (metadata.process) {
+      await addQuickRoutingRule('process', metadata.process, 'REJECT')
     }
   }, [contextMenu])
 

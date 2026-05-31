@@ -463,15 +463,24 @@ export const useCustomTheme = () => {
       const effectiveInjectedCss = scopedCss ?? setting.css_injection ?? ''
 
       const globalStyles = `
-        /* 修复滚动条样式为完全隐藏 */
+        /* 恢复窄 3D 滚动条样式 */
         * {
-          scrollbar-width: none !important;
-          -ms-overflow-style: none !important;
+          scrollbar-width: thin !important;
         }
         ::-webkit-scrollbar {
-          display: none !important;
-          width: 0 !important;
-          height: 0 !important;
+          width: 6px !important;
+          height: 6px !important;
+        }
+        ::-webkit-scrollbar-track {
+          background: transparent !important;
+        }
+        ::-webkit-scrollbar-thumb {
+          background: var(--primary-main, #1976d2) !important;
+          border-radius: 3px !important;
+          box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.3), inset -1px -1px 1px rgba(0, 0, 0, 0.2) !important;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: var(--primary-light, #42a5f5) !important;
         }
 
         /* 背景图处理 */

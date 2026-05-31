@@ -61,6 +61,7 @@ bitflags! {
         const LANGUAGE = 1 << 11;
         const LOG_LEVEL = 1 << 12;
         const LOG_FILE = 1 << 13;
+        const ALWAYS_ON_TOP = 1 << 14;
 
         const GROUP_SYS_TRAY = Self::SYSTRAY_MENU.bits()
                              | Self::SYSTRAY_TOOLTIP.bits()
@@ -113,6 +114,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     let log_level = &patch.app_log_level;
     let log_max_size = patch.app_log_max_size;
     let log_max_count = patch.app_log_max_count;
+    let enable_always_on_top = patch.enable_always_on_top;
 
     #[cfg(target_os = "windows")]
     let restart_core_needed = socks_enabled.is_some()
@@ -151,7 +153,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     if auto_launch.is_some() {
         update_flags.insert(UpdateFlags::LAUNCH);
     }
-    if system_proxy.is_some() {
+    if system_proxy.is_some() || mixed_port.is_some() {
         update_flags.insert(UpdateFlags::SYS_PROXY | UpdateFlags::GROUP_SYS_TRAY);
     }
     if proxy_bypass.is_some()
@@ -190,6 +192,9 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     }
     if log_max_size.is_some() || log_max_count.is_some() {
         update_flags.insert(UpdateFlags::LOG_FILE);
+    }
+    if enable_always_on_top.is_some() {
+        update_flags.insert(UpdateFlags::ALWAYS_ON_TOP);
     }
     if tray_inline_outbound_modes.is_some() {
         update_flags.insert(UpdateFlags::SYSTRAY_MENU);
@@ -264,6 +269,13 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         let log_max_size = patch.app_log_max_size.unwrap_or(128);
         let log_max_count = patch.app_log_max_count.unwrap_or(8);
         Logger::global().update_log_config(log_max_size, log_max_count).await?;
+    }
+    if update_flags.contains(UpdateFlags::ALWAYS_ON_TOP)
+        && let Some(always_on_top) = patch.enable_always_on_top
+    {
+        if let Some(window) = crate::utils::window_manager::WindowManager::get_main_window() {
+            let _ = window.set_always_on_top(always_on_top);
+        }
     }
     Ok(())
 }

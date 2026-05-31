@@ -1,5 +1,5 @@
-import { useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 
 import {

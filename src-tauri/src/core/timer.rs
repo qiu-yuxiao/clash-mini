@@ -21,7 +21,7 @@ use tokio_util::time::{DelayQueue, delay_queue::Key};
 enum TimerCommand {
     Apply(HashMap<String, u64>),
     RunNow(String),
-    TaskFinished(String),
+    TaskFinished(String, bool),
 }
 
 struct TaskState {
@@ -183,8 +183,8 @@ impl Timer {
                         Some(TimerCommand::RunNow(uid)) => {
                             Self::run_task_now(&mut queue, &mut tasks, uid, command_tx.clone());
                         }
-                        Some(TimerCommand::TaskFinished(uid)) => {
-                            Self::finish_task(&mut queue, &mut tasks, uid);
+                        Some(TimerCommand::TaskFinished(uid, success)) => {
+                            Self::finish_task(&mut queue, &mut tasks, uid, success);
                         }
                         None => break,
                     }
@@ -315,13 +315,18 @@ impl Timer {
         false
     }
 
-    fn finish_task(queue: &mut DelayQueue<String>, tasks: &mut HashMap<String, TaskState>, uid: String) {
+    fn finish_task(queue: &mut DelayQueue<String>, tasks: &mut HashMap<String, TaskState>, uid: String, success: bool) {
         let Some(state) = tasks.get_mut(&uid) else {
             return;
         };
 
         state.running = false;
-        let key = Self::schedule_task(queue, &uid, state.interval_minutes);
+        let interval_minutes = if success {
+            state.interval_minutes
+        } else {
+            std::cmp::min(state.interval_minutes, 2)
+        };
+        let key = Self::schedule_task(queue, &uid, interval_minutes);
         state.key = Some(key);
     }
 
@@ -329,8 +334,8 @@ impl Timer {
         logging!(info, Type::Timer, "Starting timer task: uid={}", uid);
         AsyncHandler::spawn(move || async move {
             Self::wait_until_resolve_done(Duration::from_millis(5000)).await;
-            Self::async_task(&uid).await;
-            let _ = command_tx.send(TimerCommand::TaskFinished(uid));
+            let success = Self::async_task(&uid).await;
+            let _ = command_tx.send(TimerCommand::TaskFinished(uid, success));
         });
     }
 
@@ -368,9 +373,10 @@ impl Timer {
         }
     }
 
-    async fn async_task(uid: &String) {
+    async fn async_task(uid: &String) -> bool {
         let task_start = std::time::Instant::now();
         logging!(debug, Type::Timer, "Running timer task for profile: {}", uid);
+        let mut success = false;
 
         match tokio::time::timeout(std::time::Duration::from_secs(40), async {
             Self::emit_update_event(uid, true);
@@ -396,12 +402,14 @@ impl Timer {
                     uid,
                     task_start.elapsed().as_millis()
                 );
+                success = true;
             }
             Ok(Err(e)) => logging_error!(Type::Timer, "Failed to update profile uid {}: {}", uid, e),
             Err(_) => logging_error!(Type::Timer, "Timer task timed out for uid: {}", uid),
         }
 
         Self::emit_update_event(uid, false);
+        success
     }
 
     async fn wait_until_resolve_done(max_wait: Duration) {

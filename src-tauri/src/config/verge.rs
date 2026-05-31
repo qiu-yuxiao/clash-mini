@@ -139,6 +139,9 @@ pub struct IVerge {
     /// enable global hotkey
     pub enable_global_hotkey: Option<bool>,
 
+    /// enable always on top
+    pub enable_always_on_top: Option<bool>,
+
     /// 首页卡片设置
     /// 控制首页各个卡片的显示和隐藏
     pub home_cards: Option<serde_json::Value>,
@@ -447,6 +450,7 @@ impl IVerge {
             tray_proxy_groups_display_mode: Some("default".into()),
             tray_inline_outbound_modes: Some(false),
             enable_global_hotkey: Some(true),
+            enable_always_on_top: Some(false),
             enable_auto_light_weight_mode: Some(true),
             auto_light_weight_minutes: Some(5),
             enable_dns_settings: Some(true),
@@ -530,6 +534,7 @@ impl IVerge {
         patch!(clash_core);
         patch!(hotkeys);
         patch!(enable_global_hotkey);
+        patch!(enable_always_on_top);
 
         patch!(auto_close_connection);
         patch!(auto_check_update);

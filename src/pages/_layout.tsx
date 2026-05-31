@@ -1,22 +1,31 @@
 import {
+  ArrowDownwardRounded,
+  ArrowUpwardRounded,
+  SettingsRounded as SettingsRoundedIcon,
+  CloseRounded,
+  RefreshRounded,
+  DeleteRounded,
+  WifiOff as SignalError,
+  SignalWifi3Bar as SignalGood,
+  SignalWifi2Bar as SignalMedium,
+  SignalWifi0Bar as SignalNone,
+  SignalWifi4Bar as SignalStrong,
+  SignalWifi1Bar as SignalWeak,
+  PushPinRounded,
+} from '@mui/icons-material'
+import {
   Box,
   List,
-  Menu,
-  MenuItem,
   Paper,
-  SvgIcon,
   ThemeProvider,
   Typography,
   IconButton,
   Button,
-  ButtonGroup,
   Chip,
   CircularProgress,
   TextField,
   Dialog,
-  Select,
   ListItem,
-  ListItemText,
   Slider,
 } from '@mui/material'
 import { alpha } from '@mui/material'
@@ -24,11 +33,20 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Outlet, useLocation, useNavigate } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
+import { healthcheckProxyProvider, closeAllConnections } from 'tauri-plugin-mihomo-api'
 
-import { BaseErrorBoundary, BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
+import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
+import { ConnectionDetail } from '@/components/connection/connection-detail'
+import { ConnectionTable } from '@/components/connection/connection-table'
+import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-traffic-graph'
+import { NoticeManager } from '@/components/layout/notice-manager'
 import { WindowControls } from '@/components/layout/window-controller'
+import { ProxyGroups } from '@/components/proxy/proxy-groups'
+import { useClashInfo } from '@/hooks/use-clash'
+import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
+import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
 import { useThemeMode } from '@/services/states'
@@ -41,18 +59,13 @@ import {
   useLoadingOverlay,
 } from './_layout/hooks'
 import { handleNoticeMessage } from './_layout/utils'
-import { NoticeManager } from '@/components/layout/notice-manager'
 
-import { useProfiles } from '@/hooks/use-profiles'
 import { useProxiesData, useClashConfigData, useAppRefreshers } from '@/providers/app-data-context'
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
-import { useClashInfo } from '@/hooks/use-clash'
-import { useConnectionData } from '@/hooks/use-connection-data'
-import { useConnectionSetting } from '@/hooks/use-connection-setting'
 import { useTrafficData } from '@/hooks/use-traffic-data'
-
+import { useProxySelection } from '@/hooks/use-proxy-selection'
 import {
   importProfile,
   updateProfile,
@@ -61,33 +74,11 @@ import {
   isPortInUse,
   patchClashMode,
 } from '@/services/cmds'
-import { healthcheckProxyProvider, closeAllConnections, selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 import delayManager from '@/services/delay'
 import parseTraffic from '@/utils/parse-traffic'
-
-import { ProxyGroups } from '@/components/proxy/proxy-groups'
-import { ConnectionTable } from '@/components/connection/connection-table'
-import { ConnectionDetail } from '@/components/connection/connection-detail'
-import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-traffic-graph'
 import { useVisibility } from '@/hooks/use-visibility'
 import { showNotice } from '@/services/notice-service'
 
-import {
-  ArrowDownwardRounded,
-  ArrowUpwardRounded,
-  SettingsRounded as SettingsRoundedIcon,
-  CloseRounded,
-  RefreshRounded,
-  DeleteRounded,
-  Shuffle as ShuffleIcon,
-  WifiOff as SignalError,
-  SignalWifi3Bar as SignalGood,
-  SignalWifi2Bar as SignalMedium,
-  SignalWifi0Bar as SignalNone,
-  SignalWifi4Bar as SignalStrong,
-  SignalWifi1Bar as SignalWeak,
-  SaveRounded,
-} from '@mui/icons-material'
 import LogsPage from './logs'
 
 import 'dayjs/locale/ru'
@@ -183,9 +174,6 @@ const getFriendlyProtocolName = (type?: string) => {
 const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
-  const { decorated } = useWindowDecorations()
-  const { clashInfo } = useClashInfo()
-  const [activeNodeDetail, setActiveNodeDetail] = useState<{ server?: string; port?: number } | null>(null)
   
   const primaryGroup = useMemo(() => {
     const groups = proxies?.groups || []
@@ -197,42 +185,6 @@ const ActiveNodeStatusCard = () => {
 
   const activeNodeName = primaryGroup?.now || ''
 
-  useEffect(() => {
-    if (!activeNodeName) {
-      setActiveNodeDetail(null)
-      return
-    }
-
-    const host = clashInfo?.server || '127.0.0.1:9098'
-    const secret = clashInfo?.secret || ''
-    const url = `http://${host}/proxies/${encodeURIComponent(activeNodeName)}`
-
-    const headers: Record<string, string> = {}
-    if (secret) {
-      headers['Authorization'] = `Bearer ${secret}`
-    }
-
-    let active = true
-    fetch(url, { headers })
-      .then((res) => res.json())
-      .then((data) => {
-        if (!active) return
-        if (data && (data.server || data.port)) {
-          setActiveNodeDetail({ server: data.server, port: data.port })
-        } else {
-          setActiveNodeDetail(null)
-        }
-      })
-      .catch((err) => {
-        if (!active) return
-        console.error('Failed to fetch proxy detail:', err)
-        setActiveNodeDetail(null)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [activeNodeName, clashInfo])
   const activeNodeRecord = useMemo(() => {
     if (!activeNodeName) return null
     if (proxies?.records?.[activeNodeName]) {
@@ -283,89 +235,99 @@ const ActiveNodeStatusCard = () => {
     <Paper
       className="theme-crystal-card"
       sx={{
-        m: 1,
-        mb: 0.5,
-        mr: decorated ? '48px' : 1, // Avoid overlap with Settings gear button when decorated
-        p: '6px 12px',
+        m: 0,
+        p: '0 12px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 2,
+        justifyContent: 'center',
+        gap: 1.5,
+        height: '28px',
       }}
     >
-      <Box
+      <Typography
+        variant="caption"
+        color="text.secondary"
         sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0.5,
-          '@media (max-width: 560px)': {
+          fontSize: '11px',
+          '@media (max-width: 580px)': {
             display: 'none',
           },
         }}
       >
-        <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '11px', color: 'primary.main' }}>
-          {getFriendlyProtocolName(activeNodeRecord?.type) || 'Direct'}
-        </Typography>
-      </Box>
+        当前活跃出口节点：
+      </Typography>
 
-      {/* Center Part: Active Node Name & Delay Chip */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, flex: 1 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
-          当前活跃出口节点：
-        </Typography>
+      <Typography
+        variant="caption"
+        sx={{
+          fontWeight: 'bold',
+          fontSize: '11px',
+          color: 'primary.main',
+          border: '1px solid',
+          borderColor: 'primary.main',
+          borderRadius: '4px',
+          px: 0.8,
+          py: 0.2,
+          '@media (max-width: 480px)': {
+            display: 'none',
+          },
+        }}
+      >
+        {getFriendlyProtocolName(activeNodeRecord?.type) || 'Direct'}
+      </Typography>
+
+      <Typography
+        variant="body2"
+        sx={{
+          fontWeight: 'bold',
+          fontSize: '12px',
+          color: 'text.primary',
+          maxWidth: { xs: '120px', sm: '240px', md: '360px' },
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {activeNodeName || '未选择节点 (直接连接)'}
+      </Typography>
+
+      {activeNodeName && (
+        <Chip
+          size="small"
+          icon={testing ? <CircularProgress size={10} color="inherit" /> : signalInfo.icon}
+          label={testing ? '测试中...' : delayManager.formatDelay(delay)}
+          color={delayColor}
+          onClick={handleTestDelay}
+          sx={{
+            fontSize: '11px',
+            height: '20px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            bgcolor: testing ? undefined : alpha(signalInfo.color === 'success.main' ? '#4caf50' : signalInfo.color === 'warning.main' ? '#ff9800' : '#f44336', 0.12),
+            color: signalInfo.color === 'text.secondary' ? 'text.secondary' : signalInfo.color,
+            '& .MuiChip-icon': {
+              color: 'inherit',
+              fontSize: '12px',
+            }
+          }}
+        />
+      )}
+
+      {activeNodeRecord?.server && activeNodeRecord?.port && (
         <Typography
-          variant="body2"
+          variant="caption"
           sx={{
             fontWeight: 'bold',
-            fontSize: '12px',
-            color: 'text.primary',
-            maxWidth: { xs: '150px', sm: '300px' },
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            fontSize: '11px',
+            color: 'text.secondary',
+            '@media (max-width: 400px)': {
+              display: 'none',
+            },
           }}
         >
-          {activeNodeName || '未选择节点 (直接连接)'}
+          ({activeNodeRecord.server}:{activeNodeRecord.port})
         </Typography>
-        {activeNodeName && (
-          <Chip
-            size="small"
-            icon={testing ? <CircularProgress size={10} color="inherit" /> : signalInfo.icon}
-            label={testing ? '测试中...' : delayManager.formatDelay(delay)}
-            color={delayColor}
-            onClick={handleTestDelay}
-            sx={{
-              fontSize: '11px',
-              height: '20px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              bgcolor: testing ? undefined : alpha(signalInfo.color === 'success.main' ? '#4caf50' : signalInfo.color === 'warning.main' ? '#ff9800' : '#f44336', 0.12),
-              color: signalInfo.color === 'text.secondary' ? 'text.secondary' : signalInfo.color,
-              '& .MuiChip-icon': {
-                color: 'inherit',
-                fontSize: '12px',
-              }
-            }}
-          />
-        )}
-      </Box>
-
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0.5,
-          '@media (max-width: 560px)': {
-            display: 'none',
-          },
-        }}
-      >
-        {activeNodeDetail?.server && activeNodeDetail?.port && (
-          <Typography variant="caption" sx={{ fontWeight: 'bold', fontSize: '11px', color: 'text.primary' }}>
-            {activeNodeDetail.server}:{activeNodeDetail.port}
-          </Typography>
-        )}
-      </Box>
+      )}
     </Paper>
   )
 }
@@ -688,6 +650,9 @@ const Layout = () => {
   const [url, setUrl] = useState('')
   const [profileLoading, setProfileLoading] = useState(false)
   const { profiles = {}, mutateProfiles, activateSelected, patchProfiles } = useProfiles()
+  const { changeProxy } = useProxySelection()
+  const { proxies } = useProxiesData()
+  const { refreshProxy } = useAppRefreshers()
   const profileItems = useMemo(
     () =>
       (profiles.items || []).filter(
@@ -709,11 +674,11 @@ const Layout = () => {
 
 
   // Takeover Mode States
-  const { indicator: systemProxyIndicator, toggleSystemProxy } = useSystemProxyState()
+  const { toggleSystemProxy } = useSystemProxyState()
   const { isTunModeAvailable, mutateSystemState } = useSystemState()
   const { installServiceAndRestartCore } = useServiceInstaller()
-  const { enable_tun_mode } = verge ?? {}
-  const currentMode = enable_tun_mode ? 'tun' : systemProxyIndicator ? 'system' : 'manual'
+  const { enable_tun_mode, enable_system_proxy } = verge ?? {}
+  const currentMode = enable_tun_mode ? 'tun' : enable_system_proxy ? 'system' : 'manual'
   const activeIndex = currentMode === 'tun' ? 2 : currentMode === 'system' ? 1 : 0
 
   // Port State
@@ -784,19 +749,115 @@ const Layout = () => {
     }
   }, [language, switchLanguage])
 
+  const triggerAutoSelectFastestNode = useCallback(async (profileUid: string) => {
+    if (!profileUid) return
+    console.log(`[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest...`)
+
+    // 1. Wait a bit for Clash core to reload and populate proxies
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    
+    // Invalidate/refetch proxies data to get the fresh group structure
+    const freshProxies = await refreshProxy()
+    
+    // 2. Find the PROXY group details
+    const groupName = 'PROXY'
+    const proxiesData = freshProxies || proxies
+    const group = proxiesData?.groups?.find((g: any) => g.name === groupName)
+    if (!group || !group.all || group.all.length === 0) {
+      console.warn('[BUG-034] PROXY group not found or empty')
+      return
+    }
+    
+    console.log(`[BUG-034] Found PROXY group with ${group.all.length} nodes, starting auto-latency test...`)
+    
+    // 3. Set sorting state for this group in local storage to "Latency Sort" (sortType: 1)
+    try {
+      const item = localStorage.getItem('proxy-head-state')
+      let data = (item ? JSON.parse(item) : {}) as Record<string, any>
+      if (!data || typeof data !== 'object') data = {}
+      if (!data[profileUid]) data[profileUid] = {}
+      if (!data[profileUid][groupName]) data[profileUid][groupName] = {}
+      data[profileUid][groupName].sortType = 1; // 1 = latency sort
+      localStorage.setItem('proxy-head-state', JSON.stringify(data))
+      console.log(`[BUG-034] Set proxy-head-state sortType to 1 for profile ${profileUid}`)
+    } catch (e) {
+      console.error('[BUG-034] Failed to set auto-sort in localStorage:', e)
+    }
+
+    // 4. Trigger latency tests
+    try {
+      // Check if proxy-provider exists for this group
+      // Look up first node details to see if it has provider
+      const firstNodeName = group.all[0]
+      const firstNodeRecord = firstNodeName ? proxiesData?.records?.[firstNodeName] : null
+      
+      if (firstNodeRecord?.provider) {
+        console.log(`[BUG-034] Triggering healthcheck for provider: ${firstNodeRecord.provider}`)
+        await healthcheckProxyProvider(firstNodeRecord.provider).catch((err) => {
+          console.error('[BUG-034] provider healthcheck failed:', err)
+        })
+      } else {
+        console.log(`[BUG-034] Triggering delay test for all nodes: ${group.all.length}`)
+        const timeout = verge?.default_latency_timeout || 10000
+        await delayManager.checkListDelay(group.all, groupName, timeout).catch((err) => {
+          console.error('[BUG-034] checkListDelay failed:', err)
+        })
+      }
+      
+      // Wait for test results to register (e.g. 1.5 seconds)
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      
+      // Refetch proxy data to get the test results
+      const testedProxies = await refreshProxy()
+      
+      // 5. Find the fastest node
+      let fastestNodeName = ''
+      let lowestDelay = Infinity
+      
+      const latestData = testedProxies || proxiesData
+      for (const nodeName of group.all) {
+        const nodeRecord = latestData?.records?.[nodeName]
+        if (nodeRecord) {
+          const d = delayManager.getDelayFix(nodeRecord, groupName)
+          if (d > 0 && d < lowestDelay) {
+            lowestDelay = d
+            fastestNodeName = nodeName
+          }
+        }
+      }
+      
+      if (fastestNodeName) {
+        console.log(`[BUG-034] Auto selecting fastest node: ${fastestNodeName} (delay: ${lowestDelay}ms)`)
+        changeProxy(groupName, fastestNodeName, group.now)
+        showNotice.success(`自动测速完成，已切换至最快节点: ${fastestNodeName} (${lowestDelay}ms)`)
+      } else {
+        console.log('[BUG-034] No healthy tested node found, choosing first node as fallback...')
+        const fallbackNode = group.all[0]
+        if (fallbackNode) {
+          changeProxy(groupName, fallbackNode, group.now)
+          showNotice.info(`自动测速未完成，已默认选中节点: ${fallbackNode}`)
+        }
+      }
+    } catch (err) {
+      console.error('[BUG-034] Error during auto speed test and select:', err)
+    }
+  }, [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy])
+
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
     if (currentProfileUid) {
       enhanceProfiles()
-        .then(() => {
+        .then(async () => {
           console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`);
-          activateSelectedRef.current();
+          await activateSelectedRef.current();
+          // Trigger the auto speed-test and select fastest node chain
+          triggerAutoSelectFastestNode(currentProfileUid);
         })
         .catch((err) => {
           console.error(`[Layout] Failed to enhance profile ${currentProfileUid}:`, err);
         });
     }
-  }, [currentProfileUid]);
+  }, [currentProfileUid, triggerAutoSelectFastestNode]);
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
@@ -881,16 +942,13 @@ const Layout = () => {
 
   // Takeover actions
   const handleTakeoverModeChange = async (targetMode: 'manual' | 'system' | 'tun') => {
-    const currentMode = enable_tun_mode ? 'tun' : systemProxyIndicator ? 'system' : 'manual'
     if (targetMode === currentMode) return
 
     if (targetMode === 'manual') {
       try {
-        if (systemProxyIndicator) {
-          await toggleSystemProxy(false)
-        }
-        if (enable_tun_mode) {
-          await patchVerge({ enable_tun_mode: false })
+        await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
+        if (verge?.auto_close_connection) {
+          await closeAllConnections().catch(() => {})
         }
         showNotice.success('已切换至手动模式')
       } catch (err) {
@@ -898,26 +956,12 @@ const Layout = () => {
       }
     } else if (targetMode === 'system') {
       try {
-        if (enable_tun_mode) {
-          await patchVerge({ enable_tun_mode: false })
-        }
-        if (!systemProxyIndicator) {
-          await toggleSystemProxy(true)
-        }
+        await patchVerge({ enable_system_proxy: true, enable_tun_mode: false })
         showNotice.success('已开启系统代理')
       } catch (err) {
         showNotice.error(err)
       }
     } else if (targetMode === 'tun') {
-      if (systemProxyIndicator) {
-        try {
-          await toggleSystemProxy(false)
-        } catch (err) {
-          showNotice.error(err)
-          return
-        }
-      }
-
       if (!isTunModeAvailable) {
         try {
           showNotice.info('正在自动安装/配置虚拟网卡系统服务...')
@@ -930,7 +974,7 @@ const Layout = () => {
       }
 
       try {
-        await patchVerge({ enable_tun_mode: true })
+        await patchVerge({ enable_system_proxy: false, enable_tun_mode: true })
         showNotice.success('已开启 TUN 模式')
       } catch (err) {
         showNotice.error(err)
@@ -945,6 +989,7 @@ const Layout = () => {
       const inUse = await isPortInUse(mixedPortVal)
       if (inUse) {
         showNotice.error('settings.modals.clashPort.messages.portInUse', { port: mixedPortVal })
+        setMixedPortVal(verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801)
         return
       }
       await Promise.all([
@@ -954,6 +999,7 @@ const Layout = () => {
       showNotice.success('代理端口已保存并重载')
     } catch (err) {
       showNotice.error(err)
+      setMixedPortVal(verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801)
     }
   }
 
@@ -991,10 +1037,46 @@ const Layout = () => {
           
           <IconButton
             size="small"
+            onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
+            sx={{
+              color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
+              width: '28px',
+              height: '28px',
+              p: 0,
+              mr: 0.5,
+              borderRadius: '6px',
+              border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+              background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+              boxShadow: (theme) => verge?.enable_always_on_top 
+                ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
+                : 'none',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                background: 'rgba(255, 255, 255, 0.2) !important',
+              }
+            }}
+          >
+            <PushPinRounded
+              sx={{
+                fontSize: '20px',
+                color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
+                filter: verge?.enable_always_on_top 
+                  ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                  : 'none',
+                transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
+                transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+              }}
+            />
+          </IconButton>
+
+          <IconButton
+            size="small"
             onClick={() => setDrawerOpen(!drawerOpen)}
             sx={{
               color: drawerOpen ? 'primary.main' : 'text.primary',
-              p: 0.5,
+              width: '28px',
+              height: '28px',
+              p: 0,
               mr: 1,
               borderRadius: '6px',
               border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
@@ -1004,13 +1086,13 @@ const Layout = () => {
               }
             }}
           >
-            {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '28px' }} />}
+            {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '20px' }} />}
           </IconButton>
           
           <WindowControls ref={windowControlsRef} />
         </div>
       ) : null,
-    [decorated, drawerOpen],
+    [decorated, drawerOpen, patchVerge, verge?.enable_always_on_top],
   )
 
   if (!themeReady) {
@@ -1087,31 +1169,6 @@ const Layout = () => {
             position: 'relative',
           }}
         >
-          {/* Settings button when decorated is true */}
-          {decorated && (
-            <IconButton
-              size="small"
-              onClick={() => setDrawerOpen(!drawerOpen)}
-              sx={{
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                width: '38px',
-                height: '38px',
-                zIndex: 101,
-                borderRadius: 0,
-                color: drawerOpen ? 'primary.main' : 'text.primary',
-                border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-                background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
-                '&:hover': {
-                  background: 'rgba(255, 255, 255, 0.2) !important',
-                }
-              }}
-            >
-              {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '28px' }} />}
-            </IconButton>
-          )}
-
           {/* Upper Pane: Node Selection (80%) */}
           <div
             style={{
@@ -1123,8 +1180,83 @@ const Layout = () => {
               flexDirection: 'column',
             }}
           >
-            {/*置顶当前节点*/}
-            <ActiveNodeStatusCard />
+            {/*置顶当前节点与快捷控制栏*/}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '8px 8px 4px 8px',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <ActiveNodeStatusCard />
+              </div>
+              {decorated && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginLeft: '8px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <IconButton
+                    size="small"
+                    onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
+                    sx={{
+                      color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
+                      width: '28px',
+                      height: '28px',
+                      p: 0,
+                      borderRadius: '6px',
+                      border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+                      background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                      boxShadow: (theme) => verge?.enable_always_on_top 
+                        ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
+                        : 'none',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        background: 'rgba(255, 255, 255, 0.2) !important',
+                      }
+                    }}
+                  >
+                    <PushPinRounded
+                      sx={{
+                        fontSize: '20px',
+                        color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
+                        filter: verge?.enable_always_on_top 
+                          ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                          : 'none',
+                        transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
+                        transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                      }}
+                    />
+                  </IconButton>
+
+                  <IconButton
+                    size="small"
+                    onClick={() => setDrawerOpen(!drawerOpen)}
+                    sx={{
+                      color: drawerOpen ? 'primary.main' : 'text.primary',
+                      width: '28px',
+                      height: '28px',
+                      p: 0,
+                      borderRadius: '6px',
+                      border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
+                      background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                      '&:hover': {
+                        background: 'rgba(255, 255, 255, 0.2) !important',
+                      }
+                    }}
+                  >
+                    {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '20px' }} />}
+                  </IconButton>
+                </div>
+              )}
+            </div>
 
             {/*节点组选择列表*/}
             <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -1568,6 +1700,15 @@ const Layout = () => {
                         sx={{ transform: 'scale(0.9)', transformOrigin: 'right center' }}
                       />
                     </ListItem>
+                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography variant="caption" sx={{ fontSize: '13px' }}>窗口始终置顶</Typography>
+                      <Switch
+                        size="small"
+                        checked={verge?.enable_always_on_top ?? false}
+                        onChange={(_, checked: boolean) => patchVerge({ enable_always_on_top: checked })}
+                        sx={{ transform: 'scale(0.9)', transformOrigin: 'right center' }}
+                      />
+                    </ListItem>
                     <ListItem sx={{ py: 0.25, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography variant="caption" sx={{ fontSize: '13px' }}>Mixed Port</Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -1576,11 +1717,14 @@ const Layout = () => {
                           type="text"
                           value={mixedPortVal}
                           onChange={(e) => setMixedPortVal(e.target.value ? parseInt(e.target.value, 10) || 0 : 0)}
+                          onBlur={handleSavePort}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur()
+                            }
+                          }}
                           slotProps={{ htmlInput: { style: { paddingTop: '2px', paddingBottom: '2px', paddingLeft: '4px', paddingRight: '4px', width: '80px', fontSize: '13px', textAlign: 'center' } } }}
                         />
-                        <IconButton size="small" onClick={handleSavePort} sx={{ p: 0.2 }}>
-                          <SaveRounded sx={{ fontSize: 15 }} />
-                        </IconButton>
                       </Box>
                     </ListItem>
                     <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -125,6 +125,10 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     match builder.build() {
         Ok(window) => {
+            if let Some(always_on_top) = latest.enable_always_on_top {
+                let _ = window.set_always_on_top(always_on_top);
+            }
+
             #[cfg(not(target_os = "windows"))]
             {
                 logging_error!(Type::Window, window.set_background_color(Some(background_color)));

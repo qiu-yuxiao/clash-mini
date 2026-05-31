@@ -28,7 +28,6 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
 import { delayGroup, healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
 
-import { BaseEmpty } from '@/components/base'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
 import { useProxiesData } from '@/providers/app-data-context'
@@ -39,8 +38,8 @@ import { debugLog } from '@/utils/debug'
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
 import { ProxyChain } from './proxy-chain'
-import { ProxyRender } from './proxy-render'
 import { ProxyHead } from './proxy-head'
+import { ProxyRender } from './proxy-render'
 import type { HeadState } from './use-head-state'
 import { type IRenderItem, useRenderList } from './use-render-list'
 
@@ -812,6 +811,13 @@ function ProxyVirtualList({
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
+          scrollbarWidth: 'none !important' as any,
+          msOverflowStyle: 'none !important',
+          '&::-webkit-scrollbar': {
+            display: 'none !important',
+            width: '0 !important',
+            height: '0 !important',
+          } as any,
         }}
       >
         <div style={{ height: totalSize, position: 'relative' }}>
