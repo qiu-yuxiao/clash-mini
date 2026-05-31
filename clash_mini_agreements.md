@@ -8,9 +8,10 @@
 ### 🚨 【修改顺序铁律与避坑把关（开发前必读）】
 **任何针对本项目的功能开发、Bug 修复、UI 细节微调或系统配置变动，必须遵循「协议与避坑查阅优先」的硬性流程：**
 1. **查阅红线**：每次开发前，必须先查阅项目避坑红线文件 [clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md)，确保绝对不触犯静默运行命令等底线错误。
-2. **先改协议**：在触碰任何代码（TS/React、Rust、JSON 等）前，必须首先在《唯一协议》（本文件）的对应章节中，将相关修改的设计规范、端口分配或行为变更写入协议。
-3. **后改代码**：保存协议更新后，方可编写代码。代码的实际实现必须与更新后的协议条款保持 100% 吻合。
-4. **流程审计**：任何未在协议中备案的代码修改，或未经用户在对话中明确允许而执行的代码操作，均视为严重违规。
+2. **读取本地 Token**：如果需要查询 GitHub Actions 状态、Release 发布状态或任何 GitHub API 调用，必须首先读取工作区根目录下的 [github_token.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/github_token.txt)。禁止在代码或命令中硬编码该 Token，且必须使用该 Token 进行 Authenticated 认证请求，避免匿名访问被限流。
+3. **先改协议**：在触碰任何代码（TS/React、Rust、JSON 等）前，必须首先在《唯一协议》（本文件）的对应章节中，将相关修改的设计规范、端口分配或行为变更写入协议。
+4. **后改代码**：保存协议更新后，方可编写代码。代码的实际实现必须与更新后的协议条款保持 100% 吻合。
+5. **流程审计**：任何未在协议中备案的代码修改，或未经用户在对话中明确允许而执行的代码操作，均视为严重违规。
 
 ---
 
@@ -249,6 +250,7 @@
 *   **静默封装**：自动化发布任务中，可能导致 AntiGravity 弹窗审批 of 命令（如 git 远程推送、脚本部署），必须使用 `powershell -Command` 进行静默封装。
 
 ### 4. 发行后置收尾与环境复原规程：
+*   **便携包自动拉回测试**：监控到云端构建成功发布后，必须立即使用 `gh` 工具，将发布的 `*_x64_portable.zip` 文件自动下载并保存到工作区下的 [portable_test](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/portable_test) 目录中，用于本地最后的真机物理效果复核。
 *   **物理资源释放**：打包发行或阶段开发完成后，必须无条件清理本地的编译构建缓存（运行 `Remove-Item -Recurse -Force node_modules/.vite` 等），并终止本地开发调试拉起的后台进程（如 `clash-mini`、`tauri`），释放 Mixed 监听端口，将宿主机环境与网络端口归还系统。
 *   **工作区与文档归档**：最终审计工作区，清理临时调试产物。对 `task.md` 任务看板进行重置清零，并在 `walkthrough.md` 中记录物理效果，将历史 Bug 在清单中确认为“已解决”。
 

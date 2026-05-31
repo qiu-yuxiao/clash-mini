@@ -21,6 +21,9 @@
    - **清理缓存**：必须首先在工作区运行 `Remove-Item -Recurse -Force node_modules/.vite` 命令清除旧的前端 Vite 编译缓存，确保编译状态为最新。
    - **Dev 运行**：本地必须使用 `pnpm dev`（安全隔离模式下，TUN 和系统代理为 `false`，端口 10801/9098 隔离）拉起开发调试服务。
    - **对齐汇报**：Agent 必须在本地对所有修改的 UI 元素（如按钮 3D 样式、卡片折行自适应、组件尺寸等）及后端逻辑进行物理效果与交互核对，并在聊天窗口中向用户提供详实的真机表现文字或状态证据汇报。**获得用户在对话中明确的“确认/同意”指令后，方可进行下一步的 GitHub 编译和发行。** 以后所有的发布，都必须强制走完这个本地双重核对流程，绝对禁止绕过。
+5. **GitHub API 访问凭证准备 (GitHub Token Preparation)**：
+   - 检查并读取项目根目录下的 [github_token.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/github_token.txt)。
+   - 验证并在此后的 Actions 状态查询或 Release 操作中，必须将该 Token 附在 API 请求的 `Authorization` 头部，严禁以无 Token 状态频繁匿名请求 GitHub 接口以免造成 IP 访问受限。
 
 ### 📢 反馈警报与放行规则
 - **检测通过**：在聊天窗口向用户输出：**「环境检测与缓存清理通过，接下来的编译与验证环境已就绪。我将拉起本地 dev 服务进行第一轮物理效果验证，稍后为您汇报对齐结果，等待您的确认指令。」** 之后开始后续步骤。
@@ -68,6 +71,18 @@
     ```
     *(例如：`pnpm publish-version 1.1.5-full`，这将编译并发布所有平台如 macOS、Linux、以及 Windows WebView2 固定版等，耗时约 10-15 分钟)*
 - 该脚本会自动在本地更新三端版本号，提交更改，自动建立对应的 Git Tag，并使用 Git Push 推送 Tag 到 origin，从而在云端触发对应的构建流水线。
+
+### 4. 远程构建监控与便携包自动拉回 (CI/CD Watch & Auto-Pull)
+- 推送 Tag 后，**必须**使用本地已装的 `gh` CLI 监控编译流进度。在根目录下使用 `github_token.txt` 作为凭证调用：
+  ```powershell
+  powershell -Command "$token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; & 'C:\Program Files\GitHub CLI\gh.exe' run watch --repo qiu-yuxiao/clash-mini"
+  ```
+- **监控到发行完成后，立刻将 Windows 免安装版拉回指定测试路径**：
+  - 运行下载命令将生成的 Windows x64 便携版绿色压缩包下载并覆盖至 `portable_test` 目录：
+    ```powershell
+    powershell -Command "$token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; & 'C:\Program Files\GitHub CLI\gh.exe' release download v<版本号> --pattern '*_x64_portable.zip' --dir 'C:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\portable_test' --clobber --repo qiu-yuxiao/clash-mini"
+    ```
+  - *(注：便携包拉回后，即可在该目录下解压并由人工/AI 进行真机最后的 Bug 校验与回归测试)*
 
 ---
 
