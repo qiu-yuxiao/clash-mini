@@ -843,9 +843,12 @@ const Layout = () => {
     }
   }, [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy])
 
+  const lastEnhancedProfileRef = useRef<string | null>(null);
+
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
-    if (currentProfileUid) {
+    if (currentProfileUid && lastEnhancedProfileRef.current !== currentProfileUid) {
+      lastEnhancedProfileRef.current = currentProfileUid;
       enhanceProfiles()
         .then(async () => {
           console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`);
@@ -855,6 +858,7 @@ const Layout = () => {
         })
         .catch((err) => {
           console.error(`[Layout] Failed to enhance profile ${currentProfileUid}:`, err);
+          lastEnhancedProfileRef.current = null;
         });
     }
   }, [currentProfileUid, triggerAutoSelectFastestNode]);
