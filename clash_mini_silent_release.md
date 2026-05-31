@@ -57,11 +57,17 @@
 
 ### 3. 一键版本升级与推送
 - 运行发布脚本修改版本号、打 tag 并推送至远端仓库（GitHub）：
-  ```powershell
-  powershell -Command "pnpm publish-version <版本号>"
-  ```
-  *(例如：`pnpm publish-version 1.1.1`)*
-- 该脚本会自动在本地更新三端版本号，提交更改，自动建立 Git Tag `v<版本号>`，并使用 Git Push 推送 Tag 到 origin，从而触发云端 Actions 自动编译出绿色便携版。
+  - **极速便携版发布 (默认，仅 Windows x64 便携版)**：
+    ```powershell
+    powershell -Command "pnpm publish-version <版本号>"
+    ```
+    *(例如：`pnpm publish-version 1.1.5`，这将触发 GitHub Actions 仅编译 Windows 64位绿色便携包，耗时约 2-3 分钟)*
+  - **全平台完整发布 (指定 -full 或 -all 尾缀)**：
+    ```powershell
+    powershell -Command "pnpm publish-version <版本号>-full"
+    ```
+    *(例如：`pnpm publish-version 1.1.5-full`，这将编译并发布所有平台如 macOS、Linux、以及 Windows WebView2 固定版等，耗时约 10-15 分钟)*
+- 该脚本会自动在本地更新三端版本号，提交更改，自动建立对应的 Git Tag，并使用 Git Push 推送 Tag 到 origin，从而在云端触发对应的构建流水线。
 
 ---
 

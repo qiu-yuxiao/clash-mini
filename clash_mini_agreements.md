@@ -238,7 +238,10 @@
 *   **构建输出检查**：打包脚本（`pnpm portable`）必须在前序编译进程完全退出且 Exit Code 为 0 后启动。
 
 ### 2. CI/CD 与 API 限制规避流程：
-*   **Draft Release 404 规避**：查询 Release 必须使用 `listReleases` 接口拉取 Release 列表并匹配 `tag_name`，禁止根据 Tag 直接查询 Draft 状态的发布版。
+*   **默认极速发行与全平台指定发行**：
+    *   **默认极速发布**：推送以 `v*.*.*` 格式命名的标准 Tag 时，GitHub Actions 云端只编译并发布 Windows x64 便携版（绿色版），以极速缩短发包耗时（约 2-3 分钟），适用于日常 Bug 快速验证与修复迭代。
+    *   **全平台指定发布**：若需要完整发行全平台（Windows 各版本及安装包、macOS、Linux 各包），必须推送以 `v*.*.*-full` 或 `v*.*.*-all` 格式命名的 Tag，云端将激活全编译矩阵。
+*   **Draft Release 404 规避**：查询 Release 必须使用 `listReleases` 接口拉取 Release 列表并匹配 `tag_name`，禁止根据 Tag 直接查询 Draft 状态 of 发布版。
 *   **Linux 构建兼容**：Actions 中 Linux 平台编译必须强制禁用 `includeUpdaterJson`，防止签名缺失报错。
 
 ### 3. 安全隔离与凭证保管规程：
