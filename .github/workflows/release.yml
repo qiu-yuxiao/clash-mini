@@ -254,11 +254,11 @@ jobs:
           args: --target ${{ matrix.target }}
           includeUpdaterJson: ${{ matrix.os != 'ubuntu-22.04' }}
 
-      - name: Attest Windows bundles
-        if: matrix.os == 'windows-latest'
-        uses: actions/attest-build-provenance@v4
-        with:
-          subject-path: target/${{ matrix.target }}/release/bundle/nsis/*setup*
+#      - name: Attest Windows bundles
+#        if: matrix.os == 'windows-latest'
+#        uses: actions/attest-build-provenance@v4
+#        with:
+#          subject-path: target/${{ matrix.target }}/release/bundle/nsis/*setup*
 
       - name: Portable Bundle
         if: matrix.os == 'windows-latest'
@@ -266,19 +266,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Attest macOS bundles
-        if: matrix.os == 'macos-latest'
-        uses: actions/attest-build-provenance@v4
-        with:
-          subject-path: target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+#      - name: Attest macOS bundles
+#        if: matrix.os == 'macos-latest'
+#        uses: actions/attest-build-provenance@v4
+#        with:
+#          subject-path: target/${{ matrix.target }}/release/bundle/dmg/*.dmg
 
-      - name: Attest Linux bundles
-        if: matrix.os == 'ubuntu-22.04'
-        uses: actions/attest-build-provenance@v4
-        with:
-          subject-path: |
-            target/${{ matrix.target }}/release/bundle/deb/*.deb
-            target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+#      - name: Attest Linux bundles
+#        if: matrix.os == 'ubuntu-22.04'
+#        uses: actions/attest-build-provenance@v4
+#        with:
+#          subject-path: |
+#            target/${{ matrix.target }}/release/bundle/deb/*.deb
+#            target/${{ matrix.target }}/release/bundle/rpm/*.rpm
 
   release-for-linux-arm:
     name: Release Build for Linux ARM
@@ -408,12 +408,12 @@ jobs:
           echo "VERSION=$(cat package.json | jq '.version' | tr -d '"')" >> $GITHUB_ENV
           echo "BUILDTIME=$(TZ=Asia/Shanghai date)" >> $GITHUB_ENV
 
-      - name: Attest Linux bundles
-        uses: actions/attest-build-provenance@v4
-        with:
-          subject-path: |
-            target/${{ matrix.target }}/release/bundle/deb/*.deb
-            target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+#      - name: Attest Linux bundles
+#        uses: actions/attest-build-provenance@v4
+#        with:
+#          subject-path: |
+#            target/${{ matrix.target }}/release/bundle/deb/*.deb
+#            target/${{ matrix.target }}/release/bundle/rpm/*.rpm
 
       - name: Upload Release
         uses: softprops/action-gh-release@v3
@@ -528,10 +528,10 @@ jobs:
             Rename-Item $file.FullName $newName
           }
 
-      - name: Attest Windows bundles
-        uses: actions/attest-build-provenance@v4
-        with:
-          subject-path: target/${{ matrix.target }}/release/bundle/nsis/*setup*
+#      - name: Attest Windows bundles
+#        uses: actions/attest-build-provenance@v4
+#        with:
+#          subject-path: target/${{ matrix.target }}/release/bundle/nsis/*setup*
 
       - name: Upload Release
         uses: softprops/action-gh-release@v3
