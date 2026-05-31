@@ -23,9 +23,7 @@ export const Switch = styled((props: SwitchProps) => (
         color: '#fff',
         '& + .MuiSwitch-track': {
           background: isLight ? '#bdbdbd' : '#39393d',
-          opacity: 1,
-          border: 0,
-          boxShadow: 'none',
+          opacity: 0.85,
         },
         '&.Mui-disabled + .MuiSwitch-track': {
           opacity: 0.5,
@@ -35,10 +33,7 @@ export const Switch = styled((props: SwitchProps) => (
         border: '6px solid #fff',
       },
       '&.Mui-disabled .MuiSwitch-thumb': {
-        color:
-          isLight
-            ? theme.palette.grey[100]
-            : theme.palette.grey[600],
+        color: isLight ? theme.palette.grey[100] : theme.palette.grey[600],
       },
       '&.Mui-disabled + .MuiSwitch-track': {
         opacity: isLight ? 0.7 : 0.3,
@@ -56,12 +51,13 @@ export const Switch = styled((props: SwitchProps) => (
         ? `0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.12),
            inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.8),
            inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.08),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))`
+           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
         : `0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
            inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
            inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
-      transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
+           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
+      transition:
+        'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
     },
     '& .MuiSwitch-track': {
       borderRadius: 7,
@@ -82,11 +78,11 @@ export const Switch = styled((props: SwitchProps) => (
         ? `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.16),
            inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.9),
            inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
-           0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)))`
+           0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
         : `0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
            inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.35),
            inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
-           0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)))`,
+           0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`,
     },
   }
 })

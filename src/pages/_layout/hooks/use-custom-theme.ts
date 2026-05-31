@@ -236,18 +236,21 @@ export const useCustomTheme = () => {
                       borderColor: theme.palette.primary.main,
                     },
                   },
-                  '&:hover:not(.Mui-focused) .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isLight ? 'rgba(0, 0, 0, 0.23)' : 'rgba(255, 255, 255, 0.23)',
-                  },
+                  '&:hover:not(.Mui-focused) .MuiOutlinedInput-notchedOutline':
+                    {
+                      borderColor: isLight
+                        ? 'rgba(0, 0, 0, 0.23)'
+                        : 'rgba(255, 255, 255, 0.23)',
+                    },
                 }
               },
               input: {
                 padding: '8px 12px',
                 fontSize: '13px',
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       })
     } catch (e) {
       console.error('Error creating MUI theme, falling back to defaults:', e)
@@ -305,18 +308,21 @@ export const useCustomTheme = () => {
                       borderColor: theme.palette.primary.main,
                     },
                   },
-                  '&:hover:not(.Mui-focused) .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isLight ? 'rgba(0, 0, 0, 0.23)' : 'rgba(255, 255, 255, 0.23)',
-                  },
+                  '&:hover:not(.Mui-focused) .MuiOutlinedInput-notchedOutline':
+                    {
+                      borderColor: isLight
+                        ? 'rgba(0, 0, 0, 0.23)'
+                        : 'rgba(255, 255, 255, 0.23)',
+                    },
                 }
               },
               input: {
                 padding: '8px 12px',
                 fontSize: '13px',
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       })
     }
 
@@ -375,76 +381,67 @@ export const useCustomTheme = () => {
           ? String(setting.background_opacity)
           : '1',
       )
-      
+
       // Theme Glass/Flat Variables (Flattened: Opaque, solid, no gloss/glass/skeuomorphism effects)
       rootEle.style.setProperty(
         '--theme-bg',
-        mode === 'light' ? '#f0f5ff' : '#0f1423'
+        mode === 'light' ? '#f0f5ff' : '#0f1423',
       )
       rootEle.style.setProperty(
         '--theme-panel-bg',
-        mode === 'light' ? '#ffffff' : '#1e2438'
+        mode === 'light' ? '#ffffff' : '#1e2438',
       )
       rootEle.style.setProperty(
         '--theme-bg-base-rgb',
-        mode === 'light' ? '240, 245, 255' : '15, 20, 35'
+        mode === 'light' ? '240, 245, 255' : '15, 20, 35',
       )
       rootEle.style.setProperty(
         '--theme-panel-base-rgb',
-        mode === 'light' ? '255, 255, 255' : '30, 36, 56'
+        mode === 'light' ? '255, 255, 255' : '30, 36, 56',
       )
       rootEle.style.setProperty(
         '--theme-popover-bg',
-        mode === 'light' ? '#ffffff' : '#1e1e23'
+        mode === 'light' ? '#ffffff' : '#1e1e23',
       )
       rootEle.style.setProperty(
         '--theme-border',
-        mode === 'light' ? '#d0d7de' : '#30363d'
+        mode === 'light' ? '#d0d7de' : '#30363d',
       )
       rootEle.style.setProperty(
         '--theme-input-bg',
-        mode === 'light' ? '#ffffff' : '#121824'
+        mode === 'light' ? '#ffffff' : '#121824',
       )
       rootEle.style.setProperty(
         '--theme-input-border',
-        mode === 'light' ? '#d0d7de' : '#30363d'
+        mode === 'light' ? '#d0d7de' : '#30363d',
       )
       rootEle.style.setProperty(
         '--theme-border-outer',
-        mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.35)'
+        mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.35)',
       )
       rootEle.style.setProperty(
         '--theme-box-shadow',
         mode === 'light'
           ? '0 8px 32px 0 rgba(0, 0, 0, 0.08)'
-          : '0 8px 32px 0 rgba(0, 0, 0, 0.35)'
+          : '0 8px 32px 0 rgba(0, 0, 0, 0.35)',
       )
       rootEle.style.setProperty(
         '--theme-box-shadow-subtle',
         mode === 'light'
           ? '0 4px 16px 0 rgba(0, 0, 0, 0.05)'
-          : '0 4px 16px 0 rgba(0, 0, 0, 0.22)'
+          : '0 4px 16px 0 rgba(0, 0, 0, 0.22)',
       )
       rootEle.style.setProperty(
         '--theme-btn-bg',
-        mode === 'light' ? '#f5f5f5' : '#2d3345'
+        mode === 'light' ? '#f5f5f5' : '#2d3345',
       )
       rootEle.style.setProperty(
         '--theme-btn-hover-bg',
-        mode === 'light' ? '#e8e8e8' : '#383e52'
+        mode === 'light' ? '#e8e8e8' : '#383e52',
       )
-      rootEle.style.setProperty(
-        '--theme-btn-shadow',
-        'none'
-      )
-      rootEle.style.setProperty(
-        '--theme-btn-hover-shadow',
-        'none'
-      )
-      rootEle.style.setProperty(
-        '--theme-btn-active-shadow',
-        'none'
-      )
+      rootEle.style.setProperty('--theme-btn-shadow', 'none')
+      rootEle.style.setProperty('--theme-btn-hover-shadow', 'none')
+      rootEle.style.setProperty('--theme-btn-active-shadow', 'none')
       rootEle.setAttribute('data-css-injection-root', 'true')
     }
 

@@ -90,7 +90,9 @@ export const ProxyGroups = (props: Props) => {
     return []
   })
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
-  const [testingGroups, setTestingGroups] = useState<Record<string, boolean>>({})
+  const [testingGroups, setTestingGroups] = useState<Record<string, boolean>>(
+    {},
+  )
 
   useEffect(() => {
     if (proxyChain.length > 0) {
@@ -520,7 +522,15 @@ export const ProxyGroups = (props: Props) => {
     return (
       <>
         <Box sx={{ display: 'flex', height: '100%', gap: 2 }}>
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              position: 'relative',
+            }}
+          >
             {showRuleHeader && (
               <ChainRuleHeader
                 title={t('proxies.page.rules.title')}
@@ -531,7 +541,9 @@ export const ProxyGroups = (props: Props) => {
               />
             )}
 
-            <Box sx={{ flex: 1, minHeight: 0, position: 'relative', mx: 1, mb: 1 }}>
+            <Box
+              sx={{ flex: 1, minHeight: 0, position: 'relative', mx: 1, mb: 1 }}
+            >
               {renderProxyList('100%')}
             </Box>
             <ScrollTopButton show={showScrollTop} onClick={scrollToTop} />
@@ -576,7 +588,14 @@ export const ProxyGroups = (props: Props) => {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        position: 'relative',
+      }}
+    >
       <Box sx={{ flex: 1, minHeight: 0, position: 'relative', mx: 1, mb: 1 }}>
         {renderProxyList('100%')}
       </Box>
@@ -795,7 +814,11 @@ function ProxyVirtualList({
     >
       {headItem && (
         <ProxyHead
-          sx={{ px: 2, py: 0.5, borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}
+          sx={{
+            px: 2,
+            py: 0.5,
+            borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+          }}
           url={headItem.group.testUrl}
           groupName={headItem.group.name}
           headState={headItem.headState!}
@@ -828,7 +851,9 @@ function ProxyVirtualList({
               ref={measureElement}
               style={{
                 position:
-                  virtualItem.index === activeStickyIndex ? 'sticky' : 'absolute',
+                  virtualItem.index === activeStickyIndex
+                    ? 'sticky'
+                    : 'absolute',
                 top: 0,
                 left: 0,
                 zIndex: virtualItem.index === activeStickyIndex ? 5 : undefined,
@@ -855,7 +880,9 @@ function ProxyVirtualList({
                 onHeadState={onHeadState}
                 onChangeProxy={onChangeProxy}
                 isChainMode={isChainMode}
-                isTesting={testingGroups[renderList[virtualItem.index].group?.name]}
+                isTesting={
+                  testingGroups[renderList[virtualItem.index].group?.name]
+                }
               />
             </div>
           ))}

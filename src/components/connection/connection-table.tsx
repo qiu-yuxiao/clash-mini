@@ -17,13 +17,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import {
-  memo,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { closeConnection } from 'tauri-plugin-mihomo-api'
 
 import { showNotice } from '@/services/notice-service'
@@ -131,7 +125,8 @@ const RowComponent = memo(
     onContextMenu,
   }: RowComponentProps) {
     const handleClick = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => onShowDetail(row.original, e.currentTarget),
+      (e: React.MouseEvent<HTMLDivElement>) =>
+        onShowDetail(row.original, e.currentTarget),
       [onShowDetail, row.original],
     )
 
@@ -152,9 +147,11 @@ const RowComponent = memo(
             backgroundColor:
               row.index % 2 === 0
                 ? (theme) => theme.palette.background.paper
-                : (theme) => theme.palette.mode === 'light' ? '#eef4ff' : '#232b3f',
+                : (theme) =>
+                    theme.palette.mode === 'light' ? '#eef4ff' : '#232b3f',
             '&:hover': {
-              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+              backgroundColor: (theme) =>
+                alpha(theme.palette.primary.main, 0.08),
             },
           },
         ]}
@@ -173,7 +170,8 @@ const RowComponent = memo(
                   minWidth: 0,
                   width: isChains ? '50px' : 'auto',
                   justifyContent: isChains ? 'center' : 'flex-start',
-                  borderRight: (theme) => !isChains ? `2px solid ${theme.palette.divider}` : 'none',
+                  borderRight: (theme) =>
+                    !isChains ? `2px solid ${theme.palette.divider}` : 'none',
                 },
               ]}
             >
@@ -200,14 +198,12 @@ interface Props {
 }
 
 export const ConnectionTable = (props: Props) => {
-  const {
-    connections,
-    onShowDetail: rawOnShowDetail,
-  } = props
+  const { connections, onShowDetail: rawOnShowDetail } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
   const onShowDetail = useCallback(
-    (data: IConnectionsItem, el?: HTMLElement) => onShowDetailRef.current(data, el),
+    (data: IConnectionsItem, el?: HTMLElement) =>
+      onShowDetailRef.current(data, el),
     [],
   )
 
@@ -218,15 +214,18 @@ export const ConnectionTable = (props: Props) => {
     anchorEl: HTMLElement
   } | null>(null)
 
-  const handleContextMenu = useCallback((event: React.MouseEvent, row: IConnectionsItem) => {
-    event.preventDefault()
-    setContextMenu({
-      mouseX: event.clientX + 2,
-      mouseY: event.clientY - 6,
-      row,
-      anchorEl: event.currentTarget as HTMLElement,
-    })
-  }, [])
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent, row: IConnectionsItem) => {
+      event.preventDefault()
+      setContextMenu({
+        mouseX: event.clientX + 2,
+        mouseY: event.clientY - 6,
+        row,
+        anchorEl: event.currentTarget as HTMLElement,
+      })
+    },
+    [],
+  )
 
   const handleCloseContextMenu = useCallback(() => {
     setContextMenu(null)
@@ -294,11 +293,7 @@ export const ConnectionTable = (props: Props) => {
     const address = (port ? `${host}:${port}` : host) || ''
     try {
       await navigator.clipboard.writeText(address)
-      showNotice.success(
-        'connections.copied',
-        `已复制: ${address}`,
-        2000
-      )
+      showNotice.success('connections.copied', `已复制: ${address}`, 2000)
     } catch (err) {
       console.error('Failed to copy connection address:', err)
     }
@@ -392,7 +387,10 @@ export const ConnectionTable = (props: Props) => {
                             flex: isChains ? '0 0 50px' : '1 1 0%',
                             minWidth: 0,
                             width: isChains ? '50px' : 'auto',
-                            borderRight: (theme) => !isChains ? `2px solid ${theme.palette.divider}` : 'none',
+                            borderRight: (theme) =>
+                              !isChains
+                                ? `2px solid ${theme.palette.divider}`
+                                : 'none',
                           },
                         ]}
                       >
@@ -406,7 +404,9 @@ export const ConnectionTable = (props: Props) => {
                           sx={[
                             SX_CELL_CONTENT,
                             {
-                              justifyContent: isChains ? 'center' : 'flex-start',
+                              justifyContent: isChains
+                                ? 'center'
+                                : 'flex-start',
                               cursor: header.column.getCanSort()
                                 ? 'pointer'
                                 : 'default',
@@ -473,31 +473,49 @@ export const ConnectionTable = (props: Props) => {
               boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.25)',
               minWidth: 200,
               py: 0.5,
-            }
-          }
+            },
+          },
         }}
       >
-        <MenuItem onClick={handleDirect} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+        <MenuItem
+          onClick={handleDirect}
+          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+        >
           <FlashOnRounded sx={{ fontSize: 18, color: 'success.main' }} />
           设为全局直连
         </MenuItem>
-        <MenuItem onClick={handleProxy} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+        <MenuItem
+          onClick={handleProxy}
+          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+        >
           <PublicRounded sx={{ fontSize: 18, color: 'primary.main' }} />
           设为代理分流
         </MenuItem>
-        <MenuItem onClick={handleReject} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+        <MenuItem
+          onClick={handleReject}
+          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+        >
           <BlockRounded sx={{ fontSize: 18, color: 'error.main' }} />
           封锁它 (REJECT)
         </MenuItem>
-        <MenuItem onClick={handleDisconnect} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+        <MenuItem
+          onClick={handleDisconnect}
+          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+        >
           <LinkOffRounded sx={{ fontSize: 18, color: 'error.main' }} />
           断开此连接
         </MenuItem>
-        <MenuItem onClick={handleCopy} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+        <MenuItem
+          onClick={handleCopy}
+          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+        >
           <ContentCopyRounded sx={{ fontSize: 18, color: 'text.secondary' }} />
           复制连接地址
         </MenuItem>
-        <MenuItem onClick={handleDetail} sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}>
+        <MenuItem
+          onClick={handleDetail}
+          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+        >
           <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary' }} />
           查看详细信息
         </MenuItem>

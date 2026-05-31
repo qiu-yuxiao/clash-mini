@@ -33,15 +33,17 @@ export async function enhanceProfiles() {
 
           // 2. 提取所有的 proxy-providers 名字
           const providers = doc['proxy-providers'] || {}
-          const providerNames = (providers && typeof providers === 'object')
-            ? Object.keys(providers)
-            : []
+          const providerNames =
+            providers && typeof providers === 'object'
+              ? Object.keys(providers)
+              : []
 
           // 3. 判断是否需要执行过滤 (组数大于 1，或者唯一组的名字不为 PROXY，或者规则非空)
           const groups = doc['proxy-groups'] || []
-          const hasMultipleGroups = Array.isArray(groups) && (
-            groups.length > 1 || (groups.length === 1 && groups[0].name !== 'PROXY')
-          )
+          const hasMultipleGroups =
+            Array.isArray(groups) &&
+            (groups.length > 1 ||
+              (groups.length === 1 && groups[0].name !== 'PROXY'))
           const hasRules = Array.isArray(doc.rules) && doc.rules.length > 0
 
           if (hasMultipleGroups || hasRules) {
@@ -62,16 +64,18 @@ export async function enhanceProfiles() {
 
             // 只保留唯一的 PROXY 组
             doc['proxy-groups'] = [newGroup]
-            
+
             // 摒弃并清空机场订阅自带的规则列表，完全托管给 Clash Mini 自身的智能路由
             doc.rules = []
-            
+
             modified = true
           }
 
           if (modified) {
             await saveProfileFile(activeUid, yaml.dump(doc))
-            debugLog(`[ProfileTransformer] Successfully cleaned up profile ${activeUid} to single PROXY group and empty rules`)
+            debugLog(
+              `[ProfileTransformer] Successfully cleaned up profile ${activeUid} to single PROXY group and empty rules`,
+            )
           }
         }
       }
@@ -641,7 +645,6 @@ export const isPortInUse = async (port: number) => {
     return false
   }
 }
-
 
 export async function getProxyAddr(name: string, provider?: string) {
   return invoke<[string, number] | null>('get_proxy_addr', { name, provider })

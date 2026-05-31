@@ -54,12 +54,13 @@ export function ConnectionDetail({ ref }: { ref?: Ref<ConnectionDetailRef> }) {
             background: (theme: any) => theme.palette.background.paper,
             border: '1px solid',
             borderColor: (theme: any) => alpha(theme.palette.divider, 0.5),
-            boxShadow: (theme: any) => `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,
+            boxShadow: (theme: any) =>
+              `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,
             borderRadius: 2,
             p: 2.5,
             color: (theme: any) => theme.palette.text.primary,
-          }
-        }
+          },
+        },
       }}
     >
       {detail ? (
@@ -144,10 +145,21 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const onDelete = useLockFn(async () => closeConnection(data.id))
 
   return (
-    <Box sx={{ userSelect: 'text', color: theme.palette.text.secondary, fontSize: '12px', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+    <Box
+      sx={{
+        userSelect: 'text',
+        color: theme.palette.text.secondary,
+        fontSize: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.75,
+      }}
+    >
       {information.map((each) => (
         <Box key={each.label} sx={{ display: 'flex', gap: 1 }}>
-          <b style={{ minWidth: 100, display: 'inline-block' }}>{each.label}:</b>
+          <b style={{ minWidth: 100, display: 'inline-block' }}>
+            {each.label}:
+          </b>
           <span
             style={{
               wordBreak: 'break-all',

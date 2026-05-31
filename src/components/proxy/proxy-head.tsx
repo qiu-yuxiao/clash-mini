@@ -9,13 +9,22 @@ import {
   VisibilityOffOutlined,
   FilterListOutlined,
 } from '@mui/icons-material'
-import { Box, IconButton, TextField, SxProps, Theme, keyframes } from '@mui/material'
+import {
+  Box,
+  IconButton,
+  TextField,
+  SxProps,
+  Theme,
+  keyframes,
+  useTheme,
+} from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
 import delayManager from '@/services/delay'
+import { get3DInputStyle } from '@/utils/button-styles'
 import { debugLog } from '@/utils/debug'
 
 import type { ProxySortType } from './use-filter-sort'
@@ -63,6 +72,7 @@ export const ProxyHead = ({
   onLocation,
   onCheckDelay,
 }: Props) => {
+  const theme = useTheme()
   const {
     showType,
     sortType,
@@ -93,7 +103,17 @@ export const ProxyHead = ({
   }, [groupName, testUrl, defaultLatencyUrl, url])
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, borderBottom: (theme) => `1px solid ${theme.palette.divider}`, pb: 0.5, mb: 0.5, ...sx }}>
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+        pb: 0.5,
+        mb: 0.5,
+        ...sx,
+      }}
+    >
       <IconButton
         size="small"
         color="inherit"
@@ -121,7 +141,9 @@ export const ProxyHead = ({
         <BoltOutlined
           sx={{
             fontSize: 17,
-            animation: isTesting ? `${pulseGlow} 1.2s infinite ease-in-out` : 'none',
+            animation: isTesting
+              ? `${pulseGlow} 1.2s infinite ease-in-out`
+              : 'none',
             color: isTesting ? '#ffc107' : 'inherit',
           }}
         />
@@ -142,7 +164,9 @@ export const ProxyHead = ({
         }
         sx={{ width: 26, height: 26, p: 0 }}
       >
-        {sortType !== 1 && sortType !== 2 && <SortOutlined sx={{ fontSize: 17 }} />}
+        {sortType !== 1 && sortType !== 2 && (
+          <SortOutlined sx={{ fontSize: 17 }} />
+        )}
         {sortType === 1 && <AccessTimeOutlined sx={{ fontSize: 17 }} />}
         {sortType === 2 && <SortByAlphaOutlined sx={{ fontSize: 17 }} />}
       </IconButton>
@@ -156,7 +180,9 @@ export const ProxyHead = ({
         }
         sx={{ width: 26, height: 26, p: 0 }}
       >
-        <LinkOutlined sx={{ fontSize: 17, opacity: textState === 'url' ? 1 : 0.6 }} />
+        <LinkOutlined
+          sx={{ fontSize: 17, opacity: textState === 'url' ? 1 : 0.6 }}
+        />
       </IconButton>
 
       <IconButton
@@ -170,7 +196,11 @@ export const ProxyHead = ({
         onClick={() => onHeadState({ showType: !showType })}
         sx={{ width: 26, height: 26, p: 0 }}
       >
-        {showType ? <VisibilityOutlined sx={{ fontSize: 17 }} /> : <VisibilityOffOutlined sx={{ fontSize: 17 }} />}
+        {showType ? (
+          <VisibilityOutlined sx={{ fontSize: 17 }} />
+        ) : (
+          <VisibilityOffOutlined sx={{ fontSize: 17 }} />
+        )}
       </IconButton>
 
       <IconButton
@@ -182,11 +212,20 @@ export const ProxyHead = ({
         }
         sx={{ width: 26, height: 26, p: 0 }}
       >
-        <FilterListOutlined sx={{ fontSize: 17, opacity: textState === 'filter' ? 1 : 0.6 }} />
+        <FilterListOutlined
+          sx={{ fontSize: 17, opacity: textState === 'filter' ? 1 : 0.6 }}
+        />
       </IconButton>
 
       {textState === 'filter' && (
-        <Box sx={{ ml: 0.5, flex: '1 1 auto', height: 24, '& input': { py: 0.3, px: 0.5, fontSize: 11 } }}>
+        <Box
+          sx={{
+            ml: 0.5,
+            flex: '1 1 auto',
+            height: 24,
+            '& input': { py: 0.3, px: 0.5, fontSize: 11 },
+          }}
+        >
           <BaseSearchBox
             autoFocus={autoFocus}
             value={filterText}
@@ -217,7 +256,12 @@ export const ProxyHead = ({
           variant="outlined"
           placeholder={t('proxies.page.placeholders.delayCheckUrl')}
           onChange={(e) => onHeadState({ testUrl: e.target.value })}
-          sx={{ ml: 0.5, flex: '1 1 auto', '& input': { py: 0.3, px: 0.5, fontSize: 11, height: 20 } }}
+          sx={{
+            ml: 0.5,
+            flex: '1 1 auto',
+            '& input': { py: 0.3, px: 0.5, fontSize: 11, height: 20 },
+            ...get3DInputStyle(theme),
+          }}
         />
       )}
     </Box>

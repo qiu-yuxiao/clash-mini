@@ -88,29 +88,31 @@ const STALE_DATA_THRESHOLD = 2500 // ms without fresh data => drop FPS
  */
 const getAlphaColor = (color: string, alpha: number): string => {
   if (!color) return 'rgba(0, 0, 0, 0)'
-  
+
   const trimmed = color.trim().toLowerCase()
-  
+
   if (trimmed.startsWith('#')) {
     const hexAlpha = Math.round(alpha * 255)
       .toString(16)
       .padStart(2, '0')
-    
+
     if (trimmed.length === 4) {
       const r = trimmed[1]
       const g = trimmed[2]
       const b = trimmed[3]
       return `#${r}${r}${g}${g}${b}${b}${hexAlpha}`
     }
-    
+
     if (trimmed.length === 9) {
       return `${trimmed.slice(0, 7)}${hexAlpha}`
     }
-    
+
     return `${trimmed.slice(0, 7)}${hexAlpha}`
   }
-  
-  const rgbMatch = trimmed.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/)
+
+  const rgbMatch = trimmed.match(
+    /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)$/,
+  )
   if (rgbMatch) {
     const r = rgbMatch[1]
     const g = rgbMatch[2]
@@ -118,14 +120,16 @@ const getAlphaColor = (color: string, alpha: number): string => {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`
   }
 
-  const hslMatch = trimmed.match(/^hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*([\d.]+))?\)$/)
+  const hslMatch = trimmed.match(
+    /^hsla?\((\d+),\s*([\d.]+)%,\s*([\d.]+)%(?:,\s*([\d.]+))?\)$/,
+  )
   if (hslMatch) {
     const h = hslMatch[1]
     const s = hslMatch[2]
     const l = hslMatch[3]
     return `hsla(${h}, ${s}%, ${l}%, ${alpha})`
   }
-  
+
   return trimmed
 }
 

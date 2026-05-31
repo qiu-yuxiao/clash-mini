@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 import matchCaseIcon from '@/assets/image/component/match_case.svg?react'
 import matchWholeWordIcon from '@/assets/image/component/match_whole_word.svg?react'
 import UseRegularExpressionIcon from '@/assets/image/component/use_regular_expression.svg?react'
+import { get3DInputStyle } from '@/utils/button-styles'
 import { buildRegex, compileStringMatcher } from '@/utils/search-matcher'
 
 export type SearchState = {
@@ -38,6 +39,7 @@ type SearchProps = {
 }
 
 const StyledTextField = styled(TextField)(({ theme }) => ({
+  ...get3DInputStyle(theme),
   '& .MuiInputBase-root': {
     background: theme.palette.mode === 'light' ? '#fff' : undefined,
     paddingRight: '4px',

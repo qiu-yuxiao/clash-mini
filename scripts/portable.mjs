@@ -22,9 +22,7 @@ const arch = target ? ARCH_MAP[target] : PROCESS_MAP[process.arch]
 async function resolvePortable() {
   if (process.platform !== 'win32') return
 
-  const releaseDir = target
-    ? `./target/${target}/release`
-    : `./target/release`
+  const releaseDir = target ? `./target/${target}/release` : `./target/release`
   const configDir = path.join(releaseDir, '.config')
 
   if (!fs.existsSync(releaseDir)) {
@@ -39,7 +37,7 @@ async function resolvePortable() {
   // 清理可能遗留的本地私有配置数据，防止敏感信息泄漏
   const privateDirs = [
     'io.github.clash-mini.clash-mini',
-    'io.github.clash-mini.clash-mini.dev'
+    'io.github.clash-mini.clash-mini.dev',
   ]
   for (const dirName of privateDirs) {
     const dirPath = path.join(configDir, dirName)

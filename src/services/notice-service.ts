@@ -290,7 +290,8 @@ const baseShowNotice = (
   ...extras: NoticeExtra[]
 ): number => {
   if (typeof window !== 'undefined') {
-    const notificationsEnabled = localStorage.getItem('clash-verge-enable-notification') !== 'false'
+    const notificationsEnabled =
+      localStorage.getItem('clash-verge-enable-notification') !== 'false'
     if (!notificationsEnabled) {
       return -1
     }

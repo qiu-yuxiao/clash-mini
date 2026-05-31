@@ -1055,7 +1055,7 @@ function ensureBackup(localePath) {
     } catch (error) {
       throw new Error(
         `Failed to recycle existing backup for ${path.basename(localePath)}: ${error.message}`,
-        { cause: error }
+        { cause: error },
       )
     }
   }

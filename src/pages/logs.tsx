@@ -7,7 +7,6 @@ import { Box, Button, IconButton, MenuItem } from '@mui/material'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-
 import {
   BaseEmpty,
   BasePage,

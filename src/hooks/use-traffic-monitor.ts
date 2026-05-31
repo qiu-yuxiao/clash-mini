@@ -189,7 +189,9 @@ class TrafficWorkerClient {
       },
     }
 
-    debugLog('[TrafficWorkerClient] Hardcoding inline sampler to ensure 100% stability')
+    debugLog(
+      '[TrafficWorkerClient] Hardcoding inline sampler to ensure 100% stability',
+    )
     this.startInline(initMessage)
   }
 

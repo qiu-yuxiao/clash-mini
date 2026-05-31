@@ -79,14 +79,25 @@ export const ProxyRender = (props: RenderProps) => {
         sx={{
           py: 0,
           pl: 0,
-          ...(idx < (col || 3) - 1 ? {
-            borderRight: '5px double var(--theme-border)',
-          } : {})
+          ...(idx < (col || 3) - 1
+            ? {
+                borderRight: '5px double var(--theme-border)',
+              }
+            : {}),
         }}
         onClick={() => onChangeProxy(group, proxyItem!)}
       />
     ))
-  }, [type, proxyCol, item.key, group, showType, onChangeProxy, item.indexInGroup, col])
+  }, [
+    type,
+    proxyCol,
+    item.key,
+    group,
+    showType,
+    onChangeProxy,
+    item.indexInGroup,
+    col,
+  ])
 
   if (type === 0) {
     return (

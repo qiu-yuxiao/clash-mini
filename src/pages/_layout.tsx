@@ -34,7 +34,10 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
-import { healthcheckProxyProvider, closeAllConnections } from 'tauri-plugin-mihomo-api'
+import {
+  healthcheckProxyProvider,
+  closeAllConnections,
+} from 'tauri-plugin-mihomo-api'
 
 import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
@@ -47,25 +50,19 @@ import { useClashInfo } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
 import { useProfiles } from '@/hooks/use-profiles'
-import { useVerge } from '@/hooks/use-verge'
-import { useWindowDecorations } from '@/hooks/use-window'
-import { useThemeMode } from '@/services/states'
-import getSystem from '@/utils/get-system'
-import { get3DButtonStyle } from '@/utils/button-styles'
-
-import {
-  useCustomTheme,
-  useLayoutEvents,
-  useLoadingOverlay,
-} from './_layout/hooks'
-import { handleNoticeMessage } from './_layout/utils'
-
-import { useProxiesData, useClashConfigData, useAppRefreshers } from '@/providers/app-data-context'
+import { useProxySelection } from '@/hooks/use-proxy-selection'
+import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useSystemState } from '@/hooks/use-system-state'
-import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useTrafficData } from '@/hooks/use-traffic-data'
-import { useProxySelection } from '@/hooks/use-proxy-selection'
+import { useVerge } from '@/hooks/use-verge'
+import { useVisibility } from '@/hooks/use-visibility'
+import { useWindowDecorations } from '@/hooks/use-window'
+import {
+  useProxiesData,
+  useClashConfigData,
+  useAppRefreshers,
+} from '@/providers/app-data-context'
 import {
   importProfile,
   updateProfile,
@@ -76,10 +73,18 @@ import {
   getProxyAddr,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
-import parseTraffic from '@/utils/parse-traffic'
-import { useVisibility } from '@/hooks/use-visibility'
 import { showNotice } from '@/services/notice-service'
+import { useThemeMode } from '@/services/states'
+import { get3DButtonStyle, get3DInputStyle } from '@/utils/button-styles'
+import getSystem from '@/utils/get-system'
+import parseTraffic from '@/utils/parse-traffic'
 
+import {
+  useCustomTheme,
+  useLayoutEvents,
+  useLoadingOverlay,
+} from './_layout/hooks'
+import { handleNoticeMessage } from './_layout/utils'
 import LogsPage from './logs'
 
 import 'dayjs/locale/ru'
@@ -93,26 +98,40 @@ export const portableFlag = false
 
 // Delay Helpers
 function getSignalIcon(delay: number) {
-  if (delay === -2) return { icon: <SignalNone />, text: '测试中', color: 'text.secondary' }
-  if (delay === -1) return { icon: <SignalNone />, text: '未测试', color: 'text.secondary' }
-  if (delay > 1e5) return { icon: <SignalError />, text: '错误', color: 'error.main' }
-  if (delay === 0 || delay >= 10000) return { icon: <SignalError />, text: '超时', color: 'error.main' }
-  if (delay >= 500) return { icon: <SignalWeak />, text: '延迟较高', color: 'error.main' }
-  if (delay >= 300) return { icon: <SignalMedium />, text: '延迟中等', color: 'warning.main' }
-  if (delay >= 200) return { icon: <SignalGood />, text: '延迟良好', color: 'info.main' }
+  if (delay === -2)
+    return { icon: <SignalNone />, text: '测试中', color: 'text.secondary' }
+  if (delay === -1)
+    return { icon: <SignalNone />, text: '未测试', color: 'text.secondary' }
+  if (delay > 1e5)
+    return { icon: <SignalError />, text: '错误', color: 'error.main' }
+  if (delay === 0 || delay >= 10000)
+    return { icon: <SignalError />, text: '超时', color: 'error.main' }
+  if (delay >= 500)
+    return { icon: <SignalWeak />, text: '延迟较高', color: 'error.main' }
+  if (delay >= 300)
+    return { icon: <SignalMedium />, text: '延迟中等', color: 'warning.main' }
+  if (delay >= 200)
+    return { icon: <SignalGood />, text: '延迟良好', color: 'info.main' }
   return { icon: <SignalStrong />, text: '延迟极佳', color: 'success.main' }
 }
 
-function convertDelayColor(delayValue: number): 'success' | 'warning' | 'error' | 'primary' | 'default' {
+function convertDelayColor(
+  delayValue: number,
+): 'success' | 'warning' | 'error' | 'primary' | 'default' {
   const colorStr = delayManager.formatDelayColor(delayValue)
   if (!colorStr) return 'default'
   const mainColor = colorStr.split('.')[0]
   switch (mainColor) {
-    case 'success': return 'success'
-    case 'warning': return 'warning'
-    case 'error': return 'error'
-    case 'primary': return 'primary'
-    default: return 'default'
+    case 'success':
+      return 'success'
+    case 'warning':
+      return 'warning'
+    case 'error':
+      return 'error'
+    case 'primary':
+      return 'primary'
+    default:
+      return 'default'
   }
 }
 
@@ -175,13 +194,19 @@ const getFriendlyProtocolName = (type?: string) => {
 const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
-  
+
   const primaryGroup = useMemo(() => {
     const groups = proxies?.groups || []
     const primaryKeywords = ['auto', 'select', 'proxy', '节点选择', '自动选择']
-    return groups.find((group: any) =>
-      primaryKeywords.some((keyword) => group.name.toLowerCase().includes(keyword.toLowerCase()))
-    ) || groups.filter((g: any) => g.name !== 'GLOBAL')[0] || groups[0]
+    return (
+      groups.find((group: any) =>
+        primaryKeywords.some((keyword) =>
+          group.name.toLowerCase().includes(keyword.toLowerCase()),
+        ),
+      ) ||
+      groups.filter((g: any) => g.name !== 'GLOBAL')[0] ||
+      groups[0]
+    )
   }, [proxies])
 
   const activeNodeName = primaryGroup?.now || ''
@@ -194,12 +219,16 @@ const ActiveNodeStatusCard = () => {
     const groups = proxies?.groups || []
     for (const group of groups) {
       if (group?.all) {
-        const found = group.all.find((node: any) => node?.name === activeNodeName)
+        const found = group.all.find(
+          (node: any) => node?.name === activeNodeName,
+        )
         if (found) return found
       }
     }
     if (proxies?.global?.all) {
-      const found = proxies.global.all.find((node: any) => node?.name === activeNodeName)
+      const found = proxies.global.all.find(
+        (node: any) => node?.name === activeNodeName,
+      )
       if (found) return found
     }
     return null
@@ -315,7 +344,13 @@ const ActiveNodeStatusCard = () => {
       {activeNodeName && (
         <Chip
           size="small"
-          icon={testing ? <CircularProgress size={10} color="inherit" /> : signalInfo.icon}
+          icon={
+            testing ? (
+              <CircularProgress size={10} color="inherit" />
+            ) : (
+              signalInfo.icon
+            )
+          }
           label={testing ? '测试中...' : delayManager.formatDelay(delay)}
           color={delayColor}
           onClick={handleTestDelay}
@@ -324,12 +359,24 @@ const ActiveNodeStatusCard = () => {
             height: '20px',
             fontWeight: 600,
             cursor: 'pointer',
-            bgcolor: testing ? undefined : alpha(signalInfo.color === 'success.main' ? '#4caf50' : signalInfo.color === 'warning.main' ? '#ff9800' : '#f44336', 0.12),
-            color: signalInfo.color === 'text.secondary' ? 'text.secondary' : signalInfo.color,
+            bgcolor: testing
+              ? undefined
+              : alpha(
+                  signalInfo.color === 'success.main'
+                    ? '#4caf50'
+                    : signalInfo.color === 'warning.main'
+                      ? '#ff9800'
+                      : '#f44336',
+                  0.12,
+                ),
+            color:
+              signalInfo.color === 'text.secondary'
+                ? 'text.secondary'
+                : signalInfo.color,
             '& .MuiChip-icon': {
               color: 'inherit',
               fontSize: '12px',
-            }
+            },
           }}
         />
       )}
@@ -358,8 +405,12 @@ const MiniTrafficPanel = () => {
   const mode = useThemeMode()
   const { t } = useTranslation()
   const pageVisible = useVisibility()
-  const { response: { data: traffic } } = useTrafficData({ enabled: pageVisible })
-  const { response: { data: connections } } = useConnectionData()
+  const {
+    response: { data: traffic },
+  } = useTrafficData({ enabled: pageVisible })
+  const {
+    response: { data: connections },
+  } = useConnectionData()
   const trafficRef = useRef<any>(null)
 
   useEffect(() => {
@@ -374,108 +425,181 @@ const MiniTrafficPanel = () => {
   const [upVal, upUnit] = parseTraffic(traffic?.up || 0)
   const [downVal, downUnit] = parseTraffic(traffic?.down || 0)
   const [upTotalVal, upTotalUnit] = parseTraffic(connections?.uploadTotal || 0)
-  const [downTotalVal, downTotalUnit] = parseTraffic(connections?.downloadTotal || 0)
+  const [downTotalVal, downTotalUnit] = parseTraffic(
+    connections?.downloadTotal || 0,
+  )
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        height: '100%',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+      }}
+    >
       {/* Traffic Graph (Full Width) */}
       <Box sx={{ flex: 1, width: '100%', minHeight: 0, position: 'relative' }}>
         <EnhancedCanvasTrafficGraph ref={trafficRef} />
       </Box>
 
       {/* Metrics Row (Single Line Below Graph - Raised 3D Button style) */}
-      <Box sx={{ 
-        display: 'flex', 
-        width: '100%', 
-        height: '26px', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        borderTop: (theme) => `1px solid ${theme.palette.divider}`,
-        mt: 0.5,
-        pt: 0.5,
-        px: 1,
-        gap: 1,
-        boxSizing: 'border-box',
-        '@media (max-width: 560px)': {
-          height: 'auto',
-          flexDirection: 'column',
-          gap: 0.5,
+      <Box
+        sx={{
+          display: 'flex',
+          width: '100%',
+          height: '26px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+          mt: 0.5,
           pt: 0.5,
-        }
-      }}>
+          px: 1,
+          gap: 1,
+          boxSizing: 'border-box',
+          '@media (max-width: 560px)': {
+            height: 'auto',
+            flexDirection: 'column',
+            gap: 0.5,
+            pt: 0.5,
+          },
+        }}
+      >
         {/* Upload Group */}
         <Box sx={{ display: 'flex', flex: 1, minWidth: 0, width: '100%' }}>
           {/* Upload Speed */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            flex: 1,
-            gap: 0.75,
-            height: '22px',
-            px: 1,
-            borderTopLeftRadius: '6px',
-            borderBottomLeftRadius: '6px',
-            borderTopRightRadius: 0,
-            borderBottomRightRadius: 0,
-            border: `1px solid rgba(212, 175, 55, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
-            borderRight: 'none',
-            bgcolor: mode === 'light' 
-              ? 'rgba(212, 175, 55, calc(0.04 * var(--depth-factor, 1.0) + 0.04 * var(--vibrancy-factor, 1.0)))' 
-              : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
-            boxShadow: mode === 'light'
-              ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-              : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0)))',
-            whiteSpace: 'nowrap',
-            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            '&:hover': {
-              transform: 'translateY(-1.5px)',
-              filter: 'brightness(1.08)',
-              boxShadow: mode === 'light'
-                ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
-            }
-          }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              gap: 0.75,
+              height: '22px',
+              px: 1,
+              borderTopLeftRadius: '6px',
+              borderBottomLeftRadius: '6px',
+              borderTopRightRadius: 0,
+              borderBottomRightRadius: 0,
+              border: `1px solid rgba(212, 175, 55, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              borderRight: 'none',
+              bgcolor:
+                mode === 'light'
+                  ? 'rgba(212, 175, 55, calc(0.04 * var(--depth-factor, 1.0) + 0.04 * var(--vibrancy-factor, 1.0)))'
+                  : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
+              boxShadow:
+                mode === 'light'
+                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
+                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0)))',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              '&:hover': {
+                transform: 'translateY(-1.5px)',
+                filter: 'brightness(1.08)',
+                boxShadow:
+                  mode === 'light'
+                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
+                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+              },
+            }}
+          >
             <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 16 }} />
-            <Typography sx={{ fontSize: '11px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>上传:</Typography>
-            <Typography sx={{ fontWeight: 'bold', fontSize: '15px', color: '#D4AF37', whiteSpace: 'nowrap' }}>
-              {upVal} <span style={{ fontSize: '10px', fontWeight: 'normal', color: mode === 'light' ? '#8c7010' : '#b29645' }}>{upUnit}/s</span>
+            <Typography
+              sx={{
+                fontSize: '11px',
+                color: mode === 'light' ? '#8c7010' : '#e5c158',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              上传:
+            </Typography>
+            <Typography
+              sx={{
+                fontWeight: 'bold',
+                fontSize: '15px',
+                color: '#D4AF37',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {upVal}{' '}
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 'normal',
+                  color: mode === 'light' ? '#8c7010' : '#b29645',
+                }}
+              >
+                {upUnit}/s
+              </span>
             </Typography>
           </Box>
 
           {/* Upload Total */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            flex: 1,
-            gap: 0.75,
-            height: '22px',
-            px: 1,
-            borderTopRightRadius: '6px',
-            borderBottomRightRadius: '6px',
-            borderTopLeftRadius: 0,
-            borderBottomLeftRadius: 0,
-            border: `1px solid rgba(212, 175, 55, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
-            bgcolor: mode === 'light' 
-              ? 'rgba(212, 175, 55, calc(0.04 * var(--depth-factor, 1.0) + 0.04 * var(--vibrancy-factor, 1.0)))' 
-              : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
-            boxShadow: mode === 'light'
-              ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-              : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0)))',
-            whiteSpace: 'nowrap',
-            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            '&:hover': {
-              transform: 'translateY(-1.5px)',
-              filter: 'brightness(1.08)',
-              boxShadow: mode === 'light'
-                ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
-            }
-          }}>
-            <Typography sx={{ fontSize: '11px', color: mode === 'light' ? '#8c7010' : '#e5c158', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
-            <Typography sx={{ fontSize: '15px', fontWeight: 'bold', color: '#D4AF37', whiteSpace: 'nowrap' }}>
-              {upTotalVal} <span style={{ fontSize: '10px', color: mode === 'light' ? '#8c7010' : '#b29645', fontWeight: 'normal' }}>{upTotalUnit}</span>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              gap: 0.75,
+              height: '22px',
+              px: 1,
+              borderTopRightRadius: '6px',
+              borderBottomRightRadius: '6px',
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              border: `1px solid rgba(212, 175, 55, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              bgcolor:
+                mode === 'light'
+                  ? 'rgba(212, 175, 55, calc(0.04 * var(--depth-factor, 1.0) + 0.04 * var(--vibrancy-factor, 1.0)))'
+                  : 'rgba(212, 175, 55, calc(0.08 * var(--depth-factor, 1.0) + 0.07 * var(--vibrancy-factor, 1.0)))',
+              boxShadow:
+                mode === 'light'
+                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
+                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.12 * var(--vibrancy-factor, 1.0)))',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              '&:hover': {
+                transform: 'translateY(-1.5px)',
+                filter: 'brightness(1.08)',
+                boxShadow:
+                  mode === 'light'
+                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
+                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(212, 175, 55, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+              },
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '11px',
+                color: mode === 'light' ? '#8c7010' : '#e5c158',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              总量:
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '15px',
+                fontWeight: 'bold',
+                color: '#D4AF37',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {upTotalVal}{' '}
+              <span
+                style={{
+                  fontSize: '10px',
+                  color: mode === 'light' ? '#8c7010' : '#b29645',
+                  fontWeight: 'normal',
+                }}
+              >
+                {upTotalUnit}
+              </span>
             </Typography>
           </Box>
         </Box>
@@ -483,76 +607,136 @@ const MiniTrafficPanel = () => {
         {/* Download Group */}
         <Box sx={{ display: 'flex', flex: 1, minWidth: 0, width: '100%' }}>
           {/* Download Speed */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            flex: 1,
-            gap: 0.75,
-            height: '22px',
-            px: 1,
-            borderTopLeftRadius: '6px',
-            borderBottomLeftRadius: '6px',
-            borderTopRightRadius: 0,
-            borderBottomRightRadius: 0,
-            border: `1px solid rgba(0, 132, 255, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
-            borderRight: 'none',
-            bgcolor: mode === 'light' 
-              ? 'rgba(0, 132, 255, calc(0.03 * var(--depth-factor, 1.0) + 0.03 * var(--vibrancy-factor, 1.0)))' 
-              : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
-            boxShadow: mode === 'light'
-              ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-              : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
-            whiteSpace: 'nowrap',
-            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            '&:hover': {
-              transform: 'translateY(-1.5px)',
-              filter: 'brightness(1.08)',
-              boxShadow: mode === 'light'
-                ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
-            }
-          }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              gap: 0.75,
+              height: '22px',
+              px: 1,
+              borderTopLeftRadius: '6px',
+              borderBottomLeftRadius: '6px',
+              borderTopRightRadius: 0,
+              borderBottomRightRadius: 0,
+              border: `1px solid rgba(0, 132, 255, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              borderRight: 'none',
+              bgcolor:
+                mode === 'light'
+                  ? 'rgba(0, 132, 255, calc(0.03 * var(--depth-factor, 1.0) + 0.03 * var(--vibrancy-factor, 1.0)))'
+                  : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
+              boxShadow:
+                mode === 'light'
+                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
+                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              '&:hover': {
+                transform: 'translateY(-1.5px)',
+                filter: 'brightness(1.08)',
+                boxShadow:
+                  mode === 'light'
+                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
+                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+              },
+            }}
+          >
             <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 16 }} />
-            <Typography sx={{ fontSize: '11px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>下载:</Typography>
-            <Typography sx={{ fontWeight: 'bold', fontSize: '15px', color: '#0084FF', whiteSpace: 'nowrap' }}>
-              {downVal} <span style={{ fontSize: '10px', fontWeight: 'normal', color: mode === 'light' ? '#0052a3' : '#8cd9ff' }}>{downUnit}/s</span>
+            <Typography
+              sx={{
+                fontSize: '11px',
+                color: mode === 'light' ? '#0052a3' : '#66b2ff',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              下载:
+            </Typography>
+            <Typography
+              sx={{
+                fontWeight: 'bold',
+                fontSize: '15px',
+                color: '#0084FF',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {downVal}{' '}
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 'normal',
+                  color: mode === 'light' ? '#0052a3' : '#8cd9ff',
+                }}
+              >
+                {downUnit}/s
+              </span>
             </Typography>
           </Box>
 
           {/* Download Total */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            flex: 1,
-            gap: 0.75,
-            height: '22px',
-            px: 1,
-            borderTopRightRadius: '6px',
-            borderBottomRightRadius: '6px',
-            borderTopLeftRadius: 0,
-            borderBottomLeftRadius: 0,
-            border: `1px solid rgba(0, 132, 255, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
-            bgcolor: mode === 'light' 
-              ? 'rgba(0, 132, 255, calc(0.03 * var(--depth-factor, 1.0) + 0.03 * var(--vibrancy-factor, 1.0)))' 
-              : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
-            boxShadow: mode === 'light'
-              ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
-              : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
-            whiteSpace: 'nowrap',
-            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            '&:hover': {
-              transform: 'translateY(-1.5px)',
-              filter: 'brightness(1.08)',
-              boxShadow: mode === 'light'
-                ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
-                : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
-            }
-          }}>
-            <Typography sx={{ fontSize: '11px', color: mode === 'light' ? '#0052a3' : '#66b2ff', fontWeight: 'bold', whiteSpace: 'nowrap' }}>总量:</Typography>
-            <Typography sx={{ fontWeight: 'bold', fontSize: '15px', color: '#0084FF', whiteSpace: 'nowrap' }}>
-              {downTotalVal} <span style={{ fontSize: '10px', color: mode === 'light' ? '#0052a3' : '#8cd9ff', fontWeight: 'normal' }}>{downTotalUnit}</span>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              gap: 0.75,
+              height: '22px',
+              px: 1,
+              borderTopRightRadius: '6px',
+              borderBottomRightRadius: '6px',
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              border: `1px solid rgba(0, 132, 255, calc(0.25 * var(--depth-factor, 1.0) + 0.18 * var(--vibrancy-factor, 1.0)))`,
+              bgcolor:
+                mode === 'light'
+                  ? 'rgba(0, 132, 255, calc(0.03 * var(--depth-factor, 1.0) + 0.03 * var(--vibrancy-factor, 1.0)))'
+                  : 'rgba(0, 132, 255, calc(0.06 * var(--depth-factor, 1.0) + 0.06 * var(--vibrancy-factor, 1.0)))',
+              boxShadow:
+                mode === 'light'
+                  ? '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.6 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0)))'
+                  : '0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.25 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.08 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))), 0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.1 * var(--vibrancy-factor, 1.0)))',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              '&:hover': {
+                transform: 'translateY(-1.5px)',
+                filter: 'brightness(1.08)',
+                boxShadow:
+                  mode === 'light'
+                    ? '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 132, 255, calc(0.2 * var(--vibrancy-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.8 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.12 * var(--depth-factor, 1.0)))'
+                    : '0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.35 * var(--depth-factor, 1.0))), inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))), inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.22 * var(--depth-factor, 1.0))), 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(0, 132, 255, calc(0.22 * var(--vibrancy-factor, 1.0)))',
+              },
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '11px',
+                color: mode === 'light' ? '#0052a3' : '#66b2ff',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              总量:
+            </Typography>
+            <Typography
+              sx={{
+                fontWeight: 'bold',
+                fontSize: '15px',
+                color: '#0084FF',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {downTotalVal}{' '}
+              <span
+                style={{
+                  fontSize: '10px',
+                  color: mode === 'light' ? '#0052a3' : '#8cd9ff',
+                  fontWeight: 'normal',
+                }}
+              >
+                {downTotalUnit}
+              </span>
             </Typography>
           </Box>
         </Box>
@@ -589,18 +773,19 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
       transform: 'translate(-50%, -50%)',
       border: `1px solid ${isLight ? alpha(theme.palette.primary.dark, 0.25) : 'rgba(255, 255, 255, 0.15)'}`,
       background: isLight
-        ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-        : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
+        ? `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.light} 70%, ${theme.palette.primary.main} 100%)`
+        : `radial-gradient(circle at 35% 35%, #ffffff 0%, ${theme.palette.primary.main} 70%, ${theme.palette.primary.dark} 100%)`,
       boxShadow: isLight
         ? `0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.12),
            inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.8),
            inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.08),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))`
+           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
         : `0 calc(2px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
            inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
            inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
-      transition: 'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
+           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
+      transition:
+        'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
       '&:hover, &.Mui-focusVisible': {
         transform: 'translate(-50%, -50%) scale(1.2)',
         filter: 'brightness(1.15)',
@@ -608,19 +793,19 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
           ? `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.16),
              inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.9),
              inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
-             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)))`
+             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
           : `0 calc(4px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
              inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(255,255,255,0.35),
              inset calc(-1.5px * var(--depth-factor, 1.0)) calc(-1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.45),
-             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)))`,
+             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`,
       },
       '&.Mui-active': {
         transform: 'translate(-50%, -50%) scale(0.92)',
         boxShadow: isLight
           ? `inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15)`
           : `inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.5)`,
-      }
-    }
+      },
+    },
   }
 }
 
@@ -647,11 +832,17 @@ const Layout = () => {
   }
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--depth-factor', depthFactor.toString())
+    document.documentElement.style.setProperty(
+      '--depth-factor',
+      depthFactor.toString(),
+    )
   }, [depthFactor])
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--vibrancy-factor', vibrancyFactor.toString())
+    document.documentElement.style.setProperty(
+      '--vibrancy-factor',
+      vibrancyFactor.toString(),
+    )
   }, [vibrancyFactor])
 
   const mode = useThemeMode()
@@ -670,7 +861,12 @@ const Layout = () => {
   // Profiles State
   const [url, setUrl] = useState('')
   const [profileLoading, setProfileLoading] = useState(false)
-  const { profiles = {}, mutateProfiles, activateSelected, patchProfiles } = useProfiles()
+  const {
+    profiles = {},
+    mutateProfiles,
+    activateSelected,
+    patchProfiles,
+  } = useProfiles()
   const { changeProxy } = useProxySelection()
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
@@ -693,23 +889,34 @@ const Layout = () => {
     activateSelectedRef.current = activateSelected
   }, [activateSelected])
 
-
   // Takeover Mode States
   const { toggleSystemProxy } = useSystemProxyState()
   const { isTunModeAvailable, mutateSystemState } = useSystemState()
   const { installServiceAndRestartCore } = useServiceInstaller()
   const { enable_tun_mode, enable_system_proxy } = verge ?? {}
-  const currentMode = enable_tun_mode ? 'tun' : enable_system_proxy ? 'system' : 'manual'
-  const activeIndex = currentMode === 'tun' ? 2 : currentMode === 'system' ? 1 : 0
+  const currentMode = enable_tun_mode
+    ? 'tun'
+    : enable_system_proxy
+      ? 'system'
+      : 'manual'
+  const activeIndex =
+    currentMode === 'tun' ? 2 : currentMode === 'system' ? 1 : 0
 
   // Port State
   const { clashInfo, patchInfo } = useClashInfo()
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
 
-  const policyActiveIndex = verge?.rule_fallback === 'direct' ? 0 : verge?.rule_fallback === 'adjustable' ? 1 : 2
+  const policyActiveIndex =
+    verge?.rule_fallback === 'direct'
+      ? 0
+      : verge?.rule_fallback === 'adjustable'
+        ? 1
+        : 2
 
-  const handleRuleFallbackChange = async (fallback: 'direct' | 'adjustable' | 'proxy') => {
+  const handleRuleFallbackChange = async (
+    fallback: 'direct' | 'adjustable' | 'proxy',
+  ) => {
     try {
       await patchVerge({ rule_fallback: fallback })
       await patchClashMode('rule')
@@ -722,29 +929,44 @@ const Layout = () => {
   }
 
   const themeModeVal = verge?.theme_mode || 'system'
-  const themeActiveIndex = themeModeVal === 'dark' ? 2 : themeModeVal === 'light' ? 1 : 0
+  const themeActiveIndex =
+    themeModeVal === 'dark' ? 2 : themeModeVal === 'light' ? 1 : 0
 
-  const [mixedPortVal, setMixedPortVal] = useState(verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801)
+  const [mixedPortVal, setMixedPortVal] = useState(
+    verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801,
+  )
 
   // Minimal Settings States
   const [notificationsEnabled, setNotificationsEnabled] = useState(
-    () => localStorage.getItem('clash-verge-enable-notification') !== 'false'
+    () => localStorage.getItem('clash-verge-enable-notification') !== 'false',
   )
 
   // Connections manager states
-  const [match, setMatch] = useState<(input: string) => boolean>(() => () => true)
+  const [match, setMatch] = useState<(input: string) => boolean>(
+    () => () => true,
+  )
   const [curOrderOpt, setCurOrderOpt] = useState<OrderKey>('default')
-  const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>('active')
-  const { response: { data: connectionsData }, clearClosedConnections } = useConnectionData()
+  const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>(
+    'active',
+  )
+  const {
+    response: { data: connectionsData },
+    clearClosedConnections,
+  } = useConnectionData()
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const detailRef = useRef<any>(null)
-  
+
   const filterConn = useMemo(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
-    const conns = (connectionsType === 'active' ? connectionsData?.activeConnections : connectionsData?.closedConnections) ?? []
+    const conns =
+      (connectionsType === 'active'
+        ? connectionsData?.activeConnections
+        : connectionsData?.closedConnections) ?? []
     let matchConns = conns.filter((conn) => {
       const { host, destinationIP, process } = conn.metadata
-      return match(host || '') || match(destinationIP || '') || match(process || '')
+      return (
+        match(host || '') || match(destinationIP || '') || match(process || '')
+      )
     })
     if (orderFunc) matchConns = orderFunc(matchConns)
     return matchConns
@@ -770,158 +992,184 @@ const Layout = () => {
     }
   }, [language, switchLanguage])
 
-  const triggerAutoSelectFastestNode = useCallback(async (profileUid: string) => {
-    if (!profileUid) return
-    console.log(`[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest...`)
+  const triggerAutoSelectFastestNode = useCallback(
+    async (profileUid: string) => {
+      if (!profileUid) return
+      console.log(
+        `[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest...`,
+      )
 
-    pollSessionRef.current += 1
-    const currentSession = pollSessionRef.current
+      pollSessionRef.current += 1
+      const currentSession = pollSessionRef.current
 
-    // 1. Wait a bit for Clash core to reload and populate proxies
-    await new Promise((resolve) => setTimeout(resolve, 800))
-    if (pollSessionRef.current !== currentSession) return
-    
-    // Invalidate/refetch proxies data to get the fresh group structure
-    const freshProxies = await refreshProxy()
-    if (pollSessionRef.current !== currentSession) return
-    
-    // 2. Find the PROXY group details
-    const groupName = 'PROXY'
-    const proxiesData = freshProxies || proxies
-    const group = proxiesData?.groups?.find((g: any) => g.name === groupName)
-    if (!group || !group.all || group.all.length === 0) {
-      console.warn('[BUG-034] PROXY group not found or empty')
-      return
-    }
-    
-    console.log(`[BUG-034] Found PROXY group with ${group.all.length} nodes, starting auto-latency test...`)
-    
-    // 3. Set sorting state for this group in local storage to "Latency Sort" (sortType: 1)
-    try {
-      const item = localStorage.getItem('proxy-head-state')
-      let data = (item ? JSON.parse(item) : {}) as Record<string, any>
-      if (!data || typeof data !== 'object') data = {}
-      if (!data[profileUid]) data[profileUid] = {}
-      if (!data[profileUid][groupName]) data[profileUid][groupName] = {}
-      data[profileUid][groupName].sortType = 1; // 1 = latency sort
-      localStorage.setItem('proxy-head-state', JSON.stringify(data))
-      console.log(`[BUG-034] Set proxy-head-state sortType to 1 for profile ${profileUid}`)
-    } catch (e) {
-      console.error('[BUG-034] Failed to set auto-sort in localStorage:', e)
-    }
+      // 1. Wait a bit for Clash core to reload and populate proxies
+      await new Promise((resolve) => setTimeout(resolve, 800))
+      if (pollSessionRef.current !== currentSession) return
 
-    // 4. Trigger latency tests
-    try {
-      // Check if proxy-provider exists for this group
-      // Look up first node details to see if it has provider
-      const firstNodeName = group.all[0]
-      const firstNodeRecord = firstNodeName ? proxiesData?.records?.[firstNodeName] : null
+      // Invalidate/refetch proxies data to get the fresh group structure
+      const freshProxies = await refreshProxy()
+      if (pollSessionRef.current !== currentSession) return
 
-      if (firstNodeRecord?.provider) {
-        console.log(`[BUG-034] Triggering healthcheck for provider: ${firstNodeRecord.provider}`)
-        await healthcheckProxyProvider(firstNodeRecord.provider).catch((err) => {
-          console.error('[BUG-034] provider healthcheck failed:', err)
-        })
-      } else {
-        console.log(`[BUG-034] Triggering delay test for all nodes: ${group.all.length}`)
-        const timeout = verge?.default_latency_timeout || 10000
-        await delayManager.checkListDelay(group.all, groupName, timeout).catch((err) => {
-          console.error('[BUG-034] checkListDelay failed:', err)
-        })
+      // 2. Find the PROXY group details
+      const groupName = 'PROXY'
+      const proxiesData = freshProxies || proxies
+      const group = proxiesData?.groups?.find((g: any) => g.name === groupName)
+      if (!group || !group.all || group.all.length === 0) {
+        console.warn('[BUG-034] PROXY group not found or empty')
+        return
       }
 
-      const isDummyNode = (name: string): boolean => {
-        const lower = name.toLowerCase()
-        return (
-          lower.includes('流量') ||
-          lower.includes('过期时间') ||
-          lower.includes('网址') ||
-          lower.includes('官网') ||
-          lower.includes('剩余') ||
-          lower.includes('expire') ||
-          lower.includes('traffic') ||
-          lower.includes('website') ||
-          lower.includes('http') ||
-          lower.includes('https')
+      console.log(
+        `[BUG-034] Found PROXY group with ${group.all.length} nodes, starting auto-latency test...`,
+      )
+
+      // 3. Set sorting state for this group in local storage to "Latency Sort" (sortType: 1)
+      try {
+        const item = localStorage.getItem('proxy-head-state')
+        let data = (item ? JSON.parse(item) : {}) as Record<string, any>
+        if (!data || typeof data !== 'object') data = {}
+        if (!data[profileUid]) data[profileUid] = {}
+        if (!data[profileUid][groupName]) data[profileUid][groupName] = {}
+        data[profileUid][groupName].sortType = 1 // 1 = latency sort
+        localStorage.setItem('proxy-head-state', JSON.stringify(data))
+        console.log(
+          `[BUG-034] Set proxy-head-state sortType to 1 for profile ${profileUid}`,
         )
+      } catch (e) {
+        console.error('[BUG-034] Failed to set auto-sort in localStorage:', e)
       }
 
-      const startTime = Date.now()
-      let hasSelected = false
+      // 4. Trigger latency tests
+      try {
+        // Check if proxy-provider exists for this group
+        // Look up first node details to see if it has provider
+        const firstNodeName = group.all[0]
+        const firstNodeRecord = firstNodeName
+          ? proxiesData?.records?.[firstNodeName]
+          : null
 
-      while (!hasSelected) {
-        if (pollSessionRef.current !== currentSession) {
-          console.log('[BUG-034] Session invalidated, stopping poll.')
-          return
+        if (firstNodeRecord?.provider) {
+          console.log(
+            `[BUG-034] Triggering healthcheck for provider: ${firstNodeRecord.provider}`,
+          )
+          await healthcheckProxyProvider(firstNodeRecord.provider).catch(
+            (err) => {
+              console.error('[BUG-034] provider healthcheck failed:', err)
+            },
+          )
+        } else {
+          console.log(
+            `[BUG-034] Triggering delay test for all nodes: ${group.all.length}`,
+          )
+          const timeout = verge?.default_latency_timeout || 10000
+          await delayManager
+            .checkListDelay(group.all, groupName, timeout)
+            .catch((err) => {
+              console.error('[BUG-034] checkListDelay failed:', err)
+            })
         }
 
-        const elapsed = (Date.now() - startTime) / 1000
+        const isDummyNode = (name: string): boolean => {
+          const lower = name.toLowerCase()
+          return (
+            lower.includes('流量') ||
+            lower.includes('过期时间') ||
+            lower.includes('网址') ||
+            lower.includes('官网') ||
+            lower.includes('剩余') ||
+            lower.includes('expire') ||
+            lower.includes('traffic') ||
+            lower.includes('website') ||
+            lower.includes('http') ||
+            lower.includes('https')
+          )
+        }
 
-        // Fetch fresh proxy records
-        const testedProxies = await refreshProxy()
-        if (pollSessionRef.current !== currentSession) return
+        const startTime = Date.now()
+        let hasSelected = false
 
-        const latestData = testedProxies || proxiesData
-        const currentGroup = latestData?.groups?.find((g: any) => g.name === groupName) || group
+        while (!hasSelected) {
+          if (pollSessionRef.current !== currentSession) {
+            console.log('[BUG-034] Session invalidated, stopping poll.')
+            return
+          }
 
-        // Collect healthy scanned nodes
-        const healthyNodes: { name: string; delay: number }[] = []
-        for (const nodeName of currentGroup.all) {
-          if (isDummyNode(nodeName)) continue
-          const nodeRecord = latestData?.records?.[nodeName]
-          if (nodeRecord) {
-            const d = delayManager.getDelayFix(nodeRecord, groupName)
-            if (d > 0) {
-              healthyNodes.push({ name: nodeName, delay: d })
+          const elapsed = (Date.now() - startTime) / 1000
+
+          // Fetch fresh proxy records
+          const testedProxies = await refreshProxy()
+          if (pollSessionRef.current !== currentSession) return
+
+          const latestData = testedProxies || proxiesData
+          const currentGroup =
+            latestData?.groups?.find((g: any) => g.name === groupName) || group
+
+          // Collect healthy scanned nodes
+          const healthyNodes: { name: string; delay: number }[] = []
+          for (const nodeName of currentGroup.all) {
+            if (isDummyNode(nodeName)) continue
+            const nodeRecord = latestData?.records?.[nodeName]
+            if (nodeRecord) {
+              const d = delayManager.getDelayFix(nodeRecord, groupName)
+              if (d > 0) {
+                healthyNodes.push({ name: nodeName, delay: d })
+              }
             }
           }
-        }
 
-        // Sort by delay ascending
-        healthyNodes.sort((a, b) => a.delay - b.delay)
+          // Sort by delay ascending
+          healthyNodes.sort((a, b) => a.delay - b.delay)
 
-        console.log(`[BUG-034] Polling: elapsed=${elapsed.toFixed(1)}s, healthyNodes count=${healthyNodes.length}`)
+          console.log(
+            `[BUG-034] Polling: elapsed=${elapsed.toFixed(1)}s, healthyNodes count=${healthyNodes.length}`,
+          )
 
-        // Rule A: If elapsed < 30s and healthyNodes count >= 5, pick the fastest and connect
-        if (elapsed < 30 && healthyNodes.length >= 5) {
-          const targetNode = healthyNodes[0].name
-          const targetDelay = healthyNodes[0].delay
-          changeProxy(groupName, targetNode, currentGroup.now)
-          showNotice.success(`自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`)
-          hasSelected = true
-          break
-        }
-
-        // Rule B & C: If elapsed >= 30s and < 60s
-        if (elapsed >= 30 && elapsed < 60) {
-          if (healthyNodes.length >= 1) {
+          // Rule A: If elapsed < 30s and healthyNodes count >= 5, pick the fastest and connect
+          if (elapsed < 30 && healthyNodes.length >= 5) {
             const targetNode = healthyNodes[0].name
             const targetDelay = healthyNodes[0].delay
             changeProxy(groupName, targetNode, currentGroup.now)
-            showNotice.success(`自动测速超时降级，已切换至可用最快节点: ${targetNode} (${targetDelay}ms)`)
+            showNotice.success(
+              `自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`,
+            )
             hasSelected = true
             break
           }
-        }
 
-        // Rule D: If 60 seconds have elapsed and still no healthy nodes
-        if (elapsed >= 60) {
-          showNotice.error(
-            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-              所有线路都繁忙，请耐心等待。
-            </span>
-          )
-          hasSelected = true
-          break
-        }
+          // Rule B & C: If elapsed >= 30s and < 60s
+          if (elapsed >= 30 && elapsed < 60) {
+            if (healthyNodes.length >= 1) {
+              const targetNode = healthyNodes[0].name
+              const targetDelay = healthyNodes[0].delay
+              changeProxy(groupName, targetNode, currentGroup.now)
+              showNotice.success(
+                `自动测速超时降级，已切换至可用最快节点: ${targetNode} (${targetDelay}ms)`,
+              )
+              hasSelected = true
+              break
+            }
+          }
 
-        // Wait 500ms before next poll
-        await new Promise((resolve) => setTimeout(resolve, 500))
+          // Rule D: If 60 seconds have elapsed and still no healthy nodes
+          if (elapsed >= 60) {
+            showNotice.error(
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                所有线路都繁忙，请耐心等待。
+              </span>,
+            )
+            hasSelected = true
+            break
+          }
+
+          // Wait 500ms before next poll
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+      } catch (err) {
+        console.error('[BUG-034] Error during auto speed test and select:', err)
       }
-    } catch (err) {
-      console.error('[BUG-034] Error during auto speed test and select:', err)
-    }
-  }, [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy])
+    },
+    [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy],
+  )
 
   const lastEnhancedProfileRef = useRef<string | null>(null)
   const pollSessionRef = useRef<number>(0)
@@ -934,21 +1182,27 @@ const Layout = () => {
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
-    if (currentProfileUid && lastEnhancedProfileRef.current !== currentProfileUid) {
-      lastEnhancedProfileRef.current = currentProfileUid;
+    if (
+      currentProfileUid &&
+      lastEnhancedProfileRef.current !== currentProfileUid
+    ) {
+      lastEnhancedProfileRef.current = currentProfileUid
       enhanceProfiles()
         .then(async () => {
-          console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`);
-          await activateSelectedRef.current();
+          console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`)
+          await activateSelectedRef.current()
           // Trigger the auto speed-test and select fastest node chain
-          triggerAutoSelectFastestNode(currentProfileUid);
+          triggerAutoSelectFastestNode(currentProfileUid)
         })
         .catch((err) => {
-          console.error(`[Layout] Failed to enhance profile ${currentProfileUid}:`, err);
-          lastEnhancedProfileRef.current = null;
-        });
+          console.error(
+            `[Layout] Failed to enhance profile ${currentProfileUid}:`,
+            err,
+          )
+          lastEnhancedProfileRef.current = null
+        })
     }
-  }, [currentProfileUid, triggerAutoSelectFastestNode]);
+  }, [currentProfileUid, triggerAutoSelectFastestNode])
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
@@ -986,7 +1240,10 @@ const Layout = () => {
         setUrl('')
         await mutateProfiles()
       } catch (retryErr) {
-        showNotice.error('profiles.page.feedback.notifications.importFail', String(retryErr))
+        showNotice.error(
+          'profiles.page.feedback.notifications.importFail',
+          String(retryErr),
+        )
       }
     } finally {
       setProfileLoading(false)
@@ -999,7 +1256,10 @@ const Layout = () => {
       await patchProfiles({ current: uid })
       await mutateProfiles()
       closeAllConnections()
-      showNotice.success('profiles.page.feedback.notifications.profileSwitched', 1000)
+      showNotice.success(
+        'profiles.page.feedback.notifications.profileSwitched',
+        1000,
+      )
     } catch (err) {
       showNotice.error(err)
     }
@@ -1032,7 +1292,9 @@ const Layout = () => {
   }
 
   // Takeover actions
-  const handleTakeoverModeChange = async (targetMode: 'manual' | 'system' | 'tun') => {
+  const handleTakeoverModeChange = async (
+    targetMode: 'manual' | 'system' | 'tun',
+  ) => {
     if (targetMode === currentMode) return
 
     if (targetMode === 'manual') {
@@ -1075,17 +1337,25 @@ const Layout = () => {
 
   // Port update
   const handleSavePort = async () => {
-    if (mixedPortVal === verge?.verge_mixed_port && mixedPortVal === clashInfo?.mixed_port) return
+    if (
+      mixedPortVal === verge?.verge_mixed_port &&
+      mixedPortVal === clashInfo?.mixed_port
+    )
+      return
     try {
       const inUse = await isPortInUse(mixedPortVal)
       if (inUse) {
-        showNotice.error('settings.modals.clashPort.messages.portInUse', { port: mixedPortVal })
-        setMixedPortVal(verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801)
+        showNotice.error('settings.modals.clashPort.messages.portInUse', {
+          port: mixedPortVal,
+        })
+        setMixedPortVal(
+          verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801,
+        )
         return
       }
       await Promise.all([
         patchInfo({ 'mixed-port': mixedPortVal }),
-        patchVerge({ verge_mixed_port: mixedPortVal })
+        patchVerge({ verge_mixed_port: mixedPortVal }),
       ])
       showNotice.success('代理端口已保存并重载')
     } catch (err) {
@@ -1125,38 +1395,54 @@ const Layout = () => {
               flex: '1 1 auto',
             }}
           />
-          
+
           {!drawerOpen && (
             <IconButton
               size="small"
-              onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
+              onClick={() =>
+                patchVerge({
+                  enable_always_on_top: !verge?.enable_always_on_top,
+                })
+              }
               sx={{
-                color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
+                color: verge?.enable_always_on_top
+                  ? 'primary.main'
+                  : 'text.primary',
                 width: '28px',
                 height: '28px',
                 p: 0,
                 mr: 0.5,
                 borderRadius: '6px',
-                border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-                background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
-                boxShadow: (theme) => verge?.enable_always_on_top 
-                  ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
-                  : 'none',
+                border: (theme) =>
+                  verge?.enable_always_on_top
+                    ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
+                    : '1px solid transparent',
+                background: (theme) =>
+                  verge?.enable_always_on_top
+                    ? `${alpha(theme.palette.primary.main, 0.15)} !important`
+                    : 'transparent',
+                boxShadow: (theme) =>
+                  verge?.enable_always_on_top
+                    ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`
+                    : 'none',
                 transition: 'all 0.2s ease',
                 '&:hover': {
                   background: 'rgba(255, 255, 255, 0.2) !important',
-                }
+                },
               }}
             >
               <PushPinRounded
                 sx={{
                   fontSize: '20px',
                   color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
-                  filter: verge?.enable_always_on_top 
-                    ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                  filter: verge?.enable_always_on_top
+                    ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
                     : 'none',
-                  transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
-                  transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                  transform: verge?.enable_always_on_top
+                    ? 'rotate(45deg)'
+                    : 'none',
+                  transition:
+                    'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
                 }}
               />
             </IconButton>
@@ -1172,16 +1458,26 @@ const Layout = () => {
               p: 0,
               mr: 1,
               borderRadius: '6px',
-              border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-              background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+              border: (theme) =>
+                drawerOpen
+                  ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
+                  : '1px solid transparent',
+              background: (theme) =>
+                drawerOpen
+                  ? `${alpha(theme.palette.primary.main, 0.15)} !important`
+                  : 'transparent',
               '&:hover': {
                 background: 'rgba(255, 255, 255, 0.2) !important',
-              }
+              },
             }}
           >
-            {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '20px' }} />}
+            {drawerOpen ? (
+              <CloseRounded sx={{ fontSize: '20px' }} />
+            ) : (
+              <SettingsRoundedIcon sx={{ fontSize: '20px' }} />
+            )}
           </IconButton>
-          
+
           <WindowControls ref={windowControlsRef} />
         </div>
       ) : null,
@@ -1292,14 +1588,24 @@ const Layout = () => {
                     height: '28px',
                     p: 0,
                     borderRadius: '6px',
-                    border: (theme) => drawerOpen ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-                    background: (theme) => drawerOpen ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
+                    border: (theme) =>
+                      drawerOpen
+                        ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
+                        : '1px solid transparent',
+                    background: (theme) =>
+                      drawerOpen
+                        ? `${alpha(theme.palette.primary.main, 0.15)} !important`
+                        : 'transparent',
                     '&:hover': {
                       background: 'rgba(255, 255, 255, 0.2) !important',
-                    }
+                    },
                   }}
                 >
-                  {drawerOpen ? <CloseRounded sx={{ fontSize: '20px' }} /> : <SettingsRoundedIcon sx={{ fontSize: '20px' }} />}
+                  {drawerOpen ? (
+                    <CloseRounded sx={{ fontSize: '20px' }} />
+                  ) : (
+                    <SettingsRoundedIcon sx={{ fontSize: '20px' }} />
+                  )}
                 </IconButton>
               </div>
             )}
@@ -1323,33 +1629,51 @@ const Layout = () => {
                 {decorated && (
                   <IconButton
                     size="small"
-                    onClick={() => patchVerge({ enable_always_on_top: !verge?.enable_always_on_top })}
+                    onClick={() =>
+                      patchVerge({
+                        enable_always_on_top: !verge?.enable_always_on_top,
+                      })
+                    }
                     sx={{
-                      color: verge?.enable_always_on_top ? 'primary.main' : 'text.primary',
+                      color: verge?.enable_always_on_top
+                        ? 'primary.main'
+                        : 'text.primary',
                       width: '28px',
                       height: '28px',
                       p: 0,
                       borderRadius: '6px',
-                      border: (theme) => verge?.enable_always_on_top ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : '1px solid transparent',
-                      background: (theme) => verge?.enable_always_on_top ? `${alpha(theme.palette.primary.main, 0.15)} !important` : 'transparent',
-                      boxShadow: (theme) => verge?.enable_always_on_top 
-                        ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}` 
-                        : 'none',
+                      border: (theme) =>
+                        verge?.enable_always_on_top
+                          ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
+                          : '1px solid transparent',
+                      background: (theme) =>
+                        verge?.enable_always_on_top
+                          ? `${alpha(theme.palette.primary.main, 0.15)} !important`
+                          : 'transparent',
+                      boxShadow: (theme) =>
+                        verge?.enable_always_on_top
+                          ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`
+                          : 'none',
                       transition: 'all 0.2s ease',
                       '&:hover': {
                         background: 'rgba(255, 255, 255, 0.2) !important',
-                      }
+                      },
                     }}
                   >
                     <PushPinRounded
                       sx={{
                         fontSize: '20px',
-                        color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
-                        filter: verge?.enable_always_on_top 
-                          ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))' 
+                        color: verge?.enable_always_on_top
+                          ? '#FF3B30'
+                          : '#888888',
+                        filter: verge?.enable_always_on_top
+                          ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
                           : 'none',
-                        transform: verge?.enable_always_on_top ? 'rotate(45deg)' : 'none',
-                        transition: 'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                        transform: verge?.enable_always_on_top
+                          ? 'rotate(45deg)'
+                          : 'none',
+                        transition:
+                          'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
                       }}
                     />
                   </IconButton>
@@ -1377,8 +1701,11 @@ const Layout = () => {
                 height: '100%',
                 zIndex: 100,
                 display: 'flex',
-                transition: 'transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease-in-out',
-                transform: drawerOpen ? 'translate(0, 0) scale(1)' : 'translate(100%, -100%) scale(0.95)',
+                transition:
+                  'transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease-in-out',
+                transform: drawerOpen
+                  ? 'translate(0, 0) scale(1)'
+                  : 'translate(100%, -100%) scale(0.95)',
                 opacity: drawerOpen ? 1 : 0,
                 pointerEvents: drawerOpen ? 'auto' : 'none',
                 boxSizing: 'border-box',
@@ -1400,21 +1727,62 @@ const Layout = () => {
                 }}
               >
                 {/* Section 1: Subscriptions Import */}
-                <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px', flexShrink: 0 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box
+                  sx={{
+                    p: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '8px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 'bold',
+                      mb: 0.75,
+                      fontSize: '13px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
                     订阅与机场配置
                     {profileLoading && <CircularProgress size={10} />}
                   </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.5,
+                      mb: 1,
+                    }}
+                  >
                     <TextField
                       placeholder="填入订阅链接 (YAML)"
                       size="small"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      slotProps={{ htmlInput: { style: { paddingTop: '4px', paddingBottom: '4px', fontSize: '13px', height: '30px', boxSizing: 'border-box' } } }}
-                      sx={{ width: '100%' }}
+                      slotProps={{
+                        htmlInput: {
+                          style: {
+                            paddingTop: '4px',
+                            paddingBottom: '4px',
+                            fontSize: '13px',
+                            height: '30px',
+                            boxSizing: 'border-box',
+                          },
+                        },
+                      }}
+                      sx={{ width: '100%', ...get3DInputStyle(theme) }}
                     />
-                    <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        width: '100%',
+                      }}
+                    >
                       <Button
                         variant="contained"
                         color="primary"
@@ -1432,14 +1800,34 @@ const Layout = () => {
                     </Box>
                   </Box>
                   {/* Profiles List */}
-                  <Box sx={{ maxHeight: 110, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Box
+                    sx={{
+                      maxHeight: 110,
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.5,
+                    }}
+                  >
                     {profileItems.map((item) => {
                       const isActive = item.uid === currentProfileUid
                       const extra = item.extra
                       const hasExtra = !!extra
-                      const { upload = 0, download = 0, total = 0 } = extra ?? {}
-                      const progress = total > 0 ? Math.min(Math.round(((download + upload) * 100) / (total + 0.01)), 100) : 0
-                      
+                      const {
+                        upload = 0,
+                        download = 0,
+                        total = 0,
+                      } = extra ?? {}
+                      const progress =
+                        total > 0
+                          ? Math.min(
+                              Math.round(
+                                ((download + upload) * 100) / (total + 0.01),
+                              ),
+                              100,
+                            )
+                          : 0
+
                       const formatTraffic = (num?: number) => {
                         if (typeof num !== 'number') return '-'
                         const [val, unit] = parseTraffic(num)
@@ -1462,45 +1850,73 @@ const Layout = () => {
                             mb: 0.5,
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            bgcolor: (theme) => theme.palette.mode === 'light' ? '#ffffff' : '#282A36',
-                            borderLeft: (theme) => `3px solid ${isActive ? theme.palette.primary.main : 'transparent'}`,
+                            bgcolor: (theme) =>
+                              theme.palette.mode === 'light'
+                                ? '#ffffff'
+                                : '#282A36',
+                            borderLeft: (theme) =>
+                              `3px solid ${isActive ? theme.palette.primary.main : 'transparent'}`,
                             boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                             transition: 'all 0.2s',
                             '&:hover': {
                               bgcolor: 'action.hover',
-                            }
+                            },
                           }}
                         >
                           {/* Line 1: Title & Actions */}
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                            }}
+                          >
                             <Typography
                               variant="body2"
                               sx={{
                                 fontSize: '13px',
                                 fontWeight: isActive ? 600 : 400,
-                                color: isActive ? 'primary.main' : 'text.primary',
+                                color: isActive
+                                  ? 'primary.main'
+                                  : 'text.primary',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
-                                maxWidth: '70%'
+                                maxWidth: '70%',
                               }}
                               title={item.name}
                             >
                               {item.name || '未命名配置'}
                             </Typography>
-                            <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center' }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                gap: 0.25,
+                                alignItems: 'center',
+                              }}
+                            >
                               {item.type === 'remote' && (
                                 <IconButton
                                   size="small"
-                                  onClick={(e) => handleUpdateProfile(item.uid, e)}
-                                  sx={{ p: 0.1, color: isActive ? 'primary.main' : 'text.secondary' }}
+                                  onClick={(e) =>
+                                    handleUpdateProfile(item.uid, e)
+                                  }
+                                  sx={{
+                                    p: 0.1,
+                                    color: isActive
+                                      ? 'primary.main'
+                                      : 'text.secondary',
+                                  }}
                                 >
                                   <RefreshRounded sx={{ fontSize: 12 }} />
                                 </IconButton>
                               )}
                               <IconButton
                                 size="small"
-                                onClick={(e) => handleDeleteProfile(item.uid, e)}
+                                onClick={(e) =>
+                                  handleDeleteProfile(item.uid, e)
+                                }
                                 sx={{ p: 0.1, color: 'error.main' }}
                               >
                                 <DeleteRounded sx={{ fontSize: 12 }} />
@@ -1510,20 +1926,47 @@ const Layout = () => {
 
                           {/* Line 2: Traffic & Expiration (Only for remote with extra data) */}
                           {item.type === 'remote' && hasExtra && (
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.25, fontSize: '11px', color: 'text.secondary' }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                mt: 0.25,
+                                fontSize: '11px',
+                                color: 'text.secondary',
+                              }}
+                            >
                               <span>
-                                {formatTraffic(upload + download)} / {formatTraffic(total)}
+                                {formatTraffic(upload + download)} /{' '}
+                                {formatTraffic(total)}
                               </span>
                               <span>
-                                {extra?.expire ? formatExpire(extra.expire) : '-'}
+                                {extra?.expire
+                                  ? formatExpire(extra.expire)
+                                  : '-'}
                               </span>
                             </Box>
                           )}
 
                           {/* Line 3: Traffic progress bar (Only if total traffic > 0) */}
                           {item.type === 'remote' && total > 0 && (
-                            <Box sx={{ width: '100%', height: 2, bgcolor: 'action.hover', borderRadius: 1, mt: 0.5, overflow: 'hidden' }}>
-                              <Box sx={{ width: `${progress}%`, height: '100%', bgcolor: 'primary.main' }} />
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: 2,
+                                bgcolor: 'action.hover',
+                                borderRadius: 1,
+                                mt: 0.5,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: `${progress}%`,
+                                  height: '100%',
+                                  bgcolor: 'primary.main',
+                                }}
+                              />
                             </Box>
                           )}
                         </Box>
@@ -1533,8 +1976,19 @@ const Layout = () => {
                 </Box>
 
                 {/* Section 2: Takeover Mode (三态互斥单选) */}
-                <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px', flexShrink: 0 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}>
+                <Box
+                  sx={{
+                    p: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '8px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}
+                  >
                     流量接管模式
                   </Typography>
                   <Box
@@ -1548,9 +2002,10 @@ const Layout = () => {
                       mb: 1,
                       height: 26,
                       userSelect: 'none',
-                      boxShadow: (theme) => theme.palette.mode === 'light'
-                        ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                        : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
+                      boxShadow: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
+                          : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
                       border: '1px solid',
                       borderColor: 'divider',
                     }}
@@ -1564,7 +2019,8 @@ const Layout = () => {
                         width: '33.333%',
                         height: '100%',
                         zIndex: 0,
-                        transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transition:
+                          'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         transform: `translate3d(${activeIndex * 100}%, 0, 0)`,
                       }}
                     >
@@ -1574,16 +2030,20 @@ const Layout = () => {
                           margin: '2px',
                           bgcolor: 'primary.main',
                           borderRadius: '3px',
-                          background: (theme) => theme.palette.mode === 'light'
-                            ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                            : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                          boxShadow: (theme) => theme.palette.mode === 'light'
-                            ? `0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
+                          background: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
+                              : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
+                          boxShadow: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
                                inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05)`
-                            : `0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.15),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25)`,
+                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
+                               0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
+                              : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
+                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                               0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
                         }}
                       />
                     </Box>
@@ -1597,7 +2057,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: activeIndex === 0 ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          activeIndex === 0
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -1617,7 +2080,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: activeIndex === 1 ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          activeIndex === 1
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -1637,7 +2103,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: activeIndex === 2 ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          activeIndex === 2
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -1648,7 +2117,10 @@ const Layout = () => {
                       TUN 模式
                     </Box>
                   </Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}
+                  >
                     分流策略倾向
                   </Typography>
                   <Box
@@ -1661,9 +2133,10 @@ const Layout = () => {
                       p: '1px',
                       height: 26,
                       userSelect: 'none',
-                      boxShadow: (theme) => theme.palette.mode === 'light'
-                        ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                        : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
+                      boxShadow: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
+                          : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
                       border: '1px solid',
                       borderColor: 'divider',
                     }}
@@ -1677,7 +2150,8 @@ const Layout = () => {
                         width: '33.333%',
                         height: '100%',
                         zIndex: 0,
-                        transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transition:
+                          'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         transform: `translate3d(${policyActiveIndex * 100}%, 0, 0)`,
                       }}
                     >
@@ -1687,16 +2161,20 @@ const Layout = () => {
                           margin: '2px',
                           bgcolor: 'primary.main',
                           borderRadius: '3px',
-                          background: (theme) => theme.palette.mode === 'light'
-                            ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                            : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                          boxShadow: (theme) => theme.palette.mode === 'light'
-                            ? `0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
+                          background: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
+                              : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
+                          boxShadow: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
                                inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05)`
-                            : `0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.15),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25)`,
+                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
+                               0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
+                              : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
+                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                               0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
                         }}
                       />
                     </Box>
@@ -1710,7 +2188,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: policyActiveIndex === 0 ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          policyActiveIndex === 0
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -1730,7 +2211,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: policyActiveIndex === 1 ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          policyActiveIndex === 1
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -1750,7 +2234,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: policyActiveIndex === 2 ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          policyActiveIndex === 2
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -1764,61 +2251,159 @@ const Layout = () => {
                 </Box>
 
                 {/* Section 3: Minimal Settings */}
-                <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: '8px', flexShrink: 0 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '13px' }}>
+                <Box
+                  sx={{
+                    p: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '8px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '13px' }}
+                  >
                     基础设置
                   </Typography>
                   <List dense sx={{ py: 0 }}>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>开机自动启动</Typography>
+                    <ListItem
+                      sx={{
+                        py: 0.1,
+                        px: 0.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                        开机自动启动
+                      </Typography>
                       <Switch
                         size="small"
                         checked={verge?.enable_auto_launch ?? false}
-                        onChange={(_, checked: boolean) => patchVerge({ enable_auto_launch: checked })}
-                        sx={{ transform: 'scale(0.9)', transformOrigin: 'right center' }}
+                        onChange={(_, checked: boolean) =>
+                          patchVerge({ enable_auto_launch: checked })
+                        }
+                        sx={{
+                          transform: 'scale(0.9)',
+                          transformOrigin: 'right center',
+                        }}
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>启动时最小化</Typography>
+                    <ListItem
+                      sx={{
+                        py: 0.1,
+                        px: 0.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                        启动时最小化
+                      </Typography>
                       <Switch
                         size="small"
                         checked={verge?.enable_silent_start ?? false}
-                        onChange={(_, checked: boolean) => patchVerge({ enable_silent_start: checked })}
-                        sx={{ transform: 'scale(0.9)', transformOrigin: 'right center' }}
+                        onChange={(_, checked: boolean) =>
+                          patchVerge({ enable_silent_start: checked })
+                        }
+                        sx={{
+                          transform: 'scale(0.9)',
+                          transformOrigin: 'right center',
+                        }}
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>通知弹窗显示</Typography>
+                    <ListItem
+                      sx={{
+                        py: 0.1,
+                        px: 0.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                        通知弹窗显示
+                      </Typography>
                       <Switch
                         size="small"
                         checked={notificationsEnabled}
                         onChange={(_, checked: boolean) => {
                           setNotificationsEnabled(checked)
-                          localStorage.setItem('clash-verge-enable-notification', checked ? 'true' : 'false')
+                          localStorage.setItem(
+                            'clash-verge-enable-notification',
+                            checked ? 'true' : 'false',
+                          )
                         }}
-                        sx={{ transform: 'scale(0.9)', transformOrigin: 'right center' }}
+                        sx={{
+                          transform: 'scale(0.9)',
+                          transformOrigin: 'right center',
+                        }}
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 0.25, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>Mixed Port</Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <ListItem
+                      sx={{
+                        py: 0.25,
+                        px: 0.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                        Mixed Port
+                      </Typography>
+                      <Box
+                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                      >
                         <TextField
                           size="small"
                           type="text"
                           value={mixedPortVal}
-                          onChange={(e) => setMixedPortVal(e.target.value ? parseInt(e.target.value, 10) || 0 : 0)}
+                          onChange={(e) =>
+                            setMixedPortVal(
+                              e.target.value
+                                ? parseInt(e.target.value, 10) || 0
+                                : 0,
+                            )
+                          }
                           onBlur={handleSavePort}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              (e.target as HTMLInputElement).blur()
+                              ;(e.target as HTMLInputElement).blur()
                             }
                           }}
-                          slotProps={{ htmlInput: { style: { paddingTop: '2px', paddingBottom: '2px', paddingLeft: '4px', paddingRight: '4px', width: '80px', fontSize: '13px', textAlign: 'center' } } }}
+                          slotProps={{
+                            htmlInput: {
+                              style: {
+                                paddingTop: '2px',
+                                paddingBottom: '2px',
+                                paddingLeft: '4px',
+                                paddingRight: '4px',
+                                width: '80px',
+                                fontSize: '13px',
+                                textAlign: 'center',
+                              },
+                            },
+                          }}
+                          sx={get3DInputStyle(theme)}
                         />
                       </Box>
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="caption" sx={{ fontSize: '13px', flexShrink: 0 }}>主题模式</Typography>
+                    <ListItem
+                      sx={{
+                        py: 0.1,
+                        px: 0.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: '13px', flexShrink: 0 }}
+                      >
+                        主题模式
+                      </Typography>
                       <Box
                         sx={{
                           position: 'relative',
@@ -1830,9 +2415,10 @@ const Layout = () => {
                           width: '120px',
                           height: 26,
                           userSelect: 'none',
-                          boxShadow: (theme) => theme.palette.mode === 'light'
-                            ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                            : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
+                          boxShadow: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
+                              : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
                           border: '1px solid',
                           borderColor: 'divider',
                         }}
@@ -1846,7 +2432,8 @@ const Layout = () => {
                             width: '33.333%',
                             height: '100%',
                             zIndex: 0,
-                            transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            transition:
+                              'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             transform: `translate3d(${themeActiveIndex * 100}%, 0, 0)`,
                           }}
                         >
@@ -1856,16 +2443,20 @@ const Layout = () => {
                               margin: '2px',
                               bgcolor: 'primary.main',
                               borderRadius: '3px',
-                              background: (theme) => theme.palette.mode === 'light'
-                                ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                                : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                              boxShadow: (theme) => theme.palette.mode === 'light'
-                                ? `0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
+                              background: (theme) =>
+                                theme.palette.mode === 'light'
+                                  ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
+                                  : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
+                              boxShadow: (theme) =>
+                                theme.palette.mode === 'light'
+                                  ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
                                    inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                                   inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05)`
-                                : `0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
-                                   inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.15),
-                                   inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25)`,
+                                   inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
+                                   0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
+                                  : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                                   inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
+                                   inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                                   0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
                             }}
                           />
                         </Box>
@@ -1879,7 +2470,10 @@ const Layout = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: themeActiveIndex === 0 ? 'primary.contrastText' : 'text.secondary',
+                            color:
+                              themeActiveIndex === 0
+                                ? 'primary.contrastText'
+                                : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
@@ -1899,7 +2493,10 @@ const Layout = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: themeActiveIndex === 1 ? 'primary.contrastText' : 'text.secondary',
+                            color:
+                              themeActiveIndex === 1
+                                ? 'primary.contrastText'
+                                : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
@@ -1919,7 +2516,10 @@ const Layout = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: themeActiveIndex === 2 ? 'primary.contrastText' : 'text.secondary',
+                            color:
+                              themeActiveIndex === 2
+                                ? 'primary.contrastText'
+                                : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
@@ -1931,10 +2531,35 @@ const Layout = () => {
                         </Box>
                       </Box>
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'stretch', mt: 0.5 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
-                        <Typography variant="caption" sx={{ fontSize: '13px' }}>立体磨砂 (Depth)</Typography>
-                        <Typography variant="caption" sx={{ fontSize: '12px', color: 'text.secondary', fontWeight: 'bold' }}>
+                    <ListItem
+                      sx={{
+                        py: 0.1,
+                        px: 0.5,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        mt: 0.5,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          mb: 0.25,
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                          立体磨砂 (Depth)
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: '12px',
+                            color: 'text.secondary',
+                            fontWeight: 'bold',
+                          }}
+                        >
                           {depthFactor.toFixed(1)}
                         </Typography>
                       </Box>
@@ -1944,14 +2569,41 @@ const Layout = () => {
                         min={0.0}
                         max={2.0}
                         step={0.1}
-                        onChange={(_, val) => handleDepthFactorChange(val as number)}
+                        onChange={(_, val) =>
+                          handleDepthFactorChange(val as number)
+                        }
                         sx={get3DSliderStyle(theme, mode)}
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 0.1, px: 0.5, display: 'flex', flexDirection: 'column', alignItems: 'stretch', mt: 0.5 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.25 }}>
-                        <Typography variant="caption" sx={{ fontSize: '13px' }}>色彩霓虹 (Vibrancy)</Typography>
-                        <Typography variant="caption" sx={{ fontSize: '12px', color: 'text.secondary', fontWeight: 'bold' }}>
+                    <ListItem
+                      sx={{
+                        py: 0.1,
+                        px: 0.5,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        mt: 0.5,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          mb: 0.25,
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                          色彩霓虹 (Vibrancy)
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: '12px',
+                            color: 'text.secondary',
+                            fontWeight: 'bold',
+                          }}
+                        >
                           {vibrancyFactor.toFixed(1)}
                         </Typography>
                       </Box>
@@ -1961,13 +2613,22 @@ const Layout = () => {
                         min={0.0}
                         max={2.0}
                         step={0.1}
-                        onChange={(_, val) => handleVibrancyFactorChange(val as number)}
+                        onChange={(_, val) =>
+                          handleVibrancyFactorChange(val as number)
+                        }
                         sx={get3DSliderStyle(theme, mode)}
                       />
                     </ListItem>
                   </List>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', mt: 1 }}>
+
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      width: '100%',
+                      mt: 1,
+                    }}
+                  >
                     <Button
                       variant="contained"
                       color="primary"
@@ -1999,8 +2660,24 @@ const Layout = () => {
                   overflow: 'hidden',
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 0.5, width: '100%', justifyContent: 'flex-start' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 'bold', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 0.5,
+                    width: '100%',
+                    justifyContent: 'flex-start',
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 'bold',
+                      fontSize: '11px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     路径控制（右键点击链接）
                   </Typography>
                   <Box
@@ -2014,9 +2691,10 @@ const Layout = () => {
                       width: '140px',
                       height: 24,
                       userSelect: 'none',
-                      boxShadow: (theme) => theme.palette.mode === 'light'
-                        ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
-                        : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
+                      boxShadow: (theme) =>
+                        theme.palette.mode === 'light'
+                          ? 'inset 1px 1px 2px rgba(0,0,0,0.12)'
+                          : 'inset 1px 1px 2px rgba(0,0,0,0.4)',
                       border: '1px solid',
                       borderColor: 'divider',
                     }}
@@ -2030,7 +2708,8 @@ const Layout = () => {
                         width: '50%',
                         height: '100%',
                         zIndex: 0,
-                        transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transition:
+                          'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         transform: `translate3d(${connectionsType === 'active' ? 0 : 100}%, 0, 0)`,
                       }}
                     >
@@ -2040,16 +2719,20 @@ const Layout = () => {
                           margin: '2px',
                           bgcolor: 'primary.main',
                           borderRadius: '3px',
-                          background: (theme) => theme.palette.mode === 'light'
-                            ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
-                            : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
-                          boxShadow: (theme) => theme.palette.mode === 'light'
-                            ? `0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0,0,0,0.1),
+                          background: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
+                              : `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, ${alpha(theme.palette.primary.main, 0.75)} 100%)`,
+                          boxShadow: (theme) =>
+                            theme.palette.mode === 'light'
+                              ? `0 calc(1.5px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15),
                                inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) rgba(255,255,255,0.7),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05)`
-                            : `0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
-                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.15),
-                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25)`,
+                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(0,0,0,0.05),
+                               0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
+                              : `0 calc(1.5px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                               inset calc(0.8px * var(--depth-factor, 1.0)) calc(0.8px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) rgba(255,255,255,0.25),
+                               inset calc(-0.8px * var(--depth-factor, 1.0)) calc(-0.8px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+                               0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
                         }}
                       />
                     </Box>
@@ -2063,7 +2746,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: connectionsType === 'active' ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          connectionsType === 'active'
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '11px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -2083,7 +2769,10 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: connectionsType === 'closed' ? 'primary.contrastText' : 'text.secondary',
+                        color:
+                          connectionsType === 'closed'
+                            ? 'primary.contrastText'
+                            : 'text.secondary',
                         fontSize: '11px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -2097,7 +2786,15 @@ const Layout = () => {
                 </Box>
 
                 {/* Search and Action Row */}
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', px: 0.5, mt: 0.5 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 1,
+                    alignItems: 'center',
+                    px: 0.5,
+                    mt: 0.5,
+                  }}
+                >
                   <Box sx={{ flex: 1 }}>
                     <BaseSearchBox onSearch={handleSearch} />
                   </Box>
@@ -2141,7 +2838,11 @@ const Layout = () => {
                     <ConnectionTable
                       connections={filterConn}
                       onShowDetail={(detail, el) =>
-                        detailRef.current?.open(detail, connectionsType === 'closed', el)
+                        detailRef.current?.open(
+                          detail,
+                          connectionsType === 'closed',
+                          el,
+                        )
                       }
                       columnManagerOpen={isColumnManagerOpen}
                       onCloseColumnManager={() => setIsColumnManagerOpen(false)}
@@ -2184,7 +2885,8 @@ const Layout = () => {
         slotProps={{
           paper: {
             sx: {
-              background: mode === 'light' ? 'var(--background-color)' : '#1e1f27',
+              background:
+                mode === 'light' ? 'var(--background-color)' : '#1e1f27',
               height: '480px',
               position: 'relative',
               overflow: 'hidden',
@@ -2194,8 +2896,8 @@ const Layout = () => {
               '& .base-page > header': {
                 pr: 6,
               },
-            }
-          }
+            },
+          },
         }}
       >
         <IconButton
