@@ -66,47 +66,38 @@ pub async fn get_proxy_addr(
     // 1. 如果指定了 provider，优先从 provider 的配置文件中查询
     if let Some(provider_name) = provider {
         let config_path = app_dir.join("clash-mini.yaml");
-        if config_path.exists() {
-            if let Ok(config_content) = tokio::fs::read_to_string(&config_path).await {
-                if let Ok(Value::Mapping(config_map)) = serde_yaml_ng::from_str::<Value>(&config_content) {
-                    if let Some(Value::Mapping(providers)) = config_map.get("proxy-providers") {
-                        if let Some(Value::Mapping(provider_info)) = providers.get(provider_name.as_str()) {
-                            if let Some(Value::String(path)) = provider_info.get("path") {
-                                let mut provider_path = PathBuf::from(path.as_str());
-                                if provider_path.is_relative() {
-                                    provider_path = app_dir.join(provider_path);
-                                }
-                                if provider_path.exists() {
-                                    if let Ok(provider_content) = tokio::fs::read_to_string(&provider_path).await {
-                                        if let Ok(Value::Mapping(provider_map)) =
-                                            serde_yaml_ng::from_str::<Value>(&provider_content)
-                                        {
-                                            if let Some(Value::Sequence(proxies)) = provider_map.get("proxies") {
-                                                for proxy in proxies {
-                                                    if let Some(proxy_map) = proxy.as_mapping() {
-                                                        if let Some(Value::String(proxy_name)) = proxy_map.get("name") {
-                                                            if proxy_name.as_str() == name {
-                                                                let server = proxy_map
-                                                                    .get("server")
-                                                                    .and_then(|v| v.as_str())
-                                                                    .unwrap_or("")
-                                                                    .to_string();
-                                                                let port = proxy_map
-                                                                    .get("port")
-                                                                    .and_then(|v| v.as_i64())
-                                                                    .unwrap_or(0)
-                                                                    as u16;
-                                                                return Ok(Some((server, port)));
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+        if config_path.exists()
+            && let Ok(config_content) = tokio::fs::read_to_string(&config_path).await
+            && let Ok(Value::Mapping(config_map)) = serde_yaml_ng::from_str::<Value>(&config_content)
+            && let Some(Value::Mapping(providers)) = config_map.get("proxy-providers")
+            && let Some(Value::Mapping(provider_info)) = providers.get(provider_name.as_str())
+            && let Some(Value::String(path)) = provider_info.get("path")
+        {
+            let mut provider_path = PathBuf::from(path.as_str());
+            if provider_path.is_relative() {
+                provider_path = app_dir.join(provider_path);
+            }
+            if provider_path.exists()
+                && let Ok(provider_content) = tokio::fs::read_to_string(&provider_path).await
+                && let Ok(Value::Mapping(provider_map)) = serde_yaml_ng::from_str::<Value>(&provider_content)
+                && let Some(Value::Sequence(proxies)) = provider_map.get("proxies")
+            {
+                for proxy in proxies {
+                    if let Some(proxy_map) = proxy.as_mapping()
+                        && let Some(Value::String(proxy_name)) = proxy_map.get("name")
+                        && proxy_name.as_str() == name
+                    {
+                        let server = proxy_map
+                            .get("server")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let port = proxy_map
+                            .get("port")
+                            .and_then(|v| v.as_i64())
+                            .unwrap_or(0)
+                            as u16;
+                        return Ok(Some((server, port)));
                     }
                 }
             }
@@ -115,26 +106,23 @@ pub async fn get_proxy_addr(
 
     // 2. 默认 fallback: 从 clash-mini.yaml 的 proxies 列表中查询
     let config_path = app_dir.join("clash-mini.yaml");
-    if config_path.exists() {
-        if let Ok(config_content) = tokio::fs::read_to_string(&config_path).await {
-            if let Ok(Value::Mapping(config_map)) = serde_yaml_ng::from_str::<Value>(&config_content) {
-                if let Some(Value::Sequence(proxies)) = config_map.get("proxies") {
-                    for proxy in proxies {
-                        if let Some(proxy_map) = proxy.as_mapping() {
-                            if let Some(Value::String(proxy_name)) = proxy_map.get("name") {
-                                if proxy_name.as_str() == name {
-                                    let server = proxy_map
-                                        .get("server")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string();
-                                    let port = proxy_map.get("port").and_then(|v| v.as_i64()).unwrap_or(0) as u16;
-                                    return Ok(Some((server, port)));
-                                }
-                            }
-                        }
-                    }
-                }
+    if config_path.exists()
+        && let Ok(config_content) = tokio::fs::read_to_string(&config_path).await
+        && let Ok(Value::Mapping(config_map)) = serde_yaml_ng::from_str::<Value>(&config_content)
+        && let Some(Value::Sequence(proxies)) = config_map.get("proxies")
+    {
+        for proxy in proxies {
+            if let Some(proxy_map) = proxy.as_mapping()
+                && let Some(Value::String(proxy_name)) = proxy_map.get("name")
+                && proxy_name.as_str() == name
+            {
+                let server = proxy_map
+                    .get("server")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let port = proxy_map.get("port").and_then(|v| v.as_i64()).unwrap_or(0) as u16;
+                return Ok(Some((server, port)));
             }
         }
     }
