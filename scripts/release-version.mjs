@@ -108,7 +108,7 @@ function generateShortTimestamp(withCommit = false, useTauriCommit = false) {
  * @returns {boolean}
  */
 function isValidVersion(version) {
-  return /^v?\d+\.\d+\.\d+(-(alpha|beta|rc)(\.\d+)?)?(\+[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*)?$/i.test(
+  return /^v?\d+\.\d+\.\d+(-[a-zA-Z0-9-]+(\.\d+)?)?(\+[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*)?$/i.test(
     version,
   )
 }
@@ -128,7 +128,7 @@ function normalizeVersion(version) {
  * @returns {string}
  */
 function getBaseVersion(version) {
-  let base = version.replace(/-(alpha|beta|rc)(\.\d+)?/i, '')
+  let base = version.replace(/-[a-zA-Z0-9-]+(\.\d+)?/i, '')
   base = base.replace(/\+[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*/g, '')
   return base
 }
