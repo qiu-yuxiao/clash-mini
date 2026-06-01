@@ -18,7 +18,7 @@
 *   **你必须**：
     1. 在动笔修改任何文件前，先用文字向用户陈述：“发现的隐患是什么”以及“准备如何修改”。
     2. **【故障登记闭环】在修复任何 Bug 前，必须先在 `clash_mini_agreements.md` 的「五、用户反馈问题状态跟踪清单」中追加登记该项 Bug，注明编号、问题描述。在完成修复后，必须将状态更新为“已解决”，并详实写入具体解决方案。禁止在不登记的情况下私自修复。**
-    3. **【协议先行独立提交】在与用户对齐授权并完成协议文档（如 agreements.md、pitfalls.md、silent_release.md 等）的修改后，在动手修改任何业务代码（React/Rust 等）前，必须先将协议文档的变更进行独立的 Git 提交（git commit），在 Git 历史中将“设计/协议变更”与“代码实现”彻底物理隔离，并在后续开发回滚时保护已生效的协议文件。**
+    3. **【协议先行独立提交】在与用户对齐授权并完成协议文档（如 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md)、[clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md)、[clash_mini_silent_release.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_silent_release.md) 等）的修改后，在动手修改任何业务代码（React/Rust 等）前，必须先将协议文档的变更进行独立的 Git 提交（git commit），在 Git 历史中将“设计/协议变更”与“代码实现”彻底物理隔离，并在后续开发回滚时保护已生效的协议文件。**
     4. 获得用户在对话中明确的“同意/动工”回复，且独立提交协议文档后，方可开始修改业务代码。
 *   **你严禁**：
     1. 严禁在后台执行任何形式 of “默默顺手修复”（Silent Fix）。
