@@ -15,22 +15,20 @@ export const get3DButtonStyle = (
 
   if (colorType === 'primary') {
     textColor = '#ffffff'
-    borderColor = isLight ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.15)'
-    backgroundStyle =
-      'linear-gradient(135deg, #FFE875 0%, #FFA000 45%, #F57C00 75%, #D84315 100%)'
+    borderColor = isLight ? '#9E670B' : '#6E4302'
+    backgroundStyle = 'radial-gradient(circle at center, #FFE875 0%, #FFA000 55%, #F57C00 80%, #D84315 100%)'
     bevelShadowDark = isLight ? '#9E670B' : '#6E4302'
   } else if (colorType === 'error') {
     textColor = '#ffffff'
-    borderColor = 'rgba(0, 0, 0, 0.2)'
-    backgroundStyle =
-      'linear-gradient(135deg, #FF8A80 0%, #FF1744 45%, #D50000 80%, #880E4F 100%)'
+    borderColor = isLight ? '#B71C1C' : '#6B0505'
+    backgroundStyle = 'radial-gradient(circle at center, #FF8A80 0%, #FF1744 45%, #D50000 80%, #880E4F 100%)'
     bevelShadowDark = isLight ? '#B71C1C' : '#6B0505'
   } else {
     textColor = isLight ? '#2D3748' : theme.palette.text.primary
-    borderColor = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.15)'
+    borderColor = isLight ? '#94A3B8' : '#0F172A'
     backgroundStyle = isLight
-      ? 'linear-gradient(135deg, #FFFFFF 0%, #F1F5F9 50%, #CBD5E1 100%)'
-      : 'linear-gradient(135deg, #475569 0%, #334155 50%, #1E293B 100%)'
+      ? 'radial-gradient(circle at center, #FFFFFF 0%, #F1F5F9 55%, #CBD5E1 100%)'
+      : 'radial-gradient(circle at center, #475569 0%, #334155 55%, #1E293B 100%)'
     bevelShadowDark = isLight ? '#94A3B8' : '#0F172A'
   }
 
@@ -43,9 +41,9 @@ export const get3DButtonStyle = (
   return {
     textTransform: 'none' as const,
     fontWeight: 'bold',
-    borderRadius: '2px', // Force sharp cubical corners
+    borderRadius: '6px', // Rounded keycaps
     transition: 'all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    border: '1px solid',
+    border: 'calc(4px * var(--depth-factor, 1.0)) solid',
     borderColor,
     background: backgroundStyle,
     color: textColor,
@@ -57,8 +55,8 @@ export const get3DButtonStyle = (
          0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
          0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
          0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
-         inset 0 1px 0 rgba(255, 255, 255, 0.4),
-         inset 1px 1px 0 rgba(255, 255, 255, 0.2),
+         inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+         inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
          inset -1px -1px 0 rgba(0, 0, 0, 0.15)${
            colorType === 'primary' || colorType === 'error'
              ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
@@ -71,8 +69,8 @@ export const get3DButtonStyle = (
          0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
          0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
          0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
-         inset 0 1px 0 rgba(255, 255, 255, 0.3),
-         inset 1px 1px 0 rgba(255, 255, 255, 0.15),
+         inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+         inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
          inset -1px -1px 0 rgba(0, 0, 0, 0.25)${
            colorType === 'primary' || colorType === 'error'
              ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
@@ -90,8 +88,8 @@ export const get3DButtonStyle = (
            0 calc(7px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
            0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
-           inset 0 1px 0 rgba(255, 255, 255, 0.5),
-           inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
            inset -1px -1px 0 rgba(0, 0, 0, 0.1)${
              colorType === 'primary' ||
              colorType === 'error' ||
@@ -108,8 +106,8 @@ export const get3DButtonStyle = (
            0 calc(7px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.45),
            0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
-           inset 0 1px 0 rgba(255, 255, 255, 0.4),
-           inset 1px 1px 0 rgba(255, 255, 255, 0.2),
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
            inset -1px -1px 0 rgba(0, 0, 0, 0.2)${
              colorType === 'primary' ||
              colorType === 'error' ||
@@ -119,12 +117,110 @@ export const get3DButtonStyle = (
            }`,
     },
     '&:active': {
-      transform: 'translateY(4px)',
+      transform: 'translateY(2px)', // Displacement halved (4px -> 2px)
       boxShadow: isLight
         ? `0 calc(1px * var(--depth-factor, 1.0)) 2px 0 rgba(0, 0, 0, 0.5),
            inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45)`
         : `0 calc(1px * var(--depth-factor, 1.0)) 2px 0 rgba(0, 0, 0, 0.7),
            inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.65)`,
+    },
+  }
+}
+
+// 3D Bevel Card Styling Helper
+export const get3DCardStyle = (
+  theme: Theme,
+  cardType: 'primary' | 'default' | 'upload' | 'download',
+  isLightMode?: boolean,
+) => {
+  const isLight = isLightMode !== undefined ? isLightMode : theme.palette.mode === 'light'
+
+  let backgroundStyle: string
+  let textColor: string
+  let borderColor: string
+  let bevelShadowDark: string
+
+  if (cardType === 'primary') {
+    textColor = isLight ? '#3D2A04' : '#ffffff'
+    borderColor = isLight ? '#9E670B' : '#6E4302'
+    backgroundStyle = 'radial-gradient(circle at center, #FFE875 0%, #FFA000 55%, #F57C00 80%, #D84315 100%)'
+    bevelShadowDark = isLight ? '#9E670B' : '#6E4302'
+  } else if (cardType === 'upload') {
+    textColor = isLight ? '#7F6000' : '#FFEB3B'
+    borderColor = isLight ? '#D4AF37' : '#9C7A14'
+    backgroundStyle = isLight
+      ? 'radial-gradient(circle at center, #FFFDE7 0%, #FFF59D 40%, #FBC02D 85%, #F57F17 100%)'
+      : 'radial-gradient(circle at center, #FBC02D 0%, #F57F17 55%, #E65100 80%, #3E1B00 100%)'
+    bevelShadowDark = isLight ? '#B38F1E' : '#705407'
+  } else if (cardType === 'download') {
+    textColor = isLight ? '#004D40' : '#80D8FF'
+    borderColor = isLight ? '#0084FF' : '#0D47A1'
+    backgroundStyle = isLight
+      ? 'radial-gradient(circle at center, #E0F7FA 0%, #80DEEA 40%, #00ACC1 85%, #006064 100%)'
+      : 'radial-gradient(circle at center, #00B0FF 0%, #0091EA 55%, #0D47A1 80%, #071F4D 100%)'
+    bevelShadowDark = isLight ? '#0066CC' : '#08306B'
+  } else {
+    textColor = isLight ? '#2D3748' : theme.palette.text.primary
+    borderColor = isLight ? '#94A3B8' : '#0F172A'
+    backgroundStyle = isLight
+      ? 'radial-gradient(circle at center, #FFFFFF 0%, #F1F5F9 55%, #CBD5E1 100%)'
+      : 'radial-gradient(circle at center, #475569 0%, #334155 55%, #1E293B 100%)'
+    bevelShadowDark = isLight ? '#94A3B8' : '#0F172A'
+  }
+
+  return {
+    borderRadius: '6px',
+    border: 'calc(4px * var(--depth-factor, 1.0)) solid',
+    borderColor,
+    background: backgroundStyle,
+    color: textColor,
+    transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    boxShadow: isLight
+      ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(3px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
+         0 calc(5px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
+         inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+         inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
+         inset -1px -1px 0 rgba(0, 0, 0, 0.15)`
+      : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(3px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
+         0 calc(5px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
+         inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+         inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
+         inset -1px -1px 0 rgba(0, 0, 0, 0.25)`,
+    '&:hover': {
+      transform: 'translateY(-1.5px)',
+      boxShadow: isLight
+        ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(4px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
+           0 calc(7px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+           inset -1px -1px 0 rgba(0, 0, 0, 0.1)${
+             cardType === 'primary' || cardType === 'upload' || cardType === 'download'
+               ? `, 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
+               : ''
+           }`
+        : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+           0 calc(4px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.45),
+           0 calc(7px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
+           inset -1px -1px 0 rgba(0, 0, 0, 0.2)${
+             cardType === 'primary' || cardType === 'upload' || cardType === 'download'
+               ? `, 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
+               : ''
+           }`,
     },
   }
 }
