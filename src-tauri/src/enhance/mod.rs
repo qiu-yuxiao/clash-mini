@@ -785,9 +785,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         }
     }
 
-    let config = rewrite_rules(config, &allowed);
-
-    config
+    rewrite_rules(config, &allowed)
 }
 
 /// Enhance mode
