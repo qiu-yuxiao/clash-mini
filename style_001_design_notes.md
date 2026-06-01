@@ -22,54 +22,66 @@
 ## 🛠️ 二、 关键组件 3D 参数设计规范
 
 ### 1. ⌨️ 实体按键式按钮（3D Buttons）
-为了模拟机械控制台按键，按钮包含以下三个状态：
+为了模拟放置于平面桌面上的独立 3D 立方体按键，按钮统一强制设为极窄圆角（`borderRadius: '2px'`），并包含以下三个状态：
 
 * **A. 默认常态（Normal State）**
-  具有 5 层厚底固态阴影 + 1层软阴影 + 左上倒角高光：
+  由 5 层厚底固态阴影构成侧壁 + 2层桌面接触与落影 + 顶边内高光：
   ```css
-  background: linear-gradient(to bottom, var(--btn-face-light) 0%, var(--btn-face-dark) 100%);
-  border: 1px solid rgba(0, 0, 0, 0.3); /* 高对比度物理边界 */
+  /* 多色璀璨金属渐变（以 Primary 黄金耀日为例） */
+  background: linear-gradient(135deg, #FFE875 0%, #FFA000 45%, #F57C00 75%, #D84315 100%);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
   box-shadow:
-    /* 1. 五层固态底座厚度挤压 */
-    0 calc(1px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(2px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(3px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(4px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(5px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    /* 2. 底座投影到面板的软阴影 */
-    0 calc(5px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
-    /* 3. 顶面边缘高光（左上内发光） */
-    inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.65),
-    /* 4. 顶面边缘暗面（右下内阴影） */
-    inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25);
+    /* 1. 五层固态立体侧壁（Bevel / Solid Depth） */
+    0 calc(1px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(2px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(3px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(4px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(5px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    /* 2. 桌面接触线阴影（Contact shadow） */
+    0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
+    /* 3. 投射在平面桌面上的柔和羽化落影（Desk Cast Shadow） */
+    0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
+    /* 4. 顶面边缘左上白高光（Edge Highlight） */
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.2),
+    /* 5. 顶面边缘右下内阴影（Edge Shadow） */
+    inset -1px -1px 0 rgba(0, 0, 0, 0.15);
   ```
 
 * **B. 悬浮状态（Hover State）**
-  按钮物理向上抬升 `translateY(-2px)`，固态厚度拉伸至 7 层，环境投影软化：
+  按钮向斜上方抬升并略带磁吸浮空感 `translateY(-2px)`，侧壁拉长为 7 层，落影随高度增加而放大羽化，并带有霓虹外发光：
   ```css
   transform: translateY(-2px);
   box-shadow:
-    /* 七层固态挤压 */
-    0 calc(1px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(2px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(3px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(4px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(5px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(6px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    0 calc(7px * var(--depth-factor, 1.0)) 0 0 var(--theme-button-bevel-shadow-dark),
-    /* 软环境投影扩散 */
-    0 calc(7px * var(--depth-factor, 1.0)) calc(14px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.35),
-    inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(255, 255, 255, 0.8),
-    inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.15);
+    /* 七层固态侧壁 */
+    0 calc(1px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(2px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(3px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(4px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(5px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(6px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(7px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    /* 桌面接触线与大幅羽化落影 */
+    0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
+    0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
+    /* 顶面亮暗内高光 */
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.1),
+    /* 霓虹背光 */
+    0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)));
   ```
 
 * **C. 点击状态（Active/Pressed State）**
-  按钮下沉 `translateY(4px)`，侧边挤压完全消失，转化为内部下陷阴影：
+  按钮重重下沉，贴死在桌面上 `translateY(4px)`，侧壁厚度消失，桌面落影收敛：
   ```css
   transform: translateY(4px);
   box-shadow:
-    0 0 0 0 transparent,
-    inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.55);
+    /* 桌面紧压阴影 */
+    0 calc(1px * var(--depth-factor, 1.0)) 2px 0 rgba(0, 0, 0, 0.5),
+    /* 内凹陷入阴影 */
+    inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45);
   ```
 
 ---
