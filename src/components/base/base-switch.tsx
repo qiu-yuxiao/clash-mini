@@ -24,13 +24,16 @@ export const Switch = styled((props: SwitchProps) => (
         '& + .MuiSwitch-track': {
           background: isLight
             ? `linear-gradient(to bottom, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`
-            : `linear-gradient(to bottom, #0f121a 0%, #1c202a 100%)`,
+            : `linear-gradient(to bottom, ${alpha(theme.palette.primary.dark, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.9)} 100%)`,
           opacity: 0.85,
           boxShadow: isLight
-            ? `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.8)`
+            ? `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.4),
+               0 1px 0 rgba(255,255,255,0.8),
+               0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.3 * var(--vibrancy-factor, 1.0)))`
             : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.8),
                0 1px 0 rgba(255, 255, 255, 0.08),
-               inset 0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.4)}`,
+               inset 0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.4)},
+               0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.4 * var(--vibrancy-factor, 1.0)))`,
         },
         '& .MuiSwitch-thumb': {
           background: isLight
@@ -55,10 +58,10 @@ export const Switch = styled((props: SwitchProps) => (
       boxSizing: 'border-box',
       width: 14,
       height: 14,
-      border: `1px solid ${isLight ? alpha(theme.palette.primary.dark, 0.3) : 'rgba(255, 255, 255, 0.25)'}`,
+      border: `1px solid ${isLight ? alpha(theme.palette.primary.main, 0.35) : alpha(theme.palette.primary.main, 0.4)}`,
       background: isLight
-        ? `radial-gradient(circle at 35% 35%, #ffffff 0%, #dbdbdb 45%, #a6a6a6 100%)`
-        : `radial-gradient(circle at 35% 35%, #ffffff 0%, #3e4859 45%, #181d26 100%)`,
+        ? `radial-gradient(circle at 35% 35%, #ffffff 0%, ${alpha(theme.palette.primary.light, 0.3)} 60%, ${alpha(theme.palette.primary.main, 0.5)} 100%)`
+        : `radial-gradient(circle at 35% 35%, #ffffff 0%, ${alpha(theme.palette.primary.main, 0.4)} 60%, ${alpha(theme.palette.primary.dark, 0.65)} 100%)`,
       boxShadow: isLight
         ? `0 calc(2.5px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25),
            inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.8),
@@ -71,9 +74,9 @@ export const Switch = styled((props: SwitchProps) => (
     },
     '& .MuiSwitch-track': {
       borderRadius: 7,
-      backgroundColor: isLight ? '#e0e0e0' : '#1e222b',
+      backgroundColor: isLight ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.primary.main, 0.08),
       opacity: 0.85,
-      border: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)'}`,
+      border: `1px solid ${isLight ? alpha(theme.palette.primary.main, 0.22) : alpha(theme.palette.primary.main, 0.12)}`,
       boxShadow: isLight
         ? 'inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.8)'
         : 'inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.08)',

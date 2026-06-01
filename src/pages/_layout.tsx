@@ -684,11 +684,11 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
     '& .MuiSlider-rail': {
       height: 10,
       opacity: 0.85,
-      bgcolor: isLight ? '#e0e0e0' : '#101217',
+      bgcolor: isLight ? alpha(theme.palette.primary.main, 0.15) : alpha(theme.palette.primary.main, 0.08),
       boxShadow: isLight
         ? 'inset 0 3px 5px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.8)'
         : 'inset 0 3px 5px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.08)',
-      border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)'}`,
+      border: `1px solid ${isLight ? alpha(theme.palette.primary.main, 0.2) : alpha(theme.palette.primary.main, 0.1)}`,
       borderRadius: 5,
     },
     '& .MuiSlider-track': {
@@ -696,8 +696,8 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
       border: 'none',
       borderRadius: 5,
       background: isLight
-        ? 'linear-gradient(to bottom, #bdbdbd 0%, #a6a6a6 100%)'
-        : 'linear-gradient(to bottom, #39393d 0%, #1e1e21 100%)',
+        ? `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
+        : `linear-gradient(to bottom, ${alpha(theme.palette.primary.light, 0.8)} 0%, ${alpha(theme.palette.primary.main, 0.9)} 100%)`,
       boxShadow: isLight
         ? 'inset 0 1px 0 rgba(255,255,255,0.4)'
         : 'inset 0 1px 0 rgba(255,255,255,0.08)',
@@ -910,10 +910,12 @@ const Layout = () => {
 
   // Sync mixed port val
   useEffect(() => {
-    if (verge?.verge_mixed_port) {
-      Promise.resolve().then(() => setMixedPortVal(verge.verge_mixed_port))
-    } else if (clashInfo?.mixed_port) {
-      Promise.resolve().then(() => setMixedPortVal(clashInfo.mixed_port))
+    const vPort = verge?.verge_mixed_port
+    const cPort = clashInfo?.mixed_port
+    if (vPort !== undefined && vPort !== null) {
+      Promise.resolve().then(() => setMixedPortVal(vPort))
+    } else if (cPort !== undefined && cPort !== null) {
+      Promise.resolve().then(() => setMixedPortVal(cPort))
     }
   }, [verge?.verge_mixed_port, clashInfo?.mixed_port])
 
