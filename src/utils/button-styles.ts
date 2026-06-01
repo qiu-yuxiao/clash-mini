@@ -14,7 +14,7 @@ export const get3DButtonStyle = (
   let bevelShadowDark: string
 
   if (colorType === 'primary') {
-    textColor = '#ffffff'
+    textColor = '#1E1200'
     borderColor = isLight ? '#9E670B' : '#6E4302'
     backgroundStyle = 'radial-gradient(circle at center, #FFD54F 0%, #FFA000 55%, #F57C00 80%, #E65100 100%)'
     bevelShadowDark = isLight ? '#9E670B' : '#6E4302'
@@ -141,7 +141,7 @@ export const get3DCardStyle = (
   let bevelShadowDark: string
 
   if (cardType === 'primary') {
-    textColor = isLight ? '#3D2A04' : '#ffffff'
+    textColor = '#1E1200'
     borderColor = isLight ? '#9E670B' : '#6E4302'
     backgroundStyle = 'radial-gradient(circle at center, #FFD54F 0%, #FFA000 55%, #F57C00 80%, #E65100 100%)'
     bevelShadowDark = isLight ? '#9E670B' : '#6E4302'
@@ -150,14 +150,14 @@ export const get3DCardStyle = (
     borderColor = isLight ? '#D4AF37' : '#9C7A14'
     backgroundStyle = isLight
       ? 'radial-gradient(circle at center, #FFFDE7 0%, #FFF59D 50%, #FBC02D 80%, #E65100 100%)'
-      : 'radial-gradient(circle at center, #FBC02D 0%, #E65100 65%, #BF360C 90%, #3E1B00 100%)'
+      : 'radial-gradient(circle at center, #F57C00 0%, #E65100 65%, #BF360C 90%, #3E1B00 100%)'
     bevelShadowDark = isLight ? '#B38F1E' : '#705407'
   } else if (cardType === 'download') {
     textColor = isLight ? '#004D40' : '#80D8FF'
     borderColor = isLight ? '#0084FF' : '#0D47A1'
     backgroundStyle = isLight
       ? 'radial-gradient(circle at center, #E0F7FA 0%, #80DEEA 50%, #00ACC1 80%, #006064 100%)'
-      : 'radial-gradient(circle at center, #00B0FF 0%, #0D47A1 65%, #01579B 90%, #071F4D 100%)'
+      : 'radial-gradient(circle at center, #0091EA 0%, #0D47A1 65%, #01579B 90%, #071F4D 100%)'
     bevelShadowDark = isLight ? '#0066CC' : '#08306B'
   } else {
     textColor = isLight ? '#2D3748' : theme.palette.text.primary

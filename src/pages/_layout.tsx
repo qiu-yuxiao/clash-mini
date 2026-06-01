@@ -495,11 +495,11 @@ const MiniTrafficPanel = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            <ArrowUpwardRounded sx={{ color: '#D4AF37', fontSize: 16 }} />
+            <ArrowUpwardRounded sx={{ color: mode === 'light' ? '#E65100' : '#FFD54F', fontSize: 16 }} />
             <Typography
               sx={{
                 fontSize: '11px',
-                color: mode === 'light' ? '#8c7010' : '#e5c158',
+                color: mode === 'light' ? '#7B5200' : '#FFD54F',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -510,7 +510,7 @@ const MiniTrafficPanel = () => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '15px',
-                color: '#D4AF37',
+                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -519,7 +519,7 @@ const MiniTrafficPanel = () => {
                 style={{
                   fontSize: '10px',
                   fontWeight: 'normal',
-                  color: mode === 'light' ? '#8c7010' : '#b29645',
+                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
                 }}
               >
                 {upUnit}/s
@@ -546,7 +546,7 @@ const MiniTrafficPanel = () => {
             <Typography
               sx={{
                 fontSize: '11px',
-                color: mode === 'light' ? '#8c7010' : '#e5c158',
+                color: mode === 'light' ? '#7B5200' : '#FFD54F',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -557,7 +557,7 @@ const MiniTrafficPanel = () => {
               sx={{
                 fontSize: '15px',
                 fontWeight: 'bold',
-                color: '#D4AF37',
+                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -565,7 +565,7 @@ const MiniTrafficPanel = () => {
               <span
                 style={{
                   fontSize: '10px',
-                  color: mode === 'light' ? '#8c7010' : '#b29645',
+                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
                   fontWeight: 'normal',
                 }}
               >
@@ -594,11 +594,11 @@ const MiniTrafficPanel = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            <ArrowDownwardRounded sx={{ color: '#0084FF', fontSize: 16 }} />
+            <ArrowDownwardRounded sx={{ color: mode === 'light' ? '#0084FF' : '#80D8FF', fontSize: 16 }} />
             <Typography
               sx={{
                 fontSize: '11px',
-                color: mode === 'light' ? '#0052a3' : '#66b2ff',
+                color: mode === 'light' ? '#006064' : '#80D8FF',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -609,7 +609,7 @@ const MiniTrafficPanel = () => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '15px',
-                color: '#0084FF',
+                color: mode === 'light' ? '#00363A' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -618,7 +618,7 @@ const MiniTrafficPanel = () => {
                 style={{
                   fontSize: '10px',
                   fontWeight: 'normal',
-                  color: mode === 'light' ? '#0052a3' : '#8cd9ff',
+                  color: mode === 'light' ? '#006064' : '#E0F7FA',
                 }}
               >
                 {downUnit}/s
@@ -645,7 +645,7 @@ const MiniTrafficPanel = () => {
             <Typography
               sx={{
                 fontSize: '11px',
-                color: mode === 'light' ? '#0052a3' : '#66b2ff',
+                color: mode === 'light' ? '#006064' : '#80D8FF',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -656,7 +656,7 @@ const MiniTrafficPanel = () => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '15px',
-                color: '#0084FF',
+                color: mode === 'light' ? '#00363A' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -664,7 +664,7 @@ const MiniTrafficPanel = () => {
               <span
                 style={{
                   fontSize: '10px',
-                  color: mode === 'light' ? '#0052a3' : '#8cd9ff',
+                  color: mode === 'light' ? '#006064' : '#E0F7FA',
                   fontWeight: 'normal',
                 }}
               >
@@ -1129,20 +1129,19 @@ const Layout = () => {
 
   // Background monitor for the active proxy node
   const consecutiveFailRef = useRef<number>(0)
-  const consecutiveSlowRef = useRef<number>(0)
   const lastActiveNodeRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!currentProfileUid) return
 
-    // Reset counters when profile changes
     consecutiveFailRef.current = 0
-    consecutiveSlowRef.current = 0
     lastActiveNodeRef.current = null
+    let timerId: ReturnType<typeof setTimeout> | null = null
 
-    const intervalId = setInterval(async () => {
+    const checkNode = async () => {
       const activeNodeName = proxies?.groups?.find((g: any) => g.name === 'PROXY')?.now
       if (!activeNodeName || activeNodeName === 'DIRECT' || activeNodeName === 'REJECT') {
+        timerId = setTimeout(checkNode, 60000)
         return
       }
 
@@ -1150,51 +1149,52 @@ const Layout = () => {
       if (lastActiveNodeRef.current !== activeNodeName) {
         lastActiveNodeRef.current = activeNodeName
         consecutiveFailRef.current = 0
-        consecutiveSlowRef.current = 0
       }
 
+      let isHealthy = false
       try {
         const timeout = 5000
         const testUrl = delayManager.getUrl('PROXY')
         const result = await cmdGetProxyDelay(activeNodeName, timeout, testUrl)
         const delay = result?.delay ?? 1e6
 
-        if (delay >= timeout || delay === 1e6) {
-          consecutiveFailRef.current += 1
-          consecutiveSlowRef.current = 0
-          console.log(
-            `[NodeMonitor] Active node ${activeNodeName} timeout/failed. Consecutive fails = ${consecutiveFailRef.current}`,
-          )
-          if (consecutiveFailRef.current >= 2) {
-            console.log(`[NodeMonitor] Triggering auto select fastest node due to consecutive failures.`)
-            consecutiveFailRef.current = 0
-            showNotice.info(`检测到当前节点连接超时，正在自动为您切换至最快线路...`)
-            triggerAutoSelectFastestNode(currentProfileUid)
-          }
-        } else if (delay > 1500) {
-          consecutiveSlowRef.current += 1
-          consecutiveFailRef.current = 0
-          console.log(
-            `[NodeMonitor] Active node ${activeNodeName} is slow (${delay}ms). Consecutive slows = ${consecutiveSlowRef.current}`,
-          )
-          if (consecutiveSlowRef.current >= 2) {
-            console.log(`[NodeMonitor] Triggering auto select fastest node due to consecutive slow latency.`)
-            consecutiveSlowRef.current = 0
-            showNotice.info(`检测到当前节点延迟过高 (${delay}ms)，正在自动为您切换至更快的线路...`)
-            triggerAutoSelectFastestNode(currentProfileUid)
-          }
+        if (delay < 1500) {
+          isHealthy = true
         } else {
-          // Healthy node
-          consecutiveFailRef.current = 0
-          consecutiveSlowRef.current = 0
+          console.log(`[NodeMonitor] Active node ${activeNodeName} is unhealthy (delay: ${delay}ms)`)
         }
       } catch (err) {
         console.error('[NodeMonitor] Failed to check active node latency:', err)
       }
-    }, 30000) // Check every 30 seconds
+
+      if (isHealthy) {
+        consecutiveFailRef.current = 0
+        timerId = setTimeout(checkNode, 60000)
+      } else {
+        consecutiveFailRef.current += 1
+        console.log(
+          `[NodeMonitor] Consecutive unhealthy count for ${activeNodeName} = ${consecutiveFailRef.current}`,
+        )
+
+        if (consecutiveFailRef.current >= 3) {
+          consecutiveFailRef.current = 0
+          console.log(`[NodeMonitor] Node ${activeNodeName} failed 3 times consecutively. Triggering auto select.`)
+          showNotice.info(`检测到当前线路连接超时或缓慢，正在自动为您切换至最快线路...`)
+          triggerAutoSelectFastestNode(currentProfileUid)
+          timerId = setTimeout(checkNode, 60000)
+        } else {
+          // Failure occurred: fast retry in 5 seconds
+          timerId = setTimeout(checkNode, 5000)
+        }
+      }
+    }
+
+    timerId = setTimeout(checkNode, 60000)
 
     return () => {
-      clearInterval(intervalId)
+      if (timerId) {
+        clearTimeout(timerId)
+      }
     }
   }, [currentProfileUid, proxies, triggerAutoSelectFastestNode])
 
@@ -2057,7 +2057,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           activeIndex === 0
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
@@ -2080,7 +2080,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           activeIndex === 1
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
@@ -2103,7 +2103,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           activeIndex === 2
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
@@ -2164,7 +2164,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           policyActiveIndex === 0
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
@@ -2187,7 +2187,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           policyActiveIndex === 1
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
@@ -2210,7 +2210,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           policyActiveIndex === 2
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
@@ -2426,7 +2426,7 @@ const Layout = () => {
                             justifyContent: 'center',
                             color:
                               themeActiveIndex === 0
-                                ? 'primary.contrastText'
+                                ? '#1E1200'
                                 : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
@@ -2449,7 +2449,7 @@ const Layout = () => {
                             justifyContent: 'center',
                             color:
                               themeActiveIndex === 1
-                                ? 'primary.contrastText'
+                                ? '#1E1200'
                                 : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
@@ -2472,7 +2472,7 @@ const Layout = () => {
                             justifyContent: 'center',
                             color:
                               themeActiveIndex === 2
-                                ? 'primary.contrastText'
+                                ? '#1E1200'
                                 : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
@@ -2678,7 +2678,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           connectionsType === 'active'
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '11px',
                         fontWeight: 'bold',
@@ -2701,7 +2701,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           connectionsType === 'closed'
-                            ? 'primary.contrastText'
+                            ? '#1E1200'
                             : 'text.secondary',
                         fontSize: '11px',
                         fontWeight: 'bold',
