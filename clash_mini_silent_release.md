@@ -9,15 +9,15 @@
 当接收到用户发出的发行/动工指令时，**必须首先执行以下环境检测、缓存清理与验证流程**。严禁省略此流程直接修改代码或编译发布。
 
 1. **服务锁检测 (Service Lock Check)**：
-   - 运行：`powershell -Command "Get-Service clash_verge_service -ErrorAction SilentlyContinue"`
-   - 验证：其 `Status` 必须为 `Stopped`。若为 `Running`，必须提醒用户停止服务以释放 `clash-verge-service.exe` 锁。
+   - 运行：`powershell -Command "Get-CimInstance -ClassName Win32_Service -Filter 'Name=''clash_verge_service''' -ErrorAction SilentlyContinue | Where-Object { \$_.PathName -ne \$null -and (\$_.PathName -like '*Documents\AntiGravity_Projects\ClashVerge*' -or \$_.PathName -like '*clash-mini*') }"`
+   - 验证：若有输出，且服务状态为 `Running`，必须提醒用户停止对应的开发服务以释放 `clash-verge-service.exe` 锁。若服务运行自原版安装目录（如 `C:\Program Files\Clash Verge`），则忽略，不要求停止。
 2. **残留进程锁检测 (Process Lock Check)**：
-   - 运行：`powershell -Command "Get-Process -Name clash-mini -ErrorAction SilentlyContinue; Get-Process -Name verge-mihomo, verge-mihomo-alpha -ErrorAction SilentlyContinue | Where-Object { \$_.Path -ne \$null -and (\$_.Path -like '*ClashVerge*' -or \$_.Path -like '*clash-mini*') }"`
+   - 运行：`powershell -Command "Get-Process | Where-Object { \$_.Path -ne \$null -and (\$_.Path -like '*Documents\AntiGravity_Projects\ClashVerge*' -or \$_.Name -eq 'clash-mini' -or \$_.Name -eq 'Clash Mini') }"`
    - 验证：输出必须为空，不得有本开发项目相关的残留代理或内核进程，以防文件锁死。（注：绝对禁止检测或杀灭原版 Clash Verge 代理，因为它是 AI 模型与用户之间的网络通信载体）。
-   - 调试方法：也可以在已处于 PowerShell 会话中时直接运行：`Get-Process -Name clash-mini -ErrorAction SilentlyContinue; Get-Process -Name verge-mihomo, verge-mihomo-alpha -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $null -and ($_.Path -like "*ClashVerge*" -or $_.Path -like "*clash-mini*") }`
+   - 调试方法：也可以在已处于 PowerShell 会话中时直接运行：`Get-Process | Where-Object { $_.Path -ne $null -and ($_.Path -like "*Documents\AntiGravity_Projects\ClashVerge*" -or $_.Name -eq "clash-mini" -or $_.Name -eq "Clash Mini") }`
 3. **端口占用检测 (Port Conflict Check)**：
-   - 运行：`powershell -Command "Get-NetTCPConnection -LocalPort 10801, 9098 -ErrorAction SilentlyContinue"`
-   - 验证：输出必须为空，目标 Mixed 端口和 API 端口不得被占用。
+   - 运行：`powershell -Command "Get-NetTCPConnection -LocalPort 10801, 9098 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`
+   - 验证：输出必须为空。如果占用的 PID 存在，说明存在冲突，测试前必须将其强制结束。
 4. **【强制】本地清理缓存与真机 Dev 验证核对 (Local Cache Purge & Dev Verification)**：
    - **清理缓存**：必须首先在工作区运行 `Remove-Item -Recurse -Force node_modules/.vite` 命令清除旧的前端 Vite 编译缓存，确保编译状态为最新。
    - **Dev 运行**：本地必须使用 `pnpm dev`（安全隔离模式下，TUN 和系统代理为 `false`，端口 10801/9098 隔离）拉起开发调试服务。
@@ -104,7 +104,10 @@
 在本地或远程发布构建完成后，**必须依次执行以下收尾清理程序**，将工作区与宿主机状态恢复为最洁净状态，严禁草率交付：
 
 1. **杀灭开发版残留进程 (Kill Resilient Dev Processes)**：
-   - 运行：可在 PowerShell 会话中运行：`Get-Process -Name clash-mini -ErrorAction SilentlyContinue | Stop-Process -Force; Get-Process -Name verge-mihomo, verge-mihomo-alpha -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $null -and ($_.Path -like "*ClashVerge*" -or $_.Path -like "*clash-mini*") } | Stop-Process -Force`
+   - 运行：可在 PowerShell 会话中运行：
+     `Get-Process | Where-Object { $_.Path -ne $null -and ($_.Path -like "*Documents\AntiGravity_Projects\ClashVerge*" -or $_.Name -eq "clash-mini" -or $_.Name -eq "Clash Mini") } | Stop-Process -Force`
+     并且清除端口占用：
+     `$pids = Get-NetTCPConnection -LocalPort 10801, 9098 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; if ($pids) { Stop-Process -Id $pids -Force }`
    - 验证并确保所有本项目开发版程序、UI 和内核已被干净清空，将 `10801`、`9098` 端口及系统服务锁完全释放并归还宿主机。
 2. **工作区环境打扫 (Workspace Cleaning)**：
    - 运行：`powershell -Command "Remove-Item -Recurse -Force node_modules/.vite"` 以彻底清除开发期的 Vite 构建缓存。
