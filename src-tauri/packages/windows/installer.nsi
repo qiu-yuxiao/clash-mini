@@ -932,11 +932,6 @@ Section Install
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
-  !iffileexists "..\..\..\..\..\用户必读.txt"
-    File "..\..\..\..\..\用户必读.txt"
-  !else
-    File "..\..\..\..\用户必读.txt"
-  !endif
 
   ; Copy resources
   {{#each resources_dirs}}
@@ -945,6 +940,9 @@ Section Install
   {{#each resources}}
     File /a "/oname={{this.[1]}}" "{{no-escape @key}}"
   {{/each}}
+
+  ; Copy 用户必读.txt from resources to installation root
+  CopyFiles /SILENT "$INSTDIR\resources\用户必读.txt" "$INSTDIR\用户必读.txt"
 
   ; Copy external binaries
   {{#each binaries}}
