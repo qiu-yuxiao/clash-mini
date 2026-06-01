@@ -125,7 +125,8 @@ function filterProxies(
   filterText: string,
   searchState?: ProxySearchState,
 ) {
-  const query = filterText.trim()
+  if (!proxies) return []
+  const query = (filterText || '').trim()
   if (!query) return proxies
 
   const res1 = regex1.exec(query)
