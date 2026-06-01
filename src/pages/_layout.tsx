@@ -1099,7 +1099,7 @@ const Layout = () => {
       while (Date.now() - findStartTime < 5000) {
         if (pollSessionRef.current !== currentSession) return
         const freshProxies = await refreshProxy()
-        proxiesData = freshProxies || proxies
+        proxiesData = freshProxies?.data || proxies
         group = proxiesData?.groups?.find((g: any) => g.name === groupName)
         if (group && group.all && group.all.length > 0) {
           break
@@ -1197,7 +1197,7 @@ const Layout = () => {
           const testedProxies = await refreshProxy()
           if (pollSessionRef.current !== currentSession) return
 
-          const latestData = testedProxies || proxiesData
+          const latestData = testedProxies?.data || proxiesData
           const currentGroup =
             latestData?.groups?.find((g: any) => g.name === groupName) || group
 

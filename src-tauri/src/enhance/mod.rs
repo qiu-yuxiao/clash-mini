@@ -768,6 +768,25 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 
     config.insert(Value::from("rules"), Value::from(final_rules));
 
+    let mut allowed = HashSet::new();
+    allowed.insert(String::from("PROXY"));
+    allowed.insert(String::from("DIRECT"));
+    allowed.insert(String::from("REJECT"));
+    allowed.insert(String::from("REJECT-DROP"));
+    allowed.insert(String::from("PASS"));
+
+    if let Some(Value::Sequence(proxies)) = config.get("proxies") {
+        for p in proxies {
+            if let Some(name) = p.as_mapping().and_then(|m| m.get("name")).and_then(Value::as_str) {
+                allowed.insert(String::from(name));
+            } else if let Some(name) = p.as_str() {
+                allowed.insert(String::from(name));
+            }
+        }
+    }
+
+    let config = rewrite_rules(config, &allowed);
+
     config
 }
 
