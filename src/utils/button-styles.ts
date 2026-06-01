@@ -293,21 +293,21 @@ export const get3DSegmentedActiveStyle = (theme: any) => {
     top: '1px',
     bottom: '1px',
     borderRadius: '3px',
-    background: `linear-gradient(to bottom, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`,
+    background: 'radial-gradient(circle at center, #FFD54F 0%, #FFA000 55%, #F57C00 80%, #E65100 100%)',
     boxShadow: isLight
-      ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0,0,0,0.18),
-         0 calc(2px * var(--depth-factor, 1.0)) 0 0 rgba(0,0,0,0.15),
-         0 calc(2.5px * var(--depth-factor, 1.0)) calc(4.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.2),
-         inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+      ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 #9E670B,
+         0 calc(2px * var(--depth-factor, 1.0)) 0 0 #9E670B,
+         0 calc(2px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
+         inset 0 calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.45),
+         inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
          0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
-      : `0 calc(1.5px * var(--depth-factor, 1.0)) 0 0 rgba(0,0,0,0.4),
-         0 calc(2.5px * var(--depth-factor, 1.0)) 0 0 rgba(0,0,0,0.45),
-         0 calc(3px * var(--depth-factor, 1.0)) calc(5.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.5),
-         inset 0 calc(1.2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.35),
+      : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 #6E4302,
+         0 calc(2px * var(--depth-factor, 1.0)) 0 0 #6E4302,
+         0 calc(2px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
+         inset 0 calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+         inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
          0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
     border: '1px solid',
-    borderColor: isLight
-      ? theme.palette.primary.dark
-      : 'rgba(255, 255, 255, 0.15)',
+    borderColor: isLight ? '#9E670B' : '#6E4302',
   }
 }
