@@ -12,8 +12,9 @@
    - 运行：`powershell -Command "Get-Service clash_verge_service -ErrorAction SilentlyContinue"`
    - 验证：其 `Status` 必须为 `Stopped`。若为 `Running`，必须提醒用户停止服务以释放 `clash-verge-service.exe` 锁。
 2. **残留进程锁检测 (Process Lock Check)**：
-   - 运行：`powershell -Command "Get-Process -Name clash-mini, clash-verge, verge-mihomo, verge-mihomo-alpha -ErrorAction SilentlyContinue"`
-   - 验证：输出必须为空，不得有任何残留代理或内核进程，以防文件锁死。
+   - 运行：`powershell -Command "Get-Process -Name clash-mini -ErrorAction SilentlyContinue; Get-Process -Name verge-mihomo, verge-mihomo-alpha -ErrorAction SilentlyContinue | Where-Object { \$_.Path -ne \$null -and (\$_.Path -like '*ClashVerge*' -or \$_.Path -like '*clash-mini*') }"`
+   - 验证：输出必须为空，不得有本开发项目相关的残留代理或内核进程，以防文件锁死。（注：绝对禁止检测或杀灭原版 Clash Verge 代理，因为它是 AI 模型与用户之间的网络通信载体）。
+   - 调试方法：也可以在已处于 PowerShell 会话中时直接运行：`Get-Process -Name clash-mini -ErrorAction SilentlyContinue; Get-Process -Name verge-mihomo, verge-mihomo-alpha -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $null -and ($_.Path -like "*ClashVerge*" -or $_.Path -like "*clash-mini*") }`
 3. **端口占用检测 (Port Conflict Check)**：
    - 运行：`powershell -Command "Get-NetTCPConnection -LocalPort 10801, 9098 -ErrorAction SilentlyContinue"`
    - 验证：输出必须为空，目标 Mixed 端口和 API 端口不得被占用。
@@ -103,8 +104,8 @@
 在本地或远程发布构建完成后，**必须依次执行以下收尾清理程序**，将工作区与宿主机状态恢复为最洁净状态，严禁草率交付：
 
 1. **杀灭开发版残留进程 (Kill Resilient Dev Processes)**：
-   - 运行：`powershell -Command "Stop-Process -Name clash-mini, tauri -ErrorAction SilentlyContinue"`
-   - 验证并确保所有后台开发版程序、UI 和内核已被干净清空，将 `10801`、`9098` 端口及系统服务锁完全释放并归还宿主机。
+   - 运行：可在 PowerShell 会话中运行：`Get-Process -Name clash-mini -ErrorAction SilentlyContinue | Stop-Process -Force; Get-Process -Name verge-mihomo, verge-mihomo-alpha -ErrorAction SilentlyContinue | Where-Object { $_.Path -ne $null -and ($_.Path -like "*ClashVerge*" -or $_.Path -like "*clash-mini*") } | Stop-Process -Force`
+   - 验证并确保所有本项目开发版程序、UI 和内核已被干净清空，将 `10801`、`9098` 端口及系统服务锁完全释放并归还宿主机。
 2. **工作区环境打扫 (Workspace Cleaning)**：
    - 运行：`powershell -Command "Remove-Item -Recurse -Force node_modules/.vite"` 以彻底清除开发期的 Vite 构建缓存。
    - 审计：手动检查并删除除 `.gitignore` 中 `scratch/` 目录外的所有在开发期间临时产生或修改过的调试脚本、临时日志、调试 YAML 配置文件等，保证 Git Status 干净。
