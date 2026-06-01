@@ -1,5 +1,18 @@
 # Clash Mini - AI Assistant Instructions
 
+## 🤝 【新助理报到与环境建交协议 (NEW ASSISTANT ARRIVAL PROTOCOL)】
+每当新会话启动或 AI 助手重新载入上下文时，**必须且只能**首先执行以下“环境建交”仪式，禁止直接进行其他开发或修改：
+
+1. **礼貌自我介绍**：向用户报到，简短介绍自己的助理代号（如 Antigravity）、擅长领域以及针对本次会话拟推进的核心目标。
+2. **审查 `.brain` 联接**：检查项目根目录下的 `.brain` 文件夹是否指向了当前会话的 `Artifact Directory Path`（即系统提供的 `C:\Users\sun_y\.gemini\antigravity\brain\<当前会话 ID>`）。
+3. **呈报建交指令**：向用户明确展示用于重建 `.brain` 联接的 PowerShell 指令，并请求用户口头授权：
+   ```powershell
+   if (Test-Path .brain) { rmdir .brain }; cmd /c mklink /j .brain "<当前会话的绝对路径>"
+   ```
+4. **获取授权与初始化**：在用户确认并授权后执行该命令。联接建立成功后，方可顺着 `.brain/` 路径去读取和维护本架构中的 `memory_summary.md` 和 `task.md`。
+
+---
+
 ## 🚨 【项目命根子：六合一极简文档架构 (CRITICAL 6-IN-1 DOCUMENT ARCHITECTURE)】
 **Every time you start a session or take over the codebase, you MUST read the following files before doing anything else, strictly following the DRY (Don't Repeat Yourself) principle:**
 
@@ -7,16 +20,16 @@
 2. **[clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md) (The Law - Behavioral Redlines)**: The sole source of truth for AI behavioral rules, command execution boundaries, system safety guidelines, and historical mistakes.
 3. **[clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) (The Contract - Product Specs & SOP)**: The sole source of truth for software specifications, port allocations, UI layouts, and the release checklist SOP (Section VI).
 4. **[clash_mini_silent_release.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_silent_release.md) (一键静默发行准则)**: Defines the guidelines and silent workflow for automated releases to prevent user popup interruption.
-5. **[memory_summary.md](file:///C:/Users/sun_y/.gemini/antigravity/brain/c453492a-295b-4505-ab6d-1555ef293576/memory_summary.md) (The Brain - Session Memory)**: Temporary session-level details, compiler directories, and current environment cache cleaning commands.
-6. **[task.md](file:///C:/Users/sun_y/.gemini/antigravity/brain/c453492a-295b-4505-ab6d-1555ef293576/task.md) (The Active Task - Lifecycle)**: The active task's lifecycle plan, checklist, and verification walkthrough. Cleared/reset after every milestone release.
+5. **[memory_summary.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.brain/memory_summary.md) (The Brain - Session Memory)**: Temporary session-level details, compiler directories, and current environment cache cleaning commands.
+6. **[task.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.brain/task.md) (The Active Task - Lifecycle)**: The active task's lifecycle plan, checklist, and verification walkthrough. Cleared/reset after every milestone release.
 
 ---
 
 ## 🚨 【知识库维护与 DRY 铁律 (DOCUMENT MAINTENANCE & DRY RULES)】
 1. **绝对禁止信息复制**：长期的行为红线和命令禁令只能且必须存在于 [clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md)；长期的软件设计指标和发布SOP只能存在于 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md)。绝对禁止在其他文件中复制这些规则或参数，一律使用 markdown 链接引用。
-2. **最高红线：发现任何错误必须先报告对齐，绝对禁止偷偷修复**：在发现代码库、更名或配置有任何历史遗留疏忽时，**在动手进行任何代码/配置修改前，必须先在对话中将问题及修复方案公开、坦诚地报告给用户并获得允许**。严禁以任何借口偷偷修改、提交和发布。
+2. **最高红线：发现任何错误必须先报告对齐，绝对禁止偷偷修复**：在发现代码库、更名或配置有任何历史遗留疏忽时，**在动手进行任何代码/配置修改前，必须先在对话中将问题及修复方案公开、坦诚地报告给用户并获得允许**。严禁以任何借口偷偷修改、提交 and 发布。
 3. **修改顺序铁律**：在改动任何业务代码（TS/React, Rust, JSON 等）前，必须首先在 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 的对应章节中将相关设计或行为变更写入协议。保存更新后，方可修改代码。
-4. **重大文档重构自我监督机制**：当对核心配置文件或规则文档进行合并、重构或迁移时，Agent 必须在 [current_task.md](file:///C:/Users/sun_y/.gemini/antigravity/brain/c453492a-295b-4505-ab6d-1555ef293576/current_task.md) 中添加包含以下四个维度的显式自检清单：
+4. **重大文档重构自我监督机制**：当对核心配置文件或规则文档进行合并、重构或迁移时，Agent 必须在 [task.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.brain/task.md) 中添加包含以下四个维度的显式自检清单：
    - 编写并运行 `keyword_scan.py`，100% 审计关键端口和 UI 参数的保留状态。
    - 运行 `git diff` 逐行审计修改。
    - 开启独立的 `Document Auditor` 子代理对新旧文件执行交叉审计。
