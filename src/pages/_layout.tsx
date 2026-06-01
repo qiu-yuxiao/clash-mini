@@ -47,6 +47,7 @@ import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-tr
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
+import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useClashInfo } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
@@ -1053,9 +1054,45 @@ const Layout = () => {
           const currentGroup =
             latestData?.groups?.find((g: any) => g.name === groupName) || group
 
+          // Read filter and sort from localStorage for the active profile & PROXY group
+          let filterText = ''
+          let useRegex = false
+          let matchCase = false
+          let matchWholeWord = false
+          try {
+            const item = localStorage.getItem('proxy-head-state')
+            if (item) {
+              const data = JSON.parse(item)
+              const currentProfile = profiles?.current || latestData?.current || ''
+              const groupState = data[currentProfile]?.[groupName]
+              if (groupState) {
+                filterText = groupState.filterText || ''
+                useRegex = !!groupState.filterUseRegularExpression
+                matchCase = !!groupState.filterMatchCase
+                matchWholeWord = !!groupState.filterMatchWholeWord
+              }
+            }
+          } catch (e) {
+            console.error('[BUG-034] Error parsing proxy-head-state:', e)
+          }
+
+          // Filter nodes to match the active homepage filter
+          const filteredAll = filterSort(
+            currentGroup.all || [],
+            groupName,
+            filterText,
+            0,
+            verge?.default_latency_timeout,
+            {
+              matchCase,
+              matchWholeWord,
+              useRegularExpression: useRegex,
+            }
+          )
+
           // Collect healthy scanned nodes
           const healthyNodes: { name: string; delay: number }[] = []
-          for (const node of currentGroup.all) {
+          for (const node of filteredAll) {
             const name = node?.name
             if (!name || isDummyNode(name)) continue
             const d = delayManager.getDelayFix(node, groupName)
