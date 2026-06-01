@@ -140,7 +140,7 @@ jobs:
             - [GitHub 主页](https://github.com/qiu-yuxiao/clash-mini)
 
             Created at ${{ env.BUILDTIME }}.
-            EOF
+          EOF
           else
             cat > release.txt << EOF
             $UPDATE_LOGS
@@ -154,7 +154,7 @@ jobs:
             - [GitHub 主页](https://github.com/qiu-yuxiao/clash-mini)
 
             Created at ${{ env.BUILDTIME }}.
-            EOF
+          EOF
           fi
 
       - name: Publish Release
