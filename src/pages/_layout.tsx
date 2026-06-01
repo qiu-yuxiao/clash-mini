@@ -71,6 +71,7 @@ import {
   isPortInUse,
   patchClashMode,
   getProxyAddr,
+  cmdGetProxyDelay,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
@@ -1125,6 +1126,77 @@ const Layout = () => {
       pollSessionRef.current += 1
     }
   }, [])
+
+  // Background monitor for the active proxy node
+  const consecutiveFailRef = useRef<number>(0)
+  const consecutiveSlowRef = useRef<number>(0)
+  const lastActiveNodeRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!currentProfileUid) return
+
+    // Reset counters when profile changes
+    consecutiveFailRef.current = 0
+    consecutiveSlowRef.current = 0
+    lastActiveNodeRef.current = null
+
+    const intervalId = setInterval(async () => {
+      const activeNodeName = proxies?.groups?.find((g: any) => g.name === 'PROXY')?.now
+      if (!activeNodeName || activeNodeName === 'DIRECT' || activeNodeName === 'REJECT') {
+        return
+      }
+
+      // Reset counters if node manually or automatically switched
+      if (lastActiveNodeRef.current !== activeNodeName) {
+        lastActiveNodeRef.current = activeNodeName
+        consecutiveFailRef.current = 0
+        consecutiveSlowRef.current = 0
+      }
+
+      try {
+        const timeout = 5000
+        const testUrl = delayManager.getUrl('PROXY')
+        const result = await cmdGetProxyDelay(activeNodeName, timeout, testUrl)
+        const delay = result?.delay ?? 1e6
+
+        if (delay >= timeout || delay === 1e6) {
+          consecutiveFailRef.current += 1
+          consecutiveSlowRef.current = 0
+          console.log(
+            `[NodeMonitor] Active node ${activeNodeName} timeout/failed. Consecutive fails = ${consecutiveFailRef.current}`,
+          )
+          if (consecutiveFailRef.current >= 2) {
+            console.log(`[NodeMonitor] Triggering auto select fastest node due to consecutive failures.`)
+            consecutiveFailRef.current = 0
+            showNotice.info(`检测到当前节点连接超时，正在自动为您切换至最快线路...`)
+            triggerAutoSelectFastestNode(currentProfileUid)
+          }
+        } else if (delay > 1500) {
+          consecutiveSlowRef.current += 1
+          consecutiveFailRef.current = 0
+          console.log(
+            `[NodeMonitor] Active node ${activeNodeName} is slow (${delay}ms). Consecutive slows = ${consecutiveSlowRef.current}`,
+          )
+          if (consecutiveSlowRef.current >= 2) {
+            console.log(`[NodeMonitor] Triggering auto select fastest node due to consecutive slow latency.`)
+            consecutiveSlowRef.current = 0
+            showNotice.info(`检测到当前节点延迟过高 (${delay}ms)，正在自动为您切换至更快的线路...`)
+            triggerAutoSelectFastestNode(currentProfileUid)
+          }
+        } else {
+          // Healthy node
+          consecutiveFailRef.current = 0
+          consecutiveSlowRef.current = 0
+        }
+      } catch (err) {
+        console.error('[NodeMonitor] Failed to check active node latency:', err)
+      }
+    }, 30000) // Check every 30 seconds
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [currentProfileUid, proxies, triggerAutoSelectFastestNode])
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
