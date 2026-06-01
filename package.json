@@ -23,6 +23,7 @@
     "release-version": "node scripts/release-version.mjs",
     "release:autobuild": "pnpm release-version autobuild",
     "release:deploytest": "pnpm release-version deploytest",
+    "prepare-release-v201": "python scratch/prepare_v2.0.1_release.py",
     "publish-version": "node scripts/publish-version.mjs",
     "lint": "eslint -c eslint.config.ts --max-warnings=0 --cache --cache-location .eslintcache src",
     "lint:fix": "eslint -c eslint.config.ts --max-warnings=0 --cache --cache-location .eslintcache --fix src",
