@@ -1090,28 +1090,34 @@ const Layout = () => {
       pollSessionRef.current += 1
       const currentSession = pollSessionRef.current
 
-      // 1. Wait a bit for Clash core to reload and populate proxies
-      await new Promise((resolve) => setTimeout(resolve, 800))
-      if (pollSessionRef.current !== currentSession) return
-
-      // Invalidate/refetch proxies data to get the fresh group structure
-      const freshProxies = await refreshProxy()
-      if (pollSessionRef.current !== currentSession) return
-
-      // 2. Find the PROXY group details
+      // 1. Wait a bit for Clash core to reload and populate proxies (with retry loop)
       const groupName = 'PROXY'
-      const proxiesData = freshProxies || proxies
-      const group = proxiesData?.groups?.find((g: any) => g.name === groupName)
+      let group: any = null
+      let proxiesData: any = null
+      const findStartTime = Date.now()
+
+      while (Date.now() - findStartTime < 5000) {
+        if (pollSessionRef.current !== currentSession) return
+        const freshProxies = await refreshProxy()
+        proxiesData = freshProxies || proxies
+        group = proxiesData?.groups?.find((g: any) => g.name === groupName)
+        if (group && group.all && group.all.length > 0) {
+          break
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+
       if (!group || !group.all || group.all.length === 0) {
-        console.warn('[BUG-034] PROXY group not found or empty')
+        console.warn('[BUG-034] PROXY group not found or empty after 5 seconds')
         return
       }
 
+      const nodeNames: string[] = group.all.map((n: any) => n?.name).filter(Boolean)
       console.log(
-        `[BUG-034] Found PROXY group with ${group.all.length} nodes, starting auto-latency test...`,
+        `[BUG-034] Found PROXY group with ${group.all.length} nodes (${nodeNames.length} mapped), starting auto-latency test...`,
       )
 
-      // 3. Set sorting state for this group in local storage to "Latency Sort" (sortType: 1)
+      // 2. Set sorting state for this group in local storage to "Latency Sort" (sortType: 1)
       try {
         const item = localStorage.getItem('proxy-head-state')
         let data = (item ? JSON.parse(item) : {}) as Record<string, any>
@@ -1127,31 +1133,34 @@ const Layout = () => {
         console.error('[BUG-034] Failed to set auto-sort in localStorage:', e)
       }
 
-      // 4. Trigger latency tests
+      // 3. Trigger latency tests
       try {
-        // Check if proxy-provider exists for this group
-        // Look up first node details to see if it has provider
-        const firstNodeName = group.all[0]
-        const firstNodeRecord = firstNodeName
-          ? proxiesData?.records?.[firstNodeName]
-          : null
+        // Check unique providers across nodes in the PROXY group
+        const uniqueProviders = new Set<string>()
+        for (const node of group.all) {
+          if (node?.provider) {
+            uniqueProviders.add(node.provider)
+          }
+        }
 
-        if (firstNodeRecord?.provider) {
+        if (uniqueProviders.size > 0) {
           console.log(
-            `[BUG-034] Triggering healthcheck for provider: ${firstNodeRecord.provider}`,
+            `[BUG-034] Triggering healthcheck for providers: ${Array.from(uniqueProviders).join(', ')}`,
           )
-          await healthcheckProxyProvider(firstNodeRecord.provider).catch(
-            (err) => {
-              console.error('[BUG-034] provider healthcheck failed:', err)
-            },
+          await Promise.all(
+            Array.from(uniqueProviders).map((provider) =>
+              healthcheckProxyProvider(provider).catch((err) => {
+                console.error(`[BUG-034] provider healthcheck failed for ${provider}:`, err)
+              })
+            )
           )
         } else {
           console.log(
-            `[BUG-034] Triggering delay test for all nodes: ${group.all.length}`,
+            `[BUG-034] Triggering delay test for all nodes: ${nodeNames.length}`,
           )
           const timeout = verge?.default_latency_timeout || 10000
           await delayManager
-            .checkListDelay(group.all, groupName, timeout)
+            .checkListDelay(nodeNames, groupName, timeout)
             .catch((err) => {
               console.error('[BUG-034] checkListDelay failed:', err)
             })
@@ -1194,14 +1203,12 @@ const Layout = () => {
 
           // Collect healthy scanned nodes
           const healthyNodes: { name: string; delay: number }[] = []
-          for (const nodeName of currentGroup.all) {
-            if (isDummyNode(nodeName)) continue
-            const nodeRecord = latestData?.records?.[nodeName]
-            if (nodeRecord) {
-              const d = delayManager.getDelayFix(nodeRecord, groupName)
-              if (d > 0) {
-                healthyNodes.push({ name: nodeName, delay: d })
-              }
+          for (const node of currentGroup.all) {
+            const name = node?.name
+            if (!name || isDummyNode(name)) continue
+            const d = delayManager.getDelayFix(node, groupName)
+            if (d > 0) {
+              healthyNodes.push({ name, delay: d })
             }
           }
 
