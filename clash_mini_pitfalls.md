@@ -70,3 +70,11 @@
 *   **你严禁**：
     1. 严禁要求用户为你审查、调试或定位任何具体的业务代码细节。
 
+
+## 🛑 第八条：大文件修改防死锁律 (Law of Large File Edit Deadlock Prevention)
+*   **触发场景**：当需要对项目中的大型文本文档（如 clash_mini_agreements.md、clash_mini_pitfalls.md 等超过 20KB 的 Markdown 文件）进行多行或复杂替换时。
+*   **事实背景**：Windows CRLF (\r\n) 换行符与 Agent 系统的 replace_file_content 工具在正则匹配时极易引发灾难性回溯 (Catastrophic Backtracking) 或编码冲突，导致 AI 代理主进程彻底锁死。
+*   **你必须**：
+    1. **禁用大文件正则替换工具**：严禁对大文件使用内置的 replace_file_content 或 multi_replace_file_content 执行多行或复杂的文本替换。
+    2. **使用本地脚本或全量覆写**：必须通过在 scratch/ 目录下编写并调用本地 Python 脚本（使用 run_command 执行）进行精确文本处理，或使用 write_to_file (启用 Overwrite: true) 执行一次性全量覆盖写入。
+    3. **确保脚本安全与幂等**：本地处理脚本必须安全且具备幂等性（即重复运行不会破坏文档结构），执行完毕后需通过 git diff 审计修改内容。
