@@ -793,6 +793,20 @@ const tasks = [
     retry: 5,
     macosOnly: true,
   },
+  {
+    name: 'copy_readme',
+    func: async () => {
+      const src = path.join(cwd, '小白必读.txt')
+      const dest = path.join(cwd, 'src-tauri', '小白必读.txt')
+      if (fs.existsSync(src)) {
+        await fsp.copyFile(src, dest)
+        log_success('Copied 小白必读.txt to src-tauri/')
+      } else {
+        log_info('小白必读.txt not found in workspace root, skipping copy')
+      }
+    },
+    retry: 3,
+  },
 ]
 
 async function runTask() {
