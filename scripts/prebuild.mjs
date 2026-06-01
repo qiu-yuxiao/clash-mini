@@ -796,13 +796,23 @@ const tasks = [
   {
     name: 'copy_readme',
     func: async () => {
-      const src = path.join(cwd, '小白必读.txt')
-      const dest = path.join(cwd, 'src-tauri', '小白必读.txt')
-      if (fs.existsSync(src)) {
-        await fsp.copyFile(src, dest)
+      // Copy 小白必读.txt
+      const src1 = path.join(cwd, '小白必读.txt')
+      const dest1 = path.join(cwd, 'src-tauri', '小白必读.txt')
+      if (fs.existsSync(src1)) {
+        await fsp.copyFile(src1, dest1)
         log_success('Copied 小白必读.txt to src-tauri/')
       } else {
-        log_info('小白必读.txt not found in workspace root, skipping copy')
+        log_info('小白必读.txt not found, skipping copy')
+      }
+      // Copy 用户说明书.txt
+      const src2 = path.join(cwd, '用户说明书.txt')
+      const dest2 = path.join(cwd, 'src-tauri', '用户说明书.txt')
+      if (fs.existsSync(src2)) {
+        await fsp.copyFile(src2, dest2)
+        log_success('Copied 用户说明书.txt to src-tauri/')
+      } else {
+        log_info('用户说明书.txt not found, skipping copy')
       }
     },
     retry: 3,

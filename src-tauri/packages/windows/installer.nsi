@@ -933,6 +933,7 @@ Section Install
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
   File "小白必读.txt"
+  File "用户说明书.txt"
 
   ; Copy resources
   {{#each resources_dirs}}
@@ -1109,6 +1110,7 @@ Section Uninstall
   ; Copy main executable
   Delete "$INSTDIR\${MAINBINARYNAME}.exe"
   Delete "$INSTDIR\小白必读.txt"
+  Delete "$INSTDIR\用户说明书.txt"
 
   ; Delete resources
   {{#each resources}}

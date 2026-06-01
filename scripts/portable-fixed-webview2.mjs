@@ -68,6 +68,9 @@ async function resolvePortable() {
   if (fs.existsSync(path.join(process.cwd(), '小白必读.txt'))) {
     zip.addLocalFile(path.join(process.cwd(), '小白必读.txt'))
   }
+  if (fs.existsSync(path.join(process.cwd(), '用户说明书.txt'))) {
+    zip.addLocalFile(path.join(process.cwd(), '用户说明书.txt'))
+  }
 
   const require = createRequire(import.meta.url)
   const packageJson = require('../package.json')
