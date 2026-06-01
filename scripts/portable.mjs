@@ -53,11 +53,8 @@ async function resolvePortable() {
   zip.addLocalFile(path.join(releaseDir, 'verge-mihomo-alpha.exe'))
   zip.addLocalFolder(path.join(releaseDir, 'resources'), 'resources')
   zip.addLocalFolder(configDir, '.config')
-  if (fs.existsSync(path.join(process.cwd(), '小白必读.txt'))) {
-    zip.addLocalFile(path.join(process.cwd(), '小白必读.txt'))
-  }
-  if (fs.existsSync(path.join(process.cwd(), '用户说明书.txt'))) {
-    zip.addLocalFile(path.join(process.cwd(), '用户说明书.txt'))
+  if (fs.existsSync(path.join(process.cwd(), '用户必读.txt'))) {
+    zip.addLocalFile(path.join(process.cwd(), '用户必读.txt'))
   }
 
   const require = createRequire(import.meta.url)

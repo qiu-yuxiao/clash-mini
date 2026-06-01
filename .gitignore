@@ -25,5 +25,5 @@ portable_test/
 github_token.txt
 .brain
 .brain/
-/src-tauri/小白必读.txt
-/src-tauri/用户说明书.txt
+/src-tauri/用户必读.txt
+/src-tauri/resources/用户必读.txt
