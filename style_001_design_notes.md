@@ -22,15 +22,15 @@
 ## 🛠️ 二、 关键组件 3D 参数设计规范
 
 ### 1. ⌨️ 实体按键式按钮（3D Buttons）
-为了模拟放置于平面桌面上的独立 3D 立方体按键，按钮统一强制设为极窄圆角（`borderRadius: '2px'`），并包含以下三个状态：
+为了模拟放置于平面桌面上的独立 3D 实体按键，按钮统一设为圆角（`borderRadius: '6px'`），并包含以下三个状态：
 
 * **A. 默认常态（Normal State）**
-  由 5 层厚底固态阴影构成侧壁 + 2层桌面接触与落影 + 顶边内高光：
+  由 5 层厚底固态阴影构成侧壁 + 2层桌面接触与落影 + 4px 实体边框 + 顶面同心圆径向渐变：
   ```css
-  /* 多色璀璨金属渐变（以 Primary 黄金耀日为例） */
-  background: linear-gradient(135deg, #FFE875 0%, #FFA000 45%, #F57C00 75%, #D84315 100%);
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 2px;
+  /* 多色同心圆径向渐变（以 Primary 黄金耀日为例） */
+  background: radial-gradient(circle at center, #FFE875 0%, #FFA000 55%, #F57C00 80%, #D84315 100%);
+  border: calc(3px * var(--depth-factor, 1.0)) solid var(--bevel-shadow-dark);
+  border-radius: 6px;
   box-shadow:
     /* 1. 五层固态立体侧壁（Bevel / Solid Depth） */
     0 calc(1px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
@@ -42,9 +42,9 @@
     0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
     /* 3. 投射在平面桌面上的柔和羽化落影（Desk Cast Shadow） */
     0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
-    /* 4. 顶面边缘左上白高光（Edge Highlight） */
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.2),
+    /* 4. 顶面边缘左上白高光（加粗 Bevel Highlight） */
+    inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+    inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
     /* 5. 顶面边缘右下内阴影（Edge Shadow） */
     inset -1px -1px 0 rgba(0, 0, 0, 0.15);
   ```
@@ -56,27 +56,23 @@
   box-shadow:
     /* 七层固态侧壁 */
     0 calc(1px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
-    0 calc(2px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
-    0 calc(3px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
-    0 calc(4px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
-    0 calc(5px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
-    0 calc(6px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    ...
     0 calc(7px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
     /* 桌面接触线与大幅羽化落影 */
     0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
     0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
     /* 顶面亮暗内高光 */
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
+    inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
     inset -1px -1px 0 rgba(0, 0, 0, 0.1),
     /* 霓虹背光 */
-    0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)));
+    0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb), calc(0.35 * var(--vibrancy-factor, 1.0)));
   ```
 
 * **C. 点击状态（Active/Pressed State）**
-  按钮重重下沉，贴死在桌面上 `translateY(4px)`，侧壁厚度消失，桌面落影收敛：
+  按钮轻微下沉，贴死在桌面上 `translateY(2px)`（下沉位移比先前减半），侧壁厚度缩减，桌面落影收敛：
   ```css
-  transform: translateY(4px);
+  transform: translateY(2px);
   box-shadow:
     /* 桌面紧压阴影 */
     0 calc(1px * var(--depth-factor, 1.0)) 2px 0 rgba(0, 0, 0, 0.5),
@@ -143,14 +139,41 @@ box-shadow:
 
 ---
 
-### 5. 📊 双色浮雕数据小卡片（Metrics Cards）
-主页底部的流量数据小卡片，表现为 3D 亚克力或水晶材质拼接浮雕：
-* **常态**：具有 2px 的挤压高度，并且在拼接的边缘应用相反方向的高对比高光与深影：
+### 5. 📊 3D 浮雕展示卡片（3D Display Cards）
+主页第一行（`ActiveNodeStatusCard`）以及最底行的四个流量数据卡片（Metrics Cards），全部大一统升级为具有 3D 侧壁与桌面阴影投射的独立凸起立方体结构，并支持以下特性：
+
+* **A. 径向渐变与独立配色**
+  - **主页第一行卡片**：使用 Titanium Silver / Obsidian 默认系统材质径向渐变。
+  - **上传速度与总量卡片**：使用独立的金黄色径向同心圆渐变。
+  - **下载速度与总量卡片**：使用独立的电光蓝色同心圆径向渐变。
+* **B. 物理阴影与 4K 增强设计**
   ```css
+  border: calc(3px * var(--depth-factor, 1.0)) solid var(--borderColor);
+  border-radius: 6px;
   box-shadow:
-    0 calc(1px * var(--depth-factor, 1.0)) 0 0 rgba(0,0,0,0.2),
-    0 calc(2.5px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-    inset 0 calc(1.2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.25),
-    inset 0 calc(-1.2px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4);
+    /* 1. 三层固态立体侧壁 */
+    0 calc(1px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(2px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    0 calc(3px * var(--depth-factor, 1.0)) 0 0 var(--bevel-shadow-dark),
+    /* 2. 桌面接触与羽化投影 */
+    0 calc(3px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
+    0 calc(5px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
+    /* 3. 顶面粗 bevel 双内高光 */
+    inset 0 calc(2.0px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+    inset calc(2.0px * var(--depth-factor, 1.0)) calc(2.0px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2);
   ```
-* **悬浮**：抬升 `translateY(-2px)`，底座拉长到 4px。
+* **C. 悬浮微调**：Hover 时抬升 `translateY(-1.5px)`，落影相应拉长并模糊，体现物理实体感。
+
+---
+
+## 📊 三、 全应用交互式与展示型拟物控件统计数据表
+
+| 控件类型 | 统计数量 | 具体在页面中的位置与功能 | 拟物化改造方案 |
+| :--- | :---: | :--- | :--- |
+| **3D 实体主按钮** | **6 个** | 1. 订阅导入区：“导入订阅链接”按钮<br>2. 基础设置区：“系统调试运行日志”按钮<br>3. 路径控制区：“断开全部”按钮<br>4. 路径控制区：“清空历史”按钮<br>5. 系统运行日志窗口：“清空日志”按钮<br>6. 链接详情中心：“断开连接”/“Block”按钮 | 已通过 `get3DButtonStyle` 集中管理。已应用 6px 圆角、径向渐变、4px 高清边框以及 active 2px 位移。 |
+| **3选1滑动选择器** | **3 个** | 1. 流量接管模式 (手动/系统代理/TUN)<br>2. 代理分流策略倾向 (直连兜底/规则可调/代理兜底)<br>3. 主题模式切换 (系统/浅色/深色) | 采用 3D 滑道槽（Groove）配立体浮雕选中滑块，静态霓虹。 |
+| **2选1滑动选择器** | **1 个** | 1. 路径控制中心 (活跃连接/历史连接) | 与 3选1 选择器使用相同 3D 滑槽与浮雕滑块的材质设计。 |
+| **3D 物理凹陷输入框** | **4 个** | 1. 订阅链接输入框<br>2. 基础设置 Mixed Port 端口框<br>3. 链接路径搜索过滤框<br>4. 主页代理节点过滤搜索框 | 已通过 `get3DInputStyle` 集中管理。已施加深层物理刻槽与 focus 霓虹发光。 |
+| **3D 拨动开关 (Switch)** | **3 个** | 1. 设置：“开机自动启动”<br>2. 设置：“启动时最小化”<br>3. 设置：“通知弹窗显示” | 重构为小巧的 3D 拨动物理开关，中性灰底槽配主色渐变滑球。 |
+| **3D 参数调节滑轨** | **2 个** | 1. 界面设置：“立体磨砂 (Depth)”滑轨<br>2. 界面设置：“色彩霓虹 (Vibrancy)”滑轨 | 已采用 `get3DSliderStyle` 管理，主色渐变 3D 滑珠配合中性灰滑道槽。 |
+| **3D 浮雕展示卡片** | **5 个** | 1. 主页第一行：“当前活跃出口节点”状态卡片<br>2. 主页最底行：4 个流量监控指标数据卡片 | 抽象并应用 `get3DCardStyle` 统一管理，支持同心圆径向渐变及 3D 桌面阴影投射。 |
