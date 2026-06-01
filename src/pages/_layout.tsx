@@ -75,7 +75,12 @@ import {
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
-import { get3DButtonStyle, get3DInputStyle, get3DSegmentedContainerStyle, get3DSegmentedActiveStyle } from '@/utils/button-styles'
+import {
+  get3DButtonStyle,
+  get3DInputStyle,
+  get3DSegmentedContainerStyle,
+  get3DSegmentedActiveStyle,
+} from '@/utils/button-styles'
 import getSystem from '@/utils/get-system'
 import parseTraffic from '@/utils/parse-traffic'
 
@@ -1112,7 +1117,9 @@ const Layout = () => {
         return
       }
 
-      const nodeNames: string[] = group.all.map((n: any) => n?.name).filter(Boolean)
+      const nodeNames: string[] = group.all
+        .map((n: any) => n?.name)
+        .filter(Boolean)
       console.log(
         `[BUG-034] Found PROXY group with ${group.all.length} nodes (${nodeNames.length} mapped), starting auto-latency test...`,
       )
@@ -1150,9 +1157,12 @@ const Layout = () => {
           await Promise.all(
             Array.from(uniqueProviders).map((provider) =>
               healthcheckProxyProvider(provider).catch((err) => {
-                console.error(`[BUG-034] provider healthcheck failed for ${provider}:`, err)
-              })
-            )
+                console.error(
+                  `[BUG-034] provider healthcheck failed for ${provider}:`,
+                  err,
+                )
+              }),
+            ),
           )
         } else {
           console.log(
@@ -2097,7 +2107,9 @@ const Layout = () => {
                       mb: 1,
                       height: 26,
                       userSelect: 'none',
-                      ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                      ...get3DSegmentedContainerStyle(
+                        theme.palette.mode === 'light',
+                      ),
                     })}
                   >
                     {/* Sliding Background Indicator */}
@@ -2202,7 +2214,9 @@ const Layout = () => {
                       p: '1px',
                       height: 26,
                       userSelect: 'none',
-                      ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                      ...get3DSegmentedContainerStyle(
+                        theme.palette.mode === 'light',
+                      ),
                     })}
                   >
                     {/* Sliding Background Indicator */}
@@ -2458,7 +2472,9 @@ const Layout = () => {
                           width: '120px',
                           height: 26,
                           userSelect: 'none',
-                          ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                          ...get3DSegmentedContainerStyle(
+                            theme.palette.mode === 'light',
+                          ),
                         })}
                       >
                         {/* Sliding Background Indicator */}
@@ -2475,7 +2491,9 @@ const Layout = () => {
                             transform: `translate3d(${themeActiveIndex * 100}%, 0, 0)`,
                           }}
                         >
-                          <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
+                          <Box
+                            sx={(theme) => get3DSegmentedActiveStyle(theme)}
+                          />
                         </Box>
 
                         {/* System Option */}
@@ -2708,7 +2726,9 @@ const Layout = () => {
                       width: '140px',
                       height: 24,
                       userSelect: 'none',
-                      ...get3DSegmentedContainerStyle(theme.palette.mode === 'light'),
+                      ...get3DSegmentedContainerStyle(
+                        theme.palette.mode === 'light',
+                      ),
                     })}
                   >
                     {/* Sliding Background Indicator */}
