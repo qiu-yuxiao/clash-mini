@@ -932,7 +932,11 @@ Section Install
 
   ; Copy main executable
   File "${MAINBINARYSRCPATH}"
-  File "用户必读.txt"
+  !iffileexists "..\..\..\..\..\用户必读.txt"
+    File "..\..\..\..\..\用户必读.txt"
+  !else
+    File "..\..\..\..\用户必读.txt"
+  !endif
 
   ; Copy resources
   {{#each resources_dirs}}
