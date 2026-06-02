@@ -41,7 +41,10 @@
     "i18n:types": "node scripts/generate-i18n-keys.mjs",
     "typecheck": "tsc --noEmit",
     "cargo-check": "cargo check --workspace",
-    "monitor-build": "node scratch/monitor_build.mjs"
+    "monitor-build": "node scratch/monitor_build.mjs",
+    "download-release": "node scratch/download_release.mjs",
+    "check-runs": "node scratch/check_runs.mjs",
+    "monitor-real": "node scratch/monitor_real.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
