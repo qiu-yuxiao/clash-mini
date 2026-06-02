@@ -80,6 +80,9 @@ type GroupCache = {
 
 // 优化列布局计算
 const calculateColumns = (width: number, configCol: number): number => {
+  if (width <= 285) {
+    return 1
+  }
   return 3
 }
 

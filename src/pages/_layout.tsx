@@ -1671,8 +1671,8 @@ const Layout = () => {
           {/* Upper Pane: Node Selection (80%) */}
           <div
             style={{
-              flex: isMinimalWidth ? '0 0 33px' : '80 0 0%',
-              height: isMinimalWidth ? '33px' : '80%',
+              flex: isMinimalWidth ? '1 1 0%' : '80 0 0%',
+              height: isMinimalWidth ? 'auto' : '80%',
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',
@@ -2872,8 +2872,8 @@ const Layout = () => {
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
           <div
             style={{
-              flex: isMinimalWidth ? '1 1 0%' : '0 0 178px',
-              height: isMinimalWidth ? 'auto' : '178px',
+              flex: isMinimalWidth ? '0 0 130px' : '0 0 178px',
+              height: isMinimalWidth ? '130px' : '178px',
               borderTop: '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',

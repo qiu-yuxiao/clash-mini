@@ -47,6 +47,7 @@ const popIn = keyframes`
 import { BaseLoading } from '@/components/base'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
 import delayManager from '@/services/delay'
+import { useWindowWidth } from './use-window-width'
 
 interface Props {
   group: IProxyGroupItem
@@ -87,6 +88,9 @@ export const ProxyItem = (props: Props) => {
     sx,
     onClick,
   } = props
+
+  const { width } = useWindowWidth()
+  const isMinimal = width <= 285
 
   // -1/<=0 为不显示，-2 为 loading
   const { delayValue, isPreset, timeout, onDelay } = useProxyDelayState(
@@ -173,44 +177,103 @@ export const ProxyItem = (props: Props) => {
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
       ]}
     >
-      {/* Column 1: Name (Flex growth, overflow ellipsis) */}
-      <Box
-        title={`${proxy.name}${proxy.now ? ` - ${proxy.now}` : ''}`}
-        sx={{
-          flex: 1,
-          height: '100%',
-          minWidth: 0,
-          display: 'flex',
-          alignItems: 'center',
-          px: 1,
-          boxSizing: 'border-box',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          fontSize: '12px',
-          color: 'text.primary',
-          fontWeight: selected ? 'bold' : 'normal',
-          borderRight: (theme) => `2px solid ${theme.palette.divider}`,
-        }}
-      >
+      {isMinimal ? (
+        <>
+          {/* Column 1: Protocol/Type (Width: 55px, centered, border-right divider) */}
+          <Box
+            sx={{
+              width: 55,
+              height: '100%',
+              flexShrink: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              boxSizing: 'border-box',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontSize: '11px',
+              color: 'text.secondary',
+              fontWeight: 'normal',
+              textTransform: 'uppercase',
+              borderRight: (theme) => `2px solid ${theme.palette.divider}`,
+            }}
+          >
+            {proxy.type}
+          </Box>
+
+          {/* Column 2: Name (Flex growth, centered, border-right divider) */}
+          <Box
+            title={proxy.name}
+            sx={{
+              flex: 1,
+              height: '100%',
+              minWidth: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              px: 1,
+              boxSizing: 'border-box',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontSize: '12px',
+              color: 'text.primary',
+              fontWeight: selected ? 'bold' : 'normal',
+              borderRight: (theme) => `2px solid ${theme.palette.divider}`,
+            }}
+          >
+            <Box
+              sx={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {proxy.name}
+            </Box>
+          </Box>
+        </>
+      ) : (
+        /* Column 1: Name (Flex growth, overflow ellipsis) */
         <Box
+          title={`${proxy.name}${proxy.now ? ` - ${proxy.now}` : ''}`}
           sx={{
+            flex: 1,
+            height: '100%',
+            minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
+            px: 1,
+            boxSizing: 'border-box',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            fontSize: '12px',
+            color: 'text.primary',
+            fontWeight: selected ? 'bold' : 'normal',
+            borderRight: (theme) => `2px solid ${theme.palette.divider}`,
           }}
         >
-          {proxy.name}
-          {showType && proxy.now && (
-            <Box
-              component="span"
-              sx={{ color: 'text.secondary', ml: 0.5, fontSize: '11px' }}
-            >
-              - {proxy.now}
-            </Box>
-          )}
+          <Box
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {proxy.name}
+            {showType && proxy.now && (
+              <Box
+                component="span"
+                sx={{ color: 'text.secondary', ml: 0.5, fontSize: '11px' }}
+              >
+                - {proxy.now}
+              </Box>
+            )}
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {/* Column 3: Delay (Width: 65px, centered) */}
       <Box
