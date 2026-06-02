@@ -1852,7 +1852,6 @@ const Layout = () => {
                   <Box
                     sx={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
                       mb: 0.75,
                     }}
@@ -1870,82 +1869,6 @@ const Layout = () => {
                       订阅与机场配置
                       {profileLoading && <CircularProgress size={10} />}
                     </Typography>
-
-                    {/* Compatibility Mode Two-choice Segmented Control */}
-                    <Box
-                      sx={(theme) => ({
-                        position: 'relative',
-                        display: 'flex',
-                        alignItems: 'center',
-                        bgcolor: 'action.hover',
-                        borderRadius: '4px',
-                        p: '1px',
-                        width: '120px',
-                        height: 18,
-                        userSelect: 'none',
-                        ...get3DSegmentedContainerStyle(
-                          theme.palette.mode === 'light',
-                        ),
-                      })}
-                    >
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          left: 0,
-                          top: 0,
-                          width: '50%',
-                          height: '100%',
-                          zIndex: 0,
-                          transition:
-                            'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                          transform: `translate3d(${verge?.enable_multi_sub ? 100 : 0}%, 0, 0)`,
-                        }}
-                      >
-                        <Box
-                          sx={(theme) => get3DSegmentedActiveStyle(theme)}
-                        />
-                      </Box>
-                      <Box
-                        onClick={() => patchVerge({ enable_multi_sub: false })}
-                        sx={{
-                          flex: 1,
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: !verge?.enable_multi_sub
-                            ? '#1E1200'
-                            : 'text.secondary',
-                          fontSize: '10px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          zIndex: 1,
-                          transition: 'color 0.2s ease',
-                        }}
-                      >
-                        YAML
-                      </Box>
-                      <Box
-                        onClick={() => patchVerge({ enable_multi_sub: true })}
-                        sx={{
-                          flex: 1,
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: verge?.enable_multi_sub
-                            ? '#1E1200'
-                            : 'text.secondary',
-                          fontSize: '10px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          zIndex: 1,
-                          transition: 'color 0.2s ease',
-                        }}
-                      >
-                        兼容模式
-                      </Box>
-                    </Box>
                   </Box>
                   <Box
                     sx={{
@@ -1956,7 +1879,7 @@ const Layout = () => {
                     }}
                   >
                     <TextField
-                      placeholder="填入订阅链接 (YAML)"
+                      placeholder="填入订阅链接"
                       size="small"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
@@ -1992,7 +1915,7 @@ const Layout = () => {
                         }}
                         disabled={profileLoading}
                       >
-                        导入订阅链接（YAML）
+                        导入订阅链接
                       </Button>
                     </Box>
                   </Box>

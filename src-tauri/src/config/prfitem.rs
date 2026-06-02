@@ -388,17 +388,11 @@ impl PrfItem {
         let (_yaml, serialized_data) = match serde_yaml_ng::from_str::<Mapping>(data) {
             Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => (y, data.to_string()),
             _ => {
-                let verge_config = crate::config::Config::verge().await.latest_arc();
-                let enable_multi_sub = verge_config.enable_multi_sub.unwrap_or(false);
-                if enable_multi_sub {
-                    if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(data) {
-                        let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default();
-                        (parsed, serialized)
-                    } else {
-                        return Err(anyhow::anyhow!("the remote profile data is invalid yaml and cannot be parsed as a universal URI list"));
-                    }
+                if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(data) {
+                    let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default();
+                    (parsed, serialized)
                 } else {
-                    return Err(anyhow::anyhow!("the remote profile data is invalid yaml"));
+                    return Err(anyhow::anyhow!("订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"));
                 }
             }
         };

@@ -855,16 +855,12 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     let profile = collect_profile_items().await?;
     let mut config = profile.config;
 
-    // Check if multi-subscription merging is enabled
-    let verge_config = Config::verge().await.latest_arc();
-    let enable_multi_sub = verge_config.enable_multi_sub.unwrap_or(false);
-    if enable_multi_sub {
-        let profiles = Config::profiles().await;
-        let profiles_arc = profiles.latest_arc();
-        drop(profiles);
-        let merged = get_merged_proxies(&profiles_arc).await;
-        config.insert(Value::from("proxies"), Value::from(merged));
-    }
+    // Always merge proxies from all remote and local subscription files
+    let profiles = Config::profiles().await;
+    let profiles_arc = profiles.latest_arc();
+    drop(profiles);
+    let merged = get_merged_proxies(&profiles_arc).await;
+    config.insert(Value::from("proxies"), Value::from(merged));
 
     let merge_item = profile.merge_item;
     let script_item = profile.script_item;
