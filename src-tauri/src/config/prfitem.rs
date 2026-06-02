@@ -253,6 +253,7 @@ impl PrfItem {
 
     /// ## Remote type
     /// create a new item from url
+    #[allow(clippy::cognitive_complexity)]
     pub async fn from_url(
         url: &str,
         name: Option<&String>,

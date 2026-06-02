@@ -790,7 +790,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 
 #[allow(clippy::collapsible_if, clippy::needless_borrows_for_generic_args)]
 async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
-    use chrono::{TimeZone, Local};
+    use chrono::{TimeZone as _, Local};
     let mut all_proxies = Vec::new();
     if let Some(items) = profiles.get_items() {
         for item in items {
