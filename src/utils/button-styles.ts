@@ -150,15 +150,15 @@ export const get3DCardStyle = (
     textColor = isLight ? '#7F6000' : '#FFEB3B'
     borderColor = isLight ? '#D4AF37' : '#9C7A14'
     backgroundStyle = isLight
-      ? 'radial-gradient(circle at center, #FFFDE7 0%, #FFF59D 50%, #FBC02D 80%, #E65100 100%)'
-      : 'radial-gradient(circle at center, #F57C00 0%, #E65100 65%, #BF360C 90%, #3E1B00 100%)'
+      ? 'radial-gradient(circle at center, #FFFDE7 0%, #FFF59D 45%, #FFD54F 75%, #FFB300 100%)'
+      : 'radial-gradient(circle at center, #FFA000 0%, #F57C00 50%, #E65100 80%, #803000 100%)'
     bevelShadowDark = isLight ? '#B38F1E' : '#705407'
   } else if (cardType === 'download') {
     textColor = isLight ? '#004D40' : '#80D8FF'
     borderColor = isLight ? '#0084FF' : '#0D47A1'
     backgroundStyle = isLight
-      ? 'radial-gradient(circle at center, #E0F7FA 0%, #80DEEA 50%, #00ACC1 80%, #006064 100%)'
-      : 'radial-gradient(circle at center, #0091EA 0%, #0D47A1 65%, #01579B 90%, #071F4D 100%)'
+      ? 'radial-gradient(circle at center, #E3F2FD 0%, #90CAF9 45%, #42A5F5 75%, #1E88E5 100%)'
+      : 'radial-gradient(circle at center, #00B0FF 0%, #0091EA 50%, #0D47A1 80%, #0A3570 100%)'
     bevelShadowDark = isLight ? '#0066CC' : '#08306B'
   } else {
     textColor = isLight ? '#2D3748' : theme.palette.text.primary
