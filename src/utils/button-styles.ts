@@ -153,7 +153,6 @@ export const get3DCardStyle = (
       ? 'radial-gradient(circle at center, #FFFDE7 0%, #FFF59D 50%, #FBC02D 80%, #E65100 100%)'
       : 'radial-gradient(circle at center, #F57C00 0%, #E65100 65%, #BF360C 90%, #3E1B00 100%)'
     bevelShadowDark = isLight ? '#B38F1E' : '#705407'
-    borderWidth = 'calc(1px * var(--depth-factor, 1.0))'
   } else if (cardType === 'download') {
     textColor = isLight ? '#004D40' : '#80D8FF'
     borderColor = isLight ? '#0084FF' : '#0D47A1'
@@ -161,7 +160,6 @@ export const get3DCardStyle = (
       ? 'radial-gradient(circle at center, #E0F7FA 0%, #80DEEA 50%, #00ACC1 80%, #006064 100%)'
       : 'radial-gradient(circle at center, #0091EA 0%, #0D47A1 65%, #01579B 90%, #071F4D 100%)'
     bevelShadowDark = isLight ? '#0066CC' : '#08306B'
-    borderWidth = 'calc(1px * var(--depth-factor, 1.0))'
   } else {
     textColor = isLight ? '#2D3748' : theme.palette.text.primary
     borderColor = isLight ? '#94A3B8' : '#0F172A'
@@ -177,24 +175,36 @@ export const get3DCardStyle = (
     borderColor,
     background: backgroundStyle,
     color: textColor,
-    transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    transition: 'all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
     boxShadow: isLight
       ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
          0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
          0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-         0 calc(3px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
-         0 calc(5px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
+         0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
+         0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
          inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
          inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-         inset -1px -1px 0 rgba(0, 0, 0, 0.15)`
+         inset -1px -1px 0 rgba(0, 0, 0, 0.15)${
+           cardType === 'primary' || cardType === 'upload' || cardType === 'download'
+             ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
+             : ''
+         }`
       : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
          0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
          0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-         0 calc(3px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
-         0 calc(5px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
+         0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
+         0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
+         0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
          inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
          inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
-         inset -1px -1px 0 rgba(0, 0, 0, 0.25)`,
+         inset -1px -1px 0 rgba(0, 0, 0, 0.25)${
+           cardType === 'primary' || cardType === 'upload' || cardType === 'download'
+             ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
+             : ''
+         }`,
   }
 }
 
