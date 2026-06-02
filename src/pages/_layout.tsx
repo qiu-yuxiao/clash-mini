@@ -482,105 +482,6 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
           },
         }}
       >
-        {/* Upload Group */}
-        <Box sx={{ display: 'flex', flex: 1, minWidth: 0, width: '100%' }}>
-          {/* Upload Speed */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flex: 1,
-              gap: 0.3,
-              height: '18px',
-              px: 0.5,
-              ...get3DCardStyle(theme, 'upload'),
-              borderTopRightRadius: 0,
-              borderBottomRightRadius: 0,
-              borderRight: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <ArrowUpwardRounded sx={{ color: mode === 'light' ? '#E65100' : '#FFD54F', fontSize: 14 }} />
-            <Typography
-              sx={{
-                fontSize: '9px',
-                color: mode === 'light' ? '#7B5200' : '#FFD54F',
-                fontWeight: 'bold',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              上传:
-            </Typography>
-            <Typography
-              sx={{
-                fontWeight: 'bold',
-                fontSize: '13px',
-                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {upVal}{' '}
-              <span
-                style={{
-                  fontSize: '8px',
-                  fontWeight: 'normal',
-                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
-                }}
-              >
-                {upUnit}/s
-              </span>
-            </Typography>
-          </Box>
-
-          {/* Upload Total */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flex: 1,
-              gap: 0.3,
-              height: '18px',
-              px: 0.5,
-              ...get3DCardStyle(theme, 'upload'),
-              borderTopLeftRadius: 0,
-              borderBottomLeftRadius: 0,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: '9px',
-                color: mode === 'light' ? '#7B5200' : '#FFD54F',
-                fontWeight: 'bold',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              总量:
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: '13px',
-                fontWeight: 'bold',
-                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {upTotalVal}{' '}
-              <span
-                style={{
-                  fontSize: '8px',
-                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
-                  fontWeight: 'normal',
-                }}
-              >
-                {upTotalUnit}
-              </span>
-            </Typography>
-          </Box>
-        </Box>
-
         {/* Download Group */}
         <Box sx={{ display: 'flex', flex: 1, minWidth: 0, width: '100%' }}>
           {/* Download Speed */}
@@ -675,6 +576,105 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 }}
               >
                 {downTotalUnit}
+              </span>
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Upload Group */}
+        <Box sx={{ display: 'flex', flex: 1, minWidth: 0, width: '100%' }}>
+          {/* Upload Speed */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              gap: 0.3,
+              height: '18px',
+              px: 0.5,
+              ...get3DCardStyle(theme, 'upload'),
+              borderTopRightRadius: 0,
+              borderBottomRightRadius: 0,
+              borderRight: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <ArrowUpwardRounded sx={{ color: mode === 'light' ? '#E65100' : '#FFD54F', fontSize: 14 }} />
+            <Typography
+              sx={{
+                fontSize: '9px',
+                color: mode === 'light' ? '#7B5200' : '#FFD54F',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              上传:
+            </Typography>
+            <Typography
+              sx={{
+                fontWeight: 'bold',
+                fontSize: '13px',
+                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {upVal}{' '}
+              <span
+                style={{
+                  fontSize: '8px',
+                  fontWeight: 'normal',
+                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
+                }}
+              >
+                {upUnit}/s
+              </span>
+            </Typography>
+          </Box>
+
+          {/* Upload Total */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              gap: 0.3,
+              height: '18px',
+              px: 0.5,
+              ...get3DCardStyle(theme, 'upload'),
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '9px',
+                color: mode === 'light' ? '#7B5200' : '#FFD54F',
+                fontWeight: 'bold',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              总量:
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '13px',
+                fontWeight: 'bold',
+                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {upTotalVal}{' '}
+              <span
+                style={{
+                  fontSize: '8px',
+                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
+                  fontWeight: 'normal',
+                }}
+              >
+                {upTotalUnit}
               </span>
             </Typography>
           </Box>
