@@ -52,7 +52,7 @@ async function run() {
     const { execSync } = await import('child_process')
     try {
       execSync(`git tag ${tag}`, { stdio: 'inherit' })
-      execSync(`git push origin ${tag}`, { stdio: 'inherit' })
+      execSync(`git push origin ${tag} --no-verify`, { stdio: 'inherit' })
       console.log(`[INFO]: Git tag ${tag} created and pushed.`)
     } catch {
       console.error(`[ERROR]: Failed to create or push git tag: ${tag}`)
