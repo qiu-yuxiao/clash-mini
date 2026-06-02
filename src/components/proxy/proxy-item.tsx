@@ -47,6 +47,7 @@ const popIn = keyframes`
 import { BaseLoading } from '@/components/base'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
 import delayManager from '@/services/delay'
+
 import { useWindowWidth } from './use-window-width'
 
 interface Props {
@@ -63,19 +64,6 @@ const Widget = styled(Box)(() => ({
   padding: '1px 3px',
   fontSize: 10,
   borderRadius: '3px',
-}))
-
-const TypeBox = styled('span')(({ theme }) => ({
-  display: 'inline-block',
-  border: '1px solid #ccc',
-  borderColor: alpha(theme.palette.text.secondary, 0.25),
-  color: alpha(theme.palette.text.secondary, 0.7),
-  borderRadius: 3,
-  fontSize: 9,
-  marginRight: '2px',
-  padding: '0 3px',
-  lineHeight: 1.3,
-  whiteSpace: 'nowrap',
 }))
 
 export const ProxyItem = (props: Props) => {

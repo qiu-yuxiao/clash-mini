@@ -49,6 +49,7 @@ export const ProxyRender = (props: RenderProps) => {
     onHeadState,
     onChangeProxy,
     isChainMode: _ = false,
+    isTesting,
   } = props
   const { type, group, headState, proxy, proxyCol, col } = item
   const { verge } = useVerge()
@@ -189,7 +190,7 @@ export const ProxyRender = (props: RenderProps) => {
         url={group.testUrl}
         groupName={group.name}
         headState={headState!}
-        isTesting={props.isTesting}
+        isTesting={isTesting}
         onLocation={() => onLocation(group)}
         onCheckDelay={() => onCheckAll(group.name)}
         onHeadState={(p) => onHeadState(group.name, p)}

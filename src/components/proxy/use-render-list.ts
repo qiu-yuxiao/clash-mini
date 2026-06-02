@@ -79,7 +79,7 @@ type GroupCache = {
 }
 
 // 优化列布局计算
-const calculateColumns = (width: number, configCol: number): number => {
+const calculateColumns = (width: number, _configCol: number): number => {
   if (width <= 285) {
     return 1
   }
@@ -379,7 +379,6 @@ export const useRenderList = (
     }
 
     // 正常模式的渲染逻辑
-    const useRule = mode === 'rule' || mode === 'script'
     const renderGroups = proxiesData.groups.length
       ? proxiesData.groups
       : [proxiesData.global!]

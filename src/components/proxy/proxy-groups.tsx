@@ -469,27 +469,6 @@ export const ProxyGroups = (props: Props) => {
     }
   })
 
-  // 定位到指定的代理组
-  const handleGroupLocationByName = useCallback(
-    (groupName: string) => {
-      const index = filteredRenderList.findIndex(
-        (item) => item.type === 0 && item.group?.name === groupName,
-      )
-
-      if (index >= 0) {
-        virtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' })
-      }
-    },
-    [filteredRenderList, virtualizer],
-  )
-
-  const proxyGroupNames = useMemo(() => {
-    const names = filteredRenderList
-      .filter((item) => item.type === 0 && item.group?.name)
-      .map((item) => item.group!.name)
-    return Array.from(new Set(names))
-  }, [filteredRenderList])
-
   const activeGroupHeadItem = useMemo(() => {
     return renderList.find((item) => item.type === 1)
   }, [renderList])
