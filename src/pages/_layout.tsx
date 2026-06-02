@@ -2854,7 +2854,7 @@ const Layout = () => {
               borderTop: '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',
-              padding: isMinimalWidth ? '4px 12px 0px 12px' : '8px 12px 0px 12px',
+              padding: isMinimalWidth ? '4px 12px 2px 12px' : '8px 12px 2px 12px',
               display: 'flex',
               gap: '12px',
               overflow: 'hidden',
