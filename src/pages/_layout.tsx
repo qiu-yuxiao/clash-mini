@@ -762,7 +762,7 @@ const Layout = () => {
 
   const [isMinimalWidth, setIsMinimalWidth] = useState(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth <= 270
+      return window.innerWidth <= 285
     }
     return false
   })
@@ -770,7 +770,7 @@ const Layout = () => {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleResize = () => {
-      setIsMinimalWidth(window.innerWidth <= 270)
+      setIsMinimalWidth(window.innerWidth <= 285)
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
