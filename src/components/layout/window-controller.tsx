@@ -45,6 +45,7 @@ export const WindowControls = forwardRef(function WindowControls(props, ref) {
         display: 'flex',
         gap: 1,
         alignItems: 'center',
+        flexShrink: 0,
         '> button': {
           cursor: 'default',
         },

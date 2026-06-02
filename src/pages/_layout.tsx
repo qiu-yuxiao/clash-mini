@@ -1468,7 +1468,8 @@ const Layout = () => {
             data-tauri-drag-region="true"
             style={{
               alignSelf: 'stretch',
-              flex: '1 1 auto',
+              flex: '1 1 0%',
+              minWidth: 0,
             }}
           />
 
@@ -1481,6 +1482,7 @@ const Layout = () => {
                 })
               }
               sx={{
+                flexShrink: 0,
                 color: verge?.enable_always_on_top
                   ? 'primary.main'
                   : 'text.primary',
@@ -1528,6 +1530,7 @@ const Layout = () => {
             size="small"
             onClick={() => setDrawerOpen(!drawerOpen)}
             sx={{
+              flexShrink: 0,
               color: drawerOpen ? 'primary.main' : 'text.primary',
               width: '28px',
               height: '28px',
