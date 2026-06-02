@@ -1637,8 +1637,8 @@ const Layout = () => {
           {/* Upper Pane: Node Selection (80%) */}
           <div
             style={{
-              flex: '80 0 0%',
-              height: '80%',
+              flex: isMinimalWidth ? '0 0 33px' : '80 0 0%',
+              height: isMinimalWidth ? '33px' : '80%',
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',
@@ -1646,7 +1646,7 @@ const Layout = () => {
             }}
           >
             {/* 右上角独立控制按钮（齿轮/关闭） */}
-            {decorated && (
+            {decorated && !isMinimalWidth && (
               <div
                 style={{
                   position: 'absolute',
@@ -1694,7 +1694,7 @@ const Layout = () => {
                   alignItems: 'center',
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding: '3px 44px 2px 8px', // 右侧留出 44px 避让右上角绝对定位按钮
+                  padding: isMinimalWidth ? '3px 8px 2px 8px' : '3px 44px 2px 8px', // 右侧留出 44px 避让右上角绝对定位按钮
                   position: 'relative',
                   zIndex: 110,
                 }}
@@ -1702,7 +1702,7 @@ const Layout = () => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <ActiveNodeStatusCard />
                 </div>
-                {decorated && (
+                {decorated && !isMinimalWidth && (
                   <IconButton
                     size="small"
                     onClick={() =>
@@ -1758,13 +1758,15 @@ const Layout = () => {
             )}
 
             {/*节点组选择列表*/}
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <ProxyGroups
-                mode={clashConfig?.mode?.toLowerCase() || 'rule'}
-                isChainMode={false}
-                chainConfigData={null}
-              />
-            </div>
+            {!isMinimalWidth && (
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <ProxyGroups
+                  mode={clashConfig?.mode?.toLowerCase() || 'rule'}
+                  isChainMode={false}
+                  chainConfigData={null}
+                />
+              </div>
+            )}
 
             {/* Settings Sliding Drawer (slides internal left-downwards) */}
             <div
@@ -2844,8 +2846,8 @@ const Layout = () => {
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
           <div
             style={{
-              flex: isMinimalWidth ? '0 0 100px' : '0 0 178px',
-              height: isMinimalWidth ? '100px' : '178px',
+              flex: isMinimalWidth ? '1 1 0%' : '0 0 178px',
+              height: isMinimalWidth ? 'auto' : '178px',
               borderTop: '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',
