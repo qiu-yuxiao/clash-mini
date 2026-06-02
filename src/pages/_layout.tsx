@@ -1793,15 +1793,13 @@ const Layout = () => {
             )}
 
             {/*节点组选择列表*/}
-            {!isMinimalWidth && (
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <ProxyGroups
-                  mode={clashConfig?.mode?.toLowerCase() || 'rule'}
-                  isChainMode={false}
-                  chainConfigData={null}
-                />
-              </div>
-            )}
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <ProxyGroups
+                mode={clashConfig?.mode?.toLowerCase() || 'rule'}
+                isChainMode={false}
+                chainConfigData={null}
+              />
+            </div>
 
             {/* Settings Sliding Drawer (slides internal left-downwards) */}
             <div
