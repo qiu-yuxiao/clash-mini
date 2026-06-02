@@ -92,6 +92,9 @@ export const ProxyItem = (props: Props) => {
   const { width } = useWindowWidth()
   const isMinimal = width <= 285
 
+  const displayName = proxy.name.replace(/\s\(\d{6}\)$/, '')
+  const displayNow = proxy.now ? proxy.now.replace(/\s\(\d{6}\)$/, '') : ''
+
   // -1/<=0 为不显示，-2 为 loading
   const { delayValue, isPreset, timeout, onDelay } = useProxyDelayState(
     proxy,
@@ -205,7 +208,7 @@ export const ProxyItem = (props: Props) => {
 
           {/* Column 2: Name (Flex growth, centered, border-right divider) */}
           <Box
-            title={proxy.name}
+            title={displayName}
             sx={{
               flex: 1,
               height: '100%',
@@ -231,14 +234,14 @@ export const ProxyItem = (props: Props) => {
                 whiteSpace: 'nowrap',
               }}
             >
-              {proxy.name}
+              {displayName}
             </Box>
           </Box>
         </>
       ) : (
         /* Column 1: Name (Flex growth, overflow ellipsis) */
         <Box
-          title={`${proxy.name}${proxy.now ? ` - ${proxy.now}` : ''}`}
+          title={`${displayName}${displayNow ? ` - ${displayNow}` : ''}`}
           sx={{
             flex: 1,
             height: '100%',
@@ -263,13 +266,13 @@ export const ProxyItem = (props: Props) => {
               whiteSpace: 'nowrap',
             }}
           >
-            {proxy.name}
-            {showType && proxy.now && (
+            {displayName}
+            {showType && displayNow && (
               <Box
                 component="span"
                 sx={{ color: 'text.secondary', ml: 0.5, fontSize: '11px' }}
               >
-                - {proxy.now}
+                - {displayNow}
               </Box>
             )}
           </Box>

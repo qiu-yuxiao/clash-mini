@@ -385,11 +385,23 @@ impl PrfItem {
         let data = data.trim_start_matches('\u{feff}');
 
         // check the data whether the valid yaml format
-        let yaml = serde_yaml_ng::from_str::<Mapping>(data).context("the remote profile data is invalid yaml")?;
-
-        if !yaml.contains_key("proxies") && !yaml.contains_key("proxy-providers") {
-            bail!("profile does not contain `proxies` or `proxy-providers`");
-        }
+        let (_yaml, serialized_data) = match serde_yaml_ng::from_str::<Mapping>(data) {
+            Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => (y, data.to_string()),
+            _ => {
+                let verge_config = crate::config::Config::verge().await.latest_arc();
+                let enable_multi_sub = verge_config.enable_multi_sub.unwrap_or(false);
+                if enable_multi_sub {
+                    if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(data) {
+                        let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default();
+                        (parsed, serialized)
+                    } else {
+                        return Err(anyhow::anyhow!("the remote profile data is invalid yaml and cannot be parsed as a universal URI list"));
+                    }
+                } else {
+                    return Err(anyhow::anyhow!("the remote profile data is invalid yaml"));
+                }
+            }
+        };
 
         if merge.is_none() {
             let merge_item = &mut Self::from_merge(None)?;
@@ -438,7 +450,7 @@ impl PrfItem {
             }),
             home,
             updated: Some(chrono::Local::now().timestamp() as usize),
-            file_data: Some(data.into()),
+            file_data: Some(serialized_data.into()),
         })
     }
 

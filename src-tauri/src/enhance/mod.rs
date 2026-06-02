@@ -788,6 +788,50 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     rewrite_rules(config, &allowed)
 }
 
+async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
+    use chrono::{TimeZone, Local};
+    let mut all_proxies = Vec::new();
+    if let Some(items) = profiles.get_items() {
+        for item in items {
+            // Only process remote and local types
+            if let Some(itype) = &item.itype {
+                if itype == "remote" || itype == "local" {
+                    // Read file
+                    if let Some(file) = &item.file {
+                        if let Ok(file_path) = dirs::app_profiles_dir().map(|d| d.join(file.as_str())) {
+                            if let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path).await {
+                                if let Some(Value::Sequence(mut proxies)) = mapping.remove("proxies") {
+                                    // Generate suffix from item.updated timestamp
+                                    let ts = item.updated.unwrap_or(0) as i64;
+                                    let suffix = if let Some(dt) = Local.timestamp_opt(ts, 0).single() {
+                                        dt.format("%H%M%S").to_string()
+                                    } else {
+                                        "000000".to_string()
+                                    };
+                                    
+                                    // Format name
+                                    for proxy in &mut proxies {
+                                        if let Some(map) = proxy.as_mapping_mut() {
+                                            if let Some(name_val) = map.get_mut(&Value::from("name")) {
+                                                if let Some(name_str) = name_val.as_str() {
+                                                    let new_name = format!("{} ({})", name_str, suffix);
+                                                    *name_val = Value::from(new_name);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    all_proxies.extend(proxies);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    all_proxies
+}
+
 /// Enhance mode
 /// 返回最终订阅、该订阅包含的键、和script执行的结果
 pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, ResultLog>)> {
@@ -809,7 +853,19 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
 
     // collect profile items
     let profile = collect_profile_items().await?;
-    let config = profile.config;
+    let mut config = profile.config;
+
+    // Check if multi-subscription merging is enabled
+    let verge_config = Config::verge().await.latest_arc();
+    let enable_multi_sub = verge_config.enable_multi_sub.unwrap_or(false);
+    if enable_multi_sub {
+        let profiles = Config::profiles().await;
+        let profiles_arc = profiles.latest_arc();
+        drop(profiles);
+        let merged = get_merged_proxies(&profiles_arc).await;
+        config.insert(Value::from("proxies"), Value::from(merged));
+    }
+
     let merge_item = profile.merge_item;
     let script_item = profile.script_item;
     let rules_item = profile.rules_item;

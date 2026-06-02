@@ -986,6 +986,7 @@ interface IVergeConfig {
   hover_jump_navigator_delay?: number
   enable_external_controller?: boolean
   rule_fallback?: 'direct' | 'adjustable' | 'proxy'
+  enable_multi_sub?: boolean
 }
 
 interface IWebDavFile {

@@ -263,6 +263,9 @@ pub struct IVerge {
 
     /// 分流策略倾向 (直连兜底: "direct" | 代理兜底: "proxy" | 规则可调: "adjustable")
     pub rule_fallback: Option<String>,
+
+    /// 是否开启多订阅兼容模式
+    pub enable_multi_sub: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -457,6 +460,7 @@ impl IVerge {
             home_cards: None,
             enable_external_controller: Some(false),
             rule_fallback: Some("proxy".into()),
+            enable_multi_sub: Some(false),
             ..Self::default()
         }
     }
@@ -564,6 +568,7 @@ impl IVerge {
         patch!(home_cards);
         patch!(enable_external_controller);
         patch!(rule_fallback);
+        patch!(enable_multi_sub);
     }
 
     pub const fn get_singleton_port() -> u16 {

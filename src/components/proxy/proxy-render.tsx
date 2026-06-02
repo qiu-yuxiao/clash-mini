@@ -151,7 +151,7 @@ export const ProxyRender = (props: RenderProps) => {
               <Box component="span" sx={{ marginTop: '2px' }}>
                 <StyledTypeBox>{group.type}</StyledTypeBox>
                 <StyledSubtitle sx={{ color: 'text.secondary' }}>
-                  {group.now}
+                  {group.now ? group.now.replace(/\s\(\d{6}\)$/, '') : ''}
                 </StyledSubtitle>
               </Box>
             </Box>
