@@ -44,6 +44,7 @@ import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import { ConnectionTable } from '@/components/connection/connection-table'
 import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-traffic-graph'
+import { TrafficGraph } from '@/components/layout/traffic-graph'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
@@ -410,7 +411,7 @@ const ActiveNodeStatusCard = () => {
 }
 
 // Mini Traffic Panel
-const MiniTrafficPanel = () => {
+const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
   const mode = useThemeMode()
   const theme = useTheme()
   useTranslation()
@@ -452,7 +453,11 @@ const MiniTrafficPanel = () => {
     >
       {/* Traffic Graph (Full Width) */}
       <Box sx={{ flex: 1, width: '100%', minHeight: 0, position: 'relative' }}>
-        <EnhancedCanvasTrafficGraph ref={trafficRef} />
+        {isMinimalWidth ? (
+          <TrafficGraph ref={trafficRef} />
+        ) : (
+          <EnhancedCanvasTrafficGraph ref={trafficRef} />
+        )}
       </Box>
 
       {/* Metrics Row (Single Line Below Graph - Raised 3D Button style) */}
@@ -754,6 +759,22 @@ const Layout = () => {
     const saved = localStorage.getItem('clash-mini-vibrancy-factor')
     return saved !== null ? parseFloat(saved) : 1.0
   })
+
+  const [isMinimalWidth, setIsMinimalWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 270
+    }
+    return false
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleResize = () => {
+      setIsMinimalWidth(window.innerWidth <= 270)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const handleDepthFactorChange = (val: number) => {
     setDepthFactor(val)
@@ -2823,19 +2844,19 @@ const Layout = () => {
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
           <div
             style={{
-              flex: '0 0 178px',
-              height: '178px',
+              flex: isMinimalWidth ? '0 0 100px' : '0 0 178px',
+              height: isMinimalWidth ? '100px' : '178px',
               borderTop: '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',
-              padding: '8px 12px 0px 12px',
+              padding: isMinimalWidth ? '4px 12px 0px 12px' : '8px 12px 0px 12px',
               display: 'flex',
               gap: '12px',
               overflow: 'hidden',
               boxSizing: 'border-box',
             }}
           >
-            <MiniTrafficPanel />
+            <MiniTrafficPanel isMinimalWidth={isMinimalWidth} />
           </div>
 
         </div>
