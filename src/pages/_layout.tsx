@@ -1649,7 +1649,7 @@ const Layout = () => {
             }}
           >
             {/* 右上角独立控制按钮（齿轮/关闭） */}
-            {decorated && !isMinimalWidth && (
+            {decorated && (
               <div
                 style={{
                   position: 'absolute',
@@ -1697,7 +1697,7 @@ const Layout = () => {
                   alignItems: 'center',
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding: isMinimalWidth ? '3px 8px 2px 8px' : '3px 44px 2px 8px', // 右侧留出 44px 避让右上角绝对定位按钮
+                  padding: '3px 44px 2px 8px',
                   position: 'relative',
                   zIndex: 110,
                 }}
@@ -1705,7 +1705,7 @@ const Layout = () => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <ActiveNodeStatusCard />
                 </div>
-                {decorated && !isMinimalWidth && (
+                {decorated && (
                   <IconButton
                     size="small"
                     onClick={() =>
@@ -1714,6 +1714,7 @@ const Layout = () => {
                       })
                     }
                     sx={{
+                      flexShrink: 0,
                       color: verge?.enable_always_on_top
                         ? 'primary.main'
                         : 'text.primary',
