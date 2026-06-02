@@ -2117,7 +2117,7 @@ const Layout = () => {
                       borderRadius: '4px',
                       p: '1px',
                       mb: 1,
-                      height: 24,
+                      height: 22,
                       userSelect: 'none',
                       ...get3DSegmentedContainerStyle(
                         theme.palette.mode === 'light',
@@ -2215,7 +2215,7 @@ const Layout = () => {
                       bgcolor: 'action.hover',
                       borderRadius: '4px',
                       p: '1px',
-                      height: 24,
+                      height: 22,
                       userSelect: 'none',
                       ...get3DSegmentedContainerStyle(
                         theme.palette.mode === 'light',
@@ -2475,7 +2475,7 @@ const Layout = () => {
                           borderRadius: '4px',
                           p: '1px',
                           width: '120px',
-                          height: 22,
+                          height: 20,
                           userSelect: 'none',
                           ...get3DSegmentedContainerStyle(
                             theme.palette.mode === 'light',
@@ -2729,7 +2729,7 @@ const Layout = () => {
                       borderRadius: '4px',
                       p: '1px',
                       width: '140px',
-                      height: 20,
+                      height: 18,
                       userSelect: 'none',
                       ...get3DSegmentedContainerStyle(
                         theme.palette.mode === 'light',
