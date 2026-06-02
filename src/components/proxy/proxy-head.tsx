@@ -29,6 +29,7 @@ import { debugLog } from '@/utils/debug'
 
 import type { ProxySortType } from './use-filter-sort'
 import type { HeadState } from './use-head-state'
+import { useWindowWidth } from './use-window-width'
 
 interface Props {
   sx?: SxProps<Theme>
@@ -73,6 +74,9 @@ export const ProxyHead = ({
   onCheckDelay,
 }: Props) => {
   const theme = useTheme()
+  const { width } = useWindowWidth()
+  const isMinimal = width <= 285
+
   const {
     showType,
     sortType,
@@ -83,6 +87,8 @@ export const ProxyHead = ({
     filterMatchWholeWord,
     filterUseRegularExpression,
   } = headState
+
+  const effectiveTextState = isMinimal ? 'filter' : textState
 
   const { t } = useTranslation()
   const [autoFocus, setAutoFocus] = useState(false)
@@ -114,15 +120,17 @@ export const ProxyHead = ({
         ...sx,
       }}
     >
-      <IconButton
-        size="small"
-        color="inherit"
-        title={t('proxies.page.tooltips.locate')}
-        onClick={onLocation}
-        sx={{ width: 26, height: 26, p: 0 }}
-      >
-        <MyLocationOutlined sx={{ fontSize: 17 }} />
-      </IconButton>
+      {!isMinimal && (
+        <IconButton
+          size="small"
+          color="inherit"
+          title={t('proxies.page.tooltips.locate')}
+          onClick={onLocation}
+          sx={{ width: 26, height: 26, p: 0 }}
+        >
+          <MyLocationOutlined sx={{ fontSize: 17 }} />
+        </IconButton>
+      )}
 
       <IconButton
         size="small"
@@ -130,7 +138,7 @@ export const ProxyHead = ({
         title={t('proxies.page.tooltips.delayCheck')}
         onClick={() => {
           debugLog(`[ProxyHead] 点击延迟测试按钮，组: ${groupName}`)
-          if (testUrl?.trim() && textState !== 'filter') {
+          if (testUrl?.trim() && effectiveTextState !== 'filter') {
             debugLog(`[ProxyHead] 使用自定义测试URL: ${testUrl}`)
             onHeadState({ textState: 'url' })
           }
@@ -171,53 +179,59 @@ export const ProxyHead = ({
         {sortType === 2 && <SortByAlphaOutlined sx={{ fontSize: 17 }} />}
       </IconButton>
 
-      <IconButton
-        size="small"
-        color="inherit"
-        title={t('proxies.page.tooltips.delayCheckUrl')}
-        onClick={() =>
-          onHeadState({ textState: textState === 'url' ? null : 'url' })
-        }
-        sx={{ width: 26, height: 26, p: 0 }}
-      >
-        <LinkOutlined
-          sx={{ fontSize: 17, opacity: textState === 'url' ? 1 : 0.6 }}
-        />
-      </IconButton>
+      {!isMinimal && (
+        <IconButton
+          size="small"
+          color="inherit"
+          title={t('proxies.page.tooltips.delayCheckUrl')}
+          onClick={() =>
+            onHeadState({ textState: textState === 'url' ? null : 'url' })
+          }
+          sx={{ width: 26, height: 26, p: 0 }}
+        >
+          <LinkOutlined
+            sx={{ fontSize: 17, opacity: textState === 'url' ? 1 : 0.6 }}
+          />
+        </IconButton>
+      )}
 
-      <IconButton
-        size="small"
-        color="inherit"
-        title={
-          showType
-            ? t('proxies.page.tooltips.showBasic')
-            : t('proxies.page.tooltips.showDetail')
-        }
-        onClick={() => onHeadState({ showType: !showType })}
-        sx={{ width: 26, height: 26, p: 0 }}
-      >
-        {showType ? (
-          <VisibilityOutlined sx={{ fontSize: 17 }} />
-        ) : (
-          <VisibilityOffOutlined sx={{ fontSize: 17 }} />
-        )}
-      </IconButton>
+      {!isMinimal && (
+        <IconButton
+          size="small"
+          color="inherit"
+          title={
+            showType
+              ? t('proxies.page.tooltips.showBasic')
+              : t('proxies.page.tooltips.showDetail')
+          }
+          onClick={() => onHeadState({ showType: !showType })}
+          sx={{ width: 26, height: 26, p: 0 }}
+        >
+          {showType ? (
+            <VisibilityOutlined sx={{ fontSize: 17 }} />
+          ) : (
+            <VisibilityOffOutlined sx={{ fontSize: 17 }} />
+          )}
+        </IconButton>
+      )}
 
-      <IconButton
-        size="small"
-        color="inherit"
-        title={t('proxies.page.tooltips.filter')}
-        onClick={() =>
-          onHeadState({ textState: textState === 'filter' ? null : 'filter' })
-        }
-        sx={{ width: 26, height: 26, p: 0 }}
-      >
-        <FilterListOutlined
-          sx={{ fontSize: 17, opacity: textState === 'filter' ? 1 : 0.6 }}
-        />
-      </IconButton>
+      {!isMinimal && (
+        <IconButton
+          size="small"
+          color="inherit"
+          title={t('proxies.page.tooltips.filter')}
+          onClick={() =>
+            onHeadState({ textState: textState === 'filter' ? null : 'filter' })
+          }
+          sx={{ width: 26, height: 26, p: 0 }}
+        >
+          <FilterListOutlined
+            sx={{ fontSize: 17, opacity: textState === 'filter' ? 1 : 0.6 }}
+          />
+        </IconButton>
+      )}
 
-      {textState === 'filter' && (
+      {effectiveTextState === 'filter' && (
         <Box
           sx={{
             ml: 0.5,
@@ -246,7 +260,7 @@ export const ProxyHead = ({
         </Box>
       )}
 
-      {textState === 'url' && (
+      {effectiveTextState === 'url' && (
         <TextField
           autoComplete="off"
           autoFocus={autoFocus}
