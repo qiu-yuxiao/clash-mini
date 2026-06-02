@@ -195,36 +195,6 @@ export const get3DCardStyle = (
          inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
          inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
          inset -1px -1px 0 rgba(0, 0, 0, 0.25)`,
-    '&:hover': {
-      transform: 'translateY(-1.5px)',
-      boxShadow: isLight
-        ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
-           0 calc(7px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.1)${
-             cardType === 'primary' || cardType === 'upload' || cardType === 'download'
-               ? `, 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
-               : ''
-           }`
-        : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.45),
-           0 calc(7px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.2)${
-             cardType === 'primary' || cardType === 'upload' || cardType === 'download'
-               ? `, 0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`
-               : ''
-           }`,
-    },
   }
 }
 
