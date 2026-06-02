@@ -129,7 +129,7 @@ export const get3DButtonStyle = (
 
 // 3D Bevel Card Styling Helper
 export const get3DCardStyle = (
-  theme: Theme,
+  theme: any,
   cardType: 'primary' | 'default' | 'upload' | 'download',
   isLightMode?: boolean,
 ) => {
@@ -139,6 +139,7 @@ export const get3DCardStyle = (
   let textColor: string
   let borderColor: string
   let bevelShadowDark: string
+  let borderWidth = 'calc(2px * var(--depth-factor, 1.0))'
 
   if (cardType === 'primary') {
     textColor = '#1E1200'
@@ -152,6 +153,7 @@ export const get3DCardStyle = (
       ? 'radial-gradient(circle at center, #FFFDE7 0%, #FFF59D 50%, #FBC02D 80%, #E65100 100%)'
       : 'radial-gradient(circle at center, #F57C00 0%, #E65100 65%, #BF360C 90%, #3E1B00 100%)'
     bevelShadowDark = isLight ? '#B38F1E' : '#705407'
+    borderWidth = 'calc(1px * var(--depth-factor, 1.0))'
   } else if (cardType === 'download') {
     textColor = isLight ? '#004D40' : '#80D8FF'
     borderColor = isLight ? '#0084FF' : '#0D47A1'
@@ -159,6 +161,7 @@ export const get3DCardStyle = (
       ? 'radial-gradient(circle at center, #E0F7FA 0%, #80DEEA 50%, #00ACC1 80%, #006064 100%)'
       : 'radial-gradient(circle at center, #0091EA 0%, #0D47A1 65%, #01579B 90%, #071F4D 100%)'
     bevelShadowDark = isLight ? '#0066CC' : '#08306B'
+    borderWidth = 'calc(1px * var(--depth-factor, 1.0))'
   } else {
     textColor = isLight ? '#2D3748' : theme.palette.text.primary
     borderColor = isLight ? '#94A3B8' : '#0F172A'
@@ -170,7 +173,7 @@ export const get3DCardStyle = (
 
   return {
     borderRadius: '6px',
-    border: 'calc(2px * var(--depth-factor, 1.0)) solid',
+    border: `${borderWidth} solid`,
     borderColor,
     background: backgroundStyle,
     color: textColor,

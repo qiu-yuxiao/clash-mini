@@ -460,7 +460,7 @@ const MiniTrafficPanel = () => {
         sx={{
           display: 'flex',
           width: '100%',
-          height: '26px',
+          height: '22px',
           alignItems: 'center',
           justifyContent: 'space-between',
           borderTop: (theme) => `1px solid ${theme.palette.divider}`,
@@ -472,7 +472,7 @@ const MiniTrafficPanel = () => {
           '@media (max-width: 560px)': {
             height: 'auto',
             flexDirection: 'column',
-            gap: 0.5,
+            gap: 0,
             pt: 0.5,
           },
         }}
@@ -486,9 +486,9 @@ const MiniTrafficPanel = () => {
               alignItems: 'center',
               justifyContent: 'center',
               flex: 1,
-              gap: 0.75,
-              height: '22px',
-              px: 1,
+              gap: 0.3,
+              height: '18px',
+              px: 0.5,
               ...get3DCardStyle(theme, 'upload'),
               borderTopRightRadius: 0,
               borderBottomRightRadius: 0,
@@ -496,10 +496,10 @@ const MiniTrafficPanel = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            <ArrowUpwardRounded sx={{ color: mode === 'light' ? '#E65100' : '#FFD54F', fontSize: 16 }} />
+            <ArrowUpwardRounded sx={{ color: mode === 'light' ? '#E65100' : '#FFD54F', fontSize: 14 }} />
             <Typography
               sx={{
-                fontSize: '11px',
+                fontSize: '9px',
                 color: mode === 'light' ? '#7B5200' : '#FFD54F',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
@@ -510,7 +510,7 @@ const MiniTrafficPanel = () => {
             <Typography
               sx={{
                 fontWeight: 'bold',
-                fontSize: '15px',
+                fontSize: '13px',
                 color: mode === 'light' ? '#3E2723' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
@@ -518,7 +518,7 @@ const MiniTrafficPanel = () => {
               {upVal}{' '}
               <span
                 style={{
-                  fontSize: '10px',
+                  fontSize: '8px',
                   fontWeight: 'normal',
                   color: mode === 'light' ? '#7B5200' : '#FFECB3',
                 }}
@@ -535,9 +535,9 @@ const MiniTrafficPanel = () => {
               alignItems: 'center',
               justifyContent: 'center',
               flex: 1,
-              gap: 0.75,
-              height: '22px',
-              px: 1,
+              gap: 0.3,
+              height: '18px',
+              px: 0.5,
               ...get3DCardStyle(theme, 'upload'),
               borderTopLeftRadius: 0,
               borderBottomLeftRadius: 0,
@@ -546,7 +546,7 @@ const MiniTrafficPanel = () => {
           >
             <Typography
               sx={{
-                fontSize: '11px',
+                fontSize: '9px',
                 color: mode === 'light' ? '#7B5200' : '#FFD54F',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
@@ -556,7 +556,7 @@ const MiniTrafficPanel = () => {
             </Typography>
             <Typography
               sx={{
-                fontSize: '15px',
+                fontSize: '13px',
                 fontWeight: 'bold',
                 color: mode === 'light' ? '#3E2723' : '#FFFFFF',
                 whiteSpace: 'nowrap',
@@ -565,7 +565,7 @@ const MiniTrafficPanel = () => {
               {upTotalVal}{' '}
               <span
                 style={{
-                  fontSize: '10px',
+                  fontSize: '8px',
                   color: mode === 'light' ? '#7B5200' : '#FFECB3',
                   fontWeight: 'normal',
                 }}
@@ -585,9 +585,9 @@ const MiniTrafficPanel = () => {
               alignItems: 'center',
               justifyContent: 'center',
               flex: 1,
-              gap: 0.75,
-              height: '22px',
-              px: 1,
+              gap: 0.3,
+              height: '18px',
+              px: 0.5,
               ...get3DCardStyle(theme, 'download'),
               borderTopRightRadius: 0,
               borderBottomRightRadius: 0,
@@ -595,10 +595,10 @@ const MiniTrafficPanel = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            <ArrowDownwardRounded sx={{ color: mode === 'light' ? '#0084FF' : '#80D8FF', fontSize: 16 }} />
+            <ArrowDownwardRounded sx={{ color: mode === 'light' ? '#0084FF' : '#80D8FF', fontSize: 14 }} />
             <Typography
               sx={{
-                fontSize: '11px',
+                fontSize: '9px',
                 color: mode === 'light' ? '#006064' : '#80D8FF',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
@@ -609,7 +609,7 @@ const MiniTrafficPanel = () => {
             <Typography
               sx={{
                 fontWeight: 'bold',
-                fontSize: '15px',
+                fontSize: '13px',
                 color: mode === 'light' ? '#00363A' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
@@ -617,7 +617,7 @@ const MiniTrafficPanel = () => {
               {downVal}{' '}
               <span
                 style={{
-                  fontSize: '10px',
+                  fontSize: '8px',
                   fontWeight: 'normal',
                   color: mode === 'light' ? '#006064' : '#E0F7FA',
                 }}
@@ -634,9 +634,9 @@ const MiniTrafficPanel = () => {
               alignItems: 'center',
               justifyContent: 'center',
               flex: 1,
-              gap: 0.75,
-              height: '22px',
-              px: 1,
+              gap: 0.3,
+              height: '18px',
+              px: 0.5,
               ...get3DCardStyle(theme, 'download'),
               borderTopLeftRadius: 0,
               borderBottomLeftRadius: 0,
@@ -645,7 +645,7 @@ const MiniTrafficPanel = () => {
           >
             <Typography
               sx={{
-                fontSize: '11px',
+                fontSize: '9px',
                 color: mode === 'light' ? '#006064' : '#80D8FF',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
@@ -656,7 +656,7 @@ const MiniTrafficPanel = () => {
             <Typography
               sx={{
                 fontWeight: 'bold',
-                fontSize: '15px',
+                fontSize: '13px',
                 color: mode === 'light' ? '#00363A' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
@@ -664,7 +664,7 @@ const MiniTrafficPanel = () => {
               {downTotalVal}{' '}
               <span
                 style={{
-                  fontSize: '10px',
+                  fontSize: '8px',
                   color: mode === 'light' ? '#006064' : '#E0F7FA',
                   fontWeight: 'normal',
                 }}
@@ -1629,7 +1629,7 @@ const Layout = () => {
               <div
                 style={{
                   position: 'absolute',
-                  top: '8px',
+                  top: '3px',
                   right: '8px',
                   zIndex: 120,
                 }}
@@ -1673,7 +1673,7 @@ const Layout = () => {
                   alignItems: 'center',
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding: '8px 44px 4px 8px', // 右侧留出 44px 避让右上角绝对定位按钮
+                  padding: '3px 44px 2px 8px', // 右侧留出 44px 避让右上角绝对定位按钮
                   position: 'relative',
                   zIndex: 110,
                 }}
@@ -2828,7 +2828,7 @@ const Layout = () => {
               borderTop: '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',
-              padding: '8px 12px',
+              padding: '8px 12px 0px 12px',
               display: 'flex',
               gap: '12px',
               overflow: 'hidden',
@@ -2837,6 +2837,7 @@ const Layout = () => {
           >
             <MiniTrafficPanel />
           </div>
+
         </div>
       </Paper>
 
