@@ -32,7 +32,7 @@ pub fn decode_base64_robust(s: &str) -> Option<Vec<u8>> {
 
     // Try padding if length is not multiple of 4
     let mut padded = s.to_string();
-    while padded.len() % 4 != 0 {
+    while !padded.len().is_multiple_of(4) {
         padded.push('=');
     }
     if let Ok(data) = STANDARD.decode(&padded) {
@@ -120,18 +120,16 @@ fn parse_vmess(link: &str) -> Option<serde_yaml_ng::Mapping> {
                     serde_yaml_ng::Value::from(p),
                 );
             }
-            if let Some(h) = json.host {
-                if !h.is_empty() {
-                    let mut headers = serde_yaml_ng::Mapping::new();
-                    headers.insert(
-                        serde_yaml_ng::Value::from("Host"),
-                        serde_yaml_ng::Value::from(h),
-                    );
-                    ws_opts.insert(
-                        serde_yaml_ng::Value::from("headers"),
-                        serde_yaml_ng::Value::from(headers),
-                    );
-                }
+            if let Some(h) = json.host.filter(|h| !h.is_empty()) {
+                let mut headers = serde_yaml_ng::Mapping::new();
+                headers.insert(
+                    serde_yaml_ng::Value::from("Host"),
+                    serde_yaml_ng::Value::from(h),
+                );
+                ws_opts.insert(
+                    serde_yaml_ng::Value::from("headers"),
+                    serde_yaml_ng::Value::from(headers),
+                );
             }
             map.insert(
                 serde_yaml_ng::Value::from("ws-opts"),
@@ -164,17 +162,13 @@ fn parse_ss(link: &str) -> Option<serde_yaml_ng::Mapping> {
     }).unwrap_or_else(|| "SS Node".to_string());
     
     let (method_pw, host_port) = if base_part.contains('@') {
-        let mut subparts = base_part.splitn(2, '@');
-        let m_p = subparts.next()?;
-        let h_p = subparts.next()?;
+        let (m_p, h_p) = base_part.split_once('@')?;
         (m_p.to_string(), h_p.to_string())
     } else {
         let decoded = decode_base64_robust(base_part)?;
         let decoded_str = String::from_utf8(decoded).ok()?;
-        let mut subparts = decoded_str.splitn(2, '@');
-        let m_p = subparts.next()?.to_string();
-        let h_p = subparts.next()?.to_string();
-        (m_p, h_p)
+        let (m_p, h_p) = decoded_str.split_once('@')?;
+        (m_p.to_string(), h_p.to_string())
     };
     
     let decoded_method_pw = if !method_pw.contains(':') {
