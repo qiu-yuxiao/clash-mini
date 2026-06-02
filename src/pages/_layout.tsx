@@ -44,8 +44,8 @@ import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import { ConnectionTable } from '@/components/connection/connection-table'
 import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-traffic-graph'
-import { TrafficGraph } from '@/components/layout/traffic-graph'
 import { NoticeManager } from '@/components/layout/notice-manager'
+import { TrafficGraph } from '@/components/layout/traffic-graph'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import { filterSort } from '@/components/proxy/use-filter-sort'
@@ -501,7 +501,12 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               whiteSpace: 'nowrap',
             }}
           >
-            <ArrowDownwardRounded sx={{ color: mode === 'light' ? '#0084FF' : '#80D8FF', fontSize: 14 }} />
+            <ArrowDownwardRounded
+              sx={{
+                color: mode === 'light' ? '#0084FF' : '#80D8FF',
+                fontSize: 14,
+              }}
+            />
             <Typography
               sx={{
                 fontSize: '9px',
@@ -600,7 +605,12 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               whiteSpace: 'nowrap',
             }}
           >
-            <ArrowUpwardRounded sx={{ color: mode === 'light' ? '#E65100' : '#FFD54F', fontSize: 14 }} />
+            <ArrowUpwardRounded
+              sx={{
+                color: mode === 'light' ? '#E65100' : '#FFD54F',
+                fontSize: 14,
+              }}
+            />
             <Typography
               sx={{
                 fontSize: '9px',
@@ -689,19 +699,21 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
   return {
     py: 0.5,
     '& .MuiSlider-rail': {
-      height: 10,
+      height: 5,
       opacity: 0.85,
-      bgcolor: isLight ? 'rgba(212, 175, 55, 0.15)' : 'rgba(212, 175, 55, 0.08)',
+      bgcolor: isLight
+        ? 'rgba(212, 175, 55, 0.15)'
+        : 'rgba(212, 175, 55, 0.08)',
       boxShadow: isLight
         ? 'inset 0 3px 5px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.8)'
         : 'inset 0 3px 5px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.08)',
       border: `1px solid ${isLight ? 'rgba(212, 175, 55, 0.25)' : 'rgba(212, 175, 55, 0.12)'}`,
-      borderRadius: 5,
+      borderRadius: 2.5,
     },
     '& .MuiSlider-track': {
-      height: 10,
+      height: 5,
       border: 'none',
-      borderRadius: 5,
+      borderRadius: 2.5,
       background: isLight
         ? `linear-gradient(to bottom, #FFA000 0%, #E65100 100%)`
         : `linear-gradient(to bottom, rgba(255, 160, 0, 0.8) 0%, rgba(230, 81, 0, 0.9) 100%)`,
@@ -1084,7 +1096,8 @@ const Layout = () => {
             const item = localStorage.getItem('proxy-head-state')
             if (item) {
               const data = JSON.parse(item)
-              const currentProfile = profiles?.current || latestData?.current || ''
+              const currentProfile =
+                profiles?.current || latestData?.current || ''
               const groupState = data[currentProfile]?.[groupName]
               if (groupState) {
                 filterText = groupState.filterText || ''
@@ -1108,7 +1121,7 @@ const Layout = () => {
               matchCase,
               matchWholeWord,
               useRegularExpression: useRegex,
-            }
+            },
           )
 
           // Collect healthy scanned nodes
@@ -1173,7 +1186,13 @@ const Layout = () => {
         console.error('[BUG-034] Error during auto speed test and select:', err)
       }
     },
-    [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy],
+    [
+      refreshProxy,
+      proxies,
+      verge?.default_latency_timeout,
+      changeProxy,
+      profiles,
+    ],
   )
 
   const lastEnhancedProfileRef = useRef<string | null>(null)
@@ -1197,8 +1216,14 @@ const Layout = () => {
     let timerId: ReturnType<typeof setTimeout> | null = null
 
     const checkNode = async () => {
-      const activeNodeName = proxies?.groups?.find((g: any) => g.name === 'PROXY')?.now
-      if (!activeNodeName || activeNodeName === 'DIRECT' || activeNodeName === 'REJECT') {
+      const activeNodeName = proxies?.groups?.find(
+        (g: any) => g.name === 'PROXY',
+      )?.now
+      if (
+        !activeNodeName ||
+        activeNodeName === 'DIRECT' ||
+        activeNodeName === 'REJECT'
+      ) {
         timerId = setTimeout(checkNode, 60000)
         return
       }
@@ -1219,7 +1244,9 @@ const Layout = () => {
         if (delay < 1500) {
           isHealthy = true
         } else {
-          console.log(`[NodeMonitor] Active node ${activeNodeName} is unhealthy (delay: ${delay}ms)`)
+          console.log(
+            `[NodeMonitor] Active node ${activeNodeName} is unhealthy (delay: ${delay}ms)`,
+          )
         }
       } catch (err) {
         console.error('[NodeMonitor] Failed to check active node latency:', err)
@@ -1236,8 +1263,12 @@ const Layout = () => {
 
         if (consecutiveFailRef.current >= 3) {
           consecutiveFailRef.current = 0
-          console.log(`[NodeMonitor] Node ${activeNodeName} failed 3 times consecutively. Triggering auto select.`)
-          showNotice.info(`检测到当前线路连接超时或缓慢，正在自动为您切换至最快线路...`)
+          console.log(
+            `[NodeMonitor] Node ${activeNodeName} failed 3 times consecutively. Triggering auto select.`,
+          )
+          showNotice.info(
+            `检测到当前线路连接超时或缓慢，正在自动为您切换至最快线路...`,
+          )
           triggerAutoSelectFastestNode(currentProfileUid)
           timerId = setTimeout(checkNode, 60000)
         } else {
@@ -2086,7 +2117,7 @@ const Layout = () => {
                       borderRadius: '4px',
                       p: '1px',
                       mb: 1,
-                      height: 26,
+                      height: 24,
                       userSelect: 'none',
                       ...get3DSegmentedContainerStyle(
                         theme.palette.mode === 'light',
@@ -2119,10 +2150,7 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color:
-                          activeIndex === 0
-                            ? '#1E1200'
-                            : 'text.secondary',
+                        color: activeIndex === 0 ? '#1E1200' : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -2142,10 +2170,7 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color:
-                          activeIndex === 1
-                            ? '#1E1200'
-                            : 'text.secondary',
+                        color: activeIndex === 1 ? '#1E1200' : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -2165,10 +2190,7 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color:
-                          activeIndex === 2
-                            ? '#1E1200'
-                            : 'text.secondary',
+                        color: activeIndex === 2 ? '#1E1200' : 'text.secondary',
                         fontSize: '13px',
                         fontWeight: 'bold',
                         cursor: 'pointer',
@@ -2193,7 +2215,7 @@ const Layout = () => {
                       bgcolor: 'action.hover',
                       borderRadius: '4px',
                       p: '1px',
-                      height: 26,
+                      height: 24,
                       userSelect: 'none',
                       ...get3DSegmentedContainerStyle(
                         theme.palette.mode === 'light',
@@ -2453,7 +2475,7 @@ const Layout = () => {
                           borderRadius: '4px',
                           p: '1px',
                           width: '120px',
-                          height: 26,
+                          height: 22,
                           userSelect: 'none',
                           ...get3DSegmentedContainerStyle(
                             theme.palette.mode === 'light',
@@ -2707,7 +2729,7 @@ const Layout = () => {
                       borderRadius: '4px',
                       p: '1px',
                       width: '140px',
-                      height: 24,
+                      height: 20,
                       userSelect: 'none',
                       ...get3DSegmentedContainerStyle(
                         theme.palette.mode === 'light',
@@ -2798,7 +2820,7 @@ const Layout = () => {
                     onClick={() => closeAllConnections()}
                     sx={{
                       fontSize: 11,
-                      height: 24,
+                      height: 20,
                       px: 1.5,
                       minWidth: 'auto',
                       ...get3DButtonStyle(theme, 'contained', 'primary'),
@@ -2813,7 +2835,7 @@ const Layout = () => {
                       onClick={() => clearClosedConnections()}
                       sx={{
                         fontSize: 11,
-                        height: 24,
+                        height: 20,
                         px: 1.5,
                         minWidth: 'auto',
                         ...get3DButtonStyle(theme, 'contained', 'primary'),
@@ -2855,7 +2877,9 @@ const Layout = () => {
               borderTop: '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',
-              padding: isMinimalWidth ? '4px 12px 2px 12px' : '8px 12px 2px 12px',
+              padding: isMinimalWidth
+                ? '4px 12px 2px 12px'
+                : '8px 12px 2px 12px',
               display: 'flex',
               gap: '12px',
               overflow: 'hidden',
@@ -2864,7 +2888,6 @@ const Layout = () => {
           >
             <MiniTrafficPanel isMinimalWidth={isMinimalWidth} />
           </div>
-
         </div>
       </Paper>
 
