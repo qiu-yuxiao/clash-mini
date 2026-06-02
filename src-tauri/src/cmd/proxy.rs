@@ -92,11 +92,7 @@ pub async fn get_proxy_addr(
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let port = proxy_map
-                            .get("port")
-                            .and_then(|v| v.as_i64())
-                            .unwrap_or(0)
-                            as u16;
+                        let port = proxy_map.get("port").and_then(|v| v.as_i64()).unwrap_or(0) as u16;
                         return Ok(Some((server, port)));
                     }
                 }

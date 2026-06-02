@@ -18,6 +18,8 @@ const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
 // 定义默认窗口尺寸常量
 const DEFAULT_WIDTH: f64 = 640.0;
 const DEFAULT_HEIGHT: f64 = 860.0;
+const MAX_WIDTH: f64 = 640.0;
+const MAX_HEIGHT: f64 = 860.0;
 const MINIMAL_WIDTH: f64 = 270.0;
 const MINIMAL_HEIGHT: f64 = 200.0;
 #[cfg(target_os = "linux")]
@@ -71,6 +73,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
     .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    .max_inner_size(MAX_WIDTH, MAX_HEIGHT)
     .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
     .visible(false)
     .transparent(false) // 禁用透明，原生窗口背景完全不透明
@@ -99,6 +102,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
     .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    .max_inner_size(MAX_WIDTH, MAX_HEIGHT)
     .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
     .visible(false)
     .initialization_script(&initial_script)
