@@ -778,18 +778,11 @@ const Layout = () => {
     }
     return false
   })
-  const [isMinimalHeight, setIsMinimalHeight] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerHeight <= 220
-    }
-    return false
-  })
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleResize = () => {
       setIsMinimalWidth(window.innerWidth <= 285)
-      setIsMinimalHeight(window.innerHeight <= 220)
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -1800,15 +1793,13 @@ const Layout = () => {
             )}
 
             {/*节点组选择列表*/}
-            {!isMinimalHeight && (
-              <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
                 <ProxyGroups
                   mode={clashConfig?.mode?.toLowerCase() || 'rule'}
                   isChainMode={false}
                   chainConfigData={null}
                 />
-              </div>
-            )}
+            </div>
 
             {/* Settings Sliding Drawer (slides internal left-downwards) */}
             <div
