@@ -270,7 +270,7 @@ impl PrfItem {
             let uid_str = "L_Direct_Imports".to_string();
             let file_name = "L_Direct_Imports.yaml".to_string();
             let path = dirs::app_profiles_dir()?.join(&file_name);
-            
+
             let mut final_mapping = Mapping::new();
             final_mapping.insert(
                 serde_yaml_ng::Value::from("proxies"),
@@ -282,7 +282,7 @@ impl PrfItem {
             let mut rules = option.and_then(|o| o.rules.clone());
             let mut proxies = option.and_then(|o| o.proxies.clone());
             let mut groups = option.and_then(|o| o.groups.clone());
-            
+
             if merge.is_none() {
                 let merge_item = &mut Self::from_merge(None)?;
                 profiles::profiles_append_item_safe(merge_item).await?;
@@ -315,10 +315,10 @@ impl PrfItem {
                 fs::write(&path, serialized.as_bytes())
                     .await
                     .with_context(|| format!("failed to write to file \"{file_name}\""))?;
-                    
+
                 let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
                 let desc_str = "0".to_string();
-                
+
                 return Ok(Self {
                     uid: Some(uid_str.into()),
                     itype: Some("local".into()),
@@ -347,9 +347,9 @@ impl PrfItem {
                 Some(p) => p,
                 None => bail!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"),
             };
-            
+
             final_mapping = parsed;
-            
+
             if path.exists() {
                 if let Ok(content) = fs::read_to_string(&path).await {
                     if let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content) {
@@ -361,18 +361,24 @@ impl PrfItem {
                                         for new_p in new_seq {
                                             let new_name = new_p.get("name").and_then(|v| v.as_str()).unwrap_or("");
                                             let new_server = new_p.get("server").and_then(|v| v.as_str()).unwrap_or("");
-                                            let new_port = new_p.get("port").and_then(|v| match v {
-                                                serde_yaml_ng::Value::Number(n) => n.as_u64(),
-                                                _ => None,
-                                            }).unwrap_or(0);
+                                            let new_port = new_p
+                                                .get("port")
+                                                .and_then(|v| match v {
+                                                    serde_yaml_ng::Value::Number(n) => n.as_u64(),
+                                                    _ => None,
+                                                })
+                                                .unwrap_or(0);
 
                                             let existing_pos = existing_seq.iter().position(|p| {
                                                 let p_name = p.get("name").and_then(|v| v.as_str()).unwrap_or("");
                                                 let p_server = p.get("server").and_then(|v| v.as_str()).unwrap_or("");
-                                                let p_port = p.get("port").and_then(|v| match v {
-                                                    serde_yaml_ng::Value::Number(n) => n.as_u64(),
-                                                    _ => None,
-                                                }).unwrap_or(0);
+                                                let p_port = p
+                                                    .get("port")
+                                                    .and_then(|v| match v {
+                                                        serde_yaml_ng::Value::Number(n) => n.as_u64(),
+                                                        _ => None,
+                                                    })
+                                                    .unwrap_or(0);
                                                 p_name == new_name && p_server == new_server && p_port == new_port
                                             });
 
@@ -392,14 +398,18 @@ impl PrfItem {
                     }
                 }
             }
-            
-            let serialized = serde_yaml_ng::to_string(&final_mapping)
-                .map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
-                
+
+            let serialized =
+                serde_yaml_ng::to_string(&final_mapping).map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
+
             let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
-            let count = final_mapping.get("proxies").and_then(|v| v.as_sequence()).map(|s| s.len()).unwrap_or(0);
+            let count = final_mapping
+                .get("proxies")
+                .and_then(|v| v.as_sequence())
+                .map(|s| s.len())
+                .unwrap_or(0);
             let desc_str = count.to_string();
-            
+
             return Ok(Self {
                 uid: Some(uid_str.into()),
                 itype: Some("local".into()),
@@ -557,7 +567,9 @@ impl PrfItem {
                     let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default();
                     (parsed, serialized)
                 } else {
-                    return Err(anyhow::anyhow!("订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"));
+                    return Err(anyhow::anyhow!(
+                        "订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"
+                    ));
                 }
             }
         };

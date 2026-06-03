@@ -466,19 +466,19 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
         sx={{
           display: 'flex',
           width: '100%',
-          height: '22px',
+          height: isMinimalWidth ? 'auto' : '22px',
           alignItems: 'center',
           justifyContent: 'space-between',
           borderTop: (theme) => `1px solid ${theme.palette.divider}`,
-          mt: 0.5,
-          pt: 0.5,
-          px: 1,
-          gap: 1,
+          mt: isMinimalWidth ? 0.25 : 0.5,
+          pt: isMinimalWidth ? 0.25 : 0.5,
+          px: isMinimalWidth ? 0.25 : 1,
+          gap: isMinimalWidth ? 0.5 : 1,
           boxSizing: 'border-box',
           '@media (max-width: 560px)': {
             height: 'auto',
             flexDirection: 'column',
-            gap: 0,
+            gap: isMinimalWidth ? 0.25 : 0,
             pt: 0.5,
           },
         }}
@@ -2926,11 +2926,9 @@ const Layout = () => {
               borderTop: '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',
-              padding: isMinimalWidth
-                ? '4px 12px 2px 12px'
-                : '8px 12px 2px 12px',
+              padding: isMinimalWidth ? '4px 6px 2px 6px' : '8px 12px 2px 12px',
               display: 'flex',
-              gap: '12px',
+              gap: isMinimalWidth ? '6px' : '12px',
               overflow: 'hidden',
               boxSizing: 'border-box',
             }}

@@ -4,14 +4,14 @@ import { Traffic } from 'tauri-plugin-mihomo-api'
 
 const maxPoint = 30
 
-const refLineAlpha = 1
-const refLineWidth = 2
+const refLineAlpha = 0.15
+const refLineWidth = 1
 
-const upLineAlpha = 0.6
-const upLineWidth = 4
+const upLineAlpha = 0.8
+const upLineWidth = 1.5
 
-const downLineAlpha = 1
-const downLineWidth = 4
+const downLineAlpha = 0.9
+const downLineWidth = 1.5
 const sampleIntervalMs = 1000
 const frameIntervalMs = 1000 / 15
 const animationDurationMs = sampleIntervalMs
@@ -118,8 +118,25 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
       const list = listRef.current
       const lineStyle = styleRef.current
 
-      const width = canvas.width
-      const height = canvas.height
+      const rect = canvas.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      const cssWidth = rect.width
+      const cssHeight = rect.height
+      const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr))
+      const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr))
+
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth
+        canvas.height = pixelHeight
+      }
+
+      context.save()
+      context.setTransform(1, 0, 0, 1, 0, 0)
+      context.scale(dpr, dpr)
+      context.clearRect(0, 0, cssWidth, cssHeight)
+
+      const width = cssWidth
+      const height = cssHeight
       const dx = width / maxPoint
       const dy = height / 7
       const l1 = dy
@@ -172,8 +189,6 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
         }
       }
 
-      context.clearRect(0, 0, width, height)
-
       // Reference lines
       context.beginPath()
       context.globalAlpha = refLineAlpha
@@ -209,6 +224,8 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
       }
       context.stroke()
       context.closePath()
+
+      context.restore()
     }
 
     const drawAnimatedFrame = (timestamp: number) => {
@@ -225,7 +242,8 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
 
       lastFrameTime = timestamp
 
-      const dx = canvas.width / maxPoint
+      const rect = canvas.getBoundingClientRect()
+      const dx = rect.width / maxPoint
       const progress = Math.min(
         (timestamp - animationStart) / animationDurationMs,
         1,

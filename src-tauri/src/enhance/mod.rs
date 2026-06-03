@@ -790,10 +790,10 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 
 #[allow(clippy::collapsible_if, clippy::needless_borrows_for_generic_args)]
 async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
-    use chrono::{TimeZone as _, Local};
+    use chrono::{Local, TimeZone as _};
     let mut all_proxies = Vec::new();
     let mut raw_proxies = Vec::new();
-    
+
     if let Some(items) = profiles.get_items() {
         for item in items {
             // Only process remote and local types
@@ -811,13 +811,13 @@ async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Ve
                                     } else {
                                         "000000".to_string()
                                     };
-                                    
+
                                     for proxy in proxies {
                                         let original_name = if let Some(map) = proxy.as_mapping() {
                                             map.get(&Value::from("name"))
-                                               .and_then(Value::as_str)
-                                               .unwrap_or("Proxy")
-                                               .to_string()
+                                                .and_then(Value::as_str)
+                                                .unwrap_or("Proxy")
+                                                .to_string()
                                         } else {
                                             "Proxy".to_string()
                                         };
@@ -844,7 +844,7 @@ async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Ve
     for (mut proxy, name, suffix) in raw_proxies {
         let key = (name.clone(), suffix.clone());
         let count = name_suffix_counts.get(&key).copied().unwrap_or(0);
-        
+
         let new_name = if count > 1 {
             let idx = name_suffix_counters.entry(key).or_insert(0);
             *idx += 1;

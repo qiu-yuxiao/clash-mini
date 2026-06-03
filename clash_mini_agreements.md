@@ -214,11 +214,11 @@
 
 
 
-       * 极窄模式 (宽度 $\le 285px$) 下高度固定为 `130px`，`flex: 0 0 130px`，`padding: 4px 12px 2px 12px`，顶部边框为 `1px solid`。
+       * 极窄模式 (宽度 $\le 285px$) 下高度固定为 `130px`，`flex: 0 0 130px`，`padding: 4px 6px 2px 6px`，顶部边框为 `1px solid`。
 
 
 
-     * **流量图容器**：在下半层内为 `flex: 1`，宽度 `100%`，最小高度 `minHeight: 0`。普通模式下渲染 Canvas 高级流量图 (`EnhancedCanvasTrafficGraph`)；极窄模式 (宽度 $\le 285px$) 下自动切换渲染 Compact 折线图 (`TrafficGraph`)。
+     * **流量图容器**：在下半层内为 `flex: 1`，宽度 `100%`，最小高度 `minHeight: 0`。普通模式下渲染 Canvas 高级流量图 (`EnhancedCanvasTrafficGraph`)；极窄模式 (宽度 $\le 285px$) 下自动切换渲染 Compact 折线图 (`TrafficGraph`)。该图通过 DPR 适配消除缩放模糊，且线宽减小至 `1.5px`（底线为 `1px`，透明度调小至 `0.15`），使整体展现形式更精致紧凑。
 
 
 
@@ -230,7 +230,7 @@
 
 
 
-       * 极窄模式 (宽度 $\le 285px$) 下高度为自适应 (`height: auto`)，布局变更为垂直排列 (`flexDirection: column`)，两组之间间距为 `0` (`gap: 0`)。上传组与下载组卡片换行并垂直堆叠展示，指标行所占的总高度为 `45px`（包含两行卡片共 `36px`，上边距 `4px`，上内边距 `4px`，上边框 `1px`）。
+       * 极窄模式 (宽度 $\le 285px$) 下高度为自适应 (`height: auto`)，布局变更为垂直排列 (`flexDirection: column`)，两组之间间距根据模式自适应（`gap: isMinimalWidth ? 0.25 : 0`）。上传组与下载组卡片换行并垂直堆叠展示，高度和填充进一步压缩紧凑化，在超窄视口下避免元素溢出。
 
 
 

@@ -23,9 +23,9 @@ use clash_verge_signal;
 
 pub mod dns;
 pub mod scheme;
+pub mod universal_parser;
 pub mod window;
 pub mod window_script;
-pub mod universal_parser;
 
 static RESOLVE_DONE: AtomicBool = AtomicBool::new(false);
 
