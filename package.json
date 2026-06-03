@@ -47,7 +47,9 @@
     "monitor-build": "node scratch/monitor_build.mjs",
     "download-release": "node scratch/download_release.mjs",
     "check-runs": "node scratch/check_runs.mjs",
-    "monitor-real": "node scratch/monitor_real.mjs"
+    "monitor-real": "node scratch/monitor_real.mjs",
+    "update-agreements-feat003": "python scratch/update_agreements_feat003.py",
+    "update-agreements-feat003-supplement": "python scratch/update_agreements_feat003_supplement.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
