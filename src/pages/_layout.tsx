@@ -469,9 +469,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
           height: isMinimalWidth ? 'auto' : '22px',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+          borderTop: (theme) =>
+            isMinimalWidth ? 'none' : `1px solid ${theme.palette.divider}`,
           mt: isMinimalWidth ? 0.25 : 0.5,
-          pt: isMinimalWidth ? 0.25 : 0.5,
+          pt: isMinimalWidth ? 0 : 0.5,
           px: isMinimalWidth ? 0.25 : 1,
           gap: isMinimalWidth ? 0.5 : 1,
           boxSizing: 'border-box',
@@ -479,7 +480,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
             height: 'auto',
             flexDirection: 'column',
             gap: isMinimalWidth ? 0.25 : 0,
-            pt: 0.5,
+            pt: isMinimalWidth ? 0 : 0.5,
           },
         }}
       >
@@ -2921,12 +2922,12 @@ const Layout = () => {
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
           <div
             style={{
-              flex: isMinimalWidth ? '0 0 130px' : '0 0 178px',
-              height: isMinimalWidth ? '130px' : '178px',
-              borderTop: '1px solid',
+              flex: isMinimalWidth ? '0 0 100px' : '0 0 178px',
+              height: isMinimalWidth ? '100px' : '178px',
+              borderTop: isMinimalWidth ? 'none' : '1px solid',
               borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
               background: 'inherit',
-              padding: isMinimalWidth ? '4px 6px 2px 6px' : '8px 12px 2px 12px',
+              padding: isMinimalWidth ? '3px 6px 2px 6px' : '8px 12px 2px 12px',
               display: 'flex',
               gap: isMinimalWidth ? '6px' : '12px',
               overflow: 'hidden',
