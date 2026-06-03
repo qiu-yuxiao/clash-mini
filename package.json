@@ -25,6 +25,7 @@
     "release:deploytest": "pnpm release-version deploytest",
     "prepare-release-v201": "python scratch/prepare_v2.0.1_release.py",
     "dump-nodes": "python scratch/dump_nodes.py",
+    "patch-agreements": "python scratch/patch_agreements_final.py",
     "publish-version": "node scripts/publish-version.mjs",
     "check-run": "node C:\\Users\\sun_y\\.gemini\\antigravity\\brain\\233796e9-dbba-4bae-8c91-0d25cbea3af5\\scratch\\get-failed-run-logs.mjs",
     "push-dev": "git push origin dev",
