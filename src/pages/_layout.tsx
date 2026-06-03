@@ -60,6 +60,7 @@ import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVerge } from '@/hooks/use-verge'
 import { useVisibility } from '@/hooks/use-visibility'
 import { useWindowDecorations } from '@/hooks/use-window'
+import { GlowBorder } from '@/components/glow-border'
 import {
   useProxiesData,
   useClashConfigData,
@@ -820,7 +821,7 @@ const Layout = () => {
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
   const { switchLanguage } = useI18n()
-  const { decorated } = useWindowDecorations()
+  const { decorated, isDecorationsHidden } = useWindowDecorations()
   const { pathname } = useLocation()
   const windowControlsRef = useRef<any>(null)
 
@@ -1670,7 +1671,9 @@ const Layout = () => {
       >
         {customTitlebar}
 
-        {/* Double-Pane Dashboard */}
+        {/* FEAT-003: Glow border — fixed overlay, 4px inner frame */}
+        <GlowBorder />
+
         <div
           className="layout-content"
           style={{
@@ -1680,6 +1683,11 @@ const Layout = () => {
             width: '100vw',
             overflow: 'hidden',
             position: 'relative',
+            // FEAT-003: when title bar is hidden, WebView expands ~33px upward.
+            // Add matching padding so content stays at same screen position.
+            paddingTop: isDecorationsHidden ? '33px' : '0px',
+            transition: 'padding-top 0.15s ease-out',
+            boxSizing: 'border-box',
           }}
         >
           {/* Upper Pane: Node Selection (80%) */}

@@ -4,6 +4,8 @@ import { createContext } from 'react'
 export interface WindowContextType {
   decorated: boolean | null
   maximized: boolean | null
+  /** True when the title bar is currently hidden by the idle auto-hide timer (FEAT-003) */
+  isDecorationsHidden: boolean
   toggleDecorations: () => Promise<void>
   refreshDecorated: () => Promise<boolean>
   minimize: () => Promise<void>

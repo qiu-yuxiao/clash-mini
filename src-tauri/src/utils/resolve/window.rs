@@ -16,12 +16,12 @@ const DARK_BACKGROUND_HEX: &str = "#2E303D";
 const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
 
 // 定义默认窗口尺寸常量
-const DEFAULT_WIDTH: f64 = 270.0;
+const DEFAULT_WIDTH: f64 = 276.0; // +6px: accounts for 4px inner glow border (left+right, FEAT-003)
 const DEFAULT_HEIGHT: f64 = 680.0;
 const MAX_WIDTH: f64 = 640.0;
 const MAX_HEIGHT: f64 = 860.0;
-const MINIMAL_WIDTH: f64 = 270.0;
-const MINIMAL_HEIGHT: f64 = 133.0;
+const MINIMAL_WIDTH: f64 = 276.0; // +6px: accounts for 4px inner glow border (left+right, FEAT-003)
+const MINIMAL_HEIGHT: f64 = 141.0; // +8px: accounts for 4px inner glow border (top+bottom, FEAT-003)
 #[cfg(target_os = "linux")]
 const DEFAULT_DECORATIONS: bool = false;
 #[cfg(not(target_os = "linux"))]
