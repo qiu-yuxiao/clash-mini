@@ -844,7 +844,8 @@ const Layout = () => {
           item &&
           ['local', 'remote'].includes(item.type || '') &&
           item.name &&
-          item.name.trim() !== '',
+          item.name.trim() !== '' &&
+          item.uid !== 'L_Direct_Imports',
       ),
     [profiles],
   )
@@ -1330,10 +1331,8 @@ const Layout = () => {
   // Profile actions
   const handleImportProfile = async () => {
     if (!url) return
-    if (!/^https?:\/\//i.test(url)) {
-      showNotice.error('profiles.page.feedback.errors.invalidUrl')
-      return
-    }
+    const trimmed = url.trim()
+    if (!trimmed) return
     setProfileLoading(true)
     try {
       await importProfile(url)

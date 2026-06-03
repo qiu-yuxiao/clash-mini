@@ -131,6 +131,23 @@ impl IProfiles {
             bail!("the uid should not be null");
         }
 
+        if let Some(items) = self.items.as_mut() {
+            if let Some(pos) = items.iter().position(|e| e.uid == *uid) {
+                items[pos].updated = item.updated;
+                if let Some(file_data) = item.file_data.take() {
+                    let file = items[pos]
+                        .file
+                        .clone()
+                        .ok_or_else(|| anyhow::anyhow!("file field is required in existing item"))?;
+                    let path = dirs::app_profiles_dir()?.join(file.as_str());
+                    fs::write(&path, file_data.as_bytes())
+                        .await
+                        .with_context(|| format!("failed to write to file \"{file}\""))?;
+                }
+                return Ok(());
+            }
+        }
+
         // save the file data
         // move the field value after save
         if let Some(file_data) = item.file_data.take() {
@@ -149,7 +166,10 @@ impl IProfiles {
                 .with_context(|| format!("failed to write to file \"{file}\""))?;
         }
 
-        if self.current.is_none() && (item.itype == Some("remote".into()) || item.itype == Some("local".into())) {
+        if self.current.is_none()
+            && (item.itype == Some("remote".into()) || item.itype == Some("local".into()))
+            && uid.as_ref().map(|s| s.as_str()) != Some("L_Direct_Imports")
+        {
             self.current = uid.to_owned();
         }
 
