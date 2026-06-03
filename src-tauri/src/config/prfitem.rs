@@ -266,50 +266,17 @@ impl PrfItem {
         };
 
         if is_direct_node_input {
-            let parsed = match crate::utils::resolve::universal_parser::parse_uri_list(url) {
-                Some(p) => p,
-                None => bail!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"),
-            };
-            
+            let url_trimmed = url.trim();
             let uid_str = "L_Direct_Imports".to_string();
             let file_name = "L_Direct_Imports.yaml".to_string();
             let path = dirs::app_profiles_dir()?.join(&file_name);
             
-            let mut final_mapping = parsed;
-            
-            if path.exists() {
-                if let Ok(content) = fs::read_to_string(&path).await {
-                    if let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content) {
-                        if let Some(existing_proxies_val) = existing_mapping.get_mut("proxies") {
-                            if let Some(existing_seq) = existing_proxies_val.as_sequence_mut() {
-                                if let Some(new_proxies_val) = final_mapping.get("proxies") {
-                                    if let Some(new_seq) = new_proxies_val.as_sequence() {
-                                        // Append new proxies to existing ones, avoiding duplicates by name
-                                        for new_p in new_seq {
-                                            if let Some(new_name) = new_p.get("name") {
-                                                let exists = existing_seq.iter().any(|p| p.get("name") == Some(new_name));
-                                                if !exists {
-                                                    existing_seq.push(new_p.clone());
-                                                }
-                                            } else {
-                                                existing_seq.push(new_p.clone());
-                                            }
-                                        }
-                                        final_mapping = existing_mapping;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            let serialized = serde_yaml_ng::to_string(&final_mapping)
-                .map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
-                
-            let name_str = name.cloned().unwrap_or_else(|| "Direct Import Node".into());
-            let desc_str = desc.cloned().unwrap_or_else(|| "Directly imported proxy node(s)".into());
-            
+            let mut final_mapping = Mapping::new();
+            final_mapping.insert(
+                serde_yaml_ng::Value::from("proxies"),
+                serde_yaml_ng::Value::from(Vec::<serde_yaml_ng::Value>::new()),
+            );
+
             let mut merge = option.and_then(|o| o.merge.clone());
             let mut script = option.and_then(|o| o.script.clone());
             let mut rules = option.and_then(|o| o.rules.clone());
@@ -341,12 +308,103 @@ impl PrfItem {
                 profiles::profiles_append_item_safe(groups_item).await?;
                 groups = groups_item.uid.clone();
             }
+
+            if url_trimmed.eq_ignore_ascii_case("clear") || url_trimmed.eq_ignore_ascii_case("clean") {
+                let serialized = serde_yaml_ng::to_string(&final_mapping)
+                    .map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
+                fs::write(&path, serialized.as_bytes())
+                    .await
+                    .with_context(|| format!("failed to write to file \"{file_name}\""))?;
+                    
+                let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
+                let desc_str = "0".to_string();
+                
+                return Ok(Self {
+                    uid: Some(uid_str.into()),
+                    itype: Some("local".into()),
+                    name: Some(name_str),
+                    desc: Some(desc_str.into()),
+                    file: Some(file_name.into()),
+                    url: None,
+                    selected: None,
+                    extra: None,
+                    option: Some(PrfOption {
+                        update_interval: None,
+                        merge,
+                        script,
+                        rules,
+                        proxies,
+                        groups,
+                        ..PrfOption::default()
+                    }),
+                    home: None,
+                    updated: Some(chrono::Local::now().timestamp() as usize),
+                    file_data: Some(serialized.into()),
+                });
+            }
+
+            let parsed = match crate::utils::resolve::universal_parser::parse_uri_list(url) {
+                Some(p) => p,
+                None => bail!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"),
+            };
+            
+            final_mapping = parsed;
+            
+            if path.exists() {
+                if let Ok(content) = fs::read_to_string(&path).await {
+                    if let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content) {
+                        if let Some(existing_proxies_val) = existing_mapping.get_mut("proxies") {
+                            if let Some(existing_seq) = existing_proxies_val.as_sequence_mut() {
+                                if let Some(new_proxies_val) = final_mapping.get("proxies") {
+                                    if let Some(new_seq) = new_proxies_val.as_sequence() {
+                                        // Merge new proxies into existing ones, avoiding duplicates by (Name, Server, Port)
+                                        for new_p in new_seq {
+                                            let new_name = new_p.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                            let new_server = new_p.get("server").and_then(|v| v.as_str()).unwrap_or("");
+                                            let new_port = new_p.get("port").and_then(|v| match v {
+                                                serde_yaml_ng::Value::Number(n) => n.as_u64(),
+                                                _ => None,
+                                            }).unwrap_or(0);
+
+                                            let existing_pos = existing_seq.iter().position(|p| {
+                                                let p_name = p.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                                let p_server = p.get("server").and_then(|v| v.as_str()).unwrap_or("");
+                                                let p_port = p.get("port").and_then(|v| match v {
+                                                    serde_yaml_ng::Value::Number(n) => n.as_u64(),
+                                                    _ => None,
+                                                }).unwrap_or(0);
+                                                p_name == new_name && p_server == new_server && p_port == new_port
+                                            });
+
+                                            if let Some(pos) = existing_pos {
+                                                // If exact (Name, Server, Port) match exists, update/overwrite its parameters
+                                                existing_seq[pos] = new_p.clone();
+                                            } else {
+                                                // Otherwise, append as a new node
+                                                existing_seq.push(new_p.clone());
+                                            }
+                                        }
+                                        final_mapping = existing_mapping;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            let serialized = serde_yaml_ng::to_string(&final_mapping)
+                .map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
+                
+            let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
+            let count = final_mapping.get("proxies").and_then(|v| v.as_sequence()).map(|s| s.len()).unwrap_or(0);
+            let desc_str = count.to_string();
             
             return Ok(Self {
                 uid: Some(uid_str.into()),
                 itype: Some("local".into()),
                 name: Some(name_str),
-                desc: Some(desc_str),
+                desc: Some(desc_str.into()),
                 file: Some(file_name.into()),
                 url: None,
                 selected: None,

@@ -348,7 +348,8 @@ const ActiveNodeStatusCard = () => {
           whiteSpace: 'nowrap',
         }}
       >
-        {(activeNodeName ? activeNodeName.replace(/\s\(\d{6}\)$/, '') : '') || '未选择节点 (直接连接)'}
+        {(activeNodeName ? activeNodeName.replace(/\s\(\d{6}\)$/, '') : '') ||
+          '未选择节点 (直接连接)'}
       </Typography>
 
       {activeNodeName && (
@@ -844,8 +845,7 @@ const Layout = () => {
           item &&
           ['local', 'remote'].includes(item.type || '') &&
           item.name &&
-          item.name.trim() !== '' &&
-          item.uid !== 'L_Direct_Imports',
+          item.name.trim() !== '',
       ),
     [profiles],
   )
@@ -1339,12 +1339,26 @@ const Layout = () => {
       showNotice.success('shared.feedback.notifications.importSuccess')
       setUrl('')
       await mutateProfiles()
+
+      // Real-time compilation and reload
+      await enhanceProfiles()
+      await refreshProxy()
+      if (currentProfileUid) {
+        triggerAutoSelectFastestNode(currentProfileUid)
+      }
     } catch {
       try {
         await importProfile(url, { with_proxy: false, self_proxy: true })
         showNotice.success('shared.feedback.notifications.importWithClashProxy')
         setUrl('')
         await mutateProfiles()
+
+        // Real-time compilation and reload
+        await enhanceProfiles()
+        await refreshProxy()
+        if (currentProfileUid) {
+          triggerAutoSelectFastestNode(currentProfileUid)
+        }
       } catch (retryErr) {
         showNotice.error(
           'profiles.page.feedback.notifications.importFail',
@@ -1793,11 +1807,11 @@ const Layout = () => {
 
             {/*节点组选择列表*/}
             <div style={{ flex: 1, overflow: 'hidden' }}>
-                <ProxyGroups
-                  mode={clashConfig?.mode?.toLowerCase() || 'rule'}
-                  isChainMode={false}
-                  chainConfigData={null}
-                />
+              <ProxyGroups
+                mode={clashConfig?.mode?.toLowerCase() || 'rule'}
+                isChainMode={false}
+                chainConfigData={null}
+              />
             </div>
 
             {/* Settings Sliding Drawer (slides internal left-downwards) */}
@@ -1878,17 +1892,19 @@ const Layout = () => {
                     }}
                   >
                     <TextField
-                      placeholder="填入订阅链接"
+                      placeholder="填入订阅链接/节点配置..."
                       size="small"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
+                      multiline
+                      minRows={1}
+                      maxRows={4}
                       slotProps={{
                         htmlInput: {
                           style: {
                             paddingTop: '4px',
                             paddingBottom: '4px',
                             fontSize: '13px',
-                            height: '30px',
                             boxSizing: 'border-box',
                           },
                         },
@@ -1914,7 +1930,7 @@ const Layout = () => {
                         }}
                         disabled={profileLoading}
                       >
-                        导入订阅链接
+                        导入节点信息
                       </Button>
                     </Box>
                   </Box>
@@ -1930,6 +1946,8 @@ const Layout = () => {
                   >
                     {profileItems.map((item) => {
                       const isActive = item.uid === currentProfileUid
+                      const isHighlighted =
+                        isActive || item.uid === 'L_Direct_Imports'
                       const extra = item.extra
                       const hasExtra = !!extra
                       const {
@@ -1974,7 +1992,7 @@ const Layout = () => {
                                 ? '#ffffff'
                                 : '#282A36',
                             borderLeft: (theme) =>
-                              `3px solid ${isActive ? theme.palette.primary.main : 'transparent'}`,
+                              `3px solid ${isHighlighted ? theme.palette.primary.main : 'transparent'}`,
                             boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                             transition: 'all 0.2s',
                             '&:hover': {
@@ -1995,8 +2013,8 @@ const Layout = () => {
                               variant="body2"
                               sx={{
                                 fontSize: '13px',
-                                fontWeight: isActive ? 600 : 400,
-                                color: isActive
+                                fontWeight: isHighlighted ? 600 : 400,
+                                color: isHighlighted
                                   ? 'primary.main'
                                   : 'text.primary',
                                 overflow: 'hidden',
@@ -2062,6 +2080,33 @@ const Layout = () => {
                               <span>
                                 {extra?.expire
                                   ? formatExpire(extra.expire)
+                                  : '-'}
+                              </span>
+                            </Box>
+                          )}
+
+                          {/* Line 2 for local profiles (Node count & updated time) */}
+                          {item.type === 'local' && (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                mt: 0.25,
+                                fontSize: '11px',
+                                color: 'text.secondary',
+                              }}
+                            >
+                              <span>
+                                {item.uid === 'L_Direct_Imports'
+                                  ? `节点数: ${!item.desc || item.desc === '本地手动导入的代理节点' ? '0' : item.desc}`
+                                  : '本地文件'}
+                              </span>
+                              <span>
+                                {item.updated
+                                  ? dayjs(item.updated * 1000).format(
+                                      'YYYY-MM-DD',
+                                    )
                                   : '-'}
                               </span>
                             </Box>

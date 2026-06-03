@@ -792,6 +792,8 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
     use chrono::{TimeZone as _, Local};
     let mut all_proxies = Vec::new();
+    let mut raw_proxies = Vec::new();
+    
     if let Some(items) = profiles.get_items() {
         for item in items {
             // Only process remote and local types
@@ -801,7 +803,7 @@ async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Ve
                     if let Some(file) = &item.file {
                         if let Ok(file_path) = dirs::app_profiles_dir().map(|d| d.join(file.as_str())) {
                             if let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path).await {
-                                if let Some(Value::Sequence(mut proxies)) = mapping.remove("proxies") {
+                                if let Some(Value::Sequence(proxies)) = mapping.remove("proxies") {
                                     // Generate suffix from item.updated timestamp
                                     let ts = item.updated.unwrap_or(0) as i64;
                                     let suffix = if let Some(dt) = Local.timestamp_opt(ts, 0).single() {
@@ -810,18 +812,17 @@ async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Ve
                                         "000000".to_string()
                                     };
                                     
-                                    // Format name
-                                    for proxy in &mut proxies {
-                                        if let Some(map) = proxy.as_mapping_mut() {
-                                            if let Some(name_val) = map.get_mut(&Value::from("name")) {
-                                                if let Some(name_str) = name_val.as_str() {
-                                                    let new_name = format!("{} ({})", name_str, suffix);
-                                                    *name_val = Value::from(new_name);
-                                                }
-                                            }
-                                        }
+                                    for proxy in proxies {
+                                        let original_name = if let Some(map) = proxy.as_mapping() {
+                                            map.get(&Value::from("name"))
+                                               .and_then(Value::as_str)
+                                               .unwrap_or("Proxy")
+                                               .to_string()
+                                        } else {
+                                            "Proxy".to_string()
+                                        };
+                                        raw_proxies.push((proxy, original_name, suffix.clone()));
                                     }
-                                    all_proxies.extend(proxies);
                                 }
                             }
                         }
@@ -830,6 +831,34 @@ async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Ve
             }
         }
     }
+
+    // Identify duplicate (name, suffix) keys
+    let mut name_suffix_counts = std::collections::HashMap::new();
+    for (_, name, suffix) in &raw_proxies {
+        let key = (name.clone(), suffix.clone());
+        *name_suffix_counts.entry(key).or_insert(0) += 1;
+    }
+
+    // Format names and collect proxies
+    let mut name_suffix_counters = std::collections::HashMap::new();
+    for (mut proxy, name, suffix) in raw_proxies {
+        let key = (name.clone(), suffix.clone());
+        let count = name_suffix_counts.get(&key).copied().unwrap_or(0);
+        
+        let new_name = if count > 1 {
+            let idx = name_suffix_counters.entry(key).or_insert(0);
+            *idx += 1;
+            format!("{} #{} ({})", name, idx, suffix)
+        } else {
+            format!("{} ({})", name, suffix)
+        };
+
+        if let Some(map) = proxy.as_mapping_mut() {
+            map.insert(Value::from("name"), Value::from(new_name));
+        }
+        all_proxies.push(proxy);
+    }
+
     all_proxies
 }
 

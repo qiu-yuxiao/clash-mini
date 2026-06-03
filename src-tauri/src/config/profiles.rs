@@ -166,10 +166,7 @@ impl IProfiles {
                 .with_context(|| format!("failed to write to file \"{file}\""))?;
         }
 
-        if self.current.is_none()
-            && (item.itype == Some("remote".into()) || item.itype == Some("local".into()))
-            && uid.as_ref().map(|s| s.as_str()) != Some("L_Direct_Imports")
-        {
+        if self.current.is_none() && (item.itype == Some("remote".into()) || item.itype == Some("local".into())) {
             self.current = uid.to_owned();
         }
 
