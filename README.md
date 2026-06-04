@@ -2,6 +2,25 @@
 
 Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailored workflows, enhanced 3D visual styles, and performance.
 
+## Visual Showcase
+
+### 1. Micro-Monitoring Mode (流量监控模式)
+<p align="left">
+  <img src="docs/assets/screenshot_traffic_monitor.png" alt="Micro-Monitoring Mode" width="280" />
+</p>
+
+### 2. Node List in Narrow Layout (窄窗口模式 节点列表)
+<p align="left">
+  <img src="docs/assets/screenshot_narrow_nodelist.png" alt="Narrow Layout Node List" width="280" />
+</p>
+
+### 3. Settings Panel with Copyright Footer (窄窗口模式 设定页面)
+<p align="left">
+  <img src="docs/assets/screenshot_narrow_settings.png" alt="Settings Drawer with Copyright Footer" width="280" />
+</p>
+
+---
+
 ## Copyright and Licensing
 
 - **Upstream Project**: Clash Mini is a derivative work based on [Clash Verge](https://github.com/clash-verge-rev/clash-verge-rev). We respect and acknowledge the copyright of the original authors of Clash Verge.
