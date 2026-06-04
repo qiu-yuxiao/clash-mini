@@ -127,7 +127,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       // so the entire window is draggable (buttons/links still handle their own clicks)
       if (isDecorationsHiddenRef.current) {
         const target = e.target as HTMLElement
-        if (!target.closest('button, a, input, select, textarea')) {
+        if (!target.closest('button, a, input, select, textarea, [data-no-drag]')) {
           currentWindow.startDragging().catch(() => {})
         }
       }
@@ -135,13 +135,16 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const handleClick = (e: MouseEvent) => {
       // Single click (not drag) in stealth mode → restore chrome
+      // Skip if clicking on designated no-drag zones (gear, pin, node status bar)
       if (isDecorationsHiddenRef.current && mouseDownPosRef.current) {
         const dx = e.clientX - mouseDownPosRef.current.x
         const dy = e.clientY - mouseDownPosRef.current.y
         const dist = Math.sqrt(dx * dx + dy * dy)
         if (dist < 5) {
-          // It's a genuine click, not a drag
-          restoreChrome()
+          const target = e.target as HTMLElement
+          if (!target.closest('[data-no-drag]')) {
+            restoreChrome()
+          }
         }
       }
       mouseDownPosRef.current = null

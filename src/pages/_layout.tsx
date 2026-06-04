@@ -1701,6 +1701,7 @@ const Layout = () => {
             {/* 右上角独立控制按钮（齿轮/关闭） */}
             {(decorated || isDecorationsHidden) && (
               <div
+                data-no-drag="true"
                 style={{
                   position: 'absolute',
                   top: '3px',
@@ -1742,6 +1743,7 @@ const Layout = () => {
             {/*置顶当前节点与快捷控制栏（仅在未打开设置时渲染）*/}
             {!drawerOpen && (
               <div
+                data-no-drag="true"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
