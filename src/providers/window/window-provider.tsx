@@ -3,6 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import debounce from '@/utils/debounce'
+import { useWindowSnap } from '@/hooks/useWindowSnap'
 
 import { WindowContext } from './window-context'
 
@@ -19,6 +20,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const [maximized, setMaximized] = useState<boolean | null>(null)
   /** FEAT-003: true when we have hidden the native chrome via idle timer */
   const [isDecorationsHidden, setIsDecorationsHidden] = useState(false)
+
+  // FEAT-004: Enable window edge snapping in borderless (stealth) mode
+  useWindowSnap(decorated === false)
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDecorationsHiddenRef = useRef(false)
