@@ -50,7 +50,8 @@
     "check-runs": "node scratch/check_runs.mjs",
     "monitor-real": "node scratch/monitor_real.mjs",
     "update-agreements-feat003": "python scratch/update_agreements_feat003.py",
-    "update-agreements-feat003-supplement": "python scratch/update_agreements_feat003_supplement.py"
+    "update-agreements-feat003-supplement": "python scratch/update_agreements_feat003_supplement.py",
+    "update-docs-bug046": "python scratch/update_docs_bug046.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
