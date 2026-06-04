@@ -14,20 +14,21 @@ Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailore
   <img src="docs/assets/screenshot_narrow_nodelist.png" alt="Narrow Layout Node List" width="280" />
 </p>
 
-### 3. Settings Panel with Copyright Footer (窄窗口模式 设定页面)
-<p align="left">
-  <img src="docs/assets/screenshot_narrow_settings.png" alt="Settings Drawer with Copyright Footer" width="280" />
-</p>
+### 3. Settings Panels (窄窗口模式 设定选项)
+* **Dark Theme (深色主题 - 专家级选项)**:
+  <br/>
+  <img src="docs/assets/screenshot_narrow_settings.png" alt="Settings Drawer Dark" width="280" />
+* **Light Theme (浅色主题 - 小白设定选项)**:
+  <br/>
+  <img src="docs/assets/screenshot_narrow_settings_light.png" alt="Settings Drawer Light" width="280" />
 
-### 4. Expert Mode with Dark Theme (专家模式 深色主题)
-<p align="left">
-  <img src="docs/assets/screenshot_maximized_dark.png" alt="Maximized Expert Mode with Dark Theme" width="480" />
-</p>
-
-### 5. Expert Mode with Light Theme (专家模式 浅色主题)
-<p align="left">
-  <img src="docs/assets/screenshot_maximized_light.png" alt="Maximized Expert Mode with Light Theme" width="480" />
-</p>
+### 4. Expert Mode Layouts (宽窗口专家模式)
+* **Dark Theme (深色主题)**:
+  <br/>
+  <img src="docs/assets/screenshot_maximized_dark.png" alt="Maximized Dark Theme" width="480" />
+* **Light Theme (浅色主题)**:
+  <br/>
+  <img src="docs/assets/screenshot_maximized_light.png" alt="Maximized Light Theme" width="480" />
 
 ---
 
