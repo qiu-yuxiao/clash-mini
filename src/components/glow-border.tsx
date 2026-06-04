@@ -162,9 +162,9 @@ export const GlowBorder = () => {
 
       // Amber-gold at A, electric-blue at B, smooth gradient between
       const gradient = `conic-gradient(from 0deg, 
-        #D4AF37 ${aDeg.toFixed(1)}deg,
+        #FFC400 ${aDeg.toFixed(1)}deg,
         #0084FF ${bDeg.toFixed(1)}deg,
-        #D4AF37 ${(aDeg + 360).toFixed(1)}deg
+        #FFC400 ${(aDeg + 360).toFixed(1)}deg
       )`
 
       if (gradientLayerRef.current) {
@@ -229,7 +229,7 @@ export const GlowBorder = () => {
           maskComposite: 'exclude',
           padding: '4px',
           background: isLight
-            ? 'linear-gradient(135deg, #D4AF37, #0084FF)'
+            ? 'linear-gradient(135deg, #FFC400, #0084FF)'
             : 'linear-gradient(135deg, #FFD700, #00BFFF)',
           animation: 'cm-glow-breathe var(--cm-breathe-dur, 5s) ease-in-out infinite',
           // Opacity range for breathe layer: 0.05 (dim) to 0.55*0.6=0.33 (bright) → 60% share

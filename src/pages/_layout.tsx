@@ -480,7 +480,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
           '@media (max-width: 560px)': {
             height: 'auto',
             flexDirection: 'column',
-            gap: isMinimalWidth ? 0.25 : 0,
+            gap: isMinimalWidth ? 0 : 0,
             pt: isMinimalWidth ? 0 : 0.5,
           },
         }}
@@ -1492,7 +1492,7 @@ const Layout = () => {
   // Custom Titlebar Render
   const customTitlebar = useMemo(
     () =>
-      !decorated ? (
+      !decorated && !isDecorationsHidden ? (
         <div
           className="the_titlebar"
           style={{
@@ -1606,7 +1606,7 @@ const Layout = () => {
           <WindowControls ref={windowControlsRef} />
         </div>
       ) : null,
-    [decorated, drawerOpen, patchVerge, verge?.enable_always_on_top],
+    [decorated, isDecorationsHidden, drawerOpen, patchVerge, verge?.enable_always_on_top],
   )
 
   if (!themeReady) {
@@ -1649,6 +1649,7 @@ const Layout = () => {
         square
         elevation={0}
         className={`${OS} layout`}
+        {...(isDecorationsHidden ? { 'data-tauri-drag-region': 'true' } : {})}
         style={{
           width: '100vw',
           height: '100vh',
@@ -1671,22 +1672,18 @@ const Layout = () => {
       >
         {customTitlebar}
 
-        {/* FEAT-003: Glow border — fixed overlay, 4px inner frame */}
-        <GlowBorder />
+        {/* FEAT-003: GlowBorder — only visible in stealth mode, replaces native chrome */}
+        {isDecorationsHidden && <GlowBorder />}
 
         <div
           className="layout-content"
           style={{
             display: 'flex',
             flexDirection: 'column',
-            height: decorated ? '100vh' : 'calc(100vh - 36px)',
+            height: decorated || isDecorationsHidden ? '100vh' : 'calc(100vh - 36px)',
             width: '100vw',
             overflow: 'hidden',
             position: 'relative',
-            // FEAT-003: when title bar is hidden, WebView expands ~33px upward.
-            // Add matching padding so content stays at same screen position.
-            paddingTop: isDecorationsHidden ? '33px' : '0px',
-            transition: 'padding-top 0.15s ease-out',
             boxSizing: 'border-box',
           }}
         >
@@ -1702,7 +1699,7 @@ const Layout = () => {
             }}
           >
             {/* 右上角独立控制按钮（齿轮/关闭） */}
-            {decorated && (
+            {(decorated || isDecorationsHidden) && (
               <div
                 style={{
                   position: 'absolute',
@@ -1758,7 +1755,7 @@ const Layout = () => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <ActiveNodeStatusCard />
                 </div>
-                {decorated && (
+                {(decorated || isDecorationsHidden) && (
                   <IconButton
                     size="small"
                     onClick={() =>

@@ -171,7 +171,7 @@ export const get3DCardStyle = (
 
   return {
     borderRadius: '6px',
-    border: `${borderWidth} solid`,
+    border: 'none',
     borderColor,
     background: backgroundStyle,
     color: textColor,
