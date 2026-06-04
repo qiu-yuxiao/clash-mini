@@ -52,7 +52,11 @@
     "update-agreements-feat003": "python scratch/update_agreements_feat003.py",
     "update-agreements-feat003-supplement": "python scratch/update_agreements_feat003_supplement.py",
     "update-docs-bug046": "python scratch/update_docs_bug046.py",
-    "patch-pre-push-fix": "python scratch/patch_pre_push_fix.py"
+    "patch-pre-push-fix": "python scratch/patch_pre_push_fix.py",
+    "delete-pre-100-releases": "python scratch/delete_pre_1_0_0_releases.py",
+    "print-tags": "python scratch/print_tags.py",
+    "delete-pre-100-releases-auth": "python scratch/delete_pre_1_0_0_releases_auth.py",
+    "keep-only-milestones": "python scratch/keep_only_milestones.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
