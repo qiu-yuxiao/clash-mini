@@ -270,7 +270,7 @@
 
      * **隐身模式激活**：调用 Tauri 内置 API `window.set_decorations(false)`（该 API 在 Windows 10/11 上正确处理 DWM，确保原生窗框真正消失）。WebView 自动向上填满释放的空间（约 33px），窗口总高度不变。同时 GlowBorder 淡入，接替窗框的视觉边界。齿轮（设置）和图钉（置顶）按钮在隐身模式下继续显示于内容区顶部。
 
-     * **隐身模式下移动窗口**：在 `mousedown` 事件中程序化调用 Tauri `currentWindow.startDragging()`，对按钮、链接等交互控件以外的任意区域生效，隐身状态保持。
+     * **隐身模式下移动窗口**：在 `mousedown` 事件中程序化调用 Tauri `currentWindow.startDragging()`，对按钮、链接等交互控件以外的任意区域生效，隐身状态保持。顶部第一行（活跃节点状态条、图钉按钮、齿轮按钮，标记 `data-no-drag="true"`）同时排除于拖拽和单击唤醒之外，点击该区域执行其原有功能（切换节点置顶、打开设置），不触发窗口移动也不唤醒隐身状态。
 
      * **恢复方式1（单击唤醒）**：在窗口上单击（非拖动，位移 < 5px）→ 调用 `window.set_decorations(true)` 恢复原生窗框，GlowBorder 消失。
 
