@@ -19,7 +19,7 @@
 | :--- | :--- | :---: | :--- |
 | **BUG-047** | 在本地提交推送（`git push`）时，Git 的 `pre-push` 钩子运行 `cargo clippy --all-targets` 遇到测试模块中的 `.unwrap()` 报错导致推送失败（由于项目全局禁用了 `unwrap_used`）。 | v3.0.1 | **已解决，已确认**。<br>**设计要求**：在 `universal_parser.rs` 的测试模块 `mod tests` 前端声明 `#[allow(clippy::unwrap_used)]`，允许在测试中合理使用 `.unwrap()` 以提取结果，同时修复该测试中的冗余借用警告（如 `&serde_yaml_ng::Value` 修改为直接传值）。<br>**代码状态**：代码修改完成，静态编译及单元测试全部通过，并成功推送。 |
 
-| (暂无) | 所有当前版本 (v2.0.1 followup) 发现 of 缺陷均已解决。 | - | - |
+| **BUG-048** | 无边框模式下窗口边缘磁吸及自适应吸附与脱离功能丢失，拖动时缺乏物理吸附感与防自激锁保护。 | v3.0.1 | **进行中**。<br>**设计要求**：1. 设计 useWindowSnap 状态防抖与 cooling 机制；2. 增加 mousedown 事件的预缓存，消除 onMoved 中的异步 Tauri IPC 获取，保障性能；3. 适配 DPI 缩放物理像素及多显示器。<br>**目前进度**：进行中。 |
 
 
 
