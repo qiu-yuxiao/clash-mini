@@ -1,3 +1,6 @@
+// Copyright (c) 2026 秋雨潇潇 <qiuyuxiao@gmail.com> (Portions relating to modifications)
+// SPDX-License-Identifier: GPL-3.0-only
+
 import {
   ArrowDownwardRounded,
   ArrowUpwardRounded,
@@ -2740,6 +2743,52 @@ const Layout = () => {
                     >
                       系统调试运行日志
                     </Button>
+                  </Box>
+
+                  {/* Copyright Footer */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mt: 'auto',
+                      pt: 1,
+                      borderTop: (theme) => `1px dashed ${theme.palette.divider}`,
+                      opacity: 0.75,
+                      '&:hover': {
+                        opacity: 1,
+                      },
+                      transition: 'opacity 0.2s ease',
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '11px',
+                        color: 'text.secondary',
+                        textAlign: 'center',
+                        userSelect: 'none',
+                      }}
+                    >
+                      © 2026 秋雨潇潇 (修改部分)
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontSize: '10px',
+                        color: 'primary.main',
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        '&:hover': {
+                          textDecoration: 'underline',
+                        },
+                      }}
+                      component="a"
+                      href="mailto:qiuyuxiao@gmail.com"
+                    >
+                      qiuyuxiao@gmail.com
+                    </Typography>
                   </Box>
                 </Box>
               </Box>

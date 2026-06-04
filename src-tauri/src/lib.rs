@@ -1,3 +1,6 @@
+// Copyright (c) 2026 秋雨潇潇 <qiuyuxiao@gmail.com> (Portions relating to modifications)
+// SPDX-License-Identifier: GPL-3.0-only
+
 #![allow(non_snake_case)]
 #![allow(
     clippy::collapsible_if,

@@ -132,3 +132,10 @@ Signed commits are required to verify authorship and ensure your contributions c
 4. Push your branch and submit a pull request.
 
 We appreciate your contributions and look forward to your participation!
+
+## Copyright and Licensing
+
+Copyright (c) 2026 秋雨潇潇 <qiuyuxiao@gmail.com> (Portions relating to modifications and custom enhancements).
+Copyright (c) the original authors of Clash Verge.
+
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0-only). By contributing to **Clash Mini**, you agree that your contributions will be licensed under the project's GPL-3.0-only license.

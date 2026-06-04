@@ -56,7 +56,8 @@
     "delete-pre-100-releases": "python scratch/delete_pre_1_0_0_releases.py",
     "print-tags": "python scratch/print_tags.py",
     "delete-pre-100-releases-auth": "python scratch/delete_pre_1_0_0_releases_auth.py",
-    "keep-only-milestones": "python scratch/keep_only_milestones.py"
+    "keep-only-milestones": "python scratch/keep_only_milestones.py",
+    "apply-copyright-changes": "python scratch/apply_copyright_changes.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
