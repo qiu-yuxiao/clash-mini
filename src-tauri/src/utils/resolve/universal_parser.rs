@@ -539,6 +539,7 @@ pub fn parse_uri_list(content: &str) -> Option<Mapping> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
@@ -548,45 +549,45 @@ mod tests {
         let map = parse_vless(link).unwrap();
 
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
             "vless"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
             "aws德国"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("server"))
+            map.get(serde_yaml_ng::Value::from("server"))
                 .unwrap()
                 .as_str()
                 .unwrap(),
             "awsjfde1.fatdns.net"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
             443
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(),
             "2513e61a-6982-39cd-9f0a-8f6fbc3fc5f0"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("flow")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("flow")).unwrap().as_str().unwrap(),
             "xtls-rprx-vision"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("tls")).unwrap().as_bool().unwrap(),
+            map.get(serde_yaml_ng::Value::from("tls")).unwrap().as_bool().unwrap(),
             true
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("servername"))
+            map.get(serde_yaml_ng::Value::from("servername"))
                 .unwrap()
                 .as_str()
                 .unwrap(),
             "s0.awsstatic.com"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("client-fingerprint"))
+            map.get(serde_yaml_ng::Value::from("client-fingerprint"))
                 .unwrap()
                 .as_str()
                 .unwrap(),
@@ -594,13 +595,13 @@ mod tests {
         );
 
         let reality_opts = map
-            .get(&serde_yaml_ng::Value::from("reality-opts"))
+            .get(serde_yaml_ng::Value::from("reality-opts"))
             .unwrap()
             .as_mapping()
             .unwrap();
         assert_eq!(
             reality_opts
-                .get(&serde_yaml_ng::Value::from("public-key"))
+                .get(serde_yaml_ng::Value::from("public-key"))
                 .unwrap()
                 .as_str()
                 .unwrap(),
@@ -608,7 +609,7 @@ mod tests {
         );
         assert_eq!(
             reality_opts
-                .get(&serde_yaml_ng::Value::from("short-id"))
+                .get(serde_yaml_ng::Value::from("short-id"))
                 .unwrap()
                 .as_str()
                 .unwrap(),
@@ -622,22 +623,22 @@ mod tests {
         let map = parse_http_fallback(line).unwrap();
 
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
             "http"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
             "v5-香港03|1x|v"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("server"))
+            map.get(serde_yaml_ng::Value::from("server"))
                 .unwrap()
                 .as_str()
                 .unwrap(),
             "v5.cdn.ljz8s7lhbv.fatdns.net"
         );
         assert_eq!(
-            map.get(&serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
             6712
         );
     }

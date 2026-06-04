@@ -1,4 +1,9 @@
 #![allow(non_snake_case)]
+#![allow(
+    clippy::collapsible_if,
+    clippy::cognitive_complexity,
+    clippy::bool_assert_comparison
+)]
 #![recursion_limit = "512"]
 
 mod cmd;
