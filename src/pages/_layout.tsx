@@ -1210,6 +1210,17 @@ const Layout = () => {
     }
   }, [])
 
+  // Keep stable refs for proxies and triggerAutoSelectFastestNode to prevent background monitor timer resets
+  const proxiesRef = useRef(proxies)
+  useEffect(() => {
+    proxiesRef.current = proxies
+  }, [proxies])
+
+  const triggerAutoSelectFastestNodeRef = useRef(triggerAutoSelectFastestNode)
+  useEffect(() => {
+    triggerAutoSelectFastestNodeRef.current = triggerAutoSelectFastestNode
+  }, [triggerAutoSelectFastestNode])
+
   // Background monitor for the active proxy node
   const consecutiveFailRef = useRef<number>(0)
   const lastActiveNodeRef = useRef<string | null>(null)
@@ -1222,7 +1233,7 @@ const Layout = () => {
     let timerId: ReturnType<typeof setTimeout> | null = null
 
     const checkNode = async () => {
-      const activeNodeName = proxies?.groups?.find(
+      const activeNodeName = proxiesRef.current?.groups?.find(
         (g: any) => g.name === 'PROXY',
       )?.now
       if (
@@ -1275,7 +1286,7 @@ const Layout = () => {
           showNotice.info(
             `检测到当前线路连接超时或缓慢，正在自动为您切换至最快线路...`,
           )
-          triggerAutoSelectFastestNode(currentProfileUid)
+          triggerAutoSelectFastestNodeRef.current(currentProfileUid)
           timerId = setTimeout(checkNode, 60000)
         } else {
           // Failure occurred: fast retry in 5 seconds
@@ -1291,7 +1302,7 @@ const Layout = () => {
         clearTimeout(timerId)
       }
     }
-  }, [currentProfileUid, proxies, triggerAutoSelectFastestNode])
+  }, [currentProfileUid])
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
