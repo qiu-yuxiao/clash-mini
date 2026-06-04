@@ -43,6 +43,21 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     await currentWindow.minimize()
   }, [currentWindow])
 
+  // ── Restore chrome ──────────────────────────────────────────────────────────
+  const restoreChrome = useCallback(() => {
+    if (!isDecorationsHiddenRef.current) return
+    isDecorationsHiddenRef.current = false
+    setIsDecorationsHidden(false)
+    setDecorated(true)
+    ;(async () => {
+      try {
+        await invoke('restore_window_chrome')
+      } catch (err) {
+        console.warn('[WindowProvider] restore_window_chrome failed:', err)
+      }
+    })()
+  }, [])
+
   // ── Resize listener: track maximized state + minimal width ──────────────────
   useEffect(() => {
     let isUnmounted = false
@@ -84,23 +99,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         .then((unlisten) => unlisten())
         .catch((err) => console.warn('[WindowProvider] 清理监听器失败:', err))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentWindow])
+  }, [currentWindow, restoreChrome])
 
-  // ── Restore chrome ──────────────────────────────────────────────────────────
-  const restoreChrome = useCallback(() => {
-    if (!isDecorationsHiddenRef.current) return
-    isDecorationsHiddenRef.current = false
-    setIsDecorationsHidden(false)
-    setDecorated(true)
-    ;(async () => {
-      try {
-        await invoke('restore_window_chrome')
-      } catch (err) {
-        console.warn('[WindowProvider] restore_window_chrome failed:', err)
-      }
-    })()
-  }, [])
+
 
   // ── Reset idle timer ────────────────────────────────────────────────────────
   const resetIdleTimer = useCallback(() => {

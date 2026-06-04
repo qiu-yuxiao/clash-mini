@@ -72,17 +72,17 @@ export const GlowBorder = () => {
   const gradientLayerRef = useRef<HTMLDivElement>(null)
 
   // Physics state (mutable refs, not React state — updated every RAF)
-  const poleAAngle = useRef(0)           // radians
-  const poleBAngle = useRef(Math.PI)     // start opposite
-  const poleAVel = useRef(MIN_SPEED * 0.7)
-  const poleBVel = useRef(-MIN_SPEED * 0.5)
-  const lastTimestamp = useRef<number | null>(null)
+  const poleAAngleRef = useRef(0) // radians
+  const poleBAngleRef = useRef(Math.PI) // start opposite
+  const poleAVelRef = useRef(MIN_SPEED * 0.7)
+  const poleBVelRef = useRef(-MIN_SPEED * 0.5)
+  const lastTimestampRef = useRef<number | null>(null)
   const baseSpeedRef = useRef(MIN_SPEED)
-  const rafId = useRef<number | null>(null)
+  const rafIdRef = useRef<number | null>(null)
 
   // Scheduled kick times
-  const nextKickA = useRef(Date.now() + KICK_MIN_INTERVAL)
-  const nextKickB = useRef(Date.now() + KICK_MIN_INTERVAL * 1.5)
+  const nextKickARef = useRef(0)
+  const nextKickBRef = useRef(0)
 
   // Update base speed from traffic
   useEffect(() => {
@@ -102,31 +102,37 @@ export const GlowBorder = () => {
   // Physics + gradient animation loop
   useEffect(() => {
     let mounted = true
+    nextKickARef.current = Date.now() + KICK_MIN_INTERVAL
+    nextKickBRef.current = Date.now() + KICK_MIN_INTERVAL * 1.5
 
     function tick(ts: number) {
       if (!mounted) return
-      if (lastTimestamp.current === null) lastTimestamp.current = ts
-      const dt = Math.min((ts - lastTimestamp.current) / 1000, 0.1) // seconds, cap at 100ms
-      lastTimestamp.current = ts
+      if (lastTimestampRef.current === null) lastTimestampRef.current = ts
+      const dt = Math.min((ts - lastTimestampRef.current) / 1000, 0.1) // seconds, cap at 100ms
+      lastTimestampRef.current = ts
 
       const now = Date.now()
 
       // Random kicks
-      if (now >= nextKickA.current) {
+      if (now >= nextKickARef.current) {
         const kickDir = Math.random() < 0.5 ? 1 : -1
-        poleAVel.current += kickDir * KICK_MAGNITUDE * (0.5 + Math.random())
-        nextKickA.current =
-          now + KICK_MIN_INTERVAL + Math.random() * (KICK_MAX_INTERVAL - KICK_MIN_INTERVAL)
+        poleAVelRef.current += kickDir * KICK_MAGNITUDE * (0.5 + Math.random())
+        nextKickARef.current =
+          now +
+          KICK_MIN_INTERVAL +
+          Math.random() * (KICK_MAX_INTERVAL - KICK_MIN_INTERVAL)
       }
-      if (now >= nextKickB.current) {
+      if (now >= nextKickBRef.current) {
         const kickDir = Math.random() < 0.5 ? 1 : -1
-        poleBVel.current += kickDir * KICK_MAGNITUDE * (0.5 + Math.random())
-        nextKickB.current =
-          now + KICK_MIN_INTERVAL + Math.random() * (KICK_MAX_INTERVAL - KICK_MIN_INTERVAL)
+        poleBVelRef.current += kickDir * KICK_MAGNITUDE * (0.5 + Math.random())
+        nextKickBRef.current =
+          now +
+          KICK_MIN_INTERVAL +
+          Math.random() * (KICK_MAX_INTERVAL - KICK_MIN_INTERVAL)
       }
 
       // Repulsion force: angular difference
-      let diff = poleBAngle.current - poleAAngle.current
+      let diff = poleBAngleRef.current - poleAAngleRef.current
       // Normalize to [-π, π]
       while (diff > Math.PI) diff -= 2 * Math.PI
       while (diff < -Math.PI) diff += 2 * Math.PI
@@ -134,31 +140,45 @@ export const GlowBorder = () => {
       // Repulsion: push apart (force inversely proportional to |diff|)
       const repulsion = REPULSION_K / Math.max(Math.abs(diff), 0.05)
       const repulsionDir = diff > 0 ? -1 : 1
-      poleAVel.current += repulsionDir * repulsion
-      poleBVel.current -= repulsionDir * repulsion
+      poleAVelRef.current += repulsionDir * repulsion
+      poleBVelRef.current -= repulsionDir * repulsion
 
       // Damping toward base speed (gentle drag)
       const base = baseSpeedRef.current
       const damping = 0.3
-      poleAVel.current += (Math.sign(poleAVel.current) * base - poleAVel.current) * damping * dt
-      poleBVel.current += (Math.sign(poleBVel.current) * base - poleBVel.current) * damping * dt
+      poleAVelRef.current +=
+        (Math.sign(poleAVelRef.current) * base - poleAVelRef.current) *
+        damping *
+        dt
+      poleBVelRef.current +=
+        (Math.sign(poleBVelRef.current) * base - poleBVelRef.current) *
+        damping *
+        dt
 
       // Clamp speed
       const maxSpd = MAX_SPEED * 2
-      poleAVel.current = Math.max(-maxSpd, Math.min(maxSpd, poleAVel.current))
-      poleBVel.current = Math.max(-maxSpd, Math.min(maxSpd, poleBVel.current))
+      poleAVelRef.current = Math.max(
+        -maxSpd,
+        Math.min(maxSpd, poleAVelRef.current),
+      )
+      poleBVelRef.current = Math.max(
+        -maxSpd,
+        Math.min(maxSpd, poleBVelRef.current),
+      )
 
       // Integrate positions
-      poleAAngle.current += poleAVel.current * dt
-      poleBAngle.current += poleBVel.current * dt
+      poleAAngleRef.current += poleAVelRef.current * dt
+      poleBAngleRef.current += poleBVelRef.current * dt
 
       // Normalize angles to [0, 2π]
-      poleAAngle.current = ((poleAAngle.current % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-      poleBAngle.current = ((poleBAngle.current % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+      poleAAngleRef.current =
+        ((poleAAngleRef.current % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+      poleBAngleRef.current =
+        ((poleBAngleRef.current % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
 
       // Build conic-gradient
-      const aDeg = (poleAAngle.current * 180) / Math.PI
-      const bDeg = (poleBAngle.current * 180) / Math.PI
+      const aDeg = (poleAAngleRef.current * 180) / Math.PI
+      const bDeg = (poleBAngleRef.current * 180) / Math.PI
 
       // Amber-gold at A, electric-blue at B, smooth gradient between
       const gradient = `conic-gradient(from 0deg, 
@@ -171,13 +191,13 @@ export const GlowBorder = () => {
         gradientLayerRef.current.style.background = gradient
       }
 
-      rafId.current = requestAnimationFrame(tick)
+      rafIdRef.current = requestAnimationFrame(tick)
     }
 
-    rafId.current = requestAnimationFrame(tick)
+    rafIdRef.current = requestAnimationFrame(tick)
     return () => {
       mounted = false
-      if (rafId.current !== null) cancelAnimationFrame(rafId.current)
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
     }
   }, [])
 

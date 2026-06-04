@@ -139,7 +139,6 @@ export const get3DCardStyle = (
   let textColor: string
   let borderColor: string
   let bevelShadowDark: string
-  const borderWidth = 'calc(2px * var(--depth-factor, 1.0))'
 
   if (cardType === 'primary') {
     textColor = '#1E1200'

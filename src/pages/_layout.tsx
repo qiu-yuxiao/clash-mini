@@ -43,6 +43,7 @@ import {
 import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import { ConnectionTable } from '@/components/connection/connection-table'
+import { GlowBorder } from '@/components/glow-border'
 import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-traffic-graph'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { TrafficGraph } from '@/components/layout/traffic-graph'
@@ -60,7 +61,6 @@ import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVerge } from '@/hooks/use-verge'
 import { useVisibility } from '@/hooks/use-visibility'
 import { useWindowDecorations } from '@/hooks/use-window'
-import { GlowBorder } from '@/components/glow-border'
 import {
   useProxiesData,
   useClashConfigData,
