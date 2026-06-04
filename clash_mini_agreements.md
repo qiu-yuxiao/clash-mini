@@ -1070,3 +1070,14 @@
 
 
 
+
+
+### 3. 本地编译与推送时 Clippy 规则拦截测试中的 unwrap 报错修复流程：
+
+*   当本地运行 `cargo clippy` 或 `git push` 时，遇到测试模块中的 `.unwrap()` 报错被拦截：
+
+*   **SOP 步骤**：
+
+    1. 在测试模块定义处（`mod tests`）之前声明 `#[allow(clippy::unwrap_used)]`，以豁免测试代码中的 `unwrap` 限制。
+
+    2. 对于测试代码中引用的 Key 表达式，将冗余的引用符号（如 `&serde_yaml_ng::Value`）修改为直接传值，以消除借用警告。
