@@ -216,6 +216,8 @@ mod app_init {
             cmd::restore_webdav_backup,
             cmd::get_unlock_items,
             cmd::check_media_unlock,
+            cmd::hide_window_chrome,
+            cmd::restore_window_chrome,
         ]
     }
 }

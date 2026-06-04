@@ -1,6 +1,6 @@
 {
   "name": "clash-mini",
-  "version": "2.0.7",
+  "version": "3.0.0",
   "license": "GPL-3.0-only",
   "scripts": {
     "prepare": "husky || true",
@@ -27,6 +27,7 @@
     "dump-nodes": "python scratch/dump_nodes.py",
     "patch-agreements": "python scratch/patch_agreements_final.py",
     "update-always-active-agreement": "python scratch/update_always_active_agreement.py",
+    "update-agreements": "python scratch/update_agreements.py",
     "publish-version": "node scripts/publish-version.mjs",
     "check-run": "node C:\\Users\\sun_y\\.gemini\\antigravity\\brain\\233796e9-dbba-4bae-8c91-0d25cbea3af5\\scratch\\get-failed-run-logs.mjs",
     "push-dev": "git push origin dev",

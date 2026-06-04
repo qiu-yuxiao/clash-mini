@@ -20,6 +20,7 @@ pub mod uwp;
 pub mod validate;
 pub mod verge;
 pub mod webdav;
+pub mod window_chrome;
 
 // Re-export all command functions for backwards compatibility
 pub use app::*;
@@ -38,6 +39,7 @@ pub use uwp::*;
 pub use validate::*;
 pub use verge::*;
 pub use webdav::*;
+pub use window_chrome::*;
 
 pub trait StringifyErr<T> {
     fn stringify_err(self) -> CmdResult<T>;
