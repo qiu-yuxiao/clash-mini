@@ -268,11 +268,11 @@
 
      * **触发条件**：窗口处于**最小宽度（270px）**状态，且连续 **10 秒**无任何操作（鼠标移动、点击、键盘）。两个条件须同时满足。
 
-     * **隐身模式激活**：通过 Win32 API 直接操控（`SetWindowLongW`），移除 `WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX`，保留 `WS_THICKFRAME`。窗口物理尺寸不变，WebView 自动填满释放的空间。同时 GlowBorder 淡入，接替窗框的视觉边界。
+     * **隐身模式激活**：调用 Tauri 内置 API `window.set_decorations(false)`（该 API 在 Windows 10/11 上正确处理 DWM，确保原生窗框真正消失）。WebView 自动向上填满释放的空间（约 33px），窗口总高度不变。同时 GlowBorder 淡入，接替窗框的视觉边界。齿轮（设置）和图钉（置顶）按钮在隐身模式下继续显示于内容区顶部。
 
-     * **隐身模式下移动窗口**：按住窗口任意位置拖动（根容器应用 `data-tauri-drag-region`）即可移动窗口，隐身状态保持。
+     * **隐身模式下移动窗口**：在 `mousedown` 事件中程序化调用 Tauri `currentWindow.startDragging()`，对按钮、链接等交互控件以外的任意区域生效，隐身状态保持。
 
-     * **恢复方式1（单击唤醒）**：在窗口上单击（非拖动，位移 < 5px）→ Win32 立即恢复 `WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX`，GlowBorder 消失。
+     * **恢复方式1（单击唤醒）**：在窗口上单击（非拖动，位移 < 5px）→ 调用 `window.set_decorations(true)` 恢复原生窗框，GlowBorder 消失。
 
      * **恢复方式2（变宽）**：窗口被拖宽脱离最小宽度（innerWidth > 290px）→ 自动恢复原生窗框，GlowBorder 消失。
 
@@ -280,7 +280,7 @@
 
 
 
-    * 窗口启动时的默认尺寸硬性设定为：宽度 270 px，高度 680 px。同时，支持拉伸，最大尺寸限制设定为：宽度 640 px，高度 860 px；最小尺寸限制设定为：最小宽度 270 px，最小高度 133 px。
+     * 窗口启动时的默认尺寸硬性设定为：宽度 270 px，高度 680 px。同时，支持拉伸，最大尺寸限制设定为：宽度 640 px，高度 860 px；最小尺寸限制设定为：最小宽度 270 px，最小高度 99 px。
 
 
 
@@ -295,7 +295,7 @@
 
      * **定位**：仅在隐身模式（stealth mode）下显示，紧贴原内容区外侧边缘（`position: fixed; inset: 0`），与 Windows 原生窗框互斥交替，接替其视觉边界功能。正常状态下不显示。
 
-     * **宽度**：**4px**。GlowBorder 外置于内容区边缘，不占用内容区空间，**窗口尺寸无需为其调整**（DEFAULT_WIDTH=270, MINIMAL_WIDTH=270, MINIMAL_HEIGHT=133，回归 2.0.7 原始值）。
+     * **宽度**：**4px**。GlowBorder 外置于内容区边缘，不占用内容区空间，**窗口尺寸无需为其调整**（DEFAULT_WIDTH=270, MINIMAL_WIDTH=270, MINIMAL_HEIGHT=99）。
 
      * **颜色与运动（双活塞压缩气体物理模型）**：边框上有两个独立运动的色彩极点——琥珀金 `#D4AF37` 与电光蓝 `#0084FF`，两者之间为无限平滑渐变（连续光谱）。两极点初始位置大致在对角，各自以独立速度在封闭管道内运动。靠近时因互斥斜力减速（压缩气体模拟），远离时自由漂移；受随机扰动影响，方向不规律切换。
 
