@@ -19,6 +19,11 @@ Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailore
   <img src="docs/assets/screenshot_narrow_settings.png" alt="Settings Drawer with Copyright Footer" width="280" />
 </p>
 
+### 4. Expert Mode with Dark Theme (专家模式 深色主题)
+<p align="left">
+  <img src="docs/assets/screenshot_maximized_dark.png" alt="Maximized Expert Mode with Dark Theme" width="480" />
+</p>
+
 ---
 
 ## Copyright and Licensing
