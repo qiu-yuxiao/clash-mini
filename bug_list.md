@@ -33,7 +33,8 @@
 
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 修复方法与说明 |
 
-| :--- | :--- | :---: | :--- |
+| **BUG-049** | 活跃出口节点活性监控定时检测（自动测速与切换）在运行中失效，原因为其 useEffect 依赖了频繁变动的 proxies 状态与 triggerAutoSelectFastestNode，导致定时器在倒计时完成前反复被重置清除，无法正常在后台运行测速调度。 | v3.0.2 | **已解决，待确认**。<br>**设计要求**：将活性监控 `useEffect` 中的外部状态依赖解耦，仅依赖于 `currentProfileUid`；使用 stable Refs 缓存 `proxies` 和 `triggerAutoSelectFastestNode`，使后台定时器能在长周期内平稳不间断运行，达到真正的 60 秒定期测速与失效自动连切。<br>**代码状态**：已重构 `_layout.tsx` 监控计时器逻辑，利用 `proxiesRef` 与 `triggerAutoSelectFastestNodeRef` 隔离渲染重绘，实现后台检测闭环。静态检查与前端静态资源编译通过。 |
+
 | **BUG-048** | 无边框模式下窗口边缘磁吸及自适应吸附与脱离功能丢失，拖拽时缺乏物理吸附感与防自激锁保护。 | v3.0.1 | **已解决，已确认**。<br>**设计要求**：1. 设计 useWindowSnap 状态防抖与 cooling 机制；2. 增加 mousedown 事件的预缓存，消除 onMoved 中的异步 Tauri IPC 获取，保障性能；3. 适配 DPI 缩放物理像素及多显示器。<br>**代码状态**：1. 完成 `useWindowSnap.ts` 的编写，通过 mousedown/mouseup 事件实现首尾阶段的 monitor/window 尺寸预缓存，有效规避高频 onMoved 时的 IPC 消耗；2. 引入 18 像素 (DPI-scaled) 贴合与 24 像素挣脱阈值，实现真实的“磁吸与挣脱”触感并配以 150ms 的防自激锁；3. 成功集成至 `WindowProvider` 的无边框判断逻辑中，并通过本地前端与类型安全编译。 |
 
 | **BUG-046** | 在隐身(stealth)模式下，单击窗口除交互控件和避让区之外的任意区域无法正常恢复原生标题栏（点击唤醒失效），原因为在 `mousedown` 立即启动拖拽会导致 OS 吞掉后续 click 事件。 | v3.0.0 | **已解决，已确认**。<br>**设计要求**：隐身模式下将拖拽启动移至 `mousemove`（鼠标左键按下且移动位移 > 5px），点击唤醒判定改在 `mouseup`（位移 < 5px 且未发生过拖拽），从而避免 click 事件被 OS 吞掉。同时，排除避让区域的唤醒。<br>**代码状态**：已完成 `window-provider.tsx` 逻辑重构，将拖拽启动延迟到 mousemove 位移大于 5px，并通过 mouseup 处理位移小于 5px 时的单击唤醒。已成功通过验证并提交。 |
