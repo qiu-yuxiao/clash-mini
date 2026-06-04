@@ -30,6 +30,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // ── Drag-vs-click detection ─────────────────────────────────────────────────
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null)
+  /** FEAT-003: true once startDragging() has been called for the current press */
+  const dragStartedRef = useRef(false)
 
   const close = useCallback(async () => {
     await new Promise((resolve) => setTimeout(resolve, 20))
@@ -60,7 +62,11 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         isMinimalWidthRef.current = window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
 
         // If window is no longer minimal AND chrome is hidden → restore
-        if (wasMinimal && !isMinimalWidthRef.current && isDecorationsHiddenRef.current) {
+        if (
+          wasMinimal &&
+          !isMinimalWidthRef.current &&
+          isDecorationsHiddenRef.current
+        ) {
           restoreChrome()
         }
 
@@ -78,7 +84,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         .then((unlisten) => unlisten())
         .catch((err) => console.warn('[WindowProvider] 清理监听器失败:', err))
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWindow])
 
   // ── Restore chrome ──────────────────────────────────────────────────────────
@@ -121,26 +127,55 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const handleMouseDown = (e: MouseEvent) => {
       mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
+      dragStartedRef.current = false
       resetIdleTimer()
+      // NOTE: Do NOT call startDragging() here.
+      // Calling it on mousedown causes the OS to swallow subsequent
+      // click/mouseup events, permanently breaking click-to-restore.
+      // We defer to handleMouseMove and only start dragging after 5px.
+    }
 
-      // In stealth mode, start window drag for any non-interactive target
-      // so the entire window is draggable (buttons/links still handle their own clicks)
-      if (isDecorationsHiddenRef.current) {
-        const target = e.target as HTMLElement
-        if (!target.closest('button, a, input, select, textarea, [data-no-drag]')) {
-          currentWindow.startDragging().catch(() => {})
+    const handleMouseMove = (e: MouseEvent) => {
+      // When chrome is visible, just reset idle timer
+      if (!isDecorationsHiddenRef.current) {
+        resetIdleTimer()
+        return
+      }
+      // In stealth mode: start dragging once threshold is exceeded
+      if (
+        mouseDownPosRef.current &&
+        !dragStartedRef.current &&
+        (e.buttons & 1) !== 0 // left button held
+      ) {
+        const dx = e.clientX - mouseDownPosRef.current.x
+        const dy = e.clientY - mouseDownPosRef.current.y
+        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+          const target = e.target as HTMLElement
+          if (
+            !target.closest(
+              'button, a, input, select, textarea, [data-no-drag]',
+            )
+          ) {
+            dragStartedRef.current = true
+            currentWindow.startDragging().catch(() => {})
+          } else {
+            // Interactive target: abort drag tracking
+            mouseDownPosRef.current = null
+          }
         }
       }
     }
 
-    const handleClick = (e: MouseEvent) => {
-      // Single click (not drag) in stealth mode → restore chrome
-      // Skip if clicking on designated no-drag zones (gear, pin, node status bar)
-      if (isDecorationsHiddenRef.current && mouseDownPosRef.current) {
+    const handleMouseUp = (e: MouseEvent) => {
+      // Click = mousedown + mouseup without drag → restore chrome
+      if (
+        isDecorationsHiddenRef.current &&
+        mouseDownPosRef.current &&
+        !dragStartedRef.current
+      ) {
         const dx = e.clientX - mouseDownPosRef.current.x
         const dy = e.clientY - mouseDownPosRef.current.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist < 5) {
+        if (Math.sqrt(dx * dx + dy * dy) < 5) {
           const target = e.target as HTMLElement
           if (!target.closest('[data-no-drag]')) {
             restoreChrome()
@@ -148,23 +183,24 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
       mouseDownPosRef.current = null
+      dragStartedRef.current = false
     }
 
-    const handleActivity = () => {
+    const handleKeyActivity = () => {
       if (!isDecorationsHiddenRef.current) resetIdleTimer()
     }
 
     document.addEventListener('mousedown', handleMouseDown, { passive: true })
-    document.addEventListener('click', handleClick, { capture: true })
-    document.addEventListener('mousemove', handleActivity, { passive: true })
-    document.addEventListener('keydown', handleActivity, { passive: true })
+    document.addEventListener('mousemove', handleMouseMove, { passive: true })
+    document.addEventListener('mouseup', handleMouseUp, { passive: true })
+    document.addEventListener('keydown', handleKeyActivity, { passive: true })
 
     return () => {
       if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)
       document.removeEventListener('mousedown', handleMouseDown)
-      document.removeEventListener('click', handleClick, { capture: true })
-      document.removeEventListener('mousemove', handleActivity)
-      document.removeEventListener('keydown', handleActivity)
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('keydown', handleKeyActivity)
     }
   }, [resetIdleTimer, restoreChrome, currentWindow])
 
