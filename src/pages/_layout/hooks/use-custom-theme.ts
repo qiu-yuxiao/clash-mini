@@ -4,7 +4,7 @@ import {
   WebviewWindow,
 } from '@tauri-apps/api/webviewWindow'
 import { Theme as TauriOsTheme } from '@tauri-apps/api/window'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
 import { defaultDarkTheme, defaultTheme } from '@/pages/_theme'
@@ -72,6 +72,29 @@ export const useCustomTheme = () => {
   const { theme_mode, theme_setting } = verge ?? {}
   const mode = useThemeMode()
   const setMode = useSetThemeMode()
+  const [controlSkin, setControlSkin] = useState(() => {
+    return typeof window !== 'undefined'
+      ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+      : 'retro-3d'
+  })
+
+  useEffect(() => {
+    const handleSkinChanged = () => {
+      setControlSkin(
+        localStorage.getItem('clash-mini-control-skin') || 'retro-3d',
+      )
+    }
+    window.addEventListener('clash-mini-skin-changed', handleSkinChanged)
+    return () => {
+      window.removeEventListener('clash-mini-skin-changed', handleSkinChanged)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-control-skin', controlSkin)
+    }
+  }, [controlSkin])
   const userBackgroundImage = theme_setting?.background_image || ''
   const hasUserBackground = !!userBackgroundImage
 
@@ -517,8 +540,9 @@ export const useCustomTheme = () => {
       styleElement.innerHTML = effectiveInjectedCss + globalStyles
     }
 
+    ;(muiTheme as any).controlSkin = controlSkin
     return muiTheme
-  }, [mode, theme_setting, userBackgroundImage, hasUserBackground])
+  }, [mode, theme_setting, userBackgroundImage, hasUserBackground, controlSkin])
 
   useEffect(() => {
     const id = setTimeout(() => {

@@ -105,3 +105,75 @@ body {
   box-shadow: var(--theme-box-shadow-subtle) !important;
 }
 
+
+/* ==========================================================================
+   Control Skin Swapping Overrides (BUG-054)
+   ========================================================================== */
+
+html[data-control-skin="retro-3d"] {
+  /* Keeps default styling in index.scss */
+}
+
+html[data-control-skin="modern-flat"] {
+  .theme-panel {
+    background: var(--theme-panel-bg) !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: 4px double var(--theme-border) !important; /* Keep double border */
+  }
+
+  .theme-crystal-card {
+    background: var(--theme-panel-bg) !important;
+    backdrop-filter: none !important;
+    border: 1px solid var(--theme-border) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  }
+}
+
+html[data-control-skin="frosted-glass"] {
+  .theme-panel {
+    background: rgba(var(--theme-panel-base-rgb, 255, 255, 255), 0.08) !important;
+    backdrop-filter: blur(calc(16px * var(--vibrancy-factor, 1.0))) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.06) !important;
+    border: 4px double rgba(255, 255, 255, 0.15) !important; /* Subtle frosted double border */
+  }
+
+  .theme-crystal-card {
+    background: rgba(var(--theme-panel-base-rgb, 255, 255, 255), 0.04) !important;
+    backdrop-filter: blur(calc(12px * var(--vibrancy-factor, 1.0))) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.04) !important;
+  }
+}
+
+html[data-control-skin="cyberpunk"] {
+  .theme-panel {
+    background: #05070c !important;
+    backdrop-filter: none !important;
+    border: 4px double #ff0055 !important; /* Neon double border */
+    box-shadow: 0 0 calc(15px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.25) !important;
+  }
+
+  .theme-crystal-card {
+    background: #0d1117 !important;
+    backdrop-filter: none !important;
+    border: 1px solid #00f0ff !important;
+    box-shadow: 0 0 calc(10px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.2) !important;
+  }
+}
+
+html[data-control-skin="monochrome"] {
+  .theme-panel {
+    background: var(--background-color) !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: 4px double var(--theme-border) !important; /* Keep double border */
+  }
+
+  .theme-crystal-card {
+    background: var(--background-color) !important;
+    backdrop-filter: none !important;
+    border: 1px solid var(--theme-border) !important;
+    box-shadow: none !important;
+  }
+}

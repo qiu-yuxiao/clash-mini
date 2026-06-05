@@ -703,81 +703,259 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
 
 const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
   const isLight = mode === 'light'
-  return {
-    py: 0.5,
-    '& .MuiSlider-rail': {
-      height: 5,
-      opacity: 0.85,
-      bgcolor: isLight
-        ? 'rgba(212, 175, 55, 0.15)'
-        : 'rgba(212, 175, 55, 0.08)',
-      boxShadow: isLight
-        ? 'inset 0 3px 5px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.8)'
-        : 'inset 0 3px 5px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.08)',
-      border: `1px solid ${isLight ? 'rgba(212, 175, 55, 0.25)' : 'rgba(212, 175, 55, 0.12)'}`,
-      borderRadius: 2.5,
-    },
-    '& .MuiSlider-track': {
-      height: 5,
-      border: 'none',
-      borderRadius: 2.5,
-      background: isLight
-        ? `linear-gradient(to bottom, #FFA000 0%, #E65100 100%)`
-        : `linear-gradient(to bottom, rgba(255, 160, 0, 0.8) 0%, rgba(230, 81, 0, 0.9) 100%)`,
-      boxShadow: isLight
-        ? 'inset 0 1px 0 rgba(255,255,255,0.4)'
-        : 'inset 0 1px 0 rgba(255,255,255,0.08)',
-    },
-    '& .MuiSlider-thumb': {
-      width: 14,
-      height: 14,
-      top: '50%',
-      transform: 'translate(-50%, -50%)',
-      border: `1px solid ${isLight ? '#9E670B' : '#6E4302'}`,
-      background: isLight
-        ? `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFD54F 55%, #FFA000 100%)`
-        : `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFA000 55%, #E65100 100%)`,
-      boxShadow: isLight
-        ? `0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25),
-           inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.8),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.25 * var(--vibrancy-factor, 1.0)))`
-        : `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.6),
-           inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.4),
-           0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
-      transition:
-        'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
-      '&:hover, &.Mui-focusVisible': {
-        transform: 'translate(-50%, -50%) scale(1.2)',
-        filter: 'brightness(1.15)',
+  const skin =
+    theme.controlSkin ||
+    (typeof window !== 'undefined'
+      ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+      : 'retro-3d')
+
+  if (skin === 'retro-3d') {
+    return {
+      py: 0.5,
+      '& .MuiSlider-rail': {
+        height: 5,
+        opacity: 0.85,
+        bgcolor: isLight
+          ? 'rgba(212, 175, 55, 0.15)'
+          : 'rgba(212, 175, 55, 0.08)',
         boxShadow: isLight
-          ? `0 calc(5px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
-             inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.9),
-             0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.35 * var(--vibrancy-factor, 1.0)))`
-          : `0 calc(6px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) rgba(0,0,0,0.7),
-             inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.5),
-             0 0 calc(14px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.4 * var(--vibrancy-factor, 1.0)))`,
+          ? 'inset 0 3px 5px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.8)'
+          : 'inset 0 3px 5px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.08)',
+        border: `1px solid ${isLight ? 'rgba(212, 175, 55, 0.25)' : 'rgba(212, 175, 55, 0.12)'}`,
+        borderRadius: 2.5,
       },
-      '&.Mui-active': {
-        transform: 'translate(-50%, -50%) scale(0.92)',
+      '& .MuiSlider-track': {
+        height: 5,
+        border: 'none',
+        borderRadius: 2.5,
+        background: isLight
+          ? `linear-gradient(to bottom, #FFA000 0%, #E65100 100%)`
+          : `linear-gradient(to bottom, rgba(255, 160, 0, 0.8) 0%, rgba(230, 81, 0, 0.9) 100%)`,
         boxShadow: isLight
-          ? `inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15)`
-          : `inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.5)`,
+          ? 'inset 0 1px 0 rgba(255,255,255,0.4)'
+          : 'inset 0 1px 0 rgba(255,255,255,0.08)',
       },
-    },
+      '& .MuiSlider-thumb': {
+        width: 14,
+        height: 14,
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        border: `1px solid ${isLight ? '#9E670B' : '#6E4302'}`,
+        background: isLight
+          ? `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFD54F 55%, #FFA000 100%)`
+          : `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFA000 55%, #E65100 100%)`,
+        boxShadow: isLight
+          ? `0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25),
+             inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.8),
+             0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.25 * var(--vibrancy-factor, 1.0)))`
+          : `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.6),
+             inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.4),
+             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
+        transition:
+          'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
+        '&:hover, &.Mui-focusVisible': {
+          transform: 'translate(-50%, -50%) scale(1.2)',
+          filter: 'brightness(1.15)',
+          boxShadow: isLight
+            ? `0 calc(5px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
+               inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.9),
+               0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.35 * var(--vibrancy-factor, 1.0)))`
+            : `0 calc(6px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) rgba(0,0,0,0.7),
+               inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.5),
+               0 0 calc(14px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.4 * var(--vibrancy-factor, 1.0)))`,
+        },
+        '&.Mui-active': {
+          transform: 'translate(-50%, -50%) scale(0.92)',
+          boxShadow: isLight
+            ? `inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0,0,0,0.15)`
+            : `inset calc(1.5px * var(--depth-factor, 1.0)) calc(1.5px * var(--depth-factor, 1.0)) calc(2.5px * var(--depth-factor, 1.0)) rgba(0,0,0,0.5)`,
+        },
+      },
+    }
   }
+
+  if (skin === 'modern-flat') {
+    return {
+      py: 0.5,
+      '& .MuiSlider-rail': {
+        height: 4,
+        bgcolor: isLight ? '#e5e7eb' : '#374151',
+        border: 'none',
+        borderRadius: 2,
+      },
+      '& .MuiSlider-track': {
+        height: 4,
+        border: 'none',
+        borderRadius: 2,
+        bgcolor: theme.palette.primary.main,
+      },
+      '& .MuiSlider-thumb': {
+        width: 12,
+        height: 12,
+        bgcolor: '#ffffff',
+        border: `2px solid ${theme.palette.primary.main}`,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+        '&:hover, &.Mui-focusVisible': {
+          transform: 'translate(-50%, -50%) scale(1.15)',
+        },
+      },
+    }
+  }
+
+  if (skin === 'frosted-glass') {
+    return {
+      py: 0.5,
+      '& .MuiSlider-rail': {
+        height: 4,
+        bgcolor: 'rgba(255, 255, 255, 0.08)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: 2,
+      },
+      '& .MuiSlider-track': {
+        height: 4,
+        border: 'none',
+        borderRadius: 2,
+        bgcolor: 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.5)',
+      },
+      '& .MuiSlider-thumb': {
+        width: 12,
+        height: 12,
+        bgcolor: 'rgba(255, 255, 255, 0.8)',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+        boxShadow: 'none',
+        '&:hover, &.Mui-focusVisible': {
+          transform: 'translate(-50%, -50%) scale(1.15)',
+          bgcolor: 'rgba(255, 255, 255, 1.0)',
+        },
+      },
+    }
+  }
+
+  if (skin === 'cyberpunk') {
+    return {
+      py: 0.5,
+      '& .MuiSlider-rail': {
+        height: 2,
+        bgcolor: '#05070c',
+        border: '1px solid #ff0055',
+        borderRadius: 0,
+      },
+      '& .MuiSlider-track': {
+        height: 2,
+        border: 'none',
+        borderRadius: 0,
+        bgcolor: '#39ff14',
+      },
+      '& .MuiSlider-thumb': {
+        width: 8,
+        height: 12,
+        borderRadius: 0,
+        bgcolor: '#39ff14',
+        boxShadow: '0 0 5px #39ff14',
+        '&:hover, &.Mui-focusVisible': {
+          transform: 'translate(-50%, -50%) scale(1.15)',
+          boxShadow: '0 0 8px #39ff14',
+        },
+      },
+    }
+  }
+
+  if (skin === 'monochrome') {
+    return {
+      py: 0.5,
+      '& .MuiSlider-rail': {
+        height: 2,
+        bgcolor: isLight ? '#ffffff' : '#000000',
+        border: '1px solid ' + (isLight ? '#000000' : '#ffffff'),
+        borderRadius: 0,
+      },
+      '& .MuiSlider-track': {
+        height: 2,
+        border: 'none',
+        borderRadius: 0,
+        bgcolor: isLight ? '#000000' : '#ffffff',
+      },
+      '& .MuiSlider-thumb': {
+        width: 10,
+        height: 10,
+        borderRadius: 0,
+        bgcolor: isLight ? '#000000' : '#ffffff',
+        border: 'none',
+        boxShadow: 'none',
+      },
+    }
+  }
+
+  return {}
 }
 
 const Layout = () => {
+  // Active Skin State
+  const [controlSkin, setControlSkin] = useState(() => {
+    return typeof window !== 'undefined'
+      ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+      : 'retro-3d'
+  })
+
   // Dual Sliders State (Depth & Vibrancy Factors)
   const [depthFactor, setDepthFactor] = useState<number>(() => {
-    const saved = localStorage.getItem('clash-mini-depth-factor')
-    return saved !== null ? parseFloat(saved) : 1.0
+    const skin =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+        : 'retro-3d'
+    const saved = localStorage.getItem(`clash-mini-${skin}-val1`)
+    if (saved !== null) return parseFloat(saved)
+    if (skin === 'retro-3d') {
+      const oldSaved = localStorage.getItem('clash-mini-depth-factor')
+      return oldSaved !== null ? parseFloat(oldSaved) : 1.0
+    }
+    return 1.0
   })
 
   const [vibrancyFactor, setVibrancyFactor] = useState<number>(() => {
-    const saved = localStorage.getItem('clash-mini-vibrancy-factor')
-    return saved !== null ? parseFloat(saved) : 1.0
+    const skin =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+        : 'retro-3d'
+    const saved = localStorage.getItem(`clash-mini-${skin}-val2`)
+    if (saved !== null) return parseFloat(saved)
+    if (skin === 'retro-3d') {
+      const oldSaved = localStorage.getItem('clash-mini-vibrancy-factor')
+      return oldSaved !== null ? parseFloat(oldSaved) : 1.0
+    }
+    return 1.0
   })
+
+  useEffect(() => {
+    const handleSkinChanged = () => {
+      const newSkin =
+        localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+      setControlSkin(newSkin)
+      const val1 = localStorage.getItem(`clash-mini-${newSkin}-val1`)
+      const val2 = localStorage.getItem(`clash-mini-${newSkin}-val2`)
+      if (val1 !== null) {
+        setDepthFactor(parseFloat(val1))
+      } else if (newSkin === 'retro-3d') {
+        const oldSaved = localStorage.getItem('clash-mini-depth-factor')
+        setDepthFactor(oldSaved !== null ? parseFloat(oldSaved) : 1.0)
+      } else {
+        setDepthFactor(1.0)
+      }
+
+      if (val2 !== null) {
+        setVibrancyFactor(parseFloat(val2))
+      } else if (newSkin === 'retro-3d') {
+        const oldSaved = localStorage.getItem('clash-mini-vibrancy-factor')
+        setVibrancyFactor(oldSaved !== null ? parseFloat(oldSaved) : 1.0)
+      } else {
+        setVibrancyFactor(1.0)
+      }
+    }
+    window.addEventListener('clash-mini-skin-changed', handleSkinChanged)
+    return () => {
+      window.removeEventListener('clash-mini-skin-changed', handleSkinChanged)
+    }
+  }, [])
 
   const [isMinimalWidth, setIsMinimalWidth] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -797,12 +975,18 @@ const Layout = () => {
 
   const handleDepthFactorChange = (val: number) => {
     setDepthFactor(val)
-    localStorage.setItem('clash-mini-depth-factor', val.toString())
+    localStorage.setItem(`clash-mini-${controlSkin}-val1`, val.toString())
+    if (controlSkin === 'retro-3d') {
+      localStorage.setItem('clash-mini-depth-factor', val.toString())
+    }
   }
 
   const handleVibrancyFactorChange = (val: number) => {
     setVibrancyFactor(val)
-    localStorage.setItem('clash-mini-vibrancy-factor', val.toString())
+    localStorage.setItem(`clash-mini-${controlSkin}-val2`, val.toString())
+    if (controlSkin === 'retro-3d') {
+      localStorage.setItem('clash-mini-vibrancy-factor', val.toString())
+    }
   }
 
   useEffect(() => {
@@ -810,14 +994,56 @@ const Layout = () => {
       '--depth-factor',
       depthFactor.toString(),
     )
-  }, [depthFactor])
+    document.documentElement.style.setProperty(
+      '--control-skin-val1',
+      depthFactor.toString(),
+    )
+  }, [depthFactor, controlSkin])
 
   useEffect(() => {
     document.documentElement.style.setProperty(
       '--vibrancy-factor',
       vibrancyFactor.toString(),
     )
-  }, [vibrancyFactor])
+    document.documentElement.style.setProperty(
+      '--control-skin-val2',
+      vibrancyFactor.toString(),
+    )
+  }, [vibrancyFactor, controlSkin])
+
+  const getSlider1Label = () => {
+    switch (controlSkin) {
+      case 'retro-3d':
+        return 'Depth'
+      case 'modern-flat':
+        return 'Roundness'
+      case 'frosted-glass':
+        return 'Opacity'
+      case 'cyberpunk':
+        return 'Glow'
+      case 'monochrome':
+        return 'Contrast'
+      default:
+        return 'Depth'
+    }
+  }
+
+  const getSlider2Label = () => {
+    switch (controlSkin) {
+      case 'retro-3d':
+        return 'Vibrancy'
+      case 'modern-flat':
+        return 'Shadow'
+      case 'frosted-glass':
+        return 'Blur'
+      case 'cyberpunk':
+        return 'Speed'
+      case 'monochrome':
+        return 'Border'
+      default:
+        return 'Vibrancy'
+    }
+  }
 
   const mode = useThemeMode()
   const { t } = useTranslation()
@@ -996,7 +1222,9 @@ const Layout = () => {
       }
 
       if (!group || !group.all || group.all.length === 0) {
-        console.warn('[BUG-034] PROXY group not found or empty after 20 seconds')
+        console.warn(
+          '[BUG-034] PROXY group not found or empty after 20 seconds',
+        )
         return
       }
 
@@ -1402,7 +1630,9 @@ const Layout = () => {
         setUrl('')
 
         const freshConfig = await getProfiles()
-        const newProfile = freshConfig?.items?.find((p: any) => p.url === trimmed)
+        const newProfile = freshConfig?.items?.find(
+          (p: any) => p.url === trimmed,
+        )
         let targetUid = currentProfileUid
         if (newProfile) {
           await patchProfiles({ current: newProfile.uid })
@@ -1662,7 +1892,13 @@ const Layout = () => {
           <WindowControls ref={windowControlsRef} />
         </div>
       ) : null,
-    [decorated, isDecorationsHidden, drawerOpen, patchVerge, verge?.enable_always_on_top],
+    [
+      decorated,
+      isDecorationsHidden,
+      drawerOpen,
+      patchVerge,
+      verge?.enable_always_on_top,
+    ],
   )
 
   if (!themeReady) {
@@ -1736,7 +1972,8 @@ const Layout = () => {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            height: decorated || isDecorationsHidden ? '100vh' : 'calc(100vh - 36px)',
+            height:
+              decorated || isDecorationsHidden ? '100vh' : 'calc(100vh - 36px)',
             width: '100vw',
             overflow: 'hidden',
             position: 'relative',
@@ -1899,6 +2136,7 @@ const Layout = () => {
                 boxSizing: 'border-box',
                 padding: '12px',
                 gap: '12px',
+                overflow: 'hidden',
               }}
             >
               {/* Left Settings Column (240px width) */}
@@ -1912,6 +2150,7 @@ const Layout = () => {
                   overflow: 'hidden',
                   pr: 1,
                   borderRight: (theme) => `1px solid ${theme.palette.divider}`,
+                  pb: { xs: 0, '@media (min-height: 831px)': '30px' },
                 }}
               >
                 {/* Section 1: Subscriptions Import */}
@@ -2702,8 +2941,14 @@ const Layout = () => {
                           mb: 0.25,
                         }}
                       >
-                        <Typography variant="caption" sx={{ fontSize: '13px' }}>
-                          立体磨砂 (Depth)
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: '13px',
+                            fontFamily: 'var(--control-font-family)',
+                          }}
+                        >
+                          {getSlider1Label()}
                         </Typography>
                         <Typography
                           variant="caption"
@@ -2711,6 +2956,7 @@ const Layout = () => {
                             fontSize: '12px',
                             color: 'text.secondary',
                             fontWeight: 'bold',
+                            fontFamily: 'var(--control-font-family)',
                           }}
                         >
                           {depthFactor.toFixed(1)}
@@ -2746,8 +2992,14 @@ const Layout = () => {
                           mb: 0.25,
                         }}
                       >
-                        <Typography variant="caption" sx={{ fontSize: '13px' }}>
-                          色彩霓虹 (Vibrancy)
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: '13px',
+                            fontFamily: 'var(--control-font-family)',
+                          }}
+                        >
+                          {getSlider2Label()}
                         </Typography>
                         <Typography
                           variant="caption"
@@ -2755,6 +3007,7 @@ const Layout = () => {
                             fontSize: '12px',
                             color: 'text.secondary',
                             fontWeight: 'bold',
+                            fontFamily: 'var(--control-font-family)',
                           }}
                         >
                           {vibrancyFactor.toFixed(1)}
@@ -2807,7 +3060,8 @@ const Layout = () => {
                       justifyContent: 'center',
                       mt: 'auto',
                       pt: 1,
-                      borderTop: (theme) => `1px dashed ${theme.palette.divider}`,
+                      borderTop: (theme) =>
+                        `1px dashed ${theme.palette.divider}`,
                       opacity: 0.75,
                       '&:hover': {
                         opacity: 1,
@@ -3024,6 +3278,99 @@ const Layout = () => {
                     />
                   )}
                 </Box>
+              </Box>
+
+              {/* Excel Selector Row */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  bottom: '12px',
+                  left: '177.5px',
+                  width: '462.5px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'stretch',
+                  zIndex: 200,
+                  boxSizing: 'border-box',
+                  '@media (max-height: 830px)': {
+                    display: 'none',
+                  },
+                }}
+              >
+                {[
+                  { key: 'retro-3d', label: '3D' },
+                  { key: 'modern-flat', label: 'FLAT' },
+                  { key: 'frosted-glass', label: 'GLASS' },
+                  { key: 'cyberpunk', label: 'CYBER' },
+                  { key: 'monochrome', label: 'MONO' },
+                ].map((item, index) => {
+                  const isSelected = controlSkin === item.key
+                  const handleSelect = () => {
+                    localStorage.setItem('clash-mini-control-skin', item.key)
+                    setControlSkin(item.key)
+                    window.dispatchEvent(new Event('clash-mini-skin-changed'))
+                  }
+
+                  return (
+                    <Box
+                      key={item.key}
+                      onClick={handleSelect}
+                      sx={(theme) => {
+                        const isLight = theme.palette.mode === 'light'
+                        const unselectedStyle = {
+                          width: '92.5px',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          color: isLight ? '#555555' : '#aaaaaa',
+                          backgroundColor: isLight ? '#f3f3f3' : '#1e1e1e',
+                          border: `1px solid ${isLight ? '#d0d0d0' : '#404040'}`,
+                          borderLeft:
+                            index === 0
+                              ? `1px solid ${isLight ? '#d0d0d0' : '#404040'}`
+                              : 'none',
+                          boxSizing: 'border-box',
+                          fontFamily: 'var(--control-font-family)',
+                          transition: 'background-color 0.1s ease',
+                          '&:hover': {
+                            backgroundColor: isLight ? '#e5e5e5' : '#2d2d2d',
+                          },
+                        }
+
+                        if (isSelected) {
+                          const btnStyle = get3DButtonStyle(
+                            theme,
+                            'contained',
+                            'primary',
+                          )
+                          return {
+                            width: '92.5px',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            boxSizing: 'border-box',
+                            fontFamily: 'var(--control-font-family)',
+                            ...btnStyle,
+                            borderRadius: '0px',
+                            margin: 0,
+                          }
+                        } else {
+                          return unselectedStyle
+                        }
+                      }}
+                    >
+                      {item.label}
+                    </Box>
+                  )
+                })}
               </Box>
             </div>
           </div>

@@ -69,6 +69,13 @@
     "register-req-054": "python scratch/register_req_054.py",
     "empty-req-054": "python scratch/empty_req_054.py",
     "patch-agreements-054": "python scratch/patch_agreements_054.py",
+    "patch-custom-theme": "python scratch/patch_custom_theme.py",
+    "patch-button-styles": "python scratch/patch_button_styles.py",
+    "patch-base-switch": "python scratch/patch_base_switch.py",
+    "patch-layout": "python scratch/patch_layout.py",
+    "patch-styles": "python scratch/patch_styles.py",
+    "patch-bug-list": "python scratch/patch_bug_list.py",
+    "git-commit": "python scratch/git_commit.py",
     "monitor-local-usage": "node scratch/monitor_local_usage.mjs"
   },
   "dependencies": {
