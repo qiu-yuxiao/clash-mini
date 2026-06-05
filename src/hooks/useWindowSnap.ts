@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
-import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window'
 import { PhysicalPosition } from '@tauri-apps/api/dpi'
+import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window'
+import { useEffect, useRef } from 'react'
 
 interface MonitorInfo {
   position: { x: number; y: number }

@@ -8,10 +8,10 @@ const refLineAlpha = 0.15
 const refLineWidth = 1
 
 const upLineAlpha = 0.8
-const upLineWidth = 1.5
+const upLineWidth = 2.5
 
 const downLineAlpha = 0.9
-const downLineWidth = 1.5
+const downLineWidth = 2.5
 const sampleIntervalMs = 1000
 const frameIntervalMs = 1000 / 15
 const animationDurationMs = sampleIntervalMs

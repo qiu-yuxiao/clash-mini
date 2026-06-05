@@ -426,7 +426,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
   } = useTrafficData({ enabled: pageVisible })
   const {
     response: { data: connections },
-  } = useConnectionData()
+  } = useConnectionData({ enabled: false })
   const trafficRef = useRef<any>(null)
 
   useEffect(() => {
@@ -925,7 +925,7 @@ const Layout = () => {
   const {
     response: { data: connectionsData },
     clearClosedConnections,
-  } = useConnectionData()
+  } = useConnectionData({ enabled: drawerOpen })
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const detailRef = useRef<any>(null)
 
@@ -3047,7 +3047,7 @@ const Layout = () => {
           <CloseRounded fontSize="small" />
         </IconButton>
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-          <LogsPage />
+          {logsOpen && <LogsPage />}
         </Box>
       </Dialog>
     </ThemeProvider>

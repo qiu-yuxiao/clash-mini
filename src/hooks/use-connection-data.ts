@@ -1,5 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
+import { useEffect } from 'react'
+import { getConnections, MihomoWebSocket } from 'tauri-plugin-mihomo-api'
+
+import { useVisibility } from '@/hooks/use-visibility'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 
@@ -87,12 +90,17 @@ const mergeConnectionSnapshot = (
   }
 }
 
-export const useConnectionData = () => {
+export const useConnectionData = (options?: { enabled?: boolean }) => {
+  const enabled = options?.enabled ?? true
+  const isVisible = useVisibility()
   const queryClient = useQueryClient()
+
+  const isWsActive = enabled && isVisible
+
   const { response, refresh, subscriptionCacheKey } =
     useMihomoWsSubscription<ConnectionMonitorData>({
       storageKey: 'mihomo_connection_date',
-      buildSubscriptKey: (date) => `getClashConnection-${date}`,
+      buildSubscriptKey: (date) => (isWsActive ? `getClashConnection-${date}` : null),
       fallbackData: initConnData,
       connect: () => MihomoWebSocket.connect_connections(),
       throttleMs: 16,
@@ -110,6 +118,38 @@ export const useConnectionData = () => {
         },
       }),
     })
+
+  useEffect(() => {
+    if (isWsActive || !isVisible) return
+
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const pollTotals = async () => {
+      try {
+        const res = await getConnections()
+        if (subscriptionCacheKey) {
+          queryClient.setQueryData<ConnectionMonitorData>([subscriptionCacheKey], (old) => ({
+            uploadTotal: res.uploadTotal ?? 0,
+            downloadTotal: res.downloadTotal ?? 0,
+            activeConnections: old?.activeConnections ?? [],
+            closedConnections: old?.closedConnections ?? [],
+          }))
+        }
+      } catch (err) {
+        console.warn('[useConnectionData] Low freq poll failed:', err)
+      }
+
+      if (!isWsActive && isVisible) {
+        timer = setTimeout(pollTotals, 3000)
+      }
+    }
+
+    pollTotals()
+
+    return () => {
+      if (timer) clearTimeout(timer)
+    }
+  }, [isWsActive, isVisible, queryClient, subscriptionCacheKey])
 
   const clearClosedConnections = () => {
     if (!subscriptionCacheKey) return
