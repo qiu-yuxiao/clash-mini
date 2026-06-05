@@ -65,6 +65,8 @@
     "delete-pre-100-releases-auth": "python scratch/delete_pre_1_0_0_releases_auth.py",
     "keep-only-milestones": "python scratch/keep_only_milestones.py",
     "resolve-bug-050": "python scratch/resolve_bug_050.py",
+    "resolve-bug-053": "python scratch/resolve_bug_053.py",
+    "register-req-054": "python scratch/register_req_054.py",
     "monitor-local-usage": "node scratch/monitor_local_usage.mjs"
   },
   "dependencies": {
