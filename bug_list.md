@@ -18,7 +18,6 @@
 
 | :--- | :--- | :---: | :--- |
 | **BUG-047** | 在本地提交推送（`git push`）时，Git 的 `pre-push` 钩子运行 `cargo clippy --all-targets` 遇到测试模块中的 `.unwrap()` 报错导致推送失败（由于项目全局禁用了 `unwrap_used`）。 | v3.0.1 | **已解决，已确认**。<br>**设计要求**：在 `universal_parser.rs` 的测试模块 `mod tests` 前端声明 `#[allow(clippy::unwrap_used)]`，允许在测试中合理使用 `.unwrap()` 以提取结果，同时修复该测试中的冗余借用警告（如 `&serde_yaml_ng::Value` 修改为直接传值）。<br>**代码状态**：代码修改完成，静态编译及单元测试全部通过，并成功推送。 |
-| **BUG-050** | Clash Mini 的 CPU 资源消耗（约 13%~15%）显著高于 Clash Verge（约 3%）。主要原因在于：1. 迁移后的 Connections 表单与 Logs 日志窗口均被常驻挂载且始终通过 WebSocket 在后台以极高频率（16ms - 50ms）解析 JSON 报文并进行状态差异对比和 UI 渲染调度，即使相关 Drawer（设置抽屉）或 Dialog（日志弹窗）处于关闭状态；2. 流量数据 Hook（useTrafficData）未响应窗口可见性（pageVisible），导致最小化或后台运行时仍持续进行 WebSocket 通信与渲染。 | v3.0.3 | **处理中**。<br>**设计要求**：1. 为 `useConnectionData` 引入 `enabled` 参数；在 Layout 挂载中绑定 `enabled: drawerOpen`；2. 在 `useConnectionData` 内部实现双模切换：如果处于关闭状态但可见，则停止 WebSocket 通信，降级为每 3 秒使用 REST 接口（getConnections）轮询 totals 且不合并处理 connection list；若不可见，则彻底关闭轮询；3. 在 `_layout.tsx` 中对 `<LogsPage />` 实行条件渲染 `{logsOpen && <LogsPage />}`，使日志弹窗关闭时自动注销 WebSocket；4. 修正 `useTrafficData` 中的 WebSocket 键值逻辑，使不可见时自动断连。 |
 
 | (暂无) | 所有当前版本 (v2.0.1 followup) 发现 of 缺陷均已解决。 | - | - |
 
@@ -33,6 +32,7 @@
 
 
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 修复方法与说明 |
+| **BUG-050** | Clash Mini 的 CPU 资源消耗（约 13%~15%）显著高于 Clash Verge（约 3%）。主要原因在于：1. 迁移后的 Connections 表单与 Logs 日志窗口均被常驻挂载且始终通过 WebSocket 在后台以极高频率（16ms - 50ms）解析 JSON 报文并进行状态差异对比和 UI 渲染调度，即使相关 Drawer（设置抽屉）或 Dialog（日志弹窗）处于关闭状态；2. 流量数据 Hook（useTrafficData）未响应窗口可见性（pageVisible），导致最小化或后台运行时仍持续进行 WebSocket 通信与渲染。 | v3.0.3 | **已解决，已确认**。<br>**设计要求**：1. 为 `useConnectionData` 引入 `enabled` 参数；在 Layout 挂载中绑定 `enabled: drawerOpen`；2. 在 `useConnectionData` 内部实现双模切换：如果处于关闭状态但可见，则停止 WebSocket 通信，降级为每 3 秒使用 REST 接口（getConnections）轮询 totals 且不合并处理 connection list；若不可见，则彻底关闭轮询；3. 在 `_layout.tsx` 中对 `<LogsPage />` 实行条件渲染 `{logsOpen && <LogsPage />}`，使日志弹窗关闭时自动注销 WebSocket；4. 修正 `useTrafficData` 中的 WebSocket 键值逻辑，使不可见时自动断连；5. 将极窄模式流量折线图线宽统一为 2.5px。<br>**代码状态**：已重构 hooks 和 layout 逻辑，成功通过静态类型安全与 eslint 检查，并在 Actions 云端编译成功打包。 |
 
 | **BUG-049** | 活跃出口节点活性监控定时检测（自动测速与切换）在运行中失效，原因为其 useEffect 依赖了频繁变动的 proxies 状态与 triggerAutoSelectFastestNode，导致定时器在倒计时完成前反复被重置清除，无法正常在后台运行测速调度。 | v3.0.2 | **已解决，待确认**。<br>**设计要求**：将活性监控 `useEffect` 中的外部状态依赖解耦，仅依赖于 `currentProfileUid`；使用 stable Refs 缓存 `proxies` 和 `triggerAutoSelectFastestNode`，使后台定时器能在长周期内平稳不间断运行，达到真正的 60 秒定期测速与失效自动连切。<br>**代码状态**：已重构 `_layout.tsx` 监控计时器逻辑，利用 `proxiesRef` 与 `triggerAutoSelectFastestNodeRef` 隔离渲染重绘，实现后台检测闭环。静态检查与前端静态资源编译通过。 |
 
