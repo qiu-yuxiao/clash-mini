@@ -20,8 +20,8 @@
 | **BUG-047** | 在本地提交推送（`git push`）时，Git 的 `pre-push` 钩子运行 `cargo clippy --all-targets` 遇到测试模块中的 `.unwrap()` 报错导致推送失败（由于项目全局禁用了 `unwrap_used`）。 | v3.0.1 | **已解决，已确认**。<br>**设计要求**：在 `universal_parser.rs` 的测试模块 `mod tests` 前端声明 `#[allow(clippy::unwrap_used)]`，允许在测试中合理使用 `.unwrap()` 以提取结果，同时修复该测试中的冗余借用警告（如 `&serde_yaml_ng::Value` 修改为直接传值）。<br>**代码状态**：代码修改完成，静态编译及单元测试全部通过，并成功推送。 |
 | **BUG-051** | 窗口下方的表示流量的小卡片里，上传下载总量的数值一直是 0。原因为 useConnectionData 禁用 WebSocket 后缓存键为 null，轮询获取的总量数据在 queryClient.setQueryData 找不到存储地址而被丢弃。 | v3.0.4 | **已解决**。<br>**设计要求**：1. 为 useMihomoWsSubscription 增加 buildCacheKey 选项；2. 优化 responseCacheKey 计算逻辑，当 WebSocket 禁用时 fallback 使用 buildCacheKey 提供静态缓存键；3. useConnectionData 传入对应的 buildCacheKey。 |
 | **BUG-052** | 后台自动连切功能频繁弹窗通知已切换至最快节点（但实际并没有改动节点），且后台健康检测阈值过低（1500ms），导致稍微有点延迟的节点被误判为坏掉并反复拉起全量测速。 | v3.0.4 | **已解决**。<br>**设计要求**：1. 在 `triggerAutoSelectFastestNode` 中引入 `isBackground` 判定；2. 当为背景运行且最快节点未改变（当前已是最快）时，完全静默不弹窗；3. 后台 `checkNode` 的存活检测健康阈值放宽至 `3000ms`，且移除前置加载通知。 |
+| **BUG-053** | 首次导入或更新订阅后，未能自动切换/激活该配置文件，且由于 Clash 核心下载/解析 Provider 耗时，导致容易在 5 秒内因无可用节点而误报“所有线路都繁忙”。 | v3.0.4 | **进行中**。<br>**设计要求**：1. 首次导入配置文件后自动将 `current` 切换为该新配置的 UID 并激活；2. 延长前端等待 Clash 内核就绪并获取可用节点的超时时间至 20 秒；3. 轮询期间若前 6 秒仍无可用节点，后台触发前端的直接延迟测速（`checkListDelay`）作为 fallback，避免误报繁忙。 |
 
-| (暂无) | 所有当前版本 (v2.0.1 followup) 发现 of 缺陷均已解决。 | - | - |
 
 
 
