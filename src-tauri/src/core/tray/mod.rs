@@ -60,6 +60,7 @@ async fn get_cached_proxies() -> Option<Arc<Proxies>> {
         let proxies = Arc::new(proxies);
         let mut guard = proxy_cache().write().await;
         guard.data = Some((Instant::now(), Arc::clone(&proxies)));
+        drop(guard);
         return Some(proxies);
     }
     None
