@@ -557,10 +557,7 @@ mod tests {
             "aws德国"
         );
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("server"))
-                .unwrap()
-                .as_str()
-                .unwrap(),
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
             "awsjfde1.fatdns.net"
         );
         assert_eq!(
@@ -631,10 +628,7 @@ mod tests {
             "v5-香港03|1x|v"
         );
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("server"))
-                .unwrap()
-                .as_str()
-                .unwrap(),
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
             "v5.cdn.ljz8s7lhbv.fatdns.net"
         );
         assert_eq!(

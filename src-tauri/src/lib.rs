@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #![allow(non_snake_case)]
-#![allow(
-    clippy::collapsible_if,
-    clippy::cognitive_complexity,
-    clippy::bool_assert_comparison
-)]
+#![allow(clippy::collapsible_if, clippy::cognitive_complexity, clippy::bool_assert_comparison)]
 #![recursion_limit = "512"]
 
 mod cmd;
@@ -70,8 +66,8 @@ mod app_init {
                     .pool_config(
                         tauri_plugin_mihomo::IpcPoolConfigBuilder::new()
                             .min_connections(3)
-                            .max_connections(32)
-                            .idle_timeout(std::time::Duration::from_secs(60))
+                            .max_connections(16)
+                            .idle_timeout(std::time::Duration::from_secs(30))
                             .health_check_interval(std::time::Duration::from_secs(60))
                             .reject_policy(RejectPolicy::Wait)
                             .build(),

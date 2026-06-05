@@ -17,11 +17,53 @@ use super::handle;
 use anyhow::Result;
 use smartstring::alias::String;
 use std::collections::HashMap;
-use std::time::Duration;
+use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
 use tauri::{
     AppHandle, Wry,
     menu::{CheckMenuItem, IsMenuItem, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
 };
+use tokio::sync::RwLock as TokioRwLock;
+
+/// 代理数据缓存有效期（秒）
+const PROXY_CACHE_TTL: Duration = Duration::from_secs(2);
+
+struct ProxyCache {
+    data: Option<(Instant, Arc<Proxies>)>,
+}
+
+fn proxy_cache() -> &'static TokioRwLock<ProxyCache> {
+    static CACHE: OnceLock<TokioRwLock<ProxyCache>> = OnceLock::new();
+    CACHE.get_or_init(|| TokioRwLock::new(ProxyCache { data: None }))
+}
+
+/// 获取代理数据，优先从 2 秒内的本地缓存取，避免每次菜单刷新都走 HTTP。
+/// 返回 Arc<Proxies>，调用方可低成本共享所有权，无需 Clone。
+async fn get_cached_proxies() -> Option<Arc<Proxies>> {
+    {
+        let guard = proxy_cache().read().await;
+        if let Some((ts, ref proxies)) = guard.data {
+            if ts.elapsed() < PROXY_CACHE_TTL {
+                return Some(Arc::clone(proxies));
+            }
+        }
+    }
+    // 缓存过期或为空，重新拉取
+    let result = tokio::time::timeout(
+        Duration::from_millis(1000),
+        handle::Handle::mihomo().await.get_proxies(),
+    )
+    .await
+    .map_or(None, |res| res.ok());
+
+    if let Some(proxies) = result {
+        let proxies = Arc::new(proxies);
+        let mut guard = proxy_cache().write().await;
+        guard.data = Some((Instant::now(), Arc::clone(&proxies)));
+        return Some(proxies);
+    }
+    None
+}
 
 mod menu_def;
 #[cfg(target_os = "macos")]
@@ -438,11 +480,11 @@ fn create_profile_menu_item(
         .collect()
 }
 
-fn create_subcreate_proxy_menu_item(
+fn create_proxy_submenu_items(
     app_handle: &AppHandle,
     proxy_mode: &str,
     proxy_group_order_map: Option<HashMap<String, usize>>,
-    proxy_nodes_data: Option<Proxies>,
+    proxy_nodes_data: Option<Arc<Proxies>>,
 ) -> Vec<Submenu<Wry>> {
     let proxy_submenus: Vec<Submenu<Wry>> = {
         let mut submenus: Vec<(String, usize, Submenu<Wry>)> = Vec::new();
@@ -581,12 +623,7 @@ async fn create_tray_menu(
     let current_proxy_mode = mode.unwrap_or("");
 
     // TODO: should update tray menu again when it was timeout error
-    let proxy_nodes_data = tokio::time::timeout(
-        Duration::from_millis(1000),
-        handle::Handle::mihomo().await.get_proxies(),
-    )
-    .await
-    .map_or(None, |res| res.ok());
+    let proxy_nodes_data = get_cached_proxies().await;
 
     let runtime_proxy_groups_order = cmd::get_runtime_config()
         .await
@@ -710,7 +747,7 @@ async fn create_tray_menu(
     )?;
 
     let proxy_sub_menus =
-        create_subcreate_proxy_menu_item(app_handle, current_proxy_mode, proxy_group_order_map, proxy_nodes_data);
+        create_proxy_submenu_items(app_handle, current_proxy_mode, proxy_group_order_map, proxy_nodes_data);
 
     let (proxies_menu, inline_proxy_items) = match tray_proxy_groups_display_mode {
         "default" => create_proxy_menu_item(app_handle, false, proxy_sub_menus, &texts.proxies)?,

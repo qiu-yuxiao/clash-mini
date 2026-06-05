@@ -266,36 +266,36 @@ class DelayManager {
     const startTime = Date.now()
     const listener = this.groupListenerMap.get(group)
 
-    const help = async (): Promise<void> => {
-      const currName = names[index++]
-      if (!currName) return
+    const worker = async (): Promise<void> => {
+      while (true) {
+        const currName = names[index++]
+        if (!currName) return
 
-      try {
-        // 确保API调用前状态为测试中
-        this.setDelay(currName, group, -2)
+        try {
+          // 确保API调用前状态为测试中
+          this.setDelay(currName, group, -2)
 
-        // 添加一些随机延迟，避免所有请求同时发出和返回
-        if (index > 1) {
-          // 第一个不延迟，保持响应性
-          await new Promise((resolve) =>
-            setTimeout(resolve, Math.random() * 200),
+          // 添加一些随机延迟，避免所有请求同时发出和返回
+          if (index > 1) {
+            // 第一个不延迟，保持响应性
+            await new Promise((resolve) =>
+              setTimeout(resolve, Math.random() * 200),
+            )
+          }
+
+          await this.checkDelay(currName, group, timeout)
+          if (listener) {
+            this.queueGroupNotification(group)
+          }
+        } catch (error) {
+          console.error(
+            `[DelayManager] 批量测试单个代理出错，代理: ${currName}`,
+            error,
           )
+          // 设置为错误状态
+          this.setDelay(currName, group, 1e6)
         }
-
-        await this.checkDelay(currName, group, timeout)
-        if (listener) {
-          this.queueGroupNotification(group)
-        }
-      } catch (error) {
-        console.error(
-          `[DelayManager] 批量测试单个代理出错，代理: ${currName}`,
-          error,
-        )
-        // 设置为错误状态
-        this.setDelay(currName, group, 1e6)
       }
-
-      return help()
     }
 
     // 限制并发数，避免发送太多请求
@@ -304,7 +304,7 @@ class DelayManager {
 
     const promiseList: Promise<void>[] = []
     for (let i = 0; i < actualConcurrency; i++) {
-      promiseList.push(help())
+      promiseList.push(worker())
     }
 
     await Promise.all(promiseList)

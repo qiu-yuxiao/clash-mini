@@ -3284,7 +3284,7 @@ const Layout = () => {
               <Box
                 sx={{
                   position: 'absolute',
-                  bottom: '12px',
+                  bottom: '0',
                   left: '177.5px',
                   width: '462.5px',
                   height: '24px',
@@ -3298,11 +3298,31 @@ const Layout = () => {
                 }}
               >
                 {[
-                  { key: 'retro-3d', label: '3D' },
-                  { key: 'modern-flat', label: 'FLAT' },
-                  { key: 'frosted-glass', label: 'GLASS' },
-                  { key: 'cyberpunk', label: 'CYBER' },
-                  { key: 'monochrome', label: 'MONO' },
+                  {
+                    key: 'retro-3d',
+                    label: 'Retro-3d',
+                    font: 'Trebuchet MS, SimHei, sans-serif',
+                  },
+                  {
+                    key: 'modern-flat',
+                    label: 'Modern-flat',
+                    font: 'Outfit, DengXian, sans-serif',
+                  },
+                  {
+                    key: 'frosted-glass',
+                    label: 'Frosted-glass',
+                    font: 'Segoe UI Light, Microsoft YaHei Light, sans-serif',
+                  },
+                  {
+                    key: 'cyberpunk',
+                    label: 'Cyberpunk',
+                    font: 'Consolas, NSimSun, monospace',
+                  },
+                  {
+                    key: 'monochrome',
+                    label: 'Monochrome',
+                    font: 'Georgia, KaiTi, serif',
+                  },
                 ].map((item, index) => {
                   const isSelected = controlSkin === item.key
                   const handleSelect = () => {
@@ -3334,7 +3354,7 @@ const Layout = () => {
                               ? `1px solid ${isLight ? '#d0d0d0' : '#404040'}`
                               : 'none',
                           boxSizing: 'border-box',
-                          fontFamily: 'var(--control-font-family)',
+                          fontFamily: item.font,
                           transition: 'background-color 0.1s ease',
                           '&:hover': {
                             backgroundColor: isLight ? '#e5e5e5' : '#2d2d2d',
@@ -3357,7 +3377,7 @@ const Layout = () => {
                             fontSize: '11px',
                             fontWeight: 'bold',
                             boxSizing: 'border-box',
-                            fontFamily: 'var(--control-font-family)',
+                            fontFamily: item.font,
                             ...btnStyle,
                             borderRadius: '0px',
                             margin: 0,
@@ -3378,10 +3398,8 @@ const Layout = () => {
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
           <div
             style={{
-              flex: isMinimalWidth ? '0 0 100px' : '0 0 178px',
-              height: isMinimalWidth ? '100px' : '178px',
-              borderTop: isMinimalWidth ? 'none' : '1px solid',
-              borderTopColor: 'var(--divider-color, rgba(0,0,0,0.12))',
+              flex: isMinimalWidth ? '0 0 100px' : '0 0 165px',
+              height: isMinimalWidth ? '100px' : '165px',
               background: 'inherit',
               padding: isMinimalWidth ? '3px 6px 2px 6px' : '8px 12px 2px 12px',
               display: 'flex',
