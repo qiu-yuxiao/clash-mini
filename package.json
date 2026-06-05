@@ -1,6 +1,6 @@
 {
   "name": "clash-mini",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "license": "GPL-3.0-only",
   "scripts": {
     "prepare": "husky || true",
@@ -76,7 +76,8 @@
     "patch-styles": "python scratch/patch_styles.py",
     "patch-bug-list": "python scratch/patch_bug_list.py",
     "git-commit": "python scratch/git_commit.py",
-    "monitor-local-usage": "node scratch/monitor_local_usage.mjs"
+    "monitor-local-usage": "node scratch/monitor_local_usage.mjs",
+    "parse-job": "python scratch/parse_job.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
