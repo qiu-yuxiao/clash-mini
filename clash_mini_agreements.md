@@ -2162,3 +2162,14 @@
 - **自定义增强版权**：开发者“秋雨潇潇 (<qiuyuxiao@gmail.com>)”仅对 2026 年起贡献的自定义修改、功能增强、3D 视觉样式优化等二次开发部分（Modifications）主张著作权。
 - **尊重上游版权**：保留并尊重原 Clash Verge 项目及其贡献者的所有版权声明与开源署名，严禁以任何形式将上游项目的全部著作权据为己有。
 - **界面版权页脚展示规范**：在应用设置面板（Settings Drawer）的左侧操作栏最底端，需展示简洁的版权所有文字：`© 2026 秋雨潇潇 (修改部分)`，同时附带联系邮箱链接 `qiuyuxiao@gmail.com`，样式须与 3D/Vibrancy 整体风格融合。
+
+### 5. 系统后台静默高频通信与资源占用的优化与防泄露规范
+为了彻底降低 Clash Mini 在后台挂机及日常运行中的 CPU 资源占用，必须在通信、渲染和生命周期层面遵循以下后台零泄漏防线规范：
+- **隐藏与最小化通信静默**：
+  - 流量数据 Hook (`useTrafficData`) 在窗口不可见或隐藏状态下（`pageVisible === false`），其对应的 WebSocket 订阅连接必须彻底断连，停止解析流量包，不将订阅键挂载到 `useMihomoWsSubscription`。
+  - 连接数据 Hook (`useConnectionData`) 必须支持 `enabled` 配置项：在非可见状态下（`pageVisible === false`），必须彻底停止所有形式的数据请求和通信连接。
+- **连接面板双模切换与免合并轻量化**：
+  - 当设置面板展开时（`drawerOpen === true`），连接管理开启**高频实时观测模式**：激活 WebSocket 以 16ms 节流频率全面同步活跃与历史连接详情，并执行精细的连接列表 merge/diff 差量计算。
+  - 当设置面板关闭时（`drawerOpen === false` 且可见），连接管理自动切换为**低频静默监控模式**：断开 WebSocket，降级为每 3 秒发起单次轻量级 `getConnections` HTTP REST 轮询。在此模式下，为了节省 CPU，**严禁**执行任何连接列表的差异对比、排序及 Map 内存重构计算，直接提取 totals 计入状态，且保持连接明细列表为空数组。
+- **日志组件条件渲染与彻底注销**：
+  - 日志显示组件 (`LogsPage`) 必须在布局中实行完全的条件渲染。在日志弹窗 Dialog 关闭时（`logsOpen === false`），直接以 `{logsOpen && <LogsPage />}` 方式进行 React 卸载（Unmount），使其所占用的日志 WebSocket 连接在 Dialog 关闭的第一时间彻底销毁注销，杜绝在后台默默堆积和合并解析数百条日志的行为。
