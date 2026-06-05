@@ -68,6 +68,7 @@
     "resolve-bug-053": "python scratch/resolve_bug_053.py",
     "register-req-054": "python scratch/register_req_054.py",
     "empty-req-054": "python scratch/empty_req_054.py",
+    "patch-agreements-054": "python scratch/patch_agreements_054.py",
     "monitor-local-usage": "node scratch/monitor_local_usage.mjs"
   },
   "dependencies": {
