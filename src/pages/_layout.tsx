@@ -78,6 +78,7 @@ import {
   patchClashMode,
   getProxyAddr,
   cmdGetProxyDelay,
+  getProfiles,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
@@ -968,10 +969,10 @@ const Layout = () => {
   }, [language, switchLanguage])
 
   const triggerAutoSelectFastestNode = useCallback(
-    async (profileUid: string) => {
+    async (profileUid: string, isBackground = false) => {
       if (!profileUid) return
       console.log(
-        `[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest...`,
+        `[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest... (isBackground=${isBackground})`,
       )
 
       pollSessionRef.current += 1
@@ -983,7 +984,7 @@ const Layout = () => {
       let proxiesData: any = null
       const findStartTime = Date.now()
 
-      while (Date.now() - findStartTime < 5000) {
+      while (Date.now() - findStartTime < 20000) {
         if (pollSessionRef.current !== currentSession) return
         const freshProxies = await refreshProxy()
         proxiesData = freshProxies?.data || proxies
@@ -995,7 +996,7 @@ const Layout = () => {
       }
 
       if (!group || !group.all || group.all.length === 0) {
-        console.warn('[BUG-034] PROXY group not found or empty after 5 seconds')
+        console.warn('[BUG-034] PROXY group not found or empty after 20 seconds')
         return
       }
 
@@ -1076,6 +1077,7 @@ const Layout = () => {
 
         const startTime = Date.now()
         let hasSelected = false
+        let fallbackTriggered = false
 
         while (!hasSelected) {
           if (pollSessionRef.current !== currentSession) {
@@ -1148,14 +1150,33 @@ const Layout = () => {
             `[BUG-034] Polling: elapsed=${elapsed.toFixed(1)}s, healthyNodes count=${healthyNodes.length}`,
           )
 
+          // Fallback logic: if 6 seconds elapsed and no healthy nodes, trigger checkListDelay as fallback
+          if (elapsed >= 6 && healthyNodes.length === 0 && !fallbackTriggered) {
+            fallbackTriggered = true
+            console.log(
+              `[BUG-053] 6s elapsed with 0 healthy nodes. Triggering frontend checkListDelay fallback for ${nodeNames.length} nodes.`,
+            )
+            const timeout = verge?.default_latency_timeout || 10000
+            delayManager
+              .checkListDelay(nodeNames, groupName, timeout)
+              .catch((err) => {
+                console.error('[BUG-053] Fallback checkListDelay failed:', err)
+              })
+          }
+
           // Rule A: If elapsed < 30s and healthyNodes count >= 5, pick the fastest and connect
           if (elapsed < 30 && healthyNodes.length >= 5) {
             const targetNode = healthyNodes[0].name
             const targetDelay = healthyNodes[0].delay
+            const isSameNode = targetNode === currentGroup.now
             changeProxy(groupName, targetNode, currentGroup.now)
-            showNotice.success(
-              `自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`,
-            )
+            if (!isBackground || !isSameNode) {
+              showNotice.success(
+                isSameNode
+                  ? `自动测速完成，当前已是最快节点: ${targetNode} (${targetDelay}ms)`
+                  : `自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`,
+              )
+            }
             hasSelected = true
             break
           }
@@ -1165,10 +1186,15 @@ const Layout = () => {
             if (healthyNodes.length >= 1) {
               const targetNode = healthyNodes[0].name
               const targetDelay = healthyNodes[0].delay
+              const isSameNode = targetNode === currentGroup.now
               changeProxy(groupName, targetNode, currentGroup.now)
-              showNotice.success(
-                `自动测速超时降级，已切换至可用最快节点: ${targetNode} (${targetDelay}ms)`,
-              )
+              if (!isBackground || !isSameNode) {
+                showNotice.success(
+                  isSameNode
+                    ? `自动测速超时降级，当前已是可用最快节点: ${targetNode} (${targetDelay}ms)`
+                    : `自动测速超时降级，已切换至可用最快节点: ${targetNode} (${targetDelay}ms)`,
+                )
+              }
               hasSelected = true
               break
             }
@@ -1258,7 +1284,7 @@ const Layout = () => {
         const result = await cmdGetProxyDelay(activeNodeName, timeout, testUrl)
         const delay = result?.delay ?? 1e6
 
-        if (delay < 1500) {
+        if (delay < 3000) {
           isHealthy = true
         } else {
           console.log(
@@ -1281,12 +1307,10 @@ const Layout = () => {
         if (consecutiveFailRef.current >= 3) {
           consecutiveFailRef.current = 0
           console.log(
-            `[NodeMonitor] Node ${activeNodeName} failed 3 times consecutively. Triggering auto select.`,
+            `[NodeMonitor] Node ${activeNodeName} failed 3 times consecutively. Triggering auto select in background.`,
           )
-          showNotice.info(
-            `检测到当前线路连接超时或缓慢，正在自动为您切换至最快线路...`,
-          )
-          triggerAutoSelectFastestNodeRef.current(currentProfileUid)
+          // Background auto-select runs silently, no info notice popup
+          triggerAutoSelectFastestNodeRef.current(currentProfileUid, true)
           timerId = setTimeout(checkNode, 60000)
         } else {
           // Failure occurred: fast retry in 5 seconds
@@ -1354,26 +1378,44 @@ const Layout = () => {
       await importProfile(url)
       showNotice.success('shared.feedback.notifications.importSuccess')
       setUrl('')
+
+      const freshConfig = await getProfiles()
+      const newProfile = freshConfig?.items?.find((p: any) => p.url === trimmed)
+      let targetUid = currentProfileUid
+      if (newProfile) {
+        await patchProfiles({ current: newProfile.uid })
+        targetUid = newProfile.uid
+      }
+
       await mutateProfiles()
 
       // Real-time compilation and reload
       await enhanceProfiles()
       await refreshProxy()
-      if (currentProfileUid) {
-        triggerAutoSelectFastestNode(currentProfileUid)
+      if (targetUid) {
+        triggerAutoSelectFastestNode(targetUid)
       }
     } catch {
       try {
         await importProfile(url, { with_proxy: false, self_proxy: true })
         showNotice.success('shared.feedback.notifications.importWithClashProxy')
         setUrl('')
+
+        const freshConfig = await getProfiles()
+        const newProfile = freshConfig?.items?.find((p: any) => p.url === trimmed)
+        let targetUid = currentProfileUid
+        if (newProfile) {
+          await patchProfiles({ current: newProfile.uid })
+          targetUid = newProfile.uid
+        }
+
         await mutateProfiles()
 
         // Real-time compilation and reload
         await enhanceProfiles()
         await refreshProxy()
-        if (currentProfileUid) {
-          triggerAutoSelectFastestNode(currentProfileUid)
+        if (targetUid) {
+          triggerAutoSelectFastestNode(targetUid)
         }
       } catch (retryErr) {
         showNotice.error(

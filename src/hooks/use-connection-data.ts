@@ -101,6 +101,7 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
     useMihomoWsSubscription<ConnectionMonitorData>({
       storageKey: 'mihomo_connection_date',
       buildSubscriptKey: (date) => (isWsActive ? `getClashConnection-${date}` : null),
+      buildCacheKey: (date) => `getClashConnection-${date}`,
       fallbackData: initConnData,
       connect: () => MihomoWebSocket.connect_connections(),
       throttleMs: 16,

@@ -158,6 +158,7 @@ interface HandlerResult {
 interface UseMihomoWsSubscriptionOptions<T> {
   storageKey: string
   buildSubscriptKey: (date: number) => string | null
+  buildCacheKey?: (date: number) => string
   fallbackData: T
   connect: () => Promise<MihomoWebSocket>
   /**
@@ -178,6 +179,7 @@ export const useMihomoWsSubscription = <T>(
   const {
     storageKey,
     buildSubscriptKey,
+    buildCacheKey,
     fallbackData,
     connect,
     throttleMs,
@@ -193,7 +195,9 @@ export const useMihomoWsSubscription = <T>(
     lastSubscriptionCacheKeyRef.current = subscriptionCacheKey
   }
   const responseCacheKey =
-    subscriptionCacheKey ?? lastSubscriptionCacheKeyRef.current
+    subscriptionCacheKey ??
+    lastSubscriptionCacheKeyRef.current ??
+    (buildCacheKey ? `$sub$${buildCacheKey(date)}` : null)
 
   const queryClient = useQueryClient()
 

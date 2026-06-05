@@ -1,6 +1,6 @@
 import { PhysicalPosition } from '@tauri-apps/api/dpi'
 import { getCurrentWindow, currentMonitor } from '@tauri-apps/api/window'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 
 interface MonitorInfo {
   position: { x: number; y: number }
@@ -33,7 +33,7 @@ export const useWindowSnap = (active: boolean = true) => {
   }>({})
 
   // Helper to fetch dimensions and cache them
-  const cacheDimensions = () => {
+  const cacheDimensions = useCallback(() => {
     if (cacheRef.current.fetchPromise) return cacheRef.current.fetchPromise
 
     const promise = (async () => {
@@ -60,10 +60,12 @@ export const useWindowSnap = (active: boolean = true) => {
 
     cacheRef.current.fetchPromise = promise
     return promise
-  }
+  }, [currentWindow])
 
   useEffect(() => {
     if (!active) return
+
+    let snapTimer: ReturnType<typeof setTimeout> | null = null
 
     // Register mousedown/mouseup to pre-cache dimensions
     const handleMouseDown = () => {
@@ -191,7 +193,7 @@ export const useWindowSnap = (active: boolean = true) => {
 
           await currentWindow.setPosition(new PhysicalPosition(targetX, targetY))
 
-          setTimeout(() => {
+          snapTimer = setTimeout(() => {
             isSnappingRef.current = false
           }, 150)
         } else {
@@ -204,11 +206,12 @@ export const useWindowSnap = (active: boolean = true) => {
 
     return () => {
       isUnmounted = true
+      if (snapTimer) clearTimeout(snapTimer)
       document.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mouseup', handleMouseUp)
       unlistenPromise
         .then((unlisten) => unlisten())
         .catch((err) => console.warn('[Snap] Failed to clear listener:', err))
     }
-  }, [currentWindow, active])
+  }, [currentWindow, active, cacheDimensions])
 }
