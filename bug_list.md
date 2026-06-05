@@ -18,6 +18,7 @@
 
 | :--- | :--- | :---: | :--- |
 | **BUG-047** | 在本地提交推送（`git push`）时，Git 的 `pre-push` 钩子运行 `cargo clippy --all-targets` 遇到测试模块中的 `.unwrap()` 报错导致推送失败（由于项目全局禁用了 `unwrap_used`）。 | v3.0.1 | **已解决，已确认**。<br>**设计要求**：在 `universal_parser.rs` 的测试模块 `mod tests` 前端声明 `#[allow(clippy::unwrap_used)]`，允许在测试中合理使用 `.unwrap()` 以提取结果，同时修复该测试中的冗余借用警告（如 `&serde_yaml_ng::Value` 修改为直接传值）。<br>**代码状态**：代码修改完成，静态编译及单元测试全部通过，并成功推送。 |
+| **BUG-051** | 窗口下方的表示流量的小卡片里，上传下载总量的数值一直是 0。原因为 useConnectionData 禁用 WebSocket 后缓存键为 null，轮询获取的总量数据在 queryClient.setQueryData 找不到存储地址而被丢弃。 | v3.0.4 | **已解决**。<br>**设计要求**：1. 为 useMihomoWsSubscription 增加 buildCacheKey 选项；2. 优化 responseCacheKey 计算逻辑，当 WebSocket 禁用时 fallback 使用 buildCacheKey 提供静态缓存键；3. useConnectionData 传入对应的 buildCacheKey。 |
 
 | (暂无) | 所有当前版本 (v2.0.1 followup) 发现 of 缺陷均已解决。 | - | - |
 

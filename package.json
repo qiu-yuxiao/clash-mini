@@ -53,6 +53,7 @@
     "update-agreements-feat003-supplement": "python scratch/update_agreements_feat003_supplement.py",
     "update-docs-bug046": "python scratch/update_docs_bug046.py",
     "register-bug-050": "python scratch/register_bug_050.py",
+    "register-bug-051": "python scratch/register_bug_051.py",
     "patch-agreements-bug050": "python scratch/patch_agreements.py",
     "patch-layout-bug050": "python scratch/patch_layout.py",
     "patch-agreements-linewidth": "python scratch/patch_agreements_lineWidth.py",
