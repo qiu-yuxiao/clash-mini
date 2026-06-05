@@ -54,6 +54,8 @@
     "update-docs-bug046": "python scratch/update_docs_bug046.py",
     "register-bug-050": "python scratch/register_bug_050.py",
     "patch-agreements-bug050": "python scratch/patch_agreements.py",
+    "patch-layout-bug050": "python scratch/patch_layout.py",
+    "patch-agreements-linewidth": "python scratch/patch_agreements_lineWidth.py",
     "patch-pre-push-fix": "python scratch/patch_pre_push_fix.py",
     "delete-pre-100-releases": "python scratch/delete_pre_1_0_0_releases.py",
     "print-tags": "python scratch/print_tags.py",

@@ -438,7 +438,7 @@
 
 
 
-     * **流量图容器**：在下半层内为 `flex: 1`，宽度 `100%`，最小高度 `minHeight: 0`。普通模式下渲染 Canvas 高级流量图 (`EnhancedCanvasTrafficGraph`)；极窄模式 (宽度 $\le 285px$) 下自动切换渲染 Compact 折线图 (`TrafficGraph`)。该折线图物理高度自动适配并缩减为 `55px`。该图通过 DPR 适配消除缩放模糊，且线宽减小至 `1.5px`（底线为 `1px`，透明度调小至 `0.15`），使整体展现形式更精致紧凑。
+     * **流量图容器**：在下半层内为 `flex: 1`，宽度 `100%`，最小高度 `minHeight: 0`。普通模式下渲染 Canvas 高级流量图 (`EnhancedCanvasTrafficGraph`)；极窄模式 (宽度 $\le 285px$) 下自动切换渲染 Compact 折线图 (`TrafficGraph`)。该折线图物理高度自动适配并缩减为 `55px`。该图通过 DPR 适配消除缩放模糊，且线宽与普通模式保持一致为 `2.5px`（底线为 `1px`，透明度调小至 `0.15`），使整体展现形式更精致紧凑。
 
 
 
