@@ -1,5 +1,9 @@
 # Clash Mini
 
+> [!WARNING]
+> **AI Assistant Instructions (AI 助理必读)**:
+> 本项目的 AI 协同开发受根目录 [`.cursorrules`](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.cursorrules) 协议约束。在动用任何工具排查或修改项目前，必须率先阅读并严格遵守 `.cursorrules` 中的「新助理报到协议」向 Master 进行建交。禁止绕过该仪式直接展开其他开发。
+
 Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailored workflows, enhanced 3D visual styles, and performance.
 
 ---
