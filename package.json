@@ -83,7 +83,8 @@
     "patch-bugs-resolved": "node scratch/monitor_build.mjs",
     "update-bug-and-agreements": "python scratch/update_bug_and_agreements.py",
     "cargo-test": "cargo test",
-    "resolve-bug-028": "python scratch/resolve_bug_028.py"
+    "resolve-bug-028": "python scratch/resolve_bug_028.py",
+    "update-agreement-bug-042": "python scratch/update_agreement_bug_042.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
