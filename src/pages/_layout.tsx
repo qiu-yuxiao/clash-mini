@@ -79,6 +79,7 @@ import {
   getProxyAddr,
   cmdGetProxyDelay,
   getProfiles,
+  patchClashConfig,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
@@ -1135,10 +1136,15 @@ const Layout = () => {
     verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801,
   )
 
-  // Minimal Settings States
-  const [notificationsEnabled, setNotificationsEnabled] = useState(
-    () => localStorage.getItem('clash-verge-enable-notification') !== 'false',
-  )
+  // Minimal Settings Actions
+  const handleAllowLanChange = async (checked: boolean) => {
+    try {
+      await patchClashConfig({ 'allow-lan': checked })
+      await refreshClashConfig()
+    } catch (err: any) {
+      showNotice.error(err?.message || err)
+    }
+  }
 
   // Connections manager states
   const [match, setMatch] = useState<(input: string) => boolean>(
@@ -2736,17 +2742,13 @@ const Layout = () => {
                       }}
                     >
                       <Typography variant="caption" sx={{ fontSize: '13px' }}>
-                        通知弹窗显示
+                        Allow LAN
                       </Typography>
                       <Switch
                         size="small"
-                        checked={notificationsEnabled}
+                        checked={clashConfig?.allowLan ?? false}
                         onChange={(_, checked: boolean) => {
-                          setNotificationsEnabled(checked)
-                          localStorage.setItem(
-                            'clash-verge-enable-notification',
-                            checked ? 'true' : 'false',
-                          )
+                          handleAllowLanChange(checked)
                         }}
                         sx={{
                           transform: 'scale(0.9)',

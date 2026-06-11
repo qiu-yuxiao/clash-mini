@@ -79,7 +79,8 @@
     "monitor-local-usage": "node scratch/monitor_local_usage.mjs",
     "parse-job": "python scratch/parse_job.py",
     "register-bug-055": "python scratch/register_bug_055.py",
-    "fix-tray-lock": "python scratch/fix_tray_lock.py"
+    "fix-tray-lock": "python scratch/fix_tray_lock.py",
+    "patch-bugs-resolved": "node scratch/monitor_build.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
