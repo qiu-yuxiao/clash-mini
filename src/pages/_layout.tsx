@@ -558,14 +558,14 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
           >
             <ArrowDownwardRounded
               sx={{
-                color: mode === 'light' ? '#0084FF' : '#80D8FF',
+                color: mode === 'light' ? 'var(--download-text, #0084FF)' : 'var(--download-text-dark, #80D8FF)',
                 fontSize: 14,
               }}
             />
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? '#006064' : '#80D8FF',
+                color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #80D8FF)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -579,7 +579,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '13px',
-                color: mode === 'light' ? '#00363A' : '#FFFFFF',
+                color: mode === 'light' ? 'var(--download-text, #00363A)' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -588,7 +588,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 style={{
                   fontSize: '8px',
                   fontWeight: 'normal',
-                  color: mode === 'light' ? '#006064' : '#E0F7FA',
+                  color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #E0F7FA)',
                 }}
               >
                 {downUnit}/s
@@ -615,7 +615,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? '#006064' : '#80D8FF',
+                color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #80D8FF)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -626,7 +626,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '13px',
-                color: mode === 'light' ? '#00363A' : '#FFFFFF',
+                color: mode === 'light' ? 'var(--download-text, #00363A)' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -634,7 +634,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               <span
                 style={{
                   fontSize: '8px',
-                  color: mode === 'light' ? '#006064' : '#E0F7FA',
+                  color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #E0F7FA)',
                   fontWeight: 'normal',
                 }}
               >
@@ -665,14 +665,14 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
           >
             <ArrowUpwardRounded
               sx={{
-                color: mode === 'light' ? '#E65100' : '#FFD54F',
+                color: mode === 'light' ? 'var(--upload-text, #E65100)' : 'var(--upload-text-dark, #FFD54F)',
                 fontSize: 14,
               }}
             />
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? '#7B5200' : '#FFD54F',
+                color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFD54F)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -686,7 +686,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '13px',
-                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
+                color: mode === 'light' ? 'var(--upload-text, #3E2723)' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -695,7 +695,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 style={{
                   fontSize: '8px',
                   fontWeight: 'normal',
-                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
+                  color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFECB3)',
                 }}
               >
                 {upUnit}/s
@@ -722,7 +722,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? '#7B5200' : '#FFD54F',
+                color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFD54F)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -733,7 +733,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontSize: '13px',
                 fontWeight: 'bold',
-                color: mode === 'light' ? '#3E2723' : '#FFFFFF',
+                color: mode === 'light' ? 'var(--upload-text, #3E2723)' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -741,7 +741,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               <span
                 style={{
                   fontSize: '8px',
-                  color: mode === 'light' ? '#7B5200' : '#FFECB3',
+                  color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFECB3)',
                   fontWeight: 'normal',
                 }}
               >

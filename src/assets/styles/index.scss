@@ -183,6 +183,17 @@ html[data-control-skin="original"] {
   --background-color-alpha: hsla(calc(239 * var(--control-skin-val2, 1.0)), 26%, 49%, 0.1) !important;
   --border-radius: calc(8px * var(--control-skin-val1, 1.0)) !important;
 
+  /* Slider-adaptive upload/download color variables */
+  --download-bg: hsl(calc(200 * var(--control-skin-val2, 1.0)), 90%, 94%);
+  --download-bg-dark: hsl(calc(200 * var(--control-skin-val2, 1.0)), 100%, 12%);
+  --download-text: hsl(calc(200 * var(--control-skin-val2, 1.0)), 100%, 25%);
+  --download-text-dark: hsl(calc(200 * var(--control-skin-val2, 1.0)), 100%, 75%);
+
+  --upload-bg: hsl(calc(38 * var(--control-skin-val2, 1.0)), 100%, 94%);
+  --upload-bg-dark: hsl(calc(38 * var(--control-skin-val2, 1.0)), 100%, 12%);
+  --upload-text: hsl(calc(38 * var(--control-skin-val2, 1.0)), 100%, 30%);
+  --upload-text-dark: hsl(calc(38 * var(--control-skin-val2, 1.0)), 100%, 75%);
+
   .theme-panel {
     background: var(--theme-panel-bg) !important;
     backdrop-filter: none !important;

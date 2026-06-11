@@ -517,12 +517,12 @@ export const get3DCardStyle = (
         ? 'var(--primary-main)'
         : cardType === 'upload'
           ? isLight
-            ? '#fffde7'
-            : '#ffa000'
+            ? 'var(--upload-bg)'
+            : 'var(--upload-bg-dark)'
           : cardType === 'download'
             ? isLight
-              ? '#e3f2fd'
-              : '#00b0ff'
+              ? 'var(--download-bg)'
+              : 'var(--download-bg-dark)'
             : isLight
               ? '#ffffff'
               : '#1e1f29'
