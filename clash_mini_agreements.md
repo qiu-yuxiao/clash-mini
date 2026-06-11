@@ -321,8 +321,8 @@
    * 为了彻底实现多客户端完美并存运行，Clash Mini 的单实例检测端口在 Release 模式下设为 `33335`，在 Dev 模式下设为 `33336`。绝对禁止使用与原版相同的端口（`33332`/`11234`），从而彻底杜绝因单实例检测机制互锁而产生的冲突和闪退。
 
 9. **内核与退出孤儿进程物理隔离 (BUG-056)**：
-   * **Sidecar 物理隔离**：为了与官方 Clash Verge 客户端彻底物理隔离，本项目的 Sidecar 核心二进制名称及运行进程名称由 `verge-mihomo` / `verge-mihomo-alpha` 彻底更名为 `mini-mihomo` / `mini-mihomo-alpha`。
-   * **异步强杀机制**：在主程序退出事件 `clean_async` 中，必须使用 `sysinfo` 库扫描系统运行进程，遍历并强制杀灭（kill）所有进程名包含 `mini-mihomo` 的残留子进程，保证程序退出后无任何孤儿进程驻留。
+   * **Sidecar 物理隔离与命名前缀设计**：为了与官方 Clash Verge 客户端彻底物理隔离，这是一项关键的架构设计决定。本项目的 Sidecar 核心二进制名称及运行进程名称由 `verge-mihomo` / `verge-mihomo-alpha` 彻底更名为 `mini-mihomo` / `mini-mihomo-alpha`（即在内核名称前增加 `mini-` 前缀）。这在磁盘的 `sidecar/` 目录级别与操作系统的进程控制级别建立了独立的命名空间。
+   * **异步强杀机制与隔离安全**：在主程序退出事件 `clean_async` 中，必须使用 `sysinfo` 库扫描系统运行进程，遍历并强制杀灭（kill）所有进程名包含 `mini-mihomo` 的残留子进程，保证程序退出后无任何孤儿进程驻留。同时，由于前缀隔离设计，该强杀机制绝不会误伤或影响官方 Clash Verge 客户端（其进程名为 `verge-mihomo`）的运行，实现了优雅无冲突的多客户端共存。
 
 
 

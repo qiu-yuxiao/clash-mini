@@ -9,74 +9,8 @@
 > > 2. **待验证/排查中 Bug 强制卡片化**：任何状态为 `排查中` 或 `代码已修正，待确认` 的 Bug，必须在顶部的「待验证与活动中 Bug 详情」区以独立标题 and 结构化字段登记。
 > > 3. **强制记录排查记忆，防止重复劳动**：在卡片中，必须详实搜集、继承并持久化记录以下三个协同要素：
 
-### 🚨 **BUG-060** 代理节点选择点击失效，UI 无法切换高亮与激活状态
-* **目标版本**：`v6.0.0`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 在主页 of 节点表格中点击选择不同的代理节点时，高亮选中状态无法更新到新的节点上，节点列表未触发刷新，实际上后台的代理切换也未能被正确反馈到界面上。
-* **【根因分析】**：
-  * `use-render-list.ts` 中构建列表时，`useMemo` 中的 key 列表稳定性检查只比对了 key 的数组和长度，没有检查 `group.now`（即当前激活节点名）的变化。导致在仅改变选中节点而不改变节点集合时，组件错误地沿用了旧的缓存对象引用，阻断了 React 的 UI 渲染与高亮更新。
-* **【修正方案】**：
-  * **修改文件**：
-    * [**`use-render-list.ts`**](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/use-render-list.ts)
-  * **设计要点**：
-    1. 声明 `isRenderItemEqual` 用于对渲染节点项进行深度比对（包含 `key`、`type`、`group.now` 选中状态、`headState` 表头状态，以及单个节点或多列节点数组中所有节点的名称和延迟数据 `history`）。
-    2. 将 `prevListRef` 优化比对从浅层 `key` 比较替换为 `isRenderItemEqual`。
 
----
 
-### 🚨 **BUG-061** 启动或重载时当前激活节点状态为空，定位（Locate）操作失败
-* **目标版本**：`v6.0.0`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 客户端启动、配置文件重载后，顶部的当前激活节点状态卡片中无可用节点信息（显示为空），且点击固定操作行（ProxyHead）中的定位按钮（Locate）时没有任何反应，无法定位到当前选中的节点。
-* **【根因分析】**：
-  * 在程序初始化与配置恢复阶段（`use-profiles.ts`），原逻辑在映射上次保存的选中项时，硬编码将目标组 `'PROXY'` 强行映射成了 `'GLOBAL'` 组。但由于合成的 `'GLOBAL'` 组无法直接作为代理物理节点识别，导致恢复失败。在 Clash 核心重载时当前节点丢失且定位失效。
-* **【修正方案】**：
-  * **修改文件**：
-    * [**`cmds.ts`**](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/cmds.ts) (数据计算层)
-    * [**`use-profiles.ts`**](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-profiles.ts) (配置恢复模块)
-    * [**`use-proxy-selection.ts`**](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-proxy-selection.ts) (代理选择模块)
-    * [**`proxy-groups.tsx`**](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-groups.tsx) (列表选择分发层)
-  * **设计要点**：
-    1. 在 `cmds.ts` 的 `calcuProxies` 中加入 `isSynthesized` 标志，标记该 `PROXY` 组是属于真实的物理代理组还是前端自行合成的虚拟兜底组。
-    2. 在 `use-profiles.ts` 与 `use-proxy-selection.ts` 中，只在 `PROXY` 组确实为合成虚拟组时才在向内核发请求时将其映射为 `GLOBAL`；若存在真实 `PROXY` 组则直接呼叫内核的 `PROXY`，确保物理节点切换能正确生效。
-    3. 移除 `proxy-groups.tsx` 里的改名越权逻辑，交由 `use-proxy-selection` 的 change 统一控制。
-
----
-
-### 🚨 **BUG-062** 代理表头 ProxyHead 工具栏（排序、过滤、延迟测试）无响应
-* **目标版本**：`v6.0.0`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 点击 ProxyHead 里的工具按钮进行按延迟排序、按过滤器筛选或触发全部延迟测速时，节点列表毫无变化，UI 整体无响应。
-* **【根因分析】**：
-  * 全局状态管理中，虽然 reducer 本身已在副本上修改，但是由于前端 `use-render-list.ts` 的最后一步缓存优化只比对了 key 列表一致性，且在排序/测速更改时节点名称和列表结构无变化，从而被就地缓存拦截。
-* **【修正方案】**：
-  * **修改文件**：
-    * [**`use-render-list.ts`**](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/use-render-list.ts)
-  * **设计要点**：
-    1. 在深度比较 `isRenderItemEqual` 中加入了对全局表头状态 `headState` 实例引用的变化判定。
-    2. 在比较中同时加入了对节点延迟数据（`history` 中最新的 `delay`）的变动判定，使得表头排序、过滤和测速动作能够立即越过缓存，驱动 UI 重绘响应。
-
----
-
-### 🚨 **BUG-059** GLOBAL 组未在启动/重载时绑定到 PROXY 组
-* **目标版本**：`v5.0.3`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 程序启动后、配置文件重载后、流量接管模式切换后，GLOBAL 组可能未绑定指向 PROXY 组，导致流量出口与用户在主页选择的节点脱节。
-* **【根因分析】**：
-  * 设计协议第1684行明确要求：后台及前端逻辑必须强制将 `GLOBAL` 组绑定指向唯一代理组 `PROXY`（通过 `selectNodeForGroup('GLOBAL', 'PROXY')` 保证在启动、配置文件更新重载、以及流量接管模式切换时强行生效）。
-  * 当前代码仅在用户主动点击选择节点时调用 `selectNodeForGroup('GLOBAL', proxyName)`，未在启动、重载、模式切换时执行绑定。
-* **【修正方案】**：
-  * **修改文件**：
-    * [**`_layout.tsx`**](file:///C:/Users/sun_y/Documents/trae_projects/Clash_Mini/src/pages/_layout.tsx)
-  * **设计要点**：
-    1. 在 `enhanceProfiles()` 完成后调用 `selectNodeForGroup('GLOBAL', 'PROXY')` 确保 GLOBAL 组绑定到 PROXY 组；
-    2. 在流量接管模式切换后同样执行绑定。
-
----
 
 ### 🚨 **BUG-057** 导入订阅后内核节点已展开但前端表格显示空白
 * **目标版本**：`v4.1.0`
@@ -97,25 +31,7 @@
     * 2. **`use-render-list.ts`**：替换原有仅检测 `!groups.length` 的死代码，新增智能轮询恢复机制 —— 当 PROXY 组存在但 `all` 中无真实节点时（proxy-provider 异步加载中），启动 1s 间隔轮询 `refreshProxy()`，直到节点数据到来后自动停止。
     * 3. **`cmds.ts`**：`calcuProxies()` 加入 `proxyResponse?.proxies || {}` 和 `providerResponse || {}` 空值防御；`providerMap` 构造加入 `item?.proxies` 安全检查；`generateItem` 对无名称节点返回安全的 unknown 对象。
 
----
 
-### 🚨 **BUG-058** 无效正则表达式导致节点表格消失
-* **目标版本**：`v4.0.6`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 在代理节点搜索框中输入无效的正则表达式（如 `[`、`(`、`{` 等不完整符号）时，节点表格会完全消失，所有节点都不显示。
-* **【历史诊断与物理实证】**：
-  * **已确认事实**：
-    * [x] **搜索过滤逻辑缺陷**：在 `use-filter-sort.ts` 的 `filterProxies` 函数中，当正则表达式无效时直接返回空数组，导致所有节点被过滤掉。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`use-filter-sort.ts`**](file:///C:/Users/sun_y/Documents/trae_projects/Clash_Mini/src/components/proxy/use-filter-sort.ts) (搜索过滤逻辑)
-    * [**`search-matcher.ts`**](file:///C:/Users/sun_y/Documents/trae_projects/Clash_Mini/src/utils/search-matcher.ts) (正则表达式处理)
-  * **设计要点**：
-    1. 修改 `filterProxies` 函数，当正则表达式无效时返回所有节点而非空数组；
-    2. 在 `search-matcher.ts` 中，当正则表达式无效时 fallback 到普通字符串匹配。
-
----
 
 ### 🚨 **BUG-056** 程序退出时残留内核/服务孤儿进程
 * **目标版本**：`v4.0.1`
@@ -127,10 +43,21 @@
     * [x] **官方同名进程冲突**：官方客户端也使用 `verge-mihomo` 等名称，如果直接强杀该名称会影响宿主机上正常运行 of 官方版内核。
 * **【当前修正方案 & 设计要求】**：
   * **修改文件**：
-    * 后端进程模块与退出清理事件 ([**`handle.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/handle.rs))
+    * [**`Cargo.toml`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/Cargo.toml) (根依赖)
+    * [**`src-tauri/Cargo.toml`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/Cargo.toml)
+    * [**`state.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/state.rs) ( 核心进程强杀逻辑)
+    * [**`window.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/window.rs) ( 退出清理事件集成)
+    * [**`verge.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/verge.rs) ( 内核配置更名)
+    * [**`chain.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/chain.rs) ( 支持映射更名)
+    * [**`tauri.conf.json`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/tauri.conf.json)
+    * [**`tauri.linux.conf.json`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/tauri.linux.conf.json)
+    * [**`prebuild.mjs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/prebuild.mjs)
+    * [**`portable.mjs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/portable.mjs)
+    * [**`portable-fixed-webview2.mjs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/portable-fixed-webview2.mjs)
+    * [**`installer.nsi`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/packages/windows/installer.nsi)
   * **设计要点**：
-    1. 将 sidecar 核心二进制及运行进程由 `verge-mihomo`/`verge-mihomo-alpha` 更名为 `mini-mihomo`/`mini-mihomo-alpha`，实现同官方客户端 of 完全物理隔离；
-    2. 主程序退出事件 `clean_async` 中调用 `sysinfo` 进行残留进程扫描，强杀所有名称中包含 `mini-mihomo` 的进程。
+    1. 将 sidecar 核心二进制及运行进程由 `verge-mihomo`/`verge-mihomo-alpha` 彻底更名为 `mini-mihomo`/`mini-mihomo-alpha` (增加 `mini-` 前缀)，实现与官方客户端的物理隔离；
+    2. 后端引入 `sysinfo` 库，在主程序退出事件 `clean_async` 和侧边栏停止核心 `stop_core_by_sidecar` 中，扫描系统进程并强杀所有名称包含 `mini-mihomo` 的残留进程，确保零残留且不误伤官方客户端。
 
 ---
 
