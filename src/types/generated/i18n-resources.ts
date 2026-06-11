@@ -709,6 +709,44 @@ export interface TranslationResources {
           }
         }
       }
+      mini: {
+        activeNodeLabel: string
+        connectionsActive: string
+        connectionsClearHistory: string
+        connectionsDisconnectAll: string
+        connectionsHistory: string
+        debugLogs: string
+        direct: string
+        importConfig: string
+        importPlaceholder: string
+        localFile: string
+        manual: string
+        nodeCount: string
+        pathControl: string
+        profilesTitle: string
+        proxy: string
+        routingPreference: string
+        routingTooltipDirect: string
+        routingTooltipProxy: string
+        routingTooltipRules: string
+        rules: string
+        statusDelayExcellent: string
+        statusDelayGood: string
+        statusDelayHigh: string
+        statusDelayMedium: string
+        statusError: string
+        statusTesting: string
+        statusTimeout: string
+        statusUntested: string
+        system: string
+        takeoverMode: string
+        takeoverTooltipManual: string
+        takeoverTooltipSystem: string
+        takeoverTooltipTun: string
+        total: string
+        tun: string
+        unnamedConfig: string
+      }
       modals: {
         backup: {
           actions: {

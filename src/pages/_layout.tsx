@@ -32,6 +32,9 @@ import {
   ListItem,
   Slider,
   useTheme,
+  Tooltip,
+  Select,
+  MenuItem,
 } from '@mui/material'
 import { alpha } from '@mui/material'
 import { open } from '@tauri-apps/plugin-shell'
@@ -114,22 +117,54 @@ const OS = getSystem()
 export const portableFlag = false
 
 // Delay Helpers
-function getSignalIcon(delay: number) {
+function getSignalIcon(delay: number, t: any) {
   if (delay === -2)
-    return { icon: <SignalNone />, text: '测试中', color: 'text.secondary' }
+    return {
+      icon: <SignalNone />,
+      text: t('settings.mini.statusTesting', { defaultValue: '测试中' }),
+      color: 'text.secondary',
+    }
   if (delay === -1)
-    return { icon: <SignalNone />, text: '未测试', color: 'text.secondary' }
+    return {
+      icon: <SignalNone />,
+      text: t('settings.mini.statusUntested', { defaultValue: '未测试' }),
+      color: 'text.secondary',
+    }
   if (delay > 1e5)
-    return { icon: <SignalError />, text: '错误', color: 'error.main' }
+    return {
+      icon: <SignalError />,
+      text: t('settings.mini.statusError', { defaultValue: '错误' }),
+      color: 'error.main',
+    }
   if (delay === 0 || delay >= 10000)
-    return { icon: <SignalError />, text: '超时', color: 'error.main' }
+    return {
+      icon: <SignalError />,
+      text: t('settings.mini.statusTimeout', { defaultValue: '超时' }),
+      color: 'error.main',
+    }
   if (delay >= 500)
-    return { icon: <SignalWeak />, text: '延迟较高', color: 'error.main' }
+    return {
+      icon: <SignalWeak />,
+      text: t('settings.mini.statusDelayHigh', { defaultValue: '延迟较高' }),
+      color: 'error.main',
+    }
   if (delay >= 300)
-    return { icon: <SignalMedium />, text: '延迟中等', color: 'warning.main' }
+    return {
+      icon: <SignalMedium />,
+      text: t('settings.mini.statusDelayMedium', { defaultValue: '延迟中等' }),
+      color: 'warning.main',
+    }
   if (delay >= 200)
-    return { icon: <SignalGood />, text: '延迟良好', color: 'info.main' }
-  return { icon: <SignalStrong />, text: '延迟极佳', color: 'success.main' }
+    return {
+      icon: <SignalGood />,
+      text: t('settings.mini.statusDelayGood', { defaultValue: '延迟良好' }),
+      color: 'info.main',
+    }
+  return {
+    icon: <SignalStrong />,
+    text: t('settings.mini.statusDelayExcellent', { defaultValue: '延迟极佳' }),
+    color: 'success.main',
+  }
 }
 
 function convertDelayColor(
@@ -295,7 +330,8 @@ const ActiveNodeStatusCard = () => {
     }
   }
 
-  const signalInfo = getSignalIcon(delay)
+  const { t } = useTranslation() as any
+  const signalInfo = getSignalIcon(delay, t)
   const delayColor = convertDelayColor(delay)
   const theme = useTheme()
 
@@ -322,7 +358,9 @@ const ActiveNodeStatusCard = () => {
           },
         }}
       >
-        当前活跃出口节点：
+        {t('settings.mini.activeNodeLabel', {
+          defaultValue: '当前活跃出口节点：',
+        })}
       </Typography>
 
       <Typography
@@ -357,7 +395,9 @@ const ActiveNodeStatusCard = () => {
         }}
       >
         {(activeNodeName ? activeNodeName.replace(/\s\(\d{6}\)$/, '') : '') ||
-          '未选择节点 (直接连接)'}
+          t('home.components.currentProxy.labels.noActiveNode', {
+            defaultValue: '未选择节点 (直接连接)',
+          })}
       </Typography>
 
       {activeNodeName && (
@@ -370,7 +410,12 @@ const ActiveNodeStatusCard = () => {
               signalInfo.icon
             )
           }
-          label={testing ? '测试中...' : delayManager.formatDelay(delay)}
+          label={
+            testing
+              ? t('settings.mini.statusTesting', { defaultValue: '测试中' }) +
+                '...'
+              : delayManager.formatDelay(delay)
+          }
           color={delayColor}
           onClick={handleTestDelay}
           sx={{
@@ -423,7 +468,7 @@ const ActiveNodeStatusCard = () => {
 const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
   const mode = useThemeMode()
   const theme = useTheme()
-  useTranslation()
+  const { t } = useTranslation() as any
   const pageVisible = useVisibility()
   const {
     response: { data: traffic },
@@ -525,7 +570,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 whiteSpace: 'nowrap',
               }}
             >
-              下载:
+              {t('home.components.traffic.legends.download', {
+                defaultValue: '下载',
+              })}
+              :
             </Typography>
             <Typography
               sx={{
@@ -572,7 +620,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 whiteSpace: 'nowrap',
               }}
             >
-              总量:
+              {t('settings.mini.total', { defaultValue: '总量' })}:
             </Typography>
             <Typography
               sx={{
@@ -629,7 +677,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 whiteSpace: 'nowrap',
               }}
             >
-              上传:
+              {t('home.components.traffic.legends.upload', {
+                defaultValue: '上传',
+              })}
+              :
             </Typography>
             <Typography
               sx={{
@@ -676,7 +727,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 whiteSpace: 'nowrap',
               }}
             >
-              总量:
+              {t('settings.mini.total', { defaultValue: '总量' })}:
             </Typography>
             <Typography
               sx={{
@@ -1081,11 +1132,11 @@ const Layout = () => {
   }
 
   const mode = useThemeMode()
-  const { t } = useTranslation()
+  const { t } = useTranslation() as any
   const { theme } = useCustomTheme()
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
-  const { switchLanguage } = useI18n()
+  const { switchLanguage, currentLanguage } = useI18n()
   const { decorated, isDecorationsHidden } = useWindowDecorations()
   const { pathname } = useLocation()
   const windowControlsRef = useRef<any>(null)
@@ -2222,7 +2273,9 @@ const Layout = () => {
                         gap: 1,
                       }}
                     >
-                      订阅与机场配置
+                      {t('settings.mini.profilesTitle', {
+                        defaultValue: '订阅与机场配置',
+                      })}
                       {profileLoading && <CircularProgress size={10} />}
                     </Typography>
                   </Box>
@@ -2235,7 +2288,9 @@ const Layout = () => {
                     }}
                   >
                     <TextField
-                      placeholder="填入订阅链接/节点配置..."
+                      placeholder={t('settings.mini.importPlaceholder', {
+                        defaultValue: '填入订阅链接/节点配置...',
+                      })}
                       size="small"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
@@ -2273,7 +2328,9 @@ const Layout = () => {
                         }}
                         disabled={profileLoading}
                       >
-                        导入节点信息
+                        {t('settings.mini.importConfig', {
+                          defaultValue: '导入节点信息',
+                        })}
                       </Button>
                     </Box>
                   </Box>
@@ -2367,7 +2424,10 @@ const Layout = () => {
                               }}
                               title={item.name}
                             >
-                              {item.name || '未命名配置'}
+                              {item.name ||
+                                t('settings.mini.unnamedConfig', {
+                                  defaultValue: '未命名配置',
+                                })}
                             </Typography>
                             <Box
                               sx={{
@@ -2442,8 +2502,10 @@ const Layout = () => {
                             >
                               <span>
                                 {item.uid === 'L_Direct_Imports'
-                                  ? `节点数: ${!item.desc || item.desc === '本地手动导入的代理节点' ? '0' : item.desc}`
-                                  : '本地文件'}
+                                  ? `${t('settings.mini.nodeCount', { defaultValue: '节点数: ' })}${!item.desc || item.desc === '本地手动导入的代理节点' ? '0' : item.desc}`
+                                  : t('settings.mini.localFile', {
+                                      defaultValue: '本地文件',
+                                    })}
                               </span>
                               <span>
                                 {item.updated
@@ -2498,7 +2560,9 @@ const Layout = () => {
                     variant="subtitle2"
                     sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}
                   >
-                    流量接管模式
+                    {t('settings.mini.takeoverMode', {
+                      defaultValue: '流量接管模式',
+                    })}
                   </Typography>
                   <Box
                     sx={(theme) => ({
@@ -2534,70 +2598,112 @@ const Layout = () => {
                     </Box>
 
                     {/* Manual Mode Option */}
-                    <Box
-                      onClick={() => handleTakeoverModeChange('manual')}
-                      sx={{
-                        flex: 1,
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: activeIndex === 0 ? '#1E1200' : 'text.secondary',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                        transition: 'color 0.2s ease',
-                      }}
+                    <Tooltip
+                      title={t('settings.mini.takeoverTooltipManual', {
+                        defaultValue: '完全手动配置代理',
+                      })}
+                      placement="top"
+                      arrow
                     >
-                      手动模式
-                    </Box>
+                      <Box
+                        onClick={() => handleTakeoverModeChange('manual')}
+                        sx={{
+                          flex: 1,
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color:
+                            activeIndex === 0 ? '#1E1200' : 'text.secondary',
+                          fontSize:
+                            language === 'zh' || language === 'zhtw'
+                              ? '13px'
+                              : '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          zIndex: 1,
+                          transition: 'color 0.2s ease',
+                        }}
+                      >
+                        {t('settings.mini.manual', {
+                          defaultValue: '手动模式',
+                        })}
+                      </Box>
+                    </Tooltip>
 
                     {/* System Proxy Option */}
-                    <Box
-                      onClick={() => handleTakeoverModeChange('system')}
-                      sx={{
-                        flex: 1,
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: activeIndex === 1 ? '#1E1200' : 'text.secondary',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                        transition: 'color 0.2s ease',
-                      }}
+                    <Tooltip
+                      title={t('settings.mini.takeoverTooltipSystem', {
+                        defaultValue: '自动启用系统全局代理',
+                      })}
+                      placement="top"
+                      arrow
                     >
-                      系统代理
-                    </Box>
+                      <Box
+                        onClick={() => handleTakeoverModeChange('system')}
+                        sx={{
+                          flex: 1,
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color:
+                            activeIndex === 1 ? '#1E1200' : 'text.secondary',
+                          fontSize:
+                            language === 'zh' || language === 'zhtw'
+                              ? '13px'
+                              : '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          zIndex: 1,
+                          transition: 'color 0.2s ease',
+                        }}
+                      >
+                        {t('settings.mini.system', {
+                          defaultValue: '系统代理',
+                        })}
+                      </Box>
+                    </Tooltip>
 
                     {/* TUN Mode Option */}
-                    <Box
-                      onClick={() => handleTakeoverModeChange('tun')}
-                      sx={{
-                        flex: 1,
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: activeIndex === 2 ? '#1E1200' : 'text.secondary',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                        transition: 'color 0.2s ease',
-                      }}
+                    <Tooltip
+                      title={t('settings.mini.takeoverTooltipTun', {
+                        defaultValue: '开启虚拟网卡接管全机流量',
+                      })}
+                      placement="top"
+                      arrow
                     >
-                      TUN 模式
-                    </Box>
+                      <Box
+                        onClick={() => handleTakeoverModeChange('tun')}
+                        sx={{
+                          flex: 1,
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color:
+                            activeIndex === 2 ? '#1E1200' : 'text.secondary',
+                          fontSize:
+                            language === 'zh' || language === 'zhtw'
+                              ? '13px'
+                              : '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          zIndex: 1,
+                          transition: 'color 0.2s ease',
+                        }}
+                      >
+                        {t('settings.mini.tun', { defaultValue: 'TUN 模式' })}
+                      </Box>
+                    </Tooltip>
                   </Box>
                   <Typography
                     variant="subtitle2"
                     sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}
                   >
-                    分流策略倾向
+                    {t('settings.mini.routingPreference', {
+                      defaultValue: '分流策略倾向',
+                    })}
                   </Typography>
                   <Box
                     sx={(theme) => ({
@@ -2632,73 +2738,108 @@ const Layout = () => {
                     </Box>
 
                     {/* Direct Fallback Option */}
-                    <Box
-                      onClick={() => handleRuleFallbackChange('direct')}
-                      sx={{
-                        flex: 1,
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color:
-                          policyActiveIndex === 0
-                            ? '#1E1200'
-                            : 'text.secondary',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                        transition: 'color 0.2s ease',
-                      }}
+                    <Tooltip
+                      title={t('settings.mini.routingTooltipDirect', {
+                        defaultValue: '未匹配规则时默认直连',
+                      })}
+                      placement="top"
+                      arrow
                     >
-                      直连兜底
-                    </Box>
+                      <Box
+                        onClick={() => handleRuleFallbackChange('direct')}
+                        sx={{
+                          flex: 1,
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color:
+                            policyActiveIndex === 0
+                              ? '#1E1200'
+                              : 'text.secondary',
+                          fontSize:
+                            language === 'zh' || language === 'zhtw'
+                              ? '13px'
+                              : '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          zIndex: 1,
+                          transition: 'color 0.2s ease',
+                        }}
+                      >
+                        {t('settings.mini.direct', {
+                          defaultValue: '直连兜底',
+                        })}
+                      </Box>
+                    </Tooltip>
 
                     {/* Rule Adjustable Option */}
-                    <Box
-                      onClick={() => handleRuleFallbackChange('adjustable')}
-                      sx={{
-                        flex: 1,
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color:
-                          policyActiveIndex === 1
-                            ? '#1E1200'
-                            : 'text.secondary',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                        transition: 'color 0.2s ease',
-                      }}
+                    <Tooltip
+                      title={t('settings.mini.routingTooltipRules', {
+                        defaultValue: '严格遵循预设的分流规则',
+                      })}
+                      placement="top"
+                      arrow
                     >
-                      规则可调
-                    </Box>
+                      <Box
+                        onClick={() => handleRuleFallbackChange('adjustable')}
+                        sx={{
+                          flex: 1,
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color:
+                            policyActiveIndex === 1
+                              ? '#1E1200'
+                              : 'text.secondary',
+                          fontSize:
+                            language === 'zh' || language === 'zhtw'
+                              ? '13px'
+                              : '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          zIndex: 1,
+                          transition: 'color 0.2s ease',
+                        }}
+                      >
+                        {t('settings.mini.rules', { defaultValue: '规则可调' })}
+                      </Box>
+                    </Tooltip>
 
                     {/* Proxy Fallback Option */}
-                    <Box
-                      onClick={() => handleRuleFallbackChange('proxy')}
-                      sx={{
-                        flex: 1,
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color:
-                          policyActiveIndex === 2
-                            ? '#1E1200'
-                            : 'text.secondary',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                        transition: 'color 0.2s ease',
-                      }}
+                    <Tooltip
+                      title={t('settings.mini.routingTooltipProxy', {
+                        defaultValue: '未匹配规则时默认走代理',
+                      })}
+                      placement="top"
+                      arrow
                     >
-                      代理兜底
-                    </Box>
+                      <Box
+                        onClick={() => handleRuleFallbackChange('proxy')}
+                        sx={{
+                          flex: 1,
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color:
+                            policyActiveIndex === 2
+                              ? '#1E1200'
+                              : 'text.secondary',
+                          fontSize:
+                            language === 'zh' || language === 'zhtw'
+                              ? '13px'
+                              : '11px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          zIndex: 1,
+                          transition: 'color 0.2s ease',
+                        }}
+                      >
+                        {t('settings.mini.proxy', { defaultValue: '代理兜底' })}
+                      </Box>
+                    </Tooltip>
                   </Box>
                 </Box>
 
@@ -2718,7 +2859,9 @@ const Layout = () => {
                     variant="subtitle2"
                     sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '13px' }}
                   >
-                    基础设置
+                    {t('components.verge.basic.title', {
+                      defaultValue: '基础设置',
+                    })}
                   </Typography>
                   <List dense sx={{ py: 0 }}>
                     <ListItem
@@ -2730,7 +2873,9 @@ const Layout = () => {
                       }}
                     >
                       <Typography variant="caption" sx={{ fontSize: '13px' }}>
-                        开机自动启动
+                        {t('sections.system.fields.autoLaunch', {
+                          defaultValue: '开机自动启动',
+                        })}
                       </Typography>
                       <Switch
                         size="small"
@@ -2753,7 +2898,9 @@ const Layout = () => {
                       }}
                     >
                       <Typography variant="caption" sx={{ fontSize: '13px' }}>
-                        启动时最小化
+                        {t('sections.system.fields.silentStart', {
+                          defaultValue: '启动时最小化',
+                        })}
                       </Typography>
                       <Switch
                         size="small"
@@ -2852,7 +2999,9 @@ const Layout = () => {
                         variant="caption"
                         sx={{ fontSize: '13px', flexShrink: 0 }}
                       >
-                        主题模式
+                        {t('components.verge.basic.fields.themeMode', {
+                          defaultValue: '主题模式',
+                        })}
                       </Typography>
                       <Box
                         sx={(theme) => ({
@@ -2909,7 +3058,9 @@ const Layout = () => {
                             transition: 'color 0.2s ease',
                           }}
                         >
-                          系统
+                          {t('sections.appearance.system', {
+                            defaultValue: '系统',
+                          })}
                         </Box>
 
                         {/* Light Option */}
@@ -2932,7 +3083,9 @@ const Layout = () => {
                             transition: 'color 0.2s ease',
                           }}
                         >
-                          浅色
+                          {t('sections.appearance.light', {
+                            defaultValue: '浅色',
+                          })}
                         </Box>
 
                         {/* Dark Option */}
@@ -2955,7 +3108,9 @@ const Layout = () => {
                             transition: 'color 0.2s ease',
                           }}
                         >
-                          深色
+                          {t('sections.appearance.dark', {
+                            defaultValue: '深色',
+                          })}
                         </Box>
                       </Box>
                     </ListItem>
@@ -3083,7 +3238,9 @@ const Layout = () => {
                         ...get3DButtonStyle(theme, 'contained', 'primary'),
                       }}
                     >
-                      系统调试运行日志
+                      {t('settings.mini.debugLogs', {
+                        defaultValue: '系统调试运行日志',
+                      })}
                     </Button>
                   </Box>
 
@@ -3167,7 +3324,9 @@ const Layout = () => {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    路径控制（右键点击链接）
+                    {t('settings.mini.pathControl', {
+                      defaultValue: '路径控制（右键点击链接）',
+                    })}
                   </Typography>
                   <Box
                     sx={(theme) => ({
@@ -3222,7 +3381,10 @@ const Layout = () => {
                         transition: 'color 0.2s ease',
                       }}
                     >
-                      活跃 ({connectionsData?.activeConnections.length || 0})
+                      {t('settings.mini.connectionsActive', {
+                        defaultValue: '活跃',
+                      })}{' '}
+                      ({connectionsData?.activeConnections.length || 0})
                     </Box>
 
                     {/* Closed Option */}
@@ -3245,7 +3407,10 @@ const Layout = () => {
                         transition: 'color 0.2s ease',
                       }}
                     >
-                      历史 ({connectionsData?.closedConnections.length || 0})
+                      {t('settings.mini.connectionsHistory', {
+                        defaultValue: '历史',
+                      })}{' '}
+                      ({connectionsData?.closedConnections.length || 0})
                     </Box>
                   </Box>
                 </Box>
@@ -3275,7 +3440,9 @@ const Layout = () => {
                       ...get3DButtonStyle(theme, 'contained', 'primary'),
                     }}
                   >
-                    断开全部
+                    {t('settings.mini.connectionsDisconnectAll', {
+                      defaultValue: '断开全部',
+                    })}
                   </Button>
                   {connectionsType === 'closed' && (
                     <Button
@@ -3290,7 +3457,9 @@ const Layout = () => {
                         ...get3DButtonStyle(theme, 'contained', 'primary'),
                       }}
                     >
-                      清空历史
+                      {t('settings.mini.connectionsClearHistory', {
+                        defaultValue: '清空历史',
+                      })}
                     </Button>
                   )}
                 </Box>
@@ -3348,6 +3517,94 @@ const Layout = () => {
               >
                 <HelpOutlineRounded sx={{ fontSize: '16px' }} />
               </Box>
+
+              {/* Language Selector */}
+              <Select
+                value={currentLanguage || 'zh'}
+                onChange={(e) => switchLanguage(e.target.value as string)}
+                displayEmpty
+                renderValue={() => 'Language'}
+                size="small"
+                variant="outlined"
+                MenuProps={{
+                  anchorOrigin: {
+                    vertical: 'top',
+                    horizontal: 'left',
+                  },
+                  transformOrigin: {
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                  },
+                  slotProps: {
+                    paper: {
+                      sx: {
+                        maxHeight: 300,
+                      },
+                    },
+                  },
+                }}
+                sx={(theme) => {
+                  const btnStyle = get3DButtonStyle(
+                    theme,
+                    'contained',
+                    'default',
+                  )
+                  return {
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '46px',
+                    width: '120px',
+                    height: '24px',
+                    zIndex: 200,
+                    boxSizing: 'border-box',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    fontFamily: 'var(--control-font-family)',
+                    '@media (max-height: 830px)': {
+                      display: 'none',
+                    },
+                    ...btnStyle,
+                    '& .MuiSelect-select': {
+                      paddingTop: 0,
+                      paddingBottom: 0,
+                      paddingLeft: '12px',
+                      paddingRight: '24px',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'inherit',
+                      boxSizing: 'border-box',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      border: 'none',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      border: 'none',
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'inherit',
+                      right: '4px',
+                    },
+                    '&:before, &:after': {
+                      display: 'none !important',
+                    },
+                  }
+                }}
+              >
+                <MenuItem value="zh">简体中文</MenuItem>
+                <MenuItem value="en">English</MenuItem>
+                <MenuItem value="ru">Русский</MenuItem>
+                <MenuItem value="fa">فارسی</MenuItem>
+                <MenuItem value="tt">Татарча</MenuItem>
+                <MenuItem value="id">Bahasa Indonesia</MenuItem>
+                <MenuItem value="ar">العربية</MenuItem>
+                <MenuItem value="ko">한국어</MenuItem>
+                <MenuItem value="tr">Türkçe</MenuItem>
+                <MenuItem value="de">Deutsch</MenuItem>
+                <MenuItem value="es">Español</MenuItem>
+                <MenuItem value="jp">日本語</MenuItem>
+                <MenuItem value="zhtw">繁體中文</MenuItem>
+              </Select>
 
               {/* Excel Selector Row */}
               <Box

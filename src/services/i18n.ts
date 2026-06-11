@@ -1,7 +1,21 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
-export const supportedLanguages = ['zh']
+export const supportedLanguages = [
+  'zh',
+  'en',
+  'ru',
+  'fa',
+  'tt',
+  'id',
+  'ar',
+  'ko',
+  'tr',
+  'de',
+  'es',
+  'jp',
+  'zhtw',
+]
 
 export const FALLBACK_LANGUAGE = 'zh'
 const LANGUAGE_STORAGE_KEY = 'verge-language'
