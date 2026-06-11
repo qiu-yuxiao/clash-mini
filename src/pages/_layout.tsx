@@ -1134,6 +1134,9 @@ const Layout = () => {
   const mode = useThemeMode()
   const { t } = useTranslation() as any
   const { theme } = useCustomTheme()
+  if (theme) {
+    (theme as any).controlSkin = controlSkin
+  }
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
   const { switchLanguage, currentLanguage } = useI18n()
@@ -3494,8 +3497,8 @@ const Layout = () => {
               </Box>
 
               {/* Help Button */}
-              <Box
-                component="button"
+              <Button
+                variant="contained"
                 onClick={async () => {
                   try {
                     await open('https://github.com/qiu-yuxiao/clash-mini')
@@ -3510,6 +3513,7 @@ const Layout = () => {
                   width: '48px',
                   height: '24px',
                   p: 0,
+                  minWidth: 'auto',
                   zIndex: 200,
                   display: 'flex',
                   alignItems: 'center',
@@ -3524,7 +3528,7 @@ const Layout = () => {
                 }}
               >
                 <HelpOutlineRounded sx={{ fontSize: '16px' }} />
-              </Box>
+              </Button>
 
               {/* Language Selector */}
               <Select
@@ -3565,7 +3569,18 @@ const Layout = () => {
                   '@media (max-height: 830px)': {
                     display: 'none',
                   },
-                  ...get3DButtonStyle(theme, 'contained', 'default'),
+                  ...(() => {
+                    const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
+                    const styleWithImportant: any = {}
+                    for (const [key, val] of Object.entries(btnStyle)) {
+                      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
+                        styleWithImportant[key] = `${val} !important`
+                      } else {
+                        styleWithImportant[key] = val
+                      }
+                    }
+                    return styleWithImportant
+                  })(),
                   '& .MuiSelect-select': {
                     paddingTop: 0,
                     paddingBottom: 0,
@@ -3578,10 +3593,10 @@ const Layout = () => {
                     boxSizing: 'border-box',
                   },
                   '& .MuiOutlinedInput-notchedOutline': {
-                    border: 'none',
+                    border: 'none !important',
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    border: 'none',
+                    border: 'none !important',
                   },
                   '& .MuiSelect-icon': {
                     color: 'inherit',
