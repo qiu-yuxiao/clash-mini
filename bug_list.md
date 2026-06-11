@@ -77,25 +77,6 @@
 
 ---
 
-### 🚨 **BUG-051** 流量小卡片上传下载总量数值常驻为 0
-* **目标版本**：`v3.0.4`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 窗口下方的表示流量的小卡片里，上传下载总量的数值一直是 0。
-* **【历史诊断与物理实证】**：
-  * **已确认事实**：
-    * [x] **缓存键丢失**：useConnectionData 禁用 WebSocket 后缓存键为 null，轮询获取的总量数据在 `queryClient.setQueryData` 找不到存储地址而被丢弃。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`use-mihomo-ws-subscription.ts`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-mihomo-ws-subscription.ts)
-    * [**`use-connection-data.ts`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-connection-data.ts)
-  * **设计要点**：
-    1. 为 `useMihomoWsSubscription` 增加 `buildCacheKey` 选项；
-    2. 优化 `responseCacheKey` 计算逻辑，当 WebSocket 禁用时 fallback 使用 `buildCacheKey` provide 静态缓存键；
-    3. `useConnectionData` 传入对应的 `buildCacheKey`。
-
----
-
 ### 🚨 **BUG-049** 节点活性监控 useEffect 定时器反复重置失效
 * **目标版本**：`v3.0.2`
 * **当前状态**：`代码已修正，待确认`
@@ -164,6 +145,7 @@
 
 | **BUG-057** | 导入新订阅后节点列表加载显示空白。 | v4.1.0 | 代码已修正，已确认 |
 | **BUG-053** | 首次导入或更新订阅自动切换激活及防空值误报。 | v3.0.4 | 代码已修正，已确认 |
+| **BUG-051** | 流量小卡片上传下载总量数值常驻为 0。 | v3.0.4 | 代码已修正，已确认 |
 | **BUG-055** | 托盘 `proxy_cache` 锁生命周期过长被拦截及 Git 构建失败。 | v3.0.6 | 代码已修正，已确认 |
 | **BUG-050** | CPU 资源消耗显著高于原版（常驻组件后台渲染耗能，Traffic可见性响应缺失）。 | v3.0.3 | 代码已修正，已确认 |
 | **BUG-048** | 无边框模式下窗口边缘磁吸及自适应吸附与脱离功能丢失。 | v3.0.1 | 代码已修正，已确认 |
