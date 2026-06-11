@@ -3524,7 +3524,18 @@ const Layout = () => {
                   '@media (max-height: 830px)': {
                     display: 'none',
                   },
-                  ...get3DButtonStyle(theme, 'contained', 'default'),
+                  ...(() => {
+                    const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
+                    const styleWithImportant: any = {}
+                    for (const [key, val] of Object.entries(btnStyle)) {
+                      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
+                        styleWithImportant[key] = `${val} !important`
+                      } else {
+                        styleWithImportant[key] = val
+                      }
+                    }
+                    return styleWithImportant
+                  })(),
                 }}
               >
                 <HelpOutlineRounded sx={{ fontSize: '16px' }} />
