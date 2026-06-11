@@ -12,26 +12,6 @@
 
 
 
-### 🚨 **BUG-057** 导入订阅后内核节点已展开但前端表格显示空白
-* **目标版本**：`v4.1.0`
-* **当前状态**：`代码已修正，已确认`
-* **【现象与复现路径】**：
-  * 导入订阅链接后，节点数据在后台内核（Mihomo/Clash core）中已正确解开与加载，但前端主页的节点表格（`ProxyGroups`）依然显示空白，没有任何节点数据渲染出来。首次导入后永远空白，不会自动恢复。
-* **【根因分析】**：
-  * **根因1**：双重 `enhanceProfiles()` 竞态调用 —— `handleImportProfile` 显式调用 `enhanceProfiles()`，同时 `useEffect` 检测到 `currentProfileUid` 变化后再次调用，导致内核配置被双重重载，第二次重载清空了第一次已加载的 proxy-provider 数据。
-  * **根因2**：`use-render-list.ts` 的空数据 re-fetch 机制失效 —— 原有逻辑仅检测 `!groups.length`（完全无组），但实际场景是 PROXY 组已存在、其 `all` 数组为空（proxy-provider 尚未异步下载完成），此场景未被覆盖，导致前端永远不重试刷新。
-  * **根因3**：`calcuProxies()` 空值崩溃 —— 当 `proxyResponse.proxies` 为 `null` 或 `providerRecord` 结构不完整时，后续 `.flatMap()` / `.reduce()` 直接抛出异常，阻断数据流。
-* **【v4.1.0 修正方案】**：
-  * **修改文件**：
-    * [**`_layout.tsx`**](file:///C:/Users/sun_y/Documents/trae_projects/Clash_Mini/src/pages/_layout.tsx) (布局/导入逻辑)
-    * [**`use-render-list.ts`**](file:///C:/Users/sun_y/Documents/trae_projects/Clash_Mini/src/components/proxy/use-render-list.ts) (前端节点渲染列表)
-    * [**`cmds.ts`**](file:///C:/Users/sun_y/Documents/trae_projects/Clash_Mini/src/services/cmds.ts) (数据计算服务)
-  * **设计要点**：
-    * 1. **`_layout.tsx`**：在 `handleImportProfile` 的 try 和 catch 分支中，`mutateProfiles()` 之后立即设置 `lastEnhancedProfileRef.current = targetUid`，防止后续 `useEffect` 重复调用 `enhanceProfiles()`；同时在两个分支的 `enhanceProfiles()` 之后增加 `patchClashMode('rule')`，确保导入后切换到 rule 模式显示节点列表。
-    * 2. **`use-render-list.ts`**：替换原有仅检测 `!groups.length` 的死代码，新增智能轮询恢复机制 —— 当 PROXY 组存在但 `all` 中无真实节点时（proxy-provider 异步加载中），启动 1s 间隔轮询 `refreshProxy()`，直到节点数据到来后自动停止。
-    * 3. **`cmds.ts`**：`calcuProxies()` 加入 `proxyResponse?.proxies || {}` 和 `providerResponse || {}` 空值防御；`providerMap` 构造加入 `item?.proxies` 安全检查；`generateItem` 对无名称节点返回安全的 unknown 对象。
-
-
 
 ### 🚨 **BUG-056** 程序退出时残留内核/服务孤儿进程
 * **目标版本**：`v4.0.1`
@@ -197,6 +177,7 @@
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 目前状态 |
 | :--- | :--- | :---: | :--- |
 
+| **BUG-057** | 导入新订阅后节点列表加载显示空白。 | v4.1.0 | 代码已修正，已确认 |
 | **BUG-055** | 托盘 `proxy_cache` 锁生命周期过长被拦截及 Git 构建失败。 | v3.0.6 | 代码已修正，已确认 |
 | **BUG-050** | CPU 资源消耗显著高于原版（常驻组件后台渲染耗能，Traffic可见性响应缺失）。 | v3.0.3 | 代码已修正，已确认 |
 | **BUG-048** | 无边框模式下窗口边缘磁吸及自适应吸附与脱离功能丢失。 | v3.0.1 | 代码已修正，已确认 |
