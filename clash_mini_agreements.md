@@ -1405,6 +1405,14 @@
 
     * **延迟检测递归改迭代（delay.ts）**：`checkListDelay` 内部并发 worker 由尾递归 `help()` 重构为 `while` 循环 `worker()`，消除大节点列表下调用栈累积溢出风险。调用栈深度由 O(N/concurrency) 降为恒定 O(1)，行为与原版完全等价。
 
+17. **帮助按钮 (Help Button) 规范 (FEAT-005)**：
+    * **按钮图标**：使用带圈的问号小图标（MUI 库中的 `HelpOutlineRounded`），尺寸为 `16px`。
+    * **布局定位**：采用绝对定位 `position: absolute` 固定在 Upper Pane（上半层区域）底边，高度为 `24px`，宽度为 `24px`，左边距 `left: 12px`，底边距 `bottom: 0`，`zIndex: 200`。
+    * **留空保留区**：帮助按钮右边缘（`36px`）至换肤选择器起始位置（`177.5px`）之间的区域必须完全留空，不得放置任何其他界面元素，留给用户后续设计使用。
+    * **动态换肤支持**：按钮的视觉样式必须 100% 随着六种皮肤风格的选择而动态切换，与系统中的其他按钮一致。直接应用 `get3DButtonStyle(theme, 'contained', 'default')` 样式辅助函数，使其在 Retro 3D 下呈现钛银拟物金属 Bevel 键帽，在 Original 下呈现灰黑/白纯色扁平按钮，在 Frosted Glass 下呈现磨砂透光材质，在 Cyberpunk 下呈现荧光绿 neon 描边外发光等。
+    * **响应式隐藏**：与换肤选择器保持一致的响应式高度裁剪规则，当窗口高度较小时（由媒体查询 `@media (max-height: 830px)` 触发）自动隐藏，防止纵向空间狭窄时产生重叠。
+    * **外部链接跳转**：点击时通过 `@tauri-apps/plugin-shell` 提供的 `open` 异步函数在用户系统的默认浏览器中安全打开 GitHub 项目开始页：`https://github.com/qiu-yuxiao/clash-mini`。
+
 ---
 
 

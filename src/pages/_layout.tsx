@@ -15,6 +15,7 @@ import {
   SignalWifi4Bar as SignalStrong,
   SignalWifi1Bar as SignalWeak,
   PushPinRounded,
+  HelpOutlineRounded,
 } from '@mui/icons-material'
 import {
   Box,
@@ -33,6 +34,7 @@ import {
   useTheme,
 } from '@mui/material'
 import { alpha } from '@mui/material'
+import { open } from '@tauri-apps/plugin-shell'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -3312,6 +3314,39 @@ const Layout = () => {
                     />
                   )}
                 </Box>
+              </Box>
+
+              {/* Help Button */}
+              <Box
+                component="button"
+                onClick={async () => {
+                  try {
+                    await open('https://github.com/qiu-yuxiao/clash-mini')
+                  } catch (err) {
+                    console.error('Failed to open help link:', err)
+                  }
+                }}
+                sx={(theme) => ({
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '12px',
+                  width: '24px',
+                  height: '24px',
+                  p: 0,
+                  zIndex: 200,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  '@media (max-height: 830px)': {
+                    display: 'none',
+                  },
+                  ...get3DButtonStyle(theme, 'contained', 'default'),
+                })}
+              >
+                <HelpOutlineRounded sx={{ fontSize: '16px' }} />
               </Box>
 
               {/* Excel Selector Row */}
