@@ -147,6 +147,63 @@ export const get3DButtonStyle = (
   }
 
   // ==========================================
+  // ORIGINAL
+  // ==========================================
+  if (skin === 'original') {
+    const bg =
+      colorType === 'primary'
+        ? 'var(--primary-main)'
+        : colorType === 'error'
+          ? theme.palette.error.main
+          : isLight
+            ? '#ffffff'
+            : '#2e303d'
+
+    const hoverBg =
+      colorType === 'primary'
+        ? 'var(--primary-main)'
+        : colorType === 'error'
+          ? theme.palette.error.dark
+          : isLight
+            ? '#f5f5f5'
+            : '#242530'
+
+    const textClr =
+      colorType === 'primary' || colorType === 'error'
+        ? '#ffffff'
+        : theme.palette.text.primary
+
+    const borderClr =
+      colorType === 'primary'
+        ? 'var(--primary-main)'
+        : colorType === 'error'
+          ? theme.palette.error.main
+          : 'var(--theme-border)'
+
+    return {
+      fontFamily: 'Segoe UI, Microsoft YaHei, sans-serif',
+      textTransform: 'none' as const,
+      fontWeight: 'bold',
+      borderRadius: 'calc(4px * var(--control-skin-val1, 1.0))',
+      transition: 'all 0.15s ease',
+      border: '1px solid',
+      borderColor: borderClr,
+      background: bg,
+      color: textClr,
+      boxShadow: 'none',
+      '&:hover': {
+        background: hoverBg,
+        borderColor: borderClr,
+        filter: colorType === 'primary' ? 'brightness(0.95)' : 'none',
+      },
+      '&:active': {
+        transform: 'translateY(1px)',
+        boxShadow: 'none',
+      },
+    }
+  }
+
+  // ==========================================
   // MODERN FLAT
   // ==========================================
   if (skin === 'modern-flat') {
@@ -452,6 +509,45 @@ export const get3DCardStyle = (
   }
 
   // ==========================================
+  // ORIGINAL
+  // ==========================================
+  if (skin === 'original') {
+    const bg =
+      cardType === 'primary'
+        ? 'var(--primary-main)'
+        : cardType === 'upload'
+          ? isLight
+            ? '#fffde7'
+            : '#ffa000'
+          : cardType === 'download'
+            ? isLight
+              ? '#e3f2fd'
+              : '#00b0ff'
+            : isLight
+              ? '#ffffff'
+              : '#1e1f29'
+
+    const borderClr = 'var(--theme-border)'
+    const textClr =
+      cardType === 'primary'
+        ? '#ffffff'
+        : theme && theme.palette
+          ? theme.palette.text.primary
+          : '#ffffff'
+
+    return {
+      fontFamily: 'Segoe UI, Microsoft YaHei, sans-serif',
+      borderRadius: 'calc(8px * var(--control-skin-val1, 1.0))',
+      border: '1px solid',
+      borderColor: borderClr,
+      background: bg,
+      color: textClr,
+      transition: 'none',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    }
+  }
+
+  // ==========================================
   // MODERN FLAT
   // ==========================================
   if (skin === 'modern-flat') {
@@ -596,6 +692,31 @@ export const get3DInputStyle = (theme: Theme): any => {
     }
   }
 
+  if (skin === 'original') {
+    const borderClr = isLight ? '#cbd5e1' : '#475569'
+    return {
+      '& .MuiOutlinedInput-root': {
+        fontFamily: 'Segoe UI, Microsoft YaHei, sans-serif',
+        backgroundColor: isLight ? '#ffffff' : '#1e1f29',
+        color: isLight ? '#1e293b' : '#f1f5f9',
+        borderRadius: 'calc(4px * var(--control-skin-val1, 1.0))',
+        '& .MuiOutlinedInput-notchedOutline': {
+          borderWidth: '1px',
+          borderColor: borderClr,
+        },
+        '&:hover .MuiOutlinedInput-notchedOutline': {
+          borderColor: isLight ? '#94a3b8' : '#64748b',
+        },
+        '&.Mui-focused': {
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'var(--primary-main)',
+            borderWidth: '1.5px',
+          },
+        },
+      },
+    }
+  }
+
   if (skin === 'modern-flat') {
     const borderClr = isLight ? '#d1d5db' : '#4b5563'
     return {
@@ -725,6 +846,15 @@ export const get3DSegmentedContainerStyle = (themeOrIsLight: any): any => {
     }
   }
 
+  if (skin === 'original') {
+    return {
+      border: '1px solid ' + (isLight ? '#cbd5e1' : '#475569'),
+      background: isLight ? '#f1f5f9' : '#1e1f29',
+      boxShadow: 'none',
+      borderRadius: 'calc(4px * var(--control-skin-val1, 1.0))',
+    }
+  }
+
   if (skin === 'modern-flat') {
     return {
       border: '1px solid ' + (isLight ? '#d1d5db' : '#4b5563'),
@@ -788,6 +918,21 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
            0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
       border: '1px solid',
       borderColor: isLight ? '#9E670B' : '#6E4302',
+    }
+  }
+
+  if (skin === 'original') {
+    return {
+      position: 'absolute' as const,
+      left: '1px',
+      right: '1px',
+      top: '1px',
+      bottom: '1px',
+      borderRadius: 'calc(3px * var(--control-skin-val1, 1.0))',
+      background: 'var(--primary-main)',
+      border: 'none',
+      boxShadow: 'none',
+      color: '#ffffff',
     }
   }
 

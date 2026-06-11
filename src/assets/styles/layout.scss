@@ -442,3 +442,27 @@ html[data-control-skin="monochrome"] {
     border: 1px solid var(--theme-border) !important;
   }
 }
+
+html[data-control-skin="original"] {
+  --control-font-family: Segoe UI, Microsoft YaHei, sans-serif;
+  --depth-factor: 0 !important;
+
+  .layout::before {
+    opacity: 0 !important;
+    animation: none !important;
+  }
+
+  .layout-content__left,
+  .the_titlebar {
+    background: var(--theme-bg) !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  .layout-content__right {
+    background: var(--theme-panel-bg) !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid var(--theme-border) !important;
+  }
+}

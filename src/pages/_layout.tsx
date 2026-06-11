@@ -775,6 +775,34 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
     }
   }
 
+  if (skin === 'original') {
+    return {
+      py: 0.5,
+      '& .MuiSlider-rail': {
+        height: 4,
+        bgcolor: isLight ? '#cbd5e1' : '#30363d',
+        border: 'none',
+        borderRadius: 2,
+      },
+      '& .MuiSlider-track': {
+        height: 4,
+        border: 'none',
+        borderRadius: 2,
+        bgcolor: 'var(--primary-main)',
+      },
+      '& .MuiSlider-thumb': {
+        width: 12,
+        height: 12,
+        bgcolor: '#ffffff',
+        border: `2px solid var(--primary-main)`,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+        '&:hover, &.Mui-focusVisible': {
+          transform: 'translate(-50%, -50%) scale(1.15)',
+        },
+      },
+    }
+  }
+
   if (skin === 'modern-flat') {
     return {
       py: 0.5,
@@ -1016,6 +1044,8 @@ const Layout = () => {
     switch (controlSkin) {
       case 'retro-3d':
         return 'Depth'
+      case 'original':
+        return 'Radius'
       case 'modern-flat':
         return 'Roundness'
       case 'frosted-glass':
@@ -1033,6 +1063,8 @@ const Layout = () => {
     switch (controlSkin) {
       case 'retro-3d':
         return 'Vibrancy'
+      case 'original':
+        return 'Accent'
       case 'modern-flat':
         return 'Shadow'
       case 'frosted-glass':
@@ -3306,6 +3338,11 @@ const Layout = () => {
                     font: 'Trebuchet MS, SimHei, sans-serif',
                   },
                   {
+                    key: 'original',
+                    label: 'Original',
+                    font: 'Segoe UI, Microsoft YaHei, sans-serif',
+                  },
+                  {
                     key: 'modern-flat',
                     label: 'Modern-flat',
                     font: 'Outfit, DengXian, sans-serif',
@@ -3339,8 +3376,9 @@ const Layout = () => {
                       onClick={handleSelect}
                       sx={(theme) => {
                         const isLight = theme.palette.mode === 'light'
+                        const cellWidth = index === 0 ? '92.5px' : '74px'
                         const unselectedStyle = {
-                          width: '92.5px',
+                          width: cellWidth,
                           height: '100%',
                           display: 'flex',
                           alignItems: 'center',
@@ -3370,7 +3408,7 @@ const Layout = () => {
                             'primary',
                           )
                           return {
-                            width: '92.5px',
+                            width: cellWidth,
                             height: '100%',
                             display: 'flex',
                             alignItems: 'center',

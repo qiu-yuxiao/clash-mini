@@ -99,6 +99,52 @@ export const Switch = styled((props: SwitchProps) => (
   }
 
   // ==========================================
+  // ORIGINAL
+  // ==========================================
+  if (skin === 'original') {
+    return {
+      width: 28,
+      height: 14,
+      padding: 0,
+      marginRight: 1,
+      '& .MuiSwitch-switchBase': {
+        padding: 0,
+        margin: 0,
+        transitionDuration: '200ms',
+        '&.Mui-checked': {
+          transform: 'translateX(14px)',
+          color: '#fff',
+          '& + .MuiSwitch-track': {
+            backgroundColor: 'var(--primary-main)',
+            opacity: 1,
+            boxShadow: 'none',
+            border: 'none',
+          },
+          '& .MuiSwitch-thumb': {
+            background: '#ffffff',
+            border: 'none',
+          },
+        },
+      },
+      '& .MuiSwitch-thumb': {
+        boxSizing: 'border-box',
+        width: 14,
+        height: 14,
+        borderRadius: 'calc(7px * var(--control-skin-val1, 1.0))',
+        border: 'none',
+        background: isLight ? '#cbd5e1' : '#475569',
+        boxShadow: 'none',
+      },
+      '& .MuiSwitch-track': {
+        borderRadius: 'calc(7px * var(--control-skin-val1, 1.0))',
+        backgroundColor: isLight ? '#e2e8f0' : '#30363d',
+        opacity: 1,
+        border: 'none',
+      },
+    }
+  }
+
+  // ==========================================
   // MODERN FLAT
   // ==========================================
   if (skin === 'modern-flat') {

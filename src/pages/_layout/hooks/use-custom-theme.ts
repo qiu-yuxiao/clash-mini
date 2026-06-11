@@ -170,7 +170,10 @@ export const useCustomTheme = () => {
     const dt = mode === 'light' ? defaultTheme : defaultDarkTheme
     let muiTheme: MuiTheme
 
-    const resolvedPrimary = setting.primary_color || dt.primary_color
+    let resolvedPrimary = setting.primary_color || dt.primary_color
+    if (controlSkin === 'original') {
+      resolvedPrimary = '#5b5c9d'
+    }
 
     try {
       muiTheme = createTheme({
@@ -406,42 +409,81 @@ export const useCustomTheme = () => {
       )
 
       // Theme Glass/Flat Variables (Flattened: Opaque, solid, no gloss/glass/skeuomorphism effects)
-      rootEle.style.setProperty(
-        '--theme-bg',
-        mode === 'light' ? '#f0f5ff' : '#0f1423',
-      )
-      rootEle.style.setProperty(
-        '--theme-panel-bg',
-        mode === 'light' ? '#ffffff' : '#1e2438',
-      )
-      rootEle.style.setProperty(
-        '--theme-bg-base-rgb',
-        mode === 'light' ? '240, 245, 255' : '15, 20, 35',
-      )
-      rootEle.style.setProperty(
-        '--theme-panel-base-rgb',
-        mode === 'light' ? '255, 255, 255' : '30, 36, 56',
-      )
-      rootEle.style.setProperty(
-        '--theme-popover-bg',
-        mode === 'light' ? '#ffffff' : '#1e1e23',
-      )
-      rootEle.style.setProperty(
-        '--theme-border',
-        mode === 'light' ? '#d0d7de' : '#30363d',
-      )
-      rootEle.style.setProperty(
-        '--theme-input-bg',
-        mode === 'light' ? '#ffffff' : '#121824',
-      )
-      rootEle.style.setProperty(
-        '--theme-input-border',
-        mode === 'light' ? '#d0d7de' : '#30363d',
-      )
-      rootEle.style.setProperty(
-        '--theme-border-outer',
-        mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.35)',
-      )
+      if (controlSkin === 'original') {
+        rootEle.style.setProperty(
+          '--theme-bg',
+          mode === 'light' ? '#f5f5f5' : '#2e303d',
+        )
+        rootEle.style.setProperty(
+          '--theme-panel-bg',
+          mode === 'light' ? '#ffffff' : '#1e1f29',
+        )
+        rootEle.style.setProperty(
+          '--theme-bg-base-rgb',
+          mode === 'light' ? '245, 245, 245' : '46, 48, 61',
+        )
+        rootEle.style.setProperty(
+          '--theme-panel-base-rgb',
+          mode === 'light' ? '255, 255, 255' : '30, 31, 41',
+        )
+        rootEle.style.setProperty(
+          '--theme-popover-bg',
+          mode === 'light' ? '#ffffff' : '#1b1c23',
+        )
+        rootEle.style.setProperty(
+          '--theme-border',
+          mode === 'light' ? '#e2e8f0' : '#30363d',
+        )
+        rootEle.style.setProperty(
+          '--theme-input-bg',
+          mode === 'light' ? '#ffffff' : '#1a1b26',
+        )
+        rootEle.style.setProperty(
+          '--theme-input-border',
+          mode === 'light' ? '#cbd5e1' : '#475569',
+        )
+        rootEle.style.setProperty(
+          '--theme-border-outer',
+          mode === 'light' ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.25)',
+        )
+      } else {
+        rootEle.style.setProperty(
+          '--theme-bg',
+          mode === 'light' ? '#f0f5ff' : '#0f1423',
+        )
+        rootEle.style.setProperty(
+          '--theme-panel-bg',
+          mode === 'light' ? '#ffffff' : '#1e2438',
+        )
+        rootEle.style.setProperty(
+          '--theme-bg-base-rgb',
+          mode === 'light' ? '240, 245, 255' : '15, 20, 35',
+        )
+        rootEle.style.setProperty(
+          '--theme-panel-base-rgb',
+          mode === 'light' ? '255, 255, 255' : '30, 36, 56',
+        )
+        rootEle.style.setProperty(
+          '--theme-popover-bg',
+          mode === 'light' ? '#ffffff' : '#1e1e23',
+        )
+        rootEle.style.setProperty(
+          '--theme-border',
+          mode === 'light' ? '#d0d7de' : '#30363d',
+        )
+        rootEle.style.setProperty(
+          '--theme-input-bg',
+          mode === 'light' ? '#ffffff' : '#121824',
+        )
+        rootEle.style.setProperty(
+          '--theme-input-border',
+          mode === 'light' ? '#d0d7de' : '#30363d',
+        )
+        rootEle.style.setProperty(
+          '--theme-border-outer',
+          mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.35)',
+        )
+      }
       rootEle.style.setProperty(
         '--theme-box-shadow',
         mode === 'light'
