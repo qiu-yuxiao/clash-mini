@@ -83,6 +83,7 @@
     "patch-bugs-resolved": "node scratch/monitor_build.mjs",
     "update-bug-and-agreements": "python scratch/update_bug_and_agreements.py",
     "cargo-test": "cargo test",
+    "test-agreement": "cargo test --package clash-mini --lib -- enhance::tests::test_enforce_mini_agreements_logic",
     "resolve-bug-028": "python scratch/resolve_bug_028.py",
     "update-agreement-bug-042": "python scratch/update_agreement_bug_042.py",
     "resolve-bug-042": "python scratch/resolve_bug_042.py"

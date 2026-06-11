@@ -13,95 +13,16 @@
 
 
 
-### 🚨 **BUG-056** 程序退出时残留内核/服务孤儿进程
-* **目标版本**：`v4.0.1`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 程序在退出时没有确保能把自己相关的所有进程（如内核、服务或守护进程）完全杀死，导致后台残留孤儿进程。
-* **【历史诊断与物理实证】**：
-  * **已确认事实**：
-    * [x] **官方同名进程冲突**：官方客户端也使用 `verge-mihomo` 等名称，如果直接强杀该名称会影响宿主机上正常运行 of 官方版内核。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`Cargo.toml`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/Cargo.toml) (根依赖)
-    * [**`src-tauri/Cargo.toml`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/Cargo.toml)
-    * [**`state.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/state.rs) ( 核心进程强杀逻辑)
-    * [**`window.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/window.rs) ( 退出清理事件集成)
-    * [**`verge.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/verge.rs) ( 内核配置更名)
-    * [**`chain.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/chain.rs) ( 支持映射更名)
-    * [**`tauri.conf.json`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/tauri.conf.json)
-    * [**`tauri.linux.conf.json`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/tauri.linux.conf.json)
-    * [**`prebuild.mjs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/prebuild.mjs)
-    * [**`portable.mjs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/portable.mjs)
-    * [**`portable-fixed-webview2.mjs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/portable-fixed-webview2.mjs)
-    * [**`installer.nsi`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/packages/windows/installer.nsi)
-  * **设计要点**：
-    1. 将 sidecar 核心二进制及运行进程由 `verge-mihomo`/`verge-mihomo-alpha` 彻底更名为 `mini-mihomo`/`mini-mihomo-alpha` (增加 `mini-` 前缀)，实现与官方客户端的物理隔离；
-    2. 后端引入 `sysinfo` 库，在主程序退出事件 `clean_async` 和侧边栏停止核心 `stop_core_by_sidecar` 中，扫描系统进程并强杀所有名称包含 `mini-mihomo` 的残留进程，确保零残留且不误伤官方客户端。
-
----
-
-
-### 🚨 **BUG-054** 多套控件皮肤风格（Skin Swapping）切换及滑块参数重定义
-* **目标版本**：`v3.0.4`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 多套控件皮肤风格切换支持，各皮肤下的滑动条对应底层参数在不同皮肤下需要完全重定义且独立保存，且 270px 窄窗口下换肤选择器需要支持物理裁剪。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`_layout.tsx`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)
-    * `use-custom-theme.ts` ( 样式管理)
-  * **设计要点**：
-    1. 支持五套风格：`Retro 3D`、`Modern Flat`、`Frosted Glass`、`Cyberpunk`、`Monochrome`；
-    2. 增加 Excel 风格单行选择器，排列尺寸固定 `462.5px`，左定位 `177.5px`，实现窄窗口物理裁剪，选中单元格渲染真实皮肤控件外观；
-    3. 两个滑块控制参数在不同皮肤下重定义，且在 `localStorage` 中独立存储；
-    4. 切换风格时中英文字体共鸣对齐；
-    5. 按钮有 `0.15s` 过渡动画，大卡片/背景/分栏瞬切；
-    6. 保持中缝双线、网格线和 GlowBorder 呼吸灯样式不变；
-    7. 初始默认启动尺寸 270x680 并完好显示日志按钮。
-
----
-
-### 🚨 **BUG-052** 自动连切背景运行时弹窗打扰与存活检测阈值过低
-* **目标版本**：`v3.0.4`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 后台自动连切功能频繁弹窗通知已切换至最快节点（但实际并没有改动节点），且后台健康检测阈值过低（1500ms），导致稍微有点延迟 of 节点被误判为坏掉并反复拉起全量测速。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`_layout.tsx`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx) ( `triggerAutoSelectFastestNode` )
-  * **设计要点**：
-    1. 在 `triggerAutoSelectFastestNode` 中引入 `isBackground` 判定；
-    2. 当为背景运行且最快节点未改变（当前已是最快）时，完全静默不弹窗；
-    3. 后台 `checkNode` 的存活检测健康阈值放宽至 `3000ms`，且移除前置加载通知。
-
----
-
-### 🚨 **BUG-043** 全自动订阅链接格式智能识别与并联订阅合并
-* **目标版本**：`v2.0.6`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 缺乏全自动链接格式识别（YAML与Base64）与默认并联订阅合并。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`prfitem.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/profile/prfitem.rs) ( 后端订阅处理)
-    * [**`profiles.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/profiles.rs) ( 导入/追加订阅去重处理)
-    * [**`enhance/mod.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)
-  * **设计要点**：
-    1. 从 UI 移除兼容模式开关，将输入框及按钮文字恢复为标准文案；
-    2. 后端 `prfitem.rs` 移除开关配置判断，YAML 校验失败时直接尝试 Base64/URI 解析并对垃圾数据输出自定义中文报错；
-    3. `enhance/mod.rs` 中默认开启并联订阅合并编译。
-    4. **【去重与复用】**：机场订阅链接去重与复用。在 `append_item` 时自动扫描并匹配已有的远程订阅 URL。若发现相同的远程订阅已存在，则自动复用原订阅的 `uid` 与 `file` 文件名，将新增操作转换为就地刷新更新，彻底防备同一机场订阅链接重复导入生成多个配置文件的问题。
-
----
-
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。
 
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 目前状态 |
 | :--- | :--- | :---: | :--- |
+| **BUG-056** | 程序退出时残留内核/服务工作区孤儿进程。 | v1.1.0 | 代码已修正，已确认 |
+| **BUG-054** | 多套控件皮肤风格切换及滑块参数重定义与窗口裁剪。 | v1.1.0 | 代码已修正，已确认 |
+| **BUG-052** | 自动连切背景运行时静默不弹窗及存活探活阈值放宽。 | v1.1.0 | 代码已修正，已确认 |
+| **BUG-043** | 全自动订阅格式识别、去重复用与合并编译支持。 | v1.1.0 | 代码已修正，已确认 |
 | **BUG-042** | 支持本地通用非 YAML 订阅链接解析（支持 VMess, SS, Trojan, VLESS, Hysteria2 及 HTTP 格式）。 | v2.0.4-full | 代码已修正，已确认 |
 | **BUG-028** | 开机启动时因网络未就绪自动更新失败后增加重试机制，且缺省更新间隔兜底为 24 小时。 | v1.1.4 | 代码已修正，已确认 |
 
