@@ -1,6 +1,6 @@
 [package]
 name = "clash-mini"
-version = "1.0.0"
+version = "1.1.0"
 description = "clash verge"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"

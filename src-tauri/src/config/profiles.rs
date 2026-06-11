@@ -128,7 +128,10 @@ impl IProfiles {
     pub async fn append_item(&mut self, item: &mut PrfItem) -> Result<()> {
         if item.itype.as_deref() == Some("remote") && item.url.is_some() {
             if let Some(items) = &self.items {
-                if let Some(existing) = items.iter().find(|e| e.itype.as_deref() == Some("remote") && e.url == item.url) {
+                if let Some(existing) = items
+                    .iter()
+                    .find(|e| e.itype.as_deref() == Some("remote") && e.url == item.url)
+                {
                     item.uid = existing.uid.clone();
                     item.file = existing.file.clone();
                 }

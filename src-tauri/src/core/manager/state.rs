@@ -108,13 +108,23 @@ impl CoreManager {
     }
 
     pub fn kill_all_mini_cores() {
-        logging!(info, Type::Core, "Scanning and killing leftover mini-mihomo processes...");
+        logging!(
+            info,
+            Type::Core,
+            "Scanning and killing leftover mini-mihomo processes..."
+        );
         let system = sysinfo::System::new_all();
         for (pid, process) in system.processes() {
             let name = process.name();
             let name_str = name.to_string_lossy();
             if name_str.contains("mini-mihomo") {
-                logging!(warn, Type::Core, "Killing leftover process: {} (PID: {})", name_str, pid);
+                logging!(
+                    warn,
+                    Type::Core,
+                    "Killing leftover process: {} (PID: {})",
+                    name_str,
+                    pid
+                );
                 let _ = process.kill();
             }
         }
