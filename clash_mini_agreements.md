@@ -292,8 +292,8 @@
        * 外观主题模式：**`SYS`** / **`LIGHT`** / **`DARK`**
      * **悬浮提示 (Tooltip)**：在西文缩写按钮上绑定 `title` 气泡提示，鼠标悬停时显示完整翻译名称（如 `Manual Mode`）。
    * **底部控件与换肤适配规范 (FEAT-005)**：
-     * **帮助按钮 (Help Button)**：宽度翻倍至 `48px` (`left: 12px`, `width: 48px`, `height: 24px`)，采用 MUI `<Button>` 组件实现（避免 `<Box component="button">` 的浏览器默认样式污染）。样式使用外层作用域的 `theme` 直接调用 `get3DButtonStyle(theme, ...)`，确保能正常检测皮肤切换。
-     * **语言选择器 (Language Selector)**：起始位置调整为 `left: 70px`，宽度缩减为 `97.5px`（`height: 24px`），与右侧 Excel 切换行（起始于 `177.5px`）保持 10px 间距。为了防止 MUI 主题的 `MuiOutlinedInput` 输入框默认背景色与边框覆盖换肤样式，其 `sx` 属性必须设置 `backgroundColor: 'transparent !important'`，并将子项 `.MuiOutlinedInput-notchedOutline` 的 `border` 设为 `none !important`，使 `get3DButtonStyle` 的 3D 边框与渐变背景完全展现，同样使用外层 `theme` 直接调用 `get3DButtonStyle` 杜绝遮蔽。
+     * **帮助按钮 (Help Button)**：宽度翻倍至 `48px` (`left: 12px`, `width: 48px`, `height: 24px`)，采用 MUI `<Button>` 组件实现（避免 `<Box component="button">` 的浏览器默认样式污染）。样式使用外层作用域的 `theme` 调用 `get3DButtonStyle(theme, 'contained', 'primary')`，并通过 IIFE 将外观属性加 `!important` 展开注入，确保能正常检测皮肤切换。
+     * **语言选择器 (Language Selector)**：起始位置调整为 `left: 70px`，宽度缩减为 `97.5px`（`height: 24px`），与右侧 Excel 切换行（起始于 `177.5px`）保持 10px 间距。为了防止 MUI 主题的 `MuiOutlinedInput` 输入框默认背景色与边框覆盖换肤样式，其 `sx` 属性移除 `backgroundColor` 透明设置，通过 IIFE 将 `get3DButtonStyle(theme, 'contained', 'primary')` 的外观与 `backgroundColor` 属性都加 `!important` 展开注入，并将子项 `.MuiOutlinedInput-notchedOutline` 的 `border` 设为 `none !important`，以保证背景样式完整展现而不受遮蔽。
      * **语言下拉菜单 (MenuProps)**：下拉菜单的最少最大高度为 `640px` (`maxHeight: 640`)，保证所有语言选项一屏展开放置，无需滚动。
      * **语言切换死锁回滚防范**：为避免手动切换语言导致 local 语言改变、触发 useEffect 中使用未及异步写入数据库的旧 language 值反向覆写回滚，必须在 `_layout.tsx` 中使用 `useRef` 追踪最后一次同步的语言配置。只有当数据库传回的 `language` 配置与 Ref 中保存的值不一致时，方可执行同步，切断死锁回滚环路。
 

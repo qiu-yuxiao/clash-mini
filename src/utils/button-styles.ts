@@ -2,11 +2,11 @@ import { Theme } from '@mui/material'
 
 // Centralized Skin Getter Helper
 const getActiveSkin = (theme: any): string => {
-  if (theme && theme.controlSkin) {
-    return theme.controlSkin
-  }
   if (typeof window !== 'undefined') {
     return localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+  }
+  if (theme && theme.controlSkin) {
+    return theme.controlSkin
   }
   return 'retro-3d'
 }

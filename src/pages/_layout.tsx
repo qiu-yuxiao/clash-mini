@@ -3525,7 +3525,7 @@ const Layout = () => {
                     display: 'none',
                   },
                   ...(() => {
-                    const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
+                    const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
                     const styleWithImportant: any = {}
                     for (const [key, val] of Object.entries(btnStyle)) {
                       if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
@@ -3533,6 +3533,9 @@ const Layout = () => {
                       } else {
                         styleWithImportant[key] = val
                       }
+                    }
+                    if (btnStyle.background) {
+                      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
                     }
                     return styleWithImportant
                   })(),
@@ -3581,7 +3584,7 @@ const Layout = () => {
                     display: 'none',
                   },
                   ...(() => {
-                    const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
+                    const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
                     const styleWithImportant: any = {}
                     for (const [key, val] of Object.entries(btnStyle)) {
                       if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
@@ -3589,6 +3592,9 @@ const Layout = () => {
                       } else {
                         styleWithImportant[key] = val
                       }
+                    }
+                    if (btnStyle.background) {
+                      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
                     }
                     return styleWithImportant
                   })(),
