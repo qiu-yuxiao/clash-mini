@@ -1141,6 +1141,13 @@ const Layout = () => {
   const { pathname } = useLocation()
   const windowControlsRef = useRef<any>(null)
 
+  // Language Sync Ref to prevent deadlock/rollback loops
+  const lastLanguageRef = useRef<string | undefined>(undefined)
+  const switchLanguageRef = useRef(switchLanguage)
+  useEffect(() => {
+    switchLanguageRef.current = switchLanguage
+  }, [switchLanguage])
+
   // Drawer Toggle State
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -1279,11 +1286,12 @@ const Layout = () => {
   }, [verge?.verge_mixed_port, clashInfo?.mixed_port])
 
   useEffect(() => {
-    if (language) {
+    if (language && language !== lastLanguageRef.current) {
+      lastLanguageRef.current = language
       dayjs.locale(language === 'zh' ? 'zh-cn' : language)
-      switchLanguage(language)
+      switchLanguageRef.current(language)
     }
-  }, [language, switchLanguage])
+  }, [language])
 
   const triggerAutoSelectFastestNode = useCallback(
     async (profileUid: string, isBackground = false) => {
@@ -3495,11 +3503,11 @@ const Layout = () => {
                     console.error('Failed to open help link:', err)
                   }
                 }}
-                sx={(theme) => ({
+                sx={{
                   position: 'absolute',
                   bottom: '0',
                   left: '12px',
-                  width: '24px',
+                  width: '48px',
                   height: '24px',
                   p: 0,
                   zIndex: 200,
@@ -3513,7 +3521,7 @@ const Layout = () => {
                     display: 'none',
                   },
                   ...get3DButtonStyle(theme, 'contained', 'default'),
-                })}
+                }}
               >
                 <HelpOutlineRounded sx={{ fontSize: '16px' }} />
               </Box>
@@ -3538,57 +3546,50 @@ const Layout = () => {
                   slotProps: {
                     paper: {
                       sx: {
-                        maxHeight: 300,
+                        maxHeight: 640,
                       },
                     },
                   },
                 }}
-                sx={(theme) => {
-                  const btnStyle = get3DButtonStyle(
-                    theme,
-                    'contained',
-                    'default',
-                  )
-                  return {
-                    position: 'absolute',
-                    bottom: '0',
-                    left: '46px',
-                    width: '120px',
-                    height: '24px',
-                    zIndex: 200,
+                sx={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '70px',
+                  width: '97.5px',
+                  height: '24px',
+                  zIndex: 200,
+                  boxSizing: 'border-box',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  fontFamily: 'var(--control-font-family)',
+                  '@media (max-height: 830px)': {
+                    display: 'none',
+                  },
+                  ...get3DButtonStyle(theme, 'contained', 'default'),
+                  '& .MuiSelect-select': {
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                    paddingLeft: '12px',
+                    paddingRight: '24px',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: 'inherit',
                     boxSizing: 'border-box',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    fontFamily: 'var(--control-font-family)',
-                    '@media (max-height: 830px)': {
-                      display: 'none',
-                    },
-                    ...btnStyle,
-                    '& .MuiSelect-select': {
-                      paddingTop: 0,
-                      paddingBottom: 0,
-                      paddingLeft: '12px',
-                      paddingRight: '24px',
-                      height: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      color: 'inherit',
-                      boxSizing: 'border-box',
-                    },
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      border: 'none',
-                    },
-                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      border: 'none',
-                    },
-                    '& .MuiSelect-icon': {
-                      color: 'inherit',
-                      right: '4px',
-                    },
-                    '&:before, &:after': {
-                      display: 'none !important',
-                    },
-                  }
+                  },
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    border: 'none',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    border: 'none',
+                  },
+                  '& .MuiSelect-icon': {
+                    color: 'inherit',
+                    right: '4px',
+                  },
+                  '&:before, &:after': {
+                    display: 'none !important',
+                  },
                 }}
               >
                 <MenuItem value="zh">简体中文</MenuItem>
