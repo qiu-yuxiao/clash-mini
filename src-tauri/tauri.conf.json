@@ -16,8 +16,8 @@
     ],
     "publisher": "Clash Verge Rev",
     "externalBin": [
-      "sidecar/verge-mihomo",
-      "sidecar/verge-mihomo-alpha"
+      "sidecar/mini-mihomo",
+      "sidecar/mini-mihomo-alpha"
     ],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",

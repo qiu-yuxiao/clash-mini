@@ -54,8 +54,8 @@ async function resolvePortable() {
   const zip = new AdmZip()
 
   zip.addLocalFile(path.join(releaseDir, 'clash-mini.exe'))
-  zip.addLocalFile(path.join(releaseDir, 'verge-mihomo.exe'))
-  zip.addLocalFile(path.join(releaseDir, 'verge-mihomo-alpha.exe'))
+  zip.addLocalFile(path.join(releaseDir, 'mini-mihomo.exe'))
+  zip.addLocalFile(path.join(releaseDir, 'mini-mihomo-alpha.exe'))
   zip.addLocalFolder(path.join(releaseDir, 'resources'), 'resources')
   zip.addLocalFolder(
     path.join(

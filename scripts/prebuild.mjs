@@ -301,8 +301,8 @@ function clashMetaAlpha() {
   const isWin = platform === 'win32'
   const urlExt = isWin ? 'zip' : 'gz'
   return {
-    name: 'verge-mihomo-alpha',
-    targetFile: `verge-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    name: 'mini-mihomo-alpha',
+    targetFile: `mini-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_ALPHA_VERSION}.${urlExt}`,
     downloadURL: `${META_URL_PREFIX}/${META_ALPHA_VERSION}/${name}-${META_ALPHA_VERSION}.${urlExt}`,
@@ -314,8 +314,8 @@ function clashMeta() {
   const isWin = platform === 'win32'
   const urlExt = isWin ? 'zip' : 'gz'
   return {
-    name: 'verge-mihomo',
-    targetFile: `verge-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
+    name: 'mini-mihomo',
+    targetFile: `mini-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_VERSION}.${urlExt}`,
     downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
@@ -759,13 +759,13 @@ const resolveUnSetDnsScript = () =>
 // =======================
 const tasks = [
   {
-    name: 'verge-mihomo-alpha',
+    name: 'mini-mihomo-alpha',
     func: () =>
       getLatestAlphaVersion().then(() => resolveSidecar(clashMetaAlpha())),
     retry: 5,
   },
   {
-    name: 'verge-mihomo',
+    name: 'mini-mihomo',
     func: () =>
       getLatestReleaseVersion().then(() => resolveSidecar(clashMeta())),
     retry: 5,

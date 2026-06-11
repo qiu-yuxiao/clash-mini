@@ -102,7 +102,7 @@ pub async fn clean_async() -> bool {
         let stop_timeout = Duration::from_secs(3);
 
         logging!(info, Type::System, "stop core");
-        match timeout(stop_timeout, CoreManager::global().stop_core()).await {
+        let stopped = match timeout(stop_timeout, CoreManager::global().stop_core()).await {
             Ok(_) => {
                 logging!(info, Type::Window, "core已停止");
                 true
@@ -115,7 +115,9 @@ pub async fn clean_async() -> bool {
                 );
                 false
             }
-        }
+        };
+        CoreManager::kill_all_mini_cores();
+        stopped
     });
 
     // DNS恢复（仅macOS）

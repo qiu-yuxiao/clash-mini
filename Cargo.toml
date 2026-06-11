@@ -55,6 +55,7 @@ tauri-plugin-clash-verge-sysinfo = { path = "crates/tauri-plugin-clash-verge-sys
 
 tauri = { version = "2.11.2" }
 tauri-plugin-clipboard-manager = "2.3.2"
+sysinfo = { version = "0.39.2", features = ["system"] }
 parking_lot = { version = "0.12.5", features = ["hardware-lock-elision"] }
 anyhow = "1.0.102"
 criterion = { version = "0.8.2", features = ["async_tokio"] }
