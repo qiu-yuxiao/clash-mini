@@ -212,6 +212,9 @@ const META_MAP = {
 // Fetch latest versions
 // =======================
 async function getLatestAlphaVersion() {
+  META_ALPHA_VERSION = "v1.19.26";
+  log_info(`Latest alpha version locked to: ${META_ALPHA_VERSION}`);
+  return;
   if (!FORCE) {
     const cached = await getCachedVersion('META_ALPHA_VERSION')
     if (cached) {
@@ -246,6 +249,9 @@ async function getLatestAlphaVersion() {
 }
 
 async function getLatestReleaseVersion() {
+  META_VERSION = "v1.19.26";
+  log_info(`Latest release version locked to: ${META_VERSION}`);
+  return;
   if (!FORCE) {
     const cached = await getCachedVersion('META_VERSION')
     if (cached) {
@@ -291,7 +297,7 @@ if (!META_ALPHA_MAP[`${platform}-${arch}`]) {
 // Build meta objects
 // =======================
 function clashMetaAlpha() {
-  const name = META_ALPHA_MAP[`${platform}-${arch}`]
+  const name = META_MAP[`${platform}-${arch}`]
   const isWin = platform === 'win32'
   const urlExt = isWin ? 'zip' : 'gz'
   return {
@@ -299,7 +305,7 @@ function clashMetaAlpha() {
     targetFile: `verge-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile: `${name}-${META_ALPHA_VERSION}.${urlExt}`,
-    downloadURL: `${META_ALPHA_URL_PREFIX}/${name}-${META_ALPHA_VERSION}.${urlExt}`,
+    downloadURL: `${META_URL_PREFIX}/${META_ALPHA_VERSION}/${name}-${META_ALPHA_VERSION}.${urlExt}`,
   }
 }
 

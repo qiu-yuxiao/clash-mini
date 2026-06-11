@@ -1,5 +1,9 @@
 # 👑 Clash Mini 一键静默发行准则 (One-Click Silent Release Guidelines)
 
+> [!IMPORTANT]
+> **【发行硬红线】自 2026 年 6 月 6 日起，由于 Mihomo 内核 v1.19.27 废弃了 global-client-fingerprint 导致客户端启动崩溃白屏。此后所有发行版本必须锁定并使用 v1.19.26 旧版内核进行打包，严禁拉取 latest 内核。**
+
+
 **【警告：本准则具有法律级效力，仅次于宪法（.cursorrules）。凡执行发行动作的 Agent 必须 100% 遵守本规则。违反本规则的任何原生弹窗命令均被判定为严重故障。】**
 
 ---

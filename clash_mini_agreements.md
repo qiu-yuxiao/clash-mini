@@ -320,6 +320,10 @@
 
    * 为了彻底实现多客户端完美并存运行，Clash Mini 的单实例检测端口在 Release 模式下设为 `33335`，在 Dev 模式下设为 `33336`。绝对禁止使用与原版相同的端口（`33332`/`11234`），从而彻底杜绝因单实例检测机制互锁而产生的冲突和闪退。
 
+9. **内核与退出孤儿进程物理隔离 (BUG-056)**：
+   * **Sidecar 物理隔离**：为了与官方 Clash Verge 客户端彻底物理隔离，本项目的 Sidecar 核心二进制名称及运行进程名称由 `verge-mihomo` / `verge-mihomo-alpha` 彻底更名为 `mini-mihomo` / `mini-mihomo-alpha`。
+   * **异步强杀机制**：在主程序退出事件 `clean_async` 中，必须使用 `sysinfo` 库扫描系统运行进程，遍历并强制杀灭（kill）所有进程名包含 `mini-mihomo` 的残留子进程，保证程序退出后无任何孤儿进程驻留。
+
 
 
 
@@ -422,7 +426,7 @@
 
 
 
-       * 普通模式下高度固定为 `178px`，`flex: 0 0 178px`，`padding: 8px 12px 2px 12px`，顶部边框为 `1px solid`。该固定高度确保流量折线图能够完全恢复为原版 Clash Verge 的 130px 物理高度，彻底解决高度压缩导致底部时间轴文本与“Smooth”和“Points”等状态文本发生重叠的问题。
+       * 普通模式下高度固定为 `165px`，`flex: 0 0 165px`，`padding: 8px 12px 2px 12px`，顶部边框为 `1px solid`。该固定高度确保流量折线图能够完全恢复为原版 Clash Verge 的 130px 物理高度，彻底解决高度压缩导致底部时间轴文本与“Smooth”和“Points”等状态文本发生重叠的问题。
 
 
 
@@ -478,7 +482,7 @@
 
 
 
-   * 点击右上角齿轮图标，设置页面往左下方滑出，**刚好完全覆盖上半层区域**，而**下半层（178px 区域）的流量与图表依然露出来并保持可见 and 高频更新**。
+   * 点击右上角齿轮图标，设置页面往左下方滑出，**刚好完全覆盖上半层区域**，而**下半层（165px 区域）的流量与图表依然露出来并保持可见 and 高频更新**。
 
 
 
@@ -965,6 +969,12 @@
 
 
 
+
+
+     * **数据装载源绑定（BUG-057 v4.1.0）**：v4.1.0 对 BUG-057 进行了根因级修复，涉及三个层面：
+       (1) `_layout.tsx`：`handleImportProfile` 的 try/catch 分支在 `mutateProfiles()` 后立即设置 `lastEnhancedProfileRef.current = targetUid`，防止 useEffect 再次调用 `enhanceProfiles()` 导致双重重载；同时在 `enhanceProfiles()` 后增加 `patchClashMode('rule')` 确保导入后切换到 rule 模式。
+       (2) `use-render-list.ts`：新增智能轮询恢复机制 —— 当 PROXY 组存在但 `all` 中无真实节点时（proxy-provider 异步加载中），启动 1s 间隔轮询 `refreshProxy()`，直到节点数据到来后自动停止。
+       (3) `cmds.ts`：`calcuProxies()` 加入空值防御（`proxyResponse?.proxies || {}`、`providerResponse || {}`、`item?.proxies` 安全检查），`generateItem` 对无名称节点返回安全的 unknown 对象。
 
 
 10. **全局窄滚动条与局部隐藏策略 (BUG-033)**：
@@ -2226,3 +2236,27 @@
   - 当设置面板关闭时（`drawerOpen === false` 且可见），连接管理自动切换为**低频静默监控模式**：断开 WebSocket，降级为每 3 秒发起单次轻量级 `getConnections` HTTP REST 轮询。在此模式下，为了节省 CPU，**严禁**执行任何连接列表的差异对比、排序及 Map 内存重构计算，直接提取 totals 计入状态，且保持连接明细列表为空数组。
 - **日志组件条件渲染与彻底注销**：
   - 日志显示组件 (`LogsPage`) 必须在布局中实行完全的条件渲染。在日志弹窗 Dialog 关闭时（`logsOpen === false`），直接以 `{logsOpen && <LogsPage />}` 方式进行 React 卸载（Unmount），使其所占用的日志 WebSocket 连接在 Dialog 关闭的第一时间彻底销毁注销，杜绝在后台默默堆积和合并解析数百条日志的行为。
+
+### 6. BUG-057 深度修复：导入订阅后内核重启就绪等待与 Provider 同步刷新规范
+当用户导入新订阅链接后，`handleImportProfile` 流程中调用 `restartCore()` 重启内核，内核需要数秒至十余秒才能完成初始化并下载 proxy-provider 数据。为确保前端节点表格可靠显示，必须遵循以下规范：
+- **重启后轮询等待机制**：
+  - `restartCore()` 之后严禁立即调用单次 `refreshProxy()` 作为最终数据源。必须启动轮询循环（每 1.5 秒一次，最多 20 秒），每次调用 `calcuProxies()` 检查 PROXY 组是否包含真实节点（排除 DIRECT/REJECT/unknown 类型），确认就绪后方可退出轮询。
+  - 轮询期间应同时调用 `refreshProxyProviders()` 以加速 proxy-provider 数据下载与缓存刷新。
+- **缓存直写与 UI 同步**：
+  - 轮询结束时，必须通过 `queryClient.setQueryData(['getProxies'], lastResult)` 将最新获取的完整节点数据直接注入 react-query 缓存，避免后续 `refreshProxy()` 因 staleTime 节流而跳过刷新。
+- **前端兑底轮询增强**：
+  - `use-render-list.ts` 中的空节点轮询恢复机制在调用 `refreshProxy()` 时必须同步调用 `refreshProxyProviders()`，因为 `calcuProxies()` 依赖 providerMap 构建节点信息，单独刷新 proxy 数据可能无法获取完整的节点详情。
+
+### 7. 代理数据流精简：去除原版多代理组复杂逻辑
+本项目采用唯一 PROXY 组设计，后端 `enhance_profiles` 已保证配置中始终存在 PROXY 组。前端数据流必须保持精简，严禁引入原版 Clash Verge 的多代理组复杂逻辑：
+- **`calcuProxies()` 精简规范**：
+  - 返回值只保留 `global`、`groups`、`records`，不再返回 `direct`、`reject`、`proxies`。
+  - 严禁按 `GLOBAL.all` 顺序重排 groups，严禁构建 `proxies` 扁平列表。
+  - PROXY 组创建兑底仅保留 1 层：从已有组的组内节点收集。
+- **`use-render-list.ts` physicalNodes 精简规范**：
+  - physicalNodes 仅从 PROXY 组读取，严禁多层 fallback（原版 6 层 fallback 已删除）。
+  - `calcuProxies` 已保证 PROXY 组始终存在，前端无需为此做复杂防御。
+- **轮询统一管理**：
+  - 3 秒数据轮询统一由 `AppDataProvider` 的 `useQuery` 配置驱动，严禁在组件中重复定义 `useQuery(['getProxies'])`。
+- **快捷分流简化**：
+  - `quick-routing.ts` 中代理组名称固定为 `'PROXY'`，严禁动态查找主代理组。
