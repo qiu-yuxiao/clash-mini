@@ -126,6 +126,15 @@ impl IProfiles {
     /// if the file_data is some
     /// then should save the data to file
     pub async fn append_item(&mut self, item: &mut PrfItem) -> Result<()> {
+        if item.itype.as_deref() == Some("remote") && item.url.is_some() {
+            if let Some(items) = &self.items {
+                if let Some(existing) = items.iter().find(|e| e.itype.as_deref() == Some("remote") && e.url == item.url) {
+                    item.uid = existing.uid.clone();
+                    item.file = existing.file.clone();
+                }
+            }
+        }
+
         let uid = &item.uid;
         if uid.is_none() {
             bail!("the uid should not be null");
@@ -134,6 +143,18 @@ impl IProfiles {
         if let Some(items) = self.items.as_mut() {
             if let Some(pos) = items.iter().position(|e| e.uid == *uid) {
                 items[pos].updated = item.updated;
+                items[pos].extra = item.extra;
+                if item.name.is_some() {
+                    items[pos].name = item.name.clone();
+                }
+                if item.desc.is_some() {
+                    items[pos].desc = item.desc.clone();
+                }
+                if item.home.is_some() {
+                    items[pos].home = item.home.clone();
+                }
+                items[pos].option = PrfOption::merge(items[pos].option.as_ref(), item.option.as_ref());
+
                 if let Some(file_data) = item.file_data.take() {
                     let file = items[pos]
                         .file
