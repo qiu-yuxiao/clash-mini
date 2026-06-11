@@ -85,11 +85,13 @@
 * **【当前修正方案 & 设计要求】**：
   * **修改文件**：
     * [**`prfitem.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/profile/prfitem.rs) ( 后端订阅处理)
+    * [**`profiles.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/profiles.rs) ( 导入/追加订阅去重处理)
     * [**`enhance/mod.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)
   * **设计要点**：
     1. 从 UI 移除兼容模式开关，将输入框及按钮文字恢复为标准文案；
     2. 后端 `prfitem.rs` 移除开关配置判断，YAML 校验失败时直接尝试 Base64/URI 解析并对垃圾数据输出自定义中文报错；
     3. `enhance/mod.rs` 中默认开启并联订阅合并编译。
+    4. **【去重与复用】**：机场订阅链接去重与复用。在 `append_item` 时自动扫描并匹配已有的远程订阅 URL。若发现相同的远程订阅已存在，则自动复用原订阅的 `uid` 与 `file` 文件名，将新增操作转换为就地刷新更新，彻底防备同一机场订阅链接重复导入生成多个配置文件的问题。
 
 ---
 

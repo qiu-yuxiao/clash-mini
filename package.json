@@ -80,7 +80,8 @@
     "parse-job": "python scratch/parse_job.py",
     "register-bug-055": "python scratch/register_bug_055.py",
     "fix-tray-lock": "python scratch/fix_tray_lock.py",
-    "patch-bugs-resolved": "node scratch/monitor_build.mjs"
+    "patch-bugs-resolved": "node scratch/monitor_build.mjs",
+    "update-bug-and-agreements": "python scratch/update_bug_and_agreements.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
