@@ -62,21 +62,6 @@
 ---
 
 
-### 🚨 **BUG-055** 托盘 `proxy_cache` 写入锁被拦截与 Git 抢跑导致构建失败
-* **目标版本**：`v3.0.6`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 在发布 v3.0.6 时，因为本地 `dev` 分支的提交未推送到 `origin/dev` 且版本号变更未进行 git commit 动作就直接打了 Tag 推送，导致 GitHub Actions 校验失败；且手动提交后，由于 `cargo clippy` 静态代码质量审查报错：在 `src-tauri\src\core\tray\mod.rs` 中 `proxy_cache` 写入锁 `guard` 生命周期过长（Held across significant block），导致 pre-push hook 被拦截无法推送。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`tray/mod.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/tray/mod.rs) ( 托盘写入锁释放)
-  * **设计要点**：
-    1. 在托盘缓存数据写入后显式调用 `drop(guard)` 提前释放写入锁以解决 Clippy 校验拦截；
-    2. 修复后手动提交版本号与 Clippy 锁修复，推送 `dev` 分支至远程；
-    3. 重新在最新提交上打 Tag `v3.0.6` 推送触发构建。
-
----
-
 ### 🚨 **BUG-054** 多套控件皮肤风格（Skin Swapping）切换及滑块参数重定义
 * **目标版本**：`v3.0.4`
 * **当前状态**：`代码已修正，待确认`
@@ -212,6 +197,7 @@
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 目前状态 |
 | :--- | :--- | :---: | :--- |
 
+| **BUG-055** | 托盘 `proxy_cache` 锁生命周期过长被拦截及 Git 构建失败。 | v3.0.6 | 代码已修正，已确认 |
 | **BUG-050** | CPU 资源消耗显著高于原版（常驻组件后台渲染耗能，Traffic可见性响应缺失）。 | v3.0.3 | 代码已修正，已确认 |
 | **BUG-048** | 无边框模式下窗口边缘磁吸及自适应吸附与脱离功能丢失。 | v3.0.1 | 代码已修正，已确认 |
 | **BUG-047** | 本地 pre-push 钩子运行 cargo clippy 遇到测试模块中的 `.unwrap()` 报错拦截推送。 | v3.0.1 | 代码已修正，已确认 |
