@@ -81,7 +81,9 @@
     "register-bug-055": "python scratch/register_bug_055.py",
     "fix-tray-lock": "python scratch/fix_tray_lock.py",
     "patch-bugs-resolved": "node scratch/monitor_build.mjs",
-    "update-bug-and-agreements": "python scratch/update_bug_and_agreements.py"
+    "update-bug-and-agreements": "python scratch/update_bug_and_agreements.py",
+    "cargo-test": "cargo test",
+    "resolve-bug-028": "python scratch/resolve_bug_028.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
