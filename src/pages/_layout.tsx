@@ -3711,7 +3711,7 @@ const Layout = () => {
                             boxSizing: 'border-box',
                             fontFamily: item.font,
                             ...btnStyle,
-                            borderRadius: '0px',
+                            borderRadius: btnStyle.borderRadius || '0px',
                             margin: 0,
                           }
                         } else {
