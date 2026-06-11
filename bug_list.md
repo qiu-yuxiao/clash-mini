@@ -95,19 +95,6 @@
 
 ---
 
-### 🚨 **BUG-042** 非 YAML 格式订阅链接本地通用解析机制
-* **目标版本**：`v2.0.4-full`
-* **当前状态**：`代码已修正，待确认`
-* **【现象与复现路径】**：
-  * 缺乏对非 YAML 格式订阅链接（如 Base64 编码的 ss://, trojan://, vmess:// 链接列表）的直接支持，无法进行兼容转换。
-* **【当前修正方案 & 设计要求】**：
-  * **修改文件**：
-    * [**`universal_parser.rs`**](file:///C:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/universal_parser.rs) ( 本地通用解析器)
-  * **设计要点**：
-    * 在“兼容模式”下提供通用 URI 解析管道与多订阅合并冲突处理。支持自动对 `ss://`、`trojan://`、`vmess://` 的单行 URI 或 Base64 编码的订阅源进行 robust 还原解析，并转换为 Clash YAML proxy 列表，同时解决同名节点合并时的命名碰撞，并在前端修剪还原显示。
-
----
-
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
@@ -115,6 +102,7 @@
 
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 目前状态 |
 | :--- | :--- | :---: | :--- |
+| **BUG-042** | 支持本地通用非 YAML 订阅链接解析（支持 VMess, SS, Trojan, VLESS, Hysteria2 及 HTTP 格式）。 | v2.0.4-full | 代码已修正，已确认 |
 | **BUG-028** | 开机启动时因网络未就绪自动更新失败后增加重试机制，且缺省更新间隔兜底为 24 小时。 | v1.1.4 | 代码已修正，已确认 |
 
 | **BUG-057** | 导入新订阅后节点列表加载显示空白。 | v4.1.0 | 代码已修正，已确认 |
