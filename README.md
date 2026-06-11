@@ -1,5 +1,11 @@
 # Clash Mini
 
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/qiu-yuxiao/clash-mini?style=flat-square&label=Release&color=4f46e5)](https://github.com/qiu-yuxiao/clash-mini/releases/latest)
+[![GitHub all releases](https://img.shields.io/github/downloads/qiu-yuxiao/clash-mini/total?style=flat-square&label=Downloads&color=0ea5e9)](https://github.com/qiu-yuxiao/clash-mini/releases)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
+[![Built with Tauri](https://img.shields.io/badge/Built%20with-Tauri-24C8D8?style=flat-square&logo=tauri)](https://tauri.app)
+[![Language: Rust](https://img.shields.io/badge/Language-Rust-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
 > [!WARNING]
 > **AI Assistant Instructions (AI 助理必读)**:
 > 本项目的 AI 协同开发受根目录 [`.cursorrules`](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.cursorrules) 协议约束。在动用任何工具排查或修改项目前，必须率先阅读并严格遵守 `.cursorrules` 中的「新助理报到协议」向 Master 进行建交。禁止绕过该仪式直接展开其他开发。
