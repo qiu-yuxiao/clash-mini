@@ -3678,7 +3678,7 @@ const Layout = () => {
                   },
                   {
                     key: 'frosted-glass',
-                    label: 'Frosted-glass',
+                    label: 'Frosted',
                     font: 'Segoe UI Light, Microsoft YaHei Light, sans-serif',
                   },
                   {
