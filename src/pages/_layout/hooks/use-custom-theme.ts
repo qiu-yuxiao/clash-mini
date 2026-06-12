@@ -120,8 +120,9 @@ export const useCustomTheme = () => {
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-control-skin', controlSkin)
+      document.documentElement.setAttribute('data-theme-mode', mode)
     }
-  }, [controlSkin])
+  }, [controlSkin, mode])
   const userBackgroundImage = theme_setting?.background_image || ''
   const hasUserBackground = !!userBackgroundImage
 

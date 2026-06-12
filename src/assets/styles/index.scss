@@ -196,6 +196,16 @@ html[data-control-skin="cyberpunk"] {
   }
 }
 
+html[data-theme-mode="light"][data-control-skin="cyberpunk"] {
+  .theme-panel {
+    background: #ffffff !important;
+  }
+
+  .theme-crystal-card {
+    background: #ffffff !important;
+  }
+}
+
 html[data-control-skin="monochrome"] {
   .theme-panel {
     background: var(--background-color) !important;

@@ -429,6 +429,20 @@ html[data-control-skin="cyberpunk"] {
   }
 }
 
+html[data-theme-mode="light"][data-control-skin="cyberpunk"] {
+  .layout-content__left {
+    background: #e2e8f0 !important;
+  }
+
+  .the_titlebar {
+    background: #e2e8f0 !important;
+  }
+
+  .layout-content__right {
+    background: #f8fafc !important;
+  }
+}
+
 html[data-control-skin="monochrome"] {
   --control-font-family: Georgia, KaiTi, serif;
 
