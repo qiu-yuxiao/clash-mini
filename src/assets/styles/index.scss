@@ -146,19 +146,37 @@ html[data-control-skin="frosted-glass"] {
   }
 }
 
+@keyframes cyberpunk-glow-pulse-red {
+  0% {
+    box-shadow: 0 0 calc(6px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.15) !important;
+  }
+  100% {
+    box-shadow: 0 0 calc(20px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.35) !important;
+  }
+}
+
+@keyframes cyberpunk-glow-pulse-cyan {
+  0% {
+    box-shadow: 0 0 calc(4px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.12) !important;
+  }
+  100% {
+    box-shadow: 0 0 calc(16px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.28) !important;
+  }
+}
+
 html[data-control-skin="cyberpunk"] {
   .theme-panel {
     background: #05070c !important;
     backdrop-filter: none !important;
     border: 4px double #ff0055 !important; /* Neon double border */
-    box-shadow: 0 0 calc(15px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.25) !important;
+    animation: cyberpunk-glow-pulse-red calc(6s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
   }
 
   .theme-crystal-card {
     background: #0d1117 !important;
     backdrop-filter: none !important;
     border: 1px solid #00f0ff !important;
-    box-shadow: 0 0 calc(10px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.2) !important;
+    animation: cyberpunk-glow-pulse-cyan calc(6s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
   }
 }
 

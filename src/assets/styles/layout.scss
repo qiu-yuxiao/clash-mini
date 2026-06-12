@@ -415,7 +415,7 @@ html[data-control-skin="cyberpunk"] {
     background: #05070c !important;
     backdrop-filter: none !important;
     border: 1px solid #00f0ff !important;
-    box-shadow: 0 0 calc(10px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.2) !important;
+    animation: cyberpunk-glow-pulse-cyan calc(6s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
   }
 }
 

@@ -3169,7 +3169,7 @@ const Layout = () => {
                         size="small"
                         value={depthFactor}
                         min={0.0}
-                        max={2.0}
+                        max={controlSkin === 'cyberpunk' ? 5.0 : 2.0}
                         step={0.1}
                         onChange={(_, val) =>
                           handleDepthFactorChange(val as number)
