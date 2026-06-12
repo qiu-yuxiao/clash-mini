@@ -1048,7 +1048,7 @@
 
 
 
-      * 左侧分栏 `.layout-content__left` 和右侧分栏 `.layout-content__right`，以及设置页面 `.theme-panel` 和当前节点卡片 `.theme-crystal-card` 的背景，将分别与 `--depth-factor` 联动变为半透明（使用 `rgba` 与 `--theme-bg-base-rgb` 和 `--theme-panel-base-rgb` 进行计算，当 depth 为 0.0 时 100% 实体纯色，当增加时透明度渐进提高）。
+      * 左侧分栏 `.layout-content__left` 和右侧分栏 `.layout-content__right`，以及主页节点列表（`ProxyVirtualList`）的 `.theme-panel` 容器、设置页面 `.theme-panel` 和当前节点卡片 `.theme-crystal-card` 的背景，将分别与 `--depth-factor` 联动变为半透明（使用 `rgba` 与 `--theme-bg-base-rgb` 和 `--theme-panel-base-rgb` 进行计算，当 depth 为 0.0 时 100% 实体纯色，当增加时透明度渐进提高）。
 
 
 

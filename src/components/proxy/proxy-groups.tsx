@@ -779,16 +779,13 @@ function ProxyVirtualList({
 
   return (
     <Box
+      className="theme-panel"
       sx={{
         height,
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: 1,
-        borderTop: (theme) => `4px solid ${theme.palette.divider}`,
-        borderBottom: (theme) => `4px solid ${theme.palette.divider}`,
-        borderLeft: '5px double var(--theme-border)',
-        borderRight: '5px double var(--theme-border)',
-        backgroundColor: (theme) => theme.palette.background.paper,
+        boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       {headItem && (
