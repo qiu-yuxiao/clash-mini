@@ -48,6 +48,16 @@
   2. 阴影使用纯黑色，在深色背景下发生“黑吃黑”现象，完全看不出立体投影。
 * **修改方针**：在 `use-custom-theme.ts` 中根据浅色 (6%/10%) 和深色模式 (30%/45%) 动态注入不同的阴影基准浓度变量，替换各组件和 CSS 的硬编码阴影浓度。状态目前为：`代码已修正，待确认`。
 
+### **BUG-068** (Cyberpunk 浅色模式背景与文本不可读)
+* **缺陷描述与现象**：在 `cyberpunk` 皮肤的浅色模式下，界面主背景、侧边栏及卡片背景依然显示为深黑色，而 MUI 的文本颜色会自动变为黑色，导致发生严重的“黑吃黑”现象，文字内容完全不可读。
+* **排查原因与记忆**：
+  1. Cyberpunk 皮肤样式在 `layout.scss` 与 `index.scss` 中硬编码了极暗背景色（`#0d1117` 和 `#05070c`），缺乏浅色主题模式下的覆盖规则。
+  2. 样式表缺少对全局主题模式（light/dark）的动态检测。
+* **修改方针**：
+  1. 在 `use-custom-theme.ts` 中将当前的 `mode` 作为 `data-theme-mode` 动态注入至 `document.documentElement`。
+  2. 在 `layout.scss` 和 `index.scss` 中，针对 `html[data-theme-mode="light"][data-control-skin="cyberpunk"]` 添加高对比度的浅色背景（如 `#e2e8f0`、`#f8fafc` 和 `#ffffff`），同时保留青/粉发光边框以维系 Cyberpunk 皮肤的整体风格。
+  3. 状态目前为：`代码已修正，待确认`。
+
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
