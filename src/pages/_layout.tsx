@@ -46,6 +46,7 @@ import { Outlet, useLocation } from 'react-router'
 import {
   healthcheckProxyProvider,
   closeAllConnections,
+  selectNodeForGroup,
 } from 'tauri-plugin-mihomo-api'
 
 import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
