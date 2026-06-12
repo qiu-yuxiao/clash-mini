@@ -210,13 +210,16 @@ export const Switch = styled((props: SwitchProps) => (
           transform: 'translateX(14px) !important',
           color: '#fff !important',
           '& + .MuiSwitch-track': {
-            backgroundColor: 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.35) !important',
-            border: '1px solid rgba(255, 255, 255, 0.15) !important',
+            backgroundColor: (isLight 
+              ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.5)'
+              : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.35)') + ' !important',
+            border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.2)' : 'rgba(255, 255, 255, 0.15)'} !important`,
             opacity: '1 !important',
           },
           '& .MuiSwitch-thumb': {
-            backgroundColor: 'rgba(255, 255, 255, 0.9) !important',
-            border: '1px solid rgba(255, 255, 255, 0.3) !important',
+            backgroundColor: (isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.9)') + ' !important',
+            border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.4)' : 'rgba(255, 255, 255, 0.3)'} !important`,
+            boxShadow: isLight ? '0 1px 3px rgba(0, 0, 0, 0.15) !important' : 'none !important',
           },
         },
       },
@@ -225,15 +228,15 @@ export const Switch = styled((props: SwitchProps) => (
         width: 12,
         height: 12,
         margin: '1px',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-        background: 'rgba(255, 255, 255, 0.3)',
+        border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.3)' : 'rgba(255, 255, 255, 0.2)'}`,
+        background: isLight ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.3)',
         backdropFilter: 'blur(4px)',
-        boxShadow: 'none',
+        boxShadow: isLight ? '0 1px 2px rgba(0, 0, 0, 0.1)' : 'none',
       },
       '& .MuiSwitch-track': {
         borderRadius: 7,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        backgroundColor: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+        border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)'}`,
         opacity: 1,
       },
       '&:hover .MuiSwitch-thumb': {

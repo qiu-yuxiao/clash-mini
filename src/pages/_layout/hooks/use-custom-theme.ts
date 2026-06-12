@@ -485,6 +485,10 @@ export const useCustomTheme = () => {
         )
       }
       rootEle.style.setProperty(
+        '--theme-glass-border-rgb',
+        mode === 'light' ? '0, 0, 0' : '255, 255, 255',
+      )
+      rootEle.style.setProperty(
         '--theme-box-shadow',
         mode === 'light'
           ? '0 8px 32px 0 rgba(0, 0, 0, 0.08)'

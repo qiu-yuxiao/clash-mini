@@ -890,25 +890,28 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
       py: 0.5,
       '& .MuiSlider-rail': {
         height: 4,
-        bgcolor: 'rgba(255, 255, 255, 0.08)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        bgcolor: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+        border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)'}`,
         borderRadius: 2,
       },
       '& .MuiSlider-track': {
         height: 4,
         border: 'none',
         borderRadius: 2,
-        bgcolor: 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.5)',
+        bgcolor: isLight 
+          ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.6)'
+          : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.5)',
       },
       '& .MuiSlider-thumb': {
         width: 12,
         height: 12,
-        bgcolor: 'rgba(255, 255, 255, 0.8)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        boxShadow: 'none',
+        bgcolor: isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.8)',
+        border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.3)' : 'rgba(255, 255, 255, 0.3)'}`,
+        boxShadow: isLight ? '0 1px 3px rgba(0, 0, 0, 0.12)' : 'none',
         '&:hover, &.Mui-focusVisible': {
           transform: 'translate(-50%, -50%) scale(1.15)',
           bgcolor: 'rgba(255, 255, 255, 1.0)',
+          boxShadow: isLight ? '0 2px 5px rgba(0, 0, 0, 0.18)' : '0 0 4px rgba(255, 255, 255, 0.4)',
         },
       },
     }

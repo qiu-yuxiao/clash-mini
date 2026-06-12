@@ -858,7 +858,7 @@
           * `Retro 3D` 皮肤：滑块一显示为 `Depth`（立体度），滑块二显示为 `Vibrancy`（霓虹度）；
           * `Original` 皮肤：滑块一显示为 `Radius`（圆角大小），滑块二显示为 `Accent`（主色调）；
           * `Modern Flat` 皮肤：滑块一显示为 `Roundness`（圆角大小），滑块二显示为 `Shadow`（扁平阴影）；
-          * `Frosted Glass` 皮肤：滑块一显示为 `Opacity`（背景透明），滑块二显示为 `Blur`（毛玻璃浓度）；
+          * `Frosted Glass` 皮肤：滑块一显示为 `Opacity`（背景不透明度，用于调节所有玻璃容器背景色的 Alpha 透明度），滑块二显示为 `Blur`（毛玻璃浓度，用于控制所有玻璃面板及卡片的背景模糊半径）；
           * `Cyberpunk` 皮肤：滑块一显示为 `Glow`（发光强度，范围放宽至 `0.0` - `5.0` 以增强发光辨识度），滑块二显示为 `Speed`（流光循环速度，用于动态调节主面板、大卡片等外发光的呼吸/脉动动画频率）；
           * `Monochrome` 皮肤：滑块一显示为 `Contrast`（黑白对比度），滑块二显示为 `Border`（线框粗细）。
             * **对比度与线宽控制细则**：在 `Monochrome` 皮肤下，滑块一（Contrast）绑定变量 `--control-skin-val1`，用于线性调节全局次要说明文字（如 `.MuiTypography-caption`, `.text-secondary`）与分割线（`hr`, `.MuiDivider-root`）的透明度与对比度（范围在 0.3 - 1.0 之间）；滑块二（Border）绑定变量 `--vibrancy-factor`，用于调节 3D 实体按键、指标卡片及输入框线框的粗细度。
