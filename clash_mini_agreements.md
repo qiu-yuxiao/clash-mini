@@ -861,6 +861,7 @@
           * `Frosted Glass` 皮肤：滑块一显示为 `Opacity`（背景透明），滑块二显示为 `Blur`（毛玻璃浓度）；
           * `Cyberpunk` 皮肤：滑块一显示为 `Glow`（发光强度），滑块二显示为 `Speed`（流光循环速度）；
           * `Monochrome` 皮肤：滑块一显示为 `Contrast`（黑白对比度），滑块二显示为 `Border`（线框粗细）。
+            * **对比度与线宽控制细则**：在 `Monochrome` 皮肤下，滑块一（Contrast）绑定变量 `--control-skin-val1`，用于线性调节全局次要说明文字（如 `.MuiTypography-caption`, `.text-secondary`）与分割线（`hr`, `.MuiDivider-root`）的透明度与对比度（范围在 0.3 - 1.0 之间）；滑块二（Border）绑定变量 `--vibrancy-factor`，用于调节 3D 实体按键、指标卡片及输入框线框的粗细度。
 
       * **中英文字体共鸣对齐**：
         * 换肤选择器、滑块英文说明以及界面其他按钮文字的英文字体族在切换时与中文字体族进行完美风格对齐：

@@ -176,6 +176,19 @@ html[data-control-skin="monochrome"] {
     border: 1px solid var(--theme-border) !important;
     box-shadow: none !important;
   }
+
+  // Contrast Slider (Slider 1: --control-skin-val1) adjusts opacity of secondary texts and dividers
+  .MuiTypography-caption,
+  .text-secondary,
+  .MuiListItemText-secondary,
+  .MuiFormLabel-root {
+    opacity: calc(0.3 + 0.35 * var(--control-skin-val1, 1.0)) !important;
+  }
+
+  hr,
+  .MuiDivider-root {
+    opacity: calc(0.1 + 0.45 * var(--control-skin-val1, 1.0)) !important;
+  }
 }
 
 html[data-control-skin="original"] {
