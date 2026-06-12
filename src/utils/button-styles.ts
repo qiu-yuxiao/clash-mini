@@ -1002,7 +1002,6 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
   return {}
 }
 
-// 3D Segmented Active Item Text Color Helper
 export const get3DSegmentedActiveTextColor = (theme: any): string => {
   const skin = getActiveSkin(theme)
   const isLight = theme.palette.mode === 'light'
@@ -1013,9 +1012,10 @@ export const get3DSegmentedActiveTextColor = (theme: any): string => {
       return '#000000'
     case 'monochrome':
       return isLight ? '#ffffff' : '#000000'
+    case 'frosted-glass':
+      return isLight ? 'rgba(0, 0, 0, 0.85)' : '#ffffff'
     case 'original':
     case 'modern-flat':
-    case 'frosted-glass':
     default:
       return '#ffffff'
   }

@@ -24,6 +24,19 @@ export const Switch = styled((props: SwitchProps) => (
       height: 14,
       padding: 0,
       marginRight: 1,
+      '&.MuiSwitch-sizeSmall': {
+        width: '28px !important',
+        height: '14px !important',
+        padding: '0 !important',
+        '& .MuiSwitch-switchBase': {
+          padding: '0 !important',
+          margin: '0 !important',
+        },
+        '& .MuiSwitch-thumb': {
+          width: '14px !important',
+          height: '14px !important',
+        },
+      },
       '& .MuiSwitch-switchBase': {
         padding: 0,
         margin: 0,
@@ -107,6 +120,19 @@ export const Switch = styled((props: SwitchProps) => (
       height: 14,
       padding: 0,
       marginRight: 1,
+      '&.MuiSwitch-sizeSmall': {
+        width: '28px !important',
+        height: '14px !important',
+        padding: '0 !important',
+        '& .MuiSwitch-switchBase': {
+          padding: '0 !important',
+          margin: '0 !important',
+        },
+        '& .MuiSwitch-thumb': {
+          width: '14px !important',
+          height: '14px !important',
+        },
+      },
       '& .MuiSwitch-switchBase': {
         padding: 0,
         margin: 0,
@@ -153,6 +179,19 @@ export const Switch = styled((props: SwitchProps) => (
       height: 14,
       padding: 0,
       marginRight: 1,
+      '&.MuiSwitch-sizeSmall': {
+        width: '28px !important',
+        height: '14px !important',
+        padding: '0 !important',
+        '& .MuiSwitch-switchBase': {
+          padding: '0 !important',
+          margin: '0 !important',
+        },
+        '& .MuiSwitch-thumb': {
+          width: '14px !important',
+          height: '14px !important',
+        },
+      },
       '& .MuiSwitch-switchBase': {
         padding: 0,
         margin: 0,
@@ -202,6 +241,20 @@ export const Switch = styled((props: SwitchProps) => (
       height: 14,
       padding: 0,
       marginRight: 1,
+      '&.MuiSwitch-sizeSmall': {
+        width: '28px !important',
+        height: '14px !important',
+        padding: '0 !important',
+        '& .MuiSwitch-switchBase': {
+          padding: '0 !important',
+          margin: '0 !important',
+        },
+        '& .MuiSwitch-thumb': {
+          width: '12px !important',
+          height: '12px !important',
+          margin: '1px !important',
+        },
+      },
       '& .MuiSwitch-switchBase': {
         padding: 0,
         margin: 0,
@@ -254,6 +307,20 @@ export const Switch = styled((props: SwitchProps) => (
       height: 14,
       padding: 0,
       marginRight: 1,
+      '&.MuiSwitch-sizeSmall': {
+        width: '28px !important',
+        height: '14px !important',
+        padding: '0 !important',
+        '& .MuiSwitch-switchBase': {
+          padding: '0 !important',
+          margin: '0 !important',
+        },
+        '& .MuiSwitch-thumb': {
+          width: '12px !important',
+          height: '12px !important',
+          margin: '1px !important',
+        },
+      },
       '& .MuiSwitch-switchBase': {
         padding: 0,
         margin: 0,
@@ -304,6 +371,20 @@ export const Switch = styled((props: SwitchProps) => (
       height: 14,
       padding: 0,
       marginRight: 1,
+      '&.MuiSwitch-sizeSmall': {
+        width: '28px !important',
+        height: '14px !important',
+        padding: '0 !important',
+        '& .MuiSwitch-switchBase': {
+          padding: '0 !important',
+          margin: '0 !important',
+        },
+        '& .MuiSwitch-thumb': {
+          width: '12px !important',
+          height: '12px !important',
+          margin: '1px !important',
+        },
+      },
       '& .MuiSwitch-switchBase': {
         padding: 0,
         margin: 0,
