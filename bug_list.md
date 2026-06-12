@@ -12,6 +12,24 @@
 
 
 
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
+
+### **BUG-063** (3D 开关/Switch 卡死及样式冲突)
+* **缺陷描述与现象**：在 `monochrome` 皮肤下，基础设置的三个开关（开机自启、启动最小化、Allow LAN）无法拨动，视觉上卡死在左侧。
+* **排查原因与记忆**：
+  1. MUI `size="small"` 的默认 checked 样式具有较高优先级，在没有 `!important` 保护时覆盖了自定义的 `transform: translateX(14px)`。
+  2. `monochrome` 皮肤 checked 状态的轨道样式使用了 `background` 简写而非 `backgroundColor`，与 unchecked 状态的 `backgroundColor` 冲突，导致状态颜色渲染混乱。
+  3. 其他皮肤（`cyberpunk`, `frosted-glass`, `retro-3d` 等）的 checked 样式亦缺乏 `!important` 保护，存在被覆盖卡死的隐患。
+* **修改方针**：在 `base-switch.tsx` 中对所有皮肤的 checked 状态（`transform`, `backgroundColor`/`background`, `border`, `opacity`, `borderRadius`）追加 `!important` 保护；非渐变色背景统一使用 `backgroundColor`。
+
+### **BUG-064** (三选一/分段选择器活动态文字颜色无法识别与不协调)
+* **缺陷描述与现象**：在 `monochrome` 皮肤的浅色模式下，流量接管模式、分流策略倾向、主题模式、路径控制等选择器的活动项文本颜色为 `#1E1200`（深褐/金），在黑色背景板上完全无法阅读（黑吃黑）；在 `cyberpunk`、`modern-flat` 等皮肤下活动项文本也显示为 `#1E1200`，与皮肤设计极不协调。
+* **排查原因与记忆**：`_layout.tsx` 中所有的分段按钮选项文字颜色被硬编码为 `color: active === X ? '#1E1200' : 'text.secondary'`，未随皮肤动态变化。
+* **修改方针**：
+  1. 在 `button-styles.ts` 中新增并导出 `get3DSegmentedActiveTextColor(theme)` 样式函数，返回对应皮肤高对比度的文本颜色。
+  2. 修改 `_layout.tsx`，将 `#1E1200` 替换为该函数的返回值。
+
+---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 

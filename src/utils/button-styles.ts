@@ -997,3 +997,23 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
 
   return {}
 }
+
+// 3D Segmented Active Item Text Color Helper
+export const get3DSegmentedActiveTextColor = (theme: any): string => {
+  const skin = getActiveSkin(theme)
+  const isLight = theme.palette.mode === 'light'
+  switch (skin) {
+    case 'retro-3d':
+      return '#1E1200'
+    case 'cyberpunk':
+      return '#000000'
+    case 'monochrome':
+      return isLight ? '#ffffff' : '#000000'
+    case 'original':
+    case 'modern-flat':
+    case 'frosted-glass':
+    default:
+      return '#ffffff'
+  }
+}
+

@@ -29,27 +29,27 @@ export const Switch = styled((props: SwitchProps) => (
         margin: 0,
         transitionDuration: '300ms',
         '&.Mui-checked': {
-          transform: 'translateX(14px)',
-          color: '#fff',
+          transform: 'translateX(14px) !important',
+          color: '#fff !important',
           '& + .MuiSwitch-track': {
-            background: isLight
+            background: (isLight
               ? `linear-gradient(to bottom, #FFA000 0%, #E65100 100%)`
-              : `linear-gradient(to bottom, rgba(255, 160, 0, 0.8) 0%, rgba(230, 81, 0, 0.9) 100%)`,
-            opacity: 0.85,
-            boxShadow: isLight
+              : `linear-gradient(to bottom, rgba(255, 160, 0, 0.8) 0%, rgba(230, 81, 0, 0.9) 100%)`) + ' !important',
+            opacity: '0.85 !important',
+            boxShadow: (isLight
               ? `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.4),
                  0 1px 0 rgba(255,255,255,0.8),
                  0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.3 * var(--vibrancy-factor, 1.0)))`
               : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.8),
                  0 1px 0 rgba(255, 255, 255, 0.08),
                  inset 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, 0.4),
-                 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.4 * var(--vibrancy-factor, 1.0)))`,
+                 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.4 * var(--vibrancy-factor, 1.0)))`) + ' !important',
           },
           '& .MuiSwitch-thumb': {
-            background: isLight
+            background: (isLight
               ? `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFD54F 55%, #FFA000 100%)`
-              : `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFA000 55%, #E65100 100%)`,
-            border: `1px solid ${isLight ? '#9E670B' : '#6E4302'}`,
+              : `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFA000 55%, #E65100 100%)`) + ' !important',
+            border: `1px solid ${isLight ? '#9E670B' : '#6E4302'} !important`,
           },
         },
       },
@@ -112,17 +112,17 @@ export const Switch = styled((props: SwitchProps) => (
         margin: 0,
         transitionDuration: '200ms',
         '&.Mui-checked': {
-          transform: 'translateX(14px)',
-          color: '#fff',
+          transform: 'translateX(14px) !important',
+          color: '#fff !important',
           '& + .MuiSwitch-track': {
-            backgroundColor: 'var(--primary-main)',
-            opacity: 1,
-            boxShadow: 'none',
-            border: 'none',
+            backgroundColor: 'var(--primary-main) !important',
+            opacity: '1 !important',
+            boxShadow: 'none !important',
+            border: 'none !important',
           },
           '& .MuiSwitch-thumb': {
-            background: '#ffffff',
-            border: 'none',
+            backgroundColor: '#ffffff !important',
+            border: 'none !important',
           },
         },
       },
@@ -158,17 +158,17 @@ export const Switch = styled((props: SwitchProps) => (
         margin: 0,
         transitionDuration: '200ms',
         '&.Mui-checked': {
-          transform: 'translateX(14px)',
-          color: '#fff',
+          transform: 'translateX(14px) !important',
+          color: '#fff !important',
           '& + .MuiSwitch-track': {
-            backgroundColor: theme.palette.primary.main,
-            opacity: 1,
-            boxShadow: 'none',
-            border: 'none',
+            backgroundColor: theme.palette.primary.main + ' !important',
+            opacity: '1 !important',
+            boxShadow: 'none !important',
+            border: 'none !important',
           },
           '& .MuiSwitch-thumb': {
-            background: '#ffffff',
-            border: 'none',
+            backgroundColor: '#ffffff !important',
+            border: 'none !important',
           },
         },
       },
@@ -207,16 +207,16 @@ export const Switch = styled((props: SwitchProps) => (
         margin: 0,
         transitionDuration: '250ms',
         '&.Mui-checked': {
-          transform: 'translateX(14px)',
-          color: '#fff',
+          transform: 'translateX(14px) !important',
+          color: '#fff !important',
           '& + .MuiSwitch-track': {
-            background: 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.35)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            opacity: 1,
+            backgroundColor: 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.35) !important',
+            border: '1px solid rgba(255, 255, 255, 0.15) !important',
+            opacity: '1 !important',
           },
           '& .MuiSwitch-thumb': {
-            background: 'rgba(255, 255, 255, 0.9)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
+            backgroundColor: 'rgba(255, 255, 255, 0.9) !important',
+            border: '1px solid rgba(255, 255, 255, 0.3) !important',
           },
         },
       },
@@ -256,17 +256,17 @@ export const Switch = styled((props: SwitchProps) => (
         margin: 0,
         transitionDuration: '150ms',
         '&.Mui-checked': {
-          transform: 'translateX(14px)',
+          transform: 'translateX(14px) !important',
           '& + .MuiSwitch-track': {
-            background: '#0a0e17',
-            border: '1px solid #00f0ff',
-            opacity: 1,
+            backgroundColor: '#0a0e17 !important',
+            border: '1px solid #00f0ff !important',
+            opacity: '1 !important',
           },
           '& .MuiSwitch-thumb': {
-            background: '#00f0ff',
-            color: '#00f0ff',
-            borderRadius: '0px',
-            boxShadow: '0 0 6px #00f0ff',
+            backgroundColor: '#00f0ff !important',
+            color: '#00f0ff !important',
+            borderRadius: '0px !important',
+            boxShadow: '0 0 6px #00f0ff !important',
           },
         },
       },

@@ -95,6 +95,7 @@ import {
   get3DSegmentedContainerStyle,
   get3DSegmentedActiveStyle,
   get3DCardStyle,
+  get3DSegmentedActiveTextColor,
 } from '@/utils/button-styles'
 import getSystem from '@/utils/get-system'
 import parseTraffic from '@/utils/parse-traffic'
@@ -2625,7 +2626,7 @@ const Layout = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           color:
-                            activeIndex === 0 ? '#1E1200' : 'text.secondary',
+                            activeIndex === 0 ? get3DSegmentedActiveTextColor(theme) : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -2659,7 +2660,7 @@ const Layout = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           color:
-                            activeIndex === 1 ? '#1E1200' : 'text.secondary',
+                            activeIndex === 1 ? get3DSegmentedActiveTextColor(theme) : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -2693,7 +2694,7 @@ const Layout = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           color:
-                            activeIndex === 2 ? '#1E1200' : 'text.secondary',
+                            activeIndex === 2 ? get3DSegmentedActiveTextColor(theme) : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -2766,7 +2767,7 @@ const Layout = () => {
                           justifyContent: 'center',
                           color:
                             policyActiveIndex === 0
-                              ? '#1E1200'
+                              ? get3DSegmentedActiveTextColor(theme)
                               : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
@@ -2802,7 +2803,7 @@ const Layout = () => {
                           justifyContent: 'center',
                           color:
                             policyActiveIndex === 1
-                              ? '#1E1200'
+                              ? get3DSegmentedActiveTextColor(theme)
                               : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
@@ -2836,7 +2837,7 @@ const Layout = () => {
                           justifyContent: 'center',
                           color:
                             policyActiveIndex === 2
-                              ? '#1E1200'
+                              ? get3DSegmentedActiveTextColor(theme)
                               : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
@@ -3060,7 +3061,7 @@ const Layout = () => {
                             justifyContent: 'center',
                             color:
                               themeActiveIndex === 0
-                                ? '#1E1200'
+                                ? get3DSegmentedActiveTextColor(theme)
                                 : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
@@ -3085,7 +3086,7 @@ const Layout = () => {
                             justifyContent: 'center',
                             color:
                               themeActiveIndex === 1
-                                ? '#1E1200'
+                                ? get3DSegmentedActiveTextColor(theme)
                                 : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
@@ -3110,7 +3111,7 @@ const Layout = () => {
                             justifyContent: 'center',
                             color:
                               themeActiveIndex === 2
-                                ? '#1E1200'
+                                ? get3DSegmentedActiveTextColor(theme)
                                 : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
@@ -3383,7 +3384,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           connectionsType === 'active'
-                            ? '#1E1200'
+                            ? get3DSegmentedActiveTextColor(theme)
                             : 'text.secondary',
                         fontSize: '11px',
                         fontWeight: 'bold',
@@ -3409,7 +3410,7 @@ const Layout = () => {
                         justifyContent: 'center',
                         color:
                           connectionsType === 'closed'
-                            ? '#1E1200'
+                            ? get3DSegmentedActiveTextColor(theme)
                             : 'text.secondary',
                         fontSize: '11px',
                         fontWeight: 'bold',
