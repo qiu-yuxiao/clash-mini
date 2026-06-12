@@ -398,6 +398,7 @@ export const Switch = styled((props: SwitchProps) => (
           },
           '& .MuiSwitch-thumb': {
             backgroundColor: (isLight ? '#ffffff' : '#000000') + ' !important',
+            color: (isLight ? '#ffffff' : '#000000') + ' !important',
             borderRadius: '0px !important',
             border: 'none !important',
           },
@@ -410,6 +411,7 @@ export const Switch = styled((props: SwitchProps) => (
         margin: '1px',
         borderRadius: '0px',
         backgroundColor: isLight ? '#000000' : '#ffffff',
+        color: (isLight ? '#000000' : '#ffffff') + ' !important',
         border: 'none',
         boxShadow: 'none',
       },
