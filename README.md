@@ -61,6 +61,9 @@ Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailore
 * **Retro-3D Theme (复古拟物主题)**:
   <br/>
   <img src="docs/assets/screenshot_narrow_settings_retro.png" alt="Settings Drawer Retro" width="280" />
+* **Monochrome Theme (黑白极简主题)**:
+  <br/>
+  <img src="docs/assets/screenshot_narrow_settings_monochrome.png" alt="Settings Drawer Monochrome" width="280" />
 
 ### 4. Expert Mode Layouts (宽窗口专家模式)
 * **Dark Theme (深色主题)**:
