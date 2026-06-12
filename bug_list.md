@@ -15,15 +15,16 @@
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
 ### **BUG-063** (3D 开关/Switch 卡死及样式冲突)
-* **缺陷描述与现象**：在 `monochrome`（黑白极简）和 `retro-3d`（Chrome金属）、`cyberpunk` 等换肤皮肤下，基础设置的三个 `size="small"` 开关（开机自启、启动最小化、Allow LAN）在开启（checked）状态下，视觉上依旧卡死在左侧无法移动到右侧。
+* **缺陷描述与现象**：在 `monochrome` 皮肤下，基础设置的三个开关（开机自启、启动最小化、Allow LAN）无法拨动，视觉上卡死在左侧。
 * **排查原因与记忆**：
   1. MUI `size="small"` 的默认 checked 样式具有较高优先级，在没有 `!important` 保护时覆盖了自定义的 `transform: translateX(14px)`。
-  2. 自定义皮肤下的 switchBase 移除了 padding 且未锁定 `width: 14px` 与 `height: 14px`，导致 switchBase 依然保持 MUI 默认的大尺寸（32px+），使得小开关的 checked 状态位移与热区失效，视觉上停留于左侧。
+  2. `monochrome` 皮肤 checked 状态的轨道样式使用了 `background` 简写而非 `backgroundColor`，与 unchecked 状态的 `backgroundColor` 冲突，导致状态颜色渲染混乱。
+  3. 自定义皮肤下的 switchBase 移除了 padding 导致交互层 `<input>` 物理热区极度缩小（仅 12px），点击右侧轨道或选中状态下点击左侧均无法触发 checkbox 切换，呈现出"卡死/无法拨动"的限制感。
 * **修改方针**：
-  1. 在 `base-switch.tsx` 中对所有皮肤（Retro-3d, Original, Modern Flat, Frosted Glass, Cyberpunk, Monochrome）的 `&.MuiSwitch-sizeSmall` 样式规则下的 `.MuiSwitch-switchBase` 进行 `width: '14px !important', height: '14px !important'` 的尺寸强制锁定。
-  2. 在 `sizeSmall` 内的 `.MuiSwitch-switchBase` 的 `&.Mui-checked` 中强制指定 `transform: 'translateX(14px) !important'`。
-  3. 将 `<input>` 交互热区通过 full-width (28px * 14px) 配合 checked 反向偏移 (`-14px`) 进行交互扩充，确保全开关表面均可灵敏点按。
-* **状态**：已将 sizeSmall 锁定定位和点击范围扩充推广至所有皮肤款式（特别是 Retro-3d 镜面铬球与 Monochrome 皮肤），保证滑块在 checked 状态下在视觉上可以平滑移动至右侧，待确认。
+  1. 在 `base-switch.tsx` 中对所有皮肤的 checked 状态追加 `!important` 保护；非渐变色背景统一使用 `backgroundColor`。
+  2. 通过公共后处理，将 `<input>` 交互范围强制扩充为全局 28px * 14px 满宽，并利用 checked 反向偏移 (`-14px`) 抵消位移，使整个开关范围在全状态下都极易触发交互。
+  3. 在 `.MuiSwitch-sizeSmall` 内对 `monochrome` 皮肤强制锁定 `translateX(14px) !important` 和 `width: 14px`, `height: 14px`。
+* **状态**：已修正 checked 状态下的 sizeSmall 锁定定位，保证 `monochrome` 皮肤的设置项开关在 checked 状态下在视觉上可以平滑移动至右侧，待确认。
 
 ### **BUG-064** (三选一/分段选择器活动态文字颜色无法识别与不协调)
 * **缺陷描述与现象**：在 `monochrome` 皮肤的浅色模式下，流量接管模式、分流策略倾向、主题模式、路径控制等选择器的活动项文本颜色为 `#1E1200`（深褐/金），在黑色背景板上完全无法阅读（黑吃黑）；在 `cyberpunk`、`modern-flat` 等皮肤下活动项文本也显示为 `#1E1200`，与皮肤设计极不协调。
