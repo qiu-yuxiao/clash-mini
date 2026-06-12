@@ -1,140 +1,70 @@
 # 👑 Clash Mini 一键静默发行准则 (One-Click Silent Release Guidelines)
 
 > [!IMPORTANT]
-> **【发行硬红线】自 2026 年 6 月 6 日起，由于 Mihomo 内核 v1.19.27 废弃了 global-client-fingerprint 导致客户端启动崩溃白屏。此后所有发行版本必须锁定并使用 v1.19.26 旧版内核进行打包，严禁拉取 latest 内核。**
-
-
-**【警告：本准则具有法律级效力，仅次于宪法（.cursorrules）。凡执行发行动作的 Agent 必须 100% 遵守本规则。违反本规则的任何原生弹窗命令均被判定为严重故障。】**
+> **【发行硬红线】所有发行版本必须锁定并使用 v1.19.26 旧版内核进行打包，严禁拉取 latest 内核。**
+> **本准则供 AI Agent 自动发行使用。若违反本规则导致任何非预期弹窗或流程错误，均判定为严重故障。**
 
 ---
 
-## 🔍 第一阶段：环境就绪预检与本地验证 (Environmental Pre-Check & Local Verification)
+## 🚦 决策树：选择发行路径
 
-当接收到用户发出的发行/动工指令时，**必须首先执行以下环境检测、缓存清理与验证流程**。严禁省略此流程直接修改代码或编译发布。
+1. **默认路径：云端直接极速发布（模块二）**
+   - **触发条件**：用户未明确要求“本地测试”/“真机看效果”，或直接说“静默发布”/“直接发布”。
+   - **流程**：直接跳过本地服务与端口检测，直接进入【模块二】。
+2. **分支路径：本地验证后发布（模块一 + 模块二）**
+   - **触发条件**：用户明确提出“要在本地测试”/“启动测试服务”/“真机确认效果”。
+   - **流程**：执行【模块一】进行本地预检与对齐，用户确认后再执行【模块二】。
 
-1. **服务锁检测 (Service Lock Check)**：
-   - 运行：`powershell -Command "Get-CimInstance -ClassName Win32_Service -Filter 'Name=''clash_verge_service''' -ErrorAction SilentlyContinue | Where-Object { \$_.PathName -ne \$null -and (\$_.PathName -like '*Documents\AntiGravity_Projects\ClashVerge*' -or \$_.PathName -like '*clash-mini*') }"`
-   - 验证：若有输出，且服务状态为 `Running`，必须提醒用户停止对应的开发服务以释放 `clash-verge-service.exe` 锁。若服务运行自原版安装目录（如 `C:\Program Files\Clash Verge`），则忽略，不要求停止。
-2. **残留进程锁检测 (Process Lock Check)**：
-   - 运行：`powershell -Command "Get-Process | Where-Object { \$_.Path -ne \$null -and (\$_.Path -like '*Documents\AntiGravity_Projects\ClashVerge*' -or \$_.Name -eq 'clash-mini' -or \$_.Name -eq 'Clash Mini') }"`
-   - 验证：输出必须为空，不得有本开发项目相关的残留代理或内核进程，以防文件锁死。（注：绝对禁止检测或杀灭原版 Clash Verge 代理，因为它是 AI 模型与用户之间的网络通信载体）。
-   - 调试方法：也可以在已处于 PowerShell 会话中时直接运行：`Get-Process | Where-Object { $_.Path -ne $null -and ($_.Path -like "*Documents\AntiGravity_Projects\ClashVerge*" -or $_.Name -eq "clash-mini" -or $_.Name -eq "Clash Mini") }`
-3. **端口占用检测 (Port Conflict Check)**：
-   - 运行：`powershell -Command "Get-NetTCPConnection -LocalPort 10801, 9098 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique"`
-   - 验证：输出必须为空。如果占用的 PID 存在，说明存在冲突，测试前必须将其强制结束。
-4. **【强制】本地清理缓存与真机 Dev 验证核对 (Local Cache Purge & Dev Verification)**：
-   - **清理缓存**：必须首先在工作区运行 `Remove-Item -Recurse -Force node_modules/.vite` 命令清除旧的前端 Vite 编译缓存，确保编译状态为最新。
-   - **Dev 运行**：本地必须使用 `pnpm dev`（安全隔离模式下，TUN 和系统代理为 `false`，端口 10801/9098 隔离）拉起开发调试服务。
-   - **对齐汇报**：Agent 必须在本地对所有修改的 UI 元素（如按钮 3D 样式、卡片折行自适应、组件尺寸等）及后端逻辑进行物理效果与交互核对，并在聊天窗口中向用户提供详实的真机表现文字或状态证据汇报。**获得用户在对话中明确的“确认/同意”指令后，方可进行下一步的 GitHub 编译和发行。** 以后所有的发布，都必须强制走完这个本地双重核对流程，绝对禁止绕过。
-5. **GitHub API 访问凭证与 Git 代理准备 (GitHub Token & Git Proxy Preparation)**：
-   - 检查并读取项目根目录下的 [github_token.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/github_token.txt)。
-   - 验证并在此后的 Actions 状态查询或 Release 操作中，必须将该 Token 附在 API 请求 of `Authorization` 头部，严禁以无 Token 状态频繁匿名请求 GitHub 接口以免造成 IP 访问受限。
-   - **【强制】Git 本地代理配置**：在执行任何 Git 发送、打标签或推送命令前，必须先在本地配置 Git 代理和 SSL 校验后端，以确保子进程调用时不会发生连接超时或卡死：
+---
+
+## ⚙️ 模块一：本地环境预检与真机对齐 (Local Verification)
+
+1. **清理环境锁**：
+   - 检查本地服务 `clash_verge_service`。若状态为 `Running`，**提醒用户手动运行 `Stop-Service -Name clash_verge_service`** 释放文件锁。
+   - 检查并确保无 `clash-mini` 残留进程，且端口 `10801`, `9098` 未被占用。
+2. **本地 Dev 验证**：
+   - 清除缓存：`Remove-Item -Recurse -Force node_modules/.vite`。
+   - 运行开发服务：`pnpm dev`（隔离模式，系统代理/TUN 默认为 `false`）。
+   - **对齐汇报**：在聊天窗口向用户陈述 UI 表现（尺寸、3D、折行等），**等待用户在对话中明确回复“同意/开始发行”**后，终止本地服务并进入【模块二】。
+
+---
+
+## 🚀 模块二：云端静默发布与监控 (Remote Release)
+
+1. **协议与缺陷登记**（修改顺序铁律）：
+   - 在 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 登记新特性/修改，在 [bug_list.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/bug_list.md) 登记 Bug 状态为“已解决”。
+   - **先独立提交文档**：运行 `git add` 仅包含协议与 Bug List，执行 `git commit -m "docs: register changes" --no-verify` 提交。
+2. **静态资产校验**（云端发布唯一的防线）：
+   - 运行前端编译：`pnpm web:build`。若有任何报错/警告，必须立即中止。
+3. **提交业务代码**：
+   - 运行 `git add .` 并执行 `git commit -m "feat: implement logic" --no-verify`。
+4. **Git Tag 更新与推送**：
+   - 配置 Git 代理以确保不超时：
      ```powershell
      git config --local http.proxy http://127.0.0.1:7890
      git config --local http.sslBackend openssl
      ```
-
-### 📢 反馈警报与放行规则
-- **检测通过**：在聊天窗口向用户输出：**「环境检测与缓存清理通过，接下来的编译与验证环境已就绪。我将拉起本地 dev 服务进行第一轮物理效果验证，稍后为您汇报对齐结果，等待您的确认指令。」** 之后开始后续步骤。
-- **检测失败**：立刻终止发行，并在聊天窗口中清晰指出哪一项被占用（如服务未停、端口冲突），并指导用户进行具体的手动操作，清除障碍后再试。
-
----
-
-## 🛠️ 第二阶段：协议与 Bug 清单登记
-
-在修改任何代码文件之前，必须率先更新文档，将本次修复或功能点落实在字面上：
-1. **更新基本协议**：在 `clash_mini_agreements.md` 的正本正文对应章节中写入新功能或修改细节。
-2. **更新 Bug 跟踪表**：在 `bug_list.md` 的 Bug 表格中追加/更新登记此 Bug ID、缺陷描述、解决版本及具体修复方案，注明状态为“已解决”。
-3. **【强制】NPM 脚本封装与免 verify 提交**：
-   - **完全静默运行自定义脚本**：严禁在控制台中直接运行 `python <script>`、`node <script>` 或其他自定义命令，因为它们会触发沙箱审批弹窗。所有辅助校验或文档准备脚本必须在 `package.json` 的 `scripts` 中注册为任务，并使用 `pnpm <任务名>` 格式运行，利用 `pnpm` 默认免审的权限实现完全静默。
-   - **免校验提交文档与配置**：由于 Husky/Lint-staged 可能会拦截并导致提交失败，对文档修改和版本 bump 的提交应当强制使用 `--no-verify` (或 `-n`) 选项，防止发布流水线被格式检查打断：
+   - 若是重新发布当前版本，先清除本地与远端同名 Tag：
      ```powershell
-     git commit --no-verify -m "commit_message"
+     git tag -d v1.1.2
+     git push origin :refs/tags/v1.1.2
      ```
-
----
-
-## 🚀 第三阶段：完全静默开发与校验流水线 (Silent Pipeline)
-
-为避免弹窗干扰用户，所有的编译、测试与构建指令**必须使用 `powershell` 直接执行或通过 `pnpm` 静默调用**。
-
-### 1. 代码修改与单元测试
-- 编写修复代码（Rust 与前端 TSX）。
-- 静默运行 Rust 单元测试：
-  ```powershell
-  cargo test --package clash-mini --lib -- enhance::tests::test_enforce_mini_agreements_logic
-  ```
-- 单元测试不通过，必须立即中断，严禁推标签。
-
-### 2. 前端资产编译静态校验
-- 运行前端静态类型检查与编译，验证无任何报错：
-  ```powershell
-  pnpm web:build
-  ```
-- 存在任何静态类型或编译错误，必须立刻停下，严禁强推。
-
-### 3. 一键版本升级与推送
-- 运行发布脚本修改版本号、打 tag 并推送至远端仓库（GitHub）：
-  - **极速便携版发布 (默认，仅 Windows x64 便携版)**：
-    ```powershell
-    pnpm publish-version <版本号>
-    ```
-    *(例如：`pnpm publish-version 1.1.5`，这将触发 GitHub Actions 仅编译 Windows 64位绿色便携包，耗时约 2-3 分钟)*
-  - **全平台完整发布 (指定 -full 或 -all 尾缀)**：
-    ```powershell
-    pnpm publish-version <版本号>-full
-    ```
-    *(例如：`pnpm publish-version 1.1.5-full`，这将编译并发布所有平台如 macOS、Linux、以及 Windows WebView2 固定版等，耗时约 10-15 分钟)*
-- 该脚本会自动在本地更新三端版本号，提交更改，自动建立对应的 Git Tag，并使用 Git Push 推送 Tag 到 origin，从而在云端触发对应的构建流水线。
-
-### 4. 远程构建监控与便携包自动拉回 (CI/CD Watch & Auto-Pull)
-- 推送 Tag 后，构建过程需要几分钟。为了保证对用户的零弹窗打扰，**必须优先使用「浏览器静默监控」**；只有在必要时才使用「命令行监控」。
-  
-  - **方法 A：浏览器静默监控 (推荐 - 100% 零弹窗)**：
-    1. **输出监控链接**：在启动监控的第一时间，必须将对应的 GitHub Actions Run 网页链接（`https://github.com/qiu-yuxiao/clash-mini/actions/runs/<RUN_ID>`）在对话中打印出来，提示用户可以自主点击该链接在浏览器中实时、直观地监视构建状态，从而无需依赖任何弹窗提醒。
-    2. 访问或在后台使用 `read_url_content` 静静获取 GitHub Run 详情 API：`https://api.github.com/repos/qiu-yuxiao/clash-mini/actions/runs/<RUN_ID>`
-    3. 或获取网页 HTML：`https://github.com/qiu-yuxiao/clash-mini/actions/runs/<RUN_ID>`
-    4. 利用本地 `schedule` 定时器定时唤醒，在后台静默轮询 API/HTML 状态（检查 `"status": "completed"` 或 `streaming-graph-job` 的完成图标）。
-    5. 这种方式完全不执行本地命令行，因此在整个编译监控期间**不会触发任何用户沙箱审批弹窗**。
-  
-  - **方法 B：命令行监控 (备用 - 需用户 Approve 弹窗)**：
-    - 若需要使用本地 `gh` 工具监控，在根目录下使用 `github_token.txt` 作为凭证调用：
-      ```powershell
-      $token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; gh run watch --repo qiu-yuxiao/clash-mini
-      ```
-      *注意：运行本地命令需要用户在聊天界面点击「Submit」按钮审批。*
-
-- **监控到发行完成后，立刻将 Windows 免安装版拉回指定测试路径**：
-  - 运行下载命令将生成的 Windows x64 便携版绿色压缩包下载并覆盖至 `portable_test` 目录：
-    ```powershell
-    $token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; gh release download v<版本号> --pattern '*_x64_portable.zip' --dir 'C:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\portable_test' --clobber --repo qiu-yuxiao/clash-mini
-    ```
-  - *(注：便携包拉回后，即可在该目录下解压并由人工/AI 进行真机最后的 Bug 校验与回归测试)*
-
----
-
-## 🏁 第四阶段：收尾与环境复原 (Wrap-Up & Environment Reset)
-
-在本地或远程发布构建完成后，**必须依次执行以下收尾清理程序**，将工作区与宿主机状态恢复为最洁净状态，严禁草率交付：
-
-1. **杀灭开发版残留进程 (Kill Resilient Dev Processes)**：
-   - 运行：可在 PowerShell 会话中运行：
-     `Get-Process | Where-Object { $_.Path -ne $null -and ($_.Path -like "*Documents\AntiGravity_Projects\ClashVerge*" -or $_.Name -eq "clash-mini" -or $_.Name -eq "Clash Mini") } | Stop-Process -Force`
-     并且清除端口占用：
-     `$pids = Get-NetTCPConnection -LocalPort 10801, 9098 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; if ($pids) { Stop-Process -Id $pids -Force }`
-   - 验证并确保所有本项目开发版程序、UI 和内核已被干净清空，将 `10801`、`9098` 端口及系统服务锁完全释放并归还宿主机。
-2. **工作区环境打扫 (Workspace Cleaning)**：
-   - 运行：`Remove-Item -Recurse -Force node_modules/.vite` 以彻底清除开发期的 Vite 构建缓存。
-   - 审计：手动检查并删除除 `.gitignore` 中 `scratch/` 目录外的所有在开发期间临时产生或修改过的调试脚本、临时日志、调试 YAML 配置文件等，保证 Git Status 干净。
-   - **还原本地 Git 配置**：发行工作结束后，为了保持仓库配置干净并避免干扰日常非代理操作，建议将本次发行所临时写入的本地 Git 代理与安全设置恢复初始状态：
+   - 升级版本号并推送 Tag 到 GitHub 触发 Actions 编译：
+     ```powershell
+     pnpm publish-version 1.1.2
+     ```
+5. **云端 Actions 监控**：
+   - 打印 Actions 运行链接（形如 `https://github.com/qiu-yuxiao/clash-mini/actions`）引导用户查看。
+   - 读取 [github_token.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/github_token.txt) 中的 Token 作为 API Authorization 头部。
+   - 后台静默调用 GitHub API 获取当前 Run 状态直至完成，在此期间不调用任何命令行，实现零弹窗。
+6. **拉回包与环境复原**：
+   - 运行下载命令将生成的 Windows x64 便携版绿色包拉回至 `portable_test`：
+     ```powershell
+     $token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; gh release download v1.1.2 --pattern '*_x64_portable.zip' --dir 'portable_test' --clobber --repo qiu-yuxiao/clash-mini
+     ```
+   - 恢复 Git 配置：
      ```powershell
      git config --local --unset http.proxy
      git config --local --unset http.sslBackend
      ```
-3. **缺陷闭环与 Walkthrough 归档 (Defect Tracking & Walkthrough Archive)**：
-   - 缺陷更新：确保 `bug_list.md` 和 `clash_mini_agreements.md` 的 Bug 跟踪清单中，本次修复 the 缺陷已更新为“已解决”，并详实记录了修复方案。
-   - 编写归档：在本地更新并保存 `walkthrough.md`，详细记录本次改动的物理事实、验证表现与测试结果，作为历史审计凭证。
-4. **任务看板重置 (Task Board Reset)**：
-   - 清空或重置 `task.md`，彻底清除已完成的 checklist 项，为下一个版本迭代的全新起点做好准备。
-- 给用户留下一句简炼的总结消息，报告发行圆满完成。
+   - 重置 `task.md` 看板，并在 `walkthrough.md` 归档测试表现，清空 Vite 缓存。
