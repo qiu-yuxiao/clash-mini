@@ -42,9 +42,12 @@ Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailore
 ## Visual Showcase
 
 ### 1. Micro-Monitoring Mode (流量监控模式)
-<p align="left">
+* **Standard Theme (标准主题)**:
+  <br/>
   <img src="docs/assets/screenshot_traffic_monitor.png" alt="Micro-Monitoring Mode" width="280" />
-</p>
+* **Retro-3D Theme (复古拟物主题)**:
+  <br/>
+  <img src="docs/assets/screenshot_traffic_monitor_retro.png" alt="Micro-Monitoring Mode Retro" width="280" />
 
 ### 2. Node List in Narrow Layout (窄窗口模式 节点列表)
 <p align="left">
