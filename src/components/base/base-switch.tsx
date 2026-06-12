@@ -445,6 +445,8 @@ export const Switch = styled((props: SwitchProps) => (
           margin: '0 !important',
           width: '14px !important',
           height: '14px !important',
+          transform: 'translateX(0px) !important',
+          transition: 'transform 100ms ease-in-out !important',
           '&.Mui-checked': {
             transform: 'translateX(14px) !important',
           },
@@ -468,7 +470,8 @@ export const Switch = styled((props: SwitchProps) => (
         margin: 0,
         width: '14px !important',
         height: '14px !important',
-        transitionDuration: '100ms',
+        transform: 'translateX(0px) !important',
+        transition: 'transform 100ms ease-in-out !important',
         '&.Mui-checked': {
           transform: 'translateX(14px) !important',
           '& + .MuiSwitch-track': {
