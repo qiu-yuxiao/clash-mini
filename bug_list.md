@@ -19,8 +19,11 @@
 * **排查原因与记忆**：
   1. MUI `size="small"` 的默认 checked 样式具有较高优先级，在没有 `!important` 保护时覆盖了自定义的 `transform: translateX(14px)`。
   2. `monochrome` 皮肤 checked 状态的轨道样式使用了 `background` 简写而非 `backgroundColor`，与 unchecked 状态的 `backgroundColor` 冲突，导致状态颜色渲染混乱。
-  3. 其他皮肤（`cyberpunk`, `frosted-glass`, `retro-3d` 等）的 checked 样式亦缺乏 `!important` 保护，存在被覆盖卡死的隐患。
-* **修改方针**：在 `base-switch.tsx` 中对所有皮肤的 checked 状态（`transform`, `backgroundColor`/`background`, `border`, `opacity`, `borderRadius`）追加 `!important` 保护；非渐变色背景统一使用 `backgroundColor`。
+  3. 自定义皮肤下的 switchBase 移除了 padding 导致交互层 `<input>` 物理热区极度缩小（仅 12px），点击右侧轨道或选中状态下点击左侧均无法触发 checkbox 切换，呈现出"卡死/无法拨动"的限制感。
+* **修改方针**：
+  1. 在 `base-switch.tsx` 中对所有皮肤的 checked 状态追加 `!important` 保护；非渐变色背景统一使用 `backgroundColor`。
+  2. 通过公共后处理，将 `<input>` 交互范围强制扩充为全局 28px * 14px 满宽，并利用 checked 反向偏移 (`-14px`) 抵消位移，使整个开关范围在全状态下都极易触发交互。
+  3. 在 `.MuiSwitch-sizeSmall` 内强制锁定 `translateX(14px) !important`。
 
 ### **BUG-064** (三选一/分段选择器活动态文字颜色无法识别与不协调)
 * **缺陷描述与现象**：在 `monochrome` 皮肤的浅色模式下，流量接管模式、分流策略倾向、主题模式、路径控制等选择器的活动项文本颜色为 `#1E1200`（深褐/金），在黑色背景板上完全无法阅读（黑吃黑）；在 `cyberpunk`、`modern-flat` 等皮肤下活动项文本也显示为 `#1E1200`，与皮肤设计极不协调。
