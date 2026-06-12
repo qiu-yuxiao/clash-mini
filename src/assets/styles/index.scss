@@ -74,8 +74,8 @@ body {
 .theme-panel {
   border: 4px double var(--theme-border) !important;
   border-radius: var(--border-radius, 8px);
-  background: rgba(var(--theme-panel-base-rgb, 255, 255, 255), calc(1 - 0.3 * var(--depth-factor, 1.0))) !important;
-  backdrop-filter: blur(calc(16px * var(--depth-factor, 1.0))) !important;
+  background: rgba(var(--theme-panel-base-rgb, 255, 255, 255), calc(1 - 0.3 * var(--depth-factor, 1.0) * var(--vibrancy-factor, 1.0))) !important;
+  backdrop-filter: blur(calc(16px * var(--depth-factor, 1.0) * var(--vibrancy-factor, 1.0))) !important;
   box-shadow: 
     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.12 * var(--depth-factor, 1.0))),
     inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))),
@@ -85,8 +85,8 @@ body {
 
 /* Crystal card: glassmorphism card supporting 3D bevel and neon backlights */
 .theme-crystal-card {
-  background: rgba(var(--theme-panel-base-rgb, 255, 255, 255), calc(1 - 0.3 * var(--depth-factor, 1.0))) !important;
-  backdrop-filter: blur(calc(12px * var(--depth-factor, 1.0))) !important;
+  background: rgba(var(--theme-panel-base-rgb, 255, 255, 255), calc(1 - 0.3 * var(--depth-factor, 1.0) * var(--vibrancy-factor, 1.0))) !important;
+  backdrop-filter: blur(calc(12px * var(--depth-factor, 1.0) * var(--vibrancy-factor, 1.0))) !important;
   border: 1px solid rgba(var(--theme-panel-base-rgb, 255, 255, 255), calc(0.12 + 0.1 * var(--depth-factor, 1.0))) !important;
   box-shadow: 
     inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.15 * var(--depth-factor, 1.0))),
