@@ -37,7 +37,7 @@
 2. **静态资产校验**（云端发布唯一的防线）：
    - 运行前端编译：`pnpm web:build`。若有任何报错/警告，必须立即中止。
 3. **提交业务代码**：
-   - 运行 `git add .` 并执行 `git commit -m "feat: implement logic" --no-verify`。
+   - 运行 `git add .` 并执行 `git commit -m "feat: implement logic" --no-verify`  提交。
 4. **Git Tag 更新与推送**：
    - 配置 Git 代理以确保不超时：
      ```powershell
@@ -46,21 +46,21 @@
      ```
    - 若是重新发布当前版本，先清除本地与远端同名 Tag：
      ```powershell
-     git tag -d v1.1.2
-     git push origin :refs/tags/v1.1.2
+     git tag -d v<版本号>
+     git push origin :refs/tags/v<版本号>
      ```
    - 升级版本号并推送 Tag 到 GitHub 触发 Actions 编译：
      ```powershell
-     pnpm publish-version 1.1.2
+     pnpm publish-version <版本号>
      ```
 5. **云端 Actions 监控**：
    - 打印 Actions 运行链接（形如 `https://github.com/qiu-yuxiao/clash-mini/actions`）引导用户查看。
    - 读取 [github_token.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/github_token.txt) 中的 Token 作为 API Authorization 头部。
-   - 后台静默调用 GitHub API 获取当前 Run 状态直至完成，在此期间不调用任何命令行，实现零弹窗。
+   - 后台静默调用 GitHub API 获取当前 Run 状态直至完成，在此期间不调用 any 命令行，实现零弹窗。
 6. **拉回包与环境复原**：
    - 运行下载命令将生成的 Windows x64 便携版绿色包拉回至 `portable_test`：
      ```powershell
-     $token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; gh release download v1.1.2 --pattern '*_x64_portable.zip' --dir 'portable_test' --clobber --repo qiu-yuxiao/clash-mini
+     $token = (Get-Content 'github_token.txt' -Raw).Trim(); $env:GH_TOKEN = $token; gh release download v<版本号> --pattern '*_x64_portable.zip' --dir 'portable_test' --clobber --repo qiu-yuxiao/clash-mini
      ```
    - 恢复 Git 配置：
      ```powershell
