@@ -378,19 +378,6 @@ export const Switch = styled((props: SwitchProps) => (
         '& .MuiSwitch-switchBase': {
           padding: '0 !important',
           margin: '0 !important',
-          width: '14px !important',
-          height: '14px !important',
-          '&.Mui-checked': {
-            transform: 'translateX(14px) !important',
-          },
-          '& .MuiSwitch-input': {
-            width: '28px !important',
-            height: '14px !important',
-            left: '0 !important',
-          },
-          '&.Mui-checked .MuiSwitch-input': {
-            left: '-14px !important',
-          },
         },
         '& .MuiSwitch-thumb': {
           width: '12px !important',
@@ -401,8 +388,6 @@ export const Switch = styled((props: SwitchProps) => (
       '& .MuiSwitch-switchBase': {
         padding: 0,
         margin: 0,
-        width: '14px !important',
-        height: '14px !important',
         transitionDuration: '100ms',
         '&.Mui-checked': {
           transform: 'translateX(14px) !important',
@@ -416,14 +401,6 @@ export const Switch = styled((props: SwitchProps) => (
             borderRadius: '0px !important',
             border: 'none !important',
           },
-        },
-        '& .MuiSwitch-input': {
-          width: '28px !important',
-          height: '14px !important',
-          left: '0 !important',
-        },
-        '&.Mui-checked .MuiSwitch-input': {
-          left: '-14px !important',
         },
       },
       '& .MuiSwitch-thumb': {
