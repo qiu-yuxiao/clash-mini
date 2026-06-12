@@ -1025,7 +1025,7 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
       py: 0.5,
       '& .MuiSlider-rail': {
         height: 2,
-        bgcolor: '#05070c',
+        bgcolor: isLight ? '#ffffff' : '#05070c',
         border: '1px solid #ff0055',
         borderRadius: 0,
       },
@@ -1033,17 +1033,17 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
         height: 2,
         border: 'none',
         borderRadius: 0,
-        bgcolor: '#39ff14',
+        bgcolor: isLight ? '#4caf50' : '#39ff14',
       },
       '& .MuiSlider-thumb': {
         width: 8,
         height: 12,
         borderRadius: 0,
-        bgcolor: '#39ff14',
-        boxShadow: '0 0 5px #39ff14',
+        bgcolor: isLight ? '#4caf50' : '#39ff14',
+        boxShadow: `0 0 5px ${isLight ? '#4caf50' : '#39ff14'}`,
         '&:hover, &.Mui-focusVisible': {
           transform: 'translate(-50%, -50%) scale(1.15)',
-          boxShadow: '0 0 8px #39ff14',
+          boxShadow: `0 0 8px ${isLight ? '#4caf50' : '#39ff14'}`,
         },
       },
     }

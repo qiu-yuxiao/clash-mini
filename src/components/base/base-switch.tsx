@@ -328,15 +328,15 @@ export const Switch = styled((props: SwitchProps) => (
         '&.Mui-checked': {
           transform: 'translateX(14px) !important',
           '& + .MuiSwitch-track': {
-            backgroundColor: '#0a0e17 !important',
-            border: '1px solid #00f0ff !important',
+            backgroundColor: (isLight ? '#e0f7fa !important' : '#0a0e17 !important'),
+            border: `1px solid ${isLight ? '#00b0ff' : '#00f0ff'} !important`,
             opacity: '1 !important',
           },
           '& .MuiSwitch-thumb': {
-            backgroundColor: '#00f0ff !important',
-            color: '#00f0ff !important',
+            backgroundColor: (isLight ? '#00b0ff !important' : '#00f0ff !important'),
+            color: (isLight ? '#00b0ff !important' : '#00f0ff !important'),
             borderRadius: '0px !important',
-            boxShadow: '0 0 6px #00f0ff !important',
+            boxShadow: `0 0 6px ${isLight ? '#00b0ff' : '#00f0ff'} !important`,
           },
         },
       },
@@ -352,7 +352,7 @@ export const Switch = styled((props: SwitchProps) => (
       },
       '& .MuiSwitch-track': {
         borderRadius: 0,
-        backgroundColor: '#05070c',
+        backgroundColor: isLight ? '#f1f5f9' : '#05070c',
         border: '1px solid #ff0055',
         opacity: 1,
       },

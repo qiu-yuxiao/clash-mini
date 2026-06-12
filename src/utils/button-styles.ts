@@ -314,18 +314,41 @@ export const get3DButtonStyle = (
           ? '#ff0055'
           : '#39ff14'
 
-    const bg =
-      colorType === 'primary'
+    const bg = isLight
+      ? '#ffffff'
+      : colorType === 'primary'
         ? '#0a0e17'
         : colorType === 'error'
           ? '#1c0a0a'
           : '#0d1117'
-    const hoverBg =
-      colorType === 'primary'
+
+    const hoverBg = isLight
+      ? colorType === 'primary'
+        ? '#e0f7fa'
+        : colorType === 'error'
+          ? '#ffebee'
+          : '#e8f5e9'
+      : colorType === 'primary'
         ? '#101726'
         : colorType === 'error'
           ? '#2c1010'
           : '#161b22'
+
+    const textClr = isLight
+      ? colorType === 'primary'
+        ? '#006064'
+        : colorType === 'error'
+          ? '#c2185b'
+          : '#1b5e20'
+      : neonColor
+
+    const borderClr = isLight
+      ? colorType === 'primary'
+        ? '#00bcd4'
+        : colorType === 'error'
+          ? '#ff0055'
+          : '#4caf50'
+      : neonColor
 
     return {
       fontFamily: 'Consolas, NSimSun, monospace',
@@ -334,18 +357,18 @@ export const get3DButtonStyle = (
       borderRadius: '0px',
       transition: 'all 0.15s ease',
       border: '1px solid',
-      borderColor: neonColor,
+      borderColor: borderClr,
       background: bg,
-      color: neonColor,
-      boxShadow: `0 0 calc(5px * var(--depth-factor, 1.0)) ${neonColor}`,
+      color: textClr,
+      boxShadow: `0 0 calc(5px * var(--depth-factor, 1.0)) ${borderClr}`,
       '&:hover': {
         background: hoverBg,
-        boxShadow: `0 0 calc(10px * var(--depth-factor, 1.0)) ${neonColor}`,
+        boxShadow: `0 0 calc(10px * var(--depth-factor, 1.0)) ${borderClr}`,
         transform: 'translateY(-1px)',
       },
       '&:active': {
         transform: 'translateY(1px)',
-        boxShadow: `0 0 calc(2px * var(--depth-factor, 1.0)) ${neonColor}`,
+        boxShadow: `0 0 calc(2px * var(--depth-factor, 1.0)) ${borderClr}`,
       },
     }
   }
@@ -615,16 +638,36 @@ export const get3DCardStyle = (
   // ==========================================
   if (skin === 'cyberpunk') {
     const neonColor = '#00f0ff'
-    const bg = cardType === 'primary' ? '#0a0e17' : '#05070c'
+    const bg = isLight
+      ? (cardType === 'primary' ? '#f8fafc' : '#ffffff')
+      : (cardType === 'primary' ? '#0a0e17' : '#05070c')
+
+    const textClr = isLight
+      ? (cardType === 'upload'
+          ? '#b78103'
+          : cardType === 'download'
+            ? '#0066cc'
+            : '#0f172a')
+      : neonColor
+
+    const borderClr = isLight
+      ? (cardType === 'upload'
+          ? '#f59e0b'
+          : cardType === 'download'
+            ? '#3b82f6'
+            : '#00b0ff')
+      : neonColor
 
     return {
       fontFamily: 'Consolas, NSimSun, monospace',
       borderRadius: '0px',
-      border: '1px solid ' + neonColor,
+      border: '1px solid ' + borderClr,
       background: bg,
-      color: neonColor,
+      color: textClr,
       transition: 'none',
-      boxShadow: `0 0 calc(10px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.2)`,
+      boxShadow: isLight
+        ? `0 0 calc(10px * var(--depth-factor, 1.0)) rgba(0, 176, 255, 0.15)`
+        : `0 0 calc(10px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.2)`,
     }
   }
 
@@ -769,21 +812,30 @@ export const get3DInputStyle = (theme: Theme): any => {
 
   if (skin === 'cyberpunk') {
     const neonColor = '#ff0055'
+    const bg = isLight ? '#ffffff' : '#030508'
+    const textClr = isLight ? '#0f172a' : '#ff0055'
+    const borderClr = isLight ? '#cbd5e1' : neonColor
+    const hoverBorderClr = isLight ? '#ff0055' : '#00f0ff'
+
     return {
       '& .MuiOutlinedInput-root': {
         fontFamily: 'Consolas, NSimSun, monospace',
-        backgroundColor: '#030508',
-        color: '#ff0055',
-        boxShadow: `0 0 calc(4px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.15)`,
+        backgroundColor: bg,
+        color: textClr,
+        boxShadow: isLight
+          ? `inset 0 1px 3px rgba(0, 0, 0, 0.05)`
+          : `0 0 calc(4px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.15)`,
         '& .MuiOutlinedInput-notchedOutline': {
           borderWidth: '1px',
-          borderColor: neonColor,
+          borderColor: borderClr,
         },
         '&:hover .MuiOutlinedInput-notchedOutline': {
-          borderColor: '#00f0ff',
+          borderColor: hoverBorderClr,
         },
         '&.Mui-focused': {
-          boxShadow: `0 0 calc(8px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.35)`,
+          boxShadow: isLight
+            ? `0 0 0 3px rgba(255, 0, 85, 0.15)`
+            : `0 0 calc(8px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.35)`,
           '& .MuiOutlinedInput-notchedOutline': {
             borderColor: '#ff0055',
             borderWidth: '1px',
@@ -877,8 +929,8 @@ export const get3DSegmentedContainerStyle = (themeOrIsLight: any): any => {
 
   if (skin === 'cyberpunk') {
     return {
-      border: '1px solid #39ff14',
-      background: '#05070c',
+      border: '1px solid ' + (isLight ? '#00b0ff' : '#39ff14'),
+      background: isLight ? '#ffffff' : '#05070c',
     }
   }
 
@@ -977,10 +1029,12 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
       top: '1px',
       bottom: '1px',
       borderRadius: '0px',
-      background: '#39ff14',
+      background: isLight ? '#00b0ff' : '#39ff14',
       border: 'none',
-      boxShadow: `0 0 calc(8px * var(--depth-factor, 1.0)) #39ff14`,
-      color: '#000000',
+      boxShadow: isLight
+        ? `0 0 calc(8px * var(--depth-factor, 1.0)) #00b0ff`
+        : `0 0 calc(8px * var(--depth-factor, 1.0)) #39ff14`,
+      color: isLight ? '#ffffff' : '#000000',
     }
   }
 
@@ -1009,7 +1063,7 @@ export const get3DSegmentedActiveTextColor = (theme: any): string => {
     case 'retro-3d':
       return '#1E1200'
     case 'cyberpunk':
-      return '#000000'
+      return isLight ? '#ffffff' : '#000000'
     case 'monochrome':
       return isLight ? '#ffffff' : '#000000'
     case 'frosted-glass':
