@@ -37,7 +37,7 @@
 2. **静态资产校验**（云端发布唯一的防线）：
    - 运行前端编译：`pnpm web:build`。若有任何报错/警告，必须立即中止。
 3. **提交业务代码**：
-   - 运行 `git add .` 并执行 `git commit -m "feat: implement logic" --no-verify`  提交。
+   - 运行 `git add .` 并执行 `git commit -m "feat: implement logic" --no-verify` 提交。
 4. **Git Tag 更新与推送**：
    - 配置 Git 代理以确保不超时：
      ```powershell
@@ -53,6 +53,7 @@
      ```powershell
      pnpm publish-version <版本号>
      ```
+     *(注：对于极速发布，GitHub Actions 仅编译 Windows x64 便携版，云端构建耗时约 25-30 分钟；若是全平台完整发布 `<版本号>-full`，耗时约 30-40 分钟。)*
 5. **云端 Actions 监控**：
    - 打印 Actions 运行链接（形如 `https://github.com/qiu-yuxiao/clash-mini/actions`）引导用户查看。
    - 读取 [github_token.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/github_token.txt) 中的 Token 作为 API Authorization 头部。
