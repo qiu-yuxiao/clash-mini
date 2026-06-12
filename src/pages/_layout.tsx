@@ -3275,7 +3275,7 @@ const Layout = () => {
                         size="small"
                         value={depthFactor}
                         min={0.0}
-                        max={controlSkin === 'cyberpunk' || controlSkin === 'original' ? 5.0 : 2.0}
+                        max={5.0}
                         step={0.1}
                         onChange={(_, val) =>
                           handleDepthFactorChange(val as number)
@@ -3326,7 +3326,7 @@ const Layout = () => {
                         size="small"
                         value={vibrancyFactor}
                         min={0.0}
-                        max={controlSkin === 'original' ? 3.0 : 2.0}
+                        max={5.0}
                         step={0.1}
                         onChange={(_, val) =>
                           handleVibrancyFactorChange(val as number)

@@ -122,7 +122,7 @@ html[data-control-skin="modern-flat"] {
     backdrop-filter: none !important;
     border: 4px double var(--theme-border) !important; /* Keep double border */
     border-radius: var(--border-radius) !important;
-    box-shadow: 0 calc(4px * var(--control-skin-val2, 1.0)) calc(12px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.04 * var(--control-skin-val2, 1.0))) !important;
+    box-shadow: 0 calc(4px * var(--control-skin-val2, 1.0)) calc(16px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-panel, 0.10) * var(--control-skin-val2, 1.0))) !important;
   }
 
   .theme-crystal-card {
@@ -130,7 +130,7 @@ html[data-control-skin="modern-flat"] {
     backdrop-filter: none !important;
     border: 1px solid var(--theme-border) !important;
     border-radius: calc(6px * var(--control-skin-val1, 1.0)) !important;
-    box-shadow: 0 calc(2px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0))) !important;
+    box-shadow: 0 calc(2px * var(--control-skin-val2, 1.0)) calc(8px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-card, 0.06) * var(--control-skin-val2, 1.0))) !important;
   }
 }
 
@@ -152,19 +152,31 @@ html[data-control-skin="frosted-glass"] {
 
 @keyframes cyberpunk-glow-pulse-red {
   0% {
-    box-shadow: 0 0 calc(6px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.15) !important;
+    border-color: rgba(255, 0, 85, 0.6) !important;
+    box-shadow: 
+      inset 0 0 calc(4px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.25),
+      0 0 calc(6px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.15) !important;
   }
   100% {
-    box-shadow: 0 0 calc(20px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.35) !important;
+    border-color: rgba(255, 0, 85, 1.0) !important;
+    box-shadow: 
+      inset 0 0 calc(14px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.6),
+      0 0 calc(20px * var(--depth-factor, 1.0)) rgba(255, 0, 85, 0.45) !important;
   }
 }
 
 @keyframes cyberpunk-glow-pulse-cyan {
   0% {
-    box-shadow: 0 0 calc(4px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.12) !important;
+    border-color: rgba(0, 240, 255, 0.5) !important;
+    box-shadow: 
+      inset 0 0 calc(3px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.2),
+      0 0 calc(4px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.1) !important;
   }
   100% {
-    box-shadow: 0 0 calc(16px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.28) !important;
+    border-color: rgba(0, 240, 255, 1.0) !important;
+    box-shadow: 
+      inset 0 0 calc(12px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.5),
+      0 0 calc(16px * var(--depth-factor, 1.0)) rgba(0, 240, 255, 0.35) !important;
   }
 }
 
@@ -173,14 +185,14 @@ html[data-control-skin="cyberpunk"] {
     background: #05070c !important;
     backdrop-filter: none !important;
     border: 4px double #ff0055 !important; /* Neon double border */
-    animation: cyberpunk-glow-pulse-red calc(6s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
+    animation: cyberpunk-glow-pulse-red calc(2.5s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
   }
 
   .theme-crystal-card {
     background: #0d1117 !important;
     backdrop-filter: none !important;
     border: 1px solid #00f0ff !important;
-    animation: cyberpunk-glow-pulse-cyan calc(6s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
+    animation: cyberpunk-glow-pulse-cyan calc(2.5s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
   }
 }
 

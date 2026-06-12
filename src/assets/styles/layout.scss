@@ -372,7 +372,7 @@ html[data-control-skin="modern-flat"] {
   .layout-content__right {
     background: var(--theme-panel-bg) !important;
     backdrop-filter: none !important;
-    box-shadow: 0 calc(2px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0))) !important;
+    box-shadow: 0 calc(2px * var(--control-skin-val2, 1.0)) calc(8px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-card, 0.06) * var(--control-skin-val2, 1.0))) !important;
     border: 1px solid var(--theme-border) !important;
   }
 }
@@ -399,6 +399,14 @@ html[data-control-skin="frosted-glass"] {
 html[data-control-skin="cyberpunk"] {
   --control-font-family: Consolas, NSimSun, monospace;
 
+  .layout::before {
+    background: 
+      radial-gradient(circle at 30% 30%, rgba(0, 240, 255, calc(0.15 * var(--depth-factor, 1.0))), transparent 40%),
+      radial-gradient(circle at 70% 70%, rgba(255, 0, 85, calc(0.12 * var(--depth-factor, 1.0))), transparent 40%),
+      radial-gradient(circle at 80% 20%, rgba(57, 255, 20, calc(0.10 * var(--depth-factor, 1.0))), transparent 35%) !important;
+    animation: aurora-move calc(25s / (var(--vibrancy-factor, 1.0) + 0.001)) ease infinite alternate !important;
+  }
+
   .layout-content__left {
     background: #0d1117 !important;
     backdrop-filter: none !important;
@@ -417,7 +425,7 @@ html[data-control-skin="cyberpunk"] {
     background: #05070c !important;
     backdrop-filter: none !important;
     border: 1px solid #00f0ff !important;
-    animation: cyberpunk-glow-pulse-cyan calc(6s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
+    animation: cyberpunk-glow-pulse-cyan calc(2.5s / (var(--vibrancy-factor, 1.0) + 0.001)) ease-in-out infinite alternate !important;
   }
 }
 

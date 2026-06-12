@@ -513,6 +513,14 @@ export const useCustomTheme = () => {
           '--theme-border-outer',
           mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.35)',
         )
+        rootEle.style.setProperty(
+          '--theme-shadow-base-opacity-card',
+          mode === 'light' ? '0.06' : '0.30',
+        )
+        rootEle.style.setProperty(
+          '--theme-shadow-base-opacity-panel',
+          mode === 'light' ? '0.10' : '0.45',
+        )
       }
       rootEle.style.setProperty(
         '--theme-glass-border-rgb',

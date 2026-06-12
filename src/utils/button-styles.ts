@@ -249,15 +249,15 @@ export const get3DButtonStyle = (
       borderColor: borderClr,
       background: bg,
       color: textClr,
-      boxShadow: '0 calc(2px * var(--control-skin-val2, 1.0)) calc(4px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.04 * var(--control-skin-val2, 1.0)))',
+      boxShadow: '0 calc(2px * var(--control-skin-val2, 1.0)) calc(4px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-card, 0.06) * var(--control-skin-val2, 1.0)))',
       '&:hover': {
         background: hoverBg,
         borderColor: hoverBg,
-        boxShadow: '0 calc(3px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.08 * var(--control-skin-val2, 1.0)))',
+        boxShadow: '0 calc(3px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-card, 0.06) * 2 * var(--control-skin-val2, 1.0)))',
       },
       '&:active': {
         transform: 'translateY(1px)',
-        boxShadow: '0 calc(1px * var(--control-skin-val2, 1.0)) calc(2px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.04 * var(--control-skin-val2, 1.0)))',
+        boxShadow: '0 calc(1px * var(--control-skin-val2, 1.0)) calc(2px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-card, 0.06) * var(--control-skin-val2, 1.0)))',
       },
     }
   }
@@ -585,7 +585,7 @@ export const get3DCardStyle = (
       background: bg,
       color: textClr,
       transition: 'none',
-      boxShadow: '0 calc(2px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0)))',
+      boxShadow: '0 calc(2px * var(--control-skin-val2, 1.0)) calc(8px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-card, 0.06) * var(--control-skin-val2, 1.0)))',
     }
   }
 
@@ -725,7 +725,7 @@ export const get3DInputStyle = (theme: Theme): any => {
         fontFamily: 'Outfit, DengXian, sans-serif',
         backgroundColor: isLight ? '#ffffff' : '#111827',
         borderRadius: 'calc(6px * var(--control-skin-val1, 1.0))',
-        boxShadow: 'inset 0 calc(1px * var(--control-skin-val2, 1.0)) calc(3px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0)))',
+        boxShadow: 'inset 0 calc(1px * var(--control-skin-val2, 1.0)) calc(3px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(var(--theme-shadow-base-opacity-card, 0.06) * var(--control-skin-val2, 1.0)))',
         '& .MuiOutlinedInput-notchedOutline': {
           borderWidth: '1px',
           borderColor: borderClr,
@@ -979,7 +979,7 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
       borderRadius: '0px',
       background: '#39ff14',
       border: 'none',
-      boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) #39ff14`,
+      boxShadow: `0 0 calc(8px * var(--depth-factor, 1.0)) #39ff14`,
       color: '#000000',
     }
   }
