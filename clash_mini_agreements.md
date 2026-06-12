@@ -2051,4 +2051,4 @@
 
 ## 🎨 十、 Cyberpunk 皮肤浅色模式可读性与 Monochrome 开关视觉对齐规范
 - **Cyberpunk 浅色模式适配**：在 Cyberpunk 皮肤的 Light Mode 下，基础设置、订阅机场设置等模组卡片（`get3DCardStyle`）背景由深色 `#05070c` 调整为 `#ffffff`（主页顶部活跃节点小窗口等 `'default'` 卡片）及 `#f8fafc`（`'primary'` 级卡片），文字颜色调整为 `#0f172a`（对于 upload/download 流量指标卡片分别使用 `#b78103` 与 `#0066cc`），防止“黑吃黑”文字不可读。按钮、输入框、分段选择器、拨动开关与滑动条均在 `isLight` 下适配了高对比度配色（如 `#ffffff` 或 `#f8fafc` 搭配相应的 cyber 强调色及发光），并保留其特有的霓虹发光轮廓特征。
-- **Monochrome 皮肤开关视觉对齐**：修复了在 Monochrome 皮肤下，设置项开关在开启（Mui-checked）状态下视觉上依旧停留在左侧的 Bug。通过在 `base-switch.tsx` 中锁定其 `MuiSwitch-switchBase` 的宽高度为 `14px`，并在 `Mui-checked` 状态下使用高优先级的 `transform: translateX(14px) !important` 进行定位移，实现视觉与实际功能状态的完全吻合。同时保留交互层 bounds 扩展，以最大化其可点按热区。
+- **Monochrome 皮肤开关视觉对齐**：修复了在 Monochrome 皮肤下，设置项开关在开启（Mui-checked）状态下视觉上依旧停留在左侧的 Bug。通过在 `base-switch.tsx` 中锁定其 `MuiSwitch-switchBase` 的宽高度为 `14px`，并在 `Mui-checked` 状态下使用高优先级的 `transform: translateX(14px) !important` 进行定位移，常态（unchecked）下锁定 `transform: translateX(0px) !important` 并显式补齐 `transition: transform 100ms ease-in-out !important`，以实现视觉与实际功能状态的完全吻合，同时保留交互层 bounds 扩展以最大化点按热区。
