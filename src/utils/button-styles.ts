@@ -243,20 +243,21 @@ export const get3DButtonStyle = (
       fontFamily: 'Outfit, DengXian, sans-serif',
       textTransform: 'none' as const,
       fontWeight: 'bold',
-      borderRadius: '4px',
+      borderRadius: 'calc(6px * var(--control-skin-val1, 1.0))',
       transition: 'all 0.15s ease',
       border: '1px solid',
       borderColor: borderClr,
       background: bg,
       color: textClr,
-      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+      boxShadow: '0 calc(2px * var(--control-skin-val2, 1.0)) calc(4px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.04 * var(--control-skin-val2, 1.0)))',
       '&:hover': {
         background: hoverBg,
-        borderColor: borderClr,
+        borderColor: hoverBg,
+        boxShadow: '0 calc(3px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.08 * var(--control-skin-val2, 1.0)))',
       },
       '&:active': {
-        transform: 'none',
-        boxShadow: 'none',
+        transform: 'translateY(1px)',
+        boxShadow: '0 calc(1px * var(--control-skin-val2, 1.0)) calc(2px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.04 * var(--control-skin-val2, 1.0)))',
       },
     }
   }
@@ -578,13 +579,13 @@ export const get3DCardStyle = (
 
     return {
       fontFamily: 'Outfit, DengXian, sans-serif',
-      borderRadius: '4px',
+      borderRadius: 'calc(8px * var(--control-skin-val1, 1.0))',
       border: '1px solid',
       borderColor: borderClr,
       background: bg,
       color: textClr,
       transition: 'none',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+      boxShadow: '0 calc(2px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0)))',
     }
   }
 
@@ -723,9 +724,12 @@ export const get3DInputStyle = (theme: Theme): any => {
       '& .MuiOutlinedInput-root': {
         fontFamily: 'Outfit, DengXian, sans-serif',
         backgroundColor: isLight ? '#ffffff' : '#111827',
+        borderRadius: 'calc(6px * var(--control-skin-val1, 1.0))',
+        boxShadow: 'inset 0 calc(1px * var(--control-skin-val2, 1.0)) calc(3px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0)))',
         '& .MuiOutlinedInput-notchedOutline': {
           borderWidth: '1px',
           borderColor: borderClr,
+          borderRadius: 'calc(6px * var(--control-skin-val1, 1.0))',
         },
         '&:hover .MuiOutlinedInput-notchedOutline': {
           borderColor: primaryMain,
@@ -733,7 +737,7 @@ export const get3DInputStyle = (theme: Theme): any => {
         '&.Mui-focused': {
           '& .MuiOutlinedInput-notchedOutline': {
             borderColor: primaryMain,
-            borderWidth: '2px',
+            borderWidth: '1px',
           },
         },
       },
@@ -943,7 +947,7 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
       right: '1px',
       top: '1px',
       bottom: '1px',
-      borderRadius: '2px',
+      borderRadius: 'calc(4px * var(--control-skin-val1, 1.0))',
       background: theme.palette.primary.main,
       border: 'none',
       boxShadow: 'none',

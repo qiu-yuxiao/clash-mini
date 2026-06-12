@@ -864,18 +864,19 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
         height: 4,
         bgcolor: isLight ? '#e5e7eb' : '#374151',
         border: 'none',
-        borderRadius: 2,
+        borderRadius: 'calc(2px * var(--control-skin-val1, 1.0))',
       },
       '& .MuiSlider-track': {
         height: 4,
         border: 'none',
-        borderRadius: 2,
+        borderRadius: 'calc(2px * var(--control-skin-val1, 1.0))',
         bgcolor: theme.palette.primary.main,
       },
       '& .MuiSlider-thumb': {
         width: 12,
         height: 12,
         bgcolor: '#ffffff',
+        borderRadius: 'calc(6px * var(--control-skin-val1, 1.0))',
         border: `2px solid ${theme.palette.primary.main}`,
         boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
         '&:hover, &.Mui-focusVisible': {
@@ -3673,7 +3674,7 @@ const Layout = () => {
                   },
                   {
                     key: 'modern-flat',
-                    label: 'Modern-flat',
+                    label: 'Modern',
                     font: 'Outfit, DengXian, sans-serif',
                   },
                   {

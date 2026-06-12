@@ -372,7 +372,7 @@ html[data-control-skin="modern-flat"] {
   .layout-content__right {
     background: var(--theme-panel-bg) !important;
     backdrop-filter: none !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    box-shadow: 0 calc(2px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0))) !important;
     border: 1px solid var(--theme-border) !important;
   }
 }

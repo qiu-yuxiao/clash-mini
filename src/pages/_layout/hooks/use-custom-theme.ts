@@ -11,6 +11,33 @@ import { defaultDarkTheme, defaultTheme } from '@/pages/_theme'
 import { useSetThemeMode, useThemeMode } from '@/services/states'
 import getSystem from '@/utils/get-system'
 
+const getSystemAccentColor = (): string | null => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return null
+  }
+  try {
+    const dummy = document.createElement('div')
+    dummy.style.color = 'AccentColor'
+    dummy.style.display = 'none'
+    document.body.appendChild(dummy)
+    const color = window.getComputedStyle(dummy).color
+    document.body.removeChild(dummy)
+
+    if (color && color.startsWith('rgb')) {
+      const match = color.match(/\d+/g)
+      if (match && match.length >= 3) {
+        const r = parseInt(match[0], 10)
+        const g = parseInt(match[1], 10)
+        const b = parseInt(match[2], 10)
+        return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null
+}
+
 const CSS_INJECTION_SCOPE_ROOT = '[data-css-injection-root]'
 const CSS_INJECTION_SCOPE_LIMIT =
   ':is(.monaco-editor .view-lines, .monaco-editor .view-line, .monaco-editor .margin, .monaco-editor .margin-view-overlays, .monaco-editor .view-overlays, .monaco-editor [class^="mtk"], .monaco-editor [class*=" mtk"])'
@@ -170,7 +197,10 @@ export const useCustomTheme = () => {
     const dt = mode === 'light' ? defaultTheme : defaultDarkTheme
     let muiTheme: MuiTheme
 
-    let resolvedPrimary = setting.primary_color || dt.primary_color
+    let resolvedPrimary = setting.primary_color
+    if (!resolvedPrimary) {
+      resolvedPrimary = getSystemAccentColor() || dt.primary_color
+    }
     if (controlSkin === 'original') {
       resolvedPrimary = '#5b5c9d'
     }

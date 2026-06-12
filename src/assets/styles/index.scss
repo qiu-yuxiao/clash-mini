@@ -115,18 +115,22 @@ html[data-control-skin="retro-3d"] {
 }
 
 html[data-control-skin="modern-flat"] {
+  --border-radius: calc(8px * var(--control-skin-val1, 1.0)) !important;
+
   .theme-panel {
     background: var(--theme-panel-bg) !important;
     backdrop-filter: none !important;
-    box-shadow: none !important;
     border: 4px double var(--theme-border) !important; /* Keep double border */
+    border-radius: var(--border-radius) !important;
+    box-shadow: 0 calc(4px * var(--control-skin-val2, 1.0)) calc(12px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.04 * var(--control-skin-val2, 1.0))) !important;
   }
 
   .theme-crystal-card {
     background: var(--theme-panel-bg) !important;
     backdrop-filter: none !important;
     border: 1px solid var(--theme-border) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    border-radius: calc(6px * var(--control-skin-val1, 1.0)) !important;
+    box-shadow: 0 calc(2px * var(--control-skin-val2, 1.0)) calc(6px * var(--control-skin-val2, 1.0)) rgba(0, 0, 0, calc(0.03 * var(--control-skin-val2, 1.0))) !important;
   }
 }
 
