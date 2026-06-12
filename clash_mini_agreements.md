@@ -2049,12 +2049,6 @@
 - **Modern Flat 阴影滑块修复**：阴影基准浓度区分浅色模式 (6%/10%) 与深色模式 (30%/45%)，拉到 0.0 时完全扁平，拉到 5.0 时明显放大。
 - **滑块上限提升**：所有换肤滑块的最大限制值统一由 `2.0`（或 `3.0`）提升至 `5.0`，给用户提供更加自由和夸张的效果对比调节。
 
-## 🎨 十、 Cyberpunk 皮肤浅色模式可读性修复与色彩统合规范
-- **模组与卡片背景浅色化**：在 Cyberpunk 皮肤的 Light Mode 下，基础设置、订阅机场设置等模组卡片（`get3DCardStyle`）背景由深色 `#05070c` 调整为 `#ffffff`（主页顶部活跃节点小窗口等 `'default'` 卡片）及 `#f8fafc`（`'primary'` 级卡片），文字颜色调整为 `#0f172a`（对于 upload/download 流量指标卡片分别使用 `#b78103` 与 `#0066cc`），防止“黑吃黑”文字不可读。
-- **按钮与控件质感适配**：
-  - 3D 按钮在浅色模式下采用 `#ffffff` 背景、搭配浅色悬停态背景（如 `#e0f7fa`/`#ffebee`/`#e8f5e9`），文字与边框分别使用深色 cyberpunk 强调色以保证易读性。
-  - 输入框（`get3DInputStyle`）背景调整为 `#ffffff`，文字为 `#0f172a`，常态边框为 `#cbd5e1`，悬停/聚焦时保持 neon pink 呼吸边缘。
-  - 分段选择器（Segmented Control）背景调整为 `#ffffff`，边框使用 `#00b0ff`（cyber blue），活动滑块背景为 `#00b0ff`，选中文字变更为白色。
-- **开关与滑动条明亮适配**：
-  - 拨动开关（Switch）的轨道背景在浅色未激活下使用 `#f1f5f9`，激活下使用 `#e0f7fa` 搭配 `#00b0ff` 边框，滑块激活使用 `#00b0ff` 且带有对应发光。
-  - 滑块轨道（Slider）的 rail 背景修改为 `#ffffff`，track 和 thumb 使用 `#4caf50`（cyber green）并具备相应发光。
+## 🎨 十、 Cyberpunk 皮肤浅色模式可读性与 Monochrome 开关视觉对齐规范
+- **Cyberpunk 浅色模式适配**：在 Cyberpunk 皮肤的 Light Mode 下，基础设置、订阅机场设置等模组卡片（`get3DCardStyle`）背景由深色 `#05070c` 调整为 `#ffffff`（主页顶部活跃节点小窗口等 `'default'` 卡片）及 `#f8fafc`（`'primary'` 级卡片），文字颜色调整为 `#0f172a`（对于 upload/download 流量指标卡片分别使用 `#b78103` 与 `#0066cc`），防止“黑吃黑”文字不可读。按钮、输入框、分段选择器、拨动开关与滑动条均在 `isLight` 下适配了高对比度配色（如 `#ffffff` 或 `#f8fafc` 搭配相应的 cyber 强调色及发光），并保留其特有的霓虹发光轮廓特征。
+- **Monochrome 皮肤开关视觉对齐**：修复了在 Monochrome 皮肤下，设置项开关在开启（Mui-checked）状态下视觉上依旧停留在左侧的 Bug。通过在 `base-switch.tsx` 中锁定其 `MuiSwitch-switchBase` 的宽高度为 `14px`，并在 `Mui-checked` 状态下使用高优先级的 `transform: translateX(14px) !important` 进行定位移，实现视觉与实际功能状态的完全吻合。同时保留交互层 bounds 扩展，以最大化其可点按热区。

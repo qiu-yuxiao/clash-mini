@@ -24,6 +24,7 @@
   1. 在 `base-switch.tsx` 中对所有皮肤的 checked 状态追加 `!important` 保护；非渐变色背景统一使用 `backgroundColor`。
   2. 通过公共后处理，将 `<input>` 交互范围强制扩充为全局 28px * 14px 满宽，并利用 checked 反向偏移 (`-14px`) 抵消位移，使整个开关范围在全状态下都极易触发交互。
   3. 在 `.MuiSwitch-sizeSmall` 内强制锁定 `translateX(14px) !important`。
+* **状态**：已修正 checked 状态下的 sizeSmall 锁定定位，保证滑块在 checked 状态下在视觉上可以平滑移动至右侧，待确认。
 
 ### **BUG-064** (三选一/分段选择器活动态文字颜色无法识别与不协调)
 * **缺陷描述与现象**：在 `monochrome` 皮肤的浅色模式下，流量接管模式、分流策略倾向、主题模式、路径控制等选择器的活动项文本颜色为 `#1E1200`（深褐/金），在黑色背景板上完全无法阅读（黑吃黑）；在 `cyberpunk`、`modern-flat` 等皮肤下活动项文本也显示为 `#1E1200`，与皮肤设计极不协调。
