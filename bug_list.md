@@ -52,11 +52,13 @@
 * **缺陷描述与现象**：在 `cyberpunk` 皮肤的浅色模式下，界面主背景、侧边栏及卡片背景依然显示为深黑色，而 MUI 的文本颜色会自动变为黑色，导致发生严重的“黑吃黑”现象，文字内容完全不可读。
 * **排查原因与记忆**：
   1. Cyberpunk 皮肤样式在 `layout.scss` 与 `index.scss` 中硬编码了极暗背景色（`#0d1117` 和 `#05070c`），缺乏浅色主题模式下的覆盖规则。
-  2. 样式表缺少对全局主题模式（light/dark）的动态检测。
+  2. 样式表及 JS 样式助手缺少对全局主题模式（light/dark）的动态检测。
+  3. `button-styles.ts` 中的卡片、按钮、输入框、分段选择器，`base-switch.tsx` 中的开关，以及 `_layout.tsx` 中的滑动条在浅色模式下没有适配，依然硬编码了深色背景和青绿/粉色文本，导致“黑吃黑”与视觉不协调。
 * **修改方针**：
   1. 在 `use-custom-theme.ts` 中将当前的 `mode` 作为 `data-theme-mode` 动态注入至 `document.documentElement`。
   2. 在 `layout.scss` 和 `index.scss` 中，针对 `html[data-theme-mode="light"][data-control-skin="cyberpunk"]` 添加高对比度的浅色背景（如 `#e2e8f0`、`#f8fafc` 和 `#ffffff`），同时保留青/粉发光边框以维系 Cyberpunk 皮肤的整体风格。
-  3. 状态目前为：`代码已修正，待确认`。
+  3. 重构 `button-styles.ts` 中的 `get3DCardStyle`、`get3DButtonStyle`、`get3DInputStyle`、`get3DSegmentedContainerStyle`、`get3DSegmentedActiveStyle`、`get3DSegmentedActiveTextColor`，`base-switch.tsx` 的开关，以及 `_layout.tsx` 的 `get3DSliderStyle`，在 `isLight` 时使用高对比度的明亮配色（如 `#ffffff` 或 `#f8fafc` 搭配相应的 cyber 强调色及发光）。
+  4. 状态目前为：`代码已修正，待确认`。
 
 ---
 
