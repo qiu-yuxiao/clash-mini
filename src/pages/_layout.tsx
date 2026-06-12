@@ -392,10 +392,26 @@ const ActiveNodeStatusCard = () => {
     )
 
     let nextNodeName = ''
-    if (currentIndex === -1) {
-      nextNodeName = candidateNodes[0]?.name
-    } else {
-      const nextIndex = (currentIndex + 1) % candidateNodes.length
+    const len = candidateNodes.length
+    let found = false
+
+    // Look for the next node that is not a timeout (delay === 0 or delay >= latencyTimeout)
+    for (let i = 1; i <= len; i++) {
+      const checkIndex = (currentIndex + i) % len
+      const node = candidateNodes[checkIndex]
+      const delay = delayManager.getDelayFix(node, primaryGroup.name)
+      const isTimeout = delay === 0 || delay >= latencyTimeout
+
+      if (!isTimeout) {
+        nextNodeName = node?.name
+        found = true
+        break
+      }
+    }
+
+    // Fallback: if all candidate nodes are timeout, cycle to the next node in sequence
+    if (!found) {
+      const nextIndex = (currentIndex + 1) % len
       nextNodeName = candidateNodes[nextIndex]?.name
     }
 
