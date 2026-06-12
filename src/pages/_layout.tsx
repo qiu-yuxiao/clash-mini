@@ -247,6 +247,10 @@ const getFriendlyProtocolName = (type?: string) => {
 const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
+  const { profiles } = useProfiles()
+  const currentProfileUid = profiles?.current || ''
+  const { verge } = useVerge()
+  const latencyTimeout = verge?.default_latency_timeout || 10000
 
   const primaryGroup = useMemo(() => {
     const groups = proxies?.groups || []
@@ -313,6 +317,7 @@ const ActiveNodeStatusCard = () => {
         setNodeAddr('')
       })
   }, [activeNodeName, activeNodeRecord?.provider])
+
   const handleTestDelay = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!activeNodeName || !primaryGroup?.name) return
@@ -328,6 +333,78 @@ const ActiveNodeStatusCard = () => {
       console.error(err)
     } finally {
       setTesting(false)
+    }
+  }
+
+  // Parse head state from localStorage
+  const headState = useMemo(() => {
+    try {
+      const stateStr = localStorage.getItem('proxy-head-state')
+      if (stateStr && currentProfileUid && primaryGroup?.name) {
+        const stateObj = JSON.parse(stateStr)
+        const groupState = stateObj[currentProfileUid]?.[primaryGroup.name]
+        if (groupState) {
+          return groupState
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse proxy-head-state:', e)
+    }
+    return null
+  }, [currentProfileUid, primaryGroup?.name])
+
+  // Get candidate nodes list
+  const candidateNodes = useMemo(() => {
+    if (!primaryGroup?.all || !primaryGroup?.name) return []
+    if (!headState) return primaryGroup.all
+
+    const {
+      filterText = '',
+      sortType = 0,
+      filterMatchCase = false,
+      filterMatchWholeWord = false,
+      filterUseRegularExpression = false,
+    } = headState
+
+    const searchState = {
+      matchCase: filterMatchCase,
+      matchWholeWord: filterMatchWholeWord,
+      useRegularExpression: filterUseRegularExpression,
+    }
+
+    return filterSort(
+      primaryGroup.all,
+      primaryGroup.name,
+      filterText,
+      sortType,
+      latencyTimeout,
+      searchState,
+    )
+  }, [primaryGroup?.all, primaryGroup?.name, headState, latencyTimeout])
+
+  const handleCycleNode = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!primaryGroup?.name || candidateNodes.length === 0) return
+
+    const currentIndex = candidateNodes.findIndex(
+      (node: any) => node?.name === activeNodeName,
+    )
+
+    let nextNodeName = ''
+    if (currentIndex === -1) {
+      nextNodeName = candidateNodes[0]?.name
+    } else {
+      const nextIndex = (currentIndex + 1) % candidateNodes.length
+      nextNodeName = candidateNodes[nextIndex]?.name
+    }
+
+    if (nextNodeName) {
+      try {
+        await selectNodeForGroup(primaryGroup.name, nextNodeName)
+        refreshProxy()
+      } catch (err) {
+        console.error('Failed to select node:', err)
+      }
     }
   }
 
@@ -383,23 +460,31 @@ const ActiveNodeStatusCard = () => {
         {getFriendlyProtocolName(activeNodeRecord?.type) || 'Direct'}
       </Typography>
 
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 'bold',
-          fontSize: '12px',
-          color: 'text.primary',
-          maxWidth: { xs: '120px', sm: '240px', md: '360px' },
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {(activeNodeName ? activeNodeName.replace(/\s\(\d{6}\)$/, '') : '') ||
-          t('home.components.currentProxy.labels.noActiveNode', {
-            defaultValue: '未选择节点 (直接连接)',
-          })}
-      </Typography>
+      <Tooltip title="点击轮换下一个节点">
+        <Typography
+          variant="body2"
+          onClick={handleCycleNode}
+          sx={{
+            fontWeight: 'bold',
+            fontSize: '12px',
+            color: 'text.primary',
+            maxWidth: { xs: '120px', sm: '240px', md: '360px' },
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            transition: 'color 0.2s',
+            '&:hover': {
+              color: 'primary.main',
+            },
+          }}
+        >
+          {(activeNodeName ? activeNodeName.replace(/\s\(\d{6}\)$/, '') : '') ||
+            t('home.components.currentProxy.labels.noActiveNode', {
+              defaultValue: '未选择节点 (直接连接)',
+            })}
+        </Typography>
+      </Tooltip>
 
       {activeNodeName && (
         <Chip
