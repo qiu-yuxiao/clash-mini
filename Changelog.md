@@ -55,6 +55,7 @@
 ### 🐞 修复问题
 
 - 修复 BUG-071：客户端与 Mihomo 内核自动更新功能开发及 UI 下拉菜单适配。通过升级 `tauri-plugin-mihomo` 插件依赖兼容去除了 `global-client-fingerprint` 的 v1.19.27 及最新内核，根治启动及代理页面节点列表空白（白屏）的故障。
+- 修复 BUG-072：修复由于新版内核插件 models.rs 中 LogLevel 序列化问题导致 Allow LAN 等开关状态回弹、无法加载与更新的故障。
 
 ### 🚀 优化改进
 
