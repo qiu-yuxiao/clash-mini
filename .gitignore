@@ -27,3 +27,5 @@ github_token.txt
 .brain/
 /src-tauri/用户必读.txt
 /src-tauri/resources/用户必读.txt
+wiki_dist
+wiki_dist/
