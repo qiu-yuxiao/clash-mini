@@ -14,52 +14,7 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### **BUG-063** (3D 开关/Switch 卡死及样式冲突)
-* **缺陷描述与现象**：在 `monochrome` 皮肤下，基础设置的三个开关（开机自启、启动最小化、Allow LAN）无法拨动，视觉上卡死在左侧。
-* **排查原因与记忆**：
-  1. MUI `size="small"` 的默认 checked 样式具有较高优先级，在没有 `!important` 保护时覆盖了自定义的 `transform: translateX(14px)`。
-  2. `monochrome` 皮肤 checked 状态的轨道样式使用了 `background` 简写而非 `backgroundColor`，与 unchecked 状态的 `backgroundColor` 冲突，导致状态颜色渲染混乱。
-  3. 自定义皮肤下的 switchBase 移除了 padding 导致交互层 `<input>` 物理热区极度缩小（仅 12px），点击右侧轨道或选中状态下点击左侧均无法触发 checkbox 切换，呈现出"卡死/无法拨动"的限制感。
-* **修改方针**：
-  1. 在 `base-switch.tsx` 中对所有皮肤的 checked 状态追加 `!important` 保护；非渐变色背景统一使用 `backgroundColor`。
-  2. 通过公共后处理，将 `<input>` 交互范围强制扩充为全局 28px * 14px 满宽，并利用 checked 反向偏移 (`-14px`) 抵消位移，使整个开关范围在全状态下都极易触发交互。
-  3. 在 `.MuiSwitch-sizeSmall` 内对 `monochrome` 皮肤强制锁定 `translateX(14px) !important` 和 `width: 14px`, `height: 14px`。
-* **状态**：代码已修正。已彻底重新设计为圆角胶囊形轨道与圆形滑块（与其它风格保持一致），并将整体尺寸放大两倍（56px * 28px），滑块放大至 24px，在 checked 状态下向右平滑滑动 28px，解决了直角设计卡死以及尺寸过小难以拨动与识别的问题，待确认。
-
-### **BUG-064** (三选一/分段选择器活动态文字颜色无法识别与不协调)
-* **缺陷描述与现象**：在 `monochrome` 皮肤的浅色模式下，流量接管模式、分流策略倾向、主题模式、路径控制等选择器的活动项文本颜色为 `#1E1200`（深褐/金），在黑色背景板上完全无法阅读（黑吃黑）；在 `cyberpunk`、`modern-flat` 等皮肤下活动项文本也显示为 `#1E1200`，与皮肤设计极不协调。
-* **排查原因与记忆**：`_layout.tsx` 中所有的分段按钮选项文字颜色被硬编码为 `color: active === X ? '#1E1200' : 'text.secondary'`，未随皮肤动态变化。
-* **修改方针**：
-  1. 在 `button-styles.ts` 中新增并导出 `get3DSegmentedActiveTextColor(theme)` 样式函数，返回对应皮肤高对比度的文本颜色。
-  2. 修改 `_layout.tsx`，将 `#1E1200` 替换为该函数的返回值。
-
-
-### **BUG-066** (Cyberpunk 速度滑块无效果且光晕被剪切)
-* **缺陷描述与现象**：在 `cyberpunk` 皮肤下，调节 Speed (速度) 滑块没有任何视觉变化，且面板的霓虹外发光缺失。
-* **排查原因与记忆**：
-  1. 面板容器使用了 `overflow: hidden`，导致向外的 box-shadow 被彻底裁剪。
-  2. 呼吸周期公式 `6s / vibrancyFactor` 速度过慢，最大速度时呼吸一次要 3 秒，极难被肉眼察觉。
-  3. 背景极光流速固定，Slide 2 (Speed) 却错误地控制了极光的不透明度（变慢时极光熄灭）。
-* **修改方针**：在 `index.scss` 中改用内发光 (`inset box-shadow`) 和边框明暗呼吸，将速度呼吸频率调快，并重写 `layout.scss` 使极光的旋转流动周期正确绑定到 Speed 滑块。状态目前为：`代码已修正，待确认`。
-
-### **BUG-067** (Modern Flat 阴影滑块无效果)
-* **缺陷描述与现象**：在 `modern-flat` 皮肤下，Shadow (阴影) 滑块调节无任何视觉反馈，暗黑模式下尤为明显。
-* **排查原因与记忆**：
-  1. 摩登风格的按钮、卡片和面板阴影透明度基数设置过小（3% 和 4%），在浅色背景下极不明显。
-  2. 阴影使用纯黑色，在深色背景下发生“黑吃黑”现象，完全看不出立体投影。
-* **修改方针**：在 `use-custom-theme.ts` 中根据浅色 (6%/10%) 和深色模式 (30%/45%) 动态注入不同的阴影基准浓度变量，替换各组件和 CSS 的硬编码阴影浓度。状态目前为：`代码已修正，待确认`。
-
-### **BUG-068** (Cyberpunk 浅色模式背景与文本不可读)
-* **缺陷描述与现象**：在 `cyberpunk` 皮肤的浅色模式下，界面主背景、侧边栏及卡片背景依然显示为深黑色，而 MUI 的文本颜色会自动变为黑色，导致发生严重的“黑吃黑”现象，文字内容完全不可读。
-* **排查原因与记忆**：
-  1. Cyberpunk 皮肤样式在 `layout.scss` 与 `index.scss` 中硬编码了极暗背景色（`#0d1117` 和 `#05070c`），缺乏浅色主题模式下的覆盖规则。
-  2. 样式表及 JS 样式助手缺少对全局主题模式（light/dark）的动态检测。
-  3. `button-styles.ts` 中的卡片、按钮、输入框、分段选择器，`base-switch.tsx` 中的开关，以及 `_layout.tsx` 中的滑动条在浅色模式下没有适配，依然硬编码了深色背景和青绿/粉色文本，导致“黑吃黑”与视觉不协调。
-* **修改方针**：
-  1. 在 `use-custom-theme.ts` 中将当前的 `mode` 作为 `data-theme-mode` 动态注入至 `document.documentElement`。
-  2. 在 `layout.scss` 和 `index.scss` 中，针对 `html[data-theme-mode="light"][data-control-skin="cyberpunk"]` 添加高对比度的浅色背景（如 `#e2e8f0`、`#f8fafc` 和 `#ffffff`），同时保留青/粉发光边框以维系 Cyberpunk 皮肤的整体风格。
-  3. 重构 `button-styles.ts` 中的 `get3DCardStyle`、`get3DButtonStyle`、`get3DInputStyle`、`get3DSegmentedContainerStyle`、`get3DSegmentedActiveStyle`、`get3DSegmentedActiveTextColor`，`base-switch.tsx` 的开关，以及 `_layout.tsx` 的 `get3DSliderStyle`，在 `isLight` 时使用高对比度的明亮配色（如 `#ffffff` 或 `#f8fafc` 搭配相应的 cyber 强调色及发光）。
-  4. 状态目前为：`代码已修正，待确认`。
+目前无活动中或待验证的 Bug。
 
 ---
 
@@ -69,6 +24,11 @@
 
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 目前状态 |
 | :--- | :--- | :---: | :--- |
+| **BUG-063** | 在 `monochrome` 皮肤下，基础设置的三个开关无法拨动，且视觉尺寸过小、难以拨动。 | v1.1.6 | 代码已修正，已确认 |
+| **BUG-068** | 在 `cyberpunk` 皮肤的浅色模式下，背景显示为深色导致文字不可读。 | v1.1.5 | 代码已修正，已确认 |
+| **BUG-067** | 在 `modern-flat` 皮肤下，调节 Shadow (阴影) 滑块无任何视觉反馈。 | v1.1.3 | 代码已修正，已确认 |
+| **BUG-066** | 在 `cyberpunk` 皮肤下，调节 Speed (速度) 滑块无效果，且面板外发光被裁剪。 | v1.1.3 | 代码已修正，已确认 |
+| **BUG-064** | 三选一/分段选择器活动态文字颜色硬编码为 `#1E1200` 导致浅色/Cyberpunk模式下文字不协调或无法阅读。 | v1.1.3 | 代码已修正，已确认 |
 | **BUG-065** | 在微缩窗口状态卡片内增加点击节点名称进行过滤/排序后子集节点的直接循环轮换功能。 | v1.1.4 | 代码已修正，已确认 |
 | **BUG-062** | Original 风格下底部流量小卡片颜色和选中换肤按钮圆角不随滑块动态调节的问题。 | v1.1.1 | 代码已修正，已确认 |
 | **BUG-056** | 程序退出时残留内核/服务工作区孤儿进程。 | v1.1.0 | 代码已修正，已确认 |
