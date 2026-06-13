@@ -31,7 +31,10 @@ Every Agent or automated workflow acting on this repository must comply with the
 * **禁止**：严禁在本地启动任何生产构建出的二进制包，禁止在运行中修改物理宿主机路由表或劫持全局系统代理。
 
 ### 4. 云端静默发行律 (Law of Silent Release)
-* **要求**：凡涉及编译与 GitHub 发行操作，必须严格遵循 [`clash_mini_silent_release.md`](../../clash_mini_silent_release.md) 中的静默双轨判定和 8 步 SOP 流程。
+* **要求**：
+  1. 凡涉及编译与 GitHub 发行操作，必须严格遵循 [`clash_mini_silent_release.md`](../../clash_mini_silent_release.md) 中的静默双轨判定和 8 步 SOP 流程。
+  2. **依赖包白盒审查**：凡因第三方插件或依赖更新导致的 Bug，在打包前必须核对 `Cargo.lock` 或 `pnpm-lock.yaml`，确认锁定的是最新修复版的版本号及 Git Commit Hash。
+  3. **日志本地检查**：发布前必须在控制台先执行并打印 `node scripts/extract_update_logs.mjs <版本号>` 提取的内容，以确保更新日志的明文说明与实际本次解决的缺陷无缝映射。
 * **禁止**：严禁在未通过静态类型校验（`pnpm web:build`）前强制打 Tag 或推送发布。
 
 ### 5. 设计共识律 (Law of Design Consistency)

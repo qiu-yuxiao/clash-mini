@@ -17,7 +17,17 @@ if (!versionArg) {
   process.exit(1)
 }
 
-// 1. 调用 release-version.mjs
+// 1. 调用 verify.py 进行发布前检查
+const runVerify = () =>
+  new Promise((resolve, reject) => {
+    const child = spawn('python', ['verify.py'], { stdio: 'inherit' })
+    child.on('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error('verify.py failed'))
+    })
+  })
+
+// 2. 调用 release-version.mjs
 const runRelease = () =>
   new Promise((resolve, reject) => {
     const child = spawn('node', [scriptPath, versionArg], { stdio: 'inherit' })
@@ -27,12 +37,18 @@ const runRelease = () =>
     })
   })
 
-// 2. 判断是否需要打 tag
+// 3. 判断是否需要打 tag
 function isSemver(version) {
   return /^v?\d+\.\d+\.\d+(-[0-9A-Za-z-.]+)?$/.test(version)
 }
 
 async function run() {
+  try {
+    await runVerify()
+  } catch (err) {
+    console.error('[ERROR]: verify.py verification failed! Release cancelled.')
+    process.exit(1)
+  }
   await runRelease()
 
   let tag = null

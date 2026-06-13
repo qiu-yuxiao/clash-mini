@@ -128,12 +128,142 @@ def verify_admin_check():
         
     return success
 
+import json
+
+def verify_cargo_lock():
+    path = "Cargo.lock"
+    if not os.path.exists(path):
+        print(f"[FAIL] Cargo.lock not found at {path}")
+        return False
+        
+    with open(path, "r", encoding="utf-8") as f:
+        content = f.read()
+        
+    print("\n--- Verifying Cargo.lock Plugin Dependency ---")
+    
+    # Match package section for tauri-plugin-mihomo
+    pattern = r"\[\[package\]\]\s+name\s*=\s*\"tauri-plugin-mihomo\"[\s\S]*?version\s*=\s*\"([^\"]+)\"[\s\S]*?source\s*=\s*\"([^\"]+)\""
+    match = re.search(pattern, content)
+    if not match:
+        print("[FAIL] tauri-plugin-mihomo package entry not found in Cargo.lock")
+        return False
+        
+    version = match.group(1)
+    source = match.group(2)
+    
+    commit_match = re.search(r"#([a-fA-F0-9]+)", source)
+    commit = commit_match.group(1) if commit_match else None
+    
+    print(f"[INFO] Found tauri-plugin-mihomo version: {version}, commit: {commit}")
+    
+    bad_commit = "e8f46f631f40259bcbe252f14dd49efd1afdc2f0"
+    if commit and commit.lower() == bad_commit.lower():
+        print(f"[FAIL] tauri-plugin-mihomo is locked to the bugged commit: {bad_commit} (v0.3.0)!")
+        return False
+        
+    try:
+        v_parts = [int(x) for x in version.split(".")]
+        if v_parts < [0, 5, 2]:
+            print(f"[FAIL] tauri-plugin-mihomo version is {version}, but must be >= 0.5.2 to include the white screen fix!")
+            return False
+    except Exception as e:
+        print(f"[WARN] Failed to parse semver for {version}: {e}")
+        
+    print("[PASS] tauri-plugin-mihomo dependency is correctly updated and verified")
+    return True
+
+def verify_changelog_sync():
+    package_path = "package.json"
+    bug_list_path = "bug_list.md"
+    changelog_path = "Changelog.md"
+    
+    if not os.path.exists(package_path):
+        print(f"[FAIL] package.json not found")
+        return False
+    if not os.path.exists(bug_list_path):
+        print(f"[FAIL] bug_list.md not found")
+        return False
+    if not os.path.exists(changelog_path):
+        print(f"[FAIL] Changelog.md not found")
+        return False
+        
+    with open(package_path, "r", encoding="utf-8") as f:
+        pkg = json.load(f)
+    current_version = pkg.get("version")
+    if not current_version:
+        print("[FAIL] Version field not found in package.json")
+        return False
+        
+    print(f"\n--- Verifying Changelog & Bug List Alignment for version v{current_version} ---")
+    
+    resolved_bugs = []
+    with open(bug_list_path, "r", encoding="utf-8") as f:
+        bug_content = f.read()
+        
+    for line in bug_content.split("\n"):
+        if line.strip().startswith("|") and "BUG-" in line:
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) >= 5:
+                bug_id_raw = parts[1]
+                resolve_ver_raw = parts[3]
+                
+                bug_id = re.sub(r"\*\*|\*", "", bug_id_raw).strip()
+                resolve_ver = re.sub(r"^v", "", resolve_ver_raw).split("-")[0].strip()
+                
+                if resolve_ver == current_version:
+                    resolved_bugs.append(bug_id)
+                    
+    print(f"[INFO] Resolved bugs listed for v{current_version} in bug_list.md: {resolved_bugs}")
+    
+    if not resolved_bugs:
+        print(f"[WARN] No bugs resolved for version v{current_version} in bug_list.md. (Ensure this is expected)")
+        
+    with open(changelog_path, "r", encoding="utf-8") as f:
+        changelog_content = f.read()
+        
+    lines = changelog_content.split("\n")
+    changelog_section_lines = []
+    is_capturing = False
+    
+    title_regex = re.compile(r"^##\s+v?" + re.escape(current_version) + r"\b", re.IGNORECASE)
+    next_title_regex = re.compile(r"^##\s+v?\d+", re.IGNORECASE)
+    
+    for line in lines:
+        if title_regex.match(line):
+            is_capturing = True
+            continue
+        if is_capturing:
+            if next_title_regex.match(line) or line.strip() == "## 原始版本历史 (Clash Verge History)":
+                break
+            changelog_section_lines.append(line)
+            
+    changelog_section = "\n".join(changelog_section_lines).strip()
+    
+    if not changelog_section:
+        print(f"[FAIL] Changelog.md does not contain a section for v{current_version}!")
+        return False
+        
+    success = True
+    for bug_id in resolved_bugs:
+        if bug_id not in changelog_section:
+            print(f"[FAIL] {bug_id} is resolved in bug_list.md for v{current_version}, but NOT mentioned in Changelog.md v{current_version} section!")
+            success = False
+        else:
+            print(f"[PASS] Mapped {bug_id} to Changelog description")
+            
+    if success:
+        print(f"[PASS] All resolved bugs for v{current_version} are documented in Changelog.md")
+        
+    return success
+
 if __name__ == "__main__":
     c_ok = verify_constants()
     s_ok = verify_service()
     a_ok = verify_admin_check()
+    dep_ok = verify_cargo_lock()
+    ch_ok = verify_changelog_sync()
     
-    if c_ok and s_ok and a_ok:
+    if c_ok and s_ok and a_ok and dep_ok and ch_ok:
         print("\n=== ALL VERIFICATION CHECKS PASSED SUCCESSFULLY ===")
         sys.exit(0)
     else:

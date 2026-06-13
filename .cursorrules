@@ -36,3 +36,5 @@
    - 开启独立的 `Document Auditor` 子代理对新旧文件执行交叉审计。
    - 在聊天对话中公开子代理的完整交叉审计报告供用户复核。
 5. **命令执行红线**：启动开发调试服务器或任何接管网络的命令，必须在对话中获得用户口头授权。对于静态校验（如 `pnpm web:build` 或 `cargo check`），Agent 应当主动执行无需频繁打扰用户。
+6. **发布前强验机制 (Release Pre-flight Checks)**：在运行发布打 Tag 脚本前，必须确保 `python verify.py` 本地校验 100% 通过（脚本已集成此拦截）。AI 必须亲自在 `Cargo.lock` 和 `pnpm-lock.yaml` 中审查第三方包的 Resolved Git Commit，确保依赖已指向最新修复版本；且必须本地运行并检查 `extract_update_logs.mjs` 输出的日志内容是否与当前缺陷修复相符，严禁直接无脑发布。
+
