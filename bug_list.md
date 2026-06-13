@@ -30,6 +30,14 @@
 
 ---
 
+### **BUG-071** (Mihomo v1.19.27 内核兼容性导致节点列表空白)
+* **缺陷描述与现象**：在升级 Mihomo (Clash.Meta) 内核至 v1.19.27 后，启动程序或进入代理页面时，节点列表显示为空白，主页可能提示“再无激活的代理节点”，或者提示“内核通信错误”，但实际上内核进程仍在后台正常运行。
+* **排查原因与记忆**：Mihomo v1.19.27 移除了全局配置项 `global-client-fingerprint`。我们当前锁定的 `tauri-plugin-mihomo` 插件版本（commit `e8f46f631...`）在 Rust 后端 `BaseConfig` 反序列化时，仍将 `global-client-fingerprint` 视为必填字段。当内核返回不含该字段的配置时，反序列化报错导致 API 请求完全失败。
+* **修改方针**：我们不需要修改项目自身的业务代码。只需要更新 `tauri-plugin-mihomo` 依赖（包括 Rust 端的 `Cargo.lock` 和前端的 `pnpm-lock.yaml`），拉取最新已移除该字段校验的插件版本（v0.5.2 或最新 commit），然后重新打包发行即可。
+* **状态**：排查中。
+
+---
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。

@@ -82,7 +82,7 @@ class InlineTrafficMonitor {
       clearTimeout(this.throttleTimer)
       this.throttleTimer = null
     }
-    this.sampler.clear()
+    // Do not clear sampler
     this.lastTimestamp = undefined
   }
 
@@ -90,7 +90,9 @@ class InlineTrafficMonitor {
     switch (message.type) {
       case 'init': {
         this.config = { ...message.config }
-        this.sampler = new TrafficDataSampler(this.config)
+        if (!this.sampler) {
+          this.sampler = new TrafficDataSampler(this.config)
+        }
         this.currentRange = message.config.defaultRangeMinutes
         this.emitSnapshot('init')
         break
@@ -196,11 +198,13 @@ class TrafficWorkerClient {
   }
 
   private startInline(initMessage: TrafficWorkerRequestMessage) {
-    this.inlineMonitor = new InlineTrafficMonitor((snapshot) => {
-      this.listeners.forEach((listener) => {
-        listener(snapshot)
+    if (!this.inlineMonitor) {
+      this.inlineMonitor = new InlineTrafficMonitor((snapshot) => {
+        this.listeners.forEach((listener) => {
+          listener(snapshot)
+        })
       })
-    })
+    }
     this.mode = 'inline'
     this.ready = true
     this.post(initMessage)
@@ -215,7 +219,7 @@ class TrafficWorkerClient {
       this.inlineMonitor.stop()
     }
     this.worker = null
-    this.inlineMonitor = null
+    // do not destroy it on stop (do not set to null)
     this.mode = null
     this.ready = false
     this.pendingMessages = []
@@ -336,9 +340,11 @@ export const useTrafficMonitorEnhanced = (options?: {
   const clientRef = useRef<TrafficWorkerClient | null>(getWorkerClient())
   const currentRangeRef = useRef<number>(WORKER_CONFIG.defaultRangeMinutes)
 
+  const isActive = enabled && isVisible
+
   // 注册引用计数与Worker生命周期
   useEffect(() => {
-    if (!enabled) return
+    if (!isActive) return
 
     const client = getWorkerClient()
     clientRef.current = client
@@ -371,53 +377,53 @@ export const useTrafficMonitorEnhanced = (options?: {
         client.stop()
       }
     }
-  }, [enabled, subscribeToSnapshots])
+  }, [isActive, subscribeToSnapshots])
 
   // Periodically refresh "now" so idle streams age out of the selected window when subscribed
   useEffect(() => {
-    if (!enabled || !subscribeToSnapshots || !isVisible) return
+    if (!isActive || !subscribeToSnapshots) return
 
     const timer = window.setInterval(() => {
       setNow(Date.now())
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [enabled, subscribeToSnapshots, isVisible])
+  }, [isActive, subscribeToSnapshots])
 
   // 添加流量数据
   const appendData = useCallback(
     (traffic: Traffic) => {
-      if (!enabled) return
+      if (!isActive) return
       clientRef.current?.appendData(traffic)
     },
-    [enabled],
+    [isActive],
   )
 
   // 请求不同时间范围的数据
   const requestRange = useCallback(
     (minutes: number) => {
-      if (!enabled) return
+      if (!isActive) return
       currentRangeRef.current = minutes
       setRangeMinutes(minutes)
       clientRef.current?.setRange(minutes)
     },
-    [enabled],
+    [isActive],
   )
 
   // 清空数据
   const clearData = useCallback(() => {
-    if (!enabled) return
+    if (!isActive) return
     clientRef.current?.clearData()
-  }, [enabled])
+  }, [isActive])
 
   const filteredDataPoints = useMemo(() => {
-    if (!enabled) return []
+    if (!isActive) return []
     const sourceData = latestSnapshot.availableDataPoints
     if (sourceData.length === 0) return []
 
     const cutoff = now - rangeMinutes * 60 * 1000
     return sourceData.filter((point) => point.timestamp > cutoff)
-  }, [enabled, latestSnapshot.availableDataPoints, rangeMinutes, now])
+  }, [isActive, latestSnapshot.availableDataPoints, rangeMinutes, now])
 
   return {
     graphData: {

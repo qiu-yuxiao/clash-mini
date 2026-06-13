@@ -52,7 +52,7 @@ jobs:
             VERSION=$(jq -r '.version' package.json)
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "DOWNLOAD_URL=https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v${VERSION}" >> $GITHUB_ENV
+          echo "DOWNLOAD_URL=https://github.com/qiu-yuxiao/clash-mini/releases/download/v${VERSION}" >> $GITHUB_ENV
           echo "BUILDTIME=$(TZ=Asia/Shanghai date)" >> $GITHUB_ENV
 
       - name: Generate release.txt

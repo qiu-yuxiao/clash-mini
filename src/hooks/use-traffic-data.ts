@@ -2,6 +2,7 @@ import { MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
+import { useVisibility } from './use-visibility'
 
 const FALLBACK_TRAFFIC: Traffic = { up: 0, down: 0 }
 const DUPLICATE_TRAFFIC_WINDOW_MS = 50
@@ -27,13 +28,15 @@ const shouldSkipDuplicateTraffic = (traffic: Traffic) => {
 
 export const useTrafficData = (options?: { enabled?: boolean }) => {
   const enabled = options?.enabled ?? true
+  const isVisible = useVisibility()
+  const active = enabled && isVisible
 
   const {
     graphData: { appendData },
-  } = useTrafficMonitorEnhanced({ subscribe: false, enabled })
+  } = useTrafficMonitorEnhanced({ subscribe: false, enabled: active })
   const { response, refresh } = useMihomoWsSubscription<ITrafficItem>({
     storageKey: 'mihomo_traffic_date',
-    buildSubscriptKey: (date) => (enabled ? `getClashTraffic-${date}` : null),
+    buildSubscriptKey: (date) => (active ? `getClashTraffic-${date}` : null),
     fallbackData: FALLBACK_TRAFFIC,
     connect: () => MihomoWebSocket.connect_traffic(),
     throttleMs: 200,

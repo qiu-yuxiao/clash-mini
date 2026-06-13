@@ -7,6 +7,7 @@ import { getClashLogs } from '@/services/cmds'
 
 import { useClashLog } from './use-clash-log'
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
+import { useVisibility } from './use-visibility'
 
 const MAX_LOG_NUM = 1000
 const FLUSH_DELAY_MS = 50
@@ -27,7 +28,7 @@ const clampLogs = (logs: ILogItem[]): ILogItem[] =>
 const filterLogsByLevel = (
   logs: ILogItem[],
   allowedTypes: LogType[],
-): ILogItem[] => {
+ ): ILogItem[] => {
   if (allowedTypes.length === 0) return []
   if (allowedTypes.length === DEFAULT_LOG_TYPES.length) return logs
   return logs.filter((log) => allowedTypes.includes(log.type))
@@ -54,12 +55,14 @@ export const useLogData = () => {
   const logLevel = clashLog?.logLevel ?? 'info'
   const allowedTypes = LOG_LEVEL_FILTERS[logLevel] ?? DEFAULT_LOG_TYPES
   const hasLoadedInitialLogsRef = useRef(false)
+  const isVisible = useVisibility()
+  const active = enableLog && isVisible
 
   const { response, refresh, subscriptionCacheKey } = useMihomoWsSubscription<
     ILogItem[]
   >({
     storageKey: 'mihomo_logs_date',
-    buildSubscriptKey: (date) => (enableLog ? `getClashLog-${date}` : null),
+    buildSubscriptKey: (date) => (active ? `getClashLog-${date}` : null),
     fallbackData: [],
     connect: () => MihomoWebSocket.connect_logs(logLevel),
     setupHandlers: ({ next, scheduleReconnect, isMounted }) => {

@@ -727,9 +727,25 @@ impl PrfItem {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("could not find the file"))?;
         let path = dirs::app_profiles_dir()?.join(file.as_str());
-        fs::write(path, data.as_bytes())
-            .await
-            .context("failed to save the file")
+
+        let should_write = match fs::read_to_string(&path).await {
+            Ok(existing_content) => {
+                if existing_content == data {
+                    false
+                } else {
+                    existing_content.replace("\r\n", "\n") != data.replace("\r\n", "\n")
+                }
+            }
+            Err(_) => true,
+        };
+
+        if should_write {
+            fs::write(path, data.as_bytes())
+                .await
+                .context("failed to save the file")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -793,4 +809,209 @@ fn fix_dirty_url(input: &str) -> Result<Url> {
     }
 
     Ok(url)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_prf_item_save_file_read_before_write() {
+        // Force portable flag to true so we don't need a Tauri app handle
+        let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
+
+        // Ensure profiles directory exists
+        let profiles_dir = dirs::app_profiles_dir().expect("failed to get profiles dir");
+        tokio::fs::create_dir_all(&profiles_dir)
+            .await
+            .expect("failed to create profiles dir");
+
+        let file_name = "test_prf_item_save_r_b_w.yaml";
+        let file_path = profiles_dir.join(file_name);
+
+        // Clean up any existing file
+        let _ = tokio::fs::remove_file(&file_path).await;
+
+        let item = PrfItem {
+            file: Some(file_name.into()),
+            ..Default::default()
+        };
+
+        let initial_data = "key: value\r\nlist:\r\n  - item1\r\n".into();
+
+        // 1. Initial save (should write)
+        item.save_file(initial_data.clone()).await.expect("initial save failed");
+        assert!(file_path.exists());
+
+        let metadata_first = tokio::fs::metadata(&file_path).await.expect("metadata failed");
+        let mtime_first = metadata_first.modified().expect("modified time failed");
+
+        // Sleep to ensure modification time can be distinguished if a write happens
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // 2. Save identical content but with different line endings (should skip writing)
+        let identical_data = "key: value\nlist:\n  - item1\n".into();
+        item.save_file(identical_data).await.expect("second save failed");
+
+        let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
+        let mtime_second = metadata_second.modified().expect("modified time failed");
+        assert_eq!(
+            mtime_first, mtime_second,
+            "mtime changed, meaning file was written unnecessarily"
+        );
+
+        // Sleep
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // 3. Save actually different content (should write)
+        let different_data = "key: different_value\nlist:\n  - item1\n".into();
+        item.save_file(different_data).await.expect("third save failed");
+
+        let metadata_third = tokio::fs::metadata(&file_path).await.expect("metadata failed");
+        let mtime_third = metadata_third.modified().expect("modified time failed");
+        assert_ne!(
+            mtime_second, mtime_third,
+            "mtime did not change, meaning file was not written when it should have been"
+        );
+
+        // Clean up
+        let _ = tokio::fs::remove_file(&file_path).await;
+    }
+
+    #[tokio::test]
+    async fn test_prf_item_save_file_empty_strings() {
+        let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
+        let profiles_dir = dirs::app_profiles_dir().expect("failed to get profiles dir");
+        tokio::fs::create_dir_all(&profiles_dir)
+            .await
+            .expect("failed to create profiles dir");
+
+        let file_name = "test_prf_item_save_empty.yaml";
+        let file_path = profiles_dir.join(file_name);
+        let _ = tokio::fs::remove_file(&file_path).await;
+
+        let item = PrfItem {
+            file: Some(file_name.into()),
+            ..Default::default()
+        };
+
+        // Save empty string
+        item.save_file("".into()).await.expect("save empty string failed");
+        assert!(file_path.exists());
+        let content = tokio::fs::read_to_string(&file_path).await.expect("read failed");
+        assert_eq!(content, "");
+
+        let metadata_first = tokio::fs::metadata(&file_path).await.expect("metadata failed");
+        let mtime_first = metadata_first.modified().expect("modified time failed");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Save empty string again (should be skipped)
+        item.save_file("".into())
+            .await
+            .expect("save empty string second time failed");
+        let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
+        let mtime_second = metadata_second.modified().expect("modified time failed");
+        assert_eq!(
+            mtime_first, mtime_second,
+            "mtime changed for redundant empty string write"
+        );
+
+        // Clean up
+        let _ = tokio::fs::remove_file(&file_path).await;
+    }
+
+    #[tokio::test]
+    async fn test_prf_item_save_file_missing_file() {
+        let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
+        let profiles_dir = dirs::app_profiles_dir().expect("failed to get profiles dir");
+        tokio::fs::create_dir_all(&profiles_dir)
+            .await
+            .expect("failed to create profiles dir");
+
+        let file_name = "test_prf_item_save_missing.yaml";
+        let file_path = profiles_dir.join(file_name);
+        let _ = tokio::fs::remove_file(&file_path).await;
+
+        let item = PrfItem {
+            file: Some(file_name.into()),
+            ..Default::default()
+        };
+
+        // File is missing, saving should succeed and create the file
+        item.save_file("some content".into())
+            .await
+            .expect("saving to missing file failed");
+        assert!(file_path.exists());
+        let content = tokio::fs::read_to_string(&file_path).await.expect("read failed");
+        assert_eq!(content, "some content");
+
+        // Clean up
+        let _ = tokio::fs::remove_file(&file_path).await;
+    }
+
+    #[tokio::test]
+    async fn test_prf_item_save_file_line_endings() {
+        let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
+        let profiles_dir = dirs::app_profiles_dir().expect("failed to get profiles dir");
+        tokio::fs::create_dir_all(&profiles_dir)
+            .await
+            .expect("failed to create profiles dir");
+
+        let file_name = "test_prf_item_save_endings.yaml";
+        let file_path = profiles_dir.join(file_name);
+        let _ = tokio::fs::remove_file(&file_path).await;
+
+        let item = PrfItem {
+            file: Some(file_name.into()),
+            ..Default::default()
+        };
+
+        // 1. Save LF content
+        item.save_file("line1\nline2\n".into()).await.expect("save LF failed");
+        let metadata_first = tokio::fs::metadata(&file_path).await.expect("metadata failed");
+        let mtime_first = metadata_first.modified().expect("mtime failed");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // 2. Save CRLF equivalent content -> should skip write
+        item.save_file("line1\r\nline2\r\n".into())
+            .await
+            .expect("save CRLF failed");
+        let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
+        let mtime_second = metadata_second.modified().expect("mtime failed");
+        assert_eq!(mtime_first, mtime_second, "mtime changed for normalized CRLF content");
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // 3. Save mixed content -> should skip write if normalized equivalent
+        item.save_file("line1\r\nline2\n".into())
+            .await
+            .expect("save mixed failed");
+        let metadata_third = tokio::fs::metadata(&file_path).await.expect("mtime failed");
+        let mtime_third = metadata_third.modified().expect("mtime failed");
+        assert_eq!(mtime_first, mtime_third, "mtime changed for normalized mixed content");
+
+        // Clean up
+        let _ = tokio::fs::remove_file(&file_path).await;
+    }
+
+    #[test]
+    fn test_prf_item_smartstring_type_safety() {
+        // Verify we can manipulate PrfItem using smartstrings as expected
+        let uid_smart: smartstring::alias::String = "test_uid".into();
+        let name_smart: smartstring::alias::String = "test_name".into();
+        let file_smart: smartstring::alias::String = "test_file.yaml".into();
+
+        let item = PrfItem {
+            uid: Some(uid_smart.clone()),
+            name: Some(name_smart.clone()),
+            file: Some(file_smart.clone()),
+            ..Default::default()
+        };
+
+        assert_eq!(item.uid.unwrap(), uid_smart);
+        assert_eq!(item.name.unwrap(), name_smart);
+        assert_eq!(item.file.unwrap(), file_smart);
+    }
 }

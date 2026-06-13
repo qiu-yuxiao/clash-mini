@@ -2056,3 +2056,22 @@
 ## ⚙️ 十一、 管理员模式下双内核进程泄漏的修复规范 (BUG-070)
 - **管理员权限与服务等待跳过**：当程序以 Administrator 权限拉起时，已具有最高的系统网络与 TAP/TUN 网卡控制权，不再需要或依赖辅助系统服务（`clash-verge-service`）。因此，在 Windows 的 `wait_for_service_if_needed` 逻辑的头部，必须首先查询当前应用运行状态（使用 `is_current_app_handle_admin`）。
 - **同步防阻塞机制**：若是管理员运行，必须立即返回跳过 5 秒的异步服务重试轮询。这直接保证了初始化任务的无延迟顺序执行，确保内核在主线程发起配置重载（`reload_config`）之前已经就绪，进而消除因管道连接失败导致重复触发“错误重启拉起”而形成的双进程内核残留泄漏。
+
+## ⚙️ 十二、 客户端与内核自动更新及 Help 按钮下拉菜单规范 (BUG-071)
+为了恢复 Clash Mini 的软件本体与 Mihomo 内核的自动/手动更新能力，且保证更新入口优雅收纳与全套 6 种皮肤的完美视觉融合：
+- **Help 按钮上弹菜单改造 (Pop-up Dropdown Menu)**：
+  - 将设置页面左下角的 **Help 按钮 (帮助按钮)** 的点击行为改造为触发一个**向上弹出 (Popover/Menu)** 的气泡式下拉菜单，而不是直接打开浏览器链接。
+  - 菜单项包含：
+    1. `🐱 GitHub 主页`（原跳转链接 `https://github.com/qiu-yuxiao/clash-mini`）。
+    2. 分割线 (Divider)。
+    3. `🚀 检查软件更新 (vX.Y.Z)`（调用 Tauri 自动更新插件检测新客户端发版）。
+    4. `⚙️ 检查内核更新 (Mihomo vX.Y.Z)`（通过 GitHub API 检测并热替换底层 `Mihomo` 核心）。
+- **更新面板与菜单的 6 种皮肤一致性联动**：
+  - 弹出菜单的 Paper 容器必须归属 `className="theme-panel"`，确保其背景、磨砂玻璃度 (`backdrop-filter`)、投影高度、实体 3D 边框深浅 (如 `Retro-3D`)、霓虹辉光 (如 `Cyberpunk` 的 neon border) 完全跟随系统当前所选皮肤和滑块设定。
+  - 菜单内的操作选项在鼠标 Hover 及点击时，高亮反馈须使用对应皮肤的主调强调色（如 `Retro-3D` 的同心圆黄金色、`Cyberpunk` 的荧光绿等）。
+- **客户端更新静默后台链启动**：
+  - 在 `tauri.conf.json` 中，更新公钥 (`pubkey`) 及服务端点 (`endpoints`) 指向改为 **Clash Mini 分支自身的配置与 GitHub Release 下载路径**（`qiu-yuxiao/clash-mini`），杜绝向原版 Clash Verge 检查而导致覆盖损坏。
+  - 在 `src-tauri/src/lib.rs` 的 app 启动生命周期中，挂载并启动后台更新：启动时调用 `SilentUpdater::global().try_install_on_startup()` 检查本地缓存就绪，运行中通过后台线程循环调用 `SilentUpdater::global().start_background_check()` 实现静默检测与缓存下载。
+- **Mihomo 内核动态路径与平滑更新**：
+  - **动态路径探测**：修改内核启动逻辑，启动时优先检索用户可写目录（如 `app_home_dir/cores/mini-mihomo.exe`），若存在自定义下载的内核则使用 `Command::new(custom_path)` 运行该内核；否则退回包内嵌入的 `sidecar` 作为兜底。
+  - **热更文件替换**：通过 GitHub API 获取 MetaCubeX 官方的最新 `mihomo` 版本及架构包链接。下载并解压后，替换可写目录下的内核二进制。如果当前开启了系统服务模式，应先卸载/停用旧服务，替换文件后再重装启动，防止文件写入锁死。
