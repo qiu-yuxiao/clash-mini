@@ -157,18 +157,31 @@ def verify_cargo_lock():
         
     print("\n--- Verifying Cargo.lock Plugin Dependency ---")
     
-    # Match package section for tauri-plugin-mihomo
-    pattern = r"\[\[package\]\]\s+name\s*=\s*\"tauri-plugin-mihomo\"[\s\S]*?version\s*=\s*\"([^\"]+)\"[\s\S]*?source\s*=\s*\"([^\"]+)\""
-    match = re.search(pattern, content)
-    if not match:
+    # Find tauri-plugin-mihomo package block
+    blocks = content.split("[[package]]")
+    mihomo_block = None
+    for block in blocks:
+        if 'name = "tauri-plugin-mihomo"' in block:
+            mihomo_block = block
+            break
+            
+    if not mihomo_block:
         print("[FAIL] tauri-plugin-mihomo package entry not found in Cargo.lock")
         return False
         
-    version = match.group(1)
-    source = match.group(2)
+    version_match = re.search(r'version\s*=\s*"([^"]+)"', mihomo_block)
+    if not version_match:
+        print("[FAIL] version not found in tauri-plugin-mihomo block")
+        return False
+    version = version_match.group(1)
     
-    commit_match = re.search(r"#([a-fA-F0-9]+)", source)
-    commit = commit_match.group(1) if commit_match else None
+    source_match = re.search(r'source\s*=\s*"([^"]+)"', mihomo_block)
+    source = source_match.group(1) if source_match else None
+    
+    commit = None
+    if source:
+        commit_match = re.search(r"#([a-fA-F0-9]+)", source)
+        commit = commit_match.group(1) if commit_match else None
     
     print(f"[INFO] Found tauri-plugin-mihomo version: {version}, commit: {commit}")
     

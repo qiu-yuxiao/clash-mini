@@ -36,7 +36,14 @@
 * **修改方针**：我们不需要修改项目自身的业务代码。只需要更新 `tauri-plugin-mihomo` 依赖（包括 Rust 端的 `Cargo.lock` 和前端的 `pnpm-lock.yaml`），拉取最新已移除该字段校验的插件版本（v0.5.2 或最新 commit），然后重新打包发行即可。
 * **状态**：代码已修正，待确认。
 
+### **BUG-072** (新版内核插件序列化问题导致 Allow LAN 等开关状态无法加载与更新)
+* **缺陷描述与现象**：在升级内核解析插件 `tauri-plugin-mihomo` 至 `0.5.2` 之后，主页基础设置的 **Allow LAN** 开关拨动后无法正常开启并会弹回。其他如端口状态等也有可能存在无法同步的情况。
+* **排查原因与记忆**：`tauri-plugin-mihomo` 在升级到 `0.5.2`（commit `2b2c88d`）时，其 Rust 端的 `LogLevel` 枚举漏掉了 `#[serde(rename_all = "lowercase")]` 属性。而 Mihomo 内核返回的配置中，日志级别字段是小写的 `"log-level": "info"`。这导致在通过 `/configs` 获取内核基础配置反序列化时报错，使整个 `get_base_config` 返回 `Err`，前端最终拿到 `undefined`，导致绑定的开关显示为默认关闭且无法正常切换。
+* **修改方针**：将 `tauri-plugin-mihomo` 插件的源码拷贝至本地 `crates/tauri-plugin-mihomo`，并在 `models.rs` 中为 `LogLevel` 重新加上 `#[serde(rename_all = "lowercase")]`，然后修改 `Cargo.toml` 使用本地路径依赖。
+* **状态**：代码已修正，待确认。
+
 ---
+
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 

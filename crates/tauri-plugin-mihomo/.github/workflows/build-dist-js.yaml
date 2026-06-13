@@ -1,0 +1,75 @@
+name: Build dist-js
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "guest-js/**"
+      - "src/models.rs"
+
+permissions: write-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+
+      - name: install webkit2gtk
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Rust Stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src
+
+      - name: Export Bindings
+        run: cargo test export_bindings
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: build dist
+        run: |
+          pnpm i
+          pnpm build
+
+      - name: Check file changed
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          base: HEAD
+          filters: |
+            frontend:
+              - 'dist-js/**'
+              - 'guest-js/**'
+
+      - name: Update dist-js or guest-js
+        if: steps.changes.outputs.frontend == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist-js guest-js
+          git commit -m "Update frontend code"
+          git push origin main
