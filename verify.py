@@ -207,7 +207,12 @@ def verify_cargo_lock():
             v_upstream = [int(x) for x in latest_upstream.split(".")]
             if v_local < v_upstream:
                 print(f"[FAIL] Local plugin version ({version}) is OUTDATED! Upstream has v{latest_upstream}.")
-                print(f"[FAIL] Please run 'cargo update -p tauri-plugin-mihomo' to update your dependencies before releasing!")
+                print(f"[FAIL] CRITICAL: tauri-plugin-mihomo has local patches applied in 'crates/tauri-plugin-mihomo' (BUG-072).")
+                print(f"[FAIL] DO NOT simply update via cargo/git without checking for LogLevel deserialization issue.")
+                print(f"[FAIL] To resolve this:")
+                print(f"[FAIL] 1. Check if upstream v{latest_upstream} has fixed the missing #[serde(rename_all = \"lowercase\")] on LogLevel enum.")
+                print(f"[FAIL] 2. If upstream has fixed it, you can revert back to git dependency in src-tauri/Cargo.toml.")
+                print(f"[FAIL] 3. If upstream has NOT fixed it, fetch upstream source, copy it to 'crates/tauri-plugin-mihomo', apply the LogLevel patch to 'models.rs', and update version in crates's Cargo.toml.")
                 return False
             else:
                 print(f"[PASS] Local version {version} is up-to-date with upstream v{latest_upstream}")

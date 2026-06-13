@@ -96,6 +96,12 @@ backon = { version = "1.6.0", features = ["tokio-sleep"] }
 tauri-plugin-http = "2.5.9"
 console-subscriber = { version = "0.5.0", optional = true }
 tauri-plugin-devtools = { version = "2.1.0" }
+# WARNING: tauri-plugin-mihomo is customized locally in crates/tauri-plugin-mihomo to fix BUG-072
+# (missing #[serde(rename_all = "lowercase")] on LogLevel causing Allow LAN toggle failure).
+# If upgrading to a new upstream version (e.g. 0.5.3+), do NOT simply switch back to upstream git
+# without confirming they fixed this deserialization issue. If upgrading, either:
+# A) Copy the new upstream source to crates/tauri-plugin-mihomo and re-apply the patch, or
+# B) Confirm upstream fixed the issue and then switch back to git.
 tauri-plugin-mihomo = { path = "../crates/tauri-plugin-mihomo" }
 clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger" }
 async-trait = "0.1.89"
