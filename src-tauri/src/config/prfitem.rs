@@ -837,7 +837,7 @@ mod tests {
             ..Default::default()
         };
 
-        let initial_data = "key: value\r\nlist:\r\n  - item1\r\n".into();
+        let initial_data: String = "key: value\r\nlist:\r\n  - item1\r\n".into();
 
         // 1. Initial save (should write)
         item.save_file(initial_data.clone()).await.expect("initial save failed");

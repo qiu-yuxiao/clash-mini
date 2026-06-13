@@ -35,9 +35,16 @@ import {
   Tooltip,
   Select,
   MenuItem,
+  Menu,
+  Divider,
+  Theme,
 } from '@mui/material'
 import { alpha } from '@mui/material'
 import { open } from '@tauri-apps/plugin-shell'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import { getVersion as getAppVersion } from '@tauri-apps/api/app'
+import { check } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -59,7 +66,7 @@ import { TrafficGraph } from '@/components/layout/traffic-graph'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import { filterSort } from '@/components/proxy/use-filter-sort'
-import { useClashInfo } from '@/hooks/use-clash'
+import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
 import { useProfiles } from '@/hooks/use-profiles'
@@ -187,6 +194,91 @@ function convertDelayColor(
     default:
       return 'default'
   }
+}
+
+// Helper to style MenuItem hover across different themes
+const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
+  const isLight = theme.palette.mode === 'light'
+  
+  let fontFamily = 'Trebuchet MS, SimHei, sans-serif'
+  if (skin === 'original') fontFamily = 'Segoe UI, Microsoft YaHei, sans-serif'
+  else if (skin === 'modern-flat') fontFamily = 'Outfit, DengXian, sans-serif'
+  else if (skin === 'frosted-glass') fontFamily = 'Segoe UI Light, Microsoft YaHei Light, sans-serif'
+  else if (skin === 'cyberpunk') fontFamily = 'Consolas, NSimSun, monospace'
+  else if (skin === 'monochrome') fontFamily = 'Georgia, KaiTi, serif'
+
+  const baseStyle = {
+    fontFamily,
+    fontSize: '13px',
+    padding: '8px 16px',
+    transition: 'all 0.15s ease',
+    color: theme.palette.text.primary,
+  }
+
+  if (skin === 'retro-3d') {
+    return {
+      ...baseStyle,
+      fontWeight: 'bold',
+      '&:hover': {
+        background: 'radial-gradient(circle at center, #FFD54F 0%, #FFA000 100%) !important',
+        color: '#1E1200 !important',
+      }
+    }
+  }
+  if (skin === 'original') {
+    return {
+      ...baseStyle,
+      fontWeight: 'bold',
+      '&:hover': {
+        background: 'rgba(91, 92, 157, 0.08) !important',
+        color: 'var(--primary-main) !important',
+      }
+    }
+  }
+  if (skin === 'modern-flat') {
+    return {
+      ...baseStyle,
+      fontWeight: 'bold',
+      '&:hover': {
+        background: `${alpha(theme.palette.primary.main, 0.1)} !important`,
+        color: `${theme.palette.primary.main} !important`,
+      }
+    }
+  }
+  if (skin === 'frosted-glass') {
+    return {
+      ...baseStyle,
+      '&:hover': {
+        background: 'rgba(255, 255, 255, 0.12) !important',
+        color: `${theme.palette.primary.main} !important`,
+      }
+    }
+  }
+  if (skin === 'cyberpunk') {
+    return {
+      ...baseStyle,
+      fontWeight: 'bold',
+      borderRadius: '0px',
+      border: '1px solid transparent',
+      '&:hover': {
+        background: '#39ff14 !important',
+        color: '#000000 !important',
+        border: '1px solid #39ff14 !important',
+        boxShadow: '0 0 8px #39ff14',
+      }
+    }
+  }
+  if (skin === 'monochrome') {
+    return {
+      ...baseStyle,
+      borderRadius: '0px',
+      '&:hover': {
+        background: isLight ? '#000000 !important' : '#ffffff !important',
+        color: isLight ? '#ffffff !important' : '#000000 !important',
+      }
+    }
+  }
+  return baseStyle
 }
 
 // Connections order
@@ -1146,6 +1238,26 @@ const Layout = () => {
     }
   }, [])
 
+  // Update States
+  const [helpAnchorEl, setHelpAnchorEl] = useState<null | HTMLElement>(null)
+  const [appVersion, setAppVersion] = useState<string>('')
+
+  // Client Update states
+  const [clientUpdateOpen, setClientUpdateOpen] = useState(false)
+  const [clientUpdateObj, setClientUpdateObj] = useState<any>(null)
+  const [clientStatus, setClientStatus] = useState<'idle' | 'downloading' | 'error' | 'done'>('idle')
+  const [clientProgress, setClientProgress] = useState(0)
+  const [clientProgressMessage, setClientProgressMessage] = useState('')
+  const [clientCheckLoading, setClientCheckLoading] = useState(false)
+
+  // Core Update states
+  const [coreUpdateOpen, setCoreUpdateOpen] = useState(false)
+  const [coreUpdateRelease, setCoreUpdateRelease] = useState<any>(null)
+  const [coreUpgradeStatus, setCoreUpgradeStatus] = useState<string>('idle')
+  const [coreUpgradeProgress, setCoreUpgradeProgress] = useState<number>(0)
+  const [coreUpgradeMessage, setCoreUpgradeMessage] = useState<string>('')
+  const [coreCheckLoading, setCoreCheckLoading] = useState(false)
+
   const [isMinimalWidth, setIsMinimalWidth] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.innerWidth <= 285
@@ -1306,8 +1418,136 @@ const Layout = () => {
 
   // Port State
   const { clashInfo, patchInfo } = useClashInfo()
+  const { version: coreVersion, mutateVersion } = useClash()
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
+
+  useEffect(() => {
+    getAppVersion()
+      .then(setAppVersion)
+      .catch((err) => console.error('Failed to get app version:', err))
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    const unlistenPromise = listen<any>('core-upgrade-progress', (event) => {
+      if (!active) return
+      const payload = event.payload
+      setCoreUpgradeStatus(payload.status)
+      setCoreUpgradeProgress(payload.progress)
+      setCoreUpgradeMessage(payload.message)
+      if (payload.status === 'done') {
+        showNotice.success('Mihomo 内核更新成功')
+        mutateVersion()
+      } else if (payload.status === 'error') {
+        showNotice.error(`内核更新失败: ${payload.message}`)
+      }
+    })
+    return () => {
+      active = false
+      unlistenPromise.then((unlisten) => unlisten())
+    }
+  }, [mutateVersion])
+
+  const handleHelpClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setHelpAnchorEl(event.currentTarget)
+  }
+
+  const handleHelpClose = () => {
+    setHelpAnchorEl(null)
+  }
+
+  const handleClientCheck = async () => {
+    setClientCheckLoading(true)
+    setHelpAnchorEl(null)
+    try {
+      const update = await check()
+      if (update) {
+        setClientUpdateObj(update)
+        setClientUpdateOpen(true)
+        setClientStatus('idle')
+        setClientProgress(0)
+        setClientProgressMessage('')
+      } else {
+        showNotice.info('当前已是最新版本')
+      }
+    } catch (err: any) {
+      console.error('Failed to check for client update:', err)
+      showNotice.error(`检查更新失败: ${err.message || err}`)
+    } finally {
+      setClientCheckLoading(false)
+    }
+  }
+
+  const handleClientUpgrade = async () => {
+    if (!clientUpdateObj) return
+    setClientStatus('downloading')
+    setClientProgress(0)
+    setClientProgressMessage('正在下载更新...')
+
+    try {
+      let downloaded = 0
+      let total = 0
+      await clientUpdateObj.downloadAndInstall((progressEvent: any) => {
+        if (progressEvent.event === 'Started') {
+          total = progressEvent.data.contentLength || 0
+          setClientProgressMessage('开始下载软件更新包...')
+        } else if (progressEvent.event === 'Progress') {
+          downloaded += progressEvent.data.chunkLength
+          if (total > 0) {
+            const pct = Math.round((downloaded / total) * 100)
+            setClientProgress(pct)
+            setClientProgressMessage(`已下载 ${pct}% (${(downloaded / 1024 / 1024).toFixed(2)} MB / ${(total / 1024 / 1024).toFixed(2)} MB)`)
+          } else {
+            setClientProgressMessage(`已下载 ${(downloaded / 1024 / 1024).toFixed(2)} MB`)
+          }
+        } else if (progressEvent.event === 'Finished') {
+          setClientProgress(100)
+          setClientStatus('done')
+          setClientProgressMessage('下载完成，正在准备安装并重启...')
+        }
+      })
+      showNotice.success('更新安装完毕，请重启应用以应用更改')
+    } catch (err: any) {
+      console.error('Client update error:', err)
+      setClientStatus('error')
+      setClientProgressMessage(`更新失败: ${err.message || err}`)
+      showNotice.error(`更新失败: ${err.message || err}`)
+    }
+  }
+
+  const handleCoreCheck = async () => {
+    setCoreCheckLoading(true)
+    setHelpAnchorEl(null)
+    try {
+      const release = await invoke<any>('check_core_update')
+      setCoreUpdateRelease(release)
+      setCoreUpdateOpen(true)
+      setCoreUpgradeStatus('idle')
+      setCoreUpgradeProgress(0)
+      setCoreUpgradeMessage('')
+    } catch (err: any) {
+      console.error('Failed to check for core update:', err)
+      showNotice.error(`检查内核更新失败: ${err.message || err}`)
+    } finally {
+      setCoreCheckLoading(false)
+    }
+  }
+
+  const handleCoreUpgrade = async () => {
+    if (!coreUpdateRelease) return
+    setCoreUpgradeStatus('checking')
+    setCoreUpgradeProgress(0)
+    setCoreUpgradeMessage('正在启动内核升级任务...')
+    try {
+      await invoke('start_core_upgrade', { release: coreUpdateRelease })
+    } catch (err: any) {
+      console.error('Failed to start core upgrade:', err)
+      setCoreUpgradeStatus('error')
+      setCoreUpgradeMessage(`启动失败: ${err.message || err}`)
+      showNotice.error(`启动内核升级失败: ${err.message || err}`)
+    }
+  }
 
   const policyActiveIndex =
     verge?.rule_fallback === 'direct'
@@ -3606,13 +3846,7 @@ const Layout = () => {
               {/* Help Button */}
               <Button
                 variant="contained"
-                onClick={async () => {
-                  try {
-                    await open('https://github.com/qiu-yuxiao/clash-mini')
-                  } catch (err) {
-                    console.error('Failed to open help link:', err)
-                  }
-                }}
+                onClick={handleHelpClick}
                 sx={{
                   position: 'absolute',
                   bottom: '0',
@@ -3650,6 +3884,66 @@ const Layout = () => {
               >
                 <HelpOutlineRounded sx={{ fontSize: '16px' }} />
               </Button>
+
+              <Menu
+                anchorEl={helpAnchorEl}
+                open={Boolean(helpAnchorEl)}
+                onClose={handleHelpClose}
+                anchorOrigin={{
+                  vertical: 'top',
+                  horizontal: 'left',
+                }}
+                transformOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                slotProps={{
+                  paper: {
+                    className: 'theme-panel',
+                    sx: {
+                      minWidth: '220px',
+                      mb: '8px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      backgroundColor: 'transparent',
+                      backgroundImage: 'none',
+                      boxShadow: 'none',
+                      '& .MuiList-root': {
+                        padding: '4px 0',
+                      }
+                    }
+                  }
+                }}
+              >
+                <MenuItem
+                  onClick={async () => {
+                    handleHelpClose()
+                    try {
+                      await open('https://github.com/qiu-yuxiao/clash-mini')
+                    } catch (err) {
+                      console.error('Failed to open help link:', err)
+                    }
+                  }}
+                  sx={getMenuItemHoverStyle(theme, controlSkin)}
+                >
+                  🐱 GitHub 主页
+                </MenuItem>
+                <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+                <MenuItem
+                  onClick={handleClientCheck}
+                  disabled={clientCheckLoading}
+                  sx={getMenuItemHoverStyle(theme, controlSkin)}
+                >
+                  🚀 检查软件更新 {appVersion ? `(v${appVersion})` : ''}
+                </MenuItem>
+                <MenuItem
+                  onClick={handleCoreCheck}
+                  disabled={coreCheckLoading}
+                  sx={getMenuItemHoverStyle(theme, controlSkin)}
+                >
+                  ⚙️ 检查内核更新 {coreVersion ? `(Mihomo v${coreVersion})` : ''}
+                </MenuItem>
+              </Menu>
 
               {/* Language Selector */}
               <Select
@@ -3887,6 +4181,201 @@ const Layout = () => {
 
       {/* Popups & dialogs */}
       <ConnectionDetail ref={detailRef} />
+
+      {/* Client Update Dialog */}
+      <Dialog
+        open={clientUpdateOpen}
+        onClose={() => {
+          if (clientStatus !== 'downloading') {
+            setClientUpdateOpen(false)
+          }
+        }}
+        slotProps={{
+          paper: {
+            className: 'theme-panel',
+            sx: {
+              p: 3,
+              minWidth: '400px',
+              maxWidth: '600px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              fontFamily: 'var(--control-font-family)',
+              color: theme.palette.text.primary,
+              backgroundColor: 'transparent',
+              backgroundImage: 'none',
+              boxShadow: 'none',
+            }
+          }
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, fontFamily: 'var(--control-font-family)' }}>
+          🚀 软件本体更新
+        </Typography>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}>
+            当前版本: {appVersion ? `v${appVersion}` : '未知'}
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)', fontWeight: 'bold' }}>
+            最新版本: {clientUpdateObj?.version ? `v${clientUpdateObj.version}` : '未知'}
+          </Typography>
+        </Box>
+
+        <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1, fontFamily: 'var(--control-font-family)' }}>
+          更新日志:
+        </Typography>
+        <Box
+          sx={{
+            maxHeight: '200px',
+            overflowY: 'auto',
+            p: 2,
+            mt: 1,
+            mb: 2,
+            borderRadius: '4px',
+            fontSize: '13px',
+            whiteSpace: 'pre-wrap',
+            fontFamily: 'var(--control-font-family)',
+            ...get3DCardStyle(theme, 'default'),
+          }}
+        >
+          {clientUpdateObj?.body || '暂无详细更新日志'}
+        </Box>
+
+        {clientStatus !== 'idle' && (
+          <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
+            <Box
+              sx={{
+                width: '100%',
+                height: '8px',
+                backgroundColor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                borderRadius: '4px',
+                overflow: 'hidden',
+              }}
+            >
+              <Box
+                sx={{
+                  width: `${clientProgress}%`,
+                  height: '100%',
+                  background: 'var(--primary-main)',
+                  transition: 'width 0.2s ease',
+                }}
+              />
+            </Box>
+            <Typography variant="body2" sx={{ mt: 1, fontSize: '12px', opacity: 0.8, fontFamily: 'var(--control-font-family)' }}>
+              {clientProgressMessage}
+            </Typography>
+          </Box>
+        )}
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          <Button
+            onClick={() => setClientUpdateOpen(false)}
+            disabled={clientStatus === 'downloading'}
+            sx={{
+              ...get3DButtonStyle(theme, 'outlined', 'default'),
+              mr: 1,
+            }}
+          >
+            关闭
+          </Button>
+          <Button
+            onClick={handleClientUpgrade}
+            disabled={clientStatus === 'downloading' || clientStatus === 'done'}
+            sx={{
+              ...get3DButtonStyle(theme, 'contained', 'primary'),
+            }}
+          >
+            {clientStatus === 'done' ? '准备重启' : clientStatus === 'downloading' ? '更新中...' : '立即更新'}
+          </Button>
+        </Box>
+      </Dialog>
+
+      {/* Core Update Dialog */}
+      <Dialog
+        open={coreUpdateOpen}
+        onClose={() => {
+          if (coreUpgradeStatus !== 'checking' && coreUpgradeStatus !== 'downloading' && coreUpgradeStatus !== 'extracting') {
+            setCoreUpdateOpen(false)
+          }
+        }}
+        slotProps={{
+          paper: {
+            className: 'theme-panel',
+            sx: {
+              p: 3,
+              minWidth: '400px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              fontFamily: 'var(--control-font-family)',
+              color: theme.palette.text.primary,
+              backgroundColor: 'transparent',
+              backgroundImage: 'none',
+              boxShadow: 'none',
+            }
+          }
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, fontFamily: 'var(--control-font-family)' }}>
+          ⚙️ Mihomo 内核更新
+        </Typography>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}>
+            当前版本: {coreVersion || '未知'}
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)', fontWeight: 'bold' }}>
+            最新版本: {coreUpdateRelease?.tag_name || '获取中...'}
+          </Typography>
+        </Box>
+
+        {coreUpgradeStatus !== 'idle' && (
+          <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
+            <Box
+              sx={{
+                width: '100%',
+                height: '8px',
+                backgroundColor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                borderRadius: '4px',
+                overflow: 'hidden',
+              }}
+            >
+              <Box
+                sx={{
+                  width: `${coreUpgradeProgress}%`,
+                  height: '100%',
+                  background: 'var(--primary-main)',
+                  transition: 'width 0.2s ease',
+                }}
+              />
+            </Box>
+            <Typography variant="body2" sx={{ mt: 1, fontSize: '12px', opacity: 0.8, fontFamily: 'var(--control-font-family)' }}>
+              {coreUpgradeMessage}
+            </Typography>
+          </Box>
+        )}
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          <Button
+            onClick={() => setCoreUpdateOpen(false)}
+            disabled={coreUpgradeStatus === 'checking' || coreUpgradeStatus === 'downloading' || coreUpgradeStatus === 'extracting'}
+            sx={{
+              ...get3DButtonStyle(theme, 'outlined', 'default'),
+              mr: 1,
+            }}
+          >
+            关闭
+          </Button>
+          <Button
+            onClick={handleCoreUpgrade}
+            disabled={coreUpgradeStatus === 'checking' || coreUpgradeStatus === 'downloading' || coreUpgradeStatus === 'extracting' || coreUpgradeStatus === 'done'}
+            sx={{
+              ...get3DButtonStyle(theme, 'contained', 'primary'),
+            }}
+          >
+            {coreUpgradeStatus === 'done' ? '更新完成' : coreUpgradeStatus !== 'idle' ? '更新中...' : '立即更新'}
+          </Button>
+        </Box>
+      </Dialog>
 
       {/* Logs View Dialog */}
       <Dialog

@@ -348,8 +348,18 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
     let clash_core = verge_config.latest_arc().get_valid_clash_core();
     drop(verge_config);
 
-    let bin_ext = if cfg!(windows) { ".exe" } else { "" };
-    let bin_path = current_exe()?.with_file_name(format!("{clash_core}{bin_ext}"));
+    let app_dir = dirs::app_home_dir()?;
+    let cores_dir = app_dir.join("cores");
+    let core_name = if cfg!(windows) { "mini-mihomo.exe" } else { "mini-mihomo" };
+    let custom_core_path = cores_dir.join(core_name);
+
+    let bin_path = if custom_core_path.exists() {
+        logging!(info, Type::Service, "Service using custom core: {}", custom_core_path.display());
+        custom_core_path
+    } else {
+        let bin_ext = if cfg!(windows) { ".exe" } else { "" };
+        current_exe()?.with_file_name(format!("{clash_core}{bin_ext}"))
+    };
 
     let payload = clash_verge_service_ipc::ClashConfig {
         core_config: CoreConfig {

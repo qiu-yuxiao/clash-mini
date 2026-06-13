@@ -340,11 +340,21 @@ impl CoreConfigValidator {
         logging!(info, Type::Validate, "验证目录: {}", app_dir_str);
 
         // 使用子进程运行clash验证配置
-        let command =
+        let cores_dir = app_dir.join("cores");
+        let core_name = if cfg!(windows) { "mini-mihomo.exe" } else { "mini-mihomo" };
+        let custom_core_path = cores_dir.join(core_name);
+
+        let command = if custom_core_path.exists() {
+            app_handle
+                .shell()
+                .command(custom_core_path)
+                .args(["-t", "-d", app_dir_str, "-f", config_path])
+        } else {
             app_handle
                 .shell()
                 .sidecar(clash_core.as_str())?
-                .args(["-t", "-d", app_dir_str, "-f", config_path]);
+                .args(["-t", "-d", app_dir_str, "-f", config_path])
+        };
         let output = command.output().await?;
 
         let status = &output.status;

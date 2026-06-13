@@ -1,0 +1,34 @@
+diff --git a/src-tauri/src/utils/help.rs b/src-tauri/src/utils/help.rs
+--- a/src-tauri/src/utils/help.rs
++++ b/src-tauri/src/utils/help.rs
+@@ -61,15 +61,23 @@
+ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Option<&str>) -> Result<()> {
+     let data_str = with_encryption(|| async { serde_yaml_ng::to_string(data) }).await?;
+ 
+     let yaml_str = match prefix {
+         Some(prefix) => format!("{prefix}\n\n{data_str}"),
+         None => data_str,
+     };
+ 
+-    let path_str = path.as_os_str().to_string_lossy().to_string();
+-    tokio::fs::write(path, yaml_str.as_bytes())
+-        .await
+-        .with_context(|| format!("failed to save file \"{path_str}\""))?;
+-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
++    let yaml_bytes = yaml_str.as_bytes();
++
++    let should_write = match tokio::fs::read(path).await {
++        Ok(existing_bytes) => existing_bytes != yaml_bytes,
++        Err(_) => true,
++    };
++
++    if should_write {
++        let path_str = path.as_os_str().to_string_lossy().to_string();
++        tokio::fs::write(path, yaml_bytes)
++            .await
++            .with_context(|| format!("failed to save file \"{path_str}\""))?;
++        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
++    }
++
+     Ok(())
+ }
