@@ -130,6 +130,22 @@ def verify_admin_check():
 
 import json
 
+import urllib.request
+
+def get_latest_upstream_plugin_version():
+    url = "https://raw.githubusercontent.com/clash-verge-rev/tauri-plugin-mihomo/main/Cargo.toml"
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", "verify-script")
+    try:
+        with urllib.request.urlopen(req, timeout=8) as response:
+            content = response.read().decode()
+            match = re.search(r"version\s*=\s*\"([^\"]+)\"", content)
+            if match:
+                return match.group(1)
+    except Exception as e:
+        print(f"[WARN] Failed to fetch latest Cargo.toml from GitHub raw: {e}")
+    return None
+
 def verify_cargo_lock():
     path = "Cargo.lock"
     if not os.path.exists(path):
@@ -168,6 +184,24 @@ def verify_cargo_lock():
             return False
     except Exception as e:
         print(f"[WARN] Failed to parse semver for {version}: {e}")
+        
+    # Check if there is a newer version upstream
+    latest_upstream = get_latest_upstream_plugin_version()
+    if latest_upstream:
+        print(f"[INFO] Latest upstream plugin version found: {latest_upstream}")
+        try:
+            v_local = [int(x) for x in version.split(".")]
+            v_upstream = [int(x) for x in latest_upstream.split(".")]
+            if v_local < v_upstream:
+                print(f"[FAIL] Local plugin version ({version}) is OUTDATED! Upstream has v{latest_upstream}.")
+                print(f"[FAIL] Please run 'cargo update -p tauri-plugin-mihomo' to update your dependencies before releasing!")
+                return False
+            else:
+                print(f"[PASS] Local version {version} is up-to-date with upstream v{latest_upstream}")
+        except Exception as e:
+            print(f"[WARN] Failed to compare local and upstream versions: {e}")
+    else:
+        print("[WARN] Could not retrieve latest upstream version, skipping remote check (using local offline rules)")
         
     print("[PASS] tauri-plugin-mihomo dependency is correctly updated and verified")
     return True
