@@ -76,6 +76,11 @@ Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailore
   <br/>
   <img src="docs/assets/screenshot_maximized_light.png" alt="Maximized Light Theme" width="480" />
 
+### 5. Update Dropdown (更新与帮助菜单)
+<p align="left">
+  <img src="docs/assets/screenshot_update_dropdown.png" alt="Update Dropdown Showcase" width="280" />
+</p>
+
 ---
 
 ## Copyright and Licensing
