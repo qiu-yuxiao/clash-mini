@@ -92,6 +92,11 @@ impl CoreManager {
             return;
         }
 
+        let is_admin = tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin(Handle::app_handle());
+        if is_admin {
+            return;
+        }
+
         let max_times = timing::SERVICE_WAIT_MAX.as_millis() / timing::SERVICE_WAIT_INTERVAL.as_millis();
         let backoff = ConstantBuilder::default()
             .with_delay(timing::SERVICE_WAIT_INTERVAL)
