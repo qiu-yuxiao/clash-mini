@@ -1354,6 +1354,11 @@
     * **响应式隐藏**：与换肤选择器保持一致的响应式高度裁剪规则，当窗口高度较小时（由媒体查询 `@media (max-height: 830px)` 触发）自动隐藏，防止纵向空间狭窄时产生重叠。
     * **外部链接跳转**：点击时通过 `@tauri-apps/plugin-shell` 提供的 `open` 异步函数在用户系统的默认浏览器中安全打开 GitHub 项目开始页：`https://github.com/qiu-yuxiao/clash-mini`。
 
+18. **Windows 系统托盘主线程调度与线程安全隔离规范 (BUG-073)**：
+    为彻底杜绝 Win32 托盘图标及上下文菜单因 Tokio 后台异步工作线程操作而产生的 `os error -2147467259` 线程亲和性（Thread Affinity）崩溃问题，程序必须强制实施以下跨线程隔离与主线程调度规范：
+    * **数据异步获取、UI 同步构建**：所有涉及 UI 资源操作（包括但不限于 `tauri::menu::MenuItem`、`CheckMenuItem`、`Submenu`、`MenuBuilder` 的构造和 `TrayIconBuilder::build`、`tray.set_menu`、`tray.set_icon`、`tray.set_tooltip` 的调用）一律强制置于主线程（`run_on_main_thread`）中执行；而所有前置的数据查询、网络 IO、文件读取和配置解析（如代理节点缓存、Vierge 配置及 Profiles 获取）必须提前在异步线程中处理完毕，最后以纯数据/克隆对象形式传递至主线程进行界面生成。
+    * **托盘句柄安全获取**：获取托盘实例的操作 `app_handle.tray_by_id("main")` 必须一律在 `run_on_main_thread` 主线程闭包中执行，严禁在异步 Tokio 线程上下文内直接调用或解包，确保生命周期与 GUI 窗体进程完全对齐。
+
 ---
 
 
