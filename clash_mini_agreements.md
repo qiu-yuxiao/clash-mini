@@ -2087,3 +2087,32 @@
 - **Mihomo 内核动态路径与平滑更新**：
   - **动态路径探测**：修改内核启动逻辑，启动时优先检索用户可写目录（如 `app_home_dir/cores/mini-mihomo.exe`），若存在自定义下载的内核则使用 `Command::new(custom_path)` 运行该内核；否则退回包内嵌入的 `sidecar` 作为兜底。
   - **热更文件替换**：通过 GitHub API 获取 MetaCubeX 官方的最新 `mihomo` 版本及架构包链接。下载并解压后，替换可写目录下的内核二进制。如果当前开启了系统服务模式，应先卸载/停用旧服务，替换文件后再重装启动，防止文件写入锁死。
+
+## ⚙️ 十三、 订阅/配置文件右键菜单与编辑对话框规范 (BUG-072)
+为了解决 Clash Mini 订阅卡片（Profile Card）无法右键操作以及没有编辑对话框的问题，并保持全套 6 种皮肤的完美视觉融合与交互统一，制定本设计协议：
+- **右键菜单拦截与触发 (onContextMenu Interception)**：
+  - 在前端订阅卡片容器（`<Box>`）上，绑定自定义的 `onContextMenu` 事件处理器。
+  - 事件处理器中必须调用 `e.preventDefault()` 和 `e.stopPropagation()`，屏蔽 Windows 系统或上层容器的默认右键菜单，并捕获当前右键点击对应的 Profile 项 `uid` 及其位置坐标（`e.clientX`, `e.clientY`）。
+  - 使用 MUI `<Menu>` 结合 `anchorReference="anchorPosition"`，并将 `anchorPosition={{ top: y, left: x }}` 传递给 `<Menu>`，实现精确在鼠标光标位置弹出菜单。
+- **右键菜单功能选项 (Context Menu Actions)**：
+  - 菜单包含以下 5 项：
+    1. `📝 编辑` (Edit)：打开编辑对话框。
+    2. `📄 编辑文件` (Edit File)：调用后端 `viewProfile(uid)` 命令，在系统默认文本编辑器中打开订阅的本地 YAML 配置文件。
+    3. `🔗 复制链接` (Copy Link)：将订阅 URL 复制到剪贴板，并弹出提示。若为本地文件（`type === 'local'`），该选项需禁用（`disabled`）或不予显示。
+    4. `🔄 更新` (Update)：立即触发订阅的后台下载与更新，并更新节点列表。若为本地文件（`type === 'local'`），该选项需禁用（`disabled`）。
+    5. `❌ 删除` (Delete)：触发该订阅的删除流程。
+- **编辑配置文件对话框 (Edit Profile Dialog)**：
+  - 点击“编辑”菜单项时打开该 Dialog（使用 MUI `<Dialog>` 架构）。
+  - **表单内容字段**：
+    - **配置文件名 (Profile Name)**：文本输入框，所有类型配置均可编辑。
+    - **订阅链接 (Subscription URL)**：文本输入框，仅对远程订阅（`type === 'remote'`）可编辑，本地配置文件为只读。
+    - **更新周期(小时) (Update Interval)**：数值输入框，仅对远程订阅（`type === 'remote'`）可编辑并生效，指定自动更新频率。
+  - **表单保存流程 (Save Actions)**：
+    - 点击保存时，调用后端 `patchProfile(uid, { name, url, option: { ...option, update_interval } })` 将变更写入本地配置文件。
+    - 保存成功后，触发 `mutateProfiles()` 与配置重建，使变更即时应用，关闭对话框，并弹出成功通知。
+- **菜单与对话框的 6 种皮肤视觉适配规范**：
+  - **弹出菜单 Paper 与 Dialog Paper**：必须归属 `className="theme-panel"`，确保其背景、模糊度（`backdrop-filter`）、投影高度、3D 边框（如 `Retro-3D` 的 3D Bevel、`Cyberpunk` 的 neon border 霓虹辉光等）与当前所选皮肤及滑块设定完全联动。
+  - **菜单项 Hover 与高亮**：`MenuItem` 必须应用 `getMenuItemHoverStyle(theme, controlSkin)` 样式，确保不同主题下的文字大小、字体族、高亮颜色以及霓虹投影完全匹配。
+  - **对话框输入框及按钮样式**：
+    - 文本输入框使用 MUI `<TextField>`，其 `InputProps` 需应用 `get3DInputStyle(theme)`，提供暗槽立体拟物感，防止被扁平风格污染。
+    - 按钮（取消/保存）需通过 IIFE 展开注入 `get3DButtonStyle(theme, 'contained', 'primary'/'secondary')` 样式，并加上 `!important` 展开注入以确保外观属性在换肤时刷新。

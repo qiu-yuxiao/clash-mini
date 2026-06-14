@@ -93,6 +93,8 @@ import {
   cmdGetProxyDelay,
   getProfiles,
   patchClashConfig,
+  patchProfile,
+  viewProfile,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
@@ -1376,6 +1378,60 @@ const Layout = () => {
   // Profiles State
   const [url, setUrl] = useState('')
   const [profileLoading, setProfileLoading] = useState(false)
+
+  // Context Menu State for Profile Card (BUG-072)
+  const [profileMenuAnchorPosition, setProfileMenuAnchorPosition] = useState<{ top: number; left: number } | null>(null)
+  const [contextMenuProfileUid, setContextMenuProfileUid] = useState<string | null>(null)
+
+  // Edit Profile Dialog State (BUG-072)
+  const [editProfileOpen, setEditProfileOpen] = useState(false)
+  const [editProfileUid, setEditProfileUid] = useState<string | null>(null)
+  const [editProfileName, setEditProfileName] = useState('')
+  const [editProfileUrl, setEditProfileUrl] = useState('')
+  const [editProfileInterval, setEditProfileInterval] = useState(0)
+
+  // Memoized profile and button styles to avoid IIFE syntax issues in JSX (BUG-072)
+  const contextMenuTargetItem = useMemo(() => {
+    return profileItems.find((p) => p.uid === contextMenuProfileUid)
+  }, [profileItems, contextMenuProfileUid])
+  const isContextMenuLocal = contextMenuTargetItem?.type === 'local'
+
+  const editProfileTargetItem = useMemo(() => {
+    return profileItems.find((p) => p.uid === editProfileUid)
+  }, [profileItems, editProfileUid])
+  const isEditProfileLocal = editProfileTargetItem?.type === 'local'
+
+  const primaryBtn3DStyle = useMemo(() => {
+    const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
+    const styleWithImportant: any = {}
+    for (const [key, val] of Object.entries(btnStyle)) {
+      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
+        styleWithImportant[key] = `${val} !important`
+      } else {
+        styleWithImportant[key] = val
+      }
+    }
+    if (btnStyle.background) {
+      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
+    }
+    return styleWithImportant
+  }, [theme])
+
+  const defaultBtn3DStyle = useMemo(() => {
+    const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
+    const styleWithImportant: any = {}
+    for (const [key, val] of Object.entries(btnStyle)) {
+      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
+        styleWithImportant[key] = `${val} !important`
+      } else {
+        styleWithImportant[key] = val
+      }
+    }
+    if (btnStyle.background) {
+      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
+    }
+    return styleWithImportant
+  }, [theme])
   const {
     profiles = {},
     mutateProfiles,
@@ -2148,6 +2204,76 @@ const Layout = () => {
     }
   }
 
+  const handleEditProfileClick = () => {
+    setProfileMenuAnchorPosition(null)
+    if (!contextMenuProfileUid) return
+    const targetItem = profileItems.find((p) => p.uid === contextMenuProfileUid)
+    if (!targetItem) return
+    setEditProfileUid(contextMenuProfileUid)
+    setEditProfileName(targetItem.name || '')
+    setEditProfileUrl(targetItem.url || '')
+    setEditProfileInterval(targetItem.option?.update_interval || 0)
+    setEditProfileOpen(true)
+  }
+
+  const handleEditProfileFileClick = async () => {
+    setProfileMenuAnchorPosition(null)
+    if (!contextMenuProfileUid) return
+    try {
+      await viewProfile(contextMenuProfileUid)
+    } catch (err) {
+      showNotice.error(String(err))
+    }
+  }
+
+  const handleCopyProfileLinkClick = async () => {
+    setProfileMenuAnchorPosition(null)
+    if (!contextMenuProfileUid) return
+    const targetItem = profileItems.find((p) => p.uid === contextMenuProfileUid)
+    if (!targetItem || !targetItem.url) return
+    try {
+      await navigator.clipboard.writeText(targetItem.url)
+      showNotice.success('链接已复制到剪贴板')
+    } catch (ignoreErr) {
+      showNotice.error('复制失败')
+    }
+  }
+
+  const handleUpdateProfileClick = async () => {
+    setProfileMenuAnchorPosition(null)
+    if (!contextMenuProfileUid) return
+    await handleUpdateProfile(contextMenuProfileUid, { stopPropagation: () => {} } as any)
+  }
+
+  const handleDeleteProfileClick = async () => {
+    setProfileMenuAnchorPosition(null)
+    if (!contextMenuProfileUid) return
+    await handleDeleteProfile(contextMenuProfileUid, { stopPropagation: () => {} } as any)
+  }
+
+  const handleSaveProfile = async () => {
+    if (!editProfileUid) return
+    try {
+      const targetItem = profileItems.find((p) => p.uid === editProfileUid)
+      const origOption = targetItem?.option || {}
+      await patchProfile(editProfileUid, {
+        name: editProfileName,
+        url: editProfileUrl,
+        option: {
+          ...origOption,
+          update_interval: Number(editProfileInterval) || 0,
+        }
+      })
+      showNotice.success('配置修改成功')
+      setEditProfileOpen(false)
+      await mutateProfiles()
+      await enhanceProfiles()
+      await refreshProxy()
+    } catch (err) {
+      showNotice.error(String(err))
+    }
+  }
+
   // Takeover actions
   const handleTakeoverModeChange = async (
     targetMode: 'manual' | 'system' | 'tun',
@@ -2738,6 +2864,15 @@ const Layout = () => {
                         <Box
                           key={item.uid}
                           onClick={() => handleSelectProfile(item.uid)}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setProfileMenuAnchorPosition({
+                              left: e.clientX,
+                              top: e.clientY,
+                            })
+                            setContextMenuProfileUid(item.uid)
+                          }}
                           sx={{
                             display: 'flex',
                             flexDirection: 'column',
@@ -3865,21 +4000,7 @@ const Layout = () => {
                   '@media (max-height: 830px)': {
                     display: 'none',
                   },
-                  ...(() => {
-                    const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
-                    const styleWithImportant: any = {}
-                    for (const [key, val] of Object.entries(btnStyle)) {
-                      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
-                        styleWithImportant[key] = `${val} !important`
-                      } else {
-                        styleWithImportant[key] = val
-                      }
-                    }
-                    if (btnStyle.background) {
-                      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
-                    }
-                    return styleWithImportant
-                  })(),
+                  ...primaryBtn3DStyle,
                 }}
               >
                 <HelpOutlineRounded sx={{ fontSize: '16px' }} />
@@ -3984,21 +4105,7 @@ const Layout = () => {
                   '@media (max-height: 830px)': {
                     display: 'none',
                   },
-                  ...(() => {
-                    const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
-                    const styleWithImportant: any = {}
-                    for (const [key, val] of Object.entries(btnStyle)) {
-                      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
-                        styleWithImportant[key] = `${val} !important`
-                      } else {
-                        styleWithImportant[key] = val
-                      }
-                    }
-                    if (btnStyle.background) {
-                      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
-                    }
-                    return styleWithImportant
-                  })(),
+                  ...primaryBtn3DStyle,
                   '& .MuiSelect-select': {
                     paddingTop: 0,
                     paddingBottom: 0,
@@ -4181,6 +4288,168 @@ const Layout = () => {
 
       {/* Popups & dialogs */}
       <ConnectionDetail ref={detailRef} />
+
+      {/* Profile Card Context Menu (BUG-072) */}
+      <Menu
+        anchorReference="anchorPosition"
+        anchorPosition={
+          profileMenuAnchorPosition !== null
+            ? { top: profileMenuAnchorPosition.top, left: profileMenuAnchorPosition.left }
+            : undefined
+        }
+        open={profileMenuAnchorPosition !== null}
+        onClose={() => setProfileMenuAnchorPosition(null)}
+        slotProps={{
+          paper: {
+            className: "theme-panel",
+            sx: {
+              minWidth: "160px",
+              borderRadius: "6px",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              backgroundColor: "transparent",
+              backgroundImage: "none",
+              boxShadow: "none",
+              "& .MuiList-root": {
+                padding: "4px 0",
+              },
+            },
+          },
+        }}
+      >
+        <MenuItem
+          onClick={handleEditProfileClick}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📝 编辑
+        </MenuItem>
+        <MenuItem
+          onClick={handleEditProfileFileClick}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📄 编辑文件
+        </MenuItem>
+        <Divider sx={{ my: "4px", borderColor: "rgba(255, 255, 255, 0.12)" }} />
+        <MenuItem
+          onClick={handleCopyProfileLinkClick}
+          disabled={isContextMenuLocal || !contextMenuTargetItem?.url}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🔗 复制链接
+        </MenuItem>
+        <MenuItem
+          onClick={handleUpdateProfileClick}
+          disabled={isContextMenuLocal}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🔄 更新
+        </MenuItem>
+        <Divider sx={{ my: "4px", borderColor: "rgba(255, 255, 255, 0.12)" }} />
+        <MenuItem
+          onClick={handleDeleteProfileClick}
+          sx={{
+            ...getMenuItemHoverStyle(theme, controlSkin),
+            color: "error.main",
+          }}
+        >
+          ❌ 删除
+        </MenuItem>
+      </Menu>
+
+      {/* Edit Profile Dialog (BUG-072) */}
+      <Dialog
+        open={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+        slotProps={{
+          paper: {
+            className: "theme-panel",
+            sx: {
+              p: 3,
+              minWidth: "360px",
+              maxWidth: "450px",
+              borderRadius: "8px",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              fontFamily: "var(--control-font-family)",
+              color: theme.palette.text.primary,
+              backgroundColor: "transparent",
+              backgroundImage: "none",
+              boxShadow: "none",
+            },
+          },
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2, fontFamily: "var(--control-font-family)" }}>
+          ⚙️ 编辑配置文件
+        </Typography>
+
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 3 }}>
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: "bold", fontFamily: "var(--control-font-family)" }}>
+              配置名称
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              value={editProfileName}
+              onChange={(e) => setEditProfileName(e.target.value)}
+              sx={get3DInputStyle(theme)}
+            />
+          </Box>
+
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: "bold", fontFamily: "var(--control-font-family)" }}>
+              订阅地址
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              value={editProfileUrl}
+              disabled={isEditProfileLocal}
+              onChange={(e) => setEditProfileUrl(e.target.value)}
+              sx={get3DInputStyle(theme)}
+            />
+          </Box>
+
+          <Box>
+            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: "bold", fontFamily: "var(--control-font-family)" }}>
+              更新周期 (单位: 小时, 设为 0 禁用)
+            </Typography>
+            <TextField
+              fullWidth
+              size="small"
+              type="number"
+              value={editProfileInterval}
+              disabled={isEditProfileLocal}
+              onChange={(e) => setEditProfileInterval(Number(e.target.value))}
+              sx={get3DInputStyle(theme)}
+            />
+          </Box>
+        </Box>
+
+        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
+          <Button
+            onClick={() => setEditProfileOpen(false)}
+            sx={{
+              fontSize: "12px",
+              height: "28px",
+              px: "16px",
+              ...defaultBtn3DStyle,
+            }}
+          >
+            取消
+          </Button>
+          <Button
+            onClick={handleSaveProfile}
+            sx={{
+              fontSize: "12px",
+              height: "28px",
+              px: "16px",
+              ...primaryBtn3DStyle,
+            }}
+          >
+            保存
+          </Button>
+        </Box>
+      </Dialog>
 
       {/* Client Update Dialog */}
       <Dialog
