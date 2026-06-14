@@ -26,10 +26,14 @@
 * **修改方针**：在 `handleCycleNode` 中移除 `useMemo`，改为在点击事件发生时，动态且实时地从 `localStorage` 中解析过滤/排序状态，并使用 `filterSort` 计算出最新的节点子集进行轮换。同时严格保留了原有的“跳过超时（timeout）节点”以及全部超时时的兜底循环切换逻辑。
 * **状态**：代码已修正，待确认。
 
-### **BUG-074** (检查内核更新链接点击失败)
-* **缺陷描述与现象**：在设置或帮助中，点击“⚙️ 检查内核更新”链接时，程序常提示“检查内核更新失败”。这是因为内核更新程序 `core_updater.rs` 中直接使用 raw reqwest client 发起请求，而未经过任何代理，导致在无法直连 GitHub API 的网络环境下超时或请求失败。
-* **排查原因与记忆**：`core_updater.rs` 中的 `check_latest_release` 和 `upgrade_core` 以前是直接手动构建 raw `reqwest::Client` 并发起请求，没有经过任何本地或系统代理配置，导致在无法直接访问 GitHub / GitHub API 的网络环境下发生连接超时和请求失败。
-* **修改方针**：在 `core_updater.rs` 中引入 `NetworkManager` 及 `ProxyType`。在检查内核更新以及下载核心文件包时，构建一个具备 Localhost 代理（优先使用本地已开启的 Clash 代理端口） -> System 代理 -> 无代理 (Direct 直连) 多层自动回滚降级机制的客户端请求链，以保证最大程度的网络连通性。
+### **BUG-074** (检查内核更新链接点击失败与显示格式怪异)
+* **缺陷描述与现象**：点击“⚙️ 检查内核更新”时，在无法直接访问 GitHub 的网络环境下容易超时报错；且该栏目的版本显示格式为 `vv1.19.27`（含有多余的重复字母 `v` 且包含冗余的 "Mihomo" 文本），不符合日常书写规范。
+* **排查原因与记忆**：
+  1. `core_updater.rs` 内部直接使用 raw `reqwest::Client` 访问 GitHub API，无法走本地代理。
+  2. 前端 `_layout.tsx` 对 `coreVersion` 的格式拼装为 `Mihomo v${coreVersion}`，而实际获取到的内核版本号已自带 `v` 字符前缀，导致连带出现 `Mihomo vv1.19.27` 双重 `v` 且文字冗余的怪异现象。
+* **修改方针**：
+  1. 重构后端，引入 `NetworkManager` 实现 Localhost -> System -> Direct 多重降级自动回落代理机制。
+  2. 前端引入通用 `formatCoreVersion` 格式化助手函数，使用正则 `/^v+/i` 彻底剥离可能存在的多重 `v` 前缀，并规范化重构为 `Ver.1.19.27` 展示。同时，删除括号内冗余的 "Mihomo" 单词以保证排版精炼。
 * **状态**：代码已修正，待确认。
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)

@@ -339,6 +339,12 @@ const getFriendlyProtocolName = (type?: string) => {
   return map[low] || type.toUpperCase()
 }
 
+const formatCoreVersion = (version?: string) => {
+  if (!version) return '';
+  const clean = version.trim().replace(/^v+/i, '');
+  return `Ver.${clean}`;
+}
+
 const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
@@ -4054,7 +4060,7 @@ const Layout = () => {
                   disabled={coreCheckLoading}
                   sx={getMenuItemHoverStyle(theme, controlSkin)}
                 >
-                  ⚙️ 检查内核更新 {coreVersion ? `(Mihomo v${coreVersion})` : ''}
+                  ⚙️ 检查内核更新 {coreVersion ? `(${formatCoreVersion(coreVersion)})` : ''}
                 </MenuItem>
               </Menu>
 
@@ -4582,10 +4588,10 @@ const Layout = () => {
 
         <Box sx={{ mb: 2 }}>
           <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}>
-            当前版本: {coreVersion || '未知'}
+            当前版本: {coreVersion ? formatCoreVersion(coreVersion) : '未知'}
           </Typography>
           <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)', fontWeight: 'bold' }}>
-            最新版本: {coreUpdateRelease?.tag_name || '获取中...'}
+            最新版本: {coreUpdateRelease?.tag_name ? formatCoreVersion(coreUpdateRelease.tag_name) : '获取中...'}
           </Typography>
         </Box>
 
