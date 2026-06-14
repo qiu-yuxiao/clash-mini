@@ -1,6 +1,6 @@
 use crate::{
     core::manager::CoreManager,
-    utils::dirs,
+    utils::{dirs, network::{NetworkManager, ProxyType}},
 };
 use anyhow::{Result, Context, bail};
 use clash_verge_logging::{Type, logging};
@@ -32,16 +32,43 @@ pub struct CoreUpdater;
 
 impl CoreUpdater {
     pub async fn check_latest_release() -> Result<GithubRelease> {
-        let client = reqwest::Client::builder()
-            .user_agent("clash-mini")
-            .build()
-            .context("failed to build reqwest client")?;
-
         let url = "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest";
-        let response = client.get(url)
-            .send()
-            .await
-            .context("failed to send request to GitHub API")?;
+        let nm = NetworkManager::new();
+        let mut response = None;
+
+        // 1. Try Localhost proxy
+        if let Ok(client) = nm.create_request(ProxyType::Localhost, Some(10), None, false).await {
+            if let Ok(resp) = client.get(url).send().await {
+                if resp.status().is_success() {
+                    response = Some(resp);
+                }
+            }
+        }
+
+        // 2. Try System proxy
+        if response.is_none() {
+            if let Ok(client) = nm.create_request(ProxyType::System, Some(10), None, false).await {
+                if let Ok(resp) = client.get(url).send().await {
+                    if resp.status().is_success() {
+                        response = Some(resp);
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to Direct connection
+        let response = match response {
+            Some(resp) => resp,
+            None => {
+                let client = nm.create_request(ProxyType::None, Some(15), None, false)
+                    .await
+                    .context("failed to build reqwest client")?;
+                client.get(url)
+                    .send()
+                    .await
+                    .context("failed to send request to GitHub API")?
+            }
+        };
 
         if !response.status().is_success() {
             bail!("GitHub API returned error: {}", response.status());
@@ -108,14 +135,40 @@ impl CoreUpdater {
         emit_progress("downloading", 10, &format!("开始下载: {}", asset.name));
 
         // Start downloading
-        let client = reqwest::Client::builder()
-            .user_agent("clash-mini")
-            .build()?;
+        let nm = NetworkManager::new();
+        let mut response = None;
 
-        let mut response = client.get(&download_url)
-            .send()
-            .await
-            .context("failed to download core archive")?;
+        // 1. Try Localhost proxy
+        if let Ok(client) = nm.create_request(ProxyType::Localhost, Some(30), None, false).await {
+            if let Ok(resp) = client.get(&download_url).send().await {
+                if resp.status().is_success() {
+                    response = Some(resp);
+                }
+            }
+        }
+
+        // 2. Try System proxy
+        if response.is_none() {
+            if let Ok(client) = nm.create_request(ProxyType::System, Some(30), None, false).await {
+                if let Ok(resp) = client.get(&download_url).send().await {
+                    if resp.status().is_success() {
+                        response = Some(resp);
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to Direct connection
+        let mut response = match response {
+            Some(resp) => resp,
+            None => {
+                let client = nm.create_request(ProxyType::None, Some(30), None, false).await?;
+                client.get(&download_url)
+                    .send()
+                    .await
+                    .context("failed to download core archive")?
+            }
+        };
 
         if !response.status().is_success() {
             let err_msg = format!("下载失败，HTTP 状态码: {}", response.status());

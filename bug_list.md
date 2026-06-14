@@ -28,9 +28,9 @@
 
 ### **BUG-074** (检查内核更新链接点击失败)
 * **缺陷描述与现象**：在设置或帮助中，点击“⚙️ 检查内核更新”链接时，程序常提示“检查内核更新失败”。这是因为内核更新程序 `core_updater.rs` 中直接使用 raw reqwest client 发起请求，而未经过任何代理，导致在无法直连 GitHub API 的网络环境下超时或请求失败。
-* **排查原因与记忆**：`core_updater.rs` 内部使用 `reqwest::Client::builder().build()` 直连 `api.github.com`。我们将重构为使用 `NetworkManager` 提供带有 Localhost 代理 -> System 代理 -> 无代理 (Direct) 的多级自动回退机制。
-* **修改方针**：在 `core_updater.rs` 中引入 `NetworkManager`，增加代理支持。
-* **状态**：排查中。
+* **排查原因与记忆**：`core_updater.rs` 中的 `check_latest_release` 和 `upgrade_core` 以前是直接手动构建 raw `reqwest::Client` 并发起请求，没有经过任何本地或系统代理配置，导致在无法直接访问 GitHub / GitHub API 的网络环境下发生连接超时和请求失败。
+* **修改方针**：在 `core_updater.rs` 中引入 `NetworkManager` 及 `ProxyType`。在检查内核更新以及下载核心文件包时，构建一个具备 Localhost 代理（优先使用本地已开启的 Clash 代理端口） -> System 代理 -> 无代理 (Direct 直连) 多层自动回滚降级机制的客户端请求链，以保证最大程度的网络连通性。
+* **状态**：代码已修正，待确认。
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
