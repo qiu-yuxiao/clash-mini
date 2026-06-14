@@ -443,7 +443,8 @@ pub struct GeoXUrl {
 }
 
 #[derive(Debug, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export)]
+#[ts(export, rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum FindProcessMode {
     Strict,
     Always,

@@ -2116,3 +2116,8 @@
   - **对话框输入框及按钮样式**：
     - 文本输入框使用 MUI `<TextField>`，其 `InputProps` 需应用 `get3DInputStyle(theme)`，提供暗槽立体拟物感，防止被扁平风格污染。
     - 按钮（取消/保存）需通过 IIFE 展开注入 `get3DButtonStyle(theme, 'contained', 'primary'/'secondary')` 样式，并加上 `!important` 展开注入以确保外观属性在换肤时刷新。
+
+- **局域网共享与设置开关回弹故障修复规范**：
+  - **根本原因定义**：为了解决 Allow LAN 等开关状态异常弹回、无法持久更新和保存的故障，必须解决后端与核心通信在反序列化上的硬性校验错误。由于内核 API 返回的 `"find-process-mode"` 参数在运行时以全小写形式表现（如 `"strict"`），而原有后端模型的 `FindProcessMode` 枚举定义缺乏小写转换器注解，导致在拉取基础配置（`/configs`）时反序列化解析逻辑全面报错崩溃，前端状态被强制重置为 `undefined`。
+  - **反序列化规则规范**：必须通过 `crates/tauri-plugin-mihomo` 内的 `FindProcessMode` 枚举，加入对 `serde(rename_all = "lowercase")` 及 `ts(export, rename_all = "lowercase")` 的标记，确保反序列化能够平滑兼容全小写配置，且 TypeScript 类型 bindings 同样与小写字面量类型保持对齐，避免因类型不匹配或反序列化失败导致的基础设置开关集体回弹失效。
+
