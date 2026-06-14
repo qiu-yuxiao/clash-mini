@@ -67,3 +67,31 @@
      git config --local --unset http.sslBackend
      ```
    - 重置 `task.md` 看板，并在 `walkthrough.md` 归档测试表现，清空 Vite 缓存。
+
+---
+
+## 🔄 模块三：自动更新元数据维护 (Updater Metadata Maintenance)
+
+在云端 Release 构建完成并生成对应的平台包及签名（Signature）后，需手动更新自动更新配置文件，以支持客户端的自动更新功能：
+
+1. **更新配置文件**：
+   - 打开 [updater/app-update.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/updater/app-update.json)。
+   - 更新 `"version"`、`"notes"` 和 `"pub_date"` (ISO 8601 格式，例如 `"2026-06-14T15:16:44Z"`)。
+   - 在 `"platforms"` 下添加/更新发布平台对应的包下载链接与签名。例如：
+     ```json
+     "platforms": {
+       "windows-x86_64": {
+         "signature": "<对应的 .sig 签名文件内容>",
+         "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v<版本号>/<安装包/压缩包文件名>.zip"
+       }
+     }
+     ```
+     *(注：若需支持自动安装，需提供带签名文件的 `.msi` 或 `.zip` 并在 platforms 中正确配置)*
+2. **提交并推送更新**：
+   - 确认修改后，将 `updater/app-update.json` 提交并推送至 `dev` 分支：
+     ```powershell
+     git add updater/app-update.json
+     git commit -m "chore(updater): update app-update.json to v<版本号>" --no-verify
+     git push origin dev
+     ```
+   - 未来如果您想要发布新更新并支持自动下载安装，只需在发布新版后，更新该 app-update.json 中的版本号和下载平台链接即可。
