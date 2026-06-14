@@ -2144,3 +2144,19 @@
   - **前缀剥离与统一前缀**：使用正则表达式 `/^v+/i` 彻底剥离可能存在的多重 `v` 前缀（防止产生类似 `vv1.19.27` 的前缀冗余），并统一格式化为以 `Ver.` 开头的版本号（例如 `Ver.1.19.27`）。
   - **精简描述内容**：在前置描述中删除冗余的 "Mihomo" 字样（例如，不要将括号内和括号外都显示 "Mihomo"），保证排版精炼，避免多重重复。
 
+## ⚡ 十六、 系统资源与 I/O 占用优化规范 (BUG-075)
+为了解决运行过程中 WebView2 GPU 与 Renderer 进程内存占用过高、跨进程 IPC 通信及 WMI I/O 写入吞吐量极大的性能故障，制定以下规范：
+- **布局端连接轮询彻底消除 (Connections Polling Elimination)**：
+  - 在侧边抽屉连接列表未展开时，严禁使用 `/connections` HTTP API 获取连接详情。
+  - 底部流量面板的上传/下载总量数据必须直接解析自 `/traffic` WebSocket 推送流中内置的 `upTotal` 与 `downTotal` 字段，实现连接数据零 IPC 轮询开销。
+- **3D 霓虹边框性能降频与 Visibility 熔断 (GlowBorder Throttling)**：
+  - 3D 霓虹物理边框（`GlowBorder`）的动画重绘循环必须被严格锁定在最大 20 FPS（约 50ms 渲染帧间隔），多余的 requestAnimationFrame 帧必须直接跳过，不重新写入 DOM 样式。
+  - 必须对窗口不可见状态进行监控，当 `document.hidden` 为 `true`（最小化或托盘隐藏）时，彻底切断渲染循环，释放 GPU 占用，在可见性恢复时重新激活。
+- **流量采样折线图重绘节流 (Traffic Graph Throttling)**：
+  - 数据采样器 `TrafficDataSampler` 的快照生成周期 `snapshotIntervalMs` 必须从原版的 `200ms` 提高到 `1000ms`，以显著减小主线程数据包处理及 React 数据比对强制重绘的频率。
+- **运行时间轮询消除 (Uptime Polling Elimination)**：
+  - 彻底去除前端未使用的 `getAppUptime` 接口轮询，在 `app-data-provider.tsx` 中取消对 `appUptime` 查询键的 `refetchInterval`，设其为 `enabled: false`，避免无意义的背景查询。
+- **节点组信息在不可见状态下的轮询熔断 (Proxy Groups Visibility Gating)**：
+  - 在 `ProxyGroups` 的 `/proxies` 轮询请求中结合 `useVisibility` 状态。当窗口隐藏或最小化时，将 `refetchInterval` 强行设为 `false`，停止拉取庞大的节点组详情 JSON 载荷，在窗口重新显示时恢复 3000ms 刷新。
+
+

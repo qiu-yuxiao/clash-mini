@@ -14,6 +14,18 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### **BUG-075** (系统资源与 I/O 内存消耗过大)
+* **缺陷描述与现象**：运行过程中，WebView2 GPU 进程与 Renderer 渲染进程的物理内存占用过高（分别近 300MB），且 WMI 累计 I/O 吞吐极高（达到 18GB+ 级别），远高于原版 Clash Verge（约 50MB I/O，84MB/152MB 内存）。这表明前端存在极高频且载荷过大的 IPC 状态推送及非节流重绘。
+* **排查原因与记忆**：通过与原版代码对比审计，确定了 5 项核心优化方案并实施：
+  1. **布局端连接轮询彻底消除**：MiniTrafficPanel 移除了 `useConnectionData({ enabled: false })` 的 3 秒定时轮询，总量直接读取自 `/traffic` WebSocket 推送的 `upTotal` / `downTotal`，关闭抽屉时连接数据 IPC 降为 0。
+  2. **3D 边框性能降频与 Visibility 熔断**：GlowBorder 绘制帧率强制锁定在最大 20 FPS，并且在 `document.hidden === true`（最小化/托盘隐藏）时彻底暂停 requestAnimationFrame 动画循环。
+  3. **流量图快照节流**：采样器 `snapshotIntervalMs` 提升至 1000ms，大幅减少 React 重绘及 Canvas 运算次数。
+  4. **运行时间轮询消除**：取消 app-data-provider 中前端未使用的 `getAppUptime` 每 3 秒一次的冗余轮询。
+  5. **节点组信息在不可见状态下的轮询熔断**：ProxyGroups 在最小化或隐藏时将 `/proxies` 刷新间隔设为 `false` 暂停拉取。
+* **修改方针**：遵守项目规定，不闭门造车，对齐原版并基于 visibility 状态实现高频更新的完全熔断降载。
+* **调试日志挂靠**：本地记录文件为 [BUG-075_perf_debug_log.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/BUG-075_perf_debug_log.md)。
+* **状态**：代码已修正，待确认。
+
 ### **BUG-069** (Monochrome 皮肤小尺寸开关卡死)
 * **缺陷描述与现象**：在 `monochrome` 皮肤下，三个设置开关如果使用 `size="small"` 的尺寸，会卡死在左侧无法正常拨动和进行交互（关联 GitHub 远程 Issue #1）。
 * **排查原因与记忆**：暂定测试。
