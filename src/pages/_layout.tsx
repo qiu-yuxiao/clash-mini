@@ -431,68 +431,60 @@ const ActiveNodeStatusCard = () => {
     }
   }
 
-  // Parse head state from localStorage
-  const headState = useMemo(() => {
+  const handleCycleNode = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!primaryGroup?.name || !primaryGroup?.all) return
+
+    // Get the latest head state from localStorage dynamically on click
+    let currentCandidateNodes = primaryGroup.all
     try {
       const stateStr = localStorage.getItem('proxy-head-state')
-      if (stateStr && currentProfileUid && primaryGroup?.name) {
+      if (stateStr && currentProfileUid) {
         const stateObj = JSON.parse(stateStr)
         const groupState = stateObj[currentProfileUid]?.[primaryGroup.name]
         if (groupState) {
-          return groupState
+          const {
+            filterText = '',
+            sortType = 0,
+            filterMatchCase = false,
+            filterMatchWholeWord = false,
+            filterUseRegularExpression = false,
+          } = groupState
+
+          const searchState = {
+            matchCase: filterMatchCase,
+            matchWholeWord: filterMatchWholeWord,
+            useRegularExpression: filterUseRegularExpression,
+          }
+
+          currentCandidateNodes = filterSort(
+            primaryGroup.all,
+            primaryGroup.name,
+            filterText,
+            sortType,
+            latencyTimeout,
+            searchState,
+          )
         }
       }
-    } catch (e) {
-      console.error('Failed to parse proxy-head-state:', e)
-    }
-    return null
-  }, [currentProfileUid, primaryGroup?.name])
-
-  // Get candidate nodes list
-  const candidateNodes = useMemo(() => {
-    if (!primaryGroup?.all || !primaryGroup?.name) return []
-    if (!headState) return primaryGroup.all
-
-    const {
-      filterText = '',
-      sortType = 0,
-      filterMatchCase = false,
-      filterMatchWholeWord = false,
-      filterUseRegularExpression = false,
-    } = headState
-
-    const searchState = {
-      matchCase: filterMatchCase,
-      matchWholeWord: filterMatchWholeWord,
-      useRegularExpression: filterUseRegularExpression,
+    } catch (err) {
+      console.error('Failed to parse proxy-head-state for cycling:', err)
     }
 
-    return filterSort(
-      primaryGroup.all,
-      primaryGroup.name,
-      filterText,
-      sortType,
-      latencyTimeout,
-      searchState,
-    )
-  }, [primaryGroup?.all, primaryGroup?.name, headState, latencyTimeout])
+    if (currentCandidateNodes.length === 0) return
 
-  const handleCycleNode = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!primaryGroup?.name || candidateNodes.length === 0) return
-
-    const currentIndex = candidateNodes.findIndex(
+    const currentIndex = currentCandidateNodes.findIndex(
       (node: any) => node?.name === activeNodeName,
     )
 
     let nextNodeName = ''
-    const len = candidateNodes.length
+    const len = currentCandidateNodes.length
     let found = false
 
     // Look for the next node that is not a timeout (delay === 0 or delay >= latencyTimeout)
     for (let i = 1; i <= len; i++) {
       const checkIndex = (currentIndex + i) % len
-      const node = candidateNodes[checkIndex]
+      const node = currentCandidateNodes[checkIndex]
       const delay = delayManager.getDelayFix(node, primaryGroup.name)
       const isTimeout = delay === 0 || delay >= latencyTimeout
 
@@ -506,7 +498,7 @@ const ActiveNodeStatusCard = () => {
     // Fallback: if all candidate nodes are timeout, cycle to the next node in sequence
     if (!found) {
       const nextIndex = (currentIndex + 1) % len
-      nextNodeName = candidateNodes[nextIndex]?.name
+      nextNodeName = currentCandidateNodes[nextIndex]?.name
     }
 
     if (nextNodeName) {

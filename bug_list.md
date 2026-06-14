@@ -22,9 +22,9 @@
 
 ### **BUG-065** (置顶活跃出口节点点击轮换未受子集限制)
 * **缺陷描述与现象**：在当前活跃出口节点栏目中，点击节点名称进行循环轮换时，切换范围不受过滤/排序后子集的限制，而是退化为在所有节点中进行循环。
-* **排查原因与记忆**：从 `localStorage` 中的 `'proxy-head-state'` 读取过滤和排序状态，调用 `filterSort` 计算当前过滤/排序后的候选子集 `candidateNodes`，但在点击处理函数中可能未正确限制或参数未同步。
-* **修改方针**：在点击处理器 `handleCycleNode` 中实时从 `localStorage` 读取状态并利用 `filterSort` 求解最新子集。
-* **状态**：排查中。
+* **排查原因与记忆**：在布局组件中，`candidateNodes` 被 `useMemo` 缓存。当其他组件向 `localStorage` 中写入最新的搜索/过滤状态时，并不会触发布局组件的重新渲染，导致 `handleCycleNode` 点击时使用的候选节点子集是过时的。
+* **修改方针**：在 `handleCycleNode` 中移除 `useMemo`，改为在点击事件发生时，动态且实时地从 `localStorage` 中解析过滤/排序状态，并使用 `filterSort` 计算出最新的节点子集进行轮换。同时严格保留了原有的“跳过超时（timeout）节点”以及全部超时时的兜底循环切换逻辑。
+* **状态**：代码已修正，待确认。
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
