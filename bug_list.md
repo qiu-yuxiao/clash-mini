@@ -26,6 +26,12 @@
 * **修改方针**：在 `handleCycleNode` 中移除 `useMemo`，改为在点击事件发生时，动态且实时地从 `localStorage` 中解析过滤/排序状态，并使用 `filterSort` 计算出最新的节点子集进行轮换。同时严格保留了原有的“跳过超时（timeout）节点”以及全部超时时的兜底循环切换逻辑。
 * **状态**：代码已修正，待确认。
 
+### **BUG-074** (检查内核更新链接点击失败)
+* **缺陷描述与现象**：在设置或帮助中，点击“⚙️ 检查内核更新”链接时，程序常提示“检查内核更新失败”。这是因为内核更新程序 `core_updater.rs` 中直接使用 raw reqwest client 发起请求，而未经过任何代理，导致在无法直连 GitHub API 的网络环境下超时或请求失败。
+* **排查原因与记忆**：`core_updater.rs` 内部使用 `reqwest::Client::builder().build()` 直连 `api.github.com`。我们将重构为使用 `NetworkManager` 提供带有 Localhost 代理 -> System 代理 -> 无代理 (Direct) 的多级自动回退机制。
+* **修改方针**：在 `core_updater.rs` 中引入 `NetworkManager`，增加代理支持。
+* **状态**：排查中。
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。
