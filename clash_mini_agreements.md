@@ -916,7 +916,11 @@
 
      * **数据装载源绑定（BUG-057 v4.1.0）**：v4.1.0 对 BUG-057 进行了根因级修复，涉及三个层面：
        (1) `_layout.tsx`：`handleImportProfile` 的 try/catch 分支在 `mutateProfiles()` 后立即设置 `lastEnhancedProfileRef.current = targetUid`，防止 useEffect 再次调用 `enhanceProfiles()` 导致双重重载；同时在 `enhanceProfiles()` 后增加 `patchClashMode('rule')` 确保导入后切换到 rule 模式。
-       (2) `use-render-list.ts`：新增智能轮询恢复机制 —— 当 PROXY 组存在但 `all` 中无真实节点时（proxy-provider 异步加载中），启动 1s 间隔轮询 `refreshProxy()`，直到节点数据到来后自动停止。
+       (2) `use-render-list.ts`：系统托盘图标使用指定的布偶猫咪头像图片，并直接从后端打包嵌入 PNG 字节流，以确保和原版彻底隔离：
+
+1. **常驻静态图标**：
+   * 采用金属质感灰色猫咪头像：`clash_mini_ragdoll_metal`（`tray-icon.png`）。
+   * 在极简托盘设计下，为确保稳定并避开系统 API 冲突，托盘取消动态图标切换功能，不再随 TUN 或系统代理模式动态变更图片。间隔轮询 `refreshProxy()`，直到节点数据到来后自动停止。
        (3) `cmds.ts`：`calcuProxies()` 加入空值防御（`proxyResponse?.proxies || {}`、`providerResponse || {}`、`item?.proxies` 安全检查），`generateItem` 对无名称节点返回安全的 unknown 对象。
 
 
@@ -1354,11 +1358,13 @@
     * **响应式隐藏**：与换肤选择器保持一致的响应式高度裁剪规则，当窗口高度较小时（由媒体查询 `@media (max-height: 830px)` 触发）自动隐藏，防止纵向空间狭窄时产生重叠。
     * **外部链接跳转**：点击时通过 `@tauri-apps/plugin-shell` 提供的 `open` 异步函数在用户系统的默认浏览器中安全打开 GitHub 项目开始页：`https://github.com/qiu-yuxiao/clash-mini`。
 
-18. **Windows 系统托盘主线程调度与线程安全隔离规范 (BUG-073)**：
-    为彻底杜绝 Win32 托盘图标及上下文菜单因 Tokio 后台异步工作线程操作而产生的 `os error -2147467259` 线程亲和性（Thread Affinity）崩溃问题，程序必须强制实施以下跨线程隔离与主线程调度规范：
-    * **数据异步获取、UI 同步构建**：所有涉及 UI 资源操作（包括但不限于 `tauri::menu::MenuItem`、`CheckMenuItem`、`Submenu`、`MenuBuilder` 的构造和 `TrayIconBuilder::build`、`tray.set_menu`、`tray.set_icon`、`tray.set_tooltip` 的调用）一律强制置于主线程（`run_on_main_thread`）中执行；而所有前置的数据查询、网络 IO、文件读取和配置解析（如代理节点缓存、Vierge 配置及 Profiles 获取）必须提前在异步线程中处理完毕，最后以纯数据/克隆对象形式传递至主线程进行界面生成。
-    * **托盘句柄安全获取**：获取托盘实例的操作 `app_handle.tray_by_id("main")` 必须一律在 `run_on_main_thread` 主线程闭包中执行，严禁在异步 Tokio 线程上下文内直接调用或解包，确保生命周期与 GUI 窗体进程完全对齐。
-    * **托盘生命周期常驻机制**：为防止创建出的 `TrayIcon` 句柄在主线程闭包执行完毕后被 Rust 自动 Drop 释放（在 Windows 下 Drop 会导致托盘图标从任务栏中被销毁移除，致使后续的 `set_icon` / `set_tooltip` 因底层句柄无效而报 `os error -2147467259` 错误），必须使用一个全局静态的 `OnceLock<TrayIcon>` 常驻句柄来持有创建成功的托盘实例，确保其生命周期与应用程序进程生命周期完全一致。
+18. **Windows 系统托盘极简交互与静态化设计规范 (BUG-073)**：
+    为了避开 Windows 平台高权限运行下底层托盘 API 频繁更新导致的 `os error -2147467259` (E_FAIL) 错误，系统托盘强制实施极简静态化设计：
+    * **核心功能约束**：系统托盘仅支持两个核心功能：
+      1. 左键点击托盘图标：直接恢复并显示主窗口原状。
+      2. 右键点击托盘图标：仅弹出一个包含“退出 (Exit)”选项的静态菜单，点击退出后关闭程序。
+    * **静态化与禁止动态更新**：托盘的图标常驻使用默认的金属质感灰色猫咪头像（`tray-icon.png`），提示语固定为 "Clash Mini"。在托盘启动初始化成功后，**禁止在运行期间调用任何 `set_icon`、`set_tooltip` 或动态重绘 `set_menu` 的 API**，从根本上杜绝修改 API 产生的 `E_FAIL` 报错。
+    * **生命周期与托管**：创建成功的 `TrayIcon` 必须托管在 `TrayIconState` 中并注册到 `AppHandle` 的状态管理器中，以确保其生命周期与整个应用程序完全对齐。
 
 ---
 
