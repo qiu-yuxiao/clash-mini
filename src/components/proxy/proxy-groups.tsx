@@ -30,6 +30,7 @@ import { delayGroup, healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
 
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
+import { useVisibility } from '@/hooks/use-visibility'
 import { useProxiesData } from '@/providers/app-data-context'
 import { calcuProxies, updateProxyChainConfigInRuntime } from '@/services/cmds'
 import delayManager from '@/services/delay'
@@ -67,11 +68,13 @@ export const ProxyGroups = (props: Props) => {
   const { pathname } = useLocation()
   const { mode, isChainMode = false, chainConfigData } = props
 
+  const isVisible = useVisibility()
+
   // Drive 3s polling on the shared TQ cache; data is read via granular context below
   useQuery({
     queryKey: ['getProxies'],
     queryFn: calcuProxies,
-    refetchInterval: 3000,
+    refetchInterval: isVisible ? 3000 : false,
     refetchIntervalInBackground: false,
     staleTime: 1500,
     refetchOnWindowFocus: false,

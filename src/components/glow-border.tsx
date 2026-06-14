@@ -105,13 +105,26 @@ export const GlowBorder = () => {
     nextKickARef.current = Date.now() + KICK_MIN_INTERVAL
     nextKickBRef.current = Date.now() + KICK_MIN_INTERVAL * 1.5
 
+    const FPS_INTERVAL = 1000 / 20 // 50ms (20 FPS)
+    let lastRenderTime = 0
+
     function tick(ts: number) {
       if (!mounted) return
+      if (document.hidden) {
+        lastTimestampRef.current = null
+        return
+      }
+
+      const now = Date.now()
+      if (now - lastRenderTime < FPS_INTERVAL) {
+        rafIdRef.current = requestAnimationFrame(tick)
+        return
+      }
+      lastRenderTime = now
+
       if (lastTimestampRef.current === null) lastTimestampRef.current = ts
       const dt = Math.min((ts - lastTimestampRef.current) / 1000, 0.1) // seconds, cap at 100ms
       lastTimestampRef.current = ts
-
-      const now = Date.now()
 
       // Random kicks
       if (now >= nextKickARef.current) {
@@ -194,9 +207,25 @@ export const GlowBorder = () => {
       rafIdRef.current = requestAnimationFrame(tick)
     }
 
-    rafIdRef.current = requestAnimationFrame(tick)
+    const handleVisibility = () => {
+      if (!document.hidden && mounted) {
+        if (rafIdRef.current !== null) {
+          cancelAnimationFrame(rafIdRef.current)
+        }
+        lastTimestampRef.current = null
+        rafIdRef.current = requestAnimationFrame(tick)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    if (!document.hidden) {
+      rafIdRef.current = requestAnimationFrame(tick)
+    }
+
     return () => {
       mounted = false
+      document.removeEventListener('visibilitychange', handleVisibility)
       if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
     }
   }, [])

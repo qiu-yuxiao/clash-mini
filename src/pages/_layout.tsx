@@ -668,9 +668,6 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
   const {
     response: { data: traffic },
   } = useTrafficData({ enabled: pageVisible })
-  const {
-    response: { data: connections },
-  } = useConnectionData({ enabled: false })
   const trafficRef = useRef<any>(null)
 
   useEffect(() => {
@@ -684,9 +681,9 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
 
   const [upVal, upUnit] = parseTraffic(traffic?.up || 0)
   const [downVal, downUnit] = parseTraffic(traffic?.down || 0)
-  const [upTotalVal, upTotalUnit] = parseTraffic(connections?.uploadTotal || 0)
+  const [upTotalVal, upTotalUnit] = parseTraffic(traffic?.upTotal || 0)
   const [downTotalVal, downTotalUnit] = parseTraffic(
-    connections?.downloadTotal || 0,
+    traffic?.downTotal || 0,
   )
 
   return (
