@@ -1390,17 +1390,6 @@ const Layout = () => {
   const [editProfileUrl, setEditProfileUrl] = useState('')
   const [editProfileInterval, setEditProfileInterval] = useState(0)
 
-  // Memoized profile and button styles to avoid IIFE syntax issues in JSX (BUG-072)
-  const contextMenuTargetItem = useMemo(() => {
-    return profileItems.find((p) => p.uid === contextMenuProfileUid)
-  }, [profileItems, contextMenuProfileUid])
-  const isContextMenuLocal = contextMenuTargetItem?.type === 'local'
-
-  const editProfileTargetItem = useMemo(() => {
-    return profileItems.find((p) => p.uid === editProfileUid)
-  }, [profileItems, editProfileUid])
-  const isEditProfileLocal = editProfileTargetItem?.type === 'local'
-
   const primaryBtn3DStyle = useMemo(() => {
     const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
     const styleWithImportant: any = {}
@@ -1453,6 +1442,17 @@ const Layout = () => {
     [profiles],
   )
   const currentProfileUid = profiles.current
+
+  // Memoized profile and button styles to avoid IIFE syntax issues in JSX (BUG-072)
+  const contextMenuTargetItem = useMemo(() => {
+    return profileItems.find((p) => p.uid === contextMenuProfileUid)
+  }, [profileItems, contextMenuProfileUid])
+  const isContextMenuLocal = contextMenuTargetItem?.type === 'local'
+
+  const editProfileTargetItem = useMemo(() => {
+    return profileItems.find((p) => p.uid === editProfileUid)
+  }, [profileItems, editProfileUid])
+  const isEditProfileLocal = editProfileTargetItem?.type === 'local'
 
   // Stable reference to activateSelected to avoid infinite loops and satisfy ESLint / React Compiler
   const activateSelectedRef = useRef(activateSelected)
