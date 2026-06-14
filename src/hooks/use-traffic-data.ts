@@ -1,4 +1,4 @@
-import { MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
+import { getConnections, MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
@@ -40,26 +40,55 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
     fallbackData: FALLBACK_TRAFFIC,
     connect: () => MihomoWebSocket.connect_traffic(),
     throttleMs: 200,
-    setupHandlers: ({ next, scheduleReconnect }) => ({
-      handleMessage: (data) => {
-        if (data.startsWith('Websocket error')) {
-          next(data, FALLBACK_TRAFFIC)
-          void scheduleReconnect()
-          return
-        }
+    setupHandlers: ({ next, scheduleReconnect }) => {
+      let activeUpTotal = 0
+      let activeDownTotal = 0
+      let initialized = false
 
+      const init = async () => {
         try {
-          const parsed = JSON.parse(data) as Traffic
-          if (shouldSkipDuplicateTraffic(parsed)) {
+          const res = await getConnections()
+          activeUpTotal = res.uploadTotal ?? 0
+          activeDownTotal = res.downloadTotal ?? 0
+          initialized = true
+        } catch (err) {
+          console.warn('[useTrafficData] Failed to fetch initial connection totals:', err)
+        }
+      }
+
+      init()
+
+      return {
+        handleMessage: (data) => {
+          if (data.startsWith('Websocket error')) {
+            next(data, FALLBACK_TRAFFIC)
+            void scheduleReconnect()
             return
           }
-          appendData(parsed)
-          next(null, parsed)
-        } catch (error) {
-          next(error, FALLBACK_TRAFFIC)
-        }
-      },
-    }),
+
+          try {
+            const parsed = JSON.parse(data) as Traffic
+            if (shouldSkipDuplicateTraffic(parsed)) {
+              return
+            }
+
+            activeUpTotal += parsed.up || 0
+            activeDownTotal += parsed.down || 0
+
+            const trafficWithTotals: ITrafficItem = {
+              ...parsed,
+              upTotal: activeUpTotal,
+              downTotal: activeDownTotal,
+            }
+
+            appendData(trafficWithTotals)
+            next(null, trafficWithTotals)
+          } catch (error) {
+            next(error, FALLBACK_TRAFFIC)
+          }
+        },
+      }
+    },
   })
 
   return { response, refreshGetClashTraffic: refresh }

@@ -17,7 +17,7 @@
 ### **BUG-075** (系统资源与 I/O 内存消耗过大)
 * **缺陷描述与现象**：运行过程中，WebView2 GPU 进程与 Renderer 渲染进程的物理内存占用过高（分别近 300MB），且 WMI 累计 I/O 吞吐极高（达到 18GB+ 级别），远高于原版 Clash Verge（约 50MB I/O，84MB/152MB 内存）。这表明前端存在极高频且载荷过大的 IPC 状态推送及非节流重绘。
 * **排查原因与记忆**：通过与原版代码对比审计，确定了 5 项核心优化方案并实施：
-  1. **布局端连接轮询彻底消除**：MiniTrafficPanel 移除了 `useConnectionData({ enabled: false })` 的 3 秒定时轮询，总量直接读取自 `/traffic` WebSocket 推送的 `upTotal` / `downTotal`，关闭抽屉时连接数据 IPC 降为 0。
+  1. **连接轮询彻底消除与流量总量客户端累加**：在 `useConnectionData` 中彻底封禁抽屉关闭时的 background 3秒高频轮询（彻底杜绝大体积 Connections 列表序列化开销）。通过在 `useTrafficData` 中异步初始化一次 `getConnections()` 获知底数，后随 `/traffic` SSE 流直接在客户端增量累加计算 `upTotal` / `downTotal` 并投递给底部面板显示，从而在抽屉关闭时实现连接相关 IPC 开销 100% 归零。
   2. **3D 边框性能降频与 Visibility 熔断**：GlowBorder 绘制帧率强制锁定在最大 20 FPS，并且在 `document.hidden === true`（最小化/托盘隐藏）时彻底暂停 requestAnimationFrame 动画循环。
   3. **流量图快照节流**：采样器 `snapshotIntervalMs` 提升至 1000ms，大幅减少 React 重绘及 Canvas 运算次数。
   4. **运行时间轮询消除**：取消 app-data-provider 中前端未使用的 `getAppUptime` 每 3 秒一次的冗余轮询。

@@ -121,7 +121,7 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
     })
 
   useEffect(() => {
-    if (isWsActive || !isVisible) return
+    if (isWsActive || !isVisible || !enabled) return
 
     let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -140,7 +140,7 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
         console.warn('[useConnectionData] Low freq poll failed:', err)
       }
 
-      if (!isWsActive && isVisible) {
+      if (!isWsActive && isVisible && enabled) {
         timer = setTimeout(pollTotals, 3000)
       }
     }
@@ -150,7 +150,7 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
     return () => {
       if (timer) clearTimeout(timer)
     }
-  }, [isWsActive, isVisible, queryClient, subscriptionCacheKey])
+  }, [isWsActive, isVisible, enabled, queryClient, subscriptionCacheKey])
 
   const clearClosedConnections = () => {
     if (!subscriptionCacheKey) return
