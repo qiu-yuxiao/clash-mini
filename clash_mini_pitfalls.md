@@ -19,7 +19,7 @@
 
 3. **本地运行安全律 (Law of Environment Safety)**
    - **要求**：启动本地 `dev` 服务进行验证前，必须确保前端和 Rust 配置中的网络接管模式（TUN、系统代理）为 `false`。
-   - **禁止**：严禁在本地启动或运行任何生产构建出的 `clash-mini.exe`，禁止执行任何修改物理宿主机路由表或劫持全局系统代理的命令。
+   - **禁止**：严禁在本地启动或运行任何生产构建出的 `clash-mini.exe`；禁止执行任何修改物理宿主机路由表或劫持全局系统代理的命令；**严禁杀灭除本项目开发版（`clash-mini`）之外的任何原版 Clash/Mihomo 代理进程（如 `verge-mihomo`、`clash-verge`），这关系到宿主机网络连通性与 Agent 在线状态，是绝对不可触碰的生命线。**
 
 4. **云端静默发行律 (Law of Silent Release)**
    - **要求**：凡涉及编译与 GitHub 发行操作，必须严格遵循 [clash_mini_silent_release.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_silent_release.md) 中的静默双轨判定和流程。
