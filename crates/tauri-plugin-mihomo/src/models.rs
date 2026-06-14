@@ -408,7 +408,7 @@ pub struct BrutalOption {
 }
 
 #[derive(Debug, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export)]
+#[ts(export, rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     DEBUG,
@@ -1020,12 +1020,12 @@ pub struct Traffic {
     pub up: u64,
     #[ts(type = "number")]
     pub down: u64,
-    #[serde(rename = "upTotal")]
-    #[ts(type = "number")]
-    pub up_total: u64,
-    #[serde(rename = "downTotal")]
-    #[ts(type = "number")]
-    pub down_total: u64,
+    #[serde(rename = "upTotal", skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "number")]
+    pub up_total: Option<u64>,
+    #[serde(rename = "downTotal", skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "number")]
+    pub down_total: Option<u64>,
 
     #[ts(skip)]
     #[serde(flatten, default)]

@@ -130,8 +130,8 @@ fn deserialize_traffic_captures_up_down_totals_and_unknown_fields() {
     let traffic: Traffic = parse_json(raw);
     assert_eq!(traffic.up, 10);
     assert_eq!(traffic.down, 20);
-    assert_eq!(traffic.up_total, 100);
-    assert_eq!(traffic.down_total, 200);
+    assert_eq!(traffic.up_total, Some(100));
+    assert_eq!(traffic.down_total, Some(200));
     assert_eq!(traffic.extra.get("throughput"), Some(&json!(55)));
 }
 

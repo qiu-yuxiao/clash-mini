@@ -132,8 +132,8 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
       tauri-plugin-mihomo-api:
-        specifier: github:clash-verge-rev/tauri-plugin-mihomo
-        version: https://codeload.github.com/clash-verge-rev/tauri-plugin-mihomo/tar.gz/e8f46f631f40259bcbe252f14dd49efd1afdc2f0
+        specifier: link:./crates/tauri-plugin-mihomo
+        version: link:crates/tauri-plugin-mihomo
       types-pac:
         specifier: ^1.0.3
         version: 1.0.3
@@ -3397,10 +3397,6 @@ packages:
   tar@7.5.13:
     resolution: {integrity: sha512-tOG/7GyXpFevhXVh8jOPJrmtRpOTsYqUIkVdVooZYJS/z8WhfQUX8RJILmeuJNinGAMSu1veBr4asSHFt5/hng==}
     engines: {node: '>=18'}
-
-  tauri-plugin-mihomo-api@https://codeload.github.com/clash-verge-rev/tauri-plugin-mihomo/tar.gz/e8f46f631f40259bcbe252f14dd49efd1afdc2f0:
-    resolution: {tarball: https://codeload.github.com/clash-verge-rev/tauri-plugin-mihomo/tar.gz/e8f46f631f40259bcbe252f14dd49efd1afdc2f0}
-    version: 0.3.0
 
   terser@5.46.2:
     resolution: {integrity: sha512-uxfo9fPcSgLDYob/w1FuL0c99MWiJDnv+5qXSQc5+Ki5NjVNsYi66INnMFBjf6uFz6OnX12piJQPF4IpjJTNTw==}
@@ -7138,10 +7134,6 @@ snapshots:
       minipass: 7.1.3
       minizlib: 3.1.0
       yallist: 5.0.0
-
-  tauri-plugin-mihomo-api@https://codeload.github.com/clash-verge-rev/tauri-plugin-mihomo/tar.gz/e8f46f631f40259bcbe252f14dd49efd1afdc2f0:
-    dependencies:
-      '@tauri-apps/api': 2.11.0
 
   terser@5.46.2:
     dependencies:

@@ -1,9 +1,8 @@
 use crate::{Type, core::handle, logging};
 use anyhow::Result;
 use serde::Deserialize;
-use serde_json::Value;
 use std::time::Duration;
-use tauri_plugin_mihomo::models::{ConnectionId, WebSocketMessage};
+use tauri_plugin_mihomo::models::ConnectionId;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
@@ -52,29 +51,14 @@ struct TrafficPayload {
     down: u64,
 }
 
-fn parse_traffic_event(data: Value) -> Option<InternalWsEvent<TrafficSpeedEvent>> {
-    if let Ok(payload) = serde_json::from_value::<TrafficPayload>(data.clone()) {
+fn parse_traffic_event(data: &[u8]) -> Option<InternalWsEvent<TrafficSpeedEvent>> {
+    if let Ok(payload) = serde_json::from_slice::<TrafficPayload>(data) {
         return Some(InternalWsEvent::Data(TrafficSpeedEvent {
             up: payload.up,
             down: payload.down,
         }));
     }
-
-    if let Ok(ws_message) = WebSocketMessage::deserialize(&data) {
-        match ws_message {
-            WebSocketMessage::Text(text) => {
-                let payload = serde_json::from_str::<TrafficPayload>(&text).ok()?;
-                Some(InternalWsEvent::Data(TrafficSpeedEvent {
-                    up: payload.up,
-                    down: payload.down,
-                }))
-            }
-            WebSocketMessage::Close(_) => Some(InternalWsEvent::Closed),
-            _ => None,
-        }
-    } else {
-        None
-    }
+    None
 }
 
 fn try_send_internal_event<T>(message_tx: &mpsc::Sender<InternalWsEvent<T>>, event: InternalWsEvent<T>) {
@@ -98,7 +82,7 @@ pub async fn connect_traffic_stream() -> Result<MihomoWsEventStream<TrafficSpeed
         .ws_traffic({
             let message_tx = message_tx.clone();
             move |message| {
-                if let Some(event) = parse_traffic_event(message) {
+                if let Some(event) = parse_traffic_event(&message) {
                     try_send_internal_event(&message_tx, event);
                 }
             }

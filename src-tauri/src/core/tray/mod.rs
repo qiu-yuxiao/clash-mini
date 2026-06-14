@@ -202,16 +202,22 @@ impl Tray {
             return Ok(());
         }
 
-        let app_handle = handle::Handle::app_handle();
+        let app_handle = handle::Handle::app_handle().clone();
         let tray_event = { Config::verge().await.latest_arc().tray_event.clone() };
         let tray_event = TrayAction::from(tray_event.as_deref().unwrap_or("main_window"));
         let tray = app_handle
             .tray_by_id("main")
             .ok_or_else(|| anyhow::anyhow!("Failed to get main tray"))?;
-        match tray_event {
-            TrayAction::TrayMenu => tray.set_show_menu_on_left_click(true)?,
-            _ => tray.set_show_menu_on_left_click(false)?,
-        }
+
+        app_handle.run_on_main_thread(move || {
+            logging_error!(
+                Type::Tray,
+                match tray_event {
+                    TrayAction::TrayMenu => tray.set_show_menu_on_left_click(true),
+                    _ => tray.set_show_menu_on_left_click(false),
+                }
+            );
+        })?;
         Ok(())
     }
 
@@ -250,20 +256,22 @@ impl Tray {
         let profiles_arc = profiles_config.latest_arc();
         let profiles_preview = profiles_arc.profiles_preview().unwrap_or_default();
 
-        logging_error!(
-            Type::Tray,
-            tray.set_menu(Some(
-                create_tray_menu(
-                    app_handle,
-                    Some(mode.as_str()),
-                    *system_proxy,
-                    *tun_mode,
-                    tun_mode_available,
-                    profiles_preview,
-                )
-                .await?,
-            ))
-        );
+        let menu = create_tray_menu(
+            app_handle,
+            Some(mode.as_str()),
+            *system_proxy,
+            *tun_mode,
+            tun_mode_available,
+            profiles_preview,
+        )
+        .await?;
+
+        app_handle.run_on_main_thread(move || {
+            logging_error!(
+                Type::Tray,
+                tray.set_menu(Some(menu))
+            );
+        })?;
 
         logging!(debug, Type::Tray, "托盘菜单更新成功");
         Ok(())
@@ -276,7 +284,7 @@ impl Tray {
             return Ok(());
         }
 
-        let app_handle = handle::Handle::app_handle();
+        let app_handle = handle::Handle::app_handle().clone();
 
         let Some(tray) = app_handle.tray_by_id("main") else {
             logging!(warn, Type::Tray, "Failed to update tray icon: tray not found");
@@ -284,17 +292,22 @@ impl Tray {
         };
 
         let (_is_custom_icon, icon_bytes) = TrayState::get_tray_icon(verge).await;
-
-        logging_error!(
-            Type::Tray,
-            tray.set_icon(Some(tauri::image::Image::from_bytes(&icon_bytes)?))
-        );
+        let image = tauri::image::Image::from_bytes(&icon_bytes)?;
 
         #[cfg(target_os = "macos")]
-        {
-            let is_colorful = verge.tray_icon.as_deref().unwrap_or("monochrome") == "colorful";
-            logging_error!(Type::Tray, tray.set_icon_as_template(!is_colorful));
-        }
+        let is_colorful = verge.tray_icon.as_deref().unwrap_or("monochrome") == "colorful";
+
+        app_handle.run_on_main_thread(move || {
+            logging_error!(
+                Type::Tray,
+                tray.set_icon(Some(image))
+            );
+
+            #[cfg(target_os = "macos")]
+            {
+                logging_error!(Type::Tray, tray.set_icon_as_template(!is_colorful));
+            }
+        })?;
 
         Ok(())
     }
@@ -357,7 +370,10 @@ impl Tray {
             return Ok(());
         };
 
-        logging_error!(Type::Tray, tray.set_tooltip(Some(&tooltip)));
+        let tooltip_clone = tooltip.clone();
+        app_handle.run_on_main_thread(move || {
+            logging_error!(Type::Tray, tray.set_tooltip(Some(&tooltip_clone)));
+        })?;
 
         Ok(())
     }
@@ -395,30 +411,41 @@ impl Tray {
         let icon_bytes = TrayState::get_tray_icon(&verge).await.1;
         let icon = tauri::image::Image::from_bytes(&icon_bytes)?;
 
-        #[cfg(target_os = "linux")]
-        let builder = TrayIconBuilder::with_id("main").icon(icon).icon_as_template(false);
+        #[cfg(target_os = "macos")]
+        let is_monochrome = verge.tray_icon.as_ref().is_none_or(|v| v == "monochrome");
 
         #[cfg(any(target_os = "macos", target_os = "windows"))]
         let show_menu_on_left_click = verge.tray_event.as_ref().is_some_and(|v| v == "tray_menu");
 
-        #[cfg(not(target_os = "linux"))]
-        let mut builder = TrayIconBuilder::with_id("main").icon(icon).icon_as_template(false);
-        #[cfg(target_os = "macos")]
-        {
-            let is_monochrome = verge.tray_icon.as_ref().is_none_or(|v| v == "monochrome");
-            builder = builder.icon_as_template(is_monochrome);
-        }
+        let app_handle_clone = app_handle.clone();
+        app_handle.run_on_main_thread(move || {
+            #[cfg(target_os = "linux")]
+            let builder = TrayIconBuilder::with_id("main").icon(icon).icon_as_template(false);
 
-        #[cfg(any(target_os = "macos", target_os = "windows"))]
-        {
-            if !show_menu_on_left_click {
-                builder = builder.show_menu_on_left_click(false);
+            #[cfg(not(target_os = "linux"))]
+            let mut builder = TrayIconBuilder::with_id("main").icon(icon).icon_as_template(false);
+            #[cfg(target_os = "macos")]
+            {
+                builder = builder.icon_as_template(is_monochrome);
             }
-        }
 
-        let tray = builder.build(app_handle)?;
-        tray.on_tray_icon_event(on_tray_icon_event);
-        tray.on_menu_event(on_menu_event);
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
+            {
+                if !show_menu_on_left_click {
+                    builder = builder.show_menu_on_left_click(false);
+                }
+            }
+
+            match builder.build(&app_handle_clone) {
+                Ok(tray) => {
+                    tray.on_tray_icon_event(on_tray_icon_event);
+                    tray.on_menu_event(on_menu_event);
+                }
+                Err(e) => {
+                    log::error!(target: "app", "[Tray] Failed to build tray icon on main thread: {}", e);
+                }
+            }
+        })?;
         Ok(())
     }
 
