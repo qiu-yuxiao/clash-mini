@@ -1358,6 +1358,7 @@
     为彻底杜绝 Win32 托盘图标及上下文菜单因 Tokio 后台异步工作线程操作而产生的 `os error -2147467259` 线程亲和性（Thread Affinity）崩溃问题，程序必须强制实施以下跨线程隔离与主线程调度规范：
     * **数据异步获取、UI 同步构建**：所有涉及 UI 资源操作（包括但不限于 `tauri::menu::MenuItem`、`CheckMenuItem`、`Submenu`、`MenuBuilder` 的构造和 `TrayIconBuilder::build`、`tray.set_menu`、`tray.set_icon`、`tray.set_tooltip` 的调用）一律强制置于主线程（`run_on_main_thread`）中执行；而所有前置的数据查询、网络 IO、文件读取和配置解析（如代理节点缓存、Vierge 配置及 Profiles 获取）必须提前在异步线程中处理完毕，最后以纯数据/克隆对象形式传递至主线程进行界面生成。
     * **托盘句柄安全获取**：获取托盘实例的操作 `app_handle.tray_by_id("main")` 必须一律在 `run_on_main_thread` 主线程闭包中执行，严禁在异步 Tokio 线程上下文内直接调用或解包，确保生命周期与 GUI 窗体进程完全对齐。
+    * **托盘生命周期常驻机制**：为防止创建出的 `TrayIcon` 句柄在主线程闭包执行完毕后被 Rust 自动 Drop 释放（在 Windows 下 Drop 会导致托盘图标从任务栏中被销毁移除，致使后续的 `set_icon` / `set_tooltip` 因底层句柄无效而报 `os error -2147467259` 错误），必须使用一个全局静态的 `OnceLock<TrayIcon>` 常驻句柄来持有创建成功的托盘实例，确保其生命周期与应用程序进程生命周期完全一致。
 
 ---
 
