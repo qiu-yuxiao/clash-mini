@@ -345,6 +345,21 @@ const formatCoreVersion = (version?: string) => {
   return `Ver.${clean}`;
 }
 
+const isSameVersion = (ver1?: string, ver2?: string) => {
+  if (!ver1 || !ver2) return false;
+  const clean = (v: string) => {
+    return v
+      .toLowerCase()
+      .replace(/mihomo/g, '')
+      .replace(/meta/g, '')
+      .replace(/^v+/g, '')
+      .replace(/[^a-z0-9.]/g, '')
+      .trim();
+  };
+  return clean(ver1) === clean(ver2);
+}
+
+
 const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
@@ -4631,12 +4646,12 @@ const Layout = () => {
           </Button>
           <Button
             onClick={handleCoreUpgrade}
-            disabled={coreUpgradeStatus === 'checking' || coreUpgradeStatus === 'downloading' || coreUpgradeStatus === 'extracting' || coreUpgradeStatus === 'done'}
+            disabled={coreUpgradeStatus === 'checking' || coreUpgradeStatus === 'downloading' || coreUpgradeStatus === 'extracting' || coreUpgradeStatus === 'done' || isSameVersion(coreVersion, coreUpdateRelease?.tag_name)}
             sx={{
               ...get3DButtonStyle(theme, 'contained', 'primary'),
             }}
           >
-            {coreUpgradeStatus === 'done' ? '更新完成' : coreUpgradeStatus !== 'idle' ? '更新中...' : '立即更新'}
+            {coreUpgradeStatus === 'done' ? '更新完成' : coreUpgradeStatus !== 'idle' ? '更新中...' : isSameVersion(coreVersion, coreUpdateRelease?.tag_name) ? '已是最新' : '立即更新'}
           </Button>
         </Box>
       </Dialog>
