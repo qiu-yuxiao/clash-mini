@@ -38,10 +38,8 @@
    - 运行前端编译：`pnpm web:build`。若有任何报错/警告，必须立即中止。
 3. **提交业务代码**：
    - 运行 `git add .` 并执行 `git commit -m "feat: implement logic" --no-verify` 提交。
-4. **Git Tag 更新与推送**：
-   - 配置 Git 代理以确保不超时：
+   - 配置 Git SSL 校验后端（Windows 平台必配，用以解决默认 Schannel 握手超时失败的问题）：
      ```powershell
-     git config --local http.proxy http://127.0.0.1:7890
      git config --local http.sslBackend openssl
      ```
    - 若是重新发布当前版本，先清除本地与远端同名 Tag：
