@@ -273,6 +273,7 @@ pub fn run() {
                 logging!(error, Type::Setup, "Failed to setup window state: {}", e);
             }
 
+
             resolve::resolve_setup_async();
             resolve::resolve_setup_sync();
             resolve::init_signal();

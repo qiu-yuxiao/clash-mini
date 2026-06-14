@@ -48,7 +48,12 @@ pub fn resolve_setup_sync() {
 }
 
 pub fn resolve_setup_async() {
-    AsyncHandler::spawn(|| async {
+    let app_handle = Handle::app_handle().clone();
+    AsyncHandler::spawn(move || async move {
+        if let Err(e) = Tray::global().init(&app_handle) {
+            log::error!(target: "app", "[Setup] Failed to initialize tray: {}", e);
+        }
+
         logging!(info, Type::ClashVergeRev, "Version: {}", env!("CARGO_PKG_VERSION"));
 
         init_startup_script().await;
@@ -65,7 +70,6 @@ pub fn resolve_setup_async() {
 
         let _ = futures::join!(
             core_init,
-            init_tray(),
             init_timer(),
             init_hotkey(),
             init_auto_lightweight_boot(),
@@ -145,9 +149,7 @@ pub async fn init_work_config() {
     logging_error!(Type::Setup, init::init_config().await);
 }
 
-pub(super) async fn init_tray() {
-    logging_error!(Type::Setup, Tray::global().init().await);
-}
+
 
 pub(super) async fn init_verge_config() {
     logging_error!(Type::Setup, Config::init_config().await);
