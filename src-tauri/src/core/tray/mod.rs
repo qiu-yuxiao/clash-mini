@@ -202,14 +202,16 @@ impl Tray {
             return Ok(());
         }
 
-        let app_handle = handle::Handle::app_handle().clone();
+        let app_handle = handle::Handle::app_handle();
         let tray_event = { Config::verge().await.latest_arc().tray_event.clone() };
         let tray_event = TrayAction::from(tray_event.as_deref().unwrap_or("main_window"));
-        let tray = app_handle
-            .tray_by_id("main")
-            .ok_or_else(|| anyhow::anyhow!("Failed to get main tray"))?;
 
+        let app_handle_clone = app_handle.clone();
         app_handle.run_on_main_thread(move || {
+            let Some(tray) = app_handle_clone.tray_by_id("main") else {
+                log::warn!(target: "app", "[Tray] Failed to get main tray in update_click_behavior");
+                return;
+            };
             logging_error!(
                 Type::Tray,
                 match tray_event {
@@ -232,14 +234,9 @@ impl Tray {
     }
 
     async fn update_menu_internal(&self, app_handle: &AppHandle) -> Result<()> {
-        let Some(tray) = app_handle.tray_by_id("main") else {
-            logging!(warn, Type::Tray, "Failed to update tray menu: tray not found");
-            return Ok(());
-        };
-
         let verge = Config::verge().await.latest_arc();
-        let system_proxy = verge.enable_system_proxy.as_ref().unwrap_or(&false);
-        let tun_mode = verge.enable_tun_mode.as_ref().unwrap_or(&false);
+        let system_proxy = verge.enable_system_proxy.as_ref().unwrap_or(&false).clone();
+        let tun_mode = verge.enable_tun_mode.as_ref().unwrap_or(&false).clone();
         let tun_mode_available =
             is_current_app_handle_admin(app_handle) || service::is_service_available().await.is_ok();
         let mode = {
@@ -253,27 +250,69 @@ impl Tray {
                 .to_owned()
         };
         let profiles_config = Config::profiles().await;
-        let profiles_arc = profiles_config.latest_arc();
-        let profiles_preview = profiles_arc.profiles_preview().unwrap_or_default();
+        let profiles_arc = profiles_config.latest_arc().clone();
+        let proxy_nodes_data = get_cached_proxies().await;
 
-        let menu = create_tray_menu(
-            app_handle,
-            Some(mode.as_str()),
-            *system_proxy,
-            *tun_mode,
-            tun_mode_available,
-            profiles_preview,
-        )
-        .await?;
+        let runtime_proxy_groups_order = cmd::get_runtime_config()
+            .await
+            .map_err(|e| {
+                logging!(
+                    error,
+                    Type::Cmd,
+                    "Failed to fetch runtime proxy groups for tray menu: {e}"
+                );
+            })
+            .ok()
+            .flatten()
+            .map(|config| {
+                config
+                    .get("proxy-groups")
+                    .and_then(|groups| groups.as_sequence())
+                    .map(|groups| {
+                        groups
+                            .iter()
+                            .filter_map(|group| group.get("name"))
+                            .filter_map(|name| name.as_str())
+                            .map(|name| name.into())
+                            .collect::<Vec<String>>()
+                    })
+                    .unwrap_or_default()
+            });
 
+        let app_handle_clone = app_handle.clone();
+        let verge_clone = verge.clone();
         app_handle.run_on_main_thread(move || {
-            logging_error!(
-                Type::Tray,
-                tray.set_menu(Some(menu))
-            );
+            let Some(tray) = app_handle_clone.tray_by_id("main") else {
+                log::warn!(target: "app", "[Tray] Failed to update tray menu: tray not found");
+                return;
+            };
+
+            let profiles_preview = profiles_arc.profiles_preview().unwrap_or_default();
+
+            match create_tray_menu(
+                &app_handle_clone,
+                Some(mode.as_str()),
+                system_proxy,
+                tun_mode,
+                tun_mode_available,
+                profiles_preview,
+                proxy_nodes_data,
+                &verge_clone,
+                runtime_proxy_groups_order,
+            ) {
+                Ok(menu) => {
+                    logging_error!(
+                        Type::Tray,
+                        tray.set_menu(Some(menu))
+                    );
+                }
+                Err(e) => {
+                    log::error!(target: "app", "[Tray] Failed to create tray menu on main thread: {}", e);
+                }
+            }
         })?;
 
-        logging!(debug, Type::Tray, "托盘菜单更新成功");
+        logging!(debug, Type::Tray, "托盘菜单更新已调度至主线程");
         Ok(())
     }
 
@@ -284,12 +323,7 @@ impl Tray {
             return Ok(());
         }
 
-        let app_handle = handle::Handle::app_handle().clone();
-
-        let Some(tray) = app_handle.tray_by_id("main") else {
-            logging!(warn, Type::Tray, "Failed to update tray icon: tray not found");
-            return Ok(());
-        };
+        let app_handle = handle::Handle::app_handle();
 
         let (_is_custom_icon, icon_bytes) = TrayState::get_tray_icon(verge).await;
         let image = tauri::image::Image::from_bytes(&icon_bytes)?;
@@ -297,7 +331,12 @@ impl Tray {
         #[cfg(target_os = "macos")]
         let is_colorful = verge.tray_icon.as_deref().unwrap_or("monochrome") == "colorful";
 
+        let app_handle_clone = app_handle.clone();
         app_handle.run_on_main_thread(move || {
+            let Some(tray) = app_handle_clone.tray_by_id("main") else {
+                log::warn!(target: "app", "[Tray] Failed to update tray icon: tray not found");
+                return;
+            };
             logging_error!(
                 Type::Tray,
                 tray.set_icon(Some(image))
@@ -365,13 +404,13 @@ impl Tray {
             current_profile_name
         );
 
-        let Some(tray) = app_handle.tray_by_id("main") else {
-            logging!(warn, Type::Tray, "Failed to update tray tooltip: tray not found");
-            return Ok(());
-        };
-
         let tooltip_clone = tooltip.clone();
+        let app_handle_clone = app_handle.clone();
         app_handle.run_on_main_thread(move || {
+            let Some(tray) = app_handle_clone.tray_by_id("main") else {
+                log::warn!(target: "app", "[Tray] Failed to update tray tooltip: tray not found");
+                return;
+            };
             logging_error!(Type::Tray, tray.set_tooltip(Some(&tooltip_clone)));
         })?;
 
@@ -640,44 +679,18 @@ fn create_proxy_menu_item(
     Ok((proxies_submenu, inline_proxy_items))
 }
 
-async fn create_tray_menu(
+fn create_tray_menu(
     app_handle: &AppHandle,
     mode: Option<&str>,
     system_proxy_enabled: bool,
     tun_mode_enabled: bool,
     tun_mode_available: bool,
     profiles_preview: Vec<IProfilePreview<'_>>,
+    proxy_nodes_data: Option<Arc<Proxies>>,
+    verge_settings: &IVerge,
+    runtime_proxy_groups_order: Option<Vec<String>>,
 ) -> Result<tauri::menu::Menu<Wry>> {
     let current_proxy_mode = mode.unwrap_or("");
-
-    // TODO: should update tray menu again when it was timeout error
-    let proxy_nodes_data = get_cached_proxies().await;
-
-    let runtime_proxy_groups_order = cmd::get_runtime_config()
-        .await
-        .map_err(|e| {
-            logging!(
-                error,
-                Type::Cmd,
-                "Failed to fetch runtime proxy groups for tray menu: {e}"
-            );
-        })
-        .ok()
-        .flatten()
-        .map(|config| {
-            config
-                .get("proxy-groups")
-                .and_then(|groups| groups.as_sequence())
-                .map(|groups| {
-                    groups
-                        .iter()
-                        .filter_map(|group| group.get("name"))
-                        .filter_map(|name| name.as_str())
-                        .map(|name| name.into())
-                        .collect::<Vec<String>>()
-                })
-                .unwrap_or_default()
-        });
 
     let proxy_group_order_map: Option<HashMap<smartstring::SmartString<smartstring::LazyCompact>, usize>> =
         runtime_proxy_groups_order.as_ref().map(|group_names| {
@@ -688,7 +701,6 @@ async fn create_tray_menu(
                 .collect::<HashMap<String, usize>>()
         });
 
-    let verge_settings = Config::verge().await.latest_arc();
     let tray_proxy_groups_display_mode = verge_settings
         .tray_proxy_groups_display_mode
         .as_deref()
