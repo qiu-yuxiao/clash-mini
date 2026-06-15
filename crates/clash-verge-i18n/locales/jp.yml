@@ -34,33 +34,3 @@ notifications:
 service:
   adminInstallPrompt: Clash Mini サービスのインストールには管理者権限が必要です。
   adminUninstallPrompt: Clash Mini サービスのアンインストールには管理者権限が必要です。
-tray:
-  dashboard: ダッシュボード
-  ruleMode: ルールモード
-  globalMode: グローバルモード
-  directMode: ダイレクトモード
-  outboundModes: アウトバウンドモード
-  rule: ルール
-  direct: ダイレクト
-  global: グローバル
-  profiles: プロファイル
-  proxies: プロキシ
-  systemProxy: システムプロキシ
-  tunMode: TUN モード
-  closeAllConnections: すべての接続を閉じる
-  copyEnv: 環境変数をコピー
-  confDir: 設定ディレクトリ
-  coreDir: コアディレクトリ
-  logsDir: ログディレクトリ
-  openDir: ディレクトリを開く
-  appLog: アプリケーションログ
-  coreLog: コアログ
-  restartClash: Clash コアを再起動
-  restartApp: アプリケーションを再起動
-  vergeVersion: Verge バージョン
-  more: その他
-  exit: 終了
-  tooltip:
-    systemProxy: システムプロキシ
-    tun: TUN
-    profile: プロファイル

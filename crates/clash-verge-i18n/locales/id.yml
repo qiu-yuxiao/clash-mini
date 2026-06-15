@@ -34,33 +34,3 @@ notifications:
 service:
   adminInstallPrompt: Menginstal layanan Clash Mini memerlukan hak administrator.
   adminUninstallPrompt: Menghapus instalasi layanan Clash Mini memerlukan hak administrator.
-tray:
-  dashboard: Dasbor
-  ruleMode: Mode Aturan
-  globalMode: Mode Global
-  directMode: Mode Langsung
-  outboundModes: Mode Keluar
-  rule: Aturan
-  direct: Langsung
-  global: Global
-  profiles: Profil
-  proxies: Proksi
-  systemProxy: Proksi Sistem
-  tunMode: Mode TUN
-  closeAllConnections: Tutup Semua Koneksi
-  copyEnv: Salin Variabel Lingkungan
-  confDir: Direktori Konfigurasi
-  coreDir: Direktori Core
-  logsDir: Direktori Log
-  openDir: Buka Direktori
-  appLog: Log Aplikasi
-  coreLog: Log Core
-  restartClash: Mulai Ulang Core Clash
-  restartApp: Mulai Ulang Aplikasi
-  vergeVersion: Versi Verge
-  more: Lainnya
-  exit: Keluar
-  tooltip:
-    systemProxy: Proksi Sistem
-    tun: TUN
-    profile: Profil

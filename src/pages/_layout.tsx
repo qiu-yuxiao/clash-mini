@@ -1742,11 +1742,15 @@ const Layout = () => {
 
       while (Date.now() - findStartTime < 20000) {
         if (pollSessionRef.current !== currentSession) return
-        const freshProxies = await refreshProxy({ forceFull: true })
-        proxiesData = freshProxies?.data || proxies
-        group = proxiesData?.groups?.find((g: any) => g.name === groupName)
-        if (group && group.all && group.all.length > 0) {
-          break
+        try {
+          const freshProxies = await refreshProxy({ forceFull: true })
+          proxiesData = freshProxies?.data || proxies
+          group = proxiesData?.groups?.find((g: any) => g.name === groupName)
+          if (group && group.all && group.all.length > 0) {
+            break
+          }
+        } catch (e) {
+          console.warn('[BUG-034] refreshProxy failed during startup polling:', e)
         }
         await new Promise((resolve) => setTimeout(resolve, 500))
       }
@@ -1781,7 +1785,7 @@ const Layout = () => {
         console.error('[BUG-034] Failed to set auto-sort in localStorage:', e)
       }
 
-      // 3. Trigger latency tests
+      // 3. Trigger latency tests in background (do not await)
       try {
         // Check unique providers across nodes in the PROXY group
         const uniqueProviders = new Set<string>()
@@ -1793,9 +1797,9 @@ const Layout = () => {
 
         if (uniqueProviders.size > 0) {
           console.log(
-            `[BUG-034] Triggering healthcheck for providers: ${Array.from(uniqueProviders).join(', ')}`,
+            `[BUG-034] Triggering healthcheck for providers in background: ${Array.from(uniqueProviders).join(', ')}`,
           )
-          await Promise.all(
+          Promise.all(
             Array.from(uniqueProviders).map((provider) =>
               healthcheckProxyProvider(provider).catch((err) => {
                 console.error(
@@ -1807,10 +1811,10 @@ const Layout = () => {
           )
         } else {
           console.log(
-            `[BUG-034] Triggering delay test for all nodes: ${nodeNames.length}`,
+            `[BUG-034] Triggering delay test for all nodes in background: ${nodeNames.length}`,
           )
           const timeout = verge?.default_latency_timeout || 10000
-          await delayManager
+          delayManager
             .checkListDelay(nodeNames, groupName, timeout)
             .catch((err) => {
               console.error('[BUG-034] checkListDelay failed:', err)
@@ -1835,6 +1839,7 @@ const Layout = () => {
 
         const startTime = Date.now()
         let hasSelected = false
+        let hasSelectedTemp = false
         let fallbackTriggered = false
 
         while (!hasSelected) {
@@ -1890,14 +1895,21 @@ const Layout = () => {
             },
           )
 
-          // Collect healthy scanned nodes
+          // Collect healthy scanned nodes and calculate tested count
+          const validNodes = filteredAll.filter((n: any) => n?.name && !isDummyNode(n.name))
+          const totalFilteredValidNodes = validNodes.length
+
           const healthyNodes: { name: string; delay: number }[] = []
-          for (const node of filteredAll) {
-            const name = node?.name
-            if (!name || isDummyNode(name)) continue
+          let testedCount = 0
+
+          for (const node of validNodes) {
+            const name = node.name
             const d = delayManager.getDelayFix(node, groupName)
-            if (d > 0) {
-              healthyNodes.push({ name, delay: d })
+            if (d !== -1) {
+              testedCount++
+              if (d > 0 && d < 1e6) {
+                healthyNodes.push({ name, delay: d })
+              }
             }
           }
 
@@ -1905,7 +1917,7 @@ const Layout = () => {
           healthyNodes.sort((a, b) => a.delay - b.delay)
 
           console.log(
-            `[BUG-034] Polling: elapsed=${elapsed.toFixed(1)}s, healthyNodes count=${healthyNodes.length}`,
+            `[BUG-034] Polling: elapsed=${elapsed.toFixed(1)}s, tested=${testedCount}/${totalFilteredValidNodes}, healthy=${healthyNodes.length}`,
           )
 
           // Fallback logic: if 6 seconds elapsed and no healthy nodes, trigger checkListDelay as fallback
@@ -1922,25 +1934,25 @@ const Layout = () => {
               })
           }
 
-          // Rule A: If elapsed < 30s and healthyNodes count >= 5, pick the fastest and connect
-          if (elapsed < 30 && healthyNodes.length >= 5) {
-            const targetNode = healthyNodes[0].name
-            const targetDelay = healthyNodes[0].delay
-            const isSameNode = targetNode === currentGroup.now
-            changeProxy(groupName, targetNode, currentGroup.now)
-            if (!isBackground || !isSameNode) {
-              showNotice.success(
-                isSameNode
-                  ? `自动测速完成，当前已是最快节点: ${targetNode} (${targetDelay}ms)`
-                  : `自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`,
+          // Rule A: Immediate temporary switch to the first available healthy node
+          if (!hasSelectedTemp && healthyNodes.length >= 1) {
+            const tempTarget = healthyNodes[0].name
+            if (tempTarget !== currentGroup.now) {
+              console.log(
+                `[BUG-034] Immediate temporary switch to: ${tempTarget} (${healthyNodes[0].delay}ms)`,
               )
+              changeProxy(groupName, tempTarget, currentGroup.now)
             }
-            hasSelected = true
-            break
+            hasSelectedTemp = true
           }
 
-          // Rule B & C: If elapsed >= 30s and < 60s
-          if (elapsed >= 30 && elapsed < 60) {
+          // Rule B: Final selection conditions
+          const isFinalSelection =
+            healthyNodes.length >= 5 ||
+            (totalFilteredValidNodes > 0 && testedCount >= totalFilteredValidNodes) ||
+            elapsed >= 15
+
+          if (isFinalSelection) {
             if (healthyNodes.length >= 1) {
               const targetNode = healthyNodes[0].name
               const targetDelay = healthyNodes[0].delay
@@ -1949,22 +1961,17 @@ const Layout = () => {
               if (!isBackground || !isSameNode) {
                 showNotice.success(
                   isSameNode
-                    ? `自动测速超时降级，当前已是可用最快节点: ${targetNode} (${targetDelay}ms)`
-                    : `自动测速超时降级，已切换至可用最快节点: ${targetNode} (${targetDelay}ms)`,
+                    ? `自动测速完成，当前已是最快节点: ${targetNode} (${targetDelay}ms)`
+                    : `自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`,
                 )
               }
-              hasSelected = true
-              break
+            } else {
+              showNotice.error(
+                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                  所有线路都繁忙，请耐心等待。
+                </span>,
+              )
             }
-          }
-
-          // Rule D: If 60 seconds have elapsed and still no healthy nodes
-          if (elapsed >= 60) {
-            showNotice.error(
-              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                所有线路都繁忙，请耐心等待。
-              </span>,
-            )
             hasSelected = true
             break
           }

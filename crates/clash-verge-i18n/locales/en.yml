@@ -34,33 +34,3 @@ notifications:
 service:
   adminInstallPrompt: Installing the Clash Mini service requires administrator privileges.
   adminUninstallPrompt: Uninstalling the Clash Mini service requires administrator privileges.
-tray:
-  dashboard: Dashboard
-  ruleMode: Rule Mode
-  globalMode: Global Mode
-  directMode: Direct Mode
-  outboundModes: Outbound Modes
-  rule: Rule
-  direct: Direct
-  global: Global
-  profiles: Profiles
-  proxies: Proxies
-  systemProxy: System Proxy
-  tunMode: TUN Mode
-  closeAllConnections: Close All Connections
-  copyEnv: Copy Environment Variables
-  confDir: Configuration Directory
-  coreDir: Core Directory
-  logsDir: Log Directory
-  openDir: Open Directory
-  appLog: Application Log
-  coreLog: Core Log
-  restartClash: Restart Clash Core
-  restartApp: Restart Application
-  vergeVersion: Mini Version
-  more: More
-  exit: Exit
-  tooltip:
-    systemProxy: System Proxy
-    tun: TUN
-    profile: Profile

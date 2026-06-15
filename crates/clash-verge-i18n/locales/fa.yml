@@ -34,33 +34,3 @@ notifications:
 service:
   adminInstallPrompt: نصب سرویس Clash Mini به دسترسی مدیر نیاز دارد.
   adminUninstallPrompt: حذف سرویس Clash Mini به دسترسی مدیر نیاز دارد.
-tray:
-  dashboard: داشبورد
-  ruleMode: حالت قوانین
-  globalMode: حالت سراسری
-  directMode: حالت مستقیم
-  outboundModes: حالت‌های خروجی
-  rule: قانون
-  direct: مستقیم
-  global: سراسری
-  profiles: پروفایل‌ها
-  proxies: پروکسی‌ها
-  systemProxy: پروکسی سیستم
-  tunMode: حالت TUN
-  closeAllConnections: بستن همه اتصال‌ها
-  copyEnv: کپی متغیرهای محیطی
-  confDir: پوشه پیکربندی
-  coreDir: پوشه هسته
-  logsDir: پوشه گزارش‌ها
-  openDir: باز کردن پوشه
-  appLog: گزارش برنامه
-  coreLog: گزارش هسته
-  restartClash: راه‌اندازی مجدد هسته Clash
-  restartApp: راه‌اندازی مجدد برنامه
-  vergeVersion: نسخه Verge
-  more: بیشتر
-  exit: خروج
-  tooltip:
-    systemProxy: پروکسی سیستم
-    tun: TUN
-    profile: پروفایل

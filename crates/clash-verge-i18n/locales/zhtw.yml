@@ -34,33 +34,3 @@ notifications:
 service:
   adminInstallPrompt: 安裝 Clash Mini 服務需要管理員權限
   adminUninstallPrompt: 卸载 Clash Mini 服務需要管理員權限
-tray:
-  dashboard: 儀表板
-  ruleMode: 規則模式
-  globalMode: 全域模式
-  directMode: 直連模式
-  outboundModes: 出站模式
-  rule: 規則
-  direct: 直連
-  global: 全域
-  profiles: 訂閱
-  proxies: 代理
-  systemProxy: 系統代理
-  tunMode: 虛擬網路介面卡模式
-  closeAllConnections: 關閉所有連線
-  copyEnv: 複製環境變數
-  confDir: 設定目錄
-  coreDir: 核心目錄
-  logsDir: 日誌目錄
-  openDir: 開啟目錄
-  appLog: 應用程式日誌
-  coreLog: 核心日誌
-  restartClash: 重新啟動 Clash 核心
-  restartApp: 重新啟動應用程式
-  vergeVersion: Mini 版本
-  more: 更多
-  exit: 離開
-  tooltip:
-    systemProxy: 系統代理
-    tun: 虛擬網路介面卡
-    profile: 訂閱

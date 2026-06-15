@@ -34,33 +34,3 @@ notifications:
 service:
   adminInstallPrompt: Для установки службы Clash Mini требуются права администратора.
   adminUninstallPrompt: Для удаления службы Clash Mini требуются права администратора.
-tray:
-  dashboard: Панель
-  ruleMode: Режим правил
-  globalMode: Глобальный режим
-  directMode: Прямой режим
-  outboundModes: Исходящие режимы
-  rule: Правило
-  direct: Прямой
-  global: Глобальный
-  profiles: Профили
-  proxies: Прокси
-  systemProxy: Системный прокси
-  tunMode: Режим TUN
-  closeAllConnections: Закрыть все соединения
-  copyEnv: Копировать переменные среды
-  confDir: Каталог конфигурации
-  coreDir: Каталог ядра
-  logsDir: Каталог журналов
-  openDir: Открыть каталог
-  appLog: Журнал приложения
-  coreLog: Журнал ядра
-  restartClash: Перезапустить ядро Clash
-  restartApp: Перезапустить приложение
-  vergeVersion: Версия Verge
-  more: Еще
-  exit: Выход
-  tooltip:
-    systemProxy: Системный прокси
-    tun: TUN
-    profile: Профиль
