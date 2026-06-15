@@ -54,6 +54,34 @@
   3. **超时分离**：将 TCP 握手超时从 30s 缩短至 10s（加速 fallback），将大文件下载客户端限时放宽到 300s（给下载留足时间）。
 * **状态**：代码已修正，待确认。
 
+### **BUG-079** (分流策略倾向中“规则可调”气泡说明描述不准确且多国语言未对齐)
+* **缺陷描述与现象**：分流策略倾向中的“规则可调”选项，其气泡（Tooltip）说明在中文下为“严格遵循预设的分流规则”，描述不够准确，且没有与右侧的“路径控制”功能呼应。同时，其他语言的翻译描述也需要同步更新为更准确的说明。
+* **排查原因与记忆**：该说明的文案直接硬编码在 `src/pages/_layout.tsx` 的 Tooltip 组件中作为 `defaultValue`，并且在 `src/locales/` 下的各个语言 JSON 配置文件中的 `settings.json` -> `routingTooltipRules` 中定义了多语言文案。
+* **修改方针**：
+  1. 修改 `src/pages/_layout.tsx` 中的 Tooltip `defaultValue` 为：“在预设规则的基础上任意调整路径控制”。
+  2. 修改 `src/locales/` 下所有语言配置中的 `settings.json` 内的 `routingTooltipRules` 翻译：
+     - 中文 (zh/zhtw): `"在预设规则的基础上任意调整路径控制"` / `"在預設規則的基礎上任意調整路徑控制"`
+     - 英文 (en) / 鞑靼文 (tt): `"Freely adjust path control on top of preset rules"`
+     - 日文 (jp): `"プリセットされたルールの基で自由に経路制御を調整します"`
+     - 韩文 (ko): `"설정된 규칙을 바탕으로 경로 제어를 자유롭게 조정합니다"`
+     - 德文 (de): `"Pfadsteuerung basierend auf vordefinierten Regeln frei anpassen"`
+     - 西班牙文 (es): `"Ajuste libremente el control de ruta según las reglas preestablecidas"`
+     - 阿拉伯文 (ar): `"ضبط التحكم في المسار بحرية بناءً على القواعد المحددة مسبقًا"`
+     - 波斯文 (fa): `"کنترل مسیر را بر اساس قوانین از پیش تعیین شده آزادانه تنظیم کنید"`
+     - 印尼文 (id): `"Sesuaikan kontrol jalur secara bebas berdasarkan aturan yang telah ditentukan"`
+     - 俄文 (ru): `"Свободная настройка управления маршрутами на основе предустановленных правил"`
+     - 土耳其文 (tr): `"Önceden ayarlanmış kurallara göre yol kontrolünü serbestçe ayarlayın"`
+* **状态**：代码已修正，待确认。
+
+### **BUG-080** (更新内核或程序时若版本相同气泡弹窗不应报错应说明实际情况)
+* **缺陷描述与现象**：在客户端中执行内核或软件更新检查/升级时，若当前版本与最新版本完全一致，弹出的气泡消息窗（Notice Toast）或弹出窗逻辑不够友好，可能引导为报错或没有正确友好提示。
+* **排查原因与记忆**：程序更新检查时版本一致会返回 `null` 并友好提示。但内核更新检查在版本一致时会直接弹出更新对话框，且如果在升级逻辑中触发了相同版本的升级，未在各层级安全熔断并显示正确的友好通知。
+* **修改方针**：
+  1. 在 `handleCoreCheck` 中，如果获取到的最新内核版本与当前版本一致 (`isSameVersion(coreVersion, release.tag_name)` 为 true)，直接显示 `showNotice.info('当前内核已是最新版本')`，不再弹出升级对话框。
+  2. 在 `handleCoreUpgrade` 中，如果最新版本与当前版本一致，熔断升级并显示 `showNotice.info('当前内核已是最新版本，无需更新')`。
+  3. 在 `handleClientUpgrade` 中，如果最新版本与当前版本一致，熔断升级并显示 `showNotice.info('当前软件已是最新版本，无需更新')`。
+* **状态**：代码已修正，待确认。
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
