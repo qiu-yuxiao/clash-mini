@@ -2189,6 +2189,11 @@
 - **相同版本阻断与静默提示**：在执行内核或软件的更新检查及下载流程时，必须在前端执行版本号前置比对。如果待更新的版本与当前运行的版本完全一致，严禁弹出下载升级对话框（Dialog）或启动后台安装服务。
 - **信息提示类型**：当检测到版本相同时，必须统一使用 `showNotice.info` 气泡信息窗（Toast 通知）静默向用户展示实际情况（例如 `'当前内核已是最新版本'` 或 `'当前软件已是最新版本，无需更新'`)，保证界面操作的平滑和友好。
 
-
-
-
+## ⚡ 二十、 Windows 平台 WebView2 后台内存回收与优化规范 (BUG-082)
+为了进一步减少程序在后台或托盘静默运行时的物理内存占用，制定以下规范：
+- **WebView2 内存目标等级动态切换 (SetMemoryUsageTargetLevel)**：
+  - 在 Windows 操作系统下，必须在窗口隐藏（Hidden）或最小化（Minimized）等非活动状态（Inactive）下将 WebView2 引擎的内存占用等级（Memory Usage Target Level）主动调整为 `Low`，以引导 WebView2 引擎和 GPU 进程主动释放不必要的缓存及物理内存。
+  - 在窗口恢复显示或激活（Active）状态下，应将内存占用等级自动调整回 `Normal`，以恢复高性能的渲染 and 交互体验。
+- **基于 COM 接口的底层交互实现**：
+  - 必须利用 Tauri 的 `with_webview` 底层接口，并在 unsafe 块下安全调用 Windows COM 接口。
+  - 将 `ICoreWebView2Controller::CoreWebView2()` 返回的 `ICoreWebView2` 通过 `.cast::<ICoreWebView2_19>()` 转换为高版本子接口，并调用 `.SetMemoryUsageTargetLevel(...)` 完成切换，确保兼容性并处理可能的降级/错误日志记录。
