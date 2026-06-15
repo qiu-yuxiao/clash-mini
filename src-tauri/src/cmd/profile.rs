@@ -307,8 +307,6 @@ pub async fn patch_profiles_config(profiles: IProfiles) -> CmdResult<ValidationO
     perform_config_update(target_profile, previous_profile.as_ref()).await
 }
 
-
-
 /// 修改某个profile item的
 #[tauri::command]
 pub async fn patch_profile(index: String, profile: PrfItem) -> CmdResult {

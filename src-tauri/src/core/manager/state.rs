@@ -33,11 +33,20 @@ impl CoreManager {
         #[cfg(unix)]
         let previous_mask = unsafe { tauri_plugin_clash_verge_sysinfo::libc::umask(0o007) };
         let cores_dir = config_dir.join("cores");
-        let core_name = if cfg!(windows) { "mini-mihomo.exe" } else { "mini-mihomo" };
+        let core_name = if cfg!(windows) {
+            "mini-mihomo.exe"
+        } else {
+            "mini-mihomo"
+        };
         let custom_core_path = cores_dir.join(core_name);
 
         let (mut rx, child) = if custom_core_path.exists() {
-            logging!(info, Type::Core, "Starting custom hot-upgraded core: {}", custom_core_path.display());
+            logging!(
+                info,
+                Type::Core,
+                "Starting custom hot-upgraded core: {}",
+                custom_core_path.display()
+            );
             app_handle
                 .shell()
                 .command(custom_core_path)

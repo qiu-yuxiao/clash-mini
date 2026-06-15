@@ -1,8 +1,11 @@
 use crate::{
     core::manager::CoreManager,
-    utils::{dirs, network::{NetworkManager, ProxyType}},
+    utils::{
+        dirs,
+        network::{NetworkManager, ProxyType},
+    },
 };
-use anyhow::{Result, Context, bail};
+use anyhow::{Context, Result, bail};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -60,10 +63,12 @@ impl CoreUpdater {
         let response = match response {
             Some(resp) => resp,
             None => {
-                let client = nm.create_request(ProxyType::None, Some(15), None, false)
+                let client = nm
+                    .create_request(ProxyType::None, Some(15), None, false)
                     .await
                     .context("failed to build reqwest client")?;
-                client.get(url)
+                client
+                    .get(url)
                     .send()
                     .await
                     .context("failed to send request to GitHub API")?
@@ -74,7 +79,8 @@ impl CoreUpdater {
             bail!("GitHub API returned error: {}", response.status());
         }
 
-        let release: GithubRelease = response.json()
+        let release: GithubRelease = response
+            .json()
             .await
             .context("failed to deserialize GitHub release JSON")?;
 
@@ -87,7 +93,8 @@ impl CoreUpdater {
         app_handle: &AppHandle,
         asset_name: &str,
     ) -> Result<Vec<u8>> {
-        let mut response = client.get(url)
+        let mut response = client
+            .get(url)
             .send()
             .await
             .context("failed to send request to GitHub")?;
@@ -169,24 +176,33 @@ impl CoreUpdater {
         };
 
         let target_prefix = format!("mihomo-{}-{}", target_os, target_arch);
-        logging!(info, Type::System, "Core updater searching for asset prefix: {}", target_prefix);
+        logging!(
+            info,
+            Type::System,
+            "Core updater searching for asset prefix: {}",
+            target_prefix
+        );
 
         let matched_asset = {
             let assets = release.assets.clone();
             let exact_zip = format!("{}-{}.zip", target_prefix, release.tag_name).to_lowercase();
             let exact_gz = format!("{}-{}.gz", target_prefix, release.tag_name).to_lowercase();
-            
-            assets.iter().find(|asset| {
-                let name = asset.name.to_lowercase();
-                name == exact_zip || name == exact_gz
-            })
-            .cloned()
-            .or_else(|| {
-                assets.into_iter().find(|asset| {
+
+            assets
+                .iter()
+                .find(|asset| {
                     let name = asset.name.to_lowercase();
-                    name.contains(&target_prefix) && !name.contains("compat") && (name.ends_with(".zip") || name.ends_with(".gz"))
+                    name == exact_zip || name == exact_gz
                 })
-            })
+                .cloned()
+                .or_else(|| {
+                    assets.into_iter().find(|asset| {
+                        let name = asset.name.to_lowercase();
+                        name.contains(&target_prefix)
+                            && !name.contains("compat")
+                            && (name.ends_with(".zip") || name.ends_with(".gz"))
+                    })
+                })
         };
 
         let asset = match matched_asset {
@@ -200,7 +216,12 @@ impl CoreUpdater {
 
         let is_zip = asset.name.to_lowercase().ends_with(".zip");
         let download_url = asset.browser_download_url.clone();
-        logging!(info, Type::System, "Core updater starting download from: {}", download_url);
+        logging!(
+            info,
+            Type::System,
+            "Core updater starting download from: {}",
+            download_url
+        );
         emit_progress("downloading", 10, &format!("开始下载: {}", asset.name));
 
         // Start downloading
@@ -209,16 +230,32 @@ impl CoreUpdater {
         let mut downloaded_bytes = None;
 
         for proxy_type in proxy_types {
-            logging!(info, Type::System, "Core updater trying download with proxy type: {:?}", proxy_type);
+            logging!(
+                info,
+                Type::System,
+                "Core updater trying download with proxy type: {:?}",
+                proxy_type
+            );
             if let Ok(client) = nm.create_request(proxy_type, Some(300), None, false).await {
                 match Self::download_body(&client, &download_url, &app_handle, &asset.name).await {
                     Ok(b) => {
-                        logging!(info, Type::System, "Core updater download succeeded using proxy type: {:?}", proxy_type);
+                        logging!(
+                            info,
+                            Type::System,
+                            "Core updater download succeeded using proxy type: {:?}",
+                            proxy_type
+                        );
                         downloaded_bytes = Some(b);
                         break;
                     }
                     Err(e) => {
-                        logging!(warn, Type::System, "Core updater download failed using proxy type {:?}: {:?}", proxy_type, e);
+                        logging!(
+                            warn,
+                            Type::System,
+                            "Core updater download failed using proxy type {:?}: {:?}",
+                            proxy_type,
+                            e
+                        );
                     }
                 }
             }
@@ -272,7 +309,11 @@ impl CoreUpdater {
             fs::create_dir_all(&cores_dir).context("failed to create cores directory")?;
         }
 
-        let core_name = if cfg!(windows) { "mini-mihomo.exe" } else { "mini-mihomo" };
+        let core_name = if cfg!(windows) {
+            "mini-mihomo.exe"
+        } else {
+            "mini-mihomo"
+        };
         let custom_core_path = cores_dir.join(core_name);
 
         logging!(info, Type::System, "Core updater stopping core to release file lock...");
@@ -291,8 +332,12 @@ impl CoreUpdater {
             fs::set_permissions(&custom_core_path, perms).context("failed to set execution permission on unix")?;
         }
 
-        logging!(info, Type::System, "Core updater successfully updated core binary. Restarting core...");
-        
+        logging!(
+            info,
+            Type::System,
+            "Core updater successfully updated core binary. Restarting core..."
+        );
+
         // Start core
         let _ = CoreManager::global().start_core().await;
 

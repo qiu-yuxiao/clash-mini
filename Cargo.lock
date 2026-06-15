@@ -1146,9 +1146,10 @@ dependencies = [
  "tokio-util",
  "warp",
  "webpki-roots",
- "window-vibrancy",
+ "webview2-com",
  "windows 0.61.3",
  "winreg 0.56.0",
+ "wry",
  "zip 8.6.0",
 ]
 

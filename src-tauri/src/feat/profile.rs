@@ -7,8 +7,6 @@ use anyhow::{Result, bail};
 use clash_verge_logging::{Type, logging};
 use smartstring::alias::String;
 
-
-
 async fn should_update_profile(uid: &String, ignore_auto_update: bool) -> Result<Option<(String, Option<PrfOption>)>> {
     let profiles = Config::profiles().await;
     let profiles = profiles.latest_arc();

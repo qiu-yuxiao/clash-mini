@@ -1,8 +1,8 @@
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use tauri_plugin_mihomo::models::{
-    Connections, DNSMode, ErrorResponse, FindProcessMode, LogLevel, Memory, MihomoVersion, Network,
-    Connection, Proxy, ProxyType, Rule, RuleType, Traffic, TuicServer, TunConfig,
+    Connection, Connections, DNSMode, ErrorResponse, FindProcessMode, LogLevel, Memory, MihomoVersion, Network, Proxy,
+    ProxyType, Rule, RuleType, Traffic, TuicServer, TunConfig,
 };
 
 #[allow(clippy::expect_used)]

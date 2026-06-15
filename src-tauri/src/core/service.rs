@@ -350,11 +350,20 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
 
     let app_dir = dirs::app_home_dir()?;
     let cores_dir = app_dir.join("cores");
-    let core_name = if cfg!(windows) { "mini-mihomo.exe" } else { "mini-mihomo" };
+    let core_name = if cfg!(windows) {
+        "mini-mihomo.exe"
+    } else {
+        "mini-mihomo"
+    };
     let custom_core_path = cores_dir.join(core_name);
 
     let bin_path = if custom_core_path.exists() {
-        logging!(info, Type::Service, "Service using custom core: {}", custom_core_path.display());
+        logging!(
+            info,
+            Type::Service,
+            "Service using custom core: {}",
+            custom_core_path.display()
+        );
         custom_core_path
     } else {
         let bin_ext = if cfg!(windows) { ".exe" } else { "" };

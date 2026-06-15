@@ -451,9 +451,7 @@ impl Mihomo {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<std::string::String>();
 
         tokio::spawn(async move {
-            use crate::models::{
-                ConnectionMessage, Connections, ConnectionsDelta, ConnectionsSnapshot, Connection
-            };
+            use crate::models::{Connection, ConnectionMessage, Connections, ConnectionsDelta, ConnectionsSnapshot};
             use std::collections::HashMap;
 
             let epoch_id = format!("{:016x}", rand::random::<u64>());
@@ -564,7 +562,9 @@ impl Mihomo {
         });
 
         self.connect(ws_url, move |body| {
-            if let Some(text) = channel_body_to_text_bytes(body).and_then(|bytes| std::string::String::from_utf8(bytes).ok()) {
+            if let Some(text) =
+                channel_body_to_text_bytes(body).and_then(|bytes| std::string::String::from_utf8(bytes).ok())
+            {
                 return tx.send(text).is_ok();
             }
             true
@@ -630,7 +630,9 @@ impl Mihomo {
         });
 
         self.connect(ws_url, move |body| {
-            if let Some(text) = channel_body_to_text_bytes(body).and_then(|bytes| std::string::String::from_utf8(bytes).ok()) {
+            if let Some(text) =
+                channel_body_to_text_bytes(body).and_then(|bytes| std::string::String::from_utf8(bytes).ok())
+            {
                 return tx.send(text).is_ok();
             }
             true

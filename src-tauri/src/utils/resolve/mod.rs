@@ -149,8 +149,6 @@ pub async fn init_work_config() {
     logging_error!(Type::Setup, init::init_config().await);
 }
 
-
-
 pub(super) async fn init_verge_config() {
     logging_error!(Type::Setup, Config::init_config().await);
 }

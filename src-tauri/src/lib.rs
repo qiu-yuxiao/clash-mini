@@ -251,7 +251,9 @@ pub fn run() {
 
             let app_handle = app.app_handle().clone();
             let is_updating = tauri::async_runtime::block_on(async {
-                crate::core::updater::SilentUpdater::global().try_install_on_startup(&app_handle).await
+                crate::core::updater::SilentUpdater::global()
+                    .try_install_on_startup(&app_handle)
+                    .await
             });
             if is_updating {
                 std::process::exit(0);
@@ -259,7 +261,9 @@ pub fn run() {
 
             let app_handle_bg = app.app_handle().clone();
             tauri::async_runtime::spawn(async move {
-                crate::core::updater::SilentUpdater::global().start_background_check(app_handle_bg).await;
+                crate::core::updater::SilentUpdater::global()
+                    .start_background_check(app_handle_bg)
+                    .await;
             });
 
             logging!(info, Type::Setup, "开始应用初始化...");
@@ -272,7 +276,6 @@ pub fn run() {
             if let Err(e) = app_init::setup_window_state(app) {
                 logging!(error, Type::Setup, "Failed to setup window state: {}", e);
             }
-
 
             resolve::resolve_setup_async();
             resolve::resolve_setup_sync();

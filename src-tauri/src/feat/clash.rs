@@ -23,8 +23,6 @@ static TLS_CONFIG: Lazy<Arc<rustls::ClientConfig>> = Lazy::new(|| {
     Arc::new(config)
 });
 
-
-
 /// Restart the application
 pub async fn restart_app() {
     logging!(debug, Type::System, "启动重启应用流程");

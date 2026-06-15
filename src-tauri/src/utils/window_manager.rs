@@ -190,6 +190,7 @@ impl WindowManager {
             match window.hide() {
                 Ok(_) => {
                     logging!(info, Type::Window, "窗口已成功隐藏");
+                    Self::optimize_window_memory(window, true);
                     WindowOperationResult::Hidden
                 }
                 Err(e) => {
@@ -262,6 +263,7 @@ impl WindowManager {
 
         if operations_successful {
             logging!(info, Type::Window, "窗口激活成功");
+            Self::optimize_window_memory(window, false);
             WindowOperationResult::Shown
         } else {
             logging!(warn, Type::Window, "窗口激活部分失败");
@@ -337,4 +339,37 @@ impl WindowManager {
 
         format!("窗口状态: {state:?} | 可见: {is_visible} | 有焦点: {is_focused} | 最小化: {is_minimized}")
     }
+
+    /// 优化窗口内存占用（在 Windows 下当窗口隐藏或最小化时将 WebView 内存级别设为 Low，激活时设为 Normal）
+    #[allow(unused_variables)]
+    fn optimize_window_memory(window: &WebviewWindow<Wry>, is_inactive: bool) {
+        #[cfg(target_os = "windows")]
+        {
+            use webview2_com::Microsoft::Web::WebView2::Win32::{
+                ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+            };
+            use windows::core::Interface;
+
+            let level = if is_inactive {
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+            } else {
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+            };
+            let label = window.label().to_string();
+            let res = window.with_webview(move |webview| unsafe {
+                if let Ok(core_webview) = webview.controller().CoreWebView2() {
+                    if let Ok(core_webview19) = core_webview.cast::<ICoreWebView2_19>() {
+                        let _ = core_webview19.SetMemoryUsageTargetLevel(level);
+                    }
+                }
+            });
+            if let Err(e) = res {
+                logging!(warn, Type::Window, "Failed to set memory usage level for window {}: {}", label, e);
+            } else {
+                logging!(info, Type::Window, "Set memory usage level for window {} to {:?}", label, if is_inactive { "Low" } else { "Normal" });
+            }
+        }
+    }
 }
+

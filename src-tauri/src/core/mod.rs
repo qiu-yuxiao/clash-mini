@@ -1,6 +1,6 @@
 pub mod autostart;
-pub mod core_updater;
 pub mod backup;
+pub mod core_updater;
 pub mod handle;
 pub mod hotkey;
 pub mod logger;

@@ -11,7 +11,7 @@ use super::handle;
 use anyhow::Result;
 use std::time::Duration;
 use tauri::{
-    AppHandle, Wry, Manager,
+    AppHandle, Manager, Wry,
     menu::{IsMenuItem, MenuEvent, MenuItem},
 };
 
@@ -66,7 +66,10 @@ impl Tray {
                 }
             };
 
-            let menu = match tauri::menu::MenuBuilder::new(&app_handle_clone).items(&[&quit as &dyn IsMenuItem<Wry>]).build() {
+            let menu = match tauri::menu::MenuBuilder::new(&app_handle_clone)
+                .items(&[&quit as &dyn IsMenuItem<Wry>])
+                .build()
+            {
                 Ok(m) => m,
                 Err(e) => {
                     log::error!(target: "app", "[Tray] Failed to build static menu: {}", e);
@@ -75,10 +78,16 @@ impl Tray {
             };
 
             #[cfg(target_os = "linux")]
-            let builder = TrayIconBuilder::with_id("clash-mini-dev-tray").icon(image).menu(&menu).icon_as_template(false);
+            let builder = TrayIconBuilder::with_id("clash-mini-dev-tray")
+                .icon(image)
+                .menu(&menu)
+                .icon_as_template(false);
 
             #[cfg(not(target_os = "linux"))]
-            let mut builder = TrayIconBuilder::with_id("clash-mini-dev-tray").icon(image).menu(&menu).icon_as_template(false);
+            let mut builder = TrayIconBuilder::with_id("clash-mini-dev-tray")
+                .icon(image)
+                .menu(&menu)
+                .icon_as_template(false);
 
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
@@ -90,7 +99,9 @@ impl Tray {
                     let _ = tray.set_tooltip(Some("Clash Mini"));
                     tray.on_tray_icon_event(on_tray_icon_event);
                     tray.on_menu_event(on_menu_event);
-                    app_handle_clone.manage(TrayIconState { tray: std::sync::Arc::new(tokio::sync::Mutex::new(Some(tray))) });
+                    app_handle_clone.manage(TrayIconState {
+                        tray: std::sync::Arc::new(tokio::sync::Mutex::new(Some(tray))),
+                    });
                     log::info!(target: "app", "[Tray] System tray created and managed successfully");
                 }
                 Err(e) => {
