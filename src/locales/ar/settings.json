@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "الاتصال المباشر الافتراضي",
-    "routingTooltipRules": "التوجيه المستند إلى القواعد",
+    "routingTooltipRules": "ضبط التحكم في المسار بحرية بناءً على القواعد المحددة مسبقًا",
     "routingTooltipProxy": "اتصال الوكيل الافتراضي",
     "debugLogs": "سجلات تصحيح أخطاء النظام",
     "pathControl": "التحكم في المسار (انقر بزر الماوس الأيمن)",

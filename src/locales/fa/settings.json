@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "اتصال مستقیم پیش‌فرض",
-    "routingTooltipRules": "مسیریابی بر اساس قوانین",
+    "routingTooltipRules": "کنترل مسیر را بر اساس قوانین از پیش تعیین شده آزادانه تنظیم کنید",
     "routingTooltipProxy": "اتصال پروکسی پیش‌فرض",
     "debugLogs": "لاگ‌های عیب‌یابی سیستم",
     "pathControl": "کنترل مسیر (کلیک راست)",

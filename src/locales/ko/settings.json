@@ -670,7 +670,7 @@
     "rules": "규칙",
     "proxy": "프록시",
     "routingTooltipDirect": "일치하는 규칙이 없으면 직접 연결합니다",
-    "routingTooltipRules": "설정된 라우팅 규칙을 따릅니다",
+    "routingTooltipRules": "설정된 규칙을 바탕으로 경로 제어를 자유롭게 조정합니다",
     "routingTooltipProxy": "일치하는 규칙이 없으면 프록시를 경유합니다",
     "debugLogs": "시스템 로그",
     "pathControl": "경로 제어(우클릭 링크)",

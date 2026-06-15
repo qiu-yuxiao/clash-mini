@@ -670,7 +670,7 @@
     "rules": "規則可調",
     "proxy": "代理兜底",
     "routingTooltipDirect": "未匹配規則時默認直連",
-    "routingTooltipRules": "嚴格遵循預設的分流規則",
+    "routingTooltipRules": "在預設規則的基礎上任意調整路徑控制",
     "routingTooltipProxy": "未匹配規則時默認走代理",
     "debugLogs": "系統調試運行日誌",
     "pathControl": "路徑控制（右鍵點擊鏈接）",

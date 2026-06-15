@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "Direktverbindung Fallback",
-    "routingTooltipRules": "Regelbasiertes Routing",
+    "routingTooltipRules": "Pfadsteuerung basierend auf vordefinierten Regeln frei anpassen",
     "routingTooltipProxy": "Proxy-Verbindung Fallback",
     "debugLogs": "System-Debug-Protokolle",
     "pathControl": "Pfadsteuerung (Rechtsklick auf Link)",

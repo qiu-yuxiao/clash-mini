@@ -482,7 +482,7 @@ impl Mihomo {
                 }
 
                 // Periodic full snapshot every 100 frames to prevent drift
-                let send_full = sequence_id == 0 || sequence_id % 100 == 0;
+                let send_full = sequence_id == 0 || sequence_id.is_multiple_of(100);
 
                 let msg = if send_full {
                     last_connections.clear();
@@ -564,10 +564,8 @@ impl Mihomo {
         });
 
         self.connect(ws_url, move |body| {
-            if let Some(bytes) = channel_body_to_text_bytes(body) {
-                if let Ok(text) = std::string::String::from_utf8(bytes) {
-                    return tx.send(text).is_ok();
-                }
+            if let Some(text) = channel_body_to_text_bytes(body).and_then(|bytes| std::string::String::from_utf8(bytes).ok()) {
+                return tx.send(text).is_ok();
             }
             true
         })
@@ -608,13 +606,11 @@ impl Mihomo {
                         buffer.push(log_line);
 
                         if is_error || buffer.len() >= 50 {
-                            if !buffer.is_empty() {
-                                let batched_json = format!("[{}]", buffer.join(","));
-                                buffer.clear();
-                                let body = InvokeResponseBody::Raw(batched_json.into_bytes());
-                                if !on_message(body) {
-                                    break;
-                                }
+                            let batched_json = format!("[{}]", buffer.join(","));
+                            buffer.clear();
+                            let body = InvokeResponseBody::Raw(batched_json.into_bytes());
+                            if !on_message(body) {
+                                break;
                             }
                         }
                     }
@@ -634,10 +630,8 @@ impl Mihomo {
         });
 
         self.connect(ws_url, move |body| {
-            if let Some(bytes) = channel_body_to_text_bytes(body) {
-                if let Ok(text) = std::string::String::from_utf8(bytes) {
-                    return tx.send(text).is_ok();
-                }
+            if let Some(text) = channel_body_to_text_bytes(body).and_then(|bytes| std::string::String::from_utf8(bytes).ok()) {
+                return tx.send(text).is_ok();
             }
             true
         })

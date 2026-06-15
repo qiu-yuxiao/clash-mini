@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "Sambungan Langsung Default",
-    "routingTooltipRules": "Perutean Berbasis Aturan",
+    "routingTooltipRules": "Sesuaikan kontrol jalur secara bebas berdasarkan aturan yang telah ditentukan",
     "routingTooltipProxy": "Sambungan Proksi Default",
     "debugLogs": "Log Debug Sistem",
     "pathControl": "Kontrol Jalur (Klik kanan)",

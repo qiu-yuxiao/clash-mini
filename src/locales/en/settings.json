@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "Direct Connection Fallback",
-    "routingTooltipRules": "Rule-based Routing",
+    "routingTooltipRules": "Freely adjust path control on top of preset rules",
     "routingTooltipProxy": "Proxy Connection Fallback",
     "debugLogs": "System Debug Logs",
     "pathControl": "Path Control (Right-click link)",

@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "Doğrudan Bağlantı Varsayılanı",
-    "routingTooltipRules": "Kural Tabanlı Yönlendirme",
+    "routingTooltipRules": "Önceden ayarlanmış kurallara göre yol kontrolünü serbestçe ayarlayın",
     "routingTooltipProxy": "Vekil Bağlantısı Varsayılanı",
     "debugLogs": "Sistem Hata Ayıklama Günlükleri",
     "pathControl": "Yol Kontrolü (Sağ tık)",

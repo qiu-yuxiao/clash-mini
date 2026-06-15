@@ -1547,6 +1547,11 @@ const Layout = () => {
   }
 
   const handleClientUpgrade = async () => {
+    if (clientUpdateObj && isSameVersion(appVersion, clientUpdateObj.version)) {
+      showNotice.info('当前软件已是最新版本，无需更新')
+      setClientUpdateOpen(false)
+      return
+    }
     if (!clientUpdateObj) return
     setClientStatus('downloading')
     setClientProgress(0)
@@ -1588,6 +1593,10 @@ const Layout = () => {
     setHelpAnchorEl(null)
     try {
       const release = await invoke<any>('check_core_update')
+      if (isSameVersion(coreVersion, release.tag_name)) {
+        showNotice.info('当前内核已是最新版本')
+        return
+      }
       setCoreUpdateRelease(release)
       setCoreUpdateOpen(true)
       setCoreUpgradeStatus('idle')
@@ -1602,6 +1611,11 @@ const Layout = () => {
   }
 
   const handleCoreUpgrade = async () => {
+    if (coreUpdateRelease && isSameVersion(coreVersion, coreUpdateRelease.tag_name)) {
+      showNotice.info('当前内核已是最新版本，无需更新')
+      setCoreUpdateOpen(false)
+      return
+    }
     if (!coreUpdateRelease) return
     setCoreUpgradeStatus('checking')
     setCoreUpgradeProgress(0)
@@ -3282,7 +3296,7 @@ const Layout = () => {
                     {/* Rule Adjustable Option */}
                     <Tooltip
                       title={t('settings.mini.routingTooltipRules', {
-                        defaultValue: '严格遵循预设的分流规则',
+                        defaultValue: '在预设规则的基础上任意调整路径控制',
                       })}
                       placement="top"
                       arrow

@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "Conexión Directa por Defecto",
-    "routingTooltipRules": "Enrutamiento por Reglas",
+    "routingTooltipRules": "Ajuste libremente el control de ruta según las reglas preestablecidas",
     "routingTooltipProxy": "Conexión Proxy por Defecto",
     "debugLogs": "Registros de Depuración del Sistema",
     "pathControl": "Control de Ruta (clic derecho)",

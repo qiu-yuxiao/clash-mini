@@ -670,7 +670,7 @@
     "rules": "ルール",
     "proxy": "プロキシ",
     "routingTooltipDirect": "一致するルールがない場合は直接接続します",
-    "routingTooltipRules": "プリセットされたルーティングルールに従います",
+    "routingTooltipRules": "プリセットされたルールの基で自由に経路制御を調整します",
     "routingTooltipProxy": "一致するルールがない場合はプロキシを経由します",
     "debugLogs": "システムログ",
     "pathControl": "パス制御（右クリックで接続）",

@@ -670,7 +670,7 @@
     "rules": "RUL",
     "proxy": "PRX",
     "routingTooltipDirect": "Прямое подключение по умолчанию",
-    "routingTooltipRules": "Маршрутизация по правилам",
+    "routingTooltipRules": "Свободная настройка управления маршрутами на основе предустановленных правил",
     "routingTooltipProxy": "Прокси по умолчанию",
     "debugLogs": "Журналы отладки системы",
     "pathControl": "Управление путями (ПКМ)",
