@@ -1548,7 +1548,7 @@ const Layout = () => {
 
   const handleClientUpgrade = async () => {
     if (clientUpdateObj && isSameVersion(appVersion, clientUpdateObj.version)) {
-      showNotice.info('当前软件已是最新版本，无需更新')
+      showNotice.info('当前已是最新版本')
       setClientUpdateOpen(false)
       return
     }
@@ -1612,7 +1612,7 @@ const Layout = () => {
 
   const handleCoreUpgrade = async () => {
     if (coreUpdateRelease && isSameVersion(coreVersion, coreUpdateRelease.tag_name)) {
-      showNotice.info('当前内核已是最新版本，无需更新')
+      showNotice.info('当前内核已是最新版本')
       setCoreUpdateOpen(false)
       return
     }
@@ -4583,12 +4583,12 @@ const Layout = () => {
           </Button>
           <Button
             onClick={handleClientUpgrade}
-            disabled={clientStatus === 'downloading' || clientStatus === 'done'}
+            disabled={clientStatus === 'downloading' || clientStatus === 'done' || (clientUpdateObj && isSameVersion(appVersion, clientUpdateObj.version))}
             sx={{
               ...get3DButtonStyle(theme, 'contained', 'primary'),
             }}
           >
-            {clientStatus === 'done' ? '准备重启' : clientStatus === 'downloading' ? '更新中...' : '立即更新'}
+            {clientStatus === 'done' ? '准备重启' : clientStatus === 'downloading' ? '更新中...' : (clientUpdateObj && isSameVersion(appVersion, clientUpdateObj.version)) ? '已是最新' : '立即更新'}
           </Button>
         </Box>
       </Dialog>
