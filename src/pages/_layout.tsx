@@ -105,6 +105,7 @@ import {
 } from '@/utils/button-styles'
 import getSystem from '@/utils/get-system'
 import parseTraffic from '@/utils/parse-traffic'
+import { isDummyNode } from '@/utils/node'
 import {
   healthcheckProxyProvider,
   closeAllConnections,
@@ -1820,23 +1821,6 @@ const Layout = () => {
               console.error('[BUG-034] checkListDelay failed:', err)
             })
         }
-
-        const isDummyNode = (name: string): boolean => {
-          const lower = name.toLowerCase()
-          return (
-            lower.includes('流量') ||
-            lower.includes('过期时间') ||
-            lower.includes('网址') ||
-            lower.includes('官网') ||
-            lower.includes('剩余') ||
-            lower.includes('expire') ||
-            lower.includes('traffic') ||
-            lower.includes('website') ||
-            lower.includes('http') ||
-            lower.includes('https')
-          )
-        }
-
         const startTime = Date.now()
         let hasSelected = false
         let hasSelectedTemp = false
@@ -2033,6 +2017,15 @@ const Layout = () => {
         activeNodeName === 'REJECT'
       ) {
         timerId = setTimeout(checkNode, 60000)
+        return
+      }
+
+      if (isDummyNode(activeNodeName)) {
+        console.log(
+          `[NodeMonitor] Active node ${activeNodeName} is a dummy/ad node. Force triggering auto select.`,
+        )
+        triggerAutoSelectFastestNodeRef.current(currentProfileUid, true)
+        timerId = setTimeout(checkNode, 5000)
         return
       }
 

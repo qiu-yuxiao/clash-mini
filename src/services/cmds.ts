@@ -6,6 +6,7 @@ import yaml from 'js-yaml'
 import { showNotice } from '@/services/notice-service'
 import { debugLog } from '@/utils/debug'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
+import { isDummyNode } from '@/utils/node'
 
 export async function copyClashEnv() {
   return invoke<void>('copy_clash_env')
@@ -215,7 +216,7 @@ export async function calcuProxies(): Promise<{
   // provider name map
   const providerMap = Object.fromEntries(
     Object.entries(providerRecord).flatMap(([provider, item]) =>
-      item!.proxies.map((p) => [p.name, { ...p, provider }]),
+      item!.proxies.map((p: any) => [p.name, { ...p, provider }]),
     ),
   )
 
@@ -243,7 +244,9 @@ export async function calcuProxies(): Promise<{
     if (each?.name !== 'GLOBAL' && each?.all) {
       acc.push({
         ...each,
-        all: each.all!.map((item) => generateItem(item)),
+        all: each.all!
+          .map((item) => generateItem(item))
+          .filter((item) => item?.name && !isDummyNode(item.name)),
       })
     }
 
@@ -257,7 +260,9 @@ export async function calcuProxies(): Promise<{
       if (proxyRecord[name]?.all) {
         acc.push({
           ...proxyRecord[name],
-          all: proxyRecord[name].all!.map((item) => generateItem(item)),
+          all: proxyRecord[name].all!
+            .map((item) => generateItem(item))
+            .filter((item) => item?.name && !isDummyNode(item.name)),
         })
       }
       return acc
@@ -273,13 +278,19 @@ export async function calcuProxies(): Promise<{
 
   const proxies = [direct, reject].concat(
     Object.values(proxyRecord).filter(
-      (p) => !p?.all?.length && p?.name !== 'DIRECT' && p?.name !== 'REJECT',
+      (p) =>
+        !p?.all?.length &&
+        p?.name !== 'DIRECT' &&
+        p?.name !== 'REJECT' &&
+        p?.name &&
+        !isDummyNode(p.name),
     ),
   )
 
   const _global = {
     ...global,
-    all: global?.all?.map((item) => generateItem(item)) || [],
+    all: (global?.all?.map((item) => generateItem(item)) || [])
+      .filter((item) => item?.name && !isDummyNode(item.name)),
   }
 
   return {
@@ -299,7 +310,21 @@ export async function calcuProxyProviders() {
       .filter(
         ([_, item]) =>
           item?.vehicleType === 'HTTP' || item?.vehicleType === 'File',
-      ),
+      )
+      .map(([name, item]) => {
+        const provider = item!
+        return [
+          name,
+          {
+            ...provider,
+            proxies: provider.proxies
+              ? provider.proxies
+                  .map((p) => ({ ...p, provider: name }))
+                  .filter((p) => p?.name && !isDummyNode(p.name))
+              : [],
+          } as any,
+        ]
+      }),
   )
 }
 

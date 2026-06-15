@@ -18,6 +18,7 @@ import {
   getRules,
   getProxyByName,
 } from 'tauri-plugin-mihomo-api'
+import { isDummyNode } from '@/utils/node'
 
 import {
   ClashConfigContext,
@@ -103,17 +104,21 @@ export const AppDataProvider = ({
             name: 'PROXY',
             type: groupProxy.type,
             now: activeNodeName,
-            all: groupProxy.all ? groupProxy.all.map((name: string) => {
-              if (name === activeNodeName && activeNode) {
-                return activeNode
-              }
-              return {
-                name,
-                type: name === 'DIRECT' ? 'DIRECT' : 'unknown',
-                history: [],
-                provider: '',
-              }
-            }) : []
+            all: groupProxy.all
+              ? groupProxy.all
+                  .map((name: string) => {
+                    if (name === activeNodeName && activeNode) {
+                      return activeNode
+                    }
+                    return {
+                      name,
+                      type: name === 'DIRECT' ? 'DIRECT' : 'unknown',
+                      history: [],
+                      provider: '',
+                    }
+                  })
+                  .filter((item: any) => !isDummyNode(item.name))
+              : [],
           }
 
           return {
