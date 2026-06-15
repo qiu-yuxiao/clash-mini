@@ -10,33 +10,12 @@
 > > 3. **强制记录排查记忆，防止重复劳动**：在卡片中，必须详实搜集、继承并持久化记录以下三个协同要素：
 
 
-
-
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
-
-### **BUG-075** (系统资源与 I/O 内存消耗过大)
-* **缺陷描述与现象**：运行过程中，WebView2 GPU 进程与 Renderer 渲染进程的物理内存占用过高（分别近 300MB），且 WMI 累计 I/O 吞吐极高（达到 18GB+ 级别），远高于原版 Clash Verge（约 50MB I/O，84MB/152MB 内存）。这表明前端存在极高频且载荷过大的 IPC 状态推送及非节流重绘。
-* **排查原因与记忆**：通过与原版代码对比审计，确定并实施了以下核心性能优化：
-  1. **Tauri 原生窗口可见性熔断与防抖**：重写了 `useVisibility` 挂钩，通过监听 Tauri 的原生 `minimized` 与隐藏事件对状态变化进行 `1000ms` 防抖限流，在隐藏时断开连接。
-  2. **日志分批缓冲推送**：后端 Rust 进程新增日志分批缓冲区（批处理窗口 250ms 或 50条），将高频零散日志批量传输，降低 Tauri IPC 信道高频调度成本；对 Error/Critical 级别日志保留实时推送机制以保证响应性。
-  3. **连接差异更新协议 (Flat 1D Delta)**：设计并实现了一套差分传输机制。前端建立连接快照并缓存，后续仅接收来自后端的 `Delta` 增量包（包含 `added`、扁平化 metrics 一维数组成员 `updated`、`removed`），并辅以 Sequence 和 Epoch 校验以防掉包，将 connections 通信的吞吐量降幅达 95% 以上。
-  4. **微缩窗口模式极简按需查询**：当窗口处于微缩卡片尺寸时，强制挂起 `ruleProviders`、`rule` 等 React Query 后台轮询，并将 `getProxies` 替换为专属轻量级查询，仅通过 `getProxyByName` 拉取 active 节点及其所属代理组，并在前端按 10 秒间隔单独对其测试延迟，实现无用数据调取 100% 熔断。
-  5. **静态 themed 边框取代 conic 渲染**：用静态、主题自适应的 4px 双线或实线窗框，取代了原先极其耗费 GPU 的 conic-gradient 呼吸动画渲染循环。
-  6. **连接数 Viewport 级硬上限上限 (Pagination)**：后端针对 `ws_connections` 增加最大 100 条连接的 Viewport Pagination，超出时按 activity (upload + download) 排序截断，彻底阻断了 P2P 场景下高吞吐造成的崩溃隐患。
-* **修改方针**：遵循项目规范，优化 IPC 冗余传输与不合理的重绘循环，从网络链路和渲染底层双向降载。
-* **调试日志挂靠**：本地记录文件为 [BUG-075_perf_debug_log.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/BUG-075_perf_debug_log.md)。
-* **状态**：代码已修正，待确认。
 
 ### **BUG-069** (Monochrome 皮肤小尺寸开关卡死)
 * **缺陷描述与现象**：在 `monochrome` 皮肤下，三个设置开关如果使用 `size="small"` 的尺寸，会卡死在左侧无法正常拨动 and 进行交互（关联 GitHub 远程 Issue #1）。
 * **排查原因与记忆**：暂定测试。
 * **修改方针**：暂定测试.
-* **状态**：代码已修正，待确认。
-
-### **BUG-076** (内核已是最新版本时，立即更新按钮仍可点击且触发下载重载)
-* **缺陷描述与现象**：在检查内核更新对话框中，即使当前内核版本已与 GitHub 最新 Release 版本完全一致，用户依然可以点击“立即更新”按钮，从而触发内核的重复下载和重载。
-* **排查原因与记忆**：Mihomo 内核更新逻辑只加载了最新 Release 数据并展示，但未在前端按钮的 `disabled` 属性中对当前版本与最新版本进行清洗和比对。
-* **修改方针**：在 `_layout.tsx` 中定义 `isSameVersion` 函数处理版本比对（清理 prefix `v`，后缀 `mihomo`/`meta` 和其他非数字字母字符），并将结果绑定到 Button 的 `disabled` 及展示文案（一致时展示 `已是最新`）。
 * **状态**：代码已修正，待确认。
 
 ### **BUG-077** (内核升级功能失效/下载链接配置错误)
@@ -52,25 +31,6 @@
   1. **读取流超时保护**：在 `core_updater.rs` 的数据流读取中，对 `response.chunk()` 应用 `tokio::time::timeout(Duration::from_secs(20), ...)`，传输挂起 20 秒直接报错，打破无限阻塞。
   2. **全周期多代理 Fallback**：将“建立连接 + 完整读取数据流”全周期提炼，并依次对 `Localhost`（本地代理）、`System`（系统代理）、`None`（直连）进行重试。中途任意环节（包括读取超时）报错，自动退回并切换至下一代理通道重新拉取。
   3. **超时分离**：将 TCP 握手超时从 30s 缩短至 10s（加速 fallback），将大文件下载客户端限时放宽到 300s（给下载留足时间）。
-* **状态**：代码已修正，待确认。
-
-### **BUG-079** (分流策略倾向中“规则可调”气泡说明描述不准确且多国语言未对齐)
-* **缺陷描述与现象**：分流策略倾向中的“规则可调”选项，其气泡（Tooltip）说明在中文下为“严格遵循预设的分流规则”，描述不够准确，且没有与右侧的“路径控制”功能呼应。同时，其他语言的翻译描述也需要同步更新为更准确的说明。
-* **排查原因与记忆**：该说明的文案直接硬编码在 `src/pages/_layout.tsx` 的 Tooltip 组件中作为 `defaultValue`，并且在 `src/locales/` 下的各个语言 JSON 配置文件中的 `settings.json` -> `routingTooltipRules` 中定义了多语言文案。
-* **修改方针**：
-  1. 修改 `src/pages/_layout.tsx` 中的 Tooltip `defaultValue` 为：“在预设规则的基础上任意调整路径控制”。
-  2. 修改 `src/locales/` 下所有语言配置中的 `settings.json` 内的 `routingTooltipRules` 翻译：
-     - 中文 (zh/zhtw): `"在预设规则的基础上任意调整路径控制"` / `"在預設規則的基礎上任意調整路徑控制"`
-     - 英文 (en) / 鞑靼文 (tt): `"Freely adjust path control on top of preset rules"`
-     - 日文 (jp): `"プリセットされたルールの基で自由に経路制御を調整します"`
-     - 韩文 (ko): `"설정된 규칙을 바탕으로 경로 제어를 자유롭게 조정합니다"`
-     - 德文 (de): `"Pfadsteuerung basierend auf vordefinierten Regeln frei anpassen"`
-     - 西班牙文 (es): `"Ajuste libremente el control de ruta según las reglas preestablecidas"`
-     - 阿拉伯文 (ar): `"ضبط التحكم في المسار بحرية بناءً على القواعد المحددة مسبقًا"`
-     - 波斯文 (fa): `"کنترل مسیر را بر اساس قوانین از پیش تعیین شده آزادانه تنظیم کنید"`
-     - 印尼文 (id): `"Sesuaikan kontrol jalur secara bebas berdasarkan aturan yang telah ditentukan"`
-     - 俄文 (ru): `"Свободная настройка управления маршрутами на основе предустановленных правил"`
-     - 土耳其文 (tr): `"Önceden ayarlanmış kurallara göre yol kontrolünü serbestçe ayarlayın"`
 * **状态**：代码已修正，待确认。
 
 ### **BUG-080** (更新内核或程序时若版本相同气泡弹窗不应报错应说明实际情况)
@@ -111,6 +71,9 @@
 
 | Bug 编号 | 缺陷描述与现象 | 解决版本 | 目前状态 |
 | :--- | :--- | :---: | :--- |
+| **BUG-075** | 系统资源与 I/O 内存消耗过大 | v1.2.6 | 代码已修正，已确认 |
+| **BUG-076** | 内核已是最新版本时，立即更新按钮仍可点击且触发下载重载 | v1.2.6 | 代码已修正，已确认 |
+| **BUG-079** | 分流策略倾向中“规则可调”气泡说明描述不准确且多国语言未对齐 | v1.2.6 | 代码已修正，已确认 |
 | **BUG-065** | 置顶活跃出口节点点击轮换时未能限制在当前搜索、过滤及排序后的候选节点子集范围内。 | v1.2.1 | 代码已修正，已确认 |
 | **BUG-074** | 无法直接访问 GitHub 导致检查内核更新超时失败，且内核版本号前缀重复显示为 `vvX.Y.Z`。 | v1.2.1 | 代码已修正，已确认 |
 | **BUG-072** | 在所有 6 种皮肤下，将 Allow LAN (局域网共享) 开关拨到右侧开启后，开关的视觉状态卡在左侧不更新。 | v1.2.0 | 代码已修正，已确认 |
