@@ -255,6 +255,7 @@ pub fn snapshot_path(original_path: &Path) -> Result<PathBuf> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::permissions_set_readonly_false)]
 mod tests {
     use super::*;
     use std::fs;

@@ -5,7 +5,7 @@ use crate::{
         network::{NetworkManager, ProxyType},
     },
 };
-use anyhow::{Context, Result, bail};
+use anyhow::{Context as _, Result, bail};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::fs;

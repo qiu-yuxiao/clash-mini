@@ -349,7 +349,7 @@ impl WindowManager {
                 ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
                 COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
             };
-            use windows::core::Interface;
+            use windows::core::Interface as _;
 
             let level = if is_inactive {
                 COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW

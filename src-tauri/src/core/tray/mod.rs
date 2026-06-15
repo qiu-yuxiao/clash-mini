@@ -11,7 +11,7 @@ use super::handle;
 use anyhow::Result;
 use std::time::Duration;
 use tauri::{
-    AppHandle, Manager, Wry,
+    AppHandle, Manager as _, Wry,
     menu::{IsMenuItem, MenuEvent, MenuItem},
 };
 
@@ -113,26 +113,32 @@ impl Tray {
         Ok(())
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn update_click_behavior(&self) -> Result<()> {
         Ok(())
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn update_menu(&self) -> Result<()> {
         Ok(())
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn update_icon(&self, _verge: &IVerge) -> Result<()> {
         Ok(())
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn update_tooltip(&self) -> Result<()> {
         Ok(())
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn update_part(&self) -> Result<()> {
         Ok(())
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn update_menu_and_icon(&self) {}
 
     fn should_handle_tray_click(&self) -> bool {
@@ -144,7 +150,7 @@ impl Tray {
     }
 
     #[allow(dead_code)]
-    pub fn update_speed_task(&self, _enable_tray_speed: bool) {}
+    pub const fn update_speed_task(&self, _enable_tray_speed: bool) {}
 }
 
 fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
