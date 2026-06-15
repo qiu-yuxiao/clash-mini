@@ -101,7 +101,7 @@ impl NetworkManager {
         if let Some(secs) = timeout_secs {
             builder = builder
                 .timeout(Duration::from_secs(secs))
-                .connect_timeout(Duration::from_secs(secs.min(30)));
+                .connect_timeout(Duration::from_secs(secs.min(10)));
         }
 
         Ok(builder.build()?)

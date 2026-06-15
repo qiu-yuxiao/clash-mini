@@ -81,6 +81,62 @@ impl CoreUpdater {
         Ok(release)
     }
 
+    async fn download_body(
+        client: &reqwest::Client,
+        url: &str,
+        app_handle: &AppHandle,
+        asset_name: &str,
+    ) -> Result<Vec<u8>> {
+        let mut response = client.get(url)
+            .send()
+            .await
+            .context("failed to send request to GitHub")?;
+
+        if !response.status().is_success() {
+            bail!("HTTP status error: {}", response.status());
+        }
+
+        let total_size = response.content_length().unwrap_or(0);
+        let mut downloaded: u64 = 0;
+        let mut bytes = Vec::new();
+
+        loop {
+            let chunk_opt = match tokio::time::timeout(std::time::Duration::from_secs(20), response.chunk()).await {
+                Ok(Ok(Some(chunk))) => Some(chunk),
+                Ok(Ok(None)) => None,
+                Ok(Err(e)) => {
+                    bail!("读取网络数据流失败: {:?}", e);
+                }
+                Err(_) => {
+                    bail!("读取网络数据超时 (stalled for 20s)");
+                }
+            };
+
+            let Some(chunk) = chunk_opt else {
+                break;
+            };
+
+            bytes.extend_from_slice(&chunk);
+            downloaded += chunk.len() as u64;
+            if total_size > 0 {
+                let percentage = ((downloaded as f64 / total_size as f64) * 80.0) as u32 + 10;
+                let payload = CoreUpgradeProgress {
+                    status: "downloading".to_string(),
+                    progress: percentage,
+                    message: format!(
+                        "正在下载 {}: {:.1} MB / {:.1} MB",
+                        asset_name,
+                        downloaded as f64 / 1_048_576.0,
+                        total_size as f64 / 1_048_576.0
+                    ),
+                };
+                let _ = app_handle.emit("core-upgrade-progress", payload);
+            }
+        }
+
+        Ok(bytes)
+    }
+
     pub async fn upgrade_core(app_handle: AppHandle, release: GithubRelease) -> Result<()> {
         let emit_progress = |status: &str, progress: u32, message: &str| {
             let payload = CoreUpgradeProgress {
@@ -149,91 +205,64 @@ impl CoreUpdater {
 
         // Start downloading
         let nm = NetworkManager::new();
-        let mut response = None;
+        let proxy_types = vec![ProxyType::Localhost, ProxyType::System, ProxyType::None];
+        let mut downloaded_bytes = None;
 
-        // 1. Try Localhost proxy
-        if let Ok(client) = nm.create_request(ProxyType::Localhost, Some(30), None, false).await {
-            if let Ok(resp) = client.get(&download_url).send().await {
-                if resp.status().is_success() {
-                    response = Some(resp);
-                }
-            }
-        }
-
-        // 2. Try System proxy
-        if response.is_none() {
-            if let Ok(client) = nm.create_request(ProxyType::System, Some(30), None, false).await {
-                if let Ok(resp) = client.get(&download_url).send().await {
-                    if resp.status().is_success() {
-                        response = Some(resp);
+        for proxy_type in proxy_types {
+            logging!(info, Type::System, "Core updater trying download with proxy type: {:?}", proxy_type);
+            if let Ok(client) = nm.create_request(proxy_type, Some(300), None, false).await {
+                match Self::download_body(&client, &download_url, &app_handle, &asset.name).await {
+                    Ok(b) => {
+                        logging!(info, Type::System, "Core updater download succeeded using proxy type: {:?}", proxy_type);
+                        downloaded_bytes = Some(b);
+                        break;
+                    }
+                    Err(e) => {
+                        logging!(warn, Type::System, "Core updater download failed using proxy type {:?}: {:?}", proxy_type, e);
                     }
                 }
             }
         }
 
-        // 3. Fallback to Direct connection
-        let mut response = match response {
-            Some(resp) => resp,
+        let decompressed_bytes = match downloaded_bytes {
+            Some(b) => {
+                emit_progress("extracting", 90, "正在解压并替换内核程序...");
+                if is_zip {
+                    let reader = io::Cursor::new(b);
+                    let mut archive = zip::ZipArchive::new(reader).context("failed to parse zip archive")?;
+                    let mut mihomo_file_idx = None;
+                    for i in 0..archive.len() {
+                        let file = archive.by_index(i)?;
+                        let name = file.name().to_lowercase();
+                        if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains(".")) {
+                            mihomo_file_idx = Some(i);
+                            break;
+                        }
+                    }
+                    let idx = match mihomo_file_idx {
+                        Some(i) => i,
+                        None => {
+                            let err_msg = "在 ZIP 压缩包内未找到 mini-mihomo 程序二进制";
+                            emit_progress("error", 0, err_msg);
+                            bail!(err_msg);
+                        }
+                    };
+                    let mut file = archive.by_index(idx)?;
+                    let mut buf = Vec::new();
+                    io::copy(&mut file, &mut buf).context("failed to extract file from zip")?;
+                    buf
+                } else {
+                    let mut decoder = flate2::read::GzDecoder::new(io::Cursor::new(b));
+                    let mut buf = Vec::new();
+                    io::copy(&mut decoder, &mut buf).context("failed to decompress gzip archive")?;
+                    buf
+                }
+            }
             None => {
-                let client = nm.create_request(ProxyType::None, Some(30), None, false).await?;
-                client.get(&download_url)
-                    .send()
-                    .await
-                    .context("failed to download core archive")?
+                let err_msg = "所有网络连接（代理/直连）均下载失败";
+                emit_progress("error", 0, err_msg);
+                bail!(err_msg);
             }
-        };
-
-        if !response.status().is_success() {
-            let err_msg = format!("下载失败，HTTP 状态码: {}", response.status());
-            emit_progress("error", 0, &err_msg);
-            bail!(err_msg);
-        }
-
-        let total_size = response.content_length().unwrap_or(0);
-        let mut downloaded: u64 = 0;
-        let mut bytes = Vec::new();
-
-        while let Some(chunk) = response.chunk().await.context("error reading response chunk")? {
-            bytes.extend_from_slice(&chunk);
-            downloaded += chunk.len() as u64;
-            if total_size > 0 {
-                let percentage = ((downloaded as f64 / total_size as f64) * 80.0) as u32 + 10;
-                emit_progress("downloading", percentage, &format!("已下载 {:.1} MB / {:.1} MB", downloaded as f64 / 1_048_576.0, total_size as f64 / 1_048_576.0));
-            }
-        }
-
-        emit_progress("extracting", 90, "正在解压并替换内核程序...");
-
-        // Perform decompression
-        let decompressed_bytes = if is_zip {
-            let reader = io::Cursor::new(bytes);
-            let mut archive = zip::ZipArchive::new(reader).context("failed to parse zip archive")?;
-            let mut mihomo_file_idx = None;
-            for i in 0..archive.len() {
-                let file = archive.by_index(i)?;
-                let name = file.name().to_lowercase();
-                if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains(".")) {
-                    mihomo_file_idx = Some(i);
-                    break;
-                }
-            }
-            let idx = match mihomo_file_idx {
-                Some(i) => i,
-                None => {
-                    let err_msg = "在 ZIP 压缩包内未找到 mini-mihomo 程序二进制";
-                    emit_progress("error", 0, err_msg);
-                    bail!(err_msg);
-                }
-            };
-            let mut file = archive.by_index(idx)?;
-            let mut buf = Vec::new();
-            io::copy(&mut file, &mut buf).context("failed to extract file from zip")?;
-            buf
-        } else {
-            let mut decoder = flate2::read::GzDecoder::new(io::Cursor::new(bytes));
-            let mut buf = Vec::new();
-            io::copy(&mut decoder, &mut buf).context("failed to decompress gzip archive")?;
-            buf
         };
 
         // Prepare destination path
