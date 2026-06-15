@@ -51,7 +51,7 @@ const WORKER_CONFIG = {
   rawDataMinutes: 10,
   compressedDataMinutes: 60,
   compressionRatio: 5,
-  snapshotIntervalMs: 1000,
+  snapshotIntervalMs: 3000,
   defaultRangeMinutes: 10,
 }
 

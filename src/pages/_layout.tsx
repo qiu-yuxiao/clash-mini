@@ -1727,7 +1727,7 @@ const Layout = () => {
 
       while (Date.now() - findStartTime < 20000) {
         if (pollSessionRef.current !== currentSession) return
-        const freshProxies = await refreshProxy()
+        const freshProxies = await refreshProxy({ forceFull: true })
         proxiesData = freshProxies?.data || proxies
         group = proxiesData?.groups?.find((g: any) => g.name === groupName)
         if (group && group.all && group.all.length > 0) {
@@ -1831,7 +1831,7 @@ const Layout = () => {
           const elapsed = (Date.now() - startTime) / 1000
 
           // Fetch fresh proxy records
-          const testedProxies = await refreshProxy()
+          const testedProxies = await refreshProxy({ forceFull: true })
           if (pollSessionRef.current !== currentSession) return
 
           const latestData = testedProxies?.data || proxiesData
@@ -2040,12 +2040,14 @@ const Layout = () => {
 
       if (isHealthy) {
         consecutiveFailRef.current = 0
+        refreshProxy().catch(() => {})
         timerId = setTimeout(checkNode, 60000)
       } else {
         consecutiveFailRef.current += 1
         console.log(
           `[NodeMonitor] Consecutive unhealthy count for ${activeNodeName} = ${consecutiveFailRef.current}`,
         )
+        refreshProxy().catch(() => {})
 
         if (consecutiveFailRef.current >= 3) {
           consecutiveFailRef.current = 0
@@ -2069,7 +2071,7 @@ const Layout = () => {
         clearTimeout(timerId)
       }
     }
-  }, [currentProfileUid])
+  }, [currentProfileUid, isMinimalWidth, refreshProxy])
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {

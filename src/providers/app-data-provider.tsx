@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   getBaseConfig,
   getRuleProviders,
   getRules,
+  getProxyByName,
 } from 'tauri-plugin-mihomo-api'
 
 import { useVerge } from '@/hooks/use-verge'
@@ -56,13 +57,89 @@ export const AppDataProvider = ({
 }) => {
   const { verge } = useVerge()
 
+  const [isMinimalWidth, setIsMinimalWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 285
+    }
+    return false
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleResize = () => {
+      setIsMinimalWidth(window.innerWidth <= 285)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const forceFullProxiesRef = useRef(false)
+
+  const fetchProxies = async () => {
+    const isMinimal = isMinimalWidth
+    const forceFull = forceFullProxiesRef.current
+    forceFullProxiesRef.current = false
+
+    if (isMinimal && !forceFull) {
+      try {
+        const groupProxy = await getProxyByName('PROXY')
+        if (groupProxy) {
+          const activeNodeName = groupProxy.now || ''
+          let activeNode: any = null
+          if (activeNodeName) {
+            try {
+              activeNode = await getProxyByName(activeNodeName)
+            } catch (e) {
+              console.warn('[AppDataProvider] Failed to fetch active node:', e)
+            }
+          }
+
+          if (activeNode) {
+            activeNode.provider = activeNode.providerName || activeNode.provider || ''
+          }
+
+          const groupItem = {
+            name: 'PROXY',
+            type: groupProxy.type,
+            now: activeNodeName,
+            all: groupProxy.all ? groupProxy.all.map((name: string) => {
+              if (name === activeNodeName && activeNode) {
+                return activeNode
+              }
+              return {
+                name,
+                type: name === 'DIRECT' ? 'DIRECT' : 'unknown',
+                history: [],
+                provider: '',
+              }
+            }) : []
+          }
+
+          return {
+            global: { name: 'GLOBAL', type: 'Selector', now: '', all: [] } as any,
+            direct: { name: 'DIRECT', type: 'Direct', history: [], udp: true } as any,
+            groups: [groupItem],
+            records: activeNodeName && activeNode ? {
+              [activeNodeName]: activeNode
+            } : {},
+            proxies: []
+          }
+        }
+      } catch (err) {
+        console.error('[AppDataProvider] Failed to fetch minimal proxies:', err)
+      }
+    }
+
+    return calcuProxies()
+  }
+
   const {
     data: proxiesData,
     isPending: isProxiesPending,
     refetch: _refetchProxy,
   } = useQuery({
     queryKey: ['getProxies'],
-    queryFn: calcuProxies,
+    queryFn: fetchProxies,
     ...TQ_MIHOMO,
   })
 
@@ -79,18 +156,21 @@ export const AppDataProvider = ({
   const { data: proxyProviders, refetch: _refetchProxyProviders } = useQuery({
     queryKey: ['getProxyProviders'],
     queryFn: calcuProxyProviders,
+    enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
   })
 
   const { data: ruleProviders, refetch: _refetchRuleProviders } = useQuery({
     queryKey: ['getRuleProviders'],
     queryFn: getRuleProviders,
+    enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
   })
 
   const { data: rulesData, refetch: _refetchRules } = useQuery({
     queryKey: ['getRules'],
     queryFn: getRules,
+    enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
   })
 
@@ -114,7 +194,12 @@ export const AppDataProvider = ({
     retry: 1,
   })
 
-  const refreshProxy = useStableFn(_refetchProxy)
+  const refreshProxy = useStableFn(async (options?: { forceFull?: boolean }) => {
+    if (options?.forceFull) {
+      forceFullProxiesRef.current = true
+    }
+    await _refetchProxy()
+  })
   const refreshClashConfig = useStableFn(_refetchClashConfig)
   const refreshRules = useStableFn(_refetchRules)
   const refreshSysproxy = useStableFn(_refetchSysproxy)

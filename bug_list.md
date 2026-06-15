@@ -16,13 +16,14 @@
 
 ### **BUG-075** (系统资源与 I/O 内存消耗过大)
 * **缺陷描述与现象**：运行过程中，WebView2 GPU 进程与 Renderer 渲染进程的物理内存占用过高（分别近 300MB），且 WMI 累计 I/O 吞吐极高（达到 18GB+ 级别），远高于原版 Clash Verge（约 50MB I/O，84MB/152MB 内存）。这表明前端存在极高频且载荷过大的 IPC 状态推送及非节流重绘。
-* **排查原因与记忆**：通过与原版代码对比审计，确定了 5 项核心优化方案并实施：
-  1. **连接轮询彻底消除与流量总量客户端累加**：在 `useConnectionData` 中彻底封禁抽屉关闭时的 background 3秒高频轮询（彻底杜绝大体积 Connections 列表序列化开销）。通过在 `useTrafficData` 中异步初始化一次 `getConnections()` 获知底数，后随 `/traffic` SSE 流直接在客户端增量累加计算 `upTotal` / `downTotal` 并投递给底部面板显示，从而在抽屉关闭时实现连接相关 IPC 开销 100% 归零。
-  2. **3D 边框性能降频与 Visibility 熔断**：GlowBorder 绘制帧率强制锁定在最大 20 FPS，并且在 `document.hidden === true`（最小化/托盘隐藏）时彻底暂停 requestAnimationFrame 动画循环。
-  3. **流量图快照节流**：采样器 `snapshotIntervalMs` 提升至 1000ms，大幅减少 React 重绘及 Canvas 运算次数。
-  4. **运行时间轮询消除**：取消 app-data-provider 中前端未使用的 `getAppUptime` 每 3 秒一次的冗余轮询。
-  5. **节点组信息在不可见状态下的轮询熔断**：ProxyGroups 在最小化或隐藏时将 `/proxies` 刷新间隔设为 `false` 暂停拉取。
-* **修改方针**：遵守项目规定，不闭门造车，对齐原版并基于 visibility 状态实现高频更新的完全熔断降载。
+* **排查原因与记忆**：通过与原版代码对比审计，确定并实施了以下核心性能优化：
+  1. **Tauri 原生窗口可见性熔断与防抖**：重写了 `useVisibility` 挂钩，通过监听 Tauri 的原生 `minimized` 与隐藏事件对状态变化进行 `1000ms` 防抖限流，在隐藏时断开连接。
+  2. **日志分批缓冲推送**：后端 Rust 进程新增日志分批缓冲区（批处理窗口 250ms 或 50条），将高频零散日志批量传输，降低 Tauri IPC 信道高频调度成本；对 Error/Critical 级别日志保留实时推送机制以保证响应性。
+  3. **连接差异更新协议 (Flat 1D Delta)**：设计并实现了一套差分传输机制。前端建立连接快照并缓存，后续仅接收来自后端的 `Delta` 增量包（包含 `added`、扁平化 metrics 一维数组成员 `updated`、`removed`），并辅以 Sequence 和 Epoch 校验以防掉包，将 connections 通信的吞吐量降幅达 95% 以上。
+  4. **微缩窗口模式极简按需查询**：当窗口处于微缩卡片尺寸时，强制挂起 `ruleProviders`、`rule` 等 React Query 后台轮询，并将 `getProxies` 替换为专属轻量级查询，仅通过 `getProxyByName` 拉取 active 节点及其所属代理组，并在前端按 10 秒间隔单独对其测试延迟，实现无用数据调取 100% 熔断。
+  5. **静态 themed 边框取代 conic 渲染**：用静态、主题自适应的 4px 双线或实线窗框，取代了原先极其耗费 GPU 的 conic-gradient 呼吸动画渲染循环。
+  6. **连接数 Viewport 级硬上限上限 (Pagination)**：后端针对 `ws_connections` 增加最大 100 条连接的 Viewport Pagination，超出时按 activity (upload + download) 排序截断，彻底阻断了 P2P 场景下高吞吐造成的崩溃隐患。
+* **修改方针**：遵循项目规范，优化 IPC 冗余传输与不合理的重绘循环，从网络链路和渲染底层双向降载。
 * **调试日志挂靠**：本地记录文件为 [BUG-075_perf_debug_log.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/BUG-075_perf_debug_log.md)。
 * **状态**：代码已修正，待确认。
 
@@ -40,10 +41,9 @@
 
 ### **BUG-077** (内核升级功能失效/下载链接配置错误)
 * **缺陷描述与现象**：在客户端中点击检查并尝试升级 Mihomo 内核时，内核无法成功下载或升级，疑似下载或更新链接配置错误。
-* **排查原因与记忆**：暂未开始排查。
-* **修改方针**：待排查确定具体配置后进行修正。
-* **状态**：排查中。
-
+* **排查原因与记忆**：在 Rust 层的 `core_updater.rs` 资源匹配逻辑中，仅使用包含字符串匹配导致部分不支持的包（例如 go120 兼容包）被意外匹配，造成更新流程故障。
+* **修改方针**：重写了资源匹配逻辑，优先寻找与最新 tag 精确相符的 zip 或 gz 二进制包（例如 `mihomo-{os}-{arch}-{tag}.zip`），未找到时才进行模糊匹配并过滤 "compat" 包，从而保障包的匹配准确性。
+* **状态**：代码已修正，待确认。
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 

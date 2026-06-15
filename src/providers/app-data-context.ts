@@ -18,7 +18,7 @@ export interface AppDataContextType {
   systemProxyAddress: string
   isCoreDataPending: boolean
 
-  refreshProxy: () => Promise<any>
+  refreshProxy: (options?: { forceFull?: boolean }) => Promise<any>
   refreshClashConfig: () => Promise<any>
   refreshRules: () => Promise<any>
   refreshSysproxy: () => Promise<any>
@@ -70,7 +70,7 @@ export interface CoreDataStatusContextType {
 }
 
 export interface RefreshersContextType {
-  refreshProxy: () => Promise<any>
+  refreshProxy: (options?: { forceFull?: boolean }) => Promise<any>
   refreshClashConfig: () => Promise<any>
   refreshRules: () => Promise<any>
   refreshSysproxy: () => Promise<any>

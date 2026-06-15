@@ -115,10 +115,23 @@ impl CoreUpdater {
         let target_prefix = format!("mihomo-{}-{}", target_os, target_arch);
         logging!(info, Type::System, "Core updater searching for asset prefix: {}", target_prefix);
 
-        let matched_asset = release.assets.into_iter().find(|asset| {
-            let name = asset.name.to_lowercase();
-            name.contains(&target_prefix) && !name.contains("compat") && (name.ends_with(".zip") || name.ends_with(".gz"))
-        });
+        let matched_asset = {
+            let assets = release.assets.clone();
+            let exact_zip = format!("{}-{}.zip", target_prefix, release.tag_name).to_lowercase();
+            let exact_gz = format!("{}-{}.gz", target_prefix, release.tag_name).to_lowercase();
+            
+            assets.iter().find(|asset| {
+                let name = asset.name.to_lowercase();
+                name == exact_zip || name == exact_gz
+            })
+            .cloned()
+            .or_else(|| {
+                assets.into_iter().find(|asset| {
+                    let name = asset.name.to_lowercase();
+                    name.contains(&target_prefix) && !name.contains("compat") && (name.ends_with(".zip") || name.ends_with(".gz"))
+                })
+            })
+        };
 
         let asset = match matched_asset {
             Some(a) => a,

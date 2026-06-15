@@ -888,7 +888,7 @@ pub struct Connections {
     pub extra: HashMap<String, Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, TS, PartialEq, Eq, Clone)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
@@ -911,7 +911,7 @@ pub struct Connection {
 }
 
 string_enum! {
-    #[derive(Debug, TS, PartialEq, Eq)]
+    #[derive(Debug, TS, PartialEq, Eq, Clone)]
     #[ts(export)]
     #[ts(type = "string")]
     pub enum Network {
@@ -922,7 +922,7 @@ string_enum! {
 }
 
 string_enum! {
-    #[derive(Debug, TS, PartialEq, Eq)]
+    #[derive(Debug, TS, PartialEq, Eq, Clone)]
     #[ts(export)]
     #[ts(type = "string")]
     pub enum ConnectionType {
@@ -950,7 +950,7 @@ string_enum! {
 }
 
 string_enum! {
-    #[derive(Debug, TS, PartialEq, Eq)]
+    #[derive(Debug, TS, PartialEq, Eq, Clone)]
     #[ts(export)]
     #[ts(type = "string")]
     pub enum DNSMode {
@@ -961,7 +961,7 @@ string_enum! {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, TS, PartialEq, Eq, Clone)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionMetaData {
@@ -1083,3 +1083,46 @@ impl WebSocketWriter {
 
 #[derive(Default)]
 pub struct ConnectionManager(pub RwLock<HashMap<ConnectionId, WebSocketWriter>>);
+
+#[derive(Debug, Serialize, Deserialize, TS, Clone, PartialEq, Eq)]
+#[ts(export)]
+#[serde(tag = "type", content = "data", rename_all = "camelCase")]
+pub enum ConnectionMessage {
+    Snapshot(ConnectionsSnapshot),
+    Delta(ConnectionsDelta),
+}
+
+#[derive(Debug, Serialize, Deserialize, TS, Clone, PartialEq, Eq)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionsSnapshot {
+    pub epoch_id: String,
+    #[ts(type = "number")]
+    pub sequence_id: u64,
+    #[ts(type = "number")]
+    pub download_total: u64,
+    #[ts(type = "number")]
+    pub upload_total: u64,
+    pub connections: Vec<Connection>,
+    #[ts(type = "number")]
+    pub memory: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, TS, Clone, PartialEq, Eq)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionsDelta {
+    pub epoch_id: String,
+    #[ts(type = "number")]
+    pub sequence_id: u64,
+    #[ts(type = "number")]
+    pub download_total: u64,
+    #[ts(type = "number")]
+    pub upload_total: u64,
+    #[ts(type = "number")]
+    pub memory: u64,
+    pub added: Vec<Connection>,
+    #[ts(type = "Array<string | number>")]
+    pub updated: Vec<serde_json::Value>, // Alternating flat layout: [id1, up1, down1, id2, up2, down2, ...]
+    pub removed: Vec<String>,
+}

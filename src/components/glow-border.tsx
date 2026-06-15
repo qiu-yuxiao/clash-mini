@@ -1,318 +1,90 @@
+import { useEffect, useState } from 'react'
+import { useTheme } from '@mui/material'
+
 /**
- * FEAT-003: GlowBorder
+ * GlowBorder
  *
- * A 4px inner glow border with:
- * - Dual-piston compressible-gas physics: two color poles (amber-gold + electric-blue)
- *   orbit the border as a conic-gradient, repelling each other when close.
- * - Breathing layer (60%): speed driven by real-time network traffic.
- * - Heartbeat layer (40%): fixed 0.9s pulse, always visible even at zero traffic.
- * - Overall intensity scaled by --vibrancy-factor CSS variable.
+ * A static, theme-adaptive 4px window border.
+ * - No animation loops or requestAnimationFrame, reducing CPU/GPU overhead to 0%.
+ * - Supports 6 distinct skins matching Clash Mini's aesthetics.
  */
-
-import { useEffect, useRef } from 'react'
-
-import { useTrafficData } from '@/hooks/use-traffic-data'
-import { useVisibility } from '@/hooks/use-visibility'
-import { useThemeMode } from '@/services/states'
-
-// ── Physics constants ─────────────────────────────────────────────────────────
-/** Repulsion coefficient: higher = stronger push when poles are close */
-const REPULSION_K = 0.0008
-/** Random kick magnitude (radians/s) */
-const KICK_MAGNITUDE = 0.6
-/** Minimum time between kicks per pole (ms) */
-const KICK_MIN_INTERVAL = 2000
-/** Maximum time between kicks per pole (ms) */
-const KICK_MAX_INTERVAL = 7000
-/** Max angular speed (rad/s) at full traffic */
-const MAX_SPEED = Math.PI  // half circle per second at max traffic
-/** Min angular speed (rad/s) at zero traffic */
-const MIN_SPEED = (2 * Math.PI) / 9  // ~one circle per 9 seconds
-
-// ── Traffic → speed mapping ───────────────────────────────────────────────────
-function trafficToBaseSpeed(bytesPerSec: number): number {
-  // 0 B/s → MIN_SPEED, ≥10 MB/s → MAX_SPEED (log scale)
-  if (bytesPerSec <= 0) return MIN_SPEED
-  const log = Math.log10(Math.max(bytesPerSec, 1))
-  const logMax = Math.log10(10_000_000) // 10 MB/s
-  const t = Math.min(log / logMax, 1)
-  return MIN_SPEED + t * (MAX_SPEED - MIN_SPEED)
-}
-
-// ── Heartbeat + breathing brightness ─────────────────────────────────────────
-function buildBrightnessKeyframes(): string {
-  return `
-    @keyframes cm-glow-breathe {
-      0%   { opacity: var(--cm-breathe-min, 0.08); }
-      50%  { opacity: var(--cm-breathe-max, 0.55); }
-      100% { opacity: var(--cm-breathe-min, 0.08); }
-    }
-    @keyframes cm-glow-heartbeat {
-      0%   { opacity: 0; }
-      10%  { opacity: var(--cm-hb-peak, 0.3); }
-      30%  { opacity: 0.05; }
-      50%  { opacity: var(--cm-hb-peak, 0.25); }
-      70%  { opacity: 0.02; }
-      100% { opacity: 0; }
-    }
-  `
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
 export const GlowBorder = () => {
-  const mode = useThemeMode()
-  const pageVisible = useVisibility()
-  const {
-    response: { data: traffic },
-  } = useTrafficData({ enabled: pageVisible })
+  const theme = useTheme()
+  const isLight = theme.palette.mode === 'light'
+  
+  const [controlSkin, setControlSkin] = useState(() => {
+    return typeof window !== 'undefined'
+      ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+      : 'retro-3d'
+  })
 
-  // Canvas-less animation via CSS vars + conic-gradient on a pseudo-element
-  const breatheLayerRef = useRef<HTMLDivElement>(null)
-  const heartbeatLayerRef = useRef<HTMLDivElement>(null)
-  const gradientLayerRef = useRef<HTMLDivElement>(null)
-
-  // Physics state (mutable refs, not React state — updated every RAF)
-  const poleAAngleRef = useRef(0) // radians
-  const poleBAngleRef = useRef(Math.PI) // start opposite
-  const poleAVelRef = useRef(MIN_SPEED * 0.7)
-  const poleBVelRef = useRef(-MIN_SPEED * 0.5)
-  const lastTimestampRef = useRef<number | null>(null)
-  const baseSpeedRef = useRef(MIN_SPEED)
-  const rafIdRef = useRef<number | null>(null)
-
-  // Scheduled kick times
-  const nextKickARef = useRef(0)
-  const nextKickBRef = useRef(0)
-
-  // Update base speed from traffic
   useEffect(() => {
-    const total = (traffic?.up ?? 0) + (traffic?.down ?? 0)
-    baseSpeedRef.current = trafficToBaseSpeed(total)
-
-    // Update breathing animation duration via CSS variable
-    const cycleSec = (2 * Math.PI) / Math.max(baseSpeedRef.current, MIN_SPEED)
-    // Clamp to 2s – 10s
-    const clampedSec = Math.max(2, Math.min(10, cycleSec))
-    document.documentElement.style.setProperty(
-      '--cm-breathe-dur',
-      `${clampedSec.toFixed(2)}s`,
-    )
-  }, [traffic])
-
-  // Physics + gradient animation loop
-  useEffect(() => {
-    let mounted = true
-    nextKickARef.current = Date.now() + KICK_MIN_INTERVAL
-    nextKickBRef.current = Date.now() + KICK_MIN_INTERVAL * 1.5
-
-    const FPS_INTERVAL = 1000 / 20 // 50ms (20 FPS)
-    let lastRenderTime = 0
-
-    function tick(ts: number) {
-      if (!mounted) return
-      if (document.hidden) {
-        lastTimestampRef.current = null
-        return
-      }
-
-      const now = Date.now()
-      if (now - lastRenderTime < FPS_INTERVAL) {
-        rafIdRef.current = requestAnimationFrame(tick)
-        return
-      }
-      lastRenderTime = now
-
-      if (lastTimestampRef.current === null) lastTimestampRef.current = ts
-      const dt = Math.min((ts - lastTimestampRef.current) / 1000, 0.1) // seconds, cap at 100ms
-      lastTimestampRef.current = ts
-
-      // Random kicks
-      if (now >= nextKickARef.current) {
-        const kickDir = Math.random() < 0.5 ? 1 : -1
-        poleAVelRef.current += kickDir * KICK_MAGNITUDE * (0.5 + Math.random())
-        nextKickARef.current =
-          now +
-          KICK_MIN_INTERVAL +
-          Math.random() * (KICK_MAX_INTERVAL - KICK_MIN_INTERVAL)
-      }
-      if (now >= nextKickBRef.current) {
-        const kickDir = Math.random() < 0.5 ? 1 : -1
-        poleBVelRef.current += kickDir * KICK_MAGNITUDE * (0.5 + Math.random())
-        nextKickBRef.current =
-          now +
-          KICK_MIN_INTERVAL +
-          Math.random() * (KICK_MAX_INTERVAL - KICK_MIN_INTERVAL)
-      }
-
-      // Repulsion force: angular difference
-      let diff = poleBAngleRef.current - poleAAngleRef.current
-      // Normalize to [-π, π]
-      while (diff > Math.PI) diff -= 2 * Math.PI
-      while (diff < -Math.PI) diff += 2 * Math.PI
-
-      // Repulsion: push apart (force inversely proportional to |diff|)
-      const repulsion = REPULSION_K / Math.max(Math.abs(diff), 0.05)
-      const repulsionDir = diff > 0 ? -1 : 1
-      poleAVelRef.current += repulsionDir * repulsion
-      poleBVelRef.current -= repulsionDir * repulsion
-
-      // Damping toward base speed (gentle drag)
-      const base = baseSpeedRef.current
-      const damping = 0.3
-      poleAVelRef.current +=
-        (Math.sign(poleAVelRef.current) * base - poleAVelRef.current) *
-        damping *
-        dt
-      poleBVelRef.current +=
-        (Math.sign(poleBVelRef.current) * base - poleBVelRef.current) *
-        damping *
-        dt
-
-      // Clamp speed
-      const maxSpd = MAX_SPEED * 2
-      poleAVelRef.current = Math.max(
-        -maxSpd,
-        Math.min(maxSpd, poleAVelRef.current),
+    const handleSkinChanged = () => {
+      setControlSkin(
+        localStorage.getItem('clash-mini-control-skin') || 'retro-3d',
       )
-      poleBVelRef.current = Math.max(
-        -maxSpd,
-        Math.min(maxSpd, poleBVelRef.current),
-      )
-
-      // Integrate positions
-      poleAAngleRef.current += poleAVelRef.current * dt
-      poleBAngleRef.current += poleBVelRef.current * dt
-
-      // Normalize angles to [0, 2π]
-      poleAAngleRef.current =
-        ((poleAAngleRef.current % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-      poleBAngleRef.current =
-        ((poleBAngleRef.current % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
-
-      // Build conic-gradient
-      const aDeg = (poleAAngleRef.current * 180) / Math.PI
-      const bDeg = (poleBAngleRef.current * 180) / Math.PI
-
-      // Amber-gold at A, electric-blue at B, smooth gradient between
-      const gradient = `conic-gradient(from 0deg, 
-        #FFC400 ${aDeg.toFixed(1)}deg,
-        #0084FF ${bDeg.toFixed(1)}deg,
-        #FFC400 ${(aDeg + 360).toFixed(1)}deg
-      )`
-
-      if (gradientLayerRef.current) {
-        gradientLayerRef.current.style.background = gradient
-      }
-
-      rafIdRef.current = requestAnimationFrame(tick)
     }
-
-    const handleVisibility = () => {
-      if (!document.hidden && mounted) {
-        if (rafIdRef.current !== null) {
-          cancelAnimationFrame(rafIdRef.current)
-        }
-        lastTimestampRef.current = null
-        rafIdRef.current = requestAnimationFrame(tick)
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibility)
-
-    if (!document.hidden) {
-      rafIdRef.current = requestAnimationFrame(tick)
-    }
-
+    window.addEventListener('clash-mini-skin-changed', handleSkinChanged)
     return () => {
-      mounted = false
-      document.removeEventListener('visibilitychange', handleVisibility)
-      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
+      window.removeEventListener('clash-mini-skin-changed', handleSkinChanged)
     }
   }, [])
 
-  // Inject keyframes once
-  useEffect(() => {
-    const styleId = 'cm-glow-border-keyframes'
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style')
-      style.id = styleId
-      style.textContent = buildBrightnessKeyframes()
-      document.head.appendChild(style)
-    }
-  }, [])
+  let borderStyle: React.CSSProperties = {}
 
-  const isLight = mode === 'light'
+  switch (controlSkin) {
+    case 'retro-3d':
+      borderStyle = {
+        border: '4px double transparent',
+        borderImage: 'linear-gradient(135deg, #FFC400, #0084FF) 4',
+        boxShadow: 'inset 0 0 8px rgba(212, 175, 55, 0.4)',
+      }
+      break
+    case 'original':
+      borderStyle = {
+        border: `4px solid ${isLight ? '#E0E0E0' : '#2D2D2D'}`,
+      }
+      break
+    case 'modern-flat':
+      borderStyle = {
+        border: `4px solid var(--primary-main, ${theme.palette.primary.main})`,
+        boxShadow: '0 0 10px rgba(0, 0, 0, 0.15)',
+      }
+      break
+    case 'frosted-glass':
+      borderStyle = {
+        border: '4px double rgba(255, 255, 255, 0.25)',
+        boxShadow: '0 0 20px rgba(0, 0, 0, 0.3)',
+      }
+      break
+    case 'cyberpunk':
+      borderStyle = {
+        border: '4px double transparent',
+        borderImage: 'linear-gradient(135deg, #00F5FF, #FF007F) 4',
+        filter: 'drop-shadow(0 0 4px rgba(0, 245, 255, 0.5))',
+      }
+      break
+    case 'monochrome':
+      borderStyle = {
+        border: `4px solid ${isLight ? '#808080' : '#404040'}`,
+      }
+      break
+    default:
+      borderStyle = {
+        border: `4px solid ${isLight ? '#E0E0E0' : '#2D2D2D'}`,
+      }
+  }
 
   return (
-    <>
-      {/* Gradient flow layer: the conic gradient representing the two poles */}
-      <div
-        ref={gradientLayerRef}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          pointerEvents: 'none',
-          zIndex: 9998,
-          // Mask: only show the outer 4px ring
-          WebkitMask:
-            'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-          WebkitMaskComposite: 'xor',
-          maskComposite: 'exclude',
-          padding: '4px',
-          borderRadius: '0px',
-          // Base opacity driven by breathing animation (will be overridden by layers below)
-        }}
-      />
-
-      {/* Breathing layer (60% weight): slow pulse driven by traffic speed */}
-      <div
-        ref={breatheLayerRef}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          pointerEvents: 'none',
-          zIndex: 9999,
-          WebkitMask:
-            'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-          WebkitMaskComposite: 'xor',
-          maskComposite: 'exclude',
-          padding: '4px',
-          background: isLight
-            ? 'linear-gradient(135deg, #FFC400, #0084FF)'
-            : 'linear-gradient(135deg, #FFD700, #00BFFF)',
-          animation: 'cm-glow-breathe var(--cm-breathe-dur, 5s) ease-in-out infinite',
-          // Opacity range for breathe layer: 0.05 (dim) to 0.55*0.6=0.33 (bright) → 60% share
-          '--cm-breathe-min': '0.04',
-          '--cm-breathe-max': '0.33',
-          // Box-shadow glow outward
-          boxShadow: isLight
-            ? 'inset 0 0 8px rgba(212,175,55,0.4), inset 0 0 8px rgba(0,132,255,0.4)'
-            : 'inset 0 0 12px rgba(255,215,0,0.5), inset 0 0 12px rgba(0,191,255,0.5)',
-          mixBlendMode: 'screen',
-        } as React.CSSProperties}
-      />
-
-      {/* Heartbeat layer (40% weight): fixed 0.9s pulse, always alive */}
-      <div
-        ref={heartbeatLayerRef}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          pointerEvents: 'none',
-          zIndex: 10000,
-          WebkitMask:
-            'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
-          WebkitMaskComposite: 'xor',
-          maskComposite: 'exclude',
-          padding: '4px',
-          background: isLight
-            ? 'linear-gradient(45deg, #FFB300, #40C4FF)'
-            : 'linear-gradient(45deg, #FFC107, #29B6F6)',
-          animation: 'cm-glow-heartbeat 0.9s ease-in-out infinite',
-          '--cm-hb-peak': '0.22',  // 40% share peak
-          mixBlendMode: 'screen',
-        } as React.CSSProperties}
-      />
-    </>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: 9999,
+        boxSizing: 'border-box',
+        ...borderStyle,
+      }}
+    />
   )
 }

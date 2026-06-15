@@ -1,6 +1,14 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useEffect, useState } from 'react'
 
+/**
+ * useVisibility
+ *
+ * Hook to track whether the window is visible to the user.
+ * Dis disconnection/reconnection behavior will only trigger if the window is minimized or hidden.
+ * Pausing on window focus loss (Focused(false)) is prohibited to support multi-monitor setups.
+ * State updates are debounced by 1000ms to prevent connection thrashing.
+ */
 export const useVisibility = () => {
   const [documentVisible, setDocumentVisible] = useState(() =>
     typeof document === 'undefined'
@@ -8,6 +16,22 @@ export const useVisibility = () => {
       : document.visibilityState === 'visible',
   )
   const [isMinimized, setIsMinimized] = useState(false)
+  const [isWindowVisible, setIsWindowVisible] = useState(true)
+
+  const rawVisible = documentVisible && isWindowVisible && !isMinimized
+  const [debouncedVisible, setDebouncedVisible] = useState(rawVisible)
+
+  useEffect(() => {
+    if (rawVisible) {
+      setDebouncedVisible(true)
+    } else {
+      const timer = setTimeout(() => {
+        setDebouncedVisible(false)
+      }, 1000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [rawVisible])
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -33,23 +57,29 @@ export const useVisibility = () => {
     let unlistenResized: (() => void) | null = null
     let unlistenFocus: (() => void) | null = null
 
+    const updateWindowState = async () => {
+      try {
+        const currentWindow = getCurrentWindow()
+        const [minimized, visible] = await Promise.all([
+          currentWindow.isMinimized(),
+          currentWindow.isVisible(),
+        ])
+        if (active) {
+          setIsMinimized(minimized)
+          setIsWindowVisible(visible)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     const initTauri = async () => {
       try {
         const currentWindow = getCurrentWindow()
-        const minimized = await currentWindow.isMinimized()
-        if (active) {
-          setIsMinimized(minimized)
-        }
+        await updateWindowState()
 
         const unR = await currentWindow.onResized(async () => {
-          try {
-            const min = await currentWindow.isMinimized()
-            if (active) {
-              setIsMinimized(min)
-            }
-          } catch {
-            // ignore
-          }
+          await updateWindowState()
         })
         if (active) {
           unlistenResized = unR
@@ -58,14 +88,7 @@ export const useVisibility = () => {
         }
 
         const unF = await currentWindow.onFocusChanged(async () => {
-          try {
-            const min = await currentWindow.isMinimized()
-            if (active) {
-              setIsMinimized(min)
-            }
-          } catch {
-            // ignore
-          }
+          await updateWindowState()
         })
         if (active) {
           unlistenFocus = unF
@@ -73,14 +96,17 @@ export const useVisibility = () => {
           unF()
         }
       } catch {
-        // Fallback for non-Tauri / browser / testing environments
+        // Fallback for non-Tauri
       }
     }
 
     initTauri()
 
+    const interval = setInterval(updateWindowState, 1000)
+
     return () => {
       active = false
+      clearInterval(interval)
       if (unlistenResized) {
         unlistenResized()
       }
@@ -90,5 +116,5 @@ export const useVisibility = () => {
     }
   }, [])
 
-  return documentVisible && !isMinimized
+  return debouncedVisible
 }

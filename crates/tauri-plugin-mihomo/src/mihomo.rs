@@ -447,7 +447,131 @@ impl Mihomo {
         F: Fn(InvokeResponseBody) -> bool + Send + 'static,
     {
         let ws_url = self.get_websocket_url("/connections")?;
-        self.connect(ws_url, on_message).await
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<std::string::String>();
+
+        tokio::spawn(async move {
+            use crate::models::{
+                ConnectionMessage, Connections, ConnectionsDelta, ConnectionsSnapshot, Connection
+            };
+            use std::collections::HashMap;
+
+            let epoch_id = format!("{:016x}", rand::random::<u64>());
+            let mut sequence_id: u64 = 0;
+            let mut last_connections: HashMap<String, Connection> = HashMap::new();
+
+            while let Some(text) = rx.recv().await {
+                let conn_frame: Connections = match serde_json::from_str(&text) {
+                    Ok(frame) => frame,
+                    Err(err) => {
+                        log::error!("failed to deserialize connections frame: {err}");
+                        continue;
+                    }
+                };
+
+                let mut connections_list = conn_frame.connections.unwrap_or_default();
+
+                // Viewport-based pagination: limit to top 100 active connections (sorted by activity)
+                if connections_list.len() > 100 {
+                    connections_list.sort_by(|a, b| {
+                        let a_total = a.upload + a.download;
+                        let b_total = b.upload + b.download;
+                        b_total.cmp(&a_total)
+                    });
+                    connections_list.truncate(100);
+                }
+
+                // Periodic full snapshot every 100 frames to prevent drift
+                let send_full = sequence_id == 0 || sequence_id % 100 == 0;
+
+                let msg = if send_full {
+                    last_connections.clear();
+                    for conn in &connections_list {
+                        last_connections.insert(conn.id.clone(), conn.clone());
+                    }
+
+                    ConnectionMessage::Snapshot(ConnectionsSnapshot {
+                        epoch_id: epoch_id.clone(),
+                        sequence_id,
+                        download_total: conn_frame.download_total,
+                        upload_total: conn_frame.upload_total,
+                        connections: connections_list,
+                        memory: conn_frame.memory,
+                    })
+                } else {
+                    let mut added = Vec::new();
+                    let mut removed = Vec::new();
+                    let mut updated = Vec::new();
+
+                    let mut current_ids = std::collections::HashSet::new();
+
+                    for conn in &connections_list {
+                        current_ids.insert(&conn.id);
+                        match last_connections.get_mut(&conn.id) {
+                            Some(last_conn) => {
+                                // If upload or download changed, send metrics update
+                                if last_conn.upload != conn.upload || last_conn.download != conn.download {
+                                    updated.push(serde_json::Value::String(conn.id.clone()));
+                                    updated.push(json!(conn.upload));
+                                    updated.push(json!(conn.download));
+
+                                    last_conn.upload = conn.upload;
+                                    last_conn.download = conn.download;
+                                }
+                            }
+                            None => {
+                                added.push(conn.clone());
+                                last_connections.insert(conn.id.clone(), conn.clone());
+                            }
+                        }
+                    }
+
+                    // Find removed connections
+                    for last_id in last_connections.keys().cloned().collect::<Vec<String>>() {
+                        if !current_ids.contains(&last_id) {
+                            removed.push(last_id.clone());
+                            last_connections.remove(&last_id);
+                        }
+                    }
+
+                    ConnectionMessage::Delta(ConnectionsDelta {
+                        epoch_id: epoch_id.clone(),
+                        sequence_id,
+                        download_total: conn_frame.download_total,
+                        upload_total: conn_frame.upload_total,
+                        memory: conn_frame.memory,
+                        added,
+                        updated,
+                        removed,
+                    })
+                };
+
+                let serialized = match serde_json::to_string(&msg) {
+                    Ok(json) => json,
+                    Err(err) => {
+                        log::error!("failed to serialize ConnectionMessage: {err}");
+                        continue;
+                    }
+                };
+
+                let body = InvokeResponseBody::Raw(serialized.into_bytes());
+                if !on_message(body) {
+                    break;
+                }
+
+                sequence_id += 1;
+            }
+        });
+
+        self.connect(ws_url, move |body| {
+            if let Some(bytes) = channel_body_to_text_bytes(body) {
+                if let Ok(text) = std::string::String::from_utf8(bytes) {
+                    return tx.send(text).is_ok();
+                }
+            }
+            true
+        })
+        .await
     }
 
     /// WebSocket: Mihomo 日志数据
@@ -469,7 +593,55 @@ impl Mihomo {
             Protocol::Http => format!("{ws_url}&level={level}"),
             Protocol::LocalSocket => format!("{ws_url}?level={level}"),
         };
-        self.connect(ws_url, on_message).await
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<std::string::String>();
+
+        tokio::spawn(async move {
+            let mut buffer = Vec::new();
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+            interval.tick().await;
+
+            loop {
+                tokio::select! {
+                    Some(log_line) = rx.recv() => {
+                        let is_error = log_line.contains(r#""type":"error""#) || log_line.contains(r#""type":"critical""#);
+                        buffer.push(log_line);
+
+                        if is_error || buffer.len() >= 50 {
+                            if !buffer.is_empty() {
+                                let batched_json = format!("[{}]", buffer.join(","));
+                                buffer.clear();
+                                let body = InvokeResponseBody::Raw(batched_json.into_bytes());
+                                if !on_message(body) {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    _ = interval.tick() => {
+                        if !buffer.is_empty() {
+                            let batched_json = format!("[{}]", buffer.join(","));
+                            buffer.clear();
+                            let body = InvokeResponseBody::Raw(batched_json.into_bytes());
+                            if !on_message(body) {
+                                break;
+                            }
+                        }
+                    }
+                    else => break,
+                }
+            }
+        });
+
+        self.connect(ws_url, move |body| {
+            if let Some(bytes) = channel_body_to_text_bytes(body) {
+                if let Ok(text) = std::string::String::from_utf8(bytes) {
+                    return tx.send(text).is_ok();
+                }
+            }
+            true
+        })
+        .await
     }
 
     // clash api

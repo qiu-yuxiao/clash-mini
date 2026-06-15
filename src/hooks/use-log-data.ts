@@ -97,18 +97,23 @@ export const useLogData = () => {
           }
 
           try {
-            const parsed = JSON.parse(data) as ILogItem
-            if (
-              allowedTypes.length > 0 &&
-              !allowedTypes.includes(parsed.type)
-            ) {
+            const parsed = JSON.parse(data)
+            const incomingLogs: ILogItem[] = Array.isArray(parsed) ? parsed : [parsed]
+            const filteredLogs = incomingLogs.filter(
+              (log) => allowedTypes.length === 0 || allowedTypes.includes(log.type)
+            )
+            if (filteredLogs.length === 0) {
               return
             }
+
             if (flushTimeStr === null) {
               flushTimeStr = dayjs().format('MM-DD HH:mm:ss')
             }
-            parsed.time = flushTimeStr
-            buffer.push(parsed)
+            for (const log of filteredLogs) {
+              log.time = flushTimeStr
+              buffer.push(log)
+            }
+
             if (buffer.length > MAX_LOG_NUM) {
               buffer.splice(0, buffer.length - MAX_LOG_NUM)
             }

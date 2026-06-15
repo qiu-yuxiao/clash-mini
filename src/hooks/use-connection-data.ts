@@ -22,74 +22,6 @@ export interface ConnectionMonitorData {
   closedConnections: IConnectionsItem[]
 }
 
-const mergeConnectionSnapshot = (
-  payload: IConnections,
-  previous: ConnectionMonitorData = initConnData,
-): ConnectionMonitorData => {
-  const nextConnections = payload.connections ?? []
-  const previousActive = previous.activeConnections ?? []
-  const previousClosed = previous.closedConnections ?? []
-
-  const nextById = new Map<string, IConnectionsItem>()
-  for (let i = 0; i < nextConnections.length; i++) {
-    nextById.set(nextConnections[i].id, nextConnections[i])
-  }
-
-  const carried: IConnectionsItem[] = []
-  const dropped: IConnectionsItem[] = []
-
-  for (let i = 0; i < previousActive.length; i++) {
-    const prev = previousActive[i]
-    const next = nextById.get(prev.id)
-    if (next !== undefined) {
-      nextById.delete(prev.id)
-      if (prev.upload === next.upload && prev.download === next.download) {
-        // Reuse prev reference: row identity stability is the contract Stage 2 memo relies on.
-        carried.push(prev)
-      } else {
-        carried.push({
-          ...next,
-          curUpload: next.upload - prev.upload,
-          curDownload: next.download - prev.download,
-        })
-      }
-    } else {
-      dropped.push(prev)
-    }
-  }
-
-  const activeConnections: IConnectionsItem[] = carried
-  for (let i = 0; i < nextConnections.length; i++) {
-    const conn = nextConnections[i]
-    if (nextById.has(conn.id)) {
-      activeConnections.push({
-        ...conn,
-        curUpload: 0,
-        curDownload: 0,
-      })
-    }
-  }
-
-  const rawClosedLen = previousClosed.length + dropped.length
-  let closedConnections: IConnectionsItem[]
-  if (rawClosedLen <= MAX_CLOSED_CONNS_NUM) {
-    closedConnections = previousClosed.concat(dropped)
-  } else {
-    const skipPrev = rawClosedLen - MAX_CLOSED_CONNS_NUM
-    closedConnections =
-      skipPrev >= previousClosed.length
-        ? dropped.slice(skipPrev - previousClosed.length)
-        : previousClosed.slice(skipPrev).concat(dropped)
-  }
-
-  return {
-    uploadTotal: payload.uploadTotal ?? 0,
-    downloadTotal: payload.downloadTotal ?? 0,
-    activeConnections,
-    closedConnections,
-  }
-}
-
 export const useConnectionData = (options?: { enabled?: boolean }) => {
   const enabled = options?.enabled ?? true
   const isVisible = useVisibility()
@@ -104,20 +36,162 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
       buildCacheKey: (date) => `getClashConnection-${date}`,
       fallbackData: initConnData,
       connect: () => MihomoWebSocket.connect_connections(),
-      throttleMs: 16,
-      setupHandlers: ({ next, scheduleReconnect }) => ({
-        handleMessage: (data) => {
-          if (data.startsWith('Websocket error')) {
-            next(data)
-            void scheduleReconnect()
-            return
-          }
+      throttleMs: 1000,
+      setupHandlers: ({ next, scheduleReconnect }) => {
+        let currentEpochId: string | null = null
+        let lastSequenceId = -1
 
-          next(null, (old = initConnData) =>
-            mergeConnectionSnapshot(JSON.parse(data) as IConnections, old),
-          )
-        },
-      }),
+        return {
+          handleMessage: (data) => {
+            if (data.startsWith('Websocket error')) {
+              next(data)
+              void scheduleReconnect()
+              return
+            }
+
+            try {
+              const msg = JSON.parse(data) as any
+
+              next(null, (old = initConnData) => {
+                if (msg.type === 'snapshot') {
+                  currentEpochId = msg.data.epochId
+                  lastSequenceId = msg.data.sequenceId
+
+                  return {
+                    uploadTotal: msg.data.uploadTotal,
+                    downloadTotal: msg.data.downloadTotal,
+                    activeConnections: msg.data.connections.map((conn: any) => ({
+                      ...conn,
+                      curUpload: 0,
+                      curDownload: 0,
+                    })),
+                    closedConnections: old.closedConnections,
+                  }
+                }
+
+                if (msg.type === 'delta') {
+                  const delta = msg.data
+
+                  // Sequence & Epoch Validation
+                  if (delta.epochId !== currentEpochId || delta.sequenceId !== lastSequenceId + 1) {
+                    console.warn('Sequence mismatch or epoch change. Triggering connection resync.')
+                    currentEpochId = null
+                    lastSequenceId = -1
+                    void scheduleReconnect()
+                    return old
+                  }
+
+                  lastSequenceId = delta.sequenceId
+
+                  const previousActive = old.activeConnections ?? []
+                  const previousClosed = old.closedConnections ?? []
+                  const activeMap = new Map<string, IConnectionsItem>()
+
+                  for (let i = 0; i < previousActive.length; i++) {
+                    activeMap.set(previousActive[i].id, { ...previousActive[i] })
+                  }
+
+                  // 1. Process Removals
+                  const dropped: IConnectionsItem[] = []
+                  for (let i = 0; i < delta.removed.length; i++) {
+                    const id = delta.removed[i]
+                    const conn = activeMap.get(id)
+                    if (conn) {
+                      activeMap.delete(id)
+                      dropped.push(conn)
+                    }
+                  }
+
+                  const updatedSet = new Set<string>()
+
+                  // 2. Process Updates (Flat 1D layout: [id1, up1, down1, id2, up2, down2, ...])
+                  for (let i = 0; i < delta.updated.length; i += 3) {
+                    const id = delta.updated[i] as string
+                    const upload = delta.updated[i + 1] as number
+                    const download = delta.updated[i + 2] as number
+                    const conn = activeMap.get(id)
+                    if (conn) {
+                      conn.curUpload = upload - conn.upload
+                      conn.curDownload = download - conn.download
+                      conn.upload = upload
+                      conn.download = download
+                      updatedSet.add(id)
+                    }
+                  }
+
+                  for (let i = 0; i < previousActive.length; i++) {
+                    const id = previousActive[i].id
+                    if (!updatedSet.has(id)) {
+                      const conn = activeMap.get(id)
+                      if (conn) {
+                        conn.curUpload = 0
+                        conn.curDownload = 0
+                      }
+                    }
+                  }
+
+                  // 3. Process Additions
+                  for (let i = 0; i < delta.added.length; i++) {
+                    const conn = delta.added[i]
+                    activeMap.set(conn.id, { ...conn, curUpload: 0, curDownload: 0 })
+                  }
+
+                  // 4. Optimize Reference Stability to prevent unnecessary React re-renders
+                  const activeConnections: IConnectionsItem[] = []
+                  for (let i = 0; i < previousActive.length; i++) {
+                    const prev = previousActive[i]
+                    const nextConn = activeMap.get(prev.id)
+                    if (nextConn) {
+                      if (
+                        prev.upload === nextConn.upload &&
+                        prev.download === nextConn.download &&
+                        prev.curUpload === 0 &&
+                        nextConn.curUpload === 0 &&
+                        prev.curDownload === 0 &&
+                        nextConn.curDownload === 0
+                      ) {
+                        activeConnections.push(prev)
+                      } else {
+                        activeConnections.push(nextConn)
+                      }
+                      activeMap.delete(prev.id)
+                    }
+                  }
+
+                  for (const conn of activeMap.values()) {
+                    activeConnections.push(conn)
+                  }
+
+                  // 5. Merge Closed Connections History
+                  const rawClosedLen = previousClosed.length + dropped.length
+                  let closedConnections: IConnectionsItem[]
+                  if (rawClosedLen <= MAX_CLOSED_CONNS_NUM) {
+                    closedConnections = previousClosed.concat(dropped)
+                  } else {
+                    const skipPrev = rawClosedLen - MAX_CLOSED_CONNS_NUM
+                    closedConnections =
+                      skipPrev >= previousClosed.length
+                        ? dropped.slice(skipPrev - previousClosed.length)
+                        : previousClosed.slice(skipPrev).concat(dropped)
+                  }
+
+                  return {
+                    uploadTotal: delta.uploadTotal ?? 0,
+                    downloadTotal: delta.downloadTotal ?? 0,
+                    activeConnections,
+                    closedConnections,
+                  }
+                }
+
+                return old
+              })
+            } catch (err) {
+              console.error('Failed to parse connections diff:', err)
+              next(err)
+            }
+          },
+        }
+      },
     })
 
   useEffect(() => {

@@ -39,7 +39,7 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
     buildSubscriptKey: (date) => (active ? `getClashTraffic-${date}` : null),
     fallbackData: FALLBACK_TRAFFIC,
     connect: () => MihomoWebSocket.connect_traffic(),
-    throttleMs: 200,
+    throttleMs: 3000,
     setupHandlers: ({ next, scheduleReconnect }) => {
       let activeUpTotal = 0
       let activeDownTotal = 0
