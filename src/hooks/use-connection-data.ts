@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { getConnections, MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 import { useVisibility } from '@/hooks/use-visibility'
+import { getConnections, MihomoWebSocket } from 'tauri-plugin-mihomo-api'
+
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 

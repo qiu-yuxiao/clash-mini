@@ -4,29 +4,8 @@ import {
   readProfileFile,
   saveProfileFile,
   enhanceProfiles,
-  calcuProxies,
 } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
-
-// 智能获取主代理组名称
-const findMainProxyGroup = async (): Promise<string> => {
-  try {
-    const proxies = await calcuProxies()
-    const groups = proxies.groups || []
-    if (groups.length === 0) return 'GLOBAL'
-
-    const selectGroups = groups.filter((g) => g.type === 'select')
-    const commonPattern = /proxy|选择|手动|select|node|节点/i
-    const matched = selectGroups.find((g) => commonPattern.test(g.name))
-    if (matched) return matched.name
-
-    if (selectGroups.length > 0) return selectGroups[0].name
-    return groups[0].name
-  } catch (e) {
-    console.error('Failed to get main proxy group:', e)
-    return 'PROXY'
-  }
-}
 
 // 核心功能：添加快捷分流规则到全局 Merge 的 prepend-rules 中 (置顶生效)
 export const addQuickRoutingRule = async (
@@ -40,7 +19,7 @@ export const addQuickRoutingRule = async (
     // 1. 获取主代理组名称 (如果是代理，则需要目标代理组名；如果是封锁，使用 REJECT；如果是直连，使用 DIRECT)
     let proxyGroup = 'DIRECT'
     if (target === 'PROXY') {
-      proxyGroup = await findMainProxyGroup()
+      proxyGroup = 'PROXY'
     } else if (target === 'REJECT') {
       proxyGroup = 'REJECT'
     }

@@ -23,6 +23,7 @@ export const useVisibility = () => {
 
   useEffect(() => {
     if (rawVisible) {
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
       setDebouncedVisible(true)
     } else {
       const timer = setTimeout(() => {

@@ -208,50 +208,9 @@ const META_MAP = {
   'linux-loong64': 'mihomo-linux-loong64',
 }
 
-// =======================
-// Fetch latest versions
-// =======================
-async function getLatestAlphaVersion() {
-  META_ALPHA_VERSION = "v1.19.26";
-  log_info(`Latest alpha version locked to: ${META_ALPHA_VERSION}`);
-  return;
-  if (!FORCE) {
-    const cached = await getCachedVersion('META_ALPHA_VERSION')
-    if (cached) {
-      META_ALPHA_VERSION = cached
-      return
-    }
-  }
-  const options = {}
-  const httpProxy =
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy ||
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy
-  if (httpProxy) options.agent = new HttpsProxyAgent(httpProxy)
 
-  try {
-    const response = await fetch(META_ALPHA_VERSION_URL, {
-      ...options,
-      method: 'GET',
-    })
-    if (!response.ok)
-      throw new Error(
-        `Failed to fetch ${META_ALPHA_VERSION_URL}: ${response.status}`,
-      )
-    META_ALPHA_VERSION = (await response.text()).trim()
-    log_info(`Latest alpha version: ${META_ALPHA_VERSION}`)
-    await setCachedVersion('META_ALPHA_VERSION', META_ALPHA_VERSION)
-  } catch (err) {
-    log_error('Error fetching latest alpha version:', err.message)
-    process.exit(1)
-  }
-}
 
 async function getLatestReleaseVersion() {
-  META_VERSION = "v1.19.26";
-  log_info(`Latest release version locked to: ${META_VERSION}`);
-  return;
   if (!FORCE) {
     const cached = await getCachedVersion('META_VERSION')
     if (cached) {
@@ -304,8 +263,8 @@ function clashMetaAlpha() {
     name: 'mini-mihomo-alpha',
     targetFile: `mini-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
     exeFile: `${name}${isWin ? '.exe' : ''}`,
-    zipFile: `${name}-${META_ALPHA_VERSION}.${urlExt}`,
-    downloadURL: `${META_URL_PREFIX}/${META_ALPHA_VERSION}/${name}-${META_ALPHA_VERSION}.${urlExt}`,
+    zipFile: `${name}-${META_VERSION}.${urlExt}`,
+    downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
   }
 }
 
@@ -761,7 +720,7 @@ const tasks = [
   {
     name: 'mini-mihomo-alpha',
     func: () =>
-      getLatestAlphaVersion().then(() => resolveSidecar(clashMetaAlpha())),
+      getLatestReleaseVersion().then(() => resolveSidecar(clashMetaAlpha())),
     retry: 5,
   },
   {

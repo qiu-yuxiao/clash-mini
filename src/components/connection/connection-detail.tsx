@@ -3,10 +3,11 @@ import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
-import { closeConnection } from 'tauri-plugin-mihomo-api'
+
 
 import { get3DButtonStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
+import { closeConnection } from 'tauri-plugin-mihomo-api'
 
 export interface ConnectionDetailRef {
   open: (detail: IConnectionsItem, closed: boolean, el?: HTMLElement) => void

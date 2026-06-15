@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback } from 'react'
-import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
+
 
 import {
   calcuProxies,
@@ -10,6 +10,7 @@ import {
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
 import { debugLog } from '@/utils/debug'
+import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 
 export const useProfiles = () => {
   const {

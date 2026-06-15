@@ -40,21 +40,17 @@ import {
   Theme,
 } from '@mui/material'
 import { alpha } from '@mui/material'
-import { open } from '@tauri-apps/plugin-shell'
+import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { getVersion as getAppVersion } from '@tauri-apps/api/app'
+import { open } from '@tauri-apps/plugin-shell'
 import { check } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
-import {
-  healthcheckProxyProvider,
-  closeAllConnections,
-  selectNodeForGroup,
-} from 'tauri-plugin-mihomo-api'
+
 
 import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
@@ -109,6 +105,11 @@ import {
 } from '@/utils/button-styles'
 import getSystem from '@/utils/get-system'
 import parseTraffic from '@/utils/parse-traffic'
+import {
+  healthcheckProxyProvider,
+  closeAllConnections,
+  selectNodeForGroup,
+} from 'tauri-plugin-mihomo-api'
 
 import {
   useCustomTheme,

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLockFn } from 'ahooks'
-import { getVersion } from 'tauri-plugin-mihomo-api'
+
 
 import {
   getClashInfo,
@@ -8,6 +8,7 @@ import {
   patchClashConfig,
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import { getVersion } from 'tauri-plugin-mihomo-api'
 
 type MutateClashUpdater =
   | ((old: IConfigData | undefined) => IConfigData | undefined)

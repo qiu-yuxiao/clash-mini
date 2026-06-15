@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { useTheme } from '@mui/material'
+import { useEffect, useState } from 'react'
 
 /**
  * GlowBorder
@@ -30,7 +30,7 @@ export const GlowBorder = () => {
     }
   }, [])
 
-  let borderStyle: React.CSSProperties = {}
+  let borderStyle: React.CSSProperties
 
   switch (controlSkin) {
     case 'retro-3d':

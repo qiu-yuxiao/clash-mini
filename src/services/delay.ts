@@ -1,6 +1,6 @@
+import { debugLog } from '@/utils/debug'
 import { delayProxyByName, ProxyDelay } from 'tauri-plugin-mihomo-api'
 
-import { debugLog } from '@/utils/debug'
 
 const hashKey = (name: string, group: string) => `${group ?? ''}::${name}`
 

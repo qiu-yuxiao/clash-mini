@@ -43,14 +43,11 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
     setupHandlers: ({ next, scheduleReconnect }) => {
       let activeUpTotal = 0
       let activeDownTotal = 0
-      let initialized = false
-
       const init = async () => {
         try {
           const res = await getConnections()
           activeUpTotal = res.uploadTotal ?? 0
           activeDownTotal = res.downloadTotal ?? 0
-          initialized = true
         } catch (err) {
           console.warn('[useTrafficData] Failed to fetch initial connection totals:', err)
         }

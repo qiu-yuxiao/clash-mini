@@ -1,10 +1,11 @@
 import { invoke } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
 import yaml from 'js-yaml'
-import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
+
 
 import { showNotice } from '@/services/notice-service'
 import { debugLog } from '@/utils/debug'
+import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
 export async function copyClashEnv() {
   return invoke<void>('copy_clash_env')

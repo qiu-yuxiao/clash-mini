@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRef } from 'react'
-import { closeAllConnections } from 'tauri-plugin-mihomo-api'
+
 
 import { useVerge } from '@/hooks/use-verge'
 import { useClashConfigData, useSystemData } from '@/providers/app-data-context'
 import { getAutotemProxy } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 // 系统代理状态检测统一逻辑
 export const useSystemProxyState = () => {

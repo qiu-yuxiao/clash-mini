@@ -1,12 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  getBaseConfig,
-  getRuleProviders,
-  getRules,
-  getProxyByName,
-} from 'tauri-plugin-mihomo-api'
+
 
 import { useVerge } from '@/hooks/use-verge'
 import {
@@ -17,6 +12,12 @@ import {
   getSystemProxy,
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import {
+  getBaseConfig,
+  getRuleProviders,
+  getRules,
+  getProxyByName,
+} from 'tauri-plugin-mihomo-api'
 
 import {
   ClashConfigContext,

@@ -1,14 +1,15 @@
 import { useCallback, useMemo, useRef } from 'react'
-import {
-  closeConnection,
-  getConnections,
-  selectNodeForGroup,
-} from 'tauri-plugin-mihomo-api'
+
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { syncTrayProxySelection } from '@/services/cmds'
 import { debugLog } from '@/utils/debug'
+import {
+  closeConnection,
+  getConnections,
+  selectNodeForGroup,
+} from 'tauri-plugin-mihomo-api'
 
 // 缓存连接清理
 const cleanupConnections = async (previousProxy: string) => {

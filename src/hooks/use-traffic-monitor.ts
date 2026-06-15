@@ -6,11 +6,12 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Traffic } from 'tauri-plugin-mihomo-api'
+
 
 import { useVisibility } from '@/hooks/use-visibility'
 import { debugLog } from '@/utils/debug'
 import { TrafficDataSampler, formatTrafficName } from '@/utils/traffic-sampler'
+import { Traffic } from 'tauri-plugin-mihomo-api'
 
 // 引用计数管理器
 class ReferenceCounter {

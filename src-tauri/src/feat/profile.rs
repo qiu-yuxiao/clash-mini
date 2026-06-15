@@ -1,67 +1,13 @@
 use crate::{
-    cmd,
     config::{Config, PrfItem, PrfOption, profiles::profiles_draft_update_item_safe},
-    core::{CoreManager, handle, tray, validate::ValidationOutcome},
+    core::{CoreManager, handle, validate::ValidationOutcome},
     utils::help::{mask_err, mask_url},
 };
 use anyhow::{Result, bail};
-use clash_verge_logging::{Type, logging, logging_error};
+use clash_verge_logging::{Type, logging};
 use smartstring::alias::String;
-use tauri::Emitter as _;
 
-/// Toggle proxy profile
-pub async fn toggle_proxy_profile(profile_index: String) {
-    logging_error!(
-        Type::Config,
-        cmd::patch_profiles_config_by_profile_index(profile_index).await
-    );
-}
 
-pub async fn switch_proxy_node(group_name: &str, proxy_name: &str) {
-    match handle::Handle::mihomo()
-        .await
-        .select_node_for_group(group_name, proxy_name)
-        .await
-    {
-        Ok(_) => {
-            logging!(info, Type::Tray, "切换代理成功: {} -> {}", group_name, proxy_name);
-            let _ = handle::Handle::app_handle().emit("verge://refresh-proxy-config", ());
-            let _ = tray::Tray::global().update_menu().await;
-            return;
-        }
-        Err(err) => {
-            logging!(
-                error,
-                Type::Tray,
-                "切换代理失败: {} -> {}, 错误: {:?}",
-                group_name,
-                proxy_name,
-                err
-            );
-        }
-    }
-
-    match handle::Handle::mihomo()
-        .await
-        .select_node_for_group(group_name, proxy_name)
-        .await
-    {
-        Ok(_) => {
-            logging!(info, Type::Tray, "代理切换回退成功: {} -> {}", group_name, proxy_name);
-            let _ = tray::Tray::global().update_menu().await;
-        }
-        Err(err) => {
-            logging!(
-                error,
-                Type::Tray,
-                "代理切换最终失败: {} -> {}, 错误: {:?}",
-                group_name,
-                proxy_name,
-                err
-            );
-        }
-    }
-}
 
 async fn should_update_profile(uid: &String, ignore_auto_update: bool) -> Result<Option<(String, Option<PrfOption>)>> {
     let profiles = Config::profiles().await;

@@ -307,17 +307,7 @@ pub async fn patch_profiles_config(profiles: IProfiles) -> CmdResult<ValidationO
     perform_config_update(target_profile, previous_profile.as_ref()).await
 }
 
-/// 根据profile name修改profiles
-#[tauri::command]
-pub async fn patch_profiles_config_by_profile_index(profile_index: String) -> CmdResult<ValidationOutcome> {
-    logging!(info, Type::Cmd, "切换配置到: {}", profile_index);
 
-    let profiles = IProfiles {
-        current: Some(profile_index),
-        items: None,
-    };
-    patch_profiles_config(profiles).await
-}
 
 /// 修改某个profile item的
 #[tauri::command]
