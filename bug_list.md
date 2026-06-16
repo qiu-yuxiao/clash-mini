@@ -34,40 +34,17 @@
 * **修改方针**：在 `button-styles.ts` 中根据 `variant` 动态设置文字颜色：对于实心（contained）默认按钮，将深色模式下的文字颜色调整为高对比度的深古铜黑 `#2C1F03`；对于描边（outlined）默认按钮，由于其背景是半透明深古铜，仍保持 `#FFE082` 以确保可读性。
 * **状态**：代码已修正，待确认。
 
-### **BUG-081** (导入或更新订阅链接后，节点列表不会立即更新，通常需要等待两分钟)
-* **缺陷描述与现象**：当导入新订阅链接或手动更新已有订阅时，主页的节点列表和测速选点逻辑不会立刻刷新，往往需要等待两分钟或手动切换配置才能看到最新的节点数据。
-* **排查原因与记忆**：
-  1. **手动更新订阅缺少触发链**：在 `handleUpdateProfile` 中，当更新当前激活的 profile 时，仅调用了 `enhanceProfiles()` 重载 Clash 核心配置，但没有调用 `triggerAutoSelectFastestNode` 或 `refreshProxy`，导致前端代理列表没有任何触发刷新机制。
-  2. **刷新接口无数据返回**：在 `app-data-provider.tsx` 的 `refreshProxy` 定义中，内部调用了 `await _refetchProxy()`，但未添加 `return` 语句。这导致 `refreshProxy()` 的返回值始终为 `undefined`。
-  3. **轮询机制抢跑失效**：因为 `refreshProxy` 返回 `undefined`，`triggerAutoSelectFastestNode` 在等待 Clash 核心重载的 while 循环中执行 `const freshProxies = await refreshProxy(...)` 时得到的也是 `undefined`，于是直接降级并使用旧的 proxies 缓存。在旧缓存中 `PROXY` 组已存在节点，导致 while 循环立即 break 退出。最终，选点测速均作用在旧节点上，新节点无法立即展示与测试。
-* **修改方针**：
-  1. **补全刷新接口 of 返回值**：在 `app-data-provider.tsx` 的 `refreshProxy` 中增加 `return await _refetchProxy()`。
-  2. **完善更新订阅的触发链**：在 `handleUpdateProfile` 中，若更新的是当前 active 的 profile，在 `enhanceProfiles()` 完成后，强制调用 `triggerAutoSelectFastestNode(currentProfileUid)` 触发测速和刷新。
-  3. **延迟轮询抢跑**：在 `triggerAutoSelectFastestNode` 开始轮询前，增加 `1500ms` 的短延时，确保 Clash 核心有足够的时间完成配置读取与应用，使首次 `refreshProxy` 能获取到真实的新配置节点。
-* **状态**：排查中。
-
-
-### **BUG-089** (后台监测活跃节点延迟高频误报，导致正常的低延迟活跃节点被强制切换)
-* **缺陷描述与现象**：在大窗口模式下，后台对活跃节点进行定期测速监测。然而，即使当前活跃节点测速非常快（如 100ms 级别），后台依然会在监测 3 次后强制将其切换到其他节点。且一旦切换到测速最快的特定节点后，便不再发生切换动作。
-* **排查原因与记忆**：
-  1. **Tauri 后端 API 被遗漏删除**：先前重构引入 `tauri-plugin-mihomo` 时，删除了旧的 `clash_api_get_proxy_delay` 后端命令。然而前端服务 `src/services/cmds.ts` 中的 `cmdGetProxyDelay` 仍然在使用硬编码的 `clash_api_get_proxy_delay` 字符串发起 invoke 调用。
-  2. **永远返回超时错误**：由于该后端命令不存在，invoke 调用总是报错。`cmdGetProxyDelay` 内部的 try-catch 拦截了错误并直接退回到 `{ delay: 1e6 }`（代表超时）。因此，后台监测器 `checkNode` 始终认为活跃节点延迟极高，并在连续 3 次失败后强行触发自动重新选点。
-  3. **稳定特定节点的假象**：当自动选点切到了真实延迟最低的那个特定节点（Node A）后，`checkNode` 依然会持续触发后台自动选点。但由于测速结果显示 Node A 依然是最快的，自动选点会重新选择 Node A（即它自己）。此时 `isSameNode && isBackground` 为真，不产生通知和 UI 改变，造成了“切换动作静止”的假象。
-* **修改方针**：
-  1. 修改 `src/services/cmds.ts`，从 `tauri-plugin-mihomo-api` 引入正确的延迟测试接口 `delayProxyByName`。
-  2. 重构 `cmdGetProxyDelay` 函数，使用 `delayProxyByName(name, testUrl, timeout)` 代替之前已失效的 Tauri invoke 命令。
-* **状态**：代码已修正，待确认。
-
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
-| **BUG-083** | 程序启动后测速选定节点未在用户筛选的子集中，需手动干预后才生效的问题。 | v1.2.9 | 代码已修正，已确认 |
-| **BUG-084** | 自动测速选择逻辑中存在冗余/层层叠加的 dummy 节点过滤的问题。 | v1.2.9 | 代码已修正，已确认 |
-| **BUG-087** | 将现有的 Retro-3D 风格在 UI 中改名为 Trump-3D，并重构其视觉样式为奢华黄金金条风格。 | v1.2.9 | 代码已修正，已确认 |
-| **BUG-086** | 窄视口模式下底部的流量曲线图高频跌落至零并呈现锯齿状断裂的问题。 | v1.2.9 | 代码已修正，已确认 |
-| **BUG-085** | 自动刷新检测节点健康时，频现“所有线路都繁忙”误报弹窗，且后台检查无静默运行的问题。 | v1.2.9 | 代码已修正，已确认 |
+| **BUG-089** | 后台监测活跃节点延迟高频误报，导致正常的低延迟活跃节点被强制切换的问题。 | v1.3.0 | 代码已修正，已确认 |
+| **BUG-081** | 导入或更新订阅链接后，节点列表不会立即更新，通常需要等待两分钟的问题。 | v1.3.0 | 代码已修正，已确认 |
+| **BUG-083** | 程序启动后测速选定节点未在用户筛选的子集中，需手动干预后才生效的问题。 | v1.3.0 | 代码已修正，已确认 |
+| **BUG-084** | 自动测速选择逻辑中存在冗余/层层叠加的 dummy 节点过滤的问题。 | v1.3.0 | 代码已修正，已确认 |
+| **BUG-087** | 将现有的 Retro-3D 风格在 UI 中改名为 Trump-3D，并重构其视觉样式为奢华黄金金条风格。 | v1.3.0 | 代码已修正，已确认 |
+| **BUG-086** | 窄视口模式下底部的流量曲线图高频跌落至零并呈现锯齿状断裂的问题。 | v1.3.0 | 代码已修正，已确认 |
+| **BUG-085** | 自动刷新检测节点健康时，频现“所有线路都繁忙”误报弹窗，且后台检查无静默运行的问题。 | v1.3.0 | 代码已修正，已确认 |
 
 | **BUG-080** | 内核或程序更新检查时版本一致会直接弹出更新对话框，且如果在升级逻辑中触发了相同版本的升级，未在各层级安全熔断并显示正确的友好通知。 | v1.2.6 | 代码已修正，已确认 |
 | **BUG-078** | 在客户端中点击检查并尝试升级 Mihomo 内核时，内核无法成功下载或升级，没有做超时和多重代理检测。 | v1.2.5 | 代码已修正，已确认 |
