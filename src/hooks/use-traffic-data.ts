@@ -1,4 +1,8 @@
-import { getConnections, MihomoWebSocket, Traffic } from 'tauri-plugin-mihomo-api'
+import {
+  getConnections,
+  MihomoWebSocket,
+  Traffic,
+} from 'tauri-plugin-mihomo-api'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useTrafficMonitorEnhanced } from './use-traffic-monitor'
@@ -39,7 +43,7 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
     buildSubscriptKey: (date) => (active ? `getClashTraffic-${date}` : null),
     fallbackData: FALLBACK_TRAFFIC,
     connect: () => MihomoWebSocket.connect_traffic(),
-    throttleMs: 3000,
+    throttleMs: 1000,
     setupHandlers: ({ next, scheduleReconnect }) => {
       let activeUpTotal = 0
       let activeDownTotal = 0
@@ -49,7 +53,10 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
           activeUpTotal = res.uploadTotal ?? 0
           activeDownTotal = res.downloadTotal ?? 0
         } catch (err) {
-          console.warn('[useTrafficData] Failed to fetch initial connection totals:', err)
+          console.warn(
+            '[useTrafficData] Failed to fetch initial connection totals:',
+            err,
+          )
         }
       }
 
