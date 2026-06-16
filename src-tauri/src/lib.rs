@@ -19,7 +19,7 @@ use crate::constants::files;
 use crate::{
     core::handle,
     process::AsyncHandler,
-    utils::{resolve, server},
+    utils::{resolve, server, window_manager::WindowManager},
 };
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
@@ -445,6 +445,15 @@ pub fn run() {
             }
             tauri::WindowEvent::Focused(focused) => {
                 event_handlers::handle_window_focus(focused);
+                if let Some(window) = WindowManager::get_main_window() {
+                    let is_minimized = window.is_minimized().unwrap_or(false);
+                    let is_visible = window.is_visible().unwrap_or(false);
+                    if !focused && (is_minimized || !is_visible) {
+                        WindowManager::optimize_window_memory(&window, true);
+                    } else if focused {
+                        WindowManager::optimize_window_memory(&window, false);
+                    }
+                }
             }
             #[cfg(target_os = "macos")]
             tauri::WindowEvent::Destroyed => {

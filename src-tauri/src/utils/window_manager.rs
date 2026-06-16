@@ -342,7 +342,7 @@ impl WindowManager {
 
     /// 优化窗口内存占用（在 Windows 下当窗口隐藏或最小化时将 WebView 内存级别设为 Low，激活时设为 Normal）
     #[allow(unused_variables)]
-    fn optimize_window_memory(window: &WebviewWindow<Wry>, is_inactive: bool) {
+    pub fn optimize_window_memory(window: &WebviewWindow<Wry>, is_inactive: bool) {
         #[cfg(target_os = "windows")]
         {
             use webview2_com::Microsoft::Web::WebView2::Win32::{
