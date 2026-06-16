@@ -47,6 +47,18 @@
 * **状态**：排查中。
 
 
+### **BUG-089** (后台监测活跃节点延迟高频误报，导致正常的低延迟活跃节点被强制切换)
+* **缺陷描述与现象**：在大窗口模式下，后台对活跃节点进行定期测速监测。然而，即使当前活跃节点测速非常快（如 100ms 级别），后台依然会在监测 3 次后强制将其切换到其他节点。且一旦切换到测速最快的特定节点后，便不再发生切换动作。
+* **排查原因与记忆**：
+  1. **Tauri 后端 API 被遗漏删除**：先前重构引入 `tauri-plugin-mihomo` 时，删除了旧的 `clash_api_get_proxy_delay` 后端命令。然而前端服务 `src/services/cmds.ts` 中的 `cmdGetProxyDelay` 仍然在使用硬编码的 `clash_api_get_proxy_delay` 字符串发起 invoke 调用。
+  2. **永远返回超时错误**：由于该后端命令不存在，invoke 调用总是报错。`cmdGetProxyDelay` 内部的 try-catch 拦截了错误并直接退回到 `{ delay: 1e6 }`（代表超时）。因此，后台监测器 `checkNode` 始终认为活跃节点延迟极高，并在连续 3 次失败后强行触发自动重新选点。
+  3. **稳定特定节点的假象**：当自动选点切到了真实延迟最低的那个特定节点（Node A）后，`checkNode` 依然会持续触发后台自动选点。但由于测速结果显示 Node A 依然是最快的，自动选点会重新选择 Node A（即它自己）。此时 `isSameNode && isBackground` 为真，不产生通知和 UI 改变，造成了“切换动作静止”的假象。
+* **修改方针**：
+  1. 修改 `src/services/cmds.ts`，从 `tauri-plugin-mihomo-api` 引入正确的延迟测试接口 `delayProxyByName`。
+  2. 重构 `cmdGetProxyDelay` 函数，使用 `delayProxyByName(name, testUrl, timeout)` 代替之前已失效的 Tauri invoke 命令。
+* **状态**：代码已修正，待确认。
+
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。

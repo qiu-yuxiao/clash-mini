@@ -5,7 +5,7 @@ import yaml from 'js-yaml'
 
 import { showNotice } from '@/services/notice-service'
 import { debugLog } from '@/utils/debug'
-import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
+import { getProxies, getProxyProviders, delayProxyByName } from 'tauri-plugin-mihomo-api'
 import { isDummyNode } from '@/utils/node'
 
 export async function copyClashEnv() {
@@ -451,15 +451,8 @@ export async function cmdGetProxyDelay(
   const testUrl = url || 'http://cp.cloudflare.com/generate_204'
 
   try {
-    // 不再在前端编码代理名称，由后端统一处理编码
-    const result = await invoke<{ delay: number }>(
-      'clash_api_get_proxy_delay',
-      {
-        name,
-        url: testUrl, // 传递经过验证的URL
-        timeout,
-      },
-    )
+    // 调用 tauri-plugin-mihomo 提供的正常延迟测试函数
+    const result = await delayProxyByName(name, testUrl, timeout)
 
     // 验证返回结果中是否有delay字段，并且值是一个有效的数字
     if (result && typeof result.delay === 'number') {

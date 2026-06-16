@@ -2223,3 +2223,13 @@
 - **基于 COM 接口的底层交互实现**：
   - 必须利用 Tauri 的 `with_webview` 底层接口，并在 unsafe 块下安全调用 Windows COM 接口。
   - 将 `ICoreWebView2Controller::CoreWebView2()` 返回的 `ICoreWebView2` 通过 `.cast::<ICoreWebView2_19>()` 转换为高版本子接口，并调用 `.SetMemoryUsageTargetLevel(...)` 完成切换，确保兼容性并处理可能的降级/错误日志记录。
+
+## ⚡ 二十一、 后台活跃节点延迟监测与调用接口规范 (BUG-089)
+为了防止后台活跃节点延迟监测程序因后端 API 调整产生误报和频繁强制重新选点，制定以下规范：
+- **调用可用插件接口 (delayProxyByName)**：
+  - 后台周期性健康监测函数 `checkNode`（位于 `_layout.tsx`）在获取活跃节点延迟时，其依赖的前端服务 `cmdGetProxyDelay` 必须调用 `tauri-plugin-mihomo-api` 导出的标准延迟测速函数 `delayProxyByName`。
+  - 严禁在前端硬编码或调用已废弃的 Tauri 后端命令（例如已删除的 `clash_api_get_proxy_delay`），以防 invoke 触发 Command Not Found 错误被 Catch 机制遮蔽，从而产生节点永远超时的误判。
+- **自动选点提示静默机制**：
+  - 在触发 `triggerAutoSelectFastestNode` 后台自动选点时，必须通过传参区分后台运行（`isBackground = true`）与手动测速。
+  - 对于后台运行且选出的最快节点与当前活跃节点完全一致（`isSameNode && isBackground`）的情况，必须完全静默，禁止向用户弹出任何成功或提示弹窗，防止高频通知打扰用户。
+
