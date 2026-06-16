@@ -16,7 +16,7 @@ Any AI Agent performing tasks in this repository must comply with the following 
 
 ### 2. 独立提交律 (Law of Transparency & Isolated Commit)
 * **Rule**: 
-  1. Before fixing a bug, register it in [`bug_list.md`](../bug_list.md) under the "Active & Pending Bugs" section (setting its status to `代码已修正，待确认`).
+  1. Before fixing a bug, register it in [`bug_list.md`](../bug_list.md) under the "Active & Pending Bugs" section (setting its status to `代码已修正，待用户确认`).
   2. Any modification to documentation (like `clash_mini_agreements.md` or `bug_list.md`) **must be committed separately** before writing or modifying any business logic code.
 * **Prohibition**: Silent fixes (modifying code without documenting/registering changes first) are strictly prohibited.
 

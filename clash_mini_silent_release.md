@@ -32,7 +32,7 @@
 ## 🚀 模块二：云端静默发布与监控 (Remote Release)
 
 1. **协议与缺陷登记**（修改顺序铁律）：
-   - 在 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 登记新特性/修改，在 [bug_list.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/bug_list.md) 登记 Bug 状态为“代码已修正，待确认”。
+   - 在 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 登记新特性/修改，在 [bug_list.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/bug_list.md) 登记 Bug 状态为“代码已修正，待用户确认”。
    - **先独立提交文档**：运行 `git add` 仅包含协议与 Bug List，执行 `git commit -m "docs: register changes" --no-verify` 提交。
 2. **静态资产校验**（云端发布唯一的防线）：
    - 运行前端编译：`pnpm web:build`。若有任何报错/警告，必须立即中止。

@@ -19,7 +19,7 @@ Every Agent or automated workflow acting on this repository must comply with the
 
 ### 2. 独立提交律 (Law of Transparency & Isolated Commit)
 * **要求**：
-  1. 修复 Bug 前必须先在 [`bug_list.md`](../../bug_list.md) 中以卡片形式登记（状态为 `代码已修正，待确认`）。
+  1. 修复 Bug 前必须先在 [`bug_list.md`](../../bug_list.md) 中以卡片形式登记（状态为 `代码已修正，待用户确认`）。
   2. 修改任何协议或发行文档后，**必须执行独立的 Git 提交（Git Commit）**，然后才能修改业务代码。
 * **禁止**：严禁进行“默默顺手修复（Silent Fix）”。
 
