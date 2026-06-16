@@ -28,12 +28,6 @@
   3. 当窗口最小化/托盘隐藏（`is_inactive: true`）时，调用 `SetMemoryUsageTargetLevel(COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW)`。当窗口重新获得焦点/可见时，恢复 `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL`。
 * **状态**：代码已修正，待确认。
 
-### **BUG-083** (程序启动后测试选定节点非筛选子集中的节点，需人工手动干预后才在子集中轮换)
-* **缺陷描述与现象**：程序启动后，自动选定或测试的节点并不是用户筛选出的子集节点，必须要经过人工手动干预后，才会在筛选出的子集内进行正常的测试与选点轮换。
-* **排查原因与记忆**：在 `_layout.tsx` 的 `triggerAutoSelectFastestNode` 函数中，对 localStorage 内 `proxy-head-state` 的读取依赖于 `profiles?.current || latestData?.current || ''` 作为 profile ID。然而在程序启动时，该 React Hook 中的 profiles 引用可能为空或尚未初始化完成，导致解析出的 profile ID 为 `""`，从而未能读取到用户筛选的过滤条件（filterText）。
-* **修改方针**：直接使用 `triggerAutoSelectFastestNode` 接收到的 `profileUid` 参数（该参数在启动和切换时是准确的最新值），避免依赖闭包中可能过时的 state。
-* **状态**：代码已修正，待确认。
-
 ### **BUG-088** (Trump-3D 皮肤在深色模式下默认按钮的文字几乎看不清)
 * **缺陷描述与现象**：在 Trump-3D (retro-3d) 皮肤的深色（Dark）模式下，默认按钮（contained variant）的文本颜色为 `#FFE082` (浅金黄色)。由于默认按钮在深色模式下的背景是高亮金黄色到橙色渐变，这导致浅金黄色的文字几乎与背景混为一体，极难辨认。
 * **排查原因与记忆**：默认按钮的文字颜色在深色模式下被硬编码为了亮金色 `#FFE082`，而未区分其是实心按钮（contained）还是描边按钮（outlined）。
@@ -57,6 +51,7 @@
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
+| **BUG-083** | 程序启动后测速选定节点未在用户筛选的子集中，需手动干预后才生效的问题。 | v1.2.9 | 代码已修正，已确认 |
 | **BUG-084** | 自动测速选择逻辑中存在冗余/层层叠加的 dummy 节点过滤的问题。 | v1.2.9 | 代码已修正，已确认 |
 | **BUG-087** | 将现有的 Retro-3D 风格在 UI 中改名为 Trump-3D，并重构其视觉样式为奢华黄金金条风格。 | v1.2.9 | 代码已修正，已确认 |
 | **BUG-086** | 窄视口模式下底部的流量曲线图高频跌落至零并呈现锯齿状断裂的问题。 | v1.2.9 | 代码已修正，已确认 |
