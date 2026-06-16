@@ -45,6 +45,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-shell'
 import { check } from '@tauri-apps/plugin-updater'
+import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -1441,6 +1442,112 @@ const Layout = () => {
   // Profiles State
   const [url, setUrl] = useState('')
   const [profileLoading, setProfileLoading] = useState(false)
+
+  // Context Menu State for Import Subscription Input Field (BUG-091)
+  const [importInputContextMenu, setImportInputContextMenu] = useState<{
+    mouseX: number
+    mouseY: number
+  } | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImportInputPaste = async () => {
+    setImportInputContextMenu(null)
+    let textToPaste = ''
+    try {
+      textToPaste = await readText()
+    } catch (err) {
+      try {
+        textToPaste = await navigator.clipboard.readText()
+      } catch (e) {
+        console.error('Failed to read from clipboard:', e)
+      }
+    }
+
+    if (!textToPaste) return
+
+    const input = importInputRef.current
+    if (input) {
+      const start = input.selectionStart ?? 0
+      const end = input.selectionEnd ?? 0
+      const currentVal = url || ''
+      const newValue = currentVal.substring(0, start) + textToPaste + currentVal.substring(end)
+      setUrl(newValue)
+      setTimeout(() => {
+        input.focus()
+        const newCursorPos = start + textToPaste.length
+        input.setSelectionRange(newCursorPos, newCursorPos)
+      }, 0)
+    } else {
+      setUrl(textToPaste)
+    }
+  }
+
+  const handleImportInputCopy = async () => {
+    setImportInputContextMenu(null)
+    const input = importInputRef.current
+    if (input) {
+      const start = input.selectionStart ?? 0
+      const end = input.selectionEnd ?? 0
+      const selectedText = (url || '').substring(start, end)
+      if (selectedText) {
+        try {
+          await writeText(selectedText)
+        } catch (err) {
+          try {
+            await navigator.clipboard.writeText(selectedText)
+          } catch (e) {
+            console.error('Failed to copy to clipboard:', e)
+          }
+        }
+      }
+    }
+  }
+
+  const handleImportInputCut = async () => {
+    setImportInputContextMenu(null)
+    const input = importInputRef.current
+    if (input) {
+      const start = input.selectionStart ?? 0
+      const end = input.selectionEnd ?? 0
+      const currentVal = url || ''
+      const selectedText = currentVal.substring(start, end)
+      if (selectedText) {
+        try {
+          await writeText(selectedText)
+        } catch (err) {
+          try {
+            await navigator.clipboard.writeText(selectedText)
+          } catch (e) {
+            console.error('Failed to copy to clipboard:', e)
+          }
+        }
+        const newValue = currentVal.substring(0, start) + currentVal.substring(end)
+        setUrl(newValue)
+        setTimeout(() => {
+          input.focus()
+          input.setSelectionRange(start, start)
+        }, 0)
+      }
+    }
+  }
+
+  const handleImportInputSelectAll = () => {
+    setImportInputContextMenu(null)
+    const input = importInputRef.current
+    if (input) {
+      input.focus()
+      input.setSelectionRange(0, (url || '').length)
+    }
+  }
+
+  const handleImportInputClear = () => {
+    setImportInputContextMenu(null)
+    setUrl('')
+    const input = importInputRef.current
+    if (input) {
+      input.focus()
+    }
+  }
 
   // Context Menu State for Profile Card (BUG-072)
   const [profileMenuAnchorPosition, setProfileMenuAnchorPosition] = useState<{
@@ -2880,6 +2987,14 @@ const Layout = () => {
                     }}
                   >
                     <TextField
+                      inputRef={importInputRef}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        setImportInputContextMenu({
+                          mouseX: e.clientX,
+                          mouseY: e.clientY,
+                        })
+                      }}
                       placeholder={t('settings.mini.importPlaceholder', {
                         defaultValue: '填入订阅链接/节点配置...',
                       })}
@@ -4622,6 +4737,76 @@ const Layout = () => {
           }}
         >
           ❌ 删除
+        </MenuItem>
+      </Menu>
+
+      {/* Import Input Context Menu (BUG-091) */}
+      <Menu
+        anchorReference="anchorPosition"
+        anchorPosition={
+          importInputContextMenu !== null
+            ? {
+                top: importInputContextMenu.mouseY,
+                left: importInputContextMenu.mouseX,
+              }
+            : undefined
+        }
+        open={importInputContextMenu !== null}
+        onClose={() => setImportInputContextMenu(null)}
+        slotProps={{
+          paper: {
+            className: 'theme-panel',
+            sx: {
+              minWidth: '160px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              backgroundColor: 'transparent',
+              backgroundImage: 'none',
+              boxShadow: 'none',
+              '& .MuiList-root': {
+                padding: '4px 0',
+              },
+            },
+          },
+        }}
+      >
+        <MenuItem
+          onClick={handleImportInputCut}
+          disabled={!importInputRef.current || importInputRef.current.selectionStart === importInputRef.current.selectionEnd}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          ✂️ 剪切
+        </MenuItem>
+        <MenuItem
+          onClick={handleImportInputCopy}
+          disabled={!importInputRef.current || importInputRef.current.selectionStart === importInputRef.current.selectionEnd}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📋 复制
+        </MenuItem>
+        <MenuItem
+          onClick={handleImportInputPaste}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📥 粘贴
+        </MenuItem>
+        <MenuItem
+          onClick={handleImportInputSelectAll}
+          disabled={!url}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🔍 全选
+        </MenuItem>
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <MenuItem
+          onClick={handleImportInputClear}
+          disabled={!url}
+          sx={{
+            ...getMenuItemHoverStyle(theme, controlSkin),
+            color: 'error.main',
+          }}
+        >
+          🧹 清空
         </MenuItem>
       </Menu>
 
