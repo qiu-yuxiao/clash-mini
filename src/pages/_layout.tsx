@@ -539,6 +539,12 @@ const ActiveNodeStatusCard = () => {
   const signalInfo = getSignalIcon(delay, t)
   const delayColor = convertDelayColor(delay)
   const theme = useTheme()
+  const skin =
+    (theme as any).controlSkin ||
+    (typeof window !== 'undefined'
+      ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
+      : 'retro-3d')
+  const isRetro3DDark = skin === 'retro-3d' && theme.palette.mode === 'dark'
 
   return (
     <Paper
@@ -555,7 +561,7 @@ const ActiveNodeStatusCard = () => {
     >
       <Typography
         variant="caption"
-        color="text.secondary"
+        color={isRetro3DDark ? '#2C1F03' : 'text.secondary'}
         sx={{
           fontSize: '11px',
           '@media (max-width: 580px)': {
@@ -573,9 +579,9 @@ const ActiveNodeStatusCard = () => {
         sx={{
           fontWeight: 'bold',
           fontSize: '11px',
-          color: 'primary.main',
+          color: isRetro3DDark ? '#2C1F03' : 'primary.main',
           border: '1px solid',
-          borderColor: 'primary.main',
+          borderColor: isRetro3DDark ? '#2C1F03' : 'primary.main',
           borderRadius: '4px',
           px: 0.8,
           py: 0.2,
@@ -594,7 +600,7 @@ const ActiveNodeStatusCard = () => {
           sx={{
             fontWeight: 'bold',
             fontSize: '12px',
-            color: 'text.primary',
+            color: isRetro3DDark ? '#2C1F03' : 'text.primary',
             maxWidth: { xs: '120px', sm: '240px', md: '360px' },
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -602,7 +608,10 @@ const ActiveNodeStatusCard = () => {
             cursor: 'pointer',
             transition: 'color 0.2s',
             '&:hover': {
-              color: 'primary.main',
+              color: isRetro3DDark ? 'rgba(44, 31, 3, 0.65)' : 'primary.main',
+            },
+            '&:active': {
+              color: isRetro3DDark ? 'rgba(44, 31, 3, 0.45)' : undefined,
             },
           }}
         >
@@ -648,7 +657,7 @@ const ActiveNodeStatusCard = () => {
                 ),
             color:
               signalInfo.color === 'text.secondary'
-                ? 'text.secondary'
+                ? (isRetro3DDark ? '#2C1F03' : 'text.secondary')
                 : signalInfo.color,
             '& .MuiChip-icon': {
               color: 'inherit',
@@ -661,10 +670,10 @@ const ActiveNodeStatusCard = () => {
       {nodeAddr && (
         <Typography
           variant="caption"
+          color={isRetro3DDark ? '#2C1F03' : 'text.secondary'}
           sx={{
             fontWeight: 'bold',
             fontSize: '11px',
-            color: 'text.secondary',
             '@media (max-width: 400px)': {
               display: 'none',
             },
@@ -1411,6 +1420,7 @@ const Layout = () => {
   if (theme) {
     ;(theme as any).controlSkin = controlSkin
   }
+  const isRetro3DDark = controlSkin === 'retro-3d' && theme?.palette?.mode === 'dark'
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
   const { switchLanguage, currentLanguage } = useI18n()
@@ -2852,6 +2862,7 @@ const Layout = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
+                        color: isRetro3DDark ? '#2C1F03' : 'inherit',
                       }}
                     >
                       {t('settings.mini.profilesTitle', {
@@ -3148,7 +3159,12 @@ const Layout = () => {
                 >
                   <Typography
                     variant="subtitle2"
-                    sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}
+                    sx={{
+                      fontWeight: 'bold',
+                      mb: 0.75,
+                      fontSize: '13px',
+                      color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                    }}
                   >
                     {t('settings.mini.takeoverMode', {
                       defaultValue: '流量接管模式',
@@ -3206,7 +3222,7 @@ const Layout = () => {
                           color:
                             activeIndex === 0
                               ? get3DSegmentedActiveTextColor(theme)
-                              : 'text.secondary',
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3215,6 +3231,16 @@ const Layout = () => {
                           cursor: 'pointer',
                           zIndex: 1,
                           transition: 'color 0.2s ease',
+                          '&:hover': {
+                            color: activeIndex === 0
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                          },
+                          '&:active': {
+                            color: activeIndex === 0
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                          },
                         }}
                       >
                         {t('settings.mini.manual', {
@@ -3242,7 +3268,7 @@ const Layout = () => {
                           color:
                             activeIndex === 1
                               ? get3DSegmentedActiveTextColor(theme)
-                              : 'text.secondary',
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3251,6 +3277,16 @@ const Layout = () => {
                           cursor: 'pointer',
                           zIndex: 1,
                           transition: 'color 0.2s ease',
+                          '&:hover': {
+                            color: activeIndex === 1
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                          },
+                          '&:active': {
+                            color: activeIndex === 1
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                          },
                         }}
                       >
                         {t('settings.mini.system', {
@@ -3278,7 +3314,7 @@ const Layout = () => {
                           color:
                             activeIndex === 2
                               ? get3DSegmentedActiveTextColor(theme)
-                              : 'text.secondary',
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3287,6 +3323,16 @@ const Layout = () => {
                           cursor: 'pointer',
                           zIndex: 1,
                           transition: 'color 0.2s ease',
+                          '&:hover': {
+                            color: activeIndex === 2
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                          },
+                          '&:active': {
+                            color: activeIndex === 2
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                          },
                         }}
                       >
                         {t('settings.mini.tun', { defaultValue: 'TUN 模式' })}
@@ -3295,7 +3341,12 @@ const Layout = () => {
                   </Box>
                   <Typography
                     variant="subtitle2"
-                    sx={{ fontWeight: 'bold', mb: 0.75, fontSize: '13px' }}
+                    sx={{
+                      fontWeight: 'bold',
+                      mb: 0.75,
+                      fontSize: '13px',
+                      color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                    }}
                   >
                     {t('settings.mini.routingPreference', {
                       defaultValue: '分流策略倾向',
@@ -3352,7 +3403,7 @@ const Layout = () => {
                           color:
                             policyActiveIndex === 0
                               ? get3DSegmentedActiveTextColor(theme)
-                              : 'text.secondary',
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3361,6 +3412,16 @@ const Layout = () => {
                           cursor: 'pointer',
                           zIndex: 1,
                           transition: 'color 0.2s ease',
+                          '&:hover': {
+                            color: policyActiveIndex === 0
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                          },
+                          '&:active': {
+                            color: policyActiveIndex === 0
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                          },
                         }}
                       >
                         {t('settings.mini.direct', {
@@ -3388,7 +3449,7 @@ const Layout = () => {
                           color:
                             policyActiveIndex === 1
                               ? get3DSegmentedActiveTextColor(theme)
-                              : 'text.secondary',
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3397,6 +3458,16 @@ const Layout = () => {
                           cursor: 'pointer',
                           zIndex: 1,
                           transition: 'color 0.2s ease',
+                          '&:hover': {
+                            color: policyActiveIndex === 1
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                          },
+                          '&:active': {
+                            color: policyActiveIndex === 1
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                          },
                         }}
                       >
                         {t('settings.mini.rules', { defaultValue: '规则可调' })}
@@ -3422,7 +3493,7 @@ const Layout = () => {
                           color:
                             policyActiveIndex === 2
                               ? get3DSegmentedActiveTextColor(theme)
-                              : 'text.secondary',
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3431,6 +3502,16 @@ const Layout = () => {
                           cursor: 'pointer',
                           zIndex: 1,
                           transition: 'color 0.2s ease',
+                          '&:hover': {
+                            color: policyActiveIndex === 2
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                          },
+                          '&:active': {
+                            color: policyActiveIndex === 2
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                          },
                         }}
                       >
                         {t('settings.mini.proxy', { defaultValue: '代理兜底' })}
@@ -3453,7 +3534,12 @@ const Layout = () => {
                 >
                   <Typography
                     variant="subtitle2"
-                    sx={{ fontWeight: 'bold', mb: 0.5, fontSize: '13px' }}
+                    sx={{
+                      fontWeight: 'bold',
+                      mb: 0.5,
+                      fontSize: '13px',
+                      color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                    }}
                   >
                     {t('components.verge.basic.title', {
                       defaultValue: '基础设置',
@@ -3468,7 +3554,13 @@ const Layout = () => {
                         justifyContent: 'space-between',
                       }}
                     >
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '13px',
+                          color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                        }}
+                      >
                         {t('sections.system.fields.autoLaunch', {
                           defaultValue: '开机自动启动',
                         })}
@@ -3493,7 +3585,13 @@ const Layout = () => {
                         justifyContent: 'space-between',
                       }}
                     >
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '13px',
+                          color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                        }}
+                      >
                         {t('sections.system.fields.silentStart', {
                           defaultValue: '启动时最小化',
                         })}
@@ -3518,7 +3616,13 @@ const Layout = () => {
                         justifyContent: 'space-between',
                       }}
                     >
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '13px',
+                          color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                        }}
+                      >
                         Allow LAN
                       </Typography>
                       <Switch
@@ -3542,7 +3646,13 @@ const Layout = () => {
                         alignItems: 'center',
                       }}
                     >
-                      <Typography variant="caption" sx={{ fontSize: '13px' }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '13px',
+                          color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                        }}
+                      >
                         Mixed Port
                       </Typography>
                       <Box
@@ -3593,7 +3703,11 @@ const Layout = () => {
                     >
                       <Typography
                         variant="caption"
-                        sx={{ fontSize: '13px', flexShrink: 0 }}
+                        sx={{
+                          fontSize: '13px',
+                          flexShrink: 0,
+                          color: isRetro3DDark ? '#2C1F03' : 'inherit',
+                        }}
                       >
                         {t('components.verge.basic.fields.themeMode', {
                           defaultValue: '主题模式',
@@ -3646,12 +3760,22 @@ const Layout = () => {
                             color:
                               themeActiveIndex === 0
                                 ? get3DSegmentedActiveTextColor(theme)
-                                : 'text.secondary',
+                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
                             zIndex: 1,
                             transition: 'color 0.2s ease',
+                            '&:hover': {
+                              color: themeActiveIndex === 0
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : (isRetro3DDark ? '#2C1F03' : undefined),
+                            },
+                            '&:active': {
+                              color: themeActiveIndex === 0
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            },
                           }}
                         >
                           {t('sections.appearance.system', {
@@ -3671,12 +3795,22 @@ const Layout = () => {
                             color:
                               themeActiveIndex === 1
                                 ? get3DSegmentedActiveTextColor(theme)
-                                : 'text.secondary',
+                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
                             zIndex: 1,
                             transition: 'color 0.2s ease',
+                            '&:hover': {
+                              color: themeActiveIndex === 1
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : (isRetro3DDark ? '#2C1F03' : undefined),
+                            },
+                            '&:active': {
+                              color: themeActiveIndex === 1
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            },
                           }}
                         >
                           {t('sections.appearance.light', {
@@ -3696,12 +3830,22 @@ const Layout = () => {
                             color:
                               themeActiveIndex === 2
                                 ? get3DSegmentedActiveTextColor(theme)
-                                : 'text.secondary',
+                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
                             zIndex: 1,
                             transition: 'color 0.2s ease',
+                            '&:hover': {
+                              color: themeActiveIndex === 2
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : (isRetro3DDark ? '#2C1F03' : undefined),
+                            },
+                            '&:active': {
+                              color: themeActiveIndex === 2
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            },
                           }}
                         >
                           {t('sections.appearance.dark', {
@@ -3733,6 +3877,7 @@ const Layout = () => {
                           sx={{
                             fontSize: '13px',
                             fontFamily: 'var(--control-font-family)',
+                            color: isRetro3DDark ? '#2C1F03' : 'inherit',
                           }}
                         >
                           {getSlider1Label()}
@@ -3741,7 +3886,7 @@ const Layout = () => {
                           variant="caption"
                           sx={{
                             fontSize: '12px',
-                            color: 'text.secondary',
+                            color: isRetro3DDark ? '#2C1F03' : 'text.secondary',
                             fontWeight: 'bold',
                             fontFamily: 'var(--control-font-family)',
                           }}
@@ -3784,6 +3929,7 @@ const Layout = () => {
                           sx={{
                             fontSize: '13px',
                             fontFamily: 'var(--control-font-family)',
+                            color: isRetro3DDark ? '#2C1F03' : 'inherit',
                           }}
                         >
                           {getSlider2Label()}
@@ -3792,7 +3938,7 @@ const Layout = () => {
                           variant="caption"
                           sx={{
                             fontSize: '12px',
-                            color: 'text.secondary',
+                            color: isRetro3DDark ? '#2C1F03' : 'text.secondary',
                             fontWeight: 'bold',
                             fontFamily: 'var(--control-font-family)',
                           }}
