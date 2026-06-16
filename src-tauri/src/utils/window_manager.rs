@@ -346,8 +346,8 @@ impl WindowManager {
         #[cfg(target_os = "windows")]
         {
             use webview2_com::Microsoft::Web::WebView2::Win32::{
-                ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
-                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+                ICoreWebView2_19,
             };
             use windows::core::Interface as _;
 
@@ -365,11 +365,22 @@ impl WindowManager {
                 }
             });
             if let Err(e) = res {
-                logging!(warn, Type::Window, "Failed to set memory usage level for window {}: {}", label, e);
+                logging!(
+                    warn,
+                    Type::Window,
+                    "Failed to set memory usage level for window {}: {}",
+                    label,
+                    e
+                );
             } else {
-                logging!(info, Type::Window, "Set memory usage level for window {} to {:?}", label, if is_inactive { "Low" } else { "Normal" });
+                logging!(
+                    info,
+                    Type::Window,
+                    "Set memory usage level for window {} to {:?}",
+                    label,
+                    if is_inactive { "Low" } else { "Normal" }
+                );
             }
         }
     }
 }
-

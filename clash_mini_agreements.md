@@ -1779,6 +1779,10 @@
         在前端接收后端 API 数据的唯一数据整理函数（`calcuProxies` 与 `calcuProxyProviders`）及流量微缩模式下（`fetchProxies`）的源头数据整理中直接执行过滤剔除，确保前端 UI 界面、自动连切、延迟测试等所有底层模块彻底免受假节点干扰。
         同时，当背景健康监测（`NodeMonitor`）发现当前活动节点名符合假节点特征时，判定其不健康并立刻触发自动选点算法进行强制纠偏切换。
 
+      * **启动时子集测速选择与唯一全局过滤规则 (BUG-083 & BUG-084)**：
+        - **启动时子集过滤有效性 (BUG-083)**：在自动选点函数 `triggerAutoSelectFastestNode` 中，用于解析 `proxy-head-state` 过滤设置的 profile ID，必须直接使用参数传入的 `profileUid`。禁止依赖 `profiles?.current` 等可能过时或启动时未就绪的 React 状态闭包，以防程序刚启动时选点逻辑偏离用户过滤后的子集节点。
+        - **全局唯一 Dummy 过滤点 (BUG-084)**：为了避免前端在测速和界面渲染中层层叠加、重复过滤导致代码臃肿和难以维护，仅在数据源层（`calcuProxies`/`calcuProxyProviders`/`fetchProxies`）保留唯一的 dummy 节点过滤规则，前端的其他模块（包括 `triggerAutoSelectFastestNode` 内的 `validNodes`）禁止再次使用 `!isDummyNode` 进行多重过滤。
+
 
 
 

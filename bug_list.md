@@ -28,6 +28,19 @@
   3. 当窗口最小化/托盘隐藏（`is_inactive: true`）时，调用 `SetMemoryUsageTargetLevel(COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW)`。当窗口重新获得焦点/可见时，恢复 `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL`。
 * **状态**：代码已修正，待确认。
 
+### **BUG-083** (程序启动后测试选定节点非筛选子集中的节点，需人工手动干预后才在子集中轮换)
+* **缺陷描述与现象**：程序启动后，自动选定或测试的节点并不是用户筛选出的子集节点，必须要经过人工手动干预后，才会在筛选出的子集内进行正常的测试与选点轮换。
+* **排查原因与记忆**：在 `_layout.tsx` 的 `triggerAutoSelectFastestNode` 函数中，对 localStorage 内 `proxy-head-state` 的读取依赖于 `profiles?.current || latestData?.current || ''` 作为 profile ID。然而在程序启动时，该 React Hook 中的 profiles 引用可能为空或尚未初始化完成，导致解析出的 profile ID 为 `""`，从而未能读取到用户筛选的过滤条件（filterText）。
+* **修改方针**：直接使用 `triggerAutoSelectFastestNode` 接收到的 `profileUid` 参数（该参数在启动和切换时是准确的最新值），避免依赖闭包中可能过时的 state。
+* **状态**：代码已修正，待确认。
+
+### **BUG-084** (自动测速选择逻辑中存在冗余/层层叠加的 dummy 节点过滤)
+* **缺陷描述与现象**：在 `_layout.tsx` 的自动测速选择逻辑中，存在对 dummy 节点的多重过滤。全局数据层（如 `calcuProxies`/`calcuProxyProviders`/`fetchProxies` 等）已经对 dummy 节点进行了完全过滤，因此在前端 layout 中再次过滤属于冗余设计。
+* **排查原因与记忆**：数据层已经有全局的 dummy 节点拦截机制。前端测速选择逻辑里的 secondary `!isDummyNode` 过滤是多余的，且可能在后续导致维护逻辑的重复。
+* **修改方针**：删除前端 layout 自动选择中的 `!isDummyNode` 检查，仅在全局数据层保留唯一一处 dummy 过滤以保证代码架构的简洁性。
+* **状态**：代码已修正，待确认。
+
+
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 

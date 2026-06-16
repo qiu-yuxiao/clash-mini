@@ -51,7 +51,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
 
-
 import { BaseSearchBox, BaseEmpty, Switch } from '@/components/base'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import { ConnectionTable } from '@/components/connection/connection-table'
@@ -104,8 +103,8 @@ import {
   get3DSegmentedActiveTextColor,
 } from '@/utils/button-styles'
 import getSystem from '@/utils/get-system'
-import parseTraffic from '@/utils/parse-traffic'
 import { isDummyNode } from '@/utils/node'
+import parseTraffic from '@/utils/parse-traffic'
 import {
   healthcheckProxyProvider,
   closeAllConnections,
@@ -203,11 +202,12 @@ function convertDelayColor(
 // Helper to style MenuItem hover across different themes
 const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
   const isLight = theme.palette.mode === 'light'
-  
+
   let fontFamily = 'Trebuchet MS, SimHei, sans-serif'
   if (skin === 'original') fontFamily = 'Segoe UI, Microsoft YaHei, sans-serif'
   else if (skin === 'modern-flat') fontFamily = 'Outfit, DengXian, sans-serif'
-  else if (skin === 'frosted-glass') fontFamily = 'Segoe UI Light, Microsoft YaHei Light, sans-serif'
+  else if (skin === 'frosted-glass')
+    fontFamily = 'Segoe UI Light, Microsoft YaHei Light, sans-serif'
   else if (skin === 'cyberpunk') fontFamily = 'Consolas, NSimSun, monospace'
   else if (skin === 'monochrome') fontFamily = 'Georgia, KaiTi, serif'
 
@@ -224,9 +224,10 @@ const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
       ...baseStyle,
       fontWeight: 'bold',
       '&:hover': {
-        background: 'radial-gradient(circle at center, #FFD54F 0%, #FFA000 100%) !important',
+        background:
+          'radial-gradient(circle at center, #FFD54F 0%, #FFA000 100%) !important',
         color: '#1E1200 !important',
-      }
+      },
     }
   }
   if (skin === 'original') {
@@ -236,7 +237,7 @@ const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
       '&:hover': {
         background: 'rgba(91, 92, 157, 0.08) !important',
         color: 'var(--primary-main) !important',
-      }
+      },
     }
   }
   if (skin === 'modern-flat') {
@@ -246,7 +247,7 @@ const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
       '&:hover': {
         background: `${alpha(theme.palette.primary.main, 0.1)} !important`,
         color: `${theme.palette.primary.main} !important`,
-      }
+      },
     }
   }
   if (skin === 'frosted-glass') {
@@ -255,7 +256,7 @@ const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
       '&:hover': {
         background: 'rgba(255, 255, 255, 0.12) !important',
         color: `${theme.palette.primary.main} !important`,
-      }
+      },
     }
   }
   if (skin === 'cyberpunk') {
@@ -269,7 +270,7 @@ const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
         color: '#000000 !important',
         border: '1px solid #39ff14 !important',
         boxShadow: '0 0 8px #39ff14',
-      }
+      },
     }
   }
   if (skin === 'monochrome') {
@@ -279,7 +280,7 @@ const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
       '&:hover': {
         background: isLight ? '#000000 !important' : '#ffffff !important',
         color: isLight ? '#ffffff !important' : '#000000 !important',
-      }
+      },
     }
   }
   return baseStyle
@@ -342,13 +343,13 @@ const getFriendlyProtocolName = (type?: string) => {
 }
 
 const formatCoreVersion = (version?: string) => {
-  if (!version) return '';
-  const clean = version.trim().replace(/^v+/i, '');
-  return `Ver.${clean}`;
+  if (!version) return ''
+  const clean = version.trim().replace(/^v+/i, '')
+  return `Ver.${clean}`
 }
 
 const isSameVersion = (ver1?: string, ver2?: string) => {
-  if (!ver1 || !ver2) return false;
+  if (!ver1 || !ver2) return false
   const clean = (v: string) => {
     return v
       .toLowerCase()
@@ -356,11 +357,10 @@ const isSameVersion = (ver1?: string, ver2?: string) => {
       .replace(/meta/g, '')
       .replace(/^v+/g, '')
       .replace(/[^a-z0-9.]/g, '')
-      .trim();
-  };
-  return clean(ver1) === clean(ver2);
+      .trim()
+  }
+  return clean(ver1) === clean(ver2)
 }
-
 
 const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
@@ -699,9 +699,7 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
   const [upVal, upUnit] = parseTraffic(traffic?.up || 0)
   const [downVal, downUnit] = parseTraffic(traffic?.down || 0)
   const [upTotalVal, upTotalUnit] = parseTraffic(traffic?.upTotal || 0)
-  const [downTotalVal, downTotalUnit] = parseTraffic(
-    traffic?.downTotal || 0,
-  )
+  const [downTotalVal, downTotalUnit] = parseTraffic(traffic?.downTotal || 0)
 
   return (
     <Box
@@ -767,14 +765,20 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
           >
             <ArrowDownwardRounded
               sx={{
-                color: mode === 'light' ? 'var(--download-text, #0084FF)' : 'var(--download-text-dark, #80D8FF)',
+                color:
+                  mode === 'light'
+                    ? 'var(--download-text, #0084FF)'
+                    : 'var(--download-text-dark, #80D8FF)',
                 fontSize: 14,
               }}
             />
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #80D8FF)',
+                color:
+                  mode === 'light'
+                    ? 'var(--download-text, #006064)'
+                    : 'var(--download-text-dark, #80D8FF)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -788,7 +792,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '13px',
-                color: mode === 'light' ? 'var(--download-text, #00363A)' : '#FFFFFF',
+                color:
+                  mode === 'light'
+                    ? 'var(--download-text, #00363A)'
+                    : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -797,7 +804,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 style={{
                   fontSize: '8px',
                   fontWeight: 'normal',
-                  color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #E0F7FA)',
+                  color:
+                    mode === 'light'
+                      ? 'var(--download-text, #006064)'
+                      : 'var(--download-text-dark, #E0F7FA)',
                 }}
               >
                 {downUnit}/s
@@ -824,7 +834,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #80D8FF)',
+                color:
+                  mode === 'light'
+                    ? 'var(--download-text, #006064)'
+                    : 'var(--download-text-dark, #80D8FF)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -835,7 +848,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '13px',
-                color: mode === 'light' ? 'var(--download-text, #00363A)' : '#FFFFFF',
+                color:
+                  mode === 'light'
+                    ? 'var(--download-text, #00363A)'
+                    : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -843,7 +859,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               <span
                 style={{
                   fontSize: '8px',
-                  color: mode === 'light' ? 'var(--download-text, #006064)' : 'var(--download-text-dark, #E0F7FA)',
+                  color:
+                    mode === 'light'
+                      ? 'var(--download-text, #006064)'
+                      : 'var(--download-text-dark, #E0F7FA)',
                   fontWeight: 'normal',
                 }}
               >
@@ -874,14 +893,20 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
           >
             <ArrowUpwardRounded
               sx={{
-                color: mode === 'light' ? 'var(--upload-text, #E65100)' : 'var(--upload-text-dark, #FFD54F)',
+                color:
+                  mode === 'light'
+                    ? 'var(--upload-text, #E65100)'
+                    : 'var(--upload-text-dark, #FFD54F)',
                 fontSize: 14,
               }}
             />
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFD54F)',
+                color:
+                  mode === 'light'
+                    ? 'var(--upload-text, #7B5200)'
+                    : 'var(--upload-text-dark, #FFD54F)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -895,7 +920,8 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontWeight: 'bold',
                 fontSize: '13px',
-                color: mode === 'light' ? 'var(--upload-text, #3E2723)' : '#FFFFFF',
+                color:
+                  mode === 'light' ? 'var(--upload-text, #3E2723)' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -904,7 +930,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
                 style={{
                   fontSize: '8px',
                   fontWeight: 'normal',
-                  color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFECB3)',
+                  color:
+                    mode === 'light'
+                      ? 'var(--upload-text, #7B5200)'
+                      : 'var(--upload-text-dark, #FFECB3)',
                 }}
               >
                 {upUnit}/s
@@ -931,7 +960,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
             <Typography
               sx={{
                 fontSize: '9px',
-                color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFD54F)',
+                color:
+                  mode === 'light'
+                    ? 'var(--upload-text, #7B5200)'
+                    : 'var(--upload-text-dark, #FFD54F)',
                 fontWeight: 'bold',
                 whiteSpace: 'nowrap',
               }}
@@ -942,7 +974,8 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               sx={{
                 fontSize: '13px',
                 fontWeight: 'bold',
-                color: mode === 'light' ? 'var(--upload-text, #3E2723)' : '#FFFFFF',
+                color:
+                  mode === 'light' ? 'var(--upload-text, #3E2723)' : '#FFFFFF',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -950,7 +983,10 @@ const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
               <span
                 style={{
                   fontSize: '8px',
-                  color: mode === 'light' ? 'var(--upload-text, #7B5200)' : 'var(--upload-text-dark, #FFECB3)',
+                  color:
+                    mode === 'light'
+                      ? 'var(--upload-text, #7B5200)'
+                      : 'var(--upload-text-dark, #FFECB3)',
                   fontWeight: 'normal',
                 }}
               >
@@ -1107,20 +1143,24 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
         height: 4,
         border: 'none',
         borderRadius: 2,
-        bgcolor: isLight 
+        bgcolor: isLight
           ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.6)'
           : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.5)',
       },
       '& .MuiSlider-thumb': {
         width: 12,
         height: 12,
-        bgcolor: isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.8)',
+        bgcolor: isLight
+          ? 'rgba(255, 255, 255, 0.9)'
+          : 'rgba(255, 255, 255, 0.8)',
         border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.3)' : 'rgba(255, 255, 255, 0.3)'}`,
         boxShadow: isLight ? '0 1px 3px rgba(0, 0, 0, 0.12)' : 'none',
         '&:hover, &.Mui-focusVisible': {
           transform: 'translate(-50%, -50%) scale(1.15)',
           bgcolor: 'rgba(255, 255, 255, 1.0)',
-          boxShadow: isLight ? '0 2px 5px rgba(0, 0, 0, 0.18)' : '0 0 4px rgba(255, 255, 255, 0.4)',
+          boxShadow: isLight
+            ? '0 2px 5px rgba(0, 0, 0, 0.18)'
+            : '0 0 4px rgba(255, 255, 255, 0.4)',
         },
       },
     }
@@ -1259,7 +1299,9 @@ const Layout = () => {
   // Client Update states
   const [clientUpdateOpen, setClientUpdateOpen] = useState(false)
   const [clientUpdateObj, setClientUpdateObj] = useState<any>(null)
-  const [clientStatus, setClientStatus] = useState<'idle' | 'downloading' | 'error' | 'done'>('idle')
+  const [clientStatus, setClientStatus] = useState<
+    'idle' | 'downloading' | 'error' | 'done'
+  >('idle')
   const [clientProgress, setClientProgress] = useState(0)
   const [clientProgressMessage, setClientProgressMessage] = useState('')
   const [clientCheckLoading, setClientCheckLoading] = useState(false)
@@ -1368,7 +1410,7 @@ const Layout = () => {
   const { t } = useTranslation() as any
   const { theme } = useCustomTheme()
   if (theme) {
-    (theme as any).controlSkin = controlSkin
+    ;(theme as any).controlSkin = controlSkin
   }
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
@@ -1392,8 +1434,13 @@ const Layout = () => {
   const [profileLoading, setProfileLoading] = useState(false)
 
   // Context Menu State for Profile Card (BUG-072)
-  const [profileMenuAnchorPosition, setProfileMenuAnchorPosition] = useState<{ top: number; left: number } | null>(null)
-  const [contextMenuProfileUid, setContextMenuProfileUid] = useState<string | null>(null)
+  const [profileMenuAnchorPosition, setProfileMenuAnchorPosition] = useState<{
+    top: number
+    left: number
+  } | null>(null)
+  const [contextMenuProfileUid, setContextMenuProfileUid] = useState<
+    string | null
+  >(null)
 
   // Edit Profile Dialog State (BUG-072)
   const [editProfileOpen, setEditProfileOpen] = useState(false)
@@ -1406,7 +1453,11 @@ const Layout = () => {
     const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
     const styleWithImportant: any = {}
     for (const [key, val] of Object.entries(btnStyle)) {
-      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
+      if (
+        ['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(
+          key,
+        )
+      ) {
         styleWithImportant[key] = `${val} !important`
       } else {
         styleWithImportant[key] = val
@@ -1422,7 +1473,11 @@ const Layout = () => {
     const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
     const styleWithImportant: any = {}
     for (const [key, val] of Object.entries(btnStyle)) {
-      if (['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(key)) {
+      if (
+        ['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(
+          key,
+        )
+      ) {
         styleWithImportant[key] = `${val} !important`
       } else {
         styleWithImportant[key] = val
@@ -1570,9 +1625,13 @@ const Layout = () => {
           if (total > 0) {
             const pct = Math.round((downloaded / total) * 100)
             setClientProgress(pct)
-            setClientProgressMessage(`已下载 ${pct}% (${(downloaded / 1024 / 1024).toFixed(2)} MB / ${(total / 1024 / 1024).toFixed(2)} MB)`)
+            setClientProgressMessage(
+              `已下载 ${pct}% (${(downloaded / 1024 / 1024).toFixed(2)} MB / ${(total / 1024 / 1024).toFixed(2)} MB)`,
+            )
           } else {
-            setClientProgressMessage(`已下载 ${(downloaded / 1024 / 1024).toFixed(2)} MB`)
+            setClientProgressMessage(
+              `已下载 ${(downloaded / 1024 / 1024).toFixed(2)} MB`,
+            )
           }
         } else if (progressEvent.event === 'Finished') {
           setClientProgress(100)
@@ -1612,7 +1671,10 @@ const Layout = () => {
   }
 
   const handleCoreUpgrade = async () => {
-    if (coreUpdateRelease && isSameVersion(coreVersion, coreUpdateRelease.tag_name)) {
+    if (
+      coreUpdateRelease &&
+      isSameVersion(coreVersion, coreUpdateRelease.tag_name)
+    ) {
       showNotice.info('当前内核已是最新版本')
       setCoreUpdateOpen(false)
       return
@@ -1751,7 +1813,10 @@ const Layout = () => {
             break
           }
         } catch (e) {
-          console.warn('[BUG-034] refreshProxy failed during startup polling:', e)
+          console.warn(
+            '[BUG-034] refreshProxy failed during startup polling:',
+            e,
+          )
         }
         await new Promise((resolve) => setTimeout(resolve, 500))
       }
@@ -1851,8 +1916,7 @@ const Layout = () => {
             const item = localStorage.getItem('proxy-head-state')
             if (item) {
               const data = JSON.parse(item)
-              const currentProfile =
-                profiles?.current || latestData?.current || ''
+              const currentProfile = profileUid
               const groupState = data[currentProfile]?.[groupName]
               if (groupState) {
                 filterText = groupState.filterText || ''
@@ -1880,7 +1944,7 @@ const Layout = () => {
           )
 
           // Collect healthy scanned nodes and calculate tested count
-          const validNodes = filteredAll.filter((n: any) => n?.name && !isDummyNode(n.name))
+          const validNodes = filteredAll.filter((n: any) => n?.name)
           const totalFilteredValidNodes = validNodes.length
 
           const healthyNodes: { name: string; delay: number }[] = []
@@ -1933,7 +1997,8 @@ const Layout = () => {
           // Rule B: Final selection conditions
           const isFinalSelection =
             healthyNodes.length >= 5 ||
-            (totalFilteredValidNodes > 0 && testedCount >= totalFilteredValidNodes) ||
+            (totalFilteredValidNodes > 0 &&
+              testedCount >= totalFilteredValidNodes) ||
             elapsed >= 15
 
           if (isFinalSelection) {
@@ -1967,13 +2032,7 @@ const Layout = () => {
         console.error('[BUG-034] Error during auto speed test and select:', err)
       }
     },
-    [
-      refreshProxy,
-      proxies,
-      verge?.default_latency_timeout,
-      changeProxy,
-      profiles,
-    ],
+    [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy],
   )
 
   const lastEnhancedProfileRef = useRef<string | null>(null)
@@ -2269,13 +2328,17 @@ const Layout = () => {
   const handleUpdateProfileClick = async () => {
     setProfileMenuAnchorPosition(null)
     if (!contextMenuProfileUid) return
-    await handleUpdateProfile(contextMenuProfileUid, { stopPropagation: () => {} } as any)
+    await handleUpdateProfile(contextMenuProfileUid, {
+      stopPropagation: () => {},
+    } as any)
   }
 
   const handleDeleteProfileClick = async () => {
     setProfileMenuAnchorPosition(null)
     if (!contextMenuProfileUid) return
-    await handleDeleteProfile(contextMenuProfileUid, { stopPropagation: () => {} } as any)
+    await handleDeleteProfile(contextMenuProfileUid, {
+      stopPropagation: () => {},
+    } as any)
   }
 
   const handleSaveProfile = async () => {
@@ -2289,7 +2352,7 @@ const Layout = () => {
         option: {
           ...origOption,
           update_interval: Number(editProfileInterval) || 0,
-        }
+        },
       })
       showNotice.success('配置修改成功')
       setEditProfileOpen(false)
@@ -3134,7 +3197,9 @@ const Layout = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           color:
-                            activeIndex === 0 ? get3DSegmentedActiveTextColor(theme) : 'text.secondary',
+                            activeIndex === 0
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3168,7 +3233,9 @@ const Layout = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           color:
-                            activeIndex === 1 ? get3DSegmentedActiveTextColor(theme) : 'text.secondary',
+                            activeIndex === 1
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3202,7 +3269,9 @@ const Layout = () => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           color:
-                            activeIndex === 2 ? get3DSegmentedActiveTextColor(theme) : 'text.secondary',
+                            activeIndex === 2
+                              ? get3DSegmentedActiveTextColor(theme)
+                              : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -4058,9 +4127,9 @@ const Layout = () => {
                       boxShadow: 'none',
                       '& .MuiList-root': {
                         padding: '4px 0',
-                      }
-                    }
-                  }
+                      },
+                    },
+                  },
                 }}
               >
                 <MenuItem
@@ -4076,7 +4145,9 @@ const Layout = () => {
                 >
                   🐱 GitHub 主页
                 </MenuItem>
-                <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+                <Divider
+                  sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }}
+                />
                 <MenuItem
                   onClick={handleClientCheck}
                   disabled={clientCheckLoading}
@@ -4089,7 +4160,8 @@ const Layout = () => {
                   disabled={coreCheckLoading}
                   sx={getMenuItemHoverStyle(theme, controlSkin)}
                 >
-                  ⚙️ 检查内核更新 {coreVersion ? `(${formatCoreVersion(coreVersion)})` : ''}
+                  ⚙️ 检查内核更新{' '}
+                  {coreVersion ? `(${formatCoreVersion(coreVersion)})` : ''}
                 </MenuItem>
               </Menu>
 
@@ -4321,23 +4393,26 @@ const Layout = () => {
         anchorReference="anchorPosition"
         anchorPosition={
           profileMenuAnchorPosition !== null
-            ? { top: profileMenuAnchorPosition.top, left: profileMenuAnchorPosition.left }
+            ? {
+                top: profileMenuAnchorPosition.top,
+                left: profileMenuAnchorPosition.left,
+              }
             : undefined
         }
         open={profileMenuAnchorPosition !== null}
         onClose={() => setProfileMenuAnchorPosition(null)}
         slotProps={{
           paper: {
-            className: "theme-panel",
+            className: 'theme-panel',
             sx: {
-              minWidth: "160px",
-              borderRadius: "6px",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              backgroundColor: "transparent",
-              backgroundImage: "none",
-              boxShadow: "none",
-              "& .MuiList-root": {
-                padding: "4px 0",
+              minWidth: '160px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              backgroundColor: 'transparent',
+              backgroundImage: 'none',
+              boxShadow: 'none',
+              '& .MuiList-root': {
+                padding: '4px 0',
               },
             },
           },
@@ -4355,7 +4430,7 @@ const Layout = () => {
         >
           📄 编辑文件
         </MenuItem>
-        <Divider sx={{ my: "4px", borderColor: "rgba(255, 255, 255, 0.12)" }} />
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
           onClick={handleCopyProfileLinkClick}
           disabled={isContextMenuLocal || !contextMenuTargetItem?.url}
@@ -4370,12 +4445,12 @@ const Layout = () => {
         >
           🔄 更新
         </MenuItem>
-        <Divider sx={{ my: "4px", borderColor: "rgba(255, 255, 255, 0.12)" }} />
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
           onClick={handleDeleteProfileClick}
           sx={{
             ...getMenuItemHoverStyle(theme, controlSkin),
-            color: "error.main",
+            color: 'error.main',
           }}
         >
           ❌ 删除
@@ -4388,29 +4463,43 @@ const Layout = () => {
         onClose={() => setEditProfileOpen(false)}
         slotProps={{
           paper: {
-            className: "theme-panel",
+            className: 'theme-panel',
             sx: {
               p: 3,
-              minWidth: "360px",
-              maxWidth: "450px",
-              borderRadius: "8px",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              fontFamily: "var(--control-font-family)",
+              minWidth: '360px',
+              maxWidth: '450px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              fontFamily: 'var(--control-font-family)',
               color: theme.palette.text.primary,
-              backgroundColor: "transparent",
-              backgroundImage: "none",
-              boxShadow: "none",
+              backgroundColor: 'transparent',
+              backgroundImage: 'none',
+              boxShadow: 'none',
             },
           },
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: "bold", mb: 2, fontFamily: "var(--control-font-family)" }}>
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 'bold',
+            mb: 2,
+            fontFamily: 'var(--control-font-family)',
+          }}
+        >
           ⚙️ 编辑配置文件
         </Typography>
 
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
           <Box>
-            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: "bold", fontFamily: "var(--control-font-family)" }}>
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 0.5,
+                fontWeight: 'bold',
+                fontFamily: 'var(--control-font-family)',
+              }}
+            >
               配置名称
             </Typography>
             <TextField
@@ -4423,7 +4512,14 @@ const Layout = () => {
           </Box>
 
           <Box>
-            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: "bold", fontFamily: "var(--control-font-family)" }}>
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 0.5,
+                fontWeight: 'bold',
+                fontFamily: 'var(--control-font-family)',
+              }}
+            >
               订阅地址
             </Typography>
             <TextField
@@ -4437,7 +4533,14 @@ const Layout = () => {
           </Box>
 
           <Box>
-            <Typography variant="body2" sx={{ mb: 0.5, fontWeight: "bold", fontFamily: "var(--control-font-family)" }}>
+            <Typography
+              variant="body2"
+              sx={{
+                mb: 0.5,
+                fontWeight: 'bold',
+                fontFamily: 'var(--control-font-family)',
+              }}
+            >
               更新周期 (单位: 小时, 设为 0 禁用)
             </Typography>
             <TextField
@@ -4452,13 +4555,13 @@ const Layout = () => {
           </Box>
         </Box>
 
-        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
           <Button
             onClick={() => setEditProfileOpen(false)}
             sx={{
-              fontSize: "12px",
-              height: "28px",
-              px: "16px",
+              fontSize: '12px',
+              height: '28px',
+              px: '16px',
               ...defaultBtn3DStyle,
             }}
           >
@@ -4467,9 +4570,9 @@ const Layout = () => {
           <Button
             onClick={handleSaveProfile}
             sx={{
-              fontSize: "12px",
-              height: "28px",
-              px: "16px",
+              fontSize: '12px',
+              height: '28px',
+              px: '16px',
               ...primaryBtn3DStyle,
             }}
           >
@@ -4500,24 +4603,49 @@ const Layout = () => {
               backgroundColor: 'transparent',
               backgroundImage: 'none',
               boxShadow: 'none',
-            }
-          }
+            },
+          },
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, fontFamily: 'var(--control-font-family)' }}>
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 'bold',
+            mb: 2,
+            fontFamily: 'var(--control-font-family)',
+          }}
+        >
           🚀 软件本体更新
         </Typography>
 
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}>
+          <Typography
+            variant="body2"
+            sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}
+          >
             当前版本: {appVersion ? `v${appVersion}` : '未知'}
           </Typography>
-          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)', fontWeight: 'bold' }}>
-            最新版本: {clientUpdateObj?.version ? `v${clientUpdateObj.version}` : '未知'}
+          <Typography
+            variant="body2"
+            sx={{
+              mb: 1,
+              fontFamily: 'var(--control-font-family)',
+              fontWeight: 'bold',
+            }}
+          >
+            最新版本:{' '}
+            {clientUpdateObj?.version ? `v${clientUpdateObj.version}` : '未知'}
           </Typography>
         </Box>
 
-        <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1, fontFamily: 'var(--control-font-family)' }}>
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 'bold',
+            mb: 1,
+            fontFamily: 'var(--control-font-family)',
+          }}
+        >
           更新日志:
         </Typography>
         <Box
@@ -4543,7 +4671,10 @@ const Layout = () => {
               sx={{
                 width: '100%',
                 height: '8px',
-                backgroundColor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                backgroundColor:
+                  theme.palette.mode === 'light'
+                    ? 'rgba(0,0,0,0.1)'
+                    : 'rgba(255,255,255,0.1)',
                 borderRadius: '4px',
                 overflow: 'hidden',
               }}
@@ -4557,7 +4688,15 @@ const Layout = () => {
                 }}
               />
             </Box>
-            <Typography variant="body2" sx={{ mt: 1, fontSize: '12px', opacity: 0.8, fontFamily: 'var(--control-font-family)' }}>
+            <Typography
+              variant="body2"
+              sx={{
+                mt: 1,
+                fontSize: '12px',
+                opacity: 0.8,
+                fontFamily: 'var(--control-font-family)',
+              }}
+            >
               {clientProgressMessage}
             </Typography>
           </Box>
@@ -4576,12 +4715,24 @@ const Layout = () => {
           </Button>
           <Button
             onClick={handleClientUpgrade}
-            disabled={clientStatus === 'downloading' || clientStatus === 'done' || (clientUpdateObj && isSameVersion(appVersion, clientUpdateObj.version))}
+            disabled={
+              clientStatus === 'downloading' ||
+              clientStatus === 'done' ||
+              (clientUpdateObj &&
+                isSameVersion(appVersion, clientUpdateObj.version))
+            }
             sx={{
               ...get3DButtonStyle(theme, 'contained', 'primary'),
             }}
           >
-            {clientStatus === 'done' ? '准备重启' : clientStatus === 'downloading' ? '更新中...' : (clientUpdateObj && isSameVersion(appVersion, clientUpdateObj.version)) ? '已是最新' : '立即更新'}
+            {clientStatus === 'done'
+              ? '准备重启'
+              : clientStatus === 'downloading'
+                ? '更新中...'
+                : clientUpdateObj &&
+                    isSameVersion(appVersion, clientUpdateObj.version)
+                  ? '已是最新'
+                  : '立即更新'}
           </Button>
         </Box>
       </Dialog>
@@ -4590,7 +4741,11 @@ const Layout = () => {
       <Dialog
         open={coreUpdateOpen}
         onClose={() => {
-          if (coreUpgradeStatus !== 'checking' && coreUpgradeStatus !== 'downloading' && coreUpgradeStatus !== 'extracting') {
+          if (
+            coreUpgradeStatus !== 'checking' &&
+            coreUpgradeStatus !== 'downloading' &&
+            coreUpgradeStatus !== 'extracting'
+          ) {
             setCoreUpdateOpen(false)
           }
         }}
@@ -4607,20 +4762,40 @@ const Layout = () => {
               backgroundColor: 'transparent',
               backgroundImage: 'none',
               boxShadow: 'none',
-            }
-          }
+            },
+          },
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, fontFamily: 'var(--control-font-family)' }}>
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 'bold',
+            mb: 2,
+            fontFamily: 'var(--control-font-family)',
+          }}
+        >
           ⚙️ Mihomo 内核更新
         </Typography>
 
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}>
+          <Typography
+            variant="body2"
+            sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}
+          >
             当前版本: {coreVersion ? formatCoreVersion(coreVersion) : '未知'}
           </Typography>
-          <Typography variant="body2" sx={{ mb: 1, fontFamily: 'var(--control-font-family)', fontWeight: 'bold' }}>
-            最新版本: {coreUpdateRelease?.tag_name ? formatCoreVersion(coreUpdateRelease.tag_name) : '获取中...'}
+          <Typography
+            variant="body2"
+            sx={{
+              mb: 1,
+              fontFamily: 'var(--control-font-family)',
+              fontWeight: 'bold',
+            }}
+          >
+            最新版本:{' '}
+            {coreUpdateRelease?.tag_name
+              ? formatCoreVersion(coreUpdateRelease.tag_name)
+              : '获取中...'}
           </Typography>
         </Box>
 
@@ -4630,7 +4805,10 @@ const Layout = () => {
               sx={{
                 width: '100%',
                 height: '8px',
-                backgroundColor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                backgroundColor:
+                  theme.palette.mode === 'light'
+                    ? 'rgba(0,0,0,0.1)'
+                    : 'rgba(255,255,255,0.1)',
                 borderRadius: '4px',
                 overflow: 'hidden',
               }}
@@ -4644,7 +4822,15 @@ const Layout = () => {
                 }}
               />
             </Box>
-            <Typography variant="body2" sx={{ mt: 1, fontSize: '12px', opacity: 0.8, fontFamily: 'var(--control-font-family)' }}>
+            <Typography
+              variant="body2"
+              sx={{
+                mt: 1,
+                fontSize: '12px',
+                opacity: 0.8,
+                fontFamily: 'var(--control-font-family)',
+              }}
+            >
               {coreUpgradeMessage}
             </Typography>
           </Box>
@@ -4653,7 +4839,11 @@ const Layout = () => {
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
           <Button
             onClick={() => setCoreUpdateOpen(false)}
-            disabled={coreUpgradeStatus === 'checking' || coreUpgradeStatus === 'downloading' || coreUpgradeStatus === 'extracting'}
+            disabled={
+              coreUpgradeStatus === 'checking' ||
+              coreUpgradeStatus === 'downloading' ||
+              coreUpgradeStatus === 'extracting'
+            }
             sx={{
               ...get3DButtonStyle(theme, 'outlined', 'default'),
               mr: 1,
@@ -4663,12 +4853,24 @@ const Layout = () => {
           </Button>
           <Button
             onClick={handleCoreUpgrade}
-            disabled={coreUpgradeStatus === 'checking' || coreUpgradeStatus === 'downloading' || coreUpgradeStatus === 'extracting' || coreUpgradeStatus === 'done' || isSameVersion(coreVersion, coreUpdateRelease?.tag_name)}
+            disabled={
+              coreUpgradeStatus === 'checking' ||
+              coreUpgradeStatus === 'downloading' ||
+              coreUpgradeStatus === 'extracting' ||
+              coreUpgradeStatus === 'done' ||
+              isSameVersion(coreVersion, coreUpdateRelease?.tag_name)
+            }
             sx={{
               ...get3DButtonStyle(theme, 'contained', 'primary'),
             }}
           >
-            {coreUpgradeStatus === 'done' ? '更新完成' : coreUpgradeStatus !== 'idle' ? '更新中...' : isSameVersion(coreVersion, coreUpdateRelease?.tag_name) ? '已是最新' : '立即更新'}
+            {coreUpgradeStatus === 'done'
+              ? '更新完成'
+              : coreUpgradeStatus !== 'idle'
+                ? '更新中...'
+                : isSameVersion(coreVersion, coreUpdateRelease?.tag_name)
+                  ? '已是最新'
+                  : '立即更新'}
           </Button>
         </Box>
       </Dialog>
