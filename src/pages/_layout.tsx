@@ -1381,7 +1381,7 @@ const Layout = () => {
       case 'cyberpunk':
         return 'Glow'
       case 'monochrome':
-        return 'Contrast'
+        return 'Radius'
       default:
         return 'Depth'
     }

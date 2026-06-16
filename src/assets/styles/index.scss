@@ -207,6 +207,19 @@ html[data-theme-mode="light"][data-control-skin="cyberpunk"] {
 }
 
 html[data-control-skin="monochrome"] {
+  --border-radius: calc(8px * var(--control-skin-val1, 1.0)) !important;
+
+  .MuiButton-root,
+  .MuiInputBase-root,
+  .MuiOutlinedInput-root,
+  .MuiPaper-root {
+    border-radius: var(--border-radius) !important;
+  }
+
+  .MuiChip-root {
+    border-radius: calc(6px * var(--control-skin-val1, 1.0)) !important;
+  }
+
   .theme-panel {
     background: var(--background-color) !important;
     backdrop-filter: none !important;
@@ -221,17 +234,16 @@ html[data-control-skin="monochrome"] {
     box-shadow: none !important;
   }
 
-  // Contrast Slider (Slider 1: --control-skin-val1) adjusts opacity of secondary texts and dividers
   .MuiTypography-caption,
   .text-secondary,
   .MuiListItemText-secondary,
   .MuiFormLabel-root {
-    opacity: calc(0.3 + 0.35 * var(--control-skin-val1, 1.0)) !important;
+    opacity: 0.65 !important;
   }
 
   hr,
   .MuiDivider-root {
-    opacity: calc(0.1 + 0.45 * var(--control-skin-val1, 1.0)) !important;
+    opacity: 0.45 !important;
   }
 }
 
