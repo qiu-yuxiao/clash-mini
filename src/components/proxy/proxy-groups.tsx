@@ -55,6 +55,7 @@ interface Props {
   mode: string
   isChainMode?: boolean
   chainConfigData?: string | null
+  triggerAutoSelect?: (isBackground: boolean, skipDelay?: boolean) => Promise<void>
 }
 
 interface ProxyChainItem {
@@ -67,7 +68,7 @@ interface ProxyChainItem {
 export const ProxyGroups = (props: Props) => {
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  const { mode, isChainMode = false, chainConfigData } = props
+  const { mode, isChainMode = false, chainConfigData, triggerAutoSelect } = props
 
   const isVisible = useVisibility()
 
@@ -403,48 +404,53 @@ export const ProxyGroups = (props: Props) => {
       debugLog(`[ProxyGroups] 开始测试所有延迟，组: ${groupName}`)
       setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
-      const proxies = renderList
-        .filter(
-          (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
-        )
-        .flatMap((e) => e.proxyCol || e.proxy!)
-        .filter(Boolean)
-
-      debugLog(`[ProxyGroups] 找到代理数量: ${proxies.length}`)
-
-      const providers = new Set(
-        proxies.map((p) => p!.provider!).filter(Boolean),
-      )
-
-      if (providers.size) {
-        debugLog(`[ProxyGroups] 发现提供者，数量: ${providers.size}`)
-        Promise.allSettled(
-          [...providers].map((p) => healthcheckProxyProvider(p)),
-        ).then(() => {
-          debugLog(`[ProxyGroups] 提供者健康检查完成`)
-          onProxies()
-        })
-      }
-
-      const names = proxies.filter((p) => !p!.provider).map((p) => p!.name)
-      debugLog(`[ProxyGroups] 过滤后需要测试的代理数量: ${names.length}`)
-
-      const url = delayManager.getUrl(groupName)
-      debugLog(`[ProxyGroups] 测试URL: ${url}, 超时: ${timeout}ms`)
-
       try {
-        await Promise.race([
-          delayManager.checkListDelay(names, groupName, timeout),
-          delayGroup(groupName, url, timeout).then((result) => {
-            debugLog(
-              `[ProxyGroups] getGroupProxyDelays返回结果数量:`,
-              Object.keys(result || {}).length,
+        if (groupName === 'PROXY' && triggerAutoSelect) {
+          // BUG-092: Reuse triggerAutoSelectFastestNode logic with skipDelay=true
+          await triggerAutoSelect(false, true)
+        } else {
+          const proxies = renderList
+            .filter(
+              (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
             )
-          }), // 查询group delays 将清除fixed(不关注调用结果)
-        ])
-        debugLog(`[ProxyGroups] 延迟测试完成，组: ${groupName}`)
+            .flatMap((e) => e.proxyCol || e.proxy!)
+            .filter(Boolean)
+
+          debugLog(`[ProxyGroups] 找到代理数量: ${proxies.length}`)
+
+          const providers = new Set(
+            proxies.map((p) => p!.provider!).filter(Boolean),
+          )
+
+          if (providers.size) {
+            debugLog(`[ProxyGroups] 发现提供者，数量: ${providers.size}`)
+            Promise.allSettled(
+              [...providers].map((p) => healthcheckProxyProvider(p)),
+            ).then(() => {
+              debugLog(`[ProxyGroups] 提供者健康检查完成`)
+              onProxies()
+            })
+          }
+
+          const names = proxies.filter((p) => !p!.provider).map((p) => p!.name)
+          debugLog(`[ProxyGroups] 过滤后需要测试的代理数量: ${names.length}`)
+
+          const url = delayManager.getUrl(groupName)
+          debugLog(`[ProxyGroups] 测试URL: ${url}, 超时: ${timeout}ms`)
+
+          await Promise.race([
+            delayManager.checkListDelay(names, groupName, timeout),
+            delayGroup(groupName, url, timeout).then((result) => {
+              debugLog(
+                `[ProxyGroups] getGroupProxyDelays返回结果数量:`,
+                Object.keys(result || {}).length,
+              )
+            }),
+          ])
+          debugLog(`[ProxyGroups] 延迟测试完成，组: ${groupName}`)
+        }
       } catch (error) {
-        console.error(`[ProxyGroups] 延迟测试出错，组: ${groupName}`, error)
+        console.error(`[ProxyGroups] 延迟测试或自动选路出错，组: ${groupName}`, error)
       } finally {
         setTestingGroups((prev) => ({ ...prev, [groupName]: false }))
         const headState = getGroupHeadState(groupName)

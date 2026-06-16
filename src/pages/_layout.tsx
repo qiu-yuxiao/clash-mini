@@ -1904,7 +1904,7 @@ const Layout = () => {
   }, [language])
 
   const triggerAutoSelectFastestNode = useCallback(
-    async (profileUid: string, isBackground = false) => {
+    async (profileUid: string, isBackground = false, skipDelay = false) => {
       if (!profileUid) return
       console.log(
         `[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest... (isBackground=${isBackground})`,
@@ -1914,7 +1914,9 @@ const Layout = () => {
       const currentSession = pollSessionRef.current
 
       // Wait 1500ms to allow Clash core to reload and apply config
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      if (!skipDelay) {
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+      }
       if (pollSessionRef.current !== currentSession) return
 
       // 1. Wait a bit for Clash core to reload and populate proxies (with retry loop)
@@ -2901,6 +2903,9 @@ const Layout = () => {
                 mode={clashConfig?.mode?.toLowerCase() || 'rule'}
                 isChainMode={false}
                 chainConfigData={null}
+                triggerAutoSelect={(isBackground = false, skipDelay = false) =>
+                  triggerAutoSelectFastestNode(currentProfileUid || '', isBackground, skipDelay)
+                }
               />
             </div>
 
