@@ -42,7 +42,7 @@ export const get3DButtonStyle = (
         'linear-gradient(135deg, #FF8A80 0%, #FF5252 30%, #D50000 75%, #880E4F 100%)'
       bevelShadowDark = isLight ? '#B71C1C' : '#5C0303'
     } else {
-      textColor = isLight ? '#3C2F0F' : '#FFE082'
+      textColor = isLight ? '#3C2F0F' : (variant === 'outlined' ? '#FFE082' : '#2C1F03')
       borderColor = isLight ? '#D4AF37' : '#8A6D00'
       backgroundStyle = isLight
         ? 'linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 35%, #FFF59D 70%, #FFE082 100%)'
