@@ -4148,6 +4148,21 @@ const Layout = () => {
                 >
                   🐱 GitHub 主页
                 </MenuItem>
+                <MenuItem
+                  onClick={async () => {
+                    handleHelpClose()
+                    try {
+                      await open(
+                        'https://github.com/qiu-yuxiao/clash-mini/wiki',
+                      )
+                    } catch (err) {
+                      console.error('Failed to open wiki link:', err)
+                    }
+                  }}
+                  sx={getMenuItemHoverStyle(theme, controlSkin)}
+                >
+                  💡 帮助指南 (Wiki)
+                </MenuItem>
                 <Divider
                   sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }}
                 />
