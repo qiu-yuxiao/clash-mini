@@ -40,6 +40,18 @@
 * **修改方针**：在 `button-styles.ts` 中根据 `variant` 动态设置文字颜色：对于实心（contained）默认按钮，将深色模式下的文字颜色调整为高对比度的深古铜黑 `#2C1F03`；对于描边（outlined）默认按钮，由于其背景是半透明深古铜，仍保持 `#FFE082` 以确保可读性。
 * **状态**：代码已修正，待确认。
 
+### **BUG-081** (导入或更新订阅链接后，节点列表不会立即更新，通常需要等待两分钟)
+* **缺陷描述与现象**：当导入新订阅链接或手动更新已有订阅时，主页的节点列表和测速选点逻辑不会立刻刷新，往往需要等待两分钟或手动切换配置才能看到最新的节点数据。
+* **排查原因与记忆**：
+  1. **手动更新订阅缺少触发链**：在 `handleUpdateProfile` 中，当更新当前激活的 profile 时，仅调用了 `enhanceProfiles()` 重载 Clash 核心配置，但没有调用 `triggerAutoSelectFastestNode` 或 `refreshProxy`，导致前端代理列表没有任何触发刷新机制。
+  2. **刷新接口无数据返回**：在 `app-data-provider.tsx` 的 `refreshProxy` 定义中，内部调用了 `await _refetchProxy()`，但未添加 `return` 语句。这导致 `refreshProxy()` 的返回值始终为 `undefined`。
+  3. **轮询机制抢跑失效**：因为 `refreshProxy` 返回 `undefined`，`triggerAutoSelectFastestNode` 在等待 Clash 核心重载的 while 循环中执行 `const freshProxies = await refreshProxy(...)` 时得到的也是 `undefined`，于是直接降级并使用旧的 proxies 缓存。在旧缓存中 `PROXY` 组已存在节点，导致 while 循环立即 break 退出。最终，选点测速均作用在旧节点上，新节点无法立即展示与测试。
+* **修改方针**：
+  1. **补全刷新接口 of 返回值**：在 `app-data-provider.tsx` 的 `refreshProxy` 中增加 `return await _refetchProxy()`。
+  2. **完善更新订阅的触发链**：在 `handleUpdateProfile` 中，若更新的是当前 active 的 profile，在 `enhanceProfiles()` 完成后，强制调用 `triggerAutoSelectFastestNode(currentProfileUid)` 触发测速和刷新。
+  3. **延迟轮询抢跑**：在 `triggerAutoSelectFastestNode` 开始轮询前，增加 `1500ms` 的短延时，确保 Clash 核心有足够的时间完成配置读取与应用，使首次 `refreshProxy` 能获取到真实的新配置节点。
+* **状态**：排查中。
+
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
@@ -49,7 +61,7 @@
 | **BUG-087** | 将现有的 Retro-3D 风格在 UI 中改名为 Trump-3D，并重构其视觉样式为奢华黄金金条风格。 | v1.2.9 | 代码已修正，已确认 |
 | **BUG-086** | 窄视口模式下底部的流量曲线图高频跌落至零并呈现锯齿状断裂的问题。 | v1.2.9 | 代码已修正，已确认 |
 | **BUG-085** | 自动刷新检测节点健康时，频现“所有线路都繁忙”误报弹窗，且后台检查无静默运行的问题。 | v1.2.9 | 代码已修正，已确认 |
-| **BUG-081** | 启动或切换订阅后自动选择最快节点延迟达2-3分钟，且解析的广告/假占位节点（如剩余流量、官网等）占据主页前几位并假连通干扰后台自动测速健康监测的问题。 | v1.2.8 | 代码已修正，已确认 |
+
 | **BUG-080** | 内核或程序更新检查时版本一致会直接弹出更新对话框，且如果在升级逻辑中触发了相同版本的升级，未在各层级安全熔断并显示正确的友好通知。 | v1.2.6 | 代码已修正，已确认 |
 | **BUG-078** | 在客户端中点击检查并尝试升级 Mihomo 内核时，内核无法成功下载或升级，没有做超时和多重代理检测。 | v1.2.5 | 代码已修正，已确认 |
 | **BUG-077** | 在客户端中点击检查并尝试升级 Mihomo 内核时，内核无法成功下载或升级，资源匹配不准确导致包匹配错误。 | v1.2.4 | 代码已修正，已确认 |

@@ -204,7 +204,7 @@ export const AppDataProvider = ({
     if (options?.forceFull) {
       forceFullProxiesRef.current = true
     }
-    await _refetchProxy()
+    return await _refetchProxy()
   })
   const refreshClashConfig = useStableFn(_refetchClashConfig)
   const refreshRules = useStableFn(_refetchRules)

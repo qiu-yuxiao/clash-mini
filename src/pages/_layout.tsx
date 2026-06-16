@@ -1796,6 +1796,10 @@ const Layout = () => {
       pollSessionRef.current += 1
       const currentSession = pollSessionRef.current
 
+      // Wait 1500ms to allow Clash core to reload and apply config
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      if (pollSessionRef.current !== currentSession) return
+
       // 1. Wait a bit for Clash core to reload and populate proxies (with retry loop)
       const groupName = 'PROXY'
       let group: any = null
@@ -2273,6 +2277,7 @@ const Layout = () => {
       await updateProfile(uid)
       if (uid === currentProfileUid) {
         await enhanceProfiles()
+        triggerAutoSelectFastestNode(currentProfileUid)
       }
       await mutateProfiles()
       showNotice.success('订阅更新成功')
