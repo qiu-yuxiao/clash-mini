@@ -36,8 +36,8 @@ export const GlowBorder = () => {
     case 'retro-3d':
       borderStyle = {
         border: '4px double transparent',
-        borderImage: 'linear-gradient(135deg, #FFC400, #0084FF) 4',
-        boxShadow: 'inset 0 0 8px rgba(212, 175, 55, 0.4)',
+        borderImage: 'linear-gradient(135deg, #FFE082, #FFC107, #B8860B) 4',
+        boxShadow: 'inset 0 0 8px rgba(212, 175, 55, 0.6)',
       }
       break
     case 'original':

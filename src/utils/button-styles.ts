@@ -30,31 +30,41 @@ export const get3DButtonStyle = (
     let bevelShadowDark: string
 
     if (colorType === 'primary') {
-      textColor = '#1E1200'
-      borderColor = isLight ? '#9E670B' : '#6E4302'
+      textColor = '#2C1F03'
+      borderColor = isLight ? '#8A6D00' : '#634E00'
       backgroundStyle =
-        'radial-gradient(circle at center, #FFD54F 0%, #FFA000 55%, #F57C00 80%, #E65100 100%)'
-      bevelShadowDark = isLight ? '#9E670B' : '#6E4302'
+        'linear-gradient(135deg, #FFE082 0%, #FFD54F 20%, #FFC107 45%, #FFB300 70%, #D4AF37 85%, #B8860B 100%)'
+      bevelShadowDark = isLight ? '#8A6D00' : '#5D4037'
     } else if (colorType === 'error') {
       textColor = '#ffffff'
       borderColor = isLight ? '#B71C1C' : '#6B0505'
       backgroundStyle =
-        'radial-gradient(circle at center, #FF5252 0%, #E53935 45%, #C62828 80%, #8E24AA 100%)'
-      bevelShadowDark = isLight ? '#B71C1C' : '#6B0505'
+        'linear-gradient(135deg, #FF8A80 0%, #FF5252 30%, #D50000 75%, #880E4F 100%)'
+      bevelShadowDark = isLight ? '#B71C1C' : '#5C0303'
     } else {
-      textColor = isLight ? '#2D3748' : theme.palette.text.primary
-      borderColor = isLight ? '#94A3B8' : '#0F172A'
+      textColor = isLight ? '#3C2F0F' : '#FFE082'
+      borderColor = isLight ? '#D4AF37' : '#8A6D00'
       backgroundStyle = isLight
-        ? 'radial-gradient(circle at center, #F8FAFC 0%, #F1F5F9 55%, #CBD5E1 100%)'
-        : 'radial-gradient(circle at center, #334155 0%, #1E293B 70%, #0F172A 100%)'
-      bevelShadowDark = isLight ? '#94A3B8' : '#0F172A'
+        ? 'linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 35%, #FFF59D 70%, #FFE082 100%)'
+        : 'linear-gradient(135deg, #FFF59D 0%, #FBC02D 35%, #F57F17 70%, #E65100 100%)'
+      bevelShadowDark = isLight ? '#B8860B' : '#755500'
     }
 
     if (variant === 'outlined' && colorType === 'default') {
       backgroundStyle = isLight
-        ? 'linear-gradient(to bottom, #ffffff 0%, #fafafa 100%)'
-        : 'linear-gradient(to bottom, #222a3d 0%, #161a29 100%)'
+        ? 'linear-gradient(to bottom, rgba(255, 253, 231, 0.4) 0%, rgba(255, 245, 157, 0.2) 100%)'
+        : 'linear-gradient(to bottom, rgba(42, 36, 19, 0.4) 0%, rgba(23, 20, 11, 0.2) 100%)'
     }
+
+    const glowColor =
+      colorType === 'error'
+        ? 'rgba(213, 0, 0, calc(0.15 * var(--vibrancy-factor, 1.0)))'
+        : 'rgba(255, 193, 7, calc(0.2 * var(--vibrancy-factor, 1.0)))'
+
+    const glowColorHover =
+      colorType === 'error'
+        ? 'rgba(213, 0, 0, calc(0.35 * var(--vibrancy-factor, 1.0)))'
+        : 'rgba(255, 193, 7, calc(0.4 * var(--vibrancy-factor, 1.0)))'
 
     return {
       fontFamily: 'Trebuchet MS, SimHei, sans-serif',
@@ -66,6 +76,10 @@ export const get3DButtonStyle = (
       borderColor,
       background: backgroundStyle,
       color: textColor,
+      textShadow:
+        colorType === 'error'
+          ? '0 -1px 0 rgba(0, 0, 0, 0.4)'
+          : '0 1px 0 rgba(255, 255, 255, 0.45)',
       boxShadow: isLight
         ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
@@ -74,13 +88,10 @@ export const get3DButtonStyle = (
            0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
            0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.15)${
-             colorType === 'primary' || colorType === 'error'
-               ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
-               : ''
-           }`
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.7),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+           inset -1px -1px 0 rgba(0, 0, 0, 0.15),
+           0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${glowColor}`
         : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
@@ -88,15 +99,20 @@ export const get3DButtonStyle = (
            0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
            0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.25)${
-             colorType === 'primary' || colorType === 'error'
-               ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
-               : ''
-           }`,
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
+           inset -1px -1px 0 rgba(0, 0, 0, 0.25),
+           0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${glowColor}`,
       '&:hover': {
         transform: 'translateY(-2px)',
+        background:
+          colorType === 'primary'
+            ? 'linear-gradient(135deg, #FFF59D 0%, #FFE082 20%, #FFD54F 45%, #FFC107 70%, #FFB300 85%, #D4AF37 100%)'
+            : colorType === 'error'
+              ? 'linear-gradient(135deg, #FFAB91 0%, #FF8A80 30%, #FF5252 75%, #C62828 100%)'
+              : isLight
+                ? 'linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 20%, #FFF59D 50%, #FFD54F 100%)'
+                : 'linear-gradient(135deg, #FFF9C4 0%, #FFF59D 20%, #FBC02D 50%, #F57F17 100%)',
         boxShadow: isLight
           ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
              0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
@@ -107,15 +123,10 @@ export const get3DButtonStyle = (
              0 calc(7px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
              0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
              0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
-             inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
-             inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-             inset -1px -1px 0 rgba(0, 0, 0, 0.1)${
-               colorType === 'primary' ||
-               colorType === 'error' ||
-               colorType === 'default'
-                 ? `, 0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
-                 : ''
-             }`
+             inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.8),
+             inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
+             inset -1px -1px 0 rgba(0, 0, 0, 0.1),
+             0 0 calc(12px * var(--vibrancy-factor, 1.0)) ${glowColorHover}`
           : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
              0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
              0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
@@ -125,23 +136,18 @@ export const get3DButtonStyle = (
              0 calc(7px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
              0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.45),
              0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
-             inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
-             inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-             inset -1px -1px 0 rgba(0, 0, 0, 0.2)${
-               colorType === 'primary' ||
-               colorType === 'error' ||
-               colorType === 'default'
-                 ? `, 0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
-                 : ''
-             }`,
+             inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.6),
+             inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+             inset -1px -1px 0 rgba(0, 0, 0, 0.2),
+             0 0 calc(12px * var(--vibrancy-factor, 1.0)) ${glowColorHover}`,
       },
       '&:active': {
-        transform: 'translateY(2px)',
+        transform: 'translateY(3px)',
         boxShadow: isLight
           ? `0 calc(1px * var(--depth-factor, 1.0)) 2px 0 rgba(0, 0, 0, 0.5),
-             inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45)`
+             inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.45)`
           : `0 calc(1px * var(--depth-factor, 1.0)) 2px 0 rgba(0, 0, 0, 0.7),
-             inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.65)`,
+             inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.65)`,
       },
     }
   }
@@ -457,37 +463,38 @@ export const get3DCardStyle = (
     let bevelShadowDark: string
 
     if (cardType === 'primary') {
-      textColor = '#1E1200'
-      borderColor = isLight ? '#9E670B' : '#6E4302'
+      textColor = '#2C1F03'
+      borderColor = isLight ? '#8A6D00' : '#634E00'
       backgroundStyle =
-        'radial-gradient(circle at center, #FFD54F 0%, #FFA000 55%, #F57C00 80%, #E65100 100%)'
-      bevelShadowDark = isLight ? '#9E670B' : '#6E4302'
+        'linear-gradient(135deg, #FFE082 0%, #FFD54F 20%, #FFC107 45%, #FFB300 70%, #D4AF37 85%, #B8860B 100%)'
+      bevelShadowDark = isLight ? '#8A6D00' : '#5D4037'
     } else if (cardType === 'upload') {
-      textColor = isLight ? '#7F6000' : '#FFEB3B'
-      borderColor = isLight ? '#D4AF37' : '#9C7A14'
+      textColor = isLight ? '#5D4037' : '#FFD54F'
+      borderColor = isLight ? '#B38F1E' : '#705407'
       backgroundStyle = isLight
-        ? 'radial-gradient(circle at center, #FFFDE7 0%, #FFF59D 45%, #FFD54F 75%, #FFB300 100%)'
-        : 'radial-gradient(circle at center, #FFA000 0%, #F57C00 50%, #E65100 80%, #803000 100%)'
+        ? 'linear-gradient(135deg, #FFE0B2 0%, #FFCC80 35%, #FFA726 70%, #FB8C00 100%)'
+        : 'linear-gradient(135deg, #E65100 0%, #D84315 40%, #BF360C 75%, #800000 100%)'
       bevelShadowDark = isLight ? '#B38F1E' : '#705407'
     } else if (cardType === 'download') {
-      textColor = isLight ? '#004D40' : '#80D8FF'
-      borderColor = isLight ? '#0084FF' : '#0D47A1'
+      textColor = isLight ? '#37474F' : '#90A4AE'
+      borderColor = isLight ? '#78909C' : '#37474F'
       backgroundStyle = isLight
-        ? 'radial-gradient(circle at center, #E3F2FD 0%, #90CAF9 45%, #42A5F5 75%, #1E88E5 100%)'
-        : 'radial-gradient(circle at center, #00B0FF 0%, #0091EA 50%, #0D47A1 80%, #0A3570 100%)'
-      bevelShadowDark = isLight ? '#0066CC' : '#08306B'
+        ? 'linear-gradient(135deg, #ECEFF1 0%, #CFD8DC 35%, #90A4AE 70%, #78909C 100%)'
+        : 'linear-gradient(135deg, #263238 0%, #37474F 40%, #455A64 75%, #1C252C 100%)'
+      bevelShadowDark = isLight ? '#78909C' : '#263238'
     } else {
-      textColor = isLight
-        ? '#2D3748'
-        : theme && theme.palette
-          ? theme.palette.text.primary
-          : '#ffffff'
-      borderColor = isLight ? '#94A3B8' : '#0F172A'
+      textColor = isLight ? '#3C2F0F' : '#FFE082'
+      borderColor = isLight ? '#D4AF37' : '#8A6D00'
       backgroundStyle = isLight
-        ? 'radial-gradient(circle at center, #F8FAFC 0%, #F1F5F9 55%, #CBD5E1 100%)'
-        : 'radial-gradient(circle at center, #334155 0%, #1E293B 70%, #0F172A 100%)'
-      bevelShadowDark = isLight ? '#94A3B8' : '#0F172A'
+        ? 'linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 35%, #FFF59D 70%, #FFE082 100%)'
+        : 'linear-gradient(135deg, #FFF59D 0%, #FBC02D 35%, #F57F17 70%, #E65100 100%)'
+      bevelShadowDark = isLight ? '#B8860B' : '#755500'
     }
+
+    const glowColor =
+      cardType === 'primary' || cardType === 'upload' || cardType === 'download'
+        ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.2 * var(--vibrancy-factor, 1.0)))`
+        : ''
 
     return {
       borderRadius: '6px',
@@ -504,15 +511,9 @@ export const get3DCardStyle = (
            0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
            0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.15)${
-             cardType === 'primary' ||
-             cardType === 'upload' ||
-             cardType === 'download'
-               ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
-               : ''
-           }`
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.7),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+           inset -1px -1px 0 rgba(0, 0, 0, 0.15)${glowColor}`
         : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
@@ -520,15 +521,9 @@ export const get3DCardStyle = (
            0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
            0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
            0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.25)${
-             cardType === 'primary' ||
-             cardType === 'upload' ||
-             cardType === 'download'
-               ? `, 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.15 * var(--vibrancy-factor, 1.0)))`
-               : ''
-           }`,
+           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
+           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
+           inset -1px -1px 0 rgba(0, 0, 0, 0.25)${glowColor}`,
     }
   }
 
@@ -700,35 +695,35 @@ export const get3DInputStyle = (theme: Theme): any => {
   if (skin === 'retro-3d') {
     return {
       '& .MuiOutlinedInput-root': {
-        backgroundColor: isLight ? '#ffffff' : 'transparent',
+        backgroundColor: isLight ? 'rgba(255, 253, 231, 0.8)' : 'rgba(26, 22, 14, 0.4)',
         boxShadow: isLight
-          ? `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.25),
+          ? `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.2),
              0 1px 0 rgba(255, 255, 255, 0.8)`
-          : `inset 0 calc(4px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.65),
+          : `inset 0 calc(4px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.6),
              0 1px 0 rgba(255, 255, 255, 0.08)`,
         transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
         '& .MuiOutlinedInput-notchedOutline': {
           borderWidth: 'calc(2px * var(--depth-factor, 1.0))',
           borderColor: isLight
-            ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.22)'
-            : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.2)',
+            ? 'rgba(212, 175, 55, 0.35)'
+            : 'rgba(212, 175, 55, 0.25)',
         },
         '&:hover .MuiOutlinedInput-notchedOutline': {
           borderWidth: 'calc(2px * var(--depth-factor, 1.0))',
           borderColor: isLight
-            ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.45)'
-            : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.4)',
+            ? 'rgba(212, 175, 55, 0.6)'
+            : 'rgba(212, 175, 55, 0.5)',
         },
         '&.Mui-focused': {
           boxShadow: isLight
-            ? `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.3),
+            ? `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.25),
                 0 1px 0 rgba(255, 255, 255, 0.8),
-                0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`
-            : `inset 0 calc(4px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.7),
+                0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.35 * var(--vibrancy-factor, 1.0)))`
+            : `inset 0 calc(4px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.65),
                 0 1px 0 rgba(255, 255, 255, 0.08),
-                0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.35 * var(--vibrancy-factor, 1.0)))`,
+                0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.35 * var(--vibrancy-factor, 1.0)))`,
           '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: primaryMain,
+            borderColor: isLight ? '#B8860B' : '#FFA000',
             borderWidth: 'calc(2px * var(--depth-factor, 1.0))',
           },
         },
@@ -888,17 +883,17 @@ export const get3DSegmentedContainerStyle = (themeOrIsLight: any): any => {
   if (skin === 'retro-3d') {
     return {
       boxShadow: isLight
-        ? `inset 0 calc(2.5px * var(--depth-factor, 1.0)) calc(4.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.25),
+        ? `inset 0 calc(2.5px * var(--depth-factor, 1.0)) calc(4.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.2),
            0 1px 0 rgba(255, 255, 255, 0.8)`
-        : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.75),
+        : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.7),
            0 1px 0 rgba(255, 255, 255, 0.08)`,
       border: '1px solid',
       borderColor: isLight
-        ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.25)'
-        : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.2)',
+        ? 'rgba(212, 175, 55, 0.35)'
+        : 'rgba(212, 175, 55, 0.22)',
       backgroundColor: isLight
-        ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.05)'
-        : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.08)',
+        ? 'rgba(212, 175, 55, 0.06)'
+        : 'rgba(212, 175, 55, 0.08)',
     }
   }
 
@@ -958,22 +953,22 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
       bottom: '1px',
       borderRadius: '3px',
       background:
-        'radial-gradient(circle at center, #FFD54F 0%, #FFA000 55%, #F57C00 80%, #E65100 100%)',
+        'linear-gradient(135deg, #FFE082 0%, #FFD54F 20%, #FFC107 45%, #FFB300 70%, #D4AF37 85%, #B8860B 100%)',
       boxShadow: isLight
-        ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 #9E670B,
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 #9E670B,
+        ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 #8A6D00,
+           0 calc(2px * var(--depth-factor, 1.0)) 0 0 #8A6D00,
            0 calc(2px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
-           inset 0 calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.45),
-           inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-           0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.2 * var(--vibrancy-factor, 1.0)))`
-        : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 #6E4302,
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 #6E4302,
+           inset 0 calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.7),
+           inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
+           0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.2 * var(--vibrancy-factor, 1.0)))`
+        : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 #5D4037,
+           0 calc(2px * var(--depth-factor, 1.0)) 0 0 #5D4037,
            0 calc(2px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
-           inset 0 calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-           inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.15),
-           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(var(--primary-color-rgb, 91, 92, 157), calc(0.25 * var(--vibrancy-factor, 1.0)))`,
+           inset 0 calc(1.5px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
+           inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
+           0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.25 * var(--vibrancy-factor, 1.0)))`,
       border: '1px solid',
-      borderColor: isLight ? '#9E670B' : '#6E4302',
+      borderColor: isLight ? '#8A6D00' : '#634E00',
     }
   }
 
@@ -1061,7 +1056,7 @@ export const get3DSegmentedActiveTextColor = (theme: any): string => {
   const isLight = theme.palette.mode === 'light'
   switch (skin) {
     case 'retro-3d':
-      return '#1E1200'
+      return '#2C1F03'
     case 'cyberpunk':
       return isLight ? '#ffffff' : '#000000'
     case 'monochrome':

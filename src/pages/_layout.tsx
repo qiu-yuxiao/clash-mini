@@ -225,8 +225,9 @@ const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
       fontWeight: 'bold',
       '&:hover': {
         background:
-          'radial-gradient(circle at center, #FFD54F 0%, #FFA000 100%) !important',
-        color: '#1E1200 !important',
+          'linear-gradient(135deg, #FFE082 0%, #FFD54F 35%, #FFB300 70%, #B8860B 100%) !important',
+        color: '#2C1F03 !important',
+        textShadow: '0 1px 0 rgba(255, 255, 255, 0.45)',
       },
     }
   }
@@ -1015,21 +1016,19 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
         height: 5,
         opacity: 0.85,
         bgcolor: isLight
-          ? 'rgba(212, 175, 55, 0.15)'
-          : 'rgba(212, 175, 55, 0.08)',
+          ? 'rgba(212, 175, 55, 0.25)'
+          : 'rgba(212, 175, 55, 0.15)',
         boxShadow: isLight
           ? 'inset 0 3px 5px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.8)'
           : 'inset 0 3px 5px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.08)',
-        border: `1px solid ${isLight ? 'rgba(212, 175, 55, 0.25)' : 'rgba(212, 175, 55, 0.12)'}`,
+        border: `1px solid ${isLight ? '#B8860B' : '#8A6D00'}`,
         borderRadius: 2.5,
       },
       '& .MuiSlider-track': {
         height: 5,
         border: 'none',
         borderRadius: 2.5,
-        background: isLight
-          ? `linear-gradient(to bottom, #FFA000 0%, #E65100 100%)`
-          : `linear-gradient(to bottom, rgba(255, 160, 0, 0.8) 0%, rgba(230, 81, 0, 0.9) 100%)`,
+        background: 'linear-gradient(to bottom, #FFE082 0%, #FFC107 50%, #B8860B 100%)',
         boxShadow: isLight
           ? 'inset 0 1px 0 rgba(255,255,255,0.4)'
           : 'inset 0 1px 0 rgba(255,255,255,0.08)',
@@ -1039,17 +1038,17 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
         height: 14,
         top: '50%',
         transform: 'translate(-50%, -50%)',
-        border: `1px solid ${isLight ? '#9E670B' : '#6E4302'}`,
+        border: `1px solid ${isLight ? '#8A6D00' : '#634E00'}`,
         background: isLight
-          ? `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFD54F 55%, #FFA000 100%)`
-          : `radial-gradient(circle at 35% 35%, #ffffff 0%, #FFA000 55%, #E65100 100%)`,
+          ? `radial-gradient(circle at 35% 35%, #FFFDE7 0%, #FFD54F 45%, #FFA000 80%, #B8860B 100%)`
+          : `radial-gradient(circle at 35% 35%, #FFF9C4 0%, #FFC107 45%, #FFA000 80%, #8A6D00 100%)`,
         boxShadow: isLight
           ? `0 calc(3px * var(--depth-factor, 1.0)) calc(6px * var(--depth-factor, 1.0)) rgba(0,0,0,0.25),
              inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.8),
-             0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.25 * var(--vibrancy-factor, 1.0)))`
+             0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.25 * var(--vibrancy-factor, 1.0)))`
           : `0 calc(4px * var(--depth-factor, 1.0)) calc(8px * var(--depth-factor, 1.0)) rgba(0,0,0,0.6),
              inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.4),
-             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
+             0 0 calc(10px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.3 * var(--vibrancy-factor, 1.0)))`,
         transition:
           'transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out',
         '&:hover, &.Mui-focusVisible': {
@@ -1058,10 +1057,10 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
           boxShadow: isLight
             ? `0 calc(5px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) rgba(0,0,0,0.35),
                inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.9),
-               0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.35 * var(--vibrancy-factor, 1.0)))`
+               0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.35 * var(--vibrancy-factor, 1.0)))`
             : `0 calc(6px * var(--depth-factor, 1.0)) calc(12px * var(--depth-factor, 1.0)) rgba(0,0,0,0.7),
                inset 0 calc(1px * var(--depth-factor, 1.0)) 0 rgba(255,255,255,0.5),
-               0 0 calc(14px * var(--vibrancy-factor, 1.0)) rgba(255, 160, 0, calc(0.4 * var(--vibrancy-factor, 1.0)))`,
+               0 0 calc(14px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.4 * var(--vibrancy-factor, 1.0)))`,
         },
         '&.Mui-active': {
           transform: 'translate(-50%, -50%) scale(0.92)',
@@ -4284,7 +4283,7 @@ const Layout = () => {
                 {[
                   {
                     key: 'retro-3d',
-                    label: 'Retro-3d',
+                    label: 'Trump-3D',
                     font: 'Trebuchet MS, SimHei, sans-serif',
                   },
                   {

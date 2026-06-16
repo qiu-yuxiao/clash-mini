@@ -111,7 +111,45 @@ body {
    ========================================================================== */
 
 html[data-control-skin="retro-3d"] {
-  /* Keeps default styling in index.scss */
+  .theme-panel {
+    border: 4px double #B8860B !important;
+    background: linear-gradient(135deg, #1A160E 0%, #2A2413 50%, #17140B 100%) !important;
+    box-shadow: 
+      inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.2 * var(--depth-factor, 1.0))),
+      inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.55 * var(--depth-factor, 1.0))),
+      0 calc(8px * var(--depth-factor, 1.0)) calc(32px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, calc(0.3 * var(--depth-factor, 1.0))),
+      0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.2 * var(--vibrancy-factor, 1.0))) !important;
+  }
+
+  .theme-crystal-card {
+    border: 1px solid rgba(212, 175, 55, calc(0.25 + 0.15 * var(--depth-factor, 1.0))) !important;
+    background: linear-gradient(135deg, #252013 0%, #1E1A0F 100%) !important;
+    box-shadow: 
+      inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.25 * var(--depth-factor, 1.0))),
+      inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.6 * var(--depth-factor, 1.0))),
+      0 calc(4px * var(--depth-factor, 1.0)) calc(16px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.2 * var(--depth-factor, 1.0))),
+      0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.18 * var(--vibrancy-factor, 1.0))) !important;
+  }
+}
+
+html[data-theme-mode="light"][data-control-skin="retro-3d"] {
+  .theme-panel {
+    background: linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 50%, #FFF59D 100%) !important;
+    box-shadow: 
+      inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(255, 255, 255, calc(0.65 * var(--depth-factor, 1.0))),
+      inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(138, 109, 0, calc(0.3 * var(--depth-factor, 1.0))),
+      0 calc(8px * var(--depth-factor, 1.0)) calc(32px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, calc(0.15 * var(--depth-factor, 1.0))),
+      0 0 calc(12px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.18 * var(--vibrancy-factor, 1.0))) !important;
+  }
+
+  .theme-crystal-card {
+    background: linear-gradient(135deg, #FFFDF7 0%, #FFF9E6 100%) !important;
+    box-shadow: 
+      inset calc(1px * var(--depth-factor, 1.0)) calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(255, 255, 255, 0.8),
+      inset calc(-1px * var(--depth-factor, 1.0)) calc(-1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(138, 109, 0, calc(0.35 * var(--depth-factor, 1.0))),
+      0 calc(4px * var(--depth-factor, 1.0)) calc(16px * var(--depth-factor, 1.0)) rgba(0, 0, 0, calc(0.08 * var(--depth-factor, 1.0))),
+      0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.15 * var(--vibrancy-factor, 1.0))) !important;
+  }
 }
 
 html[data-control-skin="modern-flat"] {
