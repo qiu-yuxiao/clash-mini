@@ -1998,7 +1998,8 @@ const Layout = () => {
           const isFinalSelection =
             healthyNodes.length >= 5 ||
             (totalFilteredValidNodes > 0 &&
-              testedCount >= totalFilteredValidNodes) ||
+              testedCount >= totalFilteredValidNodes &&
+              (healthyNodes.length >= 1 || elapsed >= 6)) ||
             elapsed >= 15
 
           if (isFinalSelection) {
@@ -2015,11 +2016,13 @@ const Layout = () => {
                 )
               }
             } else {
-              showNotice.error(
-                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                  所有线路都繁忙，请耐心等待。
-                </span>,
-              )
+              if (!isBackground) {
+                showNotice.error(
+                  <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                    所有线路都繁忙，请耐心等待。
+                  </span>,
+                )
+              }
             }
             hasSelected = true
             break

@@ -1783,6 +1783,10 @@
         - **启动时子集过滤有效性 (BUG-083)**：在自动选点函数 `triggerAutoSelectFastestNode` 中，用于解析 `proxy-head-state` 过滤设置的 profile ID，必须直接使用参数传入的 `profileUid`。禁止依赖 `profiles?.current` 等可能过时或启动时未就绪的 React 状态闭包，以防程序刚启动时选点逻辑偏离用户过滤后的子集节点。
         - **全局唯一 Dummy 过滤点 (BUG-084)**：为了避免前端在测速和界面渲染中层层叠加、重复过滤导致代码臃肿和难以维护，仅在数据源层（`calcuProxies`/`calcuProxyProviders`/`fetchProxies`）保留唯一的 dummy 节点过滤规则，前端的其他模块（包括 `triggerAutoSelectFastestNode` 内的 `validNodes`）禁止再次使用 `!isDummyNode` 进行多重过滤。
 
+      * **后台检测静默与测速状态缓冲期设计 (BUG-085)**：
+        - **后台静默检测**：任何在后台触发的自动测速切换逻辑（`isBackground = true`），都必须保证 100% 的静默，不仅成功通知需要被过滤，其产生的错误通知（如 `showNotice.error("所有线路都繁忙")`）也必须加上 `if (!isBackground)` 条件进行完全屏蔽。
+        - **测速状态判定与延迟缓冲**：当底层核心（Clash Core）开始对 Provider 或节点列表运行测速时，节点会经历短时间的历史数据重置或测试状态反馈（延迟返回 `0` 或 `-2`）。为避免轮询刚开始的 500ms 即误判为“测速全部结束但无健康节点”从而抢跑退出，当且仅当未扫描到任何健康可用节点时（`healthyNodes.length === 0`），测速轮询必须等待至少 **6 秒** 缓冲期，给核心留出足够时间返回真正的可用延迟数据。
+
 
 
 
