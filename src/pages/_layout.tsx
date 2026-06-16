@@ -110,6 +110,7 @@ import {
   healthcheckProxyProvider,
   closeAllConnections,
   selectNodeForGroup,
+  getBaseConfig,
 } from 'tauri-plugin-mihomo-api'
 
 import {
@@ -1913,11 +1914,55 @@ const Layout = () => {
       pollSessionRef.current += 1
       const currentSession = pollSessionRef.current
 
-      // Wait 1500ms to allow Clash core to reload and apply config
+      // 并发探测内核与物理网络是否就绪
       if (!skipDelay) {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+        const probeStartTime = Date.now()
+        
+        const probeAPIPromise = (async () => {
+          while (Date.now() - probeStartTime < 20000) {
+            if (pollSessionRef.current !== currentSession) return false
+            try {
+              await getBaseConfig()
+              console.log('[BUG-093] Probe A (API configs ready) succeeded.')
+              return true
+            } catch {
+              // ignore and retry
+            }
+            await new Promise((resolve) => setTimeout(resolve, 200))
+          }
+          return false
+        })()
+
+        const probeNetworkPromise = (async () => {
+          const testUrl = delayManager.getUrl('PROXY') || 'http://cp.cloudflare.com/generate_204'
+          while (Date.now() - probeStartTime < 20000) {
+            if (pollSessionRef.current !== currentSession) return false
+            try {
+              // 针对 DIRECT 节点发起单次延迟测试
+              const result = await cmdGetProxyDelay('DIRECT', 3000, testUrl)
+              if (result && result.delay > 0 && result.delay < 1e6) {
+                console.log(`[BUG-093] Probe B (Physical network direct delay: ${result.delay}ms) succeeded.`)
+                return true
+              }
+            } catch {
+              // ignore and retry
+            }
+            await new Promise((resolve) => setTimeout(resolve, 200))
+          }
+          return false
+        })()
+
+        console.log('[BUG-093] Starting concurrent probes A & B for kernel readiness...')
+        const [apiReady, networkReady] = await Promise.all([probeAPIPromise, probeNetworkPromise])
+        
+        if (pollSessionRef.current !== currentSession) return
+        
+        if (!apiReady || !networkReady) {
+          console.warn(`[BUG-093] Probes timed out or failed: apiReady=${apiReady}, networkReady=${networkReady}.`)
+        } else {
+          console.log('[BUG-093] Both probes A & B succeeded. Kernel and network are ready.')
+        }
       }
-      if (pollSessionRef.current !== currentSession) return
 
       // 1. Wait a bit for Clash core to reload and populate proxies (with retry loop)
       const groupName = 'PROXY'

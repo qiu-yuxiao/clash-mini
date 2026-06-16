@@ -158,15 +158,17 @@ export const useProfiles = () => {
             continue
           }
 
-          const existsInGroup = availableProxies.some((proxy) => {
-            if (typeof proxy === 'string') {
-              return proxy === savedProxy
-            }
+          const stripSuffix = (n: string) => {
+            return n.replace(/\s\(\d{6}\)$/, '').trim()
+          }
 
-            return proxy?.name === savedProxy
+          const matchedProxy = availableProxies.find((proxy) => {
+            const pName = typeof proxy === 'string' ? proxy : proxy?.name
+            if (!pName) return false
+            return stripSuffix(pName) === stripSuffix(savedProxy)
           })
 
-          if (!existsInGroup) {
+          if (!matchedProxy) {
             console.warn(
               `[ActivateSelected] 保存的代理 ${savedProxy} 不存在于代理组 ${name}`,
             )
@@ -175,13 +177,15 @@ export const useProfiles = () => {
             continue
           }
 
-          if (savedProxy !== now) {
+          const matchedProxyName = typeof matchedProxy === 'string' ? matchedProxy : matchedProxy.name
+
+          if (matchedProxyName !== now) {
             debugLog(
-              `[ActivateSelected] 需要切换代理组 ${name}: ${now} -> ${savedProxy}`,
+              `[ActivateSelected] 需要切换代理组 ${name}: ${now} -> ${matchedProxyName}`,
             )
             hasChange = true
             try {
-              await selectNodeForGroup(name, savedProxy)
+              await selectNodeForGroup(name, matchedProxyName)
             } catch (error: unknown) {
               console.warn(
                 `[ActivateSelected] 切换代理组 ${name} 失败:`,
@@ -190,7 +194,7 @@ export const useProfiles = () => {
             }
           }
 
-          newSelected.push({ name, now: savedProxy })
+          newSelected.push({ name, now: matchedProxyName })
         }
 
         if (!hasChange) {
