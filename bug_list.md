@@ -19,20 +19,11 @@
 * **修改方针**：暂定测试.
 * **状态**：代码已修正，待确认。
 
-
-### **BUG-082** (程序运行时WebView2后台内存占用过高，隐藏或最小化时没有降低内存使用目标)
-* **缺陷描述与现象**：程序后台运行时 WebView2 的 GPU 与 Renderer 进程内存占用较高，尤其是在窗口最小化或完全隐藏到系统托盘时，未对 WebView2 的内存使用目标（Memory Usage Target Level）进行限制和回收，导致物理内存占用居高不下。
-* **排查原因与记忆**：原版程序在窗口最小化/隐藏时并未主动向 WebView2 传递低内存占用指令。Tauri 默认也不提供隐藏窗口时自动设置 WebView2 内存级的方法。Windows 下 WebView2 的 COM 接口 `ICoreWebView2_19` 提供了 `SetMemoryUsageTargetLevel` 接口，可以通过传入 `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW` 主动降低后台/不可见状态下的 WebView 内存分配目标。
-* **修改方针**：
-  1. 在 `src-tauri/src/utils/window_manager.rs` 中实现 `optimize_window_memory`。
-  2. 利用 Tauri WebviewWindow 的 `with_webview` 方法，获取底层 webview，在 Windows 平台下将其 controller cast 为 `ICoreWebView2_19`。
-  3. 当窗口最小化/托盘隐藏（`is_inactive: true`）时，调用 `SetMemoryUsageTargetLevel(COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW)`。当窗口重新获得焦点/可见时，恢复 `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL`。
-* **状态**：代码已修正，待确认。
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
+| **BUG-082** | 程序运行时 WebView2 后台内存占用过高，最小化或隐藏到系统托盘时未对内存使用目标进行回收优化。 | v1.3.2 | 代码已修正，已确认 |
 | **BUG-092** | 手动触发全体测速完成后自动切换到过滤子集中的最快节点的问题。 | v1.3.1 | 代码已修正，已确认 |
 | **BUG-091** | 订阅配置输入框无法使用鼠标右键进行复制、粘贴等右键菜单操作的问题。 | v1.3.1 | 代码已修正，已确认 |
 | **BUG-090** | Trump-3D 皮肤在深色模式下设置模组与出口节点栏文字因为白色导致模糊不清的问题。 | v1.3.1 | 代码已修正，已确认 |
