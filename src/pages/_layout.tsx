@@ -44,7 +44,7 @@ import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-shell'
-import { check } from '@tauri-apps/plugin-updater'
+import { check, type Update } from '@tauri-apps/plugin-updater'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -1237,6 +1237,16 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
   return {}
 }
 
+interface GithubAsset {
+  name: string
+  browser_download_url: string
+}
+
+interface GithubRelease {
+  tag_name: string
+  assets: GithubAsset[]
+}
+
 const Layout = () => {
   // Active Skin State
   const [controlSkin, setControlSkin] = useState(() => {
@@ -1311,7 +1321,7 @@ const Layout = () => {
 
   // Client Update states
   const [clientUpdateOpen, setClientUpdateOpen] = useState(false)
-  const [clientUpdateObj, setClientUpdateObj] = useState<any>(null)
+  const [clientUpdateObj, setClientUpdateObj] = useState<Update | null>(null)
   const [clientStatus, setClientStatus] = useState<
     'idle' | 'downloading' | 'error' | 'done'
   >('idle')
@@ -1321,7 +1331,7 @@ const Layout = () => {
 
   // Core Update states
   const [coreUpdateOpen, setCoreUpdateOpen] = useState(false)
-  const [coreUpdateRelease, setCoreUpdateRelease] = useState<any>(null)
+  const [coreUpdateRelease, setCoreUpdateRelease] = useState<GithubRelease | null>(null)
   const [coreUpgradeStatus, setCoreUpgradeStatus] = useState<string>('idle')
   const [coreUpgradeProgress, setCoreUpgradeProgress] = useState<number>(0)
   const [coreUpgradeMessage, setCoreUpgradeMessage] = useState<string>('')
@@ -4791,7 +4801,7 @@ const Layout = () => {
             disabled={
               clientStatus === 'downloading' ||
               clientStatus === 'done' ||
-              (clientUpdateObj &&
+              !!(clientUpdateObj &&
                 isSameVersion(appVersion, clientUpdateObj.version))
             }
             sx={{
