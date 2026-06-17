@@ -1,11 +1,21 @@
 import { useEffect, useState } from 'react'
 
+const getIsMinimal = (): boolean => {
+  if (typeof document !== 'undefined' && document.body) {
+    return document.body.clientWidth <= 285
+  }
+  if (typeof window !== 'undefined') {
+    return window.innerWidth <= 285
+  }
+  return false
+}
+
 export const useWindowWidth = () => {
-  const [isMinimal, setIsMinimal] = useState(() => document.body.clientWidth <= 285)
+  const [isMinimal, setIsMinimal] = useState(getIsMinimal)
 
   useEffect(() => {
     const handleResize = () => {
-      const minimal = document.body.clientWidth <= 285
+      const minimal = getIsMinimal()
       setIsMinimal((prev) => {
         if (prev !== minimal) {
           return minimal
@@ -22,3 +32,4 @@ export const useWindowWidth = () => {
 
   return { width: isMinimal ? 270 : 640 }
 }
+
