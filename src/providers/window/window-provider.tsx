@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { useWindowSnap } from '@/hooks/useWindowSnap'
+import { useWindowSnap } from '@/hooks/use-window-snap'
 import debounce from '@/utils/debounce'
 
 import { WindowContext } from './window-context'
