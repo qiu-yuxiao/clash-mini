@@ -35,11 +35,11 @@ export const useProfiles = () => {
     refetchInterval: false,
   })
 
-  const mutateProfiles = async () => {
+  const mutateProfiles = useCallback(async () => {
     await refetch()
-  }
+  }, [refetch])
 
-  const patchProfiles = async (
+  const patchProfiles = useCallback(async (
     value: Partial<IProfilesConfig>,
     signal?: AbortSignal,
     options?: { deferRefreshOnSuccess?: boolean },
@@ -67,16 +67,16 @@ export const useProfiles = () => {
       await mutateProfiles()
       throw error
     }
-  }
+  }, [mutateProfiles])
 
-  const patchCurrent = async (value: Partial<IProfileItem>) => {
+  const patchCurrent = useCallback(async (value: Partial<IProfileItem>) => {
     if (profiles?.current) {
       await patchProfile(profiles.current, value)
       if (!value.selected) {
         mutateProfiles()
       }
     }
-  }
+  }, [profiles, mutateProfiles])
 
   // 根据selected的节点选择
   const activateSelected = useCallback(
