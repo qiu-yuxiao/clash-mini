@@ -1,4 +1,3 @@
-import type { IVergeConfig } from '@/types/verge'
 import { CloseRounded } from '@mui/icons-material'
 import {
   Snackbar,
@@ -17,6 +16,7 @@ import {
   showNotice,
 } from '@/services/notice-service'
 import type { TranslationKey } from '@/types/generated/i18n-keys'
+import type { IVergeConfig } from '@/types/verge'
 
 type NoticePosition = NonNullable<IVergeConfig['notice_position']>
 type NoticeItem = ReturnType<typeof getSnapshotNotices>[number]

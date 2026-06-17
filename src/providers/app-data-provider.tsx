@@ -1,4 +1,3 @@
-import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -12,13 +11,14 @@ import {
   getSystemProxy,
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
+import { isDummyNode } from '@/utils/node'
 import {
   getBaseConfig,
   getRuleProviders,
   getRules,
   getProxyByName,
 } from 'tauri-plugin-mihomo-api'
-import { isDummyNode } from '@/utils/node'
 
 import {
   ClashConfigContext,

@@ -1,8 +1,8 @@
-import type { IConnectionsItem } from '@/types/connection'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { useVisibility } from '@/hooks/use-visibility'
+import type { IConnectionsItem } from '@/types/connection'
 import { getConnections, MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
@@ -104,8 +104,9 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
 
                   // 1. Process Removals
                   const dropped: IConnectionsItem[] = []
-                  for (let i = 0; i < delta.removed.length; i++) {
-                    const id = delta.removed[i]
+                  const removed = delta.removed ?? []
+                  for (let i = 0; i < removed.length; i++) {
+                    const id = removed[i]
                     const conn = activeMap.get(id)
                     if (conn) {
                       activeMap.delete(id)
@@ -116,10 +117,11 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                   const updatedSet = new Set<string>()
 
                   // 2. Process Updates (Flat 1D layout: [id1, up1, down1, id2, up2, down2, ...])
-                  for (let i = 0; i < delta.updated.length; i += 3) {
-                    const id = delta.updated[i] as string
-                    const upload = delta.updated[i + 1] as number
-                    const download = delta.updated[i + 2] as number
+                  const updated = delta.updated ?? []
+                  for (let i = 0; i < updated.length; i += 3) {
+                    const id = updated[i] as string
+                    const upload = updated[i + 1] as number
+                    const download = updated[i + 2] as number
                     const conn = activeMap.get(id)
                     if (conn) {
                       conn.curUpload = upload - conn.upload
@@ -142,8 +144,9 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                   }
 
                   // 3. Process Additions
-                  for (let i = 0; i < delta.added.length; i++) {
-                    const conn = delta.added[i]
+                  const added = delta.added ?? []
+                  for (let i = 0; i < added.length; i++) {
+                    const conn = added[i]
                     activeMap.set(conn.id, {
                       ...conn,
                       curUpload: 0,

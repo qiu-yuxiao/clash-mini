@@ -176,11 +176,7 @@ impl SilentUpdater {
         let bytes = match tokio::task::spawn_blocking(Self::read_cache_bytes).await {
             Ok(Ok(b)) => b,
             _ => {
-                logging!(
-                    warn,
-                    Type::System,
-                    "Failed to read cached update bytes, cleaning up"
-                );
+                logging!(warn, Type::System, "Failed to read cached update bytes, cleaning up");
                 Self::delete_cache();
                 return false;
             }
@@ -474,10 +470,7 @@ impl SilentUpdater {
 
         let bytes_clone = bytes.clone();
         let version_clone = version.clone();
-        let write_result = tokio::task::spawn_blocking(move || {
-            Self::write_cache(&bytes_clone, &version_clone)
-        })
-        .await;
+        let write_result = tokio::task::spawn_blocking(move || Self::write_cache(&bytes_clone, &version_clone)).await;
 
         match write_result {
             Ok(Ok(())) => {}

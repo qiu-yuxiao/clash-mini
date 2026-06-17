@@ -2285,8 +2285,24 @@
 - **安全性提升（更换默认密码）**：
   - 彻底废弃所有硬编码的 `"set-your-secret"` 默认密码。配置初始化及模板创建时，统一将外部控制密钥 `secret` 默认为 **`"adapted-by-qiu-yuxiao"`**，保护控制接口不受其他未知本地程序窥探。
 - **控制端口的启动冲突自动规避**：
-  - 启动阶段，配置管理器动态检测默认控制端口（默认 `9098`）的可用性。
+  - 启动阶段，配置管理器动态检测默认控制端口（默认 `9098`） 的可用性。
   - **端口被占检测与复用**：若端口无法 bind，程序向该端口发送验证请求。如果带上 `"adapted-by-qiu-yuxiao"` 密钥的 `/configs` API 请求返回成功，代表该端口正由我们自己上一次运行残留的进程所占用，此时直接复用该端口进行通讯，不视为冲突。
   - **顺延分配**：若验证失败，判定为被其他第三方服务真实抢占。程序自动向后递增探测（`9098` $\rightarrow$ `9099` $\rightarrow$ `9100`...），找到首个绝对空闲的端口作为新的控制端口，并更新写入配置文件。
   - **动态连接**：整个探测、自增分配过程全部在软件启动初始化阶段无感完成，后端通信与前端 API 端口均动态读取此配置，对小白用户完全屏蔽。
+
+## ⚡ 二十七、 布局组件单体化与状态同步规范 (BUG-102)
+为了解决 `src/pages/_layout.tsx` 原上帝组件体积过于庞大、渲染开销过高以及代码难以维护的问题，对布局结构实施模块化拆分，并制定以下设计与同步规范：
+- **单一职责原则与大组件拆分**：
+  - 将庞大的上帝组件 `_layout.tsx` 拆分为职责单一的子组件（`ActiveNodeStatusCard`、`MiniTrafficPanel`、`ProfileImportCard`、`TakeoverModeCard`、`RoutingPreferenceCard`、`BasicSettingsCard`、`ConnectionsPanel`、`HelpMenuButton` 和 `LayoutDialogs`），所有拆分出的子组件统一收拢在 `src/pages/_layout/components/` 目录下。
+- **样式与公共辅助函数抽离**：
+  - 将原布局文件中零散定义的 3D 控件样式渲染辅助函数、网络延迟等级映射函数、版本比对辅助函数等公共逻辑提取至独立的 `src/pages/_layout/utils/style-helpers.tsx` 模块。
+  - 必须使用 `.tsx` 扩展名以支持 React 的 JSX 语法（如 `<SignalNone />`），并在各拆分子组件和主布局组件中通过 ESM 方式引入。
+- **父子组件状态传递与类型对齐**：
+  - 主布局组件 `Layout` 统一维护全局共享状态（如 `profileItems`、`currentProfileUid`、`language` 等），并作为 Props 传入子组件中进行渲染。
+  - **类型完备性**：子组件的 Props 定义中，对于可能为 `null` 或 `undefined` 的状态变量（如 `currentProfileUid`、`language` 等）必须定义为可选类型（如 `currentProfileUid?: string`, `language?: string`），严格对齐父组件的实际类型，杜绝 TypeScript 强类型校验失败。
+  - **回调函数兼容性**：子组件的 Props 传递的回调函数接口必须与底座全局组件完美兼容。例如，传递给 `ConnectionsPanel` 内部 `<BaseSearchBox>` 的 `handleSearch` 函数类型必须定义为 `(match: (content: string) => boolean, state: any) => void`，严禁缩减签名导致类型推导冲突。
+- **LocalStorage 纯净读取防污染规范**：
+  - 严禁在 React 组件的渲染路径（Render path）上同步调用外部 I/O 接口（如 `localStorage.getItem`）。这违背了 React 的纯函数组件设计准则，会导致在组件重绘或挂载时产生不可预测的状态回滚或性能退化。
+  - **首选惰性初始化**：任何需要在挂载时获取的本地持久化状态，必须将其读取逻辑包裹在 `useState` 的**惰性初始化函数（Lazy Initializer）**中。
+  - *示例写法*：`const [controlSkin, setControlSkin] = useState(() => localStorage.getItem('clash-mini-control-skin') || 'retro-3d')`，确保本地 I/O 只在组件首次挂载时执行一次。
 

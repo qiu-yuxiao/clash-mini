@@ -1,4 +1,3 @@
-import type { ITrafficDataPoint } from '@/types/traffic'
 import { Box, useTheme } from '@mui/material'
 import type { Ref } from 'react'
 import {
@@ -15,6 +14,7 @@ import { useTranslation } from 'react-i18next'
 
 import { useTrafficGraphDataEnhanced } from '@/hooks/use-traffic-monitor'
 import { useVerge } from '@/hooks/use-verge'
+import type { ITrafficDataPoint } from '@/types/traffic'
 import { debugLog } from '@/utils/debug'
 import parseTraffic from '@/utils/parse-traffic'
 import {

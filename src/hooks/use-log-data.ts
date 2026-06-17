@@ -1,9 +1,9 @@
-import type { ILogItem } from '@/types/clash'
 import { useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useEffect, useRef } from 'react'
 
 import { getClashLogs } from '@/services/cmds'
+import type { ILogItem } from '@/types/clash'
 import { MihomoWebSocket, type LogLevel } from 'tauri-plugin-mihomo-api'
 
 import { useClashLog } from './use-clash-log'

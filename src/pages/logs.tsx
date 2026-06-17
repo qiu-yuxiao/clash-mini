@@ -1,4 +1,3 @@
-import type { LogFilter } from '@/types/clash'
 import {
   PlayCircleOutlineRounded,
   PauseCircleOutlineRounded,
@@ -20,6 +19,7 @@ import {
 import LogItem from '@/components/log/log-item'
 import { useClashLog } from '@/hooks/use-clash-log'
 import { useLogData } from '@/hooks/use-log-data'
+import type { LogFilter } from '@/types/clash'
 import { get3DButtonStyle } from '@/utils/button-styles'
 
 const LogPage = () => {

@@ -1,4 +1,3 @@
-import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import {
   alpha,
   Box,
@@ -48,6 +47,7 @@ const popIn = keyframes`
 import { BaseLoading } from '@/components/base'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
 import delayManager from '@/services/delay'
+import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 
 import { useWindowWidth } from './use-window-width'
 

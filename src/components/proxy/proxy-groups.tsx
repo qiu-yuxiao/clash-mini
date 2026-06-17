@@ -1,4 +1,3 @@
-import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { ExpandMoreRounded } from '@mui/icons-material'
 import {
   Alert,
@@ -13,6 +12,7 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
+import { invoke } from '@tauri-apps/api/core'
 import { useLockFn } from 'ahooks'
 import {
   type Key,
@@ -34,10 +34,10 @@ import { useVisibility } from '@/hooks/use-visibility'
 import { useProxiesData } from '@/providers/app-data-context'
 import { calcuProxies, updateProxyChainConfigInRuntime } from '@/services/cmds'
 import delayManager from '@/services/delay'
+import { showNotice } from '@/services/notice-service'
+import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { delayGroup, healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
-import { invoke } from '@tauri-apps/api/core'
-import { showNotice } from '@/services/notice-service'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
@@ -376,7 +376,7 @@ export const ProxyGroups = (props: Props) => {
 
           // 安全获取延迟数据，如果没有延迟数据则设为 undefined
           const delay =
-            proxy.history && proxy.history.length > 0
+            proxy.history?.length > 0
               ? proxy.history[proxy.history.length - 1].delay
               : undefined
 

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useReducer } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { useCallback, useEffect, useReducer } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 

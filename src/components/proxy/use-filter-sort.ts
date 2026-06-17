@@ -1,8 +1,8 @@
-import type { IProxyItem } from '@/types/clash'
 import { useEffect, useMemo, useReducer, useRef } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
 import delayManager from '@/services/delay'
+import type { IProxyItem } from '@/types/clash'
 import { compileStringMatcher } from '@/utils/search-matcher'
 
 // default | delay | alphabet

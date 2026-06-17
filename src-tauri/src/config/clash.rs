@@ -63,10 +63,7 @@ impl IClashTemp {
                         let mut port = addr.port();
                         if is_port_conflict(port, secret).await {
                             port = find_free_controller_port(9098, secret);
-                            map.insert(
-                                "external-controller".into(),
-                                format!("127.0.0.1:{}", port).into(),
-                            );
+                            map.insert("external-controller".into(), format!("127.0.0.1:{}", port).into());
                         }
                     }
                 }

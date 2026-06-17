@@ -168,7 +168,7 @@ export const ProxyRender = (props: RenderProps) => {
           <Tooltip title={t('proxies.page.labels.proxyCount')} arrow>
             <Chip
               size="small"
-              label={`${group.all.length}`}
+              label={`${group.all?.length ?? 0}`}
               sx={{
                 mr: 1,
                 backgroundColor: (theme) =>

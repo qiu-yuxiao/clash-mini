@@ -1,4 +1,3 @@
-import type { IConfigData } from '@/types/clash'
 import { useQuery } from '@tanstack/react-query'
 import { useLockFn } from 'ahooks'
 import { useCallback, useMemo } from 'react'
@@ -9,6 +8,7 @@ import {
   patchClashConfig,
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import type { IConfigData } from '@/types/clash'
 import { getVersion } from 'tauri-plugin-mihomo-api'
 
 type MutateClashUpdater =

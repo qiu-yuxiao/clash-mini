@@ -1,10 +1,10 @@
-import type { IConnectionsItem } from '@/types/connection'
 import { Box, Button, Popover, useTheme, alpha } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
 import { closeConnection } from 'tauri-plugin-mihomo-api'

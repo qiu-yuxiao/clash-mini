@@ -1,4 +1,3 @@
-import type { IProfileItem, IProfilesConfig } from '@/types/profile'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
@@ -9,6 +8,7 @@ import {
   patchProfilesConfig,
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
+import type { IProfileItem, IProfilesConfig } from '@/types/profile'
 import { debugLog } from '@/utils/debug'
 import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 

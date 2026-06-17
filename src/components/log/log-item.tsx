@@ -1,8 +1,8 @@
-import type { ILogItem } from '@/types/clash'
 import { styled, Box } from '@mui/material'
 import type { ReactNode } from 'react'
 
 import type { SearchState } from '@/components/base'
+import type { ILogItem } from '@/types/clash'
 
 const Item = styled(Box)(({ theme: { palette, typography } }) => ({
   padding: '8px 0',

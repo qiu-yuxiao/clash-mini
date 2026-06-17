@@ -127,8 +127,8 @@ export const useRenderList = (
     const { groups, proxies } = proxiesData
 
     if (
-      (mode === 'rule' && !groups.length) ||
-      (mode === 'global' && proxies.length < 2)
+      (mode === 'rule' && !(groups?.length)) ||
+      (mode === 'global' && (proxies?.length ?? 0) < 2)
     ) {
       const handle = setTimeout(() => refreshProxy(), 500)
       return () => clearTimeout(handle)
@@ -186,7 +186,7 @@ export const useRenderList = (
     // 链式代理模式下，显示代理组和其节点
     if (isChainMode && runtimeConfig && mode === 'rule') {
       // 使用正常的规则模式代理组
-      const allGroups = proxiesData.groups.length
+      const allGroups = proxiesData.groups?.length
         ? proxiesData.groups
         : [proxiesData.global!]
 
@@ -379,7 +379,7 @@ export const useRenderList = (
     }
 
     // 正常模式的渲染逻辑
-    const renderGroups = proxiesData.groups.length
+    const renderGroups = proxiesData.groups?.length
       ? proxiesData.groups
       : [proxiesData.global!]
 

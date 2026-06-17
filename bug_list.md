@@ -26,9 +26,24 @@
 
 ### **BUG-102** (布局文件的上帝组件单体化)
 * **缺陷描述与现象**：`src/pages/_layout.tsx` 过于庞大（近 5000 行），合并了所有抽屉侧边栏、明细表、配置卡片、系统设置等逻辑，违背了“单一职责原则”。
-* **排查原因与记忆**：在组件内定义了多达 38 个 `useState` 钩子。任何状态微调都会重新评估 and 重绘整个大型组件，导致可读性极差且难以排错和维护。
-* **修改方针**：深度拆分组件，将各类控制面板剥离为独立的子组件放置在 `src/components/` 目录下，并提取通用逻辑为自定义 Hook，让布局文件只作为导航框架结构的载体。
-* **状态**：排查中。
+* **排查原因与记忆**：在组件内定义了多达 38 个 `useState` 钩子。任何状态微调都会重新评估 and 重绘整个大型组件，导致可读性极差且难以排错 and 维护。
+* **修改方针**：进行渐进式深度重构，将 5000 行的上帝组件拆解为高度自治、职责单一的模块化体系：
+  1. **状态与业务逻辑外置 (Hook 化)**：
+     - 将客户端更新状态与逻辑收拢至自定义 Hook `useClientUpdater` (管理 `clientUpdateOpen`、`clientProgress`、`clientStatus` 等状态与回调)。
+     - 将 Mihomo 内核更新逻辑收拢至自定义 Hook `useCoreUpdater` (管理 `coreUpdateOpen`、`coreUpgradeProgress`、`coreUpgradeStatus` 等状态与回调)。
+     - 将配置文件交互与导入逻辑收拢至自定义 Hook `useProfileManager`。
+  2. **公共工具与样式提取**：
+     - 将 `getMenuItemHoverStyle`、`get3DSliderStyle` 等 3D 控件样式渲染辅助函数，移至 `src/utils/theme-helpers.ts` 或 `src/pages/_layout/utils.ts`。
+     - 将 `getSignalIcon` 等网络延迟等级映射函数提取至 `src/utils/node.ts`。
+  3. **独立状态卡片提取 (ActiveNode & Traffic)**：
+     - 将顶部状态卡片 `ActiveNodeStatusCard` 提取至独立文件 `src/pages/_layout/components/active-node-card.tsx`。
+     - 将流量图表与指标小面板 `MiniTrafficPanel` 提取至独立文件 `src/pages/_layout/components/mini-traffic-panel.tsx`。
+  4. **大弹窗 Dialog 彻底解耦**：
+     - 新建 `src/pages/_layout/dialogs/` 目录。
+     - 独立剥离出 `EditProfileDialog.tsx`、`ClientUpdateDialog.tsx`、`CoreUpdateDialog.tsx`、`LogsViewDialog.tsx` 四个子组件，通过父组件传入 `open`、`onClose` 属性与必要的数据回调进行交互，保持极简通信。
+  5. **侧边设置抽屉 (SettingsDrawer) 模块化**：
+     - 剥离出 `SettingsDrawer.tsx`，将内部的「订阅/机场管理」、「流量接管模式分段选择器」、「风格皮肤渲染与参数滑块」等大型子面板进一步化整为零，降低单文件复杂度，缩减 `_layout.tsx` 体积达 80% 以上。
+* **状态**：代码已修正，待用户确认。
 
 ### **BUG-107** (useWindowWidth中document.body未定义导致的空指针异常)
 * **缺陷描述与现象**：在 `src/components/proxy/use-window-width.ts` 中直接使用 `document.body.clientWidth` 初始化状态。当 DOM 未就绪、或者在非浏览器环境（如服务端渲染、单元测试）中运行时，`document.body` 为 `null`，导致抛出 `TypeError: Cannot read properties of null (reading 'clientWidth')` 致命错误，造成 React 渲染树崩溃，界面显示 ErrorBoundary 的堆栈。
@@ -52,6 +67,18 @@
 * **缺陷描述与现象**：在 `src/hooks/use-mihomo-ws-subscription.ts` 中，当 `responseCacheKey` 为空时，使用了 `[responseCacheKey!]`，导致传给 `queryClient.getQueryData` 的 QueryKey 中含有 `undefined` 元素。在 TanStack Query v5 规范中，Query Key 元素不可为 `undefined`，这可能带来不确定的缓存读写崩溃或异常。
 * **排查原因与记忆**：非空断言 `!` 绕过了编译检查，但未在运行时对 `null/undefined` 的缓存 Key 做防护。
 * **修改方针**：安全处理 QueryKey 的空值防护，确保数组元素不含 `undefined`。
+* **状态**：代码已修正，待用户确认。
+
+### **BUG-111** (应用启动时因代理数据未就绪导致渲染崩溃)
+* **缺陷描述与现象**：应用每次重启后，React Router 显示 "Unexpected Application Error!"，错误为 `TypeError: Cannot read properties of undefined (reading 'length')`，界面完全不可用，必须手动刷新或重启多次才能恢复。
+* **排查原因与记忆**：应用启动时，mihomo 核心尚未完全初始化，前端通过 `useQuery` 获取的代理数据（`proxiesData`）可能存在但结构不完整（如 `groups` 字段为 `undefined`）。多个组件在访问这些数据时未做空值保护，直接访问 `.length`、`.metadata` 等属性导致崩溃。最关键的崩溃点位于 `use-render-list.ts` 第 382 行 `proxiesData.groups.length` — 这是正常模式（非链式代理）下渲染代理列表的入口，当 `proxiesData` 存在但 `groups` 为 `undefined` 时直接抛出与用户报错完全匹配的 `TypeError`。此外，连接数据（`conn.metadata`）和 WebSocket 增量消息（`delta.removed/updated/added`）也存在类似的未防护访问。
+* **修改方针**：在所有可能访问 `undefined` 中间属性的代码处添加可选链（`?.`）或空值合并（`??`）防护。涉及文件：
+  - `src/components/proxy/use-render-list.ts`：第 130-131 行 `groups.length` / `proxies.length`、第 189 行和第 382 行 `proxiesData.groups.length` 均改为 `?.length`
+  - `src/pages/_layout.tsx`：第 789 行 `conn.metadata` 改为 `conn.metadata ?? {}`
+  - `src/components/connection/connection-table.tsx`：第 292-293 行和第 315-324 行 `row.metadata` 改为 `row.metadata ?? {}`
+  - `src/components/proxy/proxy-render.tsx`：第 171 行 `group.all.length` 改为 `group.all?.length ?? 0`
+  - `src/components/proxy/proxy-groups.tsx`：第 379 行 `proxy.history && proxy.history.length` 改为 `proxy.history?.length`
+  - `src/hooks/use-connection-data.ts`：第 107/119/145 行 `delta.removed/updated/added.length` 改为 `(delta.xxx ?? []).length`
 * **状态**：代码已修正，待用户确认。
 
 

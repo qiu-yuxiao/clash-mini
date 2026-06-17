@@ -1,4 +1,3 @@
-import type { IConnectionsItem } from '@/types/connection'
 import {
   FlashOnRounded,
   PublicRounded,
@@ -21,6 +20,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 
 import { showNotice } from '@/services/notice-service'
+import type { IConnectionsItem } from '@/types/connection'
 import { addQuickRoutingRule } from '@/utils/quick-routing'
 import { closeConnection } from 'tauri-plugin-mihomo-api'
 
@@ -289,8 +289,9 @@ export const ConnectionTable = (props: Props) => {
     if (!contextMenu) return
     const { row } = contextMenu
     setContextMenu(null)
-    const host = row.metadata.host || row.metadata.remoteDestination
-    const port = row.metadata.destinationPort
+    const metadata = row.metadata ?? {}
+    const host = metadata.host || metadata.remoteDestination
+    const port = metadata.destinationPort
     const address = (port ? `${host}:${port}` : host) || ''
     try {
       await navigator.clipboard.writeText(address)
@@ -311,16 +312,19 @@ export const ConnectionTable = (props: Props) => {
     return [
       {
         id: 'host',
-        accessorFn: (row) =>
-          row.metadata.host
-            ? `${row.metadata.host}:${row.metadata.destinationPort}`
-            : `${row.metadata.remoteDestination}:${row.metadata.destinationPort}`,
+        accessorFn: (row) => {
+          const m = row.metadata ?? {}
+          return m.host
+            ? `${m.host}:${m.destinationPort}`
+            : `${m.remoteDestination}:${m.destinationPort}`
+        },
         header: '链接目标',
         cell: (ctx) => {
           const row = ctx.row.original
-          return row.metadata.host
-            ? `${row.metadata.host}:${row.metadata.destinationPort}`
-            : `${row.metadata.remoteDestination}:${row.metadata.destinationPort}`
+          const m = row.metadata ?? {}
+          return m.host
+            ? `${m.host}:${m.destinationPort}`
+            : `${m.remoteDestination}:${m.destinationPort}`
         },
       },
       {

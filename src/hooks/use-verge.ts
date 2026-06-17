@@ -1,10 +1,10 @@
-import type { IVergeConfig } from '@/types/verge'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import { getVergeConfig, patchVergeConfig } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 import { getPreloadConfig, setPreloadConfig } from '@/services/preload'
+import type { IVergeConfig } from '@/types/verge'
 
 export const useVerge = () => {
   const qc = useQueryClient()

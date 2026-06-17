@@ -1,9 +1,9 @@
-import type { IProxyItem } from '@/types/clash'
 import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useReducer } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
 import delayManager, { type DelayUpdate } from '@/services/delay'
+import type { IProxyItem } from '@/types/clash'
 
 const PRESET_PROXY_NAMES = [
   'DIRECT',

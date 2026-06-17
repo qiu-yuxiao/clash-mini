@@ -1,4 +1,3 @@
-import type { ITrafficDataPoint, ISamplerStats, TrafficWorkerRequestMessage, ITrafficWorkerSnapshotMessage } from '@/types/traffic'
 import {
   useCallback,
   useEffect,
@@ -9,6 +8,7 @@ import {
 } from 'react'
 
 import { useVisibility } from '@/hooks/use-visibility'
+import type { ITrafficDataPoint, ISamplerStats, TrafficWorkerRequestMessage, ITrafficWorkerSnapshotMessage } from '@/types/traffic'
 import { debugLog } from '@/utils/debug'
 import { TrafficDataSampler, formatTrafficName } from '@/utils/traffic-sampler'
 import { Traffic } from 'tauri-plugin-mihomo-api'

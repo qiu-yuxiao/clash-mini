@@ -75,12 +75,7 @@ pub async fn clean_async() -> bool {
 
             logging!(info, Type::System, "send disable tun request to mihomo");
             let mihomo = handle::Handle::mihomo().await.clone();
-            match timeout(
-                Duration::from_millis(1000),
-                mihomo.patch_base_config(&disable_tun),
-            )
-            .await
-            {
+            match timeout(Duration::from_millis(1000), mihomo.patch_base_config(&disable_tun)).await {
                 Ok(Ok(_)) => {
                     logging!(info, Type::Window, "TUN模式已禁用");
                 }
