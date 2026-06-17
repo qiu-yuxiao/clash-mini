@@ -27,6 +27,7 @@ export default defineConfig({
     outDir: '../dist',
     emptyOutDir: true,
     chunkSizeWarningLimit: 4000,
+    sourcemap: true,
   },
   resolve: {
     alias: {
