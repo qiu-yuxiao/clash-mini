@@ -253,14 +253,14 @@ pub fn run() {
             resolve::init_work_dir_and_logger()?;
 
             let app_handle = app.app_handle().clone();
-            let is_updating = tauri::async_runtime::block_on(async {
-                crate::core::updater::SilentUpdater::global()
+            tauri::async_runtime::spawn(async move {
+                let is_updating = crate::core::updater::SilentUpdater::global()
                     .try_install_on_startup(&app_handle)
-                    .await
+                    .await;
+                if is_updating {
+                    std::process::exit(0);
+                }
             });
-            if is_updating {
-                std::process::exit(0);
-            }
 
             let app_handle_bg = app.app_handle().clone();
             tauri::async_runtime::spawn(async move {
