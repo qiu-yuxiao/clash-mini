@@ -52,7 +52,7 @@
 * **缺陷描述与现象**：在 `src/hooks/use-mihomo-ws-subscription.ts` 中，当 `responseCacheKey` 为空时，使用了 `[responseCacheKey!]`，导致传给 `queryClient.getQueryData` 的 QueryKey 中含有 `undefined` 元素。在 TanStack Query v5 规范中，Query Key 元素不可为 `undefined`，这可能带来不确定的缓存读写崩溃或异常。
 * **排查原因与记忆**：非空断言 `!` 绕过了编译检查，但未在运行时对 `null/undefined` 的缓存 Key 做防护。
 * **修改方针**：安全处理 QueryKey 的空值防护，确保数组元素不含 `undefined`。
-* **状态**：排查中。
+* **状态**：代码已修正，待用户确认。
 
 
 
