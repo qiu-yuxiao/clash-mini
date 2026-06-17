@@ -25,7 +25,7 @@
     "createUpdaterArtifacts": false
   },
   "build": {
-    "beforeBuildCommand": "",
+    "beforeBuildCommand": "pnpm vite build",
     "frontendDist": "../dist",
     "beforeDevCommand": "node node_modules/vite/bin/vite.js",
     "devUrl": "http://localhost:3000/",
