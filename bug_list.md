@@ -46,7 +46,7 @@
 * **缺陷描述与现象**：在 `src/services/cmds.ts` 中，获取系统自动代理配置的函数名被错误地拼写为 `getAutotemProxy`，该拼写错误扩散到了使用该 API 的多处前端业务代码中，增加了代码维护的混乱感。
 * **排查原因与记忆**：历史开发时输入拼写疏忽（多拼写了 `tem` 字母），虽然后端 Tauri 指向了正确的 `get_auto_proxy`，但前端名称不规范。
 * **修改方针**：重构并统一更名为 `getAutoProxy`，同步修改所有引用的位置。
-* **状态**：排查中。
+* **状态**：代码已修正，待用户确认。
 
 ### **BUG-110** (useMihomoWsSubscription中QueryKey元素为undefined的隐患)
 * **缺陷描述与现象**：在 `src/hooks/use-mihomo-ws-subscription.ts` 中，当 `responseCacheKey` 为空时，使用了 `[responseCacheKey!]`，导致传给 `queryClient.getQueryData` 的 QueryKey 中含有 `undefined` 元素。在 TanStack Query v5 规范中，Query Key 元素不可为 `undefined`，这可能带来不确定的缓存读写崩溃或异常。
