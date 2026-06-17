@@ -2,6 +2,15 @@ name: Auto Build
 
 on:
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Build target (windows_only or all)'
+        required: false
+        default: 'windows_only'
+        type: choice
+        options:
+          - windows_only
+          - all
   schedule:
     # UTC+8 12:00, 18:00 -> UTC 4:00, 10:00
     - cron: '0 4,10 * * *'
@@ -121,10 +130,90 @@ jobs:
       tag_name: autobuild
       dry_run: false
 
+  autobuild-windows-portable:
+    name: Autobuild Windows x64 Portable
+    needs: [check_commit, update_tag]
+    if: ${{ needs.check_commit.outputs.should_run == 'true' && (github.event_name == 'schedule' || github.event.inputs.build_target == 'windows_only') }}
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust Stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.95.0'
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: true
+          prefix-key: 'v1-rust'
+          key: 'rust-shared-stable-windows-x86_64'
+          workspaces: |
+            . -> target
+          cache-all-crates: true
+          cache-workspace-crates: true
+
+      - uses: pnpm/action-setup@v6.0.8
+        name: Install pnpm
+        with:
+          run_install: false
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.16.0'
+          cache: 'pnpm'
+
+      - name: Pnpm Cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.pnpm-store
+          key: 'pnpm-shared-stable-windows-x86_64'
+          restore-keys: |
+            pnpm-shared-stable-windows-x86_64
+
+      - name: Pnpm install and check
+        run: |
+          pnpm i
+          pnpm run prebuild x86_64-pc-windows-msvc
+
+      - name: Release ${{ env.TAG_CHANNEL }} Version
+        run: pnpm release-version autobuild-latest
+
+      - name: Add Rust Target
+        run: |
+          rustup target add x86_64-pc-windows-msvc --toolchain 1.95.0 || rustup target add x86_64-pc-windows-msvc
+          rustup target list --installed
+
+      - name: Tauri build for Windows
+        uses: tauri-apps/tauri-action@v0
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: ${{ env.TAG_NAME }}
+          releaseName: 'Clash Mini ${{ env.TAG_CHANNEL }}'
+          releaseBody: 'More new features are now supported.'
+          releaseDraft: false
+          prerelease: true
+          tauriScript: pnpm
+          args: --target x86_64-pc-windows-msvc
+
+      - name: Portable Bundle
+        run: pnpm portable x86_64-pc-windows-msvc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+
   autobuild-x86-windows-macos-linux:
     name: Autobuild x86 Windows, MacOS and Linux
     needs: [check_commit, update_tag]
-    if: ${{ needs.check_commit.outputs.should_run == 'true' }}
+    if: ${{ needs.check_commit.outputs.should_run == 'true' && (github.event_name == 'schedule' || github.event.inputs.build_target == 'all') }}
     strategy:
       fail-fast: false
       matrix:
@@ -246,7 +335,7 @@ jobs:
   autobuild-arm-linux:
     name: Autobuild ARM Linux
     needs: [check_commit, update_tag]
-    if: ${{ needs.check_commit.outputs.should_run == 'true' }}
+    if: ${{ needs.check_commit.outputs.should_run == 'true' && (github.event_name == 'schedule' || github.event.inputs.build_target == 'all') }}
     strategy:
       fail-fast: false
       matrix:
@@ -399,7 +488,7 @@ jobs:
   autobuild-x86-arm-windows_webview2:
     name: Autobuild x86 and ARM Windows with WebView2
     needs: [check_commit, update_tag]
-    if: ${{ needs.check_commit.outputs.should_run == 'true' }}
+    if: ${{ needs.check_commit.outputs.should_run == 'true' && (github.event_name == 'schedule' || github.event.inputs.build_target == 'all') }}
     strategy:
       fail-fast: false
       matrix:
@@ -523,6 +612,7 @@ jobs:
     needs:
       [
         update_tag,
+        autobuild-windows-portable,
         autobuild-x86-windows-macos-linux,
         autobuild-arm-linux,
         autobuild-x86-arm-windows_webview2,
