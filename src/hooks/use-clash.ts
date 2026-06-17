@@ -90,10 +90,10 @@ export const useClash = () => {
     return Promise.resolve()
   }, [refetch])
 
-  const patchClash = useMemo(() => useLockFn(async (patch: Partial<IConfigData>) => {
+  const patchClash = useLockFn(async (patch: Partial<IConfigData>) => {
     await patchClashConfig(patch)
     mutateClash()
-  }), [mutateClash])
+  })
 
   const version = versionData?.meta
     ? `${versionData.version} Mihomo`
@@ -114,7 +114,7 @@ export const useClashInfo = () => {
     queryFn: getClashInfo,
   })
 
-  const patchInfo = useMemo(() => useLockFn(async (patch: ClashInfoPatch) => {
+  const patchInfo = useLockFn(async (patch: ClashInfoPatch) => {
     if (!hasClashInfoPayload(patch)) return
 
     validatePorts(patch)
@@ -122,7 +122,7 @@ export const useClashInfo = () => {
     await patchClashConfig(patch)
     mutateInfo()
     queryClient.invalidateQueries({ queryKey: ['getClashConfig'] })
-  }), [mutateInfo])
+  })
 
   const invalidateClashConfig = useCallback(() =>
     queryClient.invalidateQueries({ queryKey: ['getClashConfig'] }), [])
