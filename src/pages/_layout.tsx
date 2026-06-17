@@ -115,13 +115,13 @@ const ORDER_OPTIONS = [
     id: 'uploadSpeed',
     labelKey: 'connections.components.order.uploadSpeed',
     fn: (list: IConnectionsItem[]) =>
-      list.sort((a, b) => b.curUpload! - a.curUpload!),
+      list.sort((a, b) => (b.curUpload ?? 0) - (a.curUpload ?? 0)),
   },
   {
     id: 'downloadSpeed',
     labelKey: 'connections.components.order.downloadSpeed',
     fn: (list: IConnectionsItem[]) =>
-      list.sort((a, b) => b.curDownload! - a.curDownload!),
+      list.sort((a, b) => (b.curDownload ?? 0) - (a.curDownload ?? 0)),
   },
 ] as const
 

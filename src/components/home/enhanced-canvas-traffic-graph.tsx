@@ -143,6 +143,7 @@ const isSameTrafficData = (
   next: ITrafficDataPoint[],
 ) => {
   if (current === next) return true
+  if (!Array.isArray(current) || !Array.isArray(next)) return false
   if (current.length !== next.length) return false
 
   for (let i = 0; i < current.length; i++) {
@@ -165,7 +166,7 @@ const displayDataReducer = (
   current: ITrafficDataPoint[],
   payload: ITrafficDataPoint[],
 ): ITrafficDataPoint[] =>
-  isSameTrafficData(current, payload) ? current : payload
+  Array.isArray(payload) ? (isSameTrafficData(current, payload) ? current : payload) : current
 
 /**
  * 稳定版Canvas流量图表组件
@@ -243,6 +244,7 @@ export const EnhancedCanvasTrafficGraph = memo(
 
     // 更新显示数据（防抖处理）
     const updateDisplayData = useCallback((newData: ITrafficDataPoint[]) => {
+      if (!Array.isArray(newData)) return
       if (debounceTimeoutRef.current !== null) {
         window.clearTimeout(debounceTimeoutRef.current)
       }
@@ -349,7 +351,7 @@ export const EnhancedCanvasTrafficGraph = memo(
       (
         data: ITrafficDataPoint[],
       ): { topValue: number; bottomValue: number } => {
-        if (data.length === 0) return { topValue: 1024, bottomValue: 0 }
+        if (!Array.isArray(data) || data.length === 0) return { topValue: 1024, bottomValue: 0 }
 
         let maxValue = 0
         let minValue = Infinity
@@ -385,7 +387,7 @@ export const EnhancedCanvasTrafficGraph = memo(
     // 鼠标悬浮处理 - 计算最近的数据点
     const handleMouseMove = useCallback(
       (event: React.MouseEvent<HTMLElement>) => {
-        if (displayData.length === 0) return
+        if (!Array.isArray(displayData) || displayData.length === 0) return
 
         pendingMousePositionRef.current = {
           clientX: event.clientX,
@@ -634,7 +636,7 @@ export const EnhancedCanvasTrafficGraph = memo(
         height: number,
         data: ITrafficDataPoint[],
       ) => {
-        if (data.length === 0) return
+        if (!Array.isArray(data) || data.length === 0) return
 
         const padding = GRAPH_CONFIG.padding
         const effectiveWidth = width - padding.left - padding.right

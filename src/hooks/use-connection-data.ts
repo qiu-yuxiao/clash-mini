@@ -56,13 +56,14 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
 
               next(null, (old = initConnData) => {
                 if (msg.type === 'snapshot') {
-                  currentEpochId = msg.data.epochId
-                  lastSequenceId = msg.data.sequenceId
+                  const data = msg.data ?? {}
+                  currentEpochId = data.epochId
+                  lastSequenceId = data.sequenceId
 
                   return {
-                    uploadTotal: msg.data.uploadTotal,
-                    downloadTotal: msg.data.downloadTotal,
-                    activeConnections: msg.data.connections.map(
+                    uploadTotal: data.uploadTotal,
+                    downloadTotal: data.downloadTotal,
+                    activeConnections: (data.connections ?? []).map(
                       (conn: any) => ({
                         ...conn,
                         curUpload: 0,
@@ -74,7 +75,7 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                 }
 
                 if (msg.type === 'delta') {
-                  const delta = msg.data
+                  const delta = msg.data ?? {}
 
                   // Sequence & Epoch Validation
                   if (

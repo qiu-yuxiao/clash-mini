@@ -45,10 +45,10 @@ export const ActiveNodeStatusCard = () => {
     return (
       groups.find((group: any) =>
         primaryKeywords.some((keyword) =>
-          group.name.toLowerCase().includes(keyword.toLowerCase()),
+          (group?.name ?? '').toLowerCase().includes(keyword.toLowerCase()),
         ),
       ) ||
-      groups.filter((g: any) => g.name !== 'GLOBAL')[0] ||
+      groups.filter((g: any) => g?.name !== 'GLOBAL')[0] ||
       groups[0]
     )
   }, [proxies])

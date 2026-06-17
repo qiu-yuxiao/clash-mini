@@ -419,8 +419,8 @@ export const useTrafficMonitorEnhanced = (options?: {
 
   const filteredDataPoints = useMemo(() => {
     if (!isActive) return []
-    const sourceData = latestSnapshot.availableDataPoints
-    if (sourceData.length === 0) return []
+    const sourceData = latestSnapshot?.availableDataPoints
+    if (!Array.isArray(sourceData) || sourceData.length === 0) return []
 
     const cutoff = now - rangeMinutes * 60 * 1000
     return sourceData.filter((point) => point.timestamp > cutoff)

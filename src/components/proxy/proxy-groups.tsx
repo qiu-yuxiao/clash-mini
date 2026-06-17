@@ -44,6 +44,7 @@ import { ScrollTopButton } from '../layout/scroll-top-button'
 import { ProxyChain } from './proxy-chain'
 import { ProxyHead } from './proxy-head'
 import { ProxyRender } from './proxy-render'
+import { DEFAULT_STATE } from './use-head-state'
 import type { HeadState } from './use-head-state'
 import { type IRenderItem, useRenderList } from './use-render-list'
 
@@ -88,7 +89,8 @@ export const ProxyGroups = (props: Props) => {
     try {
       const saved = localStorage.getItem('proxy-chain-items')
       if (saved) {
-        return JSON.parse(saved)
+        const parsed = JSON.parse(saved)
+        return Array.isArray(parsed) ? parsed : []
       }
     } catch {
       // ignore
@@ -186,7 +188,7 @@ export const ProxyGroups = (props: Props) => {
   const stickyGroupIndexes = useMemo(
     () =>
       filteredRenderList.flatMap((item, index) =>
-        item.type === 0 && !item.group.hidden ? [index] : [],
+        item.type === 0 && !item.group?.hidden ? [index] : [],
       ),
     [filteredRenderList],
   )
@@ -376,14 +378,14 @@ export const ProxyGroups = (props: Props) => {
 
           // 安全获取延迟数据，如果没有延迟数据则设为 undefined
           const delay =
-            proxy.history?.length > 0
+            proxy?.history?.length > 0
               ? proxy.history[proxy.history.length - 1].delay
               : undefined
 
           const chainItem: ProxyChainItem = {
-            id: `${proxy.name}_${Date.now()}`,
-            name: proxy.name,
-            type: proxy.type,
+            id: `${proxy?.name}_${Date.now()}`,
+            name: proxy?.name,
+            type: proxy?.type,
             delay: delay,
           }
 
@@ -429,26 +431,26 @@ export const ProxyGroups = (props: Props) => {
               (e) =>
                 e.group?.name === groupName && (e.type === 2 || e.type === 4),
             )
-            .flatMap((e) => e.proxyCol || e.proxy!)
+            .flatMap((e) => e.proxyCol || e.proxy)
             .filter(Boolean)
 
           debugLog(`[ProxyGroups] 找到代理数量: ${proxies.length}`)
 
           const providers = new Set(
-            proxies.map((p) => p!.provider!).filter(Boolean),
+            proxies.map((p) => p?.provider).filter(Boolean),
           )
 
           if (providers.size) {
             debugLog(`[ProxyGroups] 发现提供者，数量: ${providers.size}`)
             Promise.allSettled(
-              [...providers].map((p) => healthcheckProxyProvider(p)),
+              [...providers].filter(Boolean).map((p) => healthcheckProxyProvider(p as string)),
             ).then(() => {
               debugLog(`[ProxyGroups] 提供者健康检查完成`)
               onProxies()
             })
           }
 
-          const names = proxies.filter((p) => !p!.provider).map((p) => p!.name)
+          const names = proxies.filter((p) => !p?.provider).map((p) => p?.name).filter(Boolean) as string[]
           debugLog(`[ProxyGroups] 过滤后需要测试的代理数量: ${names.length}`)
 
           const url = delayManager.getUrl(groupName)
@@ -824,13 +826,13 @@ function ProxyVirtualList({
             py: 0.5,
             borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
           }}
-          url={headItem.group.testUrl}
-          groupName={headItem.group.name}
-          headState={headItem.headState!}
-          isTesting={testingGroups[headItem.group.name]}
+          url={headItem.group?.testUrl}
+          groupName={headItem.group?.name ?? ''}
+          headState={headItem.headState ?? DEFAULT_STATE}
+          isTesting={testingGroups[headItem.group?.name ?? '']}
           onLocation={() => onLocation(headItem.group)}
-          onCheckDelay={() => onCheckAll(headItem.group.name)}
-          onHeadState={(p) => onHeadState(headItem.group.name, p)}
+          onCheckDelay={() => onCheckAll(headItem.group?.name ?? '')}
+          onHeadState={(p) => onHeadState(headItem.group?.name ?? '', p)}
         />
       )}
       <Box
@@ -886,7 +888,7 @@ function ProxyVirtualList({
                 onChangeProxy={onChangeProxy}
                 isChainMode={isChainMode}
                 isTesting={
-                  testingGroups[renderList[virtualItem.index].group?.name]
+                  testingGroups[renderList[virtualItem.index]?.group?.name]
                 }
               />
             </div>

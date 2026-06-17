@@ -154,7 +154,7 @@ function filterProxies(
   const res2 = regex2.exec(query)
   if (res2) {
     const type = res2[1].toLowerCase()
-    return proxies.filter((p) => p.type.toLowerCase().includes(type))
+    return proxies.filter((p) => (p?.type ?? '').toLowerCase().includes(type))
   }
 
   const {
@@ -169,7 +169,7 @@ function filterProxies(
   })
 
   if (!compiled.isValid) return []
-  return proxies.filter((p) => compiled.matcher(p.name))
+  return proxies.filter((p) => compiled.matcher(p?.name ?? ''))
 }
 
 /**
@@ -214,7 +214,7 @@ function sortProxies(
       return av - bv
     })
   } else {
-    list.sort((a, b) => a.name.localeCompare(b.name))
+    list.sort((a, b) => (a?.name ?? '').localeCompare(b?.name ?? ''))
   }
 
   return list

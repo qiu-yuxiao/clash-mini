@@ -180,13 +180,13 @@ export async function calcuProxies(): Promise<{
     calcuProxyProviders(),
   ])
 
-  const proxyRecord = proxyResponse.proxies
-  const providerRecord = providerResponse
+  const proxyRecord = proxyResponse?.proxies ?? {}
+  const providerRecord = providerResponse ?? {}
 
   // provider name map
   const providerMap = Object.fromEntries(
     Object.entries(providerRecord).flatMap(([provider, item]) =>
-      item!.proxies.map((p: any) => [p.name, { ...p, provider }]),
+      (item?.proxies ?? []).map((p: any) => [p.name, { ...p, provider }]),
     ),
   )
 
@@ -214,8 +214,8 @@ export async function calcuProxies(): Promise<{
     if (each?.name !== 'GLOBAL' && each?.all) {
       acc.push({
         ...each,
-        all: each
-          .all!.map((item) => generateItem(item))
+        all: (each.all ?? [])
+          .map((item) => generateItem(item))
           .filter((item) => item?.name && !isDummyNode(item.name)),
       })
     }
@@ -230,8 +230,8 @@ export async function calcuProxies(): Promise<{
       if (proxyRecord[name]?.all) {
         acc.push({
           ...proxyRecord[name],
-          all: proxyRecord[name]
-            .all!.map((item) => generateItem(item))
+          all: (proxyRecord[name].all ?? [])
+            .map((item) => generateItem(item))
             .filter((item) => item?.name && !isDummyNode(item.name)),
         })
       }
@@ -246,7 +246,7 @@ export async function calcuProxies(): Promise<{
       .concat(globalGroups)
   }
 
-  const proxies = [direct, reject].concat(
+  const proxies = [direct, reject].filter(Boolean).concat(
     Object.values(proxyRecord).filter(
       (p) =>
         !p?.all?.length &&
@@ -276,22 +276,22 @@ export async function calcuProxies(): Promise<{
 export async function calcuProxyProviders() {
   const providers = await getProxyProviders()
   return Object.fromEntries(
-    Object.entries(providers.providers)
+    Object.entries(providers?.providers ?? {})
       .sort()
       .filter(
         ([_, item]) =>
           item?.vehicleType === 'HTTP' || item?.vehicleType === 'File',
       )
       .map(([name, item]) => {
-        const provider = item!
+        const provider = (item ?? {}) as any
         return [
           name,
           {
             ...provider,
             proxies: provider.proxies
               ? provider.proxies
-                  .map((p) => ({ ...p, provider: name }))
-                  .filter((p) => p?.name && !isDummyNode(p.name))
+                  .map((p: any) => ({ ...p, provider: name }))
+                  .filter((p: any) => p?.name && !isDummyNode(p.name))
               : [],
           } as any,
         ]
@@ -304,7 +304,7 @@ export async function getClashLogs() {
   const newRegex = /(.+?)\s+(.+?)\s+(.+)/
   const logs = await invoke<string[]>('get_clash_logs')
 
-  return logs.reduce<ILogItem[]>((acc, log) => {
+  return (logs ?? []).reduce<ILogItem[]>((acc, log) => {
     const result = log.match(regex)
     if (result) {
       const [_, _time, type, payload] = result

@@ -134,7 +134,7 @@ export const useProfiles = () => {
         ])
 
         // 处理所有代理组
-        for (const group of [global, ...groups]) {
+        for (const group of [global, ...(groups ?? [])]) {
           if (!group) {
             continue
           }

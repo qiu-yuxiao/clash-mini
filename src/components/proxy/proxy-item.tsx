@@ -81,20 +81,20 @@ export const ProxyItem = (props: Props) => {
   const { width } = useWindowWidth()
   const isMinimal = width <= 285
 
-  const displayName = proxy.name.replace(/\s\(\d{6}\)$/, '')
-  const displayNow = proxy.now ? proxy.now.replace(/\s\(\d{6}\)$/, '') : ''
+  const displayName = (proxy?.name ?? '').replace(/\s\(\d{6}\)$/, '')
+  const displayNow = proxy?.now ? proxy.now.replace(/\s\(\d{6}\)$/, '') : ''
 
   // -1/<=0 为不显示，-2 为 loading
   const { delayValue, isPreset, timeout, onDelay } = useProxyDelayState(
     proxy,
-    group.name,
+    group?.name ?? '',
   )
 
   return (
     <ListItemButton
       dense
       selected={selected}
-      onClick={() => onClick?.(proxy.name)}
+      onClick={() => onClick?.(proxy?.name)}
       sx={[
         {
           borderRadius: 0,
@@ -192,7 +192,7 @@ export const ProxyItem = (props: Props) => {
               borderRight: (theme) => `2px solid ${theme.palette.divider}`,
             }}
           >
-            {proxy.type}
+            {proxy?.type ?? ''}
           </Box>
 
           {/* Column 2: Name (Flex growth, centered, border-right divider) */}
@@ -286,7 +286,7 @@ export const ProxyItem = (props: Props) => {
           </Widget>
         )}
 
-        {!proxy.provider && delayValue !== -2 && (
+        {!proxy?.provider && delayValue !== -2 && (
           <Widget
             className="the-check"
             onClick={(e) => {
@@ -312,14 +312,14 @@ export const ProxyItem = (props: Props) => {
             key={delayValue}
             className="the-delay"
             onClick={(e) => {
-              if (proxy.provider) return
+              if (proxy?.provider) return
               e.preventDefault()
               e.stopPropagation()
               onDelay()
             }}
             sx={({ palette }) => ({
               color: delayManager.formatDelayColor(delayValue, timeout),
-              cursor: proxy.provider ? 'default' : 'pointer',
+              cursor: proxy?.provider ? 'default' : 'pointer',
               fontSize: '11px',
               fontWeight: 600,
               animation: `${popIn} 0.4s ease-out`,

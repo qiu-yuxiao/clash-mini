@@ -110,8 +110,8 @@ const LogItem = ({ value, searchState }: Props) => {
     <Item>
       <div>
         <span className="time">{renderHighlightText(value.time || '')}</span>
-        <span className="type" data-type={value.type.toLowerCase()}>
-          {renderHighlightText(value.type)}
+        <span className="type" data-type={(value.type || '').toLowerCase()}>
+          {renderHighlightText(value.type || '')}
         </span>
       </div>
       <div>

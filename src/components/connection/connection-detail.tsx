@@ -85,14 +85,14 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const { t } = useTranslation()
   const { metadata, rulePayload } = data
   const theme = useTheme()
-  const chains = [...data.chains].reverse().join(' / ')
-  const rule = rulePayload ? `${data.rule}(${rulePayload})` : data.rule
-  const host = metadata.host
+  const chains = [...(data?.chains ?? [])].reverse().join(' / ')
+  const rule = rulePayload ? `${data?.rule}(${rulePayload})` : data?.rule
+  const host = metadata?.host
     ? `${metadata.host}:${metadata.destinationPort}`
-    : `${metadata.remoteDestination}:${metadata.destinationPort}`
-  const Destination = metadata.destinationIP
+    : `${metadata?.remoteDestination}:${metadata.destinationPort}`
+  const Destination = metadata?.destinationIP
     ? metadata.destinationIP
-    : metadata.remoteDestination
+    : metadata?.remoteDestination
 
   const information = [
     { label: t('connections.components.fields.host'), value: host },
@@ -119,15 +119,15 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
     { label: t('connections.components.fields.rule'), value: rule },
     {
       label: t('connections.components.fields.process'),
-      value: `${metadata.process}${metadata.processPath ? `(${metadata.processPath})` : ''}`,
+      value: `${metadata?.process ?? ''}${metadata?.processPath ? `(${metadata.processPath})` : ''}`,
     },
     {
       label: t('connections.components.fields.time'),
-      value: dayjs(data.start).fromNow(),
+      value: dayjs(data?.start).fromNow(),
     },
     {
       label: t('connections.components.fields.source'),
-      value: `${metadata.sourceIP}:${metadata.sourcePort}`,
+      value: `${metadata?.sourceIP ?? ''}:${metadata?.sourcePort ?? ''}`,
     },
     {
       label: t('connections.components.fields.destination'),
@@ -135,11 +135,11 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
     },
     {
       label: t('connections.components.fields.destinationPort'),
-      value: `${metadata.destinationPort}`,
+      value: `${metadata?.destinationPort ?? ''}`,
     },
     {
       label: t('connections.components.fields.type'),
-      value: `${metadata.type}(${metadata.network})`,
+      value: `${metadata?.type ?? ''}(${metadata?.network ?? ''})`,
     },
   ]
 

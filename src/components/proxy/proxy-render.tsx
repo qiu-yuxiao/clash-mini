@@ -22,7 +22,8 @@ import { useThemeMode } from '@/services/states'
 
 import { ProxyHead } from './proxy-head'
 import { ProxyItem } from './proxy-item'
-import { HeadState } from './use-head-state'
+import { DEFAULT_STATE } from './use-head-state'
+import type { HeadState } from './use-head-state'
 import type { IRenderItem } from './use-render-list'
 
 interface RenderProps {
@@ -58,8 +59,8 @@ export const ProxyRender = (props: RenderProps) => {
   const isDark = mode === 'light' ? false : true
   const itembackgroundcolor = isDark ? '#282A36' : '#ffffff'
   const iconCachePath = useIconCache({
-    icon: group.icon,
-    cacheKey: group.name.replaceAll(' ', ''),
+    icon: group?.icon,
+    cacheKey: (group?.name ?? '').replaceAll(' ', ''),
     enabled: enable_group_icon,
   })
 
@@ -73,8 +74,8 @@ export const ProxyRender = (props: RenderProps) => {
       <ProxyItem
         key={`${item.key}-${proxyItem?.name ?? 'unknown'}`}
         group={group}
-        proxy={proxyItem!}
-        selected={group.now === proxyItem?.name}
+        proxy={proxyItem}
+        selected={group?.now === proxyItem?.name}
         showType={showType}
         indexInGroup={item.indexInGroup}
         sx={{
@@ -86,7 +87,7 @@ export const ProxyRender = (props: RenderProps) => {
               }
             : {}),
         }}
-        onClick={() => onChangeProxy(group, proxyItem!)}
+        onClick={() => onChangeProxy(group, proxyItem)}
       />
     ))
   }, [
@@ -110,10 +111,10 @@ export const ProxyRender = (props: RenderProps) => {
           margin: '8px 8px',
           borderRadius: '8px',
         }}
-        onClick={() => onHeadState(group.name, { open: !headState?.open })}
+        onClick={() => onHeadState(group?.name ?? '', { open: !headState?.open })}
       >
         {enable_group_icon &&
-          group.icon &&
+          group?.icon &&
           group.icon.trim().startsWith('http') && (
             <img
               src={iconCachePath === '' ? group.icon : iconCachePath}
@@ -122,7 +123,7 @@ export const ProxyRender = (props: RenderProps) => {
             />
           )}
         {enable_group_icon &&
-          group.icon &&
+          group?.icon &&
           group.icon.trim().startsWith('data') && (
             <img
               src={group.icon}
@@ -131,7 +132,7 @@ export const ProxyRender = (props: RenderProps) => {
             />
           )}
         {enable_group_icon &&
-          group.icon &&
+          group?.icon &&
           group.icon.trim().startsWith('<svg') && (
             <img
               src={`data:image/svg+xml;base64,${btoa(group.icon)}`}
@@ -139,7 +140,7 @@ export const ProxyRender = (props: RenderProps) => {
             />
           )}
         <ListItemText
-          primary={<StyledPrimary>{group.name}</StyledPrimary>}
+          primary={<StyledPrimary>{group?.name ?? ''}</StyledPrimary>}
           secondary={
             <Box
               sx={{
@@ -150,9 +151,9 @@ export const ProxyRender = (props: RenderProps) => {
               }}
             >
               <Box component="span" sx={{ marginTop: '2px' }}>
-                <StyledTypeBox>{group.type}</StyledTypeBox>
+                <StyledTypeBox>{group?.type ?? ''}</StyledTypeBox>
                 <StyledSubtitle sx={{ color: 'text.secondary' }}>
-                  {group.now ? group.now.replace(/\s\(\d{6}\)$/, '') : ''}
+                  {group?.now ? group.now.replace(/\s\(\d{6}\)$/, '') : ''}
                 </StyledSubtitle>
               </Box>
             </Box>
@@ -187,27 +188,28 @@ export const ProxyRender = (props: RenderProps) => {
     return (
       <ProxyHead
         sx={{ pl: 2, pr: 3, mt: indent ? 1 : 0.5, mb: 1 }}
-        url={group.testUrl}
-        groupName={group.name}
-        headState={headState!}
+        url={group?.testUrl}
+        groupName={group?.name ?? ''}
+        headState={headState ?? DEFAULT_STATE}
         isTesting={isTesting}
         onLocation={() => onLocation(group)}
-        onCheckDelay={() => onCheckAll(group.name)}
-        onHeadState={(p) => onHeadState(group.name, p)}
+        onCheckDelay={() => onCheckAll(group?.name ?? '')}
+        onHeadState={(p) => onHeadState(group?.name ?? '', p)}
       />
     )
   }
 
   if (type === 2) {
+    if (!proxy) return null
     return (
       <ProxyItem
         group={group}
-        proxy={proxy!}
-        selected={group.now === proxy?.name}
+        proxy={proxy}
+        selected={group?.now === proxy?.name}
         showType={headState?.showType}
         indexInGroup={item.indexInGroup}
         sx={{ py: 0, pl: 2 }}
-        onClick={() => onChangeProxy(group, proxy!)}
+        onClick={() => onChangeProxy(group, proxy)}
       />
     )
   }

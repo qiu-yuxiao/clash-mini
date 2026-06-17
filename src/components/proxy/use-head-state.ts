@@ -81,7 +81,7 @@ export function useHeadStateNew() {
       .catch(() => {
         try {
           const data = JSON.parse(
-            localStorage.getItem(HEAD_STATE_KEY)!,
+            localStorage.getItem(HEAD_STATE_KEY) ?? 'null',
           ) as HeadStateStorage
           if (data && typeof data === 'object') {
             dispatch({ type: 'replace', payload: data })

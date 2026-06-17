@@ -29,18 +29,18 @@ export function useProxyDelayState(
   proxy: IProxyItem,
   groupName: string,
 ): UseProxyDelayState {
-  const isPreset = PRESET_PROXY_NAMES.includes(proxy.name)
+  const isPreset = proxy ? PRESET_PROXY_NAMES.includes(proxy.name) : false
   const [delayState, setDelayState] = useReducer(identity, INITIAL_DELAY)
   const { verge } = useVerge()
   const timeout = verge?.default_latency_timeout || 10000
 
   useEffect(() => {
-    if (isPreset) return
+    if (isPreset || !proxy) return
     delayManager.setListener(proxy.name, groupName, setDelayState)
     return () => {
       delayManager.removeListener(proxy.name, groupName)
     }
-  }, [proxy.name, groupName, isPreset])
+  }, [proxy?.name, groupName, isPreset])
 
   const updateDelay = useCallback(() => {
     if (!proxy) return
@@ -57,7 +57,7 @@ export function useProxyDelayState(
     }
 
     let updatedAt = 0
-    const history = proxy.history
+    const history = proxy?.history
     if (history && history.length > 0) {
       const lastRecord = history[history.length - 1]
       const parsed = Date.parse(lastRecord.time)
@@ -74,6 +74,7 @@ export function useProxyDelayState(
   }, [updateDelay])
 
   const onDelay = useLockFn(async () => {
+    if (!proxy) return
     setDelayState({ delay: -2, updatedAt: Date.now() })
     setDelayState(await delayManager.checkDelay(proxy.name, groupName, timeout))
   })

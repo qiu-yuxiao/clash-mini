@@ -52,7 +52,7 @@ const LogPage = () => {
       const matchesSearch = match(searchText)
 
       return (
-        (logState == 'all' ? true : data.type.includes(logState)) &&
+        (logState == 'all' ? true : (data.type || '').includes(logState)) &&
         matchesSearch
       )
     })
@@ -74,17 +74,29 @@ const LogPage = () => {
   }, [filteredLogs.length, isDescending])
 
   const handleLogLevelChange = (newLevel: LogFilter) => {
-    setClashLog((pre) => ({ ...pre!, logFilter: newLevel }))
+    setClashLog((pre) => ({
+      enable: pre?.enable ?? false,
+      logLevel: pre?.logLevel ?? 'info',
+      logFilter: newLevel,
+      logOrder: pre?.logOrder ?? 'asc',
+    }))
   }
 
   const handleToggleLog = async () => {
-    setClashLog((pre) => ({ ...pre!, enable: !enableLog }))
+    setClashLog((pre) => ({
+      enable: !enableLog,
+      logLevel: pre?.logLevel ?? 'info',
+      logFilter: pre?.logFilter ?? 'all',
+      logOrder: pre?.logOrder ?? 'asc',
+    }))
   }
 
   const handleToggleOrder = () => {
     setClashLog((pre) => ({
-      ...pre!,
-      logOrder: pre!.logOrder === 'desc' ? 'asc' : 'desc',
+      enable: pre?.enable ?? false,
+      logLevel: pre?.logLevel ?? 'info',
+      logFilter: pre?.logFilter ?? 'all',
+      logOrder: pre?.logOrder === 'desc' ? 'asc' : 'desc',
     }))
   }
 

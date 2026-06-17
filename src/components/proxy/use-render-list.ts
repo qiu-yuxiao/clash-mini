@@ -188,7 +188,7 @@ export const useRenderList = (
       // 使用正常的规则模式代理组
       const allGroups = proxiesData.groups?.length
         ? proxiesData.groups
-        : [proxiesData.global!]
+        : proxiesData.global ? [proxiesData.global] : []
 
       // 如果选择了特定代理组，只显示该组的节点
       if (selectedGroup) {
@@ -215,7 +215,7 @@ export const useRenderList = (
           } else {
             return proxies.map((proxy, proxyIdx) => ({
               type: 2,
-              key: `chain-${selectedGroup}-${proxy!.name}`,
+              key: `chain-${selectedGroup}-${proxy?.name ?? proxyIdx}`,
               group: targetGroup,
               proxy,
               headState: DEFAULT_STATE,
@@ -251,7 +251,7 @@ export const useRenderList = (
         } else {
           return proxies.map((proxy, proxyIdx) => ({
             type: 2,
-            key: `chain-first-${proxy!.name}`,
+            key: `chain-first-${proxy?.name ?? proxyIdx}`,
             group: firstGroup,
             proxy,
             headState: DEFAULT_STATE,
@@ -263,7 +263,7 @@ export const useRenderList = (
 
       // 如果没有组，显示所有节点
       const allProxies: IProxyItem[] = allGroups.flatMap(
-        (group: any) => group.all,
+        (group: any) => group?.all ?? [],
       )
 
       // 为每个节点获取延迟信息
@@ -381,7 +381,7 @@ export const useRenderList = (
     // 正常模式的渲染逻辑
     const renderGroups = proxiesData.groups?.length
       ? proxiesData.groups
-      : [proxiesData.global!]
+      : proxiesData.global ? [proxiesData.global] : []
 
     const cache = groupCacheRef.current
     let anyChanged = false
@@ -435,12 +435,12 @@ export const useRenderList = (
         ret.push(
           ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
             type: 4 as const,
-            key: `col-${group.name}-${proxyCol[0].name}-${colIndex}`,
+            key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
             group,
             headState,
             col,
             proxyCol,
-            provider: proxyCol[0].provider,
+            provider: proxyCol[0]?.provider,
             indexInGroup: colIndex,
           })),
         )
@@ -448,7 +448,7 @@ export const useRenderList = (
         ret.push(
           ...proxies.map((proxy, proxyIdx) => ({
             type: 2 as const,
-            key: `${group.name}-${proxy!.name}`,
+            key: `${group.name}-${proxy?.name ?? proxyIdx}`,
             group,
             proxy,
             headState,
@@ -469,7 +469,7 @@ export const useRenderList = (
       return ret
     })
 
-    const filtered = retList.filter((item: IRenderItem) => !item.group.hidden)
+    const filtered = retList.filter((item: IRenderItem) => !item.group?.hidden)
 
     if (!anyChanged && prevListRef.current.length === filtered.length) {
       return prevListRef.current
