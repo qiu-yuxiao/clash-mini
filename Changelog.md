@@ -1,3 +1,21 @@
+## v1.3.3
+
+### 🚀 优化改进
+
+- 优化 BUG-097：解决异步工作线程被同步磁盘 I/O 阻塞的问题。将配置文件的读取迁移至 tokio::fs 异步 API，更新包大文件写入操作使用 spawn_blocking 处理，消除了瞬时卡顿与延迟毛刺。
+- 优化 BUG-098：解决同步系统进程扫描阻塞异步线程的问题。将 sysinfo 进程扫描和强杀等安全包裹在 spawn_blocking 中执行，避免挂起 Tokio 调度工作协程。
+- 优化 BUG-101：优化 TS 辅助 Hook 内部函数与状态类型隐患。使用 useCallback 包裹暴露的回调以稳定引用，并为 proxies 等核心数据结构建立确切 TS 类型定义。
+- 优化 BUG-105：优化 use-profiles.ts 内部回调引用稳定性。使用 useCallback 对 mutateProfiles、patchProfiles、patchCurrent 回调函数进行 memoize 包装，防止子组件重复重绘。
+
+### 🐞 修复问题
+
+- 修复 BUG-069：解决 Monochrome 皮肤下设置开关选择 size="small" 时卡死在左侧无法正常拨动和交互的问题。
+- 修复 BUG-096：解决后端常驻线程因异步跨越持有 RwLock 读锁而导致的死锁问题。在独立局部作用域中获取锁并完成 Future 计算，让读锁在 await point 之前被 drop 释放。
+- 修复 BUG-099：解决客户端启动时 Tauri Setup 钩子同步 block_on 导致的主 UI 线程白屏挂起与无响应问题。改用 async_runtime::spawn 在后台异步加载静默更新检测任务。
+- 修复 BUG-100：解决后端时间戳数值强转在 32 位操作系统或嵌入式平台下的截断与溢出隐患。将 PrfItem 及 IProfiles 相关时间戳字段统一调整为 Option<i64> 类型，废除 as usize 强转。
+- 修复 BUG-104：修复 useWindowSnap.ts 文件命名大小写不一致问题，将其重命名为 use-window-snap.ts 并同步更新导入路径，统一项目 kebab-case 命名规范。
+- 修复 BUG-106：修复 _layout.tsx 内部状态变量和核心数据对象宽松 any 类型定义导致类型系统失效的问题。严格为 clientUpdateObj (Update) 与 coreUpdateRelease (GithubRelease) 标注类型并进行安全强制转换。
+
 ## v1.3.2
 
 ### 🚀 优化改进
