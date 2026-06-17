@@ -53,15 +53,12 @@ fn encode_node_name(name: &str) -> String {
 }
 
 /// 从本地 `proxy_head_state.json` 读取指定 Profile 的过滤规则
-pub fn get_active_filter_config(profile_uid: &str) -> FilterConfig {
+pub async fn get_active_filter_config(profile_uid: &str) -> FilterConfig {
     let path = match crate::utils::dirs::app_home_dir() {
         Ok(dir) => dir.join("proxy_head_state.json"),
         Err(_) => return FilterConfig::default(),
     };
-    if !path.exists() {
-        return FilterConfig::default();
-    }
-    let content = match std::fs::read_to_string(path) {
+    let content = match tokio::fs::read_to_string(path).await {
         Ok(c) => c,
         Err(_) => return FilterConfig::default(),
     };
@@ -273,7 +270,7 @@ pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Op
         None => return Ok(None),
     };
 
-    let filter_config = get_active_filter_config(profile_uid);
+    let filter_config = get_active_filter_config(profile_uid).await;
     let valid_nodes: Vec<String> = nodes
         .into_iter()
         .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_config))

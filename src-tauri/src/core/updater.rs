@@ -138,9 +138,9 @@ impl SilentUpdater {
     pub async fn try_install_on_startup(&self, app_handle: &tauri::AppHandle) -> bool {
         let current_version = env!("CARGO_PKG_VERSION");
 
-        let meta = match Self::read_cache_meta() {
-            Ok(meta) => meta,
-            Err(_) => return false, // No cache, nothing to do
+        let meta = match tokio::task::spawn_blocking(|| Self::read_cache_meta()).await {
+            Ok(Ok(meta)) => meta,
+            _ => return false, // No cache, nothing to do
         };
 
         let cached_version = &meta.version;
@@ -173,13 +173,13 @@ impl SilentUpdater {
         }
 
         // Read cached bytes
-        let bytes = match Self::read_cache_bytes() {
-            Ok(b) => b,
-            Err(e) => {
+        let bytes = match tokio::task::spawn_blocking(|| Self::read_cache_bytes()).await {
+            Ok(Ok(b)) => b,
+            _ => {
                 logging!(
                     warn,
                     Type::System,
-                    "Failed to read cached update bytes: {e}, cleaning up"
+                    "Failed to read cached update bytes, cleaning up"
                 );
                 Self::delete_cache();
                 return false;
@@ -472,8 +472,21 @@ impl SilentUpdater {
             )
             .await?;
 
-        if let Err(e) = Self::write_cache(&bytes, &version) {
-            logging!(warn, Type::System, "Silent updater: failed to write cache: {e}");
+        let bytes_clone = bytes.clone();
+        let version_clone = version.clone();
+        let write_result = tokio::task::spawn_blocking(move || {
+            Self::write_cache(&bytes_clone, &version_clone)
+        })
+        .await;
+
+        match write_result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                logging!(warn, Type::System, "Silent updater: failed to write cache: {e}");
+            }
+            Err(e) => {
+                logging!(warn, Type::System, "Silent updater: write cache join error: {e}");
+            }
         }
 
         *self.pending_bytes.write() = Some(bytes);
