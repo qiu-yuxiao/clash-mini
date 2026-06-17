@@ -805,7 +805,7 @@ async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Ve
                             if let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path).await {
                                 if let Some(Value::Sequence(proxies)) = mapping.remove("proxies") {
                                     // Generate suffix from item.updated timestamp
-                                    let ts = item.updated.unwrap_or(0) as i64;
+                                    let ts = item.updated.unwrap_or(0);
                                     let suffix = if let Some(dt) = Local.timestamp_opt(ts, 0).single() {
                                         dt.format("%H%M%S").to_string()
                                     } else {

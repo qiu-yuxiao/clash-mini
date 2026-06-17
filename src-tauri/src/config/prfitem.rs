@@ -48,7 +48,7 @@ pub struct PrfItem {
     pub extra: Option<PrfExtra>,
 
     /// updated time
-    pub updated: Option<usize>,
+    pub updated: Option<i64>,
 
     /// some options of the item
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -246,7 +246,7 @@ impl PrfItem {
                 ..PrfOption::default()
             }),
             home: None,
-            updated: Some(chrono::Local::now().timestamp() as usize),
+            updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(file_data.unwrap_or_else(|| tmpl::ITEM_LOCAL.into())),
         })
     }
@@ -338,7 +338,7 @@ impl PrfItem {
                         ..PrfOption::default()
                     }),
                     home: None,
-                    updated: Some(chrono::Local::now().timestamp() as usize),
+                    updated: Some(chrono::Local::now().timestamp()),
                     file_data: Some(serialized.into()),
                 });
             }
@@ -429,7 +429,7 @@ impl PrfItem {
                     ..PrfOption::default()
                 }),
                 home: None,
-                updated: Some(chrono::Local::now().timestamp() as usize),
+                updated: Some(chrono::Local::now().timestamp()),
                 file_data: Some(serialized.into()),
             });
         }
@@ -620,7 +620,7 @@ impl PrfItem {
                 ..PrfOption::default()
             }),
             home,
-            updated: Some(chrono::Local::now().timestamp() as usize),
+            updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(serialized_data.into()),
         })
     }
@@ -639,7 +639,7 @@ impl PrfItem {
             uid: Some(id),
             itype: Some("merge".into()),
             file: Some(file),
-            updated: Some(chrono::Local::now().timestamp() as usize),
+            updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(template),
             ..Default::default()
         })
@@ -658,7 +658,7 @@ impl PrfItem {
             uid: Some(id),
             itype: Some("script".into()),
             file: Some(file),
-            updated: Some(chrono::Local::now().timestamp() as usize),
+            updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(tmpl::ITEM_SCRIPT.into()),
             ..Default::default()
         })
@@ -673,7 +673,7 @@ impl PrfItem {
             uid: Some(uid),
             itype: Some("rules".into()),
             file: Some(file),
-            updated: Some(chrono::Local::now().timestamp() as usize),
+            updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(tmpl::ITEM_RULES.into()),
             ..Default::default()
         })
@@ -688,7 +688,7 @@ impl PrfItem {
             uid: Some(uid),
             itype: Some("proxies".into()),
             file: Some(file),
-            updated: Some(chrono::Local::now().timestamp() as usize),
+            updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(tmpl::ITEM_PROXIES.into()),
             ..Default::default()
         })
@@ -703,7 +703,7 @@ impl PrfItem {
             uid: Some(uid),
             itype: Some("groups".into()),
             file: Some(file),
-            updated: Some(chrono::Local::now().timestamp() as usize),
+            updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(tmpl::ITEM_GROUPS.into()),
             ..Default::default()
         })

@@ -110,7 +110,7 @@ impl Timer {
                     && let Some(updated) = item.updated
                 {
                     let interval = option.update_interval.unwrap_or(DEFAULT_UPDATE_INTERVAL_MINUTES);
-                    if interval > 0 && cur_timestamp - (updated as i64) >= (interval as i64) * 60 {
+                    if interval > 0 && cur_timestamp - updated >= (interval as i64) * 60 {
                         logging!(info, Type::Timer, "Running overdue timer task immediately: uid={}", uid);
                         let _ = self.command_tx.send(TimerCommand::RunNow(uid.clone()));
                     }
@@ -360,7 +360,7 @@ impl Timer {
         let items = profiles_guard.get_items()?;
 
         let profile = items.iter().find(|item| item.uid.as_deref() == Some(uid))?;
-        let updated = profile.updated.unwrap_or(0) as i64;
+        let updated = profile.updated.unwrap_or(0);
 
         if updated > 0 {
             Some(updated + (task_interval as i64 * 60))
