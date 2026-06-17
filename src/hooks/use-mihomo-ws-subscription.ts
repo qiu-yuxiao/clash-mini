@@ -222,7 +222,9 @@ export const useMihomoWsSubscription = <T>(
   const response = useQuery<T>({
     queryKey: responseCacheKey ? [responseCacheKey] : ['$sub$__disabled__'],
     queryFn: () =>
-      queryClient.getQueryData<T>([responseCacheKey!]) ?? fallbackData,
+      responseCacheKey
+        ? (queryClient.getQueryData<T>([responseCacheKey]) ?? fallbackData)
+        : fallbackData,
     initialData: () =>
       queryClient.getQueryData<T>([responseCacheKey ?? '$sub$__disabled__']) ??
       fallbackData,
