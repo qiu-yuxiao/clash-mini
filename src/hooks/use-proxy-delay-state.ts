@@ -1,3 +1,4 @@
+import type { IProxyItem } from '@/types/clash'
 import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useReducer } from 'react'
 

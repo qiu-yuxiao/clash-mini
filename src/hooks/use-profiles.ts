@@ -1,3 +1,4 @@
+import type { IProfileItem, IProfilesConfig } from '@/types/profile'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback } from 'react'
 

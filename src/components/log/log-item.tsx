@@ -1,3 +1,4 @@
+import type { ILogItem } from '@/types/clash'
 import { styled, Box } from '@mui/material'
 import type { ReactNode } from 'react'
 

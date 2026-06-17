@@ -1,3 +1,4 @@
+import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'

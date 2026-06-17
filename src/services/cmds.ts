@@ -1,3 +1,6 @@
+import type { IConfigData, IProxyItem, IProxyGroupItem, ILogItem, IClashInfo } from '@/types/clash'
+import type { IProfileItem, IProfilesConfig, IProfileOption } from '@/types/profile'
+import type { IVergeConfig, ValidationOutcome } from '@/types/verge'
 import { invoke } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
 import yaml from 'js-yaml'

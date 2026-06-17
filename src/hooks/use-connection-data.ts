@@ -1,3 +1,4 @@
+import type { IConnectionsItem } from '@/types/connection'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 

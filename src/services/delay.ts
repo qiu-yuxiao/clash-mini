@@ -1,3 +1,4 @@
+import type { IProxyItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { delayProxyByName, ProxyDelay } from 'tauri-plugin-mihomo-api'
 

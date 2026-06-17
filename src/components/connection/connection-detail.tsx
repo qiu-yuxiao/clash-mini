@@ -1,3 +1,4 @@
+import type { IConnectionsItem } from '@/types/connection'
 import { Box, Button, Popover, useTheme, alpha } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'

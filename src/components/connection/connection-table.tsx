@@ -1,3 +1,4 @@
+import type { IConnectionsItem } from '@/types/connection'
 import {
   FlashOnRounded,
   PublicRounded,

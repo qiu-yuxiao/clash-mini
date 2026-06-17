@@ -1,3 +1,5 @@
+import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
+import type { IConnectionsItem } from '@/types/connection'
 import { Context, createContext, use } from 'react'
 
 import {

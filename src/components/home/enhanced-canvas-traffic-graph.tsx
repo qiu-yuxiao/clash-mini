@@ -1,3 +1,4 @@
+import type { ITrafficDataPoint } from '@/types/traffic'
 import { Box, useTheme } from '@mui/material'
 import type { Ref } from 'react'
 import {

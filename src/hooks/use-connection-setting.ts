@@ -1,3 +1,4 @@
+import type { IConnectionSetting } from '@/types/connection'
 import { useLocalStorage } from 'foxact/use-local-storage'
 
 const defaultConnectionSetting: IConnectionSetting = { layout: 'table' }

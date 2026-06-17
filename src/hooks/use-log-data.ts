@@ -1,3 +1,4 @@
+import type { ILogItem } from '@/types/clash'
 import { useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { useEffect, useRef } from 'react'

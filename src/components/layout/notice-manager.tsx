@@ -1,3 +1,4 @@
+import type { IVergeConfig } from '@/types/verge'
 import { CloseRounded } from '@mui/icons-material'
 import {
   Snackbar,

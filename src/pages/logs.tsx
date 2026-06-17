@@ -1,3 +1,4 @@
+import type { LogFilter } from '@/types/clash'
 import {
   PlayCircleOutlineRounded,
   PauseCircleOutlineRounded,

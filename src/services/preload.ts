@@ -1,3 +1,4 @@
+import type { IVergeConfig } from '@/types/verge'
 import { getVergeConfig } from './cmds'
 import {
   cacheLanguage,

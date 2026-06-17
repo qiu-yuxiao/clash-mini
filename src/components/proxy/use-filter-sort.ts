@@ -1,3 +1,4 @@
+import type { IProxyItem } from '@/types/clash'
 import { useEffect, useMemo, useReducer, useRef } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'

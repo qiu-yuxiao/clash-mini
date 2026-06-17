@@ -1,3 +1,4 @@
+import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import {
   alpha,
   Box,

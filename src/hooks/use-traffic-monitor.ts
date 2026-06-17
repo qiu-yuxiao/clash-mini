@@ -1,3 +1,4 @@
+import type { ITrafficDataPoint, ISamplerStats, TrafficWorkerRequestMessage, ITrafficWorkerSnapshotMessage } from '@/types/traffic'
 import {
   useCallback,
   useEffect,

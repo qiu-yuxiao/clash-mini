@@ -1,3 +1,4 @@
+import type { IClashLog } from '@/types/clash'
 import { useLocalStorage } from 'foxact/use-local-storage'
 
 const defaultClashLog: IClashLog = {
