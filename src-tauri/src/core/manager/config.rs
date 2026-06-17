@@ -141,6 +141,7 @@ impl CoreManager {
     }
 
     async fn reload_config(&self, path: &str) -> Result<(), MihomoError> {
-        handle::Handle::mihomo().await.reload_config(true, path).await
+        let mihomo = handle::Handle::mihomo().await.clone();
+        mihomo.reload_config(true, path).await
     }
 }

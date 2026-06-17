@@ -77,8 +77,8 @@ pub async fn connect_traffic_stream() -> Result<MihomoWsEventStream<TrafficSpeed
     // 使用有界 mpsc 通道承接回调事件，限制消息积压上限。
     let (message_tx, message_rx) = mpsc::channel::<InternalWsEvent<TrafficSpeedEvent>>(MIHOMO_WS_STREAM_BUFFER_SIZE);
     // 建立 Mihomo `/traffic` WebSocket 订阅。
-    let connection_id = handle::Handle::mihomo()
-        .await
+    let mihomo = handle::Handle::mihomo().await.clone();
+    let connection_id = mihomo
         .ws_traffic({
             let message_tx = message_tx.clone();
             move |message| {
@@ -147,8 +147,8 @@ impl<T> MihomoWsEventStream<T> {
 /// # Arguments
 /// * `connection_id` - 目标连接 ID
 pub async fn disconnect_connection(connection_id: ConnectionId) {
-    if let Err(err) = handle::Handle::mihomo()
-        .await
+    let mihomo = handle::Handle::mihomo().await.clone();
+    if let Err(err) = mihomo
         .disconnect(connection_id, Some(MIHOMO_WS_STREAM_CLOSE_CODE))
         .await
     {

@@ -48,14 +48,13 @@ pub async fn restart_app() {
 
 fn after_change_clash_mode() {
     AsyncHandler::spawn(move || async {
-        let mihomo = handle::Handle::mihomo().await;
+        let mihomo = handle::Handle::mihomo().await.clone();
         match mihomo.get_connections().await {
             Ok(connections) => {
                 if let Some(connections_array) = connections.connections {
                     for connection in connections_array {
                         let _ = mihomo.close_connection(&connection.id).await;
                     }
-                    drop(mihomo);
                 }
             }
             Err(err) => {
@@ -74,7 +73,8 @@ pub async fn change_clash_mode(mode: String) {
         "mode": mode
     });
     logging!(debug, Type::Core, "change clash mode to {mode}");
-    match handle::Handle::mihomo().await.patch_base_config(&json_value).await {
+    let mihomo = handle::Handle::mihomo().await.clone();
+    match mihomo.patch_base_config(&json_value).await {
         Ok(_) => {
             // 更新订阅
             let clash = Config::clash().await;

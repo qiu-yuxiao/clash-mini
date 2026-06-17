@@ -13,11 +13,11 @@ pub async fn toggle_system_proxy() -> bool {
     let auto_close_connection = verge.latest_arc().auto_close_connection.unwrap_or(false);
 
     // 如果当前系统代理即将关闭，且自动关闭连接设置为true，则关闭所有连接
-    if current
-        && auto_close_connection
-        && let Err(err) = handle::Handle::mihomo().await.close_all_connections().await
-    {
-        logging!(error, Type::ProxyMode, "Failed to close all connections: {err}");
+    if current && auto_close_connection {
+        let mihomo = handle::Handle::mihomo().await.clone();
+        if let Err(err) = mihomo.close_all_connections().await {
+            logging!(error, Type::ProxyMode, "Failed to close all connections: {err}");
+        }
     }
 
     let requested = !current;

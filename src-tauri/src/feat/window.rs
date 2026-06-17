@@ -74,9 +74,10 @@ pub async fn clean_async() -> bool {
             let disable_tun = serde_json::json!({ "tun": { "enable": false } });
 
             logging!(info, Type::System, "send disable tun request to mihomo");
+            let mihomo = handle::Handle::mihomo().await.clone();
             match timeout(
                 Duration::from_millis(1000),
-                handle::Handle::mihomo().await.patch_base_config(&disable_tun),
+                mihomo.patch_base_config(&disable_tun),
             )
             .await
             {

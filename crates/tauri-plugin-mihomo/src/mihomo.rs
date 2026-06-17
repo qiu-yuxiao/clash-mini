@@ -92,6 +92,7 @@ async fn untrack_ws_reader(key: WsReaderKey) {
     WS_READER_CANCELLATIONS.lock().await.remove(&key);
 }
 
+#[derive(Clone)]
 pub struct Mihomo {
     pub protocol: Protocol,
     pub external_host: Option<String>,
