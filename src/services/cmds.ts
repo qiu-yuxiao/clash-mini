@@ -338,7 +338,7 @@ export async function getSystemProxy() {
   }>('get_sys_proxy')
 }
 
-export async function getAutotemProxy() {
+export async function getAutoProxy() {
   try {
     debugLog('[API] 开始调用 get_auto_proxy')
     const result = await invoke<{

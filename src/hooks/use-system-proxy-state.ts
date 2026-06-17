@@ -3,7 +3,7 @@ import { useRef } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
 import { useClashConfigData, useSystemData } from '@/providers/app-data-context'
-import { getAutotemProxy } from '@/services/cmds'
+import { getAutoProxy } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
@@ -13,8 +13,8 @@ export const useSystemProxyState = () => {
   const { sysproxy } = useSystemData()
   const { clashConfig } = useClashConfigData()
   const { data: autoproxy } = useQuery({
-    queryKey: ['getAutotemProxy'],
-    queryFn: getAutotemProxy,
+    queryKey: ['getAutoProxy'],
+    queryFn: getAutoProxy,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   })
@@ -67,7 +67,7 @@ export const useSystemProxyState = () => {
       busyRef.current = false
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['getSystemProxy'] }),
-        queryClient.invalidateQueries({ queryKey: ['getAutotemProxy'] }),
+        queryClient.invalidateQueries({ queryKey: ['getAutoProxy'] }),
       ])
     }
   }
@@ -75,7 +75,7 @@ export const useSystemProxyState = () => {
   const invalidateProxyState = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['getSystemProxy'] }),
-      queryClient.invalidateQueries({ queryKey: ['getAutotemProxy'] }),
+      queryClient.invalidateQueries({ queryKey: ['getAutoProxy'] }),
     ])
 
   return {
