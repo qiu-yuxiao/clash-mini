@@ -62,7 +62,7 @@ impl IClashTemp {
                     if let Ok(addr) = SocketAddr::from_str(&parsed_addr) {
                         let mut port = addr.port();
                         if is_port_conflict(port, secret).await {
-                            port = find_free_controller_port(9098, secret).await;
+                            port = find_free_controller_port(9098, secret);
                             map.insert(
                                 "external-controller".into(),
                                 format!("127.0.0.1:{}", port).into(),
@@ -478,15 +478,15 @@ async fn is_port_conflict(port: u16, secret: &str) -> bool {
             if !secret.is_empty() {
                 req = req.header("Authorization", format!("Bearer {secret}"));
             }
-            match tokio::time::timeout(Duration::from_millis(100), req.send()).await {
-                Ok(Ok(res)) if res.status().is_success() => false,
-                _ => true,
-            }
+            !matches!(
+                tokio::time::timeout(Duration::from_millis(100), req.send()).await,
+                Ok(Ok(res)) if res.status().is_success()
+            )
         }
     }
 }
 
-async fn find_free_controller_port(start_port: u16, _secret: &str) -> u16 {
+fn find_free_controller_port(start_port: u16, _secret: &str) -> u16 {
     let mut port = start_port;
     while port < 65535 {
         if TcpListener::bind(("127.0.0.1", port)).is_ok() {

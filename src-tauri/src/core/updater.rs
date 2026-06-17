@@ -138,7 +138,7 @@ impl SilentUpdater {
     pub async fn try_install_on_startup(&self, app_handle: &tauri::AppHandle) -> bool {
         let current_version = env!("CARGO_PKG_VERSION");
 
-        let meta = match tokio::task::spawn_blocking(|| Self::read_cache_meta()).await {
+        let meta = match tokio::task::spawn_blocking(Self::read_cache_meta).await {
             Ok(Ok(meta)) => meta,
             _ => return false, // No cache, nothing to do
         };
@@ -173,7 +173,7 @@ impl SilentUpdater {
         }
 
         // Read cached bytes
-        let bytes = match tokio::task::spawn_blocking(|| Self::read_cache_bytes()).await {
+        let bytes = match tokio::task::spawn_blocking(Self::read_cache_bytes).await {
             Ok(Ok(b)) => b,
             _ => {
                 logging!(

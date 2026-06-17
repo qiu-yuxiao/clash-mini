@@ -310,7 +310,7 @@ pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Op
         let secret = secret.clone();
         let encoded_url = encoded_url.clone();
         let node_name = node.clone();
-        let sem = sem.clone();
+        let sem = Arc::clone(&sem);
 
         let task = tokio::spawn(async move {
             let _permit = sem.acquire().await.ok();
@@ -400,7 +400,7 @@ pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Op
 }
 
 /// 启动全局后台节点监测常驻线程
-pub async fn start_background_monitor() {
+pub fn start_background_monitor() {
     AsyncHandler::spawn(move || async move {
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
         let mut last_profile_uid = None;
