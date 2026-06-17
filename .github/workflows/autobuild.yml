@@ -236,6 +236,13 @@ jobs:
           args: --target ${{ matrix.target }}
           # includeUpdaterJson: true
 
+      - name: Portable Bundle
+        if: matrix.os == 'windows-latest'
+        run: pnpm portable ${{ matrix.target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ env.TAG_NAME }}
+
   autobuild-arm-linux:
     name: Autobuild ARM Linux
     needs: [check_commit, update_tag]
