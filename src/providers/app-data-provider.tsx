@@ -103,6 +103,12 @@ export const AppDataProvider = ({
           const groupItem = {
             name: 'PROXY',
             type: groupProxy.type,
+            udp: false,
+            xudp: false,
+            tfo: false,
+            mptcp: false,
+            smux: false,
+            history: [],
             now: activeNodeName,
             all: groupProxy.all
               ? groupProxy.all
@@ -113,6 +119,11 @@ export const AppDataProvider = ({
                     return {
                       name,
                       type: name === 'DIRECT' ? 'DIRECT' : 'unknown',
+                      udp: false,
+                      xudp: false,
+                      tfo: false,
+                      mptcp: false,
+                      smux: false,
                       history: [],
                       provider: '',
                     }
@@ -125,16 +136,26 @@ export const AppDataProvider = ({
             global: {
               name: 'GLOBAL',
               type: 'Selector',
+              udp: false,
+              xudp: false,
+              tfo: false,
+              mptcp: false,
+              smux: false,
+              history: [],
               now: '',
               all: [],
-            } as any,
+            } as IProxyGroupItem,
             direct: {
               name: 'DIRECT',
               type: 'Direct',
-              history: [],
               udp: true,
-            } as any,
-            groups: [groupItem],
+              xudp: false,
+              tfo: false,
+              mptcp: false,
+              smux: false,
+              history: [],
+            } as IProxyItem,
+            groups: [groupItem] as IProxyGroupItem[],
             records:
               activeNodeName && activeNode
                 ? {

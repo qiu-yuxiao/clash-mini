@@ -45,7 +45,7 @@ type ProxyGroup = {
     time: string
     delay: number
   }[]
-  now: string
+  now?: string
   all: IProxyItem[]
   hidden?: boolean
   icon?: string
@@ -70,7 +70,7 @@ export interface IRenderItem {
 }
 
 type GroupCache = {
-  now: string
+  now?: string
   all: IProxyItem[]
   headState: HeadState
   col: number

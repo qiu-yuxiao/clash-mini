@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLockFn } from 'ahooks'
+import { useCallback, useMemo } from 'react'
 
 import {
   getClashInfo,
@@ -73,7 +74,7 @@ export const useClash = () => {
     queryFn: getVersion,
   })
 
-  const mutateClash = (updater?: MutateClashUpdater, revalidate?: boolean) => {
+  const mutateClash = useCallback((updater?: MutateClashUpdater, revalidate?: boolean) => {
     if (updater === undefined) {
       return refetch()
     }
@@ -86,12 +87,12 @@ export const useClash = () => {
       return refetch()
     }
     return Promise.resolve()
-  }
+  }, [refetch])
 
-  const patchClash = useLockFn(async (patch: Partial<IConfigData>) => {
+  const patchClash = useMemo(() => useLockFn(async (patch: Partial<IConfigData>) => {
     await patchClashConfig(patch)
     mutateClash()
-  })
+  }), [mutateClash])
 
   const version = versionData?.meta
     ? `${versionData.version} Mihomo`
@@ -112,7 +113,7 @@ export const useClashInfo = () => {
     queryFn: getClashInfo,
   })
 
-  const patchInfo = useLockFn(async (patch: ClashInfoPatch) => {
+  const patchInfo = useMemo(() => useLockFn(async (patch: ClashInfoPatch) => {
     if (!hasClashInfoPayload(patch)) return
 
     validatePorts(patch)
@@ -120,10 +121,10 @@ export const useClashInfo = () => {
     await patchClashConfig(patch)
     mutateInfo()
     queryClient.invalidateQueries({ queryKey: ['getClashConfig'] })
-  })
+  }), [mutateInfo])
 
-  const invalidateClashConfig = () =>
-    queryClient.invalidateQueries({ queryKey: ['getClashConfig'] })
+  const invalidateClashConfig = useCallback(() =>
+    queryClient.invalidateQueries({ queryKey: ['getClashConfig'] }), [])
 
   return {
     clashInfo,

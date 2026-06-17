@@ -7,11 +7,23 @@ import {
   RuleProvider,
 } from 'tauri-plugin-mihomo-api'
 
+export interface SystemProxyInfo {
+  enable: boolean
+  server: string
+  bypass: string
+}
+
 export interface AppDataContextType {
-  proxies: any
+  proxies: {
+    global: IProxyGroupItem
+    direct: IProxyItem
+    groups: IProxyGroupItem[]
+    records: Record<string, IProxyItem>
+    proxies: IProxyItem[]
+  }
   clashConfig: BaseConfig
   rules: Rule[]
-  sysproxy: any
+  sysproxy: SystemProxyInfo
   runningMode?: string
   uptime: number
   proxyProviders: Record<string, ProxyProvider>
@@ -41,7 +53,13 @@ export interface ConnectionSpeedData {
 }
 
 export interface ProxiesContextType {
-  proxies: any
+  proxies: {
+    global: IProxyGroupItem
+    direct: IProxyItem
+    groups: IProxyGroupItem[]
+    records: Record<string, IProxyItem>
+    proxies: IProxyItem[]
+  } | undefined
   proxyProviders: Record<string, ProxyProvider | undefined>
   isProxiesPending: boolean
 }
@@ -57,7 +75,7 @@ export interface ClashConfigContextType {
 }
 
 export interface SystemContextType {
-  sysproxy: any
+  sysproxy: SystemProxyInfo | undefined
   runningMode?: string
   systemProxyAddress: string
 }
@@ -145,11 +163,25 @@ export const useAppData = (): AppDataContextType => {
   const { isCoreDataPending } = useCoreDataStatus()
   const refreshers = useAppRefreshers()
 
+  const defaultProxies = {
+    global: { name: 'GLOBAL', type: 'Selector', udp: false, xudp: false, tfo: false, mptcp: false, smux: false, history: [], now: '', all: [] } as any,
+    direct: { name: 'DIRECT', type: 'Direct', udp: true, xudp: false, tfo: false, mptcp: false, smux: false, history: [] } as any,
+    groups: [],
+    records: {},
+    proxies: [],
+  }
+
+  const defaultSysproxy = {
+    enable: false,
+    server: '',
+    bypass: '',
+  }
+
   return {
-    proxies,
+    proxies: proxies || defaultProxies,
     clashConfig: clashConfig as BaseConfig,
     rules,
-    sysproxy,
+    sysproxy: sysproxy || defaultSysproxy,
     runningMode,
     uptime,
     proxyProviders: proxyProviders as Record<string, ProxyProvider>,
