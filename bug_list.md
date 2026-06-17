@@ -26,9 +26,35 @@
 
 ### **BUG-102** (布局文件的上帝组件单体化)
 * **缺陷描述与现象**：`src/pages/_layout.tsx` 过于庞大（近 5000 行），合并了所有抽屉侧边栏、明细表、配置卡片、系统设置等逻辑，违背了“单一职责原则”。
-* **排查原因与记忆**：在组件内定义了多达 38 个 `useState` 钩子。任何状态微调都会重新评估和重绘整个大型组件，导致可读性极差且难以排错和维护。
+* **排查原因与记忆**：在组件内定义了多达 38 个 `useState` 钩子。任何状态微调都会重新评估 and 重绘整个大型组件，导致可读性极差且难以排错和维护。
 * **修改方针**：深度拆分组件，将各类控制面板剥离为独立的子组件放置在 `src/components/` 目录下，并提取通用逻辑为自定义 Hook，让布局文件只作为导航框架结构的载体。
 * **状态**：排查中。
+
+### **BUG-107** (useWindowWidth中document.body未定义导致的空指针异常)
+* **缺陷描述与现象**：在 `src/components/proxy/use-window-width.ts` 中直接使用 `document.body.clientWidth` 初始化状态。当 DOM 未就绪、或者在非浏览器环境（如服务端渲染、单元测试）中运行时，`document.body` 为 `null`，导致抛出 `TypeError: Cannot read properties of null (reading 'clientWidth')` 致命错误，造成 React 渲染树崩溃，界面显示 ErrorBoundary 的堆栈。
+* **排查原因与记忆**：初始化状态时未对全局环境和 DOM 的加载状态做防护，假设了 `document.body` 必然存在。
+* **修改方针**：在初始化函数中加入对 `document` 和 `document.body` 的安全检查，使用 `window.innerWidth` 或做空值 fallback 极其安全的防护。
+* **状态**：代码已修正，待用户确认。
+
+### **BUG-108** (Vite配置中缺少base路径导致打包后静态资源加载失败)
+* **缺陷描述与现象**：在 `vite.config.mts` 中缺少 `base` 配置，导致打包生成的 `dist/index.html` 中的资源引入路径均带有前导斜杠 `/`（例如 `/assets/index.js`）。在 Tauri 生产环境中，如果本地文件系统或 Schema 不能正确解析以 `/` 开头的绝对路径，将导致页面白屏，静态资源全部加载失败。
+* **排查原因与记忆**：Vite 默认的资源路径 base 是 `/`，没有针对 Tauri 客户端本地包的相对路径进行配置。
+* **修改方针**：在 `vite.config.mts` 中添加 `base: './'` 配置，使用相对路径引用资源。
+* **状态**：排查中。
+
+### **BUG-109** (getAutotemProxy前端接口名称拼写错误)
+* **缺陷描述与现象**：在 `src/services/cmds.ts` 中，获取系统自动代理配置的函数名被错误地拼写为 `getAutotemProxy`，该拼写错误扩散到了使用该 API 的多处前端业务代码中，增加了代码维护的混乱感。
+* **排查原因与记忆**：历史开发时输入拼写疏忽（多拼写了 `tem` 字母），虽然后端 Tauri 指向了正确的 `get_auto_proxy`，但前端名称不规范。
+* **修改方针**：重构并统一更名为 `getAutoProxy`，同步修改所有引用的位置。
+* **状态**：排查中。
+
+### **BUG-110** (useMihomoWsSubscription中QueryKey元素为undefined的隐患)
+* **缺陷描述与现象**：在 `src/hooks/use-mihomo-ws-subscription.ts` 中，当 `responseCacheKey` 为空时，使用了 `[responseCacheKey!]`，导致传给 `queryClient.getQueryData` 的 QueryKey 中含有 `undefined` 元素。在 TanStack Query v5 规范中，Query Key 元素不可为 `undefined`，这可能带来不确定的缓存读写崩溃或异常。
+* **排查原因与记忆**：非空断言 `!` 绕过了编译检查，但未在运行时对 `null/undefined` 的缓存 Key 做防护。
+* **修改方针**：安全处理 QueryKey 的空值防护，确保数组元素不含 `undefined`。
+* **状态**：排查中。
+
+
 
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
