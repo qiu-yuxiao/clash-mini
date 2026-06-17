@@ -117,7 +117,7 @@ pub async fn clean_async() -> bool {
                 false
             }
         };
-        CoreManager::kill_all_mini_cores();
+        CoreManager::kill_all_mini_cores().await;
         stopped
     });
 
