@@ -1,5 +1,5 @@
-import type { BrutalOption } from "./BrutalOption";
+import type { BrutalOption } from './BrutalOption'
 export type MuxOption = {
-    padding?: boolean;
-    brutal?: BrutalOption;
-};
+  padding?: boolean
+  brutal?: BrutalOption
+}

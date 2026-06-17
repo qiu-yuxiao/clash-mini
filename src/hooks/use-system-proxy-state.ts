@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRef } from 'react'
 
-
 import { useVerge } from '@/hooks/use-verge'
 import { useClashConfigData, useSystemData } from '@/providers/app-data-context'
 import { getAutotemProxy } from '@/services/cmds'

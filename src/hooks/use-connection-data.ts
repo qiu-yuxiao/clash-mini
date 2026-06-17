@@ -4,7 +4,6 @@ import { useEffect } from 'react'
 import { useVisibility } from '@/hooks/use-visibility'
 import { getConnections, MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
-
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 
 const MAX_CLOSED_CONNS_NUM = 500
@@ -33,7 +32,8 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
   const { response, refresh, subscriptionCacheKey } =
     useMihomoWsSubscription<ConnectionMonitorData>({
       storageKey: 'mihomo_connection_date',
-      buildSubscriptKey: (date) => (isWsActive ? `getClashConnection-${date}` : null),
+      buildSubscriptKey: (date) =>
+        isWsActive ? `getClashConnection-${date}` : null,
       buildCacheKey: (date) => `getClashConnection-${date}`,
       fallbackData: initConnData,
       connect: () => MihomoWebSocket.connect_connections(),
@@ -61,11 +61,13 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                   return {
                     uploadTotal: msg.data.uploadTotal,
                     downloadTotal: msg.data.downloadTotal,
-                    activeConnections: msg.data.connections.map((conn: any) => ({
-                      ...conn,
-                      curUpload: 0,
-                      curDownload: 0,
-                    })),
+                    activeConnections: msg.data.connections.map(
+                      (conn: any) => ({
+                        ...conn,
+                        curUpload: 0,
+                        curDownload: 0,
+                      }),
+                    ),
                     closedConnections: old.closedConnections,
                   }
                 }
@@ -74,8 +76,13 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                   const delta = msg.data
 
                   // Sequence & Epoch Validation
-                  if (delta.epochId !== currentEpochId || delta.sequenceId !== lastSequenceId + 1) {
-                    console.warn('Sequence mismatch or epoch change. Triggering connection resync.')
+                  if (
+                    delta.epochId !== currentEpochId ||
+                    delta.sequenceId !== lastSequenceId + 1
+                  ) {
+                    console.warn(
+                      'Sequence mismatch or epoch change. Triggering connection resync.',
+                    )
                     currentEpochId = null
                     lastSequenceId = -1
                     void scheduleReconnect()
@@ -89,7 +96,9 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                   const activeMap = new Map<string, IConnectionsItem>()
 
                   for (let i = 0; i < previousActive.length; i++) {
-                    activeMap.set(previousActive[i].id, { ...previousActive[i] })
+                    activeMap.set(previousActive[i].id, {
+                      ...previousActive[i],
+                    })
                   }
 
                   // 1. Process Removals
@@ -134,7 +143,11 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                   // 3. Process Additions
                   for (let i = 0; i < delta.added.length; i++) {
                     const conn = delta.added[i]
-                    activeMap.set(conn.id, { ...conn, curUpload: 0, curDownload: 0 })
+                    activeMap.set(conn.id, {
+                      ...conn,
+                      curUpload: 0,
+                      curDownload: 0,
+                    })
                   }
 
                   // 4. Optimize Reference Stability to prevent unnecessary React re-renders
@@ -204,12 +217,15 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
       try {
         const res = await getConnections()
         if (subscriptionCacheKey) {
-          queryClient.setQueryData<ConnectionMonitorData>([subscriptionCacheKey], (old) => ({
-            uploadTotal: res.uploadTotal ?? 0,
-            downloadTotal: res.downloadTotal ?? 0,
-            activeConnections: old?.activeConnections ?? [],
-            closedConnections: old?.closedConnections ?? [],
-          }))
+          queryClient.setQueryData<ConnectionMonitorData>(
+            [subscriptionCacheKey],
+            (old) => ({
+              uploadTotal: res.uploadTotal ?? 0,
+              downloadTotal: res.downloadTotal ?? 0,
+              activeConnections: old?.activeConnections ?? [],
+              closedConnections: old?.closedConnections ?? [],
+            }),
+          )
         }
       } catch (err) {
         console.warn('[useConnectionData] Low freq poll failed:', err)

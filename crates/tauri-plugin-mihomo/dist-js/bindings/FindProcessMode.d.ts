@@ -1,1 +1,1 @@
-export type FindProcessMode = "Strict" | "Always" | "Off";
+export type FindProcessMode = 'Strict' | 'Always' | 'Off'

@@ -1,1 +1,1 @@
-export type DNSMode = string;
+export type DNSMode = string

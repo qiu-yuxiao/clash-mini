@@ -38,9 +38,22 @@ export const useWindowControls = () => {
 }
 
 export const useWindowDecorations = () => {
-  const { decorated, toggleDecorations, refreshDecorated, isDecorationsHidden } = useWindow()
-  return { decorated, toggleDecorations, refreshDecorated, isDecorationsHidden } satisfies Pick<
+  const {
+    decorated,
+    toggleDecorations,
+    refreshDecorated,
+    isDecorationsHidden,
+  } = useWindow()
+  return {
+    decorated,
+    toggleDecorations,
+    refreshDecorated,
+    isDecorationsHidden,
+  } satisfies Pick<
     WindowContextType,
-    'decorated' | 'toggleDecorations' | 'refreshDecorated' | 'isDecorationsHidden'
+    | 'decorated'
+    | 'toggleDecorations'
+    | 'refreshDecorated'
+    | 'isDecorationsHidden'
   >
 }

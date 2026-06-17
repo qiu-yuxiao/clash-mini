@@ -120,7 +120,11 @@ export const useWindowSnap = (active: boolean = true) => {
           y < screenTop - 150 ||
           y > screenBottom + 150
         ) {
-          cacheRef.current = { monitor: null, windowSize: null, fetchPromise: null }
+          cacheRef.current = {
+            monitor: null,
+            windowSize: null,
+            fetchPromise: null,
+          }
           await cacheDimensions()
           return
         }
@@ -140,10 +144,18 @@ export const useWindowSnap = (active: boolean = true) => {
             lastSnapRef.current = null
             // Set cooldown to prevent immediate re-snapping
             breakCooldownRef.current = {
-              left: Math.abs(x - screenLeft) < snapThreshold ? Date.now() + 600 : 0,
-              right: Math.abs(x + windowWidth - screenRight) < snapThreshold ? Date.now() + 600 : 0,
-              top: Math.abs(y - screenTop) < snapThreshold ? Date.now() + 600 : 0,
-              bottom: Math.abs(y + windowHeight - screenBottom) < snapThreshold ? Date.now() + 600 : 0,
+              left:
+                Math.abs(x - screenLeft) < snapThreshold ? Date.now() + 600 : 0,
+              right:
+                Math.abs(x + windowWidth - screenRight) < snapThreshold
+                  ? Date.now() + 600
+                  : 0,
+              top:
+                Math.abs(y - screenTop) < snapThreshold ? Date.now() + 600 : 0,
+              bottom:
+                Math.abs(y + windowHeight - screenBottom) < snapThreshold
+                  ? Date.now() + 600
+                  : 0,
             }
             return
           }
@@ -191,7 +203,9 @@ export const useWindowSnap = (active: boolean = true) => {
           lastSnapRef.current = { x: targetX, y: targetY }
           isSnappingRef.current = true
 
-          await currentWindow.setPosition(new PhysicalPosition(targetX, targetY))
+          await currentWindow.setPosition(
+            new PhysicalPosition(targetX, targetY),
+          )
 
           snapTimer = setTimeout(() => {
             isSnappingRef.current = false

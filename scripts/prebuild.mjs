@@ -208,8 +208,6 @@ const META_MAP = {
   'linux-loong64': 'mihomo-linux-loong64',
 }
 
-
-
 async function getLatestReleaseVersion() {
   if (!FORCE) {
     const cached = await getCachedVersion('META_VERSION')
@@ -770,7 +768,7 @@ const tasks = [
       } else {
         log_info('用户必读.txt not found, skipping copy')
       }
-      
+
       // Copy 用户必读.txt to src-tauri/resources/ (for macOS, Linux and other bundles)
       const dest_res = path.join(cwd, 'src-tauri', 'resources', '用户必读.txt')
       if (fs.existsSync(src)) {

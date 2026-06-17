@@ -105,8 +105,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [currentWindow, restoreChrome])
 
-
-
   // ── Reset idle timer ────────────────────────────────────────────────────────
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)

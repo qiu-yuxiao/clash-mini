@@ -19,7 +19,6 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 
-
 import { showNotice } from '@/services/notice-service'
 import { addQuickRoutingRule } from '@/utils/quick-routing'
 import { closeConnection } from 'tauri-plugin-mihomo-api'

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 
 import { useProfiles } from '@/hooks/use-profiles'
 
@@ -33,21 +34,29 @@ export const DEFAULT_STATE: HeadState = {
 
 type HeadStateAction =
   | { type: 'reset' }
-  | { type: 'replace'; payload: Record<string, HeadState> }
-  | { type: 'update'; groupName: string; patch: Partial<HeadState> }
+  | { type: 'replace'; payload: HeadStateStorage }
+  | { type: 'update'; profileUid: string; groupName: string; patch: Partial<HeadState> }
 
 function headStateReducer(
-  state: Record<string, HeadState>,
+  state: HeadStateStorage,
   action: HeadStateAction,
-): Record<string, HeadState> {
+): HeadStateStorage {
   switch (action.type) {
     case 'reset':
       return {}
     case 'replace':
       return action.payload
     case 'update': {
-      const prev = state[action.groupName] || DEFAULT_STATE
-      return { ...state, [action.groupName]: { ...prev, ...action.patch } }
+      const { profileUid, groupName, patch } = action
+      const profileState = state[profileUid] || {}
+      const prev = profileState[groupName] || DEFAULT_STATE
+      return {
+        ...state,
+        [profileUid]: {
+          ...profileState,
+          [groupName]: { ...prev, ...patch },
+        },
+      }
     }
     default:
       return state
@@ -60,48 +69,48 @@ export function useHeadStateNew() {
 
   const [state, dispatch] = useReducer(headStateReducer, {})
 
+  // 1. Load entire storage once on mount
   useEffect(() => {
-    try {
-      const data = JSON.parse(
-        localStorage.getItem(HEAD_STATE_KEY)!,
-      ) as HeadStateStorage
+    invoke<HeadStateStorage>('get_proxy_head_state')
+      .then((data) => {
+        if (data && typeof data === 'object') {
+          dispatch({ type: 'replace', payload: data })
+          localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(data))
+        }
+      })
+      .catch(() => {
+        try {
+          const data = JSON.parse(
+            localStorage.getItem(HEAD_STATE_KEY)!,
+          ) as HeadStateStorage
+          if (data && typeof data === 'object') {
+            dispatch({ type: 'replace', payload: data })
+          }
+        } catch {}
+      })
+  }, [])
 
-      const value = data[current] || {}
-
-      if (value && typeof value === 'object') {
-        dispatch({ type: 'replace', payload: value })
-      } else {
-        dispatch({ type: 'reset' })
-      }
-    } catch {
-      dispatch({ type: 'reset' })
-    }
-  }, [current])
-
+  // 2. Save entire storage only when state updates
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (Object.keys(state).length === 0) return
+    const timer = setTimeout(async () => {
       try {
-        const item = localStorage.getItem(HEAD_STATE_KEY)
-
-        let data = (item ? JSON.parse(item) : {}) as HeadStateStorage
-
-        if (!data || typeof data !== 'object') data = {}
-
-        data[current] = state
-
-        localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(data))
+        localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(state))
+        await invoke('save_proxy_head_state', { state })
       } catch {}
-    })
-
+    }, 100)
     return () => clearTimeout(timer)
-  }, [state, current])
+  }, [state])
 
   const setHeadState = useCallback(
     (groupName: string, obj: Partial<HeadState>) => {
-      dispatch({ type: 'update', groupName, patch: obj })
+      if (!current) return
+      dispatch({ type: 'update', profileUid: current, groupName, patch: obj })
     },
-    [],
+    [current],
   )
 
-  return [state, setHeadState] as const
+  const currentProfileState = state[current] || {}
+  return [currentProfileState, setHeadState] as const
 }
+

@@ -58,21 +58,26 @@ export const Switch = styled((props: SwitchProps) => (
           transform: 'translateX(14px) !important',
           color: '#fff !important',
           '& + .MuiSwitch-track': {
-            background: 'linear-gradient(to bottom, #FFE082 0%, #FFC107 50%, #B8860B 100%) !important',
+            background:
+              'linear-gradient(to bottom, #FFE082 0%, #FFC107 50%, #B8860B 100%) !important',
             opacity: '0.85 !important',
-            boxShadow: (isLight
-              ? `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
+            boxShadow:
+              (isLight
+                ? `inset 0 calc(2px * var(--depth-factor, 1.0)) calc(4px * var(--depth-factor, 1.0)) rgba(0,0,0,0.3),
                  0 1px 0 rgba(255,255,255,0.8),
                  0 0 calc(6px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.3 * var(--vibrancy-factor, 1.0)))`
-              : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.75),
+                : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.75),
                  0 1px 0 rgba(255, 255, 255, 0.08),
                  inset 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, 0.4),
-                 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.4 * var(--vibrancy-factor, 1.0)))`) + ' !important',
+                 0 0 calc(8px * var(--vibrancy-factor, 1.0)) rgba(255, 193, 7, calc(0.4 * var(--vibrancy-factor, 1.0)))`) +
+              ' !important',
           },
           '& .MuiSwitch-thumb': {
-            background: (isLight
-              ? `radial-gradient(circle at 35% 35%, #FFFDE7 0%, #FFD54F 45%, #FFA000 80%, #B8860B 100%)`
-              : `radial-gradient(circle at 35% 35%, #FFF9C4 0%, #FFC107 45%, #FFA000 80%, #8A6D00 100%)`) + ' !important',
+            background:
+              (isLight
+                ? `radial-gradient(circle at 35% 35%, #FFFDE7 0%, #FFD54F 45%, #FFA000 80%, #B8860B 100%)`
+                : `radial-gradient(circle at 35% 35%, #FFF9C4 0%, #FFC107 45%, #FFA000 80%, #8A6D00 100%)`) +
+              ' !important',
             border: `1px solid ${isLight ? '#8A6D00' : '#634E00'} !important`,
           },
         },
@@ -313,16 +318,23 @@ export const Switch = styled((props: SwitchProps) => (
           transform: 'translateX(14px) !important',
           color: '#fff !important',
           '& + .MuiSwitch-track': {
-            backgroundColor: (isLight 
-              ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.5)'
-              : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.35)') + ' !important',
+            backgroundColor:
+              (isLight
+                ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.5)'
+                : 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.35)') +
+              ' !important',
             border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.2)' : 'rgba(255, 255, 255, 0.15)'} !important`,
             opacity: '1 !important',
           },
           '& .MuiSwitch-thumb': {
-            backgroundColor: (isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.9)') + ' !important',
+            backgroundColor:
+              (isLight
+                ? 'rgba(255, 255, 255, 0.95)'
+                : 'rgba(255, 255, 255, 0.9)') + ' !important',
             border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.4)' : 'rgba(255, 255, 255, 0.3)'} !important`,
-            boxShadow: isLight ? '0 1px 3px rgba(0, 0, 0, 0.15) !important' : 'none !important',
+            boxShadow: isLight
+              ? '0 1px 3px rgba(0, 0, 0, 0.15) !important'
+              : 'none !important',
           },
         },
       },
@@ -332,13 +344,17 @@ export const Switch = styled((props: SwitchProps) => (
         height: 12,
         margin: '1px',
         border: `1px solid ${isLight ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.3)' : 'rgba(255, 255, 255, 0.2)'}`,
-        background: isLight ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.3)',
+        background: isLight
+          ? 'rgba(255, 255, 255, 0.8)'
+          : 'rgba(255, 255, 255, 0.3)',
         backdropFilter: 'blur(4px)',
         boxShadow: isLight ? '0 1px 2px rgba(0, 0, 0, 0.1)' : 'none',
       },
       '& .MuiSwitch-track': {
         borderRadius: 7,
-        backgroundColor: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+        backgroundColor: isLight
+          ? 'rgba(0, 0, 0, 0.06)'
+          : 'rgba(255, 255, 255, 0.08)',
         border: `1px solid ${isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)'}`,
         opacity: 1,
       },
@@ -391,13 +407,17 @@ export const Switch = styled((props: SwitchProps) => (
         '&.Mui-checked': {
           transform: 'translateX(14px) !important',
           '& + .MuiSwitch-track': {
-            backgroundColor: (isLight ? '#e0f7fa !important' : '#0a0e17 !important'),
+            backgroundColor: isLight
+              ? '#e0f7fa !important'
+              : '#0a0e17 !important',
             border: `1px solid ${isLight ? '#00b0ff' : '#00f0ff'} !important`,
             opacity: '1 !important',
           },
           '& .MuiSwitch-thumb': {
-            backgroundColor: (isLight ? '#00b0ff !important' : '#00f0ff !important'),
-            color: (isLight ? '#00b0ff !important' : '#00f0ff !important'),
+            backgroundColor: isLight
+              ? '#00b0ff !important'
+              : '#00f0ff !important',
+            color: isLight ? '#00b0ff !important' : '#00f0ff !important',
             borderRadius: '0px !important',
             boxShadow: `0 0 6px ${isLight ? '#00b0ff' : '#00f0ff'} !important`,
           },
@@ -448,13 +468,15 @@ export const Switch = styled((props: SwitchProps) => (
           '&.Mui-checked': {
             transform: 'translateX(28px) !important',
             '& + .MuiSwitch-track': {
-              backgroundColor: (isLight ? '#000000' : '#ffffff') + ' !important',
+              backgroundColor:
+                (isLight ? '#000000' : '#ffffff') + ' !important',
               opacity: '1 !important',
               boxShadow: 'none !important',
               border: 'none !important',
             },
             '& .MuiSwitch-thumb': {
-              backgroundColor: (isLight ? '#ffffff' : '#000000') + ' !important',
+              backgroundColor:
+                (isLight ? '#ffffff' : '#000000') + ' !important',
               border: 'none !important',
             },
           },

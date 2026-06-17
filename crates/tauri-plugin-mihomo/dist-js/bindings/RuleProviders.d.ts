@@ -1,6 +1,6 @@
-import type { RuleProvider } from "./RuleProvider";
+import type { RuleProvider } from './RuleProvider'
 export type RuleProviders = {
-    providers: {
-        [key in string]?: RuleProvider;
-    };
-};
+  providers: {
+    [key in string]?: RuleProvider
+  }
+}

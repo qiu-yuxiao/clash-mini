@@ -1,8 +1,8 @@
-import type { RuleType } from "./RuleType";
+import type { RuleType } from './RuleType'
 export type Rule = {
-    type: RuleType;
-    index: number;
-    payload: string;
-    proxy: string;
-    size: number;
-};
+  type: RuleType
+  index: number
+  payload: string
+  proxy: string
+  size: number
+}

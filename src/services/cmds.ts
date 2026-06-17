@@ -4,7 +4,11 @@ import yaml from 'js-yaml'
 
 import { showNotice } from '@/services/notice-service'
 import { debugLog } from '@/utils/debug'
-import { getProxies, getProxyProviders, delayProxyByName } from 'tauri-plugin-mihomo-api'
+import {
+  getProxies,
+  getProxyProviders,
+  delayProxyByName,
+} from 'tauri-plugin-mihomo-api'
 import { isDummyNode } from '@/utils/node'
 
 export async function getProfiles() {
@@ -207,8 +211,8 @@ export async function calcuProxies(): Promise<{
     if (each?.name !== 'GLOBAL' && each?.all) {
       acc.push({
         ...each,
-        all: each.all!
-          .map((item) => generateItem(item))
+        all: each
+          .all!.map((item) => generateItem(item))
           .filter((item) => item?.name && !isDummyNode(item.name)),
       })
     }
@@ -223,8 +227,8 @@ export async function calcuProxies(): Promise<{
       if (proxyRecord[name]?.all) {
         acc.push({
           ...proxyRecord[name],
-          all: proxyRecord[name].all!
-            .map((item) => generateItem(item))
+          all: proxyRecord[name]
+            .all!.map((item) => generateItem(item))
             .filter((item) => item?.name && !isDummyNode(item.name)),
         })
       }
@@ -252,8 +256,9 @@ export async function calcuProxies(): Promise<{
 
   const _global = {
     ...global,
-    all: (global?.all?.map((item) => generateItem(item)) || [])
-      .filter((item) => item?.name && !isDummyNode(item.name)),
+    all: (global?.all?.map((item) => generateItem(item)) || []).filter(
+      (item) => item?.name && !isDummyNode(item.name),
+    ),
   }
 
   return {

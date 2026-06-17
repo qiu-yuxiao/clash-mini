@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-
 import { useVerge } from '@/hooks/use-verge'
 import {
   calcuProxies,
@@ -97,7 +96,8 @@ export const AppDataProvider = ({
           }
 
           if (activeNode) {
-            activeNode.provider = activeNode.providerName || activeNode.provider || ''
+            activeNode.provider =
+              activeNode.providerName || activeNode.provider || ''
           }
 
           const groupItem = {
@@ -122,13 +122,26 @@ export const AppDataProvider = ({
           }
 
           return {
-            global: { name: 'GLOBAL', type: 'Selector', now: '', all: [] } as any,
-            direct: { name: 'DIRECT', type: 'Direct', history: [], udp: true } as any,
+            global: {
+              name: 'GLOBAL',
+              type: 'Selector',
+              now: '',
+              all: [],
+            } as any,
+            direct: {
+              name: 'DIRECT',
+              type: 'Direct',
+              history: [],
+              udp: true,
+            } as any,
             groups: [groupItem],
-            records: activeNodeName && activeNode ? {
-              [activeNodeName]: activeNode
-            } : {},
-            proxies: []
+            records:
+              activeNodeName && activeNode
+                ? {
+                    [activeNodeName]: activeNode,
+                  }
+                : {},
+            proxies: [],
           }
         }
       } catch (err) {
@@ -200,12 +213,14 @@ export const AppDataProvider = ({
     retry: 1,
   })
 
-  const refreshProxy = useStableFn(async (options?: { forceFull?: boolean }) => {
-    if (options?.forceFull) {
-      forceFullProxiesRef.current = true
-    }
-    return await _refetchProxy()
-  })
+  const refreshProxy = useStableFn(
+    async (options?: { forceFull?: boolean }) => {
+      if (options?.forceFull) {
+        forceFullProxiesRef.current = true
+      }
+      return await _refetchProxy()
+    },
+  )
   const refreshClashConfig = useStableFn(_refetchClashConfig)
   const refreshRules = useStableFn(_refetchRules)
   const refreshSysproxy = useStableFn(_refetchSysproxy)

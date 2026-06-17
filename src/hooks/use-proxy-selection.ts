@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react'
 
-
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
 import { syncTrayProxySelection } from '@/services/cmds'

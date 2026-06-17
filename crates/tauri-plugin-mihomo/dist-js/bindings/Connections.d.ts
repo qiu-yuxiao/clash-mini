@@ -1,10 +1,10 @@
-import type { Connection } from "./Connection";
+import type { Connection } from './Connection'
 /**
  * connections
  */
 export type Connections = {
-    downloadTotal: number;
-    uploadTotal: number;
-    connections: Array<Connection> | null;
-    memory: bigint;
-};
+  downloadTotal: number
+  uploadTotal: number
+  connections: Array<Connection> | null
+  memory: bigint
+}

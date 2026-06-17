@@ -7,8 +7,9 @@ use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use serde_yaml_ng::{Mapping, Value};
 use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     str::FromStr as _,
+    time::Duration,
 };
 
 #[derive(Default, Debug, Clone)]
@@ -32,12 +33,42 @@ impl IClashTemp {
                     }
                 }
 
-                // 确保 secret 字段存在且不为空
+                // 确保 secret 字段存在且不为空，且替换掉默认的容易泄漏的密钥
                 if let Some(val) = map.get_mut("secret")
                     && let Value::String(s) = val
-                    && s.is_empty()
                 {
-                    *s = "set-your-secret".into();
+                    if s.is_empty() || s == "set-your-secret" {
+                        *s = "adapted-by-qiu-yuxiao".into();
+                    }
+                }
+
+                let secret = map
+                    .get("secret")
+                    .and_then(|v| match v {
+                        Value::String(s) => Some(s.as_str()),
+                        _ => None,
+                    })
+                    .unwrap_or("adapted-by-qiu-yuxiao");
+
+                if let Some(ctrl_val) = map.get("external-controller")
+                    && let Some(ctrl_str) = ctrl_val.as_str()
+                {
+                    let parsed_addr = if ctrl_str.starts_with(':') {
+                        format!("127.0.0.1{}", ctrl_str)
+                    } else {
+                        ctrl_str.to_string()
+                    };
+
+                    if let Ok(addr) = SocketAddr::from_str(&parsed_addr) {
+                        let mut port = addr.port();
+                        if is_port_conflict(port, secret).await {
+                            port = find_free_controller_port(9098, secret).await;
+                            map.insert(
+                                "external-controller".into(),
+                                format!("127.0.0.1:{}", port).into(),
+                            );
+                        }
+                    }
                 }
 
                 Self(Self::guard(map))
@@ -103,7 +134,7 @@ impl IClashTemp {
             ]
             .into(),
         );
-        map.insert("secret".into(), "set-your-secret".into());
+        map.insert("secret".into(), "adapted-by-qiu-yuxiao".into());
         map.insert("external-controller-cors".into(), cors_map.into());
         map.insert("unified-delay".into(), true.into());
         Self(map)
@@ -436,4 +467,32 @@ pub struct IClashFallbackFilter {
     pub geoip_code: Option<String>,
     pub ipcidr: Option<Vec<String>>,
     pub domain: Option<Vec<String>>,
+}
+
+async fn is_port_conflict(port: u16, secret: &str) -> bool {
+    match TcpListener::bind(("127.0.0.1", port)) {
+        Ok(_) => false,
+        Err(_) => {
+            let client = reqwest::Client::new();
+            let mut req = client.get(format!("http://127.0.0.1:{port}/configs"));
+            if !secret.is_empty() {
+                req = req.header("Authorization", format!("Bearer {secret}"));
+            }
+            match tokio::time::timeout(Duration::from_millis(100), req.send()).await {
+                Ok(Ok(res)) if res.status().is_success() => false,
+                _ => true,
+            }
+        }
+    }
+}
+
+async fn find_free_controller_port(start_port: u16, _secret: &str) -> u16 {
+    let mut port = start_port;
+    while port < 65535 {
+        if TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return port;
+        }
+        port += 1;
+    }
+    start_port
 }

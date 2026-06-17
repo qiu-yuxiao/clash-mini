@@ -7,7 +7,6 @@ import {
   useState,
 } from 'react'
 
-
 import { useVisibility } from '@/hooks/use-visibility'
 import { debugLog } from '@/utils/debug'
 import { TrafficDataSampler, formatTrafficName } from '@/utils/traffic-sampler'

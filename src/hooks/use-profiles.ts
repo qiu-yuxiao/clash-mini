@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
-
 import {
   calcuProxies,
   getProfiles,
@@ -177,7 +176,8 @@ export const useProfiles = () => {
             continue
           }
 
-          const matchedProxyName = typeof matchedProxy === 'string' ? matchedProxy : matchedProxy.name
+          const matchedProxyName =
+            typeof matchedProxy === 'string' ? matchedProxy : matchedProxy.name
 
           if (matchedProxyName !== now) {
             debugLog(

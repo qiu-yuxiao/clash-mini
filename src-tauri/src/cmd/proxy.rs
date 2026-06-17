@@ -125,3 +125,40 @@ pub async fn get_proxy_addr(
 
     Ok(None)
 }
+
+/// 保存前端的代理组头部状态（过滤、排序选择）到本地硬盘
+#[tauri::command]
+pub async fn save_proxy_head_state(state: serde_json::Value) -> CmdResult<()> {
+    let path = dirs::app_home_dir().stringify_err()?.join("proxy_head_state.json");
+    let content = serde_json::to_string_pretty(&state).stringify_err()?;
+    tokio::fs::write(path, content).await.stringify_err()?;
+    Ok(())
+}
+
+/// 从本地硬盘读取代理组头部状态
+#[tauri::command]
+pub async fn get_proxy_head_state() -> CmdResult<serde_json::Value> {
+    let path = dirs::app_home_dir().stringify_err()?.join("proxy_head_state.json");
+    if !path.exists() {
+        return Ok(serde_json::Value::Object(serde_json::Map::new()));
+    }
+    let content = tokio::fs::read_to_string(path).await.stringify_err()?;
+    let val = serde_json::from_str(&content).stringify_err()?;
+    Ok(val)
+}
+
+/// 触发后端自动优选并切换到最快节点（如果是手动触发，则返回最优节点延迟信息）
+#[tauri::command]
+pub async fn trigger_auto_select(is_manual: bool) -> CmdResult<Option<(std::string::String, u32)>> {
+    let profiles = crate::config::Config::profiles().await;
+    if let Some(ref current_uid) = profiles.data_arc().current {
+        let current_uid_str = current_uid.to_string();
+        let res = crate::module::monitor::trigger_backend_auto_select(&current_uid_str)
+            .await
+            .stringify_err()?;
+        if is_manual {
+            return Ok(res);
+        }
+    }
+    Ok(None)
+}

@@ -77,6 +77,7 @@ pub fn resolve_setup_async() {
             init_silent_updater(),
         );
 
+        crate::module::monitor::start_background_monitor().await;
         Handle::refresh_clash();
         refresh_tray_menu().await;
         resolve_done();

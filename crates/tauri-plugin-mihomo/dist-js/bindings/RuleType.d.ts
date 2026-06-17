@@ -1,1 +1,1 @@
-export type RuleType = string;
+export type RuleType = string

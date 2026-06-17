@@ -1,4 +1,4 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from '@tauri-apps/api/core'
 import {
   BaseConfig,
   Connections,
@@ -13,10 +13,10 @@ import {
   ProxyProviders,
   RuleProviders,
   Rules,
-} from "./bindings";
+} from './bindings'
 
-export * from "./bindings";
-export type MihomoGroupDelay = Record<string, number>;
+export * from './bindings'
+export type MihomoGroupDelay = Record<string, number>
 
 // ======================= functions =======================
 
@@ -25,9 +25,9 @@ export type MihomoGroupDelay = Record<string, number>;
  * @param controller 控制器地址, 例如：127.0.0.1:9090
  */
 export async function updateController(controller: string): Promise<void> {
-  const [host, portStr] = controller.trim().split(":");
-  const port = parseInt(portStr);
-  await invoke<void>("plugin:mihomo|update_controller", { host, port });
+  const [host, portStr] = controller.trim().split(':')
+  const port = parseInt(portStr)
+  await invoke<void>('plugin:mihomo|update_controller', { host, port })
 }
 
 /**
@@ -35,28 +35,28 @@ export async function updateController(controller: string): Promise<void> {
  * @param secret 控制器的密钥
  */
 export async function updateSecret(secret: string): Promise<void> {
-  await invoke<void>("plugin:mihomo|update_secret", { secret });
+  await invoke<void>('plugin:mihomo|update_secret', { secret })
 }
 
 /**
  * 获取 Mihomo 版本信息
  */
 export async function getVersion(): Promise<MihomoVersion> {
-  return await invoke<MihomoVersion>("plugin:mihomo|get_version");
+  return await invoke<MihomoVersion>('plugin:mihomo|get_version')
 }
 
 /**
  * 清除 FakeIP 缓存
  */
 export async function flushFakeIp(): Promise<void> {
-  await invoke<void>("plugin:mihomo|flush_fakeip");
+  await invoke<void>('plugin:mihomo|flush_fakeip')
 }
 
 /**
  * 清除 DNS 缓存
  */
 export async function flushDNS(): Promise<void> {
-  await invoke<void>("plugin:mihomo|flush_dns");
+  await invoke<void>('plugin:mihomo|flush_dns')
 }
 
 // connections
@@ -65,14 +65,14 @@ export async function flushDNS(): Promise<void> {
  * @returns 所有连接信息
  */
 export async function getConnections(): Promise<Connections> {
-  return await invoke<Connections>("plugin:mihomo|get_connections");
+  return await invoke<Connections>('plugin:mihomo|get_connections')
 }
 
 /**
  * 关闭所有连接
  */
 export async function closeAllConnections(): Promise<void> {
-  await invoke<void>("plugin:mihomo|close_all_connections");
+  await invoke<void>('plugin:mihomo|close_all_connections')
 }
 
 /**
@@ -80,7 +80,7 @@ export async function closeAllConnections(): Promise<void> {
  * @param connectionId 连接 ID
  */
 export async function closeConnection(connectionId: string): Promise<void> {
-  await invoke<void>("plugin:mihomo|close_connection", { connectionId });
+  await invoke<void>('plugin:mihomo|close_connection', { connectionId })
 }
 
 // groups
@@ -89,7 +89,7 @@ export async function closeConnection(connectionId: string): Promise<void> {
  * @returns 所有代理组信息
  */
 export async function getGroups(): Promise<Groups> {
-  return await invoke<Groups>("plugin:mihomo|get_groups");
+  return await invoke<Groups>('plugin:mihomo|get_groups')
 }
 
 /**
@@ -98,9 +98,9 @@ export async function getGroups(): Promise<Groups> {
  * @returns 指定代理组信息
  */
 export async function getGroupByName(groupName: string): Promise<Proxy> {
-  return await invoke<Proxy>("plugin:mihomo|get_group_by_name", {
+  return await invoke<Proxy>('plugin:mihomo|get_group_by_name', {
     groupName,
-  });
+  })
 }
 
 /**
@@ -119,12 +119,12 @@ export async function delayGroup(
   timeout: number,
   keepFixed = false,
 ): Promise<MihomoGroupDelay> {
-  return await invoke<MihomoGroupDelay>("plugin:mihomo|delay_group", {
+  return await invoke<MihomoGroupDelay>('plugin:mihomo|delay_group', {
     groupName,
     testUrl,
     timeout,
     keepFixed,
-  });
+  })
 }
 
 // providers
@@ -133,7 +133,7 @@ export async function delayGroup(
  * @returns 所有代理提供者信息
  */
 export async function getProxyProviders(): Promise<ProxyProviders> {
-  return await invoke<ProxyProviders>("plugin:mihomo|get_proxy_providers");
+  return await invoke<ProxyProviders>('plugin:mihomo|get_proxy_providers')
 }
 
 /**
@@ -145,9 +145,9 @@ export async function getProxyProviderByName(
   providerName: string,
 ): Promise<ProxyProvider> {
   return await invoke<ProxyProvider>(
-    "plugin:mihomo|get_proxy_provider_by_name",
+    'plugin:mihomo|get_proxy_provider_by_name',
     { providerName },
-  );
+  )
 }
 
 /**
@@ -155,9 +155,9 @@ export async function getProxyProviderByName(
  * @param providerName 代理提供者名称
  */
 export async function updateProxyProvider(providerName: string): Promise<void> {
-  await invoke<void>("plugin:mihomo|update_proxy_provider", {
+  await invoke<void>('plugin:mihomo|update_proxy_provider', {
     providerName,
-  });
+  })
 }
 
 /**
@@ -167,9 +167,9 @@ export async function updateProxyProvider(providerName: string): Promise<void> {
 export async function healthcheckProxyProvider(
   providerName: string,
 ): Promise<void> {
-  await invoke<void>("plugin:mihomo|healthcheck_proxy_provider", {
+  await invoke<void>('plugin:mihomo|healthcheck_proxy_provider', {
     providerName,
-  });
+  })
 }
 
 /**
@@ -187,14 +187,14 @@ export async function healthcheckNodeInProvider(
   timeout: number,
 ): Promise<ProxyDelay> {
   return await invoke<ProxyDelay>(
-    "plugin:mihomo|healthcheck_node_in_provider",
+    'plugin:mihomo|healthcheck_node_in_provider',
     {
       providerName,
       proxyName,
       testUrl,
       timeout,
     },
-  );
+  )
 }
 
 // proxies
@@ -203,7 +203,7 @@ export async function healthcheckNodeInProvider(
  * @returns 所有代理信息
  */
 export async function getProxies(): Promise<Proxies> {
-  return await invoke<Proxies>("plugin:mihomo|get_proxies");
+  return await invoke<Proxies>('plugin:mihomo|get_proxies')
 }
 
 /**
@@ -212,9 +212,9 @@ export async function getProxies(): Promise<Proxies> {
  * @returns 代理信息
  */
 export async function getProxyByName(proxyName: string): Promise<Proxy | null> {
-  return await invoke<Proxy>("plugin:mihomo|get_proxy_by_name", {
+  return await invoke<Proxy>('plugin:mihomo|get_proxy_by_name', {
     proxiesName: proxyName,
-  });
+  })
 }
 
 /**
@@ -228,10 +228,10 @@ export async function selectNodeForGroup(
   groupName: string,
   node: string,
 ): Promise<void> {
-  await invoke<void>("plugin:mihomo|select_node_for_group", {
+  await invoke<void>('plugin:mihomo|select_node_for_group', {
     groupName,
     node,
-  });
+  })
 }
 
 /**
@@ -241,9 +241,9 @@ export async function selectNodeForGroup(
  * @param groupName 代理组名称
  */
 export async function unfixedProxy(groupName: string): Promise<void> {
-  await invoke<void>("plugin:mihomo|unfixed_proxy", {
+  await invoke<void>('plugin:mihomo|unfixed_proxy', {
     groupName,
-  });
+  })
 }
 
 /**
@@ -260,11 +260,11 @@ export async function delayProxyByName(
   testUrl: string,
   timeout: number,
 ): Promise<ProxyDelay> {
-  return await invoke<ProxyDelay>("plugin:mihomo|delay_proxy_by_name", {
+  return await invoke<ProxyDelay>('plugin:mihomo|delay_proxy_by_name', {
     proxyName,
     testUrl,
     timeout,
-  });
+  })
 }
 
 // rules
@@ -273,7 +273,7 @@ export async function delayProxyByName(
  * @returns 所有规则信息
  */
 export async function getRules(): Promise<Rules> {
-  return await invoke<Rules>("plugin:mihomo|get_rules");
+  return await invoke<Rules>('plugin:mihomo|get_rules')
 }
 
 /**
@@ -281,7 +281,7 @@ export async function getRules(): Promise<Rules> {
  * @returns 所有规则提供者信息
  */
 export async function getRuleProviders(): Promise<RuleProviders> {
-  return await invoke<RuleProviders>("plugin:mihomo|get_rule_providers");
+  return await invoke<RuleProviders>('plugin:mihomo|get_rule_providers')
 }
 
 /**
@@ -289,9 +289,9 @@ export async function getRuleProviders(): Promise<RuleProviders> {
  * @param providerName 规则提供者名称
  */
 export async function updateRuleProvider(providerName: string): Promise<void> {
-  await invoke<void>("plugin:mihomo|update_rule_provider", {
+  await invoke<void>('plugin:mihomo|update_rule_provider', {
     providerName,
-  });
+  })
 }
 
 // runtime config
@@ -300,7 +300,7 @@ export async function updateRuleProvider(providerName: string): Promise<void> {
  * @returns 基础配置
  */
 export async function getBaseConfig(): Promise<BaseConfig> {
-  return await invoke<BaseConfig>("plugin:mihomo|get_base_config");
+  return await invoke<BaseConfig>('plugin:mihomo|get_base_config')
 }
 
 /**
@@ -312,10 +312,10 @@ export async function reloadConfig(
   force: boolean,
   configPath: string,
 ): Promise<void> {
-  await invoke<void>("plugin:mihomo|reload_config", {
+  await invoke<void>('plugin:mihomo|reload_config', {
     force,
     configPath,
-  });
+  })
 }
 
 /**
@@ -325,23 +325,23 @@ export async function reloadConfig(
 export async function patchBaseConfig(
   data: Record<string, any>,
 ): Promise<void> {
-  await invoke<void>("plugin:mihomo|patch_base_config", {
+  await invoke<void>('plugin:mihomo|patch_base_config', {
     data,
-  });
+  })
 }
 
 /**
  * 更新 Geo
  */
 export async function updateGeo(): Promise<void> {
-  await invoke<void>("plugin:mihomo|update_geo");
+  await invoke<void>('plugin:mihomo|update_geo')
 }
 
 /**
  * 重启核心
  */
 export async function restart(): Promise<void> {
-  await invoke<void>("plugin:mihomo|restart");
+  await invoke<void>('plugin:mihomo|restart')
 }
 
 // upgrade
@@ -356,92 +356,92 @@ export async function restart(): Promise<void> {
  *    - true: 直接下载最新版，强制覆盖升级
  */
 export async function upgradeCore(
-  channel: CoreUpdaterChannel = "auto",
+  channel: CoreUpdaterChannel = 'auto',
   force = false,
 ): Promise<void> {
-  await invoke<void>("plugin:mihomo|upgrade_core", { channel, force });
+  await invoke<void>('plugin:mihomo|upgrade_core', { channel, force })
 }
 
 /**
  * 更新 UI
  */
 export async function upgradeUi(): Promise<void> {
-  await invoke<void>("plugin:mihomo|upgrade_ui");
+  await invoke<void>('plugin:mihomo|upgrade_ui')
 }
 
 /**
  * 更新 Geo
  */
 export async function upgradeGeo(): Promise<void> {
-  await invoke<void>("plugin:mihomo|upgrade_geo");
+  await invoke<void>('plugin:mihomo|upgrade_geo')
 }
 
 /**
  * 清除 Rust 侧中所有的 WebSocket 连接
  */
 export async function clearAllWsConnections(): Promise<void> {
-  await invoke<void>("plugin:mihomo|clear_all_ws_connections");
+  await invoke<void>('plugin:mihomo|clear_all_ws_connections')
 }
 
 export interface MessageKind<T, D> {
-  type: T;
-  data: D;
+  type: T
+  data: D
 }
 
-export type Message = MessageKind<"Text", string>;
+export type Message = MessageKind<'Text', string>
 
-type RawTextChannelMessage = string | ArrayBuffer | Uint8Array | number[];
+type RawTextChannelMessage = string | ArrayBuffer | Uint8Array | number[]
 
-const textDecoder = new TextDecoder();
+const textDecoder = new TextDecoder()
 
 function normalizeWebSocketMessage(message: RawTextChannelMessage): Message {
-  if (typeof message === "string") {
-    return { type: "Text", data: message };
+  if (typeof message === 'string') {
+    return { type: 'Text', data: message }
   }
 
   if (message instanceof ArrayBuffer) {
-    return { type: "Text", data: textDecoder.decode(new Uint8Array(message)) };
+    return { type: 'Text', data: textDecoder.decode(new Uint8Array(message)) }
   }
 
-  const bytes = Array.isArray(message) ? new Uint8Array(message) : message;
-  return { type: "Text", data: textDecoder.decode(bytes) };
+  const bytes = Array.isArray(message) ? new Uint8Array(message) : message
+  return { type: 'Text', data: textDecoder.decode(bytes) }
 }
 
 function dispatchWebSocketMessage(
   listeners: Set<(arg: Message) => void>,
   message: RawTextChannelMessage,
 ): void {
-  const normalizedMessage = normalizeWebSocketMessage(message);
+  const normalizedMessage = normalizeWebSocketMessage(message)
   listeners.forEach((listener) => {
-    listener(normalizedMessage);
-  });
+    listener(normalizedMessage)
+  })
 }
 
 async function openWebSocketCommand(
   command: string,
   args: Record<string, unknown> = {},
 ): Promise<MihomoWebSocket> {
-  const listeners: Set<(arg: Message) => void> = new Set();
-  const onMessage = new Channel<RawTextChannelMessage>();
+  const listeners: Set<(arg: Message) => void> = new Set()
+  const onMessage = new Channel<RawTextChannelMessage>()
   onMessage.onmessage = (message: RawTextChannelMessage): void => {
-    dispatchWebSocketMessage(listeners, message);
-  };
+    dispatchWebSocketMessage(listeners, message)
+  }
 
   const id = await invoke<number>(`plugin:mihomo|${command}`, {
     ...args,
     onMessage,
-  });
-  return new MihomoWebSocket(id, listeners);
+  })
+  return new MihomoWebSocket(id, listeners)
 }
 
 export class MihomoWebSocket {
-  id: number;
-  private readonly listeners: Set<(arg: Message) => void>;
-  private static instances = new Set<MihomoWebSocket>();
+  id: number
+  private readonly listeners: Set<(arg: Message) => void>
+  private static instances = new Set<MihomoWebSocket>()
 
   constructor(id: number, listeners: Set<(arg: Message) => void>) {
-    this.id = id;
-    this.listeners = listeners;
+    this.id = id
+    this.listeners = listeners
   }
 
   /**
@@ -449,9 +449,9 @@ export class MihomoWebSocket {
    * @returns WebSocket 实例
    */
   static async connect_traffic(): Promise<MihomoWebSocket> {
-    const instance = await openWebSocketCommand("ws_traffic");
-    MihomoWebSocket.instances.add(instance);
-    return instance;
+    const instance = await openWebSocketCommand('ws_traffic')
+    MihomoWebSocket.instances.add(instance)
+    return instance
   }
 
   /**
@@ -459,9 +459,9 @@ export class MihomoWebSocket {
    * @returns WebSocket 实例
    */
   static async connect_memory(): Promise<MihomoWebSocket> {
-    const instance = await openWebSocketCommand("ws_memory");
-    MihomoWebSocket.instances.add(instance);
-    return instance;
+    const instance = await openWebSocketCommand('ws_memory')
+    MihomoWebSocket.instances.add(instance)
+    return instance
   }
 
   /**
@@ -469,9 +469,9 @@ export class MihomoWebSocket {
    * @returns WebSocket 实例
    */
   static async connect_connections(): Promise<MihomoWebSocket> {
-    const instance = await openWebSocketCommand("ws_connections");
-    MihomoWebSocket.instances.add(instance);
-    return instance;
+    const instance = await openWebSocketCommand('ws_connections')
+    MihomoWebSocket.instances.add(instance)
+    return instance
   }
 
   /**
@@ -479,9 +479,9 @@ export class MihomoWebSocket {
    * @returns WebSocket 实例
    */
   static async connect_logs(level: LogLevel): Promise<MihomoWebSocket> {
-    const instance = await openWebSocketCommand("ws_logs", { level });
-    MihomoWebSocket.instances.add(instance);
-    return instance;
+    const instance = await openWebSocketCommand('ws_logs', { level })
+    MihomoWebSocket.instances.add(instance)
+    return instance
   }
 
   /**
@@ -489,10 +489,10 @@ export class MihomoWebSocket {
    * @param cb 回调函数
    */
   addListener(cb: (arg: Message) => void): () => void {
-    this.listeners.add(cb);
+    this.listeners.add(cb)
     return () => {
-      this.listeners.delete(cb);
-    };
+      this.listeners.delete(cb)
+    }
   }
 
   /**
@@ -501,15 +501,15 @@ export class MihomoWebSocket {
    */
   async close(): Promise<void> {
     try {
-      await invoke("plugin:mihomo|ws_disconnect", {
+      await invoke('plugin:mihomo|ws_disconnect', {
         id: this.id,
         forceTimeout: 0,
-      });
+      })
     } catch (ignore) {
       // ignore
     } finally {
-      this.listeners.clear();
-      MihomoWebSocket.instances.delete(this);
+      this.listeners.clear()
+      MihomoWebSocket.instances.delete(this)
     }
   }
 
@@ -519,8 +519,8 @@ export class MihomoWebSocket {
   static async cleanupAll() {
     await Promise.all(
       Array.from(MihomoWebSocket.instances).map((instance) => instance.close()),
-    );
-    this.instances.clear();
-    await clearAllWsConnections();
+    )
+    this.instances.clear()
+    await clearAllWsConnections()
   }
 }

@@ -5,7 +5,6 @@ import { useEffect, useRef } from 'react'
 import { getClashLogs } from '@/services/cmds'
 import { MihomoWebSocket, type LogLevel } from 'tauri-plugin-mihomo-api'
 
-
 import { useClashLog } from './use-clash-log'
 import { useMihomoWsSubscription } from './use-mihomo-ws-subscription'
 import { useVisibility } from './use-visibility'
@@ -29,7 +28,7 @@ const clampLogs = (logs: ILogItem[]): ILogItem[] =>
 const filterLogsByLevel = (
   logs: ILogItem[],
   allowedTypes: LogType[],
- ): ILogItem[] => {
+): ILogItem[] => {
   if (allowedTypes.length === 0) return []
   if (allowedTypes.length === DEFAULT_LOG_TYPES.length) return logs
   return logs.filter((log) => allowedTypes.includes(log.type))
@@ -99,9 +98,12 @@ export const useLogData = () => {
 
           try {
             const parsed = JSON.parse(data)
-            const incomingLogs: ILogItem[] = Array.isArray(parsed) ? parsed : [parsed]
+            const incomingLogs: ILogItem[] = Array.isArray(parsed)
+              ? parsed
+              : [parsed]
             const filteredLogs = incomingLogs.filter(
-              (log) => allowedTypes.length === 0 || allowedTypes.includes(log.type)
+              (log) =>
+                allowedTypes.length === 0 || allowedTypes.includes(log.type),
             )
             if (filteredLogs.length === 0) {
               return

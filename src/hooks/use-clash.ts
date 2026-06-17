@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLockFn } from 'ahooks'
 
-
 import {
   getClashInfo,
   getRuntimeConfig,

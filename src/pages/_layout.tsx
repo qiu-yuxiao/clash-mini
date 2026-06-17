@@ -659,7 +659,9 @@ const ActiveNodeStatusCard = () => {
                 ),
             color:
               signalInfo.color === 'text.secondary'
-                ? (isRetro3DDark ? '#2C1F03' : 'text.secondary')
+                ? isRetro3DDark
+                  ? '#2C1F03'
+                  : 'text.secondary'
                 : signalInfo.color,
             '& .MuiChip-icon': {
               color: 'inherit',
@@ -1039,7 +1041,8 @@ const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
         height: 5,
         border: 'none',
         borderRadius: 2.5,
-        background: 'linear-gradient(to bottom, #FFE082 0%, #FFC107 50%, #B8860B 100%)',
+        background:
+          'linear-gradient(to bottom, #FFE082 0%, #FFC107 50%, #B8860B 100%)',
         boxShadow: isLight
           ? 'inset 0 1px 0 rgba(255,255,255,0.4)'
           : 'inset 0 1px 0 rgba(255,255,255,0.08)',
@@ -1422,7 +1425,8 @@ const Layout = () => {
   if (theme) {
     ;(theme as any).controlSkin = controlSkin
   }
-  const isRetro3DDark = controlSkin === 'retro-3d' && theme?.palette?.mode === 'dark'
+  const isRetro3DDark =
+    controlSkin === 'retro-3d' && theme?.palette?.mode === 'dark'
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
   const { switchLanguage, currentLanguage } = useI18n()
@@ -1471,7 +1475,8 @@ const Layout = () => {
       const start = input.selectionStart ?? 0
       const end = input.selectionEnd ?? 0
       const currentVal = url || ''
-      const newValue = currentVal.substring(0, start) + textToPaste + currentVal.substring(end)
+      const newValue =
+        currentVal.substring(0, start) + textToPaste + currentVal.substring(end)
       setUrl(newValue)
       setTimeout(() => {
         input.focus()
@@ -1522,7 +1527,8 @@ const Layout = () => {
             console.error('Failed to copy to clipboard:', e)
           }
         }
-        const newValue = currentVal.substring(0, start) + currentVal.substring(end)
+        const newValue =
+          currentVal.substring(0, start) + currentVal.substring(end)
         setUrl(newValue)
         setTimeout(() => {
           input.focus()
@@ -1904,418 +1910,7 @@ const Layout = () => {
     }
   }, [language])
 
-  const triggerAutoSelectFastestNode = useCallback(
-    async (profileUid: string, isBackground = false, skipDelay = false) => {
-      if (!profileUid) return
-      console.log(
-        `[BUG-034] Profile UID changed to ${profileUid}, scheduling auto select fastest... (isBackground=${isBackground})`,
-      )
-
-      pollSessionRef.current += 1
-      const currentSession = pollSessionRef.current
-
-      // 并发探测内核与物理网络是否就绪
-      if (!skipDelay) {
-        const probeStartTime = Date.now()
-        
-        const probeAPIPromise = (async () => {
-          while (Date.now() - probeStartTime < 20000) {
-            if (pollSessionRef.current !== currentSession) return false
-            try {
-              await getBaseConfig()
-              console.log('[BUG-093] Probe A (API configs ready) succeeded.')
-              return true
-            } catch {
-              // ignore and retry
-            }
-            await new Promise((resolve) => setTimeout(resolve, 200))
-          }
-          return false
-        })()
-
-        const probeNetworkPromise = (async () => {
-          const testUrl = delayManager.getUrl('PROXY') || 'http://cp.cloudflare.com/generate_204'
-          while (Date.now() - probeStartTime < 20000) {
-            if (pollSessionRef.current !== currentSession) return false
-            try {
-              // 针对 DIRECT 节点发起单次延迟测试
-              const result = await cmdGetProxyDelay('DIRECT', 3000, testUrl)
-              if (result && result.delay > 0 && result.delay < 1e6) {
-                console.log(`[BUG-093] Probe B (Physical network direct delay: ${result.delay}ms) succeeded.`)
-                return true
-              }
-            } catch {
-              // ignore and retry
-            }
-            await new Promise((resolve) => setTimeout(resolve, 200))
-          }
-          return false
-        })()
-
-        console.log('[BUG-093] Starting concurrent probes A & B for kernel readiness...')
-        const [apiReady, networkReady] = await Promise.all([probeAPIPromise, probeNetworkPromise])
-        
-        if (pollSessionRef.current !== currentSession) return
-        
-        if (!apiReady || !networkReady) {
-          console.warn(`[BUG-093] Probes timed out or failed: apiReady=${apiReady}, networkReady=${networkReady}.`)
-        } else {
-          console.log('[BUG-093] Both probes A & B succeeded. Kernel and network are ready.')
-        }
-      }
-
-      // 1. Wait a bit for Clash core to reload and populate proxies (with retry loop)
-      const groupName = 'PROXY'
-      let group: any = null
-      let proxiesData: any = null
-      const findStartTime = Date.now()
-
-      while (Date.now() - findStartTime < 20000) {
-        if (pollSessionRef.current !== currentSession) return
-        try {
-          const freshProxies = await refreshProxy({ forceFull: true })
-          proxiesData = freshProxies?.data || proxies
-          group = proxiesData?.groups?.find((g: any) => g.name === groupName)
-          if (group && group.all && group.all.length > 0) {
-            break
-          }
-        } catch (e) {
-          console.warn(
-            '[BUG-034] refreshProxy failed during startup polling:',
-            e,
-          )
-        }
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      }
-
-      if (!group || !group.all || group.all.length === 0) {
-        console.warn(
-          '[BUG-034] PROXY group not found or empty after 20 seconds',
-        )
-        return
-      }
-
-      const nodeNames: string[] = group.all
-        .map((n: any) => n?.name)
-        .filter(Boolean)
-      console.log(
-        `[BUG-034] Found PROXY group with ${group.all.length} nodes (${nodeNames.length} mapped), starting auto-latency test...`,
-      )
-
-      // 2. Set sorting state for this group in local storage to "Latency Sort" (sortType: 1)
-      try {
-        const item = localStorage.getItem('proxy-head-state')
-        let data = (item ? JSON.parse(item) : {}) as Record<string, any>
-        if (!data || typeof data !== 'object') data = {}
-        if (!data[profileUid]) data[profileUid] = {}
-        if (!data[profileUid][groupName]) data[profileUid][groupName] = {}
-        data[profileUid][groupName].sortType = 1 // 1 = latency sort
-        localStorage.setItem('proxy-head-state', JSON.stringify(data))
-        console.log(
-          `[BUG-034] Set proxy-head-state sortType to 1 for profile ${profileUid}`,
-        )
-      } catch (e) {
-        console.error('[BUG-034] Failed to set auto-sort in localStorage:', e)
-      }
-
-      // 3. Trigger latency tests in background (do not await)
-      try {
-        // Check unique providers across nodes in the PROXY group
-        const uniqueProviders = new Set<string>()
-        for (const node of group.all) {
-          if (node?.provider) {
-            uniqueProviders.add(node.provider)
-          }
-        }
-
-        if (uniqueProviders.size > 0) {
-          console.log(
-            `[BUG-034] Triggering healthcheck for providers in background: ${Array.from(uniqueProviders).join(', ')}`,
-          )
-          Promise.all(
-            Array.from(uniqueProviders).map((provider) =>
-              healthcheckProxyProvider(provider).catch((err) => {
-                console.error(
-                  `[BUG-034] provider healthcheck failed for ${provider}:`,
-                  err,
-                )
-              }),
-            ),
-          )
-        } else {
-          console.log(
-            `[BUG-034] Triggering delay test for all nodes in background: ${nodeNames.length}`,
-          )
-          const timeout = verge?.default_latency_timeout || 10000
-          delayManager
-            .checkListDelay(nodeNames, groupName, timeout)
-            .catch((err) => {
-              console.error('[BUG-034] checkListDelay failed:', err)
-            })
-        }
-        const startTime = Date.now()
-        let hasSelected = false
-        let hasSelectedTemp = false
-        let fallbackTriggered = false
-
-        while (!hasSelected) {
-          if (pollSessionRef.current !== currentSession) {
-            console.log('[BUG-034] Session invalidated, stopping poll.')
-            return
-          }
-
-          const elapsed = (Date.now() - startTime) / 1000
-
-          // Fetch fresh proxy records
-          const testedProxies = await refreshProxy({ forceFull: true })
-          if (pollSessionRef.current !== currentSession) return
-
-          const latestData = testedProxies?.data || proxiesData
-          const currentGroup =
-            latestData?.groups?.find((g: any) => g.name === groupName) || group
-
-          // Read filter and sort from localStorage for the active profile & PROXY group
-          let filterText = ''
-          let useRegex = false
-          let matchCase = false
-          let matchWholeWord = false
-          try {
-            const item = localStorage.getItem('proxy-head-state')
-            if (item) {
-              const data = JSON.parse(item)
-              const currentProfile = profileUid
-              const groupState = data[currentProfile]?.[groupName]
-              if (groupState) {
-                filterText = groupState.filterText || ''
-                useRegex = !!groupState.filterUseRegularExpression
-                matchCase = !!groupState.filterMatchCase
-                matchWholeWord = !!groupState.filterMatchWholeWord
-              }
-            }
-          } catch (e) {
-            console.error('[BUG-034] Error parsing proxy-head-state:', e)
-          }
-
-          // Filter nodes to match the active homepage filter
-          const filteredAll = filterSort(
-            currentGroup.all || [],
-            groupName,
-            filterText,
-            0,
-            verge?.default_latency_timeout,
-            {
-              matchCase,
-              matchWholeWord,
-              useRegularExpression: useRegex,
-            },
-          )
-
-          // Collect healthy scanned nodes and calculate tested count
-          const validNodes = filteredAll.filter((n: any) => n?.name)
-          const totalFilteredValidNodes = validNodes.length
-
-          const healthyNodes: { name: string; delay: number }[] = []
-          let testedCount = 0
-
-          for (const node of validNodes) {
-            const name = node.name
-            const d = delayManager.getDelayFix(node, groupName)
-            if (d !== -1) {
-              testedCount++
-              if (d > 0 && d < 1e6) {
-                healthyNodes.push({ name, delay: d })
-              }
-            }
-          }
-
-          // Sort by delay ascending
-          healthyNodes.sort((a, b) => a.delay - b.delay)
-
-          console.log(
-            `[BUG-034] Polling: elapsed=${elapsed.toFixed(1)}s, tested=${testedCount}/${totalFilteredValidNodes}, healthy=${healthyNodes.length}`,
-          )
-
-          // Fallback logic: if 6 seconds elapsed and no healthy nodes, trigger checkListDelay as fallback
-          if (elapsed >= 6 && healthyNodes.length === 0 && !fallbackTriggered) {
-            fallbackTriggered = true
-            console.log(
-              `[BUG-053] 6s elapsed with 0 healthy nodes. Triggering frontend checkListDelay fallback for ${nodeNames.length} nodes.`,
-            )
-            const timeout = verge?.default_latency_timeout || 10000
-            delayManager
-              .checkListDelay(nodeNames, groupName, timeout)
-              .catch((err) => {
-                console.error('[BUG-053] Fallback checkListDelay failed:', err)
-              })
-          }
-
-          // Rule A: Immediate temporary switch to the first available healthy node
-          if (!hasSelectedTemp && healthyNodes.length >= 1) {
-            const tempTarget = healthyNodes[0].name
-            if (tempTarget !== currentGroup.now) {
-              console.log(
-                `[BUG-034] Immediate temporary switch to: ${tempTarget} (${healthyNodes[0].delay}ms)`,
-              )
-              changeProxy(groupName, tempTarget, currentGroup.now)
-            }
-            hasSelectedTemp = true
-          }
-
-          // Rule B: Final selection conditions
-          const isFinalSelection =
-            healthyNodes.length >= 5 ||
-            (totalFilteredValidNodes > 0 &&
-              testedCount >= totalFilteredValidNodes &&
-              (healthyNodes.length >= 1 || elapsed >= 6)) ||
-            elapsed >= 15
-
-          if (isFinalSelection) {
-            if (healthyNodes.length >= 1) {
-              const targetNode = healthyNodes[0].name
-              const targetDelay = healthyNodes[0].delay
-              const isSameNode = targetNode === currentGroup.now
-              changeProxy(groupName, targetNode, currentGroup.now)
-              if (!isBackground || !isSameNode) {
-                showNotice.success(
-                  isSameNode
-                    ? `自动测速完成，当前已是最快节点: ${targetNode} (${targetDelay}ms)`
-                    : `自动测速完成，已切换至最快节点: ${targetNode} (${targetDelay}ms)`,
-                )
-              }
-            } else {
-              if (!isBackground) {
-                showNotice.error(
-                  <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                    所有线路都繁忙，请耐心等待。
-                  </span>,
-                )
-              }
-            }
-            hasSelected = true
-            break
-          }
-
-          // Wait 500ms before next poll
-          await new Promise((resolve) => setTimeout(resolve, 500))
-        }
-      } catch (err) {
-        console.error('[BUG-034] Error during auto speed test and select:', err)
-      }
-    },
-    [refreshProxy, proxies, verge?.default_latency_timeout, changeProxy],
-  )
-
   const lastEnhancedProfileRef = useRef<string | null>(null)
-  const pollSessionRef = useRef<number>(0)
-
-  useEffect(() => {
-    return () => {
-      pollSessionRef.current += 1
-    }
-  }, [])
-
-  // Keep stable refs for proxies and triggerAutoSelectFastestNode to prevent background monitor timer resets
-  const proxiesRef = useRef(proxies)
-  useEffect(() => {
-    proxiesRef.current = proxies
-  }, [proxies])
-
-  const triggerAutoSelectFastestNodeRef = useRef(triggerAutoSelectFastestNode)
-  useEffect(() => {
-    triggerAutoSelectFastestNodeRef.current = triggerAutoSelectFastestNode
-  }, [triggerAutoSelectFastestNode])
-
-  // Background monitor for the active proxy node
-  const consecutiveFailRef = useRef<number>(0)
-  const lastActiveNodeRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    if (!currentProfileUid) return
-
-    consecutiveFailRef.current = 0
-    lastActiveNodeRef.current = null
-    let timerId: ReturnType<typeof setTimeout> | null = null
-
-    const checkNode = async () => {
-      const activeNodeName = proxiesRef.current?.groups?.find(
-        (g: any) => g.name === 'PROXY',
-      )?.now
-      if (
-        !activeNodeName ||
-        activeNodeName === 'DIRECT' ||
-        activeNodeName === 'REJECT'
-      ) {
-        timerId = setTimeout(checkNode, 60000)
-        return
-      }
-
-      if (isDummyNode(activeNodeName)) {
-        console.log(
-          `[NodeMonitor] Active node ${activeNodeName} is a dummy/ad node. Force triggering auto select.`,
-        )
-        triggerAutoSelectFastestNodeRef.current(currentProfileUid, true)
-        timerId = setTimeout(checkNode, 5000)
-        return
-      }
-
-      // Reset counters if node manually or automatically switched
-      if (lastActiveNodeRef.current !== activeNodeName) {
-        lastActiveNodeRef.current = activeNodeName
-        consecutiveFailRef.current = 0
-      }
-
-      let isHealthy = false
-      try {
-        const timeout = 5000
-        const testUrl = delayManager.getUrl('PROXY')
-        const result = await cmdGetProxyDelay(activeNodeName, timeout, testUrl)
-        const delay = result?.delay ?? 1e6
-
-        if (delay < 3000) {
-          isHealthy = true
-        } else {
-          console.log(
-            `[NodeMonitor] Active node ${activeNodeName} is unhealthy (delay: ${delay}ms)`,
-          )
-        }
-      } catch (err) {
-        console.error('[NodeMonitor] Failed to check active node latency:', err)
-      }
-
-      if (isHealthy) {
-        consecutiveFailRef.current = 0
-        refreshProxy().catch(() => {})
-        timerId = setTimeout(checkNode, 60000)
-      } else {
-        consecutiveFailRef.current += 1
-        console.log(
-          `[NodeMonitor] Consecutive unhealthy count for ${activeNodeName} = ${consecutiveFailRef.current}`,
-        )
-        refreshProxy().catch(() => {})
-
-        if (consecutiveFailRef.current >= 3) {
-          consecutiveFailRef.current = 0
-          console.log(
-            `[NodeMonitor] Node ${activeNodeName} failed 3 times consecutively. Triggering auto select in background.`,
-          )
-          // Background auto-select runs silently, no info notice popup
-          triggerAutoSelectFastestNodeRef.current(currentProfileUid, true)
-          timerId = setTimeout(checkNode, 60000)
-        } else {
-          // Failure occurred: fast retry in 5 seconds
-          timerId = setTimeout(checkNode, 5000)
-        }
-      }
-    }
-
-    timerId = setTimeout(checkNode, 60000)
-
-    return () => {
-      if (timerId) {
-        clearTimeout(timerId)
-      }
-    }
-  }, [currentProfileUid, isMinimalWidth, refreshProxy])
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
@@ -2328,8 +1923,6 @@ const Layout = () => {
         .then(async () => {
           console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`)
           await activateSelectedRef.current()
-          // Trigger the auto speed-test and select fastest node chain
-          triggerAutoSelectFastestNode(currentProfileUid)
         })
         .catch((err) => {
           console.error(
@@ -2339,7 +1932,7 @@ const Layout = () => {
           lastEnhancedProfileRef.current = null
         })
     }
-  }, [currentProfileUid, triggerAutoSelectFastestNode])
+  }, [currentProfileUid])
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
@@ -2382,7 +1975,7 @@ const Layout = () => {
       await enhanceProfiles()
       await refreshProxy()
       if (targetUid) {
-        triggerAutoSelectFastestNode(targetUid)
+        invoke('trigger_auto_select', { isManual: false })
       }
     } catch {
       try {
@@ -2406,7 +1999,7 @@ const Layout = () => {
         await enhanceProfiles()
         await refreshProxy()
         if (targetUid) {
-          triggerAutoSelectFastestNode(targetUid)
+          invoke('trigger_auto_select', { isManual: false })
         }
       } catch (retryErr) {
         showNotice.error(
@@ -2441,7 +2034,7 @@ const Layout = () => {
       await updateProfile(uid)
       if (uid === currentProfileUid) {
         await enhanceProfiles()
-        triggerAutoSelectFastestNode(currentProfileUid)
+        invoke('trigger_auto_select', { isManual: false })
       }
       await mutateProfiles()
       showNotice.success('订阅更新成功')
@@ -2948,9 +2541,6 @@ const Layout = () => {
                 mode={clashConfig?.mode?.toLowerCase() || 'rule'}
                 isChainMode={false}
                 chainConfigData={null}
-                triggerAutoSelect={(isBackground = false, skipDelay = false) =>
-                  triggerAutoSelectFastestNode(currentProfileUid || '', isBackground, skipDelay)
-                }
               />
             </div>
 
@@ -3387,7 +2977,9 @@ const Layout = () => {
                           color:
                             activeIndex === 0
                               ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                              : isRetro3DDark
+                                ? 'rgba(44, 31, 3, 0.75)'
+                                : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3397,14 +2989,20 @@ const Layout = () => {
                           zIndex: 1,
                           transition: 'color 0.2s ease',
                           '&:hover': {
-                            color: activeIndex === 0
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                            color:
+                              activeIndex === 0
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? '#2C1F03'
+                                  : undefined,
                           },
                           '&:active': {
-                            color: activeIndex === 0
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            color:
+                              activeIndex === 0
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.5)'
+                                  : undefined,
                           },
                         }}
                       >
@@ -3433,7 +3031,9 @@ const Layout = () => {
                           color:
                             activeIndex === 1
                               ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                              : isRetro3DDark
+                                ? 'rgba(44, 31, 3, 0.75)'
+                                : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3443,14 +3043,20 @@ const Layout = () => {
                           zIndex: 1,
                           transition: 'color 0.2s ease',
                           '&:hover': {
-                            color: activeIndex === 1
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                            color:
+                              activeIndex === 1
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? '#2C1F03'
+                                  : undefined,
                           },
                           '&:active': {
-                            color: activeIndex === 1
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            color:
+                              activeIndex === 1
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.5)'
+                                  : undefined,
                           },
                         }}
                       >
@@ -3479,7 +3085,9 @@ const Layout = () => {
                           color:
                             activeIndex === 2
                               ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                              : isRetro3DDark
+                                ? 'rgba(44, 31, 3, 0.75)'
+                                : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3489,14 +3097,20 @@ const Layout = () => {
                           zIndex: 1,
                           transition: 'color 0.2s ease',
                           '&:hover': {
-                            color: activeIndex === 2
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                            color:
+                              activeIndex === 2
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? '#2C1F03'
+                                  : undefined,
                           },
                           '&:active': {
-                            color: activeIndex === 2
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            color:
+                              activeIndex === 2
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.5)'
+                                  : undefined,
                           },
                         }}
                       >
@@ -3568,7 +3182,9 @@ const Layout = () => {
                           color:
                             policyActiveIndex === 0
                               ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                              : isRetro3DDark
+                                ? 'rgba(44, 31, 3, 0.75)'
+                                : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3578,14 +3194,20 @@ const Layout = () => {
                           zIndex: 1,
                           transition: 'color 0.2s ease',
                           '&:hover': {
-                            color: policyActiveIndex === 0
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                            color:
+                              policyActiveIndex === 0
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? '#2C1F03'
+                                  : undefined,
                           },
                           '&:active': {
-                            color: policyActiveIndex === 0
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            color:
+                              policyActiveIndex === 0
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.5)'
+                                  : undefined,
                           },
                         }}
                       >
@@ -3614,7 +3236,9 @@ const Layout = () => {
                           color:
                             policyActiveIndex === 1
                               ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                              : isRetro3DDark
+                                ? 'rgba(44, 31, 3, 0.75)'
+                                : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3624,14 +3248,20 @@ const Layout = () => {
                           zIndex: 1,
                           transition: 'color 0.2s ease',
                           '&:hover': {
-                            color: policyActiveIndex === 1
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                            color:
+                              policyActiveIndex === 1
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? '#2C1F03'
+                                  : undefined,
                           },
                           '&:active': {
-                            color: policyActiveIndex === 1
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            color:
+                              policyActiveIndex === 1
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.5)'
+                                  : undefined,
                           },
                         }}
                       >
@@ -3658,7 +3288,9 @@ const Layout = () => {
                           color:
                             policyActiveIndex === 2
                               ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                              : isRetro3DDark
+                                ? 'rgba(44, 31, 3, 0.75)'
+                                : 'text.secondary',
                           fontSize:
                             language === 'zh' || language === 'zhtw'
                               ? '13px'
@@ -3668,14 +3300,20 @@ const Layout = () => {
                           zIndex: 1,
                           transition: 'color 0.2s ease',
                           '&:hover': {
-                            color: policyActiveIndex === 2
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? '#2C1F03' : undefined),
+                            color:
+                              policyActiveIndex === 2
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? '#2C1F03'
+                                  : undefined,
                           },
                           '&:active': {
-                            color: policyActiveIndex === 2
-                              ? get3DSegmentedActiveTextColor(theme)
-                              : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                            color:
+                              policyActiveIndex === 2
+                                ? get3DSegmentedActiveTextColor(theme)
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.5)'
+                                  : undefined,
                           },
                         }}
                       >
@@ -3925,21 +3563,29 @@ const Layout = () => {
                             color:
                               themeActiveIndex === 0
                                 ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.75)'
+                                  : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
                             zIndex: 1,
                             transition: 'color 0.2s ease',
                             '&:hover': {
-                              color: themeActiveIndex === 0
-                                ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? '#2C1F03' : undefined),
+                              color:
+                                themeActiveIndex === 0
+                                  ? get3DSegmentedActiveTextColor(theme)
+                                  : isRetro3DDark
+                                    ? '#2C1F03'
+                                    : undefined,
                             },
                             '&:active': {
-                              color: themeActiveIndex === 0
-                                ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                              color:
+                                themeActiveIndex === 0
+                                  ? get3DSegmentedActiveTextColor(theme)
+                                  : isRetro3DDark
+                                    ? 'rgba(44, 31, 3, 0.5)'
+                                    : undefined,
                             },
                           }}
                         >
@@ -3960,21 +3606,29 @@ const Layout = () => {
                             color:
                               themeActiveIndex === 1
                                 ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.75)'
+                                  : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
                             zIndex: 1,
                             transition: 'color 0.2s ease',
                             '&:hover': {
-                              color: themeActiveIndex === 1
-                                ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? '#2C1F03' : undefined),
+                              color:
+                                themeActiveIndex === 1
+                                  ? get3DSegmentedActiveTextColor(theme)
+                                  : isRetro3DDark
+                                    ? '#2C1F03'
+                                    : undefined,
                             },
                             '&:active': {
-                              color: themeActiveIndex === 1
-                                ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                              color:
+                                themeActiveIndex === 1
+                                  ? get3DSegmentedActiveTextColor(theme)
+                                  : isRetro3DDark
+                                    ? 'rgba(44, 31, 3, 0.5)'
+                                    : undefined,
                             },
                           }}
                         >
@@ -3995,21 +3649,29 @@ const Layout = () => {
                             color:
                               themeActiveIndex === 2
                                 ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.75)' : 'text.secondary'),
+                                : isRetro3DDark
+                                  ? 'rgba(44, 31, 3, 0.75)'
+                                  : 'text.secondary',
                             fontSize: '11px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
                             zIndex: 1,
                             transition: 'color 0.2s ease',
                             '&:hover': {
-                              color: themeActiveIndex === 2
-                                ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? '#2C1F03' : undefined),
+                              color:
+                                themeActiveIndex === 2
+                                  ? get3DSegmentedActiveTextColor(theme)
+                                  : isRetro3DDark
+                                    ? '#2C1F03'
+                                    : undefined,
                             },
                             '&:active': {
-                              color: themeActiveIndex === 2
-                                ? get3DSegmentedActiveTextColor(theme)
-                                : (isRetro3DDark ? 'rgba(44, 31, 3, 0.5)' : undefined),
+                              color:
+                                themeActiveIndex === 2
+                                  ? get3DSegmentedActiveTextColor(theme)
+                                  : isRetro3DDark
+                                    ? 'rgba(44, 31, 3, 0.5)'
+                                    : undefined,
                             },
                           }}
                         >
@@ -4822,14 +4484,22 @@ const Layout = () => {
       >
         <MenuItem
           onClick={handleImportInputCut}
-          disabled={!importInputRef.current || importInputRef.current.selectionStart === importInputRef.current.selectionEnd}
+          disabled={
+            !importInputRef.current ||
+            importInputRef.current.selectionStart ===
+              importInputRef.current.selectionEnd
+          }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           ✂️ 剪切
         </MenuItem>
         <MenuItem
           onClick={handleImportInputCopy}
-          disabled={!importInputRef.current || importInputRef.current.selectionStart === importInputRef.current.selectionEnd}
+          disabled={
+            !importInputRef.current ||
+            importInputRef.current.selectionStart ===
+              importInputRef.current.selectionEnd
+          }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           📋 复制

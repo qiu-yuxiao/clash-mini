@@ -27,7 +27,6 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
 
-
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
 import { useVisibility } from '@/hooks/use-visibility'
@@ -36,6 +35,8 @@ import { calcuProxies, updateProxyChainConfigInRuntime } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { debugLog } from '@/utils/debug'
 import { delayGroup, healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
+import { invoke } from '@tauri-apps/api/core'
+import { showNotice } from '@/services/notice-service'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
@@ -55,7 +56,6 @@ interface Props {
   mode: string
   isChainMode?: boolean
   chainConfigData?: string | null
-  triggerAutoSelect?: (isBackground: boolean, skipDelay?: boolean) => Promise<void>
 }
 
 interface ProxyChainItem {
@@ -68,7 +68,7 @@ interface ProxyChainItem {
 export const ProxyGroups = (props: Props) => {
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  const { mode, isChainMode = false, chainConfigData, triggerAutoSelect } = props
+  const { mode, isChainMode = false, chainConfigData } = props
 
   const isVisible = useVisibility()
 
@@ -405,13 +405,28 @@ export const ProxyGroups = (props: Props) => {
       setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
       try {
-        if (groupName === 'PROXY' && triggerAutoSelect) {
-          // BUG-092: Reuse triggerAutoSelectFastestNode logic with skipDelay=true
-          await triggerAutoSelect(false, true)
+        if (groupName === 'PROXY') {
+          const result = await invoke<[string, number] | null>(
+            'trigger_auto_select',
+            { isManual: true },
+          )
+          if (result) {
+            const [name, delay] = result
+            showNotice.success(
+              `自动测速完成，已切换至最快节点: ${name} (${delay}ms)`,
+            )
+          } else {
+            showNotice.error(
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                所有线路都繁忙，请通过代理组手动切换。
+              </span>,
+            )
+          }
         } else {
           const proxies = renderList
             .filter(
-              (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
+              (e) =>
+                e.group?.name === groupName && (e.type === 2 || e.type === 4),
             )
             .flatMap((e) => e.proxyCol || e.proxy!)
             .filter(Boolean)
@@ -450,7 +465,10 @@ export const ProxyGroups = (props: Props) => {
           debugLog(`[ProxyGroups] 延迟测试完成，组: ${groupName}`)
         }
       } catch (error) {
-        console.error(`[ProxyGroups] 延迟测试或自动选路出错，组: ${groupName}`, error)
+        console.error(
+          `[ProxyGroups] 延迟测试或自动选路出错，组: ${groupName}`,
+          error,
+        )
       } finally {
         setTestingGroups((prev) => ({ ...prev, [groupName]: false }))
         const headState = getGroupHeadState(groupName)

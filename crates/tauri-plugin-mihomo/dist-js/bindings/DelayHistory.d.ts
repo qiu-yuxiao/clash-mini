@@ -1,4 +1,4 @@
 export type DelayHistory = {
-    time: string;
-    delay: number;
-};
+  time: string
+  delay: number
+}

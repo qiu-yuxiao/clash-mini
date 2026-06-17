@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 export const GlowBorder = () => {
   const theme = useTheme()
   const isLight = theme.palette.mode === 'light'
-  
+
   const [controlSkin, setControlSkin] = useState(() => {
     return typeof window !== 'undefined'
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'

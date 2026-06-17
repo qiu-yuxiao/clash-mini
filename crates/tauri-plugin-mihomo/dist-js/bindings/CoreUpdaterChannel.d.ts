@@ -1,1 +1,1 @@
-export type CoreUpdaterChannel = "release" | "alpha" | "auto";
+export type CoreUpdaterChannel = 'release' | 'alpha' | 'auto'
