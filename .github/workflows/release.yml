@@ -123,7 +123,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Clash Mini ${{ github.ref_name }}'
+          releaseName: 'Clash Mini Ver.${{ github.ref_name }}'
           releaseBody: 'Draft release, will be updated later.'
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
@@ -203,7 +203,7 @@ jobs:
           echo "Publishing release $release_id ($release_url) with $asset_count assets."
 
           gh api --method PATCH repos/{owner}/{repo}/releases/"$release_id" \
-            -f name="Clash Mini $TAG_NAME" \
+            -f name="Clash Mini Ver.${{ env.TAG_NAME }}" \
             -F body=@release.txt \
             -F draft=false \
             -F prerelease="$PRERELEASE" \
