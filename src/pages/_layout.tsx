@@ -833,7 +833,14 @@ const Layout = () => {
           console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`)
           await activateSelectedRef.current()
           // 配置重载会重置 PROXY 组选择，必须主动触发自动选点纠偏
-          invoke('trigger_auto_select', { isManual: false })
+          // 等待配置重载完成后再触发自动选点
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          try {
+            await invoke('trigger_auto_select', { isManual: false })
+            console.log(`[Layout] trigger_auto_select succeeded for ${currentProfileUid}`)
+          } catch (err) {
+            console.error(`[Layout] trigger_auto_select failed for ${currentProfileUid}:`, err)
+          }
         })
         .catch((err) => {
           console.error(
@@ -886,7 +893,14 @@ const Layout = () => {
       await enhanceProfiles()
       await refreshProxy()
       if (targetUid) {
-        invoke('trigger_auto_select', { isManual: false })
+        // 等待配置重载完成后再触发自动选点
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        try {
+          await invoke('trigger_auto_select', { isManual: false })
+          console.log(`[Layout] trigger_auto_select succeeded for ${targetUid}`)
+        } catch (err) {
+          console.error(`[Layout] trigger_auto_select failed for ${targetUid}:`, err)
+        }
       }
     } catch {
       try {
@@ -910,7 +924,14 @@ const Layout = () => {
         await enhanceProfiles()
         await refreshProxy()
         if (targetUid) {
-          invoke('trigger_auto_select', { isManual: false })
+          // 等待配置重载完成后再触发自动选点
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          try {
+            await invoke('trigger_auto_select', { isManual: false })
+            console.log(`[Layout] trigger_auto_select succeeded for ${targetUid}`)
+          } catch (err) {
+            console.error(`[Layout] trigger_auto_select failed for ${targetUid}:`, err)
+          }
         }
       } catch (retryErr) {
         showNotice.error(
@@ -945,7 +966,14 @@ const Layout = () => {
       await updateProfile(uid)
       if (uid === currentProfileUid) {
         await enhanceProfiles()
-        invoke('trigger_auto_select', { isManual: false })
+        // 等待配置重载完成后再触发自动选点
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        try {
+          await invoke('trigger_auto_select', { isManual: false })
+          console.log(`[Layout] trigger_auto_select succeeded for ${uid}`)
+        } catch (err) {
+          console.error(`[Layout] trigger_auto_select failed for ${uid}:`, err)
+        }
       }
       await mutateProfiles()
       showNotice.success('订阅更新成功')
