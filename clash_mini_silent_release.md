@@ -95,3 +95,29 @@
      git push origin dev
      ```
    - 未来如果您想要发布新更新并支持自动下载安装，只需在发布新版后，更新该 app-update.json 中的版本号和下载平台链接即可。
+
+---
+
+## ⚙️ GitHub Release Workflow 规范（Workflow Architecture）
+
+为彻底解决 `release.yml` 中 `publish_release` job 因依赖被条件 skip 的 job 而导致的死锁问题，以及产物混乱问题，制定以下规范：
+
+- **发布目标唯一化**：
+  - `release.yml` 是 Clash Mini 的**唯一正式发行流水线**，仅在 `git push v<version>` 打 tag 时触发。
+  - `autobuild.yml` 仅用于开发期间的自动构建测试，**严禁**将 `autobuild` 的产物当作正式 Release 使用。
+- **Job 依赖链简化（无死锁设计）**：
+  - `release.yml` 仅有三个 job：`check_tag_version` → `release` → `publish_release`。
+  - `publish_release` **仅依赖 `release` job**，不依赖任何会被条件 skip 的 job，彻底消除死锁。
+  - 删除 `generate_matrix`、`release-for-linux-arm`、`release-for-fixed-webview2`、`release-update`、`release-update-for-fixed-webview2`、`submit-to-winget`、`notify-telegram` 等所有多余 job。
+- **唯一产物：Windows x64 绿色便携版**：
+  - 正式 Release 只发行 `Clash.Mini_<version>_x64_portable.zip`（免安装绿色版）。
+  - 不发行：Linux 构建、macOS 构建、WebView2 固定版、ARM Windows、DEB/RPM 包、安装版 `.exe` 等一切其他产物。
+- **发布流程**：
+  1. `git tag v<version>` 打 tag 并 `git push origin v<version>`
+  2. `check_tag_version` 校验 tag 来源（仅限 dev 分支）与版本一致性
+  3. `release` 在 Windows 虚拟机中编译 Tauri 并打包 portable.zip，上传为 Draft Release
+  4. `publish_release` 获取已有 Draft Release，写入正式 Release Notes（含下载地址），PATCH `draft=false` 完成发布
+- **禁止事项**：
+  - 严禁在 `autobuild.yml` 的 `TAG_NAME` 使用正式版本号（如 `v1.3.4`），autobuild 必须固定为 `autobuild` tag。
+  - 严禁在 `release.yml` 中混合引入会被条件 skip 的 job 作为 `needs` 依赖。
+  - 严禁在正式 Release 发行说明中包含非 Windows 便携版的其他平台产物链接。
