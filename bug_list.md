@@ -12,54 +12,30 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### **BUG-112** (BaseSearchBox 小光标无视觉交互反馈)
-* **缺陷描述与现象**：节点组头部的搜索过滤框（`BaseSearchBox`）内的正则/区分大小写/匹配整词小光标（`SvgIcon`）无任何视觉交互反馈，无法悬停变手型指针，无高亮/按下态，导致用户无法判断这些小光标是否可点击。
-* **排查原因与记忆**：`@mui/icons-material` 的 `SvgIcon` 仅为 SVG 容器，并非交互组件（Button），不提供 CSS 中的 hover/active/cursor 伪类状态。直接将 `onClick` 绑定到 `SvgIcon` 不会产生点击态。
-* **修改方针**：将 `BaseSearchBox` 内的可点击图标（`matchCaseIcon`、`matchWholeWordIcon`、`UseRegularExpressionIcon`、`ClearRounded` 等）从裸 `SvgIcon` 包裹到 `IconButton` 中，并为非激活图标提供合适的 color 与 size 样式。
+### BUG-116: 主题设置滑块布局由两行压缩为单行
 
-### **BUG-113** (闪电光标点击后节点延迟无更新)
-* **缺陷描述与现象**：节点组头部区域（`ProxyHead`）的闪电图标（`BoltOutlined`），点击后显示"正在测试"（loading state）但测试完成后节点延迟值始终不刷新或显示为空，尤其在代理组节点全部为 provider 节点时更为明显。
-* **排查原因与记忆**：
-  1. `handleCheckAll` 中 `delayGroup(groupName, url, timeout)` 返回结果仅被 debugLog 记录，其 `{ name: delay }` 映射结果**未推送**到 `delayManager.setDelay()`，导致 delayManager 无任何更新，UI 自然不刷新。
-  2. 当组内所有节点均为 provider 节点时，`names = proxies.filter(p => !p.provider)` 为空数组，`checkListDelay` 空数组立即返回无操作，而 `delayGroup` 的结果同样被丢弃，完全无声无息。
-  3. `healthcheckProxyProvider` 调用为 `Promise.allSettled` 异步触发但未参与 `Promise.race` 的等待与结果传播，导致 provider 节点延迟刷新也不可靠。
-* **修改方针**：
-  1. 将 `delayGroup` 的返回结果 `{ name: delay }` 遍历后逐个调用 `delayManager.setDelay(name, groupName, delay)` 推送到 delayManager，确保所有非 preset 节点的监听器能触发 UI 重绘。
-  2. 保留 `healthcheckProxyProvider` 的行为，但需确保当 `names` 为空时（全 provider 节点组），仍然依赖 `delayGroup` 结果刷新。
-  3. 修复后调用 `onProxies()` 触发列表数据刷新。
-* **状态**：代码已修正，待用户确认。
+- **现象描述**：在「主题设置」模块中，两个参数调节滑块（Depth/Vibrancy 等）目前各占两行（名称+数值一行，滑块本体一行），垂直空间利用率低。
+- **修正说明**：
+  - 将滑块的名称+数值与滑块本体合并为**单行**
+  - 左侧为名称+数值区（`flex: 1`，名称左对齐、数值右对齐）
+  - 右侧为滑块区（固定宽 `100px`，与上方三选一分段选择器等宽）
+  - 模块高度自然缩减，底部按钮以绝对定位锚定不动
+- **当前状态**：`代码已修正，待用户确认`
+- **目标版本**：`v1.3.6`
 
-### **BUG-115** (Retro-3D 皮肤按钮 boxShadow 叠加层数过多，Depth 增大时阴影过度加深)
-* **缺陷描述与现象**：在 Retro-3D 皮肤下，"导入节点信息"、"系统调试运行日志" 这类按钮的 boxShadow 由 5 层 `bevelShadowDark` 外阴影叠加组成。当 Depth 滑块增大时，每一层都会按 `var(--depth-factor)` 等比放大（最大 5 倍），导致按钮下方阴影变得过厚、过深，与同皮肤下的"代理兜底"、"TUN模式"、"断开全部"等分段选择器/小按钮的视觉厚度完全不一致，破坏 UI 整体协调性。
-* **排查原因与记忆**：
-  1. `get3DButtonStyle` 的 retro-3d 分支中，boxShadow 写死了 5 层 `0 Npx 0 0 ${bevelShadowDark}` 叠加，每层都乘以 `--depth-factor`。
-  2. hover 态甚至叠加到 7 层。
-  3. 对比 `get3DSegmentedContainerStyle`（代理兜底/手动模式/系统代理等分段选择器容器）：只使用 `inset 0 Xpx Ypx rgba(0,0,0,0.X)` 内阴影 + `0 1px 0 rgba(255,255,255,...)` 单层高光，无叠加。
-  4. 其他皮肤（original / modern-flat / frosted-glass / cyberpunk / monochrome）的按钮 boxShadow 都已经是单层或无，受 depth 影响较小，无明显问题。
-* **修改方针**（仅针对 retro-3d 皮肤的 `get3DButtonStyle`，其他皮肤保持不变）：
-  1. boxShadow 简化为与分段选择器一致的结构：`inset 0 Xpx Ypx rgba(0,0,0,...)` 内阴影 + `0 1px var(--depth-factor) 2px rgba(...)` 单层外阴影 + `0 1px 0 rgba(255,255,255,...)` 顶高光 + 光晕。
-  2. 删除所有 `bevelShadowDark` 相关的 5~7 层叠加阴影。
-  3. active 态保留 inset 凹陷效果，仅保留单层外阴影。
-  4. 各皮肤（original / modern-flat / frosted-glass / cyberpunk / monochrome）原本就是单层或无 boxShadow，无需调整。
-* **状态**：代码已修正，待用户确认。
+### BUG-113: 闪电光标点击后节点延迟无更新（回归）
 
-### **BUG-114** (宽窗口上下容器高度重分配：上部+30px /下部-30px)
-* **缺陷描述与现象**：宽窗口模式下，上部（节点选择面板）与下部（流量面板）的高度分配未优化——上部操作区域偏小，下部流量曲线图高度偏大。
-* **排查原因与记忆**：
-  - 上部容器固定 `flex: '80 0 0%'` / `height: '80%'`，下部固定 `flex: '0 0 165px'` / `height: '165px'`，两者紧邻无额外 gap。
-  - 下部容器内部分为：Traffic Graph（`flex: 1`）与底部指标行（`height: 22px` + padding），曲线图随容器整体缩放。
-* **修改方针**（仅宽窗口模式，窄窗口不调整）：
-  1. 上部容器：`flex: '80 0 0%'` → `'80 0 calc(0% + 30px)'`，`height: '80%'` → `'calc(80% + 30px)'`。
-  2. 下部容器：`flex: '0 0 165px'` → `'0 0 135px'`，`height: '165px'` → `'135px'`。
-  3. 上下容器 gap 已为 0，保持不变。下部容器内部 gap 从 `'12px'` 改为 `'2px'`。
-  4. 下部指标行与流量图保持原有结构，曲线图因容器整体减少 30px 而自然缩减。
-* **状态**：代码已修正，待用户确认。
-
+- **现象描述**：点击闪电测速光标后，节点延迟数值未刷新。`handleCheckAll` 中 `delayGroup` 结果未正确推送至 `delayManager`，导致 provider 节点组的延迟在 UI 上不更新。
+- **当前状态**：`代码待修正，待用户确认`
+- **目标版本**：`v1.3.6`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。
 
+| **BUG-115** | Retro-3D 皮肤按钮与卡片 boxShadow 叠加层数过多问题，将多层 bevelShadowDark 叠加简化为单层内阴影+单层外阴影+单层顶高光结构，与分段选择器保持一致。 | v1.3.5 | 代码已修正，已确认 |
+| **BUG-114** | 宽窗口上下容器高度重分配：上部+30px /下部-30px，下部容器内部 gap 设为零。 | v1.3.5 | 代码已修正，已确认 |
+| **BUG-112** | BaseSearchBox 小光标无视觉交互反馈，将正则/区分大小写/匹配整词图标从裸 `SvgIcon` 包裹到 `IconButton` 中，添加 hover/active 状态反馈。 | v1.3.5 | 代码已修正，已确认 |
 | **BUG-109** | getAutotemProxy前端接口名称拼写错误，重构并统一更名为 getAutoProxy。 | v1.3.4 | 代码已修正，已确认 |
 | **BUG-108** | Vite配置中缺少base路径导致打包后静态资源加载失败，添加 base: './' 配置。 | v1.3.4 | 代码已修正，已确认 |
 | **BUG-107** | useWindowWidth中document.body未定义导致的空指针异常，添加安全检查和 fallback。 | v1.3.4 | 代码已修正，已确认 |

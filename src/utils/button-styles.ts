@@ -475,26 +475,12 @@ export const get3DCardStyle = (
       color: textColor,
       transition: 'all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
       boxShadow: isLight
-        ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
-           0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.7),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.15)${glowColor}`
-        : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
-           0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.25)${glowColor}`,
+        ? `inset 0 calc(2.5px * var(--depth-factor, 1.0)) calc(4.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.2),
+           0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.3),
+           0 1px 0 rgba(255, 255, 255, 0.8)${glowColor}`
+        : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.7),
+           0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.45),
+           0 1px 0 rgba(255, 255, 255, 0.08)${glowColor}`,
     }
   }
 

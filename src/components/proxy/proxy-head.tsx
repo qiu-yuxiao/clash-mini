@@ -7,7 +7,6 @@ import {
   LinkOutlined,
   VisibilityOutlined,
   VisibilityOffOutlined,
-  FilterListOutlined,
 } from '@mui/icons-material'
 import {
   Box,
@@ -88,8 +87,6 @@ export const ProxyHead = ({
     filterUseRegularExpression,
   } = headState
 
-  const effectiveTextState = isMinimal ? 'filter' : textState
-
   const { t } = useTranslation()
   const [autoFocus, setAutoFocus] = useState(false)
 
@@ -138,7 +135,7 @@ export const ProxyHead = ({
         title={t('proxies.page.tooltips.delayCheck')}
         onClick={() => {
           debugLog(`[ProxyHead] 点击延迟测试按钮，组: ${groupName}`)
-          if (testUrl?.trim() && effectiveTextState !== 'filter') {
+          if (testUrl?.trim()) {
             debugLog(`[ProxyHead] 使用自定义测试URL: ${testUrl}`)
             onHeadState({ textState: 'url' })
           }
@@ -215,52 +212,33 @@ export const ProxyHead = ({
         </IconButton>
       )}
 
-      {!isMinimal && (
-        <IconButton
-          size="small"
-          color="inherit"
-          title={t('proxies.page.tooltips.filter')}
-          onClick={() =>
-            onHeadState({ textState: textState === 'filter' ? null : 'filter' })
-          }
-          sx={{ width: 26, height: 26, p: 0 }}
-        >
-          <FilterListOutlined
-            sx={{ fontSize: 17, opacity: textState === 'filter' ? 1 : 0.6 }}
-          />
-        </IconButton>
-      )}
-
-      {effectiveTextState === 'filter' && (
-        <Box
-          sx={{
-            ml: 0.5,
-            flex: '1 1 auto',
-            height: 24,
-            '& input': { py: 0.3, px: 0.5, fontSize: 11 },
+      <Box
+        sx={{
+          ml: 0.5,
+          flex: '1 1 auto',
+          '& input': { py: 0.3, px: 0.5, fontSize: 11 },
+        }}
+      >
+        <BaseSearchBox
+          autoFocus={autoFocus}
+          value={filterText}
+          searchState={{
+            matchCase: filterMatchCase,
+            matchWholeWord: filterMatchWholeWord,
+            useRegularExpression: filterUseRegularExpression,
           }}
-        >
-          <BaseSearchBox
-            autoFocus={autoFocus}
-            value={filterText}
-            searchState={{
-              matchCase: filterMatchCase,
-              matchWholeWord: filterMatchWholeWord,
-              useRegularExpression: filterUseRegularExpression,
-            }}
-            onSearch={(_, state) =>
-              onHeadState({
-                filterText: state.text,
-                filterMatchCase: state.matchCase,
-                filterMatchWholeWord: state.matchWholeWord,
-                filterUseRegularExpression: state.useRegularExpression,
-              })
-            }
-          />
-        </Box>
-      )}
+          onSearch={(_, state) =>
+            onHeadState({
+              filterText: state.text,
+              filterMatchCase: state.matchCase,
+              filterMatchWholeWord: state.matchWholeWord,
+              filterUseRegularExpression: state.useRegularExpression,
+            })
+          }
+        />
+      </Box>
 
-      {effectiveTextState === 'url' && (
+      {textState === 'url' && (
         <TextField
           autoComplete="off"
           autoFocus={autoFocus}

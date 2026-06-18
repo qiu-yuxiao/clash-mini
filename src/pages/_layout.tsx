@@ -1484,7 +1484,7 @@ const Layout = () => {
                   width: '240px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 1,
+                  gap: '5px',
                   overflow: 'hidden',
                   pr: 1,
                   borderRight: (theme) => `1px solid ${theme.palette.divider}`,
@@ -1784,7 +1784,7 @@ const Layout = () => {
               background: 'inherit',
               padding: isMinimalWidth ? '3px 6px 2px 6px' : '8px 12px 2px 12px',
               display: 'flex',
-              gap: isMinimalWidth ? '6px' : '2px',
+              gap: isMinimalWidth ? '6px' : 0,
               overflow: 'hidden',
               boxSizing: 'border-box',
             }}

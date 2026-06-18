@@ -103,218 +103,194 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
         },
       }}
     >
-      <Typography
-        variant="subtitle2"
-        sx={{
-          fontWeight: 'bold',
-          mb: 0.75,
-          fontSize: '13px',
-          color: isRetro3DDark ? '#2C1F03' : 'inherit',
-        }}
-      >
-        {t('components.verge.themeSettings.title', {
-          defaultValue: '主题设置',
-        })}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+        <Typography
+          variant="subtitle2"
+          sx={{
+            fontWeight: 'bold',
+            fontSize: '13px',
+            color: isRetro3DDark ? '#2C1F03' : 'inherit',
+          }}
+        >
+          {t('components.verge.themeSettings.title', {
+            defaultValue: '主题设置',
+          })}
+        </Typography>
+        <Box
+          sx={(theme) => ({
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            bgcolor: 'action.hover',
+            borderRadius: '4px',
+            p: '1px',
+            width: '100px',
+            height: 18,
+            userSelect: 'none',
+            ...get3DSegmentedContainerStyle(
+              theme.palette.mode === 'light',
+            ),
+          })}
+        >
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: '33.333%',
+              height: '100%',
+              zIndex: 0,
+              transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: `translate3d(${themeActiveIndex * 100}%, 0, 0)`,
+            }}
+          >
+            <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
+          </Box>
+
+          <Box
+            onClick={() => patchVerge({ theme_mode: 'system' })}
+            sx={{
+              flex: 1,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color:
+                themeActiveIndex === 0
+                  ? get3DSegmentedActiveTextColor(theme)
+                  : isRetro3DDark
+                    ? 'rgba(44, 31, 3, 0.75)'
+                    : 'text.secondary',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              zIndex: 1,
+              transition: 'color 0.2s ease',
+              '&:hover': {
+                color:
+                  themeActiveIndex === 0
+                    ? get3DSegmentedActiveTextColor(theme)
+                    : isRetro3DDark
+                      ? '#2C1F03'
+                      : undefined,
+              },
+              '&:active': {
+                color:
+                  themeActiveIndex === 0
+                    ? get3DSegmentedActiveTextColor(theme)
+                    : isRetro3DDark
+                      ? 'rgba(44, 31, 3, 0.5)'
+                      : undefined,
+              },
+            }}
+          >
+            {t('sections.appearance.system', {
+              defaultValue: '系统',
+            })}
+          </Box>
+
+          <Box
+            onClick={() => patchVerge({ theme_mode: 'light' })}
+            sx={{
+              flex: 1,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color:
+                themeActiveIndex === 1
+                  ? get3DSegmentedActiveTextColor(theme)
+                  : isRetro3DDark
+                    ? 'rgba(44, 31, 3, 0.75)'
+                    : 'text.secondary',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              zIndex: 1,
+              transition: 'color 0.2s ease',
+              '&:hover': {
+                color:
+                  themeActiveIndex === 1
+                    ? get3DSegmentedActiveTextColor(theme)
+                    : isRetro3DDark
+                      ? '#2C1F03'
+                      : undefined,
+              },
+              '&:active': {
+                color:
+                  themeActiveIndex === 1
+                    ? get3DSegmentedActiveTextColor(theme)
+                    : isRetro3DDark
+                      ? 'rgba(44, 31, 3, 0.5)'
+                      : undefined,
+              },
+            }}
+          >
+            {t('sections.appearance.light', {
+              defaultValue: '浅色',
+            })}
+          </Box>
+
+          <Box
+            onClick={() => patchVerge({ theme_mode: 'dark' })}
+            sx={{
+              flex: 1,
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color:
+                themeActiveIndex === 2
+                  ? get3DSegmentedActiveTextColor(theme)
+                  : isRetro3DDark
+                    ? 'rgba(44, 31, 3, 0.75)'
+                    : 'text.secondary',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              zIndex: 1,
+              transition: 'color 0.2s ease',
+              '&:hover': {
+                color:
+                  themeActiveIndex === 2
+                    ? get3DSegmentedActiveTextColor(theme)
+                    : isRetro3DDark
+                      ? '#2C1F03'
+                      : undefined,
+              },
+              '&:active': {
+                color:
+                  themeActiveIndex === 2
+                    ? get3DSegmentedActiveTextColor(theme)
+                    : isRetro3DDark
+                      ? 'rgba(44, 31, 3, 0.5)'
+                      : undefined,
+              },
+            }}
+          >
+            {t('sections.appearance.dark', {
+              defaultValue: '深色',
+            })}
+          </Box>
+        </Box>
+      </Box>
+
       <List dense sx={{ py: 0 }}>
         <ListItem
           sx={{
             py: 0.1,
             px: 0.5,
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: '13px',
-              color: isRetro3DDark ? '#2C1F03' : 'inherit',
-            }}
-          >
-            {t('components.verge.basic.fields.themeMode', {
-              defaultValue: '主题模式',
-            })}
-          </Typography>
-          <Box
-            sx={(theme) => ({
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              bgcolor: 'action.hover',
-              borderRadius: '4px',
-              p: '1px',
-              width: '120px',
-              height: 20,
-              userSelect: 'none',
-              ...get3DSegmentedContainerStyle(
-                theme.palette.mode === 'light',
-              ),
-            })}
-          >
-            {/* Sliding Background Indicator */}
-            <Box
-              sx={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                width: '33.333%',
-                height: '100%',
-                zIndex: 0,
-                transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: `translate3d(${themeActiveIndex * 100}%, 0, 0)`,
-              }}
-            >
-              <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
-            </Box>
-
-            {/* System Option */}
-            <Box
-              onClick={() => patchVerge({ theme_mode: 'system' })}
-              sx={{
-                flex: 1,
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color:
-                  themeActiveIndex === 0
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? 'rgba(44, 31, 3, 0.75)'
-                      : 'text.secondary',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                zIndex: 1,
-                transition: 'color 0.2s ease',
-                '&:hover': {
-                  color:
-                    themeActiveIndex === 0
-                      ? get3DSegmentedActiveTextColor(theme)
-                      : isRetro3DDark
-                        ? '#2C1F03'
-                        : undefined,
-                },
-                '&:active': {
-                  color:
-                    themeActiveIndex === 0
-                      ? get3DSegmentedActiveTextColor(theme)
-                      : isRetro3DDark
-                        ? 'rgba(44, 31, 3, 0.5)'
-                        : undefined,
-                },
-              }}
-            >
-              {t('sections.appearance.system', {
-                defaultValue: '系统',
-              })}
-            </Box>
-
-            {/* Light Option */}
-            <Box
-              onClick={() => patchVerge({ theme_mode: 'light' })}
-              sx={{
-                flex: 1,
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color:
-                  themeActiveIndex === 1
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? 'rgba(44, 31, 3, 0.75)'
-                      : 'text.secondary',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                zIndex: 1,
-                transition: 'color 0.2s ease',
-                '&:hover': {
-                  color:
-                    themeActiveIndex === 1
-                      ? get3DSegmentedActiveTextColor(theme)
-                      : isRetro3DDark
-                        ? '#2C1F03'
-                        : undefined,
-                },
-                '&:active': {
-                  color:
-                    themeActiveIndex === 1
-                      ? get3DSegmentedActiveTextColor(theme)
-                      : isRetro3DDark
-                        ? 'rgba(44, 31, 3, 0.5)'
-                        : undefined,
-                },
-              }}
-            >
-              {t('sections.appearance.light', {
-                defaultValue: '浅色',
-              })}
-            </Box>
-
-            {/* Dark Option */}
-            <Box
-              onClick={() => patchVerge({ theme_mode: 'dark' })}
-              sx={{
-                flex: 1,
-                height: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color:
-                  themeActiveIndex === 2
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? 'rgba(44, 31, 3, 0.75)'
-                      : 'text.secondary',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                zIndex: 1,
-                transition: 'color 0.2s ease',
-                '&:hover': {
-                  color:
-                    themeActiveIndex === 2
-                      ? get3DSegmentedActiveTextColor(theme)
-                      : isRetro3DDark
-                        ? '#2C1F03'
-                        : undefined,
-                },
-                '&:active': {
-                  color:
-                    themeActiveIndex === 2
-                      ? get3DSegmentedActiveTextColor(theme)
-                      : isRetro3DDark
-                        ? 'rgba(44, 31, 3, 0.5)'
-                        : undefined,
-                },
-              }}
-            >
-              {t('sections.appearance.dark', {
-                defaultValue: '深色',
-              })}
-            </Box>
-          </Box>
-        </ListItem>
-        <ListItem
-          sx={{
-            py: 0.1,
-            px: 0.5,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'stretch',
-            mt: 0.5,
-          }}
-        >
           <Box
             sx={{
+              flex: 1,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              mb: 0.25,
+              mr: 1,
             }}
           >
             <Typography
@@ -346,7 +322,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             max={5.0}
             step={0.1}
             onChange={(_, val) => handleDepthFactorChange(val as number)}
-            sx={get3DSliderStyle(theme, mode)}
+            sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
           />
         </ListItem>
         <ListItem
@@ -354,17 +330,16 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             py: 0.1,
             px: 0.5,
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'stretch',
-            mt: 0.5,
+            alignItems: 'center',
           }}
         >
           <Box
             sx={{
+              flex: 1,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              mb: 0.25,
+              mr: 1,
             }}
           >
             <Typography
@@ -396,7 +371,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             max={5.0}
             step={0.1}
             onChange={(_, val) => handleVibrancyFactorChange(val as number)}
-            sx={get3DSliderStyle(theme, mode)}
+            sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
           />
         </ListItem>
       </List>
@@ -427,7 +402,6 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
         </Button>
       </Box>
 
-      {/* Copyright Footer */}
       <Box
         sx={{
           display: 'flex',
