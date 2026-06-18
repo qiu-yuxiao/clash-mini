@@ -29,3 +29,5 @@ github_token.txt
 /src-tauri/resources/用户必读.txt
 wiki_dist
 wiki_dist/
+tauri-key
+tauri-key.pub

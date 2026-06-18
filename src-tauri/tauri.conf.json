@@ -35,7 +35,7 @@
   "identifier": "io.github.clash-mini.clash-mini",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyOEMyRjBCQkVGOUJEREYKUldUZnZmbStDeStNMHU5Mmo1N24xQXZwSVRYbXA2NUpzZE5oVzlqeS9Bc0t6RVV4MmtwVjBZaHgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEwMzQ0QzIxODRDREI2NjAKUldSZ3RzMkVJVXcwRUtHTk1RcDE2SE1zVzd2VFE2akhleHZXWTlSbk1QZmYxYlNGWTczcXVaOXgK",
       "endpoints": [
         "https://raw.githubusercontent.com/qiu-yuxiao/clash-mini/dev/updater/app-update.json"
       ],
