@@ -1,10 +1,10 @@
 {
   "version": "1.3.8",
-  "notes": "Clash Mini v1.3.8 — BUG-117 Trump-3D阴影恢复物理3D质感、BUG-118 重启/导入后自动选点防丢失",
+  "notes": "Clash Mini v1.3.8 - BUG-117 Trump-3D shadow fix, BUG-118 auto-select after restart",
   "pub_date": "2026-06-19T05:30:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUhVSlhFVzYwa3V6bWZDdzdpYmMybmcxdldvaEhic3ZWL2QrN3BLVnBhbTN1TGVsUkgxSnpEdHgxcEJhd3pqR0dPRVJZL1V1TmJRKy9Iek1XdGlrNndZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODE3OTk3CWZpbGU6Q2xhc2guTWluaV8xLjMuOF94NjRfcG9ydGFibGUuemlwCnhFYnFxcFR4dUFMUDVHc3lHNmRMcE9OOHU1czBpazNnUmpKQ2xZTQwxZzJMeTdDR0szVXZoUmVSdXR6VE1Qd1pMelJrblo5UlpvTlNQSzVaSlBRUUR3PT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUhVSlhFVzYwa3V6bWZDdzdpYmMybmcxdldvaEhic3ZWL2QrN3BLVnBhbTN1TGVsUkgxSnpETHgxcEJhd3pqR0dPRVJZL1V1TmJRKy9Iek1XdGlrNndZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODE3OTk3CWZpbGU6Q2xhc2guTWluaV8xLjMuOF94NjRfcG9ydGFibGUuemlwCnhFYnFxcFR4dUFMUDVHc3lHNmRMcE9OOHU1czBiazNnUmpKQ2xZT20xZzJMeTdDR0szVXZoUmVSdXR6VE1Qd1pMelJrblo5UlpvTlNQSzVaSlBRUUR3PT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.3.8/Clash.Mini_1.3.8_x64_portable.zip",
       "size": 74468736
     }
