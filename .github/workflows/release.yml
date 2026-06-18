@@ -125,7 +125,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Clash Mini Ver.${{ github.ref_name }}'
           releaseBody: 'Draft release, will be updated later.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-rc') }}
           tauriScript: pnpm
           args: --target x86_64-pc-windows-msvc
