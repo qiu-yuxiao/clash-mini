@@ -109,12 +109,8 @@ export const BaseSearchBox = ({
     })
 
   const iconStyle = {
-    style: {
-      height: '24px',
-      width: '24px',
-      cursor: 'pointer',
-    } as React.CSSProperties,
-    inheritViewBox: true,
+    fontSize: 18,
+    sx: { cursor: 'pointer' },
   }
 
   useEffect(() => {
@@ -220,28 +216,46 @@ export const BaseSearchBox = ({
                   </Tooltip>
                 )}
                 <Tooltip title={t('shared.placeholders.matchCase')}>
-                  <SvgIcon
-                    component={matchCaseIcon}
+                  <IconButton
+                    size="small"
+                    color={matchCase ? 'primary' : 'default'}
                     {...iconStyle}
-                    aria-label={matchCase ? 'active' : 'inactive'}
                     onClick={handleToggleMatchCase}
-                  />
+                  >
+                    <SvgIcon
+                      component={matchCaseIcon}
+                      fontSize="inherit"
+                      aria-label={matchCase ? 'active' : 'inactive'}
+                    />
+                  </IconButton>
                 </Tooltip>
                 <Tooltip title={t('shared.placeholders.matchWholeWord')}>
-                  <SvgIcon
-                    component={matchWholeWordIcon}
+                  <IconButton
+                    size="small"
+                    color={matchWholeWord ? 'primary' : 'default'}
                     {...iconStyle}
-                    aria-label={matchWholeWord ? 'active' : 'inactive'}
                     onClick={handleToggleMatchWholeWord}
-                  />
+                  >
+                    <SvgIcon
+                      component={matchWholeWordIcon}
+                      fontSize="inherit"
+                      aria-label={matchWholeWord ? 'active' : 'inactive'}
+                    />
+                  </IconButton>
                 </Tooltip>
                 <Tooltip title={t('shared.placeholders.useRegex')}>
-                  <SvgIcon
-                    component={UseRegularExpressionIcon}
-                    aria-label={useRegularExpression ? 'active' : 'inactive'}
+                  <IconButton
+                    size="small"
+                    color={useRegularExpression ? 'primary' : 'default'}
                     {...iconStyle}
                     onClick={handleToggleUseRegularExpression}
-                  />
+                  >
+                    <SvgIcon
+                      component={UseRegularExpressionIcon}
+                      fontSize="inherit"
+                      aria-label={useRegularExpression ? 'active' : 'inactive'}
+                    />
+                  </IconButton>
                 </Tooltip>
               </Box>
             ),

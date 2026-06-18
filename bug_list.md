@@ -81,7 +81,22 @@
   - `src/hooks/use-connection-data.ts`：第 107/119/145 行 `delta.removed/updated/added.length` 改为 `(delta.xxx ?? []).length`
 * **状态**：代码已修正，待用户确认。
 
+### **BUG-112** (BaseSearchBox 小光标无视觉交互反馈)
+* **缺陷描述与现象**：节点组头部的搜索过滤框（`BaseSearchBox`）内的正则/区分大小写/匹配整词小光标（`SvgIcon`）无任何视觉交互反馈，无法悬停变手型指针，无高亮/按下态，导致用户无法判断这些小光标是否可点击。
+* **排查原因与记忆**：`@mui/icons-material` 的 `SvgIcon` 仅为 SVG 容器，并非交互组件（Button），不提供 CSS 中的 hover/active/cursor 伪类状态。直接将 `onClick` 绑定到 `SvgIcon` 不会产生点击态。
+* **修改方针**：将 `BaseSearchBox` 内的可点击图标（`matchCaseIcon`、`matchWholeWordIcon`、`UseRegularExpressionIcon`、`ClearRounded` 等）从裸 `SvgIcon` 包裹到 `IconButton` 中，并为非激活图标提供合适的 color 与 size 样式。
 
+### **BUG-113** (闪电光标点击后节点延迟无更新)
+* **缺陷描述与现象**：节点组头部区域（`ProxyHead`）的闪电图标（`BoltOutlined`），点击后显示"正在测试"（loading state）但测试完成后节点延迟值始终不刷新或显示为空，尤其在代理组节点全部为 provider 节点时更为明显。
+* **排查原因与记忆**：
+  1. `handleCheckAll` 中 `delayGroup(groupName, url, timeout)` 返回结果仅被 debugLog 记录，其 `{ name: delay }` 映射结果**未推送**到 `delayManager.setDelay()`，导致 delayManager 无任何更新，UI 自然不刷新。
+  2. 当组内所有节点均为 provider 节点时，`names = proxies.filter(p => !p.provider)` 为空数组，`checkListDelay` 空数组立即返回无操作，而 `delayGroup` 的结果同样被丢弃，完全无声无息。
+  3. `healthcheckProxyProvider` 调用为 `Promise.allSettled` 异步触发但未参与 `Promise.race` 的等待与结果传播，导致 provider 节点延迟刷新也不可靠。
+* **修改方针**：
+  1. 将 `delayGroup` 的返回结果 `{ name: delay }` 遍历后逐个调用 `delayManager.setDelay(name, groupName, delay)` 推送到 delayManager，确保所有非 preset 节点的监听器能触发 UI 重绘。
+  2. 保留 `healthcheckProxyProvider` 的行为，但需确保当 `names` 为空时（全 provider 节点组），仍然依赖 `delayGroup` 结果刷新。
+  3. 修复后调用 `onProxies()` 触发列表数据刷新。
+* **状态**：代码已修正，待用户确认。
 
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)

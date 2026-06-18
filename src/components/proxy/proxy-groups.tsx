@@ -463,6 +463,16 @@ export const ProxyGroups = (props: Props) => {
                 `[ProxyGroups] getGroupProxyDelays返回结果数量:`,
                 Object.keys(result || {}).length,
               )
+              // BUG-113: 推送 delayGroup 结果到 delayManager，否则 provider 节点与 delayGroup 测试结果不会触发 UI 刷新
+              if (result) {
+                Object.entries(result).forEach(([name, d]) => {
+                  const delayVal =
+                    typeof d === 'number' ? d : (d as any)?.delay
+                  if (typeof delayVal === 'number' && delayVal >= 0) {
+                    delayManager.setDelay(name, groupName, delayVal)
+                  }
+                })
+              }
             }),
           ])
           debugLog(`[ProxyGroups] 延迟测试完成，组: ${groupName}`)
