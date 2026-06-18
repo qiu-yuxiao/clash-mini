@@ -15,7 +15,9 @@ const MINIMAL_WIDTH_THRESHOLD = 290
 export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const currentWindow = useMemo(() => getCurrentWindow(), [])
+  // Guard: in non-Tauri environment (e.g. browser dev server), skip window operations
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__
+  const currentWindow = useMemo(() => (isTauri ? getCurrentWindow() : null), [isTauri])
   const [decorated, setDecorated] = useState<boolean | null>(null)
   const [maximized, setMaximized] = useState<boolean | null>(null)
   /** FEAT-003: true when we have hidden the native chrome via idle timer */
@@ -38,11 +40,13 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const dragStartedRef = useRef(false)
 
   const close = useCallback(async () => {
+    if (!currentWindow) return
     await new Promise((resolve) => setTimeout(resolve, 20))
     await currentWindow.close()
   }, [currentWindow])
 
   const minimize = useCallback(async () => {
+    if (!currentWindow) return
     await new Promise((resolve) => setTimeout(resolve, 10))
     await currentWindow.minimize()
   }, [currentWindow])
@@ -64,6 +68,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // ── Resize listener: track maximized state + minimal width ──────────────────
   useEffect(() => {
+    if (!currentWindow) return
     let isUnmounted = false
     let lastWidth = -1
     let lastHeight = -1
@@ -209,18 +214,21 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // ── Decorations init ────────────────────────────────────────────────────────
   const refreshDecorated = useCallback(async () => {
+    if (!currentWindow) return false
     const val = await currentWindow.isDecorated()
     setDecorated(val)
     return val
   }, [currentWindow])
 
   const toggleDecorations = useCallback(async () => {
+    if (!currentWindow) return
     const currentVal = await currentWindow.isDecorated()
     await currentWindow.setDecorations(!currentVal)
     setDecorated(!currentVal)
   }, [currentWindow])
 
   const toggleMaximize = useCallback(async () => {
+    if (!currentWindow) return
     if (await currentWindow.isMaximized()) {
       await currentWindow.unmaximize()
       setMaximized(false)
@@ -231,10 +239,12 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentWindow])
 
   const toggleFullscreen = useCallback(async () => {
+    if (!currentWindow) return
     await currentWindow.setFullscreen(!(await currentWindow.isFullscreen()))
   }, [currentWindow])
 
   useEffect(() => {
+    if (!currentWindow) return
     refreshDecorated()
     currentWindow.setMinimizable?.(true)
   }, [currentWindow, refreshDecorated])
