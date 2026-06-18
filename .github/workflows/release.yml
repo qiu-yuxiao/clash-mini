@@ -6,7 +6,9 @@ on:
     tags:
       - 'v*.*.*'
 
-permissions: write-all
+permissions:
+  contents: write
+  id-token: write
 
 env:
   CARGO_INCREMENTAL: 0
@@ -61,9 +63,9 @@ jobs:
             exit 1
           fi
 
-  # Windows x64 便携版构建
+  # Windows x64 构建（setup.exe + 签名 + 上传）
   release:
-    name: Release Build (Windows x64 Portable)
+    name: Release Build (Windows x64)
     needs: [check_tag_version]
     runs-on: windows-latest
     steps:
@@ -108,13 +110,14 @@ jobs:
           restore-keys: |
             pnpm-shared-stable-windows-x64
 
-      - name: Pnpm install and check
+      - name: Pnpm install and build
         run: |
           pnpm i
           pnpm run prebuild x86_64-pc-windows-msvc
           pnpm run web:build
 
-      - name: Tauri build
+      # Tauri build → 生成 setup.exe 并自动签名（如果私钥环境变量已设置）
+      - name: Tauri build (generates setup.exe)
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
@@ -130,32 +133,95 @@ jobs:
           tauriScript: pnpm
           args: --target x86_64-pc-windows-msvc
 
-      - name: Portable Bundle
-        run: pnpm portable x86_64-pc-windows-msvc
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-
-      - name: Sign Portable ZIP
-        run: |
-          $VERSION = (Get-Content package.json | ConvertFrom-Json).version
-          $ZIP_FILE = "Clash.Mini_${VERSION}_x64_portable.zip"
-          pnpm tauri sign "$ZIP_FILE"
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-
-      - name: Upload Signature to Release
+      # 签名 setup.exe（tauri build 可能已经签名，此步骤确保 .sig 文件存在）
+      - name: Sign setup.exe and generate .sig
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          ZIP_FILE="Clash.Mini_${VERSION}_x64_portable.zip"
-          gh release upload ${{ github.ref_name }} "${ZIP_FILE}.sig" --repo qiu-yuxiao/clash-mini --clobber
+          SETUP_EXE="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe"
+          SETUP_SIG="${SETUP_EXE}.sig"
+
+          echo "Signing: $SETUP_EXE"
+          pnpm tauri signer sign "$SETUP_EXE"
+          echo "Signature file: $SETUP_SIG"
+
+          # 验证签名文件存在
+          if [ ! -f "$SETUP_SIG" ]; then
+            echo "❌ .sig file not found: $SETUP_SIG"
+            exit 1
+          fi
+          echo "✅ .sig file generated successfully"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      # 上传 .sig 到 Release
+      - name: Upload .sig to Release
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SETUP_SIG="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe.sig"
+          gh release upload ${{ github.ref_name }} "$SETUP_SIG" --repo qiu-yuxiao/clash-mini --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 发布正式 Release（只依赖 release job，无死锁）
+      # 更新 app-update.json 并推送回 dev 分支
+      - name: Update app-update.json and push to dev
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SETUP_SIG="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe.sig"
+          SETUP_EXE="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe"
+
+          # 读取签名
+          SIG=$(cat "$SETUP_SIG" | tr -d '\n\r')
+
+          # 获取文件大小
+          SIZE=$(wc -c < "$SETUP_EXE" | tr -d ' ')
+
+          # 生成 pub_date
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # 更新 app-update.json
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const pkg = require('./package.json');
+            const sig = fs.readFileSync('$SETUP_SIG', 'utf8').trim().replace(/\n/g, '').replace(/\r/g, '');
+            const size = fs.statSync('$SETUP_EXE').size;
+            const data = {
+              version: pkg.version,
+              notes: 'Clash Mini v' + pkg.version,
+              pub_date: new Date().toISOString(),
+              platforms: {
+                'windows-x86_64': {
+                  signature: sig,
+                  url: 'https://github.com/qiu-yuxiao/clash-mini/releases/download/v' + pkg.version + '/Clash.Mini_' + pkg.version + '_x64-setup.exe',
+                  size: size
+                }
+              }
+            };
+            fs.writeFileSync('updater/app-update.json', JSON.stringify(data, null, 2) + '\n', 'utf8');
+            console.log('app-update.json updated');
+          "
+
+          # 提交并推送回 dev 分支
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add updater/app-update.json
+          git commit -m "chore: update app-update.json for v$VERSION [skip ci]" || echo "No changes to commit"
+          git push origin dev
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 便携版 ZIP（可选，不影响自动更新）
+      - name: Portable Bundle (optional)
+        run: pnpm portable x86_64-pc-windows-msvc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # 发布正式 Release（更新 Release Notes）
   publish_release:
     name: Publish Release
     needs: [release]
@@ -190,6 +256,9 @@ jobs:
           $UPDATE_LOGS
 
           ## 下载地址
+
+          ### Windows 64位 安装版（推荐，支持自动更新）
+          - [64位安装版](${DOWNLOAD_URL}/Clash.Mini_${VERSION}_x64-setup.exe)
 
           ### Windows 64位绿色便携版（免安装）
           - [64位便携版](${DOWNLOAD_URL}/Clash.Mini_${VERSION}_x64_portable.zip)
