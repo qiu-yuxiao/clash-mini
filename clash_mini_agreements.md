@@ -2316,3 +2316,10 @@
   - **首选惰性初始化**：任何需要在挂载时获取的本地持久化状态，必须将其读取逻辑包裹在 `useState` 的**惰性初始化函数（Lazy Initializer）**中。
   - *示例写法*：`const [controlSkin, setControlSkin] = useState(() => localStorage.getItem('clash-mini-control-skin') || 'retro-3d')`，确保本地 I/O 只在组件首次挂载时执行一次。
 
+## ⚡ 二十八、 重启/导入后自动选点防丢失规范 (BUG-118)
+
+**背景**：重启程序或导入新订阅后，`enhanceProfiles()` 后端调用 `update_config_forced()` 通过 `PUT /configs` 重载 Clash 配置。配置重载后，PROXY 组的 `now` 节点选择被**重置为 Clash 默认（第一个节点）**——如果该节点是订阅商插入的广告/假节点，网络即中断。旧有流程中重载后仅执行 `activateSelected()`（恢复保存的选择），未触发自动选点纠偏。
+
+- **根因**：`enhanceProfiles()` 永远调用后端 `update_config_forced()`，该函数通过 Clash API 的 `PUT /configs` 重载配置，导致当前选中的节点被 Clash 重置为默认值。
+- **修复规范**：在 `_layout.tsx` 的 `useEffect([currentProfileUid])` 中，`activateSelected()` 之后必须追加 `invoke('trigger_auto_select', { isManual: false })`，确保配置重载后始终执行一次自动选点，选取最快可用节点覆盖 Clash 的默认假节点。
+- **导入场景的竞态修复**：后台监测进程在检测到 UID 变化时，`wait_for_clash_ready()` 的阶段 2 检查 `/proxies/PROXY`——但此时 Clash 内核仍加载着旧配置，旧的 PROXY 组有节点会导致阶段 2 误判通过，从而在旧配置上选点。前端末尾的 `trigger_auto_select` 保证了最终在新加强配置上正确选点，覆盖后台的过时选点结果。

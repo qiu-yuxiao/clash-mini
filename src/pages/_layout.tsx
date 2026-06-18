@@ -832,6 +832,8 @@ const Layout = () => {
         .then(async () => {
           console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`)
           await activateSelectedRef.current()
+          // 配置重载会重置 PROXY 组选择，必须主动触发自动选点纠偏
+          invoke('trigger_auto_select', { isManual: false })
         })
         .catch((err) => {
           console.error(
