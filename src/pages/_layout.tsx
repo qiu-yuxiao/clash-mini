@@ -1317,11 +1317,11 @@ const Layout = () => {
             boxSizing: 'border-box',
           }}
         >
-          {/* Upper Pane: Node Selection (80%) */}
+          {/* Upper Pane: Node Selection (80% + 30px) */}
           <div
             style={{
-              flex: isMinimalWidth ? '1 1 0%' : '80 0 0%',
-              height: isMinimalWidth ? 'auto' : '80%',
+              flex: isMinimalWidth ? '1 1 0%' : '80 0 calc(0% + 30px)',
+              height: isMinimalWidth ? 'auto' : 'calc(80% + 30px)',
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',
@@ -1769,11 +1769,11 @@ const Layout = () => {
             </div>
           </div>
 
-          {/* Lower Pane: Constant Traffic Dashboard (Fixed Height) */}
+          {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}
           <div
             style={{
-              flex: isMinimalWidth ? '0 0 100px' : '0 0 165px',
-              height: isMinimalWidth ? '100px' : '165px',
+              flex: isMinimalWidth ? '0 0 100px' : '0 0 135px',
+              height: isMinimalWidth ? '100px' : '135px',
               background: 'inherit',
               padding: isMinimalWidth ? '3px 6px 2px 6px' : '8px 12px 2px 12px',
               display: 'flex',
