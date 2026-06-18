@@ -1777,7 +1777,7 @@ const Layout = () => {
               background: 'inherit',
               padding: isMinimalWidth ? '3px 6px 2px 6px' : '8px 12px 2px 12px',
               display: 'flex',
-              gap: isMinimalWidth ? '6px' : '12px',
+              gap: isMinimalWidth ? '6px' : '2px',
               overflow: 'hidden',
               boxSizing: 'border-box',
             }}
