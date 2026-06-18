@@ -1,6 +1,11 @@
 {
   "version": "1.3.7",
   "notes": "Clash Mini v1.3.7 — 滑块单行布局、过滤框常驻、BUG-113 修复",
-  "pub_date": "2026-06-19T00:00:00Z",
-  "platforms": {}
+  "pub_date": "2026-06-19T03:57:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRVBBOXg5aW5Xb1c1Um9mYUhBMUs0cUFOaWI3eWM3SUFMSForcHNKQ2t6VFlFSGIzaDAwNFJjcnNZb2xuajluYUwrS3NhaTZYcVZFWnlXZ0dEMDJvU2dnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODEyNzYzCWZpbGU6Q2xhc2guTWluaV8xLjMuN194NjRfcG9ydGFibGUuemlwCnVFd1VmSTljL2NhbWhndlZrU1ByVnRUWEd6T0dQRDRKbDZUSHJQSzlCbGxEanpXRUNVL3d3aDUxa09HdVBldTI2MzgyRkZ3bmRyV1BRS1QzeFcvSEJBPT0K",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.3.7/Clash.Mini_1.3.7_x64_portable.zip"
+    }
+  }
 }
