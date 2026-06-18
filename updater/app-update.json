@@ -1,12 +1,12 @@
 {
   "version": "1.3.8",
   "notes": "Clash Mini v1.3.8 - BUG-117 Trump-3D shadow fix, BUG-118 auto-select after restart",
-  "pub_date": "2026-06-19T05:35:00Z",
+  "pub_date": "2026-06-19T05:38:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUhpdHNoT3JhUXRWOTRBU01VQnlRTmM0aG11RVNjcnQ0OHd4SEhDQnJHamV3Y3hhVTQyRS8reGJXRHBsaWYwYlVkMHJhTk52T1NmZ1MxTjd6L3g2QlFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODE4NjEwCWZpbGU6Q2xhc2guTWluaV8xLjMuOF94NjRfcG9ydGFibGUuemlwCmpCQTNtRGNQQ042OUMxOC85VXBSTlkvaEx1cXIzQ2kwenBCaVlyK0JFdjNPQ2NTYlZUbnMyOFlkOGlrK1RtZURsRHY0OVk3YjNldEpmeTFZczJrT0FnPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.3.8/Clash.Mini_1.3.8_x64_portable.zip",
-      "size": 73402560
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRVBoME5tRU9IQkZ0MWNxeWNuWDlLRzE5bE9IRm9OTUI2QjVmNWV4QzNKTjNIK2tKWGRKMU91MTZyWGI4WUFIbUxZWVpra2taSVc5YUg1c3RndW80SWdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODE4ODEyCWZpbGU6Q2xhc2guTWluaV8xLjMuOF94NjQtc2V0dXAuZXhlClZNU1NJZyt6Y3JrOStpY2d2STI3a2l0anRKL0hXNWZpQm54ZnB6U0g3YytZMU1pWnF3SDB2enFoaUxDa2t2WG10UG02UTU2QlpFbCswK25DQzY3V0NnPT0K",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.3.8/Clash.Mini_1.3.8_x64-setup.exe",
+      "size": 42265376
     }
   }
 }
