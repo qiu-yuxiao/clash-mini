@@ -12,29 +12,35 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-116: 主题设置滑块布局由两行压缩为单行
+### BUG-117: Trump-3D 按钮与卡片阴影被 BUG-115 过度简化为模糊阴影，失去物理 3D 固态挤压质感
 
-- **现象描述**：在「主题设置」模块中，两个参数调节滑块（Depth/Vibrancy 等）目前各占两行（名称+数值一行，滑块本体一行），垂直空间利用率低。
+- **现象描述**：在 Trump-3D（retro-3d）皮肤下，按钮和卡片的 boxShadow 被替换为单层模糊内阴影 + 单层模糊外阴影组合，违反了 STYLE-001 协议「固态挤压厚度（Solid Extrusion Thickness）」设计原则——抛弃单一模糊阴影、改用多层无模糊像素层叠的要求。视觉效果表现为按钮/卡片变得扁平、阴影模糊发虚，缺乏物理 3D 侧壁立体感。
+- **根因**：BUG-115 的修正将原有的 5~7 层 `bevelShadowDark` 固态挤压完全移除，替换为 `inset` 模糊内阴影方案，过度简化丢失了核心 3D 拟物质感。
 - **修正说明**：
-  - 将滑块的名称+数值与滑块本体合并为**单行**
-  - 左侧为名称+数值区（`flex: 1`，名称左对齐、数值右对齐）
-  - 右侧为滑块区（固定宽 `100px`，与上方三选一分段选择器等宽）
-  - 模块高度自然缩减，底部按钮以绝对定位锚定不动
+  - 将 `get3DButtonStyle`（retro-3d）的 boxShadow 从 1 层模糊内阴影 + 1 层模糊外阴影 + 1 层顶高光 + 霓虹发光，恢复为 **3 层无模糊 bevelShadowDark 固态挤压像素层叠 + 单层接触投影 + 单层顶高光 + 霓虹发光**
+  - `get3DCardStyle`（retro-3d）同步恢复为同一方案
+  - Hover 状态增加额外悬浮投影层模拟抬升
+  - Active 状态挤压反转为其 inset 形式
+  - 同时更新协议中 3D 实体主按钮和 3D 浮雕展示卡片的 boxShadow 设计规范，明确禁止降级为纯模糊阴影
 - **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.3.6`
+- **目标版本**：`v1.3.8`
 
-### BUG-113: 闪电光标点击后节点延迟无更新（回归）
+### BUG-118: 重启程序或导入订阅后，不能自动选定可用节点，通讯受阻
 
-- **现象描述**：点击闪电测速光标后，节点延迟数值未刷新。`handleCheckAll` 中 `delayGroup` 结果未正确推送至 `delayManager`，导致 provider 节点组的延迟在 UI 上不更新。
-- **根因**：PROXY 组走 `trigger_auto_select` 专用路径，跳过了 `delayManager.checkListDelay` 和 `delayGroup` 的延迟测试流程，导致速度测试结果从未进入 `delayManager` 缓存，UI 无法刷新。
-- **修正说明**：统一化 `handleCheckAll` 流程——无论 PROXY 还是其他组，均先通过 `delayManager.checkListDelay` + `delayGroup` 执行完整延迟测试并推送到 `delayManager` 更新 UI，然后再对 PROXY 组调用 `trigger_auto_select` 选最快节点切换。
+- **现象描述**：重启 Clash Mini 或导入新的订阅链接后，程序无法自动选定一个可用的代理节点，导致网络通讯受阻。在 v1.3.2 版本中该功能正常。
+- **根因**：配置增强流程 `enhanceProfiles()` → 后端 `update_config_forced()` → `PUT /configs` 重载 Clash 配置后，PROXY 组的 `now` 节点选择被 Clash 重置为默认（即 PROXY 组的第一个节点）。如果该默认节点是订阅商插入的广告/假节点（如「剩余流量」「过期时间」等），网络即中断。旧有流程在重载后仅执行 `activateSelected()`（恢复保存的节点选择），但未触发 `trigger_auto_select` 自动选点纠偏。
+- **修正说明**：
+  - 在 `_layout.tsx` 的 `useEffect([currentProfileUid])` 中，`activateSelected()` 之后追加 `invoke('trigger_auto_select', { isManual: false })`，确保配置重载后始终执行一次自动选点，选取最快可用节点覆盖 Clash 的默认假节点。
+  - 同步更新协议第二十八章「重启/导入后自动选点防丢失规范」
 - **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.3.6`
+- **目标版本**：`v1.3.8`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。
 
+| **BUG-116** | 主题设置滑块布局由两行压缩为单行，名称+数值与滑块本体合并为单行布局，垂直空间利用率优化。 | v1.3.6 | 代码已修正，已确认 |
+| **BUG-113** | 闪电光标点击后节点延迟无更新（回归），统一化 handleCheckAll 流程，确保 PROXY 组也通过 delayManager 执行完整延迟测试并更新 UI。 | v1.3.6 | 代码已修正，已确认 |
 | **BUG-115** | Retro-3D 皮肤按钮与卡片 boxShadow 叠加层数过多问题，将多层 bevelShadowDark 叠加简化为单层内阴影+单层外阴影+单层顶高光结构，与分段选择器保持一致。 | v1.3.5 | 代码已修正，已确认 |
 | **BUG-114** | 宽窗口上下容器高度重分配：上部+30px /下部-30px，下部容器内部 gap 设为零。 | v1.3.5 | 代码已修正，已确认 |
 | **BUG-112** | BaseSearchBox 小光标无视觉交互反馈，将正则/区分大小写/匹配整词图标从裸 `SvgIcon` 包裹到 `IconButton` 中，添加 hover/active 状态反馈。 | v1.3.5 | 代码已修正，已确认 |
