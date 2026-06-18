@@ -1,4 +1,4 @@
-# Clash Mini 权威开发协议 (Authorized Development Agreements)
+﻿# Clash Mini 权威开发协议 (Authorized Development Agreements)
 
 
 
@@ -1278,7 +1278,7 @@
 
 
 
-      | **3D 实体主按钮** | **6 个** | 1. 订阅导入区：“导入订阅链接”按钮<br>2. 基础设置区：“系统调试运行日志”按钮<br>3. 路径控制区：“断开全部”按钮<br>4. 路径控制区：“清空历史”按钮<br>5. 系统运行日志窗口：“清空日志”按钮<br>6. 链接详情中心：“断开连接”/“Block”按钮 | 已通过 `get3DButtonStyle` 集中管理。已应用 6px 圆角、径向渐变、4px 高清边框以及 active 2px 位移。 |
+      | **3D 实体主按钮** | **6 个** | 1. 订阅导入区：“导入订阅链接”按钮<br>2. 基础设置区：“系统调试运行日志”按钮<br>3. 路径控制区：“断开全部”按钮<br>4. 路径控制区：“清空历史”按钮<br>5. 系统运行日志窗口：“清空日志”按钮<br>6. 链接详情中心：“断开连接”/“Block”按钮 | 已通过 `get3DButtonStyle` 集中管理。已应用 6px 圆角、径向渐变、4px 高清边框以及 active 2px 位移。在 `Trump-3D` 皮肤下，boxShadow 必须简化为与分段选择器一致的单层内阴影 + 单层外阴影 + 单层顶高光结构，禁止 5~7 层 `bevelShadowDark` 叠加（BUG-115），避免 Depth 滑块增大时阴影过厚；其他皮肤（Original / Modern / Frosted / Cyberpunk / Monochrome）的按钮 boxShadow 仍为单层或无，保持原状不变。 |
 
 
 

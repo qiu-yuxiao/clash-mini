@@ -27,20 +27,17 @@ export const get3DButtonStyle = (
     let backgroundStyle: string
     let textColor: string
     let borderColor: string
-    let bevelShadowDark: string
 
     if (colorType === 'primary') {
       textColor = '#2C1F03'
       borderColor = isLight ? '#8A6D00' : '#634E00'
       backgroundStyle =
         'linear-gradient(135deg, #FFE082 0%, #FFD54F 20%, #FFC107 45%, #FFB300 70%, #D4AF37 85%, #B8860B 100%)'
-      bevelShadowDark = isLight ? '#8A6D00' : '#5D4037'
     } else if (colorType === 'error') {
       textColor = '#ffffff'
       borderColor = isLight ? '#B71C1C' : '#6B0505'
       backgroundStyle =
         'linear-gradient(135deg, #FF8A80 0%, #FF5252 30%, #D50000 75%, #880E4F 100%)'
-      bevelShadowDark = isLight ? '#B71C1C' : '#5C0303'
     } else {
       textColor = isLight
         ? '#3C2F0F'
@@ -51,7 +48,6 @@ export const get3DButtonStyle = (
       backgroundStyle = isLight
         ? 'linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 35%, #FFF59D 70%, #FFE082 100%)'
         : 'linear-gradient(135deg, #FFF59D 0%, #FBC02D 35%, #F57F17 70%, #E65100 100%)'
-      bevelShadowDark = isLight ? '#B8860B' : '#755500'
     }
 
     if (variant === 'outlined' && colorType === 'default') {
@@ -85,27 +81,13 @@ export const get3DButtonStyle = (
           ? '0 -1px 0 rgba(0, 0, 0, 0.4)'
           : '0 1px 0 rgba(255, 255, 255, 0.45)',
       boxShadow: isLight
-        ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.4),
-           0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.3),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.7),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.15),
+        ? `inset 0 calc(2.5px * var(--depth-factor, 1.0)) calc(4.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.2),
+           0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.3),
+           0 1px 0 rgba(255, 255, 255, 0.8),
            0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${glowColor}`
-        : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-           0 calc(5px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.55),
-           0 calc(7px * var(--depth-factor, 1.0)) calc(10px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.45),
-           inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.5),
-           inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.2),
-           inset -1px -1px 0 rgba(0, 0, 0, 0.25),
+        : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.7),
+           0 calc(1px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.45),
+           0 1px 0 rgba(255, 255, 255, 0.08),
            0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${glowColor}`,
       '&:hover': {
         transform: 'translateY(-2px)',
@@ -118,31 +100,13 @@ export const get3DButtonStyle = (
                 ? 'linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 20%, #FFF59D 50%, #FFD54F 100%)'
                 : 'linear-gradient(135deg, #FFF9C4 0%, #FFF59D 20%, #FBC02D 50%, #F57F17 100%)',
         boxShadow: isLight
-          ? `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(6px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(7px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.35),
-             0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.25),
-             inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.8),
-             inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.4),
-             inset -1px -1px 0 rgba(0, 0, 0, 0.1),
+          ? `inset 0 calc(2.5px * var(--depth-factor, 1.0)) calc(4.5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.2),
+             0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.3),
+             0 1px 0 rgba(255, 255, 255, 0.8),
              0 0 calc(12px * var(--vibrancy-factor, 1.0)) ${glowColorHover}`
-          : `0 calc(1px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(2px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(3px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(4px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(5px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(6px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(7px * var(--depth-factor, 1.0)) 0 0 ${bevelShadowDark},
-             0 calc(7px * var(--depth-factor, 1.0)) 1px 0 rgba(0, 0, 0, 0.45),
-             0 calc(10px * var(--depth-factor, 1.0)) calc(15px * var(--depth-factor, 1.0)) 0 rgba(0, 0, 0, 0.4),
-             inset 0 calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.6),
-             inset calc(2px * var(--depth-factor, 1.0)) calc(2px * var(--depth-factor, 1.0)) 0 rgba(255, 255, 255, 0.3),
-             inset -1px -1px 0 rgba(0, 0, 0, 0.2),
+          : `inset 0 calc(3px * var(--depth-factor, 1.0)) calc(5px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.7),
+             0 calc(1px * var(--depth-factor, 1.0)) calc(3px * var(--depth-factor, 1.0)) rgba(0, 0, 0, 0.45),
+             0 1px 0 rgba(255, 255, 255, 0.08),
              0 0 calc(12px * var(--vibrancy-factor, 1.0)) ${glowColorHover}`,
       },
       '&:active': {

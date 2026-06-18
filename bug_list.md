@@ -29,6 +29,20 @@
   3. 修复后调用 `onProxies()` 触发列表数据刷新。
 * **状态**：代码已修正，待用户确认。
 
+### **BUG-115** (Retro-3D 皮肤按钮 boxShadow 叠加层数过多，Depth 增大时阴影过度加深)
+* **缺陷描述与现象**：在 Retro-3D 皮肤下，"导入节点信息"、"系统调试运行日志" 这类按钮的 boxShadow 由 5 层 `bevelShadowDark` 外阴影叠加组成。当 Depth 滑块增大时，每一层都会按 `var(--depth-factor)` 等比放大（最大 5 倍），导致按钮下方阴影变得过厚、过深，与同皮肤下的"代理兜底"、"TUN模式"、"断开全部"等分段选择器/小按钮的视觉厚度完全不一致，破坏 UI 整体协调性。
+* **排查原因与记忆**：
+  1. `get3DButtonStyle` 的 retro-3d 分支中，boxShadow 写死了 5 层 `0 Npx 0 0 ${bevelShadowDark}` 叠加，每层都乘以 `--depth-factor`。
+  2. hover 态甚至叠加到 7 层。
+  3. 对比 `get3DSegmentedContainerStyle`（代理兜底/手动模式/系统代理等分段选择器容器）：只使用 `inset 0 Xpx Ypx rgba(0,0,0,0.X)` 内阴影 + `0 1px 0 rgba(255,255,255,...)` 单层高光，无叠加。
+  4. 其他皮肤（original / modern-flat / frosted-glass / cyberpunk / monochrome）的按钮 boxShadow 都已经是单层或无，受 depth 影响较小，无明显问题。
+* **修改方针**（仅针对 retro-3d 皮肤的 `get3DButtonStyle`，其他皮肤保持不变）：
+  1. boxShadow 简化为与分段选择器一致的结构：`inset 0 Xpx Ypx rgba(0,0,0,...)` 内阴影 + `0 1px var(--depth-factor) 2px rgba(...)` 单层外阴影 + `0 1px 0 rgba(255,255,255,...)` 顶高光 + 光晕。
+  2. 删除所有 `bevelShadowDark` 相关的 5~7 层叠加阴影。
+  3. active 态保留 inset 凹陷效果，仅保留单层外阴影。
+  4. 各皮肤（original / modern-flat / frosted-glass / cyberpunk / monochrome）原本就是单层或无 boxShadow，无需调整。
+* **状态**：代码已修正，待用户确认。
+
 ### **BUG-114** (宽窗口上下容器高度重分配：上部+30px /下部-30px)
 * **缺陷描述与现象**：宽窗口模式下，上部（节点选择面板）与下部（流量面板）的高度分配未优化——上部操作区域偏小，下部流量曲线图高度偏大。
 * **排查原因与记忆**：
