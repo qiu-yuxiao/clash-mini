@@ -134,6 +134,20 @@ jobs:
         run: pnpm portable x86_64-pc-windows-msvc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Sign Portable ZIP and Upload Signature
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          ZIP_FILE="Clash.Mini_${VERSION}_x64_portable.zip"
+          npx @tauri-apps/cli@2 sign "$ZIP_FILE"
+          gh release upload ${{ github.ref_name }} "${ZIP_FILE}.sig" --repo qiu-yuxiao/clash-mini
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
   # 发布正式 Release（只依赖 release job，无死锁）
   publish_release:
