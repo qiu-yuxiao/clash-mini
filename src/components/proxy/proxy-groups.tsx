@@ -408,51 +408,35 @@ export const ProxyGroups = (props: Props) => {
       setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
       try {
-        if (groupName === 'PROXY') {
-          const result = await invoke<[string, number] | null>(
-            'trigger_auto_select',
-            { isManual: true },
+        // Clash Mini 架构：只有唯一 PROXY 组，所有节点扁平化在此组下
+        const proxies = renderList
+          .filter(
+            (e) =>
+              e.group?.name === groupName && (e.type === 2 || e.type === 4),
           )
-          if (result) {
-            const [name, delay] = result
-            showNotice.success(
-              `自动测速完成，已切换至最快节点: ${name} (${delay}ms)`,
-            )
-          } else {
-            showNotice.error(
-              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                所有线路都繁忙，请通过代理组手动切换。
-              </span>,
-            )
-          }
-        } else {
-          const proxies = renderList
-            .filter(
-              (e) =>
-                e.group?.name === groupName && (e.type === 2 || e.type === 4),
-            )
-            .flatMap((e) => e.proxyCol || e.proxy)
-            .filter(Boolean)
+          .flatMap((e) => e.proxyCol || e.proxy)
+          .filter(Boolean)
 
-          debugLog(`[ProxyGroups] 找到代理数量: ${proxies.length}`)
+        debugLog(`[ProxyGroups] 找到代理数量: ${proxies.length}`)
 
-          const providers = new Set(
-            proxies.map((p) => p?.provider).filter(Boolean),
-          )
+        const providers = new Set(
+          proxies.map((p) => p?.provider).filter(Boolean),
+        )
 
-          if (providers.size) {
-            debugLog(`[ProxyGroups] 发现提供者，数量: ${providers.size}`)
-            Promise.allSettled(
-              [...providers].filter(Boolean).map((p) => healthcheckProxyProvider(p as string)),
-            ).then(() => {
-              debugLog(`[ProxyGroups] 提供者健康检查完成`)
-              onProxies()
-            })
-          }
+        if (providers.size) {
+          debugLog(`[ProxyGroups] 发现提供者，数量: ${providers.size}`)
+          Promise.allSettled(
+            [...providers].filter(Boolean).map((p) => healthcheckProxyProvider(p as string)),
+          ).then(() => {
+            debugLog(`[ProxyGroups] 提供者健康检查完成`)
+            onProxies()
+          })
+        }
 
-          const names = proxies.filter((p) => !p?.provider).map((p) => p?.name).filter(Boolean) as string[]
-          debugLog(`[ProxyGroups] 过滤后需要测试的代理数量: ${names.length}`)
+        const names = proxies.filter((p) => !p?.provider).map((p) => p?.name).filter(Boolean) as string[]
+        debugLog(`[ProxyGroups] 过滤后需要测试的代理数量: ${names.length}`)
 
+        if (names.length > 0) {
           const url = delayManager.getUrl(groupName)
           debugLog(`[ProxyGroups] 测试URL: ${url}, 超时: ${timeout}ms`)
 
@@ -463,7 +447,6 @@ export const ProxyGroups = (props: Props) => {
                 `[ProxyGroups] getGroupProxyDelays返回结果数量:`,
                 Object.keys(result || {}).length,
               )
-              // BUG-113: 推送 delayGroup 结果到 delayManager，否则 provider 节点与 delayGroup 测试结果不会触发 UI 刷新
               if (result) {
                 Object.entries(result).forEach(([name, d]) => {
                   const delayVal =
@@ -476,6 +459,18 @@ export const ProxyGroups = (props: Props) => {
             }),
           ])
           debugLog(`[ProxyGroups] 延迟测试完成，组: ${groupName}`)
+        }
+
+        // PROXY 组：延迟测试后自动选最快节点
+        const result = await invoke<[string, number] | null>(
+          'trigger_auto_select',
+          { isManual: true },
+        )
+        if (result) {
+          const [name, delay] = result
+          showNotice.success(
+            `自动测速完成，已切换至最快节点: ${name} (${delay}ms)`,
+          )
         }
       } catch (error) {
         console.error(

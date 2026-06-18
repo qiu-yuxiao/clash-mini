@@ -26,7 +26,9 @@
 ### BUG-113: 闪电光标点击后节点延迟无更新（回归）
 
 - **现象描述**：点击闪电测速光标后，节点延迟数值未刷新。`handleCheckAll` 中 `delayGroup` 结果未正确推送至 `delayManager`，导致 provider 节点组的延迟在 UI 上不更新。
-- **当前状态**：`代码待修正，待用户确认`
+- **根因**：PROXY 组走 `trigger_auto_select` 专用路径，跳过了 `delayManager.checkListDelay` 和 `delayGroup` 的延迟测试流程，导致速度测试结果从未进入 `delayManager` 缓存，UI 无法刷新。
+- **修正说明**：统一化 `handleCheckAll` 流程——无论 PROXY 还是其他组，均先通过 `delayManager.checkListDelay` + `delayGroup` 执行完整延迟测试并推送到 `delayManager` 更新 UI，然后再对 PROXY 组调用 `trigger_auto_select` 选最快节点切换。
+- **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.3.6`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
