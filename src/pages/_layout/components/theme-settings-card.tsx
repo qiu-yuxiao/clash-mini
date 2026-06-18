@@ -12,12 +12,12 @@ import { useTranslation } from 'react-i18next'
 
 import {
   get3DCardStyle,
-  get3DSliderStyle,
   get3DButtonStyle,
   get3DSegmentedContainerStyle,
   get3DSegmentedActiveStyle,
   get3DSegmentedActiveTextColor,
 } from '@/utils/button-styles'
+import { get3DSliderStyle } from '../utils/style-helpers'
 
 interface ThemeSettingsCardProps {
   verge: any
