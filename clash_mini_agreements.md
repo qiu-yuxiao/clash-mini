@@ -436,7 +436,7 @@
 
 
 
-      * **左侧分栏（固定为 200px 宽度）**：自上而下整齐摆放「机场订阅区」、「流量接管模式选择」与「极简设置项」，其内所有模块尺寸完全固定，不随窗口宽度变动而缩水（拉窄时直接被遮挡即可）。其中，为了解决标题字号反而显得小的问题，设置页面内所有设置项标签（如“开机自动启动”、“启动时最小化”、“Allow LAN”、“主题模式”、“流量接管模式”、“分流策略倾向”、“Mixed Port”等）的字号一律统一为 `11px`，与各自模块标题字号（`11px`）保持一致。为了与小字号文本协调，Switch 控件高度固定为 `14px`（滑道宽度 `28px`，滑珠 `14px`）。当窗口高度被压低到极限（如 220px）时，利用布局和容器的 `overflow: hidden` 裁剪，必须确保排在最底部的“系统调试运行日志”按钮最先被截断隐藏，而排在最上方的“导入订阅”组件和“订阅列表”优先保留在视口内常驻展示。
+      * **左侧分栏（固定为 200px 宽度）**：自上而下整齐摆放「机场订阅区」、「流量接管模式选择」与「极简设置项」，其中「极简设置项」进一步拆分为上下两个独立模块——「基础设置」（包含"开机自动启动"、"启动时最小化"、"Allow LAN"、"Mixed Port"）与「主题设置」（包含"主题模式"三选一选择器、双滑动条及"系统调试运行日志"按钮），两模块之间的间距与左侧分栏内其他模块间距保持一致。其内所有模块尺寸完全固定，不随窗口宽度变动而缩水（拉窄时直接被遮挡即可）。其中，为了解决标题字号反而显得小的问题，设置页面内所有设置项标签（如“开机自动启动”、“启动时最小化”、“Allow LAN”、“主题模式”、“流量接管模式”、“分流策略倾向”、“Mixed Port”等）的字号一律统一为 `11px`，与各自模块标题字号（`11px`）保持一致。为了与小字号文本协调，Switch 控件高度固定为 `14px`（滑道宽度 `28px`，滑珠 `14px`）。当窗口高度被压低到极限（如 220px）时，利用布局和容器的 `overflow: hidden` 裁剪，必须确保排在最底部的“系统调试运行日志”按钮最先被截断隐藏，而排在最上方的“导入订阅”组件和“订阅列表”优先保留在视口内常驻展示。
 
 
 
@@ -2293,7 +2293,7 @@
 ## ⚡ 二十七、 布局组件单体化与状态同步规范 (BUG-102)
 为了解决 `src/pages/_layout.tsx` 原上帝组件体积过于庞大、渲染开销过高以及代码难以维护的问题，对布局结构实施模块化拆分，并制定以下设计与同步规范：
 - **单一职责原则与大组件拆分**：
-  - 将庞大的上帝组件 `_layout.tsx` 拆分为职责单一的子组件（`ActiveNodeStatusCard`、`MiniTrafficPanel`、`ProfileImportCard`、`TakeoverModeCard`、`RoutingPreferenceCard`、`BasicSettingsCard`、`ConnectionsPanel`、`HelpMenuButton` 和 `LayoutDialogs`），所有拆分出的子组件统一收拢在 `src/pages/_layout/components/` 目录下。
+  - 将庞大的上帝组件 `_layout.tsx` 拆分为职责单一的子组件（`ActiveNodeStatusCard`、`MiniTrafficPanel`、`ProfileImportCard`、`TakeoverModeCard`、`RoutingPreferenceCard`、`BasicSettingsCard`、`ThemeSettingsCard`、`ConnectionsPanel`、`HelpMenuButton` 和 `LayoutDialogs`），所有拆分出的子组件统一收拢在 `src/pages/_layout/components/` 目录下。
 - **样式与公共辅助函数抽离**：
   - 将原布局文件中零散定义的 3D 控件样式渲染辅助函数、网络延迟等级映射函数、版本比对辅助函数等公共逻辑提取至独立的 `src/pages/_layout/utils/style-helpers.tsx` 模块。
   - 必须使用 `.tsx` 扩展名以支持 React 的 JSX 语法（如 `<SignalNone />`），并在各拆分子组件和主布局组件中通过 ESM 方式引入。

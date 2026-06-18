@@ -73,6 +73,7 @@ import {
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
 import { BasicSettingsCard } from './_layout/components/basic-settings-card'
+import { ThemeSettingsCard } from './_layout/components/theme-settings-card'
 import { ConnectionsPanel } from './_layout/components/connections-panel'
 import { HelpMenuButton } from './_layout/components/help-menu-button'
 import { LayoutDialogs } from './_layout/components/layout-dialogs'
@@ -1531,6 +1532,12 @@ const Layout = () => {
                   mixedPortVal={mixedPortVal}
                   setMixedPortVal={setMixedPortVal}
                   handleSavePort={handleSavePort}
+                />
+
+                {/* Section 4: Theme Settings */}
+                <ThemeSettingsCard
+                  verge={verge}
+                  patchVerge={patchVerge}
                   themeActiveIndex={themeActiveIndex}
                   depthFactor={depthFactor}
                   handleDepthFactorChange={handleDepthFactorChange}
