@@ -80,6 +80,15 @@ pub async fn get_active_filter_config(profile_uid: &str) -> FilterConfig {
     }
 }
 
+/// 从 `proxy_head_state.json` 读取前台保存的排序类型
+async fn get_saved_sort_type(profile_uid: &str) -> Option<i32> {
+    let path = crate::utils::dirs::app_home_dir().ok()?.join("proxy_head_state.json");
+    let content = tokio::fs::read_to_string(path).await.ok()?;
+    let json_val: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let sort_type = json_val[profile_uid]["PROXY"]["sortType"].as_i64()?;
+    Some(sort_type as i32)
+}
+
 /// 过滤匹配算法：支持大小写敏感、正则匹配、全字匹配
 fn match_filter(name: &str, config: &FilterConfig) -> bool {
     if config.filter_text.is_empty() {
@@ -270,10 +279,17 @@ pub async fn trigger_backend_auto_select(
     let group_info: ProxyGroupInfo = res.json().await?;
     let nodes = match group_info.all {
         Some(n) => n,
-        None => return Ok(None),
+        None => return Ok(vec![]),
     };
 
     let filter_config = get_active_filter_config(profile_uid).await;
+    let sort_type = if sort_type == 0 {
+        // 未传入 sort_type 时，从 head state 配置文件读取
+        get_saved_sort_type(profile_uid).await.unwrap_or(1)
+    } else {
+        sort_type
+    };
+
     let valid_nodes: Vec<String> = nodes
         .into_iter()
         .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_config))
@@ -436,7 +452,7 @@ pub fn start_background_monitor() {
                 is_retry_mode = false;
 
                 if wait_for_clash_ready().await {
-                    if let Err(e) = trigger_backend_auto_select(&current_profile).await {
+                    if let Err(e) = trigger_backend_auto_select(&current_profile, 0).await {
                         logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
                     }
                 } else {
@@ -474,7 +490,7 @@ pub fn start_background_monitor() {
                                     Type::Lightweight,
                                     "[后台监测] 连续 3 次检测失败，启动后台自愈选点"
                                 );
-                                if let Err(e) = trigger_backend_auto_select(&current_profile).await {
+                                if let Err(e) = trigger_backend_auto_select(&current_profile, 0).await {
                                     logging!(warn, Type::Lightweight, "[后台监测] 故障自愈选点失败: {e}");
                                 }
                             }
