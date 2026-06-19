@@ -247,10 +247,11 @@ async function triggerAutoSelectAndRefresh(
         }
         // 检查当前选中节点（now）是否有健康延迟
         // 与后端 monitor.rs 中的阈值保持一致：delay > 50 && delay < 2000
+        // 修复 BUG-MAJOR-002：只检查最新一条历史记录，而不是任意历史记录
         const nowNode = await getProxyByName(nowNodeName)
-        const hasHealth = (nowNode?.history || []).some(
-          (h: any) => h.delay > 50 && h.delay < 2000,
-        )
+        const history = nowNode?.history || []
+        const latestDelay = history.length > 0 ? history[history.length - 1].delay : -1
+        const hasHealth = latestDelay > 50 && latestDelay < 2000
         if (!hasHealth) {
           // 无健康节点，强制全节点测速
           const allNames = (proxyGroup?.all || []).filter(
