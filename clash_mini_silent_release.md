@@ -64,7 +64,9 @@
      git tag -d v<版本号>
      git push origin :refs/tags/v<版本号>
      ```
-   - 升级版本号并推送 Tag 到 GitHub 触发 Actions 编译：
+   - **发版顺序铁律（必须严格执行）：**
+     1. 先确认本地所有提交已推送：`git log origin/dev..dev` 无输出才算干净
+     2. 再升级版本号、打 tag、推送 tag 触发 CI：
      ```powershell
      # 手动修改版本号
      # package.json
@@ -72,10 +74,11 @@
      # src-tauri/Cargo.toml
      git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
      git commit -m "release: bump version to <版本号>" --no-verify
-     git tag v<版本号>
      git push origin dev --no-verify
+     git tag v<版本号>
      git push origin v<版本号> --no-verify
      ```
+     **严格按顺序：先 `git push origin dev`，再 `git push origin v<版本号>`。**
      *(注：对于极速发布，GitHub Actions 仅编译 Windows x64，云端构建耗时约 25-30 分钟)*
 4. **云端 Actions 监控**：
    - 打印 Actions 运行链接（形如 `https://github.com/qiu-yuxiao/clash-mini/actions`）引导用户查看。
@@ -221,9 +224,11 @@
 - [ ] `package.json` 版本号已更新
 - [ ] `src-tauri/tauri.conf.json` 版本号已更新
 - [ ] `src-tauri/Cargo.toml` 版本号已更新
+- [ ] `release.yml` 中 `git push` 命令使用 `HEAD:dev` 格式（非 `origin dev`），确保 CI 在 detached HEAD 状态下能正确推送
 - [ ] `release.yml` 中 build artifacts 路径与 `tauri.conf.json` 的 `productName` 一致（防止 find 找不到文件）
 - [ ] `clash_mini_agreements.md` 已登记新特性/修改
 - [ ] `bug_list.md` 已更新 Bug 状态
+- [ ] 本地无未推送提交（`git log origin/dev..dev` 无输出）
 - [ ] CI 构建成功，Release 已发布（非 Draft）
 - [ ] `.sig` 文件已上传到 Release
 - [ ] `updater/app-update.json` 已更新并推送到 `dev` 分支
