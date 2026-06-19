@@ -130,7 +130,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Clash Mini Ver.${{ github.ref_name }}'
           releaseBody: 'Draft release, will be updated later.'
-          releaseDraft: false
+          releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
           tauriScript: pnpm
           args: --target x86_64-pc-windows-msvc
@@ -323,7 +323,8 @@ jobs:
           release_count=$(grep -c . <<< "$matches" || true)
 
           if [ "$release_count" -eq 0 ]; then
-            echo "::error::No release found for $TAG_NAME."
+            echo "::error::No release found for $TAG_NAME. Check if gh API returned valid results."
+            echo "::debug::gh API response was empty or no matching tag found. Possible causes: API error, network issue, or tag deleted."
             exit 1
           fi
 

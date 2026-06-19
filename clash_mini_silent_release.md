@@ -65,7 +65,7 @@
      git push origin :refs/tags/v<版本号>
      # 删除 GitHub 上与该 tag 关联的所有旧 Release
      $tag = "v<版本号>"
-     $ids = gh api "repos/qiu-yuxiao/clash-mini/releases?per_page=10" --jq ".[] | select(.tag_name == `"`"$tag`"`") | .id"
+     $ids = gh api "repos/qiu-yuxiao/clash-mini/releases?per_page=10" --jq ".[] | select(.tag_name == `"$tag`") | .id"
      foreach ($id in $ids) { gh api -X DELETE "repos/qiu-yuxiao/clash-mini/releases/$id" --silent }
      ```
    - **发版顺序铁律（必须严格执行）：**

@@ -1034,6 +1034,7 @@ const Layout = () => {
     if (!url) return
     const trimmed = url.trim()
     if (!trimmed) return
+    if (isImportingRef.current) return
     isImportingRef.current = true
     setProfileLoading(true)
     try {
@@ -1058,7 +1059,8 @@ const Layout = () => {
           await waitForClashReady(t)
           await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
         }
-      } catch {
+      } catch (err) {
+        console.error('[handleImportProfile] 首次导入失败，尝试 Clash 代理重试:', err)
       try {
         await importProfile(url, { with_proxy: false, self_proxy: true })
         showNotice.success('shared.feedback.notifications.importWithClashProxy')
@@ -1335,6 +1337,7 @@ const Layout = () => {
                 ...(verge?.enable_always_on_top ? {
                   background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
                   border: `1px solid ${alpha(theme.palette.primary.main, 0.5)} !important`,
+                  boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
                 } : {}),
               })}
             >
@@ -1554,7 +1557,7 @@ const Layout = () => {
                     height: '28px',
                     p: 0,
                     ...(verge?.enable_always_on_top ? {
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.5)} !important`,
                       background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
                       boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
                     } : {}),

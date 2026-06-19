@@ -29,6 +29,7 @@
 - **修正说明**：移除父容器 `gap: '8px'`，两按钮均通过 `get3DButtonStyle(theme, 'outlined', 'default')` 遵守六种皮肤风格；齿轮/叉子按钮在 `drawerOpen=true` 时显示 primary 色激活态（与图钉按钮的置顶激活态一致）。
 - **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.3.9`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。
