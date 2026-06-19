@@ -962,6 +962,9 @@ const Layout = () => {
 
   const lastEnhancedProfileRef = useRef<string | null>(null)
   const fallbackTimerRef = useRef<number | null>(null)
+  // 解决 BUG-118: handleImportProfile 与 useEffect 双链竞态
+  // 当 handleImportProfile 正在处理时，设置此标志让 useEffect 跳过自动选点
+  const isImportingRef = useRef(false)
 
   // 协议要求：自动选点后排序置顶（sortType: 1 = 按延迟排序）
   const [, setHeadStateForSort] = useHeadStateNew()
@@ -973,21 +976,29 @@ const Layout = () => {
       lastEnhancedProfileRef.current !== currentProfileUid
     ) {
       lastEnhancedProfileRef.current = currentProfileUid
+      const uid = currentProfileUid
+      let cancelled = false
       enhanceProfiles()
         .then(async () => {
-          console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`)
+          if (cancelled || isImportingRef.current) return
+          console.log(`[Layout] Enhanced active profile: ${uid}`)
           await activateSelectedRef.current()
+          if (cancelled || isImportingRef.current) return
           // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
           await waitForClashReady(t)
-          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef)
+          if (cancelled || isImportingRef.current) return
+          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
         })
         .catch((err) => {
           console.error(
-            `[Layout] Failed to enhance profile ${currentProfileUid}:`,
+            `[Layout] Failed to enhance profile ${uid}:`,
             err,
           )
           lastEnhancedProfileRef.current = null
         })
+      return () => {
+        cancelled = true
+      }
     }
   }, [currentProfileUid])
 
@@ -1023,6 +1034,7 @@ const Layout = () => {
     if (!url) return
     const trimmed = url.trim()
     if (!trimmed) return
+    isImportingRef.current = true
     setProfileLoading(true)
     try {
       await importProfile(url)
@@ -1078,6 +1090,7 @@ const Layout = () => {
         )
       }
     } finally {
+      isImportingRef.current = false
       setProfileLoading(false)
     }
   }
@@ -1379,6 +1392,7 @@ const Layout = () => {
       drawerOpen,
       patchVerge,
       verge?.enable_always_on_top,
+      theme,
     ],
   )
 
