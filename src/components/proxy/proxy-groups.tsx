@@ -433,10 +433,16 @@ export const ProxyGroups = (props: Props) => {
           })
         }
 
+        // 获取当前组的前端排序设置，传给后台
+        const headItem = renderList.find(
+          (e) => e.type === 1 && e.group?.name === groupName,
+        )
+        const sortType = headItem?.headState?.sortType ?? 1
+
         // 由后台统一测速并选最快节点
         const results = await invoke<[string, number][]>(
           'trigger_auto_select',
-          { isManual: true },
+          { isManual: true, sortType },
         )
         if (results && results.length > 0) {
           // 用后台测速结果刷新前台的延迟显示

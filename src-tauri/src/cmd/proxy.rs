@@ -149,13 +149,19 @@ pub async fn get_proxy_head_state() -> CmdResult<serde_json::Value> {
 
 /// 触发后端自动优选并切换到最快节点（如果是手动触发，则返回最优节点延迟信息）
 #[tauri::command]
-pub async fn trigger_auto_select(is_manual: bool) -> CmdResult<Vec<(std::string::String, u32)>> {
+pub async fn trigger_auto_select(
+    is_manual: bool,
+    sort_type: Option<i32>,
+) -> CmdResult<Vec<(std::string::String, u32)>> {
     let profiles = crate::config::Config::profiles().await;
     if let Some(ref current_uid) = profiles.data_arc().current {
         let current_uid_str = current_uid.to_string();
-        let res = crate::module::monitor::trigger_backend_auto_select(&current_uid_str)
-            .await
-            .stringify_err()?;
+        let res = crate::module::monitor::trigger_backend_auto_select(
+            &current_uid_str,
+            sort_type.unwrap_or(1),
+        )
+        .await
+        .stringify_err()?;
         return Ok(res);
     }
     Ok(vec![])

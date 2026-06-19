@@ -248,7 +248,10 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
 }
 
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
-pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Vec<(String, u32)>> {
+pub async fn trigger_backend_auto_select(
+    profile_uid: &str,
+    sort_type: i32,
+) -> anyhow::Result<Vec<(String, u32)>> {
     let info = Config::clash().await.data_arc().get_client_info();
     let server = info.server;
     let secret = info.secret;
