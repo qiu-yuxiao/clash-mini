@@ -133,6 +133,39 @@ jobs:
           tauriScript: pnpm
           args: --target x86_64-pc-windows-msvc
 
+      # 预检：确认构建产物目录结构正确
+      - name: Verify build artifacts (pre-check)
+        shell: bash
+        run: |
+          echo "=== Verifying build artifacts ==="
+          echo "Looking for bundle directory..."
+          BUNDLE_DIR="target/x86_64-pc-windows-msvc/release/bundle"
+          if [ ! -d "$BUNDLE_DIR" ]; then
+            echo "❌ ERROR: Bundle directory not found!"
+            echo "Expected: $BUNDLE_DIR"
+            echo "Contents of target/:"
+            ls -la target/x86_64-pc-windows-msvc/release/ || true
+            echo ""
+            echo "💡 HINT: If you changed tauri.conf.json productName or build config,"
+            echo "   make sure .github/workflows/release.yml paths are updated too!"
+            exit 1
+          fi
+          echo "✅ Bundle directory found: $BUNDLE_DIR"
+          echo ""
+          echo "Contents of bundle/:"
+          find "$BUNDLE_DIR" -type f -name "*.exe" | head -10
+          echo ""
+          # 确认 setup.exe 存在
+          SETUP_EXE=$(find "$BUNDLE_DIR/nsis" -name "*.exe" -type f 2>/dev/null | head -1)
+          if [ -z "$SETUP_EXE" ]; then
+            echo "❌ ERROR: No setup.exe found in $BUNDLE_DIR/nsis/"
+            echo "Contents of bundle/:"
+            find "$BUNDLE_DIR" -type f | head -20
+            exit 1
+          fi
+          echo "✅ setup.exe found: $SETUP_EXE"
+          echo "=== Pre-check passed ==="
+
       # 签名 setup.exe（tauri build 可能已经签名，此步骤确保 .sig 文件存在）
       - name: Sign setup.exe and generate .sig
         shell: bash
