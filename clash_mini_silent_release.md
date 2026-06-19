@@ -162,9 +162,18 @@
 
 ### 发布产物（从 v1.3.8 起）
 
-- **主要产物**：`Clash.Mini_<version>_x64-setup.exe`（NSIS 安装包），支持 Tauri 自动更新器。
-- **可选产物**：`Clash.Mini_<version>_x64_portable.zip`（免安装绿色版），仅供手动下载使用，**不用于自动更新**。
-- 不发行：Linux 构建、macOS 构建、WebView2 固定版、ARM Windows、DEB/RPM 包等一切其他产物。
+**Clash Mini 的正式发行产物仅限于以下 Windows x64 平台的两项，除此之外禁止发行任何其他平台或格式的构建产物：**
+
+- **【必需】主要产物**：`Clash.Mini_<version>_x64-setup.exe`（NSIS 安装包），支持 Tauri 自动更新器。**每次发行必须包含此产物。**
+- **【可选】次要产物**：`Clash.Mini_<version>_x64_portable.zip`（免安装绿色版），仅供手动下载使用，**不用于自动更新**。CI 中此步骤设置了 `continue-on-error: true`，失败不影响发行流程。
+
+**以下产物在任何情况下均不得发行**（包括但不限于）：
+- ❌ Linux 构建 (.deb / .rpm / .AppImage / snap)
+- ❌ macOS 构建 (.dmg)
+- ❌ ARM Windows 构建 (ARM64 / x86)
+- ❌ WebView2 固定版
+- ❌ DEB/RPM 包
+- ❌ 任何其他未在此章节列出的产物
 
 ### 发布流程
 

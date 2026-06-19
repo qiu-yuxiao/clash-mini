@@ -64,6 +64,8 @@ jobs:
           fi
 
   # Windows x64 构建（setup.exe + 签名 + 上传）
+  # ⚠️ 注意：Clash Mini 仅发行 Windows x64 版本（安装版 + 便携版）
+  #    禁止在此 job 中添加其他平台（Linux/macOS/ARM）的构建矩阵
   release:
     name: Release Build (Windows x64)
     needs: [check_tag_version]
