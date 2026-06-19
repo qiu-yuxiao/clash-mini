@@ -67,7 +67,10 @@ import {
 } from '@/utils/button-styles'
 import {
   closeAllConnections,
+  getProxyByName,
+  getProxies,
 } from 'tauri-plugin-mihomo-api'
+import DelayManager from '@/services/delay'
 
 
 // Sub-components
@@ -99,6 +102,99 @@ import 'dayjs/locale/ru'
 import 'dayjs/locale/zh-cn'
 
 dayjs.extend(relativeTime)
+
+// ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
+
+/** 判断是否为 dummy 假节点（与 cmds.ts 中 isDummyNode 逻辑一致） */
+function isDummyNode(node: any): boolean {
+  if (!node || !node.name) return true
+  const name = node.name.toLowerCase()
+  return (
+    name.startsWith('dummy') ||
+    name.startsWith('(dummy)') ||
+    name.includes('dummy') ||
+    node.name === 'DIRECT' ||
+    node.name === 'REJECT' ||
+    node.name === 'COMPATIBLE'
+  )
+}
+
+/** 等待 Clash 内核就绪（PROXY 组中出现非 dummy 节点），最多等 20 秒 */
+async function waitForClashReady(
+  t: (key: string, opts?: any) => string,
+): Promise<boolean> {
+  const MAX_WAIT_MS = 20_000
+  const POLL_INTERVAL_MS = 500
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < MAX_WAIT_MS) {
+    try {
+      const proxyGroup = await getProxyByName('PROXY')
+      const hasRealNodes = (proxyGroup?.all || []).some(
+        (name: string) => !isDummyNode({ name }),
+      )
+      if (hasRealNodes) {
+        console.log(
+          `[waitForClashReady] Clash 内核已就绪，耗时 ${Date.now() - startedAt}ms`,
+        )
+        return true
+      }
+    } catch {
+      // 内核还在加载中，继续等待
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+  }
+
+  console.warn(
+    `[waitForClashReady] 等待 Clash 内核就绪超时（${MAX_WAIT_MS}ms），继续触发自动选点`,
+  )
+  return false
+}
+
+/** 触发自动选点并在完成后刷新前端 proxies 数据 */
+async function triggerAutoSelectAndRefresh(
+  refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
+  t: (key: string, opts?: any) => string,
+): Promise<void> {
+  try {
+    await invoke('trigger_auto_select', { isManual: false })
+    console.log('[Layout] trigger_auto_select 完成')
+    // 后端已切换节点，立即刷新前端显示
+    await refreshProxy({ forceFull: true })
+    // 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速
+    setTimeout(async () => {
+      try {
+        const proxyGroup = await getProxyByName('PROXY')
+        const nowName = proxyGroup?.now || ''
+        // all 是 string[]，拿到 now 节点信息需要单独请求或通过 getProxies
+        const allNames = (proxyGroup?.all || []).filter(
+          (name: string) => !isDummyNode({ name }),
+        )
+        if (allNames.length === 0) {
+          console.log('[Layout] Fallback: 无可用节点，跳过')
+          return
+        }
+        // 抽样检查第一个非 dummy 节点的延迟，判断是否有健康节点
+        const sampleNode = await getProxyByName(allNames[0])
+        const hasHealth = (sampleNode?.history || []).some(
+          (h: any) => h.delay > 0 && h.delay < 10_000,
+        )
+        if (!hasHealth) {
+          console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
+          await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
+          await refreshProxy({ forceFull: true })
+        }
+      } catch (fbErr) {
+        console.error('[Layout] Fallback 逻辑异常:', fbErr)
+      }
+    }, 6000)
+  } catch (err) {
+    console.error('[Layout] trigger_auto_select 失败:', err)
+    showNotice.error(t('shared.feedback.notifications.autoSelectFailed'))
+  }
+}
+
+// ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
 
 // Connections order
 const ORDER_OPTIONS = [
@@ -832,15 +928,9 @@ const Layout = () => {
         .then(async () => {
           console.log(`[Layout] Enhanced active profile: ${currentProfileUid}`)
           await activateSelectedRef.current()
-          // 配置重载会重置 PROXY 组选择，必须主动触发自动选点纠偏
-          // 等待配置重载完成后再触发自动选点
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          try {
-            await invoke('trigger_auto_select', { isManual: false })
-            console.log(`[Layout] trigger_auto_select succeeded for ${currentProfileUid}`)
-          } catch (err) {
-            console.error(`[Layout] trigger_auto_select failed for ${currentProfileUid}:`, err)
-          }
+          // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
+          await waitForClashReady(t)
+          await triggerAutoSelectAndRefresh(refreshProxy, t)
         })
         .catch((err) => {
           console.error(
@@ -891,16 +981,10 @@ const Layout = () => {
 
       // Real-time compilation and reload
       await enhanceProfiles()
-      await refreshProxy()
+      // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
       if (targetUid) {
-        // 等待配置重载完成后再触发自动选点
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        try {
-          await invoke('trigger_auto_select', { isManual: false })
-          console.log(`[Layout] trigger_auto_select succeeded for ${targetUid}`)
-        } catch (err) {
-          console.error(`[Layout] trigger_auto_select failed for ${targetUid}:`, err)
-        }
+        await waitForClashReady(t)
+        await triggerAutoSelectAndRefresh(refreshProxy, t)
       }
     } catch {
       try {
@@ -922,16 +1006,10 @@ const Layout = () => {
 
         // Real-time compilation and reload
         await enhanceProfiles()
-        await refreshProxy()
+        // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         if (targetUid) {
-          // 等待配置重载完成后再触发自动选点
-          await new Promise(resolve => setTimeout(resolve, 1000))
-          try {
-            await invoke('trigger_auto_select', { isManual: false })
-            console.log(`[Layout] trigger_auto_select succeeded for ${targetUid}`)
-          } catch (err) {
-            console.error(`[Layout] trigger_auto_select failed for ${targetUid}:`, err)
-          }
+          await waitForClashReady(t)
+          await triggerAutoSelectAndRefresh(refreshProxy, t)
         }
       } catch (retryErr) {
         showNotice.error(
@@ -966,14 +1044,9 @@ const Layout = () => {
       await updateProfile(uid)
       if (uid === currentProfileUid) {
         await enhanceProfiles()
-        // 等待配置重载完成后再触发自动选点
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        try {
-          await invoke('trigger_auto_select', { isManual: false })
-          console.log(`[Layout] trigger_auto_select succeeded for ${uid}`)
-        } catch (err) {
-          console.error(`[Layout] trigger_auto_select failed for ${uid}:`, err)
-        }
+        // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
+        await waitForClashReady(t)
+        await triggerAutoSelectAndRefresh(refreshProxy, t)
       }
       await mutateProfiles()
       showNotice.success('订阅更新成功')
