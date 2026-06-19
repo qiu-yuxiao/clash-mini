@@ -106,25 +106,62 @@ dayjs.extend(relativeTime)
 
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
 
-/** 判断是否为 dummy 假节点（与 cmds.ts 中 isDummyNode 逻辑一致） */
+/** 判断是否为 dummy 假节点（与后端 monitor.rs 中 is_dummy_node 逻辑完全一致） */
 function isDummyNode(node: any): boolean {
   if (!node || !node.name) return true
-  const name = node.name.toLowerCase()
+  const name = node.name
+  const lower = name.toLowerCase()
   return (
-    name.startsWith('dummy') ||
-    name.startsWith('(dummy)') ||
-    name.includes('dummy') ||
-    node.name === 'DIRECT' ||
-    node.name === 'REJECT' ||
-    node.name === 'COMPATIBLE'
+    // 后端逻辑：检查中文关键词（订阅商广告节点）
+    lower.includes("流量") ||
+    lower.includes("过期时间") ||
+    lower.includes("网址") ||
+    lower.includes("官网") ||
+    lower.includes("剩余") ||
+    lower.includes("expire") ||
+    lower.includes("traffic") ||
+    lower.includes("website") ||
+    lower.includes("http://") ||
+    lower.includes("https://") ||
+    lower.includes("套餐到期") ||
+    lower.includes("续费") ||
+    lower.includes("公告") ||
+    lower.includes("购买") ||
+    lower.includes("subscribe") ||
+    lower.includes("群") ||
+    // 前端原有逻辑：检查 dummy 关键词和特殊节点名
+    lower.startsWith('dummy') ||
+    lower.startsWith('(dummy)') ||
+    lower.includes('dummy') ||
+    name === 'DIRECT' ||
+    name === 'REJECT' ||
+    name === 'COMPATIBLE'
   )
 }
 
-/** 判断节点名是否为 dummy 假节点（纯字符串版，与 isDummyNode 逻辑一致） */
+/** 判断节点名是否为 dummy 假节点（纯字符串版，与 isDummyNode 逻辑完全一致） */
 function isDummyName(name: string): boolean {
   if (!name) return true
   const lower = name.toLowerCase()
   return (
+    // 后端逻辑：检查中文关键词（订阅商广告节点）
+    lower.includes("流量") ||
+    lower.includes("过期时间") ||
+    lower.includes("网址") ||
+    lower.includes("官网") ||
+    lower.includes("剩余") ||
+    lower.includes("expire") ||
+    lower.includes("traffic") ||
+    lower.includes("website") ||
+    lower.includes("http://") ||
+    lower.includes("https://") ||
+    lower.includes("套餐到期") ||
+    lower.includes("续费") ||
+    lower.includes("公告") ||
+    lower.includes("购买") ||
+    lower.includes("subscribe") ||
+    lower.includes("群") ||
+    // 前端原有逻辑：检查 dummy 关键词和特殊节点名
     lower.startsWith('dummy') ||
     lower.startsWith('(dummy)') ||
     lower.includes('dummy') ||
@@ -185,7 +222,10 @@ async function triggerAutoSelectAndRefresh(
   setHeadState?: (groupName: string, patch: any) => void,
 ): Promise<void> {
   try {
-    await invoke('trigger_auto_select', { isManual: false })
+    // 修复 BUG-CRITICAL-003：传递 sortType 参数给后端
+    // sortType: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序
+    // 默认传 0，让后端从 proxy_head_state.json 读取用户偏好
+    await invoke('trigger_auto_select', { isManual: false, sortType: 0 })
     console.log('[Layout] trigger_auto_select 完成')
     // 后端已切换节点，立即刷新前端显示
     await refreshProxy({ forceFull: true })
@@ -206,9 +246,10 @@ async function triggerAutoSelectAndRefresh(
           return
         }
         // 检查当前选中节点（now）是否有健康延迟
+        // 与后端 monitor.rs 中的阈值保持一致：delay > 50 && delay < 2000
         const nowNode = await getProxyByName(nowNodeName)
         const hasHealth = (nowNode?.history || []).some(
-          (h: any) => h.delay > 0 && h.delay < 10_000,
+          (h: any) => h.delay > 50 && h.delay < 2000,
         )
         if (!hasHealth) {
           // 无健康节点，强制全节点测速
