@@ -155,6 +155,7 @@ async function waitForClashReady(
 async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
   t: (key: string, opts?: any) => string,
+  fallbackTimerRef: React.MutableRefObject<NodeJS.Timeout | null>,
 ): Promise<void> {
   try {
     await invoke('trigger_auto_select', { isManual: false })
@@ -162,11 +163,11 @@ async function triggerAutoSelectAndRefresh(
     // 后端已切换节点，立即刷新前端显示
     await refreshProxy({ forceFull: true })
     // 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速
-    setTimeout(async () => {
+    // 先清理旧定时器，防止重复
+    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
+    fallbackTimerRef.current = setTimeout(async () => {
       try {
         const proxyGroup = await getProxyByName('PROXY')
-        const nowName = proxyGroup?.now || ''
-        // all 是 string[]，拿到 now 节点信息需要单独请求或通过 getProxies
         const allNames = (proxyGroup?.all || []).filter(
           (name: string) => !isDummyNode({ name }),
         )
@@ -186,6 +187,8 @@ async function triggerAutoSelectAndRefresh(
         }
       } catch (fbErr) {
         console.error('[Layout] Fallback 逻辑异常:', fbErr)
+      } finally {
+        fallbackTimerRef.current = null
       }
     }, 6000)
   } catch (err) {
@@ -916,6 +919,7 @@ const Layout = () => {
   }, [language])
 
   const lastEnhancedProfileRef = useRef<string | null>(null)
+  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
@@ -930,7 +934,7 @@ const Layout = () => {
           await activateSelectedRef.current()
           // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
           await waitForClashReady(t)
-          await triggerAutoSelectAndRefresh(refreshProxy, t)
+          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef)
         })
         .catch((err) => {
           console.error(
@@ -941,6 +945,17 @@ const Layout = () => {
         })
     }
   }, [currentProfileUid])
+
+  // 组件卸载时清理 Fallback 定时器，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current)
+        fallbackTimerRef.current = null
+        console.log('[Layout] 组件卸载，清理 Fallback 定时器')
+      }
+    }
+  }, [])
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)
@@ -1009,7 +1024,7 @@ const Layout = () => {
         // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         if (targetUid) {
           await waitForClashReady(t)
-          await triggerAutoSelectAndRefresh(refreshProxy, t)
+          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef)
         }
       } catch (retryErr) {
         showNotice.error(
