@@ -219,7 +219,7 @@ async function triggerAutoSelectAndRefresh(
             console.log('[Layout] Fallback: 无可用节点，跳过')
             return
           }
-          console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
+          console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
           await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
           await refreshProxy({ forceFull: true })
           // Fallback 测速完成后再次确保排序正确
@@ -232,7 +232,7 @@ async function triggerAutoSelectAndRefresh(
       } finally {
         fallbackTimerRef.current = null
       }
-    }, 6000)
+    }, 10000)
   } catch (err) {
     console.error('[Layout] trigger_auto_select 失败:', err)
     showNotice.error(t('shared.feedback.notifications.autoSelectFailed'))
@@ -1099,6 +1099,7 @@ const Layout = () => {
 
   const handleSelectProfile = async (uid: string) => {
     if (currentProfileUid === uid) return
+    isImportingRef.current = true
     try {
       await patchProfiles({ current: uid })
       await mutateProfiles()
@@ -1109,6 +1110,8 @@ const Layout = () => {
       )
     } catch (err) {
       showNotice.error(err)
+    } finally {
+      isImportingRef.current = false
     }
   }
 
@@ -1396,6 +1399,7 @@ const Layout = () => {
       patchVerge,
       verge?.enable_always_on_top,
       theme,
+      controlSkin,
     ],
   )
 

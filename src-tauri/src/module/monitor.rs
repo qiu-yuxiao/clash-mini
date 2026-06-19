@@ -3,8 +3,15 @@ use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Semaphore;
 use tokio::time::{Duration, Instant, sleep};
+
+/// 互斥锁：同一时间只允许一个 trigger_backend_auto_select 运行
+static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// 并发测速的最大线程数
+const MAX_CONCURRENT_DELAY_TESTS: usize = 32;
 
 fn create_client() -> reqwest::Client {
     reqwest::Client::builder()
@@ -45,6 +52,12 @@ pub fn is_dummy_node(name: &str) -> bool {
         || lower.contains("website")
         || lower.contains("http://")
         || lower.contains("https://")
+        || lower.contains("套餐到期")
+        || lower.contains("续费")
+        || lower.contains("公告")
+        || lower.contains("购买")
+        || lower.contains("subscribe")
+        || lower.contains("群")
 }
 
 /// 对节点名称进行 URL 编码
@@ -163,7 +176,7 @@ async fn wait_for_clash_ready() -> bool {
 
     // 阶段 2：等待代理节点列表填充
     let start_time_2 = Instant::now();
-    while start_time_2.elapsed().as_secs() < 10 {
+    while start_time_2.elapsed().as_secs() < 20 {
         let info = Config::clash().await.data_arc().get_client_info();
         let server = info.server;
         let secret = info.secret;
@@ -257,7 +270,24 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
 }
 
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
+/// sort_type: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序
 pub async fn trigger_backend_auto_select(
+    profile_uid: &str,
+    sort_type: i32,
+) -> anyhow::Result<Vec<(String, u32)>> {
+    // S3 修复：互斥锁防止并发调用
+    if AUTO_SELECT_RUNNING.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
+        logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，跳过本次调用");
+        return Ok(vec![]);
+    }
+
+    let result = trigger_backend_auto_select_inner(profile_uid, sort_type).await;
+
+    AUTO_SELECT_RUNNING.store(false, Ordering::Release);
+    result
+}
+
+async fn trigger_backend_auto_select_inner(
     profile_uid: &str,
     sort_type: i32,
 ) -> anyhow::Result<Vec<(String, u32)>> {
@@ -320,7 +350,7 @@ pub async fn trigger_backend_auto_select(
         .to_string();
     let encoded_url = percent_encoding::utf8_percent_encode(&test_url, percent_encoding::NON_ALPHANUMERIC).to_string();
 
-    let sem = Arc::new(Semaphore::new(32));
+    let sem = Arc::new(Semaphore::new(MAX_CONCURRENT_DELAY_TESTS));
     let mut tasks = Vec::new();
 
     for node in valid_nodes {
@@ -343,7 +373,7 @@ pub async fn trigger_backend_auto_select(
             if let Ok(res) = req.send().await {
                 if res.status().is_success() {
                     if let Ok(delay_info) = res.json::<DelayResponse>().await {
-                        if delay_info.delay >= 50 && delay_info.delay < 2000 {
+                        if delay_info.delay >= 20 && delay_info.delay < 2000 {
                             return Some((node_name, delay_info.delay));
                         }
                     }
@@ -361,7 +391,12 @@ pub async fn trigger_backend_auto_select(
         }
     }
 
-    results.sort_by_key(|r| r.1);
+    // M1 修复：根据 sort_type 选择排序方式
+    // sort_type: 0=原始顺序（已从配置文件读取为1）, 1=按延迟升序, 2=按名称排序
+    match sort_type {
+        2 => results.sort_by(|a, b| a.0.cmp(&b.0)),  // 按名称排序
+        _ => results.sort_by_key(|r| r.1),            // 按延迟升序（默认）
+    }
 
     if let Some((fastest_node, delay)) = results.first() {
         logging!(

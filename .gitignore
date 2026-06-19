@@ -23,6 +23,9 @@ scratch/
 portable_test
 portable_test/
 github_token.txt
+Clash.Mini_*.exe
+Clash.Mini_*.zip
+Clash.Mini_*.sig
 .brain
 .brain/
 /src-tauri/用户必读.txt

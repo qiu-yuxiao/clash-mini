@@ -425,12 +425,11 @@ export const ProxyGroups = (props: Props) => {
 
         if (providers.size) {
           debugLog(`[ProxyGroups] 发现提供者，数量: ${providers.size}`)
-          Promise.allSettled(
+          await Promise.allSettled(
             [...providers].filter(Boolean).map((p) => healthcheckProxyProvider(p as string)),
-          ).then(() => {
-            debugLog(`[ProxyGroups] 提供者健康检查完成`)
-            onProxies()
-          })
+          )
+          debugLog(`[ProxyGroups] 提供者健康检查完成`)
+          onProxies()
         }
 
         // 获取当前组的前端排序设置，传给后台

@@ -20,7 +20,7 @@
   - 在 `_layout.tsx` 的 `useEffect([currentProfileUid])` 中，`activateSelected()` 之后追加 `invoke('trigger_auto_select', { isManual: false })`，确保配置重载后始终执行一次自动选点，选取最快可用节点覆盖 Clash 的默认假节点。
   - 同步更新协议第二十八章「重启/导入后自动选点防丢失规范」
 - **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.3.8`
+- **目标版本**：`v1.4.5`
 
 ### BUG-120: 顶栏图钉与齿轮/叉子按钮未遵守六种皮肤风格，且两按钮之间有空隙
 
@@ -28,7 +28,7 @@
 - **根因**：`_layout.tsx` 顶栏按钮区域的父容器设置了 `gap: '8px'`，且图钉与齿轮两个 `IconButton` 未调用 `get3DButtonStyle()`，直接使用了固定 `sx` 样式，导致切换皮肤时按钮外观无变化。
 - **修正说明**：移除父容器 `gap: '8px'`，两按钮均通过 `get3DButtonStyle(theme, 'outlined', 'default')` 遵守六种皮肤风格；齿轮/叉子按钮在 `drawerOpen=true` 时显示 primary 色激活态（与图钉按钮的置顶激活态一致）。
 - **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.3.9`
+- **目标版本**：`v1.4.5`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 

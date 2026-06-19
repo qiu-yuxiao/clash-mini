@@ -149,6 +149,9 @@ pub async fn get_proxy_head_state() -> CmdResult<serde_json::Value> {
 
 /// 触发后端自动优选并切换到最快节点（如果是手动触发，则返回最优节点延迟信息）
 #[tauri::command]
+/// 触发后台自动选点
+/// is_manual 参数已废弃（保留向后兼容），无论 true/false 都返回完整结果
+/// sort_type: None=从配置文件读取, Some(0)=同前, Some(1)=按延迟, Some(2)=按名称
 pub async fn trigger_auto_select(
     is_manual: bool,
     sort_type: Option<i32>,

@@ -72,6 +72,16 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
     }
   }
 
+  const getSliderMax = (skin: string): number => {
+    switch (skin) {
+      case 'retro-3d': return 1.0
+      case 'original':
+      case 'modern-flat':
+      case 'monochrome': return 2.5
+      default: return 5.0
+    }
+  }
+
   const getSlider2Label = () => {
     switch (controlSkin) {
       case 'retro-3d':
@@ -319,11 +329,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             size="small"
             value={depthFactor}
             min={0.0}
-            max={
-              controlSkin === 'retro-3d' ? 1.0 :
-              (controlSkin === 'original' || controlSkin === 'modern-flat' || controlSkin === 'monochrome') ? 2.5 :
-              5.0
-            }
+            max={getSliderMax(controlSkin)}
             step={0.1}
             onChange={(_, val) => handleDepthFactorChange(val as number)}
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
