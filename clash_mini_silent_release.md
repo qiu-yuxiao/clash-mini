@@ -237,7 +237,7 @@
 - [ ] `package.json` 版本号已更新
 - [ ] `src-tauri/tauri.conf.json` 版本号已更新
 - [ ] `src-tauri/Cargo.toml` 版本号已更新
-- [ ] `release.yml` 中 `git push` 命令使用 `HEAD:dev` 格式（非 `origin dev`），确保 CI 在 detached HEAD 状态下能正确推送
+- [ ] `release.yml` 中 `git push` 命令使用 `--force origin HEAD:dev`（CI 在 detached HEAD 状态下推送，dev 可能已被新提交提前，必须用 --force 覆盖）
 - [ ] `release.yml` 中 build artifacts 路径与 `tauri.conf.json` 的 `productName` 一致（防止 find 找不到文件）
 - [ ] `clash_mini_agreements.md` 已登记新特性/修改
 - [ ] `bug_list.md` 已更新 Bug 状态
