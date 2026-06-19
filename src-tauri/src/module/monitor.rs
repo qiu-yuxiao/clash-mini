@@ -248,7 +248,7 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
 }
 
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
-pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Option<(String, u32)>> {
+pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Vec<(String, u32)>> {
     let info = Config::clash().await.data_arc().get_client_info();
     let server = info.server;
     let secret = info.secret;
@@ -361,7 +361,7 @@ pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Op
                 Type::Lightweight,
                 "[后台监测] 活动配置已在选定期间更改，舍弃本次切换结果"
             );
-            return Ok(None);
+            return Ok(vec![]);
         }
 
         let mut put_req = client.put(format!("http://{server}/proxies/PROXY"));
@@ -378,7 +378,7 @@ pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Op
                     fastest_node
                 );
                 crate::core::handle::Handle::refresh_clash();
-                return Ok(Some((fastest_node.clone(), *delay)));
+                return Ok(results);
             }
             Ok(res) => {
                 logging!(
@@ -396,7 +396,7 @@ pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Op
         logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: 所有测速节点均不可达");
     }
 
-    Ok(None)
+    Ok(results)
 }
 
 /// 启动全局后台节点监测常驻线程

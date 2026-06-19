@@ -37,7 +37,7 @@ import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
-import { delayGroup, healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
+import { healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
@@ -433,43 +433,20 @@ export const ProxyGroups = (props: Props) => {
           })
         }
 
-        const names = proxies.filter((p) => !p?.provider).map((p) => p?.name).filter(Boolean) as string[]
-        debugLog(`[ProxyGroups] 过滤后需要测试的代理数量: ${names.length}`)
-
-        if (names.length > 0) {
-          const url = delayManager.getUrl(groupName)
-          debugLog(`[ProxyGroups] 测试URL: ${url}, 超时: ${timeout}ms`)
-
-          await Promise.race([
-            delayManager.checkListDelay(names, groupName, timeout),
-            delayGroup(groupName, url, timeout).then((result) => {
-              debugLog(
-                `[ProxyGroups] getGroupProxyDelays返回结果数量:`,
-                Object.keys(result || {}).length,
-              )
-              if (result) {
-                Object.entries(result).forEach(([name, d]) => {
-                  const delayVal =
-                    typeof d === 'number' ? d : (d as any)?.delay
-                  if (typeof delayVal === 'number' && delayVal >= 0) {
-                    delayManager.setDelay(name, groupName, delayVal)
-                  }
-                })
-              }
-            }),
-          ])
-          debugLog(`[ProxyGroups] 延迟测试完成，组: ${groupName}`)
-        }
-
-        // PROXY 组：延迟测试后自动选最快节点
-        const result = await invoke<[string, number] | null>(
+        // 由后台统一测速并选最快节点
+        const results = await invoke<[string, number][]>(
           'trigger_auto_select',
           { isManual: true },
         )
-        if (result) {
-          const [name, delay] = result
+        if (results && results.length > 0) {
+          // 用后台测速结果刷新前台的延迟显示
+          for (const [name, delay] of results) {
+            delayManager.setDelay(name, groupName, delay)
+          }
+          // 第一个结果就是后台选出的最快节点（已排序）
+          const [fastestName, fastestDelay] = results[0]
           showNotice.success(
-            `自动测速完成，已切换至最快节点: ${name} (${delay}ms)`,
+            `自动测速完成，已切换至最快节点: ${fastestName} (${fastestDelay}ms)`,
           )
         }
       } catch (error) {
