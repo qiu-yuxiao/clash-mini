@@ -319,7 +319,11 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             size="small"
             value={depthFactor}
             min={0.0}
-            max={5.0}
+            max={
+              controlSkin === 'retro-3d' ? 1.0 :
+              (controlSkin === 'original' || controlSkin === 'modern-flat' || controlSkin === 'monochrome') ? 2.5 :
+              5.0
+            }
             step={0.1}
             onChange={(_, val) => handleDepthFactorChange(val as number)}
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
