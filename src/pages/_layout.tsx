@@ -1353,24 +1353,23 @@ const Layout = () => {
                 <IconButton
                   size="small"
                   onClick={() => setDrawerOpen(!drawerOpen)}
-                  sx={{
+                  sx={(theme) => ({
+                    ...get3DButtonStyle(theme, 'outlined', 'default'),
                     color: drawerOpen ? 'primary.main' : 'text.primary',
                     width: '28px',
                     height: '28px',
                     p: 0,
                     borderRadius: '6px',
-                    border: (theme) =>
-                      drawerOpen
-                        ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
-                        : '1px solid transparent',
-                    background: (theme) =>
-                      drawerOpen
-                        ? `${alpha(theme.palette.primary.main, 0.15)} !important`
-                        : 'transparent',
+                    border: drawerOpen
+                      ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
+                      : '1px solid transparent',
+                    background: drawerOpen
+                      ? `${alpha(theme.palette.primary.main, 0.15)} !important`
+                      : 'transparent',
                     '&:hover': {
                       background: 'rgba(255, 255, 255, 0.2) !important',
                     },
-                  }}
+                  })}
                 >
                   {drawerOpen ? (
                     <CloseRounded sx={{ fontSize: '20px' }} />
@@ -1399,40 +1398,38 @@ const Layout = () => {
                   <ActiveNodeStatusCard />
                 </div>
                 {(decorated || isDecorationsHidden) && (
-                  <IconButton
-                    size="small"
-                    onClick={() =>
-                      patchVerge({
-                        enable_always_on_top: !verge?.enable_always_on_top,
-                      })
-                    }
-                    sx={{
-                      flexShrink: 0,
-                      color: verge?.enable_always_on_top
-                        ? 'primary.main'
-                        : 'text.primary',
-                      width: '28px',
-                      height: '28px',
-                      p: 0,
-                      borderRadius: '6px',
-                      border: (theme) =>
-                        verge?.enable_always_on_top
-                          ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
-                          : '1px solid transparent',
-                      background: (theme) =>
-                        verge?.enable_always_on_top
-                          ? `${alpha(theme.palette.primary.main, 0.15)} !important`
-                          : 'transparent',
-                      boxShadow: (theme) =>
-                        verge?.enable_always_on_top
-                          ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`
-                          : 'none',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        background: 'rgba(255, 255, 255, 0.2) !important',
-                      },
-                    }}
-                  >
+                <IconButton
+                  size="small"
+                  onClick={() =>
+                    patchVerge({
+                      enable_always_on_top: !verge?.enable_always_on_top,
+                    })
+                  }
+                  sx={(theme) => ({
+                    ...get3DButtonStyle(theme, 'outlined', 'default'),
+                    flexShrink: 0,
+                    color: verge?.enable_always_on_top
+                      ? 'primary.main'
+                      : 'text.primary',
+                    width: '28px',
+                    height: '28px',
+                    p: 0,
+                    borderRadius: '6px',
+                    border: verge?.enable_always_on_top
+                      ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
+                      : '1px solid transparent',
+                    background: verge?.enable_always_on_top
+                      ? `${alpha(theme.palette.primary.main, 0.15)} !important`
+                      : 'transparent',
+                    boxShadow: verge?.enable_always_on_top
+                      ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`
+                      : 'none',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      background: 'rgba(255, 255, 255, 0.2) !important',
+                    },
+                  })}
+                >
                     <PushPinRounded
                       sx={{
                         fontSize: '20px',

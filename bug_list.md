@@ -29,19 +29,11 @@
 - **修正说明**：移除父容器 `gap: '8px'`，两按钮均通过 `get3DButtonStyle(theme, 'outlined', 'default')` 遵守六种皮肤风格；齿轮/叉子按钮在 `drawerOpen=true` 时显示 primary 色激活态（与图钉按钮的置顶激活态一致）。
 - **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.3.9`
-
-### BUG-119: 设置界面多处文字不随语言切换（基础设置、主题设置）
-
-- **现象描述**：在设置界面，基础设置模块中的"基础设置"、"开机自动启动"、"启动时最小化"，以及主题设置模块中的"主题设置"、"系统"、"浅色"、"深色"，这几处文字没有随语言选择（中/英）自动切换，始终显示中文。
-- **根因**：`basic-settings-card.tsx` 和 `theme-settings-card.tsx` 中的 `t()` 调用使用的 key 缺少 `settings.` 前缀（如 `components.verge.basic.title`），而 `i18n.ts` 中 `addResourceBundle` 把 `settings.json` 的所有 key 挂在 `settings.` 前缀下，导致找不到对应的英文翻译，始终 fallback 到 `defaultValue` 的中文。此外 `themeSettings` 拼写错误（JSON 中实际为 `theme`）。
-- **修正说明**：将所有 `t()` key 补上 `settings.` 前缀，并修正 `themeSettings` → `theme`。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.3.9`
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。
 
+| **BUG-119** | 设置界面多处文字不随语言切换（基础设置、主题设置） | v1.3.9 | 代码已修正，已确认 |
 | **BUG-117** | Trump-3D 按钮与卡片阴影恢复为多层 bevelShadowDark 固态挤压，修复 BUG-115 过度简化导致的 3D 质感丢失。 | v1.3.8 | 代码已修正，已确认 |
 | **BUG-116** | 主题设置滑块布局由两行压缩为单行，名称+数值与滑块本体合并为单行布局，垂直空间利用率优化。 | v1.3.6 | 代码已修正，已确认 |
 | **BUG-113** | 闪电光标点击后节点延迟无更新（回归），统一化 handleCheckAll 流程，确保 PROXY 组也通过 delayManager 执行完整延迟测试并更新 UI。 | v1.3.6 | 代码已修正，已确认 |
