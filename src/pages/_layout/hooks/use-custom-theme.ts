@@ -449,35 +449,35 @@ export const useCustomTheme = () => {
       if (controlSkin === 'original') {
         rootEle.style.setProperty(
           '--theme-bg',
-          mode === 'light' ? '#f5f5f5' : '#2e303d',
+          mode === 'light' ? '#f5f5f5' : '#121212',
         )
         rootEle.style.setProperty(
           '--theme-panel-bg',
-          mode === 'light' ? '#ffffff' : '#1e1f29',
+          mode === 'light' ? '#ffffff' : '#1e1e1e',
         )
         rootEle.style.setProperty(
           '--theme-bg-base-rgb',
-          mode === 'light' ? '245, 245, 245' : '46, 48, 61',
+          mode === 'light' ? '245, 245, 245' : '18, 18, 18',
         )
         rootEle.style.setProperty(
           '--theme-panel-base-rgb',
-          mode === 'light' ? '255, 255, 255' : '30, 31, 41',
+          mode === 'light' ? '255, 255, 255' : '30, 30, 30',
         )
         rootEle.style.setProperty(
           '--theme-popover-bg',
-          mode === 'light' ? '#ffffff' : '#1b1c23',
+          mode === 'light' ? '#ffffff' : '#252525',
         )
         rootEle.style.setProperty(
           '--theme-border',
-          mode === 'light' ? '#e2e8f0' : '#30363d',
+          mode === 'light' ? '#e2e8f0' : '#333333',
         )
         rootEle.style.setProperty(
           '--theme-input-bg',
-          mode === 'light' ? '#ffffff' : '#1a1b26',
+          mode === 'light' ? '#ffffff' : '#1a1a1a',
         )
         rootEle.style.setProperty(
           '--theme-input-border',
-          mode === 'light' ? '#cbd5e1' : '#475569',
+          mode === 'light' ? '#cbd5e1' : '#555555',
         )
         rootEle.style.setProperty(
           '--theme-border-outer',

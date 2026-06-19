@@ -304,16 +304,16 @@ html[data-control-skin="original"] {
   .theme-panel {
     background: var(--theme-panel-bg) !important;
     backdrop-filter: none !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
-    border: 1px solid var(--theme-border) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+    border: none !important;
     border-radius: var(--border-radius) !important;
   }
 
   .theme-crystal-card {
     background: var(--theme-panel-bg) !important;
     backdrop-filter: none !important;
-    border: 1px solid var(--theme-border) !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+    border: none !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06) !important;
     border-radius: calc(6px * var(--control-skin-val1, 1.0)) !important;
   }
 }

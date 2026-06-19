@@ -173,22 +173,30 @@ export const get3DButtonStyle = (
     return {
       fontFamily: 'Segoe UI, Microsoft YaHei, sans-serif',
       textTransform: 'none' as const,
-      fontWeight: 'bold',
+      fontWeight: 500,
       borderRadius: 'calc(4px * var(--control-skin-val1, 1.0))',
       transition: 'all 0.15s ease',
       border: '1px solid',
       borderColor: borderClr,
       background: bg,
       color: textClr,
-      boxShadow: 'none',
+      boxShadow:
+        colorType === 'default' ? 'none' : '0 1px 3px rgba(0,0,0,0.15)',
       '&:hover': {
         background: hoverBg,
         borderColor: borderClr,
         filter: colorType === 'primary' ? 'brightness(0.95)' : 'none',
+        boxShadow:
+          colorType === 'default'
+            ? 'none'
+            : '0 2px 6px rgba(0,0,0,0.2)',
       },
       '&:active': {
         transform: 'translateY(1px)',
-        boxShadow: 'none',
+        boxShadow:
+          colorType === 'default'
+            ? 'none'
+            : '0 0 2px rgba(0,0,0,0.15)',
       },
     }
   }
@@ -534,12 +542,12 @@ export const get3DCardStyle = (
     return {
       fontFamily: 'Segoe UI, Microsoft YaHei, sans-serif',
       borderRadius: 'calc(8px * var(--control-skin-val1, 1.0))',
-      border: '1px solid',
+      border: 'none',
       borderColor: borderClr,
       background: bg,
       color: textClr,
       transition: 'none',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)',
     }
   }
 

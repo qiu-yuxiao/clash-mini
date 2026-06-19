@@ -119,7 +119,7 @@ export const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
   if (skin === 'original') {
     return {
       ...baseStyle,
-      fontWeight: 'bold',
+      fontWeight: 500,
       '&:hover': {
         background: 'rgba(91, 92, 157, 0.08) !important',
         color: 'var(--primary-main) !important',
