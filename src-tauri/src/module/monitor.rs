@@ -301,7 +301,7 @@ pub async fn trigger_backend_auto_select(
             Type::Lightweight,
             "[后台监测] 自动选点失败: 没有可用的非广告且符合过滤条件的节点"
         );
-        return Ok(None);
+        return Ok(vec![]);
     }
 
     logging!(
