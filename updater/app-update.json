@@ -5,7 +5,7 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUt1cXFCN1k2a2Y0K1VtdnI5YVRQRXF6VGdVZVgvUTh1dE1taS9jKy9VejllZFJNcTVDdkszMXVVSDdFWDNjL05vOFdHNTZ4b3g3eklucm9XbkwxWndZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgxODY1NjQ0CWZpbGU6Q2xhc2ggTWluaV8xLjQuMF94NjQtc2V0dXAuZXhlCjA5aEdSS25ERFRzZHRrS0ZRUDR0bi9XZkZtMUhGNHVidlZzd2RJZFk1TmZRY0NoQ0F1cW4wOFN4a29xU0I1Z0lkeHR0bUlPcHBZZTJHbmhzQ1N0T0J3PT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.4.0/Clash%20Mini_1.4.0_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.4.0/Clash.Mini_1.4.0_x64-setup.exe",
       "size": 42202698
     }
   }
