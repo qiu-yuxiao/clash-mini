@@ -908,7 +908,7 @@ function throttle<T extends (...args: any[]) => any>(
     const remaining = wait - (now - previous)
     lastArgs = args
 
-    if (remaining <= 0 || remaining > wait) {
+    if (remaining <= 0) {  // 修复 BUG-MINOR-001：删除冗余条件 remaining > wait（永远不会成立）
       if (timer) {
         clearTimeout(timer)
       }

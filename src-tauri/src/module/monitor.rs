@@ -281,10 +281,21 @@ pub async fn trigger_backend_auto_select(
         return Ok(vec![]);
     }
 
-    let result = trigger_backend_auto_select_inner(profile_uid, sort_type).await;
+    // 修复 BUG-MAJOR-001：使用 spawn 确保锁一定释放
+    let result = tokio::spawn(trigger_backend_auto_select_inner(
+        profile_uid.to_string(),
+        sort_type,
+    )).await;
 
     AUTO_SELECT_RUNNING.store(false, Ordering::Release);
-    result
+
+    match result {
+        Ok(r) => r.map_err(|e| anyhow::anyhow!("自动选点失败: {:?}", e)),
+        Err(_) => {
+            logging!(error, Type::Lightweight, "[后台监测] trigger_backend_auto_select_inner 发生 panic");
+            Ok(vec![])
+        }
+    }
 }
 
 async fn trigger_backend_auto_select_inner(

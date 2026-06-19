@@ -171,11 +171,11 @@ function isDummyName(name: string): boolean {
   )
 }
 
-/** 等待 Clash 内核就绪（PROXY 组中出现非 dummy 节点），最多等 20 秒 */
+/** 等待 Clash 内核就绪（PROXY 组中出现非 dummy 节点），最多等 10 秒 */
 async function waitForClashReady(
   t: (key: string, opts?: any) => string,
 ): Promise<boolean> {
-  const MAX_WAIT_MS = 20_000
+  const MAX_WAIT_MS = 10_000  // 修复 BUG-MAJOR-003：从 20 秒减少到 10 秒
   const POLL_INTERVAL_MS = 500
   const startedAt = Date.now()
 
