@@ -205,17 +205,14 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     AsyncHandler::spawn(|| async move {
         match event.id.as_ref() {
             MenuIds::LITE_MODE => {
-                match lightweight::entry_lightweight_mode().await {
-                    Ok(_) => {
-                        logging!(info, Type::Tray, "已进入轻量模式");
-                        // 进入轻量模式后禁用该菜单项
-                        if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-                            let _ = item.set_enabled(false);
-                        }
+                if lightweight::entry_lightweight_mode().await {
+                    logging!(info, Type::Tray, "已进入轻量模式");
+                    // 进入轻量模式后禁用该菜单项
+                    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                        let _ = item.set_enabled(false);
                     }
-                    Err(e) => {
-                        logging!(error, Type::Tray, "进入轻量模式失败: {}", e);
-                    }
+                } else {
+                    logging!(error, Type::Tray, "进入轻量模式失败");
                 }
             }
             MenuIds::EXIT => {
