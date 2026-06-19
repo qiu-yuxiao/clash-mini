@@ -275,27 +275,32 @@ pub async fn trigger_backend_auto_select(
     profile_uid: &str,
     sort_type: i32,
 ) -> anyhow::Result<Vec<(String, u32)>> {
-    // S3 修复：互斥锁防止并发调用
+    // 互斥锁防止并发调用
     if AUTO_SELECT_RUNNING.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
         logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，跳过本次调用");
         return Ok(vec![]);
     }
 
-    // 修复 BUG-MAJOR-001：使用 spawn 确保锁一定释放
-    let result = tokio::spawn(trigger_backend_auto_select_inner(
-        profile_uid.to_string(),
-        sort_type,
-    )).await;
-
-    AUTO_SELECT_RUNNING.store(false, Ordering::Release);
-
-    match result {
-        Ok(r) => r.map_err(|e| anyhow::anyhow!("自动选点失败: {:?}", e)),
-        Err(_) => {
-            logging!(error, Type::Lightweight, "[后台监测] trigger_backend_auto_select_inner 发生 panic");
-            Ok(vec![])
+    // 修复 BUG-MAJOR-001：使用 Drop Guard 确保锁一定释放（即使发生 panic）
+    struct LockGuard;
+    impl Drop for LockGuard {
+        fn drop(&mut self) {
+            AUTO_SELECT_RUNNING.store(false, Ordering::Release);
+            logging!(debug, Type::Lightweight, "[后台监测] 自动选点锁已释放（Drop Guard）");
         }
     }
+    let _guard = LockGuard;
+
+    // 直接调用内部函数
+    // 如果发生 panic，_guard 会在栈展开时自动释放锁
+    let result = trigger_backend_auto_select_inner(profile_uid, sort_type).await;
+
+    // 正常完成，显式释放锁（_guard 会在函数结束时再次 drop，但这是安全的）
+    // 注意：这里我们手动释放锁，确保锁尽早释放
+    // 但为了简化，我们依赖 _guard 的 Drop 实现
+    // Rust 会在函数返回时自动 drop _guard
+    
+    result
 }
 
 async fn trigger_backend_auto_select_inner(

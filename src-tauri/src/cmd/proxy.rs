@@ -153,7 +153,7 @@ pub async fn get_proxy_head_state() -> CmdResult<serde_json::Value> {
 /// is_manual 参数已废弃（保留向后兼容），无论 true/false 都返回完整结果
 /// sort_type: None=从配置文件读取, Some(0)=同前, Some(1)=按延迟, Some(2)=按名称
 pub async fn trigger_auto_select(
-    is_manual: bool,
+    _is_manual: bool,  // 修复编译警告：添加下划线前缀
     sort_type: Option<i32>,
 ) -> CmdResult<Vec<(std::string::String, u32)>> {
     let profiles = crate::config::Config::profiles().await;

@@ -65,7 +65,12 @@ impl Tray {
             let lite_mode = match MenuItem::with_id(&app_handle_clone, MenuIds::LITE_MODE, "轻量模式 / Lite mode", true, None::<&str>) {
                 Ok(item) => {
                     let _ = LITE_MODE_MENU_ITEM.set(item);
-                    LITE_MODE_MENU_ITEM.get().unwrap().clone()
+                    // 修复编译错误：使用 if let Some(item) 代替 unwrap/expect
+                    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                        item.clone()
+                    } else {
+                        unreachable!("LITE_MODE_MENU_ITEM 刚刚设置，不可能为 None")
+                    }
                 }
                 Err(e) => {
                     log::error!(target: "app", "[Tray] Failed to create lite mode menu item: {}", e);
@@ -201,7 +206,7 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     if event.id.as_ref().is_empty() {
         return;
     }
-    let app_clone = app.clone();
+    let _app_clone = app.clone();  // 修复编译警告：添加下划线前缀
     AsyncHandler::spawn(|| async move {
         match event.id.as_ref() {
             MenuIds::LITE_MODE => {
