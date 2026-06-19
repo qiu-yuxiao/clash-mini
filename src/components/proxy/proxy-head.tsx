@@ -221,6 +221,7 @@ export const ProxyHead = ({
       >
         <BaseSearchBox
           autoFocus={autoFocus}
+          minimal={isMinimal}
           value={filterText}
           searchState={{
             matchCase: filterMatchCase,
