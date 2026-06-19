@@ -61,7 +61,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           color: isRetro3DDark ? '#2C1F03' : 'inherit',
         }}
       >
-        {t('components.verge.basic.title', {
+        {t('settings.components.verge.basic.title', {
           defaultValue: '基础设置',
         })}
       </Typography>
@@ -81,7 +81,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               color: isRetro3DDark ? '#2C1F03' : 'inherit',
             }}
           >
-            {t('sections.system.fields.autoLaunch', {
+            {t('settings.sections.system.fields.autoLaunch', {
               defaultValue: '开机自动启动',
             })}
           </Typography>
@@ -112,7 +112,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               color: isRetro3DDark ? '#2C1F03' : 'inherit',
             }}
           >
-            {t('sections.system.fields.silentStart', {
+            {t('settings.sections.system.fields.silentStart', {
               defaultValue: '启动时最小化',
             })}
           </Typography>

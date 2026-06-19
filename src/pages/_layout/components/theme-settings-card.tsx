@@ -112,7 +112,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             color: isRetro3DDark ? '#2C1F03' : 'inherit',
           }}
         >
-          {t('components.verge.themeSettings.title', {
+          {t('settings.components.verge.theme.title', {
             defaultValue: '主题设置',
           })}
         </Typography>
@@ -184,7 +184,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
               },
             }}
           >
-            {t('sections.appearance.system', {
+            {t('settings.sections.appearance.system', {
               defaultValue: '系统',
             })}
           </Box>
@@ -226,7 +226,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
               },
             }}
           >
-            {t('sections.appearance.light', {
+            {t('settings.sections.appearance.light', {
               defaultValue: '浅色',
             })}
           </Box>
@@ -268,7 +268,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
               },
             }}
           >
-            {t('sections.appearance.dark', {
+            {t('settings.sections.appearance.dark', {
               defaultValue: '深色',
             })}
           </Box>
