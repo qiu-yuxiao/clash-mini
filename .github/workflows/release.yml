@@ -137,20 +137,26 @@ jobs:
       - name: Sign setup.exe and generate .sig
         shell: bash
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          SETUP_EXE="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe"
+          # 动态查找 setup.exe（productName 可能含空格）
+          SETUP_EXE=$(find src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe" -type f | head -1)
+          if [ -z "$SETUP_EXE" ]; then
+            echo "❌ setup.exe not found in bundle/nsis"
+            ls -la src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ || true
+            exit 1
+          fi
+          echo "Found setup.exe: $SETUP_EXE"
+
           SETUP_SIG="${SETUP_EXE}.sig"
 
           echo "Signing: $SETUP_EXE"
           pnpm tauri signer sign "$SETUP_EXE"
-          echo "Signature file: $SETUP_SIG"
 
           # 验证签名文件存在
           if [ ! -f "$SETUP_SIG" ]; then
             echo "❌ .sig file not found: $SETUP_SIG"
             exit 1
           fi
-          echo "✅ .sig file generated successfully"
+          echo "✅ .sig file generated: $SETUP_SIG"
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
@@ -159,8 +165,12 @@ jobs:
       - name: Upload .sig to Release
         shell: bash
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          SETUP_SIG="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe.sig"
+          SETUP_SIG=$(find src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe.sig" -type f | head -1)
+          if [ -z "$SETUP_SIG" ]; then
+            echo "❌ .sig file not found"
+            exit 1
+          fi
+          echo "Found .sig: $SETUP_SIG"
           gh release upload ${{ github.ref_name }} "$SETUP_SIG" --repo qiu-yuxiao/clash-mini --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -169,40 +179,40 @@ jobs:
       - name: Update app-update.json and push to dev
         shell: bash
         run: |
+          # 动态查找 setup.exe（productName 可能含空格）
+          SETUP_EXE=$(find src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe" -type f | head -1)
+          SETUP_SIG="${SETUP_EXE}.sig"
+          SETUP_FILENAME=$(basename "$SETUP_EXE")
           VERSION=$(node -p "require('./package.json').version")
-          SETUP_SIG="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe.sig"
-          SETUP_EXE="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Clash.Mini_${VERSION}_x64-setup.exe"
 
-          # 读取签名
-          SIG=$(cat "$SETUP_SIG" | tr -d '\n\r')
+          echo "Setup: $SETUP_EXE"
+          echo "Filename: $SETUP_FILENAME"
 
-          # 获取文件大小
-          SIZE=$(wc -c < "$SETUP_EXE" | tr -d ' ')
-
-          # 生成 pub_date
-          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-          # 更新 app-update.json
-          node -e "
+          # 用 node 更新 app-update.json（直接读文件，避免转义问题）
+          SETUP_EXE="$SETUP_EXE" SETUP_SIG="$SETUP_SIG" SETUP_FILENAME="$SETUP_FILENAME" VERSION="$VERSION" node -e "
             const fs = require('fs');
-            const path = require('path');
-            const pkg = require('./package.json');
-            const sig = fs.readFileSync('$SETUP_SIG', 'utf8').trim().replace(/\n/g, '').replace(/\r/g, '');
-            const size = fs.statSync('$SETUP_EXE').size;
+            const setupExe = process.env.SETUP_EXE;
+            const setupSig = process.env.SETUP_SIG;
+            const setupFilename = process.env.SETUP_FILENAME;
+            const version = process.env.VERSION;
+            const sig = fs.readFileSync(setupSig, 'utf8').trim().replace(/\n/g, '').replace(/\r/g, '');
+            const size = fs.statSync(setupExe).size;
+            const encodedFilename = encodeURIComponent(setupFilename);
             const data = {
-              version: pkg.version,
-              notes: 'Clash Mini v' + pkg.version,
+              version: version,
+              notes: 'Clash Mini v' + version,
               pub_date: new Date().toISOString(),
               platforms: {
                 'windows-x86_64': {
                   signature: sig,
-                  url: 'https://github.com/qiu-yuxiao/clash-mini/releases/download/v' + pkg.version + '/Clash.Mini_' + pkg.version + '_x64-setup.exe',
+                  url: 'https://github.com/qiu-yuxiao/clash-mini/releases/download/v' + version + '/' + encodedFilename,
                   size: size
                 }
               }
             };
             fs.writeFileSync('updater/app-update.json', JSON.stringify(data, null, 2) + '\n', 'utf8');
             console.log('app-update.json updated');
+            console.log('URL: https://github.com/qiu-yuxiao/clash-mini/releases/download/v' + version + '/' + encodedFilename);
           "
 
           # 提交并推送回 dev 分支
@@ -258,10 +268,10 @@ jobs:
           ## 下载地址
 
           ### Windows 64位 安装版（推荐，支持自动更新）
-          - [64位安装版](${DOWNLOAD_URL}/Clash.Mini_${VERSION}_x64-setup.exe)
+          - [64位安装版](${DOWNLOAD_URL}/Clash%20Mini_${VERSION}_x64-setup.exe)
 
           ### Windows 64位绿色便携版（免安装）
-          - [64位便携版](${DOWNLOAD_URL}/Clash.Mini_${VERSION}_x64_portable.zip)
+          - [64位便携版](${DOWNLOAD_URL}/Clash%20Mini_${VERSION}_x64_portable.zip)
 
           ### 项目主页
           - [GitHub 主页](https://github.com/qiu-yuxiao/clash-mini)
