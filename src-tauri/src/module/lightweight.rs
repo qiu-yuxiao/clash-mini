@@ -145,6 +145,8 @@ pub async fn exit_lightweight_mode() -> bool {
     cancel_light_weight_timer();
     record_state_and_log(LightweightState::Normal);
     refresh_lightweight_tray_state().await;
+    // 退出轻量模式后，重新启用托盘菜单中的「轻量模式」选项
+    crate::core::tray::enable_lite_mode_menu_item();
     true
 }
 

@@ -9,6 +9,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, Tray
 
 use super::handle;
 use anyhow::Result;
+use std::sync::OnceLock;
 use std::time::Duration;
 use tauri::{
     AppHandle, Manager as _, Wry,
@@ -24,6 +25,9 @@ const TRAY_CLICK_DEBOUNCE_MS: u64 = 300;
 pub struct TrayIconState {
     pub tray: std::sync::Arc<tokio::sync::Mutex<Option<TrayIcon>>>,
 }
+
+/// 轻量模式菜单项引用，用于在进入/退出轻量模式时动态设置 enabled 状态
+static LITE_MODE_MENU_ITEM: OnceLock<MenuItem<Wry>> = OnceLock::new();
 
 pub struct Tray {
     limiter: SystemLimiter,
@@ -59,12 +63,22 @@ impl Tray {
         let app_handle_clone = app_handle.clone();
         app_handle.run_on_main_thread(move || {
             let lite_mode = match MenuItem::with_id(&app_handle_clone, MenuIds::LITE_MODE, "轻量模式 / Lite mode", true, None::<&str>) {
-                Ok(item) => item,
+                Ok(item) => {
+                    let _ = LITE_MODE_MENU_ITEM.set(item);
+                    LITE_MODE_MENU_ITEM.get().unwrap().clone()
+                }
                 Err(e) => {
                     log::error!(target: "app", "[Tray] Failed to create lite mode menu item: {}", e);
                     return;
                 }
             };
+
+            // 根据当前轻量模式状态初始化菜单项 enabled 状态
+            if lightweight::is_in_lightweight_mode() {
+                if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                    let _ = item.set_enabled(false);
+                }
+            }
 
             let quit = match MenuItem::with_id(&app_handle_clone, MenuIds::EXIT, "退出 (Exit)", true, None::<&str>) {
                 Ok(item) => item,
@@ -194,6 +208,10 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
                 match lightweight::entry_lightweight_mode().await {
                     Ok(_) => {
                         logging!(info, Type::Tray, "已进入轻量模式");
+                        // 进入轻量模式后禁用该菜单项
+                        if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                            let _ = item.set_enabled(false);
+                        }
                     }
                     Err(e) => {
                         logging!(error, Type::Tray, "进入轻量模式失败: {}", e);
@@ -208,4 +226,11 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
             }
         }
     });
+}
+
+/// 供 lightweight.rs 在退出轻量模式时调用，重新启用「轻量模式」菜单项
+pub fn enable_lite_mode_menu_item() {
+    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+        let _ = item.set_enabled(true);
+    }
 }
