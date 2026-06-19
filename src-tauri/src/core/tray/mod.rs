@@ -58,6 +58,14 @@ impl Tray {
 
         let app_handle_clone = app_handle.clone();
         app_handle.run_on_main_thread(move || {
+            let lite_mode = match MenuItem::with_id(&app_handle_clone, MenuIds::LITE_MODE, "轻量模式 / Lite mode", true, None::<&str>) {
+                Ok(item) => item,
+                Err(e) => {
+                    log::error!(target: "app", "[Tray] Failed to create lite mode menu item: {}", e);
+                    return;
+                }
+            };
+
             let quit = match MenuItem::with_id(&app_handle_clone, MenuIds::EXIT, "退出 (Exit)", true, None::<&str>) {
                 Ok(item) => item,
                 Err(e) => {
@@ -67,7 +75,7 @@ impl Tray {
             };
 
             let menu = match tauri::menu::MenuBuilder::new(&app_handle_clone)
-                .items(&[&quit as &dyn IsMenuItem<Wry>])
+                .items(&[&lite_mode as &dyn IsMenuItem<Wry>, &quit as &dyn IsMenuItem<Wry>])
                 .build()
             {
                 Ok(m) => m,
@@ -172,15 +180,26 @@ fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
     }
 }
 
-fn on_menu_event(_: &AppHandle, event: MenuEvent) {
+fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     if !Tray::global().should_handle_tray_click() {
         return;
     }
     if event.id.as_ref().is_empty() {
         return;
     }
+    let app_clone = app.clone();
     AsyncHandler::spawn(|| async move {
         match event.id.as_ref() {
+            MenuIds::LITE_MODE => {
+                match lightweight::entry_lightweight_mode().await {
+                    Ok(_) => {
+                        logging!(info, Type::Tray, "已进入轻量模式");
+                    }
+                    Err(e) => {
+                        logging!(error, Type::Tray, "进入轻量模式失败: {}", e);
+                    }
+                }
+            }
             MenuIds::EXIT => {
                 feat::quit().await;
             }
