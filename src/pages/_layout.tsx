@@ -1506,16 +1506,6 @@ const Layout = () => {
                     width: '28px',
                     height: '28px',
                     p: 0,
-                    borderRadius: '6px',
-                    border: drawerOpen
-                      ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
-                      : '1px solid transparent',
-                    background: drawerOpen
-                      ? `${alpha(theme.palette.primary.main, 0.15)} !important`
-                      : 'transparent',
-                    '&:hover': {
-                      background: 'rgba(255, 255, 255, 0.2) !important',
-                    },
                   })}
                 >
                   {drawerOpen ? (
@@ -1536,7 +1526,7 @@ const Layout = () => {
                   alignItems: 'center',
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding: '3px 44px 2px 8px',
+                  padding: '3px 36px 2px 8px',
                   position: 'relative',
                   zIndex: 110,
                 }}
@@ -1561,20 +1551,11 @@ const Layout = () => {
                     width: '28px',
                     height: '28px',
                     p: 0,
-                    borderRadius: '6px',
-                    border: verge?.enable_always_on_top
-                      ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}`
-                      : '1px solid transparent',
-                    background: verge?.enable_always_on_top
-                      ? `${alpha(theme.palette.primary.main, 0.15)} !important`
-                      : 'transparent',
-                    boxShadow: verge?.enable_always_on_top
-                      ? `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`
-                      : 'none',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      background: 'rgba(255, 255, 255, 0.2) !important',
-                    },
+                    ...(verge?.enable_always_on_top ? {
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
+                      background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
+                      boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
+                    } : {}),
                   })}
                 >
                     <PushPinRounded
