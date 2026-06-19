@@ -250,14 +250,14 @@ jobs:
             console.log('URL: https://github.com/qiu-yuxiao/clash-mini/releases/download/v' + version + '/' + encodedFilename);
           "
 
-          # 提交并推送回 dev 分支
+          # 提交并推送回 dev 分支（使用 --force-with-lease 避免冲突）
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add updater/app-update.json
           git commit -m "chore: update app-update.json for v$VERSION [skip ci]" || echo "No changes to commit"
           git fetch origin dev
-          git rebase origin/dev
-          git push origin HEAD:dev
+          git pull --rebase --autostash origin dev
+          git push origin HEAD:dev --force-with-lease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
