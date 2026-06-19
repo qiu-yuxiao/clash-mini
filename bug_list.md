@@ -22,6 +22,22 @@
 - **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.3.8`
 
+### BUG-120: 顶栏图钉与齿轮/叉子按钮未遵守六种皮肤风格，且两按钮之间有空隙
+
+- **现象描述**：主页面右上角顶栏中，图钉按钮与齿轮按钮（设定界面打开时显示为叉子）的样式未遵守六种皮肤风格（Trump-3D / Original / Modern / Frosted / Cyberpunk / Monochrome），始终显示为默认扁平样式。且两按钮之间存在可见空隙，视觉不紧凑。
+- **根因**：`_layout.tsx` 顶栏按钮区域的父容器设置了 `gap: '8px'`，且图钉与齿轮两个 `IconButton` 未调用 `get3DButtonStyle()`，直接使用了固定 `sx` 样式，导致切换皮肤时按钮外观无变化。
+- **修正说明**：移除父容器 `gap: '8px'`，两按钮均通过 `get3DButtonStyle(theme, 'outlined', 'default')` 遵守六种皮肤风格；齿轮/叉子按钮在 `drawerOpen=true` 时显示 primary 色激活态（与图钉按钮的置顶激活态一致）。
+- **当前状态**：`代码已修正，待用户确认`
+- **目标版本**：`v1.3.9`
+
+### BUG-119: 设置界面多处文字不随语言切换（基础设置、主题设置）
+
+- **现象描述**：在设置界面，基础设置模块中的"基础设置"、"开机自动启动"、"启动时最小化"，以及主题设置模块中的"主题设置"、"系统"、"浅色"、"深色"，这几处文字没有随语言选择（中/英）自动切换，始终显示中文。
+- **根因**：`basic-settings-card.tsx` 和 `theme-settings-card.tsx` 中的 `t()` 调用使用的 key 缺少 `settings.` 前缀（如 `components.verge.basic.title`），而 `i18n.ts` 中 `addResourceBundle` 把 `settings.json` 的所有 key 挂在 `settings.` 前缀下，导致找不到对应的英文翻译，始终 fallback 到 `defaultValue` 的中文。此外 `themeSettings` 拼写错误（JSON 中实际为 `theme`）。
+- **修正说明**：将所有 `t()` key 补上 `settings.` 前缀，并修正 `themeSettings` → `theme`。
+- **当前状态**：`代码已修正，待用户确认`
+- **目标版本**：`v1.3.9`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭 of Bug，在此进行极简化表格索引。
