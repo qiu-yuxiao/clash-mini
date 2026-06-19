@@ -20,9 +20,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 校验 tag 格式与 package.json 版本一致性
-  check_tag_version:
-    name: Check Release Tag and package.json Version Consistency
+  # ========== 第 1 步：快速验证（1-2 分钟）==========
+  # ⚠️ 必须在编译前完成所有验证，失败立即退出，不浪费 CI 时间
+  validate:
+    name: Quick Validation (Fail Fast)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -63,12 +64,34 @@ jobs:
             exit 1
           fi
 
-  # Windows x64 构建（setup.exe + 签名 + 上传）
-  # ⚠️ 注意：Clash Mini 仅发行 Windows x64 版本（安装版 + 便携版）
-  #    禁止在此 job 中添加其他平台（Linux/macOS/ARM）的构建矩阵
-  release:
-    name: Release Build (Windows x64)
-    needs: [check_tag_version]
+      # ⚠️ 预验证 git 推送权限（不实际推送，只检查认证）
+      - name: Pre-validate git authentication
+        run: |
+          echo "Validating GitHub authentication..."
+          gh auth status
+          echo "✅ GitHub authentication valid"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ⚠️ 预检查 dev 分支状态（避免编译完后 push 失败）
+      - name: Pre-check dev branch accessibility
+        run: |
+          echo "Checking dev branch accessibility..."
+          git fetch origin dev
+          DEV_HEAD=$(git rev-parse origin/dev)
+          echo "✅ dev branch is accessible: $DEV_HEAD"
+
+          echo "Checking if app-update.json can be updated..."
+          git checkout origin/dev -- updater/app-update.json 2>/dev/null || echo "⚠️ app-update.json not found on dev (will be created)"
+          echo "✅ Pre-check passed"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ========== 第 2 步：Windows x64 构建（30 分钟）==========
+  # ⚠️ 只有 validate 步骤通过后才会执行
+  build:
+    name: Build Windows x64 (Setup + Portable)
+    needs: [validate]
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -210,29 +233,61 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 更新 app-update.json 并推送回 dev 分支
-      - name: Update app-update.json and push to dev
-        shell: bash
-        run: |
-          # 动态查找 setup.exe（productName 可能含空格）
-          SETUP_EXE=$(find target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe" -type f | head -1)
-          SETUP_SIG="${SETUP_EXE}.sig"
-          SETUP_FILENAME=$(basename "$SETUP_EXE")
-          VERSION=$(node -p "require('./package.json').version")
+      # 便携版 ZIP（可选，不影响自动更新）
+      - name: Portable Bundle (optional)
+        run: pnpm portable x86_64-pc-windows-msvc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
+  # ========== 第 3 步：更新 app-update.json 并推送 dev 分支（1 分钟）==========
+  # ⚠️ 只有 build 步骤成功后才会执行
+  update_dev:
+    name: Update app-update.json and Push to dev
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download setup.exe from Release
+        run: |
+          echo "Downloading setup.exe from Release..."
+          gh release download ${{ github.ref_name }} --repo qiu-yuxiao/clash-mini --pattern "*.exe" --dir ./downloads
+          echo "✅ Downloaded:"
+          ls -la ./downloads/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update app-update.json
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SETUP_EXE=$(find ./downloads -name "*.exe" -type f | head -1)
+          SETUP_FILENAME=$(basename "$SETUP_EXE")
+          SETUP_SIZE=$(stat --format=%s "$SETUP_EXE")
+
+          echo "Version: $VERSION"
           echo "Setup: $SETUP_EXE"
           echo "Filename: $SETUP_FILENAME"
+          echo "Size: $SETUP_SIZE"
 
-          # 用 node 更新 app-update.json（直接读文件，避免转义问题）
-          SETUP_EXE="$SETUP_EXE" SETUP_SIG="$SETUP_SIG" SETUP_FILENAME="$SETUP_FILENAME" VERSION="$VERSION" node -e "
+          # 读取 .sig 文件（从 Release 下载）
+          gh release download ${{ github.ref_name }} --repo qiu-yuxiao/clash-mini --pattern "*.sig" --dir ./downloads
+          SETUP_SIG=$(find ./downloads -name "*.sig" -type f | head -1)
+          SIG_CONTENT=$(cat "$SETUP_SIG" | tr -d '\n' | tr -d '\r')
+
+          echo "Sig: $SETUP_SIG"
+          echo "Sig content: $SIG_CONTENT"
+
+          # 生成 app-update.json
+          node -e "
             const fs = require('fs');
-            const setupExe = process.env.SETUP_EXE;
-            const setupSig = process.env.SETUP_SIG;
-            const setupFilename = process.env.SETUP_FILENAME;
-            const version = process.env.VERSION;
-            const sig = fs.readFileSync(setupSig, 'utf8').trim().replace(/\n/g, '').replace(/\r/g, '');
-            const size = fs.statSync(setupExe).size;
-            const encodedFilename = encodeURIComponent(setupFilename);
+            const version = '$VERSION';
+            const sig = '$SIG_CONTENT';
+            const size = $SETUP_SIZE;
+            const encodedFilename = encodeURIComponent('$SETUP_FILENAME');
             const data = {
               version: version,
               notes: 'Clash Mini v' + version,
@@ -246,11 +301,12 @@ jobs:
               }
             };
             fs.writeFileSync('updater/app-update.json', JSON.stringify(data, null, 2) + '\n', 'utf8');
-            console.log('app-update.json updated');
-            console.log('URL: https://github.com/qiu-yuxiao/clash-mini/releases/download/v' + version + '/' + encodedFilename);
+            console.log('✅ app-update.json updated');
           "
 
-          # 提交并推送回 dev 分支（使用 --force-with-lease 避免冲突）
+      - name: Commit and push to dev branch
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add updater/app-update.json
@@ -261,17 +317,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 便携版 ZIP（可选，不影响自动更新）
-      - name: Portable Bundle (optional)
-        run: pnpm portable x86_64-pc-windows-msvc
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
-
-  # 发布正式 Release（更新 Release Notes）
-  publish_release:
+  # ========== 第 4 步：发布正式 Release（1 分钟）==========
+  # ⚠️ 只有 update_dev 步骤成功后才会执行
+  publish:
     name: Publish Release
-    needs: [release]
+    needs: [update_dev]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
