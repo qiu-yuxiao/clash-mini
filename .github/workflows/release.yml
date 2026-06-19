@@ -138,10 +138,10 @@ jobs:
         shell: bash
         run: |
           # 动态查找 setup.exe（productName 可能含空格）
-          SETUP_EXE=$(find src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe" -type f | head -1)
+          SETUP_EXE=$(find target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe" -type f | head -1)
           if [ -z "$SETUP_EXE" ]; then
             echo "❌ setup.exe not found in bundle/nsis"
-            ls -la src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/ || true
+            ls -la target/x86_64-pc-windows-msvc/release/bundle/nsis/ || true
             exit 1
           fi
           echo "Found setup.exe: $SETUP_EXE"
@@ -165,7 +165,7 @@ jobs:
       - name: Upload .sig to Release
         shell: bash
         run: |
-          SETUP_SIG=$(find src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe.sig" -type f | head -1)
+          SETUP_SIG=$(find target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe.sig" -type f | head -1)
           if [ -z "$SETUP_SIG" ]; then
             echo "❌ .sig file not found"
             exit 1
@@ -180,7 +180,7 @@ jobs:
         shell: bash
         run: |
           # 动态查找 setup.exe（productName 可能含空格）
-          SETUP_EXE=$(find src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe" -type f | head -1)
+          SETUP_EXE=$(find target/x86_64-pc-windows-msvc/release/bundle/nsis -name "*.exe" -type f | head -1)
           SETUP_SIG="${SETUP_EXE}.sig"
           SETUP_FILENAME=$(basename "$SETUP_EXE")
           VERSION=$(node -p "require('./package.json').version")
