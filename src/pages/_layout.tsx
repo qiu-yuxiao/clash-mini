@@ -1329,7 +1329,7 @@ const Layout = () => {
                 })
               }
               sx={(theme) => ({
-                ...get3DButtonStyle(theme, 'outlined', 'default'),
+                ...get3DButtonStyle(theme, 'contained', 'default'),
                 flexShrink: 0,
                 width: '28px',
                 height: '28px',
@@ -1362,7 +1362,7 @@ const Layout = () => {
             size="small"
             onClick={() => setDrawerOpen(!drawerOpen)}
             sx={(theme) => ({
-              ...get3DButtonStyle(theme, 'outlined', 'default'),
+              ...get3DButtonStyle(theme, 'contained', 'default'),
               flexShrink: 0,
               width: '28px',
               height: '28px',
@@ -1504,7 +1504,7 @@ const Layout = () => {
                   size="small"
                   onClick={() => setDrawerOpen(!drawerOpen)}
                   sx={(theme) => ({
-                    ...get3DButtonStyle(theme, 'outlined', 'default'),
+                    ...get3DButtonStyle(theme, 'contained', 'default'),
                     width: '28px',
                     height: '28px',
                     p: 0,
@@ -1551,7 +1551,7 @@ const Layout = () => {
                     })
                   }
                   sx={(theme) => ({
-                    ...get3DButtonStyle(theme, 'outlined', 'default'),
+                    ...get3DButtonStyle(theme, 'contained', 'default'),
                     flexShrink: 0,
                     width: '28px',
                     height: '28px',
