@@ -59,10 +59,14 @@
      ```powershell
      git config --local http.sslBackend openssl
      ```
-   - 若是重新发布当前版本，先清除本地与远端同名 Tag：
+   - 若是重新发布当前版本，先清除本地与远端同名 Tag，**同时清理残留的旧 Release**（防止 publish_release 因重复 Release 而失败）：
      ```powershell
      git tag -d v<版本号>
      git push origin :refs/tags/v<版本号>
+     # 删除 GitHub 上与该 tag 关联的所有旧 Release
+     $tag = "v<版本号>"
+     $ids = gh api "repos/qiu-yuxiao/clash-mini/releases?per_page=10" --jq ".[] | select(.tag_name == `"`"$tag`"`") | .id"
+     foreach ($id in $ids) { gh api -X DELETE "repos/qiu-yuxiao/clash-mini/releases/$id" --silent }
      ```
    - **发版顺序铁律（必须严格执行）：**
      1. 先确认本地所有提交已推送：`git log origin/dev..dev` 无输出才算干净

@@ -327,8 +327,17 @@ jobs:
 
           if [ "$release_count" -gt 1 ]; then
             printf '%s\n' "$matches"
-            echo "::error::Multiple releases found for $TAG_NAME. Merge or delete duplicate releases before rerunning."
-            exit 1
+            echo "⚠️ Multiple releases found for $TAG_NAME. Auto-cleanup: keeping latest, deleting duplicates."
+            # 按行取最新一条（id 最大 = 最新创建），其余删除
+            latest=$(echo "$matches" | sort -t$'\t' -k1 -rn | head -1)
+            echo "$matches" | while IFS=$'\t' read -r dup_id _ _ dup_url; do
+              if [ "$dup_id" != "$(echo "$latest" | cut -f1)" ]; then
+                echo "  Deleting duplicate release $dup_id ($dup_url)"
+                gh api -X DELETE "repos/{owner}/{repo}/releases/$dup_id" --silent
+              fi
+            done
+            release_count=1
+            matches="$latest"
           fi
 
           IFS=$'\t' read -r release_id _ asset_count release_url <<< "$matches"
