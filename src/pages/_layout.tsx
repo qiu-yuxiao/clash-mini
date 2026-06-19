@@ -1219,6 +1219,15 @@ const Layout = () => {
               height: '28px',
               p: 0,
               mr: 1,
+              // 设定界面打开时显示激活态（同图钉按钮逻辑）
+              ...(drawerOpen
+                ? {
+                    color: 'primary.main',
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
+                    background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
+                    boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
+                  }
+                : {}),
             })}
           >
             {drawerOpen ? (
