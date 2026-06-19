@@ -221,6 +221,7 @@
 - [ ] `package.json` 版本号已更新
 - [ ] `src-tauri/tauri.conf.json` 版本号已更新
 - [ ] `src-tauri/Cargo.toml` 版本号已更新
+- [ ] `release.yml` 中 build artifacts 路径与 `tauri.conf.json` 的 `productName` 一致（防止 find 找不到文件）
 - [ ] `clash_mini_agreements.md` 已登记新特性/修改
 - [ ] `bug_list.md` 已更新 Bug 状态
 - [ ] CI 构建成功，Release 已发布（非 Draft）
