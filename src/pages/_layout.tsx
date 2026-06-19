@@ -1502,10 +1502,15 @@ const Layout = () => {
                   onClick={() => setDrawerOpen(!drawerOpen)}
                   sx={(theme) => ({
                     ...get3DButtonStyle(theme, 'outlined', 'default'),
-                    color: drawerOpen ? 'primary.main' : 'text.primary',
                     width: '28px',
                     height: '28px',
                     p: 0,
+                    ...(drawerOpen ? {
+                      color: 'primary.main',
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
+                      background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
+                      boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
+                    } : {}),
                   })}
                 >
                   {drawerOpen ? (
@@ -1545,9 +1550,6 @@ const Layout = () => {
                   sx={(theme) => ({
                     ...get3DButtonStyle(theme, 'outlined', 'default'),
                     flexShrink: 0,
-                    color: verge?.enable_always_on_top
-                      ? 'primary.main'
-                      : 'text.primary',
                     width: '28px',
                     height: '28px',
                     p: 0,
