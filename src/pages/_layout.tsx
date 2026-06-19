@@ -47,6 +47,7 @@ import {
   useClashConfigData,
   useAppRefreshers,
 } from '@/providers/app-data-context'
+import { useHeadStateNew } from '@/components/proxy/use-head-state'
 import {
   importProfile,
   updateProfile,
@@ -119,6 +120,20 @@ function isDummyNode(node: any): boolean {
   )
 }
 
+/** 判断节点名是否为 dummy 假节点（纯字符串版，与 isDummyNode 逻辑一致） */
+function isDummyName(name: string): boolean {
+  if (!name) return true
+  const lower = name.toLowerCase()
+  return (
+    lower.startsWith('dummy') ||
+    lower.startsWith('(dummy)') ||
+    lower.includes('dummy') ||
+    name === 'DIRECT' ||
+    name === 'REJECT' ||
+    name === 'COMPATIBLE'
+  )
+}
+
 /** 等待 Clash 内核就绪（PROXY 组中出现非 dummy 节点），最多等 20 秒 */
 async function waitForClashReady(
   t: (key: string, opts?: any) => string,
@@ -130,8 +145,9 @@ async function waitForClashReady(
   while (Date.now() - startedAt < MAX_WAIT_MS) {
     try {
       const proxyGroup = await getProxyByName('PROXY')
+      // all 是 string[]，直接用 isDummyName 判断节点名
       const hasRealNodes = (proxyGroup?.all || []).some(
-        (name: string) => !isDummyNode({ name }),
+        (name: string) => !isDummyName(name),
       )
       if (hasRealNodes) {
         console.log(
@@ -148,42 +164,68 @@ async function waitForClashReady(
   console.warn(
     `[waitForClashReady] 等待 Clash 内核就绪超时（${MAX_WAIT_MS}ms），继续触发自动选点`,
   )
+  // 协议要求：超时后提示用户（使用 MUI snackbar，非原生通知）
+  try {
+    showNotice.info(
+      t('shared.feedback.notifications.clashNotReady') || 'Clash 内核加载超时，自动选点可能不准确',
+    )
+  } catch {
+    // showNotice 不可用则静默失败
+  }
   return false
 }
 
-/** 触发自动选点并在完成后刷新前端 proxies 数据 */
+/** 触发自动选点并在完成后刷新前端 proxies 数据
+ *  协议 Section III.7：自动选点后设置 sortType: 1（按延迟排序，最快节点置顶）
+ */
 async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
   t: (key: string, opts?: any) => string,
-  fallbackTimerRef: React.MutableRefObject<NodeJS.Timeout | null>,
+  fallbackTimerRef: React.MutableRefObject<number | null>,
+  setHeadState?: (groupName: string, patch: any) => void,
 ): Promise<void> {
   try {
     await invoke('trigger_auto_select', { isManual: false })
     console.log('[Layout] trigger_auto_select 完成')
     // 后端已切换节点，立即刷新前端显示
     await refreshProxy({ forceFull: true })
+    // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
+    if (setHeadState) {
+      setHeadState('PROXY', { sortType: 1 })
+      console.log('[Layout] 已设置 sortType: 1（按延迟排序）')
+    }
     // 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速
     // 先清理旧定时器，防止重复
     if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
     fallbackTimerRef.current = setTimeout(async () => {
       try {
         const proxyGroup = await getProxyByName('PROXY')
-        const allNames = (proxyGroup?.all || []).filter(
-          (name: string) => !isDummyNode({ name }),
-        )
-        if (allNames.length === 0) {
-          console.log('[Layout] Fallback: 无可用节点，跳过')
+        const nowNodeName = proxyGroup?.now || ''
+        if (!nowNodeName) {
+          console.log('[Layout] Fallback: 无当前节点，跳过')
           return
         }
-        // 抽样检查第一个非 dummy 节点的延迟，判断是否有健康节点
-        const sampleNode = await getProxyByName(allNames[0])
-        const hasHealth = (sampleNode?.history || []).some(
+        // 检查当前选中节点（now）是否有健康延迟
+        const nowNode = await getProxyByName(nowNodeName)
+        const hasHealth = (nowNode?.history || []).some(
           (h: any) => h.delay > 0 && h.delay < 10_000,
         )
         if (!hasHealth) {
+          // 无健康节点，强制全节点测速
+          const allNames = (proxyGroup?.all || []).filter(
+            (name: string) => !isDummyName(name),
+          )
+          if (allNames.length === 0) {
+            console.log('[Layout] Fallback: 无可用节点，跳过')
+            return
+          }
           console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
           await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
           await refreshProxy({ forceFull: true })
+          // Fallback 测速完成后再次确保排序正确
+          if (setHeadState) {
+            setHeadState('PROXY', { sortType: 1 })
+          }
         }
       } catch (fbErr) {
         console.error('[Layout] Fallback 逻辑异常:', fbErr)
@@ -919,7 +961,10 @@ const Layout = () => {
   }, [language])
 
   const lastEnhancedProfileRef = useRef<string | null>(null)
-  const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const fallbackTimerRef = useRef<number | null>(null)
+
+  // 协议要求：自动选点后排序置顶（sortType: 1 = 按延迟排序）
+  const [, setHeadStateForSort] = useHeadStateNew()
 
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
@@ -995,13 +1040,13 @@ const Layout = () => {
       await mutateProfiles()
 
       // Real-time compilation and reload
-      await enhanceProfiles()
-      // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
-      if (targetUid) {
-        await waitForClashReady(t)
-        await triggerAutoSelectAndRefresh(refreshProxy, t)
-      }
-    } catch {
+        await enhanceProfiles()
+        // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
+        if (targetUid) {
+          await waitForClashReady(t)
+          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
+        }
+      } catch {
       try {
         await importProfile(url, { with_proxy: false, self_proxy: true })
         showNotice.success('shared.feedback.notifications.importWithClashProxy')
@@ -1024,7 +1069,7 @@ const Layout = () => {
         // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         if (targetUid) {
           await waitForClashReady(t)
-          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef)
+          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
         }
       } catch (retryErr) {
         showNotice.error(
@@ -1061,7 +1106,7 @@ const Layout = () => {
         await enhanceProfiles()
         // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         await waitForClashReady(t)
-        await triggerAutoSelectAndRefresh(refreshProxy, t)
+        await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
       }
       await mutateProfiles()
       showNotice.success('订阅更新成功')
