@@ -324,7 +324,7 @@ pub async fn trigger_backend_auto_select(profile_uid: &str) -> anyhow::Result<Op
             if let Ok(res) = req.send().await {
                 if res.status().is_success() {
                     if let Ok(delay_info) = res.json::<DelayResponse>().await {
-                        if delay_info.delay > 0 && delay_info.delay < 2000 {
+                        if delay_info.delay >= 50 && delay_info.delay < 2000 {
                             return Some((node_name, delay_info.delay));
                         }
                     }
