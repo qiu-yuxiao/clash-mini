@@ -123,6 +123,7 @@ if ($LASTEXITCODE -ne 0) {
 Log-Step "Git 提交并推送"
 
 git config --local http.sslBackend openssl
+git config --local http.sslVerify false
 git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
 git commit -m "release: bump version to $Version" --no-verify
 if ($LASTEXITCODE -ne 0) { Log-Error "git commit 失败"; exit 1 }
@@ -137,6 +138,7 @@ if ($LASTEXITCODE -ne 0) { Log-Error "git push tag 失败"; exit 1 }
 Log-Ok "Tag $TagName 已推送 -> CI 已触发"
 
 git config --local --unset http.sslBackend
+git config --local --unset http.sslVerify
 
 Write-Host ""
 Write-Host "  CI 监控面板: https://github.com/$GitHubRepo/actions" -ForegroundColor Cyan
