@@ -45,3 +45,17 @@
 10. **命令合并最小弹窗律 (Law of Command Batching)**
     - **要求**：Agent 在执行调试、测试或多步验证任务时，必须将逻辑连续的多条命令（包括 Python 脚本调用、git 操作、文件校验等）合并为**单次 `run_command` 调用**，以分号或换行符串联，确保用户仅需点击一次 Submit 即可完成整个步骤组。Python 脚本必须通过 PowerShell 直接调用（`python scripts/xxx.py`），无需额外包装层。
     - **禁止**：严禁将一个逻辑任务拆分为多次独立的 `run_command` 调用，导致用户需要多次手动点击 Submit 确认，打断工作节奏。
+
+11. **TUN 模式下 Git 推送 SSL/TLS 握手故障自愈规范 (Law of Git Push SSL Workaround under TUN Mode)**
+    - **要求**：在 TUN 模式代理网络下执行 `git push` 时，如遇 TLS/SSL 握手中断错误（如 `schannel: failed to receive handshake` 或 `unexpected eof while reading`），必须临时将本地仓库配置切换为 OpenSSL 并跳过校验进行推送，推送成功后必须立刻还原配置。
+    - **合规命令链**（必须合并为单次 `run_command` 调用以换行或分号串联，且 Token 必须由 token 文件以环境变量形式安全传入，绝对禁止明文暴露）：
+      ```powershell
+      git config --local http.sslBackend openssl
+      git config --local http.sslVerify false
+      $env:GH_TOKEN = (Get-Content 'github_token.txt' -Raw).Trim()
+      $env:GITHUB_TOKEN = $env:GH_TOKEN
+      git push origin dev
+      git config --local --unset http.sslBackend
+      git config --local --unset http.sslVerify
+      ```
+    - **禁止**：严禁修改全局 Git 配置；严禁漏掉恢复（`--unset`）命令；严禁将 GitHub Token 以明文字符串硬编码到任何脚本、日志或命令文本中。
