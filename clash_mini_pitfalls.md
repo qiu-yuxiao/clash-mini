@@ -37,3 +37,7 @@
 
 8. **收尾清洁律 (Law of Environment Reset)**
    - **要求**：任务结束后必须杀灭本地所有开发残留进程（Tauri、内核等），释放端口与服务锁，清理 Vite 构建缓存，重置 `task.md` 看板，并在 `walkthrough.md` 归档物理验证结果。
+
+9. **Windows 大文件操作 Python 强制律 (Law of Python for Large File Operations)**
+   - **要求**：在 Windows 环境下，凡涉及对大型文件（如 `Cargo.lock`、`pnpm-lock.yaml`、`clash_mini_agreements.md` 等）的读取、写入、搜索或替换操作，必须编写 Python 脚本（`.py`）在 `package.json` 中注册为脚本任务后，通过 `pnpm` 命令执行，或直接以 `python <script>.py` 方式调用。
+   - **禁止**：严禁使用 PowerShell 命令（如 `Get-Content`、`Set-Content`、`Select-String`、`-replace` 等）对大文件进行直接读写或文本替换操作，因 PowerShell 在 Windows 下处理大文件时极易产生编码错误、截断或静默失败，危及文件完整性。
