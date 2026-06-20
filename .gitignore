@@ -34,3 +34,5 @@ wiki_dist
 wiki_dist/
 tauri-key
 tauri-key.pub
+.workbuddy/
+src-tauri/src/bin/
