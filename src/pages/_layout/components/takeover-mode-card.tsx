@@ -13,12 +13,14 @@ interface TakeoverModeCardProps {
   activeIndex: number
   language?: string
   handleTakeoverModeChange: (mode: 'manual' | 'system' | 'tun') => void
+  disableCardBorder?: boolean
 }
 
 export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
   activeIndex,
   language,
   handleTakeoverModeChange,
+  disableCardBorder,
 }) => {
   const { t } = useTranslation() as any
   const theme = useTheme()
@@ -31,15 +33,19 @@ export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
 
   return (
     <Box
-      sx={{
-        p: 1,
-        flexShrink: 0,
-        ...get3DCardStyle(theme, 'default'),
-        '&:hover': {
-          transform: 'none',
-          boxShadow: get3DCardStyle(theme, 'default').boxShadow,
-        },
-      }}
+      sx={
+        disableCardBorder
+          ? undefined
+          : {
+              p: 1,
+              flexShrink: 0,
+              ...get3DCardStyle(theme, 'default'),
+              '&:hover': {
+                transform: 'none',
+                boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+              },
+            }
+      }
     >
       <Typography
         variant="subtitle2"

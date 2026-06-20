@@ -65,6 +65,7 @@ import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import {
   get3DButtonStyle,
+  get3DCardStyle,
 } from '@/utils/button-styles'
 import {
   closeAllConnections,
@@ -1673,19 +1674,32 @@ const Layout = () => {
                   setContextMenuProfileUid={setContextMenuProfileUid}
                 />
 
-                {/* Section 2: Takeover Mode (三态互斥单选) */}
-                <TakeoverModeCard
-                  activeIndex={activeIndex}
-                  language={language}
-                  handleTakeoverModeChange={handleTakeoverModeChange}
-                />
+                {/* Section 2: Takeover Mode + Routing Preference (合并为同一卡片) */}
+                <Box
+                  sx={{
+                    p: 1,
+                    flexShrink: 0,
+                    ...get3DCardStyle(theme, 'default'),
+                    '&:hover': {
+                      transform: 'none',
+                      boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+                    },
+                  }}
+                >
+                  <TakeoverModeCard
+                    activeIndex={activeIndex}
+                    language={language}
+                    handleTakeoverModeChange={handleTakeoverModeChange}
+                    disableCardBorder
+                  />
 
-                {/* Section 2b: Routing Preference */}
-                <RoutingPreferenceCard
-                  policyActiveIndex={policyActiveIndex}
-                  language={language}
-                  handleRuleFallbackChange={handleRuleFallbackChange}
-                />
+                  <RoutingPreferenceCard
+                    policyActiveIndex={policyActiveIndex}
+                    language={language}
+                    handleRuleFallbackChange={handleRuleFallbackChange}
+                    disableCardBorder
+                  />
+                </Box>
 
                 {/* Section 3: Minimal Settings */}
                 <BasicSettingsCard

@@ -13,12 +13,14 @@ interface RoutingPreferenceCardProps {
   policyActiveIndex: number
   language?: string
   handleRuleFallbackChange: (fallback: 'direct' | 'adjustable' | 'proxy') => void
+  disableCardBorder?: boolean
 }
 
 export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
   policyActiveIndex,
   language,
   handleRuleFallbackChange,
+  disableCardBorder,
 }) => {
   const { t } = useTranslation() as any
   const theme = useTheme()
@@ -31,15 +33,19 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
 
   return (
     <Box
-      sx={{
-        p: 1,
-        flexShrink: 0,
-        ...get3DCardStyle(theme, 'default'),
-        '&:hover': {
-          transform: 'none',
-          boxShadow: get3DCardStyle(theme, 'default').boxShadow,
-        },
-      }}
+      sx={
+        disableCardBorder
+          ? undefined
+          : {
+              p: 1,
+              flexShrink: 0,
+              ...get3DCardStyle(theme, 'default'),
+              '&:hover': {
+                transform: 'none',
+                boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+              },
+            }
+      }
     >
       <Typography
         variant="subtitle2"
