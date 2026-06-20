@@ -271,12 +271,12 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
 
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
 /// sort_type: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序
-pub async fn trigger_backend_auto_select(
-    profile_uid: &str,
-    sort_type: i32,
-) -> anyhow::Result<Vec<(String, u32)>> {
+pub async fn trigger_backend_auto_select(profile_uid: &str, sort_type: i32) -> anyhow::Result<Vec<(String, u32)>> {
     // 互斥锁防止并发调用
-    if AUTO_SELECT_RUNNING.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
+    if AUTO_SELECT_RUNNING
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
         logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，返回繁忙");
         return Err(anyhow::anyhow!("AUTO_SELECT_BUSY"));
     }
@@ -299,14 +299,11 @@ pub async fn trigger_backend_auto_select(
     // 注意：这里我们手动释放锁，确保锁尽早释放
     // 但为了简化，我们依赖 _guard 的 Drop 实现
     // Rust 会在函数返回时自动 drop _guard
-    
+
     result
 }
 
-async fn trigger_backend_auto_select_inner(
-    profile_uid: &str,
-    sort_type: i32,
-) -> anyhow::Result<Vec<(String, u32)>> {
+async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) -> anyhow::Result<Vec<(String, u32)>> {
     let info = Config::clash().await.data_arc().get_client_info();
     let server = info.server;
     let secret = info.secret;
@@ -410,8 +407,8 @@ async fn trigger_backend_auto_select_inner(
     // M1 修复：根据 sort_type 选择排序方式
     // sort_type: 0=原始顺序（已从配置文件读取为1）, 1=按延迟升序, 2=按名称排序
     match sort_type {
-        2 => results.sort_by(|a, b| a.0.cmp(&b.0)),  // 按名称排序
-        _ => results.sort_by_key(|r| r.1),            // 按延迟升序（默认）
+        2 => results.sort_by(|a, b| a.0.cmp(&b.0)), // 按名称排序
+        _ => results.sort_by_key(|r| r.1),          // 按延迟升序（默认）
     }
 
     if let Some((fastest_node, delay)) = results.first() {

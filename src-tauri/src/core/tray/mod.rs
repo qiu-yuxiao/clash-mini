@@ -62,7 +62,13 @@ impl Tray {
 
         let app_handle_clone = app_handle.clone();
         app_handle.run_on_main_thread(move || {
-            let lite_mode = match MenuItem::with_id(&app_handle_clone, MenuIds::LITE_MODE, "轻量模式 / Lite mode", true, None::<&str>) {
+            let lite_mode = match MenuItem::with_id(
+                &app_handle_clone,
+                MenuIds::LITE_MODE,
+                "轻量模式 / Lite mode",
+                true,
+                None::<&str>,
+            ) {
                 Ok(item) => {
                     let _ = LITE_MODE_MENU_ITEM.set(item);
                     // 修复编译错误：使用 if let Some(item) 代替 unwrap/expect
@@ -206,7 +212,7 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     if event.id.as_ref().is_empty() {
         return;
     }
-    let _app_clone = app.clone();  // 修复编译警告：添加下划线前缀
+    let _app_clone = app.clone(); // 修复编译警告：添加下划线前缀
     AsyncHandler::spawn(|| async move {
         match event.id.as_ref() {
             MenuIds::LITE_MODE => {
