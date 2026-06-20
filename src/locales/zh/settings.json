@@ -150,7 +150,7 @@
   "components": {
     "verge": {
       "basic": {
-        "title": "WinAero 基础设置",
+        "title": "基础设置",
         "actions": {
           "browse": "浏览"
         },
