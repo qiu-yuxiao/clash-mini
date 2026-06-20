@@ -1,37 +1,49 @@
-# BRIEFING — 2026-06-17T13:45:00+08:00
+# BRIEFING — 2026-06-20T12:56:00+08:00
 
 ## Mission
-Perform a comprehensive, non-modifying code audit of the Rust/Tauri backend (located in src-tauri/).
+Conduct a thorough pre-release code audit of the Clash Verge backend monitor and commands.
 
 ## 🔒 My Identity
-- Archetype: Teamwork explorer (Backend Auditor)
-- Roles: Backend Auditor, Static Analysis Investigator
-- Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_backend_audit
-- Original parent: 76fceb47-1bb8-44d9-85ad-d4fb068ec2f8
-- Milestone: Backend Audit Report Completion
+- Archetype: teamwork_preview_explorer
+- Roles: Teamwork explorer, backend auditor
+- Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_backend_audit\
+- Original parent: 81082ef7-c4aa-42ba-83d4-ff563a258097
+- Milestone: Backend Monitor & Commands Pre-Release Audit
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement
-- Do NOT build or compile code
-- Only write to our own folder
+- Read-only investigation — do NOT implement (do not write, edit, or delete any source code files inside the working directory, i.e., the project source code).
+- All proposed fixes must be presented solely as code diff blocks in the handoff report.
+- Audited files are restricted to:
+  - src-tauri/src/module/monitor.rs
+  - src-tauri/src/cmd/proxy.rs
+  - src-tauri/src/cmd/clash.rs
+  - src-tauri/src/cmd/profile.rs
 
 ## Current Parent
-- Conversation ID: 76fceb47-1bb8-44d9-85ad-d4fb068ec2f8
-- Updated: 2026-06-17T13:45:00+08:00
+- Conversation ID: 81082ef7-c4aa-42ba-83d4-ff563a258097
+- Updated: not yet
 
 ## Investigation State
-- **Explored paths**: `src/main.rs`, `src/lib.rs`, `src/core/handle.rs`, `src/core/sysopt.rs`, `src/core/timer.rs`, `src/core/updater.rs`, `src/core/manager/state.rs`, `src/core/manager/lifecycle.rs`, `src/core/tray/speed_task.rs`, `src/utils/connections_stream.rs`, `src/module/monitor.rs`, `src/module/lightweight.rs`, `src/cmd/mod.rs`, `src/cmd/clash.rs`, `src/cmd/save_profile.rs`, `src/config/profiles.rs`, `src/config/config.rs`.
+- **Explored paths**:
+  - `src-tauri/src/module/monitor.rs`
+  - `src-tauri/src/cmd/proxy.rs`
+  - `src-tauri/src/cmd/clash.rs`
+  - `src-tauri/src/cmd/profile.rs`
 - **Key findings**:
-  1. Concurrency: `RwLockReadGuard` on `Mihomo` held across `.await` boundaries in `connections_stream.rs` and other files.
-  2. Performance: Synchronous I/O operations (file read/write) executed on tokio runtime thread in `monitor.rs` and `updater.rs`.
-  3. Performance: Synchronous process scanning (`sysinfo`) blocks tokio runtime in `state.rs`.
-  4. Startup/Hang: Synchronous `block_on` call inside Tauri `setup` hook blocks the main thread during check for updates.
-  5. Architecture/Safety: Unix timestamps cast to `usize` in `prfitem.rs` (potential truncation on 32-bit).
-- **Unexplored areas**: None, the entire `src-tauri` directory has been successfully audited within the scope of static analysis.
+  - AUDIT-BE-001 (Major): Race condition in auto-select trigger on profile switch.
+  - AUDIT-BE-002 (Major): Option `sort_type` defaults to `1` (latency) instead of `0` (config) when `None`.
+  - AUDIT-BE-003 (Minor): Inconsistent parser used for `proxy_head_state.json`.
+  - AUDIT-BE-004 (Major): Auto-select filters out high-performance nodes with delay <= 50ms.
+  - AUDIT-BE-005 (Major): Dead code in `apply_dns_config` that fails to apply DNS changes.
+  - AUDIT-BE-006 (Major): Failed profile switches do not restore running Clash core state.
+  - AUDIT-BE-007 (Major): Profile deletion notifies wrong profile ID to frontend.
+- **Unexplored areas**: None
 
 ## Key Decisions Made
-- Performed thorough static analysis of concurrency primitives, blocking I/O, process scanning, and error handling.
-- Avoided executing any compile or build command, strictly following the read-only audit constraint.
+- Audited all requested backend files.
+- Developed targeted fix diffs for all identified issues.
+- Prepared `handoff.md` with complete findings.
 
 ## Artifact Index
-- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_backend_audit\handoff.md — Code audit findings
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_backend_audit\handoff.md — Analysis and audit report
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_backend_audit\progress.md — Liveness progress heartbeat

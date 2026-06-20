@@ -89,3 +89,41 @@ Integrity mode: demo
 - [ ] 提交一份详尽的第三方代码审计报告，分类归纳所有发现的问题：安全与性能类（Safety & Performance）、代码整洁与架构类（Readability & Architecture）、协议合规性类（Agreement Compliance）。
 - [ ] 对发现的每个缺陷或不合规项，报告必须包含：具体的文件路径、受影响的代码行范围、成因分析、相关的代码片段，以及具体的修复与优化建议。
 - [ ] 报告需对项目的整体代码库质量进行综合评价，并给出总体的架构健康度打分。
+
+## Follow-up — 2026-06-20T12:46:49+08:00
+
+This project performs a comprehensive pre-release code audit and readiness review of the Clash Mini project codebase, focusing on frontend layout components, backend monitoring modules, and related Tauri commands. It produces a detailed report and proposed changes without modifying any source files.
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Pre-Release Code Audit Scope
+Conduct a thorough static analysis and code review of the following areas:
+- **Frontend Page & Components**: `src/pages/_layout.tsx` and all components located in `src/pages/_layout/components/`.
+- **Backend Monitor & Core Commands**: `src-tauri/src/module/monitor.rs` and related commands under `src-tauri/src/cmd/` (especially `proxy.rs`, `clash.rs`, and `profile.rs`).
+
+### R2. Key Focus Areas
+Identify and document any issues related to:
+- **Race Conditions & Concurrency**: Potential timing conflicts, redundant configuration reloads, un-debounced state changes, or API hangouts.
+- **Skin Compatibility**: Verification that all top-bar buttons, layout elements, and dialog buttons comply strictly with the six skin styles (Trump-3D / Original / Modern / Frosted / Cyberpunk / Monochrome).
+- **Resource/Memory Management**: Uncleaned event listeners, missing React hook dependency safety, unhandled promise rejections, or memory leak risks on layout unmount.
+- **Code Quality & Dead Code**: Unused variables, redundant validation steps, outdated comments, or type safety issues.
+
+### R3. Strict "No Write" Constraint
+The team is strictly prohibited from writing or modifying any files inside the working directory (`c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge`). All proposed fixes must be presented solely as code diff blocks in the final report.
+
+## Acceptance Criteria
+
+### Audit Report Quality
+- [ ] Deliver a complete markdown report named `audit_report.md` stored in the conversation artifact directory (`C:\Users\sun_y\.gemini\antigravity\brain\cdd94940-b080-4369-a04d-422abec1819d`).
+- [ ] The report must contain an **Executive Summary** detailing overall release readiness.
+- [ ] Each finding must be structured as a card containing:
+  - Finding ID (e.g., AUDIT-001)
+  - Description of the issue
+  - Severity level (Critical, Major, Minor, Info)
+  - File path with line numbers using clickable `file:///` markdown links
+  - Root cause analysis
+  - Suggested fix with a precise diff code block
+- [ ] The report must contain a dedicated table mapping the components' compliance status against the six skin styles.

@@ -1,34 +1,52 @@
-# BRIEFING — 2026-06-17T05:24:55Z
+# BRIEFING — 2026-06-20T12:51:00+08:00
 
 ## Mission
-Perform a comprehensive, non-modifying code audit of the React/TypeScript frontend (located in `src/`).
+Conduct a thorough pre-release code audit of the frontend layout and components in ClashVerge.
 
 ## 🔒 My Identity
-- Archetype: explorer
-- Roles: Frontend Auditor, read-only investigator
-- Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit
-- Original parent: 76fceb47-1bb8-44d9-85ad-d4fb068ec2f8
-- Milestone: Frontend static analysis report
+- Archetype: teamwork_preview_explorer
+- Roles: explorer, auditor, read-only investigator
+- Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\
+- Original parent: 81082ef7-c4aa-42ba-83d4-ff563a258097
+- Milestone: pre-release frontend code audit
 
 ## 🔒 Key Constraints
-- Read-only investigation — do NOT implement
-- Do NOT modify any file
-- Do NOT build or compile
-- Focus on safety, performance, readability, and architecture
+- Read-only investigation — do NOT implement.
+- Under NO circumstances write, edit, or delete any source code files inside the workspace.
+- All proposed fixes must be presented solely as code diff blocks in your handoff report.
+- Audited files restricted to: src/pages/_layout.tsx and src/pages/_layout/components/*
 
 ## Current Parent
-- Conversation ID: 76fceb47-1bb8-44d9-85ad-d4fb068ec2f8
-- Updated: 2026-06-17T05:24:55Z
+- Conversation ID: 81082ef7-c4aa-42ba-83d4-ff563a258097
+- Updated: yes (2026-06-20T12:51:00+08:00)
 
 ## Investigation State
-- **Explored paths**: `src/providers/app-data-context.ts`, `src/providers/app-data-provider.tsx`, `src/providers/window/window-provider.tsx`, `src/hooks/use-listen.ts`, `src/hooks/use-layout-events.ts`, `src/hooks/useWindowSnap.ts`, `src/hooks/use-visibility.ts`, `src/components/proxy/use-window-width.ts`, `src/components/proxy/proxy-item.tsx`, `src/components/proxy/proxy-groups.tsx`, `src/components/proxy/use-render-list.ts`, `src/pages/_layout.tsx`, `src/pages/_routers.tsx`, `src/types/global.d.ts`, `src/main.tsx`
-- **Key findings**: Async event listener memory leak in AppDataProvider, resize-based rendering storm in proxy list, monolithic "God Component" in layout shell (4997 lines), global ambient type pollution, naming inconsistencies, non-memoized hook callbacks, loose typings.
-- **Unexplored areas**: None, the audit is completed.
+- **Explored paths**:
+  - `src/pages/_layout.tsx`
+  - `src/pages/_layout/components/active-node-card.tsx`
+  - `src/pages/_layout/components/basic-settings-card.tsx`
+  - `src/pages/_layout/components/connections-panel.tsx`
+  - `src/pages/_layout/components/help-menu-button.tsx`
+  - `src/pages/_layout/components/layout-dialogs.tsx`
+  - `src/pages/_layout/components/mini-traffic-panel.tsx`
+  - `src/pages/_layout/components/profile-import-card.tsx`
+  - `src/pages/_layout/components/routing-preference-card.tsx`
+  - `src/pages/_layout/components/takeover-mode-card.tsx`
+  - `src/pages/_layout/components/theme-settings-card.tsx`
+- **Key findings**:
+  - Identified a critical profile activation block race condition/deadlock in `handleSelectProfile` (AUDIT-FE-001).
+  - Identified SWR race condition on `lastEnhancedProfileRef` (AUDIT-FE-002).
+  - Found missing cleanup state updater memory leak risk in `ActiveNodeStatusCard` (AUDIT-FE-003).
+  - Found type safety / key mismatch bug on `'allow-lan'` (AUDIT-FE-004).
+  - Discovered 3 theme and skin compatibility violations on slider limits, transparent dialog paper styles, and metric card ordering (AUDIT-FE-005, AUDIT-FE-006, AUDIT-FE-007).
+- **Unexplored areas**: None.
 
 ## Key Decisions Made
-- Performed a static review of the codebase without running build or modifying code.
-- Outlined explicit actionable proposed refactorings/fixes for all identified performance, readability, safety, and architectural concerns.
+- Audited all 11 target files thoroughly.
+- Provided detailed findings, rationale, severity levels, file paths with link markup, and exact diff code blocks.
+- Mapped compliance matrix of components against the six skin styles.
 
 ## Artifact Index
-- handoff.md — Contains detailed audit findings and a summary checklist
-- progress.md — Heartbeat progress tracker
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\handoff.md — Handoff report with findings and skin compatibility table.
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\ORIGINAL_REQUEST.md — Original request description.
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\progress.md — Heartbeat progress tracker.

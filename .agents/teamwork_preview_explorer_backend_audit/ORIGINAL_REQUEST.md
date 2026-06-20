@@ -1,14 +1,26 @@
-## 2026-06-17T05:22:35Z
+## 2026-06-20T04:48:56Z
+You are the teamwork_preview_explorer.
+Your working directory is: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_backend_audit\
+Your task is to conduct a thorough pre-release code audit of the backend monitor and commands.
+Files to audit:
+- src-tauri/src/module/monitor.rs
+- src-tauri/src/cmd/proxy.rs
+- src-tauri/src/cmd/clash.rs
+- src-tauri/src/cmd/profile.rs
 
-You are the Backend Auditor. Your workspace folder is `c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_backend_audit`.
-Your mission is to perform a comprehensive, **non-modifying** code audit of the Rust/Tauri backend (located in `src-tauri/`).
-You must NOT modify any file. You must NOT build or compile.
-Perform static code review focusing on:
-1. Safety, Concurrency, and Performance: Search for potential deadlocks (such as locking Mutexes across async boundaries or recursive locking), thread hang/leak risks, unbounded channels, high-frequency resource polling, CPU or memory issues (e.g. leaking WebView2 processes, unclosed file descriptors), integer overflows, bounds check bypass, unsafe blocks, and panics (such as `.unwrap()` in production paths).
-2. Readability & Architecture: Assess Rust module layout, API design (Tauri commands), trait designs, error-handling conventions (e.g., thiserror, anyhow), design patterns, and overall maintainability.
+Under NO circumstances are you to write, edit, or delete any source code files inside the working directory. All proposed fixes must be presented solely as code diff blocks in your handoff report.
 
-Please write your findings to a file named `handoff.md` in your workspace folder.
-The `handoff.md` must contain:
-- Detailed findings for each issue: File path, line ranges, problem description, code snippet, and proposed refactoring or fix.
-- A summary checklist.
-When done, use the send_message tool to report completion back to the orchestrator.
+Key Focus Areas:
+1. Concurrency / Race Conditions / Locking issues (e.g., locking Mutex across async boundaries, deadlock risks, etc.).
+2. Parameter safety / URL Percent-Encoding of inputs (e.g., checking if test_url is encoded, etc.).
+3. Resource & Memory Management: Check timeouts on HTTP/WebSocket clients (e.g., ensuring a 3s timeout exists to prevent infinite hangouts), resource leaks.
+4. Regex safety (e.g. error handling on user-defined regex falling back gracefully to string contains).
+5. Code Quality & Dead Code.
+
+Please produce a detailed handoff report in your directory named handoff.md, including a list of findings where each finding includes:
+- Finding ID (e.g., AUDIT-BE-001)
+- Description of the issue
+- Severity level (Critical, Major, Minor, Info)
+- File path with line numbers (absolute path with standard file:/// link format: [filename](file:///absolute/path/to/file#Lstart-Lend))
+- Root cause analysis
+- Suggested fix with a precise diff code block

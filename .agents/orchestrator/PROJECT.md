@@ -1,4 +1,4 @@
-# Project: Clash Mini Performance Optimization
+# Project: Clash Mini Pre-Release Code Audit
 
 ## Architecture
 - Frontend: React UI built with Vite and MUI, utilizing Tauri API to communicate with Rust backend, tanstack/react-query for caching, and WebSocket for real-time traffic and connection data.
@@ -7,24 +7,16 @@
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|---|---|---|---|
-| 1 | Frontend CPU & IPC | Optimize `useVisibility`, `useTrafficMonitorEnhanced`, and `useLogData` to disable high-frequency WebSockets/timers when window is hidden or minimized. | None | DONE (Handoff: .agents/sub_orch_m1/handoff.md) |
-| 2 | Backend Disk I/O | Optimize `save_yaml` and profile writes to prevent redundant disk I/O when file contents have not changed. | None | DONE (Handoff: .agents/sub_orch_m2_gen3/handoff.md) |
-| 3 | Backend Guard Loops | Review and throttle background checking loops (like service waits or proxy guard checks) using yield control and tokio sleep. | None | DONE (Handoff: .agents/sub_orch_m3/handoff.md) |
+| 1 | Frontend Code Audit | Static analysis of `src/pages/_layout.tsx` and all components in `src/pages/_layout/components/` against skin compatibility, concurrency/race conditions, resource leaks, and code quality. | None | DONE (Conv ID: 8e7a1460-c72c-4faa-8117-838e369ab890) |
+| 2 | Backend Code Audit | Static analysis of `src-tauri/src/module/monitor.rs` and commands `proxy.rs`, `clash.rs`, `profile.rs` under `src-tauri/src/cmd/` against concurrency, safety, and correctness. | None | DONE (Conv ID: 6d62c7fa-20a7-4c9d-a5a0-606c5a40d870) |
+| 3 | Report Synthesis & Review | Aggregating subagent findings, writing the final `audit_report.md` in the required path, and verifying formatting, standard links, and completeness. | 1, 2 | DONE (Output: .agents/orchestrator/audit_report.md) |
 
 ## Interface Contracts
-### Frontend ↔ Backend (WebSocket API)
-- `MihomoWebSocket` connections are opened only when the window is active and visibility state is visible.
-- Re-render triggers are minimized and throttled when the page is visible.
-- When hidden/minimized, the subscriptions are completely closed and background workers stop.
-
-### Configuration Storage
-- `save_yaml` in `utils/help.rs` is the common interface for config saves.
-- Profile storage saving is managed in `config/prfitem.rs` and `cmd/save_profile.rs`.
+- Front-to-Back: Communication uses Tauri IPC commands and WebSockets (`MihomoWebSocket`).
+- State Preservation: Frontend states stored in LocalStorage and synchronized with backend via `save_proxy_head_state`.
 
 ## Code Layout
-- Frontend Source: `src/`
-- Frontend Hooks: `src/hooks/`
-- Tauri Backend Source: `src-tauri/src/`
-- Backend Config: `src-tauri/src/config/`
-- Backend Core Managers: `src-tauri/src/core/`
-- Backend Utilities: `src-tauri/src/utils/`
+- Frontend Page: `src/pages/_layout.tsx`
+- Frontend Components: `src/pages/_layout/components/`
+- Backend Monitor Module: `src-tauri/src/module/monitor.rs`
+- Backend Tauri Commands: `src-tauri/src/cmd/` (`proxy.rs`, `clash.rs`, `profile.rs`)

@@ -1,20 +1,23 @@
-# Clash Mini Performance Optimization Plan
+# Clash Mini Pre-Release Code Audit Plan
 
 ## Objective
-Profile, locate, and fix the root causes of high CPU usage and frequent/heavy disk read/write operations in the Clash Mini project, complying strictly with `clash_mini_agreements.md`.
+Perform a comprehensive pre-release code audit of the frontend layout components, backend monitoring modules, and related Tauri commands. Propose non-modifying diff fixes and verify compliance under the strict 'No Write' constraint.
 
-## Decomposition into Milestones
-1. **Milestone 1: Frontend CPU & IPC Optimization**
-   - Target files: `src/hooks/use-visibility.ts`, `src/hooks/use-traffic-monitor.ts`, `src/hooks/use-log-data.ts`.
-   - Goal: Pause WebSocket subscriptions and background worker threads when page visibility is false (hidden/minimized). Detect minimizing/hidden states using Tauri's window APIs.
-2. **Milestone 2: Backend Disk I/O Optimization**
-   - Target files: `src-tauri/src/utils/help.rs`, `src-tauri/src/config/prfitem.rs`, `src-tauri/src/cmd/save_profile.rs`.
-   - Goal: Read and compare file contents before writing. Avoid redundant disk I/O when file contents are unchanged.
-3. **Milestone 3: Backend Guard Loop Throttling**
-   - Target files: `src-tauri/src/core/sysopt.rs`, `src-tauri/src/core/service.rs`.
-   - Goal: Ensure system service and proxy guard checks use throttled timings and yield control correctly using tokio sleep/delay queue to prevent hot spinning.
+## Milestones
+1. **Milestone 1: Frontend Code Audit**
+   - Scope: `src/pages/_layout.tsx` and all 10 components under `src/pages/_layout/components/`.
+   - Focus: Race conditions, skin styles compatibility (Trump-3D, Original, Modern, Frosted, Cyberpunk, Monochrome), memory management, and code quality.
+   - Dispatch: Spawn `teamwork_preview_explorer` to inspect frontend files and identify findings.
 
-## Execution Strategy
-- For each milestone, we will invoke a `sub_orch` subagent to manage the milestone's implementation.
-- Each sub-orchestrator will run the iteration loop: Explorer -> Worker -> Reviewer -> Challenger -> Auditor.
-- Verification checks: unit tests must pass, and the Forensic Auditor must verify the changes for security and integrity.
+2. **Milestone 2: Backend Code Audit**
+   - Scope: `src-tauri/src/module/monitor.rs` and related commands under `src-tauri/src/cmd/` (`proxy.rs`, `clash.rs`, `profile.rs`).
+   - Focus: Race conditions, concurrency, parameters validation/percent-encoding, error handling, memory leaks.
+   - Dispatch: Spawn `teamwork_preview_explorer` to inspect backend files and identify findings.
+
+3. **Milestone 3: Report Synthesis & Review**
+   - Scope: Consolidate findings from Milestones 1 & 2.
+   - Actions: Generate `audit_report.md` in the required directory (`C:\Users\sun_y\.gemini\antigravity\brain\cdd94940-b080-4369-a04d-422abec1819d/audit_report.md`).
+   - Verify that standard links formatted like `[filename](file:///absolute/path/to/file#Lstart-Lend)` are present and valid, skin styles table is populated, and executive summary is written.
+
+## Verification
+- Validate TypeScript compilation (`pnpm typecheck` and `pnpm web:build`) using worker tools to ensure build health, though no modifications to source files are allowed.
