@@ -1090,12 +1090,14 @@ const Layout = () => {
       if (newProfile) {
         await patchProfiles({ current: newProfile.uid })
         targetUid = newProfile.uid
+        lastEnhancedProfileRef.current = targetUid
       }
 
       await mutateProfiles()
 
       // Real-time compilation and reload
         await enhanceProfiles()
+        await new Promise((r) => setTimeout(r, 1000))
         // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         if (targetUid) {
           await waitForClashReady(t)
@@ -1116,12 +1118,14 @@ const Layout = () => {
         if (newProfile) {
           await patchProfiles({ current: newProfile.uid })
           targetUid = newProfile.uid
+          lastEnhancedProfileRef.current = targetUid
         }
 
         await mutateProfiles()
 
         // Real-time compilation and reload
         await enhanceProfiles()
+        await new Promise((r) => setTimeout(r, 1000))
         // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         if (targetUid) {
           await waitForClashReady(t)
@@ -1164,6 +1168,7 @@ const Layout = () => {
       await updateProfile(uid)
       if (uid === currentProfileUid) {
         await enhanceProfiles()
+        await new Promise((r) => setTimeout(r, 1000))
         // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         await waitForClashReady(t)
         await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)

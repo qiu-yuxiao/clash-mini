@@ -152,7 +152,7 @@ async fn wait_for_clash_ready() -> bool {
     let client = create_client();
 
     // 阶段 1：等待内核 API 接口响应
-    while start_time.elapsed().as_secs() < 10 {
+    while start_time.elapsed().as_secs() < 30 {
         let info = Config::clash().await.data_arc().get_client_info();
         let server = info.server;
         let secret = info.secret;
@@ -169,7 +169,7 @@ async fn wait_for_clash_ready() -> bool {
         sleep(Duration::from_millis(200)).await;
     }
 
-    if start_time.elapsed().as_secs() >= 10 {
+    if start_time.elapsed().as_secs() >= 30 {
         logging!(warn, Type::Lightweight, "[后台监测] 阶段 1 失败：等待内核 API 响应超时");
         return false;
     }
