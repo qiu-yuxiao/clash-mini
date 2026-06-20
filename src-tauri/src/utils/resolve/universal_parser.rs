@@ -20,18 +20,24 @@ pub fn decode_base64_robust(s: &str) -> Option<Vec<u8>> {
     if s.is_empty() {
         return None;
     }
+    // Remove all whitespace characters including newlines
+    let s_clean: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+    if s_clean.is_empty() {
+        return None;
+    }
+
     // Try standard base64 first
-    if let Ok(data) = STANDARD.decode(s) {
+    if let Ok(data) = STANDARD.decode(&s_clean) {
         return Some(data);
     }
 
     // Try URL safe base64
-    if let Ok(data) = base64::engine::general_purpose::URL_SAFE.decode(s) {
+    if let Ok(data) = base64::engine::general_purpose::URL_SAFE.decode(&s_clean) {
         return Some(data);
     }
 
     // Try padding if length is not multiple of 4
-    let mut padded = s.to_string();
+    let mut padded = s_clean;
     while !padded.len().is_multiple_of(4) {
         padded.push('=');
     }
@@ -635,5 +641,13 @@ mod tests {
             map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
             6712
         );
+    }
+
+    #[test]
+    fn test_decode_base64_robust_newlines() {
+        let s = "aGVsbG8gd29ybGQKaGVs\nbG8gd29ybGQ=";
+        let decoded = decode_base64_robust(s).unwrap();
+        let decoded_str = String::from_utf8(decoded).unwrap();
+        assert_eq!(decoded_str, "hello world\nhello world");
     }
 }

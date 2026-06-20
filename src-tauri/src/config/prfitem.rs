@@ -560,16 +560,34 @@ impl PrfItem {
         let data = data.trim_start_matches('\u{feff}');
 
         // check the data whether the valid yaml format
+        let decoded_opt = crate::utils::resolve::universal_parser::decode_base64_robust(data);
+
         let (_yaml, serialized_data) = match serde_yaml_ng::from_str::<Mapping>(data) {
             Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => (y, data.to_string()),
             _ => {
-                if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(data) {
-                    let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default();
-                    (parsed, serialized)
+                let decoded_str_opt = decoded_opt
+                    .as_ref()
+                    .and_then(|bytes| std::string::String::from_utf8(bytes.clone()).ok());
+
+                let parsed_yaml_from_b64 = decoded_str_opt.as_ref().and_then(|decoded_str| {
+                    serde_yaml_ng::from_str::<Mapping>(decoded_str)
+                        .ok()
+                        .filter(|y| y.contains_key("proxies") || y.contains_key("proxy-providers"))
+                        .map(|y| (y, decoded_str.to_string()))
+                });
+
+                if let Some(res) = parsed_yaml_from_b64 {
+                    res
                 } else {
-                    return Err(anyhow::anyhow!(
-                        "订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"
-                    ));
+                    let parse_content = decoded_str_opt.as_deref().unwrap_or(data);
+                    if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(parse_content) {
+                        let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default();
+                        (parsed, serialized)
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"
+                        ));
+                    }
                 }
             }
         };
