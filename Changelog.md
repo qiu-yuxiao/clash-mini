@@ -1,3 +1,17 @@
+## v1.5.0
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-121: Resolve issue where the active outbound node is permanently occupied by a fixed node (advertising/dummy node) after importing a new subscription, and the auto-optimization process never triggers. Root cause: backend monitor thread's `trigger_backend_auto_select` locks `AUTO_SELECT_RUNNING` on the OLD config, and the frontend's `triggerAutoSelectAndRefresh` silently swallows the `AUTO_SELECT_BUSY` error without retry, causing subsequent `refreshProxy`, `setHeadState(sortType=1)`, and Fallback timer to never execute. Fix: added AUTO_SELECT_BUSY retry (up to 5 attempts, 600ms interval) in `triggerAutoSelectAndRefresh`, and moved `refreshProxy`/`setHeadState`/Fallback timer outside the try-catch block to ensure they always execute.
+- Fix BUG-138: Resolve issue where clicking the lightning cursor (batch speed test) at the top of the proxy table has no response. Root cause: `trigger_backend_auto_select` path has three inconsistencies compared to the single-node speed test path: (1) `create_client()` had an aggressive 3-second timeout, (2) `delay > 50` lower-bound filter excluded low-latency nodes, (3) `handleCheckAll` had no retry for `AUTO_SELECT_BUSY`. Fix: increased client timeout to 10s, removed the `delay > 50` filter, added AUTO_SELECT_BUSY retry in `handleCheckAll`.
+
+### 🚀 Optimizations
+
+- Refactor: Merged "Takeover Mode" and "Routing Preference" cards into a single unified card module, removing the gap between them.
+- Refactor: Swapped the positions of the Upload and Download traffic metric groups at the bottom of the window (Download on left, Upload on right).
+- Change: Default sort mode of the table header cursor changed from "default sort" to "sort by delay".
+- Change: Adjusted slider min/max values for various skin styles (Depth 2.0→1.0, Radius 5.0→3.0, Roundness 2.0→3.0, Opacity 2.0→5.0, Monochrome Radius 1.0→3.0 & min 0.3→0.0, Vibrancy 2.0→5.0, Shadow 2.0→5.0).
+
 ## v1.4.9
 
 ### 🐞 Fixed Bugs

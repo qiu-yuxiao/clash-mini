@@ -2316,3 +2316,14 @@
 - **根因**：`enhanceProfiles()` 永远调用后端 `update_config_forced()`，该函数通过 Clash API 的 `PUT /configs` 重载配置，导致当前选中的节点被 Clash 重置为默认值。
 - **修复规范**：在 `_layout.tsx` 的 `useEffect([currentProfileUid])` 中，`activateSelected()` 之后必须追加 `invoke('trigger_auto_select', { isManual: false })`，确保配置重载后始终执行一次自动选点，选取最快可用节点覆盖 Clash 的默认假节点。
 - **导入场景的竞态修复**：后台监测进程在检测到 UID 变化时，`wait_for_clash_ready()` 的阶段 2 检查 `/proxies/PROXY`——但此时 Clash 内核仍加载着旧配置，旧的 PROXY 组有节点会导致阶段 2 误判通过，从而在旧配置上选点。前端末尾的 `trigger_auto_select` 保证了最终在新加强配置上正确选点，覆盖后台的过时选点结果。
+
+## ⚡ 二十九、 自动选点竞态兜底与批量测速修复规范 (BUG-121/BUG-138)
+
+**背景**：`trigger_backend_auto_select` 使用 `AUTO_SELECT_RUNNING` 原子互斥锁防止并发调用。该锁被后台监测线程在 UID 变化时抢夺后，前端手动触发的自动选点（导入/切换配置后）和批量测速（闪电光标）均因 `AUTO_SELECT_BUSY` 失败。活跃节点卡片测速走 `delayProxyByName`（Tauri Plugin → Clash API），不经过此锁，始终正常工作。
+
+- **根因**：两处前端调用均未对 `AUTO_SELECT_BUSY` 实施重试，异常被 catch 直接吞掉。且 `trigger_backend_auto_select` 路径与单节点路径有三处不一致：HTTP 客户端超时 3s（单节点无限制）、`delay > 50` 下限过滤（单节点不过滤）、`create_client()` 超时过短。
+- **修复规范 (BUG-121)**：`_layout.tsx` 中 `triggerAutoSelectAndRefresh` 函数对 `invoke('trigger_auto_select')` 的 `AUTO_SELECT_BUSY` 错误必须重试（最多 5 次，间隔 600ms）。`refreshProxy`/`setHeadState(sortType=1)`/Fallback 定时器必须移到 try/catch 外部，确保不管 auto-select 是否成功都执行。
+- **修复规范 (BUG-138)**：
+  1. `monitor.rs` 中 `create_client()` 的超时从 3 秒增加到 10 秒。
+  2. `monitor.rs` 中 `trigger_backend_auto_select_inner` 去掉 `delay > 50` 下限过滤，仅保留 `< 2000` 上限。
+  3. `proxy-groups.tsx` 中 `handleCheckAll` 对 `invoke('trigger_auto_select')` 的 `AUTO_SELECT_BUSY` 必须重试（最多 5 次，间隔 600ms）。
