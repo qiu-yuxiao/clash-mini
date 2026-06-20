@@ -72,17 +72,17 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
     }
   }
 
-  const getSlider1Min = (skin: string): number => {
-    return skin === 'monochrome' ? 0.3 : 0.0
+  const getSlider1Min = (_skin: string): number => {
+    return 0.0
   }
 
   const getSlider1Max = (skin: string): number => {
     switch (skin) {
-      case 'retro-3d':
-      case 'modern-flat':
-      case 'frosted-glass': return 2.0
-      case 'monochrome': return 1.0
-      case 'original':
+      case 'retro-3d': return 1.0
+      case 'original': return 3.0
+      case 'modern-flat': return 3.0
+      case 'frosted-glass': return 5.0
+      case 'monochrome': return 3.0
       case 'cyberpunk': return 5.0
       default: return 2.0
     }
@@ -91,7 +91,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
   const getSlider2Max = (skin: string): number => {
     switch (skin) {
       case 'retro-3d':
-      case 'modern-flat': return 2.0
+      case 'modern-flat': return 5.0
       case 'original': return 3.0
       case 'monochrome':
       case 'frosted-glass':
