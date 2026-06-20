@@ -41,3 +41,7 @@
 9. **Windows 大文件操作 Python 强制律 (Law of Python for Large File Operations)**
    - **要求**：在 Windows 环境下，凡涉及对大型文件（如 `Cargo.lock`、`pnpm-lock.yaml`、`clash_mini_agreements.md` 等）的读取、写入、搜索或替换操作，必须编写 Python 脚本（`.py`）在 `package.json` 中注册为脚本任务后，通过 `pnpm` 命令执行，或直接以 `python <script>.py` 方式调用。
    - **禁止**：严禁使用 PowerShell 命令（如 `Get-Content`、`Set-Content`、`Select-String`、`-replace` 等）对大文件进行直接读写或文本替换操作，因 PowerShell 在 Windows 下处理大文件时极易产生编码错误、截断或静默失败，危及文件完整性。
+
+10. **命令合并最小弹窗律 (Law of Command Batching)**
+    - **要求**：Agent 在执行调试、测试或多步验证任务时，必须将逻辑连续的多条命令（包括 Python 脚本调用、git 操作、文件校验等）合并为**单次 `run_command` 调用**，以分号或换行符串联，确保用户仅需点击一次 Submit 即可完成整个步骤组。Python 脚本必须通过 PowerShell 直接调用（`python scripts/xxx.py`），无需额外包装层。
+    - **禁止**：严禁将一个逻辑任务拆分为多次独立的 `run_command` 调用，导致用户需要多次手动点击 Submit 确认，打断工作节奏。
