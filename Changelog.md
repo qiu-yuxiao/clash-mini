@@ -1,3 +1,9 @@
+## v1.4.9
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-136: Resolve issue where importing subscription links failed with error "订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表". Supported Base64-encoded YAML files in the format detection funnel, and made Base64 decoding robust against internal newlines and whitespaces.
+
 ## v1.3.4
 
 ### 🐞 Fixed Bugs
