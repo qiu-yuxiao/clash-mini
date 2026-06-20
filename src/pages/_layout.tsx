@@ -1374,16 +1374,11 @@ const Layout = () => {
                 })
               }
               sx={(theme) => ({
-                ...get3DButtonStyle(theme, 'contained', 'default'),
+                ...get3DButtonStyle(theme, 'contained', verge?.enable_always_on_top ? 'primary' : 'default'),
                 flexShrink: 0,
                 width: '28px',
                 height: '28px',
                 p: 0,
-                ...(verge?.enable_always_on_top ? {
-                  background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.5)} !important`,
-                  boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
-                } : {}),
               })}
             >
               <PushPinRounded
@@ -1407,21 +1402,12 @@ const Layout = () => {
             size="small"
             onClick={() => setDrawerOpen(!drawerOpen)}
             sx={(theme) => ({
-              ...get3DButtonStyle(theme, 'contained', 'default'),
+              ...get3DButtonStyle(theme, 'contained', drawerOpen ? 'primary' : 'default'),
               flexShrink: 0,
               width: '28px',
               height: '28px',
               p: 0,
               mr: 1,
-              // 设定界面打开时显示激活态（同图钉按钮逻辑）
-              ...(drawerOpen
-                ? {
-                    color: 'primary.main',
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
-                    background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
-                    boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
-                  }
-                : {}),
             })}
           >
             {drawerOpen ? (
@@ -1550,16 +1536,10 @@ const Layout = () => {
                   size="small"
                   onClick={() => setDrawerOpen(!drawerOpen)}
                   sx={(theme) => ({
-                    ...get3DButtonStyle(theme, 'contained', 'default'),
+                    ...get3DButtonStyle(theme, 'contained', drawerOpen ? 'primary' : 'default'),
                     width: '28px',
                     height: '28px',
                     p: 0,
-                    ...(drawerOpen ? {
-                      color: 'primary.main',
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.5)}`,
-                      background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
-                      boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
-                    } : {}),
                   })}
                 >
                   {drawerOpen ? (
@@ -1597,16 +1577,11 @@ const Layout = () => {
                     })
                   }
                   sx={(theme) => ({
-                    ...get3DButtonStyle(theme, 'contained', 'default'),
+                    ...get3DButtonStyle(theme, 'contained', verge?.enable_always_on_top ? 'primary' : 'default'),
                     flexShrink: 0,
                     width: '28px',
                     height: '28px',
                     p: 0,
-                    ...(verge?.enable_always_on_top ? {
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.5)} !important`,
-                      background: `${alpha(theme.palette.primary.main, 0.15)} !important`,
-                      boxShadow: `0 0 calc(8px * var(--vibrancy-factor, 1.0)) ${alpha(theme.palette.primary.main, 0.6)}`,
-                    } : {}),
                   })}
                 >
                     <PushPinRounded
