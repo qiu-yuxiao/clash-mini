@@ -15,7 +15,7 @@ const MAX_CONCURRENT_DELAY_TESTS: usize = 32;
 
 fn create_client() -> reqwest::Client {
     reqwest::Client::builder()
-        .timeout(Duration::from_secs(3))
+        .timeout(Duration::from_secs(10))
         .build()
         .unwrap_or_else(|_| reqwest::Client::new())
 }
@@ -386,7 +386,7 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
             if let Ok(res) = req.send().await {
                 if res.status().is_success() {
                     if let Ok(delay_info) = res.json::<DelayResponse>().await {
-                        if delay_info.delay > 50 && delay_info.delay < 2000 {
+                        if delay_info.delay < 2000 {
                             return Some((node_name, delay_info.delay));
                         }
                     }

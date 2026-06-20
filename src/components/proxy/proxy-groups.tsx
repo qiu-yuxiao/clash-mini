@@ -438,11 +438,30 @@ export const ProxyGroups = (props: Props) => {
         )
         const sortType = headItem?.headState?.sortType ?? 1
 
-        // 由后台统一测速并选最快节点
-        const results = await invoke<[string, number][]>(
-          'trigger_auto_select',
-          { isManual: true, sortType },
-        )
+        // 由后台统一测速并选最快节点（BUG-138: 增加 AUTO_SELECT_BUSY 重试）
+        let results: [string, number][] = []
+        const MAX_RETRIES = 5
+        const RETRY_DELAY_MS = 600
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            results = await invoke<[string, number][]>(
+              'trigger_auto_select',
+              { isManual: true, sortType },
+            )
+            break
+          } catch (err: any) {
+            const errMsg = typeof err === 'string' ? err : err?.message || String(err)
+            if (errMsg.includes('AUTO_SELECT_BUSY') && attempt < MAX_RETRIES) {
+              debugLog(`[ProxyGroups] trigger_auto_select 繁忙，${RETRY_DELAY_MS}ms后重试 (${attempt}/${MAX_RETRIES})`)
+              await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+            } else if (attempt < MAX_RETRIES) {
+              debugLog(`[ProxyGroups] trigger_auto_select 失败，重试 (${attempt}/${MAX_RETRIES}):`, err)
+              await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+            } else {
+              throw err
+            }
+          }
+        }
         if (results && results.length > 0) {
           // 用后台测速结果刷新前台的延迟显示
           for (const [name, delay] of results) {
