@@ -102,47 +102,75 @@ Log-Ok "Local commits successfully pushed"
 
 # Tag conflict check
 $ExistingTag = git tag -l $TagName
-if ($ExistingTag) {
-    Log-Error "Tag $TagName already exists. To re-release, please manually delete it:"
-    Log-Error "  git tag -d $TagName"
-    Log-Error "  git push origin :refs/tags/$TagName"
-    exit 1
-}
-Log-Ok "Tag $TagName does not exist, proceeding"
-
-# ─────────────────────────────────────────────
-# Stage 2: Version Bump (Python)
-# ─────────────────────────────────────────────
-Log-Step "Bumping Version Numbers (Python)"
-$BumpScript = Join-Path $ProjectRoot "scripts\bump_version.py"
-python $BumpScript $Version
-if ($LASTEXITCODE -ne 0) {
-    Log-Error "bump_version.py execution failed"
-    exit 1
+$RemoteTagCheck = git ls-remote origin refs/tags/$TagName
+$RemoteTagExists = $false
+if ($RemoteTagCheck) {
+    $RemoteTagExists = $true
 }
 
-# ─────────────────────────────────────────────
-# Stage 3: Git Commit, Push, Tag
-# ─────────────────────────────────────────────
-Log-Step "Git Commit and Push"
+$SkipBumpAndTag = $false
+if ($ExistingTag -or $RemoteTagExists) {
+    Log-Warn "Tag $TagName already exists (Local: [$(if($ExistingTag){"Yes"}else{"No"})], Remote: [$(if($RemoteTagExists){"Yes"}else{"No"})])."
+    Log-Info "Checking if a workflow run already exists for this release..."
+    
+    $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
+    if ($json) {
+        $obj = ($json -join "`n") | ConvertFrom-Json
+        $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
+               Sort-Object -Property id -Descending | Select-Object -First 1
+        if ($run) {
+            Log-Ok "Found existing workflow run for this release (Run ID: $($run.id))."
+            Log-Ok "Skipping Version Bump and Git Push steps. Jumping directly to CI monitoring..."
+            $SkipBumpAndTag = $true
+        }
+    }
+    
+    if (-not $SkipBumpAndTag) {
+        Log-Error "Tag exists but no active or completed release workflow run was found for tag $TagName."
+        Log-Error "To re-release, please manually delete the tag:"
+        Log-Error "  git tag -d $TagName"
+        Log-Error "  git push origin :refs/tags/$TagName"
+        exit 1
+    }
+} else {
+    Log-Ok "Tag $TagName does not exist, proceeding with clean release"
+}
 
-git config --local http.sslBackend openssl
-git config --local http.sslVerify false
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
-git commit -m "release: bump version to $Version" --no-verify
-if ($LASTEXITCODE -ne 0) { Log-Error "git commit failed"; exit 1 }
+if (-not $SkipBumpAndTag) {
+    # ─────────────────────────────────────────────
+    # Stage 2: Version Bump (Python)
+    # ─────────────────────────────────────────────
+    Log-Step "Bumping Version Numbers (Python)"
+    $BumpScript = Join-Path $ProjectRoot "scripts\bump_version.py"
+    python $BumpScript $Version
+    if ($LASTEXITCODE -ne 0) {
+        Log-Error "bump_version.py execution failed"
+        exit 1
+    }
 
-git push origin dev --no-verify
-if ($LASTEXITCODE -ne 0) { Log-Error "git push dev failed"; exit 1 }
-Log-Ok "dev branch pushed"
+    # ─────────────────────────────────────────────
+    # Stage 3: Git Commit, Push, Tag
+    # ─────────────────────────────────────────────
+    Log-Step "Git Commit and Push"
 
-git tag $TagName
-git push origin $TagName --no-verify
-if ($LASTEXITCODE -ne 0) { Log-Error "git push tag failed"; exit 1 }
-Log-Ok "Tag $TagName pushed -> CI triggered"
+    git config --local http.sslBackend openssl
+    git config --local http.sslVerify false
+    git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+    git commit -m "release: bump version to $Version" --no-verify
+    if ($LASTEXITCODE -ne 0) { Log-Error "git commit failed"; exit 1 }
 
-git config --local --unset http.sslBackend
-git config --local --unset http.sslVerify
+    git push origin dev --no-verify
+    if ($LASTEXITCODE -ne 0) { Log-Error "git push dev failed"; exit 1 }
+    Log-Ok "dev branch pushed"
+
+    git tag $TagName
+    git push origin $TagName --no-verify
+    if ($LASTEXITCODE -ne 0) { Log-Error "git push tag failed"; exit 1 }
+    Log-Ok "Tag $TagName pushed -> CI triggered"
+
+    git config --local --unset http.sslBackend
+    git config --local --unset http.sslVerify
+}
 
 Write-Host ""
 Write-Host "  CI Monitor Dashboard: https://github.com/$GitHubRepo/actions" -ForegroundColor Cyan
@@ -157,7 +185,7 @@ function Get-RunInfo {
     $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
     if (-not $json) { return $null }
     $obj = ($json -join "`n") | ConvertFrom-Json
-    $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq "dev" -or $_.head_sha -ne $null } |
+    $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
            Sort-Object -Property id -Descending | Select-Object -First 1
     return $run
 }
