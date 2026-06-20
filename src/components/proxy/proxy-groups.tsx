@@ -37,7 +37,8 @@ import delayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
-import { healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
+import { healthcheckProxyProvider, getProxyByName, delayProxyByName, selectNodeForGroup } from 'tauri-plugin-mihomo-api'
+import { isDummyNode } from '@/utils/node'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
@@ -432,35 +433,43 @@ export const ProxyGroups = (props: Props) => {
           onProxies()
         }
 
-        // 获取当前组的前端排序设置，传给后台
-        const headItem = renderList.find(
-          (e) => e.type === 1 && e.group?.name === groupName,
-        )
-        const sortType = headItem?.headState?.sortType ?? 1
-
-        // 由后台统一测速并选最快节点（BUG-138: 增加 AUTO_SELECT_BUSY 重试）
+        // 改用前端 delayProxyByName 路径进行全节点测速
+        // 替代 invoke('trigger_auto_select')，绕过后台 AUTO_SELECT_RUNNING 锁
         let results: [string, number][] = []
-        const MAX_RETRIES = 5
-        const RETRY_DELAY_MS = 600
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-          try {
-            results = await invoke<[string, number][]>(
-              'trigger_auto_select',
-              { isManual: true, sortType },
-            )
-            break
-          } catch (err: any) {
-            const errMsg = typeof err === 'string' ? err : err?.message || String(err)
-            if (errMsg.includes('AUTO_SELECT_BUSY') && attempt < MAX_RETRIES) {
-              debugLog(`[ProxyGroups] trigger_auto_select 繁忙，${RETRY_DELAY_MS}ms后重试 (${attempt}/${MAX_RETRIES})`)
-              await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
-            } else if (attempt < MAX_RETRIES) {
-              debugLog(`[ProxyGroups] trigger_auto_select 失败，重试 (${attempt}/${MAX_RETRIES}):`, err)
-              await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
-            } else {
-              throw err
+        try {
+          const proxyGroup = await getProxyByName(groupName)
+          const allNames = (proxyGroup?.all || []).filter(
+            (name: string) => !isDummyNode(name),
+          )
+          if (allNames.length > 0) {
+            // 并发测速所有节点
+            const concurrency = 10
+            const queue = [...allNames]
+            const worker = async () => {
+              while (queue.length > 0) {
+                const name = queue.shift()
+                if (!name) continue
+                try {
+                  const result = await delayProxyByName(name, '', 10000)
+                  if (result && result.delay > 0 && result.delay < 10000) {
+                    results.push([name, result.delay])
+                  }
+                } catch {}
+              }
+            }
+            const workerCount = Math.min(concurrency, allNames.length)
+            await Promise.all(Array.from({ length: workerCount }, () => worker()))
+            results.sort((a, b) => a[1] - b[1])
+            // 切换到最快节点
+            if (results.length > 0) {
+              await selectNodeForGroup(groupName, results[0][0])
             }
           }
+        } catch (err) {
+          console.error(
+            `[ProxyGroups] 延迟测试或自动选路出错，组: ${groupName}`,
+            err,
+          )
         }
         if (results && results.length > 0) {
           // 用后台测速结果刷新前台的延迟显示

@@ -69,8 +69,10 @@ import {
 } from '@/utils/button-styles'
 import {
   closeAllConnections,
+  delayProxyByName,
   getProxyByName,
   getProxies,
+  selectNodeForGroup,
 } from 'tauri-plugin-mihomo-api'
 import DelayManager from '@/services/delay'
 
@@ -216,42 +218,65 @@ async function waitForClashReady(
 /** 触发自动选点并在完成后刷新前端 proxies 数据
  *  协议 Section III.7：自动选点后设置 sortType: 1（按延迟排序，最快节点置顶）
  */
+/** 通过前端 delayProxyByName 路径完成全节点测速并选出最快节点
+ *  （替代 invoke('trigger_auto_select')，绕过后台 AUTO_SELECT_RUNNING 锁）
+ */
+async function frontendAutoSelect(groupName: string, timeout = 10000, concurrency = 10) {
+  const proxyGroup = await getProxyByName(groupName)
+  const allNames = (proxyGroup?.all || []).filter(
+    (name: string) => !isDummyName(name),
+  )
+  if (allNames.length === 0) return []
+
+  const results: [string, number][] = []
+  const queue = [...allNames]
+
+  const worker = async () => {
+    while (queue.length > 0) {
+      const name = queue.shift()
+      if (!name) continue
+      try {
+        const result = await delayProxyByName(name, '', timeout)
+        if (result && result.delay > 0 && result.delay < timeout) {
+          results.push([name, result.delay])
+        }
+      } catch {
+        // 测速失败则跳过
+      }
+    }
+  }
+
+  const workerCount = Math.min(concurrency, allNames.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  results.sort((a, b) => a[1] - b[1])
+
+  // 切换到最快节点
+  if (results.length > 0) {
+    try {
+      await selectNodeForGroup(groupName, results[0][0])
+    } catch {}
+  }
+
+  return results
+}
+
 async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
   t: (key: string, opts?: any) => string,
   fallbackTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
 ): Promise<void> {
-  // 修复 BUG-121: 重试 AUTO_SELECT_BUSY，最多 5 次，间隔 600ms
-  const MAX_RETRIES = 5
-  const RETRY_DELAY_MS = 600
-  let autoSelectOk = false
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      // 修复 BUG-CRITICAL-003：传递 sortType 参数给后端
-      // sortType: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序
-      // 默认传 0，让后端从 proxy_head_state.json 读取用户偏好
-      await invoke('trigger_auto_select', { isManual: false, sortType: 0 })
-      console.log('[Layout] trigger_auto_select 完成')
-      autoSelectOk = true
-      break
-    } catch (err: any) {
-      const errMsg = typeof err === 'string' ? err : err?.message || String(err)
-      if (errMsg.includes('AUTO_SELECT_BUSY') && attempt < MAX_RETRIES) {
-        console.log(
-          `[Layout] trigger_auto_select 繁忙（第${attempt}次），${RETRY_DELAY_MS}ms 后重试...`,
-        )
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
-      } else if (attempt < MAX_RETRIES) {
-        console.warn(
-          `[Layout] trigger_auto_select 失败（第${attempt}次），重试:`,
-          err,
-        )
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
-      } else {
-        console.error('[Layout] trigger_auto_select 最终失败:', err)
-      }
+  // 改用前端 delayProxyByName 路径进行全节点测速并选最快节点
+  // 替代 invoke('trigger_auto_select')，绕过后台 AUTO_SELECT_RUNNING 锁
+  try {
+    const results = await frontendAutoSelect('PROXY', 10000, 10)
+    if (results.length > 0) {
+      console.log(`[Layout] 自动选点完成，最快节点: ${results[0][0]} (${results[0][1]}ms)`)
+    } else {
+      console.log('[Layout] 自动选点无可用节点')
     }
+  } catch (err) {
+    console.error('[Layout] 自动选点失败:', err)
   }
 
   // 不管 auto-select 是否成功，以下操作永远执行
