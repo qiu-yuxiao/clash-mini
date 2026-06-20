@@ -21,6 +21,10 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+# Fix encoding issue on Windows PowerShell (CP936 to UTF-8)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 # ─────────────────────────────────────────────
 # Configuration Constants
 # ─────────────────────────────────────────────
@@ -152,7 +156,7 @@ function Get-RunInfo {
     # Get newest workflow run id, status, and conclusion
     $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
     if (-not $json) { return $null }
-    $obj = $json | ConvertFrom-Json
+    $obj = ($json -join "`n") | ConvertFrom-Json
     $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq "dev" -or $_.head_sha -ne $null } |
            Sort-Object -Property id -Descending | Select-Object -First 1
     return $run
@@ -223,8 +227,8 @@ $LastRunId    = $null
             elseif ($Conclusion -eq "failure" -or $Conclusion -eq "cancelled") {
                 $LogUrl = Get-RunLogs $Run.id
                 # Determine if retryable (network errors checked via failed job name)
-                $FailedJobs = gh api "repos/$GitHubRepo/actions/runs/$($Run.id)/jobs" 2>$null |
-                              ConvertFrom-Json | Select-Object -ExpandProperty jobs |
+                $FailedJobsJson = gh api "repos/$GitHubRepo/actions/runs/$($Run.id)/jobs" 2>$null
+                $FailedJobs = ($FailedJobsJson -join "`n") | ConvertFrom-Json | Select-Object -ExpandProperty jobs |
                               Where-Object { $_.conclusion -eq "failure" }
                 $IsRetryable = $false
                 foreach ($job in $FailedJobs) {
@@ -279,7 +283,7 @@ for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 15
     $ReleaseJson = gh api "repos/$GitHubRepo/releases/tags/$TagName" 2>$null
     if ($ReleaseJson) {
-        $Rel = $ReleaseJson | ConvertFrom-Json
+        $Rel = ($ReleaseJson -join "`n") | ConvertFrom-Json
         if (-not $Rel.draft) {
             $ReleaseReady = $true
             Log-Ok "Release $TagName is published"
