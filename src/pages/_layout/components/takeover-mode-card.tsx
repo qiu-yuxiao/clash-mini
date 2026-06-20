@@ -66,7 +66,7 @@ export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
           height: 22,
           userSelect: 'none',
           ...get3DSegmentedContainerStyle(
-            theme.palette.mode === 'light',
+            theme,
           ),
         })}
       >

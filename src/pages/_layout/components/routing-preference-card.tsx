@@ -65,7 +65,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
           height: 22,
           userSelect: 'none',
           ...get3DSegmentedContainerStyle(
-            theme.palette.mode === 'light',
+            theme,
           ),
         })}
       >

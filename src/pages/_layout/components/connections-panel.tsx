@@ -85,7 +85,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
             height: 18,
             userSelect: 'none',
             ...get3DSegmentedContainerStyle(
-              theme.palette.mode === 'light',
+              theme,
             ),
           })}
         >

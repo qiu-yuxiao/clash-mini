@@ -1032,6 +1032,7 @@ const Layout = () => {
           await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
         })
         .catch((err) => {
+          if (cancelled) return
           console.error(
             `[Layout] Failed to enhance profile ${uid}:`,
             err,
@@ -1145,7 +1146,6 @@ const Layout = () => {
 
   const handleSelectProfile = async (uid: string) => {
     if (currentProfileUid === uid) return
-    isImportingRef.current = true
     try {
       await patchProfiles({ current: uid })
       await mutateProfiles()
@@ -1156,8 +1156,6 @@ const Layout = () => {
       )
     } catch (err) {
       showNotice.error(err)
-    } finally {
-      isImportingRef.current = false
     }
   }
 
@@ -1983,9 +1981,6 @@ const Layout = () => {
               minWidth: '160px',
               borderRadius: '6px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
-              backgroundColor: 'transparent',
-              backgroundImage: 'none',
-              boxShadow: 'none',
               '& .MuiList-root': {
                 padding: '4px 0',
               },
@@ -2052,9 +2047,6 @@ const Layout = () => {
               minWidth: '160px',
               borderRadius: '6px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
-              backgroundColor: 'transparent',
-              backgroundImage: 'none',
-              boxShadow: 'none',
               '& .MuiList-root': {
                 padding: '4px 0',
               },

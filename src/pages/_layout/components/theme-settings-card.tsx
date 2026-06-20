@@ -72,13 +72,31 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
     }
   }
 
-  const getSliderMax = (skin: string): number => {
+  const getSlider1Min = (skin: string): number => {
+    return skin === 'monochrome' ? 0.3 : 0.0
+  }
+
+  const getSlider1Max = (skin: string): number => {
     switch (skin) {
-      case 'retro-3d': return 1.0
-      case 'original':
+      case 'retro-3d':
       case 'modern-flat':
-      case 'monochrome': return 2.5
-      default: return 5.0
+      case 'frosted-glass': return 2.0
+      case 'monochrome': return 1.0
+      case 'original':
+      case 'cyberpunk': return 5.0
+      default: return 2.0
+    }
+  }
+
+  const getSlider2Max = (skin: string): number => {
+    switch (skin) {
+      case 'retro-3d':
+      case 'modern-flat': return 2.0
+      case 'original': return 3.0
+      case 'monochrome':
+      case 'frosted-glass':
+      case 'cyberpunk': return 5.0
+      default: return 2.0
     }
   }
 
@@ -138,7 +156,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             height: 18,
             userSelect: 'none',
             ...get3DSegmentedContainerStyle(
-              theme.palette.mode === 'light',
+              theme,
             ),
           })}
         >
@@ -328,8 +346,8 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
           <Slider
             size="small"
             value={depthFactor}
-            min={0.0}
-            max={getSliderMax(controlSkin)}
+            min={getSlider1Min(controlSkin)}
+            max={getSlider1Max(controlSkin)}
             step={0.1}
             onChange={(_, val) => handleDepthFactorChange(val as number)}
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
@@ -378,7 +396,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             size="small"
             value={vibrancyFactor}
             min={0.0}
-            max={5.0}
+            max={getSlider2Max(controlSkin)}
             step={0.1}
             onChange={(_, val) => handleVibrancyFactorChange(val as number)}
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}

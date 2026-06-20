@@ -88,9 +88,6 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
               mb: '8px',
               borderRadius: '6px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
-              backgroundColor: 'transparent',
-              backgroundImage: 'none',
-              boxShadow: 'none',
               '& .MuiList-root': {
                 padding: '4px 0',
               },

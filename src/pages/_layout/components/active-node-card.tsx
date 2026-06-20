@@ -87,12 +87,14 @@ export const ActiveNodeStatusCard = () => {
   const [nodeAddr, setNodeAddr] = useState<string>('')
 
   useEffect(() => {
+    let cancelled = false
     if (!activeNodeName) {
-      Promise.resolve().then(() => setNodeAddr(''))
+      setNodeAddr('')
       return
     }
     getProxyAddr(activeNodeName, activeNodeRecord?.provider)
       .then((res) => {
+        if (cancelled) return
         if (res) {
           setNodeAddr(`${res[0]}:${res[1]}`)
         } else {
@@ -100,9 +102,13 @@ export const ActiveNodeStatusCard = () => {
         }
       })
       .catch((err) => {
+        if (cancelled) return
         console.error('Failed to get proxy address:', err)
         setNodeAddr('')
       })
+    return () => {
+      cancelled = true
+    }
   }, [activeNodeName, activeNodeRecord?.provider])
 
   const handleTestDelay = async (e: React.MouseEvent) => {

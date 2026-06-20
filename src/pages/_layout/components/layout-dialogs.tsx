@@ -129,9 +129,6 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               border: '1px solid rgba(255, 255, 255, 0.12)',
               fontFamily: 'var(--control-font-family)',
               color: theme.palette.text.primary,
-              backgroundColor: 'transparent',
-              backgroundImage: 'none',
-              boxShadow: 'none',
             },
           },
         }}
@@ -257,9 +254,6 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               border: '1px solid rgba(255, 255, 255, 0.12)',
               fontFamily: 'var(--control-font-family)',
               color: theme.palette.text.primary,
-              backgroundColor: 'transparent',
-              backgroundImage: 'none',
-              boxShadow: 'none',
             },
           },
         }}
@@ -416,9 +410,6 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               border: '1px solid rgba(255, 255, 255, 0.12)',
               fontFamily: 'var(--control-font-family)',
               color: theme.palette.text.primary,
-              backgroundColor: 'transparent',
-              backgroundImage: 'none',
-              boxShadow: 'none',
             },
           },
         }}
