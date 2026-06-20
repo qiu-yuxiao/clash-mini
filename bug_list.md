@@ -23,10 +23,10 @@
 ### BUG-121: 导入订阅后，活跃出口节点被固定节点长期占用，永不更新?0 分钟以上不变化）
 
 - **现象描述**：用户导入新的订阅链接并完成导入流程后，「当前活跃出口节点」状态栏被某一固定节点（甲节点）长期占用，始终不发生任何切换或更新。即使等?10 分钟以上，活跃出口节点依然停留在该甲节点，自动选优流程完全未触发。此为全新复现场景，独立于重启流程?
-- **根因**：待排查
-- **排查记忆**：（暂无?
-- **当前状?*：`排查中`
-- **目标版本**：`v1.4.8`
+- **根因**：后台监测线程与前端导入流程产生竞态。当 `handleImportProfile` 调用 `patchProfiles({current: uid})` 切换配置时，后台监测线程检测到 UID 变化，立即调用 `trigger_backend_auto_select()` 在**旧配置**上测速选点，并锁住 `AUTO_SELECT_RUNNING`。随后前端完成 `enhanceProfiles()` 重载 Clash 配置后，调用 `triggerAutoSelectAndRefresh()` → `invoke('trigger_auto_select')`，但此时锁仍被后台线程持有，后端返回 `AUTO_SELECT_BUSY` 错误。前端 `triggerAutoSelectAndRefresh` 中的 `try/catch` 将此异常直接吞掉，不再重试，后续的 `refreshProxy`、`setHeadState(sortType=1)`、Fallback 兜底定时器均不执行。最终 Clash 重载配置后被重置为默认 PROXY 组第一个节点（机场广告假节点），再无任何机制纠正。
+- **排查记忆**：协议文档第二十八节（BUG-118）虽已规定前端末尾 `trigger_auto_select` 覆盖后台过时选点，但 `triggerAutoSelectAndRefresh` 中的 `invoke` 调用缺少对 `AUTO_SELECT_BUSY` 的重试机制，且在 catch 中直接 return 导致后续 refresh/sort/Fallback 全部丢失。
+- **当前状?*：`代码已修正，待用户确认`
+- **目标版本**：`v1.4.9`
 
 ### BUG-120: 顶栏图钉与齿?叉子按钮未遵守六种皮肤风格，且两按钮之间有空?
 

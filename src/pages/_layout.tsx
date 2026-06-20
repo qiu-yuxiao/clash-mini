@@ -222,64 +222,87 @@ async function triggerAutoSelectAndRefresh(
   fallbackTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
 ): Promise<void> {
-  try {
-    // 修复 BUG-CRITICAL-003：传递 sortType 参数给后端
-    // sortType: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序
-    // 默认传 0，让后端从 proxy_head_state.json 读取用户偏好
-    await invoke('trigger_auto_select', { isManual: false, sortType: 0 })
-    console.log('[Layout] trigger_auto_select 完成')
-    // 后端已切换节点，立即刷新前端显示
-    await refreshProxy({ forceFull: true })
-    // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
-    if (setHeadState) {
-      setHeadState('PROXY', { sortType: 1 })
-      console.log('[Layout] 已设置 sortType: 1（按延迟排序）')
+  // 修复 BUG-121: 重试 AUTO_SELECT_BUSY，最多 5 次，间隔 600ms
+  const MAX_RETRIES = 5
+  const RETRY_DELAY_MS = 600
+  let autoSelectOk = false
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // 修复 BUG-CRITICAL-003：传递 sortType 参数给后端
+      // sortType: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序
+      // 默认传 0，让后端从 proxy_head_state.json 读取用户偏好
+      await invoke('trigger_auto_select', { isManual: false, sortType: 0 })
+      console.log('[Layout] trigger_auto_select 完成')
+      autoSelectOk = true
+      break
+    } catch (err: any) {
+      const errMsg = typeof err === 'string' ? err : err?.message || String(err)
+      if (errMsg.includes('AUTO_SELECT_BUSY') && attempt < MAX_RETRIES) {
+        console.log(
+          `[Layout] trigger_auto_select 繁忙（第${attempt}次），${RETRY_DELAY_MS}ms 后重试...`,
+        )
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+      } else if (attempt < MAX_RETRIES) {
+        console.warn(
+          `[Layout] trigger_auto_select 失败（第${attempt}次），重试:`,
+          err,
+        )
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS))
+      } else {
+        console.error('[Layout] trigger_auto_select 最终失败:', err)
+      }
     }
-    // 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速
-    // 先清理旧定时器，防止重复
-    if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
-    fallbackTimerRef.current = setTimeout(async () => {
-      try {
-        const proxyGroup = await getProxyByName('PROXY')
-        const nowNodeName = proxyGroup?.now || ''
-        if (!nowNodeName) {
-          console.log('[Layout] Fallback: 无当前节点，跳过')
+  }
+
+  // 不管 auto-select 是否成功，以下操作永远执行
+  // 后端已切换节点，立即刷新前端显示
+  await refreshProxy({ forceFull: true })
+  // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
+  if (setHeadState) {
+    setHeadState('PROXY', { sortType: 1 })
+    console.log('[Layout] 已设置 sortType: 1（按延迟排序）')
+  }
+  // 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速
+  // 先清理旧定时器，防止重复
+  if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
+  fallbackTimerRef.current = setTimeout(async () => {
+    try {
+      const proxyGroup = await getProxyByName('PROXY')
+      const nowNodeName = proxyGroup?.now || ''
+      if (!nowNodeName) {
+        console.log('[Layout] Fallback: 无当前节点，跳过')
+        return
+      }
+      // 检查当前选中节点（now）是否有健康延迟
+      // 与后端 monitor.rs 中的阈值保持一致：delay > 50 && delay < 2000
+      // 修复 BUG-MAJOR-002：只检查最新一条历史记录，而不是任意历史记录
+      const nowNode = await getProxyByName(nowNodeName)
+      const history = nowNode?.history || []
+      const latestDelay = history.length > 0 ? history[history.length - 1].delay : -1
+      const hasHealth = latestDelay > 50 && latestDelay < 2000
+      if (!hasHealth) {
+        // 无健康节点，强制全节点测速
+        const allNames = (proxyGroup?.all || []).filter(
+          (name: string) => !isDummyName(name),
+        )
+        if (allNames.length === 0) {
+          console.log('[Layout] Fallback: 无可用节点，跳过')
           return
         }
-        // 检查当前选中节点（now）是否有健康延迟
-        // 与后端 monitor.rs 中的阈值保持一致：delay > 50 && delay < 2000
-        // 修复 BUG-MAJOR-002：只检查最新一条历史记录，而不是任意历史记录
-        const nowNode = await getProxyByName(nowNodeName)
-        const history = nowNode?.history || []
-        const latestDelay = history.length > 0 ? history[history.length - 1].delay : -1
-        const hasHealth = latestDelay > 50 && latestDelay < 2000
-        if (!hasHealth) {
-          // 无健康节点，强制全节点测速
-          const allNames = (proxyGroup?.all || []).filter(
-            (name: string) => !isDummyName(name),
-          )
-          if (allNames.length === 0) {
-            console.log('[Layout] Fallback: 无可用节点，跳过')
-            return
-          }
-          console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
-          await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
-          await refreshProxy({ forceFull: true })
-          // Fallback 测速完成后再次确保排序正确
-          if (setHeadState) {
-            setHeadState('PROXY', { sortType: 1 })
-          }
+        console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
+        await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
+        await refreshProxy({ forceFull: true })
+        // Fallback 测速完成后再次确保排序正确
+        if (setHeadState) {
+          setHeadState('PROXY', { sortType: 1 })
         }
-      } catch (fbErr) {
-        console.error('[Layout] Fallback 逻辑异常:', fbErr)
-      } finally {
-        fallbackTimerRef.current = null
       }
-    }, 10000)
-  } catch (err) {
-    console.error('[Layout] trigger_auto_select 失败:', err)
-    showNotice.error(t('shared.feedback.notifications.autoSelectFailed'))
-  }
+    } catch (fbErr) {
+      console.error('[Layout] Fallback 逻辑异常:', fbErr)
+    } finally {
+      fallbackTimerRef.current = null
+    }
+  }, 10000)
 }
 
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
