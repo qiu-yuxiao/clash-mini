@@ -277,8 +277,8 @@ pub async fn trigger_backend_auto_select(
 ) -> anyhow::Result<Vec<(String, u32)>> {
     // 互斥锁防止并发调用
     if AUTO_SELECT_RUNNING.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
-        logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，跳过本次调用");
-        return Ok(vec![]);
+        logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，返回繁忙");
+        return Err(anyhow::anyhow!("AUTO_SELECT_BUSY"));
     }
 
     // 修复 BUG-MAJOR-001：使用 Drop Guard 确保锁一定释放（即使发生 panic）
@@ -503,8 +503,18 @@ pub fn start_background_monitor() {
                 is_retry_mode = false;
 
                 if wait_for_clash_ready().await {
-                    if let Err(e) = trigger_backend_auto_select(&current_profile, 0).await {
-                        logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
+                    loop {
+                        match trigger_backend_auto_select(&current_profile, 0).await {
+                            Ok(_) => break,
+                            Err(e) if e.to_string() == "AUTO_SELECT_BUSY" => {
+                                logging!(debug, Type::Lightweight, "[后台监测] 自动选点繁忙，等待重试...");
+                                sleep(Duration::from_millis(500)).await;
+                            }
+                            Err(e) => {
+                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
+                                break;
+                            }
+                        }
                     }
                 } else {
                     logging!(warn, Type::Lightweight, "[后台监测] 内核就绪超时，中止本次自愈优选");

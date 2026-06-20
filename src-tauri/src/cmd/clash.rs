@@ -156,20 +156,19 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
         })?;
 
         // 解析DNS配置
-        let patch_config = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&dns_yaml).stringify_err_log(|e| {
+        let _patch_config = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&dns_yaml).stringify_err_log(|e| {
             logging!(error, Type::Config, "Failed to parse DNS config: {e}");
         })?;
 
         logging!(info, Type::Config, "Applying DNS config from file");
 
-        // 创建包含DNS配置的patch
-        let mut patch = serde_yaml_ng::Mapping::new();
-        patch.insert("dns".into(), patch_config.into());
-
-        // 应用DNS配置到运行时配置
-        Config::runtime().await.edit_draft(|d| {
-            d.patch_config(&patch);
+        // 更新 verge 配置中的 DNS 启用标志为 true
+        let verge = Config::verge().await;
+        verge.edit_draft(|d| {
+            d.enable_dns_settings = Some(true);
         });
+        verge.apply();
+        let _ = Config::verge().await.data_arc().save_file().await;
 
         // 应用新配置
         CoreManager::global()
@@ -184,6 +183,14 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
     } else {
         // 当关闭DNS设置时，重新生成配置（不加载DNS配置文件）
         logging!(info, Type::Config, "DNS settings disabled, regenerating config");
+
+        // 更新 verge 配置中的 DNS 启用标志为 false
+        let verge = Config::verge().await;
+        verge.edit_draft(|d| {
+            d.enable_dns_settings = Some(false);
+        });
+        verge.apply();
+        let _ = Config::verge().await.data_arc().save_file().await;
 
         CoreManager::global()
             .update_config_checked()
@@ -202,7 +209,7 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
 
 /// 检查DNS配置文件是否存在
 #[tauri::command]
-pub fn check_dns_config_exists() -> CmdResult<bool> {
+pub async fn check_dns_config_exists() -> CmdResult<bool> {
     use crate::utils::dirs;
 
     let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);

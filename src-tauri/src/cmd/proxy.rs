@@ -161,7 +161,7 @@ pub async fn trigger_auto_select(
         let current_uid_str = current_uid.to_string();
         let res = crate::module::monitor::trigger_backend_auto_select(
             &current_uid_str,
-            sort_type.unwrap_or(1),
+            sort_type.unwrap_or(0),
         )
         .await
         .stringify_err()?;

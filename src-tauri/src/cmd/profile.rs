@@ -164,8 +164,9 @@ pub async fn delete_profile(index: String) -> CmdResult {
             Ok(outcome) if outcome.is_valid() => {
                 handle::Handle::refresh_clash();
                 // 发送配置变更通知
-                logging!(info, Type::Cmd, "[删除订阅] 发送配置变更通知: {}", index);
-                handle::Handle::notify_profile_changed(&index);
+                let new_current = Config::profiles().await.data_arc().current.clone().unwrap_or_default();
+                logging!(info, Type::Cmd, "[删除订阅] 发送配置变更通知: {}", new_current);
+                handle::Handle::notify_profile_changed(&new_current);
             }
             Ok(outcome) => {
                 logging!(warn, Type::Cmd, "删除订阅后更新配置失败: {}", outcome);
@@ -196,6 +197,9 @@ async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
     crate::process::AsyncHandler::spawn(|| async move {
         if let Err(e) = profiles_save_file_safe().await {
             logging!(warn, Type::Cmd, "Warning: 异步保存恢复配置文件失败: {e}");
+        }
+        if let Err(e) = CoreManager::global().update_config_forced().await {
+            logging!(error, Type::Cmd, "Failed to reload Clash config after restore: {e}");
         }
     });
     logging!(info, Type::Cmd, "成功恢复到之前的配置");
