@@ -23,7 +23,7 @@ const HEAD_STATE_KEY = 'proxy-head-state'
 export const DEFAULT_STATE: HeadState = {
   open: false,
   showType: true,
-  sortType: 0,
+  sortType: 1,
   filterText: '',
   filterMatchCase: false,
   filterMatchWholeWord: false,
