@@ -1,4 +1,4 @@
-﻿# Clash Mini 权威开发协议 (Authorized Development Agreements)
+# Clash Mini 权威开发协议 (Authorized Development Agreements)
 
 
 
@@ -1931,19 +1931,11 @@
 
        * **动态生效**：在导入操作成功后，程序静默触发 `enhanceProfiles()` 配置重建与 `refreshProxy()`，使新节点立即在主页渲染测速并参与连切，实现动态实时生效。
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+       * **强制全局 DNS 编译注入机制 (Mandatory Global DNS Injection)**：
+         - **全局注入覆盖**：程序在编译配置文件时，强制在配置的顶层注入统一的 `dns` 参数对象，该对象包含 `enable: true`、`enhanced-mode: fake-ip`、`fake-ip-range: 198.18.0.1/16`。
+         - **Nameserver 指定**：强制指定 DNS 解析服务器（`nameserver`）仅为 `8.8.8.8` 和 `114.114.114.114`，以兼顾国外安全解析与国内快速直连。
+         - **零冲突端口设计**：在强制注入 of DNS 块中，严禁定义任何 `listen` 端口（如 `:53`），从而将所有 DNS 重定向和解析完全限制在 Clash 核心内部及 TUN 网卡网络层，彻底杜绝与系统内其他 DNS 服务发生 53 端口冲突导致的内核启动失败。
+         - **配置开关默认关闭**：由于 DNS 重写已由后端在最终编译阶段强制注入，故原有的 `enable_dns_settings` 配置项默认初始化设置为 `false` 且不在 UI 界面提供开关，以保持极致简易与稳定性。
 
 ---
 

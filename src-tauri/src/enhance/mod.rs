@@ -15,13 +15,12 @@ use self::{
 };
 use crate::utils::dirs;
 use crate::{config::Config, utils::tmpl};
-use crate::{config::IVerge, constants};
+use crate::config::IVerge;
 use anyhow::{Context as _, Result};
 use clash_verge_logging::{Type, logging};
 use serde_yaml_ng::{Mapping, Value};
 use smartstring::alias::String;
 use std::collections::{HashMap, HashSet};
-use tokio::fs;
 
 type ResultLog = Vec<(String, String)>;
 #[derive(Debug)]
@@ -32,7 +31,6 @@ struct ConfigValues {
     enable_builtin: bool,
     socks_enabled: bool,
     http_enabled: bool,
-    enable_dns_settings: bool,
     #[cfg(not(target_os = "windows"))]
     redir_enabled: bool,
     #[cfg(target_os = "linux")]
@@ -108,7 +106,7 @@ async fn get_config_values() -> ConfigValues {
         ..
     } = *verge_arc;
 
-    let (clash_core, enable_tun, enable_builtin, socks_enabled, http_enabled, enable_dns_settings) = (
+    let (clash_core, enable_tun, enable_builtin, socks_enabled, http_enabled, _enable_dns_settings) = (
         Some(verge_arc.get_valid_clash_core()),
         enable_tun_mode.unwrap_or(false),
         enable_builtin_enhanced.unwrap_or(true),
@@ -133,7 +131,6 @@ async fn get_config_values() -> ConfigValues {
         enable_builtin,
         socks_enabled,
         http_enabled,
-        enable_dns_settings,
         #[cfg(not(target_os = "windows"))]
         redir_enabled,
         #[cfg(target_os = "linux")]
@@ -625,33 +622,24 @@ fn rewrite_rules(mut config: Mapping, allowed_names: &HashSet<String>) -> Mappin
     config
 }
 
-async fn apply_dns_settings(mut config: Mapping, enable_dns_settings: bool) -> Mapping {
-    if enable_dns_settings && let Ok(app_dir) = dirs::app_home_dir() {
-        let dns_path = app_dir.join(constants::files::DNS_CONFIG);
+fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
+    use serde_yaml_ng::Value;
 
-        if dns_path.exists()
-            && let Ok(dns_yaml) = fs::read_to_string(&dns_path).await
-            && let Ok(dns_config) = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&dns_yaml)
-        {
-            if let Some(hosts_value) = dns_config.get("hosts")
-                && hosts_value.is_mapping()
-            {
-                config.insert("hosts".into(), hosts_value.clone());
-                logging!(info, Type::Core, "apply hosts configuration");
-            }
+    // 创建强制全局 DNS 注入对象（nameserver 仅为 8.8.8.8 和 114.114.114.114，且不包含 listen 端口以避免冲突）
+    let mut dns_config = Mapping::new();
+    dns_config.insert("enable".into(), Value::Bool(true));
+    dns_config.insert("enhanced-mode".into(), Value::String("fake-ip".into()));
+    dns_config.insert("fake-ip-range".into(), Value::String("198.18.0.1/16".into()));
+    dns_config.insert(
+        "nameserver".into(),
+        Value::Sequence(vec![
+            Value::String("8.8.8.8".into()),
+            Value::String("114.114.114.114".into()),
+        ]),
+    );
 
-            if let Some(dns_value) = dns_config.get("dns") {
-                if let Some(dns_mapping) = dns_value.as_mapping() {
-                    config.insert("dns".into(), dns_mapping.clone().into());
-                    logging!(info, Type::Core, "apply dns_config.yaml (dns section)");
-                }
-            } else {
-                config.insert("dns".into(), dns_config.into());
-                logging!(info, Type::Core, "apply dns_config.yaml");
-            }
-        }
-    }
-
+    config.insert("dns".into(), Value::Mapping(dns_config));
+    logging!(info, Type::Core, "applied mandatory global DNS settings (8.8.8.8 & 114.114.114.114)");
     config
 }
 
@@ -874,7 +862,6 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
         enable_builtin,
         socks_enabled,
         http_enabled,
-        enable_dns_settings,
         #[cfg(not(target_os = "windows"))]
         redir_enabled,
         #[cfg(target_os = "linux")]
@@ -942,7 +929,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     config = use_sort(config);
 
     // dns settings
-    config = apply_dns_settings(config, enable_dns_settings).await;
+    config = apply_mandatory_dns_settings(config);
 
     let mut exists_keys_set = HashSet::new();
     exists_keys_set.extend(exists_keys);

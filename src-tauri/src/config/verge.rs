@@ -453,7 +453,7 @@ impl IVerge {
             enable_always_on_top: Some(false),
             enable_auto_light_weight_mode: Some(true),
             auto_light_weight_minutes: Some(5),
-            enable_dns_settings: Some(true),
+            enable_dns_settings: Some(false),
             home_cards: None,
             enable_external_controller: Some(false),
             rule_fallback: Some("proxy".into()),
