@@ -37,7 +37,7 @@ Optimizing profile save operations (`PrfItem::save_file` and `save_profile_file`
       
       // ...
       
-      // 读取原始内容（在释放profiles_guard后进行）
+      // Read original content (performed after releasing profiles_guard)
       let original_content = PrfItem {
           file: Some(rel_path.clone()),
           ..Default::default()
@@ -50,7 +50,7 @@ Optimizing profile save operations (`PrfItem::save_file` and `save_profile_file`
       let file_path = profiles_dir.join(rel_path.as_str());
       let file_path_str = file_path.to_string_lossy().to_string();
 
-      // 保存新的配置文件
+      // Save new configuration file
       fs::write(&file_path, &file_data).await.stringify_err()?;
       
       // ...
@@ -125,7 +125,7 @@ The optimization is highly beneficial. Here is the recommended implementation pl
 #### Changes in `src-tauri/src/cmd/save_profile.rs`
 ```diff
 --- src-tauri/src/cmd/save_profile.rs
-+++ src-tauri/src/cmd/save_profile.rs
++++ src-tauri/src-tauri/src/cmd/save_profile.rs
 @@ -50,4 +50,9 @@
      .stringify_err()?;
  

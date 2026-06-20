@@ -9,63 +9,63 @@ This agent ensures that any AI developer, assistant, or reviewer working on the 
 
 ---
 
-## 🚨 核心执行红线基本法 (Core Laws of Execution)
+## 🚨 Core Laws of Execution
 
 Every Agent or automated workflow acting on this repository must comply with the following 5 laws. Violating any of these rules is considered a critical workflow failure.
 
-### 1. 实证决策律 (Law of Empirical Evidence)
-* **要求**：在对任何代码、配置或依赖进行修改前，必须先读取物理文件或编译日志获取客观证据。
-* **禁止**：严禁在未读取相关源文件前主观猜测或盲目更改代码。
+### 1. Law of Empirical Evidence
+* **Requirement**: Before modifying any code, configuration, or dependency, you must read physical files or compile logs to obtain objective evidence.
+* **Prohibition**: Do not make assumptions or blindly alter code without reading the relevant source files.
 
-### 2. 独立提交律 (Law of Transparency & Isolated Commit)
-* **要求**：
-  1. 修复 Bug 前必须先在 [`bug_list.md`](../../bug_list.md) 中以卡片形式登记（状态为 `代码已修正，待用户确认`）。
-  2. 修改任何协议或发行文档后，**必须执行独立的 Git 提交（Git Commit）**，然后才能修改业务代码。
-* **禁止**：严禁进行“默默顺手修复（Silent Fix）”。
+### 2. Law of Transparency & Isolated Commit
+* **Requirement**:
+  1. Before fixing a bug, you must register it in [`bug_list.md`](../../bug_list.md) in the form of a card (setting its status to `Code corrected, pending user confirmation`).
+  2. Any modification to protocols or release documentation **must be committed separately** before writing or modifying any business logic code.
+* **Prohibition**: "Silent Fixes" (modifying code without documenting/registering changes first) are strictly prohibited.
 
-### 3. 环境安全与隔离律 (Law of Environment Safety & Isolation)
-* **要求**：
-  1. 启动本地开发服务前，必须确保前端和 Rust 配置中的网络接管模式（TUN、系统代理）为 `false`。
-  2. Clash Mini 的 Sidecar 核心二进制及运行进程必须重命名为 **`mini-mihomo`** / **`mini-mihomo-alpha`**（不可使用原版的 `verge-mihomo`），在进程级别实现独立命名空间。
-  3. 主程序退出事件 `clean_async` 中必须异步杀灭所有 `mini-mihomo` 残留进程，释放端口与系统锁。
-* **禁止**：严禁在本地启动任何生产构建出的二进制包，禁止在运行中修改物理宿主机路由表或劫持全局系统代理。
+### 3. Law of Environment Safety & Isolation
+* **Requirement**:
+  1. Before starting the local development service, ensure that the network takeover options (TUN Mode, System Proxy) in both the frontend and Rust configurations are set to `false`.
+  2. Clash Mini's Sidecar kernel binaries and processes must be renamed to **`mini-mihomo`** / **`mini-mihomo-alpha`** (do not use the original `verge-mihomo`) to achieve an independent namespace at the process level.
+  3. The main application exit event `clean_async` must asynchronously kill all remaining `mini-mihomo` processes to release ports and system locks.
+* **Prohibition**: Running production-built binary packages locally is strictly prohibited. Modifying the host OS routing table or hijacking the global system proxy during execution is strictly prohibited.
 
-### 4. 云端静默发行律 (Law of Silent Release)
-* **要求**：
-  1. 凡涉及编译与 GitHub 发行操作，必须严格遵循 [`clash_mini_silent_release.md`](../../clash_mini_silent_release.md) 中的静默双轨判定和 8 步 SOP 流程。
-  2. **依赖包白盒审查**：凡因第三方插件或依赖更新导致的 Bug，在打包前必须核对 `Cargo.lock` 或 `pnpm-lock.yaml`，确认锁定的是最新修复版的版本号及 Git Commit Hash。
-  3. **日志本地检查**：发布前必须在控制台先执行并打印 `node scripts/extract_update_logs.mjs <版本号>` 提取的内容，以确保更新日志的明文说明与实际本次解决的缺陷无缝映射。
-* **禁止**：严禁在未通过静态类型校验（`pnpm web:build`）前强制打 Tag 或推送发布。
+### 4. Law of Silent Release
+* **Requirement**:
+  1. Any compilation and GitHub release operations must strictly follow the silent double-track decision and 8-step SOP process in [`clash_mini_silent_release.md`](../../clash_mini_silent_release.md).
+  2. **Dependency Whitebox Review**: For any bugs caused by third-party plugin or dependency updates, you must verify `Cargo.lock` or `pnpm-lock.yaml` before packaging to confirm that the latest fixed version number and Git Commit Hash are locked.
+  3. **Local Log Verification**: Before publishing, you must execute and print the content extracted by `node scripts/extract_update_logs.mjs <version>` in the console to ensure that the release note details map seamlessly to the bugs resolved in this version.
+* **Prohibition**: Forcing tags or pushing releases without passing static type checks (`pnpm web:build`) is strictly prohibited.
 
-### 5. 设计共识律 (Law of Design Consistency)
-* **要求**：所有 UI 交互控件、皮肤及参数必须严格对齐 [`clash_mini_agreements.md`](../../clash_mini_agreements.md) 协议：
-  * **6 套预设皮肤**：`Retro 3D`（默认）、`Original`、`Modern`、`Frosted Glass`、`Cyberpunk`、`Monochrome`。
-  * **滑块控制重定义**：不同皮肤下两个英文滑块控制不同底层变量（如 Depth/Vibrancy, Radius/Accent 等），且数据在 LocalStorage 中独立字段保存。
-  * **中英文字体共鸣对齐**：不同皮肤对齐不同字体（如 Trebuchet MS / 黑体，Consolas / 等宽新宋等）。
-  * **Mixed Port 默认端口**：监听地址默认为 `127.0.0.1`，混合代理端口锁死为 `10801`，Controller API 端口为 `9098`，避让原版默认端口。
+### 5. Law of Design Consistency
+* **Requirement**: All UI interaction controls, skins, and parameters must strictly align with the [`clash_mini_agreements.md`](../../clash_mini_agreements.md) agreement:
+  * **6 Visual Skins**: `Retro 3D` (default), `Original`, `Modern`, `Frosted Glass`, `Cyberpunk`, `Monochrome`.
+  * **Redefined Slider Controls**: Under different skins, the two English sliders control different underlying variables (such as Depth/Vibrancy, Radius/Accent, etc.), and the data is stored in independent fields in LocalStorage.
+  * **Font Alignment (Chinese & English)**: Different skins align to different fonts (e.g., Trebuchet MS / SimHei, Consolas / NSimSun, etc.).
+  * **Mixed Port Default**: The listening address defaults to `127.0.0.1`, the mixed proxy port is locked to `10801`, and the Controller API port is `9098` to isolate from the upstream default ports.
 
 ---
 
-## 📋 AI Agent 任务执行准则
+## 📋 AI Agent Task Execution Guidelines
 
-当您作为 Agent 接受修改代码的任务时，请按照以下步骤行动：
+When you accept a task to modify code as an Agent, please follow these steps:
 
-1. **第一步：定位与审计**
-   - 使用 grep 检索相关文件，用阅读工具精准查看代码。
-   - 对比 [`clash_mini_agreements.md`](../../clash_mini_agreements.md) 查看该模块是否有既定设计规范。
+1. **Step 1: Locate & Audit**
+   - Use grep to retrieve relevant files and read tools to inspect code accurately.
+   - Compare with [`clash_mini_agreements.md`](../../clash_mini_agreements.md) to check if the module has established design specifications.
 
-2. **第二步：更新协议与 bug_list（独立提交）**
-   - 若是 Bug 修复，先更新 [`bug_list.md`](../../bug_list.md) 登记卡片。
-   - 若涉及设计变更，先更新 [`clash_mini_agreements.md`](../../clash_mini_agreements.md)。
-   - 执行 `git add` 并提交文档修改：`git commit -m "docs: register changes" --no-verify`。
+2. **Step 2: Update Agreement & bug_list (Isolated Commit)**
+   - If it's a bug fix, update [`bug_list.md`](../../bug_list.md) first to register a card.
+   - If it involves design changes, update [`clash_mini_agreements.md`](../../clash_mini_agreements.md) first.
+   - Execute `git add` and commit the document changes: `git commit -m "docs: register changes" --no-verify`.
 
-3. **第三步：修改业务代码**
-   - 编写或更新 TSX、Vite 或 Rust 代码。
-   - 确保遵守“英文保留原则”及字体、尺寸规范。
+3. **Step 3: Modify Business Code**
+   - Write or update TSX, Vite, or Rust code.
+   - Ensure you follow the "English preservation principle" and font/dimension specifications.
 
-4. **第四步：静态类型与编译校验**
-   - 运行本地构建命令 `pnpm web:build`，确保 100% 编译通过且无警告。
+4. **Step 4: Static Type & Compile Validation**
+   - Run the local build command `pnpm web:build` to ensure 100% compilation passes with zero warnings.
 
-5. **第五步：收尾重置**
-   - 在 `.brain/walkthrough.md` 中记录改动和验证结果。
-   - 在 `.brain/task.md` 中勾选任务，重置看板。
+5. **Step 5: Wrap Up & Reset**
+   - Record modifications and verification results in `.brain/walkthrough.md`.
+   - Check off tasks in `.brain/task.md` and reset the kanban.

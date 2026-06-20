@@ -285,7 +285,7 @@ def verify_changelog_sync():
             is_capturing = True
             continue
         if is_capturing:
-            if next_title_regex.match(line) or line.strip() == "## 原始版本历史 (Clash Verge History)":
+            if next_title_regex.match(line) or line.strip() == "## \u539f\u59cb\u7248\u672c\u5386\u53f2 (Clash Verge History)":
                 break
             changelog_section_lines.append(line)
             

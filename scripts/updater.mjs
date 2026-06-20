@@ -165,7 +165,7 @@ async function processRelease(github, options, tag, isAlpha) {
       // darwin url (aarch)
       if (name.endsWith('aarch64.app.tar.gz')) {
         updateData.platforms['darwin-aarch64'].url = browser_download_url
-        // 使linux可以检查更新
+        // Enable linux update checks
         updateData.platforms.linux.url = browser_download_url
         updateData.platforms['linux-x86_64'].url = browser_download_url
         updateData.platforms['linux-x86'].url = browser_download_url

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-bump_version.py - Clash Mini 版本号统一更新工具
-用法: python scripts/bump_version.py <版本号>
-示例: python scripts/bump_version.py 1.4.5
+bump_version.py - Clash Mini version update tool
+Usage: python scripts/bump_version.py <version>
+Example: python scripts/bump_version.py 1.4.5
 """
 
 import sys
@@ -12,7 +12,7 @@ import re
 import json
 from pathlib import Path
 
-# 强制 stdout/stderr 使用 UTF-8，避免 Windows GBK 终端编码错误
+# Force stdout/stderr to use UTF-8 to avoid Windows GBK terminal encoding errors
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
@@ -47,8 +47,8 @@ def bump_cargo_toml(root: Path, version: str):
     path = root / 'src-tauri' / 'Cargo.toml'
     content = path.read_text(encoding='utf-8')
 
-    # 只替换 [package] 块内的第一个 version = "x.y.z"
-    # 避免误改 [dependencies] 中其他包的版本号
+    # Only replace the first version = "x.y.z" inside the [package] block
+    # Avoid accidentally changing other packages' versions in [dependencies]
     in_package_block = False
     replaced = False
     lines = content.splitlines(keepends=True)
@@ -84,14 +84,14 @@ def main():
         print('Example: python scripts/bump_version.py 1.4.5')
         sys.exit(1)
 
-    version = sys.argv[1].lstrip('v')  # 兼容带 v 前缀的输入
+    version = sys.argv[1].lstrip('v')  # Support input with 'v' prefix
 
     if not validate_version(version):
         print(f'[ERROR] Invalid version format: "{version}"')
         print('        Expected: x.y.z (e.g. 1.4.5)')
         sys.exit(1)
 
-    # 定位项目根目录（本脚本在 scripts/ 子目录下）
+    # Locate project root directory (this script is in the scripts/ subdirectory)
     root = Path(__file__).parent.parent.resolve()
 
     print(f'\n>>> Bumping version to {version}')

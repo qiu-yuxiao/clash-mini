@@ -52,15 +52,15 @@ This report details the static and empirical verification results for guard loop
 ### 1.4 Rules in `clash_mini_agreements.md`
 - **Lines 177–178**:
   ```markdown
-  默认 Mixed 混合代理端口设为 `10801`，Controller API 端口设为 `9098`，彻底避让原版默认端口，允许两个客户端同时在线。
+  The default Mixed proxy port is set to `10801`, and the Controller API port is set to `9098`, completely avoiding the original default ports and allowing two clients to be online at the same time.
   ```
 - **Lines 251–252**:
   ```markdown
-  Clash Mini 的单实例检测端口在 Release 模式下设为 `33335`，在 Dev 模式下设为 `33336`。
+  The singleton instance detection port of Clash Mini is set to `33335` in Release mode and `33336` in Dev mode.
   ```
 - **Lines 2057–2059**:
   ```markdown
-  - 管理员权限与服务等待跳过：当程序以 Administrator 权限拉起时，已具有最高的系统网络与 TAP/TUN 网卡控制权，不再需要或依赖辅助系统服务（clash-verge-service）。因此，在 Windows 的 wait_for_service_if_needed 逻辑的头部，必须首先查询当前应用运行状态（使用 is_current_app_handle_admin）。若是管理员运行，必须立即返回跳过 5 秒的异步服务重试轮询。
+  - Administrator privileges and service wait skipping: When the program is launched with Administrator privileges, it already has the highest system network and TAP/TUN virtual network card control rights, and no longer needs or relies on the auxiliary system service (clash-verge-service). Therefore, at the head of the Windows wait_for_service_if_needed logic, the current application running state must first be queried (using is_current_app_handle_admin). If it is run as administrator, it must return immediately to skip the 5-second asynchronous service retry polling.
   ```
 
 ---

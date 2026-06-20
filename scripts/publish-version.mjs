@@ -17,7 +17,7 @@ if (!versionArg) {
   process.exit(1)
 }
 
-// 1. 调用 verify.py 进行发布前检查
+// 1. Call verify.py for pre-release verification
 const runVerify = () =>
   new Promise((resolve, reject) => {
     const child = spawn('python', ['verify.py'], { stdio: 'inherit' })
@@ -27,7 +27,7 @@ const runVerify = () =>
     })
   })
 
-// 2. 调用 release-version.mjs
+// 2. Call release-version.mjs
 const runRelease = () =>
   new Promise((resolve, reject) => {
     const child = spawn('node', [scriptPath, versionArg], { stdio: 'inherit' })
@@ -37,7 +37,7 @@ const runRelease = () =>
     })
   })
 
-// 3. 判断是否需要打 tag
+// 3. Check if we need to tag
 function isSemver(version) {
   return /^v?\d+\.\d+\.\d+(-[0-9A-Za-z-.]+)?$/.test(version)
 }
@@ -53,18 +53,18 @@ async function run() {
 
   let tag = null
   if (versionArg === 'alpha') {
-    // 读取 package.json 里的主版本
+    // Read package version from package.json
     const pkg = await import(path.join(rootDir, 'package.json'), {
       assert: { type: 'json' },
     })
     tag = `v${pkg.default.version}-alpha`
   } else if (isSemver(versionArg)) {
-    // 1.2.3 或 v1.2.3
+    // 1.2.3 or v1.2.3
     tag = versionArg.startsWith('v') ? versionArg : `v${versionArg}`
   }
 
   if (tag) {
-    // 打 tag 并推送
+    // Create tag and push
     const { execSync } = await import('child_process')
     try {
       execSync(`git tag ${tag}`, { stdio: 'inherit' })

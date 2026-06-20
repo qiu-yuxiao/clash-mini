@@ -96,8 +96,8 @@ async function resolveUpdater() {
     }
   })
 
-  // 生成一个代理github的更新文件
-  // 使用 https://hub.fastgit.xyz/ 做github资源的加速
+  // Generate a proxy update file for GitHub
+  // Use https://hub.fastgit.xyz/ to accelerate GitHub resources
   const updateDataNew = JSON.parse(JSON.stringify(updateData))
 
   Object.entries(updateDataNew.platforms).forEach(([key, value]) => {

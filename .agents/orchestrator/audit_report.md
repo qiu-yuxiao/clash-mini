@@ -303,36 +303,36 @@ index 1234567..89abcde 100644
 +++ b/src-tauri/src/module/monitor.rs
 @@ -276,7 +276,7 @@ pub async fn trigger_backend_auto_select(
  ) -> anyhow::Result<Vec<(String, u32)>> {
-     // 互斥锁防止并发调用
+     // Mutex lock to prevent concurrent calls
      if AUTO_SELECT_RUNNING.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
--        logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，跳过本次调用");
+-        logging!(info, Type::Lightweight, "[Background Monitor] Auto-select already running, returning busy");
 -        return Ok(vec![]);
-+        logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，返回繁忙");
++        logging!(info, Type::Lightweight, "[Background Monitor] Auto-select already running, returning busy");
 +        return Err(anyhow::anyhow!("AUTO_SELECT_BUSY"));
      }
- 
-     // 修复 BUG-MAJOR-001：使用 Drop Guard 确保锁一定释放（即使发生 panic）
+
+     // Fix BUG-MAJOR-001: Use Drop Guard to ensure the lock is released (even if panic occurs)
 @@ -503,8 +503,19 @@ pub fn start_background_monitor() {
                  is_retry_mode = false;
- 
+
                  if wait_for_clash_ready().await {
 -                    if let Err(e) = trigger_backend_auto_select(&current_profile, 0).await {
--                        logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
+-                        logging!(warn, Type::Lightweight, "[Background Monitor] Auto-select failed after configuration reload: {e}");
 +                    loop {
 +                        match trigger_backend_auto_select(&current_profile, 0).await {
 +                            Ok(_) => break,
 +                            Err(e) if e.to_string() == "AUTO_SELECT_BUSY" => {
-+                                logging!(debug, Type::Lightweight, "[后台监测] 自动选点繁忙，等待重试...");
++                                logging!(debug, Type::Lightweight, "[Background Monitor] Auto-select busy, waiting to retry...");
 +                                sleep(Duration::from_millis(500)).await;
 +                            }
 +                            Err(e) => {
-+                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
++                                logging!(warn, Type::Lightweight, "[Background Monitor] Auto-select failed after configuration reload: {e}");
 +                                break;
 +                            }
 +                        }
-                     }
++                    }
                  } else {
-                     logging!(warn, Type::Lightweight, "[后台监测] 内核就绪超时，中止本次自愈优选");
+                     logging!(warn, Type::Lightweight, "[Background Monitor] Core readiness timeout, aborting this self-healing selection");
 ```
 
 ---
@@ -420,39 +420,39 @@ index e391c53..429188a 100644
 --- b/src-tauri/src/cmd/clash.rs
 +++ b/src-tauri/src/cmd/clash.rs
 @@ -162,13 +162,11 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
- 
+
          logging!(info, Type::Config, "Applying DNS config from file");
- 
--        // 创建包含DNS配置的patch
+
+-        // Create patch containing DNS configuration
 -        let mut patch = serde_yaml_ng::Mapping::new();
 -        patch.insert("dns".into(), patch_config.into());
 -
--        // 应用DNS配置到运行时配置
+-        // Apply DNS configuration to runtime configuration
 -        Config::runtime().await.edit_draft(|d| {
 -            d.patch_config(&patch);
-+        // 更新 verge 配置中的 DNS 启用标志
++        // Update DNS enabled flag in verge config
 +        let verge = Config::verge().await;
 +        verge.edit_draft(|d| {
 +            d.enable_dns_settings = Some(true);
          });
 +        verge.apply();
 +        let _ = verge.data_arc().save_file().await;
- 
-         // 应用新配置
+
+         // Apply new configuration
 @@ -182,6 +180,14 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
          logging!(info, Type::Config, "DNS config successfully applied");
      } else {
-         // 当关闭DNS设置时，重新生成配置（不加载DNS配置文件）
+         // When disabling DNS settings, regenerate config (without loading DNS config file)
          logging!(info, Type::Config, "DNS settings disabled, regenerating config");
 +
-+        // 更新 verge 配置中的 DNS 启用标志为 false
++        // Update DNS enabled flag in verge config to false
 +        let verge = Config::verge().await;
 +        verge.edit_draft(|d| {
 +            d.enable_dns_settings = Some(false);
 +        });
 +        verge.apply();
 +        let _ = verge.data_arc().save_file().await;
- 
+
          CoreManager::global()
 ```
 
@@ -467,18 +467,18 @@ index e391c53..429188a 100644
 ```diff
 diff --git b/src-tauri/src/cmd/profile.rs a/src-tauri/src/cmd/profile.rs
 index e391c53..429188a 100644
---- a/src-tauri/src/cmd/profile.rs
+--- b/src-tauri/src/cmd/profile.rs
 +++ b/src-tauri/src/cmd/profile.rs
 @@ -196,6 +196,9 @@ async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
      crate::process::AsyncHandler::spawn(|| async move {
          if let Err(e) = profiles_save_file_safe().await {
-             logging!(warn, Type::Cmd, "Warning: 异步保存恢复配置文件失败: {e}");
+             logging!(warn, Type::Cmd, "Warning: Failed to save restored config file asynchronously: {e}");
          }
 +        if let Err(e) = CoreManager::global().update_config_forced().await {
 +            logging!(error, Type::Cmd, "Failed to reload Clash config after restore: {e}");
 +        }
      });
-     logging!(info, Type::Cmd, "成功恢复到之前的配置");
+     logging!(info, Type::Cmd, "Successfully restored to previous configuration");
 ```
 
 ---
@@ -492,16 +492,16 @@ index e391c53..429188a 100644
 ```diff
 diff --git b/src-tauri/src/cmd/profile.rs a/src-tauri/src/cmd/profile.rs
 index e391c53..429188a 100644
---- a/src-tauri/src/cmd/profile.rs
+--- b/src-tauri/src/cmd/profile.rs
 +++ b/src-tauri/src/cmd/profile.rs
 @@ -164,8 +164,9 @@ pub async fn delete_profile(index: String) -> CmdResult {
              Ok(outcome) if outcome.is_valid() => {
                  handle::Handle::refresh_clash();
-                 // 发送配置变更通知
--                logging!(info, Type::Cmd, "[删除订阅] 发送配置变更通知: {}", index);
+                 // Send configuration change notification
+-                logging!(info, Type::Cmd, "[Delete Profile] Send configuration change notification: {}", index);
 -                handle::Handle::notify_profile_changed(&index);
 +                let new_current = Config::profiles().await.data_arc().current.clone().unwrap_or_default();
-+                logging!(info, Type::Cmd, "[删除订阅] 发送配置变更通知: {}", new_current);
++                logging!(info, Type::Cmd, "[Delete Profile] Send configuration change notification: {}", new_current);
 +                handle::Handle::notify_profile_changed(&new_current);
              }
              Ok(outcome) => {

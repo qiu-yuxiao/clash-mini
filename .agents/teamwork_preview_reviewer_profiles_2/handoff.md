@@ -56,7 +56,7 @@
           (path, is_merge, is_script, affects_runtime)
       };
 
-      // 读取原始内容（在释放profiles_guard后进行）
+      // Read original content (performed after releasing profiles_guard)
       let original_content = PrfItem {
           file: Some(rel_path.clone()),
           ..Default::default()

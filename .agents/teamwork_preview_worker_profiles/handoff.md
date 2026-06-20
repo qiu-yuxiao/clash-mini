@@ -19,7 +19,7 @@
 - **Task Location 2**: `save_profile_file` in `src-tauri/src/cmd/save_profile.rs` (lines 19-84).
   - Verbatim original code around write operation:
     ```rust
-    // 读取原始内容（在释放profiles_guard后进行）
+    // Read original content (performed after releasing profiles_guard)
     let original_content = PrfItem {
         file: Some(rel_path.clone()),
         ..Default::default()
@@ -32,7 +32,7 @@
     let file_path = profiles_dir.join(rel_path.as_str());
     let file_path_str = file_path.to_string_lossy().to_string();
 
-    // 保存新的配置文件
+    // Save new configuration file
     fs::write(&file_path, &file_data).await.stringify_err()?;
     ```
 - **Command execution**:

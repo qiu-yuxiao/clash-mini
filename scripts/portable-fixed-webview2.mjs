@@ -22,7 +22,7 @@ const PROCESS_MAP = {
 }
 const arch = target ? ARCH_MAP[target] : PROCESS_MAP[process.arch]
 /// Script for ci
-/// 打包绿色版/便携版 (only Windows)
+/// Pack portable version (only Windows)
 async function resolvePortable() {
   if (process.platform !== 'win32') return
 
@@ -39,7 +39,7 @@ async function resolvePortable() {
     await fsp.writeFile(path.join(configDir, 'PORTABLE'), '')
   }
 
-  // 清理可能遗留的本地私有配置数据，防止敏感信息泄漏
+  // Clean up potential local private config data to prevent sensitive information leakage
   const privateDirs = [
     'io.github.clash-mini.clash-mini',
     'io.github.clash-mini.clash-mini.dev',
@@ -65,8 +65,8 @@ async function resolvePortable() {
     `Microsoft.WebView2.FixedVersionRuntime.133.0.3065.92.${arch}`,
   )
   zip.addLocalFolder(configDir, '.config')
-  if (fs.existsSync(path.join(process.cwd(), '用户必读.txt'))) {
-    zip.addLocalFile(path.join(process.cwd(), '用户必读.txt'))
+  if (fs.existsSync(path.join(process.cwd(), '\u7528\u6237\u5fc5\u8bfb.txt'))) {
+    zip.addLocalFile(path.join(process.cwd(), '\u7528\u6237\u5fc5\u8bfb.txt'))
   }
 
   const require = createRequire(import.meta.url)

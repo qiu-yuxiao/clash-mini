@@ -46,7 +46,7 @@ async function run() {
         if (isCapturing) {
           if (
             nextTitleRegex.test(line) ||
-            line.trim() === '## 原始版本历史 (Clash Verge History)'
+            line.trim() === '## \u539f\u59cb\u7248\u672c\u5386\u53f2 (Clash Verge History)'
           ) {
             break
           }
@@ -97,7 +97,7 @@ async function run() {
       }
 
       if (bugs.length > 0) {
-        resolvedBugsSection = `### 🐞 已解决的缺陷 (Fixed Bugs)\n${bugs.join('\n')}`
+        resolvedBugsSection = `### 🐞 Fixed Bugs\n${bugs.join('\n')}`
         console.log(
           `Found ${bugs.length} resolved bugs for version ${version} in bug_list.md`,
         )
@@ -135,19 +135,19 @@ async function run() {
     }
 
     if (commits) {
-      gitCommitsSection = `### 🔨 提交历史 (Commit History)\n${commits}`
+      gitCommitsSection = `### \uD83D\uDD28 Commit History\n${commits}`
     }
   } catch (err) {
     console.error('Error getting git commits:', err.message)
   }
 
   // Combine logs
-  let finalLogs = `## ${tagName} 更新日志\n\n`
+  let finalLogs = `## ${tagName} Update Logs\n\n`
 
   if (changelogSection) {
-    finalLogs += `### 📝 主要更新 (Key Changes)\n${changelogSection}\n\n`
+    finalLogs += `### \uD83D\uDCDD Key Changes\n${changelogSection}\n\n`
   } else {
-    finalLogs += `### 📝 主要更新 (Key Changes)\n此版本包含代码优化和缺陷修复。\n\n`
+    finalLogs += `### \uD83D\uDCDD Key Changes\nThis version includes code optimizations and bug fixes.\n\n`
   }
 
   if (resolvedBugsSection) {

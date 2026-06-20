@@ -20,12 +20,12 @@
   - **Lines**: 220-228
   - **Verbatim Code**:
     ```typescript
-    // 设置超时处理, delay = 0 为超时
+    // Set timeout handling, delay = 0 represents timeout
     const timeoutPromise = new Promise<ProxyDelay>((resolve) => {
       setTimeout(() => resolve({ delay: 0 }), timeout)
     })
 
-    // 使用Promise.race来实现超时控制
+    // Use Promise.race to implement timeout control
     const result = await Promise.race([
       delayProxyByName(name, url, timeout),
       timeoutPromise,

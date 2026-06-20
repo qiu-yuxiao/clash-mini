@@ -25,7 +25,7 @@ We directly observed the following implementations in the Clash Verge codebase:
    ```rust
    pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdResult<ValidationOutcome> {
        ...
-       // 读取原始内容（在释放profiles_guard后进行）
+       // Read original content (performed after releasing profiles_guard)
        let original_content = PrfItem {
            file: Some(rel_path.clone()),
            ..Default::default()
@@ -34,7 +34,7 @@ We directly observed the following implementations in the Clash Verge codebase:
        .await
        .stringify_err()?;
        ...
-       // 保存新的配置文件
+       // Save new configuration file
        fs::write(&file_path, &file_data).await.stringify_err()?;
        ...
        let changes_applied = handle_saved_profile_file(...)
@@ -60,7 +60,7 @@ We directly observed the following implementations in the Clash Verge codebase:
 
 1. **Unnecessary Disk I/O & SSD Wear**: `fs::write` is called on profile saves even if the editor content or incoming web request is identical to what is already on disk.
 2. **Expensive Downstream Checks**:
-   - In `save_profile_file`, saving a file triggers `handle_saved_profile_file`, which runs `CoreConfigValidator::validate_config_file_outcome`. If the file is a YAML config, this launches a external Clash validator process. If it's a QuickJS script, it initializes a Javascript engine to run syntax verification.
+   - In `save_profile_file`, saving a file triggers `handle_saved_profile_file`, which runs `CoreConfigValidator::validate_config_file_outcome`. If the file is a YAML config, this launches an external Clash validator process. If it's a QuickJS script, it initializes a Javascript engine to run syntax verification.
    - If the profile affects the current runtime (`affects_runtime == true`), it triggers `CoreManager::global().update_config_forced()`, forcing the Clash core to reload/restart, which is CPU-heavy and momentarily drops active network connections.
    - If validation is successful and it's a global Merge/Script profile, it triggers `AutoBackupManager::trigger_backup` which creates backup zip archives on disk.
 3. **Memory Availability**: Because `save_profile_file` already reads `original_content` via `PrfItem::read_file()`, we can compare the incoming `file_data` directly with `original_content` in memory with zero extra disk read overhead.
@@ -120,7 +120,7 @@ Read the file first and only write if it has changed:
 #### Step 2: Update `save_profile_file` in `src-tauri/src/cmd/save_profile.rs`
 Check if the file content is unchanged right after `original_content` is loaded, and return early:
 ```rust
-    // 读取原始内容（在释放profiles_guard后进行）
+    // Read original content (performed after releasing profiles_guard)
     let original_content = PrfItem {
         file: Some(rel_path.clone()),
         ..Default::default()

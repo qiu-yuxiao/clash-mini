@@ -1,220 +1,217 @@
 ## v1.3.4
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-103：解决全局环境类型污染问题。将 `global.d.ts` 中的核心业务类型与接口拆分到独立的 ESM 模块文件中，并在使用组件/Hook中进行显式导入；重构 `IProxyConfig` 接口定义为辨识联合与交叉类型，消除了类型重叠冲突，成功通过编译。
+- Fix BUG-103: Resolve global environment type pollution issue. Split core business types and interfaces in `global.d.ts` into independent ESM module files, and explicitly import them in components/hooks; refactored `IProxyConfig` interface definition to use discriminated unions and intersection types, eliminating overlapping type conflicts and successfully passing compilation.
 
 ## v1.3.3
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化 BUG-097：解决异步工作线程被同步磁盘 I/O 阻塞的问题。将配置文件的读取迁移至 tokio::fs 异步 API，更新包大文件写入操作使用 spawn_blocking 处理，消除了瞬时卡顿与延迟毛刺。
-- 优化 BUG-098：解决同步系统进程扫描阻塞异步线程的问题。将 sysinfo 进程扫描和强杀等安全包裹在 spawn_blocking 中执行，避免挂起 Tokio 调度工作协程。
-- 优化 BUG-101：优化 TS 辅助 Hook 内部函数与状态类型隐患。使用 useCallback 包裹暴露的回调以稳定引用，并为 proxies 等核心数据结构建立确切 TS 类型定义。
-- 优化 BUG-105：优化 use-profiles.ts 内部回调引用稳定性。使用 useCallback 对 mutateProfiles、patchProfiles、patchCurrent 回调函数进行 memoize 包装，防止子组件重复重绘。
+- Optimize BUG-097: Resolve issue where asynchronous worker threads were blocked by synchronous disk I/O. Migrated configuration file reading to `tokio::fs` async APIs and updated large package file writes to be handled by `spawn_blocking`, eliminating transient freezes and latency spikes.
+- Optimize BUG-098: Resolve issue where synchronous system process scanning blocked asynchronous threads. Executed `sysinfo` process scanning and force-killing inside `spawn_blocking` to avoid hanging Tokio scheduler worker coroutines.
+- Optimize BUG-101: Optimize internal functions and state type safety in TS helper hooks. Wrapped exposed callbacks with `useCallback` to stabilize references, and established exact TS type definitions for core data structures like `proxies`.
+- Optimize BUG-105: Optimize callback reference stability inside `use-profiles.ts`. Wrapped `mutateProfiles`, `patchProfiles`, and `patchCurrent` callback functions with `useCallback` to prevent redundant sub-component re-renders.
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-069：解决 Monochrome 皮肤下设置开关选择 size="small" 时卡死在左侧无法正常拨动和交互的问题。
-- 修复 BUG-096：解决后端常驻线程因异步跨越持有 RwLock 读锁而导致的死锁问题。在独立局部作用域中获取锁并完成 Future 计算，让读锁在 await point 之前被 drop 释放。
-- 修复 BUG-099：解决客户端启动时 Tauri Setup 钩子同步 block_on 导致的主 UI 线程白屏挂起与无响应问题。改用 async_runtime::spawn 在后台异步加载静默更新检测任务。
-- 修复 BUG-100：解决后端时间戳数值强转在 32 位操作系统或嵌入式平台下的截断与溢出隐患。将 PrfItem 及 IProfiles 相关时间戳字段统一调整为 Option<i64> 类型，废除 as usize 强转。
-- 修复 BUG-104：修复 useWindowSnap.ts 文件命名大小写不一致问题，将其重命名为 use-window-snap.ts 并同步更新导入路径，统一项目 kebab-case 命名规范。
-- 修复 BUG-106：修复 _layout.tsx 内部状态变量和核心数据对象宽松 any 类型定义导致类型系统失效的问题。严格为 clientUpdateObj (Update) 与 coreUpdateRelease (GithubRelease) 标注类型并进行安全强制转换。
+- Fix BUG-069: Resolve issue where setting switch size="small" under Monochrome skin would freeze on the left side and fail to toggle or interact normally.
+- Fix BUG-096: Resolve deadlock issue caused by backend resident threads holding `RwLock` read locks across await points. Acquired locks and completed Future computations inside independent local scopes, allowing the read lock to be dropped and released before the await point.
+- Fix BUG-099: Resolve main UI thread white screen hanging and unresponsiveness caused by the synchronous `block_on` call in the Tauri Setup hook at client startup. Switched to `async_runtime::spawn` to load silent update check tasks asynchronously in the background.
+- Fix BUG-100: Resolve truncation and overflow hazards of backend timestamp casting on 32-bit OS or embedded platforms. Standardized all timestamp fields in `PrfItem` and `IProfiles` to `Option<i64>` type, abolishing `as usize` type casting.
+- Fix BUG-104: Fix casing inconsistency in `useWindowSnap.ts` file name. Renamed it to `use-window-snap.ts` and updated import paths accordingly, aligning with the project's kebab-case naming convention.
+- Fix BUG-106: Fix type system failure caused by loose `any` type definitions for internal state variables and core data objects in `_layout.tsx`. Strictly typed `clientUpdateObj` (as `Update`) and `coreUpdateRelease` (as `GithubRelease`) and applied safe casting.
 
 ## v1.3.2
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化 BUG-082：实现 Windows 平台下 WebView2 运行时的后台内存自动回收与优化。在窗口最小化或隐藏到系统托盘时，主动向 WebView2 进程发送内存回收信号，最大限度降低挂机时的物理内存占用。
+- Optimize BUG-082: Implement automatic background memory reclamation and optimization for WebView2 runtime on Windows. Actively send memory reclamation signals to the WebView2 process when the window is minimized or hidden in the system tray, minimizing physical memory usage during standby.
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-093：解决 Clash Mini 启动或重新加载配置后，节点自动激活与连接存在显著延迟的问题。通过并发探测 API 端口及 `DIRECT` 节点的就绪状态以缩短冷启动选点时间，并在订阅更新后模糊比对剥离时间戳后缀的历史选点以恢复节点选择。
+- Fix BUG-093: Resolve significant delays in auto-activating and connecting nodes after Clash Mini starts or reloads configs. Concurrent-probed API ports and `DIRECT` node readiness to shorten cold start selection time, and applied fuzzy comparison to strip timestamp suffixes of historical selections after subscription updates to restore node selection.
 
 ## v1.3.1
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-092：解决手动点击主页活跃出口节点列表头部的“闪电光标”触发全体测速完成后，无法自动选择并切换到当前过滤出的子集中最快健康节点的问题。
-- 修复 BUG-091：解决生产环境下机场订阅链接输入框无法使用鼠标右键进行粘贴、复制、剪切、全选等菜单操作的问题。
-- 修复 BUG-090：解决 Trump-3D (retro-3d) 风格皮肤在深色模式下，左侧设置面板的“订阅与机场配置”、“流量接管模式”、“基础设置”卡片标题以及顶部当前活跃出口节点状态栏文字默认渲染为白色从而与亮金色背景混色粘连、严重影响阅读的问题，强制设为最高对比度的深古铜黑色 `#2C1F03` 并提供自然的交互反馈。
+- Fix BUG-092: Resolve issue where clicking the "lightning cursor" at the top of the active outbound node list on the home page to trigger speed tests for all nodes failed to automatically select and switch to the fastest healthy node in the current filtered subset.
+- Fix BUG-091: Resolve issue where the subscription link input field in production could not use right-click for paste, copy, cut, select all, etc.
+- Fix BUG-090: Resolve issue where the text of "Subscription & Config", "Traffic Takeover Mode", "Basic Settings" cards on the left panel, and the active outbound node status bar on top in Trump-3D (retro-3d) dark mode rendered white by default, blending into the bright gold background and making reading difficult. Forced text color to high-contrast dark bronze black `#2C1F03` and provided natural hover feedback.
 
 ## v1.3.0
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化 BUG-087：将拟物化 3D 主题 `Retro-3D` 重命名为 `Trump-3D`，并重构设计为奢华黄金金条视觉风格。全面应用线性高反光金条渐变背景、凹版深色青铜刻字投影、加重型机械按键按压物理反馈，以及双层金条边框与暗金色环境氛围灯效，大幅提升拟物科技质感。
-- 优化 BUG-086：将窄视口模式下流量数据源的节流更新间隔从 3000ms 自适应缩短至 1000ms，消除流量图高频跌落至零与锯齿状断裂，并保证窗口隐藏时自动挂起查询以优化资源消耗。
+- Optimize BUG-087: Renamed the skeuomorphic 3D theme `Retro-3D` to `Trump-3D`, and redesigned it into a luxurious gold bar visual style. Applied linear high-reflection gold bar gradient backgrounds, dark bronze engraved lettering projections, heavy mechanical button press feedback, double-layer gold borders, and dark gold ambient lighting effects to enhance the skeuomorphic feel.
+- Optimize BUG-086: Shortened the throttling interval of traffic data updates in narrow layout mode from 3000ms to 1000ms to eliminate traffic chart dropping to zero and jagged line breaks, and automatically suspended queries when the window is hidden to optimize resource consumption.
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-089：解决大窗口模式下后台对活跃节点延迟进行定期健康监测时，由于调用了已废弃的后端 API 导致高频测速超时误报，从而强制频繁重新选点与切换节点的问题。将其重构为调用新插件提供的 `delayProxyByName` API，并针对相同最快节点的后台自动选点实行通知弹窗完全静默策略。
-- 修复 BUG-081：补全数据刷新返回 Promise 链，并在配置读取轮询前加入延时，完美解决导入/手动更新订阅时主页节点列表无法立刻展示与更新、必须等待两分钟的同步问题。
-- 修复 BUG-083：解决程序刚启动时由于状态闭包未就绪导致自动选点无法读取正确的 Profile ID 进行子集过滤的问题。
-- 修复 BUG-084：清理并移除自动选点中重复叠加的 `!isDummyNode` 过滤逻辑，移交由数据装载入口层进行唯一纯净拦截。
-- 修复 BUG-085：去除后台静默健康检测中的“所有线路都繁忙”气泡弹窗，避免前台产生冗余弹窗报错打扰。
-- 修复 BUG-088：修复 Trump-3D 深色模式下，Contained 样式默认按钮的浅色黄金文字与亮金色背景粘连导致看不清的问题，调整其文字颜色为高对比度的古铜深褐。
+- Fix BUG-089: Resolve issue where periodic health monitoring of active node latency in maximized mode triggered high-frequency speed test timeouts due to deprecated backend APIs, forcing frequent re-selection and switching of nodes. Refactored it to call the new `delayProxyByName` API provided by the plugin, and implemented a silent strategy (no notification popups) for background auto-selection of the same fastest node.
+- Fix BUG-081: Completed promise chains for data refresh and added a delay before config polling, resolving the synchronization issue where home page node list failed to refresh immediately when importing/updating subscriptions and required waiting two minutes.
+- Fix BUG-083: Resolve issue where auto-selection failed to read the correct Profile ID for subset filtering at startup due to the state closure not being ready.
+- Fix BUG-084: Cleaned and removed redundant `!isDummyNode` filtering logic in auto-selection, delegating it to the data loading layer for a single clean interception.
+- Fix BUG-085: Removed "All routes are busy" bubble notifications in background silent health checks to avoid distracting users with redundant error popups.
+- Fix BUG-088: Fix issue in Trump-3D dark mode where default buttons with Contained style had light gold text blending into the bright gold background, making it hard to read. Adjusted text color to high-contrast dark bronze.
 
 ## v1.2.8
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-081：解决启动或切换订阅后自动选择最快节点响应慢，以及广告/假占位节点（如剩余流量、官网等）占据主页前几位并假连通干扰后台自动测速健康监测（NodeMonitor）的问题。在全局数据层（`calcuProxies`、`calcuProxyProviders`、`fetchProxies`）进行深度净化拦截过滤，并在 `NodeMonitor` 检测到当前处于广告节点时自动激活测速以纠正选点。
+- Fix BUG-081: Resolve slow response of auto-selecting the fastest node after starting or switching subscriptions, and the issue where advertising/placeholder nodes (such as remaining traffic, official website) occupied the top spots of the node list and falsely succeeded speed tests, interfering with background `NodeMonitor` checks. Implemented deep purification filtering in global data layers (`calcuProxies`, `calcuProxyProviders`, `fetchProxies`), and automatically triggered speed tests when `NodeMonitor` detects an ad node to correct the selection.
 
 ## v1.2.6
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化 BUG-079：精准优化分流策略倾向中“规则可调”的气泡说明为“在预设规则的基础上任意调整路径控制”，使其更加准确并与“路径控制”功能遥相呼应，且同步完成了所有 13 种多国语言的本地化翻译更新。
+- Optimize BUG-079: Refined the tooltip description of "Rules Adjustable" in routing strategy to "arbitrarily adjust path controls on top of preset rules", making it more accurate and aligned with the "Path Control" feature, and updated translations for all 13 supported languages.
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-080：解决版本相同时更新提示不够友好的问题。检测到内核或客户端已是最新版本时，将原先错误的报错信息窗统一替换为显示实际情况的提示气泡，大幅提升交互的友好度与健壮性。
+- Fix BUG-080: Resolve unfriendly update notifications when versions match. When the kernel or client is already the latest version, replaced the error popups with info tooltips to improve interaction friendliness and robustness.
 
 ## v1.2.5
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 全面清扫废代码：删除项目内多余的废弃函数、废代码和未使用的变量，精简托盘菜单，还原自动拉取最新稳定版内核机制。
+- Dead Code Cleanup: Removed redundant deprecated functions, dead code, and unused variables, streamlined the system tray menu, and restored the mechanism of automatically pulling the latest stable kernel.
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-078：解决内核升级与更新下载极易卡死的问题。对响应流数据块读取增加 20 秒超时控制，并实现多通道（Localhost、System、None）静默重试与自动 Fallback，TCP 握手超时缩短至 10 秒。
+- Fix BUG-078: Resolve freeze issues in kernel upgrade and update downloads. Added 20-second timeout control for response stream chunk reads, and implemented multi-channel (Localhost, System, None) silent retries and auto-fallback, shortening TCP handshake timeout to 10 seconds.
 
 ## v1.2.4
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 多项性能优化：实现日志分批缓冲推送，大幅减少后台 IPC 事件分发频率；极微缩模式下挂起多余的规则与策略组查询以节约资源；实现一维增量更新连接列表，降低数据吞吐量；限制列表最多展示 100 条最活跃的物理节点以提升 React 渲染性能。
-- 窗口状态非对称唤起：当窗口重新可见时立即唤醒 WebSocket 连接，最小化或隐藏时延迟 1 秒断开。
-- 自适应边框美化：使用静态、随主题自适应的双线/实线边框替换动态动画，大幅降低系统 CPU 开销。
+- Performance Optimizations: Implemented batch buffered logging to reduce backend IPC event dispatch frequency; suspended redundant rule and policy group queries in mini-monitoring mode; implemented 1D incremental connection list updates to reduce data throughput; limited the list to display at most 100 most active physical nodes to improve React rendering performance.
+- Asymmetric Window Wakeup: Wakes up WebSocket connections immediately when the window becomes visible, and disconnects with a 1-second delay when minimized or hidden.
+- Adaptive Borders: Replaced dynamic animated borders with static, adaptive double/solid borders to reduce system CPU overhead.
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-077：修复了因为 Mihomo core 自动升级文件名称正则匹配不当导致升级失败的问题。
+- Fix BUG-077: Fix update failure caused by incorrect regex matching of the Mihomo core auto-update filename.
 
 ## v1.2.3
 
+### 🚀 Optimizations
 
-### 🚀 优化改进
+- Optimize BUG-075: Completely resolve memory leak issues in backend connection list polling. Automatically suspend polling when the Connections drawer is closed; introduced client-side Traffic Accumulator to perform incremental memory calculation via low-frequency traffic SSE stream when the drawer is closed, ensuring accumulated data updates on the bottom control panel.
 
-- 性能调优（BUG-075）：彻底解决后台连接列表轮询泄漏问题。Connections 抽屉关闭时自动挂起轮询；引入客户端流量累加器（Traffic Accumulator），在抽屉关闭时通过低频流量 SSE 流做内存增量计算，完美保证底部控制面板的累计数据更新。
+### 🐞 Fixed Bugs
 
-### 🐞 修复问题
-
-- 修复 BUG-076：解决内核已是最新版本时更新按钮仍然可用且触发重复下载的问题。增加语义化版本比对（过滤 tag 前缀与后缀），最新时将按钮置为不可点击，并显示“已是最新”。
-- 修复自动更新 404 错误：创建 `updater/app-update.json`，并将 Tauri 自动更新地址重定向至 GitHub 仓库 Raw 地址，确保应用内点击检查更新不再报错。
-- 完善静默发布指南：在 `clash_mini_silent_release.md` 中增加模块三以固化自动更新配置文件的维护说明。
+- Fix BUG-076: Resolve issue where the update button remained clickable and triggered duplicate downloads when the kernel was already the latest version. Added static version comparison (filtering tag prefixes/suffixes) to disable the button and show "Up to date" when versions match.
+- Fix Auto-update 404 error: Created `updater/app-update.json` and redirected Tauri auto-update URL to the GitHub repository Raw address, ensuring check-for-updates in client no longer throws errors.
+- Refine Silent Release Guide: Added Phase 3 in `clash_mini_silent_release.md` to establish updater configuration file maintenance instructions.
 
 ## v1.2.2
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 性能与更新优化前期准备。
+- Pre-flight preparations for performance and update optimizations.
 
 ## v1.2.1
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-065：置顶出口节点实时子集轮换过滤限制。在活跃出口节点状态栏中点击节点名称进行轮换时，动态实时地提取并应用当前的搜索、过滤、排序及隐藏超时节点等条件，确保轮换范围完全限制在当前展示的候选节点子集内。
-- 修复 BUG-074：内核更新连接超时与版本号冗余格式化。重构后端，为检查内核更新引入 `NetworkManager` 多重自动降级代理回落机制（本地端口代理 -> 系统代理 -> 直连），解决由于网络环境引起的超时连接失败问题；前端增加通用 `formatCoreVersion` 格式化工具，消除重复的 `vv` 前缀并重构为统一的 `Ver.X.Y.Z` 精炼格式。
+- Fix BUG-065: Pin active outbound node real-time subset rotation filtering limits. When clicking the node name in the active outbound node status bar to rotate, dynamically extract and apply current search, filter, sorting, and hide-timeout conditions to ensure the rotation is restricted within the currently displayed candidate node subset.
+- Fix BUG-074: Kernel update connection timeout and redundant version formatting. Refactored the backend to introduce a `NetworkManager` multi-downgrade automatic fallback mechanism (Local Port -> System Proxy -> Direct) for checking kernel updates, solving timeout connection failures caused by network environments; added universal `formatCoreVersion` formatter on frontend to eliminate duplicate `vv` prefix and unify to `Ver.X.Y.Z` format.
 
 ## v1.2.0
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-072：解决 Allow LAN 局域网共享开关拨动后状态自动回弹且无法保持开启的问题。通过在后台核心的 `FindProcessMode` 模型上追加小写反序列化配置与 `ts-rs` 转换注解，彻底消除因为 Mihomo core 字段解析出错引发的前端基础开关回弹隐性故障。
+- Fix BUG-072: Resolve issue where Allow LAN switch bounced back automatically and failed to stay enabled. Added lowercase deserialization config and `ts-rs` conversion annotations to the backend core `FindProcessMode` model, eliminating bouncing switches caused by Mihomo core field parsing errors.
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 完善订阅卡右键菜单功能：支持订阅卡右键唤出拟物化上下文菜单（编辑、编辑文件、复制链接、更新、删除），并支持极简配置编辑对话框，无缝适配客户端全套 6 种视觉主题风格。
+- Refine Subscription Card Right-Click Menu: Added context menu (Edit, Edit File, Copy Link, Update, Delete) on subscription cards, and supported a simple config editing dialog, adapting seamlessly to all 6 visual themes.
 
 ## v1.1.3
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-066：优化 Cyberpunk 风格中 Speed 速度滑块的呼吸/脉动动画。改用内发光 (`inset box-shadow`) 和边框明暗呼吸，加快极速呼吸频率，并让背景极光流动速度随滑块动态增减，从而彻底解决被裁剪和无效果的问题。
-- 修复 BUG-067：优化 Modern Flat 风格中 Shadow 阴影滑块的反馈效果。为浅色和深色模式引入自适应的基准阴影浓度变量（深色模式下加深），统一按钮、卡片、输入框与面板的投影。
-- 增强调节自由度：将所有风格下双滑块的最大限值范围从 `2.0`（或 `3.0`）统一提升至 `5.0`，给用户提供更强的视觉对比与微调控制。
+- Fix BUG-066: Optimize speed slider breathing/pulsing animation in Cyberpunk skin. Switched to inset box-shadow and border breathing, accelerated breathing frequency, and dynamically scaled aurora flow speed with slider value, solving the clipping and lack-of-effect issues.
+- Fix BUG-067: Optimize shadow slider feedback in Modern Flat skin. Introduced adaptive base shadow density variables for light and dark modes (darker in dark mode) to unify button, card, input, and panel projections.
+- Enhance Adjustment Freedom: Unified the maximum limit range of double sliders under all styles from `2.0` (or `3.0`) to `5.0` to provide users with stronger visual contrast and fine-grained control.
 
 ## v1.1.2
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 新增导航栏中活跃节点的 1-click 一键循环切换功能。
-- 大幅精简开发协议 `clash_mini_agreements.md`，移除了重复冗余的避坑与发布 SOP。
+- Added 1-click loop switching of active nodes in the navigation bar.
+- Streamlined development agreement `clash_mini_agreements.md`, removing redundant pitfalls and release SOP.
 
 ## v2.0.4
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-041：彻底重构主页节点列表渲染机制，移除 React 状态 `isMinimalHeight` 及高度监听逻辑，节点列表改无条件常驻渲染并随窗口自然裁剪遮挡，根治初次加载时由于环境渲染时序造成的列表空白故障。
-- 优化协议文档：更新 【最高设计基准】 为 3D 拟物与物理质感美学，并校正项目定位中的开发边界与 Rust 后端重构规范。
-- 修正文档整合性问题：更正 `clash_mini_pitfalls.md` 与 `clash_mini_silent_release.md` 中的 Bug 登记引用为 `bug_list.md`。
+- Fix BUG-041: Completely restructured home page node list rendering, removing React state `isMinimalHeight` and height listeners. The node list now renders unconditionally and clips naturally with window size, fixing the blank list issue caused by rendering timings at initial load.
+- Optimize Agreement: Updated [Highest Design Baseline] to skeuomorphic 3D and physical texture aesthetics, and corrected development boundaries and Rust backend refactoring rules.
+- Fix Doc Consistency: Corrected bug registration references in `clash_mini_pitfalls.md` and `clash_mini_silent_release.md` to `bug_list.md`.
 
 ## v2.0.3
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 编译环境升级：更新项目依赖，支持并跑通了 TypeScript 类型与后台 Clippy 代码静态编译。
+- Upgrade Compile Environment: Updated project dependencies, supporting TypeScript type checks and backend Clippy static compilation.
 
 ## v2.0.2
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 窄窗口布局优化：调整主页节点列表中协议列为右对齐、节点名称为左对齐、延迟列为居中，并优化极简模式下的窗口限制高度为 `163px`。
+- Narrow Layout Optimization: Right-aligned the protocol column, left-aligned the node name, and centered the latency column in the home page node list, and optimized the minimum window height to `163px` in minimalist mode.
 
 ## v2.0.1
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-034：优化订阅激活自动链式动作，限制自动测速与挑选最快节点操作仅针对主页过滤筛选出的节点集合执行，防止被过滤掉的不可用节点被错误选中。
-- 归档 小白必读.txt：更新并存档新手引导说明书。
+- Fix BUG-034: Optimize subscription activation auto-chain actions, restricting speed-tests and fastest node selection strictly to the current filtered home page node subset, preventing unavailable nodes from being incorrectly selected.
+- Archive README_First: Updated and archived beginner user guides.
 
 ## v1.1.9
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-073：实施 Windows 系统托盘极简静态化设计，避开管理员高权限启动时向 Explorer 发送动态更新指令被阻断的 COM E_FAIL (os error -2147467259) 错误。
-- 修复 BUG-038：修复设置页面“活跃/历史”连接切换分段选择器被置顶的顶部 Header 区域遮挡、导致部分区域无法点击的交互故障。
+- Fix BUG-073: Implemented static system tray design on Windows, avoiding COM `E_FAIL` (os error -2147467259) errors when dynamic update instructions sent to Explorer are blocked under Administrator privileges.
+- Fix BUG-038: Fix setting page "Active/History" connection switch being blocked by the header, making parts of it unclickable.
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化 STYLE-001：对主场景及设置页面中 23 个核心交互组件（包含按钮、分段选择器、拨动开关、滑动条、物理输入框及底部指标卡片）进行拟物化 3D Bevel 物理凹凸质感与色彩霓虹发光升级，且深度关联自适应立体及发光系数。
+- Optimize STYLE-001: Upgraded 23 core interactive components (including buttons, selectors, switches, sliders, inputs, and cards) in main scene and settings page to skeuomorphic 3D Bevel textures and neon glow, linked to adaptive depth and glow variables.
 
 ## v1.1.8
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- 修复 BUG-071：客户端与 Mihomo 内核自动更新功能开发及 UI 下拉菜单适配。通过升级 `tauri-plugin-mihomo` 插件依赖兼容去除了 `global-client-fingerprint` 的 v1.19.27 及最新内核，根治启动及代理页面节点列表空白（白屏）的故障。
-- 修复 BUG-072：修复由于新版内核插件 models.rs 中 LogLevel 序列化问题导致 Allow LAN 等开关状态回弹、无法加载与更新的故障。
+- Fix BUG-071: Client and Mihomo core auto-update development and UI dropdown integration. Upgraded `tauri-plugin-mihomo` dependency to support newer kernels (v1.19.27+), resolving blank active node lists.
+- Fix BUG-072: Fix Allow LAN switch bouncing back due to LogLevel serialization issues in newer plugin models.rs.
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 前端 UI 下拉气泡菜单重构：将侧边栏“帮助”按钮重构为向上弹出的 Popover 气泡菜单，全面适配 Retro-3D、Cyberpunk、Modern Flat、Frosted、Monochrome、Original 等 6 大视觉主题与对应 3D 立体及发光特效。
-- 自适应更新机制：支持客户端静默后台更新轮询与启动安装就绪检测，集成内核热更新/热替换与服务释放机制。
+- Popover Menu Restructuring: Reconstructed the sidebar "Help" button into an upward Popover menu, adapting to all 6 visual skins with 3D bevel and glow effects.
+- Adaptive Updates: Supports client silent background update polling and boot-ready detection, integrating kernel hot-swap and service release mechanisms.
 
-
-
-## 原始版本历史 (Clash Verge History)
+## Upstream Release History (Clash Verge History)
 
 ## v2.5.2
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
-- macOS 托盘速率可能的样式错误
+- Possible styling errors in macOS tray speed display.
 
 <details>
-<summary><strong> ✨ 新增功能 </strong></summary>
+<summary><strong> ✨ New Features </strong></summary>
 
-- 增加 TrustTunnel, OpenVPN, Tailscale, GostRelay 节点显示支持
+- Added display support for TrustTunnel, OpenVPN, Tailscale, GostRelay nodes.
 
 </details>
 
 <details>
-<summary><strong> 🚀 优化改进 </strong></summary>
+<summary><strong> 🚀 Optimizations </strong></summary>
 
-- 关闭 autofill 弹出窗口
+- Close autofill popups.
 
 </details>

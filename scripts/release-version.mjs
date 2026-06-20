@@ -36,7 +36,7 @@ import path from 'path'
 import { program } from 'commander'
 
 /**
- * 获取当前 git 短 commit hash
+ * Get current git short commit hash
  * @returns {string}
  */
 function getGitShortCommit() {
@@ -49,7 +49,7 @@ function getGitShortCommit() {
 }
 
 /**
- * 获取最新 Tauri 相关提交的短 hash
+ * Get the latest Tauri-related commit short hash
  * @returns {string}
  */
 function getLatestTauriCommit() {
@@ -74,10 +74,10 @@ function getLatestTauriCommit() {
 }
 
 /**
- * 生成短时间戳（格式：MMDD）或带 commit（格式：MMDD.cc39b27）
- * 使用 Asia/Shanghai 时区
- * @param {boolean} withCommit 是否带 commit
- * @param {boolean} useTauriCommit 是否使用 Tauri 相关的 commit（仅当 withCommit 为 true 时有效）
+ * Generate short timestamp (Format: MMDD) or with commit (Format: MMDD.cc39b27)
+ * Uses Asia/Shanghai timezone
+ * @param {boolean} withCommit Whether to include commit
+ * @param {boolean} useTauriCommit Whether to use Tauri-related commit (only valid if withCommit is true)
  * @returns {string}
  */
 function generateShortTimestamp(withCommit = false, useTauriCommit = false) {
@@ -103,7 +103,7 @@ function generateShortTimestamp(withCommit = false, useTauriCommit = false) {
 }
 
 /**
- * 验证版本号格式
+ * Validate version format
  * @param {string} version
  * @returns {boolean}
  */
@@ -114,7 +114,7 @@ function isValidVersion(version) {
 }
 
 /**
- * 标准化版本号
+ * Normalize version
  * @param {string} version
  * @returns {string}
  */
@@ -123,7 +123,7 @@ function normalizeVersion(version) {
 }
 
 /**
- * 提取基础版本号（去掉所有 -tag 和 +build 部分）
+ * Extract base version (remove all -tag and +build parts)
  * @param {string} version
  * @returns {string}
  */
@@ -134,7 +134,7 @@ function getBaseVersion(version) {
 }
 
 /**
- * 更新 package.json 版本号
+ * Update package.json version
  * @param {string} newVersion
  */
 async function updatePackageVersion(newVersion) {
@@ -166,7 +166,7 @@ async function updatePackageVersion(newVersion) {
 }
 
 /**
- * 更新 Cargo.toml 版本号
+ * Update Cargo.toml version
  * @param {string} newVersion
  */
 async function updateCargoVersion(newVersion) {
@@ -198,7 +198,7 @@ async function updateCargoVersion(newVersion) {
 }
 
 /**
- * 更新 tauri.conf.json 版本号
+ * Update tauri.conf.json version
  * @param {string} newVersion
  */
 async function updateTauriConfigVersion(newVersion) {
@@ -216,7 +216,7 @@ async function updateTauriConfigVersion(newVersion) {
       tauriConfig.version,
     )
 
-    // 使用完整版本信息，包含build metadata
+    // Use full version info, including build metadata
     tauriConfig.version = versionWithoutV
 
     await fs.writeFile(
@@ -234,7 +234,7 @@ async function updateTauriConfigVersion(newVersion) {
 }
 
 /**
- * 获取当前版本号
+ * Get current version
  */
 async function getCurrentVersion() {
   const _dirname = process.cwd()
@@ -250,7 +250,7 @@ async function getCurrentVersion() {
 }
 
 /**
- * 主函数
+ * Main function
  */
 async function main(versionArg) {
   if (!versionArg) {
@@ -274,16 +274,16 @@ async function main(versionArg) {
       const baseVersion = getBaseVersion(currentVersion)
 
       if (versionArg.toLowerCase() === 'autobuild') {
-        // 格式: 2.3.0+autobuild.1004.cc39b27
-        // 使用 Tauri 相关的最新 commit hash
+        // Format: 2.3.0+autobuild.1004.cc39b27
+        // Use latest Tauri-related commit hash
         newVersion = `${baseVersion}+autobuild.${generateShortTimestamp(true, true)}`
       } else if (versionArg.toLowerCase() === 'autobuild-latest') {
-        // 格式: 2.3.0+autobuild.1004.a1b2c3d (使用最新 Tauri 提交)
+        // Format: 2.3.0+autobuild.1004.a1b2c3d (using latest Tauri commit)
         const latestTauriCommit = getLatestTauriCommit()
         newVersion = `${baseVersion}+autobuild.${generateShortTimestamp()}.${latestTauriCommit}`
       } else if (versionArg.toLowerCase() === 'deploytest') {
-        // 格式: 2.3.0+deploytest.1004.cc39b27
-        // 使用 Tauri 相关的最新 commit hash
+        // Format: 2.3.0+deploytest.1004.cc39b27
+        // Use latest Tauri-related commit hash
         newVersion = `${baseVersion}+deploytest.${generateShortTimestamp(true, true)}`
       } else {
         newVersion = `${baseVersion}-${versionArg.toLowerCase()}`

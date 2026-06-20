@@ -24,7 +24,7 @@ The current implementation of `save_file` unconditionally writes byte data to th
 ### `save_profile_file` in `src-tauri/src/cmd/save_profile.rs`
 The current implementation reads the original file content first (lines 44-50) and then unconditionally writes the new content (line 57):
 ```rust
-43:     // 读取原始内容（在释放profiles_guard后进行）
+43:     // Read original content (performed after releasing profiles_guard)
 44:     let original_content = PrfItem {
 45:         file: Some(rel_path.clone()),
 46:         ..Default::default()
@@ -33,7 +33,7 @@ The current implementation reads the original file content first (lines 44-50) a
 49:     .await
 50:     .stringify_err()?;
 ...
-56:     // 保存新的配置文件
+56:     // Save new configuration file
 57:     fs::write(&file_path, &file_data).await.stringify_err()?;
 ```
 It then passes `original_content` to `handle_saved_profile_file` to validate the file and apply runtime updates if it affects the active profile.
@@ -102,7 +102,7 @@ Update the function to read existing bytes and compare them before writing:
 ### Task 2: Optimize `save_profile_file` in `src-tauri/src/cmd/save_profile.rs`
 Handle missing files gracefully, and skip processing if contents match:
 ```rust
-    // 读取原始内容（在释放profiles_guard后进行）
+    // Read original content (performed after releasing profiles_guard)
     let original_result = PrfItem {
         file: Some(rel_path.clone()),
         ..Default::default()

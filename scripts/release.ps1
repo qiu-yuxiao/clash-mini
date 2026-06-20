@@ -1,17 +1,17 @@
-# Clash Mini 一键静默发行脚本 (Windows PowerShell)
-# 用法: .\scripts\release.ps1 <版本号>
-# 示例: .\scripts\release.ps1 1.4.5
+# Clash Mini One-Click Silent Release Script (Windows PowerShell)
+# Usage: .\scripts\release.ps1 <version>
+# Example: .\scripts\release.ps1 1.4.5
 #
-# 效果: 用户仅需点击一次 Submit 确认，脚本全自动完成：
-#   1. 版本号更新 (Python)
-#   2. git commit + tag + push (触发 CI)
-#   3. 每 3 分钟轮询 CI 状态（自动纠错重试）
-#   4. CI 成功后下载 setup.exe 到 portable_test/ 并验收
+# Effect: The user only needs to click Submit once to confirm, and the script does the rest automatically:
+#   1. Version bump (Python)
+#   2. git commit + tag + push (Triggers CI)
+#   3. Poll CI status every 3 minutes (automatic retry on error)
+#   4. Download setup.exe to portable_test/ and verify after CI succeeds
 #
 # 约束:
-#   - Token 从 github_token.txt 读取并设为环境变量，绝不打印
-#   - 不接触代理进程 (verge-mihomo/clash-verge) 及端口 (10801/9098)
-#   - 无任何 Read-Host 交互，版本号必须由参数传入
+#   - Token is read from github_token.txt and set as env variable, never printed
+#   - Do not interfere with proxy processes (verge-mihomo/clash-verge) and ports (10801/9098)
+#   - No Read-Host interaction, version must be passed as parameter
 
 param(
     [Parameter(Mandatory = $true)]
@@ -22,18 +22,18 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 # ─────────────────────────────────────────────
-# 配置常量
+# Configuration Constants
 # ─────────────────────────────────────────────
 $ProjectRoot   = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $GitHubRepo    = "qiu-yuxiao/clash-mini"
 $TokenFile     = Join-Path $ProjectRoot "github_token.txt"
 $PortableDir   = Join-Path $ProjectRoot "portable_test"
-$PollInterval  = 180   # 秒（3 分钟）
-$MaxRetries    = 2     # CI 失败自动重试次数（网络类）
-$QueueTimeout  = 900   # 排队超时（15 分钟）
+$PollInterval  = 180   # Seconds (3 minutes)
+$MaxRetries    = 2     # Number of automatic retries on CI failure (network-related)
+$QueueTimeout  = 900   # Queue timeout (15 minutes)
 
 # ─────────────────────────────────────────────
-# 输出函数
+# Output Functions
 # ─────────────────────────────────────────────
 function Log-Step  { param($msg) Write-Host "`n>>> $msg" -ForegroundColor Cyan }
 function Log-Ok    { param($msg) Write-Host "  [OK]   $msg" -ForegroundColor Green }
@@ -41,115 +41,115 @@ function Log-Warn  { param($msg) Write-Host "  [WARN] $msg" -ForegroundColor Yel
 function Log-Error { param($msg) Write-Host "  [ERR]  $msg" -ForegroundColor Red }
 function Log-Info  { param($msg) Write-Host "  [..]   $msg" }
 
-# 时间戳前缀（用于进度行）
+# Timestamp prefix
 function Now { return (Get-Date -Format "HH:mm") }
 
 # ─────────────────────────────────────────────
-# 阶段 0：Token 读取（最高优先级，绝不暴露）
+# Stage 0: Token Load (Highest priority, never print)
 # ─────────────────────────────────────────────
-Log-Step "读取 GitHub Token"
+Log-Step "Reading GitHub Token"
 if (-not (Test-Path $TokenFile)) {
-    Log-Error "github_token.txt 不存在: $TokenFile"
+    Log-Error "github_token.txt not found: $TokenFile"
     exit 1
 }
-# 仅设为环境变量，后续 gh 命令自动使用，不打印不传参
+# Set as env variable for automatic use by subsequent gh commands, never printed
 $env:GH_TOKEN = (Get-Content $TokenFile -Raw -Encoding UTF8).Trim()
-Log-Ok "Token 已加载至环境变量 GH_TOKEN（值已隐藏）"
+Log-Ok "Token loaded into environment variable GH_TOKEN (value hidden)"
 
 # ─────────────────────────────────────────────
-# 阶段 1：前置检查
+# Stage 1: Pre-flight Checks
 # ─────────────────────────────────────────────
-Log-Step "前置检查"
+Log-Step "Pre-flight Checks"
 
-# 版本号格式
+# Version format
 $Version = $Version.TrimStart('v')
 if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-    Log-Error "版本号格式错误: $Version（应为 x.y.z，例如 1.4.5）"
+    Log-Error "Invalid version format: $Version (expected x.y.z, e.g., 1.4.5)"
     exit 1
 }
 $TagName = "v$Version"
-Log-Ok "目标版本: $Version  |  Tag: $TagName"
+Log-Ok "Target Version: $Version  |  Tag: $TagName"
 
-# 当前分支必须是 dev
+# Current branch must be dev
 $Branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($Branch -ne "dev") {
-    Log-Error "当前分支为 '$Branch'，发行必须在 dev 分支执行"
+    Log-Error "Current branch is '$Branch', release must be executed on dev branch"
     exit 1
 }
-Log-Ok "分支检查通过: dev"
+Log-Ok "Branch check passed: dev"
 
-# 工作区必须干净
+# Working directory must be clean
 $Dirty = git status --porcelain
 if ($Dirty) {
-    Log-Error "工作区存在未提交的改动，请先提交后再发行:"
+    Log-Error "Working directory has uncommitted changes, please commit before release:"
     git status --short
     exit 1
 }
-Log-Ok "工作区干净"
+Log-Ok "Working directory clean"
 
-# 确认本地无未推送提交
+# Confirm no unpushed local commits
 $Unpushed = git log origin/dev..dev --oneline
 if ($Unpushed) {
-    Log-Error "存在未推送到远端的本地提交，请先 git push origin dev:"
+    Log-Error "Unpushed local commits exist, please run git push origin dev first:"
     Write-Host $Unpushed
     exit 1
 }
-Log-Ok "本地提交已全部推送"
+Log-Ok "Local commits successfully pushed"
 
-# Tag 冲突检查
+# Tag conflict check
 $ExistingTag = git tag -l $TagName
 if ($ExistingTag) {
-    Log-Error "Tag $TagName 已存在，若需重新发行请先手动删除:"
+    Log-Error "Tag $TagName already exists. To re-release, please manually delete it:"
     Log-Error "  git tag -d $TagName"
     Log-Error "  git push origin :refs/tags/$TagName"
     exit 1
 }
-Log-Ok "Tag $TagName 不存在，可继续"
+Log-Ok "Tag $TagName does not exist, proceeding"
 
 # ─────────────────────────────────────────────
-# 阶段 2：版本号更新（Python）
+# Stage 2: Version Bump (Python)
 # ─────────────────────────────────────────────
-Log-Step "更新版本号文件（Python）"
+Log-Step "Bumping Version Numbers (Python)"
 $BumpScript = Join-Path $ProjectRoot "scripts\bump_version.py"
 python $BumpScript $Version
 if ($LASTEXITCODE -ne 0) {
-    Log-Error "bump_version.py 执行失败"
+    Log-Error "bump_version.py execution failed"
     exit 1
 }
 
 # ─────────────────────────────────────────────
-# 阶段 3：Git 提交 + 推送 + 打 Tag
+# Stage 3: Git Commit, Push, Tag
 # ─────────────────────────────────────────────
-Log-Step "Git 提交并推送"
+Log-Step "Git Commit and Push"
 
 git config --local http.sslBackend openssl
 git config --local http.sslVerify false
 git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
 git commit -m "release: bump version to $Version" --no-verify
-if ($LASTEXITCODE -ne 0) { Log-Error "git commit 失败"; exit 1 }
+if ($LASTEXITCODE -ne 0) { Log-Error "git commit failed"; exit 1 }
 
 git push origin dev --no-verify
-if ($LASTEXITCODE -ne 0) { Log-Error "git push dev 失败"; exit 1 }
-Log-Ok "dev 分支已推送"
+if ($LASTEXITCODE -ne 0) { Log-Error "git push dev failed"; exit 1 }
+Log-Ok "dev branch pushed"
 
 git tag $TagName
 git push origin $TagName --no-verify
-if ($LASTEXITCODE -ne 0) { Log-Error "git push tag 失败"; exit 1 }
-Log-Ok "Tag $TagName 已推送 -> CI 已触发"
+if ($LASTEXITCODE -ne 0) { Log-Error "git push tag failed"; exit 1 }
+Log-Ok "Tag $TagName pushed -> CI triggered"
 
 git config --local --unset http.sslBackend
 git config --local --unset http.sslVerify
 
 Write-Host ""
-Write-Host "  CI 监控面板: https://github.com/$GitHubRepo/actions" -ForegroundColor Cyan
+Write-Host "  CI Monitor Dashboard: https://github.com/$GitHubRepo/actions" -ForegroundColor Cyan
 
 # ─────────────────────────────────────────────
-# 阶段 4：轮询 CI 状态（每 3 分钟）
+# Stage 4: Poll CI Status (Every 3 minutes)
 # ─────────────────────────────────────────────
-Log-Step "等待 CI 构建完成（每 3 分钟汇报一次）"
+Log-Step "Waiting for CI build to complete (polling every 3 minutes)"
 
 function Get-RunInfo {
-    # 获取最新 workflow run 的 id、status、conclusion
+    # Get newest workflow run id, status, and conclusion
     $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
     if (-not $json) { return $null }
     $obj = $json | ConvertFrom-Json
@@ -172,20 +172,20 @@ $LastRunId    = $null
 :outerLoop while ($AttemptCount -lt $MaxAttempts) {
     $AttemptCount++
     if ($AttemptCount -gt 1) {
-        Log-Warn "第 $AttemptCount 次尝试（自动重试）..."
-        # 重新推送 tag 触发新 CI run
+        Log-Warn "Attempt $AttemptCount (Automatic Retry)..."
+        # Re-push tag to trigger a new CI run
         git tag -d $TagName 2>$null
         git push origin ":refs/tags/$TagName" --no-verify 2>$null
         Start-Sleep -Seconds 5
         git tag $TagName
         git push origin $TagName --no-verify
-        if ($LASTEXITCODE -ne 0) { Log-Error "重推 Tag 失败，放弃重试"; break }
-        Log-Ok "Tag 已重推，等待新 CI Run 启动..."
+        if ($LASTEXITCODE -ne 0) { Log-Error "Failed to push tag, aborting retries"; break }
+        Log-Ok "Tag pushed, waiting for new CI Run to start..."
         Start-Sleep -Seconds 30
         $StartTime = Get-Date
     }
 
-    # 等待 CI run 出现
+    # Wait for CI run to appear
     $WaitSec = 0
     $Run     = $null
     while (-not $Run -or $Run.id -eq $LastRunId) {
@@ -193,19 +193,19 @@ $LastRunId    = $null
         $WaitSec += 15
         $Run = Get-RunInfo
         if ($WaitSec -ge 120) {
-            Log-Warn "等待 CI Run 出现超时（2 分钟），继续等待..."
+            Log-Warn "Timeout waiting for CI Run (2 minutes), continuing wait..."
         }
     }
     $LastRunId = $Run.id
     Log-Info "CI Run ID: $($Run.id) | $(Get-RunLogs $Run.id)"
 
-    # 轮询 run 状态
+    # Poll run status
     :pollLoop while ($true) {
         $Elapsed = [int]((Get-Date) - $StartTime).TotalMinutes
         $Run     = Get-RunInfo
 
         if (-not $Run) {
-            Log-Warn "$(Now) API 返回空，稍后重试..."
+            Log-Warn "$(Now) API returned empty response, retrying later..."
             Start-Sleep -Seconds $PollInterval
             continue
         }
@@ -213,16 +213,16 @@ $LastRunId    = $null
         $Status     = $Run.status      # queued / in_progress / completed
         $Conclusion = $Run.conclusion  # success / failure / cancelled / null
 
-        Write-Host "  [$(Now)] CI: $Status$(if ($Conclusion) { " / $Conclusion" }) | 已运行: $Elapsed 分钟"
+        Write-Host "  [$(Now)] CI: $Status$(if ($Conclusion) { " / $Conclusion" }) | Elapsed: $Elapsed minutes"
 
         if ($Status -eq "completed") {
             if ($Conclusion -eq "success") {
-                Log-Ok "CI 构建成功！总耗时: $Elapsed 分钟"
+                Log-Ok "CI build completed successfully! Total elapsed: $Elapsed minutes"
                 break outerLoop
             }
             elseif ($Conclusion -eq "failure" -or $Conclusion -eq "cancelled") {
                 $LogUrl = Get-RunLogs $Run.id
-                # 判断是否可重试（网络类失败，通过失败的 job 名称粗判）
+                # Determine if retryable (network errors checked via failed job name)
                 $FailedJobs = gh api "repos/$GitHubRepo/actions/runs/$($Run.id)/jobs" 2>$null |
                               ConvertFrom-Json | Select-Object -ExpandProperty jobs |
                               Where-Object { $_.conclusion -eq "failure" }
@@ -230,33 +230,33 @@ $LastRunId    = $null
                 foreach ($job in $FailedJobs) {
                     $jname = $job.name.ToLower()
                     if ($jname -match "build" -and $AttemptCount -lt $MaxAttempts) {
-                        # build job 失败且仍有重试次数 -> 视为可能是瞬时错误，重试
+                        # build job failed and retries remain -> treat as transient error, retry
                         $IsRetryable = $true
                     }
                 }
 
                 if ($IsRetryable) {
-                    Log-Warn "CI 失败（结论: $Conclusion），准备自动重试..."
-                    Log-Warn "失败详情: $LogUrl"
+                    Log-Warn "CI failed (conclusion: $Conclusion), preparing automatic retry..."
+                    Log-Warn "Failure details: $LogUrl"
                     Start-Sleep -Seconds 10
-                    break pollLoop  # 跳回 outerLoop 重试
+                    break pollLoop  # Jump back to outerLoop to retry
                 }
                 else {
-                    Log-Error "CI 构建失败（结论: $Conclusion），无法自动恢复"
-                    Log-Error "请手动查看失败日志: $LogUrl"
-                    Log-Error "常见原因: 编译错误、签名失败、代码问题，需人工介入"
+                    Log-Error "CI build failed (conclusion: $Conclusion), cannot recover automatically"
+                    Log-Error "Please view failed logs manually: $LogUrl"
+                    Log-Error "Common causes: compile errors, signature errors, code bugs, manual check required"
                     exit 1
                 }
             }
             else {
-                Log-Error "CI 结束但结论未知: $Conclusion"
+                Log-Error "CI finished but conclusion unknown: $Conclusion"
                 exit 1
             }
         }
 
-        # 排队超时检查
+        # Queue timeout check
         if ($Status -eq "queued" -and $Elapsed -ge ($QueueTimeout / 60)) {
-            Log-Warn "CI 排队超时（$Elapsed 分钟），自动重推 Tag..."
+            Log-Warn "CI queue timed out ($Elapsed minutes), pushing tag again..."
             break pollLoop
         }
 
@@ -265,14 +265,14 @@ $LastRunId    = $null
 }
 
 if ($AttemptCount -ge $MaxAttempts) {
-    Log-Error "已达最大重试次数（$MaxRetries 次），发行失败，请人工介入"
+    Log-Error "Max retry attempts reached ($MaxRetries), release failed, manual check required"
     exit 1
 }
 
 # ─────────────────────────────────────────────
-# 阶段 5：验收 - 等待 Release 正式发布
+# Stage 5: Acceptance - Wait for Release to Publish
 # ─────────────────────────────────────────────
-Log-Step "等待 Release 从 Draft 转为正式发布"
+Log-Step "Waiting for Release draft to publish"
 
 $ReleaseReady = $false
 for ($i = 0; $i -lt 20; $i++) {
@@ -282,26 +282,26 @@ for ($i = 0; $i -lt 20; $i++) {
         $Rel = $ReleaseJson | ConvertFrom-Json
         if (-not $Rel.draft) {
             $ReleaseReady = $true
-            Log-Ok "Release $TagName 已正式发布"
+            Log-Ok "Release $TagName is published"
             break
         }
         else {
-            Log-Info "Release 仍为 Draft，继续等待..."
+            Log-Info "Release is still Draft, continuing wait..."
         }
     }
     else {
-        Log-Info "Release 尚未创建，继续等待..."
+        Log-Info "Release not created yet, continuing wait..."
     }
 }
 
 if (-not $ReleaseReady) {
-    Log-Warn "等待 Release 发布超时，尝试直接下载..."
+    Log-Warn "Timeout waiting for Release to publish, attempting download anyway..."
 }
 
 # ─────────────────────────────────────────────
-# 阶段 6：下载 setup.exe 到 portable_test/ 并验收
+# Stage 6: Download setup.exe to portable_test/ and Verify
 # ─────────────────────────────────────────────
-Log-Step "下载发行产物并验收"
+Log-Step "Downloading Release Artifact and Verifying"
 
 if (-not (Test-Path $PortableDir)) {
     New-Item -ItemType Directory -Path $PortableDir | Out-Null
@@ -315,37 +315,37 @@ gh release download $TagName `
     --repo $GitHubRepo
 
 if ($LASTEXITCODE -ne 0) {
-    Log-Error "setup.exe 下载失败，请手动检查 Release 页面"
+    Log-Error "setup.exe download failed, please manually check the Release page"
     exit 1
 }
 
-# 查找下载的文件
+# Search for downloaded file
 $SetupFile = Get-ChildItem $PortableDir -Filter "*${Version}*x64-setup.exe" |
              Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 if (-not $SetupFile) {
-    Log-Error "未在 $PortableDir 中找到 setup.exe"
+    Log-Error "Could not find setup.exe in $PortableDir"
     exit 1
 }
 
 $FileSizeMB = [math]::Round($SetupFile.Length / 1MB, 2)
 if ($SetupFile.Length -eq 0) {
-    Log-Error "下载的 setup.exe 文件大小为 0，产物异常"
+    Log-Error "Downloaded setup.exe file size is 0, abnormal artifact"
     exit 1
 }
 
 # ─────────────────────────────────────────────
-# 完成报告
+# Final Report
 # ─────────────────────────────────────────────
 $TotalMin = [int]((Get-Date) - $StartTime).TotalMinutes
 Write-Host ""
 Write-Host ("=" * 62) -ForegroundColor Green
-Write-Host "  发行成功！" -ForegroundColor Green
+Write-Host "  Release Succeeded!" -ForegroundColor Green
 Write-Host ("=" * 62) -ForegroundColor Green
 Write-Host ""
-Write-Host "  版本:    $TagName"
-Write-Host "  文件:    $($SetupFile.Name)  ($FileSizeMB MB)"
-Write-Host "  路径:    $($SetupFile.FullName)"
+Write-Host "  Version:    $TagName"
+Write-Host "  File:    $($SetupFile.Name)  ($FileSizeMB MB)"
+Write-Host "  Path:    $($SetupFile.FullName)"
 Write-Host "  Release: https://github.com/$GitHubRepo/releases/tag/$TagName"
-Write-Host "  总耗时:  $TotalMin 分钟"
+Write-Host "  Total Elapsed:  $TotalMin minutes"
 Write-Host ""

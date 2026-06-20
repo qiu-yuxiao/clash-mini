@@ -280,7 +280,7 @@ function clashMeta() {
 }
 
 // =======================
-// download helper (增强：status + magic bytes)
+// download helper (Enhanced: status + magic bytes)
 // =======================
 async function downloadFile(url, outPath) {
   const options = {}
@@ -298,7 +298,7 @@ async function downloadFile(url, outPath) {
   })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    // 将 body 写到文件以便排查（可通过临时目录查看）
+    // Write body to file for troubleshooting (viewable in temp directory)
     await fsp.mkdir(path.dirname(outPath), { recursive: true })
     await fsp.writeFile(outPath, body)
     throw new Error(`Failed to download ${url}: status ${response.status}`)
@@ -307,7 +307,7 @@ async function downloadFile(url, outPath) {
   const buf = Buffer.from(await response.arrayBuffer())
   await fsp.mkdir(path.dirname(outPath), { recursive: true })
 
-  // 简单 magic 字节检查
+  // Simple magic bytes check
   if (url.endsWith('.gz') || url.endsWith('.tgz')) {
     if (!(buf[0] === 0x1f && buf[1] === 0x8b)) {
       await fsp.writeFile(outPath, buf)
@@ -329,7 +329,7 @@ async function downloadFile(url, outPath) {
 }
 
 // =======================
-// resolveSidecar (支持 zip / tgz / gz)
+// resolveSidecar (Supports zip / tgz / gz)
 // =======================
 async function resolveSidecar(binInfo) {
   const { name, targetFile, zipFile, exeFile, downloadURL } = binInfo
@@ -357,11 +357,11 @@ async function resolveSidecar(binInfo) {
         log_debug(`"${name}" entry: ${entry.entryName}`)
       })
       zip.extractAllTo(tempDir, true)
-      // 尝试按 exeFile 重命名，否则找第一个可执行文件
+      // Try renaming according to exeFile, otherwise find the first executable file
       if (fs.existsSync(tempExe)) {
         await fsp.rename(tempExe, sidecarPath)
       } else {
-        // 搜索候选
+        // Search candidates
         const files = await fsp.readdir(tempDir)
         const candidate = files.find(
           (f) =>
@@ -379,11 +379,11 @@ async function resolveSidecar(binInfo) {
       await extract({ cwd: tempDir, file: tempZip })
       const files = await fsp.readdir(tempDir)
       log_debug(`"${name}" extracted files:`, files)
-      // 优先寻找给定 exeFile 或已知前缀
+      // Prioritize searching for the given exeFile or known prefixes
       let extracted = files.find(
         (f) =>
           f === path.basename(exeFile) ||
-          f.startsWith('虚空终端-') ||
+          f.startsWith('\u865a\u7a7a\u7ec8\u7aef-') ||
           !f.includes('.'),
       )
       if (!extracted) extracted = files[0]
@@ -483,7 +483,7 @@ const resolvePlugin = async () => {
       await fsp.cp(tempDll, pluginPath, { recursive: true, force: true })
       log_success(`unzip finished: "SimpleSC"`)
     } else {
-      // 如果 dll 名称不同，尝试找到 dll
+      // If the dll name is different, try to find the dll
       const files = await fsp.readdir(tempDir)
       const dll = files.find((f) => f.toLowerCase().endsWith('.dll'))
       if (dll) {
@@ -501,7 +501,7 @@ const resolvePlugin = async () => {
   }
 }
 
-// service chmod (保留并使用 glob)
+// service chmod (Keep and use glob)
 const resolveServicePermission = async () => {
   const serviceExecutables = [
     'clash-verge-service*',

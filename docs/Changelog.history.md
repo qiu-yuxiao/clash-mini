@@ -1,1102 +1,797 @@
 ## v2.5.1
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 备份设置功能异常
-- 修复 Windows 节点交互异常 
+- Backup settings function anomaly
+- Fixed Windows node interaction anomaly
 
-</details>
-
+---
 
 ## v2.5.0
 
 > [!IMPORTANT]
-> 关于版本的说明：Clash Verge 版本号遵循 x.y.z：x 为重大架构变更，y 为功能新增，z 为 Bug 修复。
+> Version Note: Clash Verge versioning follows x.y.z: x for major architectural changes, y for new features, z for bug fixes.
 
-- **Mihomo(Meta) 内核升级至 v1.19.25**
+- **Mihomo(Meta) Kernel upgraded to v1.19.25**
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复系统代理关闭后在 PAC 模式下未完全关闭
-- 修复 macOS 开关代理时可能的卡死
-- 修复修改定时自动更新后记时未及时刷新
-- 修复 Linux 关闭 TUN 不立即生效
-- 修复系统代理关闭序列逻辑(防止快速退出时系统代理关闭状态没有保存)
-- 修复 Linux 快捷键映射错误
-- 修复 Linux Wayland 兼容性导致渲染错误 
-- 修复 Linux 边缘情况无法加载页面
+- Fixed system proxy not completely shut down in PAC mode after turning off
+- Fixed macOS potential freeze when toggling proxy
+- Fixed scheduled update timer not refreshing immediately after modification
+- Fixed Linux TUN disable not taking effect immediately
+- Fixed system proxy close sequence logic (preventing unsaved close state during quick exit)
+- Fixed Linux shortcut mapping error
+- Fixed Linux Wayland compatibility rendering error
+- Fixed Linux edge case failing to load pages
 
-### ✨ 新增功能
+### ✨ Features
 
-- 订阅 QR code 分享
-- 新增 macOS 托盘速率显示
-- 快捷键操作通知操作结果
-- 软件自动更新(后台下载，下次启动自动安装)
+- Subscription QR code sharing
+- Added macOS tray speed display
+- Shortcut operations notify results
+- App auto update (background download, auto install on next launch)
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化 macOS 读取系统代理性能
-- 优化前端 CPU 性能
-- 更健壮的服务模式与边缘状况内核恢复
-- 优化白名单网络下的订阅 TLS 更新兼容性
+- Optimized macOS system proxy reading performance
+- Optimized frontend CPU performance
+- Robust service mode and edge case kernel recovery
+- Optimized subscription TLS update compatibility under whitelist networks
 
-### 👙 界面样式
+### 👙 UI & Style
 
-- 代理组实现 Sticky Scroll 效果
+- Sticky Scroll effect for proxy groups
 
+---
 
 ## v2.4.7
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复 Windows 管理员身份运行时开关 TUN 模式异常
-- 修复静默启动与自动轻量模式存在冲突
-- 修复进入轻量模式后无法返回主界面
-- 切换配置文件偶尔失败的问题
-- 修复节点或模式切换出现极大延迟的回归问题
-- 修复代理关闭的情况下，网站测试依然会走代理的问题
-- 修复 Gemini 解锁测试不准确的情况
+- Fixed Windows switch TUN mode anomaly when running as administrator
+- Fixed silent start conflict with auto lightweight mode
+- Fixed inability to return to main interface after entering lightweight mode
+- Occasional failure when switching profiles
+- Fixed regression of extreme delay when switching nodes or modes
+- Fixed website latency tests passing through proxy when proxy is off
+- Fixed inaccurate Gemini unlock tests
 
-<details>
-<summary><strong> ✨ 新增功能 </strong></summary>
+### ✨ Features
 
-</details>
+- (None)
 
-<details>
-<summary><strong> 🚀 优化改进 </strong></summary>
+### 🚀 Optimizations
 
-- 优化订阅错误通知，仅在手动触发时
-- 隐藏日志中的订阅信息
-- 优化部分界面文案文本
-- 优化切换节点时的延迟
-- 优化托盘退出快捷键显示
-- 优化首次启动节点信息刷新
-- Linux 默认使用内置窗口控件
-- 实现排除自定义网段的校验
-- 移除冗余的自动备份触发条件
-- 恢复内置编辑器对 mihomo 配置的语法提示
-- 网站测试使用真实 TLS 握手延迟
-- 系统代理指示器(图标)使用真实代理状态
-- 系统代理开关指示器增加校验是否指向 Verge
-- 系统代理开关修改为乐观更新模式，提升用户体验
+- Optimized subscription error notification, only on manual trigger
+- Hide subscription info in logs
+- Optimized UI copy and text
+- Optimized latency when switching nodes
+- Optimized exit hotkey display in tray
+- Optimized node info refresh on first launch
+- Linux uses built-in window controls by default
+- Implemented exclusion check for custom subnets
+- Removed redundant auto-backup trigger conditions
+- Restored mihomo config syntax hints in built-in editor
+- Website latency tests use real TLS handshake delay
+- System proxy indicator (icon) uses real proxy state
+- System proxy switch indicator verifies if it points to Verge
+- System proxy switch modified to optimistic update mode to improve user experience
 
-</details>
+---
 
-## v(2.4.6)
+## v2.4.6
 
 > [!IMPORTANT]
-> 历经多轮磨合与修正，这是自 2.0 以来我们最满意的里程碑版本。建议所有用户立即升级。
+> After multiple rounds of tuning and corrections, this is our most satisfactory milestone release since 2.0. All users are highly recommended to upgrade immediately.
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复首次启动时代理信息刷新缓慢
-- 修复无网络时无限请求 IP 归属查询
-- 修复 WebDAV 页面重试逻辑
-- 修复 Linux 通过 GUI 安装服务模式权限不符合预期
-- 修复 macOS 因网口顺序导致无法正确设置代理
-- 修复恢复休眠后无法操作托盘
-- 修复首页当前节点图标语义显示不一致
-- 修复使用 URL scheme 导入订阅时没有及时重载配置
-- 修复规则界面里的行号展示逻辑
-- 修复 Windows 托盘打开日志失败
-- 修复 KDE 首次启动报错
+- Fixed slow proxy info refresh on first launch
+- Fixed infinite IP geolookup queries when offline
+- Fixed WebDAV page retry logic
+- Fixed Linux service mode permissions installed via GUI not as expected
+- Fixed macOS unable to set proxy correctly due to network interface order
+- Fixed unable to operate tray after waking up from sleep
+- Fixed inconsistent icon semantics for current node on homepage
+- Fixed configuration not reloaded in time when importing subscription via URL scheme
+- Fixed line number display logic in rules page
+- Fixed Windows tray failing to open logs
+- Fixed KDE first startup error
 
-<details>
-<summary><strong> ✨ 新增功能 </strong></summary>
+### ✨ Features
 
-- 升级 Mihomo 内核到最新
-- 支持订阅设置自动延时监测间隔
-- 新增流量隧道管理界面，支持可视化添加/删除隧道配置
-- Masque 协议的 GUI 支持
+- Upgraded Mihomo kernel to latest
+- Supported auto-latency test interval in subscription settings
+- Added connection tunnel management UI, supporting visual add/delete tunnel config
+- GUI support for Masque protocol
 
-</details>
+### 🚀 Optimizations
 
-<details>
-<summary><strong> 🚀 优化改进 </strong></summary>
+- Report more detailed errors when service installation fails
+- Prevent invalid subscription URLs from blocking scheme import
+- Use 114.114.114.114 when macOS TUN overrides DNS
+- Connectivity test replaced with faster http://1.0.0.1
+- Added clear search buttons to filters in connections, rules, logs, etc.
+- Chain proxy displays clear ingress, egress, and data flow indicators
+- Optimized IP info card
+- Beautified proxy group icon styles
+- Removed redundant service binaries in Linux resources folder
 
-- 安装服务失败时报告更详细的错误
-- 避免脏订阅地址无法 Scheme 导入订阅
-- macOS TUN 覆盖 DNS 时使用 114.114.114.114
-- 连通性测试替换为更快的 http://1.0.0.1
-- 连接、规则、日志等页面的过滤搜索组件新增了清空输入框按钮
-- 链式代理增加明显的入口出口与数据流向标识
-- 优化 IP 信息卡
-- 美化代理组图标样式
-- 移除 Linux resources 文件夹下多余的服务二进制文件
-
-</details>
+---
 
 ## v2.4.5
 
-- **Mihomo(Meta) 内核升级至 v1.19.19**
+- **Mihomo(Meta) Kernel upgraded to v1.19.19**
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复 macOS 有线网络 DNS 劫持失败
-- 修复 Monaco 编辑器内右键菜单显示异常
-- 修复设置代理端口时检查端口占用
-- 修复 Monaco 编辑器初始化卡 Loading
-- 修复恢复备份时 `config.yaml` / `profiles.yaml` 文件内字段未正确恢复
-- 修复 Windows 下系统主题同步问题
-- 修复 URL Schemes 无法正常导入
-- 修复 Linux 下无法安装 TUN 服务
-- 修复可能的端口被占用误报
-- 修复设置允许外部控制来源不能立即生效
-- 修复前端性能回归问题
+- Fixed macOS wired network DNS hijack failure
+- Fixed Monaco editor right-click menu display anomaly
+- Fixed port occupation check when setting proxy port
+- Fixed Monaco editor initialization stuck on Loading
+- Fixed fields in `config.yaml` / `profiles.yaml` not correctly restored during backup restoration
+- Fixed Windows system theme sync issue
+- Fixed URL Schemes failing to import properly
+- Fixed unable to install TUN service under Linux
+- Fixed potential port occupation false alarms
+- Fixed setting allowed external control sources not taking effect immediately
+- Fixed frontend performance regression
 
-<details>
-<summary><strong> ✨ 新增功能 </strong></summary>
+### ✨ Features
 
-- 允许代理页面允许高级过滤搜索
-- 备份设置页面新增导入备份按钮
-- 允许修改通知弹窗位置
-- 支持收起导航栏（导航栏右键菜单 / 界面设置）
-- 允许将出站模式显示在托盘一级菜单
-- 允许禁用在托盘中显示代理组
-- 支持在「编辑节点」中直接导入 AnyTLS URI 配置
-- 支持关闭「验证代理绕过格式」
-- 新增系统代理绕过和 TUN 排除自定义网段的可视化编辑器
+- Supported advanced filtering and searching on proxy page
+- Added import backup button in backup settings page
+- Allowed changing notification popup position
+- Supported collapsing navigation bar (navigation bar right-click menu / UI settings)
+- Allowed displaying outbound mode in tray primary menu
+- Allowed disabling proxy group display in tray
+- Supported importing AnyTLS URI config directly in "Edit Nodes"
+- Supported disabling "validate proxy bypass formats"
+- Added visual editor for system proxy bypass and TUN excluded custom subnets
 
-</details>
+### 🚀 Optimizations
 
-<details>
-<summary><strong> 🚀 优化改进 </strong></summary>
+- In-app update log supports parsing and rendering HTML tags
+- Performance optimized frontend and backend resources when rendering traffic charts
+- Attempted to disable WebKit DMABUF rendering under Linux NVIDIA environments to avoid potential issues
+- Changed Windows startup to scheduled task implementation
+- Improved tray and window operation rate limiting implementation
+- When adding a node using "Edit Nodes", automatically add the node to the first position of the first `select` type proxy group
+- Hidden scrollbars of sidebar navigation and floating jump navigation
+- Completed GUI support for AnyTLS / Mieru / Sudoku
+- Further restricted service IPC permissions on macOS and Linux
+- Removed redundant 3-second delay in Windows autostart scheduled task
+- Right-click error notification can copy error details
+- Optimized execution flow when saving TUN settings to avoid UI freeze
+- Added `deb` / `rpm` dependency `libayatana-appindicator`
+- Expanded connection table title sort click area to full column width
+- Display loading overlay during backup restoration, no need to manually close dialogs anymore
 
-- 应用内更新日志支持解析并渲染 HTML 标签
-- 性能优化前后端在渲染流量图时的资源
-- 在 Linux NVIDIA 显卡环境下尝试禁用 WebKit DMABUF 渲染以规避潜在问题
-- Windows 下自启动改为计划任务实现
-- 改进托盘和窗口操作频率限制实现
-- 使用「编辑节点」添加节点时，自动将节点添加到第一个 `select` 类型的代理组的第一位
-- 隐藏侧边导航栏和悬浮跳转导航的滚动条
-- 完善对 AnyTLS / Mieru / Sudoku 的 GUI 支持
-- macOS 和 Linux 对服务 IPC 权限进一步限制
-- 移除 Windows 自启动计划任务中冗余的 3 秒延时
-- 右键错误通知可复制错误详情
-- 保存 TUN 设置时优化执行流程，避免界面卡顿
-- 补充 `deb` / `rpm` 依赖 `libayatana-appindicator`
-- 「连接」表格标题的排序点击区域扩展到整列宽度
-- 备份恢复时显示加载覆盖层，恢复过程无需再手动关闭对话框
-
-</details>
+---
 
 ## v2.4.4
 
-- **Mihomo(Meta) 内核升级至 v1.19.17**
+- **Mihomo(Meta) Kernel upgraded to v1.19.17**
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- Linux 无法切换 TUN 堆栈
-- macOS service 启动项显示名称(试验性修改)
-- macOS 非预期 Tproxy 端口设置
-- 流量图缩放异常
-- PAC 自动代理脚本内容无法动态调整
-- 兼容从旧版服务模式升级
-- Monaco 编辑器的行数上限
-- 已删除节点在手动分组中导致配置无法加载
-- 仪表盘与托盘状态不同步
-- 彻底修复 macOS 连接页面显示异常
-- windows 端监听关机信号失败
-- 修复代理按钮和高亮状态不同步
-- 修复侧边栏可能的未能正确跳转
-- 修复解锁测试部分地区图标编码不正确
-- 修复 IP 检测切页后强制刷新，改为仅在必要时更新
-- 修复在搜索框输入不完整正则直接崩溃
-- 修复创建窗口时在非简体中文环境或深色主题下的短暂闪烁
-- 修复更新时加载进度条异常
-- 升级内核失败导致内核不可用问题
-- 修复 macOS 在安装和卸载服务时提示与操作不匹配
-- 修复菜单排序模式拖拽异常
-- 修复托盘菜单代理组前的异常勾选状态
-- 修复 Windows 下自定义标题栏按钮在最小化 / 关闭后 hover 状态残留
-- 修复直接覆盖 `config.yaml` 使用时无法展开代理组
-- 修复 macOS 下应用启动时系统托盘图标颜色闪烁
-- 修复应用静默启动模式下非全局热键一直抢占其他应用按键问题
-- 修复首页当前节点卡片按延迟排序时，打开节点列表后，`timeout` 节点被排在正常节点前的问题
+- Linux unable to switch TUN stack
+- macOS service startup item display name (experimental change)
+- macOS unexpected Tproxy port settings
+- Traffic chart scaling anomaly
+- PAC auto proxy script content cannot be adjusted dynamically
+- Compatible with upgrading from old version service mode
+- Monaco editor line count limit
+- Deleted nodes in manual groups causing config load failure
+- Dashboard and tray status out of sync
+- Completely fixed macOS connection page display anomaly
+- Windows client failed to listen to shutdown signals
+- Fixed proxy button and highlight status out of sync
+- Fixed sidebar potential failure to jump correctly
+- Fixed incorrect icon encoding in unlock tests for some regions
+- Changed IP detection page refresh to only update when necessary
+- Fixed crash when inputting incomplete regex in search box
+- Fixed brief flicker when creating window in non-Simplified Chinese environments or dark themes
+- Fixed progress bar anomaly during updates
+- Fixed kernel unavailable issue caused by kernel upgrade failure
+- Fixed macOS install/uninstall service prompts not matching actions
+- Fixed menu sorting mode drag-and-drop anomaly
+- Fixed abnormal check status before proxy groups in tray menu
+- Fixed Windows custom title bar buttons hover status residue after minimize / close
+- Fixed unable to expand proxy groups when overwriting `config.yaml` directly
+- Fixed macOS system tray icon color flickering at app startup
+- Fixed global hotkeys hijacking other app keys under silent start mode
+- Fixed homepage current node card sorting by delay displaying `timeout` nodes before normal nodes when list is opened
 
-<details>
-<summary><strong> ✨ 新增功能 </strong></summary>
+### ✨ Features
 
-- 支持连接页面各个项目的排序
-- 实现可选的自动备份
-- 连接页面支持查看已关闭的连接（最近最多 500 个已关闭连接）
-- 日志页面支持按时间倒序
-- 增加「重新激活订阅」的全局快捷键
-- WebView2 Runtime 修复构建升级到 133.0.3065.92
-- 侧边栏右键新增「恢复默认排序」
-- Linux 下新增对 TUN 「自动重定向」（`auto-redirect` 字段）的配置支持，默认关闭
+- Supported sorting for each column on connection page
+- Implemented optional auto-backup
+- Connection page supports viewing closed connections (up to 500 recently closed connections)
+- Log page supports reverse chronological order
+- Added global hotkey for "Re-activate Subscription"
+- WebView2 Runtime fix build upgraded to 133.0.3065.92
+- Sidebar right-click menu added "Restore Default Order"
+- Added TUN "auto-redirect" configuration support under Linux, disabled by default
 
-</details>
+### 🚀 Optimizations
 
-<details>
-<summary><strong> 🚀 优化改进 </strong></summary>
+- Network requests changed to use rustls, improving TLS compatibility
+- rustls avoids subscription import failure due to server certificate chain config issues or newer TLS requirements
+- Replaced frontend info editing components to provide better performance
+- Optimized backend memory and performance
+- Prevented potential TUN disable failure during exit
+- Brand new i18n support method
+- Optimized backup settings layout
+- Optimized traffic chart performance, implementing dynamic FPS and window blur auto-pause
+- Performance optimized system status fetching
+- Optimized tray menu current subscription detection logic
+- Optimized connection page table rendering
+- Optimized chain proxy UI feedback
+- Optimized app restart resource cleanup logic
+- Optimized frontend data refresh
+- Optimized traffic sampling and data processing
+- Optimized resource cleanup performance during app restart/exit, significantly shortening execution time
+- Optimized frontend WebSocket connection mechanism
+- Improved old version Service re-installation detection flow
+- Optimized macOS, Linux, and Windows system signal handling
+- Chain proxy only displays Selector type rule groups
+- Optimized Windows system proxy settings, no longer relying on `sysproxy.exe` to set proxy
 
-- 网络请求改为使用 rustls，提升 TLS 兼容性
-- rustls 避免因服务器证书链配置问题或较新 TLS 要求导致订阅无法导入
-- 替换前端信息编辑组件，提供更好性能
-- 优化后端内存和性能表现
-- 防止退出时可能的禁用 TUN 失败
-- 全新 i18n 支持方式
-- 优化备份设置布局
-- 优化流量图性能表现，实现动态 FPS 和窗口失焦自动暂停
-- 性能优化系统状态获取
-- 优化托盘菜单当前订阅检测逻辑
-- 优化连接页面表格渲染
-- 优化链式代理 UI 反馈
-- 优化重启应用的资源清理逻辑
-- 优化前端数据刷新
-- 优化流量采样和数据处理
-- 优化应用重启/退出时的资源清理性能, 大幅缩短执行时间
-- 优化前端 WebSocket 连接机制
-- 改进旧版 Service 需要重新安装检测流程
-- 优化 macOS, Linux 和 Windows 系统信号处理
-- 链式代理仅显示 Selector 类型规则组
-- 优化 Windows 系统代理设置，不再依赖 `sysproxy.exe` 来设置代理
-
-</details>
+---
 
 ## v2.4.3
 
-**发行代号：澜**
-代号释义：澜象征平稳与融合，本次版本聚焦稳定性、兼容性、性能与体验优化，全面提升整体可靠性。
+**Release Codename: Lan**
 
-特别感谢 @Slinetrac, @oomeow, @Lythrilla, @Dragon1573 的出色贡献
+Codename meaning: Lan symbolizes smoothness and integration. This release focuses on stability, compatibility, performance, and experience optimization, comprehensively improving overall reliability.
 
-### 🐞 修复问题
+Special thanks to @Slinetrac, @oomeow, @Lythrilla, @Dragon1573 for their excellent contributions.
 
-- 优化服务模式重装逻辑，避免不必要的重复检查
-- 修复轻量模式退出无响应的问题
-- 修复托盘轻量模式支持退出/进入
-- 修复静默启动和自动进入轻量模式时，托盘状态刷新不再依赖窗口创建流程
-- macOS Tun/系统代理 模式下图标大小不统一
-- 托盘节点切换不再显示隐藏组
-- 修复前端 IP 检测无法使用 ipapi, ipsb 提供商
-- 修复MacOS 下 Tun开启后 系统代理无法打开的问题
-- 修复服务模式启动时，修改、生成配置文件或重启内核可能导致页面卡死的问题
-- 修复 Webdav 恢复备份不重启
-- 修复 Linux 开机后无法正常代理需要手动设置
-- 修复增加订阅或导入订阅文件时订阅页面无更新
-- 修复系统代理守卫功能不工作
-- 修复 KDE + Wayland 下多屏显示 UI 异常
-- 修复 Windows 深色模式下首次启动客户端标题栏颜色异常
-- 修复静默启动不加载完整 WebView 的问题
-- 修复 Linux WebKit 网络进程的崩溃
-- 修复无法导入订阅
-- 修复实际导入成功但显示导入失败的问题
-- 修复服务不可用时，自动关闭 Tun 模式导致应用卡死问题
-- 修复删除订阅时未能实际删除相关文件
-- 修复 macOS 连接界面显示异常
-- 修复规则配置项在不同配置文件间全局共享导致切换被重置的问题
-- 修复 Linux Wayland 下部分 GPU 可能出现的 UI 渲染问题
-- 修复自动更新使版本回退的问题
-- 修复首页自定义卡片在切换轻量模式时失效
-- 修复悬浮跳转导航失效
-- 修复小键盘热键映射错误
-- 修复前端无法及时刷新操作状态
-- 修复 macOS 从 Dock 栏退出轻量模式状态不同步
-- 修复 Linux 系统主题切换不生效
-- 修复 `允许自动更新` 字段使手动订阅刷新失效
-- 修复轻量模式托盘状态不同步
-- 修复一键导入订阅导致应用卡死崩溃的问题
+### 🐞 Bug Fixes
 
-<details>
-<summary><strong> ✨ 新增功能 </strong></summary>
+- Optimized service mode reinstall logic, avoiding unnecessary checks
+- Fixed lightweight mode exit unresponsiveness
+- Fixed tray lightweight mode exit/enter support
+- Fixed tray status refresh not relying on window creation flow when starting silently and entering lightweight mode automatically
+- Fixed inconsistent icon sizes under macOS Tun/System Proxy mode
+- Tray node switching no longer displays hidden groups
+- Fixed frontend IP check unable to use ipapi, ipsb providers
+- Fixed macOS system proxy unable to open after Tun mode is enabled
+- Fixed page freeze during configuration editing, generation, or kernel restart under service mode
+- Fixed Webdav backup restoration not restarting
+- Fixed Linux startup requiring manual proxy settings to work normally
+- Fixed subscription page not updating when adding or importing subscription files
+- Fixed system proxy guard not working
+- Fixed UI rendering anomalies on multi-monitor displays under KDE + Wayland
+- Fixed Windows title bar color anomaly at first launch under dark mode
+- Fixed silent start not loading full WebView
+- Fixed Linux WebKit network process crashes
+- Fixed subscription import failures
+- Fixed successful imports showing failure notifications
+- Fixed app freeze when service is unavailable and Tun mode auto-closes
+- Fixed failure to delete actual files when deleting subscriptions
+- Fixed macOS connection page display anomaly
+- Fixed rule config shared globally across profiles causing switch reset issues
+- Fixed UI rendering issues with some GPUs under Linux Wayland
+- Fixed auto-update causing version rollbacks
+- Fixed homepage custom cards failing when switching lightweight mode
+- Fixed floating navigation failure
+- Fixed keypad hotkey mapping error
+- Fixed frontend failing to refresh operation status in time
+- Fixed macOS lightweight mode status out of sync when exiting from Dock
+- Fixed Linux system theme switch not taking effect
+- Fixed "allow auto update" field causing manual subscription refresh to fail
+- Fixed lightweight mode tray status out of sync
+- Fixed app crash when importing subscriptions with one-click import
 
-- **Mihomo(Meta) 内核升级至 v1.19.15**
-- 支持前端修改日志（最大文件大小、最大保留数量）
-- 新增链式代理图形化设置功能
-- 新增系统标题栏与程序标题栏切换 （设置-页面设置-倾向系统标题栏）
-- 监听关机事件，自动关闭系统代理
-- 主界面“当前节点”卡片新增“延迟测试”按钮
-- 新增批量选择配置文件功能
-- Windows / Linux / MacOS 监听关机信号，优雅恢复网络设置
-- 新增本地备份功能
-- 主界面“当前节点”卡片新增自动延迟检测开关（默认关闭）
-- 允许独立控制订阅自动更新
-- 托盘 `更多` 中新增 `关闭所有连接` 按钮
-- 新增左侧菜单栏的排序功能（右键点击左侧菜单栏）
-- 托盘 `打开目录` 中新增 `应用日志` 和 `内核日志`
-</details>
+### ✨ Features
 
-<details>
-<summary><strong> 🚀 优化改进 </strong></summary>
+- **Mihomo(Meta) Kernel upgraded to v1.19.15**
+- Supported frontend modification of logs (max file size, max retention count)
+- Added graphical setup for chain proxy
+- Added toggle between system title bar and app title bar (Settings - UI Settings - Prefer System Title Bar)
+- Listen to shutdown events, automatically closing system proxy
+- Homepage "Current Node" card added "Latency Test" button
+- Added batch profile selection feature
+- Windows / Linux / macOS listen to shutdown signals, gracefully restoring network settings
+- Added local backup feature
+- Homepage "Current Node" card added auto-latency test switch (disabled by default)
+- Allowed independent control of subscription auto-updates
+- Tray "More" added "Close All Connections" button
+- Added left menu bar sorting feature (right-click on left menu bar)
+- Tray "Open Directory" added "App Logs" and "Kernel Logs"
 
-- 重构并简化服务模式启动检测流程，消除重复检测
-- 重构并简化窗口创建流程
-- 重构日志系统，单个日志默认最大 10 MB
-- 优化前端资源占用
-- 改进 macos 下系统代理设置的方法
-- 优化 TUN 模式可用性的判断
-- 移除流媒体检测的系统级提示(使用软件内通知)
-- 优化后端 i18n 资源占用
-- 改进 Linux 托盘支持并添加 `--no-tray` 选项
-- Linux 现在在新生成的配置中默认将 TUN 栈恢复为 mixed 模式
-- 为代理延迟测试的 URL 设置增加了保护以及添加了安全的备用 URL
-- 更新了 Wayland 合成器检测逻辑，从而在 Hyprland 会话中保留原生 Wayland 后端
-- 改进 Windows 和 Unix 的 服务连接方式以及权限，避免无法连接服务或内核
-- 修改内核默认日志级别为 Info
-- 支持通过桌面快捷方式重新打开应用
-- 支持订阅界面输入链接后回车导入
-- 选择按延迟排序时每次延迟测试自动刷新节点顺序
-- 配置重载失败时自动重启核心
-- 启用 TUN 前等待服务就绪
-- 卸载 TUN 时会先关闭
-- 优化应用启动页
-- 优化首页当前节点对MATCH规则的支持
-- 允许在 `界面设置` 修改 `悬浮跳转导航延迟`
-- 添加热键绑定错误的提示信息
-- 在 macOS 10.15 及更高版本默认包含 Mihomo-go122，以解决 Intel 架构 Mac 无法运行内核的问题
-- Tun 模式不可用时，禁用系统托盘的 Tun 模式菜单
-- 改进订阅更新方式，仍失败需打开订阅设置 `允许危险证书`
-- 允许设置 Mihomo 端口范围 1000(含) - 65536(含)
+### 🚀 Optimizations
 
-</details>
+- Refactored and simplified service mode startup detection flow, eliminating duplicate checks
+- Refactored and simplified window creation flow
+- Refactored log system, single log defaults to max 10 MB
+- Optimized frontend resource usage
+- Improved macOS system proxy configuration method
+- Optimized TUN mode availability determination
+- Removed system-level notifications for streaming media checks (using in-app notifications instead)
+- Optimized backend i18n resource usage
+- Improved Linux tray support and added `--no-tray` option
+- Linux now defaults to restoring TUN stack to mixed mode in newly generated configs
+- Added safety protection and secure fallback URLs for latency test settings
+- Updated Wayland compositor detection logic to retain native Wayland backend in Hyprland sessions
+- Improved Windows and Unix service connection methods and permissions to prevent connection failures
+- Changed default kernel log level to Info
+- Supported re-opening application via desktop shortcuts
+- Supported pressing Enter in subscription input to import
+- Automatically refresh node order when selecting sorting by latency
+- Automatically restart core when configuration reload fails
+- Wait for service readiness before enabling TUN
+- Close TUN before uninstalling it
+- Optimized app startup page
+- Optimized homepage current node support for MATCH rules
+- Allowed modifying "Floating Navigation Delay" in UI Settings
+- Added error prompts for hotkey binding failures
+- Included Mihomo-go122 by default on macOS 10.15 and higher to resolve Intel Mac kernel compatibility issues
+- Disabled system tray TUN mode menu when TUN mode is unavailable
+- Improved subscription update mechanism; if it still fails, turn on "allow dangerous certificates" in subscription settings
+- Allowed setting Mihomo port range to 1000(inclusive) - 65536(inclusive)
+
+---
 
 ## v2.4.2
 
-### ✨ 新增功能
+### ✨ Features
 
-- 增加托盘节点选择
+- Added tray node selection
 
-### 🚀 性能优化
+### 🚀 Optimizations
 
-- 优化前端首页加载速度
-- 优化前端未使用 i18n 文件缓存
-- 优化后端内存占用
-- 优化后端启动速度
+- Optimized frontend homepage loading speed
+- Optimized frontend unused i18n file caching
+- Optimized backend memory usage
+- Optimized backend startup speed
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复首页节点切换失效的问题
-- 修复和优化服务检查流程
-- 修复2.4.1引入的订阅地址重定向报错问题
-- 修复 rpm/deb 包名称问题
-- 修复托盘轻量模式状态检测异常
-- 修复通过 scheme 导入订阅崩溃
-- 修复单例检测实效
-- 修复启动阶段可能导致的无法连接内核
-- 修复导入订阅无法 Auth Basic
+- Fixed homepage node switching failure
+- Fixed and optimized service check flow
+- Fixed redirect error when importing subscription addresses introduced in 2.4.1
+- Fixed rpm/deb package naming issues
+- Fixed tray lightweight mode status detection anomaly
+- Fixed crash when importing subscription via scheme
+- Fixed singleton detection failure
+- Fixed inability to connect to kernel during startup phase
+- Fixed subscription import failing Auth Basic
 
-### 👙 界面样式
+### 👙 UI & Style
 
-- 简化和改进代理设置样式
+- Simplified and improved proxy settings styles
+
+---
 
 ## v2.4.1
 
-### 🏆 重大改进
+### 🏆 Major Improvements
 
-- **应用响应速度提升**：采用全新异步处理架构，大幅提升应用响应速度和稳定性
+- **App Response Speedup**: Adopted a brand new asynchronous processing architecture, significantly improving app responsiveness and stability.
 
-### ✨ 新增功能
+### ✨ Features
 
-- **Mihomo(Meta) 内核升级至 v1.19.13**
+- **Mihomo(Meta) Kernel upgraded to v1.19.13**
 
-### 🚀 性能优化
+### 🚀 Optimizations
 
-- 优化热键响应速度，提升快捷键操作体验
-- 改进服务管理响应性，减少系统服务操作等待时间
-- 提升文件和配置处理性能
-- 优化任务管理和日志记录效率
-- 优化异步内存管理，减少内存占用并提升多任务处理效率
-- 优化启动阶段初始化性能
+- Optimized hotkey response speed, improving shortcut experience
+- Improved service management responsiveness, reducing wait times
+- Boosted file and configuration processing performance
+- Optimized task management and log recording efficiency
+- Optimized async memory management, reducing memory usage and improving multi-tasking efficiency
+- Optimized startup phase initialization performance
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复应用在某些操作中可能出现的响应延迟问题
-- 修复任务管理中的潜在并发问题
-- 修复通过托盘重启应用无法恢复
-- 修复订阅在某些情况下无法导入
-- 修复无法新建订阅时使用远程链接
-- 修复卸载服务后的 tun 开关状态问题
-- 修复页面快速切换订阅时导致崩溃
-- 修复丢失工作目录时无法恢复环境
-- 修复从轻量模式恢复导致崩溃
+- Fixed potential response delay in some app operations
+- Fixed potential concurrency issues in task management
+- Fixed app restart via tray failing to recover
+- Fixed subscriptions failing to import under certain conditions
+- Fixed unable to create new subscription when using remote links
+- Fixed TUN switch status issue after uninstalling service
+- Fixed crash when switching subscriptions rapidly on the page
+- Fixed unable to restore environment when working directory is lost
+- Fixed crash when restoring from lightweight mode
 
-### 👙 界面样式
+### 👙 UI & Style
 
-- 统一代理设置样式
+- Unified proxy settings styles
 
-### 🗑️ 移除内容
+### 🗑️ Removed
 
-- 移除启动阶段自动清理过期订阅
+- Removed automatic cleanup of expired subscriptions during startup phase
+
+---
 
 ## v2.4.0
 
-**发行代号：融**
-代号释义： 「融」象征融合与贯通，寓意新版本通过全新 IPC 通信机制 将系统各部分紧密衔接，打破壁垒，实现更高效的 数据流通与全面性能优化。
+**Release Codename: Rong**
 
-### 🏆 重大改进
+Codename meaning: "Rong" symbolizes integration and permeability, implying that the new version closely connects all parts of the system through a new IPC communication mechanism, breaking barriers to achieve more efficient data flow and comprehensive performance optimization.
 
-- **核心通信架构升级**：采用全新通信机制，提升应用性能和稳定性
-- **流量监控系统重构**：全新的流量监控界面，支持更丰富的数据展示
-- **数据缓存优化**：改进配置和节点数据缓存，提升响应速度
+### 🏆 Major Improvements
 
-### ✨ 新增功能
+- **Core Communication Architecture Upgrade**: Adopted a new communication mechanism, improving performance and stability.
+- **Traffic Monitoring System Refactored**: Brand new traffic monitoring interface, supporting richer data displays.
+- **Data Caching Optimized**: Improved configuration and node data caching, boosting response speed.
 
-- **Mihomo(Meta) 内核升级至 v1.19.12**
-- 新增版本信息复制按钮
-- 增强型流量监控，支持更详细的数据分析
-- 新增流量图表多种显示模式
-- 新增强制刷新配置和节点缓存功能
-- 首页流量统计支持查看刻度线详情
+### ✨ Features
 
-### 🚀 性能优化
+- **Mihomo(Meta) Kernel upgraded to v1.19.12**
+- Added copy version info button
+- Enhanced traffic monitoring, supporting more detailed data analysis
+- Added multiple display modes for traffic charts
+- Added force refresh configuration and node cache feature
+- Homepage traffic stats support viewing scale line details
 
-- 全面提升数据传输和处理效率
-- 优化内存使用，减少系统资源消耗
-- 改进流量图表渲染性能
-- 优化配置和节点刷新策略，从5秒延长到60秒
-- 改进数据缓存机制，减少重复请求
-- 优化异步程序性能
+### 🚀 Optimizations
 
-### 🐞 修复问题
+- Comprehensively improved data transmission and processing efficiency
+- Optimized memory usage, reducing system resource consumption
+- Improved traffic chart rendering performance
+- Optimized configuration and node refresh strategy, extending it from 5 seconds to 60 seconds
+- Improved data caching mechanism, reducing duplicate requests
+- Optimized async program performance
 
-- 修复系统代理状态检测和显示不一致问题
-- 修复系统主题窗口颜色不一致问题
-- 修复特殊字符 URL 处理问题
-- 修复配置修改后缓存不同步问题
-- 修复 Windows 安装器自启设置问题
-- 修复 macOS 下 Dock 图标恢复窗口问题
-- 修复 linux 下 KDE/Plasma 异常标题栏按钮
-- 修复架构升级后节点测速功能异常
-- 修复架构升级后流量统计功能异常
-- 修复架构升级后日志功能异常
-- 修复外部控制器跨域配置保存问题
-- 修复首页端口显示不一致问题
-- 修复首页流量统计刻度线显示问题
-- 修复日志页面按钮功能混淆问题
-- 修复日志等级设置保存问题
-- 修复日志等级异常过滤
-- 修复清理日志天数功能异常
-- 修复偶发性启动卡死问题
-- 修复首页虚拟网卡开关在管理模式下的状态问题
+### 🐞 Bug Fixes
 
-### 🔧 技术改进
+- Fixed system proxy status detection and display inconsistency
+- Fixed system theme window color inconsistency
+- Fixed special characters URL processing issues
+- Fixed cache out-of-sync after configuration changes
+- Fixed Windows installer autostart configuration issue
+- Fixed macOS Dock icon restoring window issue
+- Fixed Linux KDE/Plasma abnormal title bar buttons
+- Fixed node speed test feature anomaly after architecture upgrade
+- Fixed traffic stats feature anomaly after architecture upgrade
+- Fixed log feature anomaly after architecture upgrade
+- Fixed external controller CORS configuration saving issue
+- Fixed homepage port display inconsistency
+- Fixed homepage traffic stats scale line display issue
+- Fixed log page button functions confusion
+- Fixed log level setting saving issue
+- Fixed log level abnormal filtering
+- Fixed clean log days feature anomaly
+- Fixed occasional startup freeze issues
+- Fixed virtual NIC switch status under management mode on homepage
 
-- 统一使用新的内核通信方式
-- 新增外部控制器配置界面
-- 改进跨平台兼容性支持
+### 🔧 Technical Improvements
+
+- Unified using the new kernel communication method
+- Added external controller configuration interface
+- Improved cross-platform compatibility support
+
+---
 
 ## v2.3.2
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复系统代理端口不同步问题
-- 修复自定义 `css` 背景图无法生效问题
-- 修复在轻量模式下快速点击托盘图标带来的竞争态卡死问题
-- 修复同时开启静默启动与自动进入轻量模式后，自动进入轻量模式失效的问题
-- 修复静默启动时托盘工具栏轻量模式开启与关闭状态的同步
-- 修复导入订阅时非 http 协议链接被错误尝试导入
-- 修复切换节点后页面长时间 loading 及缓存过期导致的数据不同步问题
-- 修复将快捷键名称更名为 `Clash Verge`之后无法删除图标和无法删除注册表
-- 修复`DNS`覆写 `fallback` `proxy server` `nameserver` `direct Nameserver` 字段支持留空
-- 修复`DNS`覆写 `nameserver-policy` 字段无法正确识别 `geo` 库
-- 修复搜索框输入特殊字符崩溃
-- 修复 Windows 下 Start UP 名称与 exe 名称不统一
-- 修复显示 Mihomo 内核日志等级应该大于设置等级
+- Fixed system proxy port out-of-sync issue
+- Fixed custom `css` background image failing to take effect
+- Fixed race condition hang when clicking tray icon rapidly in lightweight mode
+- Fixed auto lightweight mode failing when both silent start and auto lightweight mode are enabled
+- Fixed tray toolbar lightweight mode status synchronization under silent start
+- Fixed importing non-http scheme links
+- Fixed page loading hang and out-of-sync cache when switching nodes
+- Fixed unable to delete shortcut/registry after renaming to `Clash Verge`
+- Fixed DNS override `fallback` `proxy server` `nameserver` `direct Nameserver` fields allowing empty values
+- Fixed DNS override `nameserver-policy` failing to identify `geo` database
+- Fixed search box special characters crash
+- Fixed Windows startup name mismatch with exe name
+- Fixed Mihomo core log level display should be greater than settings level
 
-### ✨ 新增功能
+### ✨ Features
 
-- `sidecar` 模式下清理多余的内核进程，防止运行出现异常
-- 新 macOS 下 TUN 和系统代理模式托盘图标（暂测）
-- 快捷键事件通过系统通知
-- 添加外部 `cors` 控制面板
+- Clean leftover core processes in `sidecar` mode to prevent run errors
+- New tray icons for macOS TUN and system proxy mode (experimental)
+- Shortcut events notify via system notifications
+- Added external `cors` control panel
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化重构订阅切换逻辑，可以随时中断载入过程，防止卡死
-- 引入事件驱动代理管理器，优化代理配置更新逻辑，防止卡死
-- 改进主页订阅卡流量已使用比例计算精度
-- 优化后端缓存刷新机制，支持毫秒级 TTL（默认 3000ms），减少重复请求并提升性能，切换节点时强制刷新后端数据，前端 UI 实时更新，操作更流畅
-- 解耦前端数据拉取与后端缓存刷新，提升节点切换速度和一致性
+- Refactored profile switch logic, allowing cancellation at any time to prevent hangs
+- Introduced event-driven proxy manager, optimizing proxy config updates to prevent hangs
+- Improved subscription card traffic usage ratio calculation accuracy
+- Optimized backend cache refresh mechanism, supporting millisecond TTL (default 3000ms) to reduce duplicate requests and improve performance; force refresh backend data when switching nodes for real-time UI updates
+- Decoupled frontend data fetching and backend cache refresh to improve node switching speed and consistency
 
-### 🗑️ 移除内容
+### 🗑️ Removed
 
-- 移除了 macOS tray 图标显示网络速率
+- Removed macOS tray network rate display
 
-### 🌐 国际化更新
+### 🌐 Internationalization
 
-- 修复部分翻译缺失和不一致问题
+- Fixed missing and inconsistent translations
+
+---
 
 ## v2.3.1
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 增加配置文件校验，修复从古老版本升级上来的"No such file or directory (os error 2)"错误
-- 修复扩展脚本转义错误
-- 修复 macOS Intel X86 架构构建错误导致无法运行
-- 修复 Linux 下界面边框白边问题
-- 修复 托盘 无响应问题
-- 修复 托盘 无法从轻量模式退出并恢复窗口
-- 修复 快速切换订阅可能导致的卡死问题
+- Added config validation to fix "No such file or directory (os error 2)" error when upgrading from older versions
+- Fixed extension script escape errors
+- Fixed macOS Intel x86 build error causing runtime failure
+- Fixed white border issue on Linux
+- Fixed tray unresponsiveness
+- Fixed tray failing to exit lightweight mode and restore window
+- Fixed potential hang when switching subscriptions rapidly
 
-### ✨ 新增功能
+### ✨ Features
 
-- 新增 window-state 窗口状态管理和恢复
+- Added window-state management and recovery
 
-### 🚀 优化改进
+### 🚀 Optimizations
 
-- 优化 托盘 统一响应
-- 优化 静默启动+自启动轻量模式 运行方式
-- 降低前端潜在内存泄漏风险，提升运行时性能
-- 优化 React 状态、副作用、数据获取、清理等流程。
+- Optimized unified tray response
+- Optimized silent start + autostart lightweight mode operation
+- Reduced frontend potential memory leaks to improve runtime performance
+- Optimized React state, side-effects, data fetching, and cleanup flows
+
+---
 
 ## v2.3.0
 
-**发行代号：御**
-代号释义： 「御」，象征掌控与守护，寓意本次版本对系统稳定性、安全性与用户体验的全面驾驭与提升。
+**Release Codename: Yu**
 
-尽管 `external-controller` 密钥现已自动补全默认值且不允许为空，**仍建议手动修改密钥以提高安全性**。
+Codename meaning: 'Yu' symbolizes control and guardianship, representing the comprehensive mastery and enhancement of system stability, safety, and user experience in this version.
 
-### ⚠️ 已知问题
+Although the `external-controller` secret is now automatically completed with a default value and is not allowed to be empty, **it is still recommended to modify the secret manually to improve security**.
 
-- 仅在 Ubuntu 22.04/24.04、Fedora 41 的 **GNOME 桌面环境** 做过简单测试，不保证其他 Linux 发行版兼容，后续将逐步适配和优化。
-- macOS：
-  - MacOS 下自动升级成功后请关闭程序等待 30 秒重启，因为 MacOS 的端口释放特性，卸载服务后需重启应用等 30 秒才能恢复内核通信。立即启动可能无法正常启动内核。
-  - 墙贴主要为浅色，深色 Tray 图标存在闪烁问题；
-  - 彩色 Tray 图标颜色偏淡；
+### ⚠️ Known Issues
 
-- 已确认窗口状态管理器存在上游缺陷，已暂时移除窗口大小与位置记忆功能。
+- Only briefly tested under the GNOME desktop environment on Ubuntu 22.04/24.04 and Fedora 41. Compatibility with other Linux distributions is not guaranteed.
+- macOS:
+  - After successful auto-upgrade on macOS, please close the program and wait 30 seconds before restarting. Due to macOS port release characteristics, you need to wait 30 seconds after uninstalling the service before restarting the app to restore core communications.
+  - Background wallpaper is mainly light, causing dark Tray icons to flicker;
+  - Color Tray icon colors are relatively light;
+- Window state manager has upstream issues, temporarily removed window size/position memory.
 
-### 🐞 修复问题
+### 🐞 Bug Fixes
 
-- 修复首页“代理模式”快速切换导致的卡死问题
-- 修复 MacOS 快捷键关闭窗口无法启用自动轻量模式
-- 修复静默启动异常窗口的创建与关闭流程
-- 修复 Windows 下错误注册的全局快捷键 `Ctrl+Q`
-- 修复解锁测试报错信息与 VLESS URL 解码时的网络类型错误
-- 修复切换自定义代理地址后系统代理状态异常
-- 修复 macOS TUN 默认无效网卡名称
-- 修复更改订阅后托盘 UI 不同步的问题
-- 修复服务模式安装后无法立即开启 TUN 模式
-- 修复无法删除 `.window-state.json`
-- 修复无法修改配置更新 HTTP 请求超时问题
-- 修复 `getDelayFix` 钩子异常
-- 修复外部扩展脚本覆写代理组时首页无法显示代理组
-- 修复 Verge 导出诊断版本与设置页面不同步
-- 修复切换语言时设置页面可能加载失败
-- 修复编辑器中连字符处理问题
-- 修复提权漏洞，改用带认证的 IPC 通信机制
-- 修复静默启动无法使用自动轻量模式
-- 修复 JS 脚本转义特殊字符报错
-- 修复 macOS 静默启动时异常启动 Dock 栏图标
+- Fixed page hang when switching proxy modes rapidly on homepage
+- Fixed macOS shortcut close window failing to trigger auto lightweight mode
+- Fixed silent start abnormal window creation/close flow
+- Fixed Windows incorrectly registered global hotkey `Ctrl+Q`
+- Fixed unlock test error messages and network type errors during VLESS URL decoding
+- Fixed system proxy status anomaly after switching custom proxy address
+- Fixed macOS TUN default invalid network interface name
+- Fixed tray UI out of sync after changing subscription
+- Fixed unable to enable TUN mode immediately after installing service mode
+- Fixed unable to delete `.window-state.json`
+- Fixed unable to modify HTTP request timeout for profile update
+- Fixed `getDelayFix` hook exception
+- Fixed homepage failing to display proxy groups when external extension script overrides them
+- Fixed Verge export diagnostic version out of sync with settings page
+- Fixed settings page potential load failure when switching language
+- Fixed hyphen handling in editor
+- Fixed privilege escalation vulnerability by switching to authenticated IPC
+- Fixed silent start unable to use auto lightweight mode
+- Fixed JS script escaping special characters error
+- Fixed macOS silent start incorrectly launching Dock icon
 
-### ✨ 新增功能
+### ✨ Features
 
-- **Mihomo(Meta) 内核升级至 v1.19.10**
-- 支持设置代理地址为非 `127.0.0.1`，提升 WSL 兼容性
-- 系统代理守卫：可检测意外变更并自动恢复
-- 托盘新增当前轻量模式状态显示
-- 关闭系统代理时同时断开已建立的连接
-- 新增 WebDAV 功能：
-  - 加入 UA 请求头
-  - 支持目录重定向
-  - 备份目录检查与上传重试机制
+- **Mihomo(Meta) Kernel upgraded to v1.19.10**
+- Supported setting proxy address to non-`127.0.0.1` to improve WSL compatibility
+- System Proxy Guard: detects unexpected changes and auto-restores
+- Tray displays current lightweight mode status
+- Disconnect established connections when system proxy is turned off
+- WebDAV features:
+  - Added UA request headers
+  - Supported directory redirection
+  - Backup directory check and upload retry mechanism
+- Auto subscription update mechanism:
+  - Added request timeout to prevent hangs
+  - Supported retrying subscription update under proxy status
+  - Supported clicking subscription card to switch next auto-update time, with update status tooltip
+- DNS settings support Hosts configuration
+- Homepage proxy nodes support sorting
+- Supported service mode manual uninstall, falling back to Sidecar mode
+- Core state management supports switching, upgrading, restarting
+- Config loading phase autocompletes `external-controller secret`
+- Added log auto-cleanup interval option (including 1 day)
+- Added Zashboard jump link
+- Use system default window manager
 
-- 自动订阅更新机制：
-  - 加入请求超时机制防止卡死
-  - 支持在代理状态下自动重试订阅更新
-  - 支持订阅卡片点击切换下次自动更新时间，并显示更新结果提示
+### 🚀 Optimizations
 
-- DNS 设置新增 Hosts 配置功能
-- 首页代理节点支持排序
-- 支持服务模式手动卸载，回退至 Sidecar 模式
-- 核心状态管理支持切换、升级、重启
-- 配置加载阶段自动补全 `external-controller secret`
-- 新增日志自动清理周期选项（含1天）
-- 新增 Zashboard 一键跳转入口
-- 使用系统默认窗口管理器
+- **System related:**
+  - Optimized system proxy Bypass settings
+  - Optimized proxy settings update logic and guard mechanism
+  - Adjusted Windows startup method to Startup folder to solve self-start issue in admin mode
+- **Performance & Stability:**
+  - Asynchronized configuration loading, UI startup, event notification to resolve lag
+  - Optimized MihomoManager and window creation
+  - Changed kernel log level to `warn` to reduce noise
+  - Refactored main process and notification system to improve responsiveness and decoupling
+  - Optimized network request and error handling
+  - Added network manager to prevent resource competition causing UI hangs
+  - Optimized profile loading memory usage
+  - Optimized memory usage for caching Mihomo proxy and providers info
+- **Frontend & Interface:**
+  - Rules page auto-refreshes data when switching
+  - Non-active subscription edits no longer trigger config reload
+  - Optimized tray rate display, disabled by default on macOS
+  - Windows shortcut name renamed to `Clash Verge`
+  - Fallback to proxy retry on update failure
+  - Supported async port lookup and saving, ports support random generation
+  - Modified port detection range to `1111-65536`
+  - Optimized saving mechanism using smooth functions to prevent lag
+- **Configuration & Security:**
+  - Auto-complete missing `secret` to `set-your-secret`
+  - Force Mihomo config to complete `external-controller-cors` (disabled cross-origin by default, restricted to local access)
+  - Optimized window permissions and state initialization logic
+  - Network latency tests replaced with HTTPS: `https://cp.cloudflare.com/generate_204`
+  - Optimized IP info fetching, adding deduplication and polling check algorithms
+- Synchronously fixed translation errors and inconsistencies, optimizing overall language experience
+- Strengthened page stability after language switching to avoid loading anomalies
 
-### 🚀 优化改进
+### 🗑️ Removed
 
-- **系统相关：**
-  - 系统代理 Bypass 设置优化
-  - 优化代理设置更新逻辑与守卫机制
-  - Windows 启动方式调整为 Startup 文件夹，解决管理员模式下自启问题
-
-- **性能与稳定性：**
-  - 全面异步化处理配置加载、UI 启动、事件通知等关键流程，解决卡顿问题
-  - 优化 MihomoManager 实现与窗口创建流程
-  - 改进内核日志等级为 `warn`，减少噪音输出
-  - 重构主进程与通知系统，提升响应性与分离度
-  - 优化网络请求与错误处理机制
-  - 添加网络管理器防止资源竞争引发 UI 卡死
-  - 优化配置文件加载内存使用
-  - 优化缓存 Mihomo proxy 和 providers 信息内存使用
-
-- **前端与界面体验：**
-  - 切换规则页自动刷新数据
-  - 非激活订阅编辑时不再触发配置重载
-  - 优化托盘速率显示，macOS 下默认关闭
-  - Windows 快捷键名称更名为 `Clash Verge`
-  - 更新失败可回退至使用代理重试
-  - 支持异步端口查找与保存，端口支持随机生成
-  - 修改端口检测范围至 `1111-65536`
-  - 优化保存机制，使用平滑函数防止卡顿
-
-- **配置增强与安全性：**
-  - 配置缺失 `secret` 字段时自动补全为 `set-your-secret`
-  - 强制为 Mihomo 配置补全 `external-controller-cors` 字段（默认不允许跨域，限制本地访问）计划后续支持自定义 cors
-  - 优化窗口权限设置与状态初始化逻辑
-  - 网络延迟测试替换为 HTTPS 协议：`https://cp.cloudflare.com/generate_204`
-  - 优化 IP 信息获取流程，添加去重机制与轮询检测算法
-
-- 同步修复翻译错误与不一致项，优化整体语言体验
-- 加强语言切换后的页面稳定性，避免加载异常
-
-### 🗑️ 移除内容
-
-- 窗口状态管理器（上游存在缺陷）
-- WebDAV 跨平台备份恢复限制
+- Window state manager (upstream issues)
+- WebDAV cross-platform backup restoration limits
 
 ---
 
 ## v2.2.3
 
-#### 已知问题
+#### Known Issues
 
-- 仅在Ubuntu 22.04/24.04，Fedora 41 **Gnome桌面环境** 做过简单测试，不保证其他其他Linux发行版可用，将在未来做进一步适配和调优
-- MacOS 自定义图标与速率显示推荐图标尺寸为 256x256。其他尺寸（可能）会导致不正常图标和速率间隙
-- MacOS 下 墙贴主要为浅色，Tray 图标深色时图标闪烁；彩色 Tray 速率颜色淡
-- Linux 下 Clash Verge Rev 内存占用显著高于 Windows / MacOS
+- Only briefly tested under the Gnome desktop environment on Ubuntu 22.04/24.04 and Fedora 41. Compatibility with other Linux distributions is not guaranteed, and adaptation/tuning will follow in the future.
+- Recommended icon size for macOS custom icons and speed display is 256x256. Other sizes may cause abnormal icons and speed display spacing.
+- On macOS, the background wallpaper is mainly light, causing the Tray icon to flicker when it is dark; color Tray speed indicator color is light.
+- Clash Verge Rev memory usage under Linux is significantly higher than on Windows / macOS.
 
-### 2.2.3 相对于 2.2.2
+### 2.2.3 compared to 2.2.2
 
-#### 修复了：
+#### Fixed:
 
-- 首页“当前代理”因为重复刷新导致的CPU占用过高的问题
-- “开机自启”和“DNS覆写”开关跳动问题
-- 自定义托盘图标未能应用更改
-- MacOS 自定义托盘图标显示速率时图标和文本间隙过大
-- MacOS 托盘速率显示不全
-- Linux 在系统服务模式下无法拉起 Mihomo 内核
-- 使用异步操作，避免获取系统信息和切换代理模式可能带来的崩溃
-- 相同节点名称可能导致的页面渲染出错
-- URL Schemes被截断的问题
-- 首页流量统计卡更好的时间戳范围
-- 静默启动无法触发自动轻量化计时器
+- Homepage "Current Proxy" CPU usage too high due to repeated refreshes
+- "Autostart" and "DNS Override" switch jumping issues
+- Custom tray icon failing to apply changes
+- macOS custom tray icon display speed icon-to-text spacing too large
+- macOS tray rate display incomplete
+- Linux failing to launch Mihomo kernel in system service mode
+- Async operations to avoid crashes from fetching system info and switching proxy modes
+- Page rendering error caused by identical node names
+- URL Schemes truncation issue
+- Homepage traffic stats card using better timestamp ranges
+- Silent start unable to trigger auto lightweight mode timer
 
-#### 新增了：
+#### Added:
 
-- Mihomo(Meta)内核升级至 1.19.4
-- Clash Verge Rev 从现在开始不再强依赖系统服务和管理权限
-- 支持根据用户偏好选择Sidecar(用户空间)模式或安装服务
-- 增加载入初始配置文件的错误提示，防止切换到错误的订阅配置
-- 检测是否以管理员模式运行软件，如果是提示无法使用开机自启
-- 代理组显示节点数量
-- 统一运行模式检测，支持管理员模式下开启TUN模式
-- 托盘切换代理模式会根据设置自动断开之前连接
-- 如订阅获取失败回退使用Clash内核代理再次尝试
+- Mihomo(Meta) Kernel upgraded to v1.19.4
+- Clash Verge Rev no longer strongly depends on system service and admin privileges
+- Supported choosing between Sidecar (user space) mode or installing service based on user preference
+- Added error prompts when loading initial config to prevent switching to incorrect subscriptions
+- Detects if running as administrator, if so, prompts that autostart cannot be enabled
+- Proxy groups show node count
+- Unified operation mode detection, supporting enabling TUN mode in admin mode
+- Tray proxy mode switching automatically disconnects previous connections based on settings
+- Fallback to Clash kernel proxy retry on subscription fetch failure
 
-#### 移除了：
+#### Removed:
 
-- 实时保存窗口位置和大小。这个功能可能会导致窗口异常大小和位置，还需观察。
+- Real-time window size and position saving. This feature might cause window size/position anomalies and needs further observation.
 
-#### 优化了：
+#### Optimized:
 
-- 重构了后端内核管理逻辑，更轻量化和有效的管理内核，提高了性能和稳定性
-- 前端统一刷新应用数据，优化数据获取和刷新逻辑
-- 优化首页流量图表代码，调整图表文字边距
-- MacOS 托盘速率更好的显示样式和更新逻辑
-- 首页仅在有流量图表时显示流量图表区域
-- 更新DNS默认覆写配置
-- 移除测试目录，简化资源初始化逻辑
+- Refactored backend kernel management logic, more lightweight and effective management, improving performance and stability
+- Unified frontend data refresh, optimizing data fetching and refresh logic
+- Optimized homepage traffic chart code, adjusting margins
+- macOS tray rate display style and update logic
+- Homepage only displays traffic chart area when traffic chart is present
+- Updated default DNS override config
+- Removed test directories, simplifying resource initialization
+
+---
 
 ## v2.2.2
 
-**发行代号：拓**
+**Release Codename: Tuo**
 
-感谢 Tunglies 对 Verge 后端重构，性能优化做出的重大贡献！
+Special thanks to @Tunglies for major contributions to Verge backend refactoring and performance optimization!
 
-代号释义： 本次发布在功能上的大幅扩展。新首页设计为用户带来全新交互体验，DNS 覆写功能增强网络控制能力，解锁测试页面助力内容访问自由度提升，轻量模式提供灵活使用选择。此外，macOS 应用菜单集成、sidecar 模式、诊断信息导出等新特性进一步丰富了软件的适用场景。这些新增功能显著拓宽了 Clash Verge 的功能边界，为用户提供了更强大的工具和可能性。
+Codename meaning: This release represents a significant expansion in features. The new homepage design brings a brand new interactive experience. The DNS override function enhances network control. The unlock test page facilitates content access freedom. The lightweight mode provides flexible choices. In addition, new features like macOS app menu integration, sidecar mode, and diagnostic info export enrich user scenarios. These additions significantly expand the functional boundaries of Clash Verge, providing users with more powerful tools and possibilities.
 
-#### 已知问题
+#### Known Issues
 
-- 仅在Ubuntu 22.04/24.04，Fedora 41 **Gnome桌面环境** 做过简单测试，不保证其他其他Linux发行版可用，将在未来做进一步适配和调优
+- Only briefly tested under the Gnome desktop environment on Ubuntu 22.04/24.04 and Fedora 41. Compatibility with other Linux distributions is not guaranteed, and adaptation/tuning will follow in the future.
 
-### 2.2.2 相对于 2.2.1(已下架不再提供)
+### 2.2.2 compared to 2.2.1
 
-#### 修复了：
+#### Fixed:
 
-- 弹黑框的问题（原因是服务崩溃触发重装机制）
-- MacOS进入轻量模式以后隐藏Dock图标
-- 增加轻量模式缺失的tray翻译
-- Linux下的窗口边框被削掉的问题
+- Black dialog popups issue (triggered by service crash reinstall mechanism)
+- Hide Dock icon after entering lightweight mode on macOS
+- Added missing tray translation for lightweight mode
+- Linux window border cutting issue
 
-#### 新增了:
+#### Added:
 
-- 加强服务检测和重装逻辑
-- 增强内核与服务保活机制
-- 增加服务模式下的僵尸进程清理机制
-- 新增当服务模式多次尝试失败后自动回退至用户空间模式
+- Enhanced service detection and reinstall logic
+- Enhanced kernel and service keep-alive mechanism
+- Added zombie process cleanup mechanism under service mode
+- Added auto rollback to user space mode after multiple service mode failures
 
-### 2.2.1 相对于 2.2.0(已下架不再提供)
+### 2.2.1 compared to 2.2.0
 
-#### 修复了：
+#### Fixed:
 
-1. **首页**
-   - 修复 Direct 模式首页无法渲染
-   - 修复 首页启用轻量模式导致 ClashVergeRev 从托盘退出
-   - 修复 系统代理标识判断不准的问题
-   - 修复 系统代理地址错误的问题
-   - 代理模式“多余的切换动画”
-2. **系统**
-   - 修复 MacOS 无法使用快捷键粘贴/选择/复制订阅地址。
-   - 修复 代理端口设置同步问题。
-   - 修复 Linux 无法与 Mihomo 核心 和 ClashVergeRev 服务通信
-3. **界面**
-   - 修复 连接详情卡没有跟随主题色
-4. **轻量模式**
-   - 修复 MacOS 轻量模式下 Dock 栏图标无法隐藏。
+1. **Homepage**
+   - Fixed Direct mode homepage failing to render
+   - Fixed homepage entering lightweight mode causing ClashVergeRev to exit from tray
+   - Fixed inaccurate system proxy flag detection
+   - Fixed incorrect system proxy address
+   - Removed redundant transitions in proxy mode switching
+2. **System**
+   - Fixed macOS unable to use shortcuts to copy/paste/select subscription URLs
+   - Fixed proxy port settings synchronization
+   - Fixed Linux unable to communicate with Mihomo core and ClashVergeRev service
+3. **UI**
+   - Fixed connection detail card not following theme color
+4. **Lightweight Mode**
+   - Fixed macOS lightweight mode Dock icon failing to hide
 
-#### 新增了:
+#### Added:
 
-1. **首页**
-   - 首页文本过长自动截断
-2. **轻量模式**
-   - 新增托盘进入轻量模式支持
-   - 新增进入轻量模式快捷键支持
-3. **系统**
-   - 在 ClashVergeRev 对 Mihomo 进行操作时，总是尝试确保两者运行
-   - 服务器模式下启动mihomo内核的时候查找并停止其他已经存在的内核进程，防止内核假死等问题带来的通信失败
-4. **托盘**
-   - 新增 MacOS 启用托盘速率显示时，可选隐藏托盘图标显示
-
----
-
-## 2.2.0(已下架不再提供)
-
-#### 新增功能
-
-1. **首页**
-   - 新增首页功能，默认启动页面改为首页。
-   - 首页流量图卡片显示上传/下载名称。
-   - 首页支持轻量模式切换。
-   - 流量统计数据持久保存。
-   - 限制首页配置文件卡片URL长度。
-
-2. **DNS 设置与覆写**
-   - 新增 DNS 覆写功能。
-   - 默认启用 DNS 覆写。
-
-3. **解锁测试**
-   - 新增解锁测试页面。
-
-4. **轻量模式**
-   - 新增轻量模式及设置。
-   - 添加自动轻量模式定时器。
-
-5. **系统支持**
-   - Mihomo(meta)内核升级 1.19.3
-   - macOS 支持 CMD+W 关闭窗口。
-   - 新增 macOS 应用菜单。
-   - 添加 macOS 安装服务时候的管理员权限提示。
-   - 新增 sidecar(用户空间启动内核) 模式。
-
-6. **其他**
-   - 增强延迟测试日志和错误处理。
-   - 添加诊断信息导出。
-   - 新增代理命令。
-
-#### 修复
-
-1. **系统**
-   - 修复 Windows 热键崩溃。
-   - 修复 macOS 无框标题。
-   - 修复 macOS 静默启动崩溃。
-   - 修复 macOS tray图标错位到左上角的问题。
-   - 修复 Windows/Linux 运行时崩溃。
-   - 修复 Win10 阴影和边框问题。
-   - 修复 升级或重装后开机自启状态检测和同步问题。
-
-2. **构建**
-   - 修复构建失败问题。
-
-#### 优化
-
-1. **性能**
-   - 重构后端，巨幅性能优化。
-   - 优化首页组件性能。
-   - 优化流量图表资源使用。
-   - 提升代理组列表滚动性能。
-   - 加快应用退出速度。
-   - 加快进入轻量模式速度。
-   - 优化小数值速度更新。
-   - 增加请求超时至 60 秒。
-   - 修复代理节点选择同步。
-   - 优化修改verge配置性能。
-
-2. **重构**
-   - 重构后端，巨幅性能优化。
-   - 优化定时器管理。
-   - 重构 MihomoManager 处理流量。
-   - 优化 WebSocket 连接。
-
-3. **其他**
-   - 更新依赖。
-   - 默认 TUN 堆栈改为 gvisor。
+1. **Homepage**
+   - Text truncation when homepage text is too long
+2. **Lightweight Mode**
+   - Added tray entrance support for lightweight mode
+   - Added hotkey support for entering lightweight mode
+3. **System**
+   - Always attempt to ensure both ClashVergeRev and Mihomo run when operating Mihomo
+   - Under service mode, scan and terminate other existing kernel processes during Mihomo kernel startup to prevent kernel freeze issues
+4. **Tray**
+   - Added option to hide tray icon display when macOS tray rate display is enabled
 
 ---
 
-## v2.1.2
+## v2.2.0
 
-**发行代号：臻**
+#### Features
 
-代号释义： 千锤百炼臻至善，集性能跃升、功能拓展、交互焕新于一体，彰显持续打磨、全方位优化的迭代精神。
-
-感谢 Tychristine 对社区群组管理做出的重大贡献！
-
-##### 2.1.2相对2.1.1(已下架不再提供)更新了：
-
-- 无法更新和签名验证失败的问题(该死的CDN缓存)
-- 设置菜单区分Verge基本设置和高级设置
-- 增加v2 Updater的更多功能和权限
-- 退出Verge后Tun代理状态仍保留的问题
-
-##### 2.1.1相对2.1.0(已下架不再提供)更新了：
-
-- 检测所需的Clash Verge Service版本（杀毒软件误报可能与此有关，因为检测和安装新版本Service需管理员权限）
-- MacOS下支持彩色托盘图标和更好速率显示（感谢Tunglies）
-- 文件类型判断不准导致脚本检测报错的问题
-- 打开Win下的阴影(Win10因底层兼容性问题，可能圆角和边框显示不太完美)
-- 边框去白边
-- 修复Linux下编译问题
-- 修复热键无法关闭面板的问题
-
-##### 2.1.0 - 发行代号：臻
-
-### 功能新增
-
-- 新增窗口状态实时监控与自动保存功能
-- 增强核心配置变更时的验证与错误处理机制
-- 支持通过环境变量 `CLASH_VERGE_REV_IP`自定义复制IP地址
-- 添加连接表列宽持久化设置与进程过滤功能
-- 新增代理组首字母导航与动态滚动定位功能
-- 实现连接追踪暂停/恢复功能
-- 支持从托盘菜单快速切换代理配置
-- 添加轻量级模式开关选项
-- 允许用户自定义TUN模式增强类型和FakeIP范围
-- 新增系统代理状态指示器
-- 增加Alpha版本自动重命名逻辑
-- 优化字母导航工具提示与防抖交互机制
-
-### 性能优化
-
-- 重构代理列表渲染逻辑，提升布局计算效率
-- 优化代理数据更新机制，采用乐观UI策略
-- 改进虚拟列表渲染性能（Virtuoso）
-- 提升主窗口Clash模式切换速度（感谢Tunglies）
-- 加速内核关闭流程并优化管理逻辑
-- 优化节点延迟刷新速率
-- 改进托盘网速显示更新逻辑
-- 提升配置验证错误信息的可读性
-- 重构服务架构，优化代码组织结构（感谢Tunglies）
-- 优化内核启动时的配置验证流程
-
-### 问题修复
-
-- 修复删除节点时关联组信息残留问题
-- 解决菜单切换异常与重复勾选问题
-- 修正连接页流量计算错误
-- 修复Windows圆角显示异常问题
-- 解决控制台废弃API警告
-- 修复全局热键空值导致的崩溃
-- 修复Alpha版本Windows打包重命名问题
-- 修复MacOS端口切换崩溃问题
-- 解决Linux持续集成更新器问题
-- 修复静默启动后热键失效问题
-- 修正TypeScript代理组类型定义
-- 修复Windows托盘图标空白问题
-- 优化远程目标地址显示（替换旧版IP展示）
-
-### 交互体验
-
-- 统一多平台托盘图标点击行为
-- 优化代理列表滚动流畅度
-- 改进日志搜索功能与数据管理
-- 重构热键管理逻辑，修复托盘冻结问题
-- 优化托盘网速显示样式
-- 增强字母导航工具提示的动态响应
-
-### 国际化
-
-- 新增配置检查多语言支持
-- 添加轻量级模式多语言文本
-- 完善多语言翻译内容
-
-### 维护更新
-
-- 将默认TUN协议栈改为gVisor
-- 更新Node.js运行版本
-- 移除自动生成更新器文件
-- 清理废弃代码与未使用组件
-- 禁用工作流自动Alpha标签更新
-- 更新依赖库版本
-- 添加MacOS格式转换函数专项测试
-- 优化开发模式日志输出
-
-### 安全增强
-
-- 强化应用启动时的配置验证机制
-- 改进脚本验证与异常处理流程
-- 修复编译警告（移除无用导入）
-
----
-
-## v2.0.3
-
-### Notice
-
-- !!使用出现异常的，打开设置-->配置目录 备份 后 删除所有文件 尝试是否正常!！
-- 历时3个月的紧密开发与严格测试稳定版2.0.0终于发布了：巨量改进与性能、稳定性提升，目前Clash Verge Rev已经有了比肩cfw的健壮性；而且更强大易用！
-- 由于更改了服务安装逻辑，每次更新安装需要输入系统密码卸载老版本服务和安装新版本服务，以后可以丝滑使用tun(虚拟网卡)模式
-
-### 2.0.3相对于2.0.2改进修复了：
-
-1. 修复VLess-URL识别网络类型错误 f400f90 #2126
-2. 新增系统代理绕过文本校验 c71e18e
-3. 修复脚本编辑器UI显示不正确 6197249 #2267
-4. 修复Shift热键无效 589324b #2278
-5. 新增nushell环境变量复制 d233a84
-6. 修复全局扩展脚本无法覆写DNS d22b37c #2235
-7. 切换到系统代理相对于稳定的版本 38745d4
-8. 修改fake-ip-range网段 0e3b631
-9. 修复窗口隐藏后WebSocket未断开连接，减小内存风险 b42d13f
-10. 改进系统代理绕过设置 c5c840d
-11. 修复i18n翻译文本缺失 b149084
-12. 修复双击托盘图标打开面板 f839d3b #2346
-13. 修复Windows10窗口白色边框 4f6ca40 #2425
-14. 修复Windows窗口状态恢复 4f6ca40
-15. 改进保存配置文件自动重启Mihomo内核 0669f7a
-16. 改进更新托盘图标性能 d9291d4
-17. 修复保存配置后代理列表未更新 542baf9 #2460
-18. 新增MacOS托盘显示实时速率，可在"界面设置"中关闭 1b2f1b6
-19. 新增托盘菜单显示已设置的快捷键 eeff4d4
-20. 新增重载配置文件错误响应"400"时显示更多错误信息 c5989d2 #2492
-21. 修复GUI代理状态与菜单显示不一致 13b63b5 #2502
-22. 新增默认语言跟随系统语言(无语言支持即为英语)，添加了阿拉伯语、印尼语、鞑靼语支持 9655f77 #2940
-
-### Features
-
-- Meta(mihomo)内核升级 1.19.1
-- 增加更多语言和托盘语言跟随
-- MacOS增加状态栏速率显示
-- 托盘显示快捷键
-- 重载配置文件错误响应"400"时显示更多错误信息
-- 改进保存配置文件自动重启Mihomo内核
-
-### Performance
-
-- 改进更新托盘图标性能
-- 窗口隐藏后WebSocket断开连接
-
----
-
-## v2.0.2
-
-### Notice
-
-- !!使用出现异常的，打开设置-->配置目录 备份 后 删除所有文件 尝试是否正常!！
-- 历时3个月的紧密开发与严格测试稳定版2.0.0终于发布了：巨量改进与性能、稳定性提升，目前Clash Verge Rev已经有了比肩cfw的健壮性；而且更强大易用！
-- 由于更改了服务安装逻辑，Mac/Linux 首次安装需要输入系统密码卸载和安装服务，以后可以丝滑使用 tun(虚拟网卡)模式
-- 因 Tauri 2.0 底层 bug，关闭窗口后保留webview进程，优点是再次打开面板更快，缺点是内存使用略有增加
-
-### 2.0.2相对于2.0.1改进了：
-
-- MacOS 下自定义图标可以支持彩色、单色切换
-- 修正了 Linux 下多个内核僵尸进程的问题
-- 修正了 DNS ipv6 强制覆盖的逻辑
-- 修改了 MacOS tun 模式下覆盖设置 dns 字段的问题
-- 修正了 MacOS tray 图标不会随代理模式更改的问题
-- 静默启动下重复运行会出现多个实例的bug
-- 安装的时候自动删除历史残留启动项
-- Tun模式默认是还用内核推荐的 mixed 堆栈
-- 改进了默认窗口大小（启动软件窗口不会那么小了）
-- 改进了 WebDAV 备份超时时间机制
-- 测试菜单添加滚动条
-- 改进和修正了 Tun 模式下对设置的覆盖逻辑
-- 修复了打开配置出错的问题
-- 修复了配置文件无法拖拽添加的问题
-- 改善了浅色模式的对比度
-
-### 2.0.1相对于2.0.0改进了：
-
-- 无法从 2.0rc和2.0.0 升级的问题（已经安装了2.0版本的需手动下载安装）
-- MacOS 系统下少有的无法安装服务，无法启动的问题，目前更健壮了
-- 当系统中没有 yaml 编辑器的情况下，打开文件程序崩溃的问题
-- Windows 应用内升级和覆盖安装不会删除老执行文件的问题
-- 修改优化了 mac 下 fakeip 段和 dns
-- 测试菜单 svg 图标格式检查
-- 应用内升级重复安装 vs runtime 的问题
-- 修复外部控制下密码有特殊字符认证出错的问题
-- 修复恢复 Webdav 备份设置后， Webdav 设置丢失的问题
-- 代理页面增加快速回到顶部的按钮
-
-### Breaking changes
-
-- 重大框架升级：使用 Tauri 2.0（巨量改进与性能提升）
-- 出现 bug 到 issues 中提出；以后不再接受1.x版本的bug反馈。
-- 强烈建议完全删除 1.x 老版本再安装此版本 !!使用出现异常的，打开设置-->配置目录 备份 后 删除所有文件 尝试是否正常!！
-
-### Features
-
-- Meta(mihomo)内核升级 1.18.10
-- Win 下的系统代理替换为 Shadowsocks/CFW/v2rayN 等成熟的 sysproxy.exe 方案，解决拨号/VPN 环境下无法设置系统代理的问题
-- 服务模式改进为启动软件时自动安装，TUN 模式可自由开启不再限制于服务模式
-- Mac 下可用 URL Scheme 导入订阅
-- 可使用 Ctrl(cmd)+Q 快捷键退出程序
-- 成功导入订阅的提示消息
-- 能自动选中新导入的订阅
-- 日志加入颜色区分
-- 改进多处文本表述
-- 加入图标 svg 格式检测
-- 增加更多 app 调试日志
-- 添加 MacOS 下白色桌面的 tray 黑色配色（但会代理系统代理、tun 模式图标失效的问题）
-- 增加 Webdav 备份功能
-- 添加统一延迟的设置开关
-- 添加 Windows 下自动检测并下载 vc runtime 的功能
-- 支持显示 mux 和 mptcp 的节点标识
-- 延迟测试连接更换 http 的 cp.cloudflare.com/generate_204 （关闭统一延迟的情况下延迟测试结果会有所增加）
-- 重构日志记录逻辑，可以收集和筛选所有日志类型了（之前无法记录debug的日志类型）
-
-### Performance
-
-- 优化及重构内核启动管理逻辑
-- 优化 TUN 启动逻辑
-- 重构和优化 app_handle
-- 重构系统代理绕过逻辑
-- 移除无用的 PID 创建逻辑
-- 优化系统 DNS 设置逻辑
-- 后端实现窗口控制
-- 重构 MacOS 下的 DNS 设置逻辑
-
-### Bugs Fixes
-
-- 修复已有多个订阅导入新订阅会跳选订阅的问题
-- 修复多个 Linux 下的 bug, Tun 模式在 Linux 下目前工作正常
-- 修复 Linux wayland 下任务栏图标缺失的问题
-- 修复 Linux KDE 桌面环境无法启动的问题
-- 移除多余退出变量和钩子
-- 修复 MacOS 下 tray 菜单重启 app 失效的问题
-- 修复某些特定配置文件载入失败的问题
-- 修复 MacOS 下 tun 模式 fakeip 不生效的问题
-- 修复 Linux 下 关闭 tun 模式文件报错的问题
-- 修复快捷键设置的相关 bug
-- 修复 Win 下点左键菜单闪现的问题（Mac 下的操作逻辑相反，默认情况下不管点左/右键均会打开菜单，闪现不属于 bug）
-
-### Known issues
-
-- Windows 下窗口大小无法记忆（等待上游修复）
-- Webdav 备份因为安全性和兼容性问题，暂不支持跨平台配置同步
+1. **Homepage**
+   - Added homepage, changing default startup page to homepage
+   - Homepage traffic card displays upload/download names
+   - Homepage supports lightweight mode switching
+   - Traffic stats data persistently saved
+   - Restricted homepage profile card URL length
+2. **DNS settings & override**
+   - Added DNS override feature
+   - Enabled DNS override by default
+3. **Unlock tests**
+   - Added unlock test page
+4. **Lightweight Mode**
+   - Added lightweight mode and settings
+   - Added auto lightweight mode timer
+5. **System Support**
+   - Mihomo(meta) kernel upgraded to v1.19.3
+   - macOS supports CMD+W to close window
+   - Added macOS application menu
+   - Added administrator privilege prompts when installing service under macOS
+   - Added sidecar (user space core start) mode
+6. **Others**
+   - Enhanced latency test logs and error handling
+   - Added diagnostic info export
+   - Added proxy commands
 
 ---
 
 ## v1.7.7
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复导入订阅没有自动重载(不显示节点)的问题
-- 英语状态下修复 Windows 工具栏提示文本超过限制的问题
+- Fixed importing subscription not auto-reloading (nodes not displaying)
+- Fixed Windows tray tooltip text exceeding limits under English locale
 
 ---
 
@@ -1104,23 +799,23 @@
 
 ### Notice
 
-- Clash Verge Rev 目前已进入稳定周期，日后更新将着重于 bug 修复与内核常规升级
+- Clash Verge Rev has entered a stable cycle; future updates will focus on bug fixes and regular kernel upgrades.
 
 ### Features
 
-- Meta(mihomo)内核升级 1.18.7
-- 界面细节调整
-- 优化服务模式安装逻辑
-- 移除无用的 console log
-- 能自动选择第一个订阅
+- Meta(mihomo) kernel upgraded to v1.18.7
+- UI details adjustments
+- Optimized service mode install logic
+- Removed redundant console logs
+- Auto select the first subscription
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复服务模式安装问题
-- 修复 Mac 下的代理绕过 CIDR 写法过滤
-- 修复 32 位升级 URL
-- 修复不同分组 URL 测试地址配置无效的问题
-- 修复 Web UI 下的一处 hostname 参数
+- Fixed service mode installation issues
+- Fixed macOS system proxy bypass CIDR filter
+- Fixed 32-bit upgrade URL
+- Fixed different groups URL test address configurations being invalid
+- Fixed hostname parameter under Web UI
 
 ---
 
@@ -1128,24 +823,24 @@
 
 ### Features
 
-- 展示局域网 IP 地址信息
-- 在设置页面直接复制环境变量
-- 优化服务模式安装逻辑
+- Display LAN IP address info
+- Copy environment variables directly on settings page
+- Optimized service mode install logic
 
 ### Performance
 
-- 优化切换订阅速度
-- 优化更改端口速度
+- Optimized subscription switching speed
+- Optimized port changing speed
 
-### Bugs Fixes
+### Bug Fixes
 
-- 调整 MacOS 托盘图标大小
-- Trojan URI 解析错误
-- 卡片拖动显示层级错误
-- 代理绕过格式检查错误
-- MacOS 下编辑器最大化失败
-- MacOS 服务安装失败
-- 更改窗口大小导致闪退的问题
+- Adjusted macOS tray icon size
+- Trojan URI parsing error
+- Card drag display layer error
+- Proxy bypass formatting check error
+- macOS editor maximize failure
+- macOS service installation failure
+- Changing window size causing crash issue
 
 ---
 
@@ -1153,14 +848,14 @@
 
 ### Features
 
-- 支持可视化编辑订阅代理组
-- 支持可视化编辑订阅节点
-- 支持可视化编辑订阅规则
-- 扩展脚本支持订阅名称参数 `function main(config, profileName)`
+- Supported visual editing of subscription proxy groups
+- Supported visual editing of subscription nodes
+- Supported visual editing of subscription rules
+- Extension scripts support subscription name parameter `function main(config, profileName)`
 
-### Bugs Fixes
+### Bug Fixes
 
-- 代理绕过格式检查错误
+- Proxy bypass formatting check error
 
 ---
 
@@ -1168,39 +863,39 @@
 
 ### Break Changes
 
-- 更新后请务必重新导入所有订阅，包括 Remote 和 Local
-- 此版本重构了 Merge/Script，更新前请先备份好自定义 Merge 和 Script（更新并不会删除配置文件，但是旧版 Merge 和 Script 在更新后无法从前端访问，备份以防万一）
-- Merge 改名为 `扩展配置`，分为 `全局扩展配置` 和 `订阅扩展配置`，全局扩展配置对所有订阅生效，订阅扩展配置只对关联的订阅生效
-- Script 改名为 `扩展脚本`，同样分为 `全局扩展脚本` 和 `订阅扩展脚本`
-- 订阅扩展配置在订阅右键菜单里进入
-- 执行优先级为： 全局扩展配置 -> 全局扩展脚本 -> 订阅扩展配置 ->订阅扩展脚本
-- 扩展配置删除了 `prepend/append` 能力，请使用 右键订阅 -> `编辑规则`/`编辑节点`/`编辑代理组` 来代替
-- MacOS 用户更新后请重新安装服务模式
+- Please make sure to re-import all subscriptions after updating, including Remote and Local.
+- This version refactored Merge/Script. Please backup custom Merge and Script before updating.
+- Merge renamed to `Extension Config`, split into `Global Extension Config` and `Subscription Extension Config`. Global extension config applies to all subscriptions, subscription extension config only applies to associated subscriptions.
+- Script renamed to `Extension Script`, similarly split.
+- Subscription extension config is accessed via subscription right-click menu.
+- Execution priority: Global Extension Config -> Global Extension Script -> Subscription Extension Config -> Subscription Extension Script.
+- Extension config removed `prepend/append` capability; please use Right-click subscription -> `Edit Rules` / `Edit Nodes` / `Edit Proxy Groups` instead.
+- macOS users please reinstall service mode after updating.
 
 ### Features
 
-- 升级内核到 1.18.6
-- 移除内核授权，改为服务模式实现
-- 自动填充本地订阅名称
-- 添加重大更新处理逻辑
-- 订阅单独指定扩展配置/脚本（需要重新导入订阅）
-- 添加可视化规则编辑器（需要重新导入订阅）
-- 编辑器新增工具栏按钮（格式化、最大化/最小化）
-- WEBUI 使用最新版 metacubex，并解决无法自动登陆问问题
-- 禁用部分 Webview2 快捷键
-- 热键配置新增连接符 + 号
-- 新增部分悬浮提示按钮，用于解释说明
-- 当日志等级为 `Debug`时（更改需重启软件生效），支持点击内存主动内存回收（绿色文字）
-- 设置页面右上角新增 TG 频道链接
-- 各种细节优化和界面性能优化
+- Upgraded kernel to v1.18.6
+- Removed kernel authorization, replaced with service mode implementation
+- Auto-fill local subscription name
+- Added major update handling logic
+- Subscriptions individually specify extension config/script (requires re-importing)
+- Added visual rules editor (requires re-importing)
+- Editor added toolbar buttons (Format, Maximize/Minimize)
+- WEBUI uses the latest metacubex version and resolves auto-login issue
+- Disabled some WebView2 shortcuts
+- Hotkey configuration added connector `+` sign
+- Added some floating tooltips for explanations
+- When log level is `Debug` (requires restart to take effect), support clicking memory for active memory reclamation (green text)
+- Added Telegram channel link in the top-right of settings page
+- Various detail optimizations and UI performance improvements
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复代理绕过格式检查
-- 通过进程名称关闭进程
-- 退出软件时恢复 DNS 设置
-- 修复创建本地订阅时更新间隔无法保存
-- 连接页面列宽无法调整
+- Fixed proxy bypass formatting checks
+- Close processes by process name
+- Restore DNS settings when exiting software
+- Fixed update interval failing to save when creating local subscriptions
+- Connection page column width cannot be adjusted
 
 ---
 
@@ -1208,39 +903,39 @@
 
 ### Break Changes
 
-- 更新后请务必重新导入所有订阅，包括 Remote 和 Local
-- 此版本重构了 Merge/Script，更新前请先备份好自定义 Merge 和 Script（更新并不会删除配置文件，但是旧版 Merge 和 Script 在更新后无法从前端访问，备份以防万一）
-- Merge 改名为 `扩展配置`，分为 `全局扩展配置` 和 `订阅扩展配置`，全局扩展配置对所有订阅生效，订阅扩展配置只对关联的订阅生效
-- Script 改名为 `扩展脚本`，同样分为 `全局扩展脚本` 和 `订阅扩展脚本`
-- 订阅扩展配置在订阅右键菜单里进入
-- 执行优先级为： 全局扩展配置 -> 全局扩展脚本 -> 订阅扩展配置 ->订阅扩展脚本
-- 扩展配置删除了 `prepend/append` 能力，请使用 右键订阅 -> `编辑规则`/`编辑节点`/`编辑代理组` 来代替
-- MacOS 用户更新后请重新安装服务模式
+- Please make sure to re-import all subscriptions after updating, including Remote and Local.
+- This version refactored Merge/Script. Please backup custom Merge and Script before updating.
+- Merge renamed to `Extension Config`, split into `Global Extension Config` and `Subscription Extension Config`. Global extension config applies to all subscriptions, subscription extension config only applies to associated subscriptions.
+- Script renamed to `Extension Script`, similarly split.
+- Subscription extension config is accessed via subscription right-click menu.
+- Execution priority: Global Extension Config -> Global Extension Script -> Subscription Extension Config -> Subscription Extension Script.
+- Extension config removed `prepend/append` capability; please use Right-click subscription -> `Edit Rules` / `Edit Nodes` / `Edit Proxy Groups` instead.
+- macOS users please reinstall service mode after updating.
 
 ### Features
 
-- 升级内核到 1.18.6
-- 移除内核授权，改为服务模式实现
-- 自动填充本地订阅名称
-- 添加重大更新处理逻辑
-- 订阅单独指定扩展配置/脚本（需要重新导入订阅）
-- 添加可视化规则编辑器（需要重新导入订阅）
-- 编辑器新增工具栏按钮（格式化、最大化/最小化）
-- WEBUI 使用最新版 metacubex，并解决无法自动登陆问问题
-- 禁用部分 Webview2 快捷键
-- 热键配置新增连接符 + 号
-- 新增部分悬浮提示按钮，用于解释说明
-- 当日志等级为 `Debug`时（更改需重启软件生效），支持点击内存主动内存回收（绿色文字）
-- 设置页面右上角新增 TG 频道链接
-- 各种细节优化和界面性能优化
+- Upgraded kernel to v1.18.6
+- Removed kernel authorization, replaced with service mode implementation
+- Auto-fill local subscription name
+- Added major update handling logic
+- Subscriptions individually specify extension config/script (requires re-importing)
+- Added visual rules editor (requires re-importing)
+- Editor added toolbar buttons (Format, Maximize/Minimize)
+- WEBUI uses the latest metacubex version and resolves auto-login issue
+- Disabled some WebView2 shortcuts
+- Hotkey configuration added connector `+` sign
+- Added some floating tooltips for explanations
+- When log level is `Debug` (requires restart to take effect), support clicking memory for active memory reclamation (green text)
+- Added Telegram channel link in the top-right of settings page
+- Various detail optimizations and UI performance improvements
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复代理绕过格式检查
-- 通过进程名称关闭进程
-- 退出软件时恢复 DNS 设置
-- 修复创建本地订阅时更新间隔无法保存
-- 连接页面列宽无法调整
+- Fixed proxy bypass formatting checks
+- Close processes by process name
+- Restore DNS settings when exiting software
+- Fixed update interval failing to save when creating local subscriptions
+- Connection page column width cannot be adjusted
 
 ---
 
@@ -1248,34 +943,34 @@
 
 ### Break Changes
 
-- 此版本重构了 Merge/Script，更新前请先备份好自定义 Merge 和 Script（更新并不会删除配置文件，但是旧版 Merge 和 Script 在更新后无法从前端访问，备份以防万一）
-- Merge 改名为 `扩展配置`，分为 `全局扩展配置` 和 `订阅扩展配置`，全局扩展配置对所有订阅生效，订阅扩展配置只对关联的订阅生效
-- Script 改名为 `扩展脚本`，同样分为 `全局扩展脚本` 和 `订阅扩展脚本`
-- 执行优先级为： 全局扩展配置 -> 全局扩展脚本 -> 订阅扩展配置 ->订阅扩展脚本
-- MacOS 用户更新后请重新安装服务模式
+- This version refactored Merge/Script. Please backup custom Merge and Script before updating.
+- Merge renamed to `Extension Config`, split into `Global Extension Config` and `Subscription Extension Config`.
+- Script renamed to `Extension Script`, similarly split.
+- Execution priority: Global Extension Config -> Global Extension Script -> Subscription Extension Config -> Subscription Extension Script.
+- macOS users please reinstall service mode after updating.
 
 ### Features
 
-- 移除内核授权，改为服务模式实现
-- 自动填充本地订阅名称
-- 添加重大更新处理逻辑
-- 订阅单独指定扩展配置/脚本（需要重新导入订阅）
-- 添加可视化规则编辑器（需要重新导入订阅）
-- 编辑器新增工具栏按钮（格式化、最大化/最小化）
-- WEBUI 使用最新版 metacubex，并解决无法自动登陆问问题
-- 禁用部分 Webview2 快捷键
-- 热键配置新增连接符 + 号
-- 新增部分悬浮提示按钮，用于解释说明
-- 当日志等级为 `Debug`时（更改需重启软件生效），支持点击内存主动内存回收（绿色文字）
-- 设置页面右上角新增 TG 频道链接
+- Removed kernel authorization, replaced with service mode implementation
+- Auto-fill local subscription name
+- Added major update handling logic
+- Subscriptions individually specify extension config/script (requires re-importing)
+- Added visual rules editor (requires re-importing)
+- Editor added toolbar buttons (Format, Maximize/Minimize)
+- WEBUI uses the latest metacubex version and resolves auto-login issue
+- Disabled some WebView2 shortcuts
+- Hotkey configuration added connector `+` sign
+- Added some floating tooltips for explanations
+- When log level is `Debug` (requires restart to take effect), support clicking memory for active memory reclamation (green text)
+- Added Telegram channel link in the top-right of settings page
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复代理绕过格式检查
-- 通过进程名称关闭进程
-- 退出软件时恢复 DNS 设置
-- 修复创建本地订阅时更新间隔无法保存
-- 连接页面列宽无法调整
+- Fixed proxy bypass formatting checks
+- Close processes by process name
+- Restore DNS settings when exiting software
+- Fixed update interval failing to save when creating local subscriptions
+- Connection page column width cannot be adjusted
 
 ---
 
@@ -1283,16 +978,16 @@
 
 ### Features
 
-- MacOS 应用签名
-- 删除 AppImage
-- 应用更新对话框添加下载按钮
-- 设置系统代理绕过时保留默认值
-- 系统代理绕过设置输入格式检查
+- macOS App signing
+- Removed AppImage
+- Added download button to app update dialog
+- Keep default values when setting system proxy bypass
+- System proxy bypass configuration format check
 
-### Bugs Fixes
+### Bug Fixes
 
-- MacOS 代理组图标无法显示
-- RPM 包依赖缺失
+- macOS proxy group icon failing to display
+- Missing RPM package dependencies
 
 ---
 
@@ -1300,13 +995,13 @@
 
 ### Features
 
-- 添加 RPM 包支持
-- 优化细节
+- Added RPM package support
+- Optimized details
 
-### Bugs Fixes
+### Bug Fixes
 
-- MacOS 10.15 编辑器空白的问题
-- MacOS 低版本启动白屏的问题
+- macOS 10.15 blank editor issue
+- macOS low version startup white screen issue
 
 ---
 
@@ -1314,21 +1009,21 @@
 
 ### Features
 
-- 系统代理支持 PAC 模式
-- 允许关闭不使用的端口
-- 使用新的应用图标
-- MacOS 支持切换托盘图标单色/彩色模式
-- CSS 注入支持通过编辑器编辑
-- 优化代理组列表性能
-- 优化流量图显性能
-- 支持波斯语
+- System proxy supports PAC mode
+- Allow closing unused ports
+- Use new app icon
+- macOS supports toggling tray icon monochrome/color mode
+- CSS injection supports editing via editor
+- Optimized proxy group list performance
+- Optimized traffic graph performance
+- Supported Persian language
 
-### Bugs Fixes
+### Bug Fixes
 
-- Kill 内核后 Tun 开启缓慢的问题
-- 代理绕过为空时使用默认值
-- 无法读取剪切板内容
-- Windows 下覆盖安装无法内核占用问题
+- Slow TUN activation after killing core
+- Use default values when proxy bypass is empty
+- Unable to read clipboard content
+- Windows overwrite installation core occupation issue
 
 ---
 
@@ -1336,19 +1031,19 @@
 
 ### Features
 
-- 支持本地文件拖拽导入
-- 重新支持 32 位 CPU
-- 新增内置 Webview2 版本
-- 优化 Merge 逻辑，支持深度合并
-- 删除 Merge 配置中的 append/prepend-provider 字段
-- 支持更新稳定版内核
+- Supported local file drag-and-drop import
+- Re-supported 32-bit CPU
+- Added built-in Webview2 version
+- Optimized Merge logic, supporting deep merge
+- Removed prepend/append-provider fields in Merge config
+- Supported updating stable version kernel
 
-### Bugs Fixes
+### Bug Fixes
 
-- MacOS DNS 还原失败
-- CMD 环境变量格式错误
-- Linux 下与 N 卡的兼容性问题
-- 修改 Tun 设置不立即生效
+- macOS DNS restoration failure
+- CMD environment variable format error
+- Compatibility issue with Linux NVIDIA GPUs
+- Modifying TUN settings not taking effect immediately
 
 ---
 
@@ -1356,16 +1051,16 @@
 
 ### Features
 
-- 鼠标悬浮显示当前订阅的名称 [#938](https://github.com/clash-verge-rev/clash-verge-rev/pull/938)
-- 日志过滤支持正则表达式 [#959](https://github.com/clash-verge-rev/clash-verge-rev/pull/959)
-- 更新 Clash 内核到 1.18.4
+- Hovering displays current subscription name
+- Log filtering supports regular expressions
+- Upgraded Clash kernel to v1.18.4
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复 Linux KDE 环境下系统代理无法开启的问题
-- 窗口最大化图标调整 [#924](https://github.com/clash-verge-rev/clash-verge-rev/pull/924)
-- 修改 MacOS 托盘点击行为(左键菜单，右键点击事件)
-- 修复 MacOS 服务模式安装失败的问题
+- Fixed system proxy unable to enable under Linux KDE environments
+- Adjusted window maximization icon
+- Modified macOS tray click behavior (left click menu, right click event)
+- Fixed macOS service mode installation failure
 
 ---
 
@@ -1373,35 +1068,29 @@
 
 ### Features
 
-- Meta(mihomo)内核回退 1.18.1（当前新版内核 hy2 协议有 bug，等修复后更新）
-- 多处界面细节调整 [#724](https://github.com/clash-verge-rev/clash-verge-rev/pull/724) [#799](https://github.com/clash-verge-rev/clash-verge-rev/pull/799) [#900](https://github.com/clash-verge-rev/clash-verge-rev/pull/900) [#901](https://github.com/clash-verge-rev/clash-verge-rev/pull/901)
-- Linux 下新增服务模式
-- 新增订阅卡片右键可以打开机场首页
-- url-test 支持手动选择、节点组 fixed 节点使用角标展示 [#840](https://github.com/clash-verge-rev/clash-verge-rev/pull/840)
-- Clash 配置、Merge 配置提供 JSON Schema 语法支持、连接界面调整 [#887](https://github.com/clash-verge-rev/clash-verge-rev/pull/887)
-- 修改 Merge 配置文件默认内容 [#889](https://github.com/clash-verge-rev/clash-verge-rev/pull/889)
-- 修改 tun 模式默认 mtu 为 1500，老版本升级，需在 tun 模式设置下“重置为默认值”。
-- 使用 npm 安装 meta-json-schema [#895](https://github.com/clash-verge-rev/clash-verge-rev/pull/895)
-- 更新部分翻译 [#904](https://github.com/clash-verge-rev/clash-verge-rev/pull/904)
-- 支持 ico 格式的任务栏图标
+- Meta(mihomo) kernel rolled back to v1.18.1 (newer kernel has hy2 protocol bugs, will update after fix)
+- Various UI detail adjustments
+- Added service mode under Linux
+- Added right-click on subscription card to open airport homepage
+- url-test supports manual selection, node group fixed nodes display with badges
+- Clash config and Merge config provide JSON Schema syntax support; connection page adjustments
+- Modified Merge default config content
+- Modified TUN mode default MTU to 1500; old versions upgrading should "reset to default" under TUN settings
+- Use npm to install meta-json-schema
+- Updated some translations
+- Supported taskbar icon in ico format
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复 Linux KDE 环境下系统代理无法开启的问题
-- 修复延迟检测动画问题
-- 窗口最大化图标调整 [#816](https://github.com/clash-verge-rev/clash-verge-rev/pull/816)
-- 修复 Windows 某些情况下无法安装服务模式 [#822](https://github.com/clash-verge-rev/clash-verge-rev/pull/822)
-- UI 细节修复 [#821](https://github.com/clash-verge-rev/clash-verge-rev/pull/821)
-- 修复使用默认编辑器打开配置文件
-- 修复内核文件在特定目录也可以更新的问题 [#857](https://github.com/clash-verge-rev/clash-verge-rev/pull/857)
-- 修复服务模式的安装目录问题
-- 修复删除配置文件的“更新间隔”出现的问题 [#907](https://github.com/clash-verge-rev/clash-verge-rev/issues/907)
-
-### 已知问题（历史遗留问题，暂未找到有效解决方案）
-
-- MacOS M 芯片下服务模式无法安装；临时解决方案：在内核 ⚙️ 下，手动授权，再打开 tun 模式。
-- MacOS 下如果删除过网络配置，会导致无法正常打开系统代理；临时解决方案：使用浏览器代理插件或手动配置系统代理。
-- Window 拨号连接下无法正确识别并打开系统代理；临时解决方案：使用浏览器代理插件或使用 tun 模式。
+- Fixed system proxy unable to enable under Linux KDE environments
+- Fixed latency test animation issues
+- Adjusted window maximization icon
+- Fixed Windows service mode installation failure under certain situations
+- UI detail fixes
+- Fixed opening configuration file using default editor
+- Fixed kernel updates in specific directories
+- Fixed service mode installation directory issue
+- Fixed issue with deleting profile "update interval"
 
 ---
 
@@ -1409,13 +1098,13 @@
 
 ### Features
 
-- Meta(mihomo)内核更新 1.18.2
+- Meta(mihomo) kernel upgraded to v1.18.2
 
-### Bugs Fixes
+### Bug Fixes
 
-- 升级图标无法点击的问题
-- 卸载时检查安装目录是否为空
-- 代理界面图标重合的问题
+- Upgrade icon unable to be clicked
+- Check if installation directory is empty during uninstall
+- Overlapping icons in proxy UI
 
 ---
 
@@ -1423,15 +1112,15 @@
 
 ### Features
 
-- 优化 Linux 托盘菜单显示
-- 添加透明代理端口设置
-- 删除订阅前确认
+- Optimized Linux tray menu display
+- Added transparent proxy port settings
+- Confirmation before deleting subscriptions
 
-### Bugs Fixes
+### Bug Fixes
 
-- 删除 MacOS 程序坞图标
-- Windows 下 service 日志没有清理
-- MacOS 无法开启系统代理
+- Delete macOS Dock icon
+- Windows service logs not cleaned up
+- macOS unable to enable system proxy
 
 ---
 
@@ -1439,18 +1128,18 @@
 
 ### Features
 
-- 缓存代理组图标
-- 使用 `boa_engine` 代替 `rquickjs`
-- 支持 Linux armv7
+- Cache proxy group icons
+- Use `boa_engine` instead of `rquickjs`
+- Supported Linux armv7
 
-### Bugs Fixes
+### Bug Fixes
 
-- Windows 首次安装无法点击
-- Windows 触摸屏无法拖动
-- 规则列表 `REJECT-DROP` 颜色
-- MacOS Dock 栏不显示图标
-- MacOS 自定义字体无效
-- 避免使用空 UA 拉取订阅
+- Windows first install unable to click
+- Windows touch screen unable to drag
+- `REJECT-DROP` rule list color
+- macOS Dock does not display icon
+- macOS custom font invalid
+- Avoid fetching subscriptions with empty UA
 
 ---
 
@@ -1458,13 +1147,13 @@
 
 ### Features
 
-- 优化 UI 细节
-- Linux 绘制窗口圆角
-- 开放 DevTools
+- Optimized UI details
+- Draw window rounded corners on Linux
+- Enabled DevTools
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复 MacOS 下开启 Tun 内核崩溃的问题
+- Fixed macOS kernel crash when enabling Tun mode
 
 ---
 
@@ -1472,11 +1161,11 @@
 
 ### Features
 
-- 优化 UI 各种细节
-- 提供菜单栏图标样式切换选项(单色/彩色/禁用)
-- 添加自动检查更新开关
-- MacOS 开启 Tun 模式自动修改 DNS
-- 调整可拖动区域(尝试修复触摸屏无法拖动的问题)
+- Optimized various UI details
+- Provided tray menu icon style options (monochrome/color/disabled)
+- Added auto check updates switch
+- macOS auto modifies DNS when enabling Tun mode
+- Adjusted draggable area (attempting to fix touch screen drag issues)
 
 ---
 
@@ -1484,17 +1173,17 @@
 
 ### Features
 
-- 全新专属 Verge rev UI 界面 (by @Amnesiash) 及细节调整
-- 提供允许无效证书的开关
-- 删除不必要的快捷键
-- Provider 更新添加动画
-- Merge 支持 Provider
-- 更换订阅框的粘贴按钮，删除默认的"Remote File" Profile 名称
-- 链接菜单添加节点显示
+- Brand new exclusive Verge rev UI and detail adjustments
+- Provided switch to allow invalid certificates
+- Removed unnecessary hotkeys
+- Added update animation for Providers
+- Merge supports Providers
+- Replaced paste button in subscription box, removed default "Remote File" profile name
+- Added node display in connection menu
 
-### Bugs Fixes
+### Bug Fixes
 
-- Linux 下图片显示错误
+- Linux image display error
 
 ---
 
@@ -1502,10 +1191,10 @@
 
 ### Features
 
-- 支持自定义托盘图标
-- 支持禁用代理组图标
-- 代理组显示当前代理
-- 修改 `打开面板` 快捷键为 `打开/关闭面板`
+- Supported custom tray icons
+- Supported disabling proxy group icons
+- Proxy groups show current proxy
+- Changed "Open Panel" hotkey to "Open/Close Panel"
 
 ---
 
@@ -1513,13 +1202,13 @@
 
 ### Features
 
-- Tun 设置添加重置按钮
+- Added reset button for Tun settings
 
-### Bugs Fixes
+### Bug Fixes
 
-- Tun 设置项显示错误的问题
-- 修改一些默认值
-- 启动时不更改启动项设置
+- Tun settings display error
+- Modified some default values
+- Do not modify startup settings at launch
 
 ---
 
@@ -1527,14 +1216,14 @@
 
 ### Features
 
-- 支持自定义延迟测试超时时间
-- 优化 Tun 相关设置
+- Supported custom latency test timeout
+- Optimized Tun related settings
 
-### Bugs Fixes
+### Bug Fixes
 
-- Merge 操作出错
-- 安装后重启服务
-- 修复管理员权限启动时开机启动失效的问题
+- Merge operation error
+- Restart service after installation
+- Fixed autostart failure when starting with administrator privileges
 
 ---
 
@@ -1542,14 +1231,14 @@
 
 ### Features
 
-- 保存窗口最大化状态
-- Proxy Provider 显示数量
-- 不再提供 32 位安装包（因为 32 位经常出现各种奇怪问题，比如 tun 模式无法开启；现在系统也几乎没有 32 位了）
+- Save window maximized status
+- Proxy Provider shows count
+- No longer provide 32-bit installation packages (32-bit has various issues like unable to enable TUN mode)
 
-### Bugs Fixes
+### Bug Fixes
 
-- 优化设置项名称
-- 自定义 GLOBAL 代理组时代理组显示错误的问题
+- Optimized setting names
+- Fixed proxy group display error when customizing GLOBAL proxy group
 
 ---
 
@@ -1557,13 +1246,13 @@
 
 ### Features
 
-- 删除 Clash 字段过滤功能
-- 添加 socks 端口和 http 端口设置
-- 升级内核到 1.18.1
+- Removed Clash field filtering feature
+- Added settings for socks port and http port
+- Upgraded kernel to v1.18.1
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复 32 位版本无法显示流量信息的问题
+- Fixed 32-bit version unable to display traffic info
 
 ---
 
@@ -1571,19 +1260,19 @@
 
 ### Break Changes
 
-- 此版本更改了 Windows 安装包安装模式，需要卸载后手动安装，否则无法安装到正确位置
+- This version changed the Windows installation package install mode. You need to uninstall and manually install, otherwise it won't install in the correct location.
 
 ### Features
 
-- 优化了系统代理开启的代码，解决了稀有场景下代理开启卡顿的问题
-- 添加 MacOS 下的 debug 日志，以便日后调试稀有场景下 MacOS 下无法开启系统代理的问题
-- MacOS 关闭 GUI 时同步杀除后台 GUI [#306](https://github.com/clash-verge-rev/clash-verge-rev/issues/306)
+- Optimized system proxy enabling code, solving lag in rare scenarios
+- Added macOS debug logs to troubleshoot future macOS system proxy issues
+- Terminate background GUI synchronously when macOS GUI is closed
 
-### Bugs Fixes
+### Bug Fixes
 
-- 解决自动更新时文件占用问题
-- 解决稀有场景下系统代理开启失败的问题
-- 删除冗余内核代码
+- Resolved file occupation issue during auto-update
+- Resolved system proxy enabling failure in rare scenarios
+- Removed redundant kernel code
 
 ---
 
@@ -1591,15 +1280,10 @@
 
 ### Features
 
-- 设置中添加退出按钮
-- 支持自定义软件启动页
-- 在 Proxy Provider 页面展示订阅信息
-- 优化 Provider 支持
-
-### Bugs Fixes
-
-- 更改端口时立即重设系统代理
-- 网站测试超时错误
+- Added exit button in settings
+- Supported custom app startup page
+- Show subscription info in Proxy Provider page
+- Optimized Provider support
 
 ---
 
@@ -1607,14 +1291,14 @@
 
 ### Features
 
-- 支持启动时运行脚本
-- 支持代理组显示图标
-- 新增测试页面
+- Supported running script at startup
+- Supported proxy group icons display
+- Added test page
 
-### Bugs Fixes
+### Bug Fixes
 
-- 连接页面时间排序错误
-- 连接页面表格宽度优化
+- Connection page time sorting error
+- Connection page table width optimized
 
 ---
 
@@ -1622,15 +1306,15 @@
 
 ### Features
 
-- 连接页面总流量显示
+- Connection page total traffic display
 
-### Bugs Fixes
+### Bug Fixes
 
-- 连接页面数据排序错误
-- 新建订阅时设置更新间隔无效
-- Windows 拨号网络无法设置系统代理
-- Windows 开启/关闭系统代理延迟(使用注册表即可)
-- 删除无效的背景模糊选项
+- Connection page data sorting error
+- Setting update interval invalid when creating new subscriptions
+- Windows dial-up network unable to set system proxy
+- Windows system proxy switch delay (using registry instead)
+- Removed invalid background blur option
 
 ---
 
@@ -1638,9 +1322,9 @@
 
 ### Features
 
-- Windows 便携版禁用应用内更新
-- 支持代理组 Hidden 选项
-- 支持 URL Scheme(MacOS & Linux)
+- Windows Portable version disables in-app updates
+- Supported proxy group Hidden option
+- Supported URL Scheme (macOS & Linux)
 
 ---
 
@@ -1648,16 +1332,16 @@
 
 ### Features
 
-- 更新 Clash Meta(mihomo) 内核到 v1.18.0
-- 支持 URL Scheme(暂时仅支持 Windows)
-- 添加窗口置顶按钮
-- UI 优化调整
+- Upgraded Clash Meta(mihomo) kernel to v1.18.0
+- Supported URL Scheme (temporarily Windows only)
+- Added window pin button
+- UI optimization adjustments
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复一些编译错误
-- 获取订阅名称错误
-- 订阅信息解析错误
+- Fixed some compile errors
+- Error fetching subscription name
+- Subscription info parsing error
 
 ---
 
@@ -1665,16 +1349,16 @@
 
 ### Features
 
-- 更新 MacOS 托盘图标样式(@gxx2778 贡献)
+- Updated macOS tray icon styles
 
-### Bugs Fixes
+### Bug Fixes
 
-- Windows 下更新时无法覆盖 `clash-verge-service.exe`的问题(需要卸载重装一次服务，下次更新生效)
-- 窗口最大化按钮变化问题
-- 窗口尺寸保存错误问题
-- 复制环境变量类型无法切换问题
-- 某些情况下闪退的问题
-- 某些订阅无法导入的问题
+- Fixed Windows unable to overwrite `clash-verge-service.exe` during update (requires reinstalling service once)
+- Window maximization button changes
+- Window size saving error
+- Copy env variable type unable to switch
+- Crash under certain circumstances
+- Inability to import some subscriptions
 
 ---
 
@@ -1682,20 +1366,20 @@
 
 ### Features
 
-- 支持 Windows aarch64(arm64) 版本
-- 支持一键更新 GeoData
-- 支持一键更新 Alpha 内核
-- MacOS 支持在系统代理时显示不同的托盘图标
-- Linux 支持在系统代理时显示不同的托盘图标
-- 优化复制环境变量逻辑
+- Supported Windows aarch64(arm64) version
+- Supported one-click update of GeoData
+- Supported one-click update of Alpha kernel
+- macOS supports displaying different tray icons for system proxy
+- Linux supports displaying different tray icons for system proxy
+- Optimized copy env variables logic
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修改 PID 文件的路径
+- Modified PID file path
 
 ### Performance
 
-- 优化创建窗口的速度
+- Optimized window creation speed
 
 ---
 
@@ -1703,24 +1387,24 @@
 
 ### Break Changes
 
-- 更改配置文件路径到标准目录(可以保证卸载时没有残留)
-- 更改 appid 为 `io.github.clash-verge-rev.clash-verge-rev`
-- 建议卸载旧版本后再安装新版本，该版本安装后不会使用旧版配置文件，你可以手动将旧版配置文件迁移到新版配置文件目录下
+- Changed config file path to standard directories (cleaner uninstall)
+- Changed appid to `io.github.clash-verge-rev.clash-verge-rev`
+- Recommended to uninstall old version before installing new version
 
 ### Features
 
-- 移除页面切换动画
-- 更改 Tun 模式托盘图标颜色
-- Portable 版本默认使用当前目录作为配置文件目录
-- 禁用 Clash 字段过滤时隐藏 Clash 字段选项
-- 优化拖拽时光标样式
+- Removed page transitions
+- Changed Tun mode tray icon color
+- Portable version defaults to using current directory as configuration directory
+- Hidden Clash field options when disabling Clash fields filter
+- Optimized cursor style when dragging
 
-### Bugs Fixes
+### Bug Fixes
 
-- 修复 windows 下更新时没有关闭内核导致的更新失败的问题
-- 修复打开文件报错的问题
-- 修复 url 导入时无法获取中文配置名称的问题
-- 修复 alpha 内核无法显示内存信息的问题
+- Fixed update failure on Windows due to kernel not closing
+- Fixed file opening error
+- Fixed URL import unable to fetch Chinese config names
+- Fixed alpha kernel unable to display memory info
 
 ---
 
@@ -1728,18 +1412,18 @@
 
 ### Features
 
-- update clash meta core to mihomo 1.17.0
-- support both clash meta stable release and prerelease-alpha release
-- fixed the problem of not being able to set the system proxy when there is a dial-up link on windows system [#833](https://github.com/zzzgydi/clash-verge/issues/833)
-- support new clash field
-- support random mixed port
-- add windows x86 and linux armv7 support
-- support disable tray click event
-- add download progress for updater
-- support drag to reorder the profile
-- embed emoji fonts
-- update depends
-- improve UI style
+- Upgraded clash meta core to mihomo v1.17.0
+- Support both clash meta stable release and prerelease-alpha release
+- Fixed system proxy configuration under Windows dial-up connections
+- Support new clash fields
+- Support random mixed port
+- Added Windows x86 and Linux armv7 support
+- Support disabling tray click events
+- Added download progress for updater
+- Support drag to reorder profiles
+- Embedded emoji fonts
+- Updated dependencies
+- Improved UI style
 
 ---
 
@@ -1747,10 +1431,10 @@
 
 ### Features
 
-- update clash meta core to newest 虚空终端(2023.11.23)
-- delete clash core UI
-- improve UI
-- change Logo to original
+- Upgraded clash meta core to latest Mihomo (2023.11.23)
+- Removed clash core UI
+- Improved UI
+- Changed logo to original
 
 ---
 
@@ -1758,13 +1442,13 @@
 
 ### Features
 
-- update clash meta core to newest 虚空终端
-- delete clash core, no longer maintain
-- merge Clash nyanpasu changes
-- remove delay display different color
-- use Meta Country.mmdb
-- update dependencies
-- small changes here and there
+- Upgraded clash meta core to latest Mihomo
+- Removed clash core, no longer maintained
+- Merged Clash Nyanpasu changes
+- Removed delay display different colors
+- Use Meta Country.mmdb
+- Updated dependencies
+- Small improvements
 
 ---
 
@@ -1772,13 +1456,13 @@
 
 ### Features
 
-- update clash meta core
-- add default valid keys
-- adjust the delay display interval and color
+- Upgraded clash meta core
+- Added default valid keys
+- Adjusted delay display intervals and colors
 
 ### Bug Fixes
 
-- fix connections page undefined exception
+- Fixed connection page undefined exception
 
 ---
 
@@ -1786,16 +1470,16 @@
 
 ### Features
 
-- update clash and clash meta core
-- profiles page add paste button
-- subscriptions url textfield use multi lines
-- set min window size
-- add check for updates buttons
-- add open dashboard to the hotkey list
+- Upgraded clash and clash meta core
+- Profiles page added paste button
+- Subscription URL text field supports multiple lines
+- Set minimum window size
+- Added check for updates buttons
+- Added open dashboard to hotkey list
 
 ### Bug Fixes
 
-- fix profiles page undefined exception
+- Fixed profiles page undefined exception
 
 ---
 
@@ -1803,22 +1487,22 @@
 
 ### Features
 
-- add russian translation
-- support to show connection detail
-- support clash meta memory usage display
-- support proxy provider update ui
-- update geo data file from meta repo
-- adjust setting page
+- Added Russian translation
+- Support to show connection details
+- Support clash meta memory usage display
+- Support proxy provider update UI
+- Updated geo data files from meta repo
+- Adjusted settings page
 
 ### Bug Fixes
 
-- center the window when it is out of screen
-- use `sudo` when `pkexec` not found (Linux)
-- reconnect websocket when window focus
+- Center window when out of screen bounds
+- Use `sudo` when `pkexec` is not found under Linux
+- Reconnect WebSockets on window focus
 
 ### Notes
 
-- The current version of the Linux installation package is built by Ubuntu 20.04 (Github Action).
+- Linux installation packages are built on Ubuntu 20.04.
 
 ---
 
@@ -1826,13 +1510,13 @@
 
 ### Features
 
-- update clash core
+- Upgraded clash core
 
 ### Bug Fixes
 
-- fix blurry system tray icon (Windows)
-- fix v1.3.4 wintun.dll not found (Windows)
-- fix v1.3.4 clash core not found (macOS, Linux)
+- Fixed blurry system tray icon under Windows
+- Fixed wintun.dll not found under Windows
+- Fixed clash core not found under macOS and Linux
 
 ---
 
@@ -1840,18 +1524,18 @@
 
 ### Features
 
-- update clash and clash meta core
-- optimize traffic graph high CPU usage when window hidden
-- use polkit to elevate permission (Linux)
-- support app log level setting
-- support copy environment variable
-- overwrite resource file according to file modified
-- save window size and position
+- Upgraded clash and clash meta core
+- Optimized traffic graph high CPU usage when window is hidden
+- Use polkit to elevate permissions on Linux
+- Support app log level configuration
+- Support copying environment variables
+- Overwrite resource files based on modification time
+- Save window size and position
 
 ### Bug Fixes
 
-- remove fallback group select status
-- enable context menu on editable element (Windows)
+- Removed fallback group select status
+- Enabled context menu on editable elements under Windows
 
 ---
 
@@ -1859,14 +1543,14 @@
 
 ### Features
 
-- update clash and clash meta core
-- show tray icon variants in different system proxy status (Windows)
-- close all connections when mode changed
+- Upgraded clash and clash meta core
+- Show tray icon variants under different system proxy statuses on Windows
+- Close all connections when mode changes
 
 ### Bug Fixes
 
-- encode controller secret into uri
-- error boundary for each page
+- Encode controller secret into URI
+- Error boundary for each page
 
 ---
 
@@ -1874,12 +1558,12 @@
 
 ### Features
 
-- update clash and clash meta core
+- Upgraded clash and clash meta core
 
 ### Bug Fixes
 
-- fix import url issue
-- fix profile undefined issue
+- Fixed URL import issues
+- Fixed profile undefined issues
 
 ---
 
@@ -1887,14 +1571,14 @@
 
 ### Features
 
-- update clash and clash meta core
+- Upgraded clash and clash meta core
 
 ### Bug Fixes
 
-- fix open url issue
-- fix appimage path panic
-- fix grant root permission in macOS
-- fix linux system proxy default bypass
+- Fixed URL opening issues
+- Fixed AppImage path panic
+- Fixed macOS root permission grant
+- Fixed Linux system proxy default bypass
 
 ---
 
@@ -1902,19 +1586,19 @@
 
 ### Features
 
-- update clash and clash meta
-- support opening dir on tray
-- support updating all profiles with one click
-- support granting root permission to clash core(Linux, macOS)
-- support enable/disable clash fields filter, feel free to experience the latest features of Clash Meta
+- Upgraded clash and clash meta core
+- Support opening directories from tray
+- Support updating all profiles with one click
+- Support granting root permissions to clash core (Linux, macOS)
+- Support enabling/disabling clash fields filter to experience the latest features of Clash Meta
 
 ### Bug Fixes
 
-- deb add openssl depend(Linux)
-- fix the AppImage auto launch path(Linux)
-- fix get the default network service(macOS)
-- remove the esc key listener in macOS, cmd+w instead(macOS)
-- fix infinite retry when websocket error
+- Added openssl dependency to deb packages on Linux
+- Fixed AppImage autostart path on Linux
+- Fixed retrieving default network service on macOS
+- Removed ESC key listener in macOS, cmd+w instead
+- Fixed infinite retries on WebSocket errors
 
 ---
 
@@ -1922,14 +1606,14 @@
 
 ### Features
 
-- update clash
-- adjust macOS window style
-- profile supports UTF8 with BOM
+- Upgraded clash core
+- Adjusted macOS window style
+- Profile supports UTF8 with BOM
 
 ### Bug Fixes
 
-- fix selected proxy
-- fix error log
+- Fixed selected proxy
+- Fixed error logs
 
 ---
 
@@ -1937,15 +1621,15 @@
 
 ### Features
 
-- update clash meta
-- recover clash core after panic
-- use system window decorations(Linux)
+- Upgraded clash meta core
+- Recover clash core after panic
+- Use system window decorations on Linux
 
 ### Bug Fixes
 
-- flush system proxy settings(Windows)
-- fix parse log panic
-- fix ui bug
+- Flush system proxy settings on Windows
+- Fixed parse log panic
+- Fixed UI bugs
 
 ---
 
@@ -1953,15 +1637,15 @@
 
 ### Features
 
-- update clash version
-- proxy groups support multi columns
-- optimize ui
+- Upgraded clash version
+- Proxy groups support multiple columns
+- Optimized UI
 
 ### Bug Fixes
 
-- fix ui websocket connection
-- adjust delay check concurrency
-- avoid setting login item repeatedly(macOS)
+- Fixed UI WebSocket connection
+- Adjusted delay check concurrency
+- Avoid setting login items repeatedly on macOS
 
 ---
 
@@ -1969,20 +1653,20 @@
 
 ### Features
 
-- update clash meta version
-- support to change external-controller
-- support to change default latency test URL
-- close all connections when proxy changed or profile changed
-- check the config by using the core
-- increase the robustness of the program
-- optimize windows service mode (need to reinstall)
-- optimize ui
+- Upgraded clash meta version
+- Support changing external-controller
+- Support changing default latency test URL
+- Close all connections when proxy or profile changes
+- Verify config using the core
+- Increased program robustness
+- Optimized Windows service mode (requires re-installation)
+- Optimized UI
 
 ### Bug Fixes
 
-- invalid hotkey cause panic
-- invalid theme setting cause panic
-- fix some other glitches
+- Invalid hotkey causing panic
+- Invalid theme setting causing panic
+- Fixed other glitches
 
 ---
 
@@ -1990,17 +1674,17 @@
 
 ### Features
 
-- the system tray follows i18n
-- change the proxy group ui of global mode
-- support to update profile with the system proxy/clash proxy
-- check the remote profile more strictly
+- System tray follows i18n
+- Changed proxy group UI of global mode
+- Support updating profile with system proxy/clash proxy
+- Check remote profile more strictly
 
 ### Bug Fixes
 
-- use app version as default user agent
-- the clash not exit in service mode
-- reset the system proxy when quit the app
-- fix some other glitches
+- Use app version as default User Agent
+- Clash does not exit in service mode
+- Reset system proxy on app exit
+- Fixed other glitches
 
 ---
 
@@ -2008,13 +1692,13 @@
 
 ### Features
 
-- optimize clash config feedback
-- hide macOS dock icon
-- use clash meta compatible version (Linux)
+- Optimized clash config feedback
+- Hidden macOS Dock icon
+- Use clash meta compatible version under Linux
 
 ### Bug Fixes
 
-- fix some other glitches
+- Fixed other glitches
 
 ---
 
@@ -2022,17 +1706,17 @@
 
 ### Features
 
-- add rule page
-- supports proxy providers delay check
-- add proxy delay check loading status
-- supports hotkey/shortcut management
-- supports displaying connections data in table layout(refer to yacd)
+- Added rule page
+- Supported proxy providers delay check
+- Added proxy delay check loading status
+- Supported hotkey/shortcut management
+- Supported displaying connections data in table layout
 
 ### Bug Fixes
 
-- supports yaml merge key in clash config
-- detect the network interface and set the system proxy(macOS)
-- fix some other glitches
+- Supported yaml merge keys in clash config
+- Detect network interface and configure system proxy on macOS
+- Fixed other glitches
 
 ---
 
@@ -2040,12 +1724,12 @@
 
 ### Features
 
-- update clash and clash.meta
+- Upgraded clash and clash.meta cores
 
 ### Bug Fixes
 
-- only script profile display console
-- automatic configuration update on demand at launch
+- Only script profiles display console
+- Automatic configuration updates on demand at launch
 
 ---
 
@@ -2053,17 +1737,17 @@
 
 ### Features
 
-- reimplement profile enhanced mode with quick-js
-- optimize the runtime config generation process
-- support web ui management
-- support clash field management
-- support viewing the runtime config
-- adjust some pages style
+- Reimplemented profile enhanced mode with quick-js
+- Optimized runtime config generation process
+- Supported Web UI management
+- Supported clash field management
+- Supported viewing the runtime config
+- Adjusted some page styles
 
 ### Bug Fixes
 
-- fix silent start
-- fix incorrectly reset system proxy on exit
+- Fixed silent start
+- Fixed incorrectly resetting system proxy on exit
 
 ---
 
@@ -2071,13 +1755,13 @@
 
 ### Features
 
-- update clash core and clash meta version
-- support switch clash mode on system tray
-- theme mode support follows system
+- Upgraded clash core and clash meta version
+- Support switching clash mode on system tray
+- Theme mode supports following system
 
 ### Bug Fixes
 
-- config load error on first use
+- Config load error on first use
 
 ---
 
@@ -2085,9 +1769,9 @@
 
 ### Features
 
-- save some states such as URL test, filter, etc
-- update clash core and clash-meta core
-- new icon for macOS
+- Save some states such as URL test, filter, etc.
+- Upgraded clash core and clash-meta core
+- New icon for macOS
 
 ---
 
@@ -2095,13 +1779,13 @@
 
 ### Features
 
-- supports for switching clash core
-- supports release UI processes
-- supports script mode setting
+- Supported switching clash cores
+- Supported releasing UI processes
+- Supported script mode settings
 
 ### Bug Fixes
 
-- fix service mode bug (Windows)
+- Fixed service mode bug on Windows
 
 ---
 
@@ -2109,15 +1793,15 @@
 
 ### Features
 
-- adjust default theme settings
-- reduce gpu usage of traffic graph when hidden
-- supports more remote profile response header setting
-- check remote profile data format when imported
+- Adjusted default theme settings
+- Reduced GPU usage of traffic graph when hidden
+- Supported more remote profile response header settings
+- Check remote profile data format when imported
 
 ### Bug Fixes
 
-- service mode install and start issue (Windows)
-- fix launch panic (Some Windows)
+- Service mode installation and startup issues on Windows
+- Fixed launch panic on some Windows systems
 
 ---
 
@@ -2125,15 +1809,15 @@
 
 ### Features
 
-- update clash core
-- optimize traffic graph animation
-- supports interval update profiles
-- supports service mode (Windows)
+- Upgraded clash core
+- Optimized traffic graph animation
+- Supported interval update profiles
+- Supported service mode on Windows
 
 ### Bug Fixes
 
-- reset system proxy when exit from dock (macOS)
-- adjust clash dns config process strategy
+- Reset system proxy when exiting from Dock on macOS
+- Adjusted clash DNS configuration processing strategy
 
 ---
 
@@ -2141,13 +1825,13 @@
 
 ### Features
 
-- sort proxy node
-- custom proxy test url
-- logs page filter
-- connections page filter
-- default user agent for subscription
-- system tray add tun mode toggle
-- enable to change the config dir (Windows only)
+- Sort proxy nodes
+- Custom proxy test URL
+- Logs page filter
+- Connections page filter
+- Default User Agent for subscription
+- System tray added TUN mode toggle
+- Enabled changing the config directory (Windows only)
 
 ---
 
@@ -2155,12 +1839,12 @@
 
 ### Features
 
-- enable to use clash config fields (UI)
+- Enabled using clash config fields in UI
 
 ### Bug Fixes
 
-- remove the character
-- fix some icon color
+- Removed character anomalies
+- Fixed some icon colors
 
 ---
 
@@ -2168,13 +1852,13 @@
 
 ### Features
 
-- supports custom theme color
-- tun mode setting control the final config
+- Supported custom theme colors
+- TUN mode settings control the final configuration
 
 ### Bug Fixes
 
-- fix transition flickers (macOS)
-- reduce proxy page render
+- Fixed transition flickers on macOS
+- Reduced proxy page renders
 
 ---
 
@@ -2182,15 +1866,15 @@
 
 ### Features
 
-- silent start
-- profile editor
-- profile enhance mode supports more fields
-- optimize profile enhance mode strategy
+- Silent start
+- Profile editor
+- Profile enhanced mode supports more fields
+- Optimized profile enhanced mode strategy
 
 ### Bug Fixes
 
-- fix csp restriction on macOS
-- window controllers on Linux
+- Fixed CSP restriction on macOS
+- Window controllers on Linux
 
 ---
 
@@ -2198,16 +1882,16 @@
 
 ### Features
 
-- update clash core version
+- Upgraded clash core version
 
 ### Bug Fixes
 
-- app updater error
-- display window controllers on Linux
+- App updater error
+- Display window controllers on Linux
 
 ### Notes
 
-If you can't update the app properly, please consider downloading the latest version from github release.
+- If you cannot update the app properly, please download the latest version from GitHub releases.
 
 ---
 
@@ -2216,16 +1900,16 @@ If you can't update the app properly, please consider downloading the latest ver
 ### Features
 
 - Connections page
-- add wintun.dll (Windows)
-- supports create local profile with selected file (Windows)
-- system tray enable set system proxy
+- Added wintun.dll (Windows)
+- Supported creating local profiles with selected files (Windows)
+- System tray enabled setting system proxy
 
 ### Bug Fixes
 
-- open dir error
-- auto launch path (Windows)
-- fix some clash config error
-- reduce the impact of the enhanced mode
+- Open directory error
+- Auto-launch path on Windows
+- Fixed some clash config errors
+- Reduced the impact of the enhanced mode
 
 ---
 
@@ -2233,10 +1917,10 @@ If you can't update the app properly, please consider downloading the latest ver
 
 ### Features
 
-- i18n supports
-- Remote profile User Agent supports
+- i18n support
+- Remote profile User Agent support
 
 ### Bug Fixes
 
-- clash config file case ignore
-- clash `external-controller` only port
+- Clash config file case ignored
+- Clash `external-controller` only port

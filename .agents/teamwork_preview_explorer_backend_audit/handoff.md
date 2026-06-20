@@ -69,36 +69,36 @@ Below is the detailed list of findings from the audit:
   +++ b/src-tauri/src/module/monitor.rs
   @@ -276,7 +276,7 @@ pub async fn trigger_backend_auto_select(
    ) -> anyhow::Result<Vec<(String, u32)>> {
-       // 互斥锁防止并发调用
+       // Mutex lock to prevent concurrent calls
        if AUTO_SELECT_RUNNING.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire).is_err() {
-  -        logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，跳过本次调用");
+  -        logging!(info, Type::Lightweight, "[Background Monitor] Auto-select already running, returning busy");
   -        return Ok(vec![]);
-  +        logging!(info, Type::Lightweight, "[后台监测] 自动选点已在运行中，返回繁忙");
+  +        logging!(info, Type::Lightweight, "[Background Monitor] Auto-select already running, returning busy");
   +        return Err(anyhow::anyhow!("AUTO_SELECT_BUSY"));
        }
    
-       // 修复 BUG-MAJOR-001：使用 Drop Guard 确保锁一定释放（即使发生 panic）
+       // Fix BUG-MAJOR-001: Use Drop Guard to ensure the lock is released (even if panic occurs)
   @@ -503,8 +503,19 @@ pub fn start_background_monitor() {
                    is_retry_mode = false;
    
                    if wait_for_clash_ready().await {
   -                    if let Err(e) = trigger_backend_auto_select(&current_profile, 0).await {
-  -                        logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
+  -                        logging!(warn, Type::Lightweight, "[Background Monitor] Auto-select failed after configuration reload: {e}");
   +                    loop {
   +                        match trigger_backend_auto_select(&current_profile, 0).await {
   +                            Ok(_) => break,
   +                            Err(e) if e.to_string() == "AUTO_SELECT_BUSY" => {
-  +                                logging!(debug, Type::Lightweight, "[后台监测] 自动选点繁忙，等待重试...");
+  +                                logging!(debug, Type::Lightweight, "[Background Monitor] Auto-select busy, waiting to retry...");
   +                                sleep(Duration::from_millis(500)).await;
   +                            }
   +                            Err(e) => {
-  +                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
+  +                                logging!(warn, Type::Lightweight, "[Background Monitor] Auto-select failed after configuration reload: {e}");
   +                                break;
   +                            }
   +                        }
-                       }
+  +                    }
                    } else {
-                       logging!(warn, Type::Lightweight, "[后台监测] 内核就绪超时，中止本次自愈优选");
+                       logging!(warn, Type::Lightweight, "[Background Monitor] Core readiness timeout, aborting this self-healing selection");
   ```
 
 ---
@@ -110,7 +110,7 @@ Below is the detailed list of findings from the audit:
   The doc comment states that `sort_type: None` represents reading from the configuration file (which maps to `0` in the backend). However, `sort_type.unwrap_or(1)` is passed. This makes it impossible for the frontend to request the config-based sorting via `None`.
 - **Suggested Fix**:
   Unwrap `sort_type` to `0` instead of `1` so that it falls back to reading the saved sorting configuration from the config file.
-
+  
   ```diff
   diff --git a/src-tauri/src/cmd/proxy.rs b/src-tauri/src/cmd/proxy.rs
   index 1234567..89abcde 100644
@@ -136,7 +136,7 @@ Below is the detailed list of findings from the audit:
   `get_saved_sort_type` parses `proxy_head_state.json` using `serde_yaml_ng::from_str`. In contrast, line 78 in `get_active_filter_config` parses the exact same file using `serde_json::from_str`. Using a YAML parser for JSON is inefficient and inconsistent.
 - **Suggested Fix**:
   Change `serde_yaml_ng::from_str` to `serde_json::from_str`.
-
+  
   ```diff
   diff --git a/src-tauri/src/module/monitor.rs b/src-tauri/src/module/monitor.rs
   index 1234567..89abcde 100644
@@ -161,7 +161,7 @@ Below is the detailed list of findings from the audit:
   In `trigger_backend_auto_select_inner`, delay test results are filtered with `delay_info.delay > 50`. Highly desirable, low-latency nodes (under 50ms) are erroneously discarded and can never be auto-selected.
 - **Suggested Fix**:
   Change the threshold check to `delay_info.delay > 0` to filter out failures while retaining high-performance nodes.
-
+  
   ```diff
   diff --git a/src-tauri/src/module/monitor.rs b/src-tauri/src/module/monitor.rs
   index 1234567..89abcde 100644
@@ -172,10 +172,10 @@ Below is the detailed list of findings from the audit:
                    if res.status().is_success() {
                        if let Ok(delay_info) = res.json::<DelayResponse>().await {
   -                        if delay_info.delay > 50 && delay_info.delay < 2000 {
-  +                        if delay_info.delay > 0 && delay_info.delay < 2000 {
-                               return Some((node_name, delay_info.delay));
-                           }
-                       }
+  -                        if delay_info.delay > 0 && delay_info.delay < 2000 {
+                              return Some((node_name, delay_info.delay));
+                          }
+                      }
   ```
 
 ---
@@ -187,7 +187,7 @@ Below is the detailed list of findings from the audit:
   In `apply_dns_config`, the DNS mapping is patched into the runtime config draft. However, `IRuntime::patch_config` only processes fields in `PATCH_CONFIG_INNER` and `"tun"`, completely ignoring `"dns"`. This makes the patch a silent no-op. Furthermore, the persistent `enable_dns_settings` flag in `Config::verge()` is never updated, meaning the config generator never builds the YAML with the custom DNS configuration.
 - **Suggested Fix**:
   Instead of patching the runtime config directly with the DNS configuration, update the `enable_dns_settings` flag in `Config::verge()`, save the file, and then trigger config regeneration.
-
+  
   ```diff
   diff --git a/src-tauri/src/cmd/clash.rs b/src-tauri/src/cmd/clash.rs
   index 1234567..89abcde 100644
@@ -197,14 +197,14 @@ Below is the detailed list of findings from the audit:
    
            logging!(info, Type::Config, "Applying DNS config from file");
    
-  -        // 创建包含DNS配置的patch
+  -        // Create patch containing DNS configuration
   -        let mut patch = serde_yaml_ng::Mapping::new();
   -        patch.insert("dns".into(), patch_config.into());
   -
-  -        // 应用DNS配置到运行时配置
+  -        // Apply DNS configuration to runtime configuration
   -        Config::runtime().await.edit_draft(|d| {
   -            d.patch_config(&patch);
-  +        // 更新 verge 配置中的 DNS 启用标志
+  +        // Update DNS enabled flag in verge config
   +        let verge = Config::verge().await;
   +        verge.edit_draft(|d| {
   +            d.enable_dns_settings = Some(true);
@@ -212,15 +212,15 @@ Below is the detailed list of findings from the audit:
   +        verge.apply();
   +        let _ = verge.data_arc().save_file().await;
    
-           // 应用新配置
+           // Apply new configuration
            CoreManager::global()
   @@ -182,6 +180,14 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
            logging!(info, Type::Config, "DNS config successfully applied");
        } else {
-           // 当关闭DNS设置时，重新生成配置（不加载DNS配置文件）
+           // When disabling DNS settings, regenerate config (without loading DNS config file)
            logging!(info, Type::Config, "DNS settings disabled, regenerating config");
   +
-  +        // 更新 verge 配置中的 DNS 启用标志为 false
+  +        // Update DNS enabled flag in verge config to false
   +        let verge = Config::verge().await;
   +        verge.edit_draft(|d| {
   +            d.enable_dns_settings = Some(false);
@@ -240,7 +240,7 @@ Below is the detailed list of findings from the audit:
   In `restore_previous_profile`, when a profile switch fails, the active profile index is reverted in memory and written to disk, but the Clash core is never notified to reload the configuration. This leaves Clash running in an inconsistent state or with the failed configuration.
 - **Suggested Fix**:
   Trigger a background reload of the Clash config using `CoreManager::global().update_config_forced()` during restoration.
-
+  
   ```diff
   diff --git a/src-tauri/src/cmd/profile.rs b/src-tauri/src/cmd/profile.rs
   index 1234567..89abcde 100644
@@ -249,13 +249,13 @@ Below is the detailed list of findings from the audit:
   @@ -196,6 +196,9 @@ async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
        crate::process::AsyncHandler::spawn(|| async move {
            if let Err(e) = profiles_save_file_safe().await {
-               logging!(warn, Type::Cmd, "Warning: 异步保存恢复配置文件失败: {e}");
+               logging!(warn, Type::Cmd, "Warning: Failed to save restored config file asynchronously: {e}");
            }
   +        if let Err(e) = CoreManager::global().update_config_forced().await {
   +            logging!(error, Type::Cmd, "Failed to reload Clash config after restore: {e}");
   +        }
        });
-       logging!(info, Type::Cmd, "成功恢复到之前的配置");
+       logging!(info, Type::Cmd, "Successfully restored to previous configuration");
        Ok(())
   ```
 
@@ -268,7 +268,7 @@ Below is the detailed list of findings from the audit:
   In `delete_profile`, when the currently active profile is deleted, the backend updates the active profile to a fallback. However, the notification broadcasted to the frontend uses `notify_profile_changed(&index)`, where `index` is the UID of the *deleted* profile. This causes the UI to attempt to fetch details for a non-existent profile, resulting in UI errors.
 - **Suggested Fix**:
   Retrieve the new active profile UID from `Config::profiles()` and pass it to the notification function.
-
+  
   ```diff
   diff --git a/src-tauri/src/cmd/profile.rs b/src-tauri/src/cmd/profile.rs
   index 1234567..89abcde 100644
@@ -277,11 +277,11 @@ Below is the detailed list of findings from the audit:
   @@ -164,8 +164,9 @@ pub async fn delete_profile(index: String) -> CmdResult {
                Ok(outcome) if outcome.is_valid() => {
                    handle::Handle::refresh_clash();
-                   // 发送配置变更通知
-  -                logging!(info, Type::Cmd, "[删除订阅] 发送配置变更通知: {}", index);
+                   // Send configuration change notification
+  -                logging!(info, Type::Cmd, "[Delete Profile] Send configuration change notification: {}", index);
   -                handle::Handle::notify_profile_changed(&index);
   +                let new_current = Config::profiles().await.data_arc().current.clone().unwrap_or_default();
-  +                logging!(info, Type::Cmd, "[删除订阅] 发送配置变更通知: {}", new_current);
+  +                logging!(info, Type::Cmd, "[Delete Profile] Send configuration change notification: {}", new_current);
   +                handle::Handle::notify_profile_changed(&new_current);
                }
                Ok(outcome) => {
@@ -317,6 +317,6 @@ cargo check
 6. **AUDIT-BE-006 (Profile Switch Failure)**:
    - Trigger a profile switch to a deliberately malformed/invalid configuration file.
    - Verify that the Clash core is successfully reloaded back to the previous working profile.
-7. **AUDIT-BE-007 (Deleted Profile Notification)**:
+ 7. **AUDIT-BE-007 (Deleted Profile Notification)**:
    - Delete the currently active profile.
    - Verify that the UI switches focus to the new fallback profile instead of throwing errors.

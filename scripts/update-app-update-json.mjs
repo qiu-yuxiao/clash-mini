@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
-// 从环境变量读取参数
+// Read parameters from environment variables
 const version = process.env.VERSION;
 const setupExe = process.env.SETUP_EXE;
 const setupFilename = process.env.SETUP_FILENAME;
@@ -23,7 +23,7 @@ if (!version || !setupExe || !setupFilename || !setupSize || !sigFile) {
   process.exit(1);
 }
 
-// 直接从文件读取 .sig 内容（避免 shell 变量插值问题）
+// Read .sig content directly from file (avoids shell variable interpolation issues)
 const sigContent = fs.readFileSync(sigFile, 'utf8').trim().replace(/\n/g, '').replace(/\r/g, '');
 
 const data = {

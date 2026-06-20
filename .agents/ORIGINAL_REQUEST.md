@@ -38,64 +38,64 @@ Write the final, complete design proposal document to the workspace at docs/ipc_
 
 ## Follow-up — 2026-06-17T05:21:24Z
 
-从独立第三方的角度，对当前最新版的 Clash Mini 程序的全部代码（包含前端 TypeScript/React 与后端 Rust/Tauri）进行全面而精细的地毯式代码审计。既要排查安全隐患与性能故障，也要提供代码整洁度与软件架构层面的专业优化建议。
+Conduct a comprehensive and meticulous code audit of the entire codebase of the latest version of Clash Mini (including frontend TypeScript/React and backend Rust/Tauri) from the perspective of an independent third party. The objective is to identify potential security issues and performance faults, and provide professional optimization suggestions on code cleanliness and software architecture.
 
-**⚠️ 绝对红线约束（Strict Non-modification Constraint）：**
-此任务为纯粹的静态代码审查与分析，**审计团队在任何情况下都严禁修改、覆盖、创建或提交任何工作目录下的项目源代码文件**。所有的发现、漏洞、重构方案及修复建议都只能以文字形式记录在最终的审计报告中，不得对项目代码进行任何实际的写操作。
+**⚠️ Strict Non-modification Constraint:**
+This task is purely static code review and analysis. **Under no circumstances is the audit team allowed to modify, overwrite, create, or commit any project source code files in the working directory.** All findings, bugs, refactoring plans, and fix recommendations must be recorded in writing solely in the final audit report, without performing any actual write operations on the project source code.
 
 Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
 Integrity mode: demo
 
 ## Requirements
 
-### R1. 安全、性能与并发性审计
-独立审计团队必须分析全部前后端核心代码，排查潜在的并发安全（如重试死锁、线程挂起风险）、资源占用（如未熔断的轮询、内存泄漏）以及边界与溢出错误。
+### R1. Security, Performance & Concurrency Audit
+The independent audit team must analyze all core frontend and backend code to identify potential concurrency safety issues (such as retry deadlocks, thread suspension risks), resource consumption (such as unthrottled polling, memory leaks), and boundary/overflow errors.
 
-### R2. 架构整洁度与重构建议
-评估代码的可读性、分层合理性、重复代码以及设计模式的应用，提供改善可维护性和可扩展性的重构建议。
+### R2. Architecture Cleanliness & Refactoring Suggestions
+Evaluate code readability, layering rationality, duplicate code, and design patterns, and provide refactoring suggestions to improve maintainability and scalability.
 
-### R3. 协议合规性核对
-核对代码实现是否与 `clash_mini_agreements.md` 中的所有 26 条设计规范完全符合。如果发现代码实现与协议描述不一致，应明确指出。
+### R3. Protocol Compliance Verification
+Verify whether the code implementation fully complies with all 26 design specifications in `clash_mini_agreements.md`. If any inconsistency between the code implementation and the protocol description is found, it must be clearly pointed out.
 
 ## Acceptance Criteria
 
-### 审计报告输出规范
-- [ ] 提交一份详尽的第三方代码审计报告，分类归纳所有发现的问题：安全与性能类（Safety & Performance）、代码整洁与架构类（Readability & Architecture）、协议合规性类（Agreement Compliance）。
-- [ ] 对发现的每个缺陷或不合规项，报告必须包含：具体的文件路径、受影响的代码行范围、成因分析、相关的代码片段，以及具体的修复与优化建议。
-- [ ] 报告需对项目的整体代码库质量进行综合评价，并给出总体的架构健康度打分。
+### Audit Report Output Specifications
+- [ ] Submit a detailed third-party code audit report, categorizing all findings into: Safety & Performance, Readability & Architecture, and Agreement Compliance.
+- [ ] For each defect or non-compliance item found, the report must contain: specific file path, affected code line range, root cause analysis, relevant code snippets, and specific fix and optimization suggestions.
+- [ ] The report must provide a comprehensive evaluation of the project's overall codebase quality and give an overall architectural health score.
 
 ## Follow-up — 2026-06-17T19:33:22+08:00
 
-严格审计 `clash_mini_agreements.md` 中定义的所有 27 条权威开发协议与 Clash Mini 源码实际实现的整合情况，指出任何不一致、偏差或未落实的问题，并生成详尽的审计分析报告。
+Strictly audit the integration of all 27 authoritative development agreements defined in `clash_mini_agreements.md` with the actual source code implementation of Clash Mini, point out any inconsistencies, deviations, or unimplemented issues, and generate a detailed audit analysis report.
 
-**⚠️ 重要约束：本次任务仅执行审计、对比与报告生成，严禁对任何项目源文件或程序代码进行修改或编辑。**
+**⚠️ Important Constraint: This task is strictly for auditing, comparison, and report generation. Modifying or editing any project source files or program code is strictly prohibited.**
 
 Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
 Integrity mode: development
 
 ## Requirements
 
-### R1. 协议一致性静态走查与审计
-审计团队必须逐条核对 `clash_mini_agreements.md` 中的一至二十七条开发协议与项目实际的前端 (React/TSX)、后端 (Rust) 源码的集成情况。核实规范是否在代码中得到真正的实现，指出任何与规范描述不符、未完全落实或存在偏差的代码逻辑。
+### R1. Agreement Consistency Static Walkthrough & Audit
+The audit team must check the integration of each of the 27 development agreements in `clash_mini_agreements.md` against the actual frontend (React/TSX) and backend (Rust) source code. Verify if the specifications are truly implemented in the code, and point out any code logic that does not match the specifications, is not fully implemented, or has deviations.
 
-### R2. 编译与构建整合校验
-结合执行类型与打包验证（如运行 `pnpm typecheck` 和 `pnpm web:build`），确认识别重构后的代码在真实的编译和生产环境构建下完全没有错误，且输出的物理结构（如拆分子组件的目录结构等）符合协议要求。
+### R2. Compilation & Build Integration Verification
+In combination with type checking and packaging verification (such as running `pnpm typecheck` and `pnpm web:build`), confirm that the refactored code is completely error-free in real compilation and production build environments, and that the physical output structure (such as the sub-component folder structure) conforms to the agreements.
 
-### R3. 输出权威审计报告
-审计完成后，在工作目录根目录下生成一份详尽的 Markdown 格式审计报告 `audit_report.md`。报告需对 27 条协议中的每一条进行评估，列出其符合性（已对齐 / 部分对齐 / 未对齐）、对应的源码文件路径与代码行（采用 markdown 文件链接形式）、任何偏离的细节和安全隐患，并为每一处偏离点给出具体的整改建议。
+### R3. Output Authoritative Audit Report
+After completing the audit, generate a detailed Markdown audit report `audit_report.md` in the working directory root. The report must evaluate each of the 27 agreements, listing their compliance status (Aligned / Partially Aligned / Not Aligned), corresponding source file paths and code lines (using markdown file links), any deviation details and security risks, and specific rectification suggestions for each deviation.
 
 ## Acceptance Criteria
 
-### 审计只读约束
-- [ ] 确保项目中的所有源代码文件（React/TSX、Rust、配置等）均未被执行修改、覆盖或删除。
+### Audit Read-Only Constraint
+- [ ] Ensure that all source files (React/TSX, Rust, configurations, etc.) in the project are not modified, overwritten, or deleted.
 
-### 审计报告完整性与准确性
-- [ ] 审计报告 `audit_report.md` 包含所有 27 条开发协议的核对项。
-- [ ] 报告中所有指向源代码 the 链接均采用标准绝对文件链接格式 `[filename](file:///absolute/path/to/file#Lstart-Lend)`，且引用的行号与源码段落完全真实匹配。
-- [ ] 如果发现代码与协议存在偏差或未落实规范，必须指出具体的文件位置、偏离详情以及针对性的修复/整改建议。
+### Audit Report Completeness & Accuracy
+- [ ] The audit report `audit_report.md` contains verification items for all 27 development agreements.
+- [ ] All links pointing to the source code in the report adopt the standard absolute file link format `[filename](file:///absolute/path/to/file#Lstart-Lend)`, and the referenced line numbers match the source code paragraphs exactly.
+- [ ] If any deviation between the code and the agreements is found, the specific file location, deviation details, and targeted fix/rectification suggestions must be pointed out.
 
-### 构建与类型校验
-- [ ] 报告中附带 `pnpm typecheck` 和 `pnpm web:build` 的校验执行日志及结果摘要，确保其成功通过。
+### Build & Type Verification
+- [ ] The report includes verification execution logs and summary results of `pnpm typecheck` and `pnpm web:build`, ensuring they pass successfully.
 
 ## Follow-up — 2026-06-20T12:46:49+08:00
 

@@ -45,7 +45,7 @@ Direct observations of the codebase relative to the 26 specifications:
 * **Agreement Three (三): Routing Logic and Manual Path Control**
   * `src/services/cmds.ts` lines 18-91 (`enhanceProfiles`): Automatically rewrites the profiles to have a single `PROXY` group.
   * `src/pages/_layout.tsx` lines 2132-2160: Enforces mutual exclusion between Manual Mode, System Proxy, and TUN Mode.
-  * `src/components/connection/connection-table.tsx` displays only "链接目标 (Host)" and "路由 (Chains)" columns.
+  * `src/components/connection/connection-table.tsx` displays only "Connection Destination (Host)" and "Routing (Chains)" columns.
 
 * **Agreement Four (四): System Tray Icon**
   * `src-tauri/src/core/tray/mod.rs` lines 56-57:
@@ -58,7 +58,7 @@ Direct observations of the codebase relative to the 26 specifications:
 * **Agreement Five (五): Copyright and Licensing**
   * `src/pages/_layout.tsx` lines 3843-3860:
     ```tsx
-    © 2026 秋雨潇潇 (修改部分)
+    © 2026 Qiu Yuxiao (Modified parts)
     ...
     href="mailto:qiuyuxiao@gmail.com"
     ```
@@ -81,7 +81,7 @@ Direct observations of the codebase relative to the 26 specifications:
     ```
 
 * **Agreement Twelve (十二): Update & Help Menu (BUG-071)**
-  * `src/pages/_layout.tsx` lines 4057-4161: Renders the Help button as a pop-up Menu with items `🐱 GitHub 主页`, `💡 帮助指南 (Wiki)`, `🚀 检查软件更新`, and `⚙️ 检查内核更新`.
+  * `src/pages/_layout.tsx` lines 4057-4161: Renders the Help button as a pop-up Menu with items `🐱 GitHub Homepage`, `💡 Help Guide (Wiki)`, `🚀 Check Software Update`, and `⚙️ Check Core Update`.
 
 * **Agreement Fifteen (十五): Kernel Update Fallback & Version Formatting (BUG-074)**
   * `src-tauri/src/core/core_updater.rs` line 228: `let nm = NetworkManager::new();`
@@ -103,7 +103,7 @@ Direct observations of the codebase relative to the 26 specifications:
   * `src/pages/_layout.tsx` lines 3222-3224:
     ```typescript
     title={t('settings.mini.routingTooltipRules', {
-      defaultValue: '在预设规则的基础上任意调整路径控制',
+      defaultValue: 'Adjust route controls at will on top of preset rules',
     })}
     ```
   * All 13 locale files `src/locales/*/settings.json` have `"routingTooltipRules"` set.
@@ -125,7 +125,7 @@ Direct observations of the codebase relative to the 26 specifications:
   * `src-tauri/src/module/monitor.rs` lines 405-494: Implements the background worker, polling every 15s (3s on failure), performing 3 consecutive failure validation checks before triggers a self-heal selection.
 
 * **Agreement Twenty-Six (二十六): Startup Port Conflict & Safety (BUG-083/093/PortSafety)**
-  * `src-tauri/src/config/clash.rs` lines 62-71 and 472-498: Automatically checks ports using secret `"adapted-by-qiu-yuxiao"`,順延 allocation.
+  * `src-tauri/src/config/clash.rs` lines 62-71 and 472-498: Automatically checks ports using secret `"adapted-by-qiu-yuxiao"`, incremental allocation.
 
 ---
 
@@ -155,7 +155,7 @@ The Clash Mini codebase (both frontend `src/` and backend `src-tauri/`) is **ful
 | **二 (2)** | Layout & Visual Spec | **Fully Compliant** | `src/assets/styles/layout.scss`<br>`src/pages/_layout/hooks/use-custom-theme.ts` lines 448-531<br>`src/utils/button-styles.ts` | Dynamic 3D skeuomorphic styling variables in `:root` with double border styling. Opaque panels. |
 | **三 (3)** | Routing & Path Control | **Fully Compliant** | `src/pages/_layout.tsx` lines 2132-2160, 3220-3240<br>`src/services/cmds.ts` lines 18-91 | 3-state mutual exclusion. Injects MATCH rules dynamically. Merges multi-subscriptions. |
 | **四 (4)** | System Tray Icon Spec | **Partially Compliant** | `src-tauri/src/core/tray/mod.rs` lines 56-57 | Icons remain static as deliberately modified by BUG-073 (Agreement 18) to avoid `E_FAIL` errors. |
-| **五 (5)** | Copyright and Licensing | **Fully Compliant** | `src/pages/_layout.tsx` lines 3843-3860 | Displays `© 2026 秋雨潇潇 (修改部分)` in settings drawer footer. |
+| **五 (5)** | Copyright and Licensing | **Fully Compliant** | `src/pages/_layout.tsx` lines 3843-3860 | Displays `© 2026 Qiu Yuxiao (Modified parts)` in settings drawer footer. |
 | **六 (6)** | Background Silence | **Fully Compliant** | `src/hooks/use-traffic-data.ts` lines 36, 43<br>`src/hooks/use-connection-data.ts` lines 30, 36<br>`src/pages/_layout.tsx` line 4989 | WS connections severed when hidden/drawer closed. LogPage unmounted when closed. |
 | **七 (7)** | BUG-057 Deep Fix | **Fully Compliant** | `src/pages/_layout.tsx` lines 1913-1935, 1974-1979 | Synchronizes configuration reload via `lastEnhancedProfileRef` to avoid double reloads. |
 | **八 (8)** | Data Stream Streamlining | **Fully Compliant** | `src/services/cmds.ts` lines 168-271<br>`src/components/proxy/use-render-list.ts` lines 381-496 | Renders only a single PROXY group without deep multi-group fallbacks. |

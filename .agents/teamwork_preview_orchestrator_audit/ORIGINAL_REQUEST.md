@@ -2,28 +2,28 @@
 
 ## Initial Request — 2026-06-17T13:21:54+08:00
 
-从独立第三方的角度，对当前最新版 Clash Mini 程序的全部代码（包含前端 TypeScript/React 与后端 Rust/Tauri）进行全面而精细的地毯式代码审计。既要排查安全隐患与性能故障，也要提供代码整洁度与软件架构层面的专业优化建议。
+From the perspective of an independent third party, conduct a comprehensive, fine-grained, carpet-style code audit of the entire codebase of the current latest version of Clash Mini (including frontend TypeScript/React and backend Rust/Tauri). It should identify security risks and performance issues, as well as provide professional optimization suggestions at the code cleanliness and software architecture levels.
 
-**⚠️ 绝对红线约束（Strict Non-modification Constraint）：**
-此任务为纯粹的静态代码审查与分析，**审计团队在任何情况下都严禁修改、覆盖、创建或提交任何工作目录下的项目源代码文件**。所有的发现、漏洞、重构方案及修复建议都只能以文字形式记录在最终的审计报告中，不得对项目代码进行任何实际的写操作。
+**⚠️ Absolute Red-Line Constraint (Strict Non-modification Constraint):**
+This task is purely static code review and analysis. **Under no circumstances is the audit team allowed to modify, overwrite, create, or commit any project source code files in the working directory.** All findings, vulnerabilities, refactoring plans, and fix suggestions must only be recorded textually in the final audit report, without any actual write operations to the project codebase.
 
 Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
 Integrity mode: demo
 
 ## Requirements
 
-### R1. 安全、性能与并发性审计
-独立审计团队必须分析全部前后端核心代码，排查潜在的并发安全（如重试死锁、线程挂起风险）、资源占用（如未熔断的轮询、内存泄漏）以及边界与溢出错误。
+### R1. Security, Performance, and Concurrency Audit
+The independent audit team must analyze all frontend and backend core code to identify potential concurrency safety issues (such as retry deadlocks, thread hang risks), resource utilization issues (such as polling without breakers, memory leaks), and boundary/overflow errors.
 
-### R2. 架构整洁度与重构建议
-评估代码的可读性、分层合理性、重复代码以及设计模式的应用，提供改善可维护性和可扩展性的重构建议。
+### R2. Architectural Cleanliness and Refactoring Recommendations
+Evaluate code readability, layering rationality, code duplication, and design pattern applications, and provide refactoring recommendations to improve maintainability and extensibility.
 
-### R3. 协议合规性核对
-核对代码实现是否与 `clash_mini_agreements.md` 中的所有 26 条设计规范完全符合。如果发现代码实现与协议描述不一致，应明确指出。
+### R3. Agreement Compliance Verification
+Verify if the code implementation completely complies with all 26 design specifications in `clash_mini_agreements.md`. If any inconsistency between the code implementation and the agreement description is found, it must be explicitly pointed out.
 
 ## Acceptance Criteria
 
-### 审计报告输出规范
-- [ ] 提交一份详尽的第三方代码审计报告，分类归纳所有发现的问题：安全与性能类（Safety & Performance）、代码整洁与架构类（Readability & Architecture）、协议合规性类（Agreement Compliance）。
-- [ ] 对发现的每个缺陷或不合规项，报告必须包含：具体的文件路径、受影响的代码行范围、成因分析、相关的代码片段，以及具体的修复与优化建议。
-- [ ] 报告需对项目的整体代码库质量进行综合评价，并给出总体的架构健康度打分。
+### Audit Report Output Specification
+- [ ] Submit a detailed third-party code audit report, categorizing all identified issues into: Safety & Performance, Readability & Architecture, and Agreement Compliance.
+- [ ] For each identified defect or non-compliance, the report must include: specific file path, affected line range, root cause analysis, relevant code snippets, and specific fix/optimization recommendations.
+- [ ] The report must provide a comprehensive evaluation of the project's overall codebase quality and assign an overall architectural health score.

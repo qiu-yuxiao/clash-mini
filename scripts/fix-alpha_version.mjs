@@ -4,18 +4,18 @@ import path from 'path'
 import { promisify } from 'util'
 
 /**
- *  为Alpha版本重命名版本号
+ * Rename version number for Alpha release
  */
 const execPromise = promisify(exec)
 
 /**
- * 标准输出HEAD hash
+ * Get HEAD commit hash
  */
 async function getLatestCommitHash() {
   try {
     const { stdout } = await execPromise('git rev-parse HEAD')
     const commitHash = stdout.trim()
-    // 格式化，只截取前7位字符
+    // Format, only extract the first 7 characters
     const formathash = commitHash.substring(0, 7)
     console.log(`Found the latest commit hash code: ${commitHash}`)
     return formathash
@@ -25,30 +25,30 @@ async function getLatestCommitHash() {
 }
 
 /**
- * @param string 传入格式化后的hash
- * 将新的版本号写入文件 package.json
+ * @param {string} newVersion The formatted hash
+ * Write the new version number into package.json
  */
 async function updatePackageVersion(newVersion) {
-  // 获取内容根目录
+  // Get process working directory
   const _dirname = process.cwd()
   const packageJsonPath = path.join(_dirname, 'package.json')
   try {
-    // 读取文件
+    // Read file
     const data = await fs.readFile(packageJsonPath, 'utf8')
     const packageJson = JSON.parse(data)
-    // 获取键值替换
+    // Perform string replacement
     let result = packageJson.version.replace('alpha', newVersion)
-    // 检查当前版本号是否已经包含了 alpha- 后缀
+    // Check if the current version already contains 'alpha-' suffix
     if (!packageJson.version.includes(`alpha-`)) {
-      // 如果只有 alpha 而没有 alpha-，则替换为 alpha-newVersion
+      // If it only contains 'alpha' without '-', replace with 'alpha-newVersion'
       result = packageJson.version.replace('alpha', `alpha-${newVersion}`)
     } else {
-      // 如果已经是 alpha-xxx 格式，则更新 xxx 部分
+      // If it's already in 'alpha-xxx' format, update the 'xxx' part
       result = packageJson.version.replace(/alpha-[^-]*/, `alpha-${newVersion}`)
     }
     console.log('[INFO]: Current version is: ', result)
     packageJson.version = result
-    // 写入版本号
+    // Write version number
     await fs.writeFile(
       packageJsonPath,
       JSON.stringify(packageJson, null, 2),

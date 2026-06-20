@@ -43,7 +43,7 @@ async function fetchLatestVersion() {
 
 function replaceExistingLine(content, version) {
   const mihomoLine =
-    /^(\s*-\s*(?:\*\*)?\s*Mihomo\(Meta\)\s*内核升级至\s*)v?\d+(?:\.\d+)+(?:[-+][^\s*]+)?((?:\*\*)?\s*)$/m
+    /^(\s*-\s*(?:\*\*)?\s*Mihomo\(Meta\)\s*\u5185\u6838\u5347\u7ea7\u81f3\s*)v?\d+(?:\.\d+)+(?:[-+][^\s*]+)?((?:\*\*)?\s*)$/m
 
   if (!mihomoLine.test(content)) return null
 
@@ -62,7 +62,7 @@ function insertMihomoLine(content, version) {
   const before = content.slice(0, titleEnd)
   const after = content.slice(titleEnd).replace(/^\n*/, '\n\n')
 
-  return `${before}\n\n- **Mihomo(Meta) 内核升级至 ${version}**${after}`
+  return `${before}\n\n- **Mihomo(Meta) \u5185\u6838\u5347\u7ea7\u81f3 ${version}**${after}`
 }
 
 async function main() {

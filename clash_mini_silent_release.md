@@ -1,228 +1,228 @@
-# 👑 Clash Mini 一键静默发行准则 (One-Click Silent Release Guidelines)
+# 👑 Clash Mini One-Click Silent Release Guidelines
 
 > [!IMPORTANT]
-> **本准则供 AI Agent 自动发行使用。若违反本规则导致任何非预期弹窗或流程错误，均判定为严重故障。**
+> **These guidelines are for AI Agent automatic releases. Any unexpected dialogs or workflow errors caused by violating these rules will be considered a critical failure.**
 >
-> **【内核版本发行准则】所有发行版本取消旧版内核强制绑定，默认动态拉取并使用官方最新发布的正式版内核（或 Prerelease-Alpha）进行打包发行。**
+> **[Kernel Release Guideline] All release versions decouple the mandatory binding of the old kernel, and default to dynamically pulling and using the official latest released stable kernel (or Prerelease-Alpha) for packaging and release.**
 
 ---
 
-## 🔐 Token 使用铁律（最高优先级）
+## 🔐 Token Usage Rule (Highest Priority)
 
-- GitHub 通信所用 Token **统一从项目根目录的 `github_token.txt` 文件读取**
-- 必须以**设定环境变量**的方式使用（`$env:GH_TOKEN = ...`），绝对禁止将 Token 值打印、输出至日志或嵌入命令行字符串中暴露
-- Token 读取示例（唯一合规写法）：
+- GitHub API token **must be read from the `github_token.txt` file in the project root directory**.
+- It must be used by **setting environment variables** (`$env:GH_TOKEN = ...`). It is strictly forbidden to print or output the token value to logs or embed it in command-line strings.
+- Token reading example (the only compliant way):
   ```powershell
   $env:GH_TOKEN = (Get-Content 'github_token.txt' -Raw).Trim()
-  # 此后所有 gh 命令自动使用该环境变量，无需再传参
+  # After this, all gh commands automatically use this environment variable without passing it as an argument.
   ```
 
 ---
 
-## 🛡️ 代理服务器保护铁律（最高优先级）
+## 🛡️ Proxy Server Protection Rule (Highest Priority)
 
-- 本机运行环境基于 TUN 模式代理服务器，**发行流程无需任何代理配置**
-- **绝对禁止**杀灭或干涉以下进程及端口：`verge-mihomo`、`clash-verge`、`mini-mihomo`，端口 `10801`、`9098`
-- 发行脚本中不得出现任何 `Stop-Process`、`taskkill` 针对上述进程的命令
+- The local execution environment runs a TUN mode proxy server, and **the release workflow requires no proxy configuration**.
+- **It is strictly forbidden** to kill or interfere with the following processes and ports: `verge-mihomo`, `clash-verge`, `mini-mihomo`, ports `10801`, `9098`.
+- Release scripts must not contain any `Stop-Process` or `taskkill` commands targeting the above processes.
 
 ---
 
-## 🚦 标准发行路径（唯一推荐流程）
+## 🚦 Standard Release Path (The Only Recommended Flow)
 
-### 触发条件
-用户本地代码已提交完毕，需要发行新版本。
+### Trigger Condition
+Local code has been fully committed, and a new version needs to be released.
 
-### 一键执行
+### One-Click Execution
 ```powershell
-.\scripts\release.ps1 <版本号>
-# 示例：.\scripts\release.ps1 1.4.5
+.\scripts\release.ps1 <version>
+# Example: .\scripts\release.ps1 1.4.5
 ```
 
-用户**仅需点击一次 Submit 确认**，脚本随后自动完成以下全部阶段，无需守候：
+The user **only needs to click Submit once** to confirm, and the script will automatically complete all of the following phases without manual intervention:
 
 ---
 
-## 🃏 阶段一：本地准备（~1 分钟）
+## 🃏 Phase 1: Local Preparation (~1 minute)
 
-脚本自动执行，无任何交互弹窗：
+The script executes automatically without any interactive prompts:
 
-1. **Token 读取**：从 `github_token.txt` 读取并设为 `$env:GH_TOKEN`（静默，不暴露值）
-2. **前置检查**：
-   - 确认当前在 `dev` 分支
-   - 确认本地工作区干净（无未提交改动）
-   - 确认版本号格式合法（`x.y.z`）
-   - 确认 tag `v<版本号>` 不与现有 tag 冲突
-3. **版本号更新**：调用 `python scripts/bump_version.py <版本号>` 更新以下三个文件：
+1. **Token Load**: Read from `github_token.txt` and set to `$env:GH_TOKEN` (silent, does not expose value).
+2. **Pre-flight Checks**:
+   - Confirm currently on `dev` branch.
+   - Confirm local workspace is clean (no uncommitted changes).
+   - Confirm version number format is valid (`x.y.z`).
+   - Confirm tag `v<version>` does not conflict with existing tags.
+3. **Version Update**: Call `python scripts/bump_version.py <version>` to update the following three files:
    - `package.json`
    - `src-tauri/tauri.conf.json`
    - `src-tauri/Cargo.toml`
-4. **Git 操作（静默执行）**：
+4. **Git Operations (Executed Silently)**:
    ```
    git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
-   git commit -m "release: bump version to <版本号>" --no-verify
+   git commit -m "release: bump version to <version>" --no-verify
    git push origin dev --no-verify
-   git tag v<版本号>
-   git push origin v<版本号> --no-verify
+   git tag v<version>
+   git push origin v<version> --no-verify
    ```
-5. **打印 Actions 监控链接**：`https://github.com/qiu-yuxiao/clash-mini/actions`
+5. **Print Actions Monitoring Link**: `https://github.com/qiu-yuxiao/clash-mini/actions`
 
 > [!WARNING]
-> **从 `git push origin v<版本号>` 触发 CI 直到 `update_dev` job 完成之前，禁止向 `dev` 分支推送任何新提交。**
-> 原因：CI 的 `update_dev` job 会自动生成并 force-push `app-update.json` 到 `dev`，此前的任何 `git push origin dev` 都可能与其产生冲突或覆盖 CI 提交。
+> **Pushing any new commits to the `dev` branch is prohibited from the time `git push origin v<version>` triggers the CI until the CI `update_dev` job finishes.**
+> Reason: The CI `update_dev` job automatically generates and force-pushes `app-update.json` to `dev`. Any prior `git push origin dev` might conflict with or overwrite the CI commit.
 
 ---
 
-## 🃠 阶段二：云端构建监控（每 3 分钟轮询，约 30 分钟）
+## 🃠 Phase 2: Cloud Build Monitoring (Polled every 3 minutes, ~30 minutes)
 
-脚本通过 GitHub API 持续监控 Actions 运行状态，**每 3 分钟**打印一次进度：
+The script queries the Actions run status via the GitHub API, printing progress **every 3 minutes**:
 
 ```
-[12:05] ⏳ CI 状态: in_progress | 已运行: 3 分钟 | 阶段: build
-[12:08] ⏳ CI 状态: in_progress | 已运行: 6 分钟 | 阶段: build
+[12:05] ⏳ CI Status: in_progress | Elapsed: 3 min | Stage: build
+[12:08] ⏳ CI Status: in_progress | Elapsed: 6 min | Stage: build
 ...
-[12:32] ✅ CI 状态: completed | 结论: success | 总耗时: 27 分钟
+[12:32] ✅ CI Status: completed | Conclusion: success | Total Time: 27 min
 ```
 
-### 自动纠错机制
+### Automatic Error Resolution
 
-| 失败类型 | 自动处理方式 |
+| Failure Type | Auto-handling Method |
 |---|---|
-| 网络超时 / API 临时错误 | 等待 3 分钟后自动重试轮询，最多 2 次 |
-| CI Run 排队超时（> 15 分钟未开始） | 自动删除 tag 并重推，触发新 Run，最多重试 1 次 |
-| 构建失败（编译/签名错误） | 打印完整失败日志 URL，停止并报告，需人工介入 |
+| Network timeout / temporary API error | Wait 3 minutes and retry polling, up to 2 retries |
+| CI Run queue timeout (> 15 minutes before starting) | Delete tag and push again to trigger a new Run, up to 1 retry |
+| Build failure (compile/signature error) | Print the full error log URL, stop and report, requires manual intervention |
 
 ---
 
-## 🏁 阶段三：验收与结束（~2 分钟）
+## 🏁 Phase 3: Verification & Completion (~2 minutes)
 
-CI 成功后，脚本自动：
+After the CI succeeds, the script automatically:
 
-1. 等待 Draft Release 转为正式发布（轮询 `draft=false`）
-2. 下载 `setup.exe` 到 `portable_test/` 目录
-3. 校验文件大小 > 0（确认产物可用）
-4. 打印结束报告：
+1. Waits for the Draft Release to be published (polls for `draft=false`).
+2. Downloads `setup.exe` to `portable_test/` directory.
+3. Verifies that the file size is > 0 (confirms the artifact is valid).
+4. Prints final report:
    ```
-   ✅ 发行成功！
-   版本：v1.4.5
-   文件：portable_test/Clash.Mini_1.4.5_x64-setup.exe（42.3 MB）
-   Release：https://github.com/qiu-yuxiao/clash-mini/releases/tag/v1.4.5
+   ✅ Release Succeeded!
+   Version: v1.4.5
+   File: portable_test/Clash.Mini_1.4.5_x64-setup.exe (42.3 MB)
+   Release: https://github.com/qiu-yuxiao/clash-mini/releases/tag/v1.4.5
    ```
 
 ---
 
-## 🔧 紧急回退方案（仅在 release.ps1 完全不可用时使用）
+## 🔧 Emergency Rollback Plan (Only used when release.ps1 is completely unavailable)
 
 > [!CAUTION]
-> 以下为手动应急操作，正常情况下**绝对不走此路径**。每一步均需手动执行，风险由操作者自行承担。
+> The following is a manual emergency operation and **should absolutely not be used under normal circumstances**. Every step must be executed manually, and the operator assumes all risks.
 
-1. **更新版本号**：手动修改 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 中的版本字段
-2. **文档登记**：在 `clash_mini_agreements.md` 登记新特性，在 `bug_list.md` 更新 Bug 状态
-3. **Git 提交**：
+1. **Update Version**: Manually modify version fields in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`.
+2. **Register Docs**: Record new features in `clash_mini_agreements.md` and update bug status in `bug_list.md`.
+3. **Git Commit**:
    ```powershell
    git add .
-   git commit -m "release: bump version to <版本号>" --no-verify
+   git commit -m "release: bump version to <version>" --no-verify
    git push origin dev --no-verify
-   git tag v<版本号>
-   git push origin v<版本号> --no-verify
+   git tag v<version>
+   git push origin v<version> --no-verify
    ```
-4. **监控 CI**：手动访问 `https://github.com/qiu-yuxiao/clash-mini/actions` 查看构建状态
-5. **拉回产物**：
+4. **Monitor CI**: Manually visit `https://github.com/qiu-yuxiao/clash-mini/actions` to inspect build status.
+5. **Download Artifact**:
    ```powershell
    $env:GH_TOKEN = (Get-Content 'github_token.txt' -Raw).Trim()
-   gh release download v<版本号> --pattern '*_x64-setup.exe' --dir 'portable_test' --clobber --repo qiu-yuxiao/clash-mini
+   gh release download v<version> --pattern '*_x64-setup.exe' --dir 'portable_test' --clobber --repo qiu-yuxiao/clash-mini
    ```
-6. **更新 Git 配置**（若推送失败，配置 OpenSSL 后重试）：
+6. **Update Git Config** (If push fails, configure OpenSSL and retry):
    ```powershell
    git config --local http.sslBackend openssl
-   # 推送后恢复：
+   # Restore after push:
    git config --local --unset http.sslBackend
    ```
 
 ---
 
-## ⚙️ GitHub Release Workflow 规范（Workflow Architecture）
+## ⚙️ GitHub Release Workflow Specs (Workflow Architecture)
 
-`release.yml` 是 Clash Mini 的**唯一正式发行流水线**，仅在 `git push v<version>` 打 tag 时触发。
+`release.yml` is the **only official release pipeline** for Clash Mini, triggered only when pushing a version tag `git push v<version>`.
 
-### Job 依赖链（四步无死锁设计）
+### Job Dependency Chain (Four-Step Deadlock-Free Design)
 
 ```
 validate → build → update_dev → publish
 ```
 
-- `validate`：快速校验 tag 来源（仅限 dev 分支）与版本一致性（~2 分钟）
-- `build`：Windows x64 云端编译 Tauri，打包 setup.exe + portable.zip，上传为 Draft Release，自动签名并上传 .sig（~25-30 分钟）
-- `update_dev`：从 Release 下载产物，自动生成 `app-update.json`（含正确的 sig/size/url），提交并 force-push 到 dev（~1 分钟）
-- `publish`：从 Changelog.md 提取更新日志，将 Draft Release 发布为正式版（~1 分钟）
+- `validate`: Quickly verifies tag source (restricted to dev branch) and version consistency (~2 minutes).
+- `build`: Compiles Tauri on Windows x64 in the cloud, packages setup.exe + portable.zip, uploads them as a Draft Release, and signs and uploads the `.sig` automatically (~25-30 minutes).
+- `update_dev`: Downloads the assets from the release, automatically generates `app-update.json` (with correct signature/size/url), and commits and force-pushes it to dev (~1 minute).
+- `publish`: Extracts release notes from Changelog.md and publishes the Draft Release to official (~1 minute).
 
 > [!IMPORTANT]
-> **`app-update.json` 的维护权完全归 CI 的 `update_dev` job 所有。`release.ps1` 不生成、不提交此文件。**
-> CI 会在构建完成后自动写入正确的签名、文件大小和下载 URL。
+> **The maintenance of `app-update.json` belongs entirely to the CI's `update_dev` job. `release.ps1` does not generate or commit this file.**
+> The CI will automatically write the correct signature, file size, and download URL after the build is successful.
 
-### 发布产物（从 v1.3.8 起）
+### Release Assets (Since v1.3.8)
 
-**正式发行产物仅限 Windows x64 平台两项：**
+**Official release assets are limited to the following two items for Windows x64:**
 
-- **【必需】** `Clash.Mini_<version>_x64-setup.exe`（NSIS 安装包，支持 Tauri 自动更新）
-- **【可选】** `Clash.Mini_<version>_x64_portable.zip`（免安装绿色版，`continue-on-error: true`）
+- **[Required]** `Clash.Mini_<version>_x64-setup.exe` (NSIS installer, supports Tauri auto-update).
+- **[Optional]** `Clash.Mini_<version>_x64_portable.zip` (Portable green version, `continue-on-error: true`).
 
-**以下产物任何情况下均不得发行：**
-- ❌ Linux 构建 (.deb / .rpm / .AppImage)
-- ❌ macOS 构建 (.dmg)
-- ❌ ARM Windows 构建
-- ❌ WebView2 固定版
+**The following assets must not be released under any circumstances:**
+- ❌ Linux builds (.deb / .rpm / .AppImage)
+- ❌ macOS builds (.dmg)
+- ❌ ARM Windows builds
+- ❌ WebView2 fixed version
 
-### 禁止事项
+### Prohibitions
 
-- 严禁在 `autobuild.yml` 的 `TAG_NAME` 使用正式版本号，autobuild 必须固定为 `autobuild` tag
-- 严禁在 `release.yml` 中混合引入会被条件 skip 的 job 作为 `needs` 依赖
-- 严禁在正式 Release 发行说明中包含非 Windows 平台的产物链接
-
----
-
-## 📦 发布产物说明（从 v1.3.8 起）
-
-### `Clash.Mini_<version>_x64-setup.exe`（主要产物）
-
-- NSIS 安装包，支持 Tauri 自动更新器
-- 用户下载后运行安装，程序安装在 `C:\Users\<用户名>\AppData\Local\Programs\clash-mini\`
-- 自动更新时会下载新版本的 `setup.exe` 并自动运行安装
-
-### `Clash.Mini_<version>_x64_portable.zip`（可选产物）
-
-- 免安装绿色版，解压即用
-- **不支持自动更新**（Tauri 更新器在 Windows 上不支持 ZIP）
-- 仅供不想安装的用户手动下载使用
+- Using official version numbers in the `TAG_NAME` of `autobuild.yml` is strictly forbidden; autobuild must use a fixed `autobuild` tag.
+- Mixing conditionally skipped jobs as `needs` dependencies in `release.yml` is strictly forbidden.
+- Including non-Windows platform artifact links in official Release release notes is strictly forbidden.
 
 ---
 
-## 🔐 签名与自动更新规范
+## 📦 Release Artifact Description (Since v1.3.8)
 
-### 私钥管理
+### `Clash.Mini_<version>_x64-setup.exe` (Primary Asset)
 
-- 私钥文件：`tauri-key`（存放在项目根目录，已加入 `.gitignore`，严禁提交到 Git）
-- 公钥文件：`tauri-key.pub`（内容已写入 `tauri.conf.json` 的 `updater.pubkey`）
-- CI 构建时自动读取 `TAURI_PRIVATE_KEY` 和 `TAURI_KEY_PASSWORD` 两个 GitHub Secrets 完成签名
+- NSIS installer, supports Tauri auto-updater.
+- Users run the installer, and the program is installed in `C:\Users\<username>\AppData\Local\Programs\clash-mini\`.
+- Auto-updates download the new `setup.exe` and run the installer automatically.
 
-### app-update.json 自动维护
+### `Clash.Mini_<version>_x64_portable.zip` (Optional Asset)
 
-- CI `update_dev` job 在每次构建成功后自动生成并提交此文件，无需手动操作
-- 确保 `signature` 字段与 `.sig` 文件内容完全一致（由 CI 保证）
-- 确保 `url` 字段指向正确的 Release 下载链接（由 CI 保证）
-- 确保 `size` 字段与实际文件字节数一致（由 CI 保证）
+- Portable green version, ready to run after extraction.
+- **Does not support auto-updates** (Tauri updater does not support ZIP on Windows).
+- Provided only for users who do not want to install and prefer manual downloads.
 
 ---
 
-## 📝 发布检查清单
+## 🔐 Signature and Auto-Update Specs
 
-发布前必须确认：
+### Private Key Management
 
-- [ ] 本地代码已全部提交且推送（`git log origin/dev..dev` 无输出）
-- [ ] `clash_mini_agreements.md` 已登记新特性/修改（并已独立提交）
-- [ ] `bug_list.md` 已更新 Bug 状态（并已独立提交）
-- [ ] `Changelog.md` 已添加本版本更新记录（供 CI 自动生成 Release Notes）
-- [ ] 版本号已在 `package.json`、`tauri.conf.json`、`Cargo.toml` 中一致（由 release.ps1 自动完成）
-- [ ] CI 构建成功，Release 已发布（非 Draft）
-- [ ] `portable_test/` 中已有本版本 setup.exe 且文件大小正常（由 release.ps1 自动验收）
-- [ ] GitHub 上可访问 `https://raw.githubusercontent.com/qiu-yuxiao/clash-mini/dev/updater/app-update.json`
-- [ ] 旧版本客户端可收到自动更新提示
+- Private key file: `tauri-key` (stored in the project root, added to `.gitignore`, strictly forbidden from being committed to Git).
+- Public key file: `tauri-key.pub` (content written in `tauri.conf.json`'s `updater.pubkey`).
+- The CI automatically reads the two GitHub Secrets `TAURI_PRIVATE_KEY` and `TAURI_KEY_PASSWORD` to complete the signature during build.
+
+### app-update.json Automated Maintenance
+
+- The CI `update_dev` job automatically generates and commits this file after each successful build, requiring no manual actions.
+- Ensure the `signature` field is identical to the content of the `.sig` file (guaranteed by CI).
+- Ensure the `url` field points to the correct Release download link (guaranteed by CI).
+- Ensure the `size` field matches the actual file size in bytes (guaranteed by CI).
+
+---
+
+## 📝 Release Checklist
+
+Confirm before release:
+
+- [ ] Local code is fully committed and pushed (`git log origin/dev..dev` has no output).
+- [ ] `clash_mini_agreements.md` has registered the new features/modifications (and has been committed separately).
+- [ ] `bug_list.md` has updated the Bug statuses (and has been committed separately).
+- [ ] `Changelog.md` has added the release notes for this version (used by CI to auto-generate Release Notes).
+- [ ] Version numbers are consistent in `package.json`, `tauri.conf.json`, and `Cargo.toml` (automatically completed by `release.ps1`).
+- [ ] CI build succeeded and the Release is published (not Draft).
+- [ ] The `setup.exe` of this version exists in `portable_test/` and the file size is normal (automatically validated by `release.ps1`).
+- [ ] `https://raw.githubusercontent.com/qiu-yuxiao/clash-mini/dev/updater/app-update.json` is accessible on GitHub.
+- [ ] Older clients can receive auto-update notifications.

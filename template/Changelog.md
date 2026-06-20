@@ -1,13 +1,13 @@
 ## v(Version Goes Here)
 
-### 🐞 修复问题
+### 🐞 Fixed Bugs
 
 <details>
-<summary><strong> ✨ 新增功能 </strong></summary>
+<summary><strong> ✨ New Features </strong></summary>
 
 </details>
 
 <details>
-<summary><strong> 🚀 优化改进 </strong></summary>
+<summary><strong> 🚀 Optimizations </strong></summary>
 
 </details>

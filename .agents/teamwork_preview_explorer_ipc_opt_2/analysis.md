@@ -1,6 +1,6 @@
 # IPC and State Update Audit Report
 
-This report presents the findings of the audit conducted on the ClashVerge TypeScript frontend codebase, specifically targeting high-frequency Tauri IPC listeners, React state hook updates, visibility-based subscriptions, and redundant polling/listener leakages.
+This report presents the findings of the audit conducted on the ClashVerge TypeScript frontend codebase, specifically targeting high-frequency Tauri IPC listeners, React state hook updates, visibility-based subscriptions, and redundant polling/listener leakage.
 
 ---
 
@@ -131,12 +131,12 @@ To reduce CPU, GPU, and memory overhead, the following frontend strategies are s
 ### 6.1 Fix for Delay Test Timer Leak (`src/services/delay.ts`)
 #### Before:
 ```typescript
-      // 设置超时处理, delay = 0 为超时
+      // Set timeout handling, delay = 0 represents timeout
       const timeoutPromise = new Promise<ProxyDelay>((resolve) => {
         setTimeout(() => resolve({ delay: 0 }), timeout)
       })
 
-      // 使用Promise.race来实现超时控制
+      // Use Promise.race to implement timeout control
       const result = await Promise.race([
         delayProxyByName(name, url, timeout),
         timeoutPromise,
@@ -146,19 +146,19 @@ To reduce CPU, GPU, and memory overhead, the following frontend strategies are s
 #### After:
 ```typescript
       let timerId: ReturnType<typeof setTimeout> | undefined
-      // 设置超时处理, delay = 0 为超时
+      // Set timeout handling, delay = 0 represents timeout
       const timeoutPromise = new Promise<ProxyDelay>((resolve) => {
         timerId = setTimeout(() => resolve({ delay: 0 }), timeout)
       })
 
       try {
-        // 使用Promise.race来实现超时控制
+        // Use Promise.race to implement timeout control
         const result = await Promise.race([
           delayProxyByName(name, url, timeout),
           timeoutPromise,
         ])
         
-        // 确保至少显示500ms的加载动画
+        // Ensure loading animation is shown for at least 500ms
         const elapsedTime = Date.now() - startTime
         if (elapsedTime < 500) {
           await new Promise((resolve) => setTimeout(resolve, 500 - elapsedTime))
@@ -166,7 +166,7 @@ To reduce CPU, GPU, and memory overhead, the following frontend strategies are s
 
         const delay = result.delay
         const elapsed = elapsedTime
-        debugLog(`[DelayManager] 延迟测试完成，代理: ${name}, 结果: ${delay}ms`)
+        debugLog(`[DelayManager] Delay test completed, proxy: ${name}, result: ${delay}ms`)
 
         return this.setDelay(name, group, delay, { elapsed })
       } finally {

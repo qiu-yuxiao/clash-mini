@@ -4,8 +4,8 @@ import axios from 'axios'
 
 import { log_error, log_info, log_success } from './utils.mjs'
 
-const CHAT_ID_RELEASE = '@clash_verge_re' // 正式发布频道
-const CHAT_ID_TEST = '@vergetest' // 测试频道
+const CHAT_ID_RELEASE = '@clash_verge_re' // Official release channel
+const CHAT_ID_TEST = '@vergetest' // Test channel
 
 async function sendTelegramNotification() {
   if (!process.env.TELEGRAM_BOT_TOKEN) {
@@ -26,23 +26,23 @@ async function sendTelegramNotification() {
   const isAutobuild =
     process.env.BUILD_TYPE === 'autobuild' || version.includes('autobuild')
   const chatId = isAutobuild ? CHAT_ID_TEST : CHAT_ID_RELEASE
-  const buildType = isAutobuild ? '滚动更新版' : '正式版'
+  const buildType = isAutobuild ? '\u6eda\u52a8\u66f4\u65b0\u7248' : '\u6b63\u5f0f\u7248'
 
   log_info(`Preparing Telegram notification for ${buildType} ${version}`)
   log_info(`Target channel: ${chatId}`)
   log_info(`Download URL: ${downloadUrl}`)
 
-  // 读取发布说明和下载地址
+  // Read release notes and download URL
   let releaseContent = ''
   try {
     releaseContent = readFileSync('release.txt', 'utf-8')
-    log_info('成功读取 release.txt 文件')
+    log_info('[OK]: Successfully read release.txt file')
   } catch (error) {
-    log_error('无法读取 release.txt，使用默认发布说明', error)
-    releaseContent = '更多新功能现已支持，详细更新日志请查看发布页面。'
+    log_error('[WARN]: Failed to read release.txt, using default release notes', error)
+    releaseContent = '\u66f4\u591a\u65b0\u529f\u80fd\u73b0\u5df2\u652f\u6301\uff0c\u8be6\u7ec6\u66f4\u65b0\u65e5\u5fd7\u8bf7\u67e5\u770b\u53d1\u5e03\u9875\u9762\u3002'
   }
 
-  // Markdown 转换为 HTML
+  // Convert Markdown to HTML
   function convertMarkdownToTelegramHTML(content) {
     // Strip stray HTML tags and markdown bold from heading text
     const cleanHeading = (text) =>
@@ -109,12 +109,12 @@ async function sendTelegramNotification() {
     convertMarkdownToTelegramHTML(releaseContent),
   )
 
-  const releaseTitle = isAutobuild ? '滚动更新版发布' : '正式发布'
+  const releaseTitle = isAutobuild ? '\u6eda\u52a8\u66f4\u65b0\u7248\u53d1\u5e03' : '\u6b63\u5f0f\u53d1\u5e03'
   const encodedVersion = encodeURIComponent(version)
   const releaseTag = isAutobuild ? 'autobuild' : `v${version}`
   const content = `<b>🎉 <a href="https://github.com/qiu-yuxiao/clash-mini/releases/tag/${releaseTag}">Clash Mini v${version}</a> ${releaseTitle}</b>\n\n${formattedContent}`
 
-  // 发送到 Telegram
+  // Send to Telegram
   try {
     await axios.post(
       `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
@@ -129,10 +129,10 @@ async function sendTelegramNotification() {
         parse_mode: 'HTML',
       },
     )
-    log_success(`✅ Telegram 通知发送成功到 ${chatId}`)
+    log_success(`Telegram notification sent successfully to ${chatId}`)
   } catch (error) {
     log_error(
-      `❌ Telegram 通知发送失败到 ${chatId}:`,
+      `Telegram notification failed to send to ${chatId}:`,
       error.response?.data || error.message,
       error,
     )
@@ -140,8 +140,8 @@ async function sendTelegramNotification() {
   }
 }
 
-// 执行函数
+// Execute function
 sendTelegramNotification().catch((error) => {
-  log_error('脚本执行失败:', error)
+  log_error('Script execution failed:', error)
   process.exit(1)
 })
