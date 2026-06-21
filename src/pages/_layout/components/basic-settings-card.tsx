@@ -147,7 +147,11 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           </Typography>
           <Switch
             size="small"
-            checked={clashConfig?.['allow-lan'] ?? false}
+            // WARNING: DO NOT change 'allowLan' to 'allow-lan'!
+            // Although Clash core uses 'allow-lan', the Tauri backend serializes the BaseConfig struct
+            // to camelCase ('allowLan') when sending it to the frontend.
+            // Refer to #[serde(rename_all(serialize = "camelCase"))] on BaseConfig in models.rs.
+            checked={clashConfig?.allowLan ?? false}
             onChange={(_, checked: boolean) => {
               handleAllowLanChange(checked)
             }}
