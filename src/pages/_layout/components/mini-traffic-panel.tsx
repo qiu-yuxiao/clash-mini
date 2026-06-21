@@ -78,6 +78,7 @@ export const MiniTrafficPanel = ({
             height: 'auto',
             flexDirection: 'column',
             gap: 0,
+            alignItems: 'stretch',
           },
         }}
       >
