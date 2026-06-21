@@ -221,7 +221,9 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         handle::Handle::refresh_verge();
     }
     if update_flags.contains(UpdateFlags::LAUNCH) {
-        autostart::update_launch().await?;
+        // WARNING: ALWAYS pass patch.enable_auto_launch directly to update_launch.
+        // DO NOT rely on update_launch querying latest_arc() during configuration patching because the draft config has not been applied yet.
+        autostart::update_launch(patch.enable_auto_launch).await?;
     }
     if update_flags.contains(UpdateFlags::LANGUAGE)
         && let Some(language) = &patch.language

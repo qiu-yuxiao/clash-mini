@@ -25,6 +25,15 @@
  - **当前状态**：`用户未确认`
  - **目标版本**：`v1.5.5`
 
+### BUG-170: Autostart Switch State Timing Race & Unnecessary UAC Elevation
+ 
+ - **现象描述**：设置页面中的“开机自动启动”开关经常在操作后弹回（无法正常开启或关闭），或者在开启后重启客户端发现自启动并未实际生效。且在普通用户权限下，开启/关闭开关会频繁强行弹出 Windows UAC（管理员授权）提示。
+ - **根因**：
+   1. **时序竞态问题**：后端在 `patch_verge` 处理配置变更时，于 `apply()` 生效前就触发了 `update_launch()`。而后者直接从 `latest_arc()` 中读取了未应用的新值（也就是旧值），导致系统指令与用户意图完全相反（开启时去删除了任务，关闭时去创建了任务）。
+   2. **无谓提权问题**：后端 `set_auto_launch` 对 `TaskMode::User`（普通用户自启任务）一刀切地使用了 `create_task_elevated`，导致普通用户环境下也强制拉起 `runas` 提权。一旦提权被取消或失败，直接导致整个 `patch_verge` 失败抛错，进而使前端 Switch 状态弹回。根据 `clash_mini_agreements.md` 第 6 条规范，只有在非管理员模式下删除已存在的 `Clash Mini (Admin)` 任务时才需提权，普通用户创建和删除自己的任务无需任何提权。
+ - **当前状态**：`排查中`
+ - **目标版本**：`v1.5.7`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?

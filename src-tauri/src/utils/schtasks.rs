@@ -417,6 +417,12 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
         logging!(warn, Type::Setup, "Failed to cleanup legacy startup shortcuts: {}", err);
     }
 
+    // WARNING AND PERMISSION AGREEMENT (clash_mini_agreements.md Section 6):
+    // 1. Standard user tasks (TaskMode::User) MUST NOT trigger UAC elevation prompts (create_task_elevated or remove_task_elevated).
+    //    Windows allows standard users to create and delete their own user-level scheduled tasks without admin privileges.
+    // 2. Standard users ONLY need UAC elevation when deleting an existing administrator-level task (TaskMode::Admin).
+    // DO NOT change this logic to use create_task_elevated / remove_task_elevated indiscriminately, as it causes unwanted UAC dialogs
+    // and throws errors (causing frontend switches to bounce back) if the user cancels the UAC prompt.
     if is_enable {
         if is_admin {
             create_task(target)?;
@@ -425,10 +431,13 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
                 return Err(err);
             }
         } else {
+            // Under standard privileges:
+            // Only use UAC elevation to clean up the Admin task if it exists.
             if is_task_enabled(other)? {
                 remove_task_elevated(other)?;
             }
-            create_task_elevated(target)?;
+            // Create user task using standard privileges (no UAC prompt required).
+            create_task(target)?;
         }
         return Ok(());
     }
@@ -449,9 +458,12 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
         return Ok(());
     }
 
+    // Under standard privileges, delete tasks:
+    // 1. Delete user task using standard privileges (no UAC prompt required).
     if is_task_enabled(TaskMode::User)? {
-        remove_task_elevated(TaskMode::User)?;
+        remove_task(TaskMode::User)?;
     }
+    // 2. Only request UAC elevation if an Admin task exists and needs to be deleted.
     if is_task_enabled(TaskMode::Admin)? {
         remove_task_elevated(TaskMode::Admin)?;
     }

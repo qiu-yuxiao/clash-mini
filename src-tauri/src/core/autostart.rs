@@ -10,9 +10,16 @@ use tauri_plugin_autostart::ManagerExt as _;
 #[cfg(target_os = "windows")]
 use tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin;
 
-pub async fn update_launch() -> Result<()> {
-    let enable_auto_launch = { Config::verge().await.latest_arc().enable_auto_launch };
-    let is_enable = enable_auto_launch.unwrap_or(false);
+/// Update the application auto-launch configuration.
+/// 
+/// WARNING: DO NOT query `Config::verge().await.latest_arc().enable_auto_launch` to determine the target state during a configuration patch.
+/// Doing so causes a timing race condition (the draft config hasn't been applied yet, so it reads the old state, causing toggling ON to disable, and toggling OFF to enable).
+/// ALWAYS pass the target state (`enable_auto_launch`) from the patch.
+pub async fn update_launch(enable_auto_launch: Option<bool>) -> Result<()> {
+    let is_enable = match enable_auto_launch {
+        Some(val) => val,
+        None => Config::verge().await.latest_arc().enable_auto_launch.unwrap_or(false),
+    };
     logging!(info, Type::System, "Setting auto-launch enabled state to: {is_enable}");
 
     #[cfg(target_os = "windows")]
