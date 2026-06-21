@@ -18,73 +18,12 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.5.5`
 
-### BUG-163: Contrast and Invisible Borders Styling Issue
- 
- - **现象描述**：在磨砂玻璃（Frosted Glass）皮肤的浅色模式下，禁用状态的按钮背景与边框完全透明隐形，不符视觉对比度要求。
- - **根因**：禁用样式硬编码为白色透明 `rgba(255,255,255,0.03)`，在浅色底色上对比度几乎为零。
- - **当前状态**：`用户未确认`
- - **目标版本**：`v1.5.5`
-
-### BUG-164: React `useMemo` Dependency Array Omits theme and skin
- 
- - **现象描述**：切换皮肤风格或深/浅色模式时，右上角图钉与设置按钮的 3D 样式没有发生对应刷新。
- - **根因**：titlebar JSX element 的 `useMemo` 依赖项中漏掉了 `theme` 和 `controlSkin`，导致其未被重新生成。
- - **当前状态**：`用户未确认`
- - **目标版本**：`v1.5.5`
-
-### BUG-165: Monochrome Skin Slider Label Inconsistency
- 
- - **现象描述**：Monochrome 皮肤下，第 1 个滑块的文本标签与协议中规定的 `'Contrast'` 不一致（代码中显示为 `'Radius'`）。
- - **根因**：用户指定以此处代码为准，需修正 `clash_mini_agreements.md` 中的协议定义。
- - **当前状态**：`用户未确认`
- - **目标版本**：`v1.5.5`
-
 ### BUG-146: Inconsistent Property Access for Allow LAN Switch State
  
  - **现象描述**：设置页面中的 "Allow LAN"（允许局域网连接）开关在页面加载时，其视觉开启状态与实际配置脱节，总是显示为关闭状态。
  - **根因**：前端代码在读取配置时使用了 `clashConfig?.allowLan`，但后端返回的 Clash 配置字段是驼峰/连字符命名的 `'allow-lan'`，导致属性读取始终为 undefined。
  - **当前状态**：`用户未确认`
  - **目标版本**：`v1.5.5`
-
-### BUG-148: Menu and Dialog Transparent Background (Aesthetic Violation)
- 
- - **现象描述**：在深色模式或特定主题下，点击设置页面的帮助问号打开的版本更新弹窗，或者打开下拉菜单时，其背景完全透明，导致菜单或弹窗中的文字与主界面的文字重叠，严重影响阅读。
- - **根因**：`_layout.tsx`、`help-menu-button.tsx` 和 `layout-dialogs.tsx` 中的 Dialog 或 Menu 组件硬编码了 `backgroundColor: 'transparent'`，违反了 agreements 中“100%不透明背景”的原则。
- - **当前状态**：`用户未确认`
- - **目标版本**：`v1.5.5`
-
-### BUG-155: Metrics Row Card Ordering Mismatch
- 
- - **现象描述**：底部流量卡片的排列顺序不符合 agreements 中“上传组在左，下载组在右”的规范，当前代码为下载组在左。
- - **根因**：`mini-traffic-panel.tsx` 中下载组 DOM 元素排在上传组前面。根据用户硬性要求，画面表示以现存代码（下载在左，上传在右）为准，需修改 agreement 协议定义。
- - **当前状态**：`用户未确认`
- - **目标版本**：`v1.5.5`
-
-### BUG-139: 底部流量卡片排列方式不符合 agreements 规范（宽/窄窗口模式均不符）
- 
- - **现象描述**：页面最下方的 4 个流量信息小卡片排列方式不正确。在宽窗口模式下，上传与下载组没有左右平铺并按“上传组”在左、“下载组”在右的方式排列；在窄窗口模式下，无法自动换行并垂直堆叠展示，而是水平挤压在一起，且样式错乱。
- - **根因**：在 `mini-traffic-panel.tsx` 中：
-   1. **结构嵌套错误**：上传组（Upload Group）的 `<Box>` 被错误地嵌套在了下载组（Download Group）的 `<Box>` 内部，而不是作为同级的兄弟节点。这导致宽窗口下 flex 布局层级错乱，而在窄窗口模式下，父级 Metrics Row 的媒体查询垂直布局（flexDirection: 'column'）只对下载组起作用，无法实现两个组 the 垂直堆叠。
-   2. **组排列顺序相反**：协议规范要求按照“上传组（速度、总量）”、“下载组（速度、总量）”顺序从左到右或从上到下排列，但代码中 Download Group 放在了 Upload Group 之前。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.3`
-
-### BUG-140: 启动后右上角的齿轮与图钉图标出现在原生窗口标题栏内
- 
- - **现象描述**：程序启动后，主页面右上角设定用的齿轮图标和图钉图标，会出现在 Windows 原生窗口的标题栏内。在把窗口调为窄窗口模式并触发隐藏标题栏（隐身模式）后，再切回正常窗口，这两个图标才会回到正常位置。接下来即使原生标题栏再出现，图标也不会再移到标题栏里。
- - **根因**：
-   1. **状态初始化未对齐**：`window-provider.tsx` 中的 `decorated` 状态在启动时默认为 `null`，导致前端布局 `!decorated && !isDecorationsHidden` 误判定为真，在有原生标题栏的情况下依然渲染了自定义标题栏，造成两者重合。
-   2. **缺少 Tauri ACL 权限**：Tauri v2 的能力配置文件 `migrated.json` 中缺少 `core:window:allow-is-decorated` 等窗口状态查询权限，导致前端在启动时通过 API 异步获取实际装饰状态的 Promise 被拒绝，状态始终无法从 `null` 更新为 `true`。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.4`
-
-### BUG-120: 顶栏图钉与齿?叉子按钮未遵守六种皮肤风格，且两按钮之间有空?
-
-- **现象描述**：主页面右上角顶栏中，图钉按钮与齿轮按钮（设定界面打开时显示为叉子）的样式未遵守六种皮肤风格（Trump-3D / Original / Modern / Frosted / Cyberpunk / Monochrome），始终显示为默认扁平样式。且两按钮之间存在可见空隙，视觉不紧凑?
-- **根因**：`_layout.tsx` 顶栏按钮区域的父容器设置?`gap: '8px'`，且图钉与齿轮两?`IconButton` 未调?`get3DButtonStyle()`，直接使用了固定 `sx` 样式，导致切换皮肤时按钮外观无变化?
-- **修正说明**：移除父容器 `gap: '8px'`，两按钮均通过 `get3DButtonStyle(theme, 'outlined', 'default')` 遵守六种皮肤风格；齿?叉子按钮?`drawerOpen=true` 时显?primary 色激活态（与图钉按钮的置顶激活态一致）?
-- **当前状?*：`代码已修正，待用户确认`
-- **目标版本**：`v1.4.8`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
@@ -106,12 +45,19 @@
 | **BUG-151** | Empty Connection Pool / Redundant Sockets | v1.5.5 | 代码已修正，已确认 |
 | **BUG-150** | Rust Local Socket Timeout Mismatch | v1.5.5 | 代码已修正，已确认 |
 | **BUG-149** | Healthy Node Delay Threshold Mismatch | v1.5.5 | 代码已修正，已确认 |
+| **BUG-165** | Monochrome Skin Slider Label Inconsistency | v1.5.5 | 代码已修正，已确认 |
+| **BUG-164** | React `useMemo` Dependency Array Omits theme and skin | v1.5.5 | 代码已修正，已确认 |
+| **BUG-163** | Contrast and Invisible Borders Styling Issue | v1.5.5 | 代码已修正，已确认 |
+| **BUG-155** | Metrics Row Card Ordering Mismatch | v1.5.5 | 代码已修正，已确认 |
+| **BUG-148** | Menu and Dialog Transparent Background | v1.5.5 | 代码已修正，已确认 |
 | **BUG-147** | 主题参数调节滑动条上限及范围偏离规范 | v1.5.5 | 代码已修正，已确认 |
 | **BUG-145** | `isImportingRef` Deadlock in `handleSelectProfile` | v1.5.5 | 代码已修正，已确认 |
 | **BUG-144** | Blocked Auto-Select on Profile Switch | v1.5.5 | 代码已修正，已确认 |
 | **BUG-143** | RwLock Writer Starvation on WebSocket Disconnect | v1.5.5 | 代码已修正，已确认 |
 | **BUG-142** | Socket Connection Timeout Bypass | v1.5.5 | 代码已修正，已确认 |
 | **BUG-141** | Windows Named Pipe Busy Infinite Loop | v1.5.5 | 代码已修正，已确认 |
+| **BUG-140** | 启动后右上角的齿轮与图钉图标出现在原生窗口标题栏内 | v1.5.4 | 代码已修正，已确认 |
+| **BUG-139** | 底部流量卡片排列方式不符合 agreements 规范（宽/窄窗口模式均不符） | v1.5.3 | 代码已修正，已确认 |
 | **BUG-138** | 闪电光标（批量测速）点击后无任何反应，无法触发全节点测速 | v1.5.3 | 代码已修正，已确认 |
 | **BUG-136** | 导入订阅链接报错无法导入节点 | v1.4.9 | 代码已修正，已确认 |
 | **BUG-135** | 检查 DNS 配置文件是否存在命令同步阻塞 UI 主线程 | v1.4.8 | 代码已修正，已确认 |
@@ -129,6 +75,7 @@
 | **BUG-123** | 快速切换配置时 catch 逻辑相互覆盖引发 SWR 重复请求与重试 | v1.4.8 | 代码已修正，已确认 |
 | **BUG-122** | 切换配置?profile 页面状态加载死锁，自动优选不触发 | v1.4.8 | 代码已修正，已确认 |
 | **BUG-121** | 导入订阅后，活跃出口节点被固定节点长期占用，永不更新（10 分钟以上不变化） | v1.4.9 | 代码已修正，已确认 |
+| **BUG-120** | 顶栏图钉与齿?叉子按钮未遵守六种皮肤风格，且两按钮之间有空? | v1.4.8 | 代码已修正，已确认 |
 | **BUG-119** | 设置界面多处文字不随语言切换（基础设置、主题设置） | v1.3.9 | 代码已修正，已确?|
 | **BUG-118** | 重启程序后，节点无法自动选优，持续等待（10 分钟以上）仍不恢复 | v1.5.3 | 代码已修正，已确认 |
 | **BUG-117** | Trump-3D 按钮与卡片阴影恢复为多层 bevelShadowDark 固态挤压，修复 BUG-115 过度简化导致的 3D 质感丢失?| v1.3.8 | 代码已修正，已确?|
