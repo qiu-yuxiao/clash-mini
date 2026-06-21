@@ -31,7 +31,18 @@
  - **根因**：
    1. **时序竞态问题**：后端在 `patch_verge` 处理配置变更时，于 `apply()` 生效前就触发了 `update_launch()`。而后者直接从 `latest_arc()` 中读取了未应用的新值（也就是旧值），导致系统指令与用户意图完全相反（开启时去删除了任务，关闭时去创建了任务）。
    2. **无谓提权问题**：后端 `set_auto_launch` 对 `TaskMode::User`（普通用户自启任务）一刀切地使用了 `create_task_elevated`，导致普通用户环境下也强制拉起 `runas` 提权。一旦提权被取消或失败，直接导致整个 `patch_verge` 失败抛错，进而使前端 Switch 状态弹回。根据 `clash_mini_agreements.md` 第 6 条规范，只有在非管理员模式下删除已存在的 `Clash Mini (Admin)` 任务时才需提权，普通用户创建和删除自己的任务无需任何提权。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.5.7`
+
+### BUG-171: Profile Switch/Import Auto-Select Hanging & Speed Test Error Responses
+ 
+ - **现象描述**：重启客户端或导入订阅链接后，界面经常等很久（10分钟以上）也没有自动选点和测速，疑似卡死，必须手动点击测速按钮（闪电图标）才能恢复。而且手动测速时，部分节点无法测试且返回红色的 "Error" 而非橙色的 "Timeout"。
+ - **根因**：
+   1. **前端锁机制卡死**：启动或导入失败时，`.catch()` 会清空 `lastEnhancedProfileRef.current`，但由于 `currentProfileUid` 未改变，`useEffect` 永远不会再次触发重试。导入配置时，复制的并行加载链路发生网络或内核延迟异常，同样会导致该 Profile 被永久锁死。
+   2. **命名管道高并发阻塞**：测速时 36 路工作线程并发请求，后端连接池瞬间建立大量 IPC socket 连接，造成 Windows 命名管道忙碌 (`ERROR_PIPE_BUSY`)。原重试次数上限仅为 5 次（最多等待 600ms），容易瞬间耗尽重试报错。
+   3. **残留失效连接**：内核重启（如切换/重配置）时未清空全局 `IpcConnectionPool`，残留旧进程失效句柄导致复用报错。
+   4. **异常响应格式反序列化错误**：Clash API 返回 504 Timeout 响应时，若格式不符 standard JSON，后端反序列化出错会抛出系统 IPC 异常，被前端判定为红色 Error。
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.5.7`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)

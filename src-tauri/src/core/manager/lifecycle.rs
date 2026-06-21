@@ -25,6 +25,15 @@ impl CoreManager {
 
     pub async fn stop_core(&self) -> Result<()> {
         CLASH_LOGGER.clear_logs().await;
+
+        // WARNING: DO NOT remove or bypass clearing the IPC connection pool here!
+        // When Clash core restarts, previous connection streams become stale and dead.
+        // Failing to clear the pool will result in backend connection errors and speed test failures.
+        // Refer to BUG-171/BUG-172 agreements.
+        if let Ok(pool) = tauri_plugin_mihomo::IpcConnectionPool::global() {
+            pool.clear_pool();
+        }
+
         defer! {
             self.after_core_process();
         }

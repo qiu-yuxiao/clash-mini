@@ -1130,7 +1130,9 @@ const Layout = () => {
     }
   }, [language])
 
-  const lastEnhancedProfileRef = useRef<string | null>(null)
+  const [profileRefreshCounter, setProfileRefreshCounter] = useState(0)
+  const lastProcessedRef = useRef<{ uid: string | null; counter: number }>({ uid: null, counter: -1 })
+  const startupRetryCountRef = useRef(0)
   const fallbackTimerRef = useRef<number | null>(null)
   // 解决 BUG-118: handleImportProfile 与 useEffect 双链竞态
   // 当 handleImportProfile 正在处理时，设置此标志让 useEffect 跳过自动选点
@@ -1146,44 +1148,67 @@ const Layout = () => {
   const tRef = useRef(t)
   tRef.current = t
 
+  // WARNING: DO NOT remove this unified hook or replace it with ad-hoc reload chains in other methods (like handleImportProfile).
+  // The state-driven approach prevents race conditions during import/activation.
+  // The 3-attempt auto-retry block in .catch resolves startup timing issues where the core/socket is temporarily busy.
+  // Refer to BUG-171/BUG-172 agreements.
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
-    if (
-      currentProfileUid &&
-      lastEnhancedProfileRef.current !== currentProfileUid
-    ) {
-      lastEnhancedProfileRef.current = currentProfileUid
-      const uid = currentProfileUid
-      let cancelled = false
-      enhanceProfiles()
-        .then(async () => {
-          if (cancelled || isImportingRef.current) return
-          console.log(`[Layout] Enhanced active profile: ${uid}`)
-          await activateSelectedRef.current()
-          if (cancelled || isImportingRef.current) return
-          // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
-          await waitForClashReady(tRef.current)
-          if (cancelled || isImportingRef.current) return
-          await triggerAutoSelectAndRefresh(
-            refreshProxyRef.current,
-            tRef.current,
-            fallbackTimerRef,
-            setHeadStateForSortRef.current,
-          )
-        })
-        .catch((err) => {
-          if (cancelled) return
-          console.error(
-            `[Layout] Failed to enhance profile ${uid}:`,
-            err,
-          )
-          lastEnhancedProfileRef.current = null
-        })
-      return () => {
-        cancelled = true
+    if (currentProfileUid) {
+      const isNewProfile = lastProcessedRef.current.uid !== currentProfileUid
+      const isRefreshTriggered = lastProcessedRef.current.counter !== profileRefreshCounter
+
+      if (isNewProfile || isRefreshTriggered) {
+        lastProcessedRef.current = { uid: currentProfileUid, counter: profileRefreshCounter }
+        const uid = currentProfileUid
+        let cancelled = false
+        enhanceProfiles()
+          .then(async (success) => {
+            if (!success) {
+              throw new Error('Profile configuration validation failed')
+            }
+            if (cancelled || isImportingRef.current) return
+            console.log(`[Layout] Enhanced active profile: ${uid}`)
+            await activateSelectedRef.current()
+            if (cancelled || isImportingRef.current) return
+            // 等待 Clash 内核就绪（最多 10 秒），然后触发自动选点并刷新前端
+            await waitForClashReady(tRef.current)
+            if (cancelled || isImportingRef.current) return
+            await triggerAutoSelectAndRefresh(
+              refreshProxyRef.current,
+              tRef.current,
+              fallbackTimerRef,
+              setHeadStateForSortRef.current,
+            )
+            // Success: reset retry counter
+            startupRetryCountRef.current = 0
+          })
+          .catch((err) => {
+            if (cancelled) return
+            console.error(
+              `[Layout] Failed to enhance profile ${uid}:`,
+              err,
+            )
+            // Reset to allow retry/reload
+            lastProcessedRef.current.uid = null
+
+            // Auto-retry up to 3 times on failure/startup
+            if (startupRetryCountRef.current < 3) {
+              startupRetryCountRef.current += 1
+              console.log(`[Layout] Retrying profile activation in 2s (Attempt ${startupRetryCountRef.current}/3)`)
+              setTimeout(() => {
+                if (!cancelled) {
+                  setProfileRefreshCounter((c) => c + 1)
+                }
+              }, 2000)
+            }
+          })
+        return () => {
+          cancelled = true
+        }
       }
     }
-  }, [currentProfileUid])
+  }, [currentProfileUid, profileRefreshCounter])
 
   // 组件卸载时清理 Fallback 及自动选优定时器，防止内存泄漏
   useEffect(() => {
@@ -1240,21 +1265,18 @@ const Layout = () => {
       if (newProfile) {
         await patchProfiles({ current: newProfile.uid })
         targetUid = newProfile.uid
-        lastEnhancedProfileRef.current = targetUid
       }
 
       await mutateProfiles()
 
-      // Real-time compilation and reload
-        await enhanceProfiles()
-        await new Promise((r) => setTimeout(r, 1000))
-        // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
-        if (targetUid) {
-          await waitForClashReady(t)
-          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
+      if (targetUid) {
+        if (targetUid === currentProfileUid) {
+          lastProcessedRef.current.uid = null
+          setProfileRefreshCounter((c) => c + 1)
         }
-      } catch (err) {
-        console.error('[handleImportProfile] 首次导入失败，尝试 Clash 代理重试:', err)
+      }
+    } catch (err) {
+      console.error('[handleImportProfile] 首次导入失败，尝试 Clash 代理重试:', err)
       try {
         await importProfile(url, { with_proxy: false, self_proxy: true })
         showNotice.success('shared.feedback.notifications.importWithClashProxy')
@@ -1268,18 +1290,15 @@ const Layout = () => {
         if (newProfile) {
           await patchProfiles({ current: newProfile.uid })
           targetUid = newProfile.uid
-          lastEnhancedProfileRef.current = targetUid
         }
 
         await mutateProfiles()
 
-        // Real-time compilation and reload
-        await enhanceProfiles()
-        await new Promise((r) => setTimeout(r, 1000))
-        // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
         if (targetUid) {
-          await waitForClashReady(t)
-          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
+          if (targetUid === currentProfileUid) {
+            lastProcessedRef.current.uid = null
+            setProfileRefreshCounter((c) => c + 1)
+          }
         }
       } catch (retryErr) {
         showNotice.error(
@@ -1314,11 +1333,8 @@ const Layout = () => {
       showNotice.info('正在更新订阅...')
       await updateProfile(uid)
       if (uid === currentProfileUid) {
-        await enhanceProfiles()
-        await new Promise((r) => setTimeout(r, 1000))
-        // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
-        await waitForClashReady(t)
-        await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
+        lastProcessedRef.current.uid = null
+        setProfileRefreshCounter((c) => c + 1)
       }
       await mutateProfiles()
       showNotice.success('订阅更新成功')
@@ -1405,8 +1421,10 @@ const Layout = () => {
       showNotice.success('配置修改成功')
       setEditProfileOpen(false)
       await mutateProfiles()
-      await enhanceProfiles()
-      await refreshProxy()
+      if (editProfileUid === currentProfileUid) {
+        lastProcessedRef.current.uid = null
+        setProfileRefreshCounter((c) => c + 1)
+      }
     } catch (err) {
       showNotice.error(String(err))
     }

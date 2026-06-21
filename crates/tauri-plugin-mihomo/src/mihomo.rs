@@ -945,19 +945,16 @@ impl Mihomo {
             .timeout(req_timeout);
         let response = self.send_by_protocol(client).await?;
         if !response.status().is_success() {
-            match response.json::<ErrorResponse>().await {
-                Ok(err_res) => {
-                    log::debug!(
-                        "delay proxy[{}], mark it timeout, response error message: {}",
-                        proxy_name,
-                        err_res.message
-                    );
-                    return Ok(ProxyDelay { delay: 0 });
-                }
-                Err(e) => {
-                    ret_failed_resp!("delay proxy[{}] failed, {}", proxy_name, e);
-                }
-            }
+            // WARNING: DO NOT return an Err/IPC error here when Clash API responds with non-success.
+            // Any HTTP failure (like 504, 502, 400, etc.) indicates a node delay check failure (Timeout).
+            // Returning an Err will trigger system-level IPC failures and cause nodes to report red "Error".
+            // Refer to BUG-171/BUG-172 agreements.
+            log::debug!(
+                "delay proxy[{}] failed with status {}, mark it timeout",
+                proxy_name,
+                response.status()
+            );
+            return Ok(ProxyDelay { delay: 0 });
         }
         Ok(response.json::<ProxyDelay>().await?)
     }

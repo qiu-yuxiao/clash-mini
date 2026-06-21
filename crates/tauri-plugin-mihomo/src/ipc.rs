@@ -1,5 +1,4 @@
 use std::{
-    ops::{Deref, DerefMut},
     pin::Pin,
     sync::{Arc, OnceLock},
     task::{Context, Poll},
@@ -224,7 +223,11 @@ pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
     #[cfg(windows)]
     {
         let mut max_retry_count = 3;
-        let mut busy_retry_count = 5;
+        // WARNING: DO NOT decrease busy_retry_count! 
+        // Under high concurrency (e.g. 36 parallel speed test workers), Named Pipes often return ERROR_PIPE_BUSY.
+        // A retry count of 24 allows up to 3 seconds of retry time, preventing false error reports.
+        // Refer to BUG-171/BUG-172 agreements.
+        let mut busy_retry_count = 24;
         const RETRY_DELAY: Duration = Duration::from_millis(125);
 
         let client = loop {

@@ -15,7 +15,7 @@ static ACTIVE_TASKS: Mutex<Vec<AbortHandle>> = Mutex::new(Vec::new());
 
 /// 强制中止正在运行的其它后台测速任务，使其尽快释放锁
 pub fn cancel_active_auto_select() {
-    let mut handles = ACTIVE_TASKS.lock().unwrap();
+    let mut handles = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
     for handle in handles.drain(..) {
         handle.abort();
     }
@@ -326,7 +326,7 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
 
     // 将这些中止句柄存入全局，以便需要时可以中止它们
     {
-        let mut active = ACTIVE_TASKS.lock().unwrap();
+        let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
         *active = abort_handles;
     }
 
@@ -339,7 +339,7 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
 
     // 清理全局任务句柄
     {
-        let mut active = ACTIVE_TASKS.lock().unwrap();
+        let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
         active.clear();
     }
 
