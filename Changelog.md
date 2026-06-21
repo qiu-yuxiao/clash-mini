@@ -1,3 +1,29 @@
+## v1.5.3
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-138: Redesign lightning speed test button to test only visible (filtered) nodes instead of all nodes, using front-end delayManager concurrency for per-node shimmer animation, and prevent auto-switching active nodes.
+- Fix BUG-139: Fix traffic metrics cards layout nesting error under both wide and narrow window modes.
+
+### 🚀 Optimizations
+
+- Optimize: Unify the default concurrency limit to 36 to match the configuration default.
+- Refactor: Format imports and simplify logger calls in Rust backend `enhance/mod.rs`.
+
+## v1.5.2
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-138: Fix lightning speed test button failure caused by empty test URL string.
+- Fix: Use pure CSS to fix narrow window folding and wide window equal-width layout.
+
+## v1.5.1
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-121/BUG-138: Use frontend `delayProxyByName` API path to prevent lock conflicts.
+- Fix: Remove "WinAero" prefix from base settings card title.
+
 ## v1.5.0
 
 ### 🐞 Fixed Bugs
