@@ -425,6 +425,35 @@ export const ProxyGroups = (props: Props) => {
         // 通过 delayManager 并发测速：每个节点测速前自动标记 -2 触发流光动画，
         // 结果实时写回 delayManager 触发界面更新
         await delayManager.checkListDelay(visibleNames, groupName, timeout)
+
+        // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 50ms 且 < timeout）
+        if (!isChainMode) {
+          const group = availableGroups.find((g: any) => g.name === groupName)
+          if (group) {
+            let fastestNodeName: string | null = null
+            let minDelay = 1e9
+
+            for (const name of visibleNames) {
+              const proxyItem = proxiesData?.records[name]
+              if (!proxyItem) continue
+              const delay = delayManager.getDelayFix(proxyItem, groupName)
+              if (delay >= 50 && delay < timeout) {
+                if (delay < minDelay) {
+                  minDelay = delay
+                  fastestNodeName = name
+                }
+              }
+            }
+
+            if (fastestNodeName) {
+              const fastestProxyItem = proxiesData?.records[fastestNodeName]
+              if (fastestProxyItem) {
+                debugLog(`[ProxyGroups] 自动优选最快节点: ${fastestNodeName} (延迟: ${minDelay}ms)`)
+                handleProxyGroupChange(group, fastestProxyItem)
+              }
+            }
+          }
+        }
       }
     } catch (error) {
       console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)
