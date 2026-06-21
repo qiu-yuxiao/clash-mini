@@ -1,189 +1,133 @@
-# Handoff Report — Agreement Audit
-
-This report presents the compliance verification of the ClashVerge frontend (`src/`) and backend (`src-tauri/`) with the 26 design and bug-fix specifications laid out in `clash_mini_agreements.md`.
-
----
+# Handoff Report - Agreement Compliance Audit
 
 ## 1. Observation
-Direct observations of the codebase relative to the 26 specifications:
 
-* **Agreement One (一): Project Positioning and System Isolation**
-  * `src-tauri/tauri.conf.json` lines 16, 29-30:
-    ```json
-    "externalBin": ["sidecar/mini-mihomo", "sidecar/mini-mihomo-alpha"],
-    ...
-    "productName": "Clash Mini",
-    "identifier": "io.github.clash-mini.clash-mini",
-    ```
-  * `src-tauri/src/constants.rs` lines 4, 11:
+Direct code observations from diffs between commit `d3831a0ce5ecc6b2c040368570773f2622d0b91b` and latest HEAD (`196e7c01`):
+
+### A. Cargo.lock
+- **File**: `Cargo.lock`
+- **Lines**: 1073
+- **Observed Change**:
+```diff
+ [[package]]
+ name = "clash-mini"
+-version = "1.5.3"
++version = "1.5.4"
+```
+
+### B. Depreciation Comments in plugin-mihomo
+- **Files**: 
+  - `crates/tauri-plugin-mihomo/guest-js/index.ts` (Lines 112-115)
+  - `crates/tauri-plugin-mihomo/src/commands.rs` (Lines 70-73)
+  - `crates/tauri-plugin-mihomo/src/mihomo.rs` (Lines 756-758)
+- **Observed Change**: Added JSDoc/code comments indicating that the front-end strategies for strategy group latency testing (such as `delayGroup` / `delay_group`) are deprecated remnants of Clash Verge, since Clash Mini handles auto-selection through the Rust backend daemon or front-end direct node tests.
+
+### C. Backend Monitor Refactoring
+- **File**: `src-tauri/src/module/monitor.rs`
+- **Lines**: 131, 148, 197-202, 301-302, 422, 441
+- **Observed Change**:
+  - Replaced HTTP client (`reqwest::Client`) with the local socket client (`Handle::mihomo()`).
+  - Active node health check:
     ```rust
-    pub const DEFAULT_EXTERNAL_CONTROLLER: &str = "127.0.0.1:9098";
-    ...
-    pub const DEFAULT_MIXED: u16 = 10801;
+    if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 500).await {
+        if delay_info.delay > 0 {
+            return Ok(true);
+        }
+    }
     ```
-  * `src-tauri/src/constants.rs` lines 15-18:
+  - Auto-select delay test:
     ```rust
-    #[cfg(not(feature = "verge-dev"))]
-    pub const SINGLETON_SERVER: u16 = 33335;
-    #[cfg(feature = "verge-dev")]
-    pub const SINGLETON_SERVER: u16 = 33336;
+    if let Ok(delay_info) = mihomo.delay_proxy_by_name(&node_name, &test_url, 2000).await {
+        if delay_info.delay > 0 && delay_info.delay < 2000 {
+            return Some((node_name, delay_info.delay));
+        }
+    }
     ```
-  * `src-tauri/src/utils/dirs.rs` lines 12, 17:
-    ```rust
-    pub static APP_ID: &str = "io.github.clash-mini.clash-mini";
-    ```
-  * `src-tauri/src/feat/window.rs` line 119 & `src-tauri/src/core/manager/state.rs` lines 143-164: Orphan child processes of `mini-mihomo` are scanned and killed on exit:
-    ```rust
-    if name_str.contains("mini-mihomo") { process.kill(); }
-    ```
+  - Detection loop interval: `check_interval = if is_retry_mode { 3 } else { 15 }`.
+  - Self-healing threshold: `consecutive_fails >= 3`.
+  - Concurrency limit: `MAX_CONCURRENT_DELAY_TESTS = 32`.
 
-* **Agreement Two (二): Interface Layout and Visual**
-  * `src/pages/_layout.tsx` lines 4245-4350: Shows the Excel-style horizontal skin selector starting at `left: 177.5px` and total width `462.5px`, rendering unselected options flat and selected options with `get3DButtonStyle(theme, 'contained', 'primary')`.
-  * `src/utils/button-styles.ts` contains full implementations of the 6 skin variants (contained, outlined, cards) using HSL calculations, linear/radial gradients, and variables from `:root`.
-  * `src/pages/_layout.tsx` lines 3724-3786: Displays sliders for skin parameter adjustment (Depth/Vibrancy/Radius/etc.) with `min={0.0}`, `max={5.0}`, and `step={0.1}`.
+### D. Layout Page Updates
+- **File**: `src/pages/_layout.tsx`
+- **Lines**: 22, 38, 87-97, 104-107, 340-343, 357, 380
+- **Observed Change**:
+  - `frontendAutoSelect` triggers asynchronous test via `DelayManager.checkListDelay(allNames, groupName, timeout, concurrency)` with a default concurrency cap of `36`.
+  - Flash-connect is implemented: `if (!hasSelectedTemp && healthyNodes.length >= 1)` immediately switches nodes and refreshes the display.
+  - Early-termination is implemented: `healthyNodes.length >= 5 || testedCount >= allNames.length || elapsed >= 15000` resolves early.
+  - Fallback logic mismatch:
+    - Line 340: `// 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速`
+    - Line 380: `}, 10000)` (Sets timeout to 10 seconds).
+    - Line 357: `const hasHealth = latestDelay > 50 && latestDelay < 2000` (Filters out delay < 50ms).
 
-* **Agreement Three (三): Routing Logic and Manual Path Control**
-  * `src/services/cmds.ts` lines 18-91 (`enhanceProfiles`): Automatically rewrites the profiles to have a single `PROXY` group.
-  * `src/pages/_layout.tsx` lines 2132-2160: Enforces mutual exclusion between Manual Mode, System Proxy, and TUN Mode.
-  * `src/components/connection/connection-table.tsx` displays only "Connection Destination (Host)" and "Routing (Chains)" columns.
-
-* **Agreement Four (四): System Tray Icon**
-  * `src-tauri/src/core/tray/mod.rs` lines 56-57:
-    ```rust
-    let icon_bytes = include_bytes!("../../../icons/tray-icon.png").to_vec();
-    let image = tauri::image::Image::from_bytes(&icon_bytes)?;
-    ```
-  * Icons do not update dynamically, conforming to the stability requirements in BUG-073 (Agreement Eighteen).
-
-* **Agreement Five (五): Copyright and Licensing**
-  * `src/pages/_layout.tsx` lines 3843-3860:
-    ```tsx
-    © 2026 Qiu Yuxiao (Modified parts)
-    ...
-    href="mailto:qiuyuxiao@gmail.com"
-    ```
-
-* **Agreement Six (六): Background Communication Silence**
-  * `src/hooks/use-traffic-data.ts` lines 36, 43:
+### E. Delay Manager sweep/glow triggering
+- **File**: `src/services/delay.ts`
+- **Lines**: 265-269
+- **Observed Change**:
+  - The UI notification triggering block is moved before the worker loop:
     ```typescript
-    const active = enabled && isVisible
-    ...
-    buildSubscriptKey: (date) => (active ? `getClashTraffic-${date}` : null),
-    ```
-  * `src/hooks/use-connection-data.ts` lines 30, 36: Shuts down WS connection when `isWsActive` (enabled && visible) is false.
-  * `src/pages/_layout.tsx` line 4989: `{logsOpen && <LogsPage />}` unmounts the log page when closed.
-
-* **Agreement Eleven (十一): Admin Mode Leak Fix (BUG-070)**
-  * `src-tauri/src/core/manager/lifecycle.rs` lines 95-98:
-    ```rust
-    let is_admin = tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin(Handle::app_handle());
-    if is_admin { return; }
-    ```
-
-* **Agreement Twelve (十二): Update & Help Menu (BUG-071)**
-  * `src/pages/_layout.tsx` lines 4057-4161: Renders the Help button as a pop-up Menu with items `🐱 GitHub Homepage`, `💡 Help Guide (Wiki)`, `🚀 Check Software Update`, and `⚙️ Check Core Update`.
-
-* **Agreement Fifteen (十五): Kernel Update Fallback & Version Formatting (BUG-074)**
-  * `src-tauri/src/core/core_updater.rs` line 228: `let nm = NetworkManager::new();`
-  * `src/pages/_layout.tsx` lines 348-352:
-    ```typescript
-    const formatCoreVersion = (version?: string) => {
-      if (!version) return ''
-      const clean = version.trim().replace(/^v+/i, '')
-      return `Ver.${clean}`
+    const listener = this.groupListenerMap.get(group)
+    if (listener) {
+      this.queueGroupNotification(group)
     }
     ```
 
-* **Agreement Sixteen (十六): System Resource & I/O Optimization (BUG-075)**
-  * `src/hooks/use-traffic-monitor.ts` line 54: `snapshotIntervalMs: 3000,`
-  * `src/providers/app-data-provider.tsx` line 212: `enabled: false,` (for `appUptime`)
-  * `src/components/proxy/proxy-groups.tsx` line 79: `refetchInterval: isVisible ? 3000 : false,`
-
-* **Agreement Eighteen (十八): Tooltip Wording (BUG-079)**
-  * `src/pages/_layout.tsx` lines 3222-3224:
-    ```typescript
-    title={t('settings.mini.routingTooltipRules', {
-      defaultValue: 'Adjust route controls at will on top of preset rules',
-    })}
-    ```
-  * All 13 locale files `src/locales/*/settings.json` have `"routingTooltipRules"` set.
-
-* **Agreement Nineteen (十九): Same Version Update Prompt Block (BUG-080)**
-  * `src/pages/_layout.tsx` lines 1729-1733 (client) and 1779-1782 (core): Returns early after triggering `showNotice.info` when versions match.
-
-* **Agreement Twenty (二十): WebView2 Memory Recovery (BUG-082)**
-  * `src-tauri/src/utils/window_manager.rs` lines 345-385:
-    ```rust
-    let _ = core_webview19.SetMemoryUsageTargetLevel(level);
-    ```
-  * Active/Inactive events hook `optimize_window_memory` in `lib.rs` and `window_manager.rs`.
-
-* **Agreement Twenty-Three (二十三): Input Context Menu & Clipboard (BUG-091)**
-  * `src/pages/_layout.tsx` lines 1452-1557: Clipboard management via selection offsets, pasting text seamlessly.
-
-* **Agreement Twenty-Five (二十五): Backend Active Node Monitor (BUG-083/093)**
-  * `src-tauri/src/module/monitor.rs` lines 405-494: Implements the background worker, polling every 15s (3s on failure), performing 3 consecutive failure validation checks before triggers a self-heal selection.
-
-* **Agreement Twenty-Six (二十六): Startup Port Conflict & Safety (BUG-083/093/PortSafety)**
-  * `src-tauri/src/config/clash.rs` lines 62-71 and 472-498: Automatically checks ports using secret `"adapted-by-qiu-yuxiao"`, incremental allocation.
+### F. Button Disabled Styles Overrides
+- **File**: `src/utils/button-styles.ts`
+- **Lines**: 138-144, 203-208, 276-281, 324-332, 404-409, 468-473
+- **Observed Change**:
+  - Implemented explicit `&.Mui-disabled` styling blocks inside `get3DButtonStyle` for all themes:
+    - Overrides background, border color, font color, shadows, and transforms with `!important` to force accessibility contrast.
 
 ---
 
 ## 2. Logic Chain
-1. Each of the 26 specifications from `clash_mini_agreements.md` was cross-referenced with local codebase searches using `find_by_name` and `grep_search`.
-2. Verifiable declarations of variables, port allocations, directory identifiers, class assignments, and backend hooks were checked directly via the `view_file` tool.
-3. Every requirement maps precisely to its corresponding file and line number as shown in the comprehensive compliance table below.
-4. Specific constraints such as the static tray icon (Agreement 4) were traced to BUG-073 (Agreement 18), demonstrating that exceptions are deliberate architectural corrections for system stability.
-5. Therefore, the codebase is concluded to be fully compliant with all 26 specifications.
+
+1. **Fallback Timeout Mismatch**:
+   - In `_layout.tsx`, line 340 states: `// 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速`.
+   - The subsequent `setTimeout` on line 380 uses `10000` (10 seconds) instead of `6000` (6 seconds).
+   - *Therefore*, the front-end fallback logic executes after a 10-second delay, deviating from both the developer's comment and the 6-second requirement specified in Agreement Section III.7 / BUG-053.
+
+2. **Healthy Node Latency Threshold Discrepancy**:
+   - In `monitor.rs` line 198, any delay `> 0` is classified as healthy for the active node health check.
+   - In `_layout.tsx` line 64 and line 357, the frontend filters out latencies below 50ms (requiring `delay >= 50` or `latestDelay > 50`).
+   - *Therefore*, a node with a delay between 1ms and 49ms is classified as healthy by the backend monitor (meaning it will remain selected) but classified as unhealthy by the frontend (meaning it will trigger fallback testing). This threshold mismatch leads to inconsistent state calculations between backend and frontend.
+
+3. **Backend Local Socket Timeout Deviation**:
+   - In `mihomo.rs` line 32, `DEFAULT_REQUEST_TIMEOUT` is defined as `Duration::from_secs(5)` (5 seconds).
+   - In `monitor.rs`, requests such as `get_base_config` and `get_group_by_name` do not override request timeouts, so they fallback to `DEFAULT_REQUEST_TIMEOUT` (5 seconds).
+   - For `delay_proxy_by_name`, it sets `req_timeout = timeout + DEFAULT_REQUEST_TIMEOUT`, yielding a request timeout of 7 seconds (Line 301).
+   - *Therefore*, Local Socket requests can block for 5 to 7 seconds, violating the 3-second limit specified in Agreement Section II.25 / BUG-083/093 to prevent deadlocks when the Clash core freezes.
 
 ---
 
 ## 3. Caveats
-* Backend compilation check (`cargo check`) timed out waiting for user permission. However, because this task is strictly a read-only investigation, no code modifications were attempted or required.
-* The compliance assessment assumes that the checked files reflect the final version of the code that will compile and run.
+- This audit is read-only and based on static code analysis of the modifications. Compile-time or run-time validation was not performed.
+- Standard behavior of other non-modified files (such as subcomponents or CSS files) is assumed to be stable and compliant.
 
 ---
 
 ## 4. Conclusion
-The Clash Mini codebase (both frontend `src/` and backend `src-tauri/`) is **fully compliant** with the 26 design and bug-fix agreements laid out in `clash_mini_agreements.md`. There are no discrepancies or omissions.
+The modifications generally fulfill the agreement requirements:
+- **36-concurrency limit** is correctly enforced in `_layout.tsx` (using 36) and `monitor.rs` (using 32).
+- **Flash-connect** and **Early-termination** are fully implemented in `_layout.tsx`.
+- **Disabled button text contrast rules** are implemented in `button-styles.ts` across all 6 skins.
+- **UI sweep/glow animation feedback** starts instantly in `delay.ts`.
+- **Backend monitor** uses Local Socket and adheres to the 15s/3s checks and 3-fail threshold.
 
-### Comprehensive Compliance Table
-
-| Agreement ID | Specification Name | Status | Implementation File(s) & Lines | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **一 (1)** | Project Positioning & Isolation | **Fully Compliant** | `src-tauri/tauri.conf.json` lines 16, 29-30<br>`src-tauri/src/constants.rs` lines 4, 11, 15-18<br>`src-tauri/src/utils/dirs.rs` lines 12, 17, 60-66<br>`src-tauri/src/feat/window.rs` line 119 | Complete port/directory separation from original Clash Verge. Sidecars renamed, orphan cores killed. |
-| **二 (2)** | Layout & Visual Spec | **Fully Compliant** | `src/assets/styles/layout.scss`<br>`src/pages/_layout/hooks/use-custom-theme.ts` lines 448-531<br>`src/utils/button-styles.ts` | Dynamic 3D skeuomorphic styling variables in `:root` with double border styling. Opaque panels. |
-| **三 (3)** | Routing & Path Control | **Fully Compliant** | `src/pages/_layout.tsx` lines 2132-2160, 3220-3240<br>`src/services/cmds.ts` lines 18-91 | 3-state mutual exclusion. Injects MATCH rules dynamically. Merges multi-subscriptions. |
-| **四 (4)** | System Tray Icon Spec | **Partially Compliant** | `src-tauri/src/core/tray/mod.rs` lines 56-57 | Icons remain static as deliberately modified by BUG-073 (Agreement 18) to avoid `E_FAIL` errors. |
-| **五 (5)** | Copyright and Licensing | **Fully Compliant** | `src/pages/_layout.tsx` lines 3843-3860 | Displays `© 2026 Qiu Yuxiao (Modified parts)` in settings drawer footer. |
-| **六 (6)** | Background Silence | **Fully Compliant** | `src/hooks/use-traffic-data.ts` lines 36, 43<br>`src/hooks/use-connection-data.ts` lines 30, 36<br>`src/pages/_layout.tsx` line 4989 | WS connections severed when hidden/drawer closed. LogPage unmounted when closed. |
-| **七 (7)** | BUG-057 Deep Fix | **Fully Compliant** | `src/pages/_layout.tsx` lines 1913-1935, 1974-1979 | Synchronizes configuration reload via `lastEnhancedProfileRef` to avoid double reloads. |
-| **八 (8)** | Data Stream Streamlining | **Fully Compliant** | `src/services/cmds.ts` lines 168-271<br>`src/components/proxy/use-render-list.ts` lines 381-496 | Renders only a single PROXY group without deep multi-group fallbacks. |
-| **九 (9)** | UI Sliders Fix | **Fully Compliant** | `src/pages/_layout.tsx` lines 3728, 3780<br>`src/assets/styles/layout.scss`<br>`src/pages/_layout/hooks/use-custom-theme.ts` | Supports custom slider labels, max limit raised to 5.0, animations scale correctly. |
-| **十 (10)** | Cyberpunk & Monochrome Switch | **Fully Compliant** | `src/assets/styles/layout.scss`<br>`src/components/base/base-switch.tsx` lines 451-547 | Cyberpunk light mode contrasts. Monochrome switch reshaped to 56x28px capsule. |
-| **十一 (11)** | Admin Mode Leak (BUG-070) | **Fully Compliant** | `src-tauri/src/core/manager/lifecycle.rs` lines 95-98 | Skips service verification logic when running as administrator. |
-| **十二 (12)** | Help Dropdown Menu (BUG-071) | **Fully Compliant** | `src/pages/_layout.tsx` lines 4057-4161 | Help button click opens a theme-compliant pop-up Menu with update options. |
-| **十三 (13)** | Profile Card Context Menu (BUG-072) | **Fully Compliant** | `src/pages/_layout.tsx` lines 1560-1566, 4533-4655 | Profile cards support context menu options (Edit, Open file, Copy url, Update, Delete). |
-| **十四 (14)** | Exit Node Rotation (BUG-065) | **Fully Compliant** | `src/pages/_layout.tsx` lines 460-538 | Cycling reads search/filter settings dynamically on click and stays in current subset. |
-| **十五 (15)** | Fallback & Formatting (BUG-074) | **Fully Compliant** | `src-tauri/src/core/core_updater.rs`<br>`src/pages/_layout.tsx` lines 348-352 | Integrates `NetworkManager` fallback and applies `formatCoreVersion` (Ver.X.Y.Z). |
-| **十六 (16)** | Resource Optimization (BUG-075) | **Fully Compliant** | `src/hooks/use-traffic-monitor.ts` line 54<br>`src/providers/app-data-provider.tsx` line 212 | Disables appUptime. Increases traffic snapshot timer to 3s. |
-| **十七 (17)** | Download Timeout (BUG-078) | **Fully Compliant** | `src-tauri/src/core/core_updater.rs` lines 111-120, 228-262 | Implements 20s network chunk timeout and attempts localhost, system proxy, direct fallbacks. |
-| **十八 (18)** | Tooltip Wording (BUG-079) | **Fully Compliant** | `src/pages/_layout.tsx` lines 3222-3224<br>`src/locales/*/settings.json` | Localized translation key updated for all 13 languages. |
-| **十九 (19)** | Version Update Block (BUG-080) | **Fully Compliant** | `src/pages/_layout.tsx` lines 1729-1733, 1779-1782 | Aborts update prompt if versions match, rendering info toast instead. |
-| **二十 (20)** | WebView2 Memory (BUG-082) | **Fully Compliant** | `src-tauri/src/utils/window_manager.rs` lines 345-385 | Window focus/visibility calls COM interface to switch WebView2 memory between Low/Normal. |
-| **二十一 (21)** | Background Monitor [Deprecated] | **Not Applicable** | Removed | Replaced by the backend daemon monitor in Agreement Twenty-Five. |
-| **二十二 (22)** | Trump-3D Dark Contrast (BUG-090) | **Fully Compliant** | `src/pages/_layout.tsx` | Enforces `#2C1F03` for settings drawer texts in Retro Dark Mode. |
-| **二十三 (23)** | Input Context Menu (BUG-091) | **Fully Compliant** | `src/pages/_layout.tsx` lines 1452-1557 | Input field has custom right-click Menu supporting caret paste/cut clipboard managers. |
-| **二十四 (24)** | Speed Test Select Fastest (BUG-092) | **Fully Compliant** | `src/components/proxy/proxy-groups.tsx` line 408 | Speed test triggers backend auto-select only within currently filtered candidate subset. |
-| **二十五 (25)** | Backend Active Monitor (BUG-083/093) | **Fully Compliant** | `src-tauri/src/module/monitor.rs` lines 405-494 | Background daemon loops 15s/3s checking health and healing via 3 consecutive failures. |
-| **二十六 (26)** | Port Conflict & Safety | **Fully Compliant** | `src-tauri/src/config/clash.rs` lines 62-71, 472-498 | Changes default secret to `"adapted-by-qiu-yuxiao"`, verifies port using it, increments on conflict. |
+However, three compliance issues remain:
+1. **Fallback Timeout Inconsistency** in `_layout.tsx` (10 seconds used instead of 6 seconds).
+2. **Healthy Node Delay Threshold Mismatch** between backend (`delay > 0`) and frontend (`delay >= 50`).
+3. **Rust Local Socket Timeout Mismatch** (using 5-7s timeouts instead of the 3s limit).
 
 ---
 
 ## 5. Verification Method
-To independently verify the observations and conclusion:
-1. **Directory Isolation**: Inspect `src-tauri/src/utils/dirs.rs` to confirm `APP_ID` is set to `"io.github.clash-mini.clash-mini"`.
-2. **Ports**: Check `src-tauri/src/constants.rs` to confirm default ports (`10801` mixed, `9098` controller, `33335/33336` singleton).
-3. **Background Silence**: Inspect `src/hooks/use-traffic-data.ts` and `src/hooks/use-connection-data.ts` to confirm WS subscription is gated by visibility.
-4. **WebView2 Memory**: Inspect `src-tauri/src/utils/window_manager.rs` function `optimize_window_memory` to confirm the COM `SetMemoryUsageTargetLevel` call is present.
-5. **Autoselect**: Inspect `src-tauri/src/module/monitor.rs` to verify the background loop and the 32 concurrency limit semaphore.
+
+- Run the following test command to verify compile safety of Rust modifications:
+  ```powershell
+  cargo check
+  ```
+- Inspect target files and verify code segments:
+  - `src/pages/_layout.tsx` (Lines 340-343, 380) for `setTimeout(..., 10000)`.
+  - `src-tauri/src/module/monitor.rs` (Lines 198, 302) and `src/pages/_layout.tsx` (Lines 64, 357) for the threshold differences (`> 0` vs `>= 50`).
+  - `crates/tauri-plugin-mihomo/src/mihomo.rs` (Line 32) and `src-tauri/src/module/monitor.rs` to verify no request timeout override.

@@ -322,8 +322,12 @@ export const get3DButtonStyle = (
         boxShadow: '0 2px 4px 0 rgba(0, 0, 0, 0.04)',
       },
       '&.Mui-disabled': {
-        background: 'rgba(255, 255, 255, 0.03) !important',
-        borderColor: 'rgba(255, 255, 255, 0.05) !important',
+        background: isLight
+          ? 'rgba(0, 0, 0, 0.03) !important'
+          : 'rgba(255, 255, 255, 0.03) !important',
+        borderColor: isLight
+          ? 'rgba(0, 0, 0, 0.08) !important'
+          : 'rgba(255, 255, 255, 0.05) !important',
         color: isLight
           ? 'rgba(0, 0, 0, 0.26) !important'
           : 'rgba(255, 255, 255, 0.25) !important',

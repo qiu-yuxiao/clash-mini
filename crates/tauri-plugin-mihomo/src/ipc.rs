@@ -224,12 +224,21 @@ pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
     #[cfg(windows)]
     {
         let mut max_retry_count = 3;
+        let mut busy_retry_count = 5;
         const RETRY_DELAY: Duration = Duration::from_millis(125);
 
         let client = loop {
             match ClientOptions::new().open(socket_path) {
                 Ok(client) => break client,
-                Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => (),
+                Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
+                    if busy_retry_count == 0 {
+                        return Err(Error::Io(std::io::Error::new(
+                            std::io::ErrorKind::TimedOut,
+                            "Named pipe busy timeout exceeded"
+                        )));
+                    }
+                    busy_retry_count -= 1;
+                }
                 Err(e) => {
                     log::warn!("failed to connect to named pipe: {socket_path}, {e}");
                     if max_retry_count == 0 {
@@ -351,38 +360,22 @@ pub enum RejectPolicy {
 
 // IPC 连接包装器
 struct IpcConnection {
-    stream: WrapStream,
+    sender: http1::SendRequest<Full<Bytes>>,
     last_used: Instant,
-}
-
-impl Deref for IpcConnection {
-    type Target = WrapStream;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.stream
-    }
-}
-
-impl DerefMut for IpcConnection {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.stream
-    }
 }
 
 impl IpcConnection {
     #[inline]
-    fn new(stream: WrapStream) -> Self {
+    fn new(sender: http1::SendRequest<Full<Bytes>>) -> Self {
         Self {
-            stream,
+            sender,
             last_used: Instant::now(),
         }
     }
 
     #[inline]
     fn is_valid(&self) -> bool {
-        self.stream.is_available().unwrap_or_default()
+        self.sender.is_ready()
     }
 }
 
@@ -529,10 +522,21 @@ impl IpcConnectionPool {
             "creating connection, available permits: {}",
             Self::global()?.semaphore.available_permits()
         );
-        match connect_to_socket(socket_path).await {
-            Ok(stream) => Ok(IpcConnection::new(stream)),
-            Err(e) => Err(Error::ConnectionFailed(e.to_string())),
-        }
+        let stream = match connect_to_socket(socket_path).await {
+            Ok(stream) => stream,
+            Err(e) => return Err(Error::ConnectionFailed(e.to_string())),
+        };
+        let (sender, conn_driver) = http1::handshake(stream)
+            .await
+            .map_err(|e| Error::HttpParseError(e.to_string()))?;
+
+        tauri::async_runtime::spawn(async move {
+            if let Err(err) = conn_driver.await {
+                log::error!("IPC Connection Error: {:?}", err);
+            }
+        });
+
+        Ok(IpcConnection::new(sender))
     }
 
     pub fn clear_pool(&self) {
@@ -557,9 +561,6 @@ impl LocalSocket for RequestBuilder {
         let reqwest_req = self.build()?;
         let timeout_dur = reqwest_req.timeout();
 
-        let pool = IpcConnectionPool::global()?;
-        let (conn, _permit) = pool.get_connection(socket_path).await?;
-
         let method = reqwest_req.method();
         let url = reqwest_req.url();
         let headers = reqwest_req.headers().clone();
@@ -578,17 +579,10 @@ impl LocalSocket for RequestBuilder {
         let hyper_req = builder.body(Full::new(body_bytes))?;
 
         let process = async move {
-            let (mut sender, conn_driver) = http1::handshake(conn.stream)
-                .await
-                .map_err(|e| Error::HttpParseError(e.to_string()))?;
+            let pool = IpcConnectionPool::global()?;
+            let (mut conn, _permit) = pool.get_connection(socket_path).await?;
 
-            tauri::async_runtime::spawn(async move {
-                if let Err(err) = conn_driver.await {
-                    log::error!("IPC Connection Error: {:?}", err);
-                }
-            });
-
-            let hyper_res = sender
+            let hyper_res = conn.sender
                 .send_request(hyper_req)
                 .await
                 .map_err(|e| Error::HttpParseError(e.to_string()))?;
@@ -601,6 +595,10 @@ impl LocalSocket for RequestBuilder {
                 .to_bytes();
 
             let final_res = http::Response::from_parts(res_parts, collected_body);
+
+            // 返还连接回连接池
+            conn.last_used = Instant::now();
+            pool.connections.push(conn);
 
             Ok(reqwest::Response::from(final_res))
         };

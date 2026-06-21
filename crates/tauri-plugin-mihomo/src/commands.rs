@@ -224,17 +224,20 @@ pub(crate) async fn upgrade_core(
     channel: CoreUpdaterChannel,
     force: bool,
 ) -> Result<()> {
-    state.read().await.upgrade_core(channel, force).await
+    let mihomo = state.read().await.clone();
+    mihomo.upgrade_core(channel, force).await
 }
 
 #[command]
 pub(crate) async fn upgrade_ui(state: State<'_, RwLock<Mihomo>>) -> Result<()> {
-    state.read().await.upgrade_ui().await
+    let mihomo = state.read().await.clone();
+    mihomo.upgrade_ui().await
 }
 
 #[command]
 pub(crate) async fn upgrade_geo(state: State<'_, RwLock<Mihomo>>) -> Result<()> {
-    state.read().await.upgrade_geo().await
+    let mihomo = state.read().await.clone();
+    mihomo.upgrade_geo().await
 }
 
 // mihomo websocket
@@ -293,7 +296,8 @@ pub(crate) async fn ws_disconnect(
     id: ConnectionId,
     force_timeout: Option<u64>,
 ) -> Result<()> {
-    state.read().await.disconnect(id, force_timeout).await
+    let mihomo = state.read().await.clone();
+    mihomo.disconnect(id, force_timeout).await
 }
 
 #[command]

@@ -147,7 +147,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           </Typography>
           <Switch
             size="small"
-            checked={clashConfig?.allowLan ?? false}
+            checked={clashConfig?.['allow-lan'] ?? false}
             onChange={(_, checked: boolean) => {
               handleAllowLanChange(checked)
             }}

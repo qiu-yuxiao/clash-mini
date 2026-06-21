@@ -1,13 +1,25 @@
 use crate::{config::Config, process::AsyncHandler};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Semaphore;
+use tokio::task::AbortHandle;
 use tokio::time::{Duration, Instant, sleep};
 
 /// 互斥锁：同一时间只允许一个 trigger_backend_auto_select 运行
 static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
+
+/// 全局持有的正在运行的任务句柄，用于在 Profile 切换时进行主动中止
+static ACTIVE_TASKS: Mutex<Vec<AbortHandle>> = Mutex::new(Vec::new());
+
+/// 强制中止正在运行的其它后台测速任务，使其尽快释放锁
+pub fn cancel_active_auto_select() {
+    let mut handles = ACTIVE_TASKS.lock().unwrap();
+    for handle in handles.drain(..) {
+        handle.abort();
+    }
+}
 
 /// 并发测速的最大线程数
 const MAX_CONCURRENT_DELAY_TESTS: usize = 32;
@@ -195,8 +207,8 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
         .unwrap_or("http://cp.cloudflare.com/generate_204");
 
     if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 500).await {
-        if delay_info.delay > 0 {
-            // 只要能在 500ms 内成功获取延迟，即判定为健康
+        if delay_info.delay >= 50 {
+            // 延迟满足 >= 50ms，即判定为健康
             return Ok(true);
         }
     }
@@ -289,30 +301,44 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
 
     let sem = Arc::new(Semaphore::new(MAX_CONCURRENT_DELAY_TESTS));
     let mut tasks = Vec::new();
-
+    let mut abort_handles = Vec::new();
+ 
     for node in valid_nodes {
         let mihomo = mihomo.clone();
         let test_url = test_url.clone();
         let node_name = node.clone();
         let sem = Arc::clone(&sem);
-
+ 
         let task = tokio::spawn(async move {
-            let _permit = sem.acquire().await.ok();
+            let Ok(_permit) = sem.acquire().await else { return None; };
             if let Ok(delay_info) = mihomo.delay_proxy_by_name(&node_name, &test_url, 2000).await {
-                if delay_info.delay > 0 && delay_info.delay < 2000 {
+                if delay_info.delay >= 50 && delay_info.delay < 2000 {
                     return Some((node_name, delay_info.delay));
                 }
             }
             None
         });
+        abort_handles.push(task.abort_handle());
         tasks.push(task);
     }
-
+ 
+    // 将这些中止句柄存入全局，以便需要时可以中止它们
+    {
+        let mut active = ACTIVE_TASKS.lock().unwrap();
+        *active = abort_handles;
+    }
+ 
     let mut results = Vec::new();
     for task in tasks {
         if let Ok(Some(res)) = task.await {
             results.push(res);
         }
+    }
+ 
+    // 清理全局任务句柄
+    {
+        let mut active = ACTIVE_TASKS.lock().unwrap();
+        active.clear();
     }
 
     // M1 修复：根据 sort_type 选择排序方式
@@ -396,7 +422,10 @@ pub fn start_background_monitor() {
                 last_profile_uid = Some(current_profile.clone());
                 consecutive_fails = 0;
                 is_retry_mode = false;
-
+ 
+                // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
+                cancel_active_auto_select();
+ 
                 if wait_for_clash_ready().await {
                     loop {
                         match trigger_backend_auto_select(&current_profile, 0).await {

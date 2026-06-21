@@ -1,0 +1,290 @@
+diff --git a/crates/tauri-plugin-mihomo/src/commands.rs b/crates/tauri-plugin-mihomo/src/commands.rs
+index 9c97c92c..340924e6 100644
+--- a/crates/tauri-plugin-mihomo/src/commands.rs
++++ b/crates/tauri-plugin-mihomo/src/commands.rs
+@@ -70,6 +70,9 @@ pub(crate) async fn get_group_by_name(state: State<'_, RwLock<Mihomo>>, group_na
+     state.read().await.get_group_by_name(&group_name).await
+ }
+ 
++// [Clash Mini 备注]: 此命令为 Clash Verge 遗留接口。
++// 在 Clash Mini 中，前台批量测速已统一收拢到后端的 trigger_auto_select 触发并返回结果，
++// 此处在 Clash Mini 内属于闲置死代码，保留仅为了维持插件 API 接口的完整性。
+ #[command]
+ pub(crate) async fn delay_group(
+     state: State<'_, RwLock<Mihomo>>,
+diff --git a/crates/tauri-plugin-mihomo/src/mihomo.rs b/crates/tauri-plugin-mihomo/src/mihomo.rs
+index ea224424..2f4740ab 100644
+--- a/crates/tauri-plugin-mihomo/src/mihomo.rs
++++ b/crates/tauri-plugin-mihomo/src/mihomo.rs
+@@ -756,6 +756,7 @@ impl Mihomo {
+     }
+ 
+     /// 对指定代理组进行延迟测试, 同时清理代理组已固定的节点
++    /// [Clash Mini 备注]: 此方法对应 Clash Verge 的策略组延迟测速，目前在 Clash Mini 内已无任何调用，保留仅作为备用和对齐内核 API。
+     pub async fn delay_group(&self, group_name: &str, test_url: &str, timeout: u32) -> Result<HashMap<String, u32>> {
+         let group_name_encode = urlencoding::encode(group_name);
+         let test_url = urlencoding::encode(test_url);
+diff --git a/src-tauri/src/module/monitor.rs b/src-tauri/src/module/monitor.rs
+index bd985071..24a8b54c 100644
+--- a/src-tauri/src/module/monitor.rs
++++ b/src-tauri/src/module/monitor.rs
+@@ -1,7 +1,6 @@
+ use crate::{config::Config, process::AsyncHandler};
+ use clash_verge_logging::{Type, logging};
+ use serde::{Deserialize, Serialize};
+-use serde_json::json;
+ use std::sync::Arc;
+ use std::sync::atomic::{AtomicBool, Ordering};
+ use tokio::sync::Semaphore;
+@@ -13,24 +12,6 @@ static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
+ /// 并发测速的最大线程数
+ const MAX_CONCURRENT_DELAY_TESTS: usize = 32;
+ 
+-fn create_client() -> reqwest::Client {
+-    reqwest::Client::builder()
+-        .timeout(Duration::from_secs(10))
+-        .build()
+-        .unwrap_or_else(|_| reqwest::Client::new())
+-}
+-
+-#[derive(Deserialize, Debug)]
+-struct ProxyGroupInfo {
+-    all: Option<Vec<String>>,
+-    now: Option<String>,
+-}
+-
+-#[derive(Deserialize, Debug)]
+-struct DelayResponse {
+-    delay: u32,
+-}
+-
+ #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+ pub struct FilterConfig {
+     pub filter_text: String,
+@@ -60,11 +41,6 @@ pub fn is_dummy_node(name: &str) -> bool {
+         || lower.contains("群")
+ }
+ 
+-/// 对节点名称进行 URL 编码
+-fn encode_node_name(name: &str) -> String {
+-    percent_encoding::utf8_percent_encode(name, percent_encoding::NON_ALPHANUMERIC).to_string()
+-}
+-
+ /// 从本地 `proxy_head_state.json` 读取指定 Profile 的过滤规则
+ pub async fn get_active_filter_config(profile_uid: &str) -> FilterConfig {
+     let path = match crate::utils::dirs::app_home_dir() {
+@@ -149,22 +125,13 @@ async fn get_current_profile_uid() -> Option<String> {
+ /// 等待 Clash 内核 API 及代理组节点列表填充完毕
+ async fn wait_for_clash_ready() -> bool {
+     let start_time = Instant::now();
+-    let client = create_client();
+ 
+     // 阶段 1：等待内核 API 接口响应
+     while start_time.elapsed().as_secs() < 30 {
+-        let info = Config::clash().await.data_arc().get_client_info();
+-        let server = info.server;
+-        let secret = info.secret;
+-        let mut req = client.get(format!("http://{server}/configs"));
+-        if let Some(ref s) = secret {
+-            req = req.header("Authorization", format!("Bearer {s}"));
+-        }
+-        if let Ok(res) = req.send().await {
+-            if res.status().is_success() {
+-                logging!(info, Type::Lightweight, "[后台监测] 阶段 1 完成：内核 API 已就绪");
+-                break;
+-            }
++        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
++        if mihomo.get_base_config().await.is_ok() {
++            logging!(info, Type::Lightweight, "[后台监测] 阶段 1 完成：内核 API 已就绪");
++            break;
+         }
+         sleep(Duration::from_millis(200)).await;
+     }
+@@ -177,22 +144,12 @@ async fn wait_for_clash_ready() -> bool {
+     // 阶段 2：等待代理节点列表填充
+     let start_time_2 = Instant::now();
+     while start_time_2.elapsed().as_secs() < 20 {
+-        let info = Config::clash().await.data_arc().get_client_info();
+-        let server = info.server;
+-        let secret = info.secret;
+-        let mut req = client.get(format!("http://{server}/proxies/PROXY"));
+-        if let Some(ref s) = secret {
+-            req = req.header("Authorization", format!("Bearer {s}"));
+-        }
+-        if let Ok(res) = req.send().await {
+-            if res.status().is_success() {
+-                if let Ok(group_info) = res.json::<ProxyGroupInfo>().await {
+-                    if let Some(all) = group_info.all {
+-                        if !all.is_empty() {
+-                            logging!(info, Type::Lightweight, "[后台监测] 阶段 2 完成：代理节点列表已填充");
+-                            return true;
+-                        }
+-                    }
++        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
++        if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
++            if let Some(all) = group_info.all {
++                if !all.is_empty() {
++                    logging!(info, Type::Lightweight, "[后台监测] 阶段 2 完成：代理节点列表已填充");
++                    return true;
+                 }
+             }
+         }
+@@ -209,22 +166,12 @@ async fn wait_for_clash_ready() -> bool {
+ 
+ /// 检测当前活跃代理节点的健康状态
+ async fn check_active_node_health() -> anyhow::Result<bool> {
+-    let info = Config::clash().await.data_arc().get_client_info();
+-    let server = info.server;
+-    let secret = info.secret;
+-
+-    let client = create_client();
+-    let mut req = client.get(format!("http://{server}/proxies/PROXY"));
+-    if let Some(ref s) = secret {
+-        req = req.header("Authorization", format!("Bearer {s}"));
+-    }
++    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
++    let group_info = mihomo
++        .get_group_by_name("PROXY")
++        .await
++        .map_err(|e| anyhow::anyhow!("获取 PROXY 组信息失败: {e}"))?;
+ 
+-    let res = req.send().await?;
+-    if !res.status().is_success() {
+-        return Err(anyhow::anyhow!("获取 PROXY 组信息失败: {}", res.status()));
+-    }
+-
+-    let group_info: ProxyGroupInfo = res.json().await?;
+     let active_node = match group_info.now {
+         Some(ref node) if !node.is_empty() && node != "DIRECT" && node != "REJECT" => node,
+         _ => return Ok(true), // 直连或拒绝节点，直接判定为健康
+@@ -246,23 +193,11 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
+         .default_latency_test
+         .as_deref()
+         .unwrap_or("http://cp.cloudflare.com/generate_204");
+-    let encoded_node = encode_node_name(active_node);
+-    let encoded_url = percent_encoding::utf8_percent_encode(test_url, percent_encoding::NON_ALPHANUMERIC).to_string();
+-
+-    let mut delay_req = client.get(format!(
+-        "http://{server}/proxies/{encoded_node}/delay?timeout=500&url={encoded_url}"
+-    ));
+-    if let Some(ref s) = secret {
+-        delay_req = delay_req.header("Authorization", format!("Bearer {s}"));
+-    }
+ 
+-    let delay_res = delay_req.send().await;
+-    if let Ok(res) = delay_res {
+-        if res.status().is_success() {
+-            if let Ok(_delay_info) = res.json::<DelayResponse>().await {
+-                // 只要能在 500ms 内成功获取延迟，即判定为健康
+-                return Ok(true);
+-            }
++    if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 500).await {
++        if delay_info.delay > 0 {
++            // 只要能在 500ms 内成功获取延迟，即判定为健康
++            return Ok(true);
+         }
+     }
+ 
+@@ -304,22 +239,12 @@ pub async fn trigger_backend_auto_select(profile_uid: &str, sort_type: i32) -> a
+ }
+ 
+ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) -> anyhow::Result<Vec<(String, u32)>> {
+-    let info = Config::clash().await.data_arc().get_client_info();
+-    let server = info.server;
+-    let secret = info.secret;
+-
+-    let client = create_client();
+-    let mut req = client.get(format!("http://{server}/proxies/PROXY"));
+-    if let Some(ref s) = secret {
+-        req = req.header("Authorization", format!("Bearer {s}"));
+-    }
++    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
++    let group_info = mihomo
++        .get_group_by_name("PROXY")
++        .await
++        .map_err(|e| anyhow::anyhow!("获取 PROXY 组信息失败: {e}"))?;
+ 
+-    let res = req.send().await?;
+-    if !res.status().is_success() {
+-        return Err(anyhow::anyhow!("获取 PROXY 组信息失败: {}", res.status()));
+-    }
+-
+-    let group_info: ProxyGroupInfo = res.json().await?;
+     let nodes = match group_info.all {
+         Some(n) => n,
+         None => return Ok(vec![]),
+@@ -361,35 +286,21 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
+         .as_deref()
+         .unwrap_or("http://cp.cloudflare.com/generate_204")
+         .to_string();
+-    let encoded_url = percent_encoding::utf8_percent_encode(&test_url, percent_encoding::NON_ALPHANUMERIC).to_string();
+ 
+     let sem = Arc::new(Semaphore::new(MAX_CONCURRENT_DELAY_TESTS));
+     let mut tasks = Vec::new();
+ 
+     for node in valid_nodes {
+-        let client = client.clone();
+-        let server = server.to_string();
+-        let secret = secret.clone();
+-        let encoded_url = encoded_url.clone();
++        let mihomo = mihomo.clone();
++        let test_url = test_url.clone();
+         let node_name = node.clone();
+         let sem = Arc::clone(&sem);
+ 
+         let task = tokio::spawn(async move {
+             let _permit = sem.acquire().await.ok();
+-            let encoded_node = encode_node_name(&node_name);
+-            let mut req = client.get(format!(
+-                "http://{server}/proxies/{encoded_node}/delay?timeout=2000&url={encoded_url}"
+-            ));
+-            if let Some(ref s) = secret {
+-                req = req.header("Authorization", format!("Bearer {s}"));
+-            }
+-            if let Ok(res) = req.send().await {
+-                if res.status().is_success() {
+-                    if let Ok(delay_info) = res.json::<DelayResponse>().await {
+-                        if delay_info.delay >= 50 && delay_info.delay < 2000 {
+-                            return Some((node_name, delay_info.delay));
+-                        }
+-                    }
++            if let Ok(delay_info) = mihomo.delay_proxy_by_name(&node_name, &test_url, 2000).await {
++                if delay_info.delay > 0 && delay_info.delay < 2000 {
++                    return Some((node_name, delay_info.delay));
+                 }
+             }
+             None
+@@ -431,13 +342,8 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
+             return Ok(vec![]);
+         }
+ 
+-        let mut put_req = client.put(format!("http://{server}/proxies/PROXY"));
+-        if let Some(ref s) = secret {
+-            put_req = put_req.header("Authorization", format!("Bearer {s}"));
+-        }
+-        let switch_res = put_req.json(&json!({ "name": fastest_node })).send().await;
+-        match switch_res {
+-            Ok(res) if res.status().is_success() => {
++        match mihomo.select_node_for_group("PROXY", fastest_node).await {
++            Ok(_) => {
+                 logging!(
+                     info,
+                     Type::Lightweight,
+@@ -447,16 +353,8 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
+                 crate::core::handle::Handle::refresh_clash();
+                 return Ok(results);
+             }
+-            Ok(res) => {
+-                logging!(
+-                    warn,
+-                    Type::Lightweight,
+-                    "[后台监测] 切换节点失败，HTTP 状态码: {}",
+-                    res.status()
+-                );
+-            }
+             Err(e) => {
+-                logging!(error, Type::Lightweight, "[后台监测] 切换节点发生网络错误: {e}");
++                logging!(warn, Type::Lightweight, "[后台监测] 切换节点失败: {e}");
+             }
+         }
+     } else {

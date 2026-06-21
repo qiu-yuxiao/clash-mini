@@ -12,6 +12,194 @@
 
 ## 📌 待验证与活动?Bug 详情 (Active & Pending Bugs)
 
+### BUG-168: Upgrade Command RwLock Writer Starvation (Deadlock Hazard)
+ 
+ - **现象描述**：点击检查/更新内核、UI 或 GeoIP 数据库时，可能导致整个后端卡死/死锁，无法响应后续的 API 请求（如获取代理、流量数据等）。
+ - **根因**：在 `commands.rs` 的 `upgrade_core`, `upgrade_ui`, `upgrade_geo` 命令中，异步持有全局 `Mihomo` 状态 of `read` 读锁，并在跨越多个 long-running 异步网络下载/更新操作 of `.await` 过程中一直持有。当有写入锁请求（如修改配置、重载核心等）被排队时，会阻塞随后的所有读锁请求，从而造成全局死锁。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-157: React Hook Dependency Safety — Permanent Cancellation of Profile Activation
+ 
+ - **现象描述**：切换配置或语言时，偶发配置增强（enhance）和激活/测速流程被静默永久终止，不再被触发。
+ - **根因**：`_layout.tsx` 中配置激活 Effect 依赖项（`refreshProxy`、`t`等）变化导致 cleanup 设置了 `cancelled = true`，而 Ref 早已同步更新，下一次渲染条件不满足导致逻辑断开。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-158: Profile Switch State Race Condition & Background Timer Leak
+ 
+ - **现象描述**：快速切换配置时，旧配置的自动选优定时轮询在后台持续 ticking，测速完成后会覆盖新激活配置的活跃代理节点。
+ - **根因**：切换配置清理 Promise 时，后台 `activeAutoSelectTimer` 轮询定时器未被清除。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-159: Double Selection Request Race Condition
+ 
+ - **现象描述**：自动选优首个轮询周期内若直接满足终选条件，会并行触发两次后端的节点切换与刷新请求，造成状态竞态。
+ - **根因**：`frontendAutoSelect` 中没有限制临时闪连与极速终选在同一次循环内同时运行。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-160: Memory Leak of Unresolved Promises
+ 
+ - **现象描述**：多次触发自动优选时，历史调用的 Promise 永远留在 Pending 状态，造成内存中 Promise 对象堆积泄露。
+ - **根因**：`frontendAutoSelect` 返回的 Promise 在被清除定时器时没有被 reject 掉。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-161: Unhandled Promise Rejection in `checkDelay`
+ 
+ - **现象描述**：测速超时后，被抛弃的底层 `delayProxyByName` 请求在后台失败时会在控制台报未捕获的 Promise 错误。
+ - **根因**：`Promise.race` 结束之后，仍在后台运行的测速 promise 没有挂载 `.catch()` 处理函数。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-162: Timeout Resource (Timer Handle) Leak
+ 
+ - **现象描述**：大量测速请求在超时前返回时，仍有大量未执行的 `setTimeout` 定时器遗留在系统中，虚耗内存与系统句柄。
+ - **根因**：测速成功返回后没有调用 `clearTimeout` 清理超时 promise 的定时器。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-163: Contrast and Invisible Borders Styling Issue
+ 
+ - **现象描述**：在磨砂玻璃（Frosted Glass）皮肤的浅色模式下，禁用状态的按钮背景与边框完全透明隐形，不符视觉对比度要求。
+ - **根因**：禁用样式硬编码为白色透明 `rgba(255,255,255,0.03)`，在浅色底色上对比度几乎为零。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-164: React `useMemo` Dependency Array Omits theme and skin
+ 
+ - **现象描述**：切换皮肤风格或深/浅色模式时，右上角图钉与设置按钮的 3D 样式没有发生对应刷新。
+ - **根因**：titlebar JSX element 的 `useMemo` 依赖项中漏掉了 `theme` 和 `controlSkin`，导致其未被重新生成。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-165: Monochrome Skin Slider Label Inconsistency
+ 
+ - **现象描述**：Monochrome 皮肤下，第 1 个滑块的文本标签与协议中规定的 `'Contrast'` 不一致（代码中显示为 `'Radius'`）。
+ - **根因**：用户指定以此处代码为准，需修正 `clash_mini_agreements.md` 中的协议定义。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-166: Fallback Timeout Inconsistency in layout code comments
+ 
+ - **现象描述**：自动选优降级日志打印和注释与协议规定的 6 秒降级可能仍有描述脱节。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-167: Rust Local Socket Timeout Inconsistency
+ 
+ - **现象描述**：后端自动测速时，对内核 Local Socket 发起的请求超时可高达 5 秒，超过了协议规定的 3 秒上限。
+ - **根因**：`mihomo.rs` 底层请求超时计算中在传入 `timeout` 后累加了 `DEFAULT_REQUEST_TIMEOUT` (3s)，导致总时长超标。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-141: Windows Named Pipe Busy Infinite Loop (Thread Suspension)
+ 
+ - **现象描述**：在 Windows 系统的 Named Pipe 连接实现中，若命名管道持续繁忙（如 Clash/Mihomo 核心重载或高负载），重试循环匹配到 `ERROR_PIPE_BUSY` 错误时，会无限空转，导致调用线程永久挂起。
+ - **根因**：在 `ipc.rs` 的 `connect_to_socket` 循环中，匹配到 `ERROR_PIPE_BUSY` 时仅调用了 `sleep`，并未递减 `max_retry_count`，导致该状态下无法跳出循环。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-142: Socket Connection Timeout Bypass (Resource Hang)
+ 
+ - **现象描述**：在进行本地套接字数据交互时，若连接池满或获取连接发生挂起，请求超时限制将被绕过，导致调用任务无限等待。
+ - **根因**：`send_by_local_socket` 中在应用 `timeout_dur` 超时包裹之前，就先行调用了 `pool.get_connection(socket_path).await` 获取连接，如果该获取过程挂起，超时机制无法对其生效。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-143: RwLock Writer Starvation on WebSocket Disconnect (Deadlock Hazard)
+ 
+ - **现象描述**：调用断开 WebSocket 命令 `ws_disconnect` 时可能导致整个后端死锁。
+ - **根因**：`ws_disconnect` 异步获取了全局 `Mihomo` 状态的 `read` 读锁，并在跨越多个 await 操作的 `disconnect` 过程中一直持有。若执行关闭连接发生挂起，会导致写锁请求被长期阻塞，从而引发后续所有读写锁死锁。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-144: Blocked Auto-Select on Profile Switch (Concurrency Hang)
+ 
+ - **现象描述**：在切换配置（Profile）时，如果前一次测速尚未完成，新测速请求会返回 `AUTO_SELECT_BUSY` 错误并陷入每 500ms 重试的无限循环，导致节点激活延迟。
+ - **根因**：切换配置时直接触发 `trigger_backend_auto_select`，但如果旧配置的测速任务仍占用 `AUTO_SELECT_RUNNING` 互斥量，则无法获取锁。需要引入取消令牌（Cancellation Token）以主动中止旧的测速任务。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-145: `isImportingRef` Deadlock in `handleSelectProfile`
+ 
+ - **现象描述**：在前端手动切换配置（Profile）时，活跃出口节点卡片显示为空，无法自动触发测速和选点流程。
+ - **根因**：`handleSelectProfile` 中同步设置了 `isImportingRef.current = true`，这导致 profile 变更触发的 `useEffect` 被提前阻断返回，无法执行编译（enhance）和测速流程。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-146: Inconsistent Property Access for Allow LAN Switch State
+ 
+ - **现象描述**：设置页面中的 "Allow LAN"（允许局域网连接）开关在页面加载时，其视觉开启状态与实际配置脱节，总是显示为关闭状态。
+ - **根因**：前端代码在读取配置时使用了 `clashConfig?.allowLan`，但后端返回的 Clash 配置字段是驼峰/连字符命名的 `'allow-lan'`，导致属性读取始终为 undefined。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-148: Menu and Dialog Transparent Background (Aesthetic Violation)
+ 
+ - **现象描述**：在深色模式或特定主题下，点击设置页面的帮助问号打开的版本更新弹窗，或者打开下拉菜单时，其背景完全透明，导致菜单或弹窗中的文字与主界面的文字重叠，严重影响阅读。
+ - **根因**：`_layout.tsx`、`help-menu-button.tsx` 和 `layout-dialogs.tsx` 中的 Dialog 或 Menu 组件硬编码了 `backgroundColor: 'transparent'`，违反了 agreements 中“100%不透明背景”的原则。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-149: Healthy Node Delay Threshold Mismatch
+ 
+ - **现象描述**：前端与后端在判断一个代理节点是否健康时使用的延迟门槛不一致，可能导致自愈自动选优机制判断失准。
+ - **根因**：后端监控器（`monitor.rs`）在自愈探活时判定 `delay > 0` 即为健康，而前端及 agreements 统一要求 `delay >= 50ms` 才是健康节点。用户硬性要求统一为 `delay >= 50ms`，且对 agreement 做必要整合。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-150: Rust Local Socket Timeout Mismatch
+ 
+ - **现象描述**：后端监控客户端与 Local Socket 请求使用的超时时间不一致，未完全遵守 agreements 规定的“3秒显式超时限制”。
+ - **根因**：`mihomo.rs` 中的 `DEFAULT_REQUEST_TIMEOUT` 仍配置为 5 秒，且部分请求没有显式传入 3 秒超时参数。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-151: Empty Connection Pool / Redundant Sockets
+ 
+ - **现象描述**：后端本地套接字请求在每次交互时都会创建全新的物理连接，导致连接池无法真正复用，增加了套接字句柄和系统资源的消耗。
+ - **根因**：`send_by_local_socket` 中使用 `http1::handshake` 获取了 stream 的所有权，导致交互结束后 stream 被直接释放销毁，没有归还到 `IpcConnectionPool` 中。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-152: Closed Semaphore Bypass
+ 
+ - **现象描述**：在触发自动选优时，如果控制并发的信号量（Semaphore）已被关闭，任务依然会继续运行，导致并发限制失效。
+ - **根因**：在 `monitor.rs` 中，测速任务使用 `.ok()` 处理 `sem.acquire().await` 结果，在信号量关闭返回 `None` 时没有进行拦截并提前退出。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-153: Cancelled SWR/Effect Race Condition on `lastEnhancedProfileRef`
+ 
+ - **现象描述**：在快速切换配置时，由于旧的编译任务失败（被取消），会错误地将 `lastEnhancedProfileRef.current` 设为 `null`，从而触发冗余的重复编译。
+ - **根因**：在 `_layout.tsx` 中，`enhanceProfiles` 的 `.catch` 块没有检查 `cancelled` 状态，就直接重置了 `lastEnhancedProfileRef.current = null`。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-154: Memory Leak / Stale Data Race Condition in `ActiveNodeStatusCard`
+ 
+ - **现象描述**：当快速切换节点时，历史节点地址异步请求返回较慢，可能覆盖当前最新的活跃节点地址，导致界面上显示错误的节点信息或造成组件卸载时的内存泄露。
+ - **根因**：`ActiveNodeStatusCard` 中 `getProxyAddr` 的异步回调中没有进行 effect 清理标记（cancelled）检查。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-155: Metrics Row Card Ordering Mismatch
+ 
+ - **现象描述**：底部流量卡片的排列顺序不符合 agreements 中“上传组在左，下载组在右”的规范，当前代码为下载组在左。
+ - **根因**：`mini-traffic-panel.tsx` 中下载组 DOM 元素排在上传组前面。根据用户硬性要求，画面表示以现存代码（下载在左，上传在右）为准，需修改 agreement 协议定义。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
+### BUG-156: Fallback Timeout Inconsistency in `_layout.tsx`
+ 
+ - **现象描述**：前端自动选优兜底定时器的超时时间与 agreements 及注释要求的 6 秒不符。
+ - **根因**：在 `_layout.tsx` 中，虽然注释标注为 6 秒，但 `setTimeout` 的延时值实际上硬编码为了 `10000`（10秒）。
+ - **当前状态**：`用户未确认`
+ - **目标版本**：`v1.5.5`
+
 ### BUG-139: 底部流量卡片排列方式不符合 agreements 规范（宽/窄窗口模式均不符）
  
  - **现象描述**：页面最下方的 4 个流量信息小卡片排列方式不正确。在宽窗口模式下，上传与下载组没有左右平铺并按“上传组”在左、“下载组”在右的方式排列；在窄窗口模式下，无法自动换行并垂直堆叠展示，而是水平挤压在一起，且样式错乱。
@@ -80,6 +268,7 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-147** | 主题参数调节滑动条上限及范围偏离规范 | v1.5.5 | 代码已修正，已确认 |
 | **BUG-138** | 闪电光标（批量测速）点击后无任何反应，无法触发全节点测速 | v1.5.3 | 代码已修正，已确认 |
 | **BUG-127** | 底部流量指标卡片排列顺序不统一 | v1.4.8 | 代码已修正，已确认 |
 | **BUG-126** | 弹出菜单与对话框层级透明背景导致文字重叠不可读 | v1.4.8 | 代码已修正，已确认 |

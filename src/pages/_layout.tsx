@@ -216,6 +216,7 @@ async function waitForClashReady(
 }
 
 let activeAutoSelectTimer: any = null
+let activeAutoSelectReject: ((reason?: any) => void) | null = null
 
 async function frontendAutoSelect(
   groupName: string,
@@ -233,6 +234,10 @@ async function frontendAutoSelect(
     clearInterval(activeAutoSelectTimer)
     activeAutoSelectTimer = null
   }
+  if (activeAutoSelectReject) {
+    activeAutoSelectReject(new Error('AutoSelectCancelled'))
+    activeAutoSelectReject = null
+  }
 
   // 1. 异步拉起 36 路并发测速（非阻塞，让其在后台继续完整跑完以刷新所有节点的延迟）
   DelayManager.checkListDelay(allNames, groupName, timeout, concurrency).catch((err) => {
@@ -243,8 +248,16 @@ async function frontendAutoSelect(
   const startTime = Date.now()
   let hasSelectedTemp = false
 
-  return new Promise<[string, number][]>((resolve) => {
-    activeAutoSelectTimer = setInterval(async () => {
+  return new Promise<[string, number][]>((resolve, reject) => {
+    activeAutoSelectReject = reject
+
+    const timerId = setInterval(async () => {
+      // 检查如果已经不是当前活动的 timer，或者被 cancel 了，直接退出并清除该 timer
+      if (activeAutoSelectTimer !== timerId) {
+        clearInterval(timerId)
+        return
+      }
+
       // 收集当前已测出的健康节点并统计已测试数量
       const healthyNodes: { name: string; delay: number }[] = []
       let testedCount = 0
@@ -259,21 +272,14 @@ async function frontendAutoSelect(
         }
       }
 
+      // 如果在此期间 timer 已经被清除或改变，直接返回
+      if (activeAutoSelectTimer !== timerId) {
+        clearInterval(timerId)
+        return
+      }
+
       healthyNodes.sort((a, b) => a.delay - b.delay)
       const elapsed = Date.now() - startTime
-
-      // 临时闪连：一旦检测到第 1 个健康可用节点，立即尝试切换以闪连网络
-      if (!hasSelectedTemp && healthyNodes.length >= 1) {
-        hasSelectedTemp = true
-        const tempTarget = healthyNodes[0].name
-        console.log(`[Layout] 自动选点触发临时闪连: ${tempTarget} (${healthyNodes[0].delay}ms)`)
-        try {
-          await selectNodeForGroup(groupName, tempTarget)
-          await refreshProxy({ forceFull: true })
-        } catch (err) {
-          console.error('[Layout] 临时闪连切换失败:', err)
-        }
-      }
 
       // 极速终选与提前终止：
       // 条件 1: 已有 5 个健康可用节点（大样本已够）
@@ -284,11 +290,28 @@ async function frontendAutoSelect(
         testedCount >= allNames.length ||
         elapsed >= 15000
 
+      // 临时闪连：一旦检测到第 1 个健康可用节点，立即尝试切换以闪连网络。如果是最终选择，则跳过临时闪连以避免竞态 (BUG-159)
+      if (!isFinalSelection && !hasSelectedTemp && healthyNodes.length >= 1) {
+        hasSelectedTemp = true
+        const tempTarget = healthyNodes[0].name
+        console.log(`[Layout] 自动选点触发临时闪连: ${tempTarget} (${healthyNodes[0].delay}ms)`)
+        try {
+          await selectNodeForGroup(groupName, tempTarget)
+          // 再次检查 timerId 是否仍有效，防止异步等待期间被切换
+          if (activeAutoSelectTimer === timerId) {
+            await refreshProxy({ forceFull: true })
+          }
+        } catch (err) {
+          console.error('[Layout] 临时闪连切换失败:', err)
+        }
+      }
+
       if (isFinalSelection) {
-        if (activeAutoSelectTimer) {
+        if (activeAutoSelectTimer === timerId) {
           clearInterval(activeAutoSelectTimer)
           activeAutoSelectTimer = null
         }
+        activeAutoSelectReject = null
 
         if (healthyNodes.length >= 1) {
           const targetNode = healthyNodes[0].name
@@ -307,6 +330,8 @@ async function frontendAutoSelect(
         resolve(healthyNodes.map((n) => [n.name, n.delay]))
       }
     }, 200)
+
+    activeAutoSelectTimer = timerId
   })
 }
 
@@ -325,8 +350,12 @@ async function triggerAutoSelectAndRefresh(
     } else {
       console.log('[Layout] 自动选点无可用节点')
     }
-  } catch (err) {
-    console.error('[Layout] 自动选点失败:', err)
+  } catch (err: any) {
+    if (err?.message === 'AutoSelectCancelled') {
+      console.log('[Layout] 自动选点任务被取消')
+    } else {
+      console.error('[Layout] 自动选点失败:', err)
+    }
   }
 
   // 不管 auto-select 是否成功，以下操作永远执行
@@ -364,7 +393,7 @@ async function triggerAutoSelectAndRefresh(
           console.log('[Layout] Fallback: 无可用节点，跳过')
           return
         }
-        console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
+        console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
         await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
         await refreshProxy({ forceFull: true })
         // Fallback 测速完成后再次确保排序正确
@@ -377,7 +406,7 @@ async function triggerAutoSelectAndRefresh(
     } finally {
       fallbackTimerRef.current = null
     }
-  }, 10000)
+  }, 6000)
 }
 
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
@@ -1110,6 +1139,13 @@ const Layout = () => {
   // 协议要求：自动选点后排序置顶（sortType: 1 = 按延迟排序）
   const [, setHeadStateForSort] = useHeadStateNew()
 
+  const refreshProxyRef = useRef(refreshProxy)
+  refreshProxyRef.current = refreshProxy
+  const setHeadStateForSortRef = useRef(setHeadStateForSort)
+  setHeadStateForSortRef.current = setHeadStateForSort
+  const tRef = useRef(t)
+  tRef.current = t
+
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
     if (
@@ -1126,9 +1162,14 @@ const Layout = () => {
           await activateSelectedRef.current()
           if (cancelled || isImportingRef.current) return
           // 等待 Clash 内核就绪（最多 20 秒），然后触发自动选点并刷新前端
-          await waitForClashReady(t)
+          await waitForClashReady(tRef.current)
           if (cancelled || isImportingRef.current) return
-          await triggerAutoSelectAndRefresh(refreshProxy, t, fallbackTimerRef, setHeadStateForSort)
+          await triggerAutoSelectAndRefresh(
+            refreshProxyRef.current,
+            tRef.current,
+            fallbackTimerRef,
+            setHeadStateForSortRef.current,
+          )
         })
         .catch((err) => {
           if (cancelled) return
@@ -1142,15 +1183,24 @@ const Layout = () => {
         cancelled = true
       }
     }
-  }, [currentProfileUid, refreshProxy, setHeadStateForSort, t])
+  }, [currentProfileUid])
 
-  // 组件卸载时清理 Fallback 定时器，防止内存泄漏
+  // 组件卸载时清理 Fallback 及自动选优定时器，防止内存泄漏
   useEffect(() => {
     return () => {
       if (fallbackTimerRef.current) {
         clearTimeout(fallbackTimerRef.current)
         fallbackTimerRef.current = null
         console.log('[Layout] 组件卸载，清理 Fallback 定时器')
+      }
+      if (activeAutoSelectTimer) {
+        clearInterval(activeAutoSelectTimer)
+        activeAutoSelectTimer = null
+        console.log('[Layout] 组件卸载，清理 activeAutoSelectTimer')
+      }
+      if (activeAutoSelectReject) {
+        activeAutoSelectReject(new Error('AutoSelectCancelled'))
+        activeAutoSelectReject = null
       }
     }
   }, [])
@@ -1528,6 +1578,8 @@ const Layout = () => {
       drawerOpen,
       patchVerge,
       verge?.enable_always_on_top,
+      theme,
+      controlSkin,
     ],
   )
 

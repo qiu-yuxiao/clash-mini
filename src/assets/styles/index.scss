@@ -105,6 +105,15 @@ body {
   box-shadow: var(--theme-box-shadow-subtle) !important;
 }
 
+/* 确保使用 theme-panel 样式的弹出菜单和对话框拥有 100% 不透明纯色背景，防止背景穿透和文字重叠 */
+.MuiDialog-paper.theme-panel,
+.MuiMenu-paper.theme-panel,
+.MuiPopover-paper.theme-panel,
+.MuiAutocomplete-paper.theme-panel {
+  background: rgb(var(--theme-panel-base-rgb, 255, 255, 255)) !important;
+  opacity: 1 !important;
+}
+
 
 /* ==========================================================================
    Control Skin Swapping Overrides (BUG-054)

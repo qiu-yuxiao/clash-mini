@@ -134,3 +134,37 @@ The team is strictly prohibited from writing or modifying any files inside the w
   - Root cause analysis
   - Suggested fix with a precise diff code block
 - [ ] The report must contain a dedicated table mapping the components' compliance status against the six skin styles.
+
+## Follow-up — 2026-06-21T11:50:21Z
+
+Audit all codebase modifications committed between the release tag/commit v1.5.4 (d3831a0ce5ecc6b2c040368570773f2622d0b91b) and the latest HEAD (196e7c01), identifying potential bugs, logic inconsistencies, or deviations from project agreements without making any changes to the source code.
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: development
+
+## Requirements
+
+### R1. Git History and Commit Range Diff
+Retrieve the diff for the commit range d3831a0ce5ecc6b2c040368570773f2622d0b91b..196e7c01 using git diff. Identify all modified frontend (TypeScript, React, CSS) and backend (Rust) files.
+
+### R2. Code Correctness and Logic Auditing
+Audit the modified files for:
+- Logic flaws or regression bugs.
+- Concurrency issues, lock safety, and error handling in Rust backend modifications (especially around the new Mihomo local socket client call patterns).
+- Layout alignment, timer synchronization, and state race conditions in frontend React components.
+
+### R3. Project Agreement Verification
+Cross-reference all modifications with the specifications in clash_mini_agreements.md (e.g. 36-concurrency limit, flash-connect, early-termination, 3D/Neon visual guidelines, and disabled button text contrast rules) to ensure 100% compliance.
+
+### R4. Read-Only Policy
+Ensure that absolutely no code changes, modifications, or files are written to the workspace (except for producing the final report file in the conversation artifacts directory).
+
+## Acceptance Criteria
+
+### Audit Report
+- [ ] Deliver a structured markdown report audit_report.md in C:\Users\sun_y\.gemini\antigravity\brain\fbaa4f45-a8a9-4f9b-8907-cc475603c678 detailing findings.
+- [ ] List all inspected files and group findings by severity (Critical Bugs, Warnings/Inconsistencies, Stylistic/Optimization Suggestions).
+- [ ] Include clear explanations of any code segments violating clash_mini_agreements.md.
+- [ ] Provide proposed code diffs/recommendations in the report text itself without altering the repository files.
+- [ ] Ensure that git status on the workspace remains completely clean (no dirty files) upon completion of the task.
+

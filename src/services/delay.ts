@@ -216,15 +216,45 @@ class DelayManager {
       const url = this.getUrl(group)
       debugLog(`[DelayManager] 调用API测试延迟，代理: ${name}, URL: ${url}`)
 
+      let raceFinished = false
+      let timerId: any = null
+
       // 设置超时处理, delay = 0 为超时
       const timeoutPromise = new Promise<ProxyDelay>((resolve) => {
-        setTimeout(() => resolve({ delay: 0 }), timeout)
+        timerId = setTimeout(() => {
+          if (!raceFinished) {
+            resolve({ delay: 0 })
+          }
+        }, timeout)
       })
 
       // 使用Promise.race来实现超时控制
       const result = await Promise.race([
-        delayProxyByName(name, url, timeout),
-        timeoutPromise,
+        delayProxyByName(name, url, timeout)
+          .then((res) => {
+            raceFinished = true
+            if (timerId) {
+              clearTimeout(timerId)
+              timerId = null
+            }
+            return res
+          })
+          .catch((err) => {
+            if (timerId) {
+              clearTimeout(timerId)
+              timerId = null
+            }
+            if (raceFinished) {
+              // Timeout resolved first, swallow background error
+              return { delay: 0 }
+            }
+            raceFinished = true
+            throw err
+          }),
+        timeoutPromise.then((res) => {
+          raceFinished = true
+          return res
+        }),
       ])
 
       // 确保至少显示500ms的加载动画
