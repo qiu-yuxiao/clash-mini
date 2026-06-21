@@ -13,9 +13,9 @@ use self::{
     seq::{SeqMap, use_seq},
     tun::use_tun,
 };
+use crate::config::IVerge;
 use crate::utils::dirs;
 use crate::{config::Config, utils::tmpl};
-use crate::config::IVerge;
 use anyhow::{Context as _, Result};
 use clash_verge_logging::{Type, logging};
 use serde_yaml_ng::{Mapping, Value};
@@ -639,7 +639,11 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     );
 
     config.insert("dns".into(), Value::Mapping(dns_config));
-    logging!(info, Type::Core, "applied mandatory global DNS settings (8.8.8.8 & 114.114.114.114)");
+    logging!(
+        info,
+        Type::Core,
+        "applied mandatory global DNS settings (8.8.8.8 & 114.114.114.114)"
+    );
     config
 }
 
