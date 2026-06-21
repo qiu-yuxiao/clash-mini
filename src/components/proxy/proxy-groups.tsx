@@ -450,7 +450,9 @@ export const ProxyGroups = (props: Props) => {
                 const name = queue.shift()
                 if (!name) continue
                 try {
-                  const result = await delayProxyByName(name, '', 10000)
+                  // 从 delayManager 获取正确的测试 URL（默认 http://cp.cloudflare.com/generate_204）
+                  const testUrl = delayManager.getUrl(groupName)
+                  const result = await delayProxyByName(name, testUrl, 10000)
                   if (result && result.delay > 0 && result.delay < 10000) {
                     results.push([name, result.delay])
                   }
