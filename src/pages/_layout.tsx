@@ -237,7 +237,7 @@ async function frontendAutoSelect(groupName: string, timeout = 10000, concurrenc
       if (!name) continue
       try {
         const result = await delayProxyByName(name, DelayManager.getUrl(groupName), timeout)
-        if (result && result.delay > 0 && result.delay < timeout) {
+        if (result && result.delay >= 50 && result.delay < timeout) {
           results.push([name, result.delay])
         }
       } catch {
