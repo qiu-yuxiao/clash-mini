@@ -71,18 +71,17 @@ export const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }
           mt: isMinimalWidth ? 0.25 : 0.5,
           pt: isMinimalWidth ? 0 : 0.5,
           px: isMinimalWidth ? 0.25 : 1,
-          gap: isMinimalWidth ? 0.5 : 1,
+          gap: 1,
           boxSizing: 'border-box',
           '@media (max-width: 560px)': {
             height: 'auto',
             flexDirection: 'column',
-            gap: isMinimalWidth ? 0 : 0,
-            pt: isMinimalWidth ? 0 : 0.5,
+            gap: 0,
           },
         }}
       >
         {/* Download Group */}
-        <Box sx={{ display: 'flex', flex: 1, minWidth: 0, width: '100%' }}>
+        <Box sx={{ display: 'flex', flex: 1, minWidth: 0 }}>
           {/* Download Speed */}
           <Box
             sx={{
@@ -209,7 +208,7 @@ export const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }
           </Box>
 
         {/* Upload Group */}
-        <Box sx={{ display: 'flex', flex: 1, minWidth: 0, width: '100%' }}>
+        <Box sx={{ display: 'flex', flex: 1, minWidth: 0 }}>
           {/* Upload Speed */}
           <Box
             sx={{
