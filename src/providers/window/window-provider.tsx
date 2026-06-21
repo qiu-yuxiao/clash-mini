@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useWindowSnap } from '@/hooks/use-window-snap'
 import debounce from '@/utils/debounce'
+import getSystem from '@/utils/get-system'
 
 import { WindowContext } from './window-context'
 
@@ -18,7 +19,13 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   // Guard: in non-Tauri environment (e.g. browser dev server), skip window operations
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__
   const currentWindow = useMemo(() => (isTauri ? getCurrentWindow() : null), [isTauri])
-  const [decorated, setDecorated] = useState<boolean | null>(null)
+  const [decorated, setDecorated] = useState<boolean | null>(() => {
+    if (typeof window === 'undefined') return true
+    const isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+    if (!isTauriEnv) return false // Render custom titlebar in browser dev server for testing
+    const OS = getSystem()
+    return OS === 'linux' ? false : true
+  })
   const [maximized, setMaximized] = useState<boolean | null>(null)
   /** FEAT-003: true when we have hidden the native chrome via idle timer */
   const [isDecorationsHidden, setIsDecorationsHidden] = useState(false)
@@ -94,8 +101,12 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           restoreChrome()
         }
 
-        const value = await currentWindow.isMaximized()
-        setMaximized(value)
+        try {
+          const value = await currentWindow.isMaximized()
+          setMaximized(value)
+        } catch (err) {
+          console.warn('[WindowProvider] checkMaximized isMaximized failed:', err)
+        }
       },
       300,
     )
@@ -215,32 +226,49 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   // ── Decorations init ────────────────────────────────────────────────────────
   const refreshDecorated = useCallback(async () => {
     if (!currentWindow) return false
-    const val = await currentWindow.isDecorated()
-    setDecorated(val)
-    return val
+    try {
+      const val = await currentWindow.isDecorated()
+      setDecorated(val)
+      return val
+    } catch (err) {
+      console.warn('[WindowProvider] refreshDecorated failed:', err)
+      return false
+    }
   }, [currentWindow])
 
   const toggleDecorations = useCallback(async () => {
     if (!currentWindow) return
-    const currentVal = await currentWindow.isDecorated()
-    await currentWindow.setDecorations(!currentVal)
-    setDecorated(!currentVal)
+    try {
+      const currentVal = await currentWindow.isDecorated()
+      await currentWindow.setDecorations(!currentVal)
+      setDecorated(!currentVal)
+    } catch (err) {
+      console.warn('[WindowProvider] toggleDecorations failed:', err)
+    }
   }, [currentWindow])
 
   const toggleMaximize = useCallback(async () => {
     if (!currentWindow) return
-    if (await currentWindow.isMaximized()) {
-      await currentWindow.unmaximize()
-      setMaximized(false)
-    } else {
-      await currentWindow.maximize()
-      setMaximized(true)
+    try {
+      if (await currentWindow.isMaximized()) {
+        await currentWindow.unmaximize()
+        setMaximized(false)
+      } else {
+        await currentWindow.maximize()
+        setMaximized(true)
+      }
+    } catch (err) {
+      console.warn('[WindowProvider] toggleMaximize failed:', err)
     }
   }, [currentWindow])
 
   const toggleFullscreen = useCallback(async () => {
     if (!currentWindow) return
-    await currentWindow.setFullscreen(!(await currentWindow.isFullscreen()))
+    try {
+      await currentWindow.setFullscreen(!(await currentWindow.isFullscreen()))
+    } catch (err) {
+      console.warn('[WindowProvider] toggleFullscreen failed:', err)
+    }
   }, [currentWindow])
 
   useEffect(() => {
