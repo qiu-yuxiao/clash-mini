@@ -1,7 +1,4 @@
-import {
-  ArrowDownwardRounded,
-  ArrowUpwardRounded,
-} from '@mui/icons-material'
+import { ArrowDownwardRounded, ArrowUpwardRounded } from '@mui/icons-material'
 import { Box, Typography, useTheme } from '@mui/material'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +11,11 @@ import { useThemeMode } from '@/services/states'
 import { get3DCardStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
 
-export const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }) => {
+export const MiniTrafficPanel = ({
+  isMinimalWidth,
+}: {
+  isMinimalWidth: boolean
+}) => {
   const mode = useThemeMode()
   const theme = useTheme()
   const { t } = useTranslation() as any
@@ -206,6 +207,7 @@ export const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }
               </span>
             </Typography>
           </Box>
+        </Box>
 
         {/* Upload Group */}
         <Box sx={{ display: 'flex', flex: 1, minWidth: 0 }}>
@@ -329,9 +331,6 @@ export const MiniTrafficPanel = ({ isMinimalWidth }: { isMinimalWidth: boolean }
               </span>
             </Typography>
           </Box>
-        </Box>
-
-
         </Box>
       </Box>
     </Box>
