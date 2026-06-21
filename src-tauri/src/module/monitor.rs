@@ -1,8 +1,8 @@
 use crate::{config::Config, process::AsyncHandler};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use tokio::sync::Semaphore;
 use tokio::task::AbortHandle;
 use tokio::time::{Duration, Instant, sleep};
@@ -302,15 +302,17 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
     let sem = Arc::new(Semaphore::new(MAX_CONCURRENT_DELAY_TESTS));
     let mut tasks = Vec::new();
     let mut abort_handles = Vec::new();
- 
+
     for node in valid_nodes {
         let mihomo = mihomo.clone();
         let test_url = test_url.clone();
         let node_name = node.clone();
         let sem = Arc::clone(&sem);
- 
+
         let task = tokio::spawn(async move {
-            let Ok(_permit) = sem.acquire().await else { return None; };
+            let Ok(_permit) = sem.acquire().await else {
+                return None;
+            };
             if let Ok(delay_info) = mihomo.delay_proxy_by_name(&node_name, &test_url, 2000).await {
                 if delay_info.delay >= 50 && delay_info.delay < 2000 {
                     return Some((node_name, delay_info.delay));
@@ -321,20 +323,20 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         abort_handles.push(task.abort_handle());
         tasks.push(task);
     }
- 
+
     // 将这些中止句柄存入全局，以便需要时可以中止它们
     {
         let mut active = ACTIVE_TASKS.lock().unwrap();
         *active = abort_handles;
     }
- 
+
     let mut results = Vec::new();
     for task in tasks {
         if let Ok(Some(res)) = task.await {
             results.push(res);
         }
     }
- 
+
     // 清理全局任务句柄
     {
         let mut active = ACTIVE_TASKS.lock().unwrap();
@@ -422,10 +424,10 @@ pub fn start_background_monitor() {
                 last_profile_uid = Some(current_profile.clone());
                 consecutive_fails = 0;
                 is_retry_mode = false;
- 
+
                 // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
                 cancel_active_auto_select();
- 
+
                 if wait_for_clash_ready().await {
                     loop {
                         match trigger_backend_auto_select(&current_profile, 0).await {

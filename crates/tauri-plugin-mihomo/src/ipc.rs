@@ -234,7 +234,7 @@ pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
                     if busy_retry_count == 0 {
                         return Err(Error::Io(std::io::Error::new(
                             std::io::ErrorKind::TimedOut,
-                            "Named pipe busy timeout exceeded"
+                            "Named pipe busy timeout exceeded",
                         )));
                     }
                     busy_retry_count -= 1;
@@ -582,7 +582,8 @@ impl LocalSocket for RequestBuilder {
             let pool = IpcConnectionPool::global()?;
             let (mut conn, _permit) = pool.get_connection(socket_path).await?;
 
-            let hyper_res = conn.sender
+            let hyper_res = conn
+                .sender
                 .send_request(hyper_req)
                 .await
                 .map_err(|e| Error::HttpParseError(e.to_string()))?;

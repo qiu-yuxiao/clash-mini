@@ -761,10 +761,7 @@ impl Mihomo {
         let group_name_encode = urlencoding::encode(group_name);
         let test_url = urlencoding::encode(test_url);
         let suffix_url = format!("/group/{group_name_encode}/delay?url={test_url}&timeout={timeout}");
-        let req_timeout = std::cmp::min(
-            Duration::from_millis(timeout as u64) + Duration::from_millis(1000),
-            Duration::from_secs(3),
-        );
+        let req_timeout = Duration::from_millis(timeout as u64) + Duration::from_millis(2000);
         let client = self.build_request(Method::GET, &suffix_url)?.timeout(req_timeout);
         let response = self.send_by_protocol(client).await?;
         if !response.status().is_success() {
@@ -848,10 +845,7 @@ impl Mihomo {
         let provider_name_encode = urlencoding::encode(provider_name);
         let proxy_name_encode = urlencoding::encode(proxy_name);
         let suffix_url = format!("/providers/proxies/{provider_name_encode}/{proxy_name_encode}/healthcheck");
-        let req_timeout = std::cmp::min(
-            Duration::from_millis(timeout as u64) + Duration::from_millis(1000),
-            Duration::from_secs(3),
-        );
+        let req_timeout = Duration::from_millis(timeout as u64) + Duration::from_millis(2000);
         let client = self
             .build_request(Method::GET, &suffix_url)?
             .query(&[("url", test_url), ("timeout", &timeout.to_string())])
@@ -944,10 +938,7 @@ impl Mihomo {
     pub async fn delay_proxy_by_name(&self, proxy_name: &str, test_url: &str, timeout: u32) -> Result<ProxyDelay> {
         let proxy_name_encode = urlencoding::encode(proxy_name);
         let suffix_url = format!("/proxies/{proxy_name_encode}/delay");
-        let req_timeout = std::cmp::min(
-            Duration::from_millis(timeout as u64) + Duration::from_millis(1000),
-            Duration::from_secs(3),
-        );
+        let req_timeout = Duration::from_millis(timeout as u64) + Duration::from_millis(2000);
         let client = self
             .build_request(Method::GET, &suffix_url)?
             .query(&[("timeout", &timeout.to_string()), ("url", &test_url.to_string())])

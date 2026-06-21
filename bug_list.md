@@ -12,6 +12,13 @@
 
 ## 📌 待验证与活动?Bug 详情 (Active & Pending Bugs)
 
+### BUG-169: Speed Test Timeout Capping Side-effects (Error State & Intermittent Auto-Select)
+ 
+ - **现象描述**：主页面点击闪电图标并发测速时，超时未响应的节点显示为红色的 "Error" 而非黃/橘色的 "Timeout"；此外，重启客户端或导入订阅后的自动测速选点时好时坏，容易选点失败。
+ - **根因**：为修复 BUG-167 引入的 3 秒最大请求超时硬限制（`std::cmp::min(..., 3s)`）过于激进，导致在前端 10 秒默认测速超时下，后端在 3 秒时便直接中止请求并返回错误（Err）。前端捕获该异常后判定为 `Error` 并显示红色。在高并发排队或网络波动时，这也导致大量原本健康的节点在 3 秒内未响应完（即使本身延迟仅几百毫秒），被后端中止抛错，从而使得自动选点失败或不稳定。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.5.5`
+
 ### BUG-168: Upgrade Command RwLock Writer Starvation (Deadlock Hazard)
  
  - **现象描述**：点击检查/更新内核、UI 或 GeoIP 数据库时，可能导致整个后端卡死/死锁，无法响应后续的 API 请求（如获取代理、流量数据等）。
