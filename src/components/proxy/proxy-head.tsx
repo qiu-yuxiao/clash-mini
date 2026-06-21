@@ -1,29 +1,16 @@
 import {
-  MyLocationOutlined,
   BoltOutlined,
   SortOutlined,
   AccessTimeOutlined,
   SortByAlphaOutlined,
-  LinkOutlined,
-  VisibilityOutlined,
-  VisibilityOffOutlined,
 } from '@mui/icons-material'
-import {
-  Box,
-  IconButton,
-  TextField,
-  SxProps,
-  Theme,
-  keyframes,
-  useTheme,
-} from '@mui/material'
+import { Box, IconButton, SxProps, Theme, keyframes } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
 import delayManager from '@/services/delay'
-import { get3DInputStyle } from '@/utils/button-styles'
 import { debugLog } from '@/utils/debug'
 
 import type { ProxySortType } from './use-filter-sort'
@@ -69,18 +56,15 @@ export const ProxyHead = ({
   headState,
   isTesting = false,
   onHeadState,
-  onLocation,
   onCheckDelay,
+  // We keep onLocation in Props to avoid breaking other files, but we don't use it here.
 }: Props) => {
-  const theme = useTheme()
   const { width } = useWindowWidth()
   const isMinimal = width <= 285
 
   const {
-    showType,
     sortType,
     filterText,
-    textState,
     testUrl,
     filterMatchCase,
     filterMatchWholeWord,
@@ -117,28 +101,12 @@ export const ProxyHead = ({
         ...sx,
       }}
     >
-      {!isMinimal && (
-        <IconButton
-          size="small"
-          color="inherit"
-          title={t('proxies.page.tooltips.locate')}
-          onClick={onLocation}
-          sx={{ width: 26, height: 26, p: 0 }}
-        >
-          <MyLocationOutlined sx={{ fontSize: 17 }} />
-        </IconButton>
-      )}
-
       <IconButton
         size="small"
         color="inherit"
         title={t('proxies.page.tooltips.delayCheck')}
         onClick={() => {
           debugLog(`[ProxyHead] 点击延迟测试按钮，组: ${groupName}`)
-          if (testUrl?.trim()) {
-            debugLog(`[ProxyHead] 使用自定义测试URL: ${testUrl}`)
-            onHeadState({ textState: 'url' })
-          }
           onCheckDelay()
         }}
         sx={{ width: 26, height: 26, p: 0 }}
@@ -176,42 +144,6 @@ export const ProxyHead = ({
         {sortType === 2 && <SortByAlphaOutlined sx={{ fontSize: 17 }} />}
       </IconButton>
 
-      {!isMinimal && (
-        <IconButton
-          size="small"
-          color="inherit"
-          title={t('proxies.page.tooltips.delayCheckUrl')}
-          onClick={() =>
-            onHeadState({ textState: textState === 'url' ? null : 'url' })
-          }
-          sx={{ width: 26, height: 26, p: 0 }}
-        >
-          <LinkOutlined
-            sx={{ fontSize: 17, opacity: textState === 'url' ? 1 : 0.6 }}
-          />
-        </IconButton>
-      )}
-
-      {!isMinimal && (
-        <IconButton
-          size="small"
-          color="inherit"
-          title={
-            showType
-              ? t('proxies.page.tooltips.showBasic')
-              : t('proxies.page.tooltips.showDetail')
-          }
-          onClick={() => onHeadState({ showType: !showType })}
-          sx={{ width: 26, height: 26, p: 0 }}
-        >
-          {showType ? (
-            <VisibilityOutlined sx={{ fontSize: 17 }} />
-          ) : (
-            <VisibilityOffOutlined sx={{ fontSize: 17 }} />
-          )}
-        </IconButton>
-      )}
-
       <Box
         sx={{
           ml: 0.5,
@@ -238,25 +170,6 @@ export const ProxyHead = ({
           }
         />
       </Box>
-
-      {textState === 'url' && (
-        <TextField
-          autoComplete="off"
-          autoFocus={autoFocus}
-          hiddenLabel
-          value={testUrl}
-          size="small"
-          variant="outlined"
-          placeholder={t('proxies.page.placeholders.delayCheckUrl')}
-          onChange={(e) => onHeadState({ testUrl: e.target.value })}
-          sx={{
-            ml: 0.5,
-            flex: '1 1 auto',
-            '& input': { py: 0.3, px: 0.5, fontSize: 11, height: 20 },
-            ...get3DInputStyle(theme),
-          }}
-        />
-      )}
     </Box>
   )
 }
