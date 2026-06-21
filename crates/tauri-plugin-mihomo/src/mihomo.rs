@@ -756,6 +756,7 @@ impl Mihomo {
     }
 
     /// 对指定代理组进行延迟测试, 同时清理代理组已固定的节点
+    /// [Clash Mini 备注]: 此方法对应 Clash Verge 的策略组延迟测速，目前在 Clash Mini 内已无任何调用，保留仅作为备用和对齐内核 API。
     pub async fn delay_group(&self, group_name: &str, test_url: &str, timeout: u32) -> Result<HashMap<String, u32>> {
         let group_name_encode = urlencoding::encode(group_name);
         let test_url = urlencoding::encode(test_url);

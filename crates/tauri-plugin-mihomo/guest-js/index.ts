@@ -112,6 +112,7 @@ export async function getGroupByName(groupName: string): Promise<Proxy> {
  * @param timeout 超时时间（毫秒）
  * @param keepFixed 是否保留已固定的节点, 默认 false
  * @returns 代理组中代理节点的延迟，返回数据中无超时节点的数据
+ * @deprecated [Clash Mini 备注]: 此接口为 Clash Verge 遗留设计，在 Clash Mini 中前台批量测速已统一收拢到后端 trigger_auto_select，本接口目前无任何地方调用，仅作为 API 完整性保留。
  */
 export async function delayGroup(
   groupName: string,

@@ -262,9 +262,14 @@ class DelayManager {
     // 设置正在延迟测试中
     names.forEach((name) => this.setDelay(name, group, -2))
 
+    const listener = this.groupListenerMap.get(group)
+    // 瞬间通知 UI 全组开始测速扫光
+    if (listener) {
+      this.queueGroupNotification(group)
+    }
+
     let index = 0
     const startTime = Date.now()
-    const listener = this.groupListenerMap.get(group)
 
     const worker = async (): Promise<void> => {
       while (true) {

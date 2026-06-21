@@ -70,6 +70,9 @@ pub(crate) async fn get_group_by_name(state: State<'_, RwLock<Mihomo>>, group_na
     state.read().await.get_group_by_name(&group_name).await
 }
 
+// [Clash Mini 备注]: 此命令为 Clash Verge 遗留接口。
+// 在 Clash Mini 中，前台批量测速已统一收拢到后端的 trigger_auto_select 触发并返回结果，
+// 此处在 Clash Mini 内属于闲置死代码，保留仅为了维持插件 API 接口的完整性。
 #[command]
 pub(crate) async fn delay_group(
     state: State<'_, RwLock<Mihomo>>,

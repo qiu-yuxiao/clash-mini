@@ -215,49 +215,99 @@ async function waitForClashReady(
   return false
 }
 
-/** 触发自动选点并在完成后刷新前端 proxies 数据
- *  协议 Section III.7：自动选点后设置 sortType: 1（按延迟排序，最快节点置顶）
- */
-/** 通过前端 delayProxyByName 路径完成全节点测速并选出最快节点
- *  （替代 invoke('trigger_auto_select')，绕过后台 AUTO_SELECT_RUNNING 锁）
- */
-async function frontendAutoSelect(groupName: string, timeout = 10000, concurrency = 10) {
+let activeAutoSelectTimer: any = null
+
+async function frontendAutoSelect(
+  groupName: string,
+  refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
+  timeout = 10000,
+  concurrency = 36,
+): Promise<[string, number][]> {
   const proxyGroup = await getProxyByName(groupName)
   const allNames = (proxyGroup?.all || []).filter(
     (name: string) => !isDummyName(name),
   )
   if (allNames.length === 0) return []
 
-  const results: [string, number][] = []
-  const queue = [...allNames]
+  if (activeAutoSelectTimer) {
+    clearInterval(activeAutoSelectTimer)
+    activeAutoSelectTimer = null
+  }
 
-  const worker = async () => {
-    while (queue.length > 0) {
-      const name = queue.shift()
-      if (!name) continue
-      try {
-        const result = await delayProxyByName(name, DelayManager.getUrl(groupName), timeout)
-        if (result && result.delay >= 50 && result.delay < timeout) {
-          results.push([name, result.delay])
+  // 1. 异步拉起 36 路并发测速（非阻塞，让其在后台继续完整跑完以刷新所有节点的延迟）
+  DelayManager.checkListDelay(allNames, groupName, timeout, concurrency).catch((err) => {
+    console.error('[Layout] 后台自动选点测速异常:', err)
+  })
+
+  // 2. 轮询选点逻辑
+  const startTime = Date.now()
+  let hasSelectedTemp = false
+
+  return new Promise<[string, number][]>((resolve) => {
+    activeAutoSelectTimer = setInterval(async () => {
+      // 收集当前已测出的健康节点并统计已测试数量
+      const healthyNodes: { name: string; delay: number }[] = []
+      let testedCount = 0
+
+      for (const name of allNames) {
+        const delay = DelayManager.getDelay(name, groupName)
+        if (delay !== -1 && delay !== -2) {
+          testedCount++
+          if (delay >= 50 && delay < timeout) {
+            healthyNodes.push({ name, delay })
+          }
         }
-      } catch {
-        // 测速失败则跳过
       }
-    }
-  }
 
-  const workerCount = Math.min(concurrency, allNames.length)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
-  results.sort((a, b) => a[1] - b[1])
+      healthyNodes.sort((a, b) => a.delay - b.delay)
+      const elapsed = Date.now() - startTime
 
-  // 切换到最快节点
-  if (results.length > 0) {
-    try {
-      await selectNodeForGroup(groupName, results[0][0])
-    } catch {}
-  }
+      // 临时闪连：一旦检测到第 1 个健康可用节点，立即尝试切换以闪连网络
+      if (!hasSelectedTemp && healthyNodes.length >= 1) {
+        hasSelectedTemp = true
+        const tempTarget = healthyNodes[0].name
+        console.log(`[Layout] 自动选点触发临时闪连: ${tempTarget} (${healthyNodes[0].delay}ms)`)
+        try {
+          await selectNodeForGroup(groupName, tempTarget)
+          await refreshProxy({ forceFull: true })
+        } catch (err) {
+          console.error('[Layout] 临时闪连切换失败:', err)
+        }
+      }
 
-  return results
+      // 极速终选与提前终止：
+      // 条件 1: 已有 5 个健康可用节点（大样本已够）
+      // 条件 2: 所有有效节点已全部测完
+      // 条件 3: 轮询时间达到 15 秒 (上限防死锁)
+      const isFinalSelection =
+        healthyNodes.length >= 5 ||
+        testedCount >= allNames.length ||
+        elapsed >= 15000
+
+      if (isFinalSelection) {
+        if (activeAutoSelectTimer) {
+          clearInterval(activeAutoSelectTimer)
+          activeAutoSelectTimer = null
+        }
+
+        if (healthyNodes.length >= 1) {
+          const targetNode = healthyNodes[0].name
+          const targetDelay = healthyNodes[0].delay
+          console.log(`[Layout] 自动选点触发极速终选: ${targetNode} (${targetDelay}ms)`)
+          try {
+            await selectNodeForGroup(groupName, targetNode)
+            await refreshProxy({ forceFull: true })
+          } catch (err) {
+            console.error('[Layout] 极速终选切换失败:', err)
+          }
+        } else {
+          console.warn('[Layout] 自动测速超时且无任何健康节点')
+        }
+
+        resolve(healthyNodes.map((n) => [n.name, n.delay]))
+      }
+    }, 200)
+  })
 }
 
 async function triggerAutoSelectAndRefresh(
@@ -269,7 +319,7 @@ async function triggerAutoSelectAndRefresh(
   // 改用前端 delayProxyByName 路径进行全节点测速并选最快节点
   // 替代 invoke('trigger_auto_select')，绕过后台 AUTO_SELECT_RUNNING 锁
   try {
-    const results = await frontendAutoSelect('PROXY', 10000, 10)
+    const results = await frontendAutoSelect('PROXY', refreshProxy, 10000, 36)
     if (results.length > 0) {
       console.log(`[Layout] 自动选点完成，最快节点: ${results[0][0]} (${results[0][1]}ms)`)
     } else {
@@ -1092,7 +1142,7 @@ const Layout = () => {
         cancelled = true
       }
     }
-  }, [currentProfileUid])
+  }, [currentProfileUid, refreshProxy, setHeadStateForSort, t])
 
   // 组件卸载时清理 Fallback 定时器，防止内存泄漏
   useEffect(() => {
@@ -1478,8 +1528,6 @@ const Layout = () => {
       drawerOpen,
       patchVerge,
       verge?.enable_always_on_top,
-      theme,
-      controlSkin,
     ],
   )
 
