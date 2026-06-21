@@ -2309,21 +2309,18 @@
   - **首选惰性初始化**：任何需要在挂载时获取的本地持久化状态，必须将其读取逻辑包裹在 `useState` 的**惰性初始化函数（Lazy Initializer）**中。
   - *示例写法*：`const [controlSkin, setControlSkin] = useState(() => localStorage.getItem('clash-mini-control-skin') || 'retro-3d')`，确保本地 I/O 只在组件首次挂载时执行一次。
 
-## ⚡ 二十八、 重启/导入后自动选点防丢失规范 (BUG-118)
+## ⚡ 二十八、重启/导入后自动选点防丢失规范
 
-**背景**：重启程序或导入新订阅后，`enhanceProfiles()` 后端调用 `update_config_forced()` 通过 `PUT /configs` 重载 Clash 配置。配置重载后，PROXY 组的 `now` 节点选择被**重置为 Clash 默认（第一个节点）**——如果该节点是订阅商插入的广告/假节点，网络即中断。旧有流程中重载后仅执行 `activateSelected()`（恢复保存的选择），未触发自动选点纠偏。
+重启程序或导入/切换订阅后，Clash 内核重载配置会将当前活跃节点重置为订阅列表中的默认第一个节点（往往是订阅商的广告假节点），导致网络中断。为防止这种情况，程序在完成配置重载后，必须自动触发一次全节点测速并选取最快的可用真实节点，以纠正 Clash 内核的默认选择。该自动选点动作必须在配置重载完成后可靠执行，即使后台存在并发的自动选点操作，也必须确保前端最终能覆盖到正确的新配置节点上执行一次选点。
 
-- **根因**：`enhanceProfiles()` 永远调用后端 `update_config_forced()`，该函数通过 Clash API 的 `PUT /configs` 重载配置，导致当前选中的节点被 Clash 重置为默认值。
-- **修复规范**：在 `_layout.tsx` 的 `useEffect([currentProfileUid])` 中，`activateSelected()` 之后必须追加 `invoke('trigger_auto_select', { isManual: false })`，确保配置重载后始终执行一次自动选点，选取最快可用节点覆盖 Clash 的默认假节点。
-- **导入场景的竞态修复**：后台监测进程在检测到 UID 变化时，`wait_for_clash_ready()` 的阶段 2 检查 `/proxies/PROXY`——但此时 Clash 内核仍加载着旧配置，旧的 PROXY 组有节点会导致阶段 2 误判通过，从而在旧配置上选点。前端末尾的 `trigger_auto_select` 保证了最终在新加强配置上正确选点，覆盖后台的过时选点结果。
+## ⚡ 二十九、闪电按钮批量测速行为规范
 
-## ⚡ 二十九、 自动选点竞态兜底与批量测速修复规范 (BUG-121/BUG-138)
+节点表格表头的闪电按钮用于对当前界面中可见节点进行批量并发测速。其行为规范如下：
 
-**背景**：`trigger_backend_auto_select` 使用 `AUTO_SELECT_RUNNING` 原子互斥锁防止并发调用。该锁被后台监测线程在 UID 变化时抢夺后，前端手动触发的自动选点（导入/切换配置后）和批量测速（闪电光标）均因 `AUTO_SELECT_BUSY` 失败。活跃节点卡片测速走 `delayProxyByName`（Tauri Plugin → Clash API），不经过此锁，始终正常工作。
-
-- **根因**：两处前端调用均未对 `AUTO_SELECT_BUSY` 实施重试，异常被 catch 直接吞掉。且 `trigger_backend_auto_select` 路径与单节点路径有三处不一致：HTTP 客户端超时 3s（单节点无限制）、`delay > 50` 下限过滤（单节点不过滤）、`create_client()` 超时过短。
-- **修复规范 (BUG-121)**：`_layout.tsx` 中 `triggerAutoSelectAndRefresh` 函数对 `invoke('trigger_auto_select')` 的 `AUTO_SELECT_BUSY` 错误必须重试（最多 5 次，间隔 600ms）。`refreshProxy`/`setHeadState(sortType=1)`/Fallback 定时器必须移到 try/catch 外部，确保不管 auto-select 是否成功都执行。
-- **修复规范 (BUG-138)**：
-  1. `monitor.rs` 中 `create_client()` 的超时从 3 秒增加到 10 秒。
-  2. `monitor.rs` 中 `trigger_backend_auto_select_inner` 去掉 `delay > 50` 下限过滤，仅保留 `< 2000` 上限。
-  3. `proxy-groups.tsx` 中 `handleCheckAll` 对 `invoke('trigger_auto_select')` 的 `AUTO_SELECT_BUSY` 必须重试（最多 5 次，间隔 600ms）。
+- **测速范围**：仅对当前搜索框过滤后在表格中实际可见的节点进行测速，而非 PROXY 组下的全部节点。例如：过滤框中输入「日本」时，只对当前可见的日本节点测速。
+- **测速方式**：所有可见节点同时并发发起测速，通过 Clash 核心的延迟测试接口完成，不经过任何额外的中间层或互斥锁。
+- **节点动画反馈**：每个被测节点在等待测速结果期间，其延迟显示格立即进入「正在测速」动画状态（流光 shimmer 扫光效果），直到该节点的测速结果返回后动画停止并显示实际延迟数值。
+- **实时更新**：每个节点测速一完成，即刻将延迟数值更新至界面，无需等待所有节点全部测完。
+- **不自动切换节点**：批量测速完成后仅显示各节点延迟数值，不自动将活跃节点切换到延迟最低者，由用户自行决定节点选择。
+- **防重复触发**：测速进行中忽略对闪电按钮的重复点击，直到本轮测速全部完成后才允许再次触发。
+- **无额外通知**：测速进行中闪电图标显示动效，全部完成后自动恢复正常状态。不弹出任何额外的完成提示。

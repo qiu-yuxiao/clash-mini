@@ -12,8 +12,6 @@ import {
 import { useTheme } from '@mui/material/styles'
 import { useQuery } from '@tanstack/react-query'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { invoke } from '@tauri-apps/api/core'
-import { useLockFn } from 'ahooks'
 import {
   type Key,
   type MouseEvent,
@@ -34,10 +32,8 @@ import { useVisibility } from '@/hooks/use-visibility'
 import { useProxiesData } from '@/providers/app-data-context'
 import { calcuProxies, updateProxyChainConfigInRuntime } from '@/services/cmds'
 import delayManager from '@/services/delay'
-import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
-import { healthcheckProxyProvider, getProxyByName, delayProxyByName, selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 import { isDummyNode } from '@/utils/node'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
@@ -402,103 +398,45 @@ export const ProxyGroups = (props: Props) => {
     [handleProxyGroupChange, isChainMode, t],
   )
 
-  // 测全部延迟
-  const handleCheckAll = useStableCallback(
-    useLockFn(async (groupName: string) => {
-      debugLog(`[ProxyGroups] 开始测试所有延迟，组: ${groupName}`)
-      setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
+  // 批量测速当前过滤后可见的节点
+  const handleCheckAll = useStableCallback(async (groupName: string) => {
+    // 防重复触发：测速进行中忽略点击
+    if (testingGroups[groupName]) return
 
-      try {
-        // Clash Mini 架构：只有唯一 PROXY 组，所有节点扁平化在此组下
-        const proxies = renderList
-          .filter(
-            (e) =>
-              e.group?.name === groupName && (e.type === 2 || e.type === 4),
-          )
-          .flatMap((e) => e.proxyCol || e.proxy)
-          .filter(Boolean)
+    debugLog(`[ProxyGroups] 开始批量测速，组: ${groupName}`)
+    setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
-        debugLog(`[ProxyGroups] 找到代理数量: ${proxies.length}`)
-
-        const providers = new Set(
-          proxies.map((p) => p?.provider).filter(Boolean),
+    try {
+      // 从当前过滤后可见的渲染列表中提取节点名称（可见即可测）
+      const visibleNames = filteredRenderList
+        .filter(
+          (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
         )
-
-        if (providers.size) {
-          debugLog(`[ProxyGroups] 发现提供者，数量: ${providers.size}`)
-          await Promise.allSettled(
-            [...providers].filter(Boolean).map((p) => healthcheckProxyProvider(p as string)),
-          )
-          debugLog(`[ProxyGroups] 提供者健康检查完成`)
-          onProxies()
-        }
-
-        // 改用前端 delayProxyByName 路径进行全节点测速
-        // 替代 invoke('trigger_auto_select')，绕过后台 AUTO_SELECT_RUNNING 锁
-        let results: [string, number][] = []
-        try {
-          const proxyGroup = await getProxyByName(groupName)
-          const allNames = (proxyGroup?.all || []).filter(
-            (name: string) => !isDummyNode(name),
-          )
-          if (allNames.length > 0) {
-            // 并发测速所有节点
-            const concurrency = 10
-            const queue = [...allNames]
-            const worker = async () => {
-              while (queue.length > 0) {
-                const name = queue.shift()
-                if (!name) continue
-                try {
-                  // 从 delayManager 获取正确的测试 URL（默认 http://cp.cloudflare.com/generate_204）
-                  const testUrl = delayManager.getUrl(groupName)
-                  const result = await delayProxyByName(name, testUrl, 10000)
-                  if (result && result.delay > 0 && result.delay < 10000) {
-                    results.push([name, result.delay])
-                  }
-                } catch {}
-              }
-            }
-            const workerCount = Math.min(concurrency, allNames.length)
-            await Promise.all(Array.from({ length: workerCount }, () => worker()))
-            results.sort((a, b) => a[1] - b[1])
-            // 切换到最快节点
-            if (results.length > 0) {
-              await selectNodeForGroup(groupName, results[0][0])
-            }
-          }
-        } catch (err) {
-          console.error(
-            `[ProxyGroups] 延迟测试或自动选路出错，组: ${groupName}`,
-            err,
-          )
-        }
-        if (results && results.length > 0) {
-          // 用后台测速结果刷新前台的延迟显示
-          for (const [name, delay] of results) {
-            delayManager.setDelay(name, groupName, delay)
-          }
-          // 第一个结果就是后台选出的最快节点（已排序）
-          const [fastestName, fastestDelay] = results[0]
-          showNotice.success(
-            `自动测速完成，已切换至最快节点: ${fastestName} (${fastestDelay}ms)`,
-          )
-        }
-      } catch (error) {
-        console.error(
-          `[ProxyGroups] 延迟测试或自动选路出错，组: ${groupName}`,
-          error,
+        .flatMap((e) =>
+          e.type === 4
+            ? (e.proxyCol ?? []).map((p) => p?.name)
+            : [e.proxy?.name],
         )
-      } finally {
-        setTestingGroups((prev) => ({ ...prev, [groupName]: false }))
-        const headState = getGroupHeadState(groupName)
-        if (headState?.sortType === 1) {
-          onHeadState(groupName, { sortType: headState.sortType })
-        }
-        onProxies()
+        .filter((name): name is string => !!name && !isDummyNode(name))
+
+      debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
+
+      if (visibleNames.length > 0) {
+        // 通过 delayManager 并发测速：每个节点测速前自动标记 -2 触发流光动画，
+        // 结果实时写回 delayManager 触发界面更新
+        await delayManager.checkListDelay(visibleNames, groupName, timeout)
       }
-    }),
-  )
+    } catch (error) {
+      console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)
+    } finally {
+      setTestingGroups((prev) => ({ ...prev, [groupName]: false }))
+      const headState = getGroupHeadState(groupName)
+      if (headState?.sortType === 1) {
+        onHeadState(groupName, { sortType: headState.sortType })
+      }
+      onProxies()
+    }
+  })
 
   // 滚到对应的节点
   const handleLocation = useStableCallback((group: IProxyGroupItem) => {
@@ -938,7 +876,8 @@ function throttle<T extends (...args: any[]) => any>(
     const remaining = wait - (now - previous)
     lastArgs = args
 
-    if (remaining <= 0) {  // 修复 BUG-MINOR-001：删除冗余条件 remaining > wait（永远不会成立）
+    if (remaining <= 0) {
+      // 修复 BUG-MINOR-001：删除冗余条件 remaining > wait（永远不会成立）
       if (timer) {
         clearTimeout(timer)
       }

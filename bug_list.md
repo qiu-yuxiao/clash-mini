@@ -63,16 +63,12 @@
 
 ### BUG-138: 闪电光标（批量测速）点击后无任何反应，无法触发全节点测速
 
-- **现象描述**：点击表格顶部的闪电光标（左起第二个），应触发全节点批量测速并按延迟排序，但实际点击后无任何反应。闪电图标不闪烁、节点延迟不更新、无通知提示。等待 30~60 分钟后仍然无效。但位于界面最上方的"当前活跃出口节点"卡片中的测速按钮可以正常工作，点击后单个节点延迟正确返回并更新。
-- **根因**：两个测速入口走的是完全不同的代码路径：
-  1. **活跃节点卡片测速**（能工作）→ `delayProxyByName`（Tauri Plugin）→ 直接调 Clash REST API 测**单个节点**，不经过 `trigger_auto_select`。
-  2. **闪电光标批量测速**（不工作）→ `invoke('trigger_auto_select')` → Rust 后端 `trigger_backend_auto_select()`。该函数有 `AUTO_SELECT_RUNNING` 原子互斥锁，被后台监测线程（`start_background_monitor`）或上次调用占住后不再释放，后续所有闪电光标点击都因无法获取锁而失败。`handleCheckAll` 中 catch 直接将 `AUTO_SELECT_BUSY` 异常吞掉，只打 `console.error`，用户看不到任何反馈。锁一旦卡死即永久失效，等待多久都没用。
-- **排查记忆**：活跃节点卡片测速走 `delayProxyByName`（tauri-plugin-mihomo API，直接调 Clash API）；闪电光标走 `invoke('trigger_auto_select')` → `trigger_backend_auto_select`（自有的 monitor.rs，含原子锁）。两条路径完全独立。锁 `AUTO_SELECT_RUNNING` 无超时保护，一旦被后台线程抢占后未正常释放，前端所有后续调用全部被拒。
-- **当前状?*：`代码已修正，待用户确认`
-- **修正说明**：
-  1. `monitor.rs` `create_client()` 超时从 3 秒提到 10 秒（与单节点路径对齐）
-  2. `monitor.rs` 去掉 `delay > 50` 下限过滤（单节点路径不拦该条件，排除节点后返回空列表导致前端无更新）
-  3. `proxy-groups.tsx` `handleCheckAll` 中 `trigger_auto_select` 增加 `AUTO_SELECT_BUSY` 重试（最多 5 次，间隔 600ms）
+- **现象描述**：点击节点表格顶部的闪电按钮后，无任何节点出现正在测速的动画，延迟数值无更新，无论等待多久均无效。
+- **根因**：历经多次修复方向均存在错误。根本原因有两处：
+  1. 此前走 Rust 后端 `trigger_auto_select` 路径，该路径存在原子互斥锁，锁被后台线程占住时前端调用被静默丢弃；
+  2. 改用前端自建并发逻辑后，错误使用了 `useLockFn` 包裹函数——只要第一次调用未完成，后续所有点击被 `useLockFn` 静默丢弃且无任何反馈；同时节点名称列表取自 `getProxyByName` API（PROXY 组全量节点），而非当前过滤后可见节点，与设计要求不符。
+- **修正说明**：彻底重新设计。点击闪电按钮后，直接从当前过滤后可见的渲染列表中提取节点名称（可见即可测），通过 `delayManager.checkListDelay()` 并发测速。该方法在每个节点测速前自动将其延迟标记为「测速中」状态（触发节点行流光动画），每个节点测完即时更新延迟数值。防重复点击改用 `testingGroups` 状态判断，去掉了造成静默丢失的 `useLockFn`。不走任何 Rust 后端命令，无互斥锁问题。不自动切换节点，由用户决定。
+- **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.4.9`
 
 - **现象描述**：删除某一个订阅链接后，界面卡死在空白状态，无法自动切换到其他可用订阅，日志报错“未找到指定 ID”?
