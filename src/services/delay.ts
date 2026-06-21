@@ -299,7 +299,7 @@ class DelayManager {
     }
 
     // 限制并发数，避免发送太多请求
-    const actualConcurrency = Math.min(concurrency, names.length, 10)
+    const actualConcurrency = Math.min(concurrency, names.length, 36)
     debugLog(`[DelayManager] 实际并发数: ${actualConcurrency}`)
 
     const promiseList: Promise<void>[] = []
