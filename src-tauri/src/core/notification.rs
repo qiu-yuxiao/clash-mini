@@ -26,8 +26,8 @@ pub enum FrontendEvent<'a> {
         uid: &'a String,
     },
     DelayResults {
-        group: std::string::String,
-        results: Vec<(std::string::String, u32)>,
+        group: String,
+        results: Vec<(String, u32)>,
     },
 }
 

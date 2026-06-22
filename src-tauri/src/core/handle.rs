@@ -63,7 +63,10 @@ impl Handle {
     }
 
     pub fn notify_delay_results(group: std::string::String, results: Vec<(std::string::String, u32)>) {
-        Self::send_event(FrontendEvent::DelayResults { group, results });
+        Self::send_event(FrontendEvent::DelayResults {
+            group: group.into(),
+            results: results.into_iter().map(|(n, d)| (n.into(), d)).collect(),
+        });
     }
 
     pub fn notice_message<S: AsRef<str>, M: Into<String>>(status: S, msg: M) {

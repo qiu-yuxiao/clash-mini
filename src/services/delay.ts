@@ -356,8 +356,9 @@ class DelayManager {
     debugLog(
       `[DelayManager] 注入后台测速结果，组: ${group}, 数量: ${results.length}`,
     )
+    const now = Date.now()
     for (const [name, delay] of results) {
-      this.setDelay(name, group, delay)
+      this.setDelay(name, group, delay, { elapsed: Date.now() - now })
     }
     this.queueGroupNotification(group)
   }

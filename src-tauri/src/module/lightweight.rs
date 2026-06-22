@@ -81,7 +81,9 @@ pub async fn auto_lightweight_boot() -> Result<()> {
     Ok(())
 }
 
-/// 已废弃定时器机制，现为关闭按钮直接触发轻量模式的兼容空壳。
+/// 轻量模式延迟触发定时器已废弃（关闭窗口直接触发替代）。
+/// 此处 Timer::global().init() 仅初始化全局定时器（服务于 Profile 定时更新等），
+/// 与轻量模式延迟触发无关联。
 pub async fn enable_auto_light_weight_mode() {
     if let Err(e) = Timer::global().init().await {
         logging!(error, Type::Lightweight, "Failed to initialize timer: {e}");

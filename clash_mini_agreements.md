@@ -2326,14 +2326,14 @@
 - **macOS 隐藏行为**：`feat::window::hide()` 中 `add_light_weight_timer` 替换为直接调用 `entry_lightweight_mode`，确保跨平台行为一致。
 - **兼容空壳**：`enable_auto_light_weight_mode` / `disable_auto_light_weight_mode` 保留为无操作的兼容空壳，避免破坏配置热更新路径和前端配置界面的联动逻辑。`enable_auto_light_weight_mode` 配置项本身继续保留以维持配置文件向后兼容。
 
-## ⚡ 二十九、 Retro-3D 深色模式 Default 卡片文字颜色规范 (BUG-174)
+## ⚡ 三十、 Retro-3D 深色模式 Default 卡片文字颜色规范 (BUG-174)
 
 Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类型卡片，其暖色黄金渐变背景（`#FFF59D → #FBC02D → #F57F17 → #E65100`）上原先使用的淡金色文字 `#FFE082` 与渐变起始色 `#FFF59D` 几乎同色，导致文字淹没于背景、无法辨识。本节规范如下：
 
 - **暗墨黑金统一文字色**：retro-3d 深色模式下所有卡片（含 `default` 类型）的文字色统一采用 `#2C1F03`，与 primary 卡片和按钮的深色标准文字色保持一致，确保在暖色黄金渐变背景上有足够的对比反差。
 - **亮色模式不受影响**：亮色模式下 default 卡片的文字色 `#3C2F0F` 保持不变，因其与淡黄渐变背景的对比度已经充足。
 
-## ⚡ 三十、 后台测速结果前端回传规范 (BUG-176)
+## ⚡ 三十一、 后台测速结果前端回传规范 (BUG-176)
 
 后台 monitor 常驻线程在 Profile 切换和故障自愈时执行的群发测速结果必须回传至前端 UI 界面，使代理节点列表上的延迟数值实时更新，而非仅用于内部节点切换决策。
 

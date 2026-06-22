@@ -329,7 +329,7 @@ pub fn run() {
             }
         }
 
-        pub fn handle_window_close(api: &tauri::WindowEvent) {
+        pub fn handle_window_close(event: &tauri::WindowEvent) {
             #[cfg(target_os = "macos")]
             handle::Handle::global().set_activation_policy_accessory();
 
@@ -337,13 +337,20 @@ pub fn run() {
                 return;
             }
 
-            if let tauri::WindowEvent::CloseRequested { api, .. } = api {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
                 if let Some(window) = WindowManager::get_main_window() {
                     let _ = window.hide();
                 }
                 AsyncHandler::spawn(|| async {
-                    lightweight::entry_lightweight_mode().await;
+                    let entered = lightweight::entry_lightweight_mode().await;
+                    if !entered {
+                        logging!(
+                            error,
+                            Type::Lightweight,
+                            "[窗口关闭] 轻量模式进入失败"
+                        );
+                    }
                 });
             }
         }

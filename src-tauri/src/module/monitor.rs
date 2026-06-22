@@ -486,6 +486,13 @@ pub fn start_background_monitor() {
                                     if !results.is_empty() {
                                         Handle::notify_delay_results("PROXY".into(), results);
                                     }
+                                    last_check_time = Instant::now();
+                                } else {
+                                    logging!(
+                                        warn,
+                                        Type::Lightweight,
+                                        "[后台监测] 自愈选点失败"
+                                    );
                                 }
                             }
                         }
