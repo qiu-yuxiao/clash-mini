@@ -52,13 +52,14 @@ The script executes automatically without any interactive prompts:
    - Confirm local workspace is clean (no uncommitted changes).
    - Confirm version number format is valid (`x.y.z`).
    - Confirm tag `v<version>` does not conflict with existing tags.
-3. **Version Update**: Call `python scripts/bump_version.py <version>` to update the following three files:
+3. **Version Update**: Call `python scripts/bump_version.py <version>` to update the following files:
    - `package.json`
    - `src-tauri/tauri.conf.json`
    - `src-tauri/Cargo.toml`
+   - `updater/app-update.json`（version + url + pub_date，signature 和 size 由 CI update_dev 填充）
 4. **Git Operations (Executed Silently)**:
    ```
-   git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+   git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml updater/app-update.json
    git commit -m "release: bump version to <version>" --no-verify
    git push origin dev --no-verify
    git tag v<version>
@@ -115,7 +116,7 @@ After the CI succeeds, the script automatically:
 > [!CAUTION]
 > The following is a manual emergency operation and **should absolutely not be used under normal circumstances**. Every step must be executed manually, and the operator assumes all risks.
 
-1. **Update Version**: Manually modify version fields in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`.
+1. **Update Version**: Manually modify version fields in `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `updater/app-update.json`.
 2. **Register Docs**: Record new features in `clash_mini_agreements.md` and update bug status in `bug_list.md`.
 3. **Git Commit**:
    ```powershell
@@ -158,6 +159,8 @@ validate → build → update_dev → publish
 > [!IMPORTANT]
 > **The maintenance of `app-update.json` belongs entirely to the CI's `update_dev` job. `release.ps1` does not generate or commit this file.**
 > The CI will automatically write the correct signature, file size, and download URL after the build is successful.
+>
+> **⚠️ 手动发布（绕过 CI pipeline 时）必须同步更新 `updater/app-update.json` 中的 `version`、`pub_date`、`url` 三个字段**，否则客户端版本升级界面显示异常。
 
 ### Release Assets (Since v1.3.8)
 
@@ -221,7 +224,7 @@ Confirm before release:
 - [ ] `clash_mini_agreements.md` has registered the new features/modifications (and has been committed separately).
 - [ ] `bug_list.md` has updated the Bug statuses (and has been committed separately).
 - [ ] `Changelog.md` has added the release notes for this version (used by CI to auto-generate Release Notes).
-- [ ] Version numbers are consistent in `package.json`, `tauri.conf.json`, and `Cargo.toml` (automatically completed by `release.ps1`).
+- [ ] Version numbers are consistent in `package.json`, `tauri.conf.json`, `Cargo.toml`, and `updater/app-update.json`（自动/手动发布均需检查，两者不一致时 pre-push hook 会拒绝推送）.
 - [ ] CI build succeeded and the Release is published (not Draft).
 - [ ] The `setup.exe` of this version exists in `portable_test/` and the file size is normal (automatically validated by `release.ps1`).
 - [ ] `https://raw.githubusercontent.com/qiu-yuxiao/clash-mini/dev/updater/app-update.json` is accessible on GitHub.

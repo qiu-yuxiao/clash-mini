@@ -69,5 +69,21 @@ description = "Pre-commit checks: format only"
 dependencies = ["rust-format", "frontend-format"]
 
 [tasks.pre-push]
-description = "Pre-push checks: lint and typecheck"
-dependencies = ["rust-clippy", "typecheck"]
+description = "Pre-push checks: lint, typecheck and version consistency"
+dependencies = ["rust-clippy", "typecheck", "check-version-consistency"]
+
+[tasks.check-version-consistency]
+description = "Ensure Cargo.toml version matches app-update.json"
+script = '''
+CARGO_VER=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+UPDATE_VER=$(grep '"version"' updater/app-update.json | sed 's/.*"\(.*\)".*/\1/')
+if [ "$CARGO_VER" != "$UPDATE_VER" ]; then
+  echo "ERROR: Version mismatch!"
+  echo "  src-tauri/Cargo.toml:        $CARGO_VER"
+  echo "  updater/app-update.json:     $UPDATE_VER"
+  echo ""
+  echo "Fix: update updater/app-update.json to match Cargo.toml before pushing."
+  exit 1
+fi
+echo "OK: Version consistent ($CARGO_VER)"
+'''
