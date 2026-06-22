@@ -526,7 +526,7 @@ export const get3DCardStyle = (
         : 'linear-gradient(135deg, #263238 0%, #37474F 40%, #455A64 75%, #1C252C 100%)'
       bevelShadowDark = isLight ? '#78909C' : '#263238'
     } else {
-      textColor = isLight ? '#3C2F0F' : '#FFE082'
+      textColor = isLight ? '#3C2F0F' : '#2C1F03'
       borderColor = isLight ? '#D4AF37' : '#8A6D00'
       backgroundStyle = isLight
         ? 'linear-gradient(135deg, #FFFDE7 0%, #FFF9C4 35%, #FFF59D 70%, #FFE082 100%)'
