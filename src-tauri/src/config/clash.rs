@@ -98,7 +98,7 @@ impl IClashTemp {
         map.insert("socks-port".into(), network::ports::DEFAULT_SOCKS.into());
         map.insert("port".into(), network::ports::DEFAULT_HTTP.into());
         map.insert("log-level".into(), "info".into());
-        map.insert("allow-lan".into(), false.into());
+        map.insert("allow-lan".into(), true.into());
         map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
         map.insert(

@@ -391,7 +391,7 @@ impl IVerge {
             app_log_max_count: Some(8),
             clash_core: Some("mini-mihomo".into()),
             language: Some(clash_verge_i18n::system_language().into()),
-            theme_mode: Some("system".into()),
+            theme_mode: Some("dark".into()),
             #[cfg(not(target_os = "windows"))]
             env_type: Some("bash".into()),
             #[cfg(target_os = "windows")]
