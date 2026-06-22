@@ -39,8 +39,8 @@
 
 - **现象描述**：`entry_lightweight_mode` 内部直接丢弃 `WindowManager::destroy_main_window()` 返回值，`exit_lightweight_mode` 丢弃 `WindowManager::show_main_window().await` 返回值。若窗口销毁/重建失败（底层 webview 异常），调用链无感知，函数始终返回 `true`，实际窗口状态可能与状态机不符。
 - **根因**：`entry_lightweight_mode` 和 `exit_lightweight_mode` 均使用 `;` 丢弃了窗口操作的返回值，未做失败检查和日志记录。
-- **当前状态**：`排查中`
-- **目标版本**：`v1.5.9`
+- **当前状态**：`代码已修正，待用户确认`
+- **目标版本**：`v1.6.0`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 

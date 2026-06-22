@@ -5,7 +5,7 @@ use crate::{
 
 use clash_verge_logging::{Type, logging};
 
-use crate::utils::window_manager::WindowManager;
+use crate::utils::window_manager::{WindowManager, WindowOperationResult};
 use anyhow::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
 
@@ -104,7 +104,13 @@ pub async fn entry_lightweight_mode() -> bool {
         return false;
     }
     record_state_and_log(LightweightState::In);
-    WindowManager::destroy_main_window();
+    let result = WindowManager::destroy_main_window();
+    if result == WindowOperationResult::Failed {
+        logging!(warn, Type::Lightweight, "销毁主窗口失败，回滚轻量模式状态");
+        try_transition(LightweightState::In, LightweightState::Normal);
+        refresh_lightweight_tray_state().await;
+        return false;
+    }
     refresh_lightweight_tray_state().await;
     true
 }
@@ -120,7 +126,13 @@ pub async fn exit_lightweight_mode() -> bool {
         return false;
     }
     record_state_and_log(LightweightState::Exiting);
-    WindowManager::show_main_window().await;
+    let result = WindowManager::show_main_window().await;
+    if result == WindowOperationResult::Failed {
+        logging!(warn, Type::Lightweight, "显示主窗口失败，回滚轻量模式状态");
+        try_transition(LightweightState::Exiting, LightweightState::In);
+        refresh_lightweight_tray_state().await;
+        return false;
+    }
     record_state_and_log(LightweightState::Normal);
     refresh_lightweight_tray_state().await;
     // 退出轻量模式后，重新启用托盘菜单中的「轻量模式」选项
