@@ -11,13 +11,6 @@
 
 ## 📌 待验证与活动?Bug 详情 (Active & Pending Bugs)
 
-### BUG-169: Speed Test Timeout Capping Side-effects (Error State & Intermittent Auto-Select)
- 
- - **现象描述**：主页面点击闪电图标并发测速时，超时未响应的节点显示为红色的 "Error" 而非黃/橘色的 "Timeout"；此外，重启客户端或导入订阅后的自动测速选点时好时坏，容易选点失败。
- - **根因**：为修复 BUG-167 引入的 3 秒最大请求超时硬限制（`std::cmp::min(..., 3s)`）过于激进，导致在前端 10 秒默认测速超时下，后端在 3 秒时便直接中止请求并返回错误（Err）。前端捕获该异常后判定为 `Error` 并显示红色。在高并发排队或网络波动时，这也导致大量原本健康的节点在 3 秒内未响应完（即使本身延迟仅几百毫秒），被后端中止抛错，从而使得自动选点失败或不稳定。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.5`
-
 ### BUG-146: Inconsistent Property Access for Allow LAN Switch State
  
  - **现象描述**：设置页面中的 "Allow LAN"（允许局域网连接）开关在页面加载时，其视觉开启状态与实际配置脱节，总是显示为关闭状态。
@@ -28,45 +21,6 @@
 
 
 
-
-### BUG-172: Falsy History Delay Value Coercion to Error State
- 
- - **现象描述**：重启客户端或导入订阅链接后，部分不健康或超时的节点在未测试时，其延迟状态在列表中会显示为红色的 "Error" 而非黄/橙色的 "Timeout"；但手动点击测试后可正确变回 "Timeout"。
- - **根因**：前端 `getDelayFix` 方法在加载历史延迟记录时使用 `proxy.history[...].delay || 1e6`，其中 `||` 逻辑将超时节点所对应的合法 `0` 延迟数值强制转换成了大数 `1e6` (1,000,000ms)，触发了 `formatDelay` 中 `delay > 1e5` 的 "Error" 渲染边界。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.8`
-
-### BUG-170: Autostart Switch State Timing Race & Unnecessary UAC Elevation
- 
- - **现象描述**：设置页面中的“开机自动启动”开关经常在操作后弹回（无法正常开启或关闭），或者在开启后重启客户端发现自启动并未实际生效。且在普通用户权限下，开启/关闭开关会频繁强行弹出 Windows UAC（管理员授权）提示。此外，开启自启失败后，切换其他设置项会导致自启开关在前端显示为开启（跑至右侧）但实际自启未在系统生效。
- - **根因**：
-   1. **时序竞态问题**：后端在 `patch_verge` 处理配置变更时，于 `apply()` 生效前就触发了 `update_launch()`。而后者直接从 `latest_arc()` 中读取了未应用的新值（也就是旧值），导致系统指令与用户意图完全相反（开启时去删除了任务，关闭时去创建了任务）。
-   2. **无谓提权问题**：后端 `set_auto_launch` 对 `TaskMode::User`（普通用户自启任务）一刀切地使用了 `create_task_elevated`，导致普通用户环境下也强制拉起 `runas` 提权。一旦提权被取消或失败，直接导致整个 `patch_verge` 失败抛错，进而使前端 Switch 状态弹回。根据 `clash_mini_agreements.md` 第 6 条规范，只有在非管理员模式下删除已存在的 `Clash Mini (Admin)` 任务时才需提权，普通用户创建和删除自己的任务无需任何提权。
-   3. **配置草稿回滚失效（Rust 早回语法 Bug）**：后端 `patch_verge` 和 `patch_clash` 在捕获配置变更报错时，利用 `{ process_terminated_flags(...).await?; Ok(()) }` 的结构，由于 `?` 运算符直接返回了外层函数，导致下方的 `discard()` 重置逻辑从未被执行。未回滚的脏配置草稿留存在内存中，在下次用户修改任意其他配置项（如主题模式）且成功提交时被“搭便车”式强行应用并保存到磁盘配置文件，最终在前端造成视觉上开启而系统自启任务实际并未生效的假象。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.7`
-
-### BUG-173: Admin Autostart Task Creation Failed due to Password Prompt
- 
- - **现象描述**：以管理员身份运行客户端时，开启“开机自动启动”报错且无法成功开启。
- - **根因**：后端通过 `schtasks` 命令创建高权限（HighestAvailable）的自启任务时，由于 XML 文件指定了 `<UserId>` 但在执行 `schtasks /Create` 时命令中没有携带 `/RU ""` 参数，导致 Windows 系统默认会要求在控制台交互式输入运行用户的密码。由于进程是在后台静默执行且没有标准输入（stdin），密码验证直接超时报错，导致任务创建失败。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.7`
-
-### BUG-174: 3D Dark Mode Update Card Text/BG Contrast Failure
-
-- **现象描述**：3D 风格（retro-3d）深色模式下，自动版本升级弹窗中的更新日志卡片模块，文字颜色与背景颜色反差极小，肉眼几乎无法区分。
-- **根因**：`src/utils/button-styles.ts` 中 `get3DCardStyle` 函数，retro-3d 分支下 `cardType === 'default'` 的暗色模式文字色设为 `#FFE082`（淡金），而背景渐变色起止于 `#FFF59D`（亮黄）→ `#E65100`（深橙）。`#FFE082` 与 `#FFF59D` 色相相同、明度接近，导致文字淹没在卡片顶部区域。retro-3d 统一深色文字色为 `#2C1F03`（暗墨黑金），亮色模式及 primary 卡片均使用该色或 `#3C2F0F`，唯独 default 卡片暗色分支遗漏。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-176: 后台 Monitor 测速结果不回传前端 UI
-
-- **现象描述**：后台 monitor 常驻线程在 Profile 切换和故障自愈时执行的全节点群发测速结果（`Vec<(节点名, 延迟ms)>`）仅用于内部节点切换决策，未回传至前端 UI 界面。用户在前端代理节点列表中无法看到后台测速产生的延迟数值更新。
-- **根因**：monitor 的两个调用点（`start_background_monitor` 中 Profile 切换分支和故障自愈分支）均丢弃了 `trigger_backend_auto_select` 的返回值。前端 `DelayManager` 仅有「前端主动发起测速→自写入缓存」一条数据通路，缺少「后台结果注入」入口。
-- **修复**：Rust 侧在 `FrontendEvent` 新增 `DelayResults` 变体，`trigger_backend_auto_select` 成功返回后在两个调用点通过 `Handle::notify_delay_results` 将完整结果以 `verge://backend-delay-results` 事件推送到前端。前端侧 `DelayManager` 新增 `injectBatchResults(group, results)` 公共方法，`use-layout-events` 中注册事件监听器，收到后台结果后注入缓存并触发 UI 批量刷新。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
 
 ### BUG-189: BUG-173 修复 /RU "" 被错误地同时加入 create_task 和 create_task_elevated，导致管理员和非管理员均无法开启自启
 
@@ -262,3 +216,9 @@
 | **BUG-186** | CI rustfmt格式化检查配置确认 | v1.5.9 | 用户已确认 |
 | **BUG-187** | 协议三十/三十一条文排列确认 | v1.5.9 | 用户已确认 |
 | **BUG-175** | 关闭窗口即刻进入轻量模式 | v1.5.9 | 用户已确认 |
+| **BUG-169** | Speed Test 超时硬限制导致 Error 显示 | v1.5.5 | 用户已确认 |
+| **BUG-170** | 自启开关时序竞态与 UAC 提权修复 | v1.5.7 | 用户已确认 |
+| **BUG-172** | getDelayFix || 1e6 导致超时节点显示 Error | v1.5.8 | 用户已确认 |
+| **BUG-173** | Admin 模式 schtasks 缺 /RU "" 修复 | v1.5.7 | 用户已确认 |
+| **BUG-174** | Retro-3D 深色 default 卡片文字色 #FFE082 → #2C1F03 | v1.5.9 | 用户已确认 |
+| **BUG-176** | 后台 Monitor 测速结果不回传前端 UI | v1.5.9 | 用户已确认 |
