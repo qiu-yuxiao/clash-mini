@@ -1,7 +1,31 @@
+## v1.6.1
+
+### 🚀 New Features
+
+- Optimize auto-select health check sensitivity: increased timeout from 500ms to 1000ms and failure threshold from 3 to 5 to prevent high-frequency node switching.
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-190: Implement exponential backoff cooldown (60s to 15m) for self-healing auto-select daemon when no nodes >= 50ms are available.
+- Fix BUG-191: Reuse reqwest::Client connection pool in Mihomo struct to prevent socket and CPU resource exhaustion.
+- Fix BUG-192: Throttle core updater download progress emissions to only when the integer percentage changes.
+- Fix BUG-193: Replace semaphore add_permits(1) with a PoolPermit enum to prevent connection pool capacity inflation under RejectPolicy::New.
+- Fix BUG-194: Proactively check and clean up invalid/dead sockets inside the connection pool.
+- Fix BUG-195: Stream-decompress zip/gz packages directly to disk during updates to avoid buffering large files (~40MB) in RAM.
+- Fix BUG-196: Delete uncompiled dead code speed_task.rs.
+- Fix BUG-197: Add an active mounting flag to useConnectionData hook to prevent infinite background polling on unmount.
+- Fix BUG-198 / FEAT-DELETE-001: Completely remove the window snap (磁吸) feature and its associated hook.
+- Fix BUG-199: Add null safety checks for unlistenPromise during useCustomTheme cleanup.
+- Fix BUG-200: Add a 2-hour active GC timer to DelayManager cache to clean up expired entries.
+- Fix BUG-201: Replace 1-second setInterval polling in useVisibility with 100% event-driven native Tauri listeners.
+
+---
+
 ## v1.6.0
 
 ### 🐞 Fixed Bugs
 
+- Fix BUG-188: Handle discarded return values of destroy_main_window/show_main_window by logging or returning errors properly to prevent potential silent failures in main window lifecycle management.
 - Fix BUG-189: Remove incorrect `/RU ""` from `create_task` that was erroneously added in the BUG-173 fix. The `/RU ""` parameter conflicts with the XML `<UserId>` when running as admin, causing `schtasks` to fail with "未指定的错误". Only `create_task_elevated` (UAC elevation path) needs `/RU ""` because the process context is lost after elevation. `create_task` runs directly without elevation and the XML provides the UserId, so `/RU ""` is unnecessary and harmful.
 
 ---

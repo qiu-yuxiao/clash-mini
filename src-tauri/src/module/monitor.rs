@@ -206,7 +206,7 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
         .as_deref()
         .unwrap_or("http://cp.cloudflare.com/generate_204");
 
-    if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 500).await {
+    if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 1000).await {
         if delay_info.delay >= 50 {
             // 延迟满足 >= 50ms，即判定为健康
             return Ok(true);
@@ -503,7 +503,7 @@ pub fn start_background_monitor() {
                                 consecutive_fails
                             );
 
-                            if consecutive_fails >= 3 {
+                            if consecutive_fails >= 5 {
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
 
@@ -539,7 +539,8 @@ pub fn start_background_monitor() {
                                             if current_cooldown.as_secs() == 0 {
                                                 current_cooldown = Duration::from_secs(60); // 初始冷却 1 分钟
                                             } else {
-                                                current_cooldown = std::cmp::min(current_cooldown * 2, Duration::from_secs(900)); // 每次翻倍，最高 15 分钟
+                                                current_cooldown =
+                                                    std::cmp::min(current_cooldown * 2, Duration::from_secs(900)); // 每次翻倍，最高 15 分钟
                                             }
                                             logging!(
                                                 warn,
@@ -554,7 +555,8 @@ pub fn start_background_monitor() {
                                         if current_cooldown.as_secs() == 0 {
                                             current_cooldown = Duration::from_secs(60);
                                         } else {
-                                            current_cooldown = std::cmp::min(current_cooldown * 2, Duration::from_secs(900));
+                                            current_cooldown =
+                                                std::cmp::min(current_cooldown * 2, Duration::from_secs(900));
                                         }
                                         logging!(
                                             warn,

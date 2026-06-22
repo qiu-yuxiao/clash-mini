@@ -345,11 +345,7 @@ pub fn run() {
                 AsyncHandler::spawn(|| async {
                     let entered = lightweight::entry_lightweight_mode().await;
                     if !entered {
-                        logging!(
-                            error,
-                            Type::Lightweight,
-                            "[窗口关闭] 轻量模式进入失败"
-                        );
+                        logging!(error, Type::Lightweight, "[窗口关闭] 轻量模式进入失败");
                     }
                 });
             }
