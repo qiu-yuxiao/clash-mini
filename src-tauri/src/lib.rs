@@ -290,7 +290,6 @@ pub fn run() {
         .invoke_handler(app_init::generate_handlers());
 
     mod event_handlers {
-        #[cfg(target_os = "macos")]
         use crate::module::lightweight;
         use crate::utils::window_manager::WindowManager;
         use crate::{
@@ -343,6 +342,9 @@ pub fn run() {
                 if let Some(window) = WindowManager::get_main_window() {
                     let _ = window.hide();
                 }
+                AsyncHandler::spawn(|| async {
+                    lightweight::entry_lightweight_mode().await;
+                });
             }
         }
 

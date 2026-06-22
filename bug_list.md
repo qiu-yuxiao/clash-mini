@@ -60,6 +60,14 @@
 - **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.5.9`
 
+### BUG-175: Windows Close Button Does Not Trigger Lightweight Mode
+
+- **现象描述**：Windows 原生窗口标题栏点击关闭按钮（X）后，程序退缩至托盘但并未进入轻量化模式（窗口仅隐藏未销毁）。右键托盘图标选择"轻量模式"可正常进入，说明程序通路本身畅通，仅关闭按钮未正确触发入口。
+- **根因**：`src-tauri/src/lib.rs` 中 `handle_window_close` 仅调用 `window.hide()` 隐藏窗口，未调用 `entry_lightweight_mode()`。原设计依赖 `tauri://close-requested` 事件监听启动 5 分钟定时器，超时后才进入轻量模式。该延迟触发机制与用户预期不符——关闭窗口应即刻进入轻量模式。
+- **修复**：在 `handle_window_close` 中隐藏窗口后，立即通过 `AsyncHandler::spawn` 调用 `entry_lightweight_mode()`，同时移除废代码：定时器链路（`setup_light_weight_timer`、`cancel_light_weight_timer`）、关闭/焦点事件监听器（`setup_window_close_listener` 等）及相关静态状态（`WINDOW_CLOSE_HANDLER_ID`、`WEBVIEW_FOCUS_HANDLER_ID`、`CANCEL_TX`）。macOS 侧 `feat::window::hide()` 同步替换为直接调用 `entry_lightweight_mode`。`enable_auto_light_weight_mode` / `disable_auto_light_weight_mode` 改为兼容空壳。
+- **当前状态**：`代码已修正，待用户确认`
+- **目标版本**：`v1.5.9`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?

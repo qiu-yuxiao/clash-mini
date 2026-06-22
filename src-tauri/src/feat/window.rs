@@ -162,7 +162,7 @@ pub async fn clean_async() -> bool {
 
 #[cfg(target_os = "macos")]
 pub async fn hide() {
-    use crate::module::lightweight::add_light_weight_timer;
+    use crate::module::lightweight::entry_lightweight_mode;
 
     let enable_auto_light_weight_mode = Config::verge()
         .await
@@ -171,7 +171,7 @@ pub async fn hide() {
         .unwrap_or(false);
 
     if enable_auto_light_weight_mode {
-        add_light_weight_timer().await;
+        entry_lightweight_mode().await;
     }
 
     if let Some(window) = WindowManager::get_main_window()

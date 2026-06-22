@@ -2318,6 +2318,14 @@
 
 重启程序或导入/切换订阅后，Clash 内核重载配置会将当前活跃节点重置为订阅列表中的默认第一个节点（往往是订阅商的广告假节点），导致网络中断。为防止这种情况，程序在完成配置重载后，必须自动触发一次全节点测速并选取最快的可用真实节点，以纠正 Clash 内核的默认选择。该自动选点动作必须在配置重载完成后可靠执行，即使后台存在并发的自动选点操作，也必须确保前端最终能覆盖到正确的新配置节点上执行一次选点。
 
+## ⚡ 二十九、 窗口关闭即入轻量模式规范 (BUG-175)
+
+点击 Windows 原生标题栏关闭按钮（X）后，程序应立即进入轻量化模式（销毁主窗口释放内存/GPU 资源），而非仅隐藏窗口并等待延迟定时器。原定时器机制（`setup_light_weight_timer`、`cancel_light_weight_timer`、关闭/焦点事件监听器）已全部移除。
+
+- **关闭按钮行为**：`handle_window_close` 在 `window.hide()` 后，通过 `AsyncHandler::spawn` 立即调用 `lightweight::entry_lightweight_mode()`，同步销毁主窗口。
+- **macOS 隐藏行为**：`feat::window::hide()` 中 `add_light_weight_timer` 替换为直接调用 `entry_lightweight_mode`，确保跨平台行为一致。
+- **兼容空壳**：`enable_auto_light_weight_mode` / `disable_auto_light_weight_mode` 保留为无操作的兼容空壳，避免破坏配置热更新路径和前端配置界面的联动逻辑。`enable_auto_light_weight_mode` 配置项本身继续保留以维持配置文件向后兼容。
+
 ## ⚡ 二十九、 Retro-3D 深色模式 Default 卡片文字颜色规范 (BUG-174)
 
 Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类型卡片，其暖色黄金渐变背景（`#FFF59D → #FBC02D → #F57F17 → #E65100`）上原先使用的淡金色文字 `#FFE082` 与渐变起始色 `#FFF59D` 几乎同色，导致文字淹没于背景、无法辨识。本节规范如下：
