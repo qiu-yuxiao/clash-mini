@@ -45,6 +45,13 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.5.7`
 
+### BUG-172: Falsy History Delay Value Coercion to Error State
+ 
+ - **现象描述**：重启客户端或导入订阅链接后，部分不健康或超时的节点在未测试时，其延迟状态在列表中会显示为红色的 "Error" 而非黄/橙色的 "Timeout"；但手动点击测试后可正确变回 "Timeout"。
+ - **根因**：前端 `getDelayFix` 方法在加载历史延迟记录时使用 `proxy.history[...].delay || 1e6`，其中 `||` 逻辑将超时节点所对应的合法 `0` 延迟数值强制转换成了大数 `1e6` (1,000,000ms)，触发了 `formatDelay` 中 `delay > 1e5` 的 "Error" 渲染边界。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.5.8`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
