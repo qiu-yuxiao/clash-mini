@@ -60,14 +60,6 @@
 - **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.5.9`
 
-### BUG-175: Windows Close Button Does Not Trigger Lightweight Mode
-
-- **现象描述**：Windows 原生窗口标题栏点击关闭按钮（X）后，程序退缩至托盘但并未进入轻量化模式（窗口仅隐藏未销毁）。右键托盘图标选择"轻量模式"可正常进入，说明程序通路本身畅通，仅关闭按钮未正确触发入口。
-- **根因**：`src-tauri/src/lib.rs` 中 `handle_window_close` 仅调用 `window.hide()` 隐藏窗口，未调用 `entry_lightweight_mode()`。原设计依赖 `tauri://close-requested` 事件监听启动 5 分钟定时器，超时后才进入轻量模式。该延迟触发机制与用户预期不符——关闭窗口应即刻进入轻量模式。
-- **修复**：在 `handle_window_close` 中隐藏窗口后，立即通过 `AsyncHandler::spawn` 调用 `entry_lightweight_mode()`，同时移除废代码：定时器链路（`setup_light_weight_timer`、`cancel_light_weight_timer`）、关闭/焦点事件监听器（`setup_window_close_listener` 等）及相关静态状态（`WINDOW_CLOSE_HANDLER_ID`、`WEBVIEW_FOCUS_HANDLER_ID`、`CANCEL_TX`）。macOS 侧 `feat::window::hide()` 同步替换为直接调用 `entry_lightweight_mode`。`enable_auto_light_weight_mode` / `disable_auto_light_weight_mode` 改为兼容空壳。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
 ### BUG-176: 后台 Monitor 测速结果不回传前端 UI
 
 - **现象描述**：后台 monitor 常驻线程在 Profile 切换和故障自愈时执行的全节点群发测速结果（`Vec<(节点名, 延迟ms)>`）仅用于内部节点切换决策，未回传至前端 UI 界面。用户在前端代理节点列表中无法看到后台测速产生的延迟数值更新。
@@ -256,3 +248,4 @@
 | **BUG-185** | CHANGELOG补录默认值变更 | v1.5.9 | 用户已确认 |
 | **BUG-186** | CI rustfmt格式化检查配置确认 | v1.5.9 | 用户已确认 |
 | **BUG-187** | 协议三十/三十一条文排列确认 | v1.5.9 | 用户已确认 |
+| **BUG-175** | 关闭窗口即刻进入轻量模式 | v1.5.9 | 用户已确认 |
