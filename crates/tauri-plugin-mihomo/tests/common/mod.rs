@@ -29,6 +29,7 @@ pub fn mihomo() -> Mihomo {
             secret: None,
             socket_path: Some(socket_path),
             connection_manager: Arc::new(Default::default()),
+            client: reqwest::Client::new(),
         }
     } else {
         println!("connect to mihomo by http");
@@ -40,6 +41,7 @@ pub fn mihomo() -> Mihomo {
             secret: Some("yPMJk9i7UaR1hv3-2BkPy".into()),
             socket_path: None,
             connection_manager: Arc::new(Default::default()),
+            client: reqwest::Client::new(),
         }
     }
 }

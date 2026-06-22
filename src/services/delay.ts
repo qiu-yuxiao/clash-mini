@@ -27,6 +27,21 @@ class DelayManager {
   private itemFlushScheduled = false
   private groupFlushScheduled = false
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      setInterval(() => {
+        const now = Date.now()
+        const expiredKeys: string[] = []
+        this.cache.forEach((entry, key) => {
+          if (now - entry.updatedAt > CACHE_TTL) {
+            expiredKeys.push(key)
+          }
+        })
+        expiredKeys.forEach((key) => this.cache.delete(key))
+      }, 2 * 60 * 60 * 1000) // Clean up expired cache every 2 hours
+    }
+  }
+
   private scheduleOnNextFrame(run: () => void): void {
     if (typeof window !== 'undefined') {
       if (typeof window.requestAnimationFrame === 'function') {

@@ -168,15 +168,17 @@ export const useCustomTheme = () => {
     return () => {
       isMounted = false
       clearTimeout(timerId)
-      unlistenPromise
-        .then((unlistenFn) => {
-          if (typeof unlistenFn === 'function') {
-            unlistenFn()
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to unlisten from theme changes:', err)
-        })
+      if (unlistenPromise) {
+        unlistenPromise
+          .then((unlistenFn) => {
+            if (typeof unlistenFn === 'function') {
+              unlistenFn()
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to unlisten from theme changes:', err)
+          })
+      }
     }
   }, [theme_mode, appWindow, setMode])
 

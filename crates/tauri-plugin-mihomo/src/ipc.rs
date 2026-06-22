@@ -361,6 +361,13 @@ pub enum RejectPolicy {
     Wait,              // 一直等待连接池的连接可用
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum PoolPermit<'a> {
+    Semaphore(SemaphorePermit<'a>),
+    Bypass,
+}
+
 // IPC 连接包装器
 struct IpcConnection {
     sender: http1::SendRequest<Full<Bytes>>,
@@ -446,11 +453,15 @@ impl IpcConnectionPool {
         for _ in 0..approx_len {
             if let Some(conn) = self.connections.pop() {
                 total_checked += 1;
-                let is_idle_timeout = now.duration_since(conn.last_used) > self.config.idle_timeout;
+                if conn.is_valid() {
+                    let is_idle_timeout = now.duration_since(conn.last_used) > self.config.idle_timeout;
 
-                if kept < min_to_keep || !is_idle_timeout {
-                    self.connections.push(conn);
-                    kept += 1;
+                    if kept < min_to_keep || !is_idle_timeout {
+                        self.connections.push(conn);
+                        kept += 1;
+                    }
+                } else {
+                    log::debug!("cleanup: dropping invalid connection");
                 }
             } else {
                 break;
@@ -460,37 +471,29 @@ impl IpcConnectionPool {
     }
 
     #[inline]
-    async fn get_connection<'a>(&'a self, socket_path: &str) -> Result<(IpcConnection, SemaphorePermit<'a>)> {
+    async fn get_connection<'a>(&'a self, socket_path: &str) -> Result<(IpcConnection, PoolPermit<'a>)> {
         log::debug!("get connection from pool");
-        // 确保获取 semaphore permit
+        // 确保获取 pool permit
         let permit = self.acquire_permit().await?;
         // 开始创建连接
         let conn = self.acquire_or_create_connection(socket_path).await?;
         Ok((conn, permit))
     }
 
-    async fn acquire_permit<'a>(&'a self) -> Result<SemaphorePermit<'a>> {
+    async fn acquire_permit<'a>(&'a self) -> Result<PoolPermit<'a>> {
         log::debug!("acquire permit");
         match self.semaphore.try_acquire() {
-            Ok(permit) => Ok(permit),
+            Ok(permit) => Ok(PoolPermit::Semaphore(permit)),
             Err(_) => match self.config.reject_policy {
                 RejectPolicy::New => {
-                    log::debug!("max permit has acquire, add permit");
-                    self.semaphore.add_permits(1);
-                    match self.semaphore.acquire().await {
-                        Ok(permit) => Ok(permit),
-                        Err(e) => {
-                            log::error!("failed to acquire permit, forget permit");
-                            self.semaphore.forget_permits(1);
-                            Err(Error::ConnectionFailed(e.to_string()))
-                        }
-                    }
+                    log::debug!("max permit has acquire, bypass semaphore");
+                    Ok(PoolPermit::Bypass)
                 }
                 RejectPolicy::Reject => Err(Error::ConnectionPoolFull),
                 RejectPolicy::Timeout(timeout_duration) => {
                     let acquire_future = self.semaphore.acquire();
                     match timeout(timeout_duration, acquire_future).await {
-                        Ok(Ok(permit)) => Ok(permit),
+                        Ok(Ok(permit)) => Ok(PoolPermit::Semaphore(permit)),
                         Ok(Err(_)) => Err(Error::ConnectionPoolFull),
                         Err(e) => Err(Error::Timeout(e)),
                     }
@@ -498,7 +501,7 @@ impl IpcConnectionPool {
                 RejectPolicy::Wait => {
                     let acquire_future = self.semaphore.acquire().await;
                     match acquire_future {
-                        Ok(permit) => Ok(permit),
+                        Ok(permit) => Ok(PoolPermit::Semaphore(permit)),
                         Err(_) => Err(Error::ConnectionPoolFull),
                     }
                 }

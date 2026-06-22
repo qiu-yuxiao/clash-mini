@@ -106,6 +106,7 @@ impl CoreUpdater {
         let total_size = response.content_length().unwrap_or(0);
         let mut downloaded: u64 = 0;
         let mut bytes = Vec::new();
+        let mut last_emitted_percentage = 0u32;
 
         loop {
             let chunk_opt = match tokio::time::timeout(std::time::Duration::from_secs(20), response.chunk()).await {
@@ -127,17 +128,20 @@ impl CoreUpdater {
             downloaded += chunk.len() as u64;
             if total_size > 0 {
                 let percentage = ((downloaded as f64 / total_size as f64) * 80.0) as u32 + 10;
-                let payload = CoreUpgradeProgress {
-                    status: "downloading".to_string(),
-                    progress: percentage,
-                    message: format!(
-                        "正在下载 {}: {:.1} MB / {:.1} MB",
-                        asset_name,
-                        downloaded as f64 / 1_048_576.0,
-                        total_size as f64 / 1_048_576.0
-                    ),
-                };
-                let _ = app_handle.emit("core-upgrade-progress", payload);
+                if percentage != last_emitted_percentage {
+                    last_emitted_percentage = percentage;
+                    let payload = CoreUpgradeProgress {
+                        status: "downloading".to_string(),
+                        progress: percentage,
+                        message: format!(
+                            "正在下载 {}: {:.1} MB / {:.1} MB",
+                            asset_name,
+                            downloaded as f64 / 1_048_576.0,
+                            total_size as f64 / 1_048_576.0
+                        ),
+                    };
+                    let _ = app_handle.emit("core-upgrade-progress", payload);
+                }
             }
         }
 
@@ -261,40 +265,8 @@ impl CoreUpdater {
             }
         }
 
-        let decompressed_bytes = match downloaded_bytes {
-            Some(b) => {
-                emit_progress("extracting", 90, "正在解压并替换内核程序...");
-                if is_zip {
-                    let reader = io::Cursor::new(b);
-                    let mut archive = zip::ZipArchive::new(reader).context("failed to parse zip archive")?;
-                    let mut mihomo_file_idx = None;
-                    for i in 0..archive.len() {
-                        let file = archive.by_index(i)?;
-                        let name = file.name().to_lowercase();
-                        if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains(".")) {
-                            mihomo_file_idx = Some(i);
-                            break;
-                        }
-                    }
-                    let idx = match mihomo_file_idx {
-                        Some(i) => i,
-                        None => {
-                            let err_msg = "在 ZIP 压缩包内未找到 mini-mihomo 程序二进制";
-                            emit_progress("error", 0, err_msg);
-                            bail!(err_msg);
-                        }
-                    };
-                    let mut file = archive.by_index(idx)?;
-                    let mut buf = Vec::new();
-                    io::copy(&mut file, &mut buf).context("failed to extract file from zip")?;
-                    buf
-                } else {
-                    let mut decoder = flate2::read::GzDecoder::new(io::Cursor::new(b));
-                    let mut buf = Vec::new();
-                    io::copy(&mut decoder, &mut buf).context("failed to decompress gzip archive")?;
-                    buf
-                }
-            }
+        let downloaded = match downloaded_bytes {
+            Some(b) => b,
             None => {
                 let err_msg = "所有网络连接（代理/直连）均下载失败";
                 emit_progress("error", 0, err_msg);
@@ -320,8 +292,37 @@ impl CoreUpdater {
         // Stop core
         let _ = CoreManager::global().stop_core().await;
 
-        // Write to destination
-        fs::write(&custom_core_path, decompressed_bytes).context("failed to write core binary to disk")?;
+        emit_progress("extracting", 90, "正在解压并替换内核程序...");
+
+        // Create destination file directly on disk
+        let mut dest_file = fs::File::create(&custom_core_path).context("failed to create destination core file")?;
+
+        if is_zip {
+            let reader = io::Cursor::new(downloaded);
+            let mut archive = zip::ZipArchive::new(reader).context("failed to parse zip archive")?;
+            let mut mihomo_file_idx = None;
+            for i in 0..archive.len() {
+                let file = archive.by_index(i)?;
+                let name = file.name().to_lowercase();
+                if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains(".")) {
+                    mihomo_file_idx = Some(i);
+                    break;
+                }
+            }
+            let idx = match mihomo_file_idx {
+                Some(i) => i,
+                None => {
+                    let err_msg = "在 ZIP 压缩包内未找到 mini-mihomo 程序二进制";
+                    emit_progress("error", 0, err_msg);
+                    bail!(err_msg);
+                }
+            };
+            let mut file = archive.by_index(idx)?;
+            io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to destination")?;
+        } else {
+            let mut decoder = flate2::read::GzDecoder::new(io::Cursor::new(downloaded));
+            io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to destination")?;
+        }
 
         // Set Unix execute permission
         #[cfg(unix)]

@@ -100,6 +100,7 @@ pub struct Mihomo {
     pub secret: Option<String>,
     pub socket_path: Option<String>,
     pub connection_manager: Arc<ConnectionManager>,
+    pub client: reqwest::Client,
 }
 
 impl Mihomo {
@@ -167,13 +168,12 @@ impl Mihomo {
     fn build_request(&self, method: Method, suffix_url: &str) -> Result<RequestBuilder> {
         let url = self.get_req_url(suffix_url)?;
         let headers = self.get_req_headers()?;
-        let client = reqwest::ClientBuilder::new().build()?;
         let req = match method {
-            Method::POST => Ok(client.post(url).headers(headers)),
-            Method::GET => Ok(client.get(url).headers(headers)),
-            Method::PUT => Ok(client.put(url).headers(headers)),
-            Method::PATCH => Ok(client.patch(url).headers(headers)),
-            Method::DELETE => Ok(client.delete(url).headers(headers)),
+            Method::POST => Ok(self.client.post(url).headers(headers)),
+            Method::GET => Ok(self.client.get(url).headers(headers)),
+            Method::PUT => Ok(self.client.put(url).headers(headers)),
+            Method::PATCH => Ok(self.client.patch(url).headers(headers)),
+            Method::DELETE => Ok(self.client.delete(url).headers(headers)),
             _ => {
                 let method_str = method.as_str().to_string();
                 log::error!("method not supported: {method_str}");

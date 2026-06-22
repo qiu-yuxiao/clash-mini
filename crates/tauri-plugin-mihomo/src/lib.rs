@@ -160,6 +160,7 @@ impl Builder {
                     secret,
                     socket_path,
                     connection_manager: Default::default(),
+                    client: reqwest::Client::new(),
                 }));
 
                 Ok(())

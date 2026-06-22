@@ -392,6 +392,12 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
     Ok(results)
 }
 
+async fn get_active_node_name() -> Option<String> {
+    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+    let group_info = mihomo.get_group_by_name("PROXY").await.ok()?;
+    group_info.now.filter(|node| !node.is_empty())
+}
+
 /// 启动全局后台节点监测常驻线程
 pub fn start_background_monitor() {
     AsyncHandler::spawn(move || async move {
@@ -400,6 +406,9 @@ pub fn start_background_monitor() {
         let mut last_check_time = Instant::now();
         let mut consecutive_fails = 0;
         let mut is_retry_mode = false;
+        let mut last_active_node: Option<String> = None;
+        let mut last_auto_select_time: Option<Instant> = None;
+        let mut current_cooldown = Duration::from_secs(0);
 
         loop {
             sleep(Duration::from_secs(1)).await;
@@ -424,6 +433,9 @@ pub fn start_background_monitor() {
                 last_profile_uid = Some(current_profile.clone());
                 consecutive_fails = 0;
                 is_retry_mode = false;
+                last_active_node = None;
+                last_auto_select_time = None;
+                current_cooldown = Duration::from_secs(0);
 
                 // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
                 cancel_active_auto_select();
@@ -459,11 +471,28 @@ pub fn start_background_monitor() {
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
 
+                // 检测活动节点是否发生变化（如用户手动切换）
+                let active_node_name = get_active_node_name().await.unwrap_or_default();
+                if Some(&active_node_name) != last_active_node.as_ref() {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 检测到活动节点发生变化: {:?} -> {}",
+                        last_active_node,
+                        active_node_name
+                    );
+                    last_active_node = Some(active_node_name);
+                    consecutive_fails = 0;
+                    is_retry_mode = false;
+                    current_cooldown = Duration::from_secs(0);
+                }
+
                 match check_active_node_health().await {
                     Ok(is_healthy) => {
                         if is_healthy {
                             consecutive_fails = 0;
                             is_retry_mode = false;
+                            current_cooldown = Duration::from_secs(0); // 节点健康，重置冷却时间
                         } else {
                             consecutive_fails += 1;
                             is_retry_mode = true;
@@ -477,22 +506,65 @@ pub fn start_background_monitor() {
                             if consecutive_fails >= 3 {
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
+
+                                // 检查退避冷却时间
+                                let now = Instant::now();
+                                if let Some(last_time) = last_auto_select_time {
+                                    if now.duration_since(last_time) < current_cooldown {
+                                        logging!(
+                                            info,
+                                            Type::Lightweight,
+                                            "[后台监测] 自愈选点处于退避冷却中（剩余 {} 秒），跳过本次选点",
+                                            current_cooldown.as_secs() - now.duration_since(last_time).as_secs()
+                                        );
+                                        last_check_time = now;
+                                        continue;
+                                    }
+                                }
+
                                 logging!(
                                     info,
                                     Type::Lightweight,
                                     "[后台监测] 连续 3 次检测失败，启动后台自愈选点"
                                 );
-                                if let Ok(results) = trigger_backend_auto_select(&current_profile, 0).await {
-                                    if !results.is_empty() {
-                                        Handle::notify_delay_results("PROXY".into(), results);
+                                last_auto_select_time = Some(now);
+
+                                match trigger_backend_auto_select(&current_profile, 0).await {
+                                    Ok(results) => {
+                                        if !results.is_empty() {
+                                            Handle::notify_delay_results("PROXY".into(), results);
+                                            current_cooldown = Duration::from_secs(0); // 选点成功，重置退避冷却
+                                        } else {
+                                            // 选点未找到可用节点（延迟>=50ms），计算下一次退避冷却时间
+                                            if current_cooldown.as_secs() == 0 {
+                                                current_cooldown = Duration::from_secs(60); // 初始冷却 1 分钟
+                                            } else {
+                                                current_cooldown = std::cmp::min(current_cooldown * 2, Duration::from_secs(900)); // 每次翻倍，最高 15 分钟
+                                            }
+                                            logging!(
+                                                warn,
+                                                Type::Lightweight,
+                                                "[后台监测] 自愈选点未找到可用节点，进入退避冷却期：{} 秒",
+                                                current_cooldown.as_secs()
+                                            );
+                                        }
+                                        last_check_time = Instant::now();
                                     }
-                                    last_check_time = Instant::now();
-                                } else {
-                                    logging!(
-                                        warn,
-                                        Type::Lightweight,
-                                        "[后台监测] 自愈选点失败"
-                                    );
+                                    Err(e) => {
+                                        if current_cooldown.as_secs() == 0 {
+                                            current_cooldown = Duration::from_secs(60);
+                                        } else {
+                                            current_cooldown = std::cmp::min(current_cooldown * 2, Duration::from_secs(900));
+                                        }
+                                        logging!(
+                                            warn,
+                                            Type::Lightweight,
+                                            "[后台监测] 自愈选点失败 ({})，进入退避冷却期：{} 秒",
+                                            e,
+                                            current_cooldown.as_secs()
+                                        );
+                                        last_check_time = Instant::now();
+                                    }
                                 }
                             }
                         }

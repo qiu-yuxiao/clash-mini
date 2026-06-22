@@ -103,11 +103,8 @@ export const useVisibility = () => {
 
     initTauri()
 
-    const interval = setInterval(updateWindowState, 1000)
-
     return () => {
       active = false
-      clearInterval(interval)
       if (unlistenResized) {
         unlistenResized()
       }
