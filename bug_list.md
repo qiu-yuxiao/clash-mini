@@ -9,90 +9,9 @@
 > > 2. **待验?排查?Bug 强制卡片?*：任何状态为 `排查中` ?`代码已修正，待用户确认` ?Bug，必须在顶部的「待验证与活动中 Bug 详情」区以独立标?and 结构化字段登记?
 > > 3. **强制记录排查记忆，防止重复劳?*：在卡片中，必须详实搜集、继承并持久化记录以下三个协同要素：
 
-## 📌 待验证与活动?Bug 详情 (Active & Pending Bugs)
-### BUG-190: Infinite Self-Healing Auto-Select Loop on Fast Nodes (< 50ms)
- 
- - **现象描述**：当出口节点特别快（延迟小于 50ms）时，自动健康检查和测速选路会判定为“不健康”，从而引发无限循环的全节点测速，持续消耗大量 CPU、套接字（Socket）和网络带宽。
- - **根因**：`check_active_node_health` 里的延迟检查条件为 `delay >= 50`，导致小于 50ms 的超快节点被判为不健康，并且在自动测速过滤中也跳过了小于 50ms 的节点。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-191: Redundant reqwest::Client Creation per Request
- 
- - **现象描述**：每次网络请求（包括 LocalSocket 和 HTTP）都会新建并销毁 `reqwest::Client`，无法复用 TCP 连接池，高频请求时会导致严重的 CPU 飙升以及系统网络套接字（Socket）句柄耗尽。
- - **根因**：`Mihomo::build_request` 中每次都调用 `reqwest::ClientBuilder::new().build()` 实例化新客户端，导致连接池被销毁且产生了大量的 TCP 握手和句柄开销。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-192: Unthrottled Core Updater IPC Progress Emitter
- 
- - **现象描述**：升级内核下载文件时，每下载一个极小的块（4KB-16KB）就会向前端发送一次 Tauri IPC 进度事件。在下载几十MB的内核时，会产生数万次 IPC 序列化通信，导致 Rust 后端和前端渲染引擎 CPU 瞬间拉满，界面产生卡顿。
- - **根因**：在 `core_updater.rs` 的下载循环中未进行进度百分比去重，每次读取到 chunk 都会无条件调用 `app_handle.emit`。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-193: Semaphore Permit Inflation under RejectPolicy::New
- 
- - **现象描述**：连接池的并发上限随着负载增加不断漂移至无限大，使连接池保护机制失效并造成内存持续增长。
- - **根因**：当连接池超限时，`IpcConnectionPool` 虽然通过 `self.semaphore.add_permits(1)` 临时放行，但完成连接后未正确收回，导致连接池的并发上限永久增加。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-194: Dead Sockets Kept in the IPC Connection Pool
- 
- - **现象描述**：闲置连接清理逻辑在回收连接时，没有校验 Socket 链接本身的存活状态，导致一些已经被 Clash 后端主动断开的死连接依旧残留在连接池中，造成系统句柄资源浪费。
- - **根因**：`cleanup_idle_connections` 中将连接放回连接池前没有调用 `conn.is_valid()` 进行状态验证。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-195: RAM Buffering of Large File Updates
- 
- - **现象描述**：下载更新包时，先将整个文件直接缓存在内存的堆空间中，而不是边下载边写入临时磁盘文件，导致下载几十 MB 核心包时瞬间内存占用偏高。
- - **根因**：`core_updater.rs` 将下载的字节流全部存储在内存中的 `bytes: Vec<u8>` 中。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-196: Uncompiled Dead Code (speed_task.rs)
- 
- - **现象描述**：存在未被引用的死代码文件 `speed_task.rs`，浪费了代码库空间。
- - **根因**：文件存在于目录中，但从未被模块注册引用。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-197: Infinite Background Polling Loop in useConnectionData
- 
- - **现象描述**：前端连接数据监控在组件卸载（unmount）时，若有正在挂起的异步请求，清理定时器会失效。当请求返回后，会重新启动并永久在后台进行无限循环的轮询，造成前端内存与 CPU 泄漏。
- - **根因**：`use-connection-data.ts` 中的 `pollTotals` 在异步请求返回后没有检查组件是否仍然挂载，直接无条件设置了下一次的 `setTimeout`。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-198: Unhandled Tauri Listener Promise Rejection in useWindowSnap
- 
- - **现象描述**：窗口磁吸组件在销毁清理事件监听时，没有进行 Promise 空值防护，一旦报错会中断清理流程，导致 `mousedown` 和 `mouseup` 监听器残留在系统 document 中，引发内存和句柄泄漏。
- - **根因**：在 cleanup 中直接调用 `unlistenPromise.then()`，当 `unlistenPromise` 为空/报错时抛出异常打断了后续 `removeEventListener` 的执行。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-199: Unhandled Tauri Listener Promise Rejection in useCustomTheme
- 
- - **现象描述**：主题切换组件在销毁时也存在类似的 Tauri 监听器清理 Promise 异常未捕获问题，容易在报错时中断清理流程导致内存泄漏。
- - **根因**：在 cleanup 中未进行 `unlistenPromise` 的空值防护，调用 `.then()` 时可能由于空指针导致清理异常中断。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-200: Passive Cache Eviction Leak in DelayManager
- 
- - **现象描述**：节点延迟缓存仅在主动查询时才进行过期清理。当节点被改名、删除或切换订阅后，已失效的缓存将再也不会被查询，从而永久残留在内存中，造成内存缓慢泄漏。
- - **根因**：`DelayManager` 缺乏主动的主动清理过期缓存定时机制，仅依赖于被动查询触发清理。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
-
-### BUG-201: High-Frequency Tauri IPC Polling in useVisibility
- 
- - **现象描述**：窗口可见性监控采用 1 秒一次的高频定时轮询来检测窗口是否最小化，导致频繁触发 Tauri IPC 跨进程通信，造成不必要的 CPU 周期性唤醒与功耗增加。
- - **根因**：`use-visibility.ts` 使用 `setInterval` 每秒轮询调用 `currentWindow.isMinimized()` 等 IPC API，而非完全基于事件驱动。
- - **当前状态**：`待讨论`
- - **目标版本**：`v1.6.1`
+无。
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
@@ -277,3 +196,15 @@
 | **BUG-146** | Inconsistent Property Access for Allow LAN Switch State | v1.5.5 | 用户已确认 |
 | **BUG-188** | destroy_main_window/show_main_window 返回值被丢弃 | v1.6.0 | 用户已确认 |
 | **BUG-189** | BUG-173 修复 /RU "" 被错误地同时加入 create_task 和 create_task_elevated，导致管理员和非管理员均无法开启自启 | v1.6.0 | 用户已确认 |
+| **BUG-190** | Infinite Self-Healing Auto-Select Loop on Fast Nodes (< 50ms) | v1.6.1 | 代码已修正，已确认 |
+| **BUG-191** | Redundant reqwest::Client Creation per Request | v1.6.1 | 代码已修正，已确认 |
+| **BUG-192** | Unthrottled Core Updater IPC Progress Emitter | v1.6.1 | 代码已修正，已确认 |
+| **BUG-193** | Semaphore Permit Inflation under RejectPolicy::New | v1.6.1 | 代码已修正，已确认 |
+| **BUG-194** | Dead Sockets Kept in the IPC Connection Pool | v1.6.1 | 代码已修正，已确认 |
+| **BUG-195** | RAM Buffering of Large File Updates | v1.6.1 | 代码已修正，已确认 |
+| **BUG-196** | Uncompiled Dead Code (speed_task.rs) | v1.6.1 | 代码已修正，已确认 |
+| **BUG-197** | Infinite Background Polling Loop in useConnectionData | v1.6.1 | 代码已修正，已确认 |
+| **BUG-198** | Unhandled Tauri Listener Promise Rejection in useWindowSnap | v1.6.1 | Function Removed / Obsolete |
+| **BUG-199** | Unhandled Tauri Listener Promise Rejection in useCustomTheme | v1.6.1 | 代码已修正，已确认 |
+| **BUG-200** | Passive Cache Eviction Leak in DelayManager | v1.6.1 | 代码已修正，已确认 |
+| **BUG-201** | High-Frequency Tauri IPC Polling in useVisibility | v1.6.1 | 代码已修正，已确认 |
