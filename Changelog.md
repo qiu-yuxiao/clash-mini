@@ -1,3 +1,11 @@
+## v1.6.0
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-189: Remove incorrect `/RU ""` from `create_task` that was erroneously added in the BUG-173 fix. The `/RU ""` parameter conflicts with the XML `<UserId>` when running as admin, causing `schtasks` to fail with "未指定的错误". Only `create_task_elevated` (UAC elevation path) needs `/RU ""` because the process context is lost after elevation. `create_task` runs directly without elevation and the XML provides the UserId, so `/RU ""` is unnecessary and harmful.
+
+---
+
 ## v1.5.9
 
 ### 🚀 New Features

@@ -1,11 +1,11 @@
 {
-  "version": "1.5.9",
-  "notes": "Clash Mini v1.5.9",
-  "pub_date": "2026-06-22T11:41:53.139Z",
+  "version": "1.6.0",
+  "notes": "Clash Mini v1.6.0",
+  "pub_date": "2026-06-22T14:41:53.000Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUM5NFo5d3FFMVl5OFZPU3NpanNtSm1DZGxBYklxeHN3d01zVWVCUkNKb0dIVFV6eVNyRHAyWTQ2OWoxa2haVCt3TTBJc1ZGRTAxQmpRcHpzdlgrZGdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMTI4MjY0CWZpbGU6Q2xhc2ggTWluaV8xLjUuOF94NjQtc2V0dXAuZXhlCjRwVmpsTnpPN0xLK3VtTWpRa3NSS0xDTm5DbmJ6MU1ONEVTNTJ1VzkyVEU3ZVpucHdIU3BwNlBzR2VUL1V4Q1AxUUQ3NDZ2YUxxNzlNbzI1NStHT0FBPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.5.9/Clash.Mini_1.5.8_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.6.0/Clash.Mini_1.6.0_x64-setup.exe",
       "size": 42192664
     }
   }

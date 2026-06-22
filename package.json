@@ -1,6 +1,6 @@
 {
   "name": "clash-mini",
-  "version": "1.5.9",
+  "version": "1.6.0",
   "license": "GPL-3.0-only",
   "scripts": {
     "prepare": "husky || true",
