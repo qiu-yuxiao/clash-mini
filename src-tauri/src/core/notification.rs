@@ -9,12 +9,26 @@ use tauri::{Emitter as _, WebviewWindow};
 pub enum FrontendEvent<'a> {
     RefreshClash,
     RefreshVerge,
-    NoticeMessage { status: &'a str, message: String },
-    ProfileChanged { current_profile_id: &'a String },
-    TimerUpdated { profile_index: &'a String },
-    ProfileUpdateStarted { uid: &'a String },
-    ProfileUpdateCompleted { uid: &'a String },
-    DelayResults { group: std::string::String, results: Vec<(std::string::String, u32)> },
+    NoticeMessage {
+        status: &'a str,
+        message: String,
+    },
+    ProfileChanged {
+        current_profile_id: &'a String,
+    },
+    TimerUpdated {
+        profile_index: &'a String,
+    },
+    ProfileUpdateStarted {
+        uid: &'a String,
+    },
+    ProfileUpdateCompleted {
+        uid: &'a String,
+    },
+    DelayResults {
+        group: std::string::String,
+        results: Vec<(std::string::String, u32)>,
+    },
 }
 
 #[derive(Debug)]
