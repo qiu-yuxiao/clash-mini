@@ -181,8 +181,8 @@ class DelayManager {
     return update ? update.delay : -1
   }
 
-  /// 暂时修复provider的节点延迟排序的问题
   getDelayFix(proxy: IProxyItem, group: string) {
+    if (!proxy) return -1
     if (!proxy.provider) {
       const update = this.getDelayUpdate(proxy.name, group)
       if (update && (update.delay >= 0 || update.delay === -2)) {
@@ -192,7 +192,7 @@ class DelayManager {
 
     // 添加 history 属性的安全检查
     if (proxy.history && proxy.history.length > 0) {
-      return proxy.history[proxy.history.length - 1].delay
+      return proxy.history[proxy.history.length - 1].delay ?? -1
     }
     return -1
   }
