@@ -25,6 +25,17 @@
  - **当前状态**：`用户未确认`
  - **目标版本**：`v1.5.5`
 
+
+
+
+
+### BUG-172: Falsy History Delay Value Coercion to Error State
+ 
+ - **现象描述**：重启客户端或导入订阅链接后，部分不健康或超时的节点在未测试时，其延迟状态在列表中会显示为红色的 "Error" 而非黄/橙色的 "Timeout"；但手动点击测试后可正确变回 "Timeout"。
+ - **根因**：前端 `getDelayFix` 方法在加载历史延迟记录时使用 `proxy.history[...].delay || 1e6`，其中 `||` 逻辑将超时节点所对应的合法 `0` 延迟数值强制转换成了大数 `1e6` (1,000,000ms)，触发了 `formatDelay` 中 `delay > 1e5` 的 "Error" 渲染边界。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.5.8`
+
 ### BUG-170: Autostart Switch State Timing Race & Unnecessary UAC Elevation
  
  - **现象描述**：设置页面中的“开机自动启动”开关经常在操作后弹回（无法正常开启或关闭），或者在开启后重启客户端发现自启动并未实际生效。且在普通用户权限下，开启/关闭开关会频繁强行弹出 Windows UAC（管理员授权）提示。
@@ -34,28 +45,11 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.5.7`
 
-### BUG-171: Profile Switch/Import Auto-Select Hanging & Speed Test Error Responses
- 
- - **现象描述**：重启客户端或导入订阅链接后，界面经常等很久（10分钟以上）也没有自动选点和测速，疑似卡死，必须手动点击测速按钮（闪电图标）才能恢复。而且手动测速时，部分节点无法测试且返回红色的 "Error" 而非橙色的 "Timeout"。
- - **根因**：
-   1. **前端锁机制卡死**：启动或导入失败时，`.catch()` 会清空 `lastEnhancedProfileRef.current`，但由于 `currentProfileUid` 未改变，`useEffect` 永远不会再次触发重试。导入配置时，复制的并行加载链路发生网络或内核延迟异常，同样会导致该 Profile 被永久锁死。
-   2. **命名管道高并发阻塞**：测速时 36 路工作线程并发请求，后端连接池瞬间建立大量 IPC socket 连接，造成 Windows 命名管道忙碌 (`ERROR_PIPE_BUSY`)。原重试次数上限仅为 5 次（最多等待 600ms），容易瞬间耗尽重试报错。
-   3. **残留失效连接**：内核重启（如切换/重配置）时未清空全局 `IpcConnectionPool`，残留旧进程失效句柄导致复用报错。
-   4. **异常响应格式反序列化错误**：Clash API 返回 504 Timeout 响应时，若格式不符 standard JSON，后端反序列化出错会抛出系统 IPC 异常，被前端判定为红色 Error。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.7`
-
-### BUG-172: Falsy History Delay Value Coercion to Error State
- 
- - **现象描述**：重启客户端或导入订阅链接后，部分不健康或超时的节点在未测试时，其延迟状态在列表中会显示为红色的 "Error" 而非黄/橙色的 "Timeout"；但手动点击测试后可正确变回 "Timeout"。
- - **根因**：前端 `getDelayFix` 方法在加载历史延迟记录时使用 `proxy.history[...].delay || 1e6`，其中 `||` 逻辑将超时节点所对应的合法 `0` 延迟数值强制转换成了大数 `1e6` (1,000,000ms)，触发了 `formatDelay` 中 `delay > 1e5` 的 "Error" 渲染边界。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.5.8`
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-171** | Profile Switch/Import Auto-Select Hanging & Speed Test Error Responses | v1.5.7 | 代码已修正，已确认 |
 | **BUG-168** | Upgrade Command RwLock Writer Starvation | v1.5.5 | 代码已修正，已确认 |
 | **BUG-167** | Rust Local Socket Timeout Inconsistency | v1.5.5 | 代码已修正，已确认 |
 | **BUG-166** | Fallback Timeout Inconsistency in layout code comments | v1.5.5 | 代码已修正，已确认 |

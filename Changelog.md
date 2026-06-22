@@ -1,3 +1,9 @@
+## v1.5.7
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-171: Resolve auto-select hanging issue on profile switch/import, improve Windows named pipe busy retries under concurrency, clear stale connection handles on restart, and gracefully map non-JSON API errors.
+
 ## v1.5.3
 
 ### 🐞 Fixed Bugs
