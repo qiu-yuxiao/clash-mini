@@ -13,7 +13,7 @@ use serde_yaml_ng::Mapping;
 pub async fn patch_clash(patch: &Mapping) -> Result<()> {
     Config::clash().await.edit_draft(|d| d.patch_config(patch));
 
-    let res = {
+    let res = async {
         // 激活订阅
         if patch.get("secret").is_some() || patch.get("external-controller").is_some() {
             Config::generate().await?;
@@ -27,7 +27,8 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
         }
         handle::Handle::refresh_clash();
         <Result<()>>::Ok(())
-    };
+    }
+    .await;
     match res {
         Ok(()) => {
             Config::clash().await.apply();
@@ -286,10 +287,7 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
 
     let update_flags = determine_update_flags(patch);
     logging!(debug, Type::Setup, "Determined update flags: {:?}", update_flags);
-    let process_flag_result: std::result::Result<(), anyhow::Error> = {
-        process_terminated_flags(update_flags, patch).await?;
-        Ok(())
-    };
+    let process_flag_result = process_terminated_flags(update_flags, patch).await;
 
     if let Err(err) = process_flag_result {
         Config::verge().await.discard();

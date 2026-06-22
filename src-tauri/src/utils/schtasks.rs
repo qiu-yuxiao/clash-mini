@@ -283,6 +283,7 @@ pub fn create_task(mode: TaskMode) -> Result<()> {
         let mut cmd = Command::new("schtasks");
         cmd.args(["/Create", "/TN", mode.name(), "/XML"]);
         cmd.arg(&task_xml_path);
+        cmd.args(["/RU", ""]);
         cmd.arg("/F");
         cmd
     })?;
@@ -346,6 +347,8 @@ pub fn create_task_elevated(mode: TaskMode) -> Result<()> {
                 .arg(mode.name())
                 .arg("/XML")
                 .arg(&task_xml_path)
+                .arg("/RU")
+                .arg("")
                 .arg("/F")
                 .show(false)
                 .status()

@@ -2,6 +2,8 @@
 
 ### 🐞 Fixed Bugs
 
+- Fix BUG-170: Fix autostart switch timing race, eliminate unnecessary UAC elevation prompts for standard user tasks, and resolve early-return syntax bug in configuration patching which caused failed config drafts to stay dirty in memory and get applied in subsequent unrelated edits.
+- Fix BUG-173: Add /RU "" parameter to schtasks /Create commands to bypass the user password verification prompt when creating auto-launch tasks, resolving task creation failures in Administrator mode.
 - Fix BUG-171: Resolve auto-select hanging issue on profile switch/import, improve Windows named pipe busy retries under concurrency, clear stale connection handles on restart, and gracefully map non-JSON API errors.
 
 ## v1.5.3
