@@ -1,4 +1,4 @@
-use crate::{config::Config, process::AsyncHandler};
+use crate::{config::Config, core::handle::Handle, process::AsyncHandler};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -431,7 +431,12 @@ pub fn start_background_monitor() {
                 if wait_for_clash_ready().await {
                     loop {
                         match trigger_backend_auto_select(&current_profile, 0).await {
-                            Ok(_) => break,
+                            Ok(results) => {
+                                if !results.is_empty() {
+                                    Handle::notify_delay_results("PROXY".into(), results);
+                                }
+                                break;
+                            }
                             Err(e) if e.to_string() == "AUTO_SELECT_BUSY" => {
                                 logging!(debug, Type::Lightweight, "[后台监测] 自动选点繁忙，等待重试...");
                                 sleep(Duration::from_millis(500)).await;
@@ -477,8 +482,10 @@ pub fn start_background_monitor() {
                                     Type::Lightweight,
                                     "[后台监测] 连续 3 次检测失败，启动后台自愈选点"
                                 );
-                                if let Err(e) = trigger_backend_auto_select(&current_profile, 0).await {
-                                    logging!(warn, Type::Lightweight, "[后台监测] 故障自愈选点失败: {e}");
+                                if let Ok(results) = trigger_backend_auto_select(&current_profile, 0).await {
+                                    if !results.is_empty() {
+                                        Handle::notify_delay_results("PROXY".into(), results);
+                                    }
                                 }
                             }
                         }

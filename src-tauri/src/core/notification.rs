@@ -14,6 +14,7 @@ pub enum FrontendEvent<'a> {
     TimerUpdated { profile_index: &'a String },
     ProfileUpdateStarted { uid: &'a String },
     ProfileUpdateCompleted { uid: &'a String },
+    DelayResults { group: std::string::String, results: Vec<(std::string::String, u32)> },
 }
 
 #[derive(Debug)]
@@ -41,6 +42,13 @@ impl NotificationSystem {
             FrontendEvent::TimerUpdated { profile_index } => ("verge://timer-updated", Ok(json!(profile_index))),
             FrontendEvent::ProfileUpdateStarted { uid } => ("profile-update-started", Ok(json!({ "uid": uid }))),
             FrontendEvent::ProfileUpdateCompleted { uid } => ("profile-update-completed", Ok(json!({ "uid": uid }))),
+            FrontendEvent::DelayResults { group, results } => {
+                let data = json!({
+                    "group": group,
+                    "results": results
+                });
+                ("verge://backend-delay-results", Ok(data))
+            }
         }
     }
 

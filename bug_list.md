@@ -68,6 +68,14 @@
 - **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.5.9`
 
+### BUG-176: 后台 Monitor 测速结果不回传前端 UI
+
+- **现象描述**：后台 monitor 常驻线程在 Profile 切换和故障自愈时执行的全节点群发测速结果（`Vec<(节点名, 延迟ms)>`）仅用于内部节点切换决策，未回传至前端 UI 界面。用户在前端代理节点列表中无法看到后台测速产生的延迟数值更新。
+- **根因**：monitor 的两个调用点（`start_background_monitor` 中 Profile 切换分支和故障自愈分支）均丢弃了 `trigger_backend_auto_select` 的返回值。前端 `DelayManager` 仅有「前端主动发起测速→自写入缓存」一条数据通路，缺少「后台结果注入」入口。
+- **修复**：Rust 侧在 `FrontendEvent` 新增 `DelayResults` 变体，`trigger_backend_auto_select` 成功返回后在两个调用点通过 `Handle::notify_delay_results` 将完整结果以 `verge://backend-delay-results` 事件推送到前端。前端侧 `DelayManager` 新增 `injectBatchResults(group, results)` 公共方法，`use-layout-events` 中注册事件监听器，收到后台结果后注入缓存并触发 UI 批量刷新。
+- **当前状态**：`代码已修正，待用户确认`
+- **目标版本**：`v1.5.9`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?

@@ -2332,3 +2332,12 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 - **暗墨黑金统一文字色**：retro-3d 深色模式下所有卡片（含 `default` 类型）的文字色统一采用 `#2C1F03`，与 primary 卡片和按钮的深色标准文字色保持一致，确保在暖色黄金渐变背景上有足够的对比反差。
 - **亮色模式不受影响**：亮色模式下 default 卡片的文字色 `#3C2F0F` 保持不变，因其与淡黄渐变背景的对比度已经充足。
+
+## ⚡ 三十、 后台测速结果前端回传规范 (BUG-176)
+
+后台 monitor 常驻线程在 Profile 切换和故障自愈时执行的群发测速结果必须回传至前端 UI 界面，使代理节点列表上的延迟数值实时更新，而非仅用于内部节点切换决策。
+
+- **事件通道**：Rust 侧通过 `FrontendEvent::DelayResults { group, results }` 变体，在 `trigger_backend_auto_select` 成功返回非空结果后，以 Tauri 事件 `verge://backend-delay-results` 推送至前端。事件负载为 `{ group: String, results: Vec<(节点名, u32)> }`。
+- **前端注入**：`DelayManager` 暴露 `injectBatchResults(group, results)` 公共方法，对批量结果逐条写入缓存并通过 `setDelay` 触发逐节点 UI 刷新，最后通过 `queueGroupNotification` 触发分组级 UI 刷新。
+- **生命周期**：监听器在 `use-layout-events` 中随布局组件生命周期注册/注销，与现有前端测速通路完全解耦。
+- **互不阻塞**：后台推送与前端主动测速两条通路在 Rust 层使用不同入口函数（`trigger_backend_auto_select` vs `delayProxyByName`），前端层共用同一 `DelayManager` 缓存（JS 单线程天然安全），RAF 批量合并确保不产生刷新风暴。

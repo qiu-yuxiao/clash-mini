@@ -62,6 +62,10 @@ impl Handle {
         Self::send_event(FrontendEvent::ProfileUpdateCompleted { uid });
     }
 
+    pub fn notify_delay_results(group: std::string::String, results: Vec<(std::string::String, u32)>) {
+        Self::send_event(FrontendEvent::DelayResults { group, results });
+    }
+
     pub fn notice_message<S: AsRef<str>, M: Into<String>>(status: S, msg: M) {
         let status_str = status.as_ref();
         let msg_str = msg.into();

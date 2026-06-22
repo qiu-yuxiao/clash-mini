@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 
 import { useListen } from '@/hooks/use-listen'
+import delayManager from '@/services/delay'
 import { queryClient } from '@/services/query-client'
 
 export const useLayoutEvents = (
@@ -68,6 +69,17 @@ export const useLayoutEvents = (
     register(
       addListener('verge://notice-message', ({ payload }) =>
         handleNotice(payload as [string, string]),
+      ),
+    )
+
+    register(
+      addListener<{ group: string; results: Array<[string, number]> }>(
+        'verge://backend-delay-results',
+        ({ payload }) => {
+          if (payload.results && payload.results.length > 0) {
+            delayManager.injectBatchResults(payload.group, payload.results)
+          }
+        },
       ),
     )
 

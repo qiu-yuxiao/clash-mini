@@ -348,6 +348,20 @@ class DelayManager {
     )
   }
 
+  /**
+   * 注入后台批量测速结果到缓存，并通知 UI 刷新
+   * 由 Tauri 事件 verge://backend-delay-results 驱动
+   */
+  injectBatchResults(group: string, results: Array<[string, number]>) {
+    debugLog(
+      `[DelayManager] 注入后台测速结果，组: ${group}, 数量: ${results.length}`,
+    )
+    for (const [name, delay] of results) {
+      this.setDelay(name, group, delay)
+    }
+    this.queueGroupNotification(group)
+  }
+
   formatDelay(delay: number, timeout = 10000) {
     if (delay === -1) return '-'
     if (delay === -2) return 'testing'
