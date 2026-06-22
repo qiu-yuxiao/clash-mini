@@ -53,6 +53,13 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.5.7`
 
+### BUG-174: 3D Dark Mode Update Card Text/BG Contrast Failure
+
+- **现象描述**：3D 风格（retro-3d）深色模式下，自动版本升级弹窗中的更新日志卡片模块，文字颜色与背景颜色反差极小，肉眼几乎无法区分。
+- **根因**：`src/utils/button-styles.ts` 中 `get3DCardStyle` 函数，retro-3d 分支下 `cardType === 'default'` 的暗色模式文字色设为 `#FFE082`（淡金），而背景渐变色起止于 `#FFF59D`（亮黄）→ `#E65100`（深橙）。`#FFE082` 与 `#FFF59D` 色相相同、明度接近，导致文字淹没在卡片顶部区域。retro-3d 统一深色文字色为 `#2C1F03`（暗墨黑金），亮色模式及 primary 卡片均使用该色或 `#3C2F0F`，唯独 default 卡片暗色分支遗漏。
+- **当前状态**：`代码已修正，待用户确认`
+- **目标版本**：`v1.5.9`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?

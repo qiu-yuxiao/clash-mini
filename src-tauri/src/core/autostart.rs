@@ -11,7 +11,7 @@ use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin;
 
 /// Update the application auto-launch configuration.
-/// 
+///
 /// WARNING: DO NOT query `Config::verge().await.latest_arc().enable_auto_launch` to determine the target state during a configuration patch.
 /// Doing so causes a timing race condition (the draft config hasn't been applied yet, so it reads the old state, causing toggling ON to disable, and toggling OFF to enable).
 /// ALWAYS pass the target state (`enable_auto_launch`) from the patch.
