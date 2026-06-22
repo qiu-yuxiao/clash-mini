@@ -74,16 +74,17 @@ dependencies = ["rust-clippy", "typecheck", "check-version-consistency"]
 
 [tasks.check-version-consistency]
 description = "Ensure Cargo.toml version matches app-update.json"
+script_runner = "powershell"
 script = '''
-CARGO_VER=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-UPDATE_VER=$(grep '"version"' updater/app-update.json | sed 's/.*"\(.*\)".*/\1/')
-if [ "$CARGO_VER" != "$UPDATE_VER" ]; then
-  echo "ERROR: Version mismatch!"
-  echo "  src-tauri/Cargo.toml:        $CARGO_VER"
-  echo "  updater/app-update.json:     $UPDATE_VER"
-  echo ""
-  echo "Fix: update updater/app-update.json to match Cargo.toml before pushing."
+$cargoVer = Select-String -Path "src-tauri/Cargo.toml" -Pattern '^version\s*=\s*"(.*)"' | % { $_.Matches.Groups[1].Value }
+$updateVer = Select-String -Path "updater/app-update.json" -Pattern '"version"\s*:\s*"(.*)"' | % { $_.Matches.Groups[1].Value }
+if ($cargoVer -ne $updateVer) {
+  Write-Host "ERROR: Version mismatch!"
+  Write-Host "  src-tauri/Cargo.toml:        $cargoVer"
+  Write-Host "  updater/app-update.json:     $updateVer"
+  Write-Host ""
+  Write-Host "Fix: update updater/app-update.json to match Cargo.toml before pushing."
   exit 1
-fi
-echo "OK: Version consistent ($CARGO_VER)"
+}
+Write-Host "OK: Version consistent ($cargoVer)"
 '''
