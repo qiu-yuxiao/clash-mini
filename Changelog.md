@@ -1,3 +1,27 @@
+## v1.5.9
+
+### 🚀 New Features
+
+- Default theme changed to dark mode for first-time users, improving out-of-the-box experience in low-light environments.
+- `allow-lan` now defaults to `true`, enabling LAN device proxying without manual configuration.
+
+### 🐞 Fixed Bugs
+
+- Fix BUG-174: Resolve text color contrast issue in Retro-3D dark mode update log cards. Changed text color from low-contrast gold `#FFE082` to high-contrast dark bronze black `#2C1F03`.
+- Fix BUG-175: Window close button now immediately enters lightweight mode after hiding the window, eliminating the 10-second delay. Removed obsolete timer chain and listener code.
+- Fix BUG-177: Monitor health-check error logs in the fault-recovery branch were being silently dropped. Now properly logged via `logging!` macro.
+- Fix BUG-183: `FrontendEvent::DelayResults` variant now uses `SmartString` instead of `std::string::String` for consistency with the rest of the codebase.
+
+### 🚀 Optimizations
+
+- Enhance BUG-176: Backend Monitor speed-test results are now pushed to the frontend UI in real-time via Tauri events (`verge://backend-delay-results`), eliminating the need for manual refresh to see auto-selected node latencies.
+- Hardened AsyncHandler::spawn closures with error logging to prevent silent failures in background tasks (BUG-179).
+- `injectBatchResults` now preserves `elapsed` metadata when batch-writing delay results (BUG-180).
+- Reset `last_check_time` after Monitor fault recovery to prevent excessive immediate re-checks (BUG-184).
+- Added CI code-formatting consistency check job (BUG-186).
+
+---
+
 ## v1.5.7
 
 ### 🐞 Fixed Bugs
