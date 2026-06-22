@@ -76,83 +76,6 @@
 - **当前状态**：`代码已修正，待用户确认`
 - **目标版本**：`v1.5.9`
 
-### BUG-177: Monitor 故障自愈分支错误日志被静默丢弃
-
-- **现象描述**：后台 monitor 线程在连续 3 次健康检查失败后触发故障自愈选点时，若选点本身失败（如获取代理组信息失败、所有节点不可达等），错误信息不会被记录到日志。旧代码 `if let Err(e)` 捕获并打印 warning，新代码改为 `if let Ok(results)` 仅处理成功分支，`Err` 分支完全丢失。
-- **根因**：BUG-176 修复时将故障自愈分支的 `if let Err(e) = trigger_backend_auto_select(...).await` 改为 `if let Ok(results) = ... await`，仅追加了成功路径的结果回传逻辑，遗漏了错误日志的保留。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-178: 协议文档章节编号重复 (两个"二十九")
-
-- **现象描述**：`clash_mini_agreements.md` 中 BUG-175（窗口关闭即入轻量模式）和 BUG-174（Retro-3D 深色文字颜色）两条规范均标注为"二十九"，破坏章节编号唯一性和引用准确性。
-- **根因**：两次追加协议时均未检查已有编号，独立编号为"二十九"。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-179: AsyncHandler::spawn 闭包缺乏错误处理和生命周期防御
-
-- **现象描述**：`handle_window_close` 中 `AsyncHandler::spawn(|| async { ... })` 闭包调用 `entry_lightweight_mode()` 无错误处理——若未来在闭包中不慎引用了函数参数 `api`（生命周期仅为函数调用期间），将导致编译错误或 use-after-free。同时闭包内未记录 entry_lightweight_mode 的返回值。
-- **根因**：BUG-175 修复添加的异步调用未做防御性错误处理，`entry_lightweight_mode` 返回 `bool` 但被丢弃。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-180: injectBatchResults 未传递 elapsed 元数据
-
-- **现象描述**：后台测速结果通过 `injectBatchResults` 注入 `DelayManager` 时，未传递 `{ elapsed }` 元数据字段。前端主动测速路径 `checkDelay` 设置此字段，若未来有 UI 组件依赖 `elapsed` 做展示逻辑（如"上次测速耗时: 2.3s"），后台注入的结果将显示为空或默认值，体验不一致。
-- **根因**：`DelayResults` 事件和 `injectBatchResults` 方法均未定义/传递耗时元数据字段。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-181: handle_window_close 函数参数变量名遮蔽
-
-- **现象描述**：`handle_window_close` 函数参数名 `api: &tauri::WindowEvent`，在模式匹配 `if let tauri::WindowEvent::CloseRequested { api, .. } = api` 中，解构出的 `api` 字段与函数参数同名，产生变量遮蔽（shadowing）。虽然不影响编译和运行，但降低代码可读性，后续维护者可能混淆两者。
-- **根因**：旧代码遗留问题（非本次 diff 引入），但审核中检出。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-182: enable_auto_light_weight_mode 注释歧义
-
-- **现象描述**：`enable_auto_light_weight_mode` 注释声明为"已废弃定时器机制，现为兼容空壳"，但函数体仍调用 `Timer::global().init().await`。注释中的"已废弃"仅指轻量模式延迟触发定时器已移除，但 `Timer::global()` 服务于其他定时任务（如 Profile 定时更新），注释容易引起误解。
-- **根因**：BUG-175 清理定时器链路后，注释仅笼统写"已废弃"，未区分"轻量模式专用定时器已移除"与"全局 Timer 组件仍需初始化"。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-183: DelayResults 使用 std::string::String 而非模块级 SmartString 别名
-
-- **现象描述**：`Handle` 模块顶部 `use smartstring::alias::String;` 引入了内联短字符串优化别名，其他事件方法均使用该类型。但 `notify_delay_results` 和 `FrontendEvent::DelayResults` 直接使用 `std::string::String`，破坏模块级类型一致性。
-- **根因**：BUG-176 实现时直接用了标准库 `String`，未注意模块已有的 `smartstring::alias::String` 别名约定。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-184: Monitor 故障自愈后 last_check_time 未重置
-
-- **现象描述**：故障自愈触发自动选点后，`last_check_time` 未被重置为 `Instant::now()`。而 Profile 切换分支同一位置有 `last_check_time = Instant::now()`。导致故障自愈后下一次健康检查可能立即触发，行为不一致。
-- **根因**：BUG-176 修改故障自愈分支时（`if let Err(e)` → `if let Ok(results)`），未沿用 Profile 切换分支末尾的 `last_check_time` 重置逻辑。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-185: Changelog 未记录 allow-lan 和 theme_mode 默认值变更
-
-- **现象描述**：`allow-lan: false → true` 和 `theme_mode: "system" → "dark"` 两项默认配置变更属于面向用户的行为变更，Changelog 中未记录，用户升级后可能对行为差异缺乏预期。
-- **根因**：默认值变更 commit 未同步更新 Changelog。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-186: CI 代码格式化一致性检查
-
-- **现象描述**：`FrontendEvent` 枚举格式化（紧凑→展开）和 `autostart.rs` 空白行清理属于 ci lint-staged 触发的自动格式化，不含逻辑改动。需确认 CI 中 rustfmt 和 biome 配置一致，避免后续提交中反复格式化同一代码块。
-- **根因**：pre-commit hook 中 `cargo make pre-commit` 的 lint-staged 自动格式化行为与本地编辑器配置可能不一致。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
-### BUG-187: 协议条款二十九的条文顺序确认
-
-- **现象描述**：两条"二十九"按 BUG-175（窗口关闭行为）在前、BUG-174（UI 颜色）在后的顺序排列。若按重要性和系统级影响排序合理，但编号修复后需同步确认排列顺序是否符合文档结构的逻辑分组习惯。
-- **根因**：编号重复修复（BUG-178）时应一并审视章节排列合理性。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.5.9`
-
 ### BUG-188: destroy_main_window/show_main_window 返回值被丢弃
 
 - **现象描述**：`entry_lightweight_mode` 内部直接丢弃 `WindowManager::destroy_main_window()` 返回值，`exit_lightweight_mode` 丢弃 `WindowManager::show_main_window().await` 返回值。若窗口销毁/重建失败（底层 webview 异常），调用链无感知，函数始终返回 `true`，实际窗口状态可能与状态机不符。
@@ -322,3 +245,14 @@
 | **BUG-003** | DNS 覆写默认未开启，导致国内直连 and 防泄露体验不佳?| v1.0.3 | 代码已修正，已确?|
 | **BUG-002** | 默认开?IPv6 且缺乏界面控制，可能导致某些网络环境?DNS 泄露或代理分流异常?| v1.0.3 | 代码已修正，已确?|
 | **BUG-001** | 开机自启非管理员权限下修改后台静默失败且前?Switch 状态脱节?| v1.0.2 | 代码已修正，已确?|
+| **BUG-177** | Monitor故障自愈补全error log | v1.5.9 | 用户已确认 |
+| **BUG-178** | 协议章节编号二十九→三十/三十一 | v1.5.9 | 用户已确认 |
+| **BUG-179** | AsyncHandler::spawn闭包补全错误处理 | v1.5.9 | 用户已确认 |
+| **BUG-180** | injectBatchResults补传elapsed元数据 | v1.5.9 | 用户已确认 |
+| **BUG-181** | handle_window_close参数重命名消除遮蔽 | v1.5.9 | 用户已确认 |
+| **BUG-182** | enable_auto_light_weight_mode注释澄清 | v1.5.9 | 用户已确认 |
+| **BUG-183** | DelayResults统一使用SmartString别名 | v1.5.9 | 用户已确认 |
+| **BUG-184** | 故障自愈后重置last_check_time | v1.5.9 | 用户已确认 |
+| **BUG-185** | CHANGELOG补录默认值变更 | v1.5.9 | 用户已确认 |
+| **BUG-186** | CI rustfmt格式化检查配置确认 | v1.5.9 | 用户已确认 |
+| **BUG-187** | 协议三十/三十一条文排列确认 | v1.5.9 | 用户已确认 |
