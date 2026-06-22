@@ -73,9 +73,9 @@ description = "Pre-push checks: lint, typecheck and version consistency"
 dependencies = ["rust-clippy", "typecheck", "check-version-consistency"]
 
 [tasks.check-version-consistency]
-description = "Ensure Cargo.toml version matches app-update.json"
+description = "Ensure version consistency across Cargo.toml, app-update.json, package.json, and tauri.conf.json"
 command = "python"
 args = [
   "-c",
-  "import re, sys; c=open('src-tauri/Cargo.toml').read(); u=open('updater/app-update.json').read(); cv=re.search(r'^version\\s*=\\s*\"([^\"]+)\"', c, re.M).group(1); uv=re.search(r'\"version\"\\s*:\\s*\"([^\"]+)\"', u).group(1); print(f'OK: {cv}') if cv==uv else (print(f'ERROR: Cargo={cv} Update={uv}') or sys.exit(1))"
+  "import re, json, sys; c=open('src-tauri/Cargo.toml').read(); u=open('updater/app-update.json').read(); p=json.load(open('package.json')); t=json.load(open('src-tauri/tauri.conf.json')); cv=re.search(r'^version\\s*=\\s*\"([^\"]+)\"', c, re.M).group(1); uv=re.search(r'\"version\"\\s*:\\s*\"([^\"]+)\"', u).group(1); pv=p.get('version'); tv=t.get('version'); (print(f'OK: {cv}') if cv==uv==pv==tv else (print(f'ERROR: Mismatch! Cargo={cv} Update={uv} Package={pv} Tauri={tv}') or sys.exit(1)))"
 ]
