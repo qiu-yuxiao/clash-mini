@@ -156,7 +156,7 @@ if (-not $SkipBumpAndTag) {
     git config --local http.sslBackend openssl
     git config --local http.sslVerify false
     git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
-    git commit -m "release: bump version to $Version" --no-verify
+    git commit -m "release: bump version to $Version" --allow-empty --no-verify
     if ($LASTEXITCODE -ne 0) { Log-Error "git commit failed"; exit 1 }
 
     git push origin dev --no-verify
