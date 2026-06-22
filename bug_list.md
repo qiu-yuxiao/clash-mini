@@ -11,37 +11,6 @@
 
 ## 📌 待验证与活动?Bug 详情 (Active & Pending Bugs)
 
-### BUG-146: Inconsistent Property Access for Allow LAN Switch State
- 
- - **现象描述**：设置页面中的 "Allow LAN"（允许局域网连接）开关在页面加载时，其视觉开启状态与实际配置脱节，总是显示为关闭状态。
- - **根因**：前端代码在读取配置时使用了 `clashConfig?.allowLan`，但后端返回的 Clash 配置字段是驼峰/连字符命名的 `'allow-lan'`，导致属性读取始终为 undefined。
- - **当前状态**：`用户未确认`
- - **目标版本**：`v1.5.5`
-
-
-
-
-
-### BUG-189: BUG-173 修复 /RU "" 被错误地同时加入 create_task 和 create_task_elevated，导致管理员和非管理员均无法开启自启
-
-- **现象描述**：设置页面中的"开机自动启动"开关，无论是在管理员权限还是普通用户权限下运行 clash mini，均无法开启。点击开关后，弹窗报错 `"failed to create admin task: 错误: 未指定的错误"`，开关弹回关闭状态。日志中仅有 `Setting auto-launch enabled state to: true` 的入口日志，无后续 `Created xxx auto-launch task` 的成功日志。
-- **根因**：修复 BUG-173（管理员模式 schtasks 缺 `/RU ""` 导致密码弹窗超时）时，自作聪明地将 `/RU ""` 同时加入了两条路径：
-  1. **`create_task_elevated`（UAC 提权路径）**— 这里加 `/RU ""` 是正确的。因为提权后进程上下文丢失，需要用 `/RU ""` 通知 schtasks 用当前用户运行，避免弹出密码输入框。
-  2. **`create_task`（直接执行路径）**— 这里加 `/RU ""` 是错误的。`create_task` 以当前进程身份直接运行 schtasks，XML 模板中已有 `<UserId>` 明确指定了运行用户。再多加命令行 `/RU ""` 导致 schtasks 收到矛盾的"用哪个用户运行"指令（XML <UserId> vs 命令行 /RU ""），报 `"错误: 未指定的错误"` 后拒绝创建任务。此问题影响所有用户：
-     - **管理员**：以管理员权限直接调用 `create_task` 时，`/RU ""` 与 XML `<UserId>` 冲突，schtasks 拒绝执行。
-     - **普通用户**：虽然在普通用户下 `/RU ""` 不会引发错误，但 v1.0.0 中 `create_task` 没有 `/RU ""` 就能正常工作，加它是多此一举。
-- **根因提交**：BUG-173 修复 commit（`6ddafeb7`），代码审查遗漏了 `create_task` 不应加 `/RU ""`。
-- **修复方案**：将 `src-tauri/src/utils/schtasks.rs` 中 `create_task` 函数的 `/RU ""` 参数移除，恢复为 v1.0.0 的原样——仅保留 `/Create /TN <name> /XML <path> /F`。`/RU ""` 仅保留在 `create_task_elevated` 中。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.6.0`
-
-### BUG-188: destroy_main_window/show_main_window 返回值被丢弃
-
-- **现象描述**：`entry_lightweight_mode` 内部直接丢弃 `WindowManager::destroy_main_window()` 返回值，`exit_lightweight_mode` 丢弃 `WindowManager::show_main_window().await` 返回值。若窗口销毁/重建失败（底层 webview 异常），调用链无感知，函数始终返回 `true`，实际窗口状态可能与状态机不符。
-- **根因**：`entry_lightweight_mode` 和 `exit_lightweight_mode` 均使用 `;` 丢弃了窗口操作的返回值，未做失败检查和日志记录。
-- **当前状态**：`代码已修正，待用户确认`
-- **目标版本**：`v1.6.0`
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
@@ -222,3 +191,6 @@
 | **BUG-173** | Admin 模式 schtasks 缺 /RU "" 修复 | v1.5.7 | 用户已确认 |
 | **BUG-174** | Retro-3D 深色 default 卡片文字色 #FFE082 → #2C1F03 | v1.5.9 | 用户已确认 |
 | **BUG-176** | 后台 Monitor 测速结果不回传前端 UI | v1.5.9 | 用户已确认 |
+| **BUG-146** | Inconsistent Property Access for Allow LAN Switch State | v1.5.5 | 用户已确认 |
+| **BUG-188** | destroy_main_window/show_main_window 返回值被丢弃 | v1.6.0 | 用户已确认 |
+| **BUG-189** | BUG-173 修复 /RU "" 被错误地同时加入 create_task 和 create_task_elevated，导致管理员和非管理员均无法开启自启 | v1.6.0 | 用户已确认 |
