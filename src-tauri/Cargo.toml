@@ -35,7 +35,6 @@ clash-verge-logging = { workspace = true }
 clash-verge-signal = { workspace = true }
 clash-verge-i18n = { workspace = true }
 clash-verge-limiter = { workspace = true }
-tauri-plugin-clash-verge-sysinfo = { workspace = true }
 sysinfo = { workspace = true }
 tauri-plugin-clipboard-manager = { workspace = true }
 tauri = { workspace = true, features = [
@@ -149,6 +148,9 @@ winreg = "0.56.0"
 windows = { version = "0.61.3", features = ["Win32_Globalization", "Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 wry = "0.55.1"
 webview2-com = "0.38.2"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.186"
 
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

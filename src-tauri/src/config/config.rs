@@ -19,7 +19,7 @@ use clash_verge_logging::{Type, logging, logging_error};
 use serde_yaml_ng::{Mapping, Value};
 use smartstring::alias::String;
 use std::{collections::HashSet, path::PathBuf};
-use tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin;
+use crate::utils::sysinfo::is_current_app_handle_admin;
 use tokio::sync::OnceCell;
 use tokio::time::sleep;
 

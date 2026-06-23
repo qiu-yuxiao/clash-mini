@@ -48,7 +48,6 @@ mod app_init {
     pub fn setup_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
         #[allow(unused_mut)]
         let mut builder = builder
-            .plugin(tauri_plugin_clash_verge_sysinfo::init())
             .plugin(tauri_plugin_notification::init())
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_clipboard_manager::init())
@@ -134,10 +133,10 @@ mod app_init {
 
     pub fn generate_handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
         tauri::generate_handler![
-            tauri_plugin_clash_verge_sysinfo::commands::get_system_info,
-            tauri_plugin_clash_verge_sysinfo::commands::get_app_uptime,
-            tauri_plugin_clash_verge_sysinfo::commands::app_is_admin,
-            tauri_plugin_clash_verge_sysinfo::commands::export_diagnostic_info,
+            crate::utils::sysinfo::get_system_info,
+            crate::utils::sysinfo::get_app_uptime_cmd,
+            crate::utils::sysinfo::app_is_admin,
+            crate::utils::sysinfo::export_diagnostic_info,
             cmd::is_port_in_use,
             cmd::get_sys_proxy,
             cmd::get_auto_proxy,
@@ -283,6 +282,9 @@ pub fn run() {
             resolve::resolve_setup_async();
             resolve::resolve_setup_sync();
             resolve::init_signal();
+
+            // 初始化平台系统信息
+            crate::utils::sysinfo::init_platform(app);
 
             logging!(info, Type::Setup, "初始化已启动");
             Ok(())

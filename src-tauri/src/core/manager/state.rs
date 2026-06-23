@@ -11,6 +11,8 @@ use clash_verge_logging::Type;
 use compact_str::CompactString;
 use log::Level;
 use scopeguard::defer;
+#[cfg(unix)]
+use libc;
 use tauri_plugin_shell::ShellExt as _;
 
 impl CoreManager {
@@ -31,7 +33,7 @@ impl CoreManager {
         let config_dir = dirs::app_home_dir()?;
 
         #[cfg(unix)]
-        let previous_mask = unsafe { tauri_plugin_clash_verge_sysinfo::libc::umask(0o007) };
+        let previous_mask = unsafe { libc::umask(0o007) };
         let cores_dir = config_dir.join("cores");
         let core_name = if cfg!(windows) {
             "mini-mihomo.exe"
@@ -83,7 +85,7 @@ impl CoreManager {
         };
         #[cfg(unix)]
         unsafe {
-            tauri_plugin_clash_verge_sysinfo::libc::umask(previous_mask)
+            libc::umask(previous_mask)
         };
 
         let pid = child.pid();

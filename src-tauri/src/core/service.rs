@@ -222,7 +222,7 @@ fn install_service() -> Result<()> {
 #[cfg(target_os = "linux")]
 fn linux_running_as_root() -> bool {
     use crate::core::handle;
-    use tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin;
+    use crate::utils::sysinfo::is_current_app_handle_admin;
     let app_handle = handle::Handle::app_handle();
     is_current_app_handle_admin(app_handle)
 }
@@ -275,7 +275,7 @@ fn install_service() -> Result<()> {
 
     // clash_verge_i18n::sync_locale(Config::verge().await.latest_arc().language.as_deref());
 
-    let gid = tauri_plugin_clash_verge_sysinfo::current_gid();
+    let gid = crate::utils::sysinfo::current_gid();
     let prompt = clash_verge_i18n::t!("service.adminInstallPrompt");
     let command = format!(
         r#"do shell script "sudo CLASH_VERGE_SERVICE_GID={gid} '{install_shell}'" with administrator privileges with prompt "{prompt}""#

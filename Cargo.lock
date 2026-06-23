@@ -1198,7 +1198,7 @@ dependencies = [
 [[package]]
 name = "clash_verge_logger"
 version = "0.2.2"
-source = "git+https://github.com/clash-verge-rev/clash-verge-logger#e4768e3852c4868ed86e7210df82c1178467820d"
+source = "git+https://github.com/clash-verge-rev/clash-verge-logger?rev=e4768e3852c4868ed86e7210df82c1178467820d#e4768e3852c4868ed86e7210df82c1178467820d"
 dependencies = [
  "arraydeque",
  "compact_str",
@@ -1211,7 +1211,7 @@ dependencies = [
 [[package]]
 name = "clash_verge_service_ipc"
 version = "2.3.0"
-source = "git+https://github.com/clash-verge-rev/clash-verge-service-ipc#21e661fa141e5ad3c705ee4cdb86efff8df6f769"
+source = "git+https://github.com/clash-verge-rev/clash-verge-service-ipc?rev=21e661fa141e5ad3c705ee4cdb86efff8df6f769#21e661fa141e5ad3c705ee4cdb86efff8df6f769"
 dependencies = [
  "anyhow",
  "compact_str",
@@ -1749,7 +1749,7 @@ dependencies = [
 [[package]]
 name = "dark-light"
 version = "2.0.0"
-source = "git+https://github.com/rust-dark-light/dark-light#0f18d2fbcaa5d1c175db8aae7d53428988d7e961"
+source = "git+https://github.com/rust-dark-light/dark-light?rev=0f18d2fbcaa5d1c175db8aae7d53428988d7e961#0f18d2fbcaa5d1c175db8aae7d53428988d7e961"
 dependencies = [
  "objc2",
  "objc2-foundation",
@@ -7301,7 +7301,7 @@ dependencies = [
 [[package]]
 name = "sysproxy"
 version = "0.5.4"
-source = "git+https://github.com/clash-verge-rev/sysproxy-rs?branch=0.5.4#f0775f6f4173c9dd6228cd7c3d183019b9ba6a7b"
+source = "git+https://github.com/clash-verge-rev/sysproxy-rs?rev=f0775f6f4173c9dd6228cd7c3d183019b9ba6a7b#f0775f6f4173c9dd6228cd7c3d183019b9ba6a7b"
 dependencies = [
  "iptools",
  "log",
