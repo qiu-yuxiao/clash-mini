@@ -266,7 +266,7 @@ async function frontendAutoSelect(
         const delay = DelayManager.getDelay(name, groupName)
         if (delay !== -1 && delay !== -2) {
           testedCount++
-          if (delay >= 50 && delay < timeout) {
+          if (delay >= 30 && delay < timeout) { // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
             healthyNodes.push({ name, delay })
           }
         }

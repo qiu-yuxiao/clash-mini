@@ -37,40 +37,6 @@ pub enum WrapStream {
 }
 
 impl WrapStream {
-    #[inline]
-    pub fn is_available(&self) -> Result<bool> {
-        match self {
-            #[cfg(unix)]
-            WrapStream::Unix(s) => {
-                let mut buf = [0u8; 1];
-                match s.try_io(tokio::io::Interest::READABLE, || {
-                    let raw_fd = std::os::unix::io::AsRawFd::as_raw_fd(s);
-                    let n = unsafe { libc::recv(raw_fd, buf.as_mut_ptr() as *mut libc::c_void, 1, libc::MSG_PEEK) };
-                    if n == 0 {
-                        return Err(std::io::Error::new(std::io::ErrorKind::ConnectionAborted, "Closed"));
-                    }
-                    if n < 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                    Ok(n)
-                }) {
-                    Ok(_) => Ok(true),
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(true),
-                    Err(_) => Ok(false),
-                }
-            }
-            #[cfg(windows)]
-            WrapStream::NamedPipe(s) => {
-                let mut buffer = [];
-                match s.try_read(&mut buffer) {
-                    Ok(_) => Ok(true),
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(true),
-                    Err(_) => Ok(false),
-                }
-            }
-        }
-    }
-
     pub async fn readable(&self) -> std::io::Result<()> {
         match self {
             #[cfg(unix)]

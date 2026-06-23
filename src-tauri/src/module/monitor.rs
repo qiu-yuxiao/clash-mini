@@ -207,8 +207,8 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
         .unwrap_or("http://cp.cloudflare.com/generate_204");
 
     if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 1000).await {
-        if delay_info.delay >= 50 {
-            // 延迟满足 >= 50ms，即判定为健康
+        if delay_info.delay >= 30 {
+            // 延迟满足 >= 30ms，即判定为健康 (阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点)
             return Ok(true);
         }
     }
@@ -314,7 +314,8 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
                 return None;
             };
             if let Ok(delay_info) = mihomo.delay_proxy_by_name(&node_name, &test_url, 2000).await {
-                if delay_info.delay >= 50 && delay_info.delay < 2000 {
+                if delay_info.delay >= 30 && delay_info.delay < 2000 {
+                    // 延迟满足 >= 30ms 且小于 2000ms (阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点)
                     return Some((node_name, delay_info.delay));
                 }
             }

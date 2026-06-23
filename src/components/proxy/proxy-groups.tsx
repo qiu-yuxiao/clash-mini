@@ -437,7 +437,7 @@ export const ProxyGroups = (props: Props) => {
               const proxyItem = proxiesData?.records[name]
               if (!proxyItem) continue
               const delay = delayManager.getDelayFix(proxyItem, groupName)
-              if (delay >= 50 && delay < timeout) {
+              if (delay >= 30 && delay < timeout) { // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
                 if (delay < minDelay) {
                   minDelay = delay
                   fastestNodeName = name

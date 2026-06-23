@@ -87,12 +87,13 @@ impl CoreUpdater {
         Ok(release)
     }
 
-    async fn download_body(
+    async fn download_body_to_file(
         client: &reqwest::Client,
         url: &str,
         app_handle: &AppHandle,
         asset_name: &str,
-    ) -> Result<Vec<u8>> {
+        dest_path: &std::path::Path,
+    ) -> Result<()> {
         let mut response = client
             .get(url)
             .send()
@@ -105,7 +106,7 @@ impl CoreUpdater {
 
         let total_size = response.content_length().unwrap_or(0);
         let mut downloaded: u64 = 0;
-        let mut bytes = Vec::new();
+        let mut dest_file = fs::File::create(dest_path).context("failed to create temp download file")?;
         let mut last_emitted_percentage = 0u32;
 
         loop {
@@ -124,7 +125,7 @@ impl CoreUpdater {
                 break;
             };
 
-            bytes.extend_from_slice(&chunk);
+            io::Write::write_all(&mut dest_file, &chunk).context("failed to write chunk to disk")?;
             downloaded += chunk.len() as u64;
             if total_size > 0 {
                 let percentage = ((downloaded as f64 / total_size as f64) * 80.0) as u32 + 10;
@@ -145,7 +146,7 @@ impl CoreUpdater {
             }
         }
 
-        Ok(bytes)
+        Ok(())
     }
 
     pub async fn upgrade_core(app_handle: AppHandle, release: GithubRelease) -> Result<()> {
@@ -160,61 +161,80 @@ impl CoreUpdater {
 
         emit_progress("checking", 5, "正在检测适合您系统架构的内核包...");
 
-        // Detect OS and Arch
-        let target_os = if cfg!(target_os = "windows") {
-            "windows"
+        // 识别平台架构及匹配文件名
+        let (target_prefix, exact_gz) = if cfg!(target_os = "windows") {
+            if cfg!(target_arch = "x86_64") {
+                ("mihomo-windows-amd64", "mihomo-windows-amd64.exe.gz")
+            } else if cfg!(target_arch = "x86") {
+                ("mihomo-windows-386", "mihomo-windows-386.exe.gz")
+            } else if cfg!(target_arch = "aarch64") {
+                ("mihomo-windows-arm64", "mihomo-windows-arm64.exe.gz")
+            } else {
+                ("", "")
+            }
         } else if cfg!(target_os = "macos") {
-            "darwin"
+            if cfg!(target_arch = "x86_64") {
+                ("mihomo-darwin-amd64", "mihomo-darwin-amd64.gz")
+            } else if cfg!(target_arch = "aarch64") {
+                ("mihomo-darwin-arm64", "mihomo-darwin-arm64.gz")
+            } else {
+                ("", "")
+            }
+        } else if cfg!(target_os = "linux") {
+            if cfg!(target_arch = "x86_64") {
+                ("mihomo-linux-amd64", "mihomo-linux-amd64.gz")
+            } else if cfg!(target_arch = "aarch64") {
+                ("mihomo-linux-arm64", "mihomo-linux-arm64.gz")
+            } else if cfg!(target_arch = "arm") {
+                ("mihomo-linux-armv7", "mihomo-linux-armv7.gz")
+            } else {
+                ("", "")
+            }
         } else {
-            "linux"
+            ("", "")
         };
 
-        let target_arch = if cfg!(target_arch = "x86_64") {
-            "amd64"
-        } else if cfg!(target_arch = "aarch64") {
-            "arm64"
-        } else if cfg!(target_arch = "x86") {
-            "386"
-        } else {
-            "amd64" // fallback
-        };
+        if target_prefix.is_empty() {
+            let err_msg = "不支持的操作系统或架构，无法自动升级。";
+            emit_progress("error", 0, err_msg);
+            bail!(err_msg);
+        }
 
-        let target_prefix = format!("mihomo-{}-{}", target_os, target_arch);
-        logging!(
-            info,
-            Type::System,
-            "Core updater searching for asset prefix: {}",
-            target_prefix
-        );
+        // 在 Release assets 中寻找对应文件
+        let mut target_asset = None;
+        let exact_zip = format!("{}-{}.zip", target_prefix, release.tag_name).to_lowercase();
+        let exact_gz = exact_gz.to_lowercase();
 
-        let matched_asset = {
-            let assets = release.assets.clone();
-            let exact_zip = format!("{}-{}.zip", target_prefix, release.tag_name).to_lowercase();
-            let exact_gz = format!("{}-{}.gz", target_prefix, release.tag_name).to_lowercase();
+        for asset in &release.assets {
+            let name = asset.name.to_lowercase();
+            if name == exact_zip || name == exact_gz {
+                target_asset = Some(asset);
+                break;
+            }
+        }
 
-            assets
-                .iter()
-                .find(|asset| {
-                    let name = asset.name.to_lowercase();
-                    name == exact_zip || name == exact_gz
-                })
-                .cloned()
-                .or_else(|| {
-                    assets.into_iter().find(|asset| {
-                        let name = asset.name.to_lowercase();
-                        name.contains(&target_prefix)
-                            && !name.contains("compat")
-                            && (name.ends_with(".zip") || name.ends_with(".gz"))
-                    })
-                })
-        };
-
-        let asset = match matched_asset {
+        // 如果没有精准匹配，使用宽泛前缀匹配
+        let asset = match target_asset {
             Some(a) => a,
             None => {
-                let err_msg = format!("未找到适用于 {}-{} 的内核安装包", target_os, target_arch);
-                emit_progress("error", 0, &err_msg);
-                bail!(err_msg);
+                let mut fallback_asset = None;
+                for asset in &release.assets {
+                    let name = asset.name.to_lowercase();
+                    if name.starts_with(target_prefix)
+                        && (name.ends_with(".zip") || name.ends_with(".gz"))
+                    {
+                        fallback_asset = Some(asset);
+                        break;
+                    }
+                }
+                match fallback_asset {
+                    Some(a) => a,
+                    None => {
+                        let err_msg = "在 GitHub Release 中未找到适合您系统架构的内核包";
+                        emit_progress("error", 0, err_msg);
+                        bail!(err_msg);
+                    }
+                }
             }
         };
 
@@ -231,7 +251,14 @@ impl CoreUpdater {
         // Start downloading
         let nm = NetworkManager::new();
         let proxy_types = vec![ProxyType::Localhost, ProxyType::System, ProxyType::None];
-        let mut downloaded_bytes = None;
+
+        let app_dir = dirs::app_home_dir()?;
+        let cores_dir = app_dir.join("cores");
+        if !cores_dir.exists() {
+            fs::create_dir_all(&cores_dir).context("failed to create cores directory")?;
+        }
+        let temp_download_path = cores_dir.join("mini-mihomo.download.tmp");
+        let mut download_success = false;
 
         for proxy_type in proxy_types {
             logging!(
@@ -241,15 +268,15 @@ impl CoreUpdater {
                 proxy_type
             );
             if let Ok(client) = nm.create_request(proxy_type, Some(300), None, false).await {
-                match Self::download_body(&client, &download_url, &app_handle, &asset.name).await {
-                    Ok(b) => {
+                match Self::download_body_to_file(&client, &download_url, &app_handle, &asset.name, &temp_download_path).await {
+                    Ok(_) => {
                         logging!(
                             info,
                             Type::System,
                             "Core updater download succeeded using proxy type: {:?}",
                             proxy_type
                         );
-                        downloaded_bytes = Some(b);
+                        download_success = true;
                         break;
                     }
                     Err(e) => {
@@ -265,22 +292,16 @@ impl CoreUpdater {
             }
         }
 
-        let downloaded = match downloaded_bytes {
-            Some(b) => b,
-            None => {
-                let err_msg = "所有网络连接（代理/直连）均下载失败";
-                emit_progress("error", 0, err_msg);
-                bail!(err_msg);
+        if !download_success {
+            let err_msg = "所有网络连接（代理/直连）均下载失败";
+            emit_progress("error", 0, err_msg);
+            if temp_download_path.exists() {
+                let _ = fs::remove_file(&temp_download_path);
             }
-        };
-
-        // Prepare destination path
-        let app_dir = dirs::app_home_dir()?;
-        let cores_dir = app_dir.join("cores");
-        if !cores_dir.exists() {
-            fs::create_dir_all(&cores_dir).context("failed to create cores directory")?;
+            bail!(err_msg);
         }
 
+        // Prepare destination path
         let core_name = if cfg!(windows) {
             "mini-mihomo.exe"
         } else {
@@ -297,9 +318,9 @@ impl CoreUpdater {
         // Create destination file directly on disk
         let mut dest_file = fs::File::create(&custom_core_path).context("failed to create destination core file")?;
 
-        if is_zip {
-            let reader = io::Cursor::new(downloaded);
-            let mut archive = zip::ZipArchive::new(reader).context("failed to parse zip archive")?;
+        let extract_res = if is_zip {
+            let archive_file = fs::File::open(&temp_download_path).context("failed to open downloaded zip archive")?;
+            let mut archive = zip::ZipArchive::new(archive_file).context("failed to parse zip archive")?;
             let mut mihomo_file_idx = None;
             for i in 0..archive.len() {
                 let file = archive.by_index(i)?;
@@ -314,15 +335,24 @@ impl CoreUpdater {
                 None => {
                     let err_msg = "在 ZIP 压缩包内未找到 mini-mihomo 程序二进制";
                     emit_progress("error", 0, err_msg);
+                    let _ = fs::remove_file(&temp_download_path);
                     bail!(err_msg);
                 }
             };
             let mut file = archive.by_index(idx)?;
-            io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to destination")?;
+            io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to destination")
         } else {
-            let mut decoder = flate2::read::GzDecoder::new(io::Cursor::new(downloaded));
-            io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to destination")?;
+            let archive_file = fs::File::open(&temp_download_path).context("failed to open downloaded gz archive")?;
+            let mut decoder = flate2::read::GzDecoder::new(archive_file);
+            io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to destination")
+        };
+
+        // Clean up temp file
+        if temp_download_path.exists() {
+            let _ = fs::remove_file(&temp_download_path);
         }
+
+        extract_res?;
 
         // Set Unix execute permission
         #[cfg(unix)]
