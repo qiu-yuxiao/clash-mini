@@ -39,6 +39,8 @@ fn use_script_sync(script: String, config: &Mapping, name: &String) -> Result<(M
         Object.freeze(String.prototype);
         Object.freeze(Number.prototype);
         Object.freeze(Boolean.prototype);
+        delete globalThis.Proxy;
+        delete globalThis.Reflect;
         ",
     ));
 

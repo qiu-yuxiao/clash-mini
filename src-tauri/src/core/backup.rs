@@ -109,6 +109,11 @@ impl WebDavClient {
         };
 
         // 创建新的客户端
+        logging!(
+            warn,
+            Type::Security,
+            "WebDAV 客户端设置了 danger_accept_invalid_certs=true（TLS 证书验证已跳过）"
+        );
         let client = reqwest_dav::ClientBuilder::new()
             .set_agent(
                 reqwest::Client::builder()
