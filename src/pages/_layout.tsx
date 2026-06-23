@@ -1894,7 +1894,7 @@ const Layout = () => {
                   fontSize: '11px',
                   fontWeight: 'bold',
                   fontFamily: 'var(--control-font-family)',
-                  '@media (max-height: 500px)': {
+                  '@media (max-height: 830px)': {
                     display: 'none',
                   },
                   ...primaryBtn3DStyle,
@@ -1951,7 +1951,7 @@ const Layout = () => {
                   alignItems: 'stretch',
                   zIndex: 200,
                   boxSizing: 'border-box',
-                  '@media (max-height: 500px)': {
+                  '@media (max-height: 830px)': {
                     display: 'none',
                   },
                 }}
