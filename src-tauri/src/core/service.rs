@@ -3,23 +3,17 @@ use crate::{
     core::{logger::Logger, tray::Tray},
     utils::dirs,
 };
-use anyhow::{Context as _, Result, bail};
 #[cfg(unix)]
 use anyhow::anyhow;
+use anyhow::{Context as _, Result, bail};
 use backon::{ConstantBuilder, Retryable as _};
 use clash_verge_logging::{Type, logging, logging_error};
 use clash_verge_service_ipc::CoreConfig;
 use compact_str::CompactString;
 use once_cell::sync::Lazy;
-use std::{
-    borrow::Cow,
-    env::current_exe,
-    path::PathBuf,
-    process::Command as StdCommand,
-    time::Duration,
-};
 #[cfg(unix)]
 use std::path::Path;
+use std::{borrow::Cow, env::current_exe, path::PathBuf, process::Command as StdCommand, time::Duration};
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -505,6 +499,7 @@ async fn wait_for_service_ipc(status: &mut ServiceManager, reason: &str) -> Resu
     result
 }
 
+#[allow(clippy::missing_const_for_fn)]
 pub fn is_service_ipc_path_exists() -> bool {
     #[cfg(windows)]
     {
