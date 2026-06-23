@@ -196,15 +196,15 @@
 | **BUG-146** | Inconsistent Property Access for Allow LAN Switch State | v1.5.5 | 用户已确认 |
 | **BUG-188** | destroy_main_window/show_main_window 返回值被丢弃 | v1.6.0 | 用户已确认 |
 | **BUG-189** | BUG-173 修复 /RU "" 被错误地同时加入 create_task 和 create_task_elevated，导致管理员和非管理员均无法开启自启 | v1.6.0 | 用户已确认 |
-| **BUG-190** | Infinite Self-Healing Auto-Select Loop on Fast Nodes (< 50ms) | v1.6.1 | 用户已确认 |
-| **BUG-191** | Redundant reqwest::Client Creation per Request | v1.6.1 | 用户已确认 |
-| **BUG-193** | Semaphore Permit Inflation under RejectPolicy::New | v1.6.1 | 用户已确认 |
-| **BUG-194** | Dead Sockets Kept in the IPC Connection Pool | v1.6.1 | 用户已确认 |
-| **BUG-195** | RAM Buffering of Large File Updates | v1.6.1 | 用户已确认 |
-| **BUG-196** | Uncompiled Dead Code (speed_task.rs) | v1.6.1 | 用户已确认 |
-| **BUG-197** | Infinite Background Polling Loop in useConnectionData | v1.6.1 | 用户已确认 |
-| **BUG-199** | Unhandled Tauri Listener Promise Rejection in useCustomTheme | v1.6.1 | 用户已确认 |
-| **BUG-200** | Passive Cache Eviction Leak in DelayManager | v1.6.1 | 用户已确认 |
-| **BUG-201** | High-Frequency Tauri IPC Polling in useVisibility | v1.6.1 | 用户已确认 |
-| **BUG-192** | Unthrottled Core Updater IPC Progress Emitter | v1.6.1 | 用户已确认 |
-| **BUG-198** | Unhandled Tauri Listener Promise Rejection in useWindowSnap | v1.6.1 | 用户已确认 |
+| **BUG-190** | Infinite Self-Healing Auto-Select Loop on Fast Nodes (< 30ms) | v1.6.3 | 用户已确认 |
+| **BUG-191** | Redundant reqwest::Client Creation per Request | v1.6.3 | 用户已确认 |
+| **BUG-193** | Semaphore Permit Inflation under RejectPolicy::New | v1.6.3 | 用户已确认 |
+| **BUG-194** | Dead Sockets Kept in the IPC Connection Pool | v1.6.3 | 用户已确认 |
+| **BUG-195** | RAM Buffering of Large File Updates | v1.6.3 | 用户已确认 |
+| **BUG-196** | Uncompiled Dead Code (speed_task.rs) | v1.6.3 | 用户已确认 |
+| **BUG-197** | Infinite Background Polling Loop in useConnectionData | v1.6.3 | 用户已确认 |
+| **BUG-199** | Unhandled Tauri Listener Promise Rejection in useCustomTheme | v1.6.3 | 用户已确认 |
+| **BUG-200** | Passive Cache Eviction Leak in DelayManager | v1.6.3 | 用户已确认 |
+| **BUG-201** | High-Frequency Tauri IPC Polling in useVisibility | v1.6.3 | 用户已确认 |
+| **BUG-192** | Unthrottled Core Updater IPC Progress Emitter | v1.6.3 | 用户已确认 |
+| **BUG-198** | Unhandled Tauri Listener Promise Rejection in useWindowSnap | v1.6.3 | 用户已确认 |

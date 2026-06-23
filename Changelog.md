@@ -1,4 +1,4 @@
-## v1.6.1
+## v1.6.3
 
 ### 🚀 New Features
 
@@ -6,7 +6,7 @@
 
 ### 🐞 Fixed Bugs
 
-- Fix BUG-190: Implement exponential backoff cooldown (60s to 15m) for self-healing auto-select daemon when no nodes >= 50ms are available.
+- Fix BUG-190: Implement exponential backoff cooldown (60s to 15m) for self-healing auto-select daemon when no nodes >= 30ms are available.
 - Fix BUG-191: Reuse reqwest::Client connection pool in Mihomo struct to prevent socket and CPU resource exhaustion.
 - Fix BUG-192: Throttle core updater download progress emissions to only when the integer percentage changes.
 - Fix BUG-193: Replace semaphore add_permits(1) with a PoolPermit enum to prevent connection pool capacity inflation under RejectPolicy::New.
