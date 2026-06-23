@@ -5,7 +5,7 @@ use std::{
 };
 use sysinfo::{Networks, System};
 use tauri::{AppHandle, Manager as _, Runtime, State};
-use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_clipboard_manager::ClipboardExt as _;
 
 #[cfg(windows)]
 use deelevate::{PrivilegeLevel, Token};
