@@ -127,3 +127,44 @@ The team is strictly prohibited from writing or modifying any files inside the w
   - Root cause analysis
   - Suggested fix with a precise diff code block
 - [ ] The report must contain a dedicated table mapping the components' compliance status against the six skin styles.
+
+## Follow-up — 2026-06-23T15:03:20+08:00
+
+对 Clash Mini 全体代码进行广泛、深入、全面、多角度的资源占用审核，找出可以进一步减少系统资源占用（CPU、内存、线程数、句柄/套接字描述符、磁盘 I/O 等）的改良空间。只提交审核报告和具体的修改建议（不修改任何代码）。
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: development
+
+## Requirements
+
+### R1. 全面资源优化审计 (System Resource Optimization Audit)
+审计团队必须深入审查 Rust 后端 (`src-tauri` 及相关 crates) 和 React/TypeScript 前端 (`src`) 代码，重点寻找以下能够进一步降低资源占用的改良点：
+1. **CPU 占用**：无效的忙等待、高频定时轮询、过度的 React 重新渲染、可优化的算法与数据结构。
+2. **内存占用**：不必要的克隆/拷贝、大型数据常驻内存、潜在的内存泄漏风险、前端大型状态树的冗余数据。
+3. **线程与异步任务**：过多的空闲线程、未加限制的异步任务生成（Spawn）、过载的并发连接。
+4. **I/O 与句柄**：套接字/描述符泄漏风险、高频小文件读写、未缓冲的 I/O 操作。
+
+### R2. 详尽的优化建议报告 (Point-by-Point Recommendation Report)
+针对发现的每个优化点，生成一份结构化的审计报告，包含：
+1. 优化点类型及影响的资源。
+2. 精确的文件路径及行号范围。
+3. 详细的成因分析与具体优化方案。
+4. 供参考的修改 diff 代码或伪代码。
+
+### R3. 严格的代码隔离 (Strict Code Isolation)
+审计团队绝对不能修改任何代码、脚本或配置文件，工作区必须保持 100% 干净。允许运行已有的辅助测试与分析命令（如 `cargo check`, `eslint` 等）以协助分析瓶颈，但不得在工作区留下 any 未提交的修改。
+
+## Acceptance Criteria
+
+### 审计范围与质量 (Audit Scope & Quality)
+- [ ] 审计覆盖前端 (React/TS) 和后端 (Rust) 代码中影响资源的各个维度。
+- [ ] 每个发现的优化点都有合理且具说服力的原理解释。
+
+### 报告完整性 (Report Completeness)
+- [ ] 报告中指明了具体文件位置与行号。
+- [ ] 提供了供后续实施的修改 diff 或重构建议。
+
+### 代码安全隔离 (Code Safety)
+- [ ] 工作区中没有产生任何代码修改。
+- [ ] `git status --porcelain` 返回结果完全为空。
+

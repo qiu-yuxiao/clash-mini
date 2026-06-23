@@ -10,24 +10,39 @@ const getIsMinimal = (): boolean => {
   return false
 }
 
+// 维护全局的监听状态与订阅者集合
+let globalIsMinimal = getIsMinimal()
+const listeners = new Set<(val: boolean) => void>()
+let isListening = false
+
+const handleResize = () => {
+  const minimal = getIsMinimal()
+  if (minimal !== globalIsMinimal) {
+    globalIsMinimal = minimal
+    listeners.forEach((listener) => listener(minimal))
+  }
+}
+
+const subscribe = (listener: (val: boolean) => void) => {
+  listeners.add(listener)
+  if (!isListening) {
+    window.addEventListener('resize', handleResize)
+    isListening = true
+  }
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0 && isListening) {
+      window.removeEventListener('resize', handleResize)
+      isListening = false
+    }
+  }
+}
+
 export const useWindowWidth = () => {
-  const [isMinimal, setIsMinimal] = useState(getIsMinimal)
+  const [isMinimal, setIsMinimal] = useState(globalIsMinimal)
 
   useEffect(() => {
-    const handleResize = () => {
-      const minimal = getIsMinimal()
-      setIsMinimal((prev) => {
-        if (prev !== minimal) {
-          return minimal
-        }
-        return prev
-      })
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => {
-      window.removeEventListener('resize', handleResize)
-    }
+    return subscribe(setIsMinimal)
   }, [])
 
   return { width: isMinimal ? 270 : 640 }

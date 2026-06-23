@@ -184,7 +184,8 @@ const RowComponent = memo(
     )
   },
   (prev, next) =>
-    prev.row === next.row &&
+    prev.row.original === next.row.original &&
+    prev.row.index === next.row.index &&
     prev.virtualStart === next.virtualStart &&
     prev.virtualSize === next.virtualSize &&
     prev.onShowDetail === next.onShowDetail &&

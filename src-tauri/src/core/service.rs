@@ -582,3 +582,66 @@ impl ServiceManager {
 }
 
 pub static SERVICE_MANAGER: Lazy<Mutex<ServiceManager>> = Lazy::new(|| Mutex::new(ServiceManager::default()));
+
+pub async fn handle_service_operation(status: &ServiceStatus) -> Result<()> {
+    // 1. 防止并发执行服务安装操作
+    static INSTALL_MUTEX: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _install_guard = INSTALL_MUTEX.lock().await;
+
+    let mut dummy = ServiceManager::default();
+
+    // 2. 在不持有 SERVICE_MANAGER 锁的情况下，执行耗时的安装/卸载与重试等待
+    match status {
+        ServiceStatus::Ready => {
+            logging!(info, Type::Service, "服务就绪，直接启动");
+        }
+        ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired => {
+            logging!(info, Type::Service, "服务需要重装，执行重装流程");
+            reinstall_service()?;
+            wait_for_service_ipc(&mut dummy, "Waiting for service to be available").await?;
+        }
+        ServiceStatus::ForceReinstallRequired => {
+            logging!(info, Type::Service, "服务需要强制重装，执行强制重装流程");
+            force_reinstall_service()?;
+            wait_for_service_ipc(&mut dummy, "Waiting for service to be available").await?;
+        }
+        ServiceStatus::InstallRequired => {
+            logging!(info, Type::Service, "需要安装服务，执行安装流程");
+            install_service()?;
+            wait_for_service_ipc(&mut dummy, "Waiting for service to be available").await?;
+            if clash_verge_service_ipc::is_reinstall_service_needed().await {
+                logging!(info, Type::Service, "服务版本不匹配，执行重装流程");
+                reinstall_service()?;
+                wait_for_service_ipc(&mut dummy, "Waiting for service to be available").await?;
+            }
+        }
+        ServiceStatus::UninstallRequired => {
+            logging!(info, Type::Service, "服务需要卸载，执行卸载流程");
+            uninstall_service()?;
+        }
+        ServiceStatus::Unavailable(reason) => {
+            logging!(info, Type::Service, "服务不可用: {}，将使用Sidecar模式", reason);
+            return Err(anyhow::anyhow!("服务不可用: {}", reason));
+        }
+    }
+
+    // 3. 只有在最终写入状态时，才短暂锁定 SERVICE_MANAGER
+    {
+        let mut manager = SERVICE_MANAGER.lock().await;
+        match status {
+            ServiceStatus::UninstallRequired => {
+                manager.0 = ServiceStatus::Unavailable("Service Uninstalled".into());
+            }
+            ServiceStatus::Unavailable(reason) => {
+                manager.0 = ServiceStatus::Unavailable(reason.clone());
+            }
+            _ => {
+                manager.0 = ServiceStatus::Ready;
+            }
+        }
+    }
+
+    // 更新系统托盘菜单
+    Tray::global().update_menu().await?;
+    Ok(())
+}

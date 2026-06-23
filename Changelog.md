@@ -1,3 +1,28 @@
+## v1.6.5
+
+### 🚀 Optimizations
+
+- Item A.1: Optimized Connection Table rendering by comparing raw row data index/origin instead of TanStack Table wrapper references to prevent redundant row re-renders.
+- Item A.2: Memoized LogItem component and cached Regex compilation to prevent duplicate compilations across visible logs.
+- Item A.3: Implemented a global singleton resize listener in use-window-width to avoid registering O(N) resize event listeners for proxy cards.
+- Item A.4: Replaced useVerge hook subscription with synchronous config cache reading getPreloadConfig in useProxyDelayState hook to reduce Query observers.
+- Item A.5: Added refresh token trigger in use-filter-sort useMemo dependencies to ensure proxy sorting updates immediately upon latency checks.
+- Item B.1: Replaced tokio::spawn loop in latency sweep with a fixed worker pool of size 32 using lock-free AtomicUsize indexing in monitor.rs.
+- Item B.2: Moved service installation and IPC waiting logic outside the SERVICE_MANAGER Mutex lock to resolve GUI hangs.
+- Item B.3: Simplified tray proxy selection sync to a direct zero-cost NO-OP for the static tray menu.
+- Item B.4: Replaced 200ms sleep busy loop in timer.rs with a tokio::sync::Notify awaiter in resolve/mod.rs.
+- Item B.5: Replaced 1-second busy loop in background monitor with a tokio::select! block waiting on a 15-second timer or PROFILE_SWITCH_NOTIFY.
+- Item C.1: Implemented write_file_if_changed in profiles.rs to compare content before writing config, saving I/O overhead.
+- Item C.2: Configured reqwest Client with connection pooling limits to avoid socket churn under high concurrency.
+- Item C.3: Wrapped backup output file in std::io::BufWriter to aggregate small metadata writes.
+- Item D.1: Integrated useVisibility event listeners to disable system state polling when the window is hidden or minimized.
+
+### 🐞 Fixed Bugs
+
+- Fix all ESLint warnings and React Compiler/Purity warnings in layout and settings components (active-node-card, basic-settings-card, help-menu-button, profile-import-card, routing-preference-card, takeover-mode-card, theme-settings-card, style-helpers).
+
+---
+
 ## v1.6.3
 
 ### 🚀 New Features

@@ -164,7 +164,7 @@ impl IProfiles {
                         .clone()
                         .ok_or_else(|| anyhow::anyhow!("file field is required in existing item"))?;
                     let path = dirs::app_profiles_dir()?.join(file.as_str());
-                    fs::write(&path, file_data.as_bytes())
+                    write_file_if_changed(&path, file_data.as_bytes())
                         .await
                         .with_context(|| format!("failed to write to file \"{file}\""))?;
                 }
@@ -185,7 +185,7 @@ impl IProfiles {
                 .ok_or_else(|| anyhow::anyhow!("file field is required when file_data is provided"))?;
             let path = dirs::app_profiles_dir()?.join(file.as_str());
 
-            fs::write(&path, file_data.as_bytes())
+            write_file_if_changed(&path, file_data.as_bytes())
                 .await
                 .with_context(|| format!("failed to write to file \"{file}\""))?;
         }
@@ -286,7 +286,7 @@ impl IProfiles {
 
                         let path = dirs::app_profiles_dir()?.join(file.as_str());
 
-                        fs::write(&path, file_data.as_bytes())
+                        write_file_if_changed(&path, file_data.as_bytes())
                             .await
                             .with_context(|| format!("failed to write to file \"{file}\""))?;
                     }
@@ -632,4 +632,18 @@ pub async fn profiles_draft_update_item_safe(index: &String, item: &mut PrfItem)
             Ok((profiles, ()))
         })
         .await
+}
+
+async fn write_file_if_changed<P: AsRef<std::path::Path>>(path: P, content: &[u8]) -> std::io::Result<()> {
+    let path = path.as_ref();
+    let mut write_needed = true;
+    if let Ok(existing) = fs::read(path).await {
+        if existing == content {
+            write_needed = false;
+        }
+    }
+    if write_needed {
+        fs::write(path, content).await?;
+    }
+    Ok(())
 }

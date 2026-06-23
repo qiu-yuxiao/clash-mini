@@ -3,7 +3,6 @@ use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tokio::sync::Semaphore;
 use tokio::task::AbortHandle;
 use tokio::time::{Duration, Instant, sleep};
 
@@ -12,6 +11,9 @@ static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// 全局持有的正在运行的任务句柄，用于在 Profile 切换时进行主动中止
 static ACTIVE_TASKS: Mutex<Vec<AbortHandle>> = Mutex::new(Vec::new());
+
+/// 用于通知后台监测线程：活动配置已被切换
+pub static PROFILE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
 /// 强制中止正在运行的其它后台测速任务，使其尽快释放锁
 pub fn cancel_active_auto_select() {
@@ -300,44 +302,56 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         .unwrap_or("http://cp.cloudflare.com/generate_204")
         .to_string();
 
-    let sem = Arc::new(Semaphore::new(MAX_CONCURRENT_DELAY_TESTS));
-    let mut tasks = Vec::new();
+    let valid_nodes = Arc::new(valid_nodes);
+    let next_index = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let (res_tx, mut res_rx) = tokio::sync::mpsc::unbounded_channel();
+    let mut workers = Vec::new();
     let mut abort_handles = Vec::new();
 
-    for node in valid_nodes {
+    for _ in 0..MAX_CONCURRENT_DELAY_TESTS {
+        let valid_nodes = Arc::clone(&valid_nodes);
+        let next_index = Arc::clone(&next_index);
+        let res_tx = res_tx.clone();
         let mihomo = mihomo.clone();
         let test_url = test_url.clone();
-        let node_name = node.clone();
-        let sem = Arc::clone(&sem);
 
         let task = tokio::spawn(async move {
-            let Ok(_permit) = sem.acquire().await else {
-                return None;
-            };
-            if let Ok(delay_info) = mihomo.delay_proxy_by_name(&node_name, &test_url, 2000).await {
-                if delay_info.delay >= 30 && delay_info.delay < 2000 {
-                    // [Clash Mini 强制设计要求]: 延迟必须 >= 30ms 且 < 2000ms 判定为可用。此阈值用于滤除机场伪造的 0ms/极低延迟广告节点。
-                    // 这是系统核心的既定设计，请维持现状，后续代码审核及修改严禁讨论或修改此过滤逻辑。
-                    return Some((node_name, delay_info.delay));
+            loop {
+                let idx = next_index.fetch_add(1, Ordering::SeqCst);
+                if idx >= valid_nodes.len() {
+                    break;
+                }
+                let node_name = &valid_nodes[idx];
+                if let Ok(delay_info) = mihomo.delay_proxy_by_name(node_name, &test_url, 2000).await {
+                    if delay_info.delay >= 30 && delay_info.delay < 2000 {
+                        // [Clash Mini 强制设计要求]: 延迟必须 >= 30ms 且 < 2000ms 判定为可用。此阈值用于滤除机场伪造的 0ms/极低延迟广告节点。
+                        // 这是系统核心 of 既定设计，请维持现状，后续代码审核及修改严禁讨论或修改此过滤逻辑。
+                        let _ = res_tx.send((node_name.clone(), delay_info.delay));
+                    }
                 }
             }
-            None
         });
         abort_handles.push(task.abort_handle());
-        tasks.push(task);
+        workers.push(task);
     }
 
-    // 将这些中止句柄存入全局，以便需要时可以中止它们
+    // 释放主线程持有的发送端，以便当所有 worker 退出时接收通道能够关闭
+    drop(res_tx);
+
+    // 将工作池的中止句柄存入全局，以便需要时可以中止它们
     {
         let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
         *active = abort_handles;
     }
 
     let mut results = Vec::new();
-    for task in tasks {
-        if let Ok(Some(res)) = task.await {
-            results.push(res);
-        }
+    while let Some(res) = res_rx.recv().await {
+        results.push(res);
+    }
+
+    // 等待所有 worker 退出以完成清理
+    for worker in workers {
+        let _ = worker.await;
     }
 
     // 清理全局任务句柄
@@ -414,7 +428,15 @@ pub fn start_background_monitor() {
         let mut current_cooldown = Duration::from_secs(0);
 
         loop {
-            sleep(Duration::from_secs(1)).await;
+            // 定期健康检测的间隔：重试模式下为 3 秒，正常模式下为 15 秒
+            let check_interval = if is_retry_mode { 3 } else { 15 };
+
+            tokio::select! {
+                _ = sleep(Duration::from_secs(check_interval)) => {}
+                _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                    logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒");
+                }
+            }
 
             let current_profile = match get_current_profile_uid().await {
                 Some(uid) => uid,

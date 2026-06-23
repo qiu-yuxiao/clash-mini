@@ -1,8 +1,8 @@
 import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useReducer } from 'react'
 
-import { useVerge } from '@/hooks/use-verge'
 import delayManager, { type DelayUpdate } from '@/services/delay'
+import { getPreloadConfig } from '@/services/preload'
 import type { IProxyItem } from '@/types/clash'
 
 const PRESET_PROXY_NAMES = [
@@ -31,8 +31,7 @@ export function useProxyDelayState(
 ): UseProxyDelayState {
   const isPreset = proxy ? PRESET_PROXY_NAMES.includes(proxy.name) : false
   const [delayState, setDelayState] = useReducer(identity, INITIAL_DELAY)
-  const { verge } = useVerge()
-  const timeout = verge?.default_latency_timeout || 10000
+  const timeout = getPreloadConfig()?.default_latency_timeout || 10000
 
   useEffect(() => {
     if (isPreset || !proxy) return
@@ -40,7 +39,7 @@ export function useProxyDelayState(
     return () => {
       delayManager.removeListener(proxy.name, groupName)
     }
-  }, [proxy?.name, groupName, isPreset])
+  }, [proxy, groupName, isPreset])
 
   const updateDelay = useCallback(() => {
     if (!proxy) return
@@ -76,7 +75,8 @@ export function useProxyDelayState(
   const onDelay = useLockFn(async () => {
     if (!proxy) return
     setDelayState({ delay: -2, updatedAt: Date.now() })
-    setDelayState(await delayManager.checkDelay(proxy.name, groupName, timeout))
+    const currentTimeout = getPreloadConfig()?.default_latency_timeout || 10000
+    setDelayState(await delayManager.checkDelay(proxy.name, groupName, currentTimeout))
   })
 
   return {

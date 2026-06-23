@@ -10,7 +10,6 @@ import {
   Typography,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { useQuery } from '@tanstack/react-query'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import {
   type Key,
@@ -29,7 +28,7 @@ import { useLocation } from 'react-router'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
 import { useProxiesData } from '@/providers/app-data-context'
-import { calcuProxies, updateProxyChainConfigInRuntime } from '@/services/cmds'
+import { updateProxyChainConfigInRuntime } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'

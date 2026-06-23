@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
+import { useVisibility } from '@/hooks/use-visibility'
 import { getRunningMode, isAdmin, isServiceAvailable } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
@@ -27,6 +28,7 @@ const STARTUP_GRACE_MS = 10_000
  */
 export function useSystemState() {
   const { verge, patchVerge } = useVerge()
+  const isVisible = useVisibility()
   const disablingTunRef = useRef(false)
   const [isStartingUp, setIsStartingUp] = useState(true)
 
@@ -49,7 +51,8 @@ export function useSystemState() {
       ])
       return { runningMode, isAdminMode, isServiceOk } as SystemState
     },
-    refetchInterval: isStartingUp ? 2000 : 30000,
+    refetchInterval: isVisible ? (isStartingUp ? 2000 : 30000) : false,
+    refetchIntervalInBackground: false,
   })
 
   const isSidecarMode = systemState.runningMode === 'Sidecar'

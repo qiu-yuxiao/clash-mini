@@ -1,4 +1,5 @@
 import { styled, Box } from '@mui/material'
+import { memo, useMemo } from 'react'
 import type { ReactNode } from 'react'
 
 import type { SearchState } from '@/components/base'
@@ -48,10 +49,9 @@ interface Props {
   searchState?: SearchState
 }
 
-const LogItem = ({ value, searchState }: Props) => {
-  const renderHighlightText = (text: string) => {
-    if (!searchState?.text.trim()) return text
-
+const LogItem = memo(({ value, searchState }: Props) => {
+  const regex = useMemo(() => {
+    if (!searchState?.text.trim()) return null
     try {
       const searchText = searchState.text
       let pattern: string
@@ -69,7 +69,17 @@ const LogItem = ({ value, searchState }: Props) => {
       }
 
       const flags = searchState.matchCase ? 'g' : 'gi'
-      const regex = new RegExp(pattern, flags)
+      return new RegExp(pattern, flags)
+    } catch {
+      return null
+    }
+  }, [searchState?.text, searchState?.useRegularExpression, searchState?.matchWholeWord, searchState?.matchCase])
+
+  const renderHighlightText = (text: string) => {
+    if (!regex) return text
+
+    try {
+      regex.lastIndex = 0
       const elements: ReactNode[] = []
       let lastIndex = 0
       let match: RegExpExecArray | null
@@ -119,6 +129,14 @@ const LogItem = ({ value, searchState }: Props) => {
       </div>
     </Item>
   )
-}
+}, (prev, next) => {
+  return (
+    prev.value === next.value &&
+    prev.searchState?.text === next.searchState?.text &&
+    prev.searchState?.useRegularExpression === next.searchState?.useRegularExpression &&
+    prev.searchState?.matchWholeWord === next.searchState?.matchWholeWord &&
+    prev.searchState?.matchCase === next.searchState?.matchCase
+  )
+})
 
 export default LogItem

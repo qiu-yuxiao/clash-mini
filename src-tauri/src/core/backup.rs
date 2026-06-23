@@ -237,7 +237,11 @@ pub async fn create_backup() -> Result<(String, PathBuf), Error> {
     let zip_path = temp_dir().join(zip_file_name.as_str());
 
     let value = zip_path.clone();
-    let file = AsyncHandler::spawn_blocking(move || std::fs::File::create(&value)).await??;
+    let file = AsyncHandler::spawn_blocking(move || {
+        let file = std::fs::File::create(&value)?;
+        Ok::<_, anyhow::Error>(std::io::BufWriter::new(file))
+    })
+    .await??;
     let mut zip = zip::ZipWriter::new(file);
     zip.add_directory("profiles/", SimpleFileOptions::default())?;
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);

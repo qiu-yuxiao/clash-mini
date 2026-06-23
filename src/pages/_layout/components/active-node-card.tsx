@@ -89,7 +89,7 @@ export const ActiveNodeStatusCard = () => {
   useEffect(() => {
     let cancelled = false
     if (!activeNodeName) {
-      setNodeAddr('')
+      Promise.resolve().then(() => setNodeAddr(''))
       return
     }
     getProxyAddr(activeNodeName, activeNodeRecord?.provider)
@@ -210,11 +210,12 @@ export const ActiveNodeStatusCard = () => {
   const signalInfo = getSignalIcon(delay, t)
   const delayColor = convertDelayColor(delay)
   const theme = useTheme()
-  const skin =
-    (theme as any).controlSkin ||
-    (typeof window !== 'undefined'
+  const skinFallback = useMemo(() => {
+    return typeof window !== 'undefined'
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
-      : 'retro-3d')
+      : 'retro-3d'
+  }, [])
+  const skin = (theme as any).controlSkin || skinFallback
   const isRetro3DDark = skin === 'retro-3d' && theme.palette.mode === 'dark'
 
   return (

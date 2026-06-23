@@ -46,7 +46,7 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
   profileItems,
   currentProfileUid,
   importInputRef,
-  importInputContextMenu,
+  importInputContextMenu: _importInputContextMenu,
   setImportInputContextMenu,
   handleImportProfile,
   handleSelectProfile,
@@ -57,11 +57,12 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
 }) => {
   const { t } = useTranslation() as any
   const theme = useTheme()
-  const skin =
-    (theme as any).controlSkin ||
-    (typeof window !== 'undefined'
+  const skinFallback = React.useMemo(() => {
+    return typeof window !== 'undefined'
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
-      : 'retro-3d')
+      : 'retro-3d'
+  }, [])
+  const skin = (theme as any).controlSkin || skinFallback
   const isRetro3DDark = skin === 'retro-3d' && theme.palette.mode === 'dark'
 
   const formatTraffic = (num?: number) => {

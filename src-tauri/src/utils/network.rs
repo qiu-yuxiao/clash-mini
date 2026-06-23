@@ -73,8 +73,8 @@ impl NetworkManager {
             .tls_backend_rustls()
             .redirect(reqwest::redirect::Policy::limited(10))
             .tcp_keepalive(Duration::from_secs(60))
-            .pool_max_idle_per_host(0)
-            .pool_idle_timeout(None);
+            .pool_max_idle_per_host(8)
+            .pool_idle_timeout(Some(Duration::from_secs(15)));
 
         if matches!(tls_root_mode, TlsRootMode::StaticWebpkiRoots) {
             builder = builder.tls_backend_preconfigured(Self::build_static_webpki_tls_config()?);

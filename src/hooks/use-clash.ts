@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLockFn } from 'ahooks'
-import { useCallback, useMemo } from 'react'
+import { useCallback } from 'react'
 
 import {
   getClashInfo,

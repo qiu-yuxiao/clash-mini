@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   SignalWifi3Bar as SignalGood,
   SignalWifi2Bar as SignalMedium,

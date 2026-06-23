@@ -16,7 +16,6 @@ import {
   Menu,
   Divider,
 } from '@mui/material'
-import { alpha } from '@mui/material'
 import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -33,22 +32,19 @@ import { GlowBorder } from '@/components/glow-border'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
+import { useHeadStateNew } from '@/components/proxy/use-head-state'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
 import { useProfiles } from '@/hooks/use-profiles'
-import { useProxySelection } from '@/hooks/use-proxy-selection'
-import { isDummyNode } from '@/utils/node'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
 import {
-  useProxiesData,
   useClashConfigData,
   useAppRefreshers,
 } from '@/providers/app-data-context'
-import { useHeadStateNew } from '@/components/proxy/use-head-state'
 import {
   importProfile,
   updateProfile,
@@ -61,6 +57,7 @@ import {
   patchProfile,
   viewProfile,
 } from '@/services/cmds'
+import DelayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
@@ -68,20 +65,17 @@ import {
   get3DButtonStyle,
   get3DCardStyle,
 } from '@/utils/button-styles'
+import { isDummyNode } from '@/utils/node'
 import {
   closeAllConnections,
-  delayProxyByName,
   getProxyByName,
-  getProxies,
   selectNodeForGroup,
 } from 'tauri-plugin-mihomo-api'
-import DelayManager from '@/services/delay'
 
 
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
 import { BasicSettingsCard } from './_layout/components/basic-settings-card'
-import { ThemeSettingsCard } from './_layout/components/theme-settings-card'
 import { ConnectionsPanel } from './_layout/components/connections-panel'
 import { HelpMenuButton } from './_layout/components/help-menu-button'
 import { LayoutDialogs } from './_layout/components/layout-dialogs'
@@ -89,14 +83,13 @@ import { MiniTrafficPanel } from './_layout/components/mini-traffic-panel'
 import { ProfileImportCard } from './_layout/components/profile-import-card'
 import { RoutingPreferenceCard } from './_layout/components/routing-preference-card'
 import { TakeoverModeCard } from './_layout/components/takeover-mode-card'
+import { ThemeSettingsCard } from './_layout/components/theme-settings-card'
 import {
   useCustomTheme,
   useLayoutEvents,
   useLoadingOverlay,
 } from './_layout/hooks'
 import { handleNoticeMessage } from './_layout/utils'
-
-// Style Helpers
 import {
   OS,
   getMenuItemHoverStyle,
@@ -537,7 +530,7 @@ const Layout = () => {
     )
   }, [vibrancyFactor, controlSkin])
 
-  const getSlider1Label = () => {
+  const _getSlider1Label = () => {
     switch (controlSkin) {
       case 'retro-3d':
         return 'Depth'
@@ -556,7 +549,7 @@ const Layout = () => {
     }
   }
 
-  const getSlider2Label = () => {
+  const _getSlider2Label = () => {
     switch (controlSkin) {
       case 'retro-3d':
         return 'Vibrancy'
@@ -581,7 +574,7 @@ const Layout = () => {
   if (theme) {
     ;(theme as any).controlSkin = controlSkin
   }
-  const isRetro3DDark =
+  const _isRetro3DDark =
     controlSkin === 'retro-3d' && theme?.palette?.mode === 'dark'
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
@@ -616,7 +609,7 @@ const Layout = () => {
     let textToPaste = ''
     try {
       textToPaste = await readText()
-    } catch (err) {
+    } catch {
       try {
         textToPaste = await navigator.clipboard.readText()
       } catch (e) {
@@ -654,7 +647,7 @@ const Layout = () => {
       if (selectedText) {
         try {
           await writeText(selectedText)
-        } catch (err) {
+        } catch {
           try {
             await navigator.clipboard.writeText(selectedText)
           } catch (e) {
@@ -676,7 +669,7 @@ const Layout = () => {
       if (selectedText) {
         try {
           await writeText(selectedText)
-        } catch (err) {
+        } catch {
           try {
             await navigator.clipboard.writeText(selectedText)
           } catch (e) {
@@ -773,8 +766,6 @@ const Layout = () => {
     activateSelected,
     patchProfiles,
   } = useProfiles()
-  const { changeProxy } = useProxySelection()
-  const { proxies } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
   const profileItems = useMemo(
     () =>
@@ -1068,6 +1059,7 @@ const Layout = () => {
     }
   }, [language])
 
+  // eslint-disable-next-line @eslint-react/no-unused-state
   const [profileRefreshCounter, setProfileRefreshCounter] = useState(0)
   const lastProcessedRef = useRef<{ uid: string | null; counter: number }>({ uid: null, counter: -1 })
   const startupRetryCountRef = useRef(0)
@@ -1100,6 +1092,7 @@ const Layout = () => {
         lastProcessedRef.current = { uid: currentProfileUid, counter: profileRefreshCounter }
         const uid = currentProfileUid
         let cancelled = false
+        let timerId: any = null
         enhanceProfiles()
           .then(async (success) => {
             if (!success) {
@@ -1134,7 +1127,7 @@ const Layout = () => {
             if (startupRetryCountRef.current < 3) {
               startupRetryCountRef.current += 1
               console.log(`[Layout] Retrying profile activation in 2s (Attempt ${startupRetryCountRef.current}/3)`)
-              setTimeout(() => {
+              timerId = setTimeout(() => {
                 if (!cancelled) {
                   setProfileRefreshCounter((c) => c + 1)
                 }
@@ -1143,6 +1136,9 @@ const Layout = () => {
           })
         return () => {
           cancelled = true
+          if (timerId) {
+            clearTimeout(timerId)
+          }
         }
       }
     }
@@ -1534,8 +1530,6 @@ const Layout = () => {
       drawerOpen,
       patchVerge,
       verge?.enable_always_on_top,
-      theme,
-      controlSkin,
     ],
   )
 

@@ -28,6 +28,7 @@ pub mod window;
 pub mod window_script;
 
 static RESOLVE_DONE: AtomicBool = AtomicBool::new(false);
+static RESOLVE_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
 pub fn init_work_dir_and_logger() -> anyhow::Result<()> {
     AsyncHandler::block_on(async {
@@ -194,8 +195,16 @@ pub(super) async fn init_window() {
 
 pub fn resolve_done() {
     RESOLVE_DONE.store(true, Ordering::Release);
+    RESOLVE_NOTIFY.notify_waiters();
 }
 
 pub fn is_resolve_done() -> bool {
     RESOLVE_DONE.load(Ordering::Acquire)
+}
+
+pub async fn wait_for_resolve_done() {
+    if is_resolve_done() {
+        return;
+    }
+    RESOLVE_NOTIFY.notified().await;
 }

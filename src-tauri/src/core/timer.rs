@@ -1,4 +1,4 @@
-use crate::{config::Config, feat, process::AsyncHandler, singleton, utils::resolve::is_resolve_done};
+use crate::{config::Config, feat, process::AsyncHandler, singleton, utils::resolve::wait_for_resolve_done};
 use anyhow::Result;
 use clash_verge_logging::{Type, logging, logging_error};
 use parking_lot::{Mutex, RwLock};
@@ -13,7 +13,7 @@ use std::{
 };
 use tokio::{
     sync::mpsc,
-    time::{sleep, timeout},
+    time::timeout,
 };
 use tokio_stream::StreamExt as _;
 use tokio_util::time::{DelayQueue, delay_queue::Key};
@@ -417,12 +417,6 @@ impl Timer {
     }
 
     async fn wait_until_resolve_done(max_wait: Duration) {
-        let _ = timeout(max_wait, async {
-            while !is_resolve_done() {
-                logging!(debug, Type::Timer, "Waiting for resolve to be done...");
-                sleep(Duration::from_millis(200)).await;
-            }
-        })
-        .await;
+        let _ = timeout(max_wait, wait_for_resolve_done()).await;
     }
 }

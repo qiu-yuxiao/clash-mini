@@ -46,6 +46,7 @@ export default function useFilterSort(
   }, [groupName])
 
   const compute = useMemo(() => {
+    void _;
     const fp = filterProxies(proxies, groupName, filterText, searchState)
     const sp = sortProxies(
       fp,
@@ -55,6 +56,7 @@ export default function useFilterSort(
     )
     return sp
   }, [
+    _,
     proxies,
     groupName,
     filterText,
