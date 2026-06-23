@@ -13,7 +13,7 @@ import {
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
-import {
+import type {
   ProxyProvider,
   RuleProvider,
   BaseConfig,
