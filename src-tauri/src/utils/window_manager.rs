@@ -1,9 +1,8 @@
 use crate::{core::handle, utils::resolve::window::build_new_window};
-use clash_verge_limiter::Limiter;
 use clash_verge_logging::{Type, logging};
-use once_cell::sync::Lazy;
-use std::pin::Pin;
-use std::time::Duration;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Manager as _, WebviewWindow, Wry};
 
 /// 窗口操作结果
@@ -39,20 +38,44 @@ pub enum WindowState {
 }
 
 // 窗口操作防抖机制
+/// 窗口操作最大防抖间隔（快速连续点击时的保护阈值）
 const WINDOW_OPERATION_DEBOUNCE_MS: u64 = 625;
-static WINDOW_OPERATION_LIMITER: Lazy<Limiter> = Lazy::new(|| {
-    Limiter::new(
-        Duration::from_millis(WINDOW_OPERATION_DEBOUNCE_MS),
-        clash_verge_limiter::SystemClock,
-    )
-});
+/// 空闲判定阈值 — 超过此时间无操作，下次点击跳过防抖（立即响应）
+const WINDOW_IDLE_THRESHOLD_MS: u64 = 3000;
+/// 上次成功执行窗口操作的时间戳（毫秒）
+static LAST_WINDOW_OP_MS: AtomicU64 = AtomicU64::new(0);
 
+/// 自适应防抖检查：
+/// - 距离上次操作超过 IDLE_THRESHOLD（3s）→ 立即允许（用户长时间未操作，无需防抖）
+/// - 距离上次操作小于 IDLE_THRESHOLD → 使用 DEBOUNCE 间隔（用户在频繁操作，防抽风）
 fn should_handle_window_operation() -> bool {
-    let allow = WINDOW_OPERATION_LIMITER.check();
-    if !allow {
-        logging!(debug, Type::Window, "window operation rate limited");
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let last = LAST_WINDOW_OP_MS.load(Ordering::Relaxed);
+    let elapsed = now.saturating_sub(last);
+
+    let threshold = if elapsed > WINDOW_IDLE_THRESHOLD_MS || last == 0 {
+        // 空闲超时或首次操作 — 立即响应
+        0
+    } else {
+        // 频繁操作 — 启用防抖
+        WINDOW_OPERATION_DEBOUNCE_MS
+    };
+
+    if elapsed < threshold {
+        logging!(
+            debug,
+            Type::Window,
+            "window operation rate limited (elapsed={elapsed}ms, threshold={threshold}ms)"
+        );
+        return false;
     }
-    allow
+
+    LAST_WINDOW_OP_MS
+        .compare_exchange(last, now, Ordering::SeqCst, Ordering::Relaxed)
+        .is_ok()
 }
 
 /// 统一的窗口管理器
