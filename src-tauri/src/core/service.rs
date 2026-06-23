@@ -3,7 +3,9 @@ use crate::{
     core::{logger::Logger, tray::Tray},
     utils::dirs,
 };
-use anyhow::{Context as _, Result, anyhow, bail};
+use anyhow::{Context as _, Result, bail};
+#[cfg(unix)]
+use anyhow::anyhow;
 use backon::{ConstantBuilder, Retryable as _};
 use clash_verge_logging::{Type, logging, logging_error};
 use clash_verge_service_ipc::CoreConfig;
@@ -12,10 +14,12 @@ use once_cell::sync::Lazy;
 use std::{
     borrow::Cow,
     env::current_exe,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Command as StdCommand,
     time::Duration,
 };
+#[cfg(unix)]
+use std::path::Path;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -441,14 +445,17 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
 
 /// 检查服务是否正在运行
 pub async fn is_service_available() -> Result<()> {
-    if let Err(e) = Path::metadata(clash_verge_service_ipc::IPC_PATH.as_ref()) {
-        let verge = Config::verge().await;
-        let verge_last = verge.latest_arc();
-        let is_enable = verge_last.enable_tun_mode.unwrap_or(false);
-        if is_enable {
-            logging!(warn, Type::Service, "Some issue with service IPC Path: {}", e);
+    #[cfg(unix)]
+    {
+        if let Err(e) = Path::metadata(clash_verge_service_ipc::IPC_PATH.as_ref()) {
+            let verge = Config::verge().await;
+            let verge_last = verge.latest_arc();
+            let is_enable = verge_last.enable_tun_mode.unwrap_or(false);
+            if is_enable {
+                logging!(warn, Type::Service, "Some issue with service IPC Path: {}", e);
+            }
+            return Err(e.into());
         }
-        return Err(e.into());
     }
     clash_verge_service_ipc::connect().await?;
     Ok(())
@@ -479,12 +486,14 @@ async fn wait_for_service_ipc(status: &mut ServiceManager, reason: &str) -> Resu
         .with_max_times(config.max_retries);
 
     let result = (|| async {
-        if Path::new(clash_verge_service_ipc::IPC_PATH).exists() {
-            clash_verge_service_ipc::connect().await?;
-            Ok(())
-        } else {
-            Err(anyhow!("IPC path not ready"))
+        #[cfg(unix)]
+        {
+            if !Path::new(clash_verge_service_ipc::IPC_PATH).exists() {
+                return Err(anyhow!("IPC path not ready"));
+            }
         }
+        clash_verge_service_ipc::connect().await?;
+        Ok(())
     })
     .retry(backoff)
     .await;
@@ -497,7 +506,14 @@ async fn wait_for_service_ipc(status: &mut ServiceManager, reason: &str) -> Resu
 }
 
 pub fn is_service_ipc_path_exists() -> bool {
-    Path::new(clash_verge_service_ipc::IPC_PATH).exists()
+    #[cfg(windows)]
+    {
+        true
+    }
+    #[cfg(unix)]
+    {
+        Path::new(clash_verge_service_ipc::IPC_PATH).exists()
+    }
 }
 
 impl ServiceManager {
