@@ -1,3 +1,20 @@
+## v1.6.6
+
+### 🔒 Security Hardening
+
+- **CSP 内容安全策略**：设置严格 CSP，防止 XSS 攻击加载外部脚本。
+- **权限最小化**：移除 shell 执行权限、收紧 FS/Asset 作用域、HTTP 插件域名白名单。
+- **URL 输入验证**：open_web_url 协议验证、ZIP 解压防路径遍历、SSRF 防护（订阅/图标 URL）。
+- **JS 沙箱加固**：冻结原型链防止逃逸，JSON 传递 name 参数替代字符串拼接。
+- **运行时防护**：启用 release overflow-checks，YAML 解析 50MB 大小限制。
+- **安全审计**：完成全量代码安全评估，修复 15/18 项安全问题（4 项架构级问题延期处理）。
+
+### 🐞 Fixed Bugs
+
+- Fix clippy `missing_const_for_fn` warning in service.rs.
+
+---
+
 ## v1.6.5
 
 ### 🚀 Optimizations
