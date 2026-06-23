@@ -1,3 +1,12 @@
+## v1.7.1
+
+### 🐞 Fixed Bugs
+
+- **CSP 字体拦截修复**：将 `Outfit` 字体通过 `@fontsource/outfit` 本地化打包引入项目，完全摆脱对外部 Google 字体库（`fonts.googleapis.com`/`fonts.gstatic.com`）的依赖，解决了在启用严格 CSP 的系统环境下因字体缺失导致的主界面 3D 拟物排版与 Label 崩溃混乱的问题。
+- **修复 Clippy 编译警告**：修复了 Rust 编译器下的 `unused_trait_names` 和 `unused_async` 警告以顺利通过 pre-push 编译质量拦截。
+
+---
+
 ## v1.7.0
 
 ### 🐞 Fixed Bugs
