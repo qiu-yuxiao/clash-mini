@@ -11,6 +11,13 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-203: Outfit Font Blocked by CSP causing Layout Chaos
+ 
+ - **现象描述**：启用 CSP 内容安全策略后，WebView 拒绝加载外部的 Google Fonts（`https://fonts.googleapis.com` 及 `https://fonts.gstatic.com`），导致 Outfit 字体加载失败。在使用 Modern Flat 皮肤时，系统回退到备用字体，由于字体规格与排版不一致，导致主界面部分 3D 组件、Label 文本错位、折叠裁剪甚至整体布局混乱。
+ - **验证方法**：启动程序并切换至 Modern Flat 皮肤，主界面布局正确，英文正常呈现 Outfit 字体，控制台无外部字体 CSP 拦截报错。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.0`
+
 ### BUG-202: Windows Named Pipe IPC Path Validation Mismatch
  
  - **现象描述**：在 Windows 上，Clash Verge Service 使用命名管道进行通信（路径为 `\\.\pipe\clash_verge_service`）。程序在初始化/启动检查服务可用性时，调用 `Path::metadata` 或 `Path::exists` 检查该路径。由于 Windows 命名管道不是标准文件，标准库文件属性接口对其失效并总是返回路径不存在错误，导致程序即使在系统服务已正常开启的情况下，仍会误判服务不可用，进而在以普通权限启动时将用户接管模式强制降级为“手动设定”。
