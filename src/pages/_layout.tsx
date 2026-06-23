@@ -24,11 +24,13 @@ import { check, type Update } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
 
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import { GlowBorder } from '@/components/glow-border'
+import { AreaErrorFallback } from '@/components/base/base-error-boundary'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
@@ -1558,7 +1560,9 @@ const Layout = () => {
         <Paper square elevation={0} className={`${OS} layout`}>
           {customTitlebar}
           <div className="layout-content" style={{ padding: 20 }}>
-            <Outlet />
+            <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </Paper>
       </ThemeProvider>
@@ -1709,11 +1713,13 @@ const Layout = () => {
 
             {/*节点组选择列表*/}
             <div style={{ flex: 1, overflow: 'hidden' }}>
-              <ProxyGroups
-                mode={clashConfig?.mode?.toLowerCase() || 'rule'}
-                isChainMode={false}
-                chainConfigData={null}
-              />
+              <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                <ProxyGroups
+                  mode={clashConfig?.mode?.toLowerCase() || 'rule'}
+                  isChainMode={false}
+                  chainConfigData={null}
+                />
+              </ErrorBoundary>
             </div>
 
             {/* Settings Sliding Drawer (slides internal left-downwards) */}
@@ -1825,17 +1831,19 @@ const Layout = () => {
                 />
               </Box>
               {/* Right Connections column (自适应 flex: 1) */}
-              <ConnectionsPanel
-                connectionsType={connectionsType}
-                setConnectionsType={setConnectionsType}
-                connectionsData={connectionsData}
-                handleSearch={handleSearch}
-                filterConn={filterConn}
-                detailRef={detailRef}
+              <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                <ConnectionsPanel
+                  connectionsType={connectionsType}
+                  setConnectionsType={setConnectionsType}
+                  connectionsData={connectionsData}
+                  handleSearch={handleSearch}
+                  filterConn={filterConn}
+                  detailRef={detailRef}
                 isColumnManagerOpen={isColumnManagerOpen}
                 setIsColumnManagerOpen={setIsColumnManagerOpen}
                 clearClosedConnections={clearClosedConnections}
               />
+              </ErrorBoundary>
               {/* Help Button */}
               <HelpMenuButton
                 helpAnchorEl={helpAnchorEl}
