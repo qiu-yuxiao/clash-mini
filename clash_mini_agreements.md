@@ -2341,3 +2341,11 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **前端注入**：`DelayManager` 暴露 `injectBatchResults(group, results)` 公共方法，对批量结果逐条写入缓存并通过 `setDelay` 触发逐节点 UI 刷新，最后通过 `queueGroupNotification` 触发分组级 UI 刷新。
 - **生命周期**：监听器在 `use-layout-events` 中随布局组件生命周期注册/注销，与现有前端测速通路完全解耦。
 - **互不阻塞**：后台推送与前端主动测速两条通路在 Rust 层使用不同入口函数（`trigger_backend_auto_select` vs `delayProxyByName`），前端层共用同一 `DelayManager` 缓存（JS 单线程天然安全），RAF 批量合并确保不产生刷新风暴。
+
+## 🔒 三十二、 安全加固：CSP 内容安全策略 (BUG-001/CSP)
+
+启用严格的内容安全策略防止 XSS 攻击，限制 WebView 中允许加载的资源来源。
+
+- **CSP 策略**：`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data:; connect-src 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'`
+- **不允许**：外部 CDN 脚本、外部字体、data: URI 作为脚本源、`eval()`、内联事件处理器
+- **原因**：前端应用无外部 CDN 依赖，所有网络请求通过 Rust 后端 IPC 而非浏览器 fetch，WebSocket 通过 Tauri 插件而非浏览器原生 API，因此 CSP 可设至最严级别
