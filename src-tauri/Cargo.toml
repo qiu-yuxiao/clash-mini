@@ -71,7 +71,7 @@ reqwest = { version = "0.13.3", features = [
   "form",
 ] }
 regex = "1.12.3"
-sysproxy = { git = "https://github.com/clash-verge-rev/sysproxy-rs", branch = "0.5.4", features = [
+sysproxy = { git = "https://github.com/clash-verge-rev/sysproxy-rs", rev = "f0775f6f4173c9dd6228cd7c3d183019b9ba6a7b", features = [
   "guard",
 ] }
 network-interface = { version = "2.0.5", features = ["serde"] }
@@ -103,18 +103,18 @@ tauri-plugin-devtools = { version = "2.1.0" }
 # A) Copy the new upstream source to crates/tauri-plugin-mihomo and re-apply the patch, or
 # B) Confirm upstream fixed the issue and then switch back to git.
 tauri-plugin-mihomo = { path = "../crates/tauri-plugin-mihomo" }
-clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger" }
+clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger", rev = "e4768e3852c4868ed86e7210df82c1178467820d" }
 async-trait = "0.1.89"
 clash_verge_service_ipc = { version = "2.3.0", features = [
   "client",
-], git = "https://github.com/clash-verge-rev/clash-verge-service-ipc" }
+], git = "https://github.com/clash-verge-rev/clash-verge-service-ipc", rev = "21e661fa141e5ad3c705ee4cdb86efff8df6f769" }
 arc-swap = "1.9.1"
 tokio-rustls = "0.26.4"
 rustls = { version = "0.23.40", features = ["ring"] }
 webpki-roots = "1.0.7"
 rust_iso3166 = "0.1.14"
 # Use the git repo until the next release after v2.0.0.
-dark-light = { git = "https://github.com/rust-dark-light/dark-light" }
+dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" }
 bytes = "1.11.1"
 tokio-util = { version = "0.7.18", features = ["time"] }
 url = "2.5.2"
