@@ -1374,7 +1374,7 @@ const Layout = () => {
       try {
         await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
         if (verge?.auto_close_connection) {
-          await closeAllConnections().catch(() => {})
+          await closeAllConnections().catch(() => console.warn('[layout] closeAllConnections failed'))
         }
         showNotice.success('已切换至手动模式')
       } catch (err) {

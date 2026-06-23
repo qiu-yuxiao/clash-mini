@@ -176,7 +176,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
             )
           ) {
             dragStartedRef.current = true
-            currentWindow?.startDragging().catch(() => {})
+            currentWindow?.startDragging().catch(() => console.warn('[window] startDragging failed'))
           } else {
             // Interactive target: abort drag tracking
             mouseDownPosRef.current = null
