@@ -1,8 +1,9 @@
 use crate::{core::handle, utils::resolve::window::build_new_window};
 use clash_verge_logging::{Type, logging};
+use std::pin::Pin;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager as _, WebviewWindow, Wry};
 
 /// 窗口操作结果

@@ -8,7 +8,6 @@ use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 use smartstring::alias::String;
-use crate::utils::sysinfo;
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {

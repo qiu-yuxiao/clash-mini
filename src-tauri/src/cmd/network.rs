@@ -7,7 +7,6 @@ use network_interface::NetworkInterface;
 use serde_yaml_ng::Mapping;
 use std::net::TcpListener;
 use sysproxy::{Autoproxy, Sysproxy};
-use crate::utils::sysinfo;
 
 /// get the system proxy
 #[tauri::command]

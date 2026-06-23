@@ -2,7 +2,7 @@ import { Context, createContext, use } from 'react'
 
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import type { IConnectionsItem } from '@/types/connection'
-import {
+import type {
   BaseConfig,
   ProxyProvider,
   Rule,
