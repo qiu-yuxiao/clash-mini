@@ -1,3 +1,25 @@
+## v1.7.2
+
+### 🐞 Fixed Bugs
+
+- **主界面与多皮肤排版崩溃修复 (BUG-205, BUG-206, BUG-212, BUG-213, BUG-214)**：
+  - 修复设置抽屉的横向布局在最窄宽度下挤压 Connections 栏至 0px (不可见) 的问题。
+  - 修复皮肤切换与语言选择组件在默认高度 (680px) 下被媒体查询隐藏的问题。
+  - 修复 Original 皮肤 accent 颜色未跟滑块动态绑定的问题。
+  - 修复 Monochrome 皮肤在深色模式下 cards/panels 缺乏对比度背景色融合的问题。
+  - 修复 Cyberpunk 和 Monochrome 皮肤中 small 尺寸开关没有适配比例的尺寸溢出问题。
+- **后台死锁与启动阻塞修复 (BUG-209, BUG-210)**：
+  - 将 `init_startup_script` 的执行迁移到后台 `tokio::spawn` 异步线程，防止启动脚本长时间执行导致的主 UI 线程卡死/黑屏。
+  - 解决 Service Manager 初始化提权重装服务时的同步阻塞，重装过程采用 `tokio::task::spawn_blocking` 以彻底避免 Mutex 死锁和启动挂起。
+- **WebView 窗口销毁性能优化 (BUG-211)**：
+  - 关闭窗口时，如果未开启“自动轻量化模式”，改为隐藏 WebView 并调用 WebView2 内存回收（Low 级别），不再无条件销毁整个窗口，从而极大地提升了二次打开窗口的速度，并保留了前端的临时交互状态。
+- **便携模式资源协议范围放宽 (BUG-207)**：
+  - 放宽 asset 协议的 scope，在 `tauri.conf.json` 中允许加载 `$EXE_DIR/**` 和 `$RESOURCE_DIR/**`，解决便携绿色版中 profile 缓存图片加载失败显示破损的问题。
+- **主题即时更新事件补发 (BUG-208)**：
+  - 修复 patch 修改主题设置后未能标记 config 变化的问题，确保即时触发前端 RefreshVerge 广播重新应用 CSS，不需要再手动重启程序。
+
+---
+
 ## v1.7.1
 
 ### 🐞 Fixed Bugs
