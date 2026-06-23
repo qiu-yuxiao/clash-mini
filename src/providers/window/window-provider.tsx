@@ -101,7 +101,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
         try {
           const value = await currentWindow.isMaximized()
-          setMaximized(value)
+          if (!isUnmounted) {
+            setMaximized(value)
+          }
         } catch (err) {
           console.warn('[WindowProvider] checkMaximized isMaximized failed:', err)
         }

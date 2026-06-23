@@ -911,7 +911,9 @@ const Layout = () => {
     })
     return () => {
       active = false
-      unlistenPromise.then((unlisten) => unlisten())
+      unlistenPromise
+        .then((unlisten) => unlisten())
+        .catch((err) => console.warn('Failed to unlisten from core-upgrade-progress:', err))
     }
   }, [mutateVersion])
 
