@@ -292,15 +292,15 @@ export const AppDataProvider = ({
       lastProfileId = newProfileId
       lastUpdateTime = now
       void queryClient.invalidateQueries({ queryKey: ['getProfiles'] })
-      refreshRules().catch(() => {})
-      refreshRuleProviders().catch(() => {})
+      refreshRules().catch(() => console.warn('[app-data] refreshRules failed'))
+      refreshRuleProviders().catch(() => console.warn('[app-data] refreshRuleProviders failed'))
     }
 
     const handleRefreshProxy = () => {
       const now = Date.now()
       if (now - lastUpdateTime <= refreshThrottle) return
       lastUpdateTime = now
-      refreshProxy().catch(() => {})
+      refreshProxy().catch(() => console.warn('[app-data] refreshProxy failed'))
     }
 
     const initializeListeners = async () => {
