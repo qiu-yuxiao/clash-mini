@@ -812,7 +812,7 @@ function ProxyVirtualList({
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
-          scrollbarWidth: 'none',
+          scrollbarWidth: 'none !important' as 'none',
           msOverflowStyle: 'none !important',
           '&::-webkit-scrollbar': {
             display: 'none !important',

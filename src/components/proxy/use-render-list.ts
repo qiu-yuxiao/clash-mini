@@ -381,7 +381,7 @@ export const useRenderList = (
     // 正常模式的渲染逻辑
     const renderGroups = proxiesData.groups?.length
       ? proxiesData.groups
-      : proxiesData.global ? [proxiesData.global] : []
+      : []
 
     const cache = groupCacheRef.current
     let anyChanged = false
