@@ -43,13 +43,14 @@ function isSemver(version) {
 }
 
 async function run() {
+  await runRelease()
   try {
     await runVerify()
   } catch (err) {
-    console.error('[ERROR]: verify.py verification failed! Release cancelled.')
+    console.error('[ERROR]: verify.py verification failed! Release tag will not be created.')
+    console.error('[INFO]: Please fix the Changelog/Bug List alignment issues and run the command again.')
     process.exit(1)
   }
-  await runRelease()
 
   let tag = null
   if (versionArg === 'alpha') {

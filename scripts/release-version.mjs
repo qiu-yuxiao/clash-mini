@@ -234,6 +234,61 @@ async function updateTauriConfigVersion(newVersion) {
 }
 
 /**
+ * Update updater/app-update.json version and URLs
+ * @param {string} newVersion
+ */
+async function updateAppUpdateVersion(newVersion) {
+  const _dirname = process.cwd()
+  const appUpdatePath = path.join(_dirname, 'updater', 'app-update.json')
+  try {
+    const data = await fs.readFile(appUpdatePath, 'utf8')
+    const appUpdate = JSON.parse(data)
+    const versionWithoutV = newVersion.startsWith('v')
+      ? newVersion.slice(1)
+      : newVersion
+    const versionWithV = newVersion.startsWith('v')
+      ? newVersion
+      : `v${newVersion}`
+
+    console.log(
+      '[INFO]: Current app-update.json version is: ',
+      appUpdate.version,
+    )
+
+    const oldVersion = appUpdate.version
+    appUpdate.version = versionWithoutV
+    appUpdate.notes = `Clash Mini ${versionWithV}`
+    appUpdate.pub_date = new Date().toISOString()
+
+    if (appUpdate.platforms) {
+      for (const platform of Object.keys(appUpdate.platforms)) {
+        const pInfo = appUpdate.platforms[platform]
+        if (pInfo && pInfo.url) {
+          const oldVWithV = oldVersion.startsWith('v') ? oldVersion : `v${oldVersion}`
+          const oldVWithoutV = oldVersion.startsWith('v') ? oldVersion.slice(1) : oldVersion
+          
+          pInfo.url = pInfo.url
+            .replace(new RegExp(oldVWithV, 'g'), versionWithV)
+            .replace(new RegExp(oldVWithoutV, 'g'), versionWithoutV)
+        }
+      }
+    }
+
+    await fs.writeFile(
+      appUpdatePath,
+      JSON.stringify(appUpdate, null, 2),
+      'utf8',
+    )
+    console.log(
+      `[INFO]: app-update.json version updated to: ${versionWithoutV}`,
+    )
+  } catch (error) {
+    console.error('Error updating app-update.json version:', error)
+    throw error
+  }
+}
+
+/**
  * Get current version
  */
 async function getCurrentVersion() {
@@ -300,6 +355,7 @@ async function main(versionArg) {
     await updatePackageVersion(newVersion)
     await updateCargoVersion(newVersion)
     await updateTauriConfigVersion(newVersion)
+    await updateAppUpdateVersion(newVersion)
     console.log('[SUCCESS]: All version updates completed successfully!')
   } catch (error) {
     console.error('[ERROR]: Failed to update versions:', error)
