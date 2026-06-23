@@ -35,7 +35,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
   setIsColumnManagerOpen,
   clearClosedConnections,
 }) => {
-  const { t } = useTranslation() as any
+  const { t } = useTranslation()
   const theme = useTheme()
 
   return (

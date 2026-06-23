@@ -166,10 +166,10 @@ export const useAppData = (): AppDataContextType => {
   const refreshers = useAppRefreshers()
 
   const defaultProxies = {
-    global: { name: 'GLOBAL', type: 'Selector', udp: false, xudp: false, tfo: false, mptcp: false, smux: false, history: [], now: '', all: [] } as any,
-    direct: { name: 'DIRECT', type: 'Direct', udp: true, xudp: false, tfo: false, mptcp: false, smux: false, history: [] } as any,
+    global: { name: 'GLOBAL', type: 'Selector' as const, udp: false, xudp: false, tfo: false, mptcp: false, smux: false, history: [], now: '', all: [] },
+    direct: { name: 'DIRECT', type: 'Direct' as const, udp: true, xudp: false, tfo: false, mptcp: false, smux: false, history: [] },
     groups: [],
-    records: {},
+    records: {} as Record<string, IProxyItem>,
     proxies: [],
   }
 

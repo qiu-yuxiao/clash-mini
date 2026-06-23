@@ -36,7 +36,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
   controlSkin,
   primaryBtn3DStyle,
 }) => {
-  const { t: _t } = useTranslation() as any
+  const { t: _t } = useTranslation()
   const theme = useTheme()
 
   return (

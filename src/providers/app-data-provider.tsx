@@ -13,6 +13,11 @@ import {
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
+import {
+  ProxyProvider,
+  RuleProvider,
+  BaseConfig,
+} from 'tauri-plugin-mihomo-api'
 import { isDummyNode } from '@/utils/node'
 import {
   getBaseConfig,
@@ -362,7 +367,7 @@ export const AppDataProvider = ({
   const proxiesValue = useMemo(
     () => ({
       proxies: proxiesData,
-      proxyProviders: proxyProviders || {},
+      proxyProviders: (proxyProviders || {}) as unknown as Record<string, ProxyProvider | undefined>,
       isProxiesPending,
     }),
     [proxiesData, proxyProviders, isProxiesPending],

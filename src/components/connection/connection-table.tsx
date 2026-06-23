@@ -42,13 +42,13 @@ const SX_SCROLL_CONTAINER: React.ComponentProps<typeof Box>['sx'] = {
   overflowX: 'hidden',
   WebkitOverflowScrolling: 'touch',
   overscrollBehavior: 'contain',
-  scrollbarWidth: 'none !important' as any,
+  scrollbarWidth: 'none',
   msOverflowStyle: 'none !important',
   '&::-webkit-scrollbar': {
     display: 'none !important',
     width: '0 !important',
     height: '0 !important',
-  } as any,
+  },
   border: '5px double var(--theme-border)',
   borderRadius: '4px',
 }

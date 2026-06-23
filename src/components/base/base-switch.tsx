@@ -10,7 +10,7 @@ export const Switch = styled((props: SwitchProps) => (
 ))(({ theme }) => {
   const isLight = theme.palette.mode === 'light'
   const skin =
-    (theme as any).controlSkin ||
+    theme.controlSkin ||
     (typeof window !== 'undefined'
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
       : 'retro-3d')
