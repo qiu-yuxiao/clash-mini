@@ -1,6 +1,6 @@
 // scripts/publish-version.mjs
 import { spawn } from 'child_process'
-import { existsSync } from 'fs'
+import fs, { existsSync } from 'fs'
 import path from 'path'
 
 const rootDir = process.cwd()
@@ -65,14 +65,36 @@ async function run() {
   }
 
   if (tag) {
-    // Create tag and push
     const { execSync } = await import('child_process')
+    console.log('[INFO]: Committing version configurations and docs...')
+    try {
+      execSync('git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json updater/app-update.json bug_list.md Changelog.md Cargo.lock', { stdio: 'inherit' })
+      execSync(`git commit -m "release: bump version to ${versionArg}" --no-verify`, { stdio: 'inherit' })
+      console.log('[INFO]: Pushing dev branch to origin...')
+      execSync('git push origin dev --no-verify', { stdio: 'inherit' })
+    } catch (gitErr) {
+      console.warn('[WARNING]: Git commit or push failed, but proceeding to tag anyway:', gitErr.message)
+    }
+
     try {
       execSync(`git tag ${tag}`, { stdio: 'inherit' })
       execSync(`git push origin ${tag} --no-verify`, { stdio: 'inherit' })
       console.log(`[INFO]: Git tag ${tag} created and pushed.`)
-    } catch {
-      console.error(`[ERROR]: Failed to create or push git tag: ${tag}`)
+
+      // Spawn background build monitor and log to release_monitor.log
+      console.log('[INFO]: Spawning background build monitor...')
+      const logFile = path.join(rootDir, 'release_monitor.log')
+      const out = fs.openSync(logFile, 'a')
+      const err = fs.openSync(logFile, 'a')
+      const monitorProcess = spawn('node', ['scratch/monitor_build.mjs'], {
+        detached: true,
+        stdio: ['ignore', out, err]
+      })
+      monitorProcess.unref()
+      console.log(`[INFO]: Build monitor spawned in background. Log file: ${logFile}`)
+      console.log('[INFO]: It will automatically wait for CI and download the portable release.')
+    } catch (err) {
+      console.error(`[ERROR]: Failed to create or push git tag: ${tag}`, err.message)
       process.exit(1)
     }
   } else {
