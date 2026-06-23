@@ -188,7 +188,7 @@ export const useRenderList = (
       // 使用正常的规则模式代理组
       const allGroups = proxiesData.groups?.length
         ? proxiesData.groups
-        : proxiesData.global ? [proxiesData.global] : []
+        : []
 
       // 如果选择了特定代理组，只显示该组的节点
       if (selectedGroup) {
@@ -381,7 +381,7 @@ export const useRenderList = (
     // 正常模式的渲染逻辑
     const renderGroups = proxiesData.groups?.length
       ? proxiesData.groups
-      : proxiesData.global ? [proxiesData.global] : []
+      : []
 
     const cache = groupCacheRef.current
     let anyChanged = false
