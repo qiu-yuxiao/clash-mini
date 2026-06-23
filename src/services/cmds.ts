@@ -25,7 +25,7 @@ export async function enhanceProfiles() {
     if (activeUid) {
       const rawYaml = await readProfileFile(activeUid)
       if (rawYaml) {
-        const doc = yaml.load(rawYaml) as any
+        const doc = yaml.load(rawYaml) as Record<string, unknown>
         if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
           let modified = false
 
@@ -283,17 +283,19 @@ export async function calcuProxyProviders() {
           item?.vehicleType === 'HTTP' || item?.vehicleType === 'File',
       )
       .map(([name, item]) => {
-        const provider = (item ?? {}) as any
+        const provider = (item ?? {}) as Record<string, unknown>
+        const proxyList = provider.proxies as Array<Record<string, unknown>> | undefined
+        const proxies = proxyList
+          ? proxyList
+              .map((p) => ({ ...p, provider: name }) as { name: string; provider: string })
+              .filter((p) => p.name && !isDummyNode(p.name))
+          : []
         return [
           name,
           {
             ...provider,
-            proxies: provider.proxies
-              ? provider.proxies
-                  .map((p: any) => ({ ...p, provider: name }))
-                  .filter((p: any) => p?.name && !isDummyNode(p.name))
-              : [],
-          } as any,
+            proxies,
+          },
         ]
       }),
   )

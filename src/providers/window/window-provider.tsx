@@ -16,11 +16,11 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   // Guard: in non-Tauri environment (e.g. browser dev server), skip window operations
-  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__
+  const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
   const currentWindow = useMemo(() => (isTauri ? getCurrentWindow() : null), [isTauri])
   const [decorated, setDecorated] = useState<boolean | null>(() => {
     if (typeof window === 'undefined') return true
-    const isTauriEnv = !!(window as any).__TAURI_INTERNALS__
+    const isTauriEnv = !!window.__TAURI_INTERNALS__
     if (!isTauriEnv) return false // Render custom titlebar in browser dev server for testing
     const OS = getSystem()
     return OS === 'linux' ? false : true

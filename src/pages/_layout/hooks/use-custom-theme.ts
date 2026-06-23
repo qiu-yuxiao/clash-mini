@@ -632,7 +632,7 @@ export const useCustomTheme = () => {
       styleElement.innerHTML = effectiveInjectedCss + globalStyles
     }
 
-    ;(muiTheme as any).controlSkin = controlSkin
+    muiTheme.controlSkin = controlSkin
     return muiTheme
   }, [mode, theme_setting, userBackgroundImage, hasUserBackground, controlSkin])
 

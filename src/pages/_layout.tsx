@@ -569,10 +569,10 @@ const Layout = () => {
   }
 
   const mode = useThemeMode()
-  const { t } = useTranslation() as any
+  const { t } = useTranslation()
   const { theme } = useCustomTheme()
   if (theme) {
-    ;(theme as any).controlSkin = controlSkin
+    theme.controlSkin = controlSkin
   }
   const _isRetro3DDark =
     controlSkin === 'retro-3d' && theme?.palette?.mode === 'dark'
@@ -1328,7 +1328,7 @@ const Layout = () => {
     if (!contextMenuProfileUid) return
     await handleUpdateProfile(contextMenuProfileUid, {
       stopPropagation: () => {},
-    } as any)
+    } as React.MouseEvent)
   }
 
   const handleDeleteProfileClick = async () => {
@@ -1336,7 +1336,7 @@ const Layout = () => {
     if (!contextMenuProfileUid) return
     await handleDeleteProfile(contextMenuProfileUid, {
       stopPropagation: () => {},
-    } as any)
+    } as React.MouseEvent)
   }
 
   const handleSaveProfile = async () => {

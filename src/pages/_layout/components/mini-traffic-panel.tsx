@@ -18,7 +18,7 @@ export const MiniTrafficPanel = ({
 }) => {
   const mode = useThemeMode()
   const theme = useTheme()
-  const { t } = useTranslation() as any
+  const { t } = useTranslation()
   const pageVisible = useVisibility()
   const {
     response: { data: traffic },

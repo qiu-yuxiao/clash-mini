@@ -51,7 +51,7 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
             }
 
             try {
-              const msg = JSON.parse(data) as any
+              const msg = JSON.parse(data)
 
               next(null, (old = initConnData) => {
                 if (msg.type === 'snapshot') {

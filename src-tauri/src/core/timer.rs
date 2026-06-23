@@ -11,10 +11,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{
-    sync::mpsc,
-    time::timeout,
-};
+use tokio::{sync::mpsc, time::timeout};
 use tokio_stream::StreamExt as _;
 use tokio_util::time::{DelayQueue, delay_queue::Key};
 

@@ -140,7 +140,7 @@ export const useRenderList = (
     if (!isChainMode || !runtimeConfig) return
 
     const allProxies: IProxyItem[] = Object.values(
-      (runtimeConfig as any).proxies || {},
+      (runtimeConfig as { proxies?: Record<string, IProxyItem> }).proxies || {},
     )
     if (allProxies.length === 0) return
 
@@ -320,9 +320,9 @@ export const useRenderList = (
 
     // 链式代理模式下的其他模式（如global）仍显示所有节点
     if (isChainMode && runtimeConfig) {
-      // 从运行时配置直接获取 proxies 列表 (需要类型断言)
+      // 从运行时配置直接获取 proxies 列表
       const allProxies: IProxyItem[] = Object.values(
-        (runtimeConfig as any).proxies || {},
+        (runtimeConfig as { proxies?: Record<string, IProxyItem> }).proxies || {},
       )
 
       // 为每个节点获取延迟信息

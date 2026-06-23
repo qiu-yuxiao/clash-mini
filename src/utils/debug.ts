@@ -19,7 +19,7 @@ const parseStringFlag = (value: unknown) => {
 
 const readGlobalFlag = (): boolean | null => {
   if (typeof window === 'undefined') return null
-  const flag = (window as any).__VERGE_ENABLE_DEBUG_LOGS__
+  const flag = window.__VERGE_ENABLE_DEBUG_LOGS__
   return typeof flag === 'boolean' ? flag : null
 }
 

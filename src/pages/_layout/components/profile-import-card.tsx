@@ -55,14 +55,14 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
   setProfileMenuAnchorPosition,
   setContextMenuProfileUid,
 }) => {
-  const { t } = useTranslation() as any
+  const { t } = useTranslation()
   const theme = useTheme()
   const skinFallback = React.useMemo(() => {
     return typeof window !== 'undefined'
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
       : 'retro-3d'
   }, [])
-  const skin = (theme as any).controlSkin || skinFallback
+  const skin = theme.controlSkin || skinFallback
   const isRetro3DDark = skin === 'retro-3d' && theme.palette.mode === 'dark'
 
   const formatTraffic = (num?: number) => {

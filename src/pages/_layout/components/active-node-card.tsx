@@ -206,7 +206,7 @@ export const ActiveNodeStatusCard = () => {
     }
   }
 
-  const { t } = useTranslation() as any
+  const { t } = useTranslation()
   const signalInfo = getSignalIcon(delay, t)
   const delayColor = convertDelayColor(delay)
   const theme = useTheme()
@@ -215,7 +215,7 @@ export const ActiveNodeStatusCard = () => {
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
       : 'retro-3d'
   }, [])
-  const skin = (theme as any).controlSkin || skinFallback
+  const skin = theme.controlSkin || skinFallback
   const isRetro3DDark = skin === 'retro-3d' && theme.palette.mode === 'dark'
 
   return (

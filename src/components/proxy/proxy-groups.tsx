@@ -812,13 +812,13 @@ function ProxyVirtualList({
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
-          scrollbarWidth: 'none !important' as any,
+          scrollbarWidth: 'none',
           msOverflowStyle: 'none !important',
           '&::-webkit-scrollbar': {
             display: 'none !important',
             width: '0 !important',
             height: '0 !important',
-          } as any,
+          },
         }}
       >
         <div style={{ height: totalSize, position: 'relative' }}>
