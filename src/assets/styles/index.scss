@@ -268,14 +268,14 @@ html[data-control-skin="monochrome"] {
   }
 
   .theme-panel {
-    background: var(--background-color) !important;
+    background: var(--theme-panel-bg, var(--background-color)) !important;
     backdrop-filter: none !important;
     box-shadow: none !important;
     border: 4px double var(--theme-border) !important; /* Keep double border */
   }
 
   .theme-crystal-card {
-    background: var(--background-color) !important;
+    background: var(--theme-panel-bg, var(--background-color)) !important;
     backdrop-filter: none !important;
     border: 1px solid var(--theme-border) !important;
     box-shadow: none !important;

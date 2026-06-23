@@ -212,7 +212,9 @@ export const useCustomTheme = () => {
       resolvedPrimary = getSystemAccentColor() || dt.primary_color
     }
     if (controlSkin === 'original') {
-      resolvedPrimary = '#5b5c9d'
+      const val2Str = typeof window !== 'undefined' ? localStorage.getItem('clash-mini-original-val2') : null
+      const val2 = val2Str ? parseFloat(val2Str) : 1.0
+      resolvedPrimary = `hsl(${239 * val2}, 26%, 49%)`
     }
 
     try {

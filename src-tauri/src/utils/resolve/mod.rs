@@ -57,7 +57,9 @@ pub fn resolve_setup_async() {
 
         logging!(info, Type::ClashVergeRev, "Version: {}", env!("CARGO_PKG_VERSION"));
 
-        init_startup_script().await;
+        tokio::spawn(async {
+            init_startup_script().await;
+        });
         init_verge_config().await;
         Config::verify_config_initialization().await;
         init_window().await;

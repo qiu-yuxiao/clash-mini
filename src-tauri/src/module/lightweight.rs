@@ -98,6 +98,15 @@ pub fn disable_auto_light_weight_mode() {
 }
 
 pub async fn entry_lightweight_mode() -> bool {
+    let verge = Config::verge().await;
+    if !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false) {
+        if let Some(window) = WindowManager::get_main_window() {
+            let _ = window.hide();
+            WindowManager::optimize_window_memory(&window, true);
+        }
+        return true;
+    }
+
     if !try_transition(LightweightState::Normal, LightweightState::In) {
         logging!(debug, Type::Lightweight, "无需进入轻量模式，跳过调用");
         refresh_lightweight_tray_state().await;

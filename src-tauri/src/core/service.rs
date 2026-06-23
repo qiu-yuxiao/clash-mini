@@ -538,8 +538,14 @@ impl ServiceManager {
 
     pub async fn refresh(&mut self) -> Result<()> {
         let status = self.check_service_comprehensive().await;
-        self.0 = status.clone();
-        logging_error!(Type::Service, self.handle_service_status(&status).await);
+        if matches!(status, ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired) {
+            tokio::task::spawn_blocking(move || {
+                let _ = reinstall_service();
+            });
+        } else {
+            self.0 = status.clone();
+            logging_error!(Type::Service, self.handle_service_status(&status).await);
+        }
         Ok(())
     }
 

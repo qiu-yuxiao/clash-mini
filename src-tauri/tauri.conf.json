@@ -62,7 +62,9 @@
         "enable": true,
         "scope": {
           "allow": [
-            "$APPDATA/**"
+            "$APPDATA/**",
+            "$EXE_DIR/**",
+            "$RESOURCE_DIR/**"
           ],
           "requireLiteralLeadingDot": false
         }

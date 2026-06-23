@@ -175,8 +175,5 @@ pub fn export_diagnostic_info<R: Runtime>(
     state: State<'_, RwLock<Platform>>,
 ) -> Result<(), String> {
     let info = state.inner().read().to_string();
-    app_handle
-        .clipboard()
-        .write_text(info)
-        .map_err(|e| e.to_string())
+    app_handle.clipboard().write_text(info).map_err(|e| e.to_string())
 }

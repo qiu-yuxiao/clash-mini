@@ -1733,6 +1733,8 @@ const Layout = () => {
                 height: '100%',
                 zIndex: 100,
                 display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
                 transition:
                   'transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease-in-out',
                 transform: drawerOpen
@@ -1894,7 +1896,7 @@ const Layout = () => {
                   fontSize: '11px',
                   fontWeight: 'bold',
                   fontFamily: 'var(--control-font-family)',
-                  '@media (max-height: 830px)': {
+                  '@media (max-height: 500px)': {
                     display: 'none',
                   },
                   ...primaryBtn3DStyle,
@@ -1951,7 +1953,7 @@ const Layout = () => {
                   alignItems: 'stretch',
                   zIndex: 200,
                   boxSizing: 'border-box',
-                  '@media (max-height: 830px)': {
+                  '@media (max-height: 500px)': {
                     display: 'none',
                   },
                 }}

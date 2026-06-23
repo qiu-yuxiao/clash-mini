@@ -1,5 +1,7 @@
 #[cfg(target_os = "windows")]
 use crate::utils::schtasks;
+#[cfg(target_os = "windows")]
+use crate::utils::sysinfo::is_current_app_handle_admin;
 use crate::{config::Config, core::handle::Handle};
 use anyhow::Result;
 #[cfg(not(target_os = "windows"))]
@@ -7,8 +9,6 @@ use clash_verge_logging::logging_error;
 use clash_verge_logging::{Type, logging};
 #[cfg(not(target_os = "windows"))]
 use tauri_plugin_autostart::ManagerExt as _;
-#[cfg(target_os = "windows")]
-use crate::utils::sysinfo::is_current_app_handle_admin;
 
 /// Update the application auto-launch configuration.
 ///

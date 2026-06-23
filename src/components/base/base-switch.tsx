@@ -374,29 +374,29 @@ export const Switch = styled((props: SwitchProps) => (
       padding: 0,
       marginRight: 1,
       '&.MuiSwitch-sizeSmall': {
-        width: '28px !important',
-        height: '14px !important',
+        width: '18px !important',
+        height: '10px !important',
         padding: '0 !important',
         '& .MuiSwitch-switchBase': {
           padding: '0 !important',
           margin: '0 !important',
-          width: '14px !important',
-          height: '14px !important',
+          width: '10px !important',
+          height: '10px !important',
           '&.Mui-checked': {
-            transform: 'translateX(14px) !important',
+            transform: 'translateX(8px) !important',
           },
           '& .MuiSwitch-input': {
-            width: '28px !important',
-            height: '14px !important',
+            width: '18px !important',
+            height: '10px !important',
             left: '0 !important',
           },
           '&.Mui-checked .MuiSwitch-input': {
-            left: '-14px !important',
+            left: '-8px !important',
           },
         },
         '& .MuiSwitch-thumb': {
-          width: '12px !important',
-          height: '12px !important',
+          width: '8px !important',
+          height: '8px !important',
           margin: '1px !important',
         },
       },
@@ -455,18 +455,18 @@ export const Switch = styled((props: SwitchProps) => (
       padding: 0,
       marginRight: 1,
       '&.MuiSwitch-sizeSmall': {
-        width: '56px !important',
-        height: '28px !important',
+        width: '28px !important',
+        height: '14px !important',
         padding: '0 !important',
         '& .MuiSwitch-switchBase': {
           padding: '0 !important',
           margin: '0 !important',
-          width: '28px !important',
-          height: '28px !important',
+          width: '14px !important',
+          height: '14px !important',
           transform: 'translateX(0px) !important',
           transition: 'transform 200ms cubic-bezier(0.4, 0, 0.2, 1) !important',
           '&.Mui-checked': {
-            transform: 'translateX(28px) !important',
+            transform: 'translateX(14px) !important',
             '& + .MuiSwitch-track': {
               backgroundColor:
                 (isLight ? '#000000' : '#ffffff') + ' !important',
@@ -481,18 +481,18 @@ export const Switch = styled((props: SwitchProps) => (
             },
           },
           '& .MuiSwitch-input': {
-            width: '56px !important',
-            height: '28px !important',
+            width: '28px !important',
+            height: '14px !important',
             left: '0 !important',
           },
           '&.Mui-checked .MuiSwitch-input': {
-            left: '-28px !important',
+            left: '-14px !important',
           },
         },
         '& .MuiSwitch-thumb': {
-          width: '24px !important',
-          height: '24px !important',
-          margin: '2px !important',
+          width: '12px !important',
+          height: '12px !important',
+          margin: '1px !important',
         },
       },
       '& .MuiSwitch-switchBase': {

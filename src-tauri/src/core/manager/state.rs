@@ -9,10 +9,10 @@ use crate::{
 use anyhow::Result;
 use clash_verge_logging::Type;
 use compact_str::CompactString;
-use log::Level;
-use scopeguard::defer;
 #[cfg(unix)]
 use libc;
+use log::Level;
+use scopeguard::defer;
 use tauri_plugin_shell::ShellExt as _;
 
 impl CoreManager {

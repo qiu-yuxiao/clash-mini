@@ -1,4 +1,5 @@
 use super::{IClashTemp, IProfiles, IVerge};
+use crate::utils::sysinfo::is_current_app_handle_admin;
 use crate::{
     config::{PrfItem, profiles_append_item_safe, runtime::IRuntime},
     constants::{files, timing},
@@ -19,7 +20,6 @@ use clash_verge_logging::{Type, logging, logging_error};
 use serde_yaml_ng::{Mapping, Value};
 use smartstring::alias::String;
 use std::{collections::HashSet, path::PathBuf};
-use crate::utils::sysinfo::is_current_app_handle_admin;
 use tokio::sync::OnceCell;
 use tokio::time::sleep;
 
