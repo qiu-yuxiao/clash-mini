@@ -23,7 +23,12 @@
     "http:allow-fetch",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://*/*" }, { "url": "http://*/*" }]
+      "allow": [
+        { "url": "https://cdn.jsdelivr.net/**" },
+        { "url": "https://raw.githubusercontent.com/**" },
+        { "url": "https://github.com/**" },
+        { "url": "https://*.githubusercontent.com/**" }
+      ]
     },
     "mihomo:default"
   ]

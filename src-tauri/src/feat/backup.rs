@@ -1,20 +1,57 @@
 use crate::{
     config::{Config, IClashTemp, IProfiles, IVerge},
     core::backup,
-    process::AsyncHandler,
     utils::{
         dirs::{PathBufExec as _, app_home_dir, local_backup_dir, verge_path},
         help,
     },
 };
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 use chrono::Utc;
 use clash_verge_logging::{Type, logging};
 use reqwest_dav::list_cmd::ListFile;
 use serde::Serialize;
 use smartstring::alias::String;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::fs;
+
+/// 安全解压 ZIP 文件（防止 Zip Slip 路径遍历攻击）
+fn safe_extract_zip(zip_path: &Path, dest: &Path) -> Result<()> {
+    let file = std::fs::File::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
+        #[allow(deprecated)]
+        let entry_path = entry.mangled_name();
+        let sanitized = entry_path
+            .components()
+            .try_fold(dest.to_path_buf(), |base, comp| match comp {
+                std::path::Component::ParentDir => {
+                    bail!("ZIP entry contains '..' path component: {:?}", entry_path);
+                }
+                std::path::Component::RootDir => {
+                    bail!("ZIP entry contains absolute path: {:?}", entry_path);
+                }
+                _ => Ok(base.join(comp)),
+            })?;
+
+        if !sanitized.starts_with(dest) {
+            bail!("ZIP entry escapes target directory: {:?}", entry_path);
+        }
+
+        if entry.is_dir() {
+            std::fs::create_dir_all(&sanitized)?;
+        } else {
+            if let Some(parent) = sanitized.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let mut outfile = std::fs::File::create(&sanitized)?;
+            std::io::copy(&mut entry, &mut outfile)?;
+        }
+    }
+    Ok(())
+}
 
 #[derive(Debug, Serialize)]
 pub struct LocalBackupFile {
@@ -126,11 +163,8 @@ pub async fn restore_webdav_backup(filename: String) -> Result<()> {
             err
         })?;
 
-    // extract zip file
-    let value = backup_storage_path.clone();
-    let file = AsyncHandler::spawn_blocking(move || std::fs::File::open(&value)).await??;
-    let mut zip = zip::ZipArchive::new(file)?;
-    zip.extract(app_home_dir()?)?;
+    // 安全解压 zip 文件（防 Zip Slip）
+    safe_extract_zip(&backup_storage_path, &app_home_dir()?)?;
     let res = finalize_restored_verge_config(webdav_url, webdav_username, webdav_password).await;
     // Finally remove the temp file (attempt cleanup even if finalize fails)
     let _ = backup_storage_path.remove_if_exists().await;
@@ -311,9 +345,7 @@ pub async fn restore_local_backup(filename: String) -> Result<()> {
         )
     };
 
-    let file = AsyncHandler::spawn_blocking(move || std::fs::File::open(&target_path)).await??;
-    let mut zip = zip::ZipArchive::new(file)?;
-    zip.extract(app_home_dir()?)?;
+    safe_extract_zip(&target_path, &app_home_dir()?)?;
     finalize_restored_verge_config(webdav_url, webdav_username, webdav_password).await?;
     Ok(())
 }

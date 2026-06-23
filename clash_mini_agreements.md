@@ -2349,3 +2349,35 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **CSP 策略**：`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data:; connect-src 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'`
 - **不允许**：外部 CDN 脚本、外部字体、data: URI 作为脚本源、`eval()`、内联事件处理器
 - **原因**：前端应用无外部 CDN 依赖，所有网络请求通过 Rust 后端 IPC 而非浏览器 fetch，WebSocket 通过 Tauri 插件而非浏览器原生 API，因此 CSP 可设至最严级别
+
+## 🔒 三十三、 安全加固：权限最小化 (BUG-002~004/LeastPrivilege)
+
+移除 Tauri 权限配置中的开放权限，实施最小权限原则。
+
+- **Shell 权限**：保留 `shell:allow-open`，移除 `shell:allow-execute`、`shell:allow-spawn`、`shell:allow-kill`、`shell:allow-stdin-write`。前端不应拥有执行任意系统命令的能力。
+- **FS 作用域**：从 `["$APPDATA/**", "$RESOURCE/../**", "**"]` 收紧为 `["$APPDATA/**"]`。移除 `**` 通配符以防止前端读取任意文件。
+- **Asset Protocol**：从 `["**"]` 收紧为 `["$APPDATA/**"]`，仅允许通过 asset 协议访问应用数据目录。
+- **HTTP 插件**：从允许所有 `https://*/*` 和 `http://*/*` 收紧为仅允许 `cdn.jsdelivr.net`、`raw.githubusercontent.com`、`github.com` 等已知域名。
+
+## 🔒 三十四、 安全加固：URL 输入验证 (BUG-005~010/URLValidation)
+
+对所有用户可控的 URL 输入进行严格验证，防止 SSRF、路径遍历和协议滥用。
+
+- **open_web_url**：仅允许 `http://` 和 `https://` 协议，拒绝 `file://`、`javascript:` 等危险协议。
+- **ZIP 解压**：使用 `safe_extract_zip` 函数替代 `zip.extract`，拒绝包含 `..` 路径组件或绝对路径的 ZIP 条目（Zip Slip 防护）。
+- **订阅 URL (SSRF)**：在 `fix_dirty_url` 后增加 `validate_url_no_ssrf` 检查，禁止访问回环地址（127.0.0.1、localhost）、私有 IP（10.x、172.16-31.x、192.168.x）和未指定地址（0.0.0.0）。
+- **图标下载 URL**：在 `download_icon_cache` 中增加协议验证（仅 http/https）和 SSRF 防护。
+- **danger_accept_invalid_certs**：启用时记录 warn 级别日志，提醒安全风险。
+- **JS 脚本传递**：使用 `serde_json::to_string` 替代字符串拼接传递 name 参数，彻底防止代码注入。
+
+## 🔒 三十五、 安全加固：运行时沙箱 (BUG-008/Sandbox)
+
+增强 JavaScript 引擎 boa_engine 的运行时安全性。
+
+- **原型链冻结**：在执行用户脚本前，冻结 `Object.prototype`、`Function.prototype`、`Array.prototype`、`String.prototype`、`Number.prototype`、`Boolean.prototype`，防止原型污染攻击。
+- **已有防护**：保留循环迭代上限（1000万次）、超时（5秒）、输出大小上限（1MB）、JSON 大小上限（10MB）。
+
+## 🔒 三十六、 安全加固：防 DoS 与编译选项 (BUG-017~018/Hardening)
+
+- **YAML 大小限制**：订阅内容解析前检查大小，拒绝超过 50MB 的超大 YAML（防止解压炸弹和内存耗尽）。
+- **overflow-checks**：release 配置从 `false` 改为 `true`，防止整数溢出导致意外安全漏洞。

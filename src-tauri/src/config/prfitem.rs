@@ -7,6 +7,7 @@ use crate::{
     },
 };
 use anyhow::{Context as _, Result, bail};
+use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use serde_yaml_ng::Mapping;
 use smartstring::alias::String;
@@ -150,6 +151,8 @@ impl PrfOption {
         }
     }
 }
+
+const MAX_YAML_SIZE: usize = 50 * 1024 * 1024; // 50MB YAML 解析上限
 
 impl PrfItem {
     /// From partial item
@@ -458,6 +461,18 @@ impl PrfItem {
 
         let url = fix_dirty_url(url)?;
 
+        // SSRF 防护：禁止访问内网地址
+        validate_url_no_ssrf(&url)?;
+
+        // 记录危险选项日志
+        if accept_invalid_certs {
+            logging!(
+                warn,
+                Type::Config,
+                "⚠️ 订阅使用了危险选项 `danger_accept_invalid_certs=true`，TLS 证书验证被跳过！"
+            );
+        }
+
         // 使用网络管理器发送请求
         let resp = match NetworkManager::new()
             .get_with_interrupt(
@@ -558,6 +573,11 @@ impl PrfItem {
 
         // process the charset "UTF-8 with BOM"
         let data = data.trim_start_matches('\u{feff}');
+
+        // YAML 大小限制防止 DoS
+        if data.len() > MAX_YAML_SIZE {
+            bail!("subscription content exceeds maximum allowed size (50MB)");
+        }
 
         // check the data whether the valid yaml format
         let decoded_opt = crate::utils::resolve::universal_parser::decode_base64_robust(data);
@@ -798,6 +818,36 @@ impl PrfItem {
 #[allow(clippy::unnecessary_wraps)]
 const fn default_allow_auto_update() -> Option<bool> {
     Some(true)
+}
+
+/// SSRF 防护：禁止访问内网/回环地址
+fn validate_url_no_ssrf(url: &Url) -> Result<()> {
+    if let Some(host) = url.host() {
+        match host {
+            url::Host::Domain(d) => {
+                let lower = d.to_ascii_lowercase();
+                if lower == "localhost"
+                    || lower == "127.0.0.1"
+                    || lower == "::1"
+                    || lower == "0.0.0.0"
+                    || lower.starts_with("169.254.")
+                {
+                    bail!("cannot fetch subscription from localhost/loopback address");
+                }
+            }
+            url::Host::Ipv4(ip) => {
+                if ip.is_loopback() || ip.is_private() || ip.is_unspecified() {
+                    bail!("cannot fetch subscription from private/loopback IP");
+                }
+            }
+            url::Host::Ipv6(ip) => {
+                if ip.is_loopback() || ip.is_unspecified() {
+                    bail!("cannot fetch subscription from loopback IP");
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Fix URLs where query parameters are incorrectly appended to the path segment

@@ -75,6 +75,34 @@ pub async fn download_icon_cache(url: String, name: String) -> CmdResult<String>
     let icon_name = normalize_icon_segment(name.as_str())?;
     let icon_path = ensure_icon_cache_target(&icon_cache_dir, icon_name.as_str())?;
 
+    // 验证 URL 协议
+    let parsed = url::Url::parse(&url).map_err(|_| format!("invalid URL: {url}"))?;
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(format!("only http/https URLs are allowed for icon download, got: {scheme}").into());
+    }
+    // SSRF 防护：禁止访问内网地址
+    if let Some(host) = parsed.host() {
+        match host {
+            url::Host::Domain(d) => {
+                let lower = d.to_ascii_lowercase();
+                if lower == "localhost" || lower == "127.0.0.1" || lower == "::1" || lower == "0.0.0.0" {
+                    return Err("cannot download icon from localhost".into());
+                }
+            }
+            url::Host::Ipv4(ip) => {
+                if ip.is_loopback() || ip.is_private() || ip.is_unspecified() {
+                    return Err("cannot download icon from private/loopback IP".into());
+                }
+            }
+            url::Host::Ipv6(ip) => {
+                if ip.is_loopback() || ip.is_unspecified() {
+                    return Err("cannot download icon from loopback IP".into());
+                }
+            }
+        }
+    }
+
     if icon_path.exists() {
         return Ok(icon_path.to_string_lossy().into());
     }

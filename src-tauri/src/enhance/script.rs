@@ -31,6 +31,17 @@ fn use_script_sync(script: String, config: &Mapping, name: &String) -> Result<(M
         .runtime_limits_mut()
         .set_loop_iteration_limit(MAX_LOOP_ITERATIONS);
 
+    // 沙箱加固：冻结原型链防止逃逸
+    let _ = context.eval(Source::from_bytes(
+        r"Object.freeze(Object.prototype);
+        Object.freeze(Function.prototype);
+        Object.freeze(Array.prototype);
+        Object.freeze(String.prototype);
+        Object.freeze(Number.prototype);
+        Object.freeze(Boolean.prototype);
+        ",
+    ));
+
     let outputs = Arc::new(Mutex::new(vec![]));
     let total_size = Arc::new(Mutex::new(0usize));
 
@@ -93,16 +104,14 @@ fn use_script_sync(script: String, config: &Mapping, name: &String) -> Result<(M
         anyhow::bail!("Configuration size exceeds maximum allowed size");
     }
 
-    // 仅处理 name 参数中的特殊字符
-    let safe_name = escape_js_string_for_single_quote(name);
-    if safe_name.len() > 1024 {
-        anyhow::bail!("Name parameter too long");
-    }
+    // 使用 JSON 传递 name 参数避免字符串注入
+    let safe_name_json = serde_json::to_string(&name)?;
 
     let code = format!(
         r"try{{
+        const __verge_name = JSON.parse({safe_name_json});
         {script};
-        JSON.stringify(main({config_str},'{safe_name}')||'')
+        JSON.stringify(main({config_str},__verge_name)||'')
       }} catch(err) {{
         `__error_flag__ ${{err.toString()}}`
       }}"
@@ -164,20 +173,6 @@ fn strip_outer_quotes(s: &str) -> &str {
     }
 }
 
-// 安全地转义字符串
-fn escape_js_string_for_single_quote(s: &str) -> String {
-    // 限制处理的字符串长度
-    if s.len() > 10240 {
-        return s[..10240].replace('\\', "\\\\").replace('\'', "\\'").into();
-    }
-
-    s.replace('\\', "\\\\")
-        .replace('\'', "\\'")
-        .replace('\n', "\\n") // 添加换行符转义
-        .replace('\r', "\\r") // 添加回车转义
-        .into()
-}
-
 #[test]
 #[allow(unused_variables)]
 #[allow(clippy::expect_used)]
@@ -211,28 +206,6 @@ fn test_script() {
     let yaml_config_size = std::mem::size_of_val(&config);
     let box_yaml_config_size = std::mem::size_of_val(&Box::new(config));
     assert!(box_yaml_config_size < yaml_config_size);
-}
-
-// 测试特殊字符转义功能
-#[test]
-#[allow(clippy::expect_used)]
-fn test_escape_unescape() {
-    let test_string = r#"Hello "World"!\nThis is a test with \u00A9 copyright symbol."#;
-    let escaped = escape_js_string_for_single_quote(test_string);
-    println!("Original: {test_string}");
-    println!("Escaped: {escaped}");
-
-    let json_str = r#"{"key":"value","nested":{"key":"value"}}"#;
-    let parsed = parse_json_safely(json_str).expect("Failed to parse test JSON safely");
-
-    assert!(parsed.contains_key("key"));
-    assert!(parsed.contains_key("nested"));
-
-    let quoted_json_str = r#""{"key":"value","nested":{"key":"value"}}""#;
-    let parsed_quoted = parse_json_safely(quoted_json_str).expect("Failed to parse quoted test JSON safely");
-
-    assert!(parsed_quoted.contains_key("key"));
-    assert!(parsed_quoted.contains_key("nested"));
 }
 
 #[test]

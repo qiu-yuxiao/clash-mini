@@ -26,9 +26,14 @@ pub async fn open_logs_dir() -> CmdResult<()> {
     open::that(log_dir).stringify_err()
 }
 
-/// 打开网页链接
+/// 打开网页链接（仅允许 http/https 协议）
 #[tauri::command]
 pub fn open_web_url(url: String) -> CmdResult<()> {
+    let parsed = url::Url::parse(&url).map_err(|_| "invalid URL")?;
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err("only http/https URLs are allowed".into());
+    }
     open::that(url.as_str()).stringify_err()
 }
 
