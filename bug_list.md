@@ -11,20 +11,7 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-192: Unthrottled Core Updater IPC Progress Emitter
- 
- - **现象描述**：升级内核下载文件时，每下载一个极小的块（4KB-16KB）就会向前端发送一次 Tauri IPC 进度事件。在下载几十MB的内核时，会产生数万次 IPC 序列化通信，导致 Rust 后端和前端渲染引擎 CPU 瞬间拉满，界面产生卡顿。
- - **验证方法**：启动内核检查更新（Mihomo内核更新），在前端点击更新，观察进度条是否平滑滚动，界面是否保持响应、无卡顿死锁。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.6.1`
-
-### BUG-198: Unhandled Tauri Listener Promise Rejection in useWindowSnap
- 
- - **现象描述**：窗口磁吸组件在销毁清理事件监听时，没有进行 Promise 空值防护，一旦报错会中断清理流程，导致 `mousedown` 和 `mouseup` 监听器残留在系统 document 中，引发内存和句柄泄漏。
- - **修改说明**：已根据用户指示，彻底删除窗口磁吸（useWindowSnap）相关代码和功能，销毁了相关设计要求。
- - **验证方法**：拖拽 Clash Mini 窗口至屏幕边缘，确认没有任何吸附/磁吸效果。
- - **当前状态**：`功能已删除，待用户确认`
- - **目标版本**：`v1.6.1`
+无。
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
@@ -219,3 +206,5 @@
 | **BUG-199** | Unhandled Tauri Listener Promise Rejection in useCustomTheme | v1.6.1 | 用户已确认 |
 | **BUG-200** | Passive Cache Eviction Leak in DelayManager | v1.6.1 | 用户已确认 |
 | **BUG-201** | High-Frequency Tauri IPC Polling in useVisibility | v1.6.1 | 用户已确认 |
+| **BUG-192** | Unthrottled Core Updater IPC Progress Emitter | v1.6.1 | 用户已确认 |
+| **BUG-198** | Unhandled Tauri Listener Promise Rejection in useWindowSnap | v1.6.1 | 用户已确认 |
