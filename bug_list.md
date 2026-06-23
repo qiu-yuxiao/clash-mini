@@ -11,6 +11,66 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-205: Settings Drawer Horizontal Layout Overflow
+ - **现象描述**：在默认/最小窗口宽度（270px）下，设置抽屉的横向布局挤压右侧 Connections 列，导致 active/closed 连接列表宽度被压缩为 0px，完全不可见且无法操作。
+ - **验证方法**：宽度设为 270px 时，设置抽屉内容能自动折行或正常流动，连接列表可见。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-206: Skin Switcher & Language Selector Hidden at Default Window Height
+ - **现象描述**：设置抽屉内绝对定位的皮肤切换器和语言选择器，在窗口高度低于 830px 时由于媒体查询被完全隐藏，导致在默认窗口高度（680px）下无法切换皮肤和语言。
+ - **验证方法**：在 680px 高度下，皮肤切换和语言选择组件正常可见且可交互。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-207: Tightened Asset Protocol Blocks Icons in Portable Mode
+ - **现象描述**：Tauri 资源协议作用域限制为 `"$APPDATA/**"`，在便携版运行模式下，因为配置目录在程序执行目录下（外部），导致无法加载或渲染本地 profile 缓存图片，显示为破损占位符。
+ - **验证方法**：允许 `$EXE_DIR/**` 和 `$RESOURCE_DIR/**` 作用域后，便携版中的本地 profile 缓存图标渲染正常。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-208: Theme/CSS Injection Patch Updates Silently Ignored
+ - **现象描述**：用户修改皮肤模式（theme_mode）或 CSS 注入（theme_setting）配置时，后台 `determine_update_flags` 未能标记 `VERGE_CONFIG` 更新，导致不会向前端触发 `RefreshVerge` 刷新事件，需重启程序才生效。
+ - **验证方法**：修改皮肤或 CSS 注入后，前端 UI 即时重新渲染。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-209: Startup Script Blocks Window Initialization
+ - **现象描述**：程序初始化时同步 `.await` 执行用户配置的启动脚本，若脚本阻塞或执行时间长，将一直阻塞 UI 窗口创建，导致启动黑屏或假死。
+ - **验证方法**：在后台异步 spawn 执行启动脚本，不阻塞 `init_window().await`。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-210: Service Manager Reinstall Deadlock during Startup
+ - **现象描述**：启动初始化服务管理器 `init_service_manager` 时加锁 `SERVICE_MANAGER` Mutex。检测到服务需要重装时调用同步的 `reinstall_service()`，弹出 UAC 提权确认框。此期间阻断整个 UI 启动流程，且由于竞争锁易导致死锁。
+ - **验证方法**：在后台 blocking 线程中异步执行重装服务，不阻塞启动加锁周期。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-211: Window Close Unconditionally Destroys WebView State
+ - **现象描述**：不管是否开启“自动轻量化模式”（`enable_auto_light_weight_mode`），关闭窗口时都无条件销毁（destroy）WebView 窗口，导致每次重新打开窗口时都需要彻底重建、耗时变长且丢失所有前端临时状态。
+ - **验证方法**：未开启自动轻量模式时，关闭窗口仅隐藏（hide）窗口并调用内存回收，重新显示时瞬时恢复状态。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-212: Original Skin Accent Color Dynamic Shift Mismatch
+ - **现象描述**：Original 皮肤的 Material UI React 组件的主色调在 custom-theme 中硬编码为 `#5b5c9d`，与 index.scss 中根据色彩滑块动态计算的 HSL 主色不匹配。
+ - **验证方法**：滑动滑块时，React 组件的主色能同步动态变化。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-213: Monochrome Skin Dark Mode Card Background Contrast Loss
+ - **现象描述**：Monochrome 皮肤在深色模式下强制 cards/panels 背景与窗口整体背景（`--background-color`）一致，导致内容卡片完全融合在背景中，缺乏视觉层次感。
+ - **验证方法**：Monochrome 皮肤在深色模式下，cards/panels 采用 `--theme-panel-bg` 渲染，与主背景 `#0f1423` 有对比色阶。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
+### BUG-214: Switch Component Sizing Inconsistency in Cyberpunk/Monochrome Skins
+ - **现象描述**：Cyberpunk 和 Monochrome 皮肤的 small 尺寸开关没有适配比例，强行按普通尺寸渲染，导致小开关在 settings 卡片中宽度溢出或表现异常。
+ - **验证方法**：small 尺寸的 BaseSwitch 组件渲染出的尺寸明显小于普通尺寸开关（Monochrome 为 28x14px，Cyberpunk 为 18x10px）。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.2`
+
 ### BUG-204: Clippy Warnings Blocking Git Push
  
  - **现象描述**：在最新的 Rust 编译器环境下，由于 `sysinfo.rs` 中 Trait 导入未使用 alias 以及 `tray/mod.rs` 中托盘兼容占位方法存在无 `await` 的 `async` 声明，触发了 Clippy 的 `unused_trait_names` 和 `unused_async` 警告，被 `pre-push` 钩子拦截导致无法推送。
