@@ -36,3 +36,4 @@ tauri-key
 tauri-key.pub
 .workbuddy/
 src-tauri/src/bin/
+debug.log
