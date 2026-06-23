@@ -42,7 +42,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
     <Box
       sx={{
         flex: 1,
-        minWidth: 0,
+        minWidth: '340px',
         display: 'flex',
         flexDirection: 'column',
         gap: 0.5,

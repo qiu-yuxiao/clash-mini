@@ -1733,8 +1733,6 @@ const Layout = () => {
                 height: '100%',
                 zIndex: 100,
                 display: 'flex',
-                flexDirection: 'row',
-                flexWrap: 'wrap',
                 transition:
                   'transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease-in-out',
                 transform: drawerOpen
