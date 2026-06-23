@@ -3,7 +3,7 @@ use crate::{
     core::{CoreManager, autostart, handle, hotkey, logger::Logger, sysopt, tray},
     module::{auto_backup::AutoBackupManager, lightweight},
 };
-use anyhow::Result;
+use anyhow::{Result, bail};
 use bitflags::bitflags;
 use clash_verge_draft::SharedDraft;
 use clash_verge_logging::{Type, logging, logging_error};
@@ -282,7 +282,34 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     Ok(())
 }
 
+/// 验证 CSS injection 字符串的安全性
+fn validate_css_injection(css: &str) -> Result<()> {
+    if css.len() > 100_000 {
+        bail!("CSS injection exceeds maximum length of 100KB");
+    }
+    // 禁止 @import（可能加载外部资源）
+    if css.contains("@import") {
+        bail!("CSS injection cannot contain @import rules");
+    }
+    // 禁止 javascript: URL（XSS 向量）
+    if css.to_ascii_lowercase().contains("javascript:") {
+        bail!("CSS injection cannot contain javascript: URLs");
+    }
+    // 禁止 IE expression()（旧式 XSS 向量）
+    if css.to_ascii_lowercase().contains("expression(") {
+        bail!("CSS injection cannot contain expression()");
+    }
+    Ok(())
+}
+
 pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
+    // 验证 css_injection 安全性
+    if let Some(theme) = &patch.theme_setting {
+        if let Some(css) = &theme.css_injection {
+            validate_css_injection(css)?;
+        }
+    }
+
     Config::verge().await.edit_draft(|d| d.patch_config(patch));
 
     let update_flags = determine_update_flags(patch);

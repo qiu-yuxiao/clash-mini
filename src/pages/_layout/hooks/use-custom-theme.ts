@@ -77,7 +77,7 @@ const canUseCssScope = () => {
   return cssScopeSupport
 }
 
-const wrapCssInjectionWithScope = (css?: string) => {
+const wrapCssInjectionWithScope = (css?: string): string | null => {
   if (!css?.trim()) {
     return ''
   }
@@ -86,6 +86,7 @@ const wrapCssInjectionWithScope = (css?: string) => {
     lowerCss.includes(rule),
   )
   if (hasTopLevelOnlyRule) {
+    // 返回 null 表示跳过 CSS 注入（含有 @import/@charset/@namespace 等危险规则）
     return null
   }
   const scopeRoot = CSS_INJECTION_SCOPE_ROOT
@@ -569,11 +570,16 @@ export const useCustomTheme = () => {
     }
 
     if (styleElement) {
-      let scopedCss: string | null = null
+      let effectiveInjectedCss = setting.css_injection ?? ''
       if (canUseCssScope() && setting.css_injection) {
-        scopedCss = wrapCssInjectionWithScope(setting.css_injection)
+        const scopedCss = wrapCssInjectionWithScope(setting.css_injection)
+        if (scopedCss !== null) {
+          effectiveInjectedCss = scopedCss
+        } else {
+          // wrapCssInjectionWithScope 返回 null 表示含有 @import/@charset/@namespace 等危险规则，跳过注入
+          effectiveInjectedCss = ''
+        }
       }
-      const effectiveInjectedCss = scopedCss ?? setting.css_injection ?? ''
 
       const globalStyles = `
         /* 恢复窄 3D 滚动条样式 */
