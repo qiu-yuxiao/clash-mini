@@ -146,32 +146,28 @@ impl Tray {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
+    // 以下方法在 Clash Mini 的简化托盘中均不执行实际操作，
+    // 保留接口以兼容上游调用，避免大规模重构。
     pub async fn update_click_behavior(&self) -> Result<()> {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
     pub async fn update_menu(&self) -> Result<()> {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
     pub async fn update_icon(&self, _verge: &IVerge) -> Result<()> {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
     pub async fn update_tooltip(&self) -> Result<()> {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
     pub async fn update_part(&self) -> Result<()> {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
     pub async fn update_menu_and_icon(&self) {}
 
     fn should_handle_tray_click(&self) -> bool {
