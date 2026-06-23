@@ -4,11 +4,6 @@
 
 - **修复 Rust 编译错误**：在 `window_manager.rs` 添加缺失的 `use std::pin::Pin`，清理多余 import。
 - **修复 TypeScript import 类型错误**：`app-data-context.ts` 中 `BaseConfig`/`ProxyProvider`/`Rule`/`RuleProvider` 改为 `import type`，防止运行时因无法解析外部包类型导致前端白屏。
-- **修复代理组回退逻辑**：`use-render-list.ts` 中 `renderGroups` 的回退分支移除 GLOBAL 组兜底，Groups 为空时渲染空列表，避免将 GLOBAL.all 中的组名列表误作节点渲染导致画面混乱。
-
-### 🎨 Style
-
-- **滚动条样式增强**：添加 `& *::-webkit-scrollbar` 深层选择器，确保子容器滚动条全面隐藏。
 
 ---
 
