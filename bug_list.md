@@ -11,6 +11,13 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-204: Clippy Warnings Blocking Git Push
+ 
+ - **现象描述**：在最新的 Rust 编译器环境下，由于 `sysinfo.rs` 中 Trait 导入未使用 alias 以及 `tray/mod.rs` 中托盘兼容占位方法存在无 `await` 的 `async` 声明，触发了 Clippy 的 `unused_trait_names` 和 `unused_async` 警告，被 `pre-push` 钩子拦截导致无法推送。
+ - **验证方法**：修改后本地运行 `cargo clippy --all-targets --all-features -- -D warnings` 无任何警告，并能成功 `git push`。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.7.1`
+
 ### BUG-203: Outfit Font Blocked by CSP causing Layout Chaos
  
  - **现象描述**：启用 CSP 内容安全策略后，WebView 拒绝加载外部的 Google Fonts（`https://fonts.googleapis.com` 及 `https://fonts.gstatic.com`），导致 Outfit 字体加载失败。在使用 Modern Flat 皮肤时，系统回退到备用字体，由于字体规格与排版不一致，导致主界面部分 3D 组件、Label 文本错位、折叠裁剪甚至整体布局混乱。
