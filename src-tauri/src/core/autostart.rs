@@ -8,7 +8,7 @@ use clash_verge_logging::{Type, logging};
 #[cfg(not(target_os = "windows"))]
 use tauri_plugin_autostart::ManagerExt as _;
 #[cfg(target_os = "windows")]
-use tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin;
+use crate::utils::sysinfo::is_current_app_handle_admin;
 
 /// Update the application auto-launch configuration.
 ///

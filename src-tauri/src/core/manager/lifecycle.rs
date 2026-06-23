@@ -8,7 +8,7 @@ use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 use smartstring::alias::String;
-use tauri_plugin_clash_verge_sysinfo;
+use crate::utils::sysinfo;
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
@@ -87,7 +87,7 @@ impl CoreManager {
 
     fn after_core_process(&self) {
         let app_handle = Handle::app_handle();
-        tauri_plugin_clash_verge_sysinfo::set_app_core_mode(app_handle, self.get_running_mode().to_string());
+        crate::utils::sysinfo::set_app_core_mode(app_handle, self.get_running_mode().to_string());
     }
 
     #[cfg(target_os = "windows")]
@@ -101,7 +101,7 @@ impl CoreManager {
             return;
         }
 
-        let is_admin = tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin(Handle::app_handle());
+        let is_admin = crate::utils::sysinfo::is_current_app_handle_admin(Handle::app_handle());
         if is_admin {
             return;
         }
