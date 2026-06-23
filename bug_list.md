@@ -12,9 +12,9 @@
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
 ### BUG-205: Settings Drawer Horizontal Layout Overflow
- - **现象描述**：在默认/最小窗口宽度（270px）下，设置抽屉的横向布局挤压右侧 Connections 列，导致 active/closed 连接列表宽度被压缩为 0px，完全不可见且无法操作。
- - **验证方法**：宽度设为 270px 时，设置抽屉内容能自动折行或正常流动，连接列表可见。
- - **当前状态**：`代码已修正，待用户确认`
+ - **现象描述**：在默认/最小窗口宽度（270px）下，设置抽屉的横向布局挤压右侧 Connections 列，导致 active/closed 连接列表宽度被压缩为 0px。经重新审计确认，此为项目 Agreement 设计规范中预期的“物理裁剪遮盖”设计，而非布局缺陷。
+ - **验证方法**：已完全撤销本地换行和最小宽度修改，还原为原生单行横向并排布局与 minWidth: 0，确保窄窗口下连接面板被正常裁剪遮挡，窗口拉宽时正常侧向展露。
+ - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
 ### BUG-206: Skin Switcher & Language Selector Hidden at Default Window Height
