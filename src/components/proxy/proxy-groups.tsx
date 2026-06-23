@@ -28,7 +28,6 @@ import { useLocation } from 'react-router'
 
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
-import { useVisibility } from '@/hooks/use-visibility'
 import { useProxiesData } from '@/providers/app-data-context'
 import { calcuProxies, updateProxyChainConfigInRuntime } from '@/services/cmds'
 import delayManager from '@/services/delay'
@@ -69,18 +68,7 @@ export const ProxyGroups = (props: Props) => {
   const { pathname } = useLocation()
   const { mode, isChainMode = false, chainConfigData } = props
 
-  const isVisible = useVisibility()
 
-  // Drive 3s polling on the shared TQ cache; data is read via granular context below
-  useQuery({
-    queryKey: ['getProxies'],
-    queryFn: calcuProxies,
-    refetchInterval: isVisible ? 3000 : false,
-    refetchIntervalInBackground: false,
-    staleTime: 1500,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  })
 
   const [proxyChain, setProxyChain] = useState<ProxyChainItem[]>(() => {
     try {
@@ -426,7 +414,7 @@ export const ProxyGroups = (props: Props) => {
         // 结果实时写回 delayManager 触发界面更新
         await delayManager.checkListDelay(visibleNames, groupName, timeout)
 
-        // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 50ms 且 < timeout）
+        // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 30ms 且 < timeout，注：30ms为系统强制设计要求以过滤广告节点）
         if (!isChainMode) {
           const group = availableGroups.find((g: any) => g.name === groupName)
           if (group) {

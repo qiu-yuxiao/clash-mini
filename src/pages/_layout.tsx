@@ -38,6 +38,7 @@ import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
+import { isDummyNode } from '@/utils/node'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
@@ -109,71 +110,6 @@ dayjs.extend(relativeTime)
 
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
 
-/** 判断是否为 dummy 假节点（与后端 monitor.rs 中 is_dummy_node 逻辑完全一致） */
-function isDummyNode(node: any): boolean {
-  if (!node || !node.name) return true
-  const name = node.name
-  const lower = name.toLowerCase()
-  return (
-    // 后端逻辑：检查中文关键词（订阅商广告节点）
-    lower.includes("流量") ||
-    lower.includes("过期时间") ||
-    lower.includes("网址") ||
-    lower.includes("官网") ||
-    lower.includes("剩余") ||
-    lower.includes("expire") ||
-    lower.includes("traffic") ||
-    lower.includes("website") ||
-    lower.includes("http://") ||
-    lower.includes("https://") ||
-    lower.includes("套餐到期") ||
-    lower.includes("续费") ||
-    lower.includes("公告") ||
-    lower.includes("购买") ||
-    lower.includes("subscribe") ||
-    lower.includes("群") ||
-    // 前端原有逻辑：检查 dummy 关键词和特殊节点名
-    lower.startsWith('dummy') ||
-    lower.startsWith('(dummy)') ||
-    lower.includes('dummy') ||
-    name === 'DIRECT' ||
-    name === 'REJECT' ||
-    name === 'COMPATIBLE'
-  )
-}
-
-/** 判断节点名是否为 dummy 假节点（纯字符串版，与 isDummyNode 逻辑完全一致） */
-function isDummyName(name: string): boolean {
-  if (!name) return true
-  const lower = name.toLowerCase()
-  return (
-    // 后端逻辑：检查中文关键词（订阅商广告节点）
-    lower.includes("流量") ||
-    lower.includes("过期时间") ||
-    lower.includes("网址") ||
-    lower.includes("官网") ||
-    lower.includes("剩余") ||
-    lower.includes("expire") ||
-    lower.includes("traffic") ||
-    lower.includes("website") ||
-    lower.includes("http://") ||
-    lower.includes("https://") ||
-    lower.includes("套餐到期") ||
-    lower.includes("续费") ||
-    lower.includes("公告") ||
-    lower.includes("购买") ||
-    lower.includes("subscribe") ||
-    lower.includes("群") ||
-    // 前端原有逻辑：检查 dummy 关键词和特殊节点名
-    lower.startsWith('dummy') ||
-    lower.startsWith('(dummy)') ||
-    lower.includes('dummy') ||
-    name === 'DIRECT' ||
-    name === 'REJECT' ||
-    name === 'COMPATIBLE'
-  )
-}
-
 /** 等待 Clash 内核就绪（PROXY 组中出现非 dummy 节点），最多等 10 秒 */
 async function waitForClashReady(
   t: (key: string, opts?: any) => string,
@@ -185,9 +121,9 @@ async function waitForClashReady(
   while (Date.now() - startedAt < MAX_WAIT_MS) {
     try {
       const proxyGroup = await getProxyByName('PROXY')
-      // all 是 string[]，直接用 isDummyName 判断节点名
+      // all 是 string[]，直接用 isDummyNode 判断节点名
       const hasRealNodes = (proxyGroup?.all || []).some(
-        (name: string) => !isDummyName(name),
+        (name: string) => !isDummyNode(name),
       )
       if (hasRealNodes) {
         console.log(
@@ -226,7 +162,7 @@ async function frontendAutoSelect(
 ): Promise<[string, number][]> {
   const proxyGroup = await getProxyByName(groupName)
   const allNames = (proxyGroup?.all || []).filter(
-    (name: string) => !isDummyName(name),
+    (name: string) => !isDummyNode(name),
   )
   if (allNames.length === 0) return []
 
@@ -387,7 +323,7 @@ async function triggerAutoSelectAndRefresh(
       if (!hasHealth) {
         // 无健康节点，强制全节点测速
         const allNames = (proxyGroup?.all || []).filter(
-          (name: string) => !isDummyName(name),
+          (name: string) => !isDummyNode(name),
         )
         if (allNames.length === 0) {
           console.log('[Layout] Fallback: 无可用节点，跳过')

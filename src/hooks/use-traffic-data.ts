@@ -1,6 +1,5 @@
 import type { ITrafficItem } from '@/types/traffic'
 import {
-  getConnections,
   MihomoWebSocket,
   Traffic,
 } from 'tauri-plugin-mihomo-api'
@@ -46,23 +45,6 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
     connect: () => MihomoWebSocket.connect_traffic(),
     throttleMs: 1000,
     setupHandlers: ({ next, scheduleReconnect }) => {
-      let activeUpTotal = 0
-      let activeDownTotal = 0
-      const init = async () => {
-        try {
-          const res = await getConnections()
-          activeUpTotal = res.uploadTotal ?? 0
-          activeDownTotal = res.downloadTotal ?? 0
-        } catch (err) {
-          console.warn(
-            '[useTrafficData] Failed to fetch initial connection totals:',
-            err,
-          )
-        }
-      }
-
-      init()
-
       return {
         handleMessage: (data) => {
           if (data.startsWith('Websocket error')) {
@@ -77,13 +59,10 @@ export const useTrafficData = (options?: { enabled?: boolean }) => {
               return
             }
 
-            activeUpTotal += parsed.up || 0
-            activeDownTotal += parsed.down || 0
-
             const trafficWithTotals: ITrafficItem = {
               ...parsed,
-              upTotal: activeUpTotal,
-              downTotal: activeDownTotal,
+              upTotal: parsed.upTotal ?? 0,
+              downTotal: parsed.downTotal ?? 0,
             }
 
             appendData(trafficWithTotals)

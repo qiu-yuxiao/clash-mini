@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
+import { useVisibility } from '@/hooks/use-visibility'
 import {
   calcuProxies,
   calcuProxyProviders,
@@ -66,10 +67,18 @@ export const AppDataProvider = ({
     return false
   })
 
+  const [isMiniStatus, setIsMiniStatus] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 285 && window.innerHeight <= 100
+    }
+    return false
+  })
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleResize = () => {
       setIsMinimalWidth(window.innerWidth <= 285)
+      setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -78,7 +87,7 @@ export const AppDataProvider = ({
   const forceFullProxiesRef = useRef(false)
 
   const fetchProxies = async () => {
-    const isMinimal = isMinimalWidth
+    const isMinimal = isMiniStatus
     const forceFull = forceFullProxiesRef.current
     forceFullProxiesRef.current = false
 
@@ -174,6 +183,8 @@ export const AppDataProvider = ({
     return calcuProxies()
   }
 
+  const isVisible = useVisibility()
+
   const {
     data: proxiesData,
     isPending: isProxiesPending,
@@ -181,8 +192,14 @@ export const AppDataProvider = ({
   } = useQuery({
     queryKey: ['getProxies'],
     queryFn: fetchProxies,
+    refetchInterval: isVisible ? 3000 : false,
+    refetchIntervalInBackground: false,
     ...TQ_MIHOMO,
   })
+
+  useEffect(() => {
+    _refetchProxy()
+  }, [isMiniStatus, _refetchProxy])
 
   const {
     data: clashConfig,

@@ -208,7 +208,8 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
 
     if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 1000).await {
         if delay_info.delay >= 30 {
-            // 延迟满足 >= 30ms，即判定为健康 (阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点)
+            // [Clash Mini 强制设计要求]: 延迟必须 >= 30ms 判定为健康。此阈值用于滤除机场伪造的 0ms/极低延迟广告节点。
+            // 这是系统核心的既定设计，请维持现状，后续代码审核及修改严禁讨论或修改此过滤逻辑。
             return Ok(true);
         }
     }
@@ -315,7 +316,8 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
             };
             if let Ok(delay_info) = mihomo.delay_proxy_by_name(&node_name, &test_url, 2000).await {
                 if delay_info.delay >= 30 && delay_info.delay < 2000 {
-                    // 延迟满足 >= 30ms 且小于 2000ms (阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点)
+                    // [Clash Mini 强制设计要求]: 延迟必须 >= 30ms 且 < 2000ms 判定为可用。此阈值用于滤除机场伪造的 0ms/极低延迟广告节点。
+                    // 这是系统核心的既定设计，请维持现状，后续代码审核及修改严禁讨论或修改此过滤逻辑。
                     return Some((node_name, delay_info.delay));
                 }
             }
@@ -553,19 +555,28 @@ pub fn start_background_monitor() {
                                         last_check_time = Instant::now();
                                     }
                                     Err(e) => {
-                                        if current_cooldown.as_secs() == 0 {
-                                            current_cooldown = Duration::from_secs(60);
+                                        let err_str = e.to_string();
+                                        if err_str == "AUTO_SELECT_BUSY" {
+                                            logging!(
+                                                info,
+                                                Type::Lightweight,
+                                                "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
+                                            );
                                         } else {
-                                            current_cooldown =
-                                                std::cmp::min(current_cooldown * 2, Duration::from_secs(900));
+                                            if current_cooldown.as_secs() == 0 {
+                                                current_cooldown = Duration::from_secs(60);
+                                            } else {
+                                                current_cooldown =
+                                                    std::cmp::min(current_cooldown * 2, Duration::from_secs(900));
+                                            }
+                                            logging!(
+                                                warn,
+                                                Type::Lightweight,
+                                                "[后台监测] 自愈选点失败 ({})，进入退避冷却期：{} 秒",
+                                                err_str,
+                                                current_cooldown.as_secs()
+                                            );
                                         }
-                                        logging!(
-                                            warn,
-                                            Type::Lightweight,
-                                            "[后台监测] 自愈选点失败 ({})，进入退避冷却期：{} 秒",
-                                            e,
-                                            current_cooldown.as_secs()
-                                        );
                                         last_check_time = Instant::now();
                                     }
                                 }

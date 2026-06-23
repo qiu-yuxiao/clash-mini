@@ -106,7 +106,9 @@ impl CoreUpdater {
 
         let total_size = response.content_length().unwrap_or(0);
         let mut downloaded: u64 = 0;
-        let mut dest_file = fs::File::create(dest_path).context("failed to create temp download file")?;
+        let mut dest_file = tokio::fs::File::create(dest_path)
+            .await
+            .context("failed to create temp download file")?;
         let mut last_emitted_percentage = 0u32;
 
         loop {
@@ -125,7 +127,9 @@ impl CoreUpdater {
                 break;
             };
 
-            io::Write::write_all(&mut dest_file, &chunk).context("failed to write chunk to disk")?;
+            tokio::io::AsyncWriteExt::write_all(&mut dest_file, &chunk)
+                .await
+                .context("failed to write chunk to disk")?;
             downloaded += chunk.len() as u64;
             if total_size > 0 {
                 let percentage = ((downloaded as f64 / total_size as f64) * 80.0) as u32 + 10;
@@ -220,9 +224,7 @@ impl CoreUpdater {
                 let mut fallback_asset = None;
                 for asset in &release.assets {
                     let name = asset.name.to_lowercase();
-                    if name.starts_with(target_prefix)
-                        && (name.ends_with(".zip") || name.ends_with(".gz"))
-                    {
+                    if name.starts_with(target_prefix) && (name.ends_with(".zip") || name.ends_with(".gz")) {
                         fallback_asset = Some(asset);
                         break;
                     }
@@ -268,7 +270,9 @@ impl CoreUpdater {
                 proxy_type
             );
             if let Ok(client) = nm.create_request(proxy_type, Some(300), None, false).await {
-                match Self::download_body_to_file(&client, &download_url, &app_handle, &asset.name, &temp_download_path).await {
+                match Self::download_body_to_file(&client, &download_url, &app_handle, &asset.name, &temp_download_path)
+                    .await
+                {
                     Ok(_) => {
                         logging!(
                             info,
@@ -315,36 +319,46 @@ impl CoreUpdater {
 
         emit_progress("extracting", 90, "正在解压并替换内核程序...");
 
-        // Create destination file directly on disk
-        let mut dest_file = fs::File::create(&custom_core_path).context("failed to create destination core file")?;
-
-        let extract_res = if is_zip {
-            let archive_file = fs::File::open(&temp_download_path).context("failed to open downloaded zip archive")?;
-            let mut archive = zip::ZipArchive::new(archive_file).context("failed to parse zip archive")?;
-            let mut mihomo_file_idx = None;
-            for i in 0..archive.len() {
-                let file = archive.by_index(i)?;
-                let name = file.name().to_lowercase();
-                if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains(".")) {
-                    mihomo_file_idx = Some(i);
-                    break;
+        let temp_download_path_clone = temp_download_path.clone();
+        let custom_core_path_clone = custom_core_path.clone();
+        let extract_res = tokio::task::spawn_blocking(move || -> Result<()> {
+            let mut dest_file =
+                fs::File::create(&custom_core_path_clone).context("failed to create destination core file")?;
+            if is_zip {
+                let archive_file =
+                    fs::File::open(&temp_download_path_clone).context("failed to open downloaded zip archive")?;
+                let mut archive = zip::ZipArchive::new(archive_file).context("failed to parse zip archive")?;
+                let mut mihomo_file_idx = None;
+                for i in 0..archive.len() {
+                    let file = archive.by_index(i)?;
+                    let name = file.name().to_lowercase();
+                    if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains(".")) {
+                        mihomo_file_idx = Some(i);
+                        break;
+                    }
                 }
+                let idx = match mihomo_file_idx {
+                    Some(i) => i,
+                    None => {
+                        let _ = fs::remove_file(&temp_download_path_clone);
+                        bail!("在 ZIP 压缩包内未找到 mini-mihomo 程序二进制");
+                    }
+                };
+                let mut file = archive.by_index(idx)?;
+                io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to destination")?;
+            } else {
+                let archive_file =
+                    fs::File::open(&temp_download_path_clone).context("failed to open downloaded gz archive")?;
+                let mut decoder = flate2::read::GzDecoder::new(archive_file);
+                io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to destination")?;
             }
-            let idx = match mihomo_file_idx {
-                Some(i) => i,
-                None => {
-                    let err_msg = "在 ZIP 压缩包内未找到 mini-mihomo 程序二进制";
-                    emit_progress("error", 0, err_msg);
-                    let _ = fs::remove_file(&temp_download_path);
-                    bail!(err_msg);
-                }
-            };
-            let mut file = archive.by_index(idx)?;
-            io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to destination")
-        } else {
-            let archive_file = fs::File::open(&temp_download_path).context("failed to open downloaded gz archive")?;
-            let mut decoder = flate2::read::GzDecoder::new(archive_file);
-            io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to destination")
+            Ok(())
+        })
+        .await;
+
+        let extract_res = match extract_res {
+            Ok(res) => res,
+            Err(join_err) => Err(anyhow::anyhow!("spawn_blocking panicked: {:?}", join_err)),
         };
 
         // Clean up temp file
@@ -352,7 +366,11 @@ impl CoreUpdater {
             let _ = fs::remove_file(&temp_download_path);
         }
 
-        extract_res?;
+        if let Err(e) = extract_res {
+            let _ = CoreManager::global().start_core().await;
+            emit_progress("error", 0, &format!("解压替换失败: {:?}", e));
+            return Err(e);
+        }
 
         // Set Unix execute permission
         #[cfg(unix)]
