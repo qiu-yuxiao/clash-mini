@@ -1,3 +1,22 @@
+## v1.6.8
+
+### 🔒 Security Hardening
+
+- **CSS Injection 安全加固**：后端 URL 验证 + 前端 Content-Security-Policy 双重防御。
+- **加固 deny.toml**：禁止通配符依赖、添加许可证白名单、标注所有 RUSTSEC 通报。
+- **锁定 4 个 Git 依赖到 commit hash**：构建完全可重现，消除供应链风险。
+- **消除 `as any` 类型安全违规**：启用 `no-explicit-any` ESLint 规则，全量修复类型擦除。
+- **替换 8 处空 catch 块**：补充 `console.warn` 日志，消除静默吞异常。
+
+### 🚀 Optimizations
+
+- **内联 sysinfo 插件**：移除独立 `tauri-plugin-clash-verge-sysinfo` crate，将功能内联到 `src-tauri/src/utils/sysinfo.rs`，减少编译产物体积。
+- **自适应窗口防抖**：空闲用户窗口操作即时响应，高频点击渐进延迟，消除 UI 卡顿。
+- **添加细粒度 ErrorBoundary**：代理列表、连接管理、路由区域各有独立错误边界，防止单点崩溃白屏。
+- **清理 package.json**：移除 45 个一次性 scratch 脚本，减少依赖污染。
+
+---
+
 ## v1.6.7
 
 ### 🔒 Security Hardening
