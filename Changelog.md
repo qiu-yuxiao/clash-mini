@@ -1,3 +1,13 @@
+## v1.6.9
+
+### 🐞 Fixed Bugs
+
+- **修复 Rust 编译错误**：在 `window_manager.rs` 添加缺失的 `use std::pin::Pin`，清理多余 import。
+- **修复 TypeScript import 类型错误**：`app-data-context.ts` 中 `BaseConfig`/`ProxyProvider`/`Rule`/`RuleProvider` 改为 `import type`，防止运行时因无法解析外部包类型导致前端白屏。
+- **滚动条样式修正**：恢复 `proxy-groups.tsx` 中 `scrollbarWidth: 'none'` 样式稳定性。
+
+---
+
 ## v1.6.8
 
 ### 🔒 Security Hardening
