@@ -1,3 +1,13 @@
+## v1.7.4
+
+### 🐞 Fixed Bugs
+
+- **修复严格CSP下活跃连接节点状态条布局崩溃 (BUG-215)**：
+  - 针对在启用严格 CSP 的环境下，由于 Emotion 动态样式注入延迟导致 MUI SvgIcon/loading 旋转图标尺寸变大（300px）从而撑破顶层布局的缺陷进行修复。
+  - 为所有信号图标及 Loading 圈增加显式内联 `sx` 尺寸限制（`12px`），并对卡片及节点名标签增加 `minWidth: 0` 和 `overflow: 'hidden'` 保证长节点名干净截断不撑开布局。
+
+---
+
 ## v1.7.3
 
 ### 🐞 Fixed Bugs
