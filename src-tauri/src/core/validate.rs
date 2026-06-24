@@ -245,10 +245,9 @@ impl CoreConfigValidator {
         let handle = crate::process::AsyncHandler::spawn_blocking(move || {
             use boa_engine::{Context, Source};
             let mut context = Context::default();
+            context.runtime_limits_mut().set_loop_iteration_limit(100_000); // 限制循环指令数
             context
-                .runtime_limits_mut()
-                .set_loop_iteration_limit(100_000); // 限制循环指令数
-            context.eval(Source::from_bytes(&content_clone))
+                .eval(Source::from_bytes(&content_clone))
                 .map(|_| ())
                 .map_err(|err| err.to_string())
         });

@@ -213,12 +213,16 @@ impl NetworkManager {
 
         let status = response.status();
         let headers = response.headers().to_owned();
-        
+
         // Limit download size to 10MB to avoid OOM crashes
         const MAX_DOWNLOAD_SIZE: usize = 10 * 1024 * 1024; // 10MB
         let mut body_bytes = Vec::new();
         let mut response = response;
-        while let Some(chunk) = response.chunk().await.map_err(|e| anyhow::anyhow!("Stream read error: {}", e))? {
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|e| anyhow::anyhow!("Stream read error: {}", e))?
+        {
             if body_bytes.len() + chunk.len() > MAX_DOWNLOAD_SIZE {
                 anyhow::bail!("Subscription file size exceeds the 10MB limit");
             }

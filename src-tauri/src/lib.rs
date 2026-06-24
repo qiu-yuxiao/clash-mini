@@ -235,12 +235,7 @@ fn show_error_dialog(title: &str, message: &str) {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     unsafe extern "system" {
-        fn MessageBoxW(
-            hwnd: *mut std::ffi::c_void,
-            lpText: *const u16,
-            lpCaption: *const u16,
-            uType: u32,
-        ) -> i32;
+        fn MessageBoxW(hwnd: *mut std::ffi::c_void, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
     }
     let wide_message: Vec<u16> = OsStr::new(message).encode_wide().chain(Some(0)).collect();
     let wide_title: Vec<u16> = OsStr::new(title).encode_wide().chain(Some(0)).collect();
@@ -261,9 +256,7 @@ fn show_error_dialog(title: &str, message: &str) {
         "display dialog {:?} with title {:?} buttons {{\"OK\"}} default button \"OK\" with icon stop",
         message, title
     );
-    let _ = std::process::Command::new("osascript")
-        .args(["-e", &script])
-        .spawn();
+    let _ = std::process::Command::new("osascript").args(["-e", &script]).spawn();
 }
 
 #[cfg(target_os = "linux")]
