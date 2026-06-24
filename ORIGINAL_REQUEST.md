@@ -168,3 +168,68 @@ Integrity mode: development
 - [ ] 工作区中没有产生任何代码修改。
 - [ ] `git status --porcelain` 返回结果完全为空。
 
+
+## Follow-up — 2026-06-25T02:32:35+08:00
+
+对 ClashVerge 项目中 **BUG-239** 的代码修正进行全方位独立代码审计，评估其正确性、潜在隐患、是否是最佳方案，并提出具体的改进建议。
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: development
+
+---
+
+## Background
+
+BUG-239 的修正已在 commit `af81e726` 落地，包含以下改动：
+
+1. **事件驱动代理刷新（Event-Driven Proxy Refresh）**
+   - 在 `crates/tauri-plugin-mihomo/src/commands.rs` 中，为 `select_node_for_group`、`unfixed_proxy`、`delay_proxy_by_name`、`update_proxy_provider`、`healthcheck_proxy_provider` 等命令加入 `AppHandle<R>` 泛型参数，并在命令成功完成后通过 `app.emit("verge://refresh-proxy-config", "yes")` 向前端推送刷新信号。
+   - 在 `src-tauri/src/core/notification.rs` 中添加了 `RefreshProxies` 事件变体，映射到 `"verge://refresh-proxy-config"`。
+   - 在 `src-tauri/src/core/handle.rs` 的 `refresh_clash()` 中增加调用 `Self::refresh_proxies()`，使配置重载时也自动推送代理刷新事件。
+   - 在前端 `src/providers/app-data-provider.tsx` 中，将 `getProxies` 查询的 `refetchInterval` 从 `isVisible ? 3000 : false` 改为 `false`，停止轮询；同时新增对 `verge://refresh-clash-config` 事件的监听，触发 `handleRefreshProxy`。
+
+2. **连接追踪可见性判定（WebSocket Visibility Gating）**
+   - 在 `src/pages/_layout.tsx` 中引入 `ResizeObserver` 监听连接面板容器的宽度，`width > 10px` 时设置 `isPanelVisible = true`。
+   - `useConnectionData` 的 `enabled` 参数从 `drawerOpen` 改为 `drawerOpen && isPanelVisible`。
+   - 在 `src/pages/_layout/components/connections-panel.tsx` 中添加 `containerRef` prop，将其 attach 到外层 `<Box>`。
+
+---
+
+## Requirements
+
+### R1. 正确性与完整性审计
+审查上述所有改动是否逻辑正确、是否覆盖所有应该触发代理刷新的场景。是否有遗漏的触发点（如 provider 健康检查完成后不触发刷新、后端 auto-select 后是否能正确推送等）？核查事件名称是否与前端监听一致，是否存在事件丢失、重复触发或竞争条件（race condition）。
+
+### R2. 潜在隐患与安全风险分析
+分析修改是否引入了新的问题，包括但不限于：
+- `delay_proxy_by_name` 在测速失败时是否仍然触发刷新事件（可能引发无效 of UI 更新）。
+- `app.emit` 调用是否在所有平台和生命周期节点上均安全可靠。
+- 前端新增的 `verge://refresh-clash-config` 监听与已有的 `use-layout-events.ts` 中的监听是否存在重复刷新或竞争问题（两个地方都监听同一事件，一个 invalidate query 缓存，另一个直接 refetch）。
+- `ResizeObserver` 用于判断可见性是否足够精确可靠，在动画过渡期间（如抽屉展开动画）是否可能造成 WebSocket 在面板可见之前就断开重连。
+- `refreshThrottle = 800ms` 节流是否合理，是否存在由于 `lastUpdateTime` 被多个事件共享而造成误判。
+
+### R3. 最佳方案评估与替代方案比较
+评估当前方案是否是最合适的实现方式，并与以下替代方案进行对比分析：
+- 方案A（当前）：在 Tauri Plugin 的 command handler 中直接 emit 事件。
+- 方案B：在后端已有的 `Handle::refresh_clash()` 统一管理，不在 plugin 中分散 emit。
+- 方案C：使用 Tauri v2 的 `Channel` 机制替代全局 emit，避免广播到多个窗口的不必要开销。
+- 对于连接面板可见性判定，评估 `ResizeObserver` vs. `IntersectionObserver` vs. 监听 CSS 变量/动画事件 vs. 直接由父组件通过 prop 传递 visible 状态。
+
+### R4. 代码质量与架构一致性审计
+检查修改是否与项目现有的代码风格、设计协议 (`clash_mini_agreements.md`) 和模块职责边界保持一致。Tauri Plugin 中添加应用层逻辑（emit 事件）是否与插件的职责定位相符？
+
+---
+
+## Acceptance Criteria
+
+### 审计报告完整性
+- [ ] 审计报告必须写入 `docs/bug239_audit_report.md`，包含所有发现问题的具体文件路径、行号（使用 `file://` 链接）及根因分析。
+- [ ] 报告必须明确回答：当前修正是否有遗漏的触发场景（给出 Yes/No + 证据）。
+- [ ] 报告必须明确回答：`delay_proxy_by_name` 在测速失败情况下是否仍触发不必要的 UI 刷新（给出 Yes/No + 代码证据）。
+- [ ] 报告必须明确回答：`verge://refresh-clash-config` 在 `app-data-provider.tsx` 和 `use-layout-events.ts` 中存在的双重监听是否产生重复/竞争问题（给出 Yes/No + 分析）。
+- [ ] 报告必须提供至少一个具体的代码改进建议（以 diff 格式展示）。
+
+### 代码审计约束
+- [ ] 审计团队不得修改任何项目源代码文件。所有建议以 diff block 形式记录在报告中。
+- [ ] 审计完成后 `git status --porcelain` 输出必须为空（工作区 100% 干净）。
+

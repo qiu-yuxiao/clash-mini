@@ -2069,8 +2069,8 @@
   - 流量数据 Hook (`useTrafficData`) 在窗口不可见或隐藏状态下（`pageVisible === false`），其对应的 WebSocket 订阅连接必须彻底断连，停止解析流量包，不将订阅键挂载到 `useMihomoWsSubscription`。
   - 连接数据 Hook (`useConnectionData`) 必须支持 `enabled` 配置项：在非可见状态下（`pageVisible === false`），必须彻底停止所有形式的数据请求和通信连接。
 - **连接面板双模切换与免合并轻量化**：
-  - 当设置面板展开时（`drawerOpen === true`），连接管理开启**高频实时观测模式**：激活 WebSocket 以 16ms 节流频率全面同步活跃与历史连接详情，并执行精细的连接列表 merge/diff 差量计算。
-  - 当设置面板关闭时（`drawerOpen === false` 且可见），连接管理自动切换为**低频静默监控模式**：断开 WebSocket，降级为每 3 秒发起单次轻量级 `getConnections` HTTP REST 轮询。在此模式下，为了节省 CPU，**严禁**执行任何连接列表的差异对比、排序及 Map 内存重构计算，直接提取 totals 计入状态，且保持连接明细列表为空数组。
+  - 当设置面板展开且连接面板容器宽度 > 10px 时（`drawerOpen === true && isPanelVisible === true`），连接管理开启**高频实时观测模式**：激活 WebSocket 以 16ms 节流频率全面同步活跃与历史连接详情，并执行精细的连接列表 merge/diff 差量计算。
+  - 当设置面板关闭或连接面板不可见时（`drawerOpen === false || isPanelVisible === false`），连接管理进入**完全静默模式**：彻底断开 WebSocket，停止所有连接数据请求，连接数据冻结在最后已知状态。此模式下**不再**进行任何降频 REST 轮询，以最大限度降低后台资源占用。这是经用户确认的设计决策（BUG-239 修正，v1.8.2）。
 - **日志组件条件渲染与彻底注销**：
   - 日志显示组件 (`LogsPage`) 必须在布局中实行完全的条件渲染。在日志弹窗 Dialog 关闭时（`logsOpen === false`），直接以 `{logsOpen && <LogsPage />}` 方式进行 React 卸载（Unmount），使其所占用的日志 WebSocket 连接在 Dialog 关闭的第一时间彻底销毁注销，杜绝在后台默默堆积和合并解析数百条日志的行为。
 

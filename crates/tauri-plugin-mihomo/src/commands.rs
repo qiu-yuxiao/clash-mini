@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use tauri::{
-    AppHandle,
-    Emitter,
-    Runtime,
-    State,
+    AppHandle, Emitter, Runtime, State,
     async_runtime::RwLock,
     command,
     ipc::{Channel, InvokeResponseBody},
@@ -150,7 +147,8 @@ pub(crate) async fn healthcheck_proxy_provider<R: Runtime>(
 }
 
 #[command]
-pub(crate) async fn healthcheck_node_in_provider(
+pub(crate) async fn healthcheck_node_in_provider<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, RwLock<Mihomo>>,
     provider_name: String,
     proxy_name: String,
@@ -158,9 +156,13 @@ pub(crate) async fn healthcheck_node_in_provider(
     timeout: u32,
 ) -> Result<ProxyDelay> {
     let mihomo = state.read().await.clone();
-    mihomo
+    let res = mihomo
         .healthcheck_node_in_provider(&provider_name, &proxy_name, &test_url, timeout)
-        .await
+        .await;
+    if res.is_ok() {
+        let _ = app.emit("verge://refresh-proxy-config", "yes");
+    }
+    res
 }
 
 // proxies
@@ -211,7 +213,9 @@ pub(crate) async fn delay_proxy_by_name<R: Runtime>(
 ) -> Result<ProxyDelay> {
     let mihomo = state.read().await.clone();
     let res = mihomo.delay_proxy_by_name(&proxy_name, &test_url, timeout).await;
-    let _ = app.emit("verge://refresh-proxy-config", "yes");
+    if res.is_ok() {
+        let _ = app.emit("verge://refresh-proxy-config", "yes");
+    }
     res
 }
 
@@ -229,9 +233,15 @@ pub(crate) async fn get_rule_providers(state: State<'_, RwLock<Mihomo>>) -> Resu
 }
 
 #[command]
-pub(crate) async fn update_rule_provider(state: State<'_, RwLock<Mihomo>>, provider_name: String) -> Result<()> {
+pub(crate) async fn update_rule_provider<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, RwLock<Mihomo>>,
+    provider_name: String,
+) -> Result<()> {
     let mihomo = state.read().await.clone();
-    mihomo.update_rule_provider(&provider_name).await
+    let res = mihomo.update_rule_provider(&provider_name).await;
+    let _ = app.emit("verge://refresh-clash-config", "yes");
+    res
 }
 
 // runtime config
@@ -242,9 +252,16 @@ pub(crate) async fn get_base_config(state: State<'_, RwLock<Mihomo>>) -> Result<
 }
 
 #[command]
-pub(crate) async fn reload_config(state: State<'_, RwLock<Mihomo>>, force: bool, config_path: String) -> Result<()> {
+pub(crate) async fn reload_config<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, RwLock<Mihomo>>,
+    force: bool,
+    config_path: String,
+) -> Result<()> {
     let mihomo = state.read().await.clone();
-    mihomo.reload_config(force, &config_path).await
+    let res = mihomo.reload_config(force, &config_path).await;
+    let _ = app.emit("verge://refresh-clash-config", "yes");
+    res
 }
 
 #[command]

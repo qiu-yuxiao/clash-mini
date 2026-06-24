@@ -3,7 +3,6 @@ import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
-import { useVisibility } from '@/hooks/use-visibility'
 import {
   calcuProxies,
   calcuProxyProviders,
@@ -47,6 +46,7 @@ const TQ_DEFAULTS = {
   retry: 2,
 } as const
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function useStableFn<T extends (...args: any[]) => any>(fn: T): T {
   const ref = useRef(fn)
   ref.current = fn
@@ -97,6 +97,7 @@ export const AppDataProvider = ({
         const groupProxy = await getProxyByName('PROXY')
         if (groupProxy) {
           const activeNodeName = groupProxy.now || ''
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let activeNode: any = null
           if (activeNodeName) {
             try {
@@ -139,6 +140,7 @@ export const AppDataProvider = ({
                       provider: '',
                     }
                   })
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   .filter((item: any) => !isDummyNode(item.name))
               : [],
           }
@@ -183,8 +185,6 @@ export const AppDataProvider = ({
 
     return calcuProxies()
   }
-
-  const isVisible = useVisibility()
 
   const {
     data: proxiesData,
@@ -271,10 +271,10 @@ export const AppDataProvider = ({
     let active = true
     let unlistenProfile: (() => void) | null = null
     let unlistenProxy: (() => void) | null = null
-    let unlistenClash: (() => void) | null = null
 
     let lastProfileId: string | null = null
-    let lastUpdateTime = 0
+    let lastProfileUpdateTime = 0
+    let lastProxyUpdateTime = 0
     const refreshThrottle = 800
 
     const handleProfileChanged = (event: { payload: string }) => {
@@ -282,21 +282,23 @@ export const AppDataProvider = ({
       const now = Date.now()
       if (
         lastProfileId === newProfileId &&
-        now - lastUpdateTime < refreshThrottle
+        now - lastProfileUpdateTime < refreshThrottle
       ) {
         return
       }
       lastProfileId = newProfileId
-      lastUpdateTime = now
+      lastProfileUpdateTime = now
       void queryClient.invalidateQueries({ queryKey: ['getProfiles'] })
       refreshRules().catch(() => console.warn('[app-data] refreshRules failed'))
-      refreshRuleProviders().catch(() => console.warn('[app-data] refreshRuleProviders failed'))
+      refreshRuleProviders().catch(() =>
+        console.warn('[app-data] refreshRuleProviders failed'),
+      )
     }
 
     const handleRefreshProxy = () => {
       const now = Date.now()
-      if (now - lastUpdateTime <= refreshThrottle) return
-      lastUpdateTime = now
+      if (now - lastProxyUpdateTime <= refreshThrottle) return
+      lastProxyUpdateTime = now
       refreshProxy().catch(() => console.warn('[app-data] refreshProxy failed'))
     }
 
@@ -328,20 +330,6 @@ export const AppDataProvider = ({
       } catch (error) {
         console.warn('[AppDataProvider] 设置 Tauri 事件监听器失败:', error)
       }
-
-      try {
-        const uClash = await listen(
-          'verge://refresh-clash-config',
-          handleRefreshProxy,
-        )
-        if (!active) {
-          uClash()
-        } else {
-          unlistenClash = uClash
-        }
-      } catch (error) {
-        console.warn('[AppDataProvider] 设置 Clash 事件监听器失败:', error)
-      }
     }
 
     void initializeListeners()
@@ -353,9 +341,6 @@ export const AppDataProvider = ({
       }
       if (unlistenProxy) {
         unlistenProxy()
-      }
-      if (unlistenClash) {
-        unlistenClash()
       }
     }
   }, [refreshProxy, refreshRules, refreshRuleProviders])
@@ -381,7 +366,10 @@ export const AppDataProvider = ({
   const proxiesValue = useMemo(
     () => ({
       proxies: proxiesData,
-      proxyProviders: (proxyProviders || {}) as unknown as Record<string, ProxyProvider | undefined>,
+      proxyProviders: (proxyProviders || {}) as unknown as Record<
+        string,
+        ProxyProvider | undefined
+      >,
       isProxiesPending,
     }),
     [proxiesData, proxyProviders, isProxiesPending],
