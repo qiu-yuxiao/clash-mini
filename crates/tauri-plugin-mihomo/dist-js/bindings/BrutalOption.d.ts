@@ -1,5 +1,5 @@
 export type BrutalOption = {
-  enabled: boolean
-  up?: string
-  down?: string
-}
+    enabled: boolean;
+    up?: string;
+    down?: string;
+};

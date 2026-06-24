@@ -1,3 +1,14 @@
+## v1.7.9
+
+### 🐞 Fixed Bugs
+
+- **修复系统测速模式切换通信接口报错与构建一致性校验**：
+  - 修复前端 `FindProcessMode` 选项为首字母大写（`'Strict' | 'Always' | 'Off'`）而 Rust 后端只认纯小写（`'strict' | 'always' | 'off'`）导致的切换模式接口通信解析失败问题。
+  - 同步 `tauri-plugin-mihomo` 插件的前端 package.json 版本号从 0.5.2 至 0.5.4，以对齐 Rust backend 的版本配置。
+  - 在 `tauri.conf.json` 中将 `beforeBuildCommand` 恢复为 `pnpm web:build`，确保打包时包含完整的 TypeScript 类型校验（`tsc --noEmit`），防范未来潜在的类型不匹配隐患。
+
+---
+
 ## v1.7.8
 
 ### 🐞 Fixed Bugs

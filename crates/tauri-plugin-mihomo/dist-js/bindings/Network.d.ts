@@ -1,1 +1,1 @@
-export type Network = string
+export type Network = string;

@@ -1,6 +1,6 @@
 {
   "name": "tauri-plugin-mihomo-api",
-  "version": "0.5.2",
+  "version": "0.5.4",
   "author": "oomeow",
   "description": "Tauri plugin for invoke Mihomo API",
   "type": "module",

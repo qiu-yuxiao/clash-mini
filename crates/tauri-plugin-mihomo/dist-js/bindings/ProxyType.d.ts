@@ -1,1 +1,1 @@
-export type ProxyType = string
+export type ProxyType = string;

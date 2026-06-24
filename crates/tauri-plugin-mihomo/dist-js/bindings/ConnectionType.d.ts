@@ -1,1 +1,1 @@
-export type ConnectionType = string
+export type ConnectionType = string;

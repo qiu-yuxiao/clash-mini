@@ -1,6 +1,6 @@
-import type { ProxyProvider } from './ProxyProvider'
+import type { ProxyProvider } from './ProxyProvider';
 export type ProxyProviders = {
-  providers: {
-    [key in string]?: ProxyProvider
-  }
-}
+    providers: {
+        [key in string]?: ProxyProvider;
+    };
+};

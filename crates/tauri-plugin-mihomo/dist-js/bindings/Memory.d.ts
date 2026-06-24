@@ -1,4 +1,4 @@
 export type Memory = {
-  inuse: bigint
-  oslimit: bigint
-}
+    inuse: bigint;
+    oslimit: bigint;
+};

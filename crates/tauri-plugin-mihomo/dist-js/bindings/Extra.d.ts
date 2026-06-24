@@ -1,5 +1,5 @@
-import type { DelayHistory } from './DelayHistory'
+import type { DelayHistory } from './DelayHistory';
 export type Extra = {
-  alive: boolean
-  history: Array<DelayHistory>
-}
+    alive: boolean;
+    history: Array<DelayHistory>;
+};

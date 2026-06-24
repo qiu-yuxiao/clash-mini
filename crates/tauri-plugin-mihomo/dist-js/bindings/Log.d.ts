@@ -1,4 +1,4 @@
 export type Log = {
-  type: string
-  payload: string
-}
+    type: string;
+    payload: string;
+};
