@@ -79,11 +79,11 @@ type GroupCache = {
 }
 
 // 优化列布局计算
-const calculateColumns = (width: number, _configCol: number): number => {
+const calculateColumns = (width: number): number => {
   if (width <= 285) {
     return 1
   }
-  return _configCol
+  return 3 // 依据 Agreement 第九条，宽屏下固定为 3 列排版
 }
 
 // 优化分组逻辑
@@ -117,8 +117,8 @@ export const useRenderList = (
 
   // 计算列数
   const col = useMemo(
-    () => calculateColumns(width, verge?.proxy_layout_column || 6),
-    [width, verge?.proxy_layout_column],
+    () => calculateColumns(width),
+    [width],
   )
 
   // 确保代理数据加载
