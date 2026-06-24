@@ -240,7 +240,9 @@ pub(crate) async fn update_rule_provider<R: Runtime>(
 ) -> Result<()> {
     let mihomo = state.read().await.clone();
     let res = mihomo.update_rule_provider(&provider_name).await;
-    let _ = app.emit("verge://refresh-clash-config", "yes");
+    if res.is_ok() {
+        let _ = app.emit("verge://refresh-clash-config", "yes");
+    }
     res
 }
 
@@ -260,7 +262,9 @@ pub(crate) async fn reload_config<R: Runtime>(
 ) -> Result<()> {
     let mihomo = state.read().await.clone();
     let res = mihomo.reload_config(force, &config_path).await;
-    let _ = app.emit("verge://refresh-clash-config", "yes");
+    if res.is_ok() {
+        let _ = app.emit("verge://refresh-clash-config", "yes");
+    }
     res
 }
 

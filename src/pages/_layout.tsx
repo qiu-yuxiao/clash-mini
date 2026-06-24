@@ -1586,8 +1586,6 @@ const Layout = () => {
       drawerOpen,
       patchVerge,
       verge?.enable_always_on_top,
-      theme,
-      controlSkin,
     ],
   )
 
