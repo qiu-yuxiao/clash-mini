@@ -630,6 +630,8 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     dns_config.insert("enable".into(), Value::Bool(true));
     dns_config.insert("enhanced-mode".into(), Value::String("fake-ip".into()));
     dns_config.insert("fake-ip-range".into(), Value::String("198.18.0.1/16".into()));
+    dns_config.insert("cache-algorithm".into(), Value::String("lru".into()));
+    dns_config.insert("cache-limit".into(), Value::Number(512.into()));
     dns_config.insert(
         "nameserver".into(),
         Value::Sequence(vec![

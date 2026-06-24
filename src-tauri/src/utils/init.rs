@@ -133,6 +133,8 @@ async fn init_dns_config() -> Result<()> {
         ("enhanced-mode".into(), Value::String("fake-ip".into())),
         ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
         ("fake-ip-filter-mode".into(), Value::String("blacklist".into())),
+        ("cache-algorithm".into(), Value::String("lru".into())),
+        ("cache-limit".into(), Value::Number(512.into())),
         ("prefer-h3".into(), Value::Bool(false)),
         ("respect-rules".into(), Value::Bool(false)),
         ("use-hosts".into(), Value::Bool(false)),

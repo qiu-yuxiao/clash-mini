@@ -97,10 +97,15 @@ impl IClashTemp {
         map.insert("mixed-port".into(), network::ports::DEFAULT_MIXED.into());
         map.insert("socks-port".into(), network::ports::DEFAULT_SOCKS.into());
         map.insert("port".into(), network::ports::DEFAULT_HTTP.into());
-        map.insert("log-level".into(), "info".into());
+        map.insert("log-level".into(), "warning".into());
         map.insert("allow-lan".into(), true.into());
         map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
+
+        let mut profile_config = Mapping::new();
+        profile_config.insert("store-selected".into(), true.into());
+        profile_config.insert("store-fake-ip".into(), false.into());
+        map.insert("profile".into(), profile_config.into());
         map.insert(
             "external-controller".into(),
             network::DEFAULT_EXTERNAL_CONTROLLER.into(),

@@ -39,7 +39,7 @@ pub mod files {
 }
 
 pub mod tun {
-    pub const DEFAULT_STACK: &str = "gvisor";
+    pub const DEFAULT_STACK: &str = "system";
 
     pub const DNS_HIJACK: &[&str] = &["any:53"];
 }
