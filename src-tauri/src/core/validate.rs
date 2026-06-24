@@ -376,7 +376,7 @@ impl CoreConfigValidator {
             Ok(Err(err)) => return Err(err.into()),
             Err(_) => {
                 logging!(error, Type::Validate, "验证进程执行超时 (5s)");
-                return Err(anyhow::anyhow!("Validation process timed out after 5 seconds").into());
+                return Err(anyhow::anyhow!("Validation process timed out after 5 seconds"));
             }
         };
 

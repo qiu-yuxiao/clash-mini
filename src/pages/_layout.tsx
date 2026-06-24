@@ -1036,10 +1036,33 @@ const Layout = () => {
   const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>(
     'active',
   )
+  const connectionsPanelRef = useRef<HTMLDivElement>(null)
+  const [isPanelVisible, setIsPanelVisible] = useState(false)
+
+  useEffect(() => {
+    if (!drawerOpen) {
+      setIsPanelVisible(false)
+      return
+    }
+    const element = connectionsPanelRef.current
+    if (!element) return
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setIsPanelVisible(entry.contentRect.width > 10)
+      }
+    })
+
+    observer.observe(element)
+    return () => {
+      observer.disconnect()
+    }
+  }, [drawerOpen])
+
   const {
     response: { data: connectionsData },
     clearClosedConnections,
-  } = useConnectionData({ enabled: drawerOpen })
+  } = useConnectionData({ enabled: drawerOpen && isPanelVisible })
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const detailRef = useRef<any>(null)
 
@@ -1881,6 +1904,7 @@ const Layout = () => {
                 isColumnManagerOpen={isColumnManagerOpen}
                 setIsColumnManagerOpen={setIsColumnManagerOpen}
                 clearClosedConnections={clearClosedConnections}
+                containerRef={connectionsPanelRef}
               />
               </ErrorBoundary>
               {/* Help Button */}

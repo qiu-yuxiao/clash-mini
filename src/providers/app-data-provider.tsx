@@ -193,7 +193,7 @@ export const AppDataProvider = ({
   } = useQuery({
     queryKey: ['getProxies'],
     queryFn: fetchProxies,
-    refetchInterval: isVisible ? 3000 : false,
+    refetchInterval: false,
     refetchIntervalInBackground: false,
     ...TQ_MIHOMO,
   })
@@ -271,6 +271,7 @@ export const AppDataProvider = ({
     let active = true
     let unlistenProfile: (() => void) | null = null
     let unlistenProxy: (() => void) | null = null
+    let unlistenClash: (() => void) | null = null
 
     let lastProfileId: string | null = null
     let lastUpdateTime = 0
@@ -327,6 +328,20 @@ export const AppDataProvider = ({
       } catch (error) {
         console.warn('[AppDataProvider] 设置 Tauri 事件监听器失败:', error)
       }
+
+      try {
+        const uClash = await listen(
+          'verge://refresh-clash-config',
+          handleRefreshProxy,
+        )
+        if (!active) {
+          uClash()
+        } else {
+          unlistenClash = uClash
+        }
+      } catch (error) {
+        console.warn('[AppDataProvider] 设置 Clash 事件监听器失败:', error)
+      }
     }
 
     void initializeListeners()
@@ -338,6 +353,9 @@ export const AppDataProvider = ({
       }
       if (unlistenProxy) {
         unlistenProxy()
+      }
+      if (unlistenClash) {
+        unlistenClash()
       }
     }
   }, [refreshProxy, refreshRules, refreshRuleProviders])

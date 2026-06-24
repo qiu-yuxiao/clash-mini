@@ -854,7 +854,7 @@ fn validate_url_no_ssrf(url: &Url) -> Result<()> {
         }
 
         // 2. 动态 DNS 解析校验，防止 DNS 重绑定绕过
-        use std::net::ToSocketAddrs;
+        use std::net::ToSocketAddrs as _;
         let host_str = match host {
             url::Host::Domain(d) => d.to_string(),
             url::Host::Ipv4(ip) => ip.to_string(),

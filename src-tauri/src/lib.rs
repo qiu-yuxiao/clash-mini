@@ -233,7 +233,7 @@ mod app_init {
 #[cfg(target_os = "windows")]
 fn show_error_dialog(title: &str, message: &str) {
     use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::ffi::OsStrExt as _;
     unsafe extern "system" {
         fn MessageBoxW(hwnd: *mut std::ffi::c_void, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
     }

@@ -38,10 +38,15 @@ impl Handle {
 
     pub fn refresh_clash() {
         Self::send_event(FrontendEvent::RefreshClash);
+        Self::refresh_proxies();
     }
 
     pub fn refresh_verge() {
         Self::send_event(FrontendEvent::RefreshVerge);
+    }
+
+    pub fn refresh_proxies() {
+        Self::send_event(FrontendEvent::RefreshProxies);
     }
 
     pub fn notify_profile_changed(profile_id: &String) {

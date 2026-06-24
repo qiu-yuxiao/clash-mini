@@ -22,6 +22,7 @@ interface ConnectionsPanelProps {
   isColumnManagerOpen: boolean
   setIsColumnManagerOpen: (open: boolean) => void
   clearClosedConnections: () => void
+  containerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
@@ -34,12 +35,14 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
   isColumnManagerOpen,
   setIsColumnManagerOpen,
   clearClosedConnections,
+  containerRef,
 }) => {
   const { t } = useTranslation()
   const theme = useTheme()
 
   return (
     <Box
+      ref={containerRef}
       sx={{
         flex: 1,
         // WARNING [FOR AI AGENTS / AUDITORS]:

@@ -133,7 +133,7 @@
 
 ### BUG-239: High-frequency polling on proxies and connections causing high CPU/Resource consumption
  - **现象描述**：主页数据刷新采用前端主动发起、每隔 3 秒一次的高频轮询机制（calcuProxies），在闲置或数据无变化时产生持续的 CPU 唤醒与进程通信开销；同时，连接管理面板在后台或被遮挡时缺乏深度可见性判定。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **需求与改进方案**：
    1. **轮询重构为事件信号驱动（Event-Driven）**：
       - 前端彻底关闭每 3 秒一次的 `refetchInterval` 定时请求。

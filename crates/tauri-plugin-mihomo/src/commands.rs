@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
 use tauri::{
+    AppHandle,
+    Emitter,
+    Runtime,
     State,
     async_runtime::RwLock,
     command,
@@ -123,15 +126,27 @@ pub(crate) async fn get_proxy_provider_by_name(
 }
 
 #[command]
-pub(crate) async fn update_proxy_provider(state: State<'_, RwLock<Mihomo>>, provider_name: String) -> Result<()> {
+pub(crate) async fn update_proxy_provider<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, RwLock<Mihomo>>,
+    provider_name: String,
+) -> Result<()> {
     let mihomo = state.read().await.clone();
-    mihomo.update_proxy_provider(&provider_name).await
+    mihomo.update_proxy_provider(&provider_name).await?;
+    let _ = app.emit("verge://refresh-proxy-config", "yes");
+    Ok(())
 }
 
 #[command]
-pub(crate) async fn healthcheck_proxy_provider(state: State<'_, RwLock<Mihomo>>, provider_name: String) -> Result<()> {
+pub(crate) async fn healthcheck_proxy_provider<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, RwLock<Mihomo>>,
+    provider_name: String,
+) -> Result<()> {
     let mihomo = state.read().await.clone();
-    mihomo.healthcheck_proxy_provider(&provider_name).await
+    mihomo.healthcheck_proxy_provider(&provider_name).await?;
+    let _ = app.emit("verge://refresh-proxy-config", "yes");
+    Ok(())
 }
 
 #[command]
@@ -162,30 +177,42 @@ pub(crate) async fn get_proxy_by_name(state: State<'_, RwLock<Mihomo>>, proxy_na
 }
 
 #[command]
-pub(crate) async fn select_node_for_group(
+pub(crate) async fn select_node_for_group<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, RwLock<Mihomo>>,
     group_name: String,
     node: String,
 ) -> Result<()> {
     let mihomo = state.read().await.clone();
-    mihomo.select_node_for_group(&group_name, &node).await
+    mihomo.select_node_for_group(&group_name, &node).await?;
+    let _ = app.emit("verge://refresh-proxy-config", "yes");
+    Ok(())
 }
 
 #[command]
-pub(crate) async fn unfixed_proxy(state: State<'_, RwLock<Mihomo>>, group_name: String) -> Result<()> {
+pub(crate) async fn unfixed_proxy<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, RwLock<Mihomo>>,
+    group_name: String,
+) -> Result<()> {
     let mihomo = state.read().await.clone();
-    mihomo.unfixed_proxy(&group_name).await
+    mihomo.unfixed_proxy(&group_name).await?;
+    let _ = app.emit("verge://refresh-proxy-config", "yes");
+    Ok(())
 }
 
 #[command]
-pub(crate) async fn delay_proxy_by_name(
+pub(crate) async fn delay_proxy_by_name<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, RwLock<Mihomo>>,
     proxy_name: String,
     test_url: String,
     timeout: u32,
 ) -> Result<ProxyDelay> {
     let mihomo = state.read().await.clone();
-    mihomo.delay_proxy_by_name(&proxy_name, &test_url, timeout).await
+    let res = mihomo.delay_proxy_by_name(&proxy_name, &test_url, timeout).await;
+    let _ = app.emit("verge://refresh-proxy-config", "yes");
+    res
 }
 
 // rules
