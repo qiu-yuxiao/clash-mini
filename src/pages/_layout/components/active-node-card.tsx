@@ -302,7 +302,7 @@ export const ActiveNodeStatusCard = () => {
           size="small"
           icon={
             testing ? (
-              <CircularProgress size={10} color="inherit" sx={{ width: '10px !important', height: '10px !important' }} />
+              <CircularProgress size={10} color="inherit" style={{ width: '10px', height: '10px' }} />
             ) : (
               signalInfo.icon
             )

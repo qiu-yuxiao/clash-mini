@@ -20,48 +20,48 @@ export function getSignalIcon(delay: number, t: any) {
   const iconStyle = { fontSize: '12px', width: '12px', height: '12px' }
   if (delay === -2)
     return {
-      icon: <SignalNone sx={iconStyle} />,
+      icon: <SignalNone style={iconStyle} />,
       text: t('settings.mini.statusTesting', { defaultValue: '测试中' }),
       color: 'text.secondary',
     }
   if (delay === -1)
     return {
-      icon: <SignalNone sx={iconStyle} />,
+      icon: <SignalNone style={iconStyle} />,
       text: t('settings.mini.statusUntested', { defaultValue: '未测试' }),
       color: 'text.secondary',
     }
   if (delay > 1e5)
     return {
-      icon: <SignalError sx={iconStyle} />,
+      icon: <SignalError style={iconStyle} />,
       text: t('settings.mini.statusError', { defaultValue: '错误' }),
       color: 'error.main',
     }
   if (delay === 0 || delay >= 10000)
     return {
-      icon: <SignalError sx={iconStyle} />,
+      icon: <SignalError style={iconStyle} />,
       text: t('settings.mini.statusTimeout', { defaultValue: '超时' }),
       color: 'error.main',
     }
   if (delay >= 500)
     return {
-      icon: <SignalWeak sx={iconStyle} />,
+      icon: <SignalWeak style={iconStyle} />,
       text: t('settings.mini.statusDelayHigh', { defaultValue: '延迟较高' }),
       color: 'error.main',
     }
   if (delay >= 300)
     return {
-      icon: <SignalMedium sx={iconStyle} />,
+      icon: <SignalMedium style={iconStyle} />,
       text: t('settings.mini.statusDelayMedium', { defaultValue: '延迟中等' }),
       color: 'warning.main',
     }
   if (delay >= 200)
     return {
-      icon: <SignalGood sx={iconStyle} />,
+      icon: <SignalGood style={iconStyle} />,
       text: t('settings.mini.statusDelayGood', { defaultValue: '延迟良好' }),
       color: 'info.main',
     }
   return {
-    icon: <SignalStrong sx={iconStyle} />,
+    icon: <SignalStrong style={iconStyle} />,
     text: t('settings.mini.statusDelayExcellent', { defaultValue: '延迟极佳' }),
     color: 'success.main',
   }

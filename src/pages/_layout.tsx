@@ -1488,7 +1488,7 @@ const Layout = () => {
               })}
             >
               <PushPinRounded
-                sx={{
+                style={{
                   fontSize: '20px',
                   width: '20px',
                   height: '20px',
@@ -1519,9 +1519,9 @@ const Layout = () => {
             })}
           >
             {drawerOpen ? (
-              <CloseRounded sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+              <CloseRounded style={{ fontSize: '20px', width: '20px', height: '20px' }} />
             ) : (
-              <SettingsRoundedIcon sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+              <SettingsRoundedIcon style={{ fontSize: '20px', width: '20px', height: '20px' }} />
             )}
           </IconButton>
 
@@ -1651,9 +1651,9 @@ const Layout = () => {
                   })}
                 >
                   {drawerOpen ? (
-                    <CloseRounded sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+                    <CloseRounded style={{ fontSize: '20px', width: '20px', height: '20px' }} />
                   ) : (
-                    <SettingsRoundedIcon sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+                    <SettingsRoundedIcon style={{ fontSize: '20px', width: '20px', height: '20px' }} />
                   )}
                 </IconButton>
               </div>
@@ -1693,7 +1693,7 @@ const Layout = () => {
                   })}
                 >
                     <PushPinRounded
-                      sx={{
+                      style={{
                         fontSize: '20px',
                         width: '20px',
                         height: '20px',
