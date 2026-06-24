@@ -47,8 +47,8 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
         sx={{
           position: 'absolute',
           bottom: '0',
-          left: '12px',
-          width: '48px',
+          left: '0',
+          width: '80px',
           height: '24px',
           p: 0,
           minWidth: 'auto',

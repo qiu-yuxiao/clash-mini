@@ -1925,7 +1925,7 @@ const Layout = () => {
                 sx={{
                   position: 'absolute',
                   bottom: '0',
-                  left: '70px',
+                  left: '80px',
                   width: '97.5px',
                   height: '24px',
                   zIndex: 200,
