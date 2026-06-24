@@ -1490,6 +1490,8 @@ const Layout = () => {
               <PushPinRounded
                 sx={{
                   fontSize: '20px',
+                  width: '20px',
+                  height: '20px',
                   color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
                   filter: verge?.enable_always_on_top
                     ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
@@ -1517,9 +1519,9 @@ const Layout = () => {
             })}
           >
             {drawerOpen ? (
-              <CloseRounded sx={{ fontSize: '20px' }} />
+              <CloseRounded sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
             ) : (
-              <SettingsRoundedIcon sx={{ fontSize: '20px' }} />
+              <SettingsRoundedIcon sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
             )}
           </IconButton>
 
@@ -1649,9 +1651,9 @@ const Layout = () => {
                   })}
                 >
                   {drawerOpen ? (
-                    <CloseRounded sx={{ fontSize: '20px' }} />
+                    <CloseRounded sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
                   ) : (
-                    <SettingsRoundedIcon sx={{ fontSize: '20px' }} />
+                    <SettingsRoundedIcon sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
                   )}
                 </IconButton>
               </div>
@@ -1693,6 +1695,8 @@ const Layout = () => {
                     <PushPinRounded
                       sx={{
                         fontSize: '20px',
+                        width: '20px',
+                        height: '20px',
                         color: verge?.enable_always_on_top
                           ? '#FF3B30'
                           : '#888888',
