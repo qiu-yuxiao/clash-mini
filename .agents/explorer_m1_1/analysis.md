@@ -1,175 +1,123 @@
-# Technical Analysis: Frontend Visibility State & Tauri Window Events Optimization
+# Technical Analysis: Clash Mini Outbound Node Card Layout and Icon Size Inflation
 
-## 1. Executive Summary
-This report analyzes the current implementation of `src/hooks/use-visibility.ts` and details a robust, performance-optimized strategy to integrate Tauri's window event listeners and state queries. The goal is to ensure that the hook `useVisibility` accurately returns `false` when the window is minimized or hidden, which in turn suspends CPU-intensive and high-frequency IPC/WebSocket operations (such as traffic monitor graphs, connections, and log subscriptions).
+This report documents the detailed investigation into the layout collapse of the top active connection outbound node card, the size inflation of its delay indicator icon, and the speed test progress spinner (cursor) behavior.
 
-## 2. Current Implementation Analysis of `use-visibility.ts`
-The current implementation of the `useVisibility` hook is purely DOM-based:
-- It initializes state by checking if `document.visibilityState === 'visible'`.
-- It registers three DOM event listeners on the `document`:
-  - `visibilitychange`: updates the state based on `document.visibilityState === 'visible'`.
-  - `focus`: sets the state to `true`.
-  - `pointerdown`: sets the state to `true`.
-- It cleans up these listeners on unmount.
+---
 
-### Key Limitations:
-1. **Lack of Blur Handling**: There is no DOM `blur` event listener to set visibility to `false`. Once the window loses focus, it may remain marked as "visible" (which is appropriate if the window is side-by-side but out of focus). However, it does not handle OS-level minimization or hiding actions gracefully if they do not trigger a DOM `visibilitychange` event (which can happen under certain Tauri webview platforms or when minimized to the system tray).
-2. **Ignorance of Tauri Window State**: The hook has no knowledge of whether the Tauri native window container itself is minimized (`isMinimized`) or hidden (`isHidden`). In Tauri apps, the webview container's DOM visibility state does not always sync reliably with the host OS window minimization, causing background resources (like WebSockets) to continue polling/subscribing.
+## 1. Outbound Node Card Layout Collapse
 
-## 3. Tauri Window APIs and Events Investigation
-Under `@tauri-apps/api/window` (Tauri v2), we have APIs to query and listen to window state:
+### Exact Code Locations
+- **Parent Container Layout**: `src/pages/_layout.tsx` (Lines 1663–1678)
+- **Active Node Card Wrapper**: `src/pages/_layout/components/active-node-card.tsx` (Lines 222–235)
+- **Node Name Typography**: `src/pages/_layout/components/active-node-card.tsx` (Lines 271–297)
+- **Responsive Media Queries**: `src/pages/_layout/components/active-node-card.tsx` (Lines 237–242, 260–264, 351–354)
 
-### A. Window Event Listeners:
-1. `getCurrentWindow().onResized(handler)`:
-   - Emits whenever the native window is resized.
-   - **Relevance**: On Windows and other OSs, minimizing a window changes its size (usually to 0x0 or a specialized minimized state), which fires a resize event. Listening to resize changes allows us to recheck if the window was minimized.
-2. `getCurrentWindow().onFocusChanged(handler)`:
-   - Emits a boolean payload (`true` if focused, `false` if blurred).
-   - Under the hood, this API listens to both the `tauri://focus` and `tauri://blur` Tauri events and normalizes the payload.
-   - **Relevance**: Minimizing or hiding the window always changes its focus state.
+### Diagnosis & Root Cause
+1. **Flexbox Width Inflation (`min-width: auto`)**:
+   In CSS Flexbox, flex children default to `min-width: auto`. Inside `<ActiveNodeStatusCard>`, the node name is displayed inside a `<Typography>` element styled with `whiteSpace: 'nowrap'`. Without `minWidth: 0`, the browser calculates the element's minimum width using the full length of the un-truncated text, ignoring the `maxWidth` constraints during flex layout calculations. This prevents the text from shrinking and forces the parent `<Paper>` card to expand.
+2. **Container Squeeze vs. Viewport Media Queries**:
+   The active node card hides secondary components (the active node label, protocol badge, and node address) using viewport-width media queries (e.g. `@media (max-width: 580px)`). However, in narrow display modes (such as the 270px narrow side pane view), the container is squeezed independently of viewport resizing. Since the viewport width remains wide, the media queries evaluate to `false` and the elements remain visible, overflowing the container's physical boundaries and overlapping adjacent controls.
 
-### B. State Query APIs:
-1. `getCurrentWindow().isMinimized()`:
-   - Returns a `Promise<boolean>`.
-   - **Relevance**: Directly queries the OS/window manager to determine if the window is minimized.
-2. `getCurrentWindow().isFocused()`:
-   - Returns a `Promise<boolean>`.
-   - **Relevance**: Directly queries if the window currently holds focus.
+---
 
-## 4. Robust Visibility Strategy
-Per the interface contracts in `SCOPE.md` (Milestone 1) and the request:
-- `useVisibility()` must return `true` if and only if `document.visibilityState === 'visible'` AND the Tauri window is not minimized.
-- Optionally, we can check for focus, but doing so strictly (e.g. marking visible as `false` when blurred) would disconnect WebSockets when the user interacts with another window (e.g. side-by-side monitoring). Therefore, the recommended robust strategy focuses on **document visibility state and Tauri window minimized state**, while using focus events merely as triggers to re-evaluate the state.
+## 2. Delay Indicator Icon Size Inflation (Diamond Cursor)
 
-### Proposed Code for `src/hooks/use-visibility.ts`
-Below is the proposed implementation of the optimized `useVisibility` hook:
+### Exact Code Locations
+- **Signal Icon Definitions**: `src/pages/_layout/utils/style-helpers.tsx` (Lines 20–68)
+- **Chip Integration**: `src/pages/_layout/components/active-node-card.tsx` (Lines 300–309)
 
-```typescript
-import { useEffect, useState } from 'react'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+### Diagnosis & Root Cause
+1. **Specificity Regression (Inline style vs. MUI sx)**:
+   In commit `0ef47242`, the inline style bindings on all signal icons returned by `getSignalIcon` (e.g. `<SignalNone style={iconStyle} />`) were changed to `sx={iconStyle}` (e.g. `<SignalNone sx={iconStyle} />`).
+   - Inline styles (`style`) possess the highest specificity in CSS, ensuring they always override stylesheet overrides.
+   - MUI `sx` styles compile to Emotion class names, which have the same specificity as standard stylesheet classes.
+2. **MUI Chip Icon Default Class Override**:
+   When passed as the `icon` prop of `<Chip>`, the SvgIcon automatically receives the `.MuiChip-icon` class from MUI, which defaults to `fontSize: 24px` (or `1.5rem`). Because the Emotion class generated by `sx={iconStyle}` has the same specificity, it gets overridden by the default `.MuiChip-icon` styles, inflating the icon to its default large size and breaking the intended 12px sizing boundary.
 
-export const useVisibility = () => {
-  const [visible, setVisible] = useState(() =>
-    typeof document === 'undefined'
-      ? true
-      : document.visibilityState === 'visible',
-  )
+---
 
-  useEffect(() => {
-    let isUnmounted = false
-    let unlistenResize: (() => void) | null = null
-    let unlistenFocus: (() => void) | null = null
+## 3. Speed Test Cursor (CircularProgress Spinner) Sizing and Rendering
 
-    // Asynchronously queries the document and Tauri window states to determine visibility
-    const checkVisibility = async () => {
-      if (isUnmounted) return
+### Exact Code Locations
+- **Testing State Render**: `src/pages/_layout/components/active-node-card.tsx` (Lines 304–309)
+- **MUI Chip Styling Hook**: `src/pages/_layout/components/active-node-card.tsx` (Lines 339–342)
 
-      const isDocVisible = typeof document !== 'undefined'
-        ? document.visibilityState === 'visible'
-        : true
+### Diagnosis & Root Cause
+1. **CircularProgress Specificity Override**:
+   Unlike standard `SvgIcon` components (which scale with `fontSize` because their size is set to `1em`), `CircularProgress` renders a `span` wrapping a native SVG. It does not scale via `fontSize` and instead sets absolute inline styles for its width/height based on the `size` prop. By applying `className="MuiChip-icon"`, MUI's default stylesheet classes override the inline `size={10}` prop, inflating it to a full `40px` unless inline style overrides are applied.
+2. **Testing State Disconnect**:
+   The active node card only displays the `CircularProgress` when `testing` (the local state) is true. If a speed test is triggered globally or in the background (which sets `delay === -2`), `testing` remains `false`. The Chip renders `signalInfo.icon` (which is `SignalNone`) instead of the animated `CircularProgress`.
 
-      let isMin = false
-      try {
-        const currentWindow = getCurrentWindow()
-        isMin = await currentWindow.isMinimized()
-      } catch (err) {
-        // Fallback to false if the Tauri API is unavailable (e.g. during tests or browser preview)
-        console.warn('[useVisibility] Failed to query minimized state:', err)
-      }
+---
 
-      const nextVisible = isDocVisible && !isMin
+## 4. Suggested Fixes (Non-destructive)
 
-      if (!isUnmounted) {
-        setVisible(nextVisible)
-      }
-    }
-
-    // Run immediately on mount to sync the state asynchronously
-    checkVisibility()
-
-    // DOM event listeners
-    const handleVisibilityChange = () => {
-      checkVisibility()
-    }
-    const handleFocus = () => {
-      checkVisibility()
-    }
-    const handlePointerDown = () => {
-      checkVisibility()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    document.addEventListener('focus', handleFocus)
-    document.addEventListener('pointerdown', handlePointerDown)
-
-    // Tauri window event listeners
-    try {
-      const currentWindow = getCurrentWindow()
-
-      // Listen to window resize events (triggered during minimization/restoration)
-      currentWindow
-        .onResized(() => {
-          checkVisibility()
-        })
-        .then((unlisten) => {
-          if (isUnmounted) {
-            unlisten()
-          } else {
-            unlistenResize = unlisten
-          }
-        })
-        .catch((err) => {
-          console.warn('[useVisibility] Failed to bind onResized:', err)
-        })
-
-      // Listen to focus changes (triggered when window is focused/blurred/minimized)
-      currentWindow
-        .onFocusChanged(() => {
-          checkVisibility()
-        })
-        .then((unlisten) => {
-          if (isUnmounted) {
-            unlisten()
-          } else {
-            unlistenFocus = unlisten
-          }
-        })
-        .catch((err) => {
-          console.warn('[useVisibility] Failed to bind onFocusChanged:', err)
-        })
-    } catch (err) {
-      console.warn('[useVisibility] Tauri API not available, using DOM events only:', err)
-    }
-
-    // Cleanup listeners
-    return () => {
-      isUnmounted = true
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      document.removeEventListener('focus', handleFocus)
-      document.removeEventListener('pointerdown', handlePointerDown)
-      if (unlistenResize) unlistenResize()
-      if (unlistenFocus) unlistenFocus()
-    }
-  }, [])
-
-  return visible
-}
+### A. Fix Active Node Card & Typography Squeezing
+Add `minWidth: 0` and `overflow: 'hidden'` to both the `<Paper>` card and the `<Typography>` node name component:
+```diff
+diff --git a/src/pages/_layout/components/active-node-card.tsx b/src/pages/_layout/components/active-node-card.tsx
+--- a/src/pages/_layout/components/active-node-card.tsx
++++ b/src/pages/_layout/components/active-node-card.tsx
+@@ -222,6 +222,8 @@ export const ActiveNodeStatusCard = () => {
+         justifyContent: 'center',
+         gap: 1.5,
+         height: '28px',
++        minWidth: 0,
++        overflow: 'hidden',
+         ...get3DCardStyle(theme, 'default'),
+       }}
+     >
+@@ -274,6 +276,7 @@ export const ActiveNodeStatusCard = () => {
+             fontSize: '12px',
+             color: isRetro3DDark ? '#2C1F03' : 'text.primary',
+             maxWidth: { xs: '120px', sm: '240px', md: '360px' },
++            minWidth: 0,
+             overflow: 'hidden',
+             textOverflow: 'ellipsis',
+             whiteSpace: 'nowrap',
 ```
 
-### Breakdown of State Transitions:
-1. **Minimize Event**: 
-   - Fires `onFocusChanged(false)` and `onResized`. 
-   - `checkVisibility` runs asynchronously, checks `currentWindow.isMinimized()`, gets `true`. State updates to `false`.
-2. **Restore Event**: 
-   - Fires `onResized` and `onFocusChanged(true)`. 
-   - `checkVisibility` queries `isMinimized()`, gets `false`. State updates to `true`.
-3. **Tray Hide / Show**: 
-   - Hiding changes document visibility state and window focus.
-   - Evaluation of `document.visibilityState === 'visible'` correctly determines visibility.
-4. **DOM Focus/PointerDown**:
-   - Re-evaluates visibility state asynchronously to ensure consistency when clicking/interacting.
+### B. Fix Delay Icon Size Inflation
+Revert `sx={iconStyle}` back to inline `style={iconStyle}` in `style-helpers.tsx` to restore specificity:
+```diff
+diff --git a/src/pages/_layout/utils/style-helpers.tsx b/src/pages/_layout/utils/style-helpers.tsx
+--- a/src/pages/_layout/utils/style-helpers.tsx
++++ b/src/pages/_layout/utils/style-helpers.tsx
+@@ -20,20 +20,20 @@ export function getSignalIcon(delay: number, t: any) {
+   const iconStyle = { fontSize: '12px', width: '12px', height: '12px' }
+   if (delay === -2)
+     return {
+-      icon: <SignalNone sx={iconStyle} />,
++      icon: <SignalNone style={iconStyle} />,
+       text: t('settings.mini.statusTesting', { defaultValue: '测试中' }),
+       color: 'text.secondary',
+     }
+   if (delay === -1)
+     return {
+-      icon: <SignalNone sx={iconStyle} />,
++      icon: <SignalNone style={iconStyle} />,
+       text: t('settings.mini.statusUntested', { defaultValue: '未测试' }),
+       color: 'text.secondary',
+     }
+```
+*(Apply this reversion to all other signal icons in the function: `SignalError`, `SignalWeak`, `SignalMedium`, `SignalGood`, `SignalStrong`)*
 
-## 5. Potential Issues & Mitigation Strategy
-1. **Tauri Environment Availability**: In web-only development modes or unit tests, `getCurrentWindow` will throw or return an invalid object. We mitigate this by wrapping the Tauri calls in a `try...catch` block and defaulting `isMin = false`, ensuring the hook remains functional in standard web browsers and testing environments.
-2. **Race Conditions during Unmount**: Since `onResized` and `onFocusChanged` return promises, the component might unmount before they resolve. We mitigate this by setting an `isUnmounted` flag, checking it inside the `.then()` callbacks, and immediately calling the resolved unlisten function if the component has already unmounted.
-3. **Redundant Render Cycles**: React's state updater (`setVisible`) automatically skips re-rendering if the new boolean state matches the previous state. This ensures that multiple event triggers (like both a resize and a focus event firing during minimize) do not cause unnecessary component updates.
+### C. Fix Speed Test Spinner Size Inflation & State Check
+1. Change the card check to render the loading spinner when `testing` is true OR when the delay state is `-2` (background testing).
+2. Restore inline style to the `CircularProgress` component:
+```diff
+diff --git a/src/pages/_layout/components/active-node-card.tsx b/src/pages/_layout/components/active-node-card.tsx
+--- a/src/pages/_layout/components/active-node-card.tsx
++++ b/src/pages/_layout/components/active-node-card.tsx
+@@ -301,8 +301,8 @@ export const ActiveNodeStatusCard = () => {
+         <Chip
+           size="small"
+           icon={
+-            testing ? (
+-              <CircularProgress size={10} color="inherit" sx={{ width: '10px !important', height: '10px !important' }} />
++            (testing || delay === -2) ? (
++              <CircularProgress size={10} color="inherit" style={{ width: '10px', height: '10px' }} />
+             ) : (
+               signalInfo.icon
+             )
+```

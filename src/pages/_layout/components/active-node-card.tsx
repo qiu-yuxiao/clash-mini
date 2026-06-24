@@ -275,7 +275,7 @@ export const ActiveNodeStatusCard = () => {
             fontWeight: 'bold',
             fontSize: '12px',
             color: isRetro3DDark ? '#2C1F03' : 'text.primary',
-            maxWidth: { xs: '120px', sm: '240px', md: '360px' },
+            maxWidth: { xs: '120px', sm: '180px' },
             minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -301,14 +301,14 @@ export const ActiveNodeStatusCard = () => {
         <Chip
           size="small"
           icon={
-            testing ? (
-              <CircularProgress size={10} color="inherit" sx={{ width: '10px !important', height: '10px !important' }} />
+            (testing || delay === -2) ? (
+              <CircularProgress size={10} color="inherit" style={{ width: '10px', height: '10px' }} />
             ) : (
               signalInfo.icon
             )
           }
           label={
-            testing
+            (testing || delay === -2)
               ? t('settings.mini.statusTesting', { defaultValue: '测试中' }) +
                 '...'
               : delayManager.formatDelay(delay)

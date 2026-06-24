@@ -1,43 +1,41 @@
-# BRIEFING — 2026-06-13T16:15:00+08:00
+# BRIEFING — 2026-06-24T10:02:00Z
 
 ## Mission
-Analyze WebSocket subscriptions for traffic, connections, and logs, and formulate a strategy to conditionally connect/disconnect them based on window visibility.
+Analyze the missing table inside the proxy node list view, and the colored double-border outline around the proxy node table.
 
 ## 🔒 My Identity
 - Archetype: Teamwork explorer
-- Roles: Read-only investigation: analyze problems, synthesize findings, produce structured reports
+- Roles: Read-only investigator
 - Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\explorer_m1_2
-- Original parent: 0fbabf25-8b4d-4a1a-8893-a7c9d0aa698c
-- Milestone: Milestone 1
+- Original parent: 6b4d9fe2-46ca-431a-9563-7bd9dd7e8292
+- Milestone: Proxy Node List Analysis
 
 ## 🔒 Key Constraints
 - Read-only investigation — do NOT implement
-- Network Restrictions: CODE_ONLY network mode. No external websites/services access.
+- CODE_ONLY network mode: no external requests, no curl/wget/lynx.
+- Do not modify any source code files. Deliver findings in handoff.md.
 
 ## Current Parent
-- Conversation ID: 0fbabf25-8b4d-4a1a-8893-a7c9d0aa698c
-- Updated: not yet
+- Conversation ID: 6b4d9fe2-46ca-431a-9563-7bd9dd7e8292
+- Updated: yes
 
 ## Investigation State
 - **Explored paths**:
-  - `src/hooks/use-mihomo-ws-subscription.ts` (Core WebSocket sharing & lifetime implementation)
-  - `src/hooks/use-traffic-data.ts` (Traffic hook)
-  - `src/hooks/use-connection-data.ts` (Connections hook)
-  - `src/hooks/use-log-data.ts` (Logs hook)
-  - `src/hooks/use-visibility.ts` (Page visibility state observer)
-  - `src/pages/logs.tsx` (Logs UI component mounting behavior)
+  - `src/components/proxy/use-render-list.ts`
+  - `src/components/proxy/proxy-groups.tsx`
+  - `src/components/proxy/proxy-render.tsx`
+  - `src/components/proxy/proxy-item.tsx`
+  - `src/assets/styles/index.scss`
+  - `src/pages/_layout/hooks/use-custom-theme.ts`
+  - `src/components/connection/connection-table.tsx`
 - **Key findings**:
-  - `useMihomoWsSubscription` manages WebSocket connection lifecycle dynamically using a `subscriptionCacheKey`. When the key is `null`, it bypasses connection and cleans up existing references/sockets.
-  - `useConnectionData` already integrates `useVisibility()` and conditionally returns a `null` key, which stops both WebSocket connections and its 3s low-frequency REST polling when window is hidden.
-  - `useTrafficData` accepts an `enabled` prop, but does not query `useVisibility()` internally. Integrating `useVisibility()` internally will automatically pause traffic WebSocket subscription and propagate the disable state to the underlying Web Worker client.
-  - `useLogData` does not use `useVisibility()` at all. It must be updated to import `useVisibility()` and conditionally return `null` for its subscription key when the page is hidden, safely pausing the log streaming connection.
-- **Unexplored areas**:
-  - None. All target hooks have been fully analyzed.
+  - The missing table is caused by `calculateColumns` ignoring the configured columns count (hardcoding to 3 columns, preventing the 1-column list/table layout) and missing group headers/toolbars (type 0 and type 1).
+  - The double border is caused by `theme-panel` class border rules (`4px double var(--theme-border) !important`) and right/bottom cell borders (`5px double var(--theme-border)`).
+- **Unexplored areas**: None.
 
 ## Key Decisions Made
-- Confirmed that `useMihomoWsSubscription` handles key transitions to `null` cleanly, making it the perfect point of control.
-- Designed precise, minimally invasive changes for `useTrafficData` and `useLogData` to introduce visibility awareness without breaking existing options or component contracts.
+- Confirmed cause of missing table and double-borders using exact line-by-line file traces.
 
 ## Artifact Index
-- `c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\explorer_m1_2\analysis.md` — Detailed analysis report on WebSocket hooks and visibility state
-- `c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\explorer_m1_2\handoff.md` — Handoff report complying with the 5-component protocol
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\explorer_m1_2\analysis.md — Detailed analysis
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\explorer_m1_2\handoff.md — Handoff report

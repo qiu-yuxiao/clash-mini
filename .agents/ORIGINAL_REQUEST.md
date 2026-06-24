@@ -168,6 +168,44 @@ Ensure that absolutely no code changes, modifications, or files are written to t
 - [ ] Provide proposed code diffs/recommendations in the report text itself without altering the repository files.
 - [ ] Ensure that git status on the workspace remains completely clean (no dirty files) upon completion of the task.
 
+## Follow-up — 2026-06-24T17:58:02+08:00
+
+Perform a comprehensive layout and rendering correctness audit of the Clash Mini project to identify the root causes of the layout collapse (top active export node row size inflation and speed test cursor occupying the screen), missing node table, and double-border outline issues, specifically verifying the impact of the plugin upgrade (from 0.5.2 to 0.5.4) and any potentially missing/removed patch/batch files since version 1.6.5.
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: benchmark
+
+## Requirements
+
+### R1. Target Layout Bug Diagnosis
+Audit all React components, page layouts, styling rules (CSS/SCSS), and state hooks related to:
+- The top active connection outbound node card and the size inflation of its delay indicator icon (diamond cursor).
+- The missing table inside the proxy node list view.
+- The colored double-border outline around the proxy node table.
+
+Identify the exact root causes of these rendering and layout anomalies.
+
+### R2. Plugin Upgrade and Build Script Audit
+Investigate whether the upgrade of the `tauri-plugin-mihomo` plugin (or other dependencies) from `0.5.2` to `0.5.4` is related to these issues. Verify if any patch, build script, or batch file (for building Javascript assets of the plugin or compiling bindings) was deleted, modified, or needs to be executed to resolve the issue.
+
+### R3. Non-Modification Constraint
+The audit team must strictly perform static analysis and review. Do not modify, add, or delete any source code files inside the working directory. All proposed fixes must be documented solely as code diffs in the final report.
+
+### R4. Audit Report
+Output a detailed markdown report named `comprehensive_layout_audit_report.md` stored in the workspace at `docs/comprehensive_layout_audit_report.md`.
+
+## Acceptance Criteria
+
+### Deliverable Verification
+- [ ] The audit report exists at the exact path `docs/comprehensive_layout_audit_report.md`.
+- [ ] The report contains a clear description of the root cause of the top active node icon size inflation.
+- [ ] The report contains a clear description of why the node table inside the proxy list is missing.
+- [ ] The report registers a finding card for each issue with:
+  - Exact file path and line numbers using clickable `file:///` markdown links.
+  - Detailed root cause analysis.
+  - A suggested diff code block to resolve the issue.
+- [ ] The report explicitly details the investigation findings on the `0.5.2` to `0.5.4` plugin upgrade, including any missing/removed patch/batch scripts.
+- [ ] The git status of the project remains 100% clean (`git status --porcelain` has no output for source files).
 
 ## Follow-up — 2026-06-24T11:26:42+08:00
 

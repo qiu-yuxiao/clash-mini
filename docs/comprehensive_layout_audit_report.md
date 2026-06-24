@@ -1,258 +1,360 @@
-# Clash Mini Comprehensive Layout & Rendering Audit Report
+# Comprehensive Layout and Rendering Correctness Audit Report
 
-## Executive Summary
-This report presents a comprehensive, multi-angle code audit of the Clash Mini (Clash Verge) project to identify all potential root causes of layout/screen rendering failures (chaos, blanks, or crashes) introduced since version 1.6.5.
+## 1. Executive Summary
+This audit was commissioned to diagnose visual layout/rendering correctness bugs in Clash Mini (Clash Verge UI variant) and to audit the impact of upgrading the `tauri-plugin-mihomo` plugin from version `0.5.2` to `0.5.4`.
 
-Under the strict **Non-Modification Constraint**, no changes were directly applied to the codebase. All findings, logic chains, and precise code diff blocks have been compiled below to guide the development team in resolving these visual and layout anomalies.
-
-**Overall Layout & Rendering Stability: AMBER (High Risk of Rendering Failures & Hangs)**
-While the custom skeuomorphic 3D aesthetics are well-structured, several security hardening and configuration refactor changes introduced since version 1.6.5 have created regression vectors:
-1. **Asset Protocol Scope Tightening**: Restricting asset loads to `"$APPDATA/**"` blocks cached profile icons in portable mode.
-2. **Hidden Skin Switcher & Language Selector**: A media query hides the switcher at the default window height (680px).
-3. **Settings Drawer horizontal layout overflow**: Squeezes the connections panel to 0px, making it invisible.
-4. **Startup Script Blocking**: A synchronous `.output().await` blocks window creation, causing permanent blank screens/crashes.
-5. **Service Manager Deadlocks**: Mutex lock contention blocks the GUI initialization thread during reinstall UAC prompts.
-6. **Live Theme Config Updates Skipped**: Config patches do not emit `RefreshVerge`, ignoring theme/CSS changes.
-7. **Window Close Unconditionally Destroys WebView**: Discards all state memory and slows window recreation.
-
-Applying the proposed diffs will restore visual compliance with the project's design agreements and ensure smooth rendering.
-
----
-
-## 🎨 Component Compliance Status Table
-
-The following table maps the compliance status of layout components against the six skin styles (`Trump-3D` / `Original` / `Modern` / `Frosted` / `Cyberpunk` / `Monochrome`):
-
-| Component / Layout | Trump-3D | Original | Modern | Frosted | Cyberpunk | Monochrome | Notes |
-|---|---|---|---|---|---|---|---|
-| `_layout.tsx` Settings Drawer | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | Squeezes right connection panel to 0px (AUDIT-LAYOUT-001) and hides switcher (AUDIT-LAYOUT-002). |
-| `use-custom-theme.ts` | ✅ Compliant | ❌ Non-compliant | ✅ Compliant | ✅ Compliant | ✅ Compliant | ⚠️ Partial | Original skin accent color is static in React (AUDIT-LAYOUT-008); Monochrome lacks contrast (AUDIT-LAYOUT-009). |
-| `base-switch.tsx` | ✅ Compliant | ✅ Compliant | ✅ Compliant | ✅ Compliant | ❌ Non-compliant | ❌ Non-compliant | Small switches rendered at standard size (AUDIT-LAYOUT-010). |
-| `tauri.conf.json` | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | ⚠️ Partial | Scope blocks portable mode icons (AUDIT-LAYOUT-003). |
+### Key Findings:
+1. **Outbound Node Card Layout & Icon Inflation**:
+   - The layout collapse is caused by CSS flex items defaulting to `min-width: auto`. Typography constraints based on viewport breakpoints fail when the container is squeezed in narrow panels.
+   - SvgIcon size inflation is caused by Emotion classes (`sx`) having lower CSS specificity than the default MUI `.MuiChip-icon` styles (which enforce `fontSize: 24px`). Reverting to inline `style` overrides restores layout dimensions to `12px`.
+   - The speed test spinner fails to display on background speed tests due to a state check limitation (`testing` vs `delay === -2`).
+2. **Missing Proxy Node Table/List**:
+   - The proxy single-column list/table layout (`type: 2`) was inaccessible because column layout calculations hardcoded the column count to `3`, ignoring the user's setting.
+   - Collapsible group headers (`type: 0`) were completely omitted from list rendering in normal mode, collapsing all proxy nodes into a single flat list without separators.
+3. **Double-Border Outline**:
+   - A `4px double` border was globally enforced via the `.theme-panel` class in `index.scss` and cell components inside `proxy-render.tsx` / `connection-table.tsx`. Replacing these with a clean `1px solid` border resolves the double-border style anomaly.
+4. **Plugin & Build Script Audit**:
+   - The upgrade from `0.5.2` to `0.5.4` is a metadata-only change in Cargo configuration files to satisfy `verify.py` validation. It does not contain layout or rendering code modifications.
+   - No build scripts, patches, or batch files were deleted. Manually executing `cargo test` followed by `pnpm build` in the plugin directory is only necessary if plugin models/bindings are modified.
 
 ---
 
-## 🖥️ Layout & Rendering Audit Findings
+## 2. Target Layout Bug Diagnosis
 
-### AUDIT-LAYOUT-001: Settings Drawer Horizontal Layout Overflow
-* **Severity**: High
-* **File Path & Link**: [_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx#L1726-L1762)
-* **Description**: Squeezes the Connections column to 0px, making active/closed connection lists completely invisible and inaccessible in the default/minimal window width of 270px.
-* **Root Cause**: The Settings Drawer container (`.theme-panel`) uses `display: 'flex'` (row layout by default) with a fixed-width left settings column of `240px` and total padding/gaps of `36px`, exceeding the window width of `270px`. This leaves negative space for the right connections panel.
-* **Suggested Fix**:
+### Bug 1: Outbound Node Card Collapse, Delay Icon Sizing, and Speed Test Spinner
+* **Affected Files & Links**:
+  - [src/pages/_layout/components/active-node-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/active-node-card.tsx#L271-L320)
+  - [src/pages/_layout/utils/style-helpers.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/style-helpers.tsx#L20-L68)
+* **Root Causes**:
+  - **Layout Collapse**: The node name `<Typography>` uses responsive `maxWidth` breakpoints (e.g., `md: '360px'`). Under wide screens with narrow side panels (e.g., 270px), it defaults to `360px`, overflowing container boundaries.
+  - **Icon Sizing**: `getSignalIcon` returned SvgIcons with `sx={iconStyle}` overrides. Class-level specificity is lower than MUI's internal `.MuiChip-icon` selector. The icons were styled at 24px instead of 12px.
+  - **Spinner Visibility & Sizing**: The card only checked local state `testing`. Sizing was bloated due to overriding via Emotion classes. Background speed tests (`delay === -2`) rendered static grey indicators instead of animated loaders.
+* **Proposed Diffs**:
+
+#### `src/pages/_layout/components/active-node-card.tsx`
+* **File Location**: [src/pages/_layout/components/active-node-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/active-node-card.tsx#L275-L318)
 ```diff
-diff --git a/src/pages/_layout.tsx b/src/pages/_layout.tsx
-index a123456..b654321 100644
---- a/src/pages/_layout.tsx
-+++ b/src/pages/_layout.tsx
-@@ -1732,3 +1732,4 @@
-                 width: '100%',
-                 height: '100%',
-                 zIndex: 100,
--                display: 'flex',
-+                display: 'flex',
-+                flexDirection: 'row',
-+                flexWrap: 'wrap',
+diff --git a/src/pages/_layout/components/active-node-card.tsx b/src/pages/_layout/components/active-node-card.tsx
+--- a/src/pages/_layout/components/active-node-card.tsx
++++ b/src/pages/_layout/components/active-node-card.tsx
+@@ -275,3 +275,3 @@
+             fontWeight: 'bold',
+             fontSize: '12px',
+             color: isRetro3DDark ? '#2C1F03' : 'text.primary',
+-            maxWidth: { xs: '120px', sm: '240px', md: '360px' },
++            maxWidth: '120px',
+             minWidth: 0,
+             overflow: 'hidden',
+@@ -301,9 +301,9 @@
+       {activeNodeName && (
+         <Chip
+           size="small"
+           icon={
+-            testing ? (
+-              <CircularProgress size={10} color="inherit" sx={{ width: '10px !important', height: '10px !important' }} />
++            (testing || delay === -2) ? (
++              <CircularProgress size={10} color="inherit" style={{ width: '10px', height: '10px' }} />
+             ) : (
+               signalInfo.icon
+             )
+           }
+           label={
+-            testing
++            (testing || delay === -2)
+               ? t('settings.mini.statusTesting', { defaultValue: '测试中' }) +
+                 '...'
+               : delayManager.formatDelay(delay)
+           }
 ```
 
----
-
-### AUDIT-LAYOUT-002: Skin Switcher & Language Selector Hidden at Default Window Height
-* **Severity**: Medium
-* **File Path & Link**: [_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx#L1897-L1899)
-* **Description**: Users cannot see or switch skins/languages because the elements are completely hidden under default window dimensions.
-* **Root Cause**: The media query `@media (max-height: 830px) { display: none }` is applied to these absolutely positioned elements inside the settings drawer. Since the default window height is `680px` (which is less than `830px`), they are always hidden by default.
-* **Suggested Fix**:
+#### `src/pages/_layout/utils/style-helpers.tsx`
+* **File Location**: [src/pages/_layout/utils/style-helpers.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/style-helpers.tsx#L20-L68)
 ```diff
-diff --git a/src/pages/_layout.tsx b/src/pages/_layout.tsx
-index a123456..b654321 100644
---- a/src/pages/_layout.tsx
-+++ b/src/pages/_layout.tsx
-@@ -1897,3 +1897,3 @@
--                  '@media (max-height: 830px)': {
--                    display: 'none',
--                  },
-+                  '@media (max-height: 500px)': {
-+                    display: 'none',
-+                  },
-@@ -1954,3 +1954,3 @@
--                  '@media (max-height: 830px)': {
--                    display: 'none',
--                  },
-+                  '@media (max-height: 500px)': {
-+                    display: 'none',
-+                  },
-```
-
----
-
-### AUDIT-LAYOUT-003: Tightened Asset Protocol Blocks Icons in Portable Mode
-* **Severity**: Medium
-* **File Path & Link**: [tauri.conf.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/tauri.conf.json#L61-L69)
-* **Description**: Profiles and custom icons fail to render and show up as broken/blank images when Clash Mini is run in portable mode.
-* **Root Cause**: The asset protocol scope is restricted to `"$APPDATA/**"`. In portable mode, the `.config/clash-verge/` directory resides in the execution directory (outside AppData), causing Tauri to block file queries with `403 Forbidden`.
-* **Suggested Fix**:
-```diff
-diff --git a/src-tauri/tauri.conf.json b/src-tauri/tauri.conf.json
-index a123456..b654321 100644
---- a/src-tauri/tauri.conf.json
-+++ b/src-tauri/tauri.conf.json
-@@ -64,3 +64,5 @@
-           "allow": [
--            "$APPDATA/**"
-+            "$APPDATA/**",
-+            "$EXE_DIR/**",
-+            "$RESOURCE_DIR/**"
-           ],
-```
-
----
-
-### AUDIT-LAYOUT-004: Theme/CSS Injection Patch Updates Silently Ignored
-* **Severity**: Medium
-* **File Path & Link**: [config.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/config.rs#L73-L165)
-* **Description**: Real-time styling/layout updates are ignored when users change theme settings or inject custom CSS, requiring manual app restart to apply changes.
-* **Root Cause**: `determine_update_flags` fails to check/set `UpdateFlags::VERGE_CONFIG` for `theme_mode` and `theme_setting` (`css_injection`) changes, omitting `RefreshVerge` event emission.
-* **Suggested Fix**:
-```diff
-diff --git a/src-tauri/src/feat/config.rs b/src-tauri/src/feat/config.rs
-index a123456..b654321 100644
---- a/src-tauri/src/feat/config.rs
-+++ b/src-tauri/src/feat/config.rs
-@@ -151,3 +151,3 @@
--    if enable_global_hotkey.is_some() || home_cards.is_some() {
-+    if enable_global_hotkey.is_some() || home_cards.is_some() || patch.theme_mode.is_some() || patch.theme_setting.is_some() {
-         update_flags.insert(UpdateFlags::VERGE_CONFIG);
+diff --git a/src/pages/_layout/utils/style-helpers.tsx b/src/pages/_layout/utils/style-helpers.tsx
+--- a/src/pages/_layout/utils/style-helpers.tsx
++++ b/src/pages/_layout/utils/style-helpers.tsx
+@@ -20,49 +20,49 @@
+ export function getSignalIcon(delay: number, t: any) {
+   const iconStyle = { fontSize: '12px', width: '12px', height: '12px' }
+   if (delay === -2)
+     return {
+-      icon: <SignalNone sx={iconStyle} />,
++      icon: <SignalNone style={iconStyle} />,
+       text: t('settings.mini.statusTesting', { defaultValue: '测试中' }),
+       color: 'text.secondary',
      }
+   if (delay === -1)
+     return {
+-      icon: <SignalNone sx={iconStyle} />,
++      icon: <SignalNone style={iconStyle} />,
+       text: t('settings.mini.statusUntested', { defaultValue: '未测试' }),
+       color: 'text.secondary',
+     }
+   if (delay > 1e5)
+     return {
+-      icon: <SignalError sx={iconStyle} />,
++      icon: <SignalError style={iconStyle} />,
+       text: t('settings.mini.statusError', { defaultValue: '错误' }),
+       color: 'error.main',
+     }
+   if (delay === 0 || delay >= 10000)
+     return {
+-      icon: <SignalError sx={iconStyle} />,
++      icon: <SignalError style={iconStyle} />,
+       text: t('settings.mini.statusTimeout', { defaultValue: '超时' }),
+       color: 'error.main',
+     }
+   if (delay >= 500)
+     return {
+-      icon: <SignalWeak sx={iconStyle} />,
++      icon: <SignalWeak style={iconStyle} />,
+       text: t('settings.mini.statusDelayHigh', { defaultValue: '延迟较高' }),
+       color: 'error.main',
+     }
+   if (delay >= 300)
+     return {
+-      icon: <SignalMedium sx={iconStyle} />,
++      icon: <SignalMedium style={iconStyle} />,
+       text: t('settings.mini.statusDelayMedium', { defaultValue: '延迟中等' }),
+       color: 'warning.main',
+     }
+   if (delay >= 200)
+     return {
+-      icon: <SignalGood sx={iconStyle} />,
++      icon: <SignalGood style={iconStyle} />,
+       text: t('settings.mini.statusDelayGood', { defaultValue: '延迟良好' }),
+       color: 'info.main',
+     }
+   return {
+-    icon: <SignalStrong sx={iconStyle} />,
++    icon: <SignalStrong style={iconStyle} />,
+     text: t('settings.mini.statusDelayExcellent', { defaultValue: '延迟极佳' }),
+     color: 'success.main',
+   }
+ }
 ```
 
 ---
 
-### AUDIT-LAYOUT-005: Startup Script Blocks Window Initialization
-* **Severity**: High
-* **File Path & Link**: [mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/mod.rs#L60-L63)
-* **Description**: Startup hang or permanent blank screen when users configure a blocking/long-running startup script.
-* **Root Cause**: `resolve_setup_async()` runs `init_startup_script().await` synchronously before creating the window. The startup script function waits for command exit output asynchronously, blocking the thread indefinitely.
-* **Suggested Fix**:
-```diff
-diff --git a/src-tauri/src/utils/resolve/mod.rs b/src-tauri/src/utils/resolve/mod.rs
-index a123456..b654321 100644
---- a/src-tauri/src/utils/resolve/mod.rs
-+++ b/src-tauri/src/utils/resolve/mod.rs
-@@ -60,3 +60,5 @@
--        init_startup_script().await;
-+        tokio::spawn(async {
-+            let _ = init_startup_script().await;
-+        });
-```
+## 3. Missing Table inside Proxy Node List View
+* **Affected Files & Links**:
+  - [src/components/proxy/use-render-list.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/use-render-list.ts#L82-L460)
+* **Root Causes**:
+  - **Layout Column Ignored**: In `use-render-list.ts`, `calculateColumns` completely ignored the user's configured column layout parameter (`_configCol`), hardcoding the return value to `3` (for widths > 285px). This prevented column counts of `1`, which renders the table-based single-column item list (`type: 2`).
+  - **Collapsible Headers Missing**: The normal mode rendering logic in `use-render-list.ts` omitted pushing collapsible group headers (`type: 0`) and checking `headState.open`. This collapsed all proxy nodes into a single flat list without separators or group boundaries.
+* **Proposed Diffs**:
 
----
-
-### AUDIT-LAYOUT-006: Service Manager Reinstall Deadlock during Startup
-* **Severity**: High
-* **File Path & Link**: [service.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/service.rs#L539-L566)
-* **Description**: UI hangs and startup freeze if the app needs to reinstall the helper service.
-* **Root Cause**: `init_service_manager()` locks the global `SERVICE_MANAGER` Mutex. Inside `refresh()`, it triggers service reinstallation which shows a blocking UAC prompt. The core startup loop checks service status by locking `SERVICE_MANAGER`, resulting in a deadlock.
-* **Suggested Fix**:
+#### `src/components/proxy/use-render-list.ts`
+* **File Location**: [src/components/proxy/use-render-list.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/use-render-list.ts#L82-L460)
 ```diff
-diff --git a/src-tauri/src/core/service.rs b/src-tauri/src/core/service.rs
-index a123456..b654321 100644
---- a/src-tauri/src/core/service.rs
-+++ b/src-tauri/src/core/service.rs
-@@ -539,3 +539,4 @@
-     pub async fn refresh(&mut self) -> Result<()> {
--        let status = self.check_service_comprehensive().await;
--        self.0 = status.clone();
--        logging_error!(Type::Service, self.handle_service_status(&status).await);
-+        let status = self.check_service_comprehensive().await;
-+        if matches!(status, ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired) {
-+            tokio::task::spawn_blocking(move || {
-+                let _ = reinstall_service();
-+            });
+diff --git a/src/components/proxy/use-render-list.ts b/src/components/proxy/use-render-list.ts
+--- a/src/components/proxy/use-render-list.ts
++++ b/src/components/proxy/use-render-list.ts
+@@ -82,6 +82,6 @@
+ const calculateColumns = (width: number, _configCol: number): number => {
+   if (width <= 285) {
+     return 1
+   }
+-  return 3
++  return _configCol
+ }
+@@ -420,40 +420,44 @@
+-      ret.push({
+-        type: 1,
+-        key: `head-${group.name}`,
+-        group,
+-        headState,
+-      })
+-
+-      if (!proxies.length) {
+-        ret.push({
+-          type: 3,
+-          key: `empty-${group.name}`,
+-          group,
+-          headState,
+-        })
+-      } else if (col > 1) {
+-        ret.push(
+-          ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
+-            type: 4 as const,
+-            key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
+-            group,
+-            headState,
+-            col,
+-            proxyCol,
+-            provider: proxyCol[0]?.provider,
+-            indexInGroup: colIndex,
+-          })),
+-        )
+-      } else {
+-        ret.push(
+-          ...proxies.map((proxy, proxyIdx) => ({
+-            type: 2 as const,
+-            key: `${group.name}-${proxy?.name ?? proxyIdx}`,
+-            group,
+-            proxy,
+-            headState,
+-            provider: proxy.provider,
+-            indexInGroup: proxyIdx,
+-          })),
+-        )
+-      }
++      ret.push({
++        type: 0,
++        key: `group-${group.name}`,
++        group,
++        headState,
++      })
++
++      if (headState.open) {
++        ret.push({
++          type: 1,
++          key: `head-${group.name}`,
++          group,
++          headState,
++        })
++
++        if (!proxies.length) {
++          ret.push({
++            type: 3,
++            key: `empty-${group.name}`,
++            group,
++            headState,
++          })
++        } else if (col > 1) {
++          ret.push(
++            ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
++              type: 4 as const,
++              key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
++              group,
++              headState,
++              col,
++              proxyCol,
++              provider: proxyCol[0]?.provider,
++              indexInGroup: colIndex,
++            })),
++          )
 +        } else {
-+            self.0 = status.clone();
-+            logging_error!(Type::Service, self.handle_service_status(&status).await);
++          ret.push(
++            ...proxies.map((proxy, proxyIdx) => ({
++              type: 2 as const,
++              key: `${group.name}-${proxy?.name ?? proxyIdx}`,
++              group,
++              proxy,
++              headState,
++              provider: proxy.provider,
++              indexInGroup: proxyIdx,
++            })),
++          )
 +        }
++      }
 ```
 
 ---
 
-### AUDIT-LAYOUT-007: Window Close Unconditionally Destroys WebView State
-* **Severity**: Medium
-* **File Path & Link**: [lightweight.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/lightweight.rs#L100-L115)
-* **Description**: Slower reopening of the window and loss of all frontend state/UI focus on close.
-* **Root Cause**: `entry_lightweight_mode()` unconditionally destroys the main window instead of checking if `enable_auto_light_weight_mode` is true.
-* **Suggested Fix**:
+## 4. Colored Double-Border Outline around Proxy Node Table
+* **Affected Files & Links**:
+  - [src/components/proxy/proxy-groups.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-groups.tsx#L782-L792)
+  - [src/components/proxy/proxy-render.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-render.tsx#L84-L89)
+  - [src/components/connection/connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx#L52-L73)
+  - [src/assets/styles/index.scss](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/assets/styles/index.scss#L73-L84)
+* **Root Causes**:
+  - The outer wrapper box of the virtualized proxy groups uses `className="theme-panel"`.
+  - In `src/assets/styles/index.scss`, the `.theme-panel` class enforces `border: 4px double var(--theme-border) !important` across all skins/themes.
+  - Proxy cell renderers use `borderRight: '5px double var(--theme-border)'` internally for separation borders.
+  - Connection tables use `border: '5px double var(--theme-border)'` and `borderBottom: '5px double var(--theme-border)'`.
+* **Proposed Diffs**:
+
+#### `src/components/proxy/proxy-groups.tsx`
+* **File Location**: [src/components/proxy/proxy-groups.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-groups.tsx#L782-L792)
 ```diff
-diff --git a/src-tauri/src/module/lightweight.rs b/src-tauri/src/module/lightweight.rs
-index a123456..b654321 100644
---- a/src-tauri/src/module/lightweight.rs
-+++ b/src-tauri/src/module/lightweight.rs
-@@ -100,3 +100,6 @@
- pub async fn entry_lightweight_mode() -> bool {
-+    let verge = Config::verge().await;
-+    if !verge.enable_auto_light_weight_mode.unwrap_or(false) {
-+        return WindowManager::hide_main_window();
-+    }
+diff --git a/src/components/proxy/proxy-groups.tsx b/src/components/proxy/proxy-groups.tsx
+--- a/src/components/proxy/proxy-groups.tsx
++++ b/src/components/proxy/proxy-groups.tsx
+@@ -782,10 +782,11 @@
+   return (
+     <Box
+-      className="theme-panel"
+       sx={{
+         height,
+         display: 'flex',
+         flexDirection: 'column',
+         boxSizing: 'border-box',
+         overflow: 'hidden',
++        border: '1px solid var(--theme-border)',
++        borderRadius: '8px',
+       }}
+     >
+```
+
+#### `src/components/proxy/proxy-render.tsx`
+* **File Location**: [src/components/proxy/proxy-render.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-render.tsx#L84-L89)
+```diff
+diff --git a/src/components/proxy/proxy-render.tsx b/src/components/proxy/proxy-render.tsx
+--- a/src/components/proxy/proxy-render.tsx
++++ b/src/components/proxy/proxy-render.tsx
+@@ -84,5 +84,5 @@
+           ...(idx < (col || 3) - 1
+             ? {
+-                borderRight: '5px double var(--theme-border)',
++                borderRight: '1px solid var(--theme-border)',
+               }
+             : {}),
+```
+
+#### `src/components/connection/connection-table.tsx`
+* **File Location**: [src/components/connection/connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx#L52-L73)
+```diff
+diff --git a/src/components/connection/connection-table.tsx b/src/components/connection/connection-table.tsx
+--- a/src/components/connection/connection-table.tsx
++++ b/src/components/connection/connection-table.tsx
+@@ -52,3 +52,3 @@
+-  border: '5px double var(--theme-border)',
++  border: '1px solid var(--theme-border)',
+   borderRadius: '4px',
+ }
+@@ -73,3 +73,3 @@
+-  borderBottom: '5px double var(--theme-border)',
++  borderBottom: '1px solid var(--theme-border)',
+   backgroundColor: (theme) => theme.palette.background.paper,
 ```
 
 ---
 
-### AUDIT-LAYOUT-008: Original Skin Accent Color Dynamic Shift Mismatch
-* **Severity**: Low
-* **File Path & Link**: [use-custom-theme.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/hooks/use-custom-theme.ts#L214-L216)
-* **Description**: Visual styling discrepancy where CSS components change color with the slider, but MUI React components remain static purple.
-* **Root Cause**: Theme primary color is hardcoded to `#5b5c9d` in `use-custom-theme.ts`, but index.scss shifts color dynamically based on HSL.
-* **Suggested Fix**:
-```diff
-diff --git a/src/pages/_layout/hooks/use-custom-theme.ts b/src/pages/_layout/hooks/use-custom-theme.ts
-index a123456..b654321 100644
---- a/src/pages/_layout/hooks/use-custom-theme.ts
-+++ b/src/pages/_layout/hooks/use-custom-theme.ts
-@@ -214,3 +214,3 @@
-         if (controlSkin === 'original') {
--          resolvedPrimary = '#5b5c9d'
-+          resolvedPrimary = `hsl(${239 * (setting.control_skin_val2 ?? 1.0)}, 26%, 49%)`
-         }
-```
+## 5. Plugin Upgrade and Build Script Audit
+
+### 5.1 `tauri-plugin-mihomo` Upgrade Analysis
+* **Git history & commit audit**: 
+  - [crates/tauri-plugin-mihomo/Cargo.toml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/Cargo.toml)
+  - Commit `579532ad` bumped the local version of `tauri-plugin-mihomo` in `Cargo.toml`/`Cargo.lock` from `0.5.2` to `0.5.4`.
+  - The bump was metadata-only. Its purpose was to satisfy validation checks in `verify.py` (which queries upstream versions via GitHub API). Bypassing `v_local < v_upstream` was required once the upstream release moved to `0.5.4`.
+  - There are no layout/rendering style hooks introduced or modified in the local Rust code of the plugin in version `0.5.4`.
+* **White Screen Connection**:
+  - The previous upgrade to `0.5.2` (Commit `3b693842`) resolved a startup white screen bug.
+  - Active layout/rendering bugs listed in `bug_list.md` (specifically `BUG-215` and `BUG-203`) reference WebView2 CSP issues blocking external font loading/dynamic styles, which are local frontend problems unrelated to the plugin version.
+
+### 5.2 Patches, Scripts, and Bindings Verification
+* **Deleted/Modified Patches**:
+  - No build scripts, patches, or batch files were deleted.
+  - Lowercase deserialization overrides for model enums (adding `#[ts(export, rename_all = "lowercase")]` / `#[serde(rename_all = "lowercase")]` to `LogLevel` and `FindProcessMode` in [crates/tauri-plugin-mihomo/src/models.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/src/models.rs#L411-L447)) are intact and correctly applied.
+* **Manual Bindings and Compilation commands**:
+  - The frontend accesses the plugin locally via a package link (`"tauri-plugin-mihomo-api": "link:./crates/tauri-plugin-mihomo"`).
+  - If Rust models or guest-js bindings are modified, bindings must be compiled manually because there are no watchers on the plugin directory.
+  - The execution commands to rebuild bindings are:
+    ```bash
+    # Run tests in the plugin crate to auto-generate TS model definitions
+    cargo test --package tauri-plugin-mihomo
+    
+    # Install dependencies and build guest-js assets in the plugin directory
+    cd crates/tauri-plugin-mihomo
+    pnpm install
+    pnpm build
+    ```
 
 ---
 
-### AUDIT-LAYOUT-009: Monochrome Skin Dark Mode Card Background Contrast Loss
-* **Severity**: Low
-* **File Path & Link**: [index.scss](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/assets/styles/index.scss#L270-L282)
-* **Description**: Settings cards and panels blend entirely into the dark window background, making the UI unreadable.
-* **Root Cause**: Cards and panels are forced to use `var(--background-color)` which in dark mode is set to `#2E303D` (matching the main background).
-* **Suggested Fix**:
-```diff
-diff --git a/src/assets/styles/index.scss b/src/assets/styles/index.scss
-index a123456..b654321 100644
---- a/src/assets/styles/index.scss
-+++ b/src/assets/styles/index.scss
-@@ -270,3 +270,3 @@
- html[data-control-skin="monochrome"] {
-   .theme-panel {
--    background: var(--background-color) !important;
-+    background: var(--paper-color, #1e2438) !important;
-```
-
----
-
-### AUDIT-LAYOUT-010: Switch Component Sizing Inconsistency in Cyberpunk/Monochrome Skins
-* **Severity**: Low
-* **File Path & Link**: [base-switch.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-switch.tsx#L370-L402)
-* **Description**: Sizing layout mismatch when small switches are rendered at standard size.
-* **Root Cause**: Standard switch dimensions are forced onto small-sized Mui classes in these skins.
-* **Suggested Fix**:
-```diff
-diff --git a/src/components/base/base-switch.tsx b/src/components/base/base-switch.tsx
-index a123456..b654321 100644
---- a/src/components/base/base-switch.tsx
-+++ b/src/components/base/base-switch.tsx
-@@ -370,3 +370,3 @@
-         '&.MuiSwitch-sizeSmall': {
--          width: '28px !important',
--          height: '14px !important',
-+          width: '18px !important',
-+          height: '10px !important',
-```
+## 6. Verification Protocol
+To verify the audit findings:
+1. Confirm that `python verify.py` passes without version warnings (verifies that `0.5.4` is correctly declared).
+2. Inspect the lines specified in **Section 2, 3 and 4** for each affected file and confirm that local code matches the pre-patched states.
+3. Validate that TypeScript compiler (`pnpm typecheck`) and linter (`pnpm lint`) are clean after applying the code diff proposals.

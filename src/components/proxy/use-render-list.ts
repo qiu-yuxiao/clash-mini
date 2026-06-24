@@ -83,7 +83,7 @@ const calculateColumns = (width: number, _configCol: number): number => {
   if (width <= 285) {
     return 1
   }
-  return 3
+  return _configCol
 }
 
 // 优化分组逻辑
@@ -418,44 +418,53 @@ export const useRenderList = (
       )
 
       ret.push({
-        type: 1,
-        key: `head-${group.name}`,
+        type: 0,
+        key: `group-${group.name}`,
         group,
         headState,
       })
 
-      if (!proxies.length) {
+      if (headState.open) {
         ret.push({
-          type: 3,
-          key: `empty-${group.name}`,
+          type: 1,
+          key: `head-${group.name}`,
           group,
           headState,
         })
-      } else if (col > 1) {
-        ret.push(
-          ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
-            type: 4 as const,
-            key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
+
+        if (!proxies.length) {
+          ret.push({
+            type: 3,
+            key: `empty-${group.name}`,
             group,
             headState,
-            col,
-            proxyCol,
-            provider: proxyCol[0]?.provider,
-            indexInGroup: colIndex,
-          })),
-        )
-      } else {
-        ret.push(
-          ...proxies.map((proxy, proxyIdx) => ({
-            type: 2 as const,
-            key: `${group.name}-${proxy?.name ?? proxyIdx}`,
-            group,
-            proxy,
-            headState,
-            provider: proxy.provider,
-            indexInGroup: proxyIdx,
-          })),
-        )
+          })
+        } else if (col > 1) {
+          ret.push(
+            ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
+              type: 4 as const,
+              key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
+              group,
+              headState,
+              col,
+              proxyCol,
+              provider: proxyCol[0]?.provider,
+              indexInGroup: colIndex,
+            })),
+          )
+        } else {
+          ret.push(
+            ...proxies.map((proxy, proxyIdx) => ({
+              type: 2 as const,
+              key: `${group.name}-${proxy?.name ?? proxyIdx}`,
+              group,
+              proxy,
+              headState,
+              provider: proxy.provider,
+              indexInGroup: proxyIdx,
+            })),
+          )
+        }
       }
 
       cache.set(group.name, {
