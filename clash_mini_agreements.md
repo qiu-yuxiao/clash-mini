@@ -2346,7 +2346,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 启用严格的内容安全策略防止 XSS 攻击，限制 WebView 中允许加载的资源来源。
 
-- **CSP 策略**：`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost data:; connect-src 'self'; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'`
+- **CSP 策略**：`default-src 'self' tauri: asset:; script-src 'self' 'unsafe-inline' tauri: asset:; style-src 'self' 'unsafe-inline' tauri: asset:; img-src 'self' asset: tauri: https://asset.localhost data:; connect-src 'self' tauri: asset: ws://localhost:* http://localhost:* ws://127.0.0.1:* http://127.0.0.1:*; font-src 'self' tauri: asset: data:; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'`
 - **不允许**：外部 CDN 脚本、外部字体、data: URI 作为脚本源、`eval()`、内联事件处理器
 - **原因**：前端应用无外部 CDN 依赖，所有网络请求通过 Rust 后端 IPC 而非浏览器 fetch，WebSocket 通过 Tauri 插件而非浏览器原生 API，因此 CSP 可设至最严级别
 
