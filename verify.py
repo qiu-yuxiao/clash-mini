@@ -263,6 +263,12 @@ def verify_changelog_sync():
                 resolve_ver = re.sub(r"^v", "", resolve_ver_raw).split("-")[0].strip()
                 
                 if resolve_ver == current_version:
+                    status_raw = parts[4]
+                    status = re.sub(r"`", "", status_raw).strip()
+                    if "待用户确认" in status or "进行中" in status:
+                        print(f"[FAIL] {bug_id} is in the historical resolved table for v{current_version}, but its status is still \"{status}\"!")
+                        print(f"[FAIL] Releases cannot be made with unconfirmed bugs in the history table. Please keep it in the active card section at the top of bug_list.md.")
+                        return False
                     resolved_bugs.append(bug_id)
                     
     print(f"[INFO] Resolved bugs listed for v{current_version} in bug_list.md: {resolved_bugs}")

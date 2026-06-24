@@ -59,3 +59,7 @@
       git config --local --unset http.sslVerify
       ```
     - **禁止**：严禁修改全局 Git 配置；严禁漏掉恢复（`--unset`）命令；严禁将 GitHub Token 以明文字符串硬编码到任何脚本、日志或命令文本中。
+
+12. **Bug 状态变更人工确认唯一性与防抢跑律 (Law of User-Controlled Bug Confirmation & Archiving)**
+    - **要求**：`bug_list.md` 中任何 Bug 的状态变更（即从“待确认”向“已确认”的迁移）和归档至历史表格动作，必须绝对且唯一依赖于用户在当前对话中发出的明确人工“同意/已确认/已验证”指令。在版本正式发行和发布前，Bug 必须作为卡片存放在 `bug_list.md` 顶部的待验证区，严禁提前写入底部历史归档表格。具体发版、测试与确认的步骤顺序，必须严格遵循 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 第五章节中定义的 SOP。
+    - **禁止**：严禁在发布新版本前为了让预检脚本通过而抢跑修改状态为 `已确认`；严禁在底部历史归档表格中录入状态为 `待用户确认` 的条目进行提前占位或规避校验。
