@@ -1,3 +1,14 @@
+## v1.7.5
+
+### 🐞 Fixed Bugs
+
+- **补全严格CSP下右上角控制按钮及窗口边框图标尺寸约束 (BUG-215)**：
+  - 修复无边框和有边框模式下，右上角的设置齿轮、图钉固定、关闭按钮以及窗口控制按钮（最小化、最大化、关闭）由于缺少显式内联 `width` / `height` 导致在 CSP 下体积膨胀至 300px 撑大整个顶部控制栏的缺陷。
+  - 为 `_layout.tsx` 中的 `PushPinRounded`、`CloseRounded`、`SettingsRoundedIcon` 增加显式 `width: '20px', height: '20px'` 内联样式。
+  - 为 `window-controller.tsx` 中的控制按钮（`Close`、`Minimize`、`FilterNone`、`CropSquare`）增加显式内联宽高限制。
+
+---
+
 ## v1.7.4
 
 ### 🐞 Fixed Bugs
