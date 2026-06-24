@@ -10,18 +10,6 @@
 > > 3. **强制记录排查记忆，防止重复劳?*：在卡片中，必须详实搜集、继承并持久化记录以下三个协同要素：
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
-### BUG-215: Active Connection Node status row layout collapse and styling loss under strict CSP
- - **现象描述**：启用严格 CSP 后，WebView2 拒绝加载未显式放行的 `tauri://` 与 `asset://` 协议下的静态 CSS 资源及 Emotion 动态注入的样式，导致页面全部类样式失效，界面彻底退化为无样式灰白色，活动出口节点卡片也由于样式失效而失去 Flex 和高度约束产生崩塌。
- - **验证方法**：启动本地打包编译版本，确认界面主色调、3D 渐变及活动节点卡片布局约束在严格 CSP 限制下完全正常恢复。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.7`
-
-### BUG-216: Cleanup of temporary CSS bypass styling workarounds
- - **现象描述**：在 1.7.6 临时版本中，为了回避 Emotion 在 CSP 拦截下的尺寸溢出问题，将窗口控制按钮、顶部置顶及设置齿轮图标的样式临时写死为了内联 `style` 属性。在从根本上通过 CSP 协议放行解决样式加载问题后，需要将这些临时内联属性全部清理并重构回 MUI 原生的 `sx` 属性，以保证代码纯净和符合设计协议。
- - **验证方法**：检查 `window-controller.tsx`、`_layout.tsx`、`active-node-card.tsx` 和 `style-helpers.tsx`，确认临时内联 `style` 补丁已全部还原为标准的 `sx` 属性，且界面和图标渲染不受影响。
- - **当前状态**：`进行中`
- - **目标版本**：`v1.7.7`
-
 
 ### BUG-205: Settings Drawer Horizontal Layout Overflow
  - **现象描述**：在默认/最小窗口宽度（270px）下，设置抽屉的横向布局挤压右侧 Connections 列，导致 active/closed 连接列表宽度被压缩为 0px。经重新审计确认，此为项目 Agreement 设计规范中预期的“物理裁剪遮盖”设计，而非布局缺陷。
@@ -299,5 +287,6 @@
 | **BUG-201** | High-Frequency Tauri IPC Polling in useVisibility | v1.6.3 | 用户已确认 |
 | **BUG-192** | Unthrottled Core Updater IPC Progress Emitter | v1.6.3 | 用户已确认 |
 | **BUG-198** | Unhandled Tauri Listener Promise Rejection in useWindowSnap | v1.6.3 | 用户已确认 |
-| **BUG-215** | Active Connection Node status row layout collapse and styling loss under strict CSP | v1.7.7 | 代码已修正，待用户确认 |
-| **BUG-216** | Cleanup of temporary CSS bypass styling workarounds | v1.7.7 | 进行中 |
+| **BUG-215** | Active Connection Node status row layout collapse and styling loss under strict CSP | v1.7.8 | 代码已修正，已确认 |
+| **BUG-216** | Cleanup of temporary CSS bypass styling workarounds | v1.7.8 | 代码已修正，已确认 |
+
