@@ -2342,21 +2342,20 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **生命周期**：监听器在 `use-layout-events` 中随布局组件生命周期注册/注销，与现有前端测速通路完全解耦。
 - **互不阻塞**：后台推送与前端主动测速两条通路在 Rust 层使用不同入口函数（`trigger_backend_auto_select` vs `delayProxyByName`），前端层共用同一 `DelayManager` 缓存（JS 单线程天然安全），RAF 批量合并确保不产生刷新风暴。
 
-## 🔒 三十二、 安全加固：CSP 内容安全策略 (BUG-001/CSP)
+## 🔓 三十二、 废弃安全加固：CSP 内容安全策略 (BUG-001/CSP) [已回滚]
 
-启用严格的内容安全策略防止 XSS 攻击，限制 WebView 中允许加载的资源来源。
+由于严格的 CSP 策略在 Windows 平台上会导致 WebView2 拦截静态 CSS 资源及 Emotion 注入样式，造成界面崩溃，现已将该配置回滚：
 
-- **CSP 策略**：`default-src 'self' tauri: asset:; script-src 'self' 'unsafe-inline' tauri: asset:; style-src 'self' 'unsafe-inline' tauri: asset:; img-src 'self' asset: tauri: https://asset.localhost data:; connect-src 'self' tauri: asset: ws://localhost:* http://localhost:* ws://127.0.0.1:* http://127.0.0.1:*; font-src 'self' tauri: asset: data:; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'`
-- **不允许**：外部 CDN 脚本、外部字体、data: URI 作为脚本源、`eval()`、内联事件处理器
-- **原因**：前端应用无外部 CDN 依赖，所有网络请求通过 Rust 后端 IPC 而非浏览器 fetch，WebSocket 通过 Tauri 插件而非浏览器原生 API，因此 CSP 可设至最严级别
+- **CSP 策略**：设置为 `null`（不开启内容安全策略）
+- **原因**：完全移除内容安全策略，确保页面样式与脚本资源不再受到任何拦截。
 
 ## 🔒 三十三、 安全加固：权限最小化 (BUG-002~004/LeastPrivilege)
 
-移除 Tauri 权限配置中的开放权限，实施最小权限原则。
+移除部分 Tauri 权限配置中的开放权限，实施最小权限原则：
 
 - **Shell 权限**：保留 `shell:allow-open`，移除 `shell:allow-execute`、`shell:allow-spawn`、`shell:allow-kill`、`shell:allow-stdin-write`。前端不应拥有执行任意系统命令的能力。
 - **FS 作用域**：从 `["$APPDATA/**", "$RESOURCE/../**", "**"]` 收紧为 `["$APPDATA/**"]`。移除 `**` 通配符以防止前端读取任意文件。
-- **Asset Protocol**：从 `["**"]` 收紧为 `["$APPDATA/**"]`，仅允许通过 asset 协议访问应用数据目录。
+- **Asset Protocol [已回滚]**：为了兼容本地静态图片及样式的加载，从 `["$APPDATA/**"]` 回滚为允许 `["**"]`，确保本地任意目录资源均可正常由 `asset://` 协议读取。
 - **HTTP 插件**：从允许所有 `https://*/*` 和 `http://*/*` 收紧为仅允许 `cdn.jsdelivr.net`、`raw.githubusercontent.com`、`github.com` 等已知域名。
 
 ## 🔒 三十四、 安全加固：URL 输入验证 (BUG-005~010/URLValidation)

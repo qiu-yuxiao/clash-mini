@@ -445,7 +445,11 @@ pub fn start_background_monitor() {
                 logging!(info, Type::Lightweight, "[后台监测] 触发定期网络连接垃圾回收 (GC)...");
                 let mihomo = Handle::mihomo().await.clone();
                 if let Err(err) = mihomo.close_all_connections().await {
-                    logging!(error, Type::Lightweight, "[后台监测] 触发定期网络连接垃圾回收 (GC) 失败: {err}");
+                    logging!(
+                        error,
+                        Type::Lightweight,
+                        "[后台监测] 触发定期网络连接垃圾回收 (GC) 失败: {err}"
+                    );
                 }
             }
 

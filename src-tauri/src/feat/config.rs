@@ -148,7 +148,11 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     if tun_mode.is_some() {
         update_flags.insert(UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY);
     }
-    if enable_global_hotkey.is_some() || home_cards.is_some() || patch.theme_mode.is_some() || patch.theme_setting.is_some() {
+    if enable_global_hotkey.is_some()
+        || home_cards.is_some()
+        || patch.theme_mode.is_some()
+        || patch.theme_setting.is_some()
+    {
         update_flags.insert(UpdateFlags::VERGE_CONFIG);
     }
     if auto_launch.is_some() {

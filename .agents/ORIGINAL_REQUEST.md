@@ -274,3 +274,32 @@ The audit team must strictly perform static analysis and review. Do not modify, 
 - [ ] The report must explicitly detail the investigation findings on whether the layout rendering is 100% correct, and check if all buttons and icons strictly follow the size constraints of clash_mini_agreements.md.
 - [ ] The git status of the project remains 100% clean (`git status --porcelain` has no output for source files).
 
+## Follow-up — 2026-06-24T14:36:39Z
+
+对当前 Clash Verge/Mini 项目代码库进行一次全面的代码审计与 Bug 排查，重点查找近期提交引入的潜在逻辑漏洞、样式异常、IPC 异常，并生成详细的审计报告。
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+
+## Requirements
+
+### R1. 全面代码审计与排查
+- 审计范围包括前端组件（TypeScript / React / Material-UI）及 Rust 后端的核心逻辑与配置处理（`src-tauri/`）。
+- 重点排查：
+  - 测速模式切换、延迟显示等核心功能的逻辑正确性。
+  - 样式渲染在 WebView2/不同系统环境下的渲染与定位异常。
+  - 任何未捕获的空指针异常、未处理的 Result/Option 错误等。
+
+### R2. 严禁改动代码
+- 整个审计排查工作必须在**只读模式**下进行，严禁对工作目录下的任何源文件、配置文件、样式文件进行任何修改、删除或新增。
+
+### R3. 生成结构化审计报告
+- 必须在指定目录生成一份详细的审计报告 `docs/comprehensive_code_audit_report.md`，列出所有发现的问题、潜在隐患及其具体位置与原因分析。
+
+## Acceptance Criteria
+
+### 审计完整性与结果输出
+- [ ] 审计报告必须详细记录于 docs/comprehensive_code_audit_report.md。
+- [ ] 报告中每个登记之 Bug/隐患必须附带具体的源文件绝对路径、可点击的行号链接（如 file:///...#L10）以及详细的逻辑漏洞原因分析。
+- [ ] 工作区代码在审计跑完后必须保持 100% 干净（git status --porcelain 没有任何输出）。
+
+

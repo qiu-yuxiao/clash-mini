@@ -62,14 +62,12 @@
         "enable": true,
         "scope": {
           "allow": [
-            "$APPDATA/**",
-            "$EXE_DIR/**",
-            "$RESOURCE_DIR/**"
+            "**"
           ],
           "requireLiteralLeadingDot": false
         }
       },
-      "csp": "default-src 'self' tauri: asset:; script-src 'self' 'unsafe-inline' tauri: asset:; style-src 'self' 'unsafe-inline' tauri: asset:; img-src 'self' asset: tauri: https://asset.localhost data:; connect-src 'self' tauri: asset: ws://localhost:* http://localhost:* ws://127.0.0.1:* http://127.0.0.1:*; font-src 'self' tauri: asset: data:; object-src 'none'; frame-src 'none'; form-action 'self'; base-uri 'none'"
+      "csp": null
     }
   }
 }

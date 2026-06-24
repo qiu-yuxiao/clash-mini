@@ -1,46 +1,46 @@
-# BRIEFING — 2026-06-21T19:55:00+08:00
+# BRIEFING — 2026-06-24T14:40:00Z
 
 ## Mission
-Audit React/TypeScript/CSS frontend modifications in Clash Mini between release commit d3831a0ce5ecc6b2c040368570773f2622d0b91b and latest HEAD (196e7c01).
+Audit ClashVerge frontend speed test logic, UI/styling issues, and error handling.
 
 ## 🔒 My Identity
-- Archetype: Teamwork explorer
-- Roles: Read-only investigator
+- Archetype: Frontend Audit Explorer
+- Roles: teamwork_preview_explorer
 - Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit
-- Original parent: 955c9809-e935-4bdf-8714-47831b6cfc1f
-- Milestone: Frontend audit of Clash Mini changes
+- Original parent: b207f8ec-b32b-4303-9bf6-398aa4afc874
+- Milestone: Frontend Audit
 
 ## 🔒 Key Constraints
 - Read-only investigation — do NOT implement
-- CODE_ONLY network mode: no external requests, only code_search/filesystem tools.
-- Under no circumstances modify any workspace files (only write to our working directory).
+- Do NOT edit, delete, or create any source code, styles, or configuration files in the workspace. Read-only audit only.
+- Write your findings ONLY inside your own metadata folder c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\handoff.md.
 
 ## Current Parent
-- Conversation ID: 955c9809-e935-4bdf-8714-47831b6cfc1f
-- Updated: 2026-06-21T19:55:00+08:00
+- Conversation ID: b207f8ec-b32b-4303-9bf6-398aa4afc874
+- Updated: not yet
 
 ## Investigation State
 - **Explored paths**:
-  - `src/pages/_layout.tsx` (audited hooks, auto-select logic, timer intervals, and profile activation effects)
-  - `src/services/delay.ts` (audited `DelayManager`, worker concurrency, and `Promise.race` timeout implementation)
-  - `src/utils/button-styles.ts` (audited MUI styles, 3D/flat/glass button skins, and disabled states)
-  - `crates/tauri-plugin-mihomo/guest-js/index.ts` (audited JSDoc deprecation notices)
+  - `src/services/delay.ts`
+  - `src/hooks/use-proxy-delay-state.ts`
+  - `src/pages/_layout.tsx`
+  - `src/pages/_layout/components/connections-panel.tsx`
+  - `src/pages/_layout/components/active-node-card.tsx`
+  - `src/pages/unlock.tsx`
+  - `src/components/proxy/proxy-groups.tsx`
+  - `src/components/proxy/proxy-chain.tsx`
+  - `src/components/home/enhanced-canvas-traffic-graph.tsx`
 - **Key findings**:
-  - Found critical dependency array bug in profile activation `useEffect` causing permanent cancellation of activation logic.
-  - Found profile synchronization race condition and background interval timer leak in `frontendAutoSelect`.
-  - Found double selection request race condition in `frontendAutoSelect`'s quick connect vs final selection.
-  - Found unresolved promise leak in concurrent `frontendAutoSelect` calls.
-  - Found unhandled promise rejection bug in `checkDelay` due to unawaited losing promise in `Promise.race`.
-  - Found timer resource leak in `checkDelay`.
-  - Found low contrast / invisible border styling issue in the disabled state of `frosted-glass` skin in light mode.
-- **Unexplored areas**: None. Audited all requested target files.
+  - Speed test checkListDelay lacks cancellation, causing concurrent test races.
+  - Multiple state updates on unmounted components (`useProxyDelayState`, `_layout.tsx` fallback timer, `ActiveNodeStatusCard`, `ProxyChain`).
+  - Viewport layout issues with `100vw` in `_layout.tsx` causing horizontal overflow.
+  - Overlap/clipping issues with absolute positioning of selectors and hardcoded pixel sizes.
+  - Font scaling layout anomalies in `mini-traffic-panel.tsx` (18px hardcoded height).
+  - Unhandled promise rejection risk in `unlock.tsx` initial load.
+- **Unexplored areas**: None, the frontend audit objectives are fully met.
 
 ## Key Decisions Made
-- Audited git diff range `d3831a0ce5ecc6b2c040368570773f2622d0b91b..196e7c01` across all requested frontend source files.
-- Formulated precise code proposals / patches for each identified issue to include in the final report.
+- Audited TSX files for async safety, CSS viewport constraints, and React 19 compatibility.
 
 ## Artifact Index
-- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\ORIGINAL_REQUEST.md — Original task description
-- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\BRIEFING.md — Current briefing and status
-- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\analysis.md — Comprehensive audit report
-- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\progress.md — Progress tracking
+- c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_frontend_audit\handoff.md — Handoff report of audit findings

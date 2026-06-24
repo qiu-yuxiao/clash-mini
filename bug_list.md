@@ -13,15 +13,13 @@
 
 ### BUG-215: Active Connection Node status row layout collapse and styling loss under strict CSP
  - **现象描述**：启用严格 CSP 后，WebView2 拒绝加载未显式放行的 `tauri://` 与 `asset://` 协议下的静态 CSS 资源及 Emotion 动态注入的样式，导致页面全部类样式失效，界面彻底退化为无样式灰白色，活动出口节点卡片也由于样式失效而失去 Flex 和高度约束产生崩塌。
- - **验证方法**：启动本地打包编译版本，确认界面主色调、3D 渐变及活动节点卡片布局约束在严格 CSP 限制下完全正常恢复。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.8`
+ - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
+ - **目标版本**：`v1.8.0`
 
 ### BUG-216: Cleanup of temporary CSS bypass styling workarounds
- - **现象描述**：在 1.7.6 临时版本中，为了回避 Emotion 在 CSP 拦截下的尺寸溢出问题，将窗口控制按钮、顶部置顶及设置齿轮图标的样式临时写死为了内联 `style` 属性。在从根本上通过 CSP 协议放行解决样式加载问题后，需要将这些临时内联属性全部清理并重构回 MUI 原生的 `sx` 属性，以保证代码纯净和符合设计协议。
- - **验证方法**：检查 `window-controller.tsx`、`_layout.tsx`、`active-node-card.tsx` 和 `style-helpers.tsx`，确认临时内联 `style` 补丁已全部还原为标准的 `sx` 属性，且界面和图标渲染不受影响。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.8`
+ - **现象描述**：在 1.7.6 临时版本中，为了回避 Emotion 在 CSP 拦截下的尺寸溢出问题，将窗口控制按钮、顶部置顶及设置齿轮图标的样式临时写死为了内联 `style` 属性。
+ - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
+ - **目标版本**：`v1.8.0`
 
 
 
