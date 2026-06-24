@@ -287,4 +287,4 @@
 | **BUG-201** | High-Frequency Tauri IPC Polling in useVisibility | v1.6.3 | 用户已确认 |
 | **BUG-192** | Unthrottled Core Updater IPC Progress Emitter | v1.6.3 | 用户已确认 |
 | **BUG-198** | Unhandled Tauri Listener Promise Rejection in useWindowSnap | v1.6.3 | 用户已确认 |
-| **BUG-215** | Active Connection Node status row layout collapse under strict CSP | v1.7.5 | 代码已修正，已确认 |
+| **BUG-215** | Active Connection Node status row layout collapse under strict CSP | v1.7.6 | 代码已修正，已确认 |
