@@ -1,12 +1,12 @@
 {
   "version": "1.7.8",
   "notes": "Clash Mini v1.7.8",
-  "pub_date": "2026-06-24T10:54:03.465Z",
+  "pub_date": "2026-06-24T11:28:50.250Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUR1d3FwSVZpZmFCMUNMMG5ZeURiQ2NXamlOd2s5ZE9vbCtPQUh5TGtnU3Q0czNUa2RXaEk3Q0g1dWdhOGk4aWh3ZUlqSTBxRm5KOWpjSmE2N1M2SmdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMjg3NzE1CWZpbGU6Q2xhc2ggTWluaV8xLjcuN194NjQtc2V0dXAuZXhlCk9xUDdwVllPOUN2b3MwM0tVamNSZjJObVBhTEErLzJOL1NLYlR5c3QwaVBTUER3SUIxeWdXTzFKQVN0N0xMTmZpakhXdXAzQzJUZThHY0k3OTF4TERBPT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUhqTllQVUVyN1B4c2tnQitGb1JJUnRxaFA1RDY2VGhGL0lwSHB4ZDNKNWxnMlh2TnM3K3lheHozTi95YlJSaHNWN05VdElld0QwOGtKOGs4MlUxMFFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyMzAwMjY4CWZpbGU6Q2xhc2ggTWluaV8xLjcuOF94NjQtc2V0dXAuZXhlCi9Td3NzdUs4dkQwZzBxUzFUQ211UmxNMDVWSWhqdGFoSFlOeUFHeEtvQ1h4UG55alIrQkJ3WVRFZG0vdlVzYmwvbm0wZzFYb2R3ZVVzQWxCZVBkdkFnPT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v1.7.8/Clash.Mini_1.7.8_x64-setup.exe",
-      "size": 42564724
+      "size": 42585401
     }
   }
 }
