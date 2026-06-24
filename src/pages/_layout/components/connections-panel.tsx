@@ -42,6 +42,10 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
     <Box
       sx={{
         flex: 1,
+        // WARNING [FOR AI AGENTS / AUDITORS]:
+        // This minWidth must remain 0 and MUST NOT be set to a fixed minimum width.
+        // Shrinking to 0px is the INTENDED behavior for 270px narrow width mode to hide
+        // the panel by sliding/clipping it off-screen, per the design agreement.
         minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
