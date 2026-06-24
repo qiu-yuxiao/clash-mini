@@ -178,6 +178,8 @@ async function frontendAutoSelect(
   // 2. 轮询选点逻辑
   const startTime = Date.now()
   let hasSelectedTemp = false
+  let selectedTempNode: string | null = null
+  let activeSelectionPromise: Promise<any> | null = null
 
   return new Promise<[string, number][]>((resolve, reject) => {
     activeAutoSelectReject = reject
@@ -225,16 +227,19 @@ async function frontendAutoSelect(
       if (!isFinalSelection && !hasSelectedTemp && healthyNodes.length >= 1) {
         hasSelectedTemp = true
         const tempTarget = healthyNodes[0].name
+        selectedTempNode = tempTarget
         console.log(`[Layout] 自动选点触发临时闪连: ${tempTarget} (${healthyNodes[0].delay}ms)`)
-        try {
-          await selectNodeForGroup(groupName, tempTarget)
-          // 再次检查 timerId 是否仍有效，防止异步等待期间被切换
-          if (activeAutoSelectTimer === timerId) {
-            await refreshProxy({ forceFull: true })
+        activeSelectionPromise = (async () => {
+          try {
+            await selectNodeForGroup(groupName, tempTarget)
+            // 再次检查 timerId 是否仍有效，防止异步等待期间被切换
+            if (activeAutoSelectTimer === timerId) {
+              await refreshProxy({ forceFull: true })
+            }
+          } catch (err) {
+            console.error('[Layout] 临时闪连切换失败:', err)
           }
-        } catch (err) {
-          console.error('[Layout] 临时闪连切换失败:', err)
-        }
+        })()
       }
 
       if (isFinalSelection) {
@@ -248,11 +253,27 @@ async function frontendAutoSelect(
           const targetNode = healthyNodes[0].name
           const targetDelay = healthyNodes[0].delay
           console.log(`[Layout] 自动选点触发极速终选: ${targetNode} (${targetDelay}ms)`)
-          try {
-            await selectNodeForGroup(groupName, targetNode)
-            await refreshProxy({ forceFull: true })
-          } catch (err) {
-            console.error('[Layout] 极速终选切换失败:', err)
+          if (selectedTempNode === targetNode) {
+            console.log(`[Layout] 极速终选节点与临时闪连一致 (${targetNode})，无需重复切换`)
+            if (activeSelectionPromise) {
+              try {
+                await activeSelectionPromise
+              } catch {}
+            }
+          } else {
+            if (activeSelectionPromise) {
+              try {
+                await activeSelectionPromise
+              } catch {}
+            }
+            if (activeAutoSelectTimer === timerId || activeAutoSelectTimer === null) {
+              try {
+                await selectNodeForGroup(groupName, targetNode)
+                await refreshProxy({ forceFull: true })
+              } catch (err) {
+                console.error('[Layout] 极速终选切换失败:', err)
+              }
+            }
           }
         } else {
           console.warn('[Layout] 自动测速超时且无任何健康节点')
@@ -1141,6 +1162,14 @@ const Layout = () => {
           if (timerId) {
             clearTimeout(timerId)
           }
+          if (activeAutoSelectTimer) {
+            clearInterval(activeAutoSelectTimer)
+            activeAutoSelectTimer = null
+          }
+          if (activeAutoSelectReject) {
+            activeAutoSelectReject(new Error('AutoSelectCancelled'))
+            activeAutoSelectReject = null
+          }
         }
       }
     }
@@ -1534,6 +1563,8 @@ const Layout = () => {
       drawerOpen,
       patchVerge,
       verge?.enable_always_on_top,
+      theme,
+      controlSkin,
     ],
   )
 

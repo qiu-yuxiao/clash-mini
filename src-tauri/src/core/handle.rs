@@ -48,7 +48,7 @@ impl Handle {
         Self::send_event(FrontendEvent::ProfileChanged {
             current_profile_id: profile_id,
         });
-        crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_waiters();
+        crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_one();
     }
 
     pub fn notify_timer_updated(profile_index: &String) {

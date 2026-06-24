@@ -236,7 +236,8 @@ export const ProxyRender = (props: RenderProps) => {
     return (
       <Box
         sx={{
-          height: '20px',
+          minHeight: '24px',
+          height: 'auto',
           display: 'grid',
           gridTemplateColumns: `repeat(${col || 3}, 1fr)`,
           pl: 0,

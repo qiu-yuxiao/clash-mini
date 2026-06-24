@@ -198,9 +198,9 @@ export const ProxyGroups = (props: Props) => {
     estimateSize: (index) => {
       const item = filteredRenderList[index]
       if (item?.type === 0) return 56
-      if (item?.type === 2) return 20
+      if (item?.type === 2) return 24
       if (item?.type === 3) return 80
-      if (item?.type === 4) return 20
+      if (item?.type === 4) return 24
       return 56
     },
     overscan: 15,
@@ -776,8 +776,7 @@ function ProxyVirtualList({
   testingGroups,
 }: ProxyVirtualListProps) {
   const theme = useTheme()
-  const stickyBackground =
-    theme.palette.mode === 'dark' ? '#1e1f27' : 'var(--background-color)'
+  const stickyBackground = 'var(--theme-bg, var(--background-color))'
 
   return (
     <Box

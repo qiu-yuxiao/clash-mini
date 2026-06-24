@@ -1,3 +1,14 @@
+## v1.8.1
+
+### 🐞 Fixed Bugs
+
+- **BUG-217~238 22项系统代码安全与样式兼容Bug修复**：
+  - **测速逻辑与定时器漏孔 (BUG-217~222, 224)**：在配置切换时实现自动清理与彻底关闭后台测速定时器；利用 Promise 锁对选点行为执行严格串行化，避免临时闪连与极速终选对后端造成的并发请求竞态；吞掉延迟测试后的 unhandled rejections，并重新对齐了顶栏的 theme/skin 响应依赖。
+  - **内核底层并发安全与 SSRF 防护 (BUG-225~232)**：修复 TcpStream 读取空切片导致测速永远 0ms 或超时的逻辑缺陷；将 Boa 解释器及外部验证命令输出封装至 tokio 超时机制及循环指令限制下，彻底避免死循环卡死 tokio 主线程；针对订阅/图片引入 ToSocketAddrs DNS 动态解析，并将解析出的 IP 地址与 IPv6 link-local 和 ULA 敏感子网对比，防范 SSRF DNS 重新绑定绕过；添加单例冲突时的 native MessageBox 错误弹窗提示；对订阅下载加入 10MB 物理上限及流式传输限制，防止 OOM 崩溃。
+  - **界面层级特异性与高 DPI 裁剪 (BUG-223, 233~238)**：使用 `html[data-control-skin]` 提升 opaque 对话框遮罩的权重，消除毛玻璃下的文本重合穿透；修复磨砂卡片在浅色模式下的低对比度问题；移除全局 scss 的 `!important` scrollbar 限制以支持局部 `scrollbar-width: none` 连接表，并绑定 scrollbar CSS 变量；将 compact 代理项行高从 20px 统一扩容为 24px 并去除高度死锁，防止 Windows 高 DPI 缩放下的文字和延迟物理裁剪；对侧栏菜单提供 Hover-dependent 滚动条显隐机制。
+
+---
+
 ## v1.8.0
 
 ### 🐞 Fixed Bugs

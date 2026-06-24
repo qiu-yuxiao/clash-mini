@@ -823,6 +823,7 @@ const fn default_allow_auto_update() -> Option<bool> {
 /// SSRF 防护：禁止访问内网/回环地址
 fn validate_url_no_ssrf(url: &Url) -> Result<()> {
     if let Some(host) = url.host() {
+        // 1. 静态字符串与直接 IP 校验
         match host {
             url::Host::Domain(d) => {
                 let lower = d.to_ascii_lowercase();
@@ -836,13 +837,51 @@ fn validate_url_no_ssrf(url: &Url) -> Result<()> {
                 }
             }
             url::Host::Ipv4(ip) => {
-                if ip.is_loopback() || ip.is_private() || ip.is_unspecified() {
+                if ip.is_loopback() || ip.is_private() || ip.is_unspecified() || ip.is_link_local() {
                     bail!("cannot fetch subscription from private/loopback IP");
                 }
             }
             url::Host::Ipv6(ip) => {
                 if ip.is_loopback() || ip.is_unspecified() {
                     bail!("cannot fetch subscription from loopback IP");
+                }
+                let segments = ip.segments();
+                // 链路本地地址 (fe80::/10) 唯一本地地址 (fc00::/7)
+                if (segments[0] & 0xffc0) == 0xfe80 || (segments[0] & 0xfe00) == 0xfc00 {
+                    bail!("cannot fetch subscription from local/link-local IP");
+                }
+            }
+        }
+
+        // 2. 动态 DNS 解析校验，防止 DNS 重绑定绕过
+        use std::net::ToSocketAddrs;
+        let host_str = match host {
+            url::Host::Domain(d) => d.to_string(),
+            url::Host::Ipv4(ip) => ip.to_string(),
+            url::Host::Ipv6(ip) => ip.to_string(),
+        };
+        let port = url.port().unwrap_or(80);
+        if let Ok(addrs) = (host_str.as_str(), port).to_socket_addrs() {
+            for addr in addrs {
+                let ip = addr.ip();
+                match ip {
+                    std::net::IpAddr::V4(ipv4) => {
+                        if ipv4.is_loopback() || ipv4.is_private() || ipv4.is_unspecified() || ipv4.is_link_local() {
+                            bail!("cannot fetch subscription from private/loopback IP");
+                        }
+                    }
+                    std::net::IpAddr::V6(ipv6) => {
+                        if ipv6.is_loopback() || ipv6.is_unspecified() {
+                            bail!("cannot fetch subscription from loopback IP");
+                        }
+                        let segments = ipv6.segments();
+                        if (segments[0] & 0xffc0) == 0xfe80 {
+                            bail!("cannot fetch subscription from link-local IP");
+                        }
+                        if (segments[0] & 0xfe00) == 0xfc00 {
+                            bail!("cannot fetch subscription from local range IP");
+                        }
+                    }
                 }
             }
         }

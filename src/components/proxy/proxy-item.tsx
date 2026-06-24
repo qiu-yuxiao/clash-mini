@@ -98,8 +98,8 @@ export const ProxyItem = (props: Props) => {
       sx={[
         {
           borderRadius: 0,
-          height: '20px',
-          minHeight: '20px',
+          minHeight: '24px',
+          height: 'auto',
           py: 0,
           px: 0,
           display: 'flex',

@@ -258,12 +258,9 @@ class DelayManager {
               clearTimeout(timerId)
               timerId = null
             }
-            if (raceFinished) {
-              // Timeout resolved first, swallow background error
-              return { delay: 0 }
-            }
             raceFinished = true
-            throw err
+            console.error(`[DelayManager] delayProxyByName error for ${name}:`, err)
+            return { delay: 1e6 }
           }),
         timeoutPromise.then((res) => {
           raceFinished = true

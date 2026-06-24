@@ -292,14 +292,18 @@ export const get3DButtonStyle = (
         ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.25)'
         : colorType === 'error'
           ? 'rgba(239, 68, 68, 0.25)'
-          : 'rgba(255, 255, 255, 0.08)'
+          : isLight
+            ? 'rgba(0, 0, 0, 0.06)'
+            : 'rgba(255, 255, 255, 0.08)'
 
     const hoverBg =
       colorType === 'primary'
         ? 'rgba(var(--primary-color-rgb, 91, 92, 157), 0.4)'
         : colorType === 'error'
           ? 'rgba(239, 68, 68, 0.4)'
-          : 'rgba(255, 255, 255, 0.15)'
+          : isLight
+            ? 'rgba(0, 0, 0, 0.12)'
+            : 'rgba(255, 255, 255, 0.15)'
 
     return {
       fontFamily: 'Segoe UI Light, Microsoft YaHei Light, sans-serif',
@@ -307,7 +311,9 @@ export const get3DButtonStyle = (
       fontWeight: 'normal',
       borderRadius: '8px',
       transition: 'all 0.15s ease',
-      border: '1px solid rgba(255, 255, 255, 0.12)',
+      border: isLight
+        ? '1px solid rgba(0, 0, 0, 0.12)'
+        : '1px solid rgba(255, 255, 255, 0.12)',
       background: bg,
       color: theme.palette.text.primary,
       backdropFilter: 'blur(calc(8px * var(--vibrancy-factor, 1.0)))',

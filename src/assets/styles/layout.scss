@@ -89,8 +89,16 @@
         scrollbar-width: none;
 
         &::-webkit-scrollbar {
-          width: 0;
-          height: 0;
+          width: 4px;
+          height: 4px;
+          display: none;
+        }
+
+        &:hover {
+          scrollbar-width: thin;
+          &::-webkit-scrollbar {
+            display: block;
+          }
         }
       }
 

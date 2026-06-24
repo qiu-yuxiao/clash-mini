@@ -586,17 +586,17 @@ export const useCustomTheme = () => {
       const globalStyles = `
         /* 恢复窄 3D 滚动条样式 */
         * {
-          scrollbar-width: thin !important;
+          scrollbar-width: thin;
         }
         ::-webkit-scrollbar {
           width: 6px !important;
           height: 6px !important;
         }
         ::-webkit-scrollbar-track {
-          background: transparent !important;
+          background: var(--scrollbar-bg, transparent) !important;
         }
         ::-webkit-scrollbar-thumb {
-          background: var(--primary-main, #1976d2) !important;
+          background: var(--scrollbar-thumb, var(--primary-main, #1976d2)) !important;
           border-radius: 3px !important;
           box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.3), inset -1px -1px 1px rgba(0, 0, 0, 0.2) !important;
         }

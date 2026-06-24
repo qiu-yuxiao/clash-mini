@@ -230,8 +230,62 @@ mod app_init {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn show_error_dialog(title: &str, message: &str) {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    unsafe extern "system" {
+        fn MessageBoxW(
+            hwnd: *mut std::ffi::c_void,
+            lpText: *const u16,
+            lpCaption: *const u16,
+            uType: u32,
+        ) -> i32;
+    }
+    let wide_message: Vec<u16> = OsStr::new(message).encode_wide().chain(Some(0)).collect();
+    let wide_title: Vec<u16> = OsStr::new(title).encode_wide().chain(Some(0)).collect();
+    unsafe {
+        MessageBoxW(
+            std::ptr::null_mut(),
+            wide_message.as_ptr(),
+            wide_title.as_ptr(),
+            0x00000010, // MB_ICONERROR
+        );
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn show_error_dialog(title: &str, message: &str) {
+    eprintln!("[{}] {}", title, message);
+    let script = format!(
+        "display dialog {:?} with title {:?} buttons {{\"OK\"}} default button \"OK\" with icon stop",
+        message, title
+    );
+    let _ = std::process::Command::new("osascript")
+        .args(["-e", &script])
+        .spawn();
+}
+
+#[cfg(target_os = "linux")]
+fn show_error_dialog(title: &str, message: &str) {
+    eprintln!("[{}] {}", title, message);
+    let _ = std::process::Command::new("zenity")
+        .args(["--error", &format!("--title={}", title), &format!("--text={}", message)])
+        .spawn();
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+fn show_error_dialog(title: &str, message: &str) {
+    eprintln!("[{}] {}", title, message);
+}
+
 pub fn run() {
-    if app_init::init_singleton_check().is_err() {
+    if let Err(err) = app_init::init_singleton_check() {
+        let msg = format!(
+            "Clash Mini is already running or another process is using its port.\nError details: {}",
+            err
+        );
+        show_error_dialog("Clash Mini Startup Error", &msg);
         return;
     }
 

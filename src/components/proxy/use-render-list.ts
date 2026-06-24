@@ -380,7 +380,7 @@ export const useRenderList = (
 
     // 正常模式的渲染逻辑
     const renderGroups = proxiesData.groups?.length
-      ? proxiesData.groups
+      ? proxiesData.groups.filter((group) => group.name === 'PROXY')
       : []
 
     const cache = groupCacheRef.current
@@ -417,14 +417,18 @@ export const useRenderList = (
         },
       )
 
-      ret.push({
-        type: 0,
-        key: `group-${group.name}`,
-        group,
-        headState,
-      })
+      if (group.name !== 'PROXY') {
+        ret.push({
+          type: 0,
+          key: `group-${group.name}`,
+          group,
+          headState,
+        })
+      }
 
-      if (headState.open) {
+      const isOpen = group.name === 'PROXY' ? true : headState.open
+
+      if (isOpen) {
         ret.push({
           type: 1,
           key: `head-${group.name}`,

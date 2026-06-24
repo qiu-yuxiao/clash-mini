@@ -447,14 +447,17 @@ pub async fn startup_script() -> Result<()> {
         return Err(anyhow::anyhow!("script not found: {}", script_path));
     }
 
-    let parent_dir = script_dir.parent();
-    let working_dir = parent_dir.unwrap_or_else(|| script_dir.as_ref());
+    let script_abs = std::fs::canonicalize(&script_dir)
+        .map_err(|e| anyhow::anyhow!("failed to canonicalize script path: {}", e))?;
+
+    let parent_dir = script_abs.parent();
+    let working_dir = parent_dir.unwrap_or_else(|| script_abs.as_path());
 
     app_handle
         .shell()
         .command(shell_type)
         .current_dir(working_dir)
-        .args([script_path.as_str()])
+        .args([script_abs.to_string_lossy().to_string()])
         .output()
         .await?;
 

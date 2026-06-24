@@ -21,6 +21,116 @@
  - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
  - **目标版本**：`v1.8.0`
 
+### BUG-217: Hook Timer Leak / Profile Switch Starvation
+ - **现象描述**：`_layout.tsx` 中的 profile 增强 `useEffect` 依赖数组监视了易变对象 `t`，导致切换 Profile 时直接将初始化 Promise 标为 `cancelled` 提前中止，使新配置无法生效。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-218: ActiveAutoSelectTimer Leak / Profile Switch State Corruption
+ - **现象描述**：切换配置时旧的 `setInterval` 测速定时器未被清除，依然在后台轮询并修改选择的节点，将新配置的节点选择错误覆盖，导致状态错乱。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-219: Double Selection Request Race Condition
+ - **现象描述**：测速时“临时闪连”与“极速终选”两个逻辑块在首轮轮询中同时触发，导致向后端并发发送两条 `select_node` 重复网络请求。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-220: Memory Leak of Unresolved Promises in frontendAutoSelect
+ - **现象描述**：`frontendAutoSelect` 被二次调用并清理前一个定时器时，前一次调用创建的 Promise 处于悬空挂死状态，没有被 resolve 也没有被 reject。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-221: Unhandled Promise Rejection in checkDelay
+ - **现象描述**：测速使用 `Promise.race` 配合超时 Promise 控制。如果超时逻辑先赢，实际的 `delayProxyByName` 请求异常失败抛出的错误未被捕捉，导致未处理的 Promise Rejection 异常。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-222: Timeout Resource (Timer Handle) Leak in checkDelay
+ - **现象描述**：测速提前成功返回，但超时定时器未被 `clearTimeout` 手动回收，占用系统计时器句柄。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-223: Contrast and Invisible Borders Styling Issue in Frosted Glass Skin
+ - **现象描述**：Frosted Glass（毛玻璃）下失效按钮的背景与边框被硬编码为半透明白色，在浅色主题下几乎不可见，对比度低于 2.6:1。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-224: React useMemo Dependency Array Omits theme and skin
+ - **现象描述**：顶栏标题渲染在 `useMemo` 中被缓存，但其依赖数组未加入 `theme` 模式与 `skin`（`controlSkin`）变量，导致切换皮肤或深浅色模式时顶栏不刷新。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-225: Zero-Length Slice Read in HTTP Latency Test (clash.rs)
+ - **现象描述**：测速读取数据时，使用 `BytesMut::with_capacity(1024)`，长度为 0，导致底层读取空切片直接返回 `Ok(0)`，测速瞬间判定为 0ms 或超时，无法反映真实延迟。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-226: Concurrency Hang / Infinite Loop in JS Script Validation
+ - **现象描述**：运行用户自定义 JS 脚本预校验时，直接同步执行且缺少指令数量限制和看门狗机制，如果脚本存在死循环会导致整个后端线程卡死，CPU 100% 占满。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-227: Core Validation Infinite Hang due to Missing Command Timeout
+ - **现象描述**：外部校验调用 `command.output().await` 缺少 Timeout，如果子进程由于网卡驱动或端口冲突卡死，主程序线程将无限等待，导致配置保存无限假死。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-228: SSRF Bypass via DNS Resolution and IPv6 Local Ranges
+ - **现象描述**：订阅及图标链接在检测 SSRF 时，只对域名做字面校验，且未拦截 IPv6 内网本地链路和唯一本地地址（ULA）范围，可通过 DNS Rebinding 等手段绕过。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-229: Silent Application Exit on Port Collision
+ - **现象描述**：当主程序 singleton 单例检查失败（如端口被占用）时，直接 `exit(1)` 静默退出，未向用户弹出任何错误提示。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-230: Lost Notification Bug in Background Monitor
+ - **现象描述**：`PROFILE_SWITCH_NOTIFY` 广播时，如果后台线程正忙于 GC 未等待 `notified()`，配置切换通知将被丢弃，导致需要等待一个完整的休眠周期（15s）才响应。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-231: Crash/Error on Relative Startup Script Paths
+ - **现象描述**：当启动脚本配置为相对路径（如 `"script.sh"`）时，`parent()` 返回 `None`，导致 `Command::current_dir` 设置失败触发崩溃。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-232: Unbounded Memory Allocation Risk on Subscriptions
+ - **现象描述**：拉取配置订阅时使用 `response.text().await` 无条件读取全部网络数据，如果返回超大文件或无限数据流，易导致 OOM 闪退崩溃。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-233: CSS Specificity Conflict on Dialog/Menu Backgrounds under Frosted Glass
+ - **现象描述**：毛玻璃皮肤下的优先级选择器覆盖了全局 Dialog 遮罩的 opacity 配置，将原本不透明背景重写为半透明，导致弹窗文字与网页文字叠显冲突，无法看清。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-234: Hardcoded Opaque Background Colors Overriding Theme Skins
+ - **现象描述**：部分组件（如 base-page, unlock 页面等）在 dark mode 判定中强制写死深灰色背景，覆盖了毛玻璃或赛博朋克等特制皮肤的透明度与背景设计。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-235: Scrollbar Hiding Overrides and Layout Conflict
+ - **现象描述**：全局 `index.scss` 强行指定了 `* { scrollbar-width: thin !important; }`，覆盖了连接表局部指定的 `scrollbarWidth: 'none'`，导致局部滚动条无法隐藏。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-236: Inactive Scrollbar Variables Set in CSS but Unused
+ - **现象描述**：主题管理器向 root 注入了 `--scrollbar-thumb` 等 CSS 变量，但内部渲染时使用了硬编码值，导致设置中的滚动条是个性化设置失效。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-237: Vertical Clipping Hazard in Compact Proxy Columns under High DPI
+ - **现象描述**：代理节点列的行高写死了 `20px` 且强制 `overflow: hidden`，在 Windows 高 DPI 缩放（150%以上）时，文字和延迟标签会被底部横向物理裁剪。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`
+
+### BUG-238: Navigation Menu Scrollbar Truncation
+ - **现象描述**：侧边导航菜单硬编码隐藏了滚动条，在低分辨率小屏幕下导致用户无法察觉侧边栏还有可滚动的内容。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.1`\n
+
 
 
 ### BUG-205: Settings Drawer Horizontal Layout Overflow

@@ -5,7 +5,7 @@ use crate::{
     process::AsyncHandler,
     utils,
 };
-use bytes::BytesMut;
+
 use clash_verge_logging::{Type, logging};
 use once_cell::sync::Lazy;
 use serde_yaml_ng::{Mapping, Value};
@@ -127,7 +127,7 @@ pub async fn test_delay(url: String) -> anyhow::Result<u32> {
 
     tokio::time::timeout(Duration::from_secs(10), async {
         let start = Instant::now();
-        let mut buf = BytesMut::with_capacity(1024);
+        let mut buf = vec![0u8; 1024];
 
         if is_https {
             let stream = match proxy_port {
@@ -135,8 +135,8 @@ pub async fn test_delay(url: String) -> anyhow::Result<u32> {
                     let mut s = TcpStream::connect(format!("127.0.0.1:{pp}")).await?;
                     s.write_all(format!("CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n").as_bytes())
                         .await?;
-                    s.read_buf(&mut buf).await?;
-                    if !buf.windows(3).any(|w| w == b"200") {
+                    let n = s.read(&mut buf).await?;
+                    if !buf[..n].windows(3).any(|w| w == b"200") {
                         return Err(anyhow::anyhow!("Proxy CONNECT failed"));
                     }
                     s

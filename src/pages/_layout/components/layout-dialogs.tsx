@@ -532,8 +532,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
         slotProps={{
           paper: {
             sx: {
-              background:
-                mode === 'light' ? 'var(--background-color)' : '#1e1f27',
+              background: 'var(--theme-bg, var(--background-color))',
               height: '480px',
               position: 'relative',
               overflow: 'hidden',

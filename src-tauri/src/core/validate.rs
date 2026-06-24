@@ -241,12 +241,25 @@ impl CoreConfigValidator {
         logging!(debug, Type::Validate, "验证脚本文件: {}", path);
 
         // 使用boa引擎进行基本语法检查
-        use boa_engine::{Context, Source};
+        let content_clone = content.clone();
+        let handle = crate::process::AsyncHandler::spawn_blocking(move || {
+            use boa_engine::{Context, Source};
+            let mut context = Context::default();
+            context
+                .runtime_limits_mut()
+                .set_loop_iteration_limit(100_000); // 限制循环指令数
+            context.eval(Source::from_bytes(&content_clone))
+                .map(|_| ())
+                .map_err(|err| err.to_string())
+        });
 
-        let mut context = Context::default();
-        let result = context.eval(Source::from_bytes(&content));
+        let eval_result = match tokio::time::timeout(std::time::Duration::from_secs(2), handle).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(join_err)) => Err(format!("Validation task panicked: {join_err}")),
+            Err(_) => Err("Validation timed out (possible infinite loop)".to_string()),
+        };
 
-        match result {
+        match eval_result {
             Ok(_) => {
                 logging!(debug, Type::Validate, "脚本语法验证通过: {}", path);
 
@@ -359,7 +372,14 @@ impl CoreConfigValidator {
                 .sidecar(clash_core.as_str())?
                 .args(["-t", "-d", app_dir_str, "-f", config_path])
         };
-        let output = command.output().await?;
+        let output = match tokio::time::timeout(std::time::Duration::from_secs(5), command.output()).await {
+            Ok(Ok(out)) => out,
+            Ok(Err(err)) => return Err(err.into()),
+            Err(_) => {
+                logging!(error, Type::Validate, "验证进程执行超时 (5s)");
+                return Err(anyhow::anyhow!("Validation process timed out after 5 seconds").into());
+            }
+        };
 
         let status = &output.status;
         let stderr = &output.stderr;
