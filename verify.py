@@ -110,7 +110,7 @@ def verify_admin_check():
     
     # Locate wait_for_service_if_needed
     # Check for admin status check directly in file content to avoid non-greedy brace matching issues
-    admin_check_match = re.search(r"let\s+(\w+)\s*=\s*tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin\(Handle::app_handle\(\)\);", content)
+    admin_check_match = re.search(r"let\s+(\w+)\s*=\s*(?:tauri_plugin_clash_verge_sysinfo|crate::utils::sysinfo)::is_current_app_handle_admin\(Handle::app_handle\(\)\);", content)
     if admin_check_match:
         var_name = admin_check_match.group(1)
         print(f"[PASS] Found admin status check using variable: {var_name}")

@@ -228,6 +228,8 @@ export const ActiveNodeStatusCard = () => {
         justifyContent: 'center',
         gap: 1.5,
         height: '28px',
+        minWidth: 0,
+        overflow: 'hidden',
         ...get3DCardStyle(theme, 'default'),
       }}
     >
@@ -274,6 +276,7 @@ export const ActiveNodeStatusCard = () => {
             fontSize: '12px',
             color: isRetro3DDark ? '#2C1F03' : 'text.primary',
             maxWidth: { xs: '120px', sm: '240px', md: '360px' },
+            minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
@@ -299,7 +302,7 @@ export const ActiveNodeStatusCard = () => {
           size="small"
           icon={
             testing ? (
-              <CircularProgress size={10} color="inherit" />
+              <CircularProgress size={10} color="inherit" sx={{ width: '10px !important', height: '10px !important' }} />
             ) : (
               signalInfo.icon
             )

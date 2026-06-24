@@ -13,12 +13,8 @@ import {
 } from '@/services/cmds'
 import { queryClient } from '@/services/query-client'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
-import type {
-  ProxyProvider,
-  RuleProvider,
-  BaseConfig,
-} from 'tauri-plugin-mihomo-api'
 import { isDummyNode } from '@/utils/node'
+import type { ProxyProvider } from 'tauri-plugin-mihomo-api'
 import {
   getBaseConfig,
   getRuleProviders,
