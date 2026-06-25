@@ -336,11 +336,36 @@ pub fn run() {
             logging!(info, Type::Setup, "初始化已启动");
             Ok(())
         })
-        .invoke_handler(app_init::generate_handlers());
+        .invoke_handler(app_init::generate_handlers())
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let Some(webview_window) = window.get_webview_window("main") {
+                    match event {
+                        tauri::WindowEvent::CloseRequested { .. } => {
+                            event_handlers::handle_window_close(&webview_window, event);
+                        }
+                        tauri::WindowEvent::Focused(focused) => {
+                            event_handlers::handle_window_focus(*focused);
+                            let is_minimized = webview_window.is_minimized().unwrap_or(false);
+                            let is_visible = webview_window.is_visible().unwrap_or(false);
+                            if !focused && (is_minimized || !is_visible) {
+                                WindowManager::optimize_window_memory(&webview_window, true);
+                            } else if *focused {
+                                WindowManager::optimize_window_memory(&webview_window, false);
+                            }
+                        }
+                        #[cfg(target_os = "macos")]
+                        tauri::WindowEvent::Destroyed => {
+                            event_handlers::handle_window_destroyed();
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        });
 
     mod event_handlers {
         use crate::module::lightweight;
-        use crate::utils::window_manager::WindowManager;
         use crate::{
             config::Config,
             core::{self, handle, hotkey},
@@ -378,7 +403,7 @@ pub fn run() {
             }
         }
 
-        pub fn handle_window_close(event: &tauri::WindowEvent) {
+        pub fn handle_window_close(window: &tauri::WebviewWindow, event: &tauri::WindowEvent) {
             #[cfg(target_os = "macos")]
             handle::Handle::global().set_activation_policy_accessory();
 
@@ -388,9 +413,7 @@ pub fn run() {
 
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();
-                if let Some(window) = WindowManager::get_main_window() {
-                    let _ = window.hide();
-                }
+                let _ = window.hide();
                 AsyncHandler::spawn(|| async {
                     let entered = lightweight::entry_lightweight_mode().await;
                     if !entered {
@@ -496,28 +519,6 @@ pub fn run() {
                 }
             }
         }
-        tauri::RunEvent::WindowEvent { label, event, .. } if label == "main" => match event {
-            tauri::WindowEvent::CloseRequested { .. } => {
-                event_handlers::handle_window_close(&event);
-            }
-            tauri::WindowEvent::Focused(focused) => {
-                event_handlers::handle_window_focus(focused);
-                if let Some(window) = WindowManager::get_main_window() {
-                    let is_minimized = window.is_minimized().unwrap_or(false);
-                    let is_visible = window.is_visible().unwrap_or(false);
-                    if !focused && (is_minimized || !is_visible) {
-                        WindowManager::optimize_window_memory(&window, true);
-                    } else if focused {
-                        WindowManager::optimize_window_memory(&window, false);
-                    }
-                }
-            }
-            #[cfg(target_os = "macos")]
-            tauri::WindowEvent::Destroyed => {
-                event_handlers::handle_window_destroyed();
-            }
-            _ => {}
-        },
         _ => {}
     });
 }
