@@ -146,5 +146,7 @@ pub async fn exit_lightweight_mode() -> bool {
     refresh_lightweight_tray_state().await;
     // 退出轻量模式后，重新启用托盘菜单中的「轻量模式」选项
     crate::core::tray::enable_lite_mode_menu_item();
+    // 唤醒常驻监测线程以立即重置为前台周期（15秒）
+    crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
     true
 }

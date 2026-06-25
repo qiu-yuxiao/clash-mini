@@ -15,6 +15,9 @@ static ACTIVE_TASKS: Mutex<Vec<AbortHandle>> = Mutex::new(Vec::new());
 /// 用于通知后台监测线程：活动配置已被切换
 pub static PROFILE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
+/// 用于通知/唤醒后台监测线程（如退出轻量模式时）
+pub static MONITOR_WAKEUP_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
 /// 强制中止正在运行的其它后台测速任务，使其尽快释放锁
 pub fn cancel_active_auto_select() {
     let mut handles = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
@@ -446,11 +449,21 @@ pub fn start_background_monitor() {
             if is_first_run {
                 is_first_run = false;
             } else {
-                // 定期健康检测的间隔：重试模式下为 3 秒，正常模式下为 15 秒
-                let check_interval = if is_retry_mode { 3 } else { 15 };
+                // 定期健康检测的间隔：重试模式下为 3 秒，轻量模式下为 60 秒，正常模式下为 15 秒
+                let is_lightweight = crate::module::lightweight::is_in_lightweight_mode();
+                let check_interval = if is_retry_mode {
+                    3
+                } else if is_lightweight {
+                    60
+                } else {
+                    15
+                };
 
                 tokio::select! {
                     _ = sleep(Duration::from_secs(check_interval)) => {}
+                    _ = MONITOR_WAKEUP_NOTIFY.notified() => {
+                        logging!(debug, Type::Lightweight, "[后台监测] 收到唤醒信号，立即唤醒监测");
+                    }
                     _ = PROFILE_SWITCH_NOTIFY.notified() => {
                         logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒");
                     }
@@ -600,7 +613,14 @@ pub fn start_background_monitor() {
             was_online = is_online;
 
             // 2. 定期检测与快速重试自愈
-            let check_interval = if is_retry_mode { 3 } else { 15 };
+            let is_lightweight = crate::module::lightweight::is_in_lightweight_mode();
+            let check_interval = if is_retry_mode {
+                3
+            } else if is_lightweight {
+                60
+            } else {
+                15
+            };
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
 
