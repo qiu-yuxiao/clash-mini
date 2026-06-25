@@ -775,7 +775,6 @@ function ProxyVirtualList({
   headItem,
   testingGroups,
 }: ProxyVirtualListProps) {
-  const theme = useTheme()
   const stickyBackground = 'var(--theme-bg, var(--background-color))'
 
   return (

@@ -253,7 +253,7 @@
 
 ### BUG-245: Shadowed/unused theme variable in proxy-groups.tsx (WARN-02)
  - **现象描述**：`ProxyVirtualList` 组件内部通过 `useTheme()` 声明了 `theme` 变量，但由于组件内的样式配置（SX）以 `(theme) => ...` 的参数形式阴影化（shadowed）了外层变量，导致外层变量成为未使用变量，触发 ESLint 警告。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-246: Unused destructured prop mode in layout-dialogs.tsx (WARN-03)
