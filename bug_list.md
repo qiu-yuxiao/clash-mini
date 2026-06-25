@@ -80,15 +80,36 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
+### BUG-257: High CPU/Battery Consumption of Background Health Check in Lightweight Mode
+ - **现象描述**：当主程序隐藏并进入轻量化模式后，后台监测线程 `start_background_monitor` 仍以固定 15 秒的周期频繁发起活跃代理节点的延迟探测（DNS 解析及 HTTP 请求），这在无人值守、纯后台挂机状态下会导致不必要的 CPU 唤醒、物理网卡工作和电池消耗。需要实现轻量模式下的自适应探测周期，当开启轻量模式时自动将正常检测的间隔时间放宽至 60 秒，并在恢复/退出轻量模式时瞬间重置/唤醒检测。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.0`
+
+### BUG-258: Active TCP Connections Leftover in Mihomo Kernel on Entering Lightweight Mode
+ - **现象描述**：当程序进入轻量化模式（主窗口销毁）时，Mihomo 内核进程中可能依然残留有大量之前网页浏览遗留的活动/空闲 TCP 连接和套接字。在纯后台挂机期间，这些连接依然会占用系统的网络套接字及内核的物理内存。需要在进入轻量模式的瞬间，由 Rust 后端向内核发送清空连接命令，清空所有活跃与空闲连接，使内核进入真正的低能耗状态。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.0`
+
+### BUG-259: WebSocket Subscription CPU Overhead in Rust Backend on Entering Lightweight Mode
+ - **现象描述**：主窗口销毁进入轻量模式后，Rust 后端如果仍维持与 Mihomo 内核的数据流（如流量、日志、连接明细等）WebSocket 订阅，会导致在后台继续进行无用的 JSON 反序列化 and 进程间通信（IPC）计算，产生不必要的 CPU 资源开销。需要在进入轻量模式时主动熔断、清理所有的后台 WebSocket 订阅，等主窗口重建时再重新订阅。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.0`
+
+### BUG-260: Web Worker Lifecycle Leak in Traffic Monitor on Visibility Toggle
+ - **现象描述**：在流量监控 Hook（use-traffic-monitor.ts）中，原先当窗口变为不可见或进入轻量模式时，会销毁并终止 Web Worker 实例（worker.terminate()），而窗口恢复可见时重新实例化一个新的 Web Worker。然而，在 Chromium/WebView2 中频繁地销毁与创建 Worker 线程会由于垃圾回收延迟及 V8 堆内存隔离区残留而导致严重的系统线程句柄与内存泄露。应重构为 Web Worker 单例复用机制，当隐藏时发送 "stop" 消息使其进入休眠，当恢复时发送 "start" 消息唤醒采样，在全局生命周期中只保持单个 Worker 实例。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.0`
+
+### BUG-261: Settings Drawer Conditional Rendering Memory Leak and Style Bloat
+ - **现象描述**：在 _layout.tsx 中，为了优化性能，Settings Drawer 的渲染被改为了根据 drawerOpen 和 isMiniStatus 进行条件挂载 {drawerOpen && !isMiniStatus && ...}。但这在用户频繁拉伸窗口大小或频繁开关设置抽屉时，会导致大量的 Emotion 动态样式表重新计算并在 HTML <head> 中累积未清理的 <style> 标签，且 MUI 组件卸载时可能残留部分全局事件监听器导致 React 内存发生累加性泄露。应将设置抽屉的条件挂载回滚为 1.8.2 的经典 CSS transform 物理移动（例如 translate(100%)）与 pointer-events 隐藏的机制，仅通过 CSS 控制其可见性而不卸载 DOM 树。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.0`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
-| **BUG-261** | Settings Drawer Conditional Rendering Memory Leak and Style Bloat | v1.9.0 | 代码已修正，已确认 |
-| **BUG-260** | Web Worker Lifecycle Leak in Traffic Monitor on Visibility Toggle | v1.9.0 | 代码已修正，已确认 |
-| **BUG-259** | WebSocket Subscription CPU Overhead in Rust Backend on Entering Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
-| **BUG-258** | Active TCP Connections Leftover in Mihomo Kernel on Entering Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
-| **BUG-257** | High CPU/Battery Consumption of Background Health Check in Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
+
 | **BUG-242** | Mismatched window threshold hiding titlebar in normal layout (AUDIT-03) | v1.8.8 | 代码已修正，已确认 |
 | **BUG-256** | Shell Program Exits and Panics on Window Close in Auto Lightweight Mode | v1.8.8 | 代码已修正，已确认 |
 | **BUG-241** | Settings Drawer active and resources polling in mini mode (AUDIT-02) | v1.8.8 | 代码已修正，已确认 |
