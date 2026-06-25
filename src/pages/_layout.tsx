@@ -506,10 +506,18 @@ const Layout = () => {
     return false
   })
 
+  const [isMiniStatus, setIsMiniStatus] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 285 && window.innerHeight <= 100
+    }
+    return false
+  })
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleResize = () => {
       setIsMinimalWidth(window.innerWidth <= 285)
+      setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -1768,15 +1776,17 @@ const Layout = () => {
             )}
 
             {/*节点组选择列表*/}
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-                <ProxyGroups
-                  mode={clashConfig?.mode?.toLowerCase() || 'rule'}
-                  isChainMode={false}
-                  chainConfigData={null}
-                />
-              </ErrorBoundary>
-            </div>
+            {!isMiniStatus && (
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                  <ProxyGroups
+                    mode={clashConfig?.mode?.toLowerCase() || 'rule'}
+                    isChainMode={false}
+                    chainConfigData={null}
+                  />
+                </ErrorBoundary>
+              </div>
+            )}
 
             {/* Settings Sliding Drawer (slides internal left-downwards) */}
             <div
