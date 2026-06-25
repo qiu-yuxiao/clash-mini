@@ -80,12 +80,6 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-211: Window Close Unconditionally Destroys WebView State
- - **现象描述**：不管是否开启“自动轻量化模式”（`enable_auto_light_weight_mode`），关闭窗口时都无条件销毁（destroy）WebView 窗口，导致每次重新打开窗口时都需要彻底重建、耗时变长且丢失所有前端临时状态。
- - **验证方法**：未开启自动轻量模式时，关闭窗口仅隐藏（hide）窗口并调用内存回收，重新显示时瞬时恢复状态。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.2`
-
 ### BUG-212: Original Skin Accent Color Dynamic Shift Mismatch
  - **现象描述**：Original 皮肤的 Material UI React 组件的主色调在 custom-theme 中硬编码为 `#5b5c9d`，与 index.scss 中根据色彩滑块动态计算的 HSL 主色不匹配。
  - **验证方法**：滑动滑块时，React 组件的主色能同步动态变化。
@@ -138,6 +132,7 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-211** | Window Close Unconditionally Destroys WebView State | v1.7.2 | 代码已修正，已确认 |
 | **BUG-208** | Theme/CSS Injection Patch Updates Silently Ignored | v1.7.2 | 代码已修正，已确认 |
 | **BUG-207** | Tightened Asset Protocol Blocks Icons in Portable Mode | v1.7.2 | 代码已修正，已确认 |
 | **BUG-203** | Outfit Font Blocked by CSP causing Layout Chaos | v1.7.0 | 代码已修正，已确认 |
