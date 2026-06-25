@@ -16,8 +16,6 @@ export const BasePage: React.FC<Props> = (props) => {
   const { title, header, contentStyle, full, children } = props
   const theme = useTheme()
 
-  const isDark = theme.palette.mode === 'dark'
-
   return (
     <BaseErrorBoundary>
       <div className="base-page">

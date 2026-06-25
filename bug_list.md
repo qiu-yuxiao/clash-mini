@@ -248,7 +248,7 @@
 
 ### BUG-244: Unused isDark variable in base-page.tsx (WARN-01)
  - **现象描述**：`base-page.tsx` 中声明并计算了 `isDark` 变量，但在渲染体和任何子逻辑中均未被引用，导致编译/ESLint 报 `'isDark' is assigned a value but never used` 警告。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-245: Shadowed/unused theme variable in proxy-groups.tsx (WARN-02)
