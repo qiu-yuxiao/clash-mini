@@ -1,6 +1,7 @@
 use crate::{
     config::Config,
     core::{timer::Timer, tray::Tray},
+    process::AsyncHandler,
 };
 
 use clash_verge_logging::{Type, logging};
@@ -121,6 +122,45 @@ pub async fn entry_lightweight_mode() -> bool {
         return false;
     }
     refresh_lightweight_tray_state().await;
+
+    // 💡 建议 2：进入轻量模式时触发 Mihomo 内核的激进连接清理 (GC) - BUG-258
+    // 💡 建议 3：彻底熔断外壳 Rust 后端与内核的常驻数据流订阅 - BUG-259
+    AsyncHandler::spawn(|| async {
+        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+        
+        logging!(info, Type::Lightweight, "[轻量模式] 触发进入时连接清理与数据订阅熔断...");
+        
+        // 激进清空所有网络连接 (GC)
+        if let Err(err) = mihomo.close_all_connections().await {
+            logging!(
+                error,
+                Type::Lightweight,
+                "[轻量模式] 触发进入时网络连接垃圾回收 (GC) 失败: {err}"
+            );
+        } else {
+            logging!(
+                info,
+                Type::Lightweight,
+                "[轻量模式] 触发进入时网络连接垃圾回收 (GC) 成功"
+            );
+        }
+
+        // 清理所有 WebSocket 连接 (熔断订阅)
+        if let Err(err) = mihomo.clear_all_ws_connections().await {
+            logging!(
+                error,
+                Type::Lightweight,
+                "[轻量模式] 彻底熔断外壳与内核的常驻数据流订阅失败: {err}"
+            );
+        } else {
+            logging!(
+                info,
+                Type::Lightweight,
+                "[轻量模式] 彻底熔断外壳与内核的常驻数据流订阅成功"
+            );
+        }
+    });
+
     true
 }
 
