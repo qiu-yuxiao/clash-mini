@@ -80,12 +80,6 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-213: Monochrome Skin Dark Mode Card Background Contrast Loss
- - **现象描述**：Monochrome 皮肤在深色模式下强制 cards/panels 背景与窗口整体背景（`--background-color`）一致，导致内容卡片完全融合在背景中，缺乏视觉层次感。
- - **验证方法**：Monochrome 皮肤在深色模式下，cards/panels 采用 `--theme-panel-bg` 渲染，与主背景 `#0f1423` 有对比色阶。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.2`
-
 ### BUG-214: Switch Component Sizing Inconsistency in Cyberpunk/Monochrome Skins
  - **现象描述**：Cyberpunk 和 Monochrome 皮肤的 small 尺寸开关没有适配比例，强行按普通尺寸渲染，导致小开关在 settings 卡片中宽度溢出或表现异常。
  - **验证方法**：small 尺寸的 BaseSwitch 组件渲染出的尺寸明显小于普通尺寸开关（Monochrome 为 28x14px，Cyberpunk 为 18x10px）。
@@ -126,6 +120,7 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-213** | Monochrome Skin Dark Mode Card Background Contrast Loss | v1.7.2 | 代码已修正，已确认 |
 | **BUG-212** | Original Skin Accent Color Dynamic Shift Mismatch | v1.7.2 | 代码已修正，已确认 |
 | **BUG-211** | Window Close Unconditionally Destroys WebView State | v1.7.2 | 代码已修正，已确认 |
 | **BUG-208** | Theme/CSS Injection Patch Updates Silently Ignored | v1.7.2 | 代码已修正，已确认 |
