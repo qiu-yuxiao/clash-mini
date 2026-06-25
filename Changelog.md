@@ -1,3 +1,12 @@
+## v1.8.9
+
+### 🐞 Fixed Bugs
+
+- **BUG-256 自动轻量模式关闭窗口崩溃与托盘失效修复**：
+  - 将窗口关闭（CloseRequested）、聚焦（Focused）和销毁（Destroyed）等生命周期事件的捕获逻辑从 `app.run` 移入 `tauri::Builder` 的 `on_window_event` 拦截器中，确保在窗口真正被 OS / 默认行为销毁前完成隐藏，并安全地在异步任务中执行轻量化转换，彻底解决了 Windows / Tao 引擎下关闭窗口导致的 `cannot move state from Destroyed` 崩溃 Panic。
+
+---
+
 ## v1.8.8
 
 ### 🐞 Fixed Bugs
