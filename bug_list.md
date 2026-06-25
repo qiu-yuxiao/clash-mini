@@ -80,12 +80,6 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-214: Switch Component Sizing Inconsistency in Cyberpunk/Monochrome Skins
- - **现象描述**：Cyberpunk 和 Monochrome 皮肤的 small 尺寸开关没有适配比例，强行按普通尺寸渲染，导致小开关在 settings 卡片中宽度溢出或表现异常。
- - **验证方法**：small 尺寸的 BaseSwitch 组件渲染出的尺寸明显小于普通尺寸开关（Monochrome 为 28x14px，Cyberpunk 为 18x10px）。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.2`
-
 ### BUG-241: Settings Drawer active and resources polling in mini mode (AUDIT-02)
  - **现象描述**：当窗口缩放至迷你模式时，根据项目设计协议规范，除了当前活跃节点、4个流量小卡片和1个流量图之外，其他无关组件都必须强制物理卸载。然而，若用户在大窗口下打开了设置抽屉（即 `drawerOpen` 为 `true` 时），在窗口缩小后，由于设置抽屉仅根据 `drawerOpen` 条件渲染，它仍会保持挂载状态留在 DOM 树中。这违反了迷你模式的完全卸载规约，且会导致抽屉内的连接面板（Connections Panel）在后台继续进行高频 WebSocket 流量轮询，白白消耗系统 CPU 与 IPC 资源。
  - **当前状态**：`代码已修正，待用户确认`
@@ -120,6 +114,7 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-214** | Switch Component Sizing Inconsistency in Cyberpunk/Monochrome Skins | v1.7.2 | 代码已修正，已确认 |
 | **BUG-213** | Monochrome Skin Dark Mode Card Background Contrast Loss | v1.7.2 | 代码已修正，已确认 |
 | **BUG-212** | Original Skin Accent Color Dynamic Shift Mismatch | v1.7.2 | 代码已修正，已确认 |
 | **BUG-211** | Window Close Unconditionally Destroys WebView State | v1.7.2 | 代码已修正，已确认 |
