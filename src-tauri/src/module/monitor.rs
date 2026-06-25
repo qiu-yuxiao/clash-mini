@@ -529,32 +529,32 @@ pub fn start_background_monitor() {
 
             let is_online = if need_probe {
                 last_online_check_time = Some(Instant::now());
-                // 【性能优化与双重探测】：优先检测 baidu.com:80 (中国大陆)，失败则尝试 dns.google:53 (全球/海外)
-                // 兼顾国内与海外用户，避免由于 GFW 或特定地域拦截导致物理连通性状态误判
-                let check_baidu = async {
-                    tokio::time::timeout(
-                        Duration::from_millis(1500),
-                        tokio::net::lookup_host("baidu.com:80"),
-                    )
-                    .await
-                    .map(|res| res.is_ok())
-                    .unwrap_or(false)
-                };
-                let check_google = async {
-                    tokio::time::timeout(
-                        Duration::from_millis(1500),
-                        tokio::net::lookup_host("dns.google:53"),
-                    )
-                    .await
-                    .map(|res| res.is_ok())
-                    .unwrap_or(false)
+                
+                // 【性能优化与动态探测】：直接从当前配置的测速网址中解析域名与端口作为探测目标，
+                // 彻底消除硬编码的第三方网站，测速用什么网络检测就测什么，天然兼顾海内外。
+                let verge = Config::verge().await.latest_arc();
+                let test_url = verge
+                    .default_latency_test
+                    .as_deref()
+                    .unwrap_or("http://cp.cloudflare.com/generate_204")
+                    .to_string();
+                
+                let host_port = match url::Url::parse(&test_url) {
+                    Ok(parsed_url) => {
+                        let host = parsed_url.host_str().unwrap_or("cp.cloudflare.com");
+                        let port = parsed_url.port().unwrap_or(if parsed_url.scheme() == "https" { 443 } else { 80 });
+                        format!("{}:{}", host, port)
+                    }
+                    Err(_) => "cp.cloudflare.com:80".to_string(),
                 };
 
-                if check_baidu.await {
-                    true
-                } else {
-                    check_google.await
-                }
+                tokio::time::timeout(
+                    Duration::from_secs(2),
+                    tokio::net::lookup_host(host_port),
+                )
+                .await
+                .map(|res| res.is_ok())
+                .unwrap_or(false)
             } else {
                 // 尚未到探测间隔，复用上次结果
                 was_online
