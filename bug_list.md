@@ -243,7 +243,7 @@
 
 ### BUG-243: Stale size refs check in resetIdleTimer callback (AUDIT-04)
  - **现象描述**：`window-provider.tsx` 中监听窗口缩放的回调是防抖（debounced 300ms）执行的，而检测用户鼠标移动的空闲计时器重置方法 `resetIdleTimer` 是即时触发的。当用户跨阈值拖拽窗口尺寸并停止移动时，空闲计时器可能会比防抖的 resize 监听器更早触发。此时它会读取保存在 `isMinimalWidthRef.current` 中的窗口宽度，而此引用还是过期的值（比如上次静默启动时的 0 宽度），导致计时器在实际窗口足够宽的情况下，误判并调用 IPC 接口隐藏了窗口装饰。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-244: Unused isDark variable in base-page.tsx (WARN-01)

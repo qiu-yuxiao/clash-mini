@@ -131,7 +131,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
     idleTimerRef.current = setTimeout(async () => {
       // Only hide if currently at minimal width and not already hidden
-      if (!isMinimalWidthRef.current || isDecorationsHiddenRef.current) return
+      const currentIsMinimal = typeof window !== 'undefined' ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD : false
+      if (!currentIsMinimal || isDecorationsHiddenRef.current) return
       try {
         await invoke('hide_window_chrome')
         isDecorationsHiddenRef.current = true
