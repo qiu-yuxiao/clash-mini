@@ -316,6 +316,17 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.9.0`
 
+### BUG-258: Active TCP Connections Leftover in Mihomo Kernel on Entering Lightweight Mode
+ - **现象描述**：当程序进入轻量化模式（主窗口销毁）时，Mihomo 内核进程中可能依然残留有大量之前网页浏览遗留的活动/空闲 TCP 连接和套接字。在纯后台挂机期间，这些连接依然会占用系统的网络套接字及内核的物理内存。需要在进入轻量模式的瞬间，由 Rust 后端向内核发送清空连接命令，清空所有活跃与空闲连接，使内核进入真正的低能耗状态。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.0`
+
+### BUG-259: WebSocket Subscription CPU Overhead in Rust Backend on Entering Lightweight Mode
+ - **现象描述**：主窗口销毁进入轻量模式后，Rust 后端如果仍维持与 Mihomo 内核的数据流（如流量、日志、连接明细等）WebSocket 订阅，会导致在后台继续进行无用的 JSON 反序列化 and 进程间通信（IPC）计算，产生不必要的 CPU 资源开销。需要在进入轻量模式时主动熔断、清理所有的后台 WebSocket 订阅，等主窗口重建时再重新订阅。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.0`
+
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
