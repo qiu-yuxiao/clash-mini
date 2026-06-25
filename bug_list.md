@@ -116,13 +116,6 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-203: Outfit Font Blocked by CSP causing Layout Chaos
- 
- - **现象描述**：启用 CSP 内容安全策略后，WebView 拒绝加载外部的 Google Fonts（`https://fonts.googleapis.com` 及 `https://fonts.gstatic.com`），导致 Outfit 字体加载失败。在使用 Modern Flat 皮肤时，系统回退到备用字体，由于字体规格与排版不一致，导致主界面部分 3D 组件、Label 文本错位、折叠裁剪甚至整体布局混乱。
- - **验证方法**：启动程序并切换至 Modern Flat 皮肤，主界面布局正确，英文正常呈现 Outfit 字体，控制台无外部字体 CSP 拦截报错。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.0`
-
 ### BUG-241: Settings Drawer active and resources polling in mini mode (AUDIT-02)
  - **现象描述**：当窗口缩放至迷你模式时，根据项目设计协议规范，除了当前活跃节点、4个流量小卡片和1个流量图之外，其他无关组件都必须强制物理卸载。然而，若用户在大窗口下打开了设置抽屉（即 `drawerOpen` 为 `true` 时），在窗口缩小后，由于设置抽屉仅根据 `drawerOpen` 条件渲染，它仍会保持挂载状态留在 DOM 树中。这违反了迷你模式的完全卸载规约，且会导致抽屉内的连接面板（Connections Panel）在后台继续进行高频 WebSocket 流量轮询，白白消耗系统 CPU 与 IPC 资源。
  - **当前状态**：`代码已修正，待用户确认`
@@ -156,6 +149,8 @@
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
+
+| **BUG-203** | Outfit Font Blocked by CSP causing Layout Chaos | v1.7.0 | 代码已修正，已确认 |
 
 | **BUG-171** | Profile Switch/Import Auto-Select Hanging & Speed Test Error Responses | v1.5.7 | 代码已修正，已确认 |
 | **BUG-168** | Upgrade Command RwLock Writer Starvation | v1.5.5 | 代码已修正，已确认 |
