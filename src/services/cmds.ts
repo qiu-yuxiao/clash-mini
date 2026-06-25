@@ -32,7 +32,7 @@ export async function enhanceProfiles() {
           // 1. 提取所有原始 proxies 名字
           const proxies = doc.proxies || []
           const proxyNames = Array.isArray(proxies)
-            ? proxies.map((p: { name?: string }) => p && p.name).filter(Boolean)
+            ? proxies.map((p: { name?: string }) => p && p.name).filter((name): name is string => !!name)
             : []
 
           // 2. 提取所有的 proxy-providers 名字
@@ -292,7 +292,7 @@ export async function calcuProxyProviders() {
         const proxyList = provider.proxies as Array<Record<string, unknown>> | undefined
         const proxies = proxyList
           ? proxyList
-              .map((p) => ({ ...p, provider: name }) as { name: string; provider: string })
+              .map((p) => ({ ...p, provider: name }) as unknown as IProxyItem)
               .filter((p) => p.name && !isDummyNode(p.name))
           : []
         return [
