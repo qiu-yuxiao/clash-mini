@@ -80,11 +80,6 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-241: Settings Drawer active and resources polling in mini mode (AUDIT-02)
- - **现象描述**：当窗口缩放至迷你模式时，根据项目设计协议规范，除了当前活跃节点、4个流量小卡片和1个流量图之外，其他无关组件都必须强制物理卸载。然而，若用户在大窗口下打开了设置抽屉（即 `drawerOpen` 为 `true` 时），在窗口缩小后，由于设置抽屉仅根据 `drawerOpen` 条件渲染，它仍会保持挂载状态留在 DOM 树中。这违反了迷你模式的完全卸载规约，且会导致抽屉内的连接面板（Connections Panel）在后台继续进行高频 WebSocket 流量轮询，白白消耗系统 CPU 与 IPC 资源。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
 ### BUG-242: Mismatched window threshold hiding titlebar in normal layout (AUDIT-03)
  - **现象描述**：`window-provider.tsx` 中定义的迷你宽度阈值为 `MINIMAL_WIDTH_THRESHOLD = 290`（像素），而在 React 前端渲染组件（如 `_layout.tsx` 和 `app-data-provider.tsx`）中检测迷你模式的阈值为 `285`（像素）。此阈值不一致导致在窗口宽度处于 286px 至 290px 之间时产生视觉异常：窗口服务认为窗口处于迷你模式并调用后端 IPC 隐藏了系统原生标题栏与窗口控制按钮，但 React 布局仍判定窗口处于正常模式并进行全量排版，这使得用户看到一个普通窗口却没有顶栏和任何窗口控制组件（最小化/最大化/关闭）。
  - **当前状态**：`代码已修正，待用户确认`
@@ -114,6 +109,7 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-241** | Settings Drawer active and resources polling in mini mode (AUDIT-02) | v1.8.8 | 代码已修正，已确认 |
 | **BUG-214** | Switch Component Sizing Inconsistency in Cyberpunk/Monochrome Skins | v1.7.2 | 代码已修正，已确认 |
 | **BUG-213** | Monochrome Skin Dark Mode Card Background Contrast Loss | v1.7.2 | 代码已修正，已确认 |
 | **BUG-212** | Original Skin Accent Color Dynamic Shift Mismatch | v1.7.2 | 代码已修正，已确认 |
