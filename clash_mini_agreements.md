@@ -2406,3 +2406,9 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **对话框毛玻璃不透明遮罩**：使用 `html[data-control-skin]` 属性选择器提高 Dialog 遮罩的 specificity 优先级，防止弹窗文本发生重叠和穿透。
 - **动态滚动条与行高适配**：移除了全局 scrollbar-width 中的 `!important` 限制以允许局部隐藏；节点列表项高度从 20px 增加为 24px 并使用 `height: auto` 配合虚拟列表估值重设，彻底解决 Windows 高 DPI 缩放下的文字物理裁剪与错折行问题。
 
+## ⚡ 三十九、 设置面板瞬时挂载与联动关闭规范 (BUG-240)
+
+为了最大程度释放前端系统资源，彻底移除过度设计的侧滑/淡出过渡动画，主页面及全局数据层实施如下设计规范：
+
+- **设置抽屉组件生命周期**：撤销所有退场过渡动画（包括 transition、transform 位移、opacity 变化和 pointer-events 遮罩属性），在主布局中直接使用 `{drawerOpen && <div className="theme-panel">...</div>}` 进行条件渲染。当设置面板关闭时（即大窗口默认关闭，或微小窗口模式下），其内部的所有子组件全部从 DOM 树中物理卸载，达到零 DOM 节点残留。
+- **配置数据拉取联动**：将设置页面的打开状态 `drawerOpen` 作为全局上下文状态提升至根 `SystemContext` 统一管理（以 `isSettingsOpen` / `setIsSettingsOpen` 属性暴露）。全局 `getSystemProxy` (系统代理) 与 `getRunningMode` (运行模式) 的 React Query 查询，其启用参数直接绑定为 `enabled: isSettingsOpen`。当设置抽屉关闭时，后台接口查询自动被禁用以消除多余的 Tauri IPC 进程间通信；仅在设置抽屉处于打开状态时，方可激活查询以提供设置卡片所需数据。

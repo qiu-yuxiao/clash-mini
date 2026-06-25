@@ -75,6 +75,8 @@ export const AppDataProvider = ({
     return false
   })
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleResize = () => {
@@ -236,12 +238,14 @@ export const AppDataProvider = ({
   const { data: sysproxy, refetch: _refetchSysproxy } = useQuery({
     queryKey: ['getSystemProxy'],
     queryFn: getSystemProxy,
+    enabled: isSettingsOpen,
     ...TQ_DEFAULTS,
   })
 
   const { data: runningMode } = useQuery({
     queryKey: ['getRunningMode'],
     queryFn: getRunningMode,
+    enabled: isSettingsOpen,
     ...TQ_DEFAULTS,
   })
 
@@ -432,8 +436,10 @@ export const AppDataProvider = ({
       sysproxy,
       runningMode,
       systemProxyAddress: calculateSystemProxyAddress(),
+      isSettingsOpen,
+      setIsSettingsOpen,
     }
-  }, [sysproxy, runningMode, verge, clashConfig])
+  }, [sysproxy, runningMode, verge, clashConfig, isSettingsOpen])
 
   const uptimeValue = useMemo(() => ({ uptime: uptimeData || 0 }), [uptimeData])
 

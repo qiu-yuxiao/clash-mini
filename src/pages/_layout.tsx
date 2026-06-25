@@ -46,6 +46,7 @@ import { useWindowDecorations } from '@/hooks/use-window'
 import {
   useClashConfigData,
   useAppRefreshers,
+  useSystemData,
 } from '@/providers/app-data-context'
 import {
   importProfile,
@@ -622,7 +623,7 @@ const Layout = () => {
   }, [switchLanguage])
 
   // Drawer Toggle State
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const { isSettingsOpen: drawerOpen, setIsSettingsOpen: setDrawerOpen } = useSystemData()
 
   // Profiles State
   const [url, setUrl] = useState('')
@@ -1788,34 +1789,28 @@ const Layout = () => {
               </div>
             )}
 
-            {/* Settings Sliding Drawer (slides internal left-downwards) */}
-            <div
-              className="theme-panel"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                zIndex: 100,
-                // WARNING [FOR AI AGENTS / AUDITORS]:
-                // This flex layout must remain as row direction and MUST NOT wrap. In default 270px width,
-                // the connections panel is intentionally squeezed to 0px (hidden) and physically clipped
-                // off-screen, per the design agreement. Widening the window will slide it into view.
-                display: 'flex',
-                transition:
-                  'transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease-in-out',
-                transform: drawerOpen
-                  ? 'translate(0, 0) scale(1)'
-                  : 'translate(100%, -100%) scale(0.95)',
-                opacity: drawerOpen ? 1 : 0,
-                pointerEvents: drawerOpen ? 'auto' : 'none',
-                boxSizing: 'border-box',
-                padding: '12px',
-                gap: '12px',
-                overflow: 'hidden',
-              }}
-            >
+            {/* Settings Drawer (Instantly mounted when drawerOpen is true) */}
+            {drawerOpen && (
+              <div
+                className="theme-panel"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  zIndex: 100,
+                  // WARNING [FOR AI AGENTS / AUDITORS]:
+                  // This flex layout must remain as row direction and MUST NOT wrap. In default 270px width,
+                  // the connections panel is intentionally squeezed to 0px (hidden) and physically clipped
+                  // off-screen, per the design agreement. Widening the window will slide it into view.
+                  display: 'flex',
+                  boxSizing: 'border-box',
+                  padding: '12px',
+                  gap: '12px',
+                  overflow: 'hidden',
+                }}
+              >
               {/* Left Settings Column (240px width) */}
               <Box
                 sx={{
@@ -2137,6 +2132,7 @@ const Layout = () => {
                 })}
               </Box>
             </div>
+          )}
           </div>
 
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}

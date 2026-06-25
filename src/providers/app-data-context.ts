@@ -80,6 +80,8 @@ export interface SystemContextType {
   sysproxy: SystemProxyInfo | undefined
   runningMode?: string
   systemProxyAddress: string
+  isSettingsOpen: boolean
+  setIsSettingsOpen: (open: boolean) => void
 }
 
 export interface UptimeContextType {
