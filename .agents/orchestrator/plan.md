@@ -1,23 +1,27 @@
-# Clash Mini Pre-Release Code Audit Plan
+# Clash Verge/Mini Post-1.8.5 Changes Audit Plan
 
-## Objective
-Perform a comprehensive pre-release code audit of the frontend layout components, backend monitoring modules, and related Tauri commands. Propose non-modifying diff fixes and verify compliance under the strict 'No Write' constraint.
+## Objectives
+Perform a comprehensive read-only audit of all commits and changes between versions 1.8.5 (`fd26ae0a`) and 1.8.7 (`47877a1e`) in the Clash Verge/Mini codebase. Identify logical bugs, UI/layout bugs, resource management issues, and compile/clippy warnings. Document all findings in `docs/post_185_changes_audit_report.md` with file:/// markdown links, root cause analysis, and proposed git diffs.
 
 ## Milestones
-1. **Milestone 1: Frontend Code Audit**
-   - Scope: `src/pages/_layout.tsx` and all 10 components under `src/pages/_layout/components/`.
-   - Focus: Race conditions, skin styles compatibility (Trump-3D, Original, Modern, Frosted, Cyberpunk, Monochrome), memory management, and code quality.
-   - Dispatch: Spawn `teamwork_preview_explorer` to inspect frontend files and identify findings.
 
-2. **Milestone 2: Backend Code Audit**
-   - Scope: `src-tauri/src/module/monitor.rs` and related commands under `src-tauri/src/cmd/` (`proxy.rs`, `clash.rs`, `profile.rs`).
-   - Focus: Race conditions, concurrency, parameters validation/percent-encoding, error handling, memory leaks.
-   - Dispatch: Spawn `teamwork_preview_explorer` to inspect backend files and identify findings.
+1. **Milestone 1: Plan Initialization & Setup**
+   - Initialize `plan.md` and `progress.md`.
+   - Start heartbeat cron.
 
-3. **Milestone 3: Report Synthesis & Review**
-   - Scope: Consolidate findings from Milestones 1 & 2.
-   - Actions: Generate `audit_report.md` in the required directory (`C:\Users\sun_y\.gemini\antigravity\brain\cdd94940-b080-4369-a04d-422abec1819d/audit_report.md`).
-   - Verify that standard links formatted like `[filename](file:///absolute/path/to/file#Lstart-Lend)` are present and valid, skin styles table is populated, and executive summary is written.
+2. **Milestone 2: Commit Scanning & Focused Listener Audit**
+   - Dispatch `teamwork_preview_explorer` to scan commits from `fd26ae0a` to `47877a1e`.
+   - Analyze resource optimization changes: unmounting `ProxyGroups`, context-driven query disabling, window size event listeners.
+   - Audit focus and visibility change event listeners in `_layout.tsx` and `app-data-provider.tsx`.
+   - Audit `resetIdleTimer` fix in `window-provider.tsx` for memory leaks or double-triggering.
 
-## Verification
-- Validate TypeScript compilation (`pnpm typecheck` and `pnpm web:build`) using worker tools to ensure build health, though no modifications to source files are allowed.
+3. **Milestone 3: Static Checks & Clippy Audit**
+   - Dispatch a worker/explorer to run frontend/backend static checks (eslint, typescript compile, cargo clippy).
+   - Collect and compile all warnings and propose cleanup.
+
+4. **Milestone 4: Synthesis & Final Audit Report Generation**
+   - Consolidate findings from Milestones 2 & 3.
+   - Review proposed git diff blocks for syntax and logic.
+   - Write the final comprehensive report to `docs/post_185_changes_audit_report.md`.
+   - Ensure git status remains 100% clean.
+   - Report victory to the Sentinel.
