@@ -61,19 +61,9 @@ export const AppDataProvider = ({
 }) => {
   const { verge } = useVerge()
 
-  const [isMinimalWidth, setIsMinimalWidth] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth <= 285
-    }
-    return false
-  })
+  const [isMinimalWidth, setIsMinimalWidth] = useState(false)
 
-  const [isMiniStatus, setIsMiniStatus] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth <= 285 && window.innerHeight <= 100
-    }
-    return false
-  })
+  const [isMiniStatus, setIsMiniStatus] = useState(false)
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -83,8 +73,12 @@ export const AppDataProvider = ({
       setIsMinimalWidth(window.innerWidth <= 285)
       setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
     }
+    const timer = setTimeout(handleResize, 0)
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', handleResize)
+    }
   }, [])
 
   const forceFullProxiesRef = useRef(false)
