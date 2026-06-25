@@ -1593,6 +1593,7 @@ const Layout = () => {
       decorated,
       isDecorationsHidden,
       drawerOpen,
+      setDrawerOpen,
       patchVerge,
       verge?.enable_always_on_top,
     ],

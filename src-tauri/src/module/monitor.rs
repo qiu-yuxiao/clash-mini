@@ -86,7 +86,6 @@ async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<
     (filter_config, sort_type)
 }
 
-
 /// 过滤匹配算法：支持大小写敏感、正则匹配、全字匹配
 /// 【性能优化】：接收预编译的可选正则对象，避免在过滤循环中频繁调用 Regex::new()
 fn match_filter(name: &str, config: &FilterConfig, compiled_re: Option<&regex::Regex>) -> bool {
@@ -102,8 +101,16 @@ fn match_filter(name: &str, config: &FilterConfig, compiled_re: Option<&regex::R
         // 若正则编译失败（compiled_re 为 None），降级为普通子串匹配
     }
 
-    let name_cmp = if config.match_case { name.to_string() } else { name.to_lowercase() };
-    let filter_cmp = if config.match_case { config.filter_text.clone() } else { config.filter_text.to_lowercase() };
+    let name_cmp = if config.match_case {
+        name.to_string()
+    } else {
+        name.to_lowercase()
+    };
+    let filter_cmp = if config.match_case {
+        config.filter_text.clone()
+    } else {
+        config.filter_text.to_lowercase()
+    };
 
     name_cmp.contains(&filter_cmp)
 }
@@ -521,7 +528,7 @@ pub fn start_background_monitor() {
             let probe_interval = if was_online {
                 Duration::from_secs(60) // 在线时：60 秒探测一次
             } else {
-                Duration::from_secs(5)  // 离线时：5 秒探测一次，快速发现网络恢复
+                Duration::from_secs(5) // 离线时：5 秒探测一次，快速发现网络恢复
             };
             let need_probe = last_online_check_time
                 .map(|t| t.elapsed() >= probe_interval)
@@ -529,7 +536,7 @@ pub fn start_background_monitor() {
 
             let is_online = if need_probe {
                 last_online_check_time = Some(Instant::now());
-                
+
                 // 【性能优化与动态探测】：直接从当前配置的测速网址中解析域名与端口作为探测目标，
                 // 彻底消除硬编码的第三方网站，测速用什么网络检测就测什么，天然兼顾海内外。
                 let verge = Config::verge().await.latest_arc();
@@ -538,23 +545,22 @@ pub fn start_background_monitor() {
                     .as_deref()
                     .unwrap_or("http://cp.cloudflare.com/generate_204")
                     .to_string();
-                
+
                 let host_port = match url::Url::parse(&test_url) {
                     Ok(parsed_url) => {
                         let host = parsed_url.host_str().unwrap_or("cp.cloudflare.com");
-                        let port = parsed_url.port().unwrap_or_else(|| if parsed_url.scheme() == "https" { 443 } else { 80 });
+                        let port = parsed_url
+                            .port()
+                            .unwrap_or_else(|| if parsed_url.scheme() == "https" { 443 } else { 80 });
                         format!("{}:{}", host, port)
                     }
                     Err(_) => "cp.cloudflare.com:80".to_string(),
                 };
 
-                tokio::time::timeout(
-                    Duration::from_secs(2),
-                    tokio::net::lookup_host(host_port),
-                )
-                .await
-                .map(|res| res.is_ok())
-                .unwrap_or(false)
+                tokio::time::timeout(Duration::from_secs(2), tokio::net::lookup_host(host_port))
+                    .await
+                    .map(|res| res.is_ok())
+                    .unwrap_or(false)
             } else {
                 // 尚未到探测间隔，复用上次结果
                 was_online
