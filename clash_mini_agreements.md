@@ -2419,3 +2419,11 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 - **多事件尺寸补偿机制**：在主布局组件（`_layout.tsx`）及全局数据提供者（`app-data-provider.tsx`）中，窗口尺寸和“微小窗口模式”的判定逻辑不仅要监听 `resize` 事件，还必须注册并监听窗口聚焦（`focus`）和文档可见性变化（`visibilitychange`）事件。当用户从托盘唤醒窗口时，通过这些补偿事件重新测量并更新真实的窗口尺寸，从而使前端正确退出微小模式，恢复完整的节点数据流和节点服务商查询。
 - **无挂载尺寸动态重算**：在窗口控制器组件（`window-provider.tsx`）中，为防止在静默启动（初始宽度检测为 `0`）时引发的标题栏异常隐藏，`resetIdleTimer` 会在重置计时器时，通过 `window.innerWidth` 动态且同步地重新评估是否处于最小宽度状态，不依赖初始化时缓存的过时/静默尺寸值。
+
+
+## ⚡ 四十一、 窗口生命周期事件在 tauri::Builder 拦截规范 (BUG-256)
+
+为了解决在 Windows 下自动轻量化模式开启时关闭窗口导致程序崩溃 Panic 并导致托盘图标消失、内核残留的问题，制定以下规范：
+
+- **Builder 级别拦截窗口事件**：禁止在 `app.run` 事件循环中捕获 `RunEvent::WindowEvent` 的 `CloseRequested` 并调用 `api.prevent_close()`。所有窗口相关的生命周期拦截（包括 `CloseRequested`、`Focused` 等）必须通过 `tauri::Builder` 的 `.on_window_event` 接口进行注册。
+- **获取 WebviewWindow 后 hide 隐藏**：在 `.on_window_event` 回调中，必须通过 `window.get_webview_window("main")` 接口安全获取 `tauri::WebviewWindow` 句柄后，调用 `api.prevent_close()` 并对该句柄调用 `window.hide()` 隐藏窗口，再执行异步轻量化模式转换。这确保了在窗口生命周期真正进入销毁（Destroy）之前就完成了对关闭动作的阻止与隐藏，彻底规避了 Windows/Tao 引擎下因窗口异常关闭导致的 `cannot move state from Destroyed` 底层 Panic。
