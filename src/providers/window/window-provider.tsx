@@ -10,7 +10,7 @@ import { WindowContext } from './window-context'
 /** FEAT-003: Idle duration (ms) before chrome auto-hides */
 const IDLE_HIDE_DELAY_MS = 10_000
 /** Width threshold (CSS px) below which the window is in "traffic monitor" mode */
-const MINIMAL_WIDTH_THRESHOLD = 290
+const MINIMAL_WIDTH_THRESHOLD = 285
 
 export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   children,

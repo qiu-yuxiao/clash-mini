@@ -238,7 +238,7 @@
 
 ### BUG-242: Mismatched window threshold hiding titlebar in normal layout (AUDIT-03)
  - **现象描述**：`window-provider.tsx` 中定义的迷你宽度阈值为 `MINIMAL_WIDTH_THRESHOLD = 290`（像素），而在 React 前端渲染组件（如 `_layout.tsx` 和 `app-data-provider.tsx`）中检测迷你模式的阈值为 `285`（像素）。此阈值不一致导致在窗口宽度处于 286px 至 290px 之间时产生视觉异常：窗口服务认为窗口处于迷你模式并调用后端 IPC 隐藏了系统原生标题栏与窗口控制按钮，但 React 布局仍判定窗口处于正常模式并进行全量排版，这使得用户看到一个普通窗口却没有顶栏和任何窗口控制组件（最小化/最大化/关闭）。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-243: Stale size refs check in resetIdleTimer callback (AUDIT-04)
