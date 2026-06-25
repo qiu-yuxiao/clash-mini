@@ -233,7 +233,7 @@
 
 ### BUG-241: Settings Drawer active and resources polling in mini mode (AUDIT-02)
  - **现象描述**：当窗口缩放至迷你模式时，根据项目设计协议规范，除了当前活跃节点、4个流量小卡片和1个流量图之外，其他无关组件都必须强制物理卸载。然而，若用户在大窗口下打开了设置抽屉（即 `drawerOpen` 为 `true` 时），在窗口缩小后，由于设置抽屉仅根据 `drawerOpen` 条件渲染，它仍会保持挂载状态留在 DOM 树中。这违反了迷你模式的完全卸载规约，且会导致抽屉内的连接面板（Connections Panel）在后台继续进行高频 WebSocket 流量轮询，白白消耗系统 CPU 与 IPC 资源。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-242: Mismatched window threshold hiding titlebar in normal layout (AUDIT-03)

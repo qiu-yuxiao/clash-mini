@@ -1789,7 +1789,7 @@ const Layout = () => {
             )}
 
             {/* Settings Drawer (Instantly mounted when drawerOpen is true) */}
-            {drawerOpen && (
+            {drawerOpen && !isMiniStatus && (
               <div
                 className="theme-panel"
                 style={{
