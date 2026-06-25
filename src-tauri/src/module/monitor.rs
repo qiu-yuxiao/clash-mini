@@ -542,7 +542,7 @@ pub fn start_background_monitor() {
                 let host_port = match url::Url::parse(&test_url) {
                     Ok(parsed_url) => {
                         let host = parsed_url.host_str().unwrap_or("cp.cloudflare.com");
-                        let port = parsed_url.port().unwrap_or(if parsed_url.scheme() == "https" { 443 } else { 80 });
+                        let port = parsed_url.port().unwrap_or_else(|| if parsed_url.scheme() == "https" { 443 } else { 80 });
                         format!("{}:{}", host, port)
                     }
                     Err(_) => "cp.cloudflare.com:80".to_string(),

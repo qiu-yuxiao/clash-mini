@@ -198,11 +198,9 @@ class DelayManager {
 
   getDelayFix(proxy: IProxyItem, group: string) {
     if (!proxy) return -1
-    if (!proxy.provider) {
-      const update = this.getDelayUpdate(proxy.name, group)
-      if (update && (update.delay >= 0 || update.delay === -2)) {
-        return update.delay
-      }
+    const update = this.getDelayUpdate(proxy.name, group)
+    if (update && (update.delay >= 0 || update.delay === -2)) {
+      return update.delay
     }
 
     // 添加 history 属性的安全检查
