@@ -293,7 +293,7 @@
 
 ### BUG-253: Explicit any in nameserver policy type dictionary in clash.ts (WARN-10)
  - **现象描述**：`clash.ts` 中的 Mihomo 系统核心配置接口 `IClashConfig` 声明 `nameserver-policy` 采用 `Record<string, any>`，在强类型检查下会引发 ESLint 语法规则报错。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-254: Explicit any in traffic monitor validator functions in traffic.ts (WARN-11)

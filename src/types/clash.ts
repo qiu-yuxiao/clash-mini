@@ -42,7 +42,7 @@ export interface IConfigData {
     'proxy-server-nameserver'?: string[]
     'direct-nameserver'?: string[]
     'direct-nameserver-follow-policy'?: boolean
-    'nameserver-policy'?: Record<string, any>
+    'nameserver-policy'?: Record<string, unknown>
     'use-hosts'?: boolean
     'use-system-hosts'?: boolean
     'fallback-filter'?: {
