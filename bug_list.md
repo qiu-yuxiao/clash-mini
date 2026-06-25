@@ -80,16 +80,6 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-242: Mismatched window threshold hiding titlebar in normal layout (AUDIT-03)
- - **现象描述**：`window-provider.tsx` 中定义的迷你宽度阈值为 `MINIMAL_WIDTH_THRESHOLD = 290`（像素），而在 React 前端渲染组件（如 `_layout.tsx` 和 `app-data-provider.tsx`）中检测迷你模式的阈值为 `285`（像素）。此阈值不一致导致在窗口宽度处于 286px 至 290px 之间时产生视觉异常：窗口服务认为窗口处于迷你模式并调用后端 IPC 隐藏了系统原生标题栏与窗口控制按钮，但 React 布局仍判定窗口处于正常模式并进行全量排版，这使得用户看到一个普通窗口却没有顶栏和任何窗口控制组件（最小化/最大化/关闭）。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-256: Shell Program Exits and Panics on Window Close in Auto Lightweight Mode
- - **现象描述**：当开启自动轻量模式时，用户点击主窗口关闭（X）按钮，主程序退出且系统托盘图标消失，但后端 mihomo 核心进程仍在后台运行。原因是 `WindowEvent::CloseRequested` 被注册在 `app.run` 事件循环中，此时拦截已失效，导致窗口被 Windows/Tauri 默认行为销毁；随后触发的 `ExitRequested` 误判轻量模式状态并触发退出逻辑，使得在窗口销毁与事件循环退出期间产生 Tao 窗口状态冲突，最终引发 `cannot move state from Destroyed` 崩溃退出。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
 ### BUG-257: High CPU/Battery Consumption of Background Health Check in Lightweight Mode
  - **现象描述**：当主程序隐藏并进入轻量化模式后，后台监测线程 `start_background_monitor` 仍以固定 15 秒的周期频繁发起活跃代理节点的延迟探测（DNS 解析及 HTTP 请求），这在无人值守、纯后台挂机状态下会导致不必要的 CPU 唤醒、物理网卡工作和电池消耗。需要实现轻量模式下的自适应探测周期，当开启轻量模式时自动将正常检测的间隔时间放宽至 60 秒，并在恢复/退出轻量模式时瞬间重置/唤醒检测。
  - **当前状态**：`代码已修正，待用户确认`
@@ -109,6 +99,8 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-242** | Mismatched window threshold hiding titlebar in normal layout (AUDIT-03) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-256** | Shell Program Exits and Panics on Window Close in Auto Lightweight Mode | v1.8.8 | 代码已修正，已确认 |
 | **BUG-241** | Settings Drawer active and resources polling in mini mode (AUDIT-02) | v1.8.8 | 代码已修正，已确认 |
 | **BUG-214** | Switch Component Sizing Inconsistency in Cyberpunk/Monochrome Skins | v1.7.2 | 代码已修正，已确认 |
 | **BUG-213** | Monochrome Skin Dark Mode Card Background Contrast Loss | v1.7.2 | 代码已修正，已确认 |
