@@ -2442,3 +2442,25 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 在退出轻量模式的入口函数（`exit_lightweight_mode()`）成功恢复/重建主窗口并记录状态为 `Normal` 后，必须显式调用 `MONITOR_WAKEUP_NOTIFY.notify_one()` 发送即时唤醒信号。
   - 监测线程接收到该唤醒信号后，将立即跳出当前的 60 秒长休眠，重置检测时间并无延迟地发起一次健康探测，并使探测周期瞬间回归至 15 秒活跃规格，实现前端界面恢复时的“无缝高频监控”。
 
+## ⚡ 四十三、 轻量模式进入时激进清空内核连接规范 (BUG-258)
+
+为了降低程序在轻量模式下后台挂机时，由之前网页浏览遗留的活动或空闲 TCP 连接对系统套接字及内核内存的持续占用，制定以下规范：
+
+- **瞬间触发垃圾回收 (GC)**：
+  - 在 `src-tauri/src/module/lightweight.rs` 的 `entry_lightweight_mode()` 函数成功执行并记录状态为 `LightweightState::In` 之后，必须立即通过 `AsyncHandler::spawn` 异步调用 `mihomo.close_all_connections().await`。
+  - 这将在外壳关闭销毁的瞬间，向内核发出物理清空命令，物理强制切断并关闭当前所有的活跃与空闲网络连接。
+- **低功耗运行状态**：
+  - 清空连接的操作不影响任何已确立的代理端口存活和系统的路由分发，但可以彻底促使 `mini-mihomo` 核心快速释放物理套接字句柄和已分配的通信内存缓冲区，使其与外壳同步进入真正的低耗能后台状态。
+
+## ⚡ 四十四、 轻量模式进入时彻底熔断数据订阅规范 (BUG-259)
+
+为了消除主窗口关闭物理销毁后，Rust 后端依然对内核持续推送的数据事件（如网速、日志、连接明细等）进行无用的反序列化和 IPC 消息管道消耗，制定以下规范：
+
+- **主动熔断 WebSocket 常驻订阅**：
+  - 在 `src-tauri/src/module/lightweight.rs` 的 `entry_lightweight_mode()` 函数成功记录状态为 `LightweightState::In` 之后，必须立即通过 `AsyncHandler::spawn` 异步调用 `mihomo.clear_all_ws_connections().await`。
+  - 此项操作将强行断开并清理 Rust 侧插件状态中保存的所有由前端调用的 WebSocket 实时流通道（包括流量 `/traffic`、日志 `/logs`、连接 `/connections` 等），彻底截断内核到外壳的数据分发链路。
+- **UI 生命周期自动恢复机制**：
+  - Rust 侧的订阅清理不需要在退出轻量模式时进行手动重建，因为主窗口重建挂载时，前端 React 组件自身的挂载逻辑（`useEffect`）会自动向 Tauri 后端发送新的 WS 建立指令。
+  - 该机制不仅能在外壳处于轻量后台时将 CPU 消耗和内存吞吐减少到绝对的 `0.0%`，又能保证窗口唤醒时数据流无感瞬间重连。
+
+
