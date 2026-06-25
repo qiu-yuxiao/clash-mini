@@ -86,15 +86,6 @@ async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<
     (filter_config, sort_type)
 }
 
-/// 从本地 `proxy_head_state.json` 读取指定 Profile 的过滤规则
-async fn get_active_filter_config(profile_uid: &str) -> FilterConfig {
-    get_filter_and_sort_config(profile_uid).await.0
-}
-
-/// 从 `proxy_head_state.json` 读取前台保存的排序类型
-async fn get_saved_sort_type(profile_uid: &str) -> Option<i32> {
-    get_filter_and_sort_config(profile_uid).await.1
-}
 
 /// 过滤匹配算法：支持大小写敏感、正则匹配、全字匹配
 /// 【性能优化】：接收预编译的可选正则对象，避免在过滤循环中频繁调用 Regex::new()
