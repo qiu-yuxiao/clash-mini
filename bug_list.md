@@ -80,12 +80,6 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-207: Tightened Asset Protocol Blocks Icons in Portable Mode
- - **现象描述**：Tauri 资源协议作用域限制为 `"$APPDATA/**"`，在便携版运行模式下，因为配置目录在程序执行目录下（外部），导致无法加载或渲染本地 profile 缓存图片，显示为破损占位符。
- - **验证方法**：允许 `$EXE_DIR/**` 和 `$RESOURCE_DIR/**` 作用域后，便携版中的本地 profile 缓存图标渲染正常。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.2`
-
 ### BUG-208: Theme/CSS Injection Patch Updates Silently Ignored
  - **现象描述**：用户修改皮肤模式（theme_mode）或 CSS 注入（theme_setting）配置时，后台 `determine_update_flags` 未能标记 `VERGE_CONFIG` 更新，导致不会向前端触发 `RefreshVerge` 刷新事件，需重启程序才生效。
  - **验证方法**：修改皮肤或 CSS 注入后，前端 UI 即时重新渲染。
@@ -150,6 +144,7 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-207** | Tightened Asset Protocol Blocks Icons in Portable Mode | v1.7.2 | 代码已修正，已确认 |
 | **BUG-203** | Outfit Font Blocked by CSP causing Layout Chaos | v1.7.0 | 代码已修正，已确认 |
 
 | **BUG-171** | Profile Switch/Import Auto-Select Hanging & Speed Test Error Responses | v1.5.7 | 代码已修正，已确认 |
