@@ -60,7 +60,7 @@ export const isDebugLoggingEnabled = () =>
  * Logs to the console only when debug logging is enabled.
  * Forwards all arguments to `console.log`; does nothing otherwise.
  */
-export const debugLog = (...args: any[]) => {
+export const debugLog = (...args: unknown[]) => {
   if (!isDebugLoggingEnabled()) return
   console.log(...args)
 }

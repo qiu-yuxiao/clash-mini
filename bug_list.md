@@ -303,7 +303,7 @@
 
 ### BUG-255: Explicit any in debug log rest parameters in debug.ts (WARN-12)
  - **现象描述**：调试日志辅助函数 `debugLog` 的剩余参数接收采用 `...args: any[]` 类型声明，违反了防 `any` 原则，属于非强类型设计缺陷。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
