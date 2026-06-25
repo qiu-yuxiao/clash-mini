@@ -306,6 +306,11 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
+### BUG-256: Shell Program Exits and Panics on Window Close in Auto Lightweight Mode
+ - **现象描述**：当开启自动轻量模式时，用户点击主窗口关闭（X）按钮，主程序退出且系统托盘图标消失，但后端 mihomo 核心进程仍在后台运行。原因是 `WindowEvent::CloseRequested` 被注册在 `app.run` 事件循环中，此时拦截已失效，导致窗口被 Windows/Tauri 默认行为销毁；随后触发的 `ExitRequested` 误判轻量模式状态并触发退出逻辑，使得在窗口销毁与事件循环退出期间产生 Tao 窗口状态冲突，最终引发 `cannot move state from Destroyed` 崩溃退出。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.8.8`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
