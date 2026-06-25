@@ -33,13 +33,13 @@ export interface AppDataContextType {
   systemProxyAddress: string
   isCoreDataPending: boolean
 
-  refreshProxy: (options?: { forceFull?: boolean }) => Promise<any>
-  refreshClashConfig: () => Promise<any>
-  refreshRules: () => Promise<any>
-  refreshSysproxy: () => Promise<any>
-  refreshProxyProviders: () => Promise<any>
-  refreshRuleProviders: () => Promise<any>
-  refreshAll: () => Promise<any>
+  refreshProxy: (options?: { forceFull?: boolean }) => Promise<unknown>
+  refreshClashConfig: () => Promise<unknown>
+  refreshRules: () => Promise<unknown>
+  refreshSysproxy: () => Promise<unknown>
+  refreshProxyProviders: () => Promise<unknown>
+  refreshRuleProviders: () => Promise<unknown>
+  refreshAll: () => Promise<unknown>
 }
 
 export interface ConnectionWithSpeed extends IConnectionsItem {
@@ -93,13 +93,13 @@ export interface CoreDataStatusContextType {
 }
 
 export interface RefreshersContextType {
-  refreshProxy: (options?: { forceFull?: boolean }) => Promise<any>
-  refreshClashConfig: () => Promise<any>
-  refreshRules: () => Promise<any>
-  refreshSysproxy: () => Promise<any>
-  refreshProxyProviders: () => Promise<any>
-  refreshRuleProviders: () => Promise<any>
-  refreshAll: () => Promise<any>
+  refreshProxy: (options?: { forceFull?: boolean }) => Promise<unknown>
+  refreshClashConfig: () => Promise<unknown>
+  refreshRules: () => Promise<unknown>
+  refreshSysproxy: () => Promise<unknown>
+  refreshProxyProviders: () => Promise<unknown>
+  refreshRuleProviders: () => Promise<unknown>
+  refreshAll: () => Promise<unknown>
 }
 
 export const ProxiesContext = createContext<ProxiesContextType | null>(null)

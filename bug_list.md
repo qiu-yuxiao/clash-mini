@@ -268,7 +268,7 @@
 
 ### BUG-248: Explicit any in context refreshers in app-data-context.ts (WARN-05)
  - **现象描述**：`AppDataContextType` 与 `RefreshersContextType` 接口下的多个异步重载方法（如 `refreshProxy`, `refreshClashConfig` 等）返回值类型被强制定义为 `Promise<any>`，不符合严格 TypeScript 类型检查下的防 `any` 规则。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-249: Explicit any in debounce rest parameters (WARN-06)
