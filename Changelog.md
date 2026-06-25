@@ -1,3 +1,14 @@
+## v1.8.8
+
+### 🐞 Fixed Bugs
+
+- **BUG-240~255 16项审计遗留代码规范与安全性改进修复**：
+  - **组件双重触发与内存泄漏优化 (BUG-240, 241, 243, 247)**：修复静默启动期间因窗口尺寸初始为0引起的 `getProxies` 重复触发；确保在迷你模式下完全卸载设置抽屉，杜绝 WebSocket 后台高频连接开销；为空闲计时器在 `resetIdleTimer` 回调中采用实时尺寸校验以防止过期状态缓存导致的误隐藏问题；在 `_layout` 状态更新中使用异步非阻塞延迟以消除 React render 周期中的同步状态更新警告。
+  - **窗口自适应阈值对齐与多余无用代码清理 (BUG-242, 244, 245, 246)**：使 window-provider 中的 chrome 隐藏判定阈值与 React 布局的迷你模式阈值均对齐为 `285px`，消除窄宽度下的黑边与无标题栏排版错位；清理 `base-page`、`proxy-groups` 与 `layout-dialogs` 中声明但未使用的多余变量或阴影变量。
+  - **严格 TypeScript 去 `any` 强类型规约 (BUG-248, 249, 250, 251, 252, 253, 254, 255)**：对 `app-data-context`、`debounce` 工具类、`cmds` 原始代理组转换器、延迟测试定时器 `timerId`、i18n 语言加载 reduce 累加器、Mihomo 配置中的 `nameserver-policy` 字典、流量监控 validator 验证以及 `debugLog` 的参数类型进行重构，全面消除 `any` 类型声明，使用强类型或安全的 `unknown` 进行类型收窄，保证项目严苛编译校验通过。
+
+---
+
 ## v1.8.1
 
 ### 🐞 Fixed Bugs
