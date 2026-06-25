@@ -1048,7 +1048,7 @@ const Layout = () => {
 
   useEffect(() => {
     if (!drawerOpen) {
-      setIsPanelVisible(false)
+      setTimeout(() => setIsPanelVisible(false), 0)
       return
     }
     const element = connectionsPanelRef.current

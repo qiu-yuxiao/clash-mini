@@ -263,7 +263,7 @@
 
 ### BUG-247: Synchronous state update inside layout effect in _layout.tsx (WARN-04)
  - **现象描述**：在 `_layout.tsx` 中，当设置抽屉状态 `drawerOpen` 发生改变（转为 `false`）时，`useEffect` 同步调用了 `setIsPanelVisible(false)`。这导致 React 在当前渲染周期的提交阶段（Commit Phase）立即重新安排了一次渲染循环，触发 `@eslint-react/set-state-in-effect` 的性能警告。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-248: Explicit any in context refreshers in app-data-context.ts (WARN-05)
