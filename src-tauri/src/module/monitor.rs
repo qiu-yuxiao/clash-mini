@@ -513,16 +513,17 @@ pub fn start_background_monitor() {
             }
 
             // 检测物理网络连通性状态（限制 2 秒超时）
-            let is_online = tokio::time::timeout(
-                Duration::from_secs(2),
-                tokio::net::lookup_host("baidu.com:80"),
-            )
-            .await
-            .map(|res| res.is_ok())
-            .unwrap_or(false);
+            let is_online = tokio::time::timeout(Duration::from_secs(2), tokio::net::lookup_host("baidu.com:80"))
+                .await
+                .map(|res| res.is_ok())
+                .unwrap_or(false);
 
             if !was_online && is_online {
-                logging!(info, Type::Lightweight, "[后台监测] 检测到网络连接已恢复，重置自愈冷却及失败计数");
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 检测到网络连接已恢复，重置自愈冷却及失败计数"
+                );
                 current_cooldown = Duration::from_secs(0);
                 last_auto_select_time = None;
                 consecutive_fails = 0;
@@ -530,7 +531,11 @@ pub fn start_background_monitor() {
 
                 // 如果当前活跃节点不可用，立刻触发一次自愈选点
                 if check_active_node_health().await.ok() == Some(false) {
-                    logging!(info, Type::Lightweight, "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点");
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点"
+                    );
                     if let Ok(results) = trigger_backend_auto_select(&current_profile, 0).await {
                         if !results.is_empty() {
                             Handle::notify_delay_results("PROXY".into(), results);
@@ -538,7 +543,11 @@ pub fn start_background_monitor() {
                     }
                 }
             } else if was_online && !is_online {
-                logging!(warn, Type::Lightweight, "[后台监测] 检测到网络已断开，暂停健康检测与自愈");
+                logging!(
+                    warn,
+                    Type::Lightweight,
+                    "[后台监测] 检测到网络已断开，暂停健康检测与自愈"
+                );
             }
             was_online = is_online;
 

@@ -461,6 +461,11 @@ FunctionEnd
   !include "{{this}}"
 {{/each}}
 
+Function .onGUIInit
+  ; 强制将安装程序窗口置顶最上层，防止被其他窗口遮挡导致防毒软件拦截提示被忽略
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"
+FunctionEnd
+
 Function .onInit
   ${GetOptions} $CMDLINE "/P" $PassiveMode
   ${IfNot} ${Errors}
