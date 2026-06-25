@@ -13,6 +13,8 @@ import { debugLog } from '@/utils/debug'
 import { TrafficDataSampler, formatTrafficName } from '@/utils/traffic-sampler'
 import { Traffic } from 'tauri-plugin-mihomo-api'
 
+import TrafficWorker from './traffic.worker.ts?worker'
+
 // 引用计数管理器
 class ReferenceCounter {
   private count = 0
@@ -192,10 +194,31 @@ class TrafficWorkerClient {
       },
     }
 
-    debugLog(
-      '[TrafficWorkerClient] Hardcoding inline sampler to ensure 100% stability',
-    )
-    this.startInline(initMessage)
+    try {
+      const worker = new TrafficWorker()
+      worker.onmessage = (event: MessageEvent<ITrafficWorkerSnapshotMessage>) => {
+        this.listeners.forEach((listener) => {
+          listener(event.data)
+        })
+      }
+      worker.onerror = (error) => {
+        debugLog('[TrafficWorkerClient] Web Worker runtime error, falling back to inline:', error)
+        this.stop()
+        this.startInline(initMessage)
+      }
+      this.worker = worker
+      this.mode = 'worker'
+      this.ready = true
+      this.post(initMessage)
+      this.flushQueue()
+      debugLog('[TrafficWorkerClient] Background Web Worker started successfully')
+    } catch (e) {
+      debugLog(
+        '[TrafficWorkerClient] Failed to instantiate background Web Worker, falling back to inline:',
+        e,
+      )
+      this.startInline(initMessage)
+    }
   }
 
   private startInline(initMessage: TrafficWorkerRequestMessage) {

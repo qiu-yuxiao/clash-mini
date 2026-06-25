@@ -274,7 +274,7 @@ export const AppDataProvider = ({
 
     let lastProfileId: string | null = null
     let lastProfileUpdateTime = 0
-    let lastProxyUpdateTime = 0
+    let lastProxyTimer: ReturnType<typeof setTimeout> | null = null
     const refreshThrottle = 800
 
     const handleProfileChanged = (event: { payload: string }) => {
@@ -296,10 +296,13 @@ export const AppDataProvider = ({
     }
 
     const handleRefreshProxy = () => {
-      const now = Date.now()
-      if (now - lastProxyUpdateTime <= refreshThrottle) return
-      lastProxyUpdateTime = now
-      refreshProxy().catch(() => console.warn('[app-data] refreshProxy failed'))
+      if (lastProxyTimer) {
+        clearTimeout(lastProxyTimer)
+      }
+      lastProxyTimer = setTimeout(() => {
+        lastProxyTimer = null
+        refreshProxy().catch(() => console.warn('[app-data] refreshProxy failed'))
+      }, 200)
     }
 
     const initializeListeners = async () => {
@@ -341,6 +344,9 @@ export const AppDataProvider = ({
       }
       if (unlistenProxy) {
         unlistenProxy()
+      }
+      if (lastProxyTimer) {
+        clearTimeout(lastProxyTimer)
       }
     }
   }, [refreshProxy, refreshRules, refreshRuleProviders])
