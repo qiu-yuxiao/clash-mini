@@ -529,14 +529,32 @@ pub fn start_background_monitor() {
 
             let is_online = if need_probe {
                 last_online_check_time = Some(Instant::now());
-                // 【优化】：使用 dns.google:53 替代 baidu.com:80，全球可达，避免境外用户误判为离线
-                tokio::time::timeout(
-                    Duration::from_secs(2),
-                    tokio::net::lookup_host("dns.google:53"),
-                )
-                .await
-                .map(|res| res.is_ok())
-                .unwrap_or(false)
+                // 【性能优化与双重探测】：优先检测 baidu.com:80 (中国大陆)，失败则尝试 dns.google:53 (全球/海外)
+                // 兼顾国内与海外用户，避免由于 GFW 或特定地域拦截导致物理连通性状态误判
+                let check_baidu = async {
+                    tokio::time::timeout(
+                        Duration::from_millis(1500),
+                        tokio::net::lookup_host("baidu.com:80"),
+                    )
+                    .await
+                    .map(|res| res.is_ok())
+                    .unwrap_or(false)
+                };
+                let check_google = async {
+                    tokio::time::timeout(
+                        Duration::from_millis(1500),
+                        tokio::net::lookup_host("dns.google:53"),
+                    )
+                    .await
+                    .map(|res| res.is_ok())
+                    .unwrap_or(false)
+                };
+
+                if check_baidu.await {
+                    true
+                } else {
+                    check_google.await
+                }
             } else {
                 // 尚未到探测间隔，复用上次结果
                 was_online
