@@ -298,7 +298,7 @@
 
 ### BUG-254: Explicit any in traffic monitor validator functions in traffic.ts (WARN-11)
  - **现象描述**：流量监视数据解析验证接口 `validate(data: any)` 与清洗接口 `sanitize(data: any)` 接收的参数类型为 `any`，应改为安全的 `unknown` 配合类型收窄（type narrowing）来通过类型规则校验。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-255: Explicit any in debug log rest parameters in debug.ts (WARN-12)

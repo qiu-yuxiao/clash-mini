@@ -58,8 +58,8 @@ export interface ISystemMonitorOverview {
 
 // 类型安全的数据验证器
 export interface ISystemMonitorOverviewValidator {
-  validate(data: any): data is ISystemMonitorOverview
-  sanitize(data: any): ISystemMonitorOverview
+  validate(data: unknown): data is ISystemMonitorOverview
+  sanitize(data: unknown): ISystemMonitorOverview
 }
 
 
