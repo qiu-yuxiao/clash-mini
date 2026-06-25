@@ -427,15 +427,21 @@ pub fn start_background_monitor() {
         let mut last_auto_select_time: Option<Instant> = None;
         let mut current_cooldown = Duration::from_secs(0);
         let mut last_gc_time = Instant::now();
+        let mut was_online = true;
+        let mut is_first_run = true;
 
         loop {
-            // 定期健康检测的间隔：重试模式下为 3 秒，正常模式下为 15 秒
-            let check_interval = if is_retry_mode { 3 } else { 15 };
+            if is_first_run {
+                is_first_run = false;
+            } else {
+                // 定期健康检测的间隔：重试模式下为 3 秒，正常模式下为 15 秒
+                let check_interval = if is_retry_mode { 3 } else { 15 };
 
-            tokio::select! {
-                _ = sleep(Duration::from_secs(check_interval)) => {}
-                _ = PROFILE_SWITCH_NOTIFY.notified() => {
-                    logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒");
+                tokio::select! {
+                    _ = sleep(Duration::from_secs(check_interval)) => {}
+                    _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                        logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒");
+                    }
                 }
             }
 
@@ -506,10 +512,45 @@ pub fn start_background_monitor() {
                 continue;
             }
 
+            // 检测物理网络连通性状态（限制 2 秒超时）
+            let is_online = tokio::time::timeout(
+                Duration::from_secs(2),
+                tokio::net::lookup_host("baidu.com:80"),
+            )
+            .await
+            .map(|res| res.is_ok())
+            .unwrap_or(false);
+
+            if !was_online && is_online {
+                logging!(info, Type::Lightweight, "[后台监测] 检测到网络连接已恢复，重置自愈冷却及失败计数");
+                current_cooldown = Duration::from_secs(0);
+                last_auto_select_time = None;
+                consecutive_fails = 0;
+                is_retry_mode = false;
+
+                // 如果当前活跃节点不可用，立刻触发一次自愈选点
+                if check_active_node_health().await.ok() == Some(false) {
+                    logging!(info, Type::Lightweight, "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点");
+                    if let Ok(results) = trigger_backend_auto_select(&current_profile, 0).await {
+                        if !results.is_empty() {
+                            Handle::notify_delay_results("PROXY".into(), results);
+                        }
+                    }
+                }
+            } else if was_online && !is_online {
+                logging!(warn, Type::Lightweight, "[后台监测] 检测到网络已断开，暂停健康检测与自愈");
+            }
+            was_online = is_online;
+
             // 2. 定期检测与快速重试自愈
             let check_interval = if is_retry_mode { 3 } else { 15 };
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
+
+                // 如果当前处于离线状态，跳过本次检测
+                if !is_online {
+                    continue;
+                }
 
                 // 检测活动节点是否发生变化（如用户手动切换）
                 let active_node_name = get_active_node_name().await.unwrap_or_default();
