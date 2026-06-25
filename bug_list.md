@@ -21,36 +21,6 @@
  - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
  - **目标版本**：`v1.8.0`
 
-### BUG-217: Hook Timer Leak / Profile Switch Starvation
- - **现象描述**：`_layout.tsx` 中的 profile 增强 `useEffect` 依赖数组监视了易变对象 `t`，导致切换 Profile 时直接将初始化 Promise 标为 `cancelled` 提前中止，使新配置无法生效。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-218: ActiveAutoSelectTimer Leak / Profile Switch State Corruption
- - **现象描述**：切换配置时旧的 `setInterval` 测速定时器未被清除，依然在后台轮询并修改选择的节点，将新配置的节点选择错误覆盖，导致状态错乱。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-219: Double Selection Request Race Condition
- - **现象描述**：测速时“临时闪连”与“极速终选”两个逻辑块在首轮轮询中同时触发，导致向后端并发发送两条 `select_node` 重复网络请求。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-220: Memory Leak of Unresolved Promises in frontendAutoSelect
- - **现象描述**：`frontendAutoSelect` 被二次调用并清理前一个定时器时，前一次调用创建的 Promise 处于悬空挂死状态，没有被 resolve 也没有被 reject。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-221: Unhandled Promise Rejection in checkDelay
- - **现象描述**：测速使用 `Promise.race` 配合超时 Promise 控制。如果超时逻辑先赢，实际的 `delayProxyByName` 请求异常失败抛出的错误未被捕捉，导致未处理的 Promise Rejection 异常。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-222: Timeout Resource (Timer Handle) Leak in checkDelay
- - **现象描述**：测速提前成功返回，但超时定时器未被 `clearTimeout` 手动回收，占用系统计时器句柄。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
 ### BUG-223: Contrast and Invisible Borders Styling Issue in Frosted Glass Skin
  - **现象描述**：Frosted Glass（毛玻璃）下失效按钮的背景与边框被硬编码为半透明白色，在浅色主题下几乎不可见，对比度低于 2.6:1。
  - **当前状态**：`代码已修正，待用户确认`
@@ -58,46 +28,6 @@
 
 ### BUG-224: React useMemo Dependency Array Omits theme and skin
  - **现象描述**：顶栏标题渲染在 `useMemo` 中被缓存，但其依赖数组未加入 `theme` 模式与 `skin`（`controlSkin`）变量，导致切换皮肤或深浅色模式时顶栏不刷新。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-225: Zero-Length Slice Read in HTTP Latency Test (clash.rs)
- - **现象描述**：测速读取数据时，使用 `BytesMut::with_capacity(1024)`，长度为 0，导致底层读取空切片直接返回 `Ok(0)`，测速瞬间判定为 0ms 或超时，无法反映真实延迟。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-226: Concurrency Hang / Infinite Loop in JS Script Validation
- - **现象描述**：运行用户自定义 JS 脚本预校验时，直接同步执行且缺少指令数量限制和看门狗机制，如果脚本存在死循环会导致整个后端线程卡死，CPU 100% 占满。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-227: Core Validation Infinite Hang due to Missing Command Timeout
- - **现象描述**：外部校验调用 `command.output().await` 缺少 Timeout，如果子进程由于网卡驱动或端口冲突卡死，主程序线程将无限等待，导致配置保存无限假死。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-228: SSRF Bypass via DNS Resolution and IPv6 Local Ranges
- - **现象描述**：订阅及图标链接在检测 SSRF 时，只对域名做字面校验，且未拦截 IPv6 内网本地链路和唯一本地地址（ULA）范围，可通过 DNS Rebinding 等手段绕过。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-229: Silent Application Exit on Port Collision
- - **现象描述**：当主程序 singleton 单例检查失败（如端口被占用）时，直接 `exit(1)` 静默退出，未向用户弹出任何错误提示。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-230: Lost Notification Bug in Background Monitor
- - **现象描述**：`PROFILE_SWITCH_NOTIFY` 广播时，如果后台线程正忙于 GC 未等待 `notified()`，配置切换通知将被丢弃，导致需要等待一个完整的休眠周期（15s）才响应。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-231: Crash/Error on Relative Startup Script Paths
- - **现象描述**：当启动脚本配置为相对路径（如 `"script.sh"`）时，`parent()` 返回 `None`，导致 `Command::current_dir` 设置失败触发崩溃。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-232: Unbounded Memory Allocation Risk on Subscriptions
- - **现象描述**：拉取配置订阅时使用 `response.text().await` 无条件读取全部网络数据，如果返回超大文件或无限数据流，易导致 OOM 闪退崩溃。
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.1`
 
@@ -113,11 +43,6 @@
 
 ### BUG-235: Scrollbar Hiding Overrides and Layout Conflict
  - **现象描述**：全局 `index.scss` 强行指定了 `* { scrollbar-width: thin !important; }`，覆盖了连接表局部指定的 `scrollbarWidth: 'none'`，导致局部滚动条无法隐藏。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-236: Inactive Scrollbar Variables Set in CSS but Unused
- - **现象描述**：主题管理器向 root 注入了 `--scrollbar-thumb` 等 CSS 变量，但内部渲染时使用了硬编码值，导致设置中的滚动条是个性化设置失效。
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.1`
 
@@ -143,8 +68,6 @@
       - 对设置抽屉中的连接列表（Connections Panel）进行组件级可见性监控，若面板处于遮挡或非活动标签状态，自动暂停高频 WebSocket 追踪。
  - **目标版本**：`v1.8.2`
 
-
-
 ### BUG-205: Settings Drawer Horizontal Layout Overflow
  - **现象描述**：在默认/最小窗口宽度（270px）下，设置抽屉的横向布局挤压右侧 Connections 列，导致 active/closed 连接列表宽度被压缩为 0px。经重新审计确认，此为项目 Agreement 设计规范中预期的“物理裁剪遮盖”设计，而非布局缺陷。
  - **验证方法**：已完全撤销本地换行和最小宽度修改，还原为原生单行横向并排布局与 minWidth: 0，确保窄窗口下连接面板被正常裁剪遮挡，窗口拉宽时正常侧向展露。
@@ -166,18 +89,6 @@
 ### BUG-208: Theme/CSS Injection Patch Updates Silently Ignored
  - **现象描述**：用户修改皮肤模式（theme_mode）或 CSS 注入（theme_setting）配置时，后台 `determine_update_flags` 未能标记 `VERGE_CONFIG` 更新，导致不会向前端触发 `RefreshVerge` 刷新事件，需重启程序才生效。
  - **验证方法**：修改皮肤或 CSS 注入后，前端 UI 即时重新渲染。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.2`
-
-### BUG-209: Startup Script Blocks Window Initialization
- - **现象描述**：程序初始化时同步 `.await` 执行用户配置的启动脚本，若脚本阻塞或执行时间长，将一直阻塞 UI 窗口创建，导致启动黑屏或假死。
- - **验证方法**：在后台异步 spawn 执行启动脚本，不阻塞 `init_window().await`。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.2`
-
-### BUG-210: Service Manager Reinstall Deadlock during Startup
- - **现象描述**：启动初始化服务管理器 `init_service_manager` 时加锁 `SERVICE_MANAGER` Mutex。检测到服务需要重装时调用同步的 `reinstall_service()`，弹出 UAC 提权确认框。此期间阻断整个 UI 启动流程，且由于竞争锁易导致死锁。
- - **验证方法**：在后台 blocking 线程中异步执行重装服务，不阻塞启动加锁周期。
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.7.2`
 
@@ -205,31 +116,12 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-204: Clippy Warnings Blocking Git Push
- 
- - **现象描述**：在最新的 Rust 编译器环境下，由于 `sysinfo.rs` 中 Trait 导入未使用 alias 以及 `tray/mod.rs` 中托盘兼容占位方法存在无 `await` 的 `async` 声明，触发了 Clippy 的 `unused_trait_names` 和 `unused_async` 警告，被 `pre-push` 钩子拦截导致无法推送。
- - **验证方法**：修改后本地运行 `cargo clippy --all-targets --all-features -- -D warnings` 无任何警告，并能成功 `git push`。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.1`
-
 ### BUG-203: Outfit Font Blocked by CSP causing Layout Chaos
  
  - **现象描述**：启用 CSP 内容安全策略后，WebView 拒绝加载外部的 Google Fonts（`https://fonts.googleapis.com` 及 `https://fonts.gstatic.com`），导致 Outfit 字体加载失败。在使用 Modern Flat 皮肤时，系统回退到备用字体，由于字体规格与排版不一致，导致主界面部分 3D 组件、Label 文本错位、折叠裁剪甚至整体布局混乱。
  - **验证方法**：启动程序并切换至 Modern Flat 皮肤，主界面布局正确，英文正常呈现 Outfit 字体，控制台无外部字体 CSP 拦截报错。
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.7.0`
-
-### BUG-202: Windows Named Pipe IPC Path Validation Mismatch
- 
- - **现象描述**：在 Windows 上，Clash Verge Service 使用命名管道进行通信（路径为 `\\.\pipe\clash_verge_service`）。程序在初始化/启动检查服务可用性时，调用 `Path::metadata` 或 `Path::exists` 检查该路径。由于 Windows 命名管道不是标准文件，标准库文件属性接口对其失效并总是返回路径不存在错误，导致程序即使在系统服务已正常开启的情况下，仍会误判服务不可用，进而在以普通权限启动时将用户接管模式强制降级为“手动设定”。
- - **验证方法**：在 Windows 系统服务（Clash Verge Service）运行的前提下，以普通权限直接双击运行 Clash Mini。开启自动接管模式为 TUN 模式，程序重启或更新重启后，TUN 模式依然能正常维持，而不是自动滑落到手动模式。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.6.7`
-
-### BUG-240: getProxies query double-triggering during silent startup (AUDIT-01)
- - **现象描述**：在静默启动时（如随系统托盘启动且最小化），WebView 初始大小为 0x0。组件中的 `isMiniStatus` 状态默认初始化为 `false`（即假定在正常宽度模式下），这导致在挂载的瞬间前端立即发起了全量的 `getProxies` 接口查询请求。虽然随后 `setTimeout` 很快检测到真实的 0x0 窗口并更新 `isMiniStatus` 为 `true`，但状态变更再次触发了 `useEffect` 中代理刷新逻辑，导致在启动瞬间连续发起了两次代理查询请求，浪费网络与系统开销。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
 
 ### BUG-241: Settings Drawer active and resources polling in mini mode (AUDIT-02)
  - **现象描述**：当窗口缩放至迷你模式时，根据项目设计协议规范，除了当前活跃节点、4个流量小卡片和1个流量图之外，其他无关组件都必须强制物理卸载。然而，若用户在大窗口下打开了设置抽屉（即 `drawerOpen` 为 `true` 时），在窗口缩小后，由于设置抽屉仅根据 `drawerOpen` 条件渲染，它仍会保持挂载状态留在 DOM 树中。这违反了迷你模式的完全卸载规约，且会导致抽屉内的连接面板（Connections Panel）在后台继续进行高频 WebSocket 流量轮询，白白消耗系统 CPU 与 IPC 资源。
@@ -238,71 +130,6 @@
 
 ### BUG-242: Mismatched window threshold hiding titlebar in normal layout (AUDIT-03)
  - **现象描述**：`window-provider.tsx` 中定义的迷你宽度阈值为 `MINIMAL_WIDTH_THRESHOLD = 290`（像素），而在 React 前端渲染组件（如 `_layout.tsx` 和 `app-data-provider.tsx`）中检测迷你模式的阈值为 `285`（像素）。此阈值不一致导致在窗口宽度处于 286px 至 290px 之间时产生视觉异常：窗口服务认为窗口处于迷你模式并调用后端 IPC 隐藏了系统原生标题栏与窗口控制按钮，但 React 布局仍判定窗口处于正常模式并进行全量排版，这使得用户看到一个普通窗口却没有顶栏和任何窗口控制组件（最小化/最大化/关闭）。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-243: Stale size refs check in resetIdleTimer callback (AUDIT-04)
- - **现象描述**：`window-provider.tsx` 中监听窗口缩放的回调是防抖（debounced 300ms）执行的，而检测用户鼠标移动的空闲计时器重置方法 `resetIdleTimer` 是即时触发的。当用户跨阈值拖拽窗口尺寸并停止移动时，空闲计时器可能会比防抖的 resize 监听器更早触发。此时它会读取保存在 `isMinimalWidthRef.current` 中的窗口宽度，而此引用还是过期的值（比如上次静默启动时的 0 宽度），导致计时器在实际窗口足够宽的情况下，误判并调用 IPC 接口隐藏了窗口装饰。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-244: Unused isDark variable in base-page.tsx (WARN-01)
- - **现象描述**：`base-page.tsx` 中声明并计算了 `isDark` 变量，但在渲染体和任何子逻辑中均未被引用，导致编译/ESLint 报 `'isDark' is assigned a value but never used` 警告。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-245: Shadowed/unused theme variable in proxy-groups.tsx (WARN-02)
- - **现象描述**：`ProxyVirtualList` 组件内部通过 `useTheme()` 声明了 `theme` 变量，但由于组件内的样式配置（SX）以 `(theme) => ...` 的参数形式阴影化（shadowed）了外层变量，导致外层变量成为未使用变量，触发 ESLint 警告。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-246: Unused destructured prop mode in layout-dialogs.tsx (WARN-03)
- - **现象描述**：`LayoutDialogs` 组件的 props 声明并解构了 `mode` 变量，但在组件内容中没有对它进行任何实际消费，从而触发 `unused-imports/no-unused-vars` 警告。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-247: Synchronous state update inside layout effect in _layout.tsx (WARN-04)
- - **现象描述**：在 `_layout.tsx` 中，当设置抽屉状态 `drawerOpen` 发生改变（转为 `false`）时，`useEffect` 同步调用了 `setIsPanelVisible(false)`。这导致 React 在当前渲染周期的提交阶段（Commit Phase）立即重新安排了一次渲染循环，触发 `@eslint-react/set-state-in-effect` 的性能警告。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-248: Explicit any in context refreshers in app-data-context.ts (WARN-05)
- - **现象描述**：`AppDataContextType` 与 `RefreshersContextType` 接口下的多个异步重载方法（如 `refreshProxy`, `refreshClashConfig` 等）返回值类型被强制定义为 `Promise<any>`，不符合严格 TypeScript 类型检查下的防 `any` 规则。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-249: Explicit any in debounce rest parameters (WARN-06)
- - **现象描述**：防抖工具函数 `debounce.ts` 的泛型约束声明了 `T extends (...args: any[]) => void` 并且使用了 `this: any` 上下文绑定。在 ESLint 规则审查下会抛出 `no-explicit-any` 警告。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-250: Explicit any in profile parser raw proxies in cmds.ts (WARN-07)
- - **现象描述**：`enhanceProfiles` 针对原始配置列表解析时，使用了 `any` 作为参数断言（如 `p: any` 和 构造的 `newGroup: any` 或者是配置更新参数类型），触发 TypeScript 类型安全警告。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-251: Explicit any in timer identifier in delay.ts (WARN-08)
- - **现象描述**：延时管理器 `DelayManager` 底层的 `setTimeout` 定时器对象 `timerId` 的类型硬编码为了 `any`，应使用原生 `ReturnType<typeof setTimeout>` 进行类型规约以消除类型推断异常。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-252: Explicit any in language modules reduction in i18n.ts (WARN-09)
- - **现象描述**：国际化组件在初始化语言字典并对 `supportedLanguages` 做累加转换（reduce）时，目标累加器类型和字典对象被指定为了 `Record<string, any>`，触发 `no-explicit-any` 检查警告。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-253: Explicit any in nameserver policy type dictionary in clash.ts (WARN-10)
- - **现象描述**：`clash.ts` 中的 Mihomo 系统核心配置接口 `IClashConfig` 声明 `nameserver-policy` 采用 `Record<string, any>`，在强类型检查下会引发 ESLint 语法规则报错。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-254: Explicit any in traffic monitor validator functions in traffic.ts (WARN-11)
- - **现象描述**：流量监视数据解析验证接口 `validate(data: any)` 与清洗接口 `sanitize(data: any)` 接收的参数类型为 `any`，应改为安全的 `unknown` 配合类型收窄（type narrowing）来通过类型规则校验。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.8`
-
-### BUG-255: Explicit any in debug log rest parameters in debug.ts (WARN-12)
- - **现象描述**：调试日志辅助函数 `debugLog` 的剩余参数接收采用 `...args: any[]` 类型声明，违反了防 `any` 原则，属于非强类型设计缺陷。
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
@@ -326,13 +153,45 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.9.0`
 
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
 | **BUG-171** | Profile Switch/Import Auto-Select Hanging & Speed Test Error Responses | v1.5.7 | 代码已修正，已确认 |
 | **BUG-168** | Upgrade Command RwLock Writer Starvation | v1.5.5 | 代码已修正，已确认 |
+| **BUG-217** | Hook Timer Leak / Profile Switch Starvation | v1.8.1 | 代码已修正，已确认 |
+| **BUG-218** | ActiveAutoSelectTimer Leak / Profile Switch State Corruption | v1.8.1 | 代码已修正，已确认 |
+| **BUG-219** | Double Selection Request Race Condition | v1.8.1 | 代码已修正，已确认 |
+| **BUG-220** | Memory Leak of Unresolved Promises in frontendAutoSelect | v1.8.1 | 代码已修正，已确认 |
+| **BUG-221** | Unhandled Promise Rejection in checkDelay | v1.8.1 | 代码已修正，已确认 |
+| **BUG-222** | Timeout Resource (Timer Handle) Leak in checkDelay | v1.8.1 | 代码已修正，已确认 |
+| **BUG-225** | Zero-Length Slice Read in HTTP Latency Test (clash.rs) | v1.8.1 | 代码已修正，已确认 |
+| **BUG-226** | Concurrency Hang / Infinite Loop in JS Script Validation | v1.8.1 | 代码已修正，已确认 |
+| **BUG-227** | Core Validation Infinite Hang due to Missing Command Timeout | v1.8.1 | 代码已修正，已确认 |
+| **BUG-228** | SSRF Bypass via DNS Resolution and IPv6 Local Ranges | v1.8.1 | 代码已修正，已确认 |
+| **BUG-229** | Silent Application Exit on Port Collision | v1.8.1 | 代码已修正，已确认 |
+| **BUG-230** | Lost Notification Bug in Background Monitor | v1.8.1 | 代码已修正，已确认 |
+| **BUG-231** | Crash/Error on Relative Startup Script Paths | v1.8.1 | 代码已修正，已确认 |
+| **BUG-232** | Unbounded Memory Allocation Risk on Subscriptions | v1.8.1 | 代码已修正，已确认 |
+| **BUG-236** | Inactive Scrollbar Variables Set in CSS but Unused | v1.8.1 | 代码已修正，已确认 |
+| **BUG-209** | Startup Script Blocks Window Initialization | v1.7.2 | 代码已修正，已确认 |
+| **BUG-210** | Service Manager Reinstall Deadlock during Startup | v1.7.2 | 代码已修正，已确认 |
+| **BUG-204** | Clippy Warnings Blocking Git Push | v1.7.1 | 代码已修正，已确认 |
+| **BUG-202** | Windows Named Pipe IPC Path Validation Mismatch | v1.6.7 | 代码已修正，已确认 |
+| **BUG-240** | getProxies query double-triggering during silent startup (AUDIT-01) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-243** | Stale size refs check in resetIdleTimer callback (AUDIT-04) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-244** | Unused isDark variable in base-page.tsx (WARN-01) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-245** | Shadowed/unused theme variable in proxy-groups.tsx (WARN-02) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-246** | Unused destructured prop mode in layout-dialogs.tsx (WARN-03) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-247** | Synchronous state update inside layout effect in _layout.tsx (WARN-04) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-248** | Explicit any in context refreshers in app-data-context.ts (WARN-05) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-249** | Explicit any in debounce rest parameters (WARN-06) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-250** | Explicit any in profile parser raw proxies in cmds.ts (WARN-07) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-251** | Explicit any in timer identifier in delay.ts (WARN-08) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-252** | Explicit any in language modules reduction in i18n.ts (WARN-09) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-253** | Explicit any in nameserver policy type dictionary in clash.ts (WARN-10) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-254** | Explicit any in traffic monitor validator functions in traffic.ts (WARN-11) | v1.8.8 | 代码已修正，已确认 |
+| **BUG-255** | Explicit any in debug log rest parameters in debug.ts (WARN-12) | v1.8.8 | 代码已修正，已确认 |
 | **BUG-167** | Rust Local Socket Timeout Inconsistency | v1.5.5 | 代码已修正，已确认 |
 | **BUG-166** | Fallback Timeout Inconsistency in layout code comments | v1.5.5 | 代码已修正，已确认 |
 | **BUG-162** | Timeout Resource (Timer Handle) Leak | v1.5.5 | 代码已修正，已确认 |
