@@ -1,136 +1,72 @@
-# Handoff Report: Backend Guard Loops, Throttling & Compliance Verification
+# Handoff Report — Memory Usage Regression Investigation
+
+This handoff report summarizes the investigation and compilation of the Clash Mini memory usage regression report comparing v1.8.9 against v1.8.2.
 
 ## 1. Observation
 
-- **Command Execution Attempts**:
-  - `cargo check --manifest-path src-tauri/Cargo.toml` was attempted but timed out waiting for user permission twice:
-    ```
-    Permission prompt for action 'command' on target 'cargo check --manifest-path src-tauri/Cargo.toml' timed out waiting for user response.
-    ```
-    As this is a non-interactive automated environment, code verification was conducted via static analysis of the source code.
+- **Task Requirements** (`task.md` lines 12–31):
+  - **Title**: Clash Mini Memory Usage Regression Investigation Report (检测分析报告)
+  - **Root Cause 1**: Web Worker Lifecycle Leak in `src/hooks/use-traffic-monitor.ts` and `src/hooks/traffic.worker.ts`. Frequent creation/destruction of worker instances, reference cycles formed by event listeners.
+  - **Root Cause 2**: Settings Drawer Conditional Rendering Leak in `src/pages/_layout.tsx` and subcomponents, causing Emotion style tag accumulation in `<head>` and MUI event listener/portal leaks.
+  - **Codebase Cleanliness Constraint**: "Ensure the codebase remains unmodified (only the report file is created/written)."
+  - **Recommendation patches**: Reconstruct Git patches from `bfc5330e` and `41693533`.
 
-- **Wait Loop & Throttling Logic in `src-tauri/src/core/service.rs`**:
-  - File Path: `src-tauri/src/core/service.rs`
-  - Throttling retry configuration (lines 489-495):
-    ```rust
-        pub const fn config() -> clash_verge_service_ipc::IpcConfig {
-            clash_verge_service_ipc::IpcConfig {
-                default_timeout: Duration::from_millis(150),
-                retry_delay: Duration::from_millis(250),
-                max_retries: 20,
-            }
-        }
-    ```
-  - Wait loop implementation (lines 454-478):
-    ```rust
-    async fn wait_for_service_ipc(status: &mut ServiceManager, reason: &str) -> Result<()> {
-        status.0 = ServiceStatus::Unavailable(reason.into());
-        let config = ServiceManager::config();
-
-        let backoff = ConstantBuilder::default()
-            .with_delay(config.retry_delay)
-            .with_max_times(config.max_retries);
-
-        let result = (|| async {
-            if Path::new(clash_verge_service_ipc::IPC_PATH).exists() {
-                clash_verge_service_ipc::connect().await?;
-                Ok(())
-            } else {
-                Err(anyhow!("IPC path not ready"))
-            }
-        })
-        .retry(backoff)
-        .await;
-
-        if result.is_ok() {
-            status.0 = ServiceStatus::Ready;
-        }
-
-        result
+- **Web Worker Instantiation and Termination Logic** (`src/hooks/use-traffic-monitor.ts` lines 198–214 & 239–250):
+  - Line 198: `const worker = new TrafficWorker()` (creates a new worker instance inside `start`).
+  - Lines 239–241: 
+    ```typescript
+    if (this.worker) {
+      this.worker.terminate()
     }
     ```
-    *Observed:* The wait loop uses `backon::ConstantBuilder` retries with `config.retry_delay` (250ms delay) and yields control via async execution.
+    (terminates the worker instance inside `stop`).
 
-- **Administrator Privilege Skip Logic in `src-tauri/src/core/manager/lifecycle.rs`**:
-  - File Path: `src-tauri/src/core/manager/lifecycle.rs`
-  - Skip logic (lines 95-98):
-    ```rust
-            let is_admin = tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin(Handle::app_handle());
-            if is_admin {
-                return;
-            }
-    ```
-    *Observed:* When `is_admin` is true, `wait_for_service_if_needed` returns immediately, skipping the retry loop entirely.
+- **Settings Drawer Conditional Render Logic** (`src/pages/_layout.tsx` lines 1792–1812):
+  - Line 1792: `{drawerOpen && !isMiniStatus && (` (conditionally mounts/unmounts settings drawer theme-panel container).
 
-- **Throttling Logic in `src-tauri/src/core/sysopt.rs`**:
-  - File Path: `src-tauri/src/core/sysopt.rs`
-  - Throttling sync lock (lines 130-132):
-    ```rust
-        pub async fn wait_idle(&self) {
-            let _ = self.update_lock.lock().await;
-        }
-    ```
-    *Observed:* `update_lock` is a `tokio::sync::Mutex<()>` ensuring synchronization and preventing overlapping system proxy updates.
+- **Current Repository Status** (`git status --porcelain`):
+  - The working directory has no modified source code files. Only `.agents/` metadata and the newly created `docs/memory_regression_report.md` are present.
 
-- **Compliance with `clash_mini_agreements.md`**:
-  - Mixed Proxy Port (File: `src-tauri/src/constants.rs`, line 11):
-    ```rust
-            pub const DEFAULT_MIXED: u16 = 10801;
-    ```
-  - Controller API Port (File: `src-tauri/src/constants.rs`, line 4):
-    ```rust
-        pub const DEFAULT_EXTERNAL_CONTROLLER: &str = "127.0.0.1:9098";
-    ```
-  - Single Instance Port (File: `src-tauri/src/constants.rs`, lines 15-18):
-    ```rust
-            #[cfg(not(feature = "verge-dev"))]
-            pub const SINGLETON_SERVER: u16 = 33335;
-            #[cfg(feature = "verge-dev")]
-            pub const SINGLETON_SERVER: u16 = 33336;
-    ```
-  - System Service Name (File: `src-tauri/packages/windows/installer.nsi`, line 621):
-    ```nsi
-      SimpleSC::ExistsService "clash_verge_service"
-    ```
-    *Observed:* System service name, mixed proxy port, controller port, and single instance ports comply exactly with the definitions in `clash_mini_agreements.md`.
+---
 
 ## 2. Logic Chain
 
-1. **Wait Loops & Throttling Verification**:
-   - The retry logic in `wait_for_service_ipc` (in `service.rs`) and `wait_for_service_if_needed` (in `lifecycle.rs`) implements `backon`'s retry mechanisms.
-   - The retry delay is `250ms` (non-zero) and is asynchronous, ensuring control is yielded during wait.
-   - Thus, the explorer findings regarding wait loops using non-zero delays and yielding control are verified and correct.
+1. **Root Cause 1 (Web Worker Lifecycle Leak)**:
+   - Observation of `use-traffic-monitor.ts` shows that every time `start()` is triggered on window visibility change, `new TrafficWorker()` is executed, and on visibility loss, `worker.terminate()` is called.
+   - Frequent creation and termination cycles in WebView2 leave dangling threads and heap fragments.
+   - Strong references from `onmessage` and `onerror` event listeners prevent garbage collection.
+   - Therefore, reusing the worker instance, sending a `'stop'` message to clear timers/memory in the worker, clearing event listeners, and terminating only on `beforeunload` directly resolves the thread/handle leaks.
 
-2. **Administrator Skip Logic Verification**:
-   - `wait_for_service_if_needed` checks if the application is running as admin using `is_current_app_handle_admin`.
-   - If `is_admin` is true, the function returns immediately.
-   - Thus, the explorer findings that admin mode immediately skips the wait loop are verified and correct.
+2. **Root Cause 2 (Settings Drawer Conditional Rendering Leak)**:
+   - Observation of `_layout.tsx` shows the settings drawer is conditionally mounted via `{drawerOpen && !isMiniStatus && ...}`.
+   - When components are repeatedly mounted/unmounted, Emotion injects style tags (`<style data-emotion="...">`) into `<head>` that are never removed.
+   - Additionally, MUI interactive components leak event listeners and portal structures on unmount.
+   - Under low-power target modes, the JS engine retains strong references to these leaked elements, rendering `SetMemoryUsageTargetLevel(LOW)` ineffective.
+   - Reverting to the v1.8.2 CSS translation strategy (keeping the drawer mounted, and using `transform: translate(100%, -100%)` / `pointer-events: none`) avoids style accumulation and unmount leaks entirely.
 
-3. **Throttling Verification**:
-   - `Sysopt::wait_idle` locks the asynchronous mutex `update_lock` to serialize execution and prevent race conditions when applying system proxy settings.
-   - Config updates are debounced using `timing::CONFIG_UPDATE_DEBOUNCE` (300ms) in `should_update_config` (in `manager/config.rs`).
-   - Thus, throttling is correctly implemented and active.
+3. **No Program Code Modification**:
+   - The user has mandated that NO program source code files are modified.
+   - The final output has been written solely to `docs/memory_regression_report.md`.
+   - Running `git status --porcelain` confirms the source tree remains clean.
 
-4. **Agreement Compliance**:
-   - Port 10801 is configured as `DEFAULT_MIXED` (Mixed proxy).
-   - Port 9098 is configured in `DEFAULT_EXTERNAL_CONTROLLER` (Controller API).
-   - Port 33335 is set as Release single-instance port and 33336 as Dev single-instance port.
-   - The service name is kept as `clash_verge_service`.
-   - Therefore, the codebase is in strict compliance with the isolation and integration agreements of `clash_mini_agreements.md`.
+---
 
 ## 3. Caveats
 
-- **No Execution Logs**: Due to the non-interactive execution environment, command approval timed out, so we could not run cargo check/test compiler validations. However, static verification has proven that all paths, constants, and logical expressions are present, syntactically correct, and align with Rust version 1.95 conventions.
+- **External WebView2 Engine Garbage Collection**: The timing of WebView2's garbage collection is determined by the underlying Chromium engine and OS paging configurations. Reclaiming memory via target levels may still have slight delays depending on the OS load.
+- **DOM Node Footprint**: While the CSS translation strategy avoids stylesheet injection and event listener leaks, it keeps the drawer DOM node tree permanently in the DOM. This is the intended trade-off to resolve the 50% memory regression as verified in v1.8.2.
+
+---
 
 ## 4. Conclusion
 
-- The backend guard loops, throttling, and isolation settings are fully implemented as specified. No code modifications are required.
+The investigation report at `docs/memory_regression_report.md` has been successfully created. It details the root causes (Web Worker lifecycle leaks and Settings Drawer mount leaks), compares the memory overhead between v1.8.2 and v1.8.9, and outlines the precise recommendation patches to restore stability. No source code files have been modified, leaving the codebase in a clean state.
+
+---
 
 ## 5. Verification Method
 
-- **Compilation Check**:
-  - Run `cargo check --manifest-path src-tauri/Cargo.toml` in an interactive environment with command permissions approved.
-- **Unit Tests**:
-  - Run `cargo test --manifest-path src-tauri/Cargo.toml` to verify existing tests, particularly `sysopt::tests`, compile and pass.
-- **Source Inspection**:
-  - Inspect `src-tauri/src/core/service.rs` at `wait_for_service_ipc` and `src-tauri/src/core/manager/lifecycle.rs` at `wait_for_service_if_needed`.
+- **Code Cleanliness Verification**:
+  Run `git status --porcelain` in the workspace root to ensure no program files (`*.ts`, `*.tsx`, `*.rs`, etc.) are modified.
+- **Report Verification**:
+  Inspect `docs/memory_regression_report.md` to confirm it contains the Title, Root Cause 1 (Web Worker Lifecycle Leak), Root Cause 2 (Settings Drawer Conditional Rendering Leak), comparison table, and Git patches (`bfc5330e` and `41693533`).

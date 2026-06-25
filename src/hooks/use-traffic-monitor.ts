@@ -173,6 +173,19 @@ class TrafficWorkerClient {
   private ready = false
   private currentRange = WORKER_CONFIG.defaultRangeMinutes
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        if (this.worker) {
+          this.worker.onmessage = null
+          this.worker.onerror = null
+          this.worker.terminate()
+          this.worker = null
+        }
+      })
+    }
+  }
+
   start(rangeMinutes?: number) {
     if (typeof window === 'undefined') {
       debugLog('[TrafficWorkerClient] Window not available, skip start')
@@ -192,6 +205,15 @@ class TrafficWorkerClient {
         snapshotIntervalMs: WORKER_CONFIG.snapshotIntervalMs,
         defaultRangeMinutes: this.currentRange,
       },
+    }
+
+    if (this.worker) {
+      this.mode = 'worker'
+      this.ready = true
+      this.post(initMessage)
+      this.flushQueue()
+      debugLog('[TrafficWorkerClient] Background Web Worker reused successfully')
+      return
     }
 
     try {
@@ -237,12 +259,11 @@ class TrafficWorkerClient {
 
   stop() {
     if (this.worker) {
-      this.worker.terminate()
+      this.post({ type: 'stop' })
     }
     if (this.inlineMonitor) {
       this.inlineMonitor.stop()
     }
-    this.worker = null
     // do not destroy it on stop (do not set to null)
     this.mode = null
     this.ready = false

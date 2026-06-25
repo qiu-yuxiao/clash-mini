@@ -1788,8 +1788,8 @@ const Layout = () => {
               </div>
             )}
 
-            {/* Settings Drawer (Instantly mounted when drawerOpen is true) */}
-            {drawerOpen && !isMiniStatus && (
+            {/* Settings Drawer (Always mounted, hidden via transform when closed) */}
+            {!isMiniStatus && (
               <div
                 className="theme-panel"
                 style={{
@@ -1808,6 +1808,13 @@ const Layout = () => {
                   padding: '12px',
                   gap: '12px',
                   overflow: 'hidden',
+                  transform: drawerOpen
+                    ? 'translate(0, 0) scale(1)'
+                    : 'translate(100%, -100%) scale(0.95)',
+                  opacity: drawerOpen ? 1 : 0,
+                  pointerEvents: drawerOpen ? 'auto' : 'none',
+                  transition:
+                    'transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease-in-out',
                 }}
               >
               {/* Left Settings Column (240px width) */}

@@ -80,25 +80,15 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-257: High CPU/Battery Consumption of Background Health Check in Lightweight Mode
- - **现象描述**：当主程序隐藏并进入轻量化模式后，后台监测线程 `start_background_monitor` 仍以固定 15 秒的周期频繁发起活跃代理节点的延迟探测（DNS 解析及 HTTP 请求），这在无人值守、纯后台挂机状态下会导致不必要的 CPU 唤醒、物理网卡工作和电池消耗。需要实现轻量模式下的自适应探测周期，当开启轻量模式时自动将正常检测的间隔时间放宽至 60 秒，并在恢复/退出轻量模式时瞬间重置/唤醒检测。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
-### BUG-258: Active TCP Connections Leftover in Mihomo Kernel on Entering Lightweight Mode
- - **现象描述**：当程序进入轻量化模式（主窗口销毁）时，Mihomo 内核进程中可能依然残留有大量之前网页浏览遗留的活动/空闲 TCP 连接和套接字。在纯后台挂机期间，这些连接依然会占用系统的网络套接字及内核的物理内存。需要在进入轻量模式的瞬间，由 Rust 后端向内核发送清空连接命令，清空所有活跃与空闲连接，使内核进入真正的低能耗状态。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
-### BUG-259: WebSocket Subscription CPU Overhead in Rust Backend on Entering Lightweight Mode
- - **现象描述**：主窗口销毁进入轻量模式后，Rust 后端如果仍维持与 Mihomo 内核的数据流（如流量、日志、连接明细等）WebSocket 订阅，会导致在后台继续进行无用的 JSON 反序列化 and 进程间通信（IPC）计算，产生不必要的 CPU 资源开销。需要在进入轻量模式时主动熔断、清理所有的后台 WebSocket 订阅，等主窗口重建时再重新订阅。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-261** | Settings Drawer Conditional Rendering Memory Leak and Style Bloat | v1.9.0 | 代码已修正，已确认 |
+| **BUG-260** | Web Worker Lifecycle Leak in Traffic Monitor on Visibility Toggle | v1.9.0 | 代码已修正，已确认 |
+| **BUG-259** | WebSocket Subscription CPU Overhead in Rust Backend on Entering Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
+| **BUG-258** | Active TCP Connections Leftover in Mihomo Kernel on Entering Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
+| **BUG-257** | High CPU/Battery Consumption of Background Health Check in Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
 | **BUG-242** | Mismatched window threshold hiding titlebar in normal layout (AUDIT-03) | v1.8.8 | 代码已修正，已确认 |
 | **BUG-256** | Shell Program Exits and Panics on Window Close in Auto Lightweight Mode | v1.8.8 | 代码已修正，已确认 |
 | **BUG-241** | Settings Drawer active and resources polling in mini mode (AUDIT-02) | v1.8.8 | 代码已修正，已确认 |

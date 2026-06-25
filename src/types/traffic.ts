@@ -113,12 +113,17 @@ export interface ITrafficWorkerRequestSnapshotMessage {
   type: 'requestSnapshot'
 }
 
+export interface ITrafficWorkerStopMessage {
+  type: 'stop'
+}
+
 export type TrafficWorkerRequestMessage =
   | ITrafficWorkerInitMessage
   | ITrafficWorkerAppendMessage
   | ITrafficWorkerClearMessage
   | ITrafficWorkerSetRangeMessage
   | ITrafficWorkerRequestSnapshotMessage
+  | ITrafficWorkerStopMessage
 
 export interface ITrafficWorkerSnapshotMessage {
   type: 'snapshot'

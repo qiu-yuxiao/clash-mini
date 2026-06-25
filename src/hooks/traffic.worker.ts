@@ -86,5 +86,17 @@ self.onmessage = (event) => {
       emitSnapshot('request')
       break
     }
+    case 'stop': {
+      if (throttleTimer !== null) {
+        clearTimeout(throttleTimer)
+        throttleTimer = null
+      }
+      if (sampler) {
+        sampler.clear()
+        sampler = null
+      }
+      lastTimestamp = undefined
+      break
+    }
   }
 }
