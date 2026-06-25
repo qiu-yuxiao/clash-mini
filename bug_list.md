@@ -273,7 +273,7 @@
 
 ### BUG-249: Explicit any in debounce rest parameters (WARN-06)
  - **现象描述**：防抖工具函数 `debounce.ts` 的泛型约束声明了 `T extends (...args: any[]) => void` 并且使用了 `this: any` 上下文绑定。在 ESLint 规则审查下会抛出 `no-explicit-any` 警告。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-250: Explicit any in profile parser raw proxies in cmds.ts (WARN-07)
