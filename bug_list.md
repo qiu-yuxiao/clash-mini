@@ -80,12 +80,6 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-212: Original Skin Accent Color Dynamic Shift Mismatch
- - **现象描述**：Original 皮肤的 Material UI React 组件的主色调在 custom-theme 中硬编码为 `#5b5c9d`，与 index.scss 中根据色彩滑块动态计算的 HSL 主色不匹配。
- - **验证方法**：滑动滑块时，React 组件的主色能同步动态变化。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.7.2`
-
 ### BUG-213: Monochrome Skin Dark Mode Card Background Contrast Loss
  - **现象描述**：Monochrome 皮肤在深色模式下强制 cards/panels 背景与窗口整体背景（`--background-color`）一致，导致内容卡片完全融合在背景中，缺乏视觉层次感。
  - **验证方法**：Monochrome 皮肤在深色模式下，cards/panels 采用 `--theme-panel-bg` 渲染，与主背景 `#0f1423` 有对比色阶。
@@ -132,6 +126,7 @@
 
 所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
 
+| **BUG-212** | Original Skin Accent Color Dynamic Shift Mismatch | v1.7.2 | 代码已修正，已确认 |
 | **BUG-211** | Window Close Unconditionally Destroys WebView State | v1.7.2 | 代码已修正，已确认 |
 | **BUG-208** | Theme/CSS Injection Patch Updates Silently Ignored | v1.7.2 | 代码已修正，已确认 |
 | **BUG-207** | Tightened Asset Protocol Blocks Icons in Portable Mode | v1.7.2 | 代码已修正，已确认 |
