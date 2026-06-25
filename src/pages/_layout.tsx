@@ -500,9 +500,9 @@ const Layout = () => {
   const [coreUpgradeMessage, setCoreUpgradeMessage] = useState<string>('')
   const [coreCheckLoading, setCoreCheckLoading] = useState(false)
 
-  const [isMinimalWidth, setIsMinimalWidth] = useState(false)
+  const [isMinimalWidth, setIsMinimalWidth] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 285)
 
-  const [isMiniStatus, setIsMiniStatus] = useState(false)
+  const [isMiniStatus, setIsMiniStatus] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 285 && window.innerHeight <= 100)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
