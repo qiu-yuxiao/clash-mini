@@ -55,79 +55,66 @@ pub fn is_dummy_node(name: &str) -> bool {
         || lower.contains("群")
 }
 
-/// 从本地 `proxy_head_state.json` 读取指定 Profile 的过滤规则
-pub async fn get_active_filter_config(profile_uid: &str) -> FilterConfig {
+/// 从 `proxy_head_state.json` 一次性读取并解析 FilterConfig 和 sort_type
+/// 【性能优化】：将原来两次独立的磁盘读取和 JSON 解析合并为一次
+async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<i32>) {
     let path = match crate::utils::dirs::app_home_dir() {
         Ok(dir) => dir.join("proxy_head_state.json"),
-        Err(_) => return FilterConfig::default(),
+        Err(_) => return (FilterConfig::default(), None),
     };
-    let content = match tokio::fs::read_to_string(path).await {
+    let content = match tokio::fs::read_to_string(&path).await {
         Ok(c) => c,
-        Err(_) => return FilterConfig::default(),
+        Err(_) => return (FilterConfig::default(), None),
     };
     let json_val: serde_json::Value = match serde_json::from_str(&content) {
         Ok(v) => v,
-        Err(_) => return FilterConfig::default(),
+        Err(_) => return (FilterConfig::default(), None),
     };
 
     let group_state = &json_val[profile_uid]["PROXY"];
     if group_state.is_null() {
-        return FilterConfig::default();
+        return (FilterConfig::default(), None);
     }
 
-    FilterConfig {
+    let filter_config = FilterConfig {
         filter_text: group_state["filterText"].as_str().unwrap_or("").to_string(),
         use_regex: group_state["filterUseRegularExpression"].as_bool().unwrap_or(false),
         match_case: group_state["filterMatchCase"].as_bool().unwrap_or(false),
         match_whole_word: group_state["filterMatchWholeWord"].as_bool().unwrap_or(false),
-    }
+    };
+    let sort_type = group_state["sortType"].as_i64().map(|v| v as i32);
+    (filter_config, sort_type)
+}
+
+/// 从本地 `proxy_head_state.json` 读取指定 Profile 的过滤规则
+async fn get_active_filter_config(profile_uid: &str) -> FilterConfig {
+    get_filter_and_sort_config(profile_uid).await.0
 }
 
 /// 从 `proxy_head_state.json` 读取前台保存的排序类型
 async fn get_saved_sort_type(profile_uid: &str) -> Option<i32> {
-    let path = crate::utils::dirs::app_home_dir().ok()?.join("proxy_head_state.json");
-    let content = tokio::fs::read_to_string(path).await.ok()?;
-    let json_val: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let sort_type = json_val[profile_uid]["PROXY"]["sortType"].as_i64()?;
-    Some(sort_type as i32)
+    get_filter_and_sort_config(profile_uid).await.1
 }
 
 /// 过滤匹配算法：支持大小写敏感、正则匹配、全字匹配
-fn match_filter(name: &str, config: &FilterConfig) -> bool {
+/// 【性能优化】：接收预编译的可选正则对象，避免在过滤循环中频繁调用 Regex::new()
+fn match_filter(name: &str, config: &FilterConfig, compiled_re: Option<&regex::Regex>) -> bool {
     if config.filter_text.is_empty() {
         return true;
     }
 
-    if config.use_regex {
-        let pattern = if config.match_case {
-            config.filter_text.clone()
-        } else {
-            format!("(?i){}", config.filter_text)
-        };
-        if let Ok(re) = regex::Regex::new(&pattern) {
+    // 使用调用方预编译的正则对象，避免每次调用都重新编译
+    if config.use_regex || config.match_whole_word {
+        if let Some(re) = compiled_re {
             return re.is_match(name);
         }
+        // 若正则编译失败（compiled_re 为 None），降级为普通子串匹配
     }
 
-    let (n_str, f_str) = if config.match_case {
-        (name.to_string(), config.filter_text.clone())
-    } else {
-        (name.to_lowercase(), config.filter_text.to_lowercase())
-    };
+    let name_cmp = if config.match_case { name.to_string() } else { name.to_lowercase() };
+    let filter_cmp = if config.match_case { config.filter_text.clone() } else { config.filter_text.to_lowercase() };
 
-    if config.match_whole_word {
-        let pattern = format!(r"\b{}\b", regex::escape(&config.filter_text));
-        let pattern = if config.match_case {
-            pattern
-        } else {
-            format!("(?i){}", pattern)
-        };
-        if let Ok(re) = regex::Regex::new(&pattern) {
-            return re.is_match(name);
-        }
-    }
-
-    n_str.contains(&f_str)
+    name_cmp.contains(&filter_cmp)
 }
 
 /// 获取当前活动 Profile 的 UID
@@ -265,17 +252,42 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         None => return Ok(vec![]),
     };
 
-    let filter_config = get_active_filter_config(profile_uid).await;
+    // 【性能优化】：一次性读取 proxy_head_state.json，同时获取 filter_config 和 sort_type
+    let (filter_config, saved_sort_type) = get_filter_and_sort_config(profile_uid).await;
     let sort_type = if sort_type == 0 {
         // 未传入 sort_type 时，从 head state 配置文件读取
-        get_saved_sort_type(profile_uid).await.unwrap_or(1)
+        saved_sort_type.unwrap_or(1)
     } else {
         sort_type
     };
 
+    // 【性能优化】：在过滤循环前预编译正则表达式，避免对每个节点重复编译
+    let compiled_re: Option<regex::Regex> = if !filter_config.filter_text.is_empty() {
+        if filter_config.use_regex {
+            let pattern = if filter_config.match_case {
+                filter_config.filter_text.clone()
+            } else {
+                format!("(?i){}", filter_config.filter_text)
+            };
+            regex::Regex::new(&pattern).ok()
+        } else if filter_config.match_whole_word {
+            let escaped = regex::escape(&filter_config.filter_text);
+            let pattern = if filter_config.match_case {
+                format!(r"\b{}\b", escaped)
+            } else {
+                format!(r"(?i)\b{}\b", escaped)
+            };
+            regex::Regex::new(&pattern).ok()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let valid_nodes: Vec<String> = nodes
         .into_iter()
-        .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_config))
+        .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_config, compiled_re.as_ref()))
         .collect();
 
     if valid_nodes.is_empty() {
@@ -429,6 +441,8 @@ pub fn start_background_monitor() {
         let mut last_gc_time = Instant::now();
         let mut was_online = true;
         let mut is_first_run = true;
+        // 【性能优化】： DNS 探测流量减少器——在线时 60s 探测一次，离线时 5s 探测一次
+        let mut last_online_check_time: Option<Instant> = None;
 
         loop {
             if is_first_run {
@@ -512,11 +526,30 @@ pub fn start_background_monitor() {
                 continue;
             }
 
-            // 检测物理网络连通性状态（限制 2 秒超时）
-            let is_online = tokio::time::timeout(Duration::from_secs(2), tokio::net::lookup_host("baidu.com:80"))
+            // 检测物理网络连通性状态（有节流门控，避免每次循环都发起 DNS 查询）
+            let probe_interval = if was_online {
+                Duration::from_secs(60) // 在线时：60 秒探测一次
+            } else {
+                Duration::from_secs(5)  // 离线时：5 秒探测一次，快速发现网络恢复
+            };
+            let need_probe = last_online_check_time
+                .map(|t| t.elapsed() >= probe_interval)
+                .unwrap_or(true); // 首次循环一定探测
+
+            let is_online = if need_probe {
+                last_online_check_time = Some(Instant::now());
+                // 【优化】：使用 dns.google:53 替代 baidu.com:80，全球可达，避免境外用户误判为离线
+                tokio::time::timeout(
+                    Duration::from_secs(2),
+                    tokio::net::lookup_host("dns.google:53"),
+                )
                 .await
                 .map(|res| res.is_ok())
-                .unwrap_or(false);
+                .unwrap_or(false)
+            } else {
+                // 尚未到探测间隔，复用上次结果
+                was_online
+            };
 
             if !was_online && is_online {
                 logging!(
