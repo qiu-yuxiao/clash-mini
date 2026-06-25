@@ -278,7 +278,7 @@
 
 ### BUG-250: Explicit any in profile parser raw proxies in cmds.ts (WARN-07)
  - **现象描述**：`enhanceProfiles` 针对原始配置列表解析时，使用了 `any` 作为参数断言（如 `p: any` 和 构造的 `newGroup: any` 或者是配置更新参数类型），触发 TypeScript 类型安全警告。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-251: Explicit any in timer identifier in delay.ts (WARN-08)

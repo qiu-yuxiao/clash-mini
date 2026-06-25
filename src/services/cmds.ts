@@ -32,7 +32,7 @@ export async function enhanceProfiles() {
           // 1. 提取所有原始 proxies 名字
           const proxies = doc.proxies || []
           const proxyNames = Array.isArray(proxies)
-            ? proxies.map((p: any) => p && p.name).filter(Boolean)
+            ? proxies.map((p: { name?: string }) => p && p.name).filter(Boolean)
             : []
 
           // 2. 提取所有的 proxy-providers 名字
@@ -52,7 +52,12 @@ export async function enhanceProfiles() {
 
           if (hasMultipleGroups || hasRules) {
             // 构造唯一的 PROXY 组
-            const newGroup: any = {
+            const newGroup: {
+              name: string
+              type: string
+              proxies?: string[]
+              use?: string[]
+            } = {
               name: 'PROXY',
               type: 'select',
             }
@@ -150,7 +155,7 @@ export async function getRuntimeConfig() {
   return invoke<IConfigData | null>('get_runtime_config')
 }
 
-export async function updateProxyChainConfigInRuntime(proxyChainConfig: any) {
+export async function updateProxyChainConfigInRuntime(proxyChainConfig: unknown) {
   return invoke<void>('update_proxy_chain_config_in_runtime', {
     proxyChainConfig,
   })
@@ -186,7 +191,7 @@ export async function calcuProxies(): Promise<{
   // provider name map
   const providerMap = Object.fromEntries(
     Object.entries(providerRecord).flatMap(([provider, item]) =>
-      (item?.proxies ?? []).map((p: any) => [p.name, { ...p, provider }]),
+      (item?.proxies ?? []).map((p: IProxyItem) => [p.name, { ...p, provider }]),
     ),
   )
 
