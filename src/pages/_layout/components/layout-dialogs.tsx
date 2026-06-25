@@ -108,7 +108,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
 
   logsOpen,
   setLogsOpen,
-  mode,
+  mode: _mode,
 }) => {
   const theme = useTheme()
 

@@ -258,7 +258,7 @@
 
 ### BUG-246: Unused destructured prop mode in layout-dialogs.tsx (WARN-03)
  - **现象描述**：`LayoutDialogs` 组件的 props 声明并解构了 `mode` 变量，但在组件内容中没有对它进行任何实际消费，从而触发 `unused-imports/no-unused-vars` 警告。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-247: Synchronous state update inside layout effect in _layout.tsx (WARN-04)
