@@ -229,7 +229,7 @@ class DelayManager {
       debugLog(`[DelayManager] 调用API测试延迟，代理: ${name}, URL: ${url}`)
 
       let raceFinished = false
-      let timerId: any = null
+      let timerId: ReturnType<typeof setTimeout> | null = null
 
       // 设置超时处理, delay = 0 为超时
       const timeoutPromise = new Promise<ProxyDelay>((resolve) => {

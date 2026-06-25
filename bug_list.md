@@ -283,7 +283,7 @@
 
 ### BUG-251: Explicit any in timer identifier in delay.ts (WARN-08)
  - **现象描述**：延时管理器 `DelayManager` 底层的 `setTimeout` 定时器对象 `timerId` 的类型硬编码为了 `any`，应使用原生 `ReturnType<typeof setTimeout>` 进行类型规约以消除类型推断异常。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-252: Explicit any in language modules reduction in i18n.ts (WARN-09)
