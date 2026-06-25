@@ -125,6 +125,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)
 
+    if (typeof window !== 'undefined') {
+      isMinimalWidthRef.current = window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
+    }
+
     idleTimerRef.current = setTimeout(async () => {
       // Only hide if currently at minimal width and not already hidden
       if (!isMinimalWidthRef.current || isDecorationsHiddenRef.current) return

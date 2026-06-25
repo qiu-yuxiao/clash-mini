@@ -75,9 +75,13 @@ export const AppDataProvider = ({
     }
     const timer = setTimeout(handleResize, 0)
     window.addEventListener('resize', handleResize)
+    window.addEventListener('focus', handleResize)
+    document.addEventListener('visibilitychange', handleResize)
     return () => {
       clearTimeout(timer)
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('focus', handleResize)
+      document.removeEventListener('visibilitychange', handleResize)
     }
   }, [])
 

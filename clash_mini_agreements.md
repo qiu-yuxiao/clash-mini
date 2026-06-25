@@ -2412,3 +2412,10 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 - **设置抽屉组件生命周期**：撤销所有退场过渡动画（包括 transition、transform 位移、opacity 变化和 pointer-events 遮罩属性），在主布局中直接使用 `{drawerOpen && <div className="theme-panel">...</div>}` 进行条件渲染。当设置面板关闭时（即大窗口默认关闭，或微小窗口模式下），其内部的所有子组件全部从 DOM 树中物理卸载，达到零 DOM 节点残留。
 - **配置数据拉取联动**：将设置页面的打开状态 `drawerOpen` 作为全局上下文状态提升至根 `SystemContext` 统一管理（以 `isSettingsOpen` / `setIsSettingsOpen` 属性暴露）。全局 `getSystemProxy` (系统代理) 与 `getRunningMode` (运行模式) 的 React Query 查询，其启用参数直接绑定为 `enabled: isSettingsOpen`。当设置抽屉关闭时，后台接口查询自动被禁用以消除多余的 Tauri IPC 进程间通信；仅在设置抽屉处于打开状态时，方可激活查询以提供设置卡片所需数据。
+
+## ⚡ 四十、 静默启动与尺寸事件补偿规范 (BUG-STARTUP)
+
+为了解决静默启动（托盘静默启动）时，由于 WebView 初始尺寸为 `0x0` 导致窗口错误初始化并卡死在“微小窗口模式”的问题，制定以下规范：
+
+- **多事件尺寸补偿机制**：在主布局组件（`_layout.tsx`）及全局数据提供者（`app-data-provider.tsx`）中，窗口尺寸和“微小窗口模式”的判定逻辑不仅要监听 `resize` 事件，还必须注册并监听窗口聚焦（`focus`）和文档可见性变化（`visibilitychange`）事件。当用户从托盘唤醒窗口时，通过这些补偿事件重新测量并更新真实的窗口尺寸，从而使前端正确退出微小模式，恢复完整的节点数据流和节点服务商查询。
+- **无挂载尺寸动态重算**：在窗口控制器组件（`window-provider.tsx`）中，为防止在静默启动（初始宽度检测为 `0`）时引发的标题栏异常隐藏，`resetIdleTimer` 会在重置计时器时，通过 `window.innerWidth` 动态且同步地重新评估是否处于最小宽度状态，不依赖初始化时缓存的过时/静默尺寸值。
