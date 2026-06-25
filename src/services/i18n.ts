@@ -93,12 +93,12 @@ const localeLoaders = Object.entries(localeModules).reduce<
   return acc
 }, {})
 
-export const languages: Record<string, any> = supportedLanguages.reduce(
+export const languages: Record<string, Record<string, unknown>> = supportedLanguages.reduce(
   (acc, lang) => {
     acc[lang] = {}
     return acc
   },
-  {} as Record<string, any>,
+  {} as Record<string, Record<string, unknown>>,
 )
 
 export const loadLanguage = async (language: string) => {

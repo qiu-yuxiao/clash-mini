@@ -288,7 +288,7 @@
 
 ### BUG-252: Explicit any in language modules reduction in i18n.ts (WARN-09)
  - **现象描述**：国际化组件在初始化语言字典并对 `supportedLanguages` 做累加转换（reduce）时，目标累加器类型和字典对象被指定为了 `Record<string, any>`，触发 `no-explicit-any` 检查警告。
- - **当前状态**：`排查中`
+ - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.8.8`
 
 ### BUG-253: Explicit any in nameserver policy type dictionary in clash.ts (WARN-10)
