@@ -2463,4 +2463,17 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - Rust 侧的订阅清理不需要在退出轻量模式时进行手动重建，因为主窗口重建挂载时，前端 React 组件自身的挂载逻辑（`useEffect`）会自动向 Tauri 后端发送新的 WS 建立指令。
   - 该机制不仅能在外壳处于轻量后台时将 CPU 消耗和内存吞吐减少到绝对的 `0.0%`，又能保证窗口唤醒时数据流无感瞬间重连。
 
+## ⚡ 四十五、 轻量模式唤醒后节点延迟刷新规范 (BUG-262)
+
+为了解决程序从轻量模式（隐藏窗口或销毁重建窗口）中唤醒后，节点列表中的延迟信息无法恢复且持续显示为 `-` 的问题，制定以下规范：
+
+- **解决双挂载/竞态取消导致初始化中断**：
+  - 在前端 `src/pages/_layout.tsx` 挂载 `useEffect` 的清理函数中，如果因为 StrictMode 重跑或尺寸修改重新渲染导致 Effect 被清理（`cancelled = true`），必须显式将 `lastProcessedRef.current.uid` 重置为 `null`。
+  - 这能确保下一次挂载和 Effect 运行时能够正确判定为新 Profile 从而再次拉起配置增强、激活选择及全节点测速流程，防止首次启动测速被永远拦截。
+- **自适应窗口可见度唤醒测速**：
+  - 在 Layout 顶层事件监听器中，增加对窗口聚焦（`focus`）和文档可见度变化（`visibilitychange`）的拦截。
+  - 当文档状态变为可见（`document.visibilityState === 'visible'`）时，如果组件已完成启动过程（`isStartingUpRef.current === false`），且距离上一次全节点测速已经超过 30 秒（防止用户切出应用导致的重复流量刷新），应立刻自动触发 `DelayManager.checkListDelay` 对 PROXY 策略组执行后台全节点延迟测试，并刷新前端数据展示。
+  - 该唤醒测速为非阻塞测速，并且只能静默填充和恢复延迟缓存，严禁修改/篡改用户当前手动选中的活跃代理节点。
+
+
 

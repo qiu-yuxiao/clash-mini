@@ -105,11 +105,16 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.9.0`
 
+### BUG-262: Missing Node Latency Display after Awakening from Lightweight Mode
+ - **现象描述**：导入订阅链接后节点信息正常显示延迟。但是当程序从轻量模式（无论是销毁窗口重建还是隐藏窗口重新显示）被唤醒后，节点列表表格中的延迟信息均显示为 `-` 且无法显示数值。原因为：① 在销毁重建模式下，React StrictMode 双挂载或尺寸改变引发的 Effect 重新挂载，导致前一次初始化被 `cancelled`，而第二次挂载被 `lastProcessedRef` 重复判定拦截，初始化测速被彻底取消；② 在隐藏唤醒模式下，React Layout 不重新挂载，且后台缓存因 30 分钟过期被清空，后端健康检查仅探测活跃节点，从而没有新测速任务被触发。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.1`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
-所有已通过 Master 验证并确认关?of Bug，在此进行极简化表格索引?
+所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
-
+| **BUG-262** | Missing Node Latency Display after Awakening from Lightweight Mode | v1.9.1 | 代码已修正，已确认 |
 | **BUG-242** | Mismatched window threshold hiding titlebar in normal layout (AUDIT-03) | v1.8.8 | 代码已修正，已确认 |
 | **BUG-256** | Shell Program Exits and Panics on Window Close in Auto Lightweight Mode | v1.8.8 | 代码已修正，已确认 |
 | **BUG-241** | Settings Drawer active and resources polling in mini mode (AUDIT-02) | v1.8.8 | 代码已修正，已确认 |

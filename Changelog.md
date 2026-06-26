@@ -1,3 +1,13 @@
+## v1.9.1
+
+### 🐞 Fixed Bugs
+
+- **BUG-262 解决从轻量化后台唤醒后节点列表无延迟数据问题**：
+  - **解决初始化挂载测速被取消问题**：在 Layout 组件 profile 增强 Effect 的清理函数中，添加 `lastProcessedRef.current.uid = null` 的重置逻辑。完美解决了在窗口销毁重建模式下，React StrictMode 双挂载或尺寸改变引发的 Effect 重新挂载导致前一次初始化被 cancelled、而第二次挂载被 lastProcessed 判定拦截，使初始化测速被彻底取消的 Bug。
+  - **自适应窗口可见度唤醒测速**：在 Layout 窗口事件监听器中，增加对 `focus` 和 `visibilitychange` 事件的可见性判定。当窗口重新可见时，如果非启动阶段且已超过 30 秒冷却防抖时间，自动在后台触发 `DelayManager.checkListDelay` 对全节点执行静默测试并更新界面延迟缓存，且不会篡改用户手动选中的策略组节点。
+
+---
+
 ## v1.9.0
 
 ### 🐞 Fixed Bugs
