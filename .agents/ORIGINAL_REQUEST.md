@@ -70,3 +70,51 @@ Draft a structured Markdown report named `docs/memory_regression_report.md` deta
 - [ ] The report clearly details the Web Worker lifecycle termination leak in Chromium/WebView2 with specific code locations.
 - [ ] The report details the Settings Drawer conditional unmounting overhead and React leak potential.
 - [ ] The report provides clear, drop-in replacement code snippets demonstrating how to roll back or refactor these two modules.
+
+## Follow-up — 2026-06-26T17:01:39+08:00
+
+Conduct a comprehensive code audit of all changes made in the Clash Mini project since version 1.8.9 (comparing against Git tag `v1.8.9` up to the current HEAD of the `dev` branch). Identify bugs, regression risks, resource leaks, and structural improvements, and output a detailed Markdown report.
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: development
+
+## Requirements
+
+### R1. Diff Extraction & Filtered Code Scoping
+Extract the exact git diff between tag `v1.8.9` and the current `dev` branch HEAD. Filter out non-code assets (e.g. images, localizations) and identify the core modified source files in `src/` (React frontend) and `src-tauri/src/` (Rust/Tauri backend).
+
+### R2. Compiler & Linter Verification
+Run static analysis tools to verify the codebase after the changes:
+- Run `cargo clippy` and `cargo check` on the backend to flag structural issues, warnings, or compile errors.
+- Run `eslint` or frontend typescript checkers on the modified frontend files to check for static issues.
+
+### R3. Rust/Tauri Backend Audit
+Analyze the modifications in the Rust backend for:
+- Thread safety, async task spawn boundaries, and potential deadlocks.
+- Tauri window creation/destruction state management.
+- Resource management (socket leak risks, file handle safety).
+
+### R4. React Frontend Hook & Lifecycle Audit
+Analyze the modifications in the React frontend, particularly inside page layouts and hooks, for:
+- React StrictMode compatibility and double-mounting robustness.
+- `useEffect` cleanup execution and dependency array completeness (preventing infinite loops or missed updates).
+- Unhandled async promise rejections or race conditions.
+
+### R5. Audit Report Generation
+Compile all findings into a Markdown report.
+
+## Acceptance Criteria
+
+### Audit Scope & Input
+- [ ] The git diff analyzed represents exactly the changes between the `v1.8.9` tag and current HEAD.
+
+### Verification Tools
+- [ ] Linter outputs (`clippy` warnings, compilation check logs) for modified code are reviewed and referenced in the report.
+
+### Report Structure & Completeness
+- [ ] The report is written in Markdown and saved at `C:\Users\sun_y\.gemini\antigravity\brain\94f078ae-2fb9-46a3-b3b6-9b8ae4e2dd48/v189_post_release_audit_report.md`.
+- [ ] Every identified issue or improvement includes:
+  - Severity level: `Critical` (bugs, crashes), `Warning` (potential leaks, race conditions), or `Optimization` (cleanliness, performance).
+  - Exact file path (using Markdown file:/// links) and code snippet/line references.
+  - Concrete physical explanation of the issue and a proposed fix.
+- [ ] Specifies whether any of the post-1.8.9 changes are redundant or could be simplified.
