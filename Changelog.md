@@ -1,3 +1,13 @@
+## v1.9.4
+
+### ⚡ Optimizations
+
+- **OPT-001 优化 mini-mihomo 内核物理内存与虚拟分配内存占用**：
+  - **Go 运行时轻量化参数调优 (OPT-001)**：在 Rust 后端启动 `mini-mihomo` 内核进程时，主动注入运行时环境变量。在没有外部自定义变量时，默认应用 `GOMEMLIMIT=96MiB`（内存软上限强制GC页换回）、`GOGC=50`（GC触发频次翻倍控制内存稳健）、`GOMAXPROCS=2`（最大并发线程数限制，大幅缩减高核机器下的线程栈虚拟分配及系统句柄开销）。
+  - **默认 geodata-loader: memconservative 地理数据保守加载**：在默认 Clash 配置生成模板中写入 `geodata-loader: memconservative` 参数，指示内核采用内存保守算法和简洁匹配器加载 IP 与域名数据库，削减 20MB~30MB 基线物理内存开销。
+
+---
+
 ## v1.9.3
 
 ### 🐞 Fixed Bugs

@@ -11,6 +11,11 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### OPT-001: Sidecar Kernel Memory and Thread Handle Footprint Optimization
+ - **现象描述**：由于 Mihomo (Clash Meta) Go 运行时未显式限制 GC 频率及内存上限，且在高物理核心的 CPU 机器上 Go 自动创建的大量底层调度线程耗费大量虚拟分配内存（每个线程默认 1MB 栈空间）和系统句柄；同时，未开启 `memconservative` 选项导致 geodata 数据库加载耗费较大物理内存。现已针对 Sidecar 进程在启动时注入 `GOMEMLIMIT=96MiB`、`GOGC=50`、`GOMAXPROCS=2` 等 Go 运行时参数，并配置 `geodata-loader: memconservative` 默认参数，将 mini-mihomo 物理与虚拟内存开销压缩至极致。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.4`
+
 ### BUG-215: Active Connection Node status row layout collapse and styling loss under strict CSP
  - **现象描述**：启用严格 CSP 后，WebView2 拒绝加载未显式放行的 `tauri://` 与 `asset://` 协议下的静态 CSS 资源及 Emotion 动态注入的样式，导致页面全部类样式失效，界面彻底退化为无样式灰白色，活动出口节点卡片也由于样式失效而失去 Flex 和高度约束产生崩塌。
  - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
