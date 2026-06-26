@@ -138,7 +138,10 @@
 ### BUG-268: Background connection cleanup race condition with wakeup
  - **现象描述**：进入轻量化异步触发的 Mihomo 垃圾连接清理和 WS 熔断任务无活性监控，在主窗口快速唤醒时可能误杀新窗口建立的正常网络与数据订阅连接。
  - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.2`
+### BUG-269: Leaked Background Logs Web Socket Processing Task in Rust Backend
+ - **现象描述**：`ws_logs_checked` 中的日志后台任务没有在接收通道关闭返回 `None` 时断开循环并退出协程，导致协程在后台无限挂起，阻止了主窗口/WebView2 销毁后的资源回收，引发内存和句柄残留。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.3`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 

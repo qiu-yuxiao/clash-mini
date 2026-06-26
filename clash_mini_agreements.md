@@ -2492,5 +2492,17 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 移除了 mixedPortVal 状态设置时包裹的 `Promise.resolve().then()`，直接在已异步运行的 `useEffect` 中进行同步状态同步。
 - **冗余及废弃组件清理**：从 `enable_auto_light_weight_mode` 中彻底移除已无用处的定时器全局初始化 `Timer::global().init()` 及 `async` 异步修饰词，保证代码的高效简洁。
 
+## ⚡ 四十七、 WebView2 销毁释放与 WebSocket 熔断任务泄漏修复规范 (BUG-269)
+
+为了解决程序在后台挂机（轻量模式/托盘模式）时，由于后台日志协程未随通道关闭退出，导致持有 Tauri 窗口引用阻碍 WebView2 销毁释放、残留大量句柄和虚拟内存的问题，制定以下规范：
+
+- **WebSocket 日志协程生命周期熔断**：
+  - 在 `crates/tauri-plugin-mihomo/src/mihomo.rs` 的 `ws_logs_checked` 接口中，后台常驻的日志处理协程必须能感知数据分发通道的关闭状态。
+  - 严禁在 `tokio::select!` 接收循环分支中使用只匹配 `Some` 模式的 `Some(log_line) = rx.recv()`。必须使用常规匹配 `msg = rx.recv()`，并在通道关闭（`None` 分支）时执行 `break` 主动退出协程，确保随 WebSocket 关闭而自动销毁协程。
+- **本地连接池空闲管道激进清空**：
+  - 在轻量模式调用的 `clear_all_ws_connections()` 清理任务中，除了断开所有的 WebSocket 连接，还必须显式调用 `IpcConnectionPool::global().map(|pool| pool.clear_pool())`。
+  - 这将在隐身托盘模式下，彻底断开并关闭全局连接池中保留的 3 个空闲本地管道连接（NamedPipe），消除最后几处系统活跃句柄的占用。
+
+
 
 

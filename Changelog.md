@@ -1,3 +1,13 @@
+## v1.9.3
+
+### 🐞 Fixed Bugs
+
+- **BUG-269 解决后台日志 WebSocket 协程泄漏及连接池句柄残留问题**：
+  - **WebSocket 日志协程生命周期修复 (BUG-269)**：修复 `ws_logs_checked` 中的 tokio select 循环模式匹配。将 `Some(log_line) = rx.recv()` 重构为常规接收，并在通道关闭返回 `None` 时主动 break 退出循环，彻底消除协程在后台无限空转导致的主窗口/WebView2 销毁受阻问题。
+  - **托盘轻量化模式连接池激进回收**：在 WebSocket 熔断清理函数中，增加对 `IpcConnectionPool` 的全局 `clear_pool()` 调用，确保在窗口销毁时完全释放残留的空闲 NamedPipe 管道系统句柄。
+
+---
+
 ## v1.9.2
 
 ### 🐞 Fixed Bugs
