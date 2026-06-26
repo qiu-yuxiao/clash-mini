@@ -110,6 +110,36 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.9.1`
 
+### BUG-263: State Machine Race Condition via Raw Stores in lightweight.rs
+ - **现象描述**：`try_transition` 在利用 CAS 完成状态转移后，会立即执行 `record_state_and_log` 中非原子的 raw `store` 覆写，在大窗口频繁开合或托盘快速切换时容易造成竞态覆盖，导致后端状态机与实际窗口状态不同步。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.2`
+
+### BUG-264: Web Worker Reuse and Fallback Termination Failure in use-traffic-monitor.ts
+ - **现象描述**：Web Worker 运行时报错触发 `onerror` 降级逻辑时，没有清理旧的 worker 线程和实例引用，导致下一次运行循环时误以为 Worker 依然存在并重用该损坏实例。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.2`
+
+### BUG-265: Silent Start lightweight mode initialization failure
+ - **现象描述**：静默启动时主窗口尚未创建，进入轻量模式执行 `destroy_main_window` 返回 `Failed` 并回滚状态机。现已修正其在窗口不存在时返回 `NoAction` 并不再回滚状态机。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.2`
+
+### BUG-266: Debounce limit causing window/state-machine desync
+ - **现象描述**：防抖限流导致窗口展示操作返回 `NoAction` 时，退出轻量模式依然强行切换状态机至 `Normal`，导致主窗口未显示但后端状态不一致。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.2`
+
+### BUG-267: Leaked useEffect timeout in _layout.tsx
+ - **现象描述**：设置抽屉的 `useEffect` 中，当 `drawerOpen` 变为 falsy 时所调用的 `setTimeout` 超时器未被清除，产生组件卸载后的内存泄露风险。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.2`
+
+### BUG-268: Background connection cleanup race condition with wakeup
+ - **现象描述**：进入轻量化异步触发的 Mihomo 垃圾连接清理和 WS 熔断任务无活性监控，在主窗口快速唤醒时可能误杀新窗口建立的正常网络与数据订阅连接。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.2`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
