@@ -397,6 +397,10 @@ impl Mihomo {
         for id in ids {
             cancel_ws_reader(ws_reader_key(&self.connection_manager, id)).await;
         }
+        // Also clear the global IPC connection pool to release idle NamedPipeClient handles
+        if let Ok(pool) = IpcConnectionPool::global() {
+            pool.clear_pool();
+        }
         Ok(())
     }
 
@@ -602,17 +606,22 @@ impl Mihomo {
 
             loop {
                 tokio::select! {
-                    Some(log_line) = rx.recv() => {
-                        let is_error = log_line.contains(r#""type":"error""#) || log_line.contains(r#""type":"critical""#);
-                        buffer.push(log_line);
+                    msg = rx.recv() => {
+                        match msg {
+                            Some(log_line) => {
+                                let is_error = log_line.contains(r#""type":"error""#) || log_line.contains(r#""type":"critical""#);
+                                buffer.push(log_line);
 
-                        if is_error || buffer.len() >= 50 {
-                            let batched_json = format!("[{}]", buffer.join(","));
-                            buffer.clear();
-                            let body = InvokeResponseBody::Raw(batched_json.into_bytes());
-                            if !on_message(body) {
-                                break;
+                                if is_error || buffer.len() >= 50 {
+                                    let batched_json = format!("[{}]", buffer.join(","));
+                                    buffer.clear();
+                                    let body = InvokeResponseBody::Raw(batched_json.into_bytes());
+                                    if !on_message(body) {
+                                        break;
+                                    }
+                                }
                             }
+                            None => break,
                         }
                     }
                     _ = interval.tick() => {
@@ -625,7 +634,6 @@ impl Mihomo {
                             }
                         }
                     }
-                    else => break,
                 }
             }
         });
