@@ -1,0 +1,2 @@
+## 2026-06-25T18:01:34Z
+Please execute the task in c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_auditor_memory_regression\task.md. Your working directory is c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_auditor_memory_regression\. Perform the forensic integrity checks and confirm if the workspace remains clean of any program source code modifications. Record your audit verdict in handoff.md in your working directory and notify the parent.
