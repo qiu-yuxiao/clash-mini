@@ -504,23 +504,6 @@ const Layout = () => {
 
   const [isMiniStatus, setIsMiniStatus] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 285 && window.innerHeight <= 100)
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const handleResize = () => {
-      setIsMinimalWidth(window.innerWidth <= 285)
-      setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
-    }
-    const timer = setTimeout(handleResize, 0)
-    window.addEventListener('resize', handleResize)
-    window.addEventListener('focus', handleResize)
-    document.addEventListener('visibilitychange', handleResize)
-    return () => {
-      clearTimeout(timer)
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('focus', handleResize)
-      document.removeEventListener('visibilitychange', handleResize)
-    }
-  }, [])
 
   const handleDepthFactorChange = (val: number) => {
     setDepthFactor(val)
@@ -1131,6 +1114,40 @@ const Layout = () => {
   const tRef = useRef(t)
   tRef.current = t
 
+  const isStartingUpRef = useRef(true)
+  const lastFullTestTimeRef = useRef<number>(0)
+
+  const triggerWakeupLatencyTest = useCallback(async () => {
+    try {
+      const now = Date.now()
+      // 限制 30 秒内不重复触发全节点自动测速，避免频繁聚焦导致重复测试
+      if (now - lastFullTestTimeRef.current < 30 * 1000) {
+        return
+      }
+
+      if (isStartingUpRef.current) {
+        return
+      }
+
+      const proxyGroup = await getProxyByName('PROXY')
+      const allNames = (proxyGroup?.all || []).filter(
+        (name: string) => !isDummyNode(name),
+      )
+      if (allNames.length === 0) return
+
+      const timeout = verge?.default_latency_timeout || 10000
+      lastFullTestTimeRef.current = now
+      console.log('[Layout] 窗口唤醒，触发后台节点测速以刷新延迟')
+      await DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
+      await refreshProxyRef.current({ forceFull: true })
+    } catch (err) {
+      console.error('[Layout] 唤醒测速失败:', err)
+    }
+  }, [verge?.default_latency_timeout])
+
+  const triggerWakeupLatencyTestRef = useRef(triggerWakeupLatencyTest)
+  triggerWakeupLatencyTestRef.current = triggerWakeupLatencyTest
+
   // WARNING: DO NOT remove this unified hook or replace it with ad-hoc reload chains in other methods (like handleImportProfile).
   // The state-driven approach prevents race conditions during import/activation.
   // The 3-attempt auto-retry block in .catch resolves startup timing issues where the core/socket is temporarily busy.
@@ -1166,6 +1183,7 @@ const Layout = () => {
             )
             // Success: reset retry counter
             startupRetryCountRef.current = 0
+            isStartingUpRef.current = false
           })
           .catch((err) => {
             if (cancelled) return
@@ -1200,6 +1218,8 @@ const Layout = () => {
             activeAutoSelectReject(new Error('AutoSelectCancelled'))
             activeAutoSelectReject = null
           }
+          // Reset last processed to allow retry/reload on next mount/run if cancelled before completion
+          lastProcessedRef.current.uid = null
         }
       }
     }
@@ -1222,6 +1242,31 @@ const Layout = () => {
         activeAutoSelectReject(new Error('AutoSelectCancelled'))
         activeAutoSelectReject = null
       }
+    }
+  }, [])
+
+  // 监听窗口大小、焦点及可见度变化，并在唤醒时触发全节点自动测速刷新延迟
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleResize = () => {
+      setIsMinimalWidth(window.innerWidth <= 285)
+      setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
+    }
+    const handleFocusOrVisible = () => {
+      handleResize()
+      if (document.visibilityState === 'visible') {
+        triggerWakeupLatencyTestRef.current()
+      }
+    }
+    const timer = setTimeout(handleResize, 0)
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('focus', handleFocusOrVisible)
+    document.addEventListener('visibilitychange', handleFocusOrVisible)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('focus', handleFocusOrVisible)
+      document.removeEventListener('visibilitychange', handleFocusOrVisible)
     }
   }, [])
 
