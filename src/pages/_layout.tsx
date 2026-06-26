@@ -1030,9 +1030,12 @@ const Layout = () => {
   const [isPanelVisible, setIsPanelVisible] = useState(false)
 
   useEffect(() => {
+    let timerId: any = null
     if (!drawerOpen) {
-      setTimeout(() => setIsPanelVisible(false), 0)
-      return
+      timerId = setTimeout(() => setIsPanelVisible(false), 0)
+      return () => {
+        if (timerId) clearTimeout(timerId)
+      }
     }
     const element = connectionsPanelRef.current
     if (!element) return
@@ -1046,6 +1049,7 @@ const Layout = () => {
     observer.observe(element)
     return () => {
       observer.disconnect()
+      if (timerId) clearTimeout(timerId)
     }
   }, [drawerOpen])
 
@@ -1081,9 +1085,9 @@ const Layout = () => {
     const vPort = verge?.verge_mixed_port
     const cPort = clashInfo?.mixed_port
     if (vPort !== undefined && vPort !== null) {
-      Promise.resolve().then(() => setMixedPortVal(vPort))
+      setMixedPortVal(vPort)
     } else if (cPort !== undefined && cPort !== null) {
-      Promise.resolve().then(() => setMixedPortVal(cPort))
+      setMixedPortVal(cPort)
     }
   }, [verge?.verge_mixed_port, clashInfo?.mixed_port])
 

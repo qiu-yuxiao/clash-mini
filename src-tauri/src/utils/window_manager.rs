@@ -351,7 +351,7 @@ impl WindowManager {
             }
             return WindowOperationResult::Destroyed;
         }
-        WindowOperationResult::Failed
+        WindowOperationResult::NoAction
     }
 
     /// 获取详细的窗口状态信息

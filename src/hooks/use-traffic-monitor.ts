@@ -225,6 +225,14 @@ class TrafficWorkerClient {
       }
       worker.onerror = (error) => {
         debugLog('[TrafficWorkerClient] Web Worker runtime error, falling back to inline:', error)
+        worker.onmessage = null
+        worker.onerror = null
+        try {
+          worker.terminate()
+        } catch {}
+        if (this.worker === worker) {
+          this.worker = null
+        }
         this.stop()
         this.startInline(initMessage)
       }

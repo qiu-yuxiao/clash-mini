@@ -1,6 +1,6 @@
 use crate::{
     config::Config,
-    core::{timer::Timer, tray::Tray},
+    core::tray::Tray,
     process::AsyncHandler,
 };
 
@@ -41,20 +41,19 @@ fn get_state() -> LightweightState {
     LIGHTWEIGHT_STATE.load(Ordering::Acquire).into()
 }
 
-#[inline]
-fn try_transition(from: LightweightState, to: LightweightState) -> bool {
-    LIGHTWEIGHT_STATE
+fn transition_and_log(from: LightweightState, to: LightweightState) -> bool {
+    if LIGHTWEIGHT_STATE
         .compare_exchange(from.as_u8(), to.as_u8(), Ordering::AcqRel, Ordering::Relaxed)
         .is_ok()
-}
-
-#[inline]
-fn record_state_and_log(state: LightweightState) {
-    LIGHTWEIGHT_STATE.store(state.as_u8(), Ordering::Release);
-    match state {
-        LightweightState::Normal => logging!(info, Type::Lightweight, "轻量模式已关闭"),
-        LightweightState::In => logging!(info, Type::Lightweight, "轻量模式已开启"),
-        LightweightState::Exiting => logging!(info, Type::Lightweight, "正在退出轻量模式"),
+    {
+        match to {
+            LightweightState::Normal => logging!(info, Type::Lightweight, "轻量模式已关闭"),
+            LightweightState::In => logging!(info, Type::Lightweight, "轻量模式已开启"),
+            LightweightState::Exiting => logging!(info, Type::Lightweight, "正在退出轻量模式"),
+        }
+        true
+    } else {
+        false
     }
 }
 
@@ -74,7 +73,7 @@ pub async fn auto_lightweight_boot() -> Result<()> {
     let is_enable_auto = verge_config.data_arc().enable_auto_light_weight_mode.unwrap_or(false);
     let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
     if is_enable_auto {
-        enable_auto_light_weight_mode().await;
+        enable_auto_light_weight_mode();
     }
     if is_silent_start {
         entry_lightweight_mode().await;
@@ -83,13 +82,7 @@ pub async fn auto_lightweight_boot() -> Result<()> {
 }
 
 /// 轻量模式延迟触发定时器已废弃（关闭窗口直接触发替代）。
-/// 此处 Timer::global().init() 仅初始化全局定时器（服务于 Profile 定时更新等），
-/// 与轻量模式延迟触发无关联。
-pub async fn enable_auto_light_weight_mode() {
-    if let Err(e) = Timer::global().init().await {
-        logging!(error, Type::Lightweight, "Failed to initialize timer: {e}");
-        return;
-    }
+pub fn enable_auto_light_weight_mode() {
     logging!(info, Type::Lightweight, "开启自动轻量模式（关闭窗口即刻进入）");
 }
 
@@ -108,16 +101,15 @@ pub async fn entry_lightweight_mode() -> bool {
         return true;
     }
 
-    if !try_transition(LightweightState::Normal, LightweightState::In) {
+    if !transition_and_log(LightweightState::Normal, LightweightState::In) {
         logging!(debug, Type::Lightweight, "无需进入轻量模式，跳过调用");
         refresh_lightweight_tray_state().await;
         return false;
     }
-    record_state_and_log(LightweightState::In);
     let result = WindowManager::destroy_main_window();
     if result == WindowOperationResult::Failed {
         logging!(warn, Type::Lightweight, "销毁主窗口失败，回滚轻量模式状态");
-        try_transition(LightweightState::In, LightweightState::Normal);
+        transition_and_log(LightweightState::In, LightweightState::Normal);
         refresh_lightweight_tray_state().await;
         return false;
     }
@@ -126,10 +118,16 @@ pub async fn entry_lightweight_mode() -> bool {
     // 💡 建议 2：进入轻量模式时触发 Mihomo 内核的激进连接清理 (GC) - BUG-258
     // 💡 建议 3：彻底熔断外壳 Rust 后端与内核的常驻数据流订阅 - BUG-259
     AsyncHandler::spawn(|| async {
+        if !is_in_lightweight_mode() {
+            return;
+        }
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
         
         logging!(info, Type::Lightweight, "[轻量模式] 触发进入时连接清理与数据订阅熔断...");
         
+        if !is_in_lightweight_mode() {
+            return;
+        }
         // 激进清空所有网络连接 (GC)
         if let Err(err) = mihomo.close_all_connections().await {
             logging!(
@@ -145,6 +143,9 @@ pub async fn entry_lightweight_mode() -> bool {
             );
         }
 
+        if !is_in_lightweight_mode() {
+            return;
+        }
         // 清理所有 WebSocket 连接 (熔断订阅)
         if let Err(err) = mihomo.clear_all_ws_connections().await {
             logging!(
@@ -194,7 +195,7 @@ pub async fn entry_lightweight_mode() -> bool {
 }
 
 pub async fn exit_lightweight_mode() -> bool {
-    if !try_transition(LightweightState::In, LightweightState::Exiting) {
+    if !transition_and_log(LightweightState::In, LightweightState::Exiting) {
         logging!(
             debug,
             Type::Lightweight,
@@ -203,15 +204,18 @@ pub async fn exit_lightweight_mode() -> bool {
         refresh_lightweight_tray_state().await;
         return false;
     }
-    record_state_and_log(LightweightState::Exiting);
     let result = WindowManager::show_main_window().await;
-    if result == WindowOperationResult::Failed {
-        logging!(warn, Type::Lightweight, "显示主窗口失败，回滚轻量模式状态");
-        try_transition(LightweightState::Exiting, LightweightState::In);
-        refresh_lightweight_tray_state().await;
-        return false;
+    match result {
+        WindowOperationResult::Shown | WindowOperationResult::Created => {
+            transition_and_log(LightweightState::Exiting, LightweightState::Normal);
+        }
+        _ => {
+            logging!(warn, Type::Lightweight, "智能显示主窗口未完成/被防抖限流，回滚轻量模式状态");
+            transition_and_log(LightweightState::Exiting, LightweightState::In);
+            refresh_lightweight_tray_state().await;
+            return false;
+        }
     }
-    record_state_and_log(LightweightState::Normal);
     refresh_lightweight_tray_state().await;
     // 退出轻量模式后，重新启用托盘菜单中的「轻量模式」选项
     crate::core::tray::enable_lite_mode_menu_item();

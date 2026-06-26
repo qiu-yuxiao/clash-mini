@@ -9,7 +9,6 @@ import {
   Snackbar,
   Typography,
 } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import {
   type Key,

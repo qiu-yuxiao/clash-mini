@@ -1,6 +1,6 @@
 import type { TrafficWorkerRequestMessage } from '@/types/traffic'
 
-import { TrafficDataSampler } from '../utils/traffic-sampler'
+import { TrafficDataSampler, formatTrafficName } from '../utils/traffic-sampler'
 
 let sampler: TrafficDataSampler | null = null
 let config = {
@@ -47,7 +47,9 @@ self.onmessage = (event) => {
   switch (message.type) {
     case 'init': {
       config = { ...message.config }
-      sampler = new TrafficDataSampler(config)
+      if (!sampler) {
+        sampler = new TrafficDataSampler(config)
+      }
       currentRange = message.config.defaultRangeMinutes
       emitSnapshot('init')
       break
@@ -59,7 +61,7 @@ self.onmessage = (event) => {
         up: message.payload.up || 0,
         down: message.payload.down || 0,
         timestamp,
-        name: `${new Date(timestamp).getHours().toString().padStart(2, '0')}:${new Date(timestamp).getMinutes().toString().padStart(2, '0')}:${new Date(timestamp).getSeconds().toString().padStart(2, '0')}`,
+        name: formatTrafficName(timestamp),
       }
 
       lastTimestamp = timestamp
@@ -90,10 +92,6 @@ self.onmessage = (event) => {
       if (throttleTimer !== null) {
         clearTimeout(throttleTimer)
         throttleTimer = null
-      }
-      if (sampler) {
-        sampler.clear()
-        sampler = null
       }
       lastTimestamp = undefined
       break
