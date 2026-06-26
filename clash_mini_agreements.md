@@ -2475,5 +2475,22 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 当文档状态变为可见（`document.visibilityState === 'visible'`）时，如果组件已完成启动过程（`isStartingUpRef.current === false`），且距离上一次全节点测速已经超过 30 秒（防止用户切出应用导致的重复流量刷新），应立刻自动触发 `DelayManager.checkListDelay` 对 PROXY 策略组执行后台全节点延迟测试，并刷新前端数据展示。
   - 该唤醒测速为非阻塞测速，并且只能静默填充和恢复延迟缓存，严禁修改/篡改用户当前手动选中的活跃代理节点。
 
+## ⚡ 四十六、 发布后综合代码审计缺陷修复规范 (BUG-AUDIT-v1.9.2)
+
+根据 v1.9.1 发布后进行的代码安全与并发审计，对发现 of 10 项缺陷进行了集中修复，制定以下规范：
+
+- **状态机 CAS 迁移与日志隔离**：所有轻量模式状态转换必须通过原子 `compare_exchange` (CAS) 实现。删除 `record_state_and_log` 中非原子的 raw `store` 写入，将其与状态变更合并至统一 `transition_and_log` 辅助函数中，防止在快速、高频托盘切换时，各分支回滚覆写。
+- **静默启动销毁行为适配**：在 `window_manager.rs` 中，当销毁主窗口发现其不存在时，`destroy_main_window` 返回 `WindowOperationResult::NoAction`。后端在进入轻量模式时，必须将 `Destroyed` 和 `NoAction` 均视为成功，支持在开启静默启动时直接成功初始化后端轻量状态，避免产生状态回滚。
+- **窗口限流状态同步回滚**：当由于防抖（625ms）限制导致 `show_main_window` 返回限流 `NoAction` 时，`exit_lightweight_mode` 不得将其当作成功，必须回滚状态机回到 `In` 并中断退出，防止产生同步偏差。
+- **后台连接清理任务的生命周期活性判定**：在进入轻量模式而异步派生出的 `mihomo.close_all_connections()` 和 `clear_all_ws_connections()` 清理任务中，在每一处耗时异步操作前，必须进行 `is_in_lightweight_mode()` 判定。若用户在极短时间内重新激活/显示窗口退出轻量模式，该后台任务必须立即熔断返回，不得继续执行，避免误杀新连接。
+- **Web Worker 销毁与引用重置规范**：在 `use-traffic-monitor.ts` 的 `onerror` 降级逻辑中，必须在调用 `this.stop()` 之前，显式终止当前的 Worker 线程（`worker.terminate()`），清理消息回调，并将 `this.worker` 成员置为 `null`，防止下一次启动循环时由于残留非空引用而误用损坏的旧 Worker 实例。
+- **Web Worker 状态保持与采样控制**：
+  - 在 `traffic.worker.ts` 的 `init` 消息处理中，只有在 `sampler` 实例不存在时（`if (!sampler)`）才新建实例，防止重入时覆盖历史采样。
+  - 在 `stop` 处理中，移除清空采样器历史的 `sampler.clear()` 动作，仅取消采样调度计时器并重置时间戳，使 Web Worker 的数据保持特性与内联 Monitor 达成 100% 行为一致，保证窗口切换时历史流量图表不失真。
+- **前端生命周期超时器与微任务清理**：
+  - 在 `_layout.tsx` 侧边设置面板 of `useEffect` 中，对延迟 0ms 设置可见性 of `setTimeout` 进行 timerId 追踪，并在 effect 的清理函数中执行 `clearTimeout`，彻底杜绝组件销毁或频繁操作时的 React 组件状态泄露与警告。
+  - 移除了 mixedPortVal 状态设置时包裹的 `Promise.resolve().then()`，直接在已异步运行的 `useEffect` 中进行同步状态同步。
+- **冗余及废弃组件清理**：从 `enable_auto_light_weight_mode` 中彻底移除已无用处的定时器全局初始化 `Timer::global().init()` 及 `async` 异步修饰词，保证代码的高效简洁。
+
 
 
