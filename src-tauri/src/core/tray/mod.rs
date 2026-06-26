@@ -244,3 +244,11 @@ pub fn enable_lite_mode_menu_item() {
         let _ = item.set_enabled(true);
     }
 }
+
+/// 进入轻量模式后禁用「轻量模式」菜单项
+/// 供 lib.rs 的事件处理句柄（窗口关闭时）和 tray 自身菜单点击时调用
+pub fn disable_lite_mode_menu_item() {
+    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+        let _ = item.set_enabled(false);
+    }
+}
