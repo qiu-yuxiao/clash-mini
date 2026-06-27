@@ -125,6 +125,7 @@ impl CoreManager {
 
             // If the service IPC path is not ready yet, treat it as transient and retry.
             // Running init/refresh too early can mark service state unavailable and break later config reloads.
+            #[cfg(unix)]
             if !service::is_service_ipc_path_exists() {
                 return Err(anyhow::anyhow!("Service IPC not ready"));
             }

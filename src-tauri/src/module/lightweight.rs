@@ -160,8 +160,6 @@ pub async fn entry_lightweight_mode() -> bool {
                 "[轻量模式] 彻底熔断外壳与内核的常驻数据流订阅成功"
             );
         }
-
-
     });
 
     true
