@@ -2503,15 +2503,6 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 在轻量模式调用的 `clear_all_ws_connections()` 清理任务中，除了断开所有的 WebSocket 连接，还必须显式调用 `IpcConnectionPool::global().map(|pool| pool.clear_pool())`。
   - 这将在隐身托盘模式下，彻底断开并关闭全局连接池中保留的 3 个空闲本地管道连接（NamedPipe），消除最后几处系统活跃句柄的占用。
 
-## ⚡ 四十八、 内存与内核进程轻量化运行时参数优化规范 (OPT-001)
 
-为了降低内核 `mini-mihomo` 在纯后端网络转发状态下的物理内存占用，并大幅缩减在高核心数 CPU 设备上的线程栈虚拟内存分配与句柄开销，制定以下规范：
 
-- **Go 运行时性能及并发参数注入**：
-  - 在 Rust 后端（如 `src-tauri/src/core/manager/state.rs` 等）启动自定义或内置的 `mini-mihomo` 内核二进制时，必须向子进程显式注入 Go 运行时微调环境变量：
-    - `GOMEMLIMIT`：若父进程环境未提供自定义设置，默认注入 `"96MiB"`。用于设定软内存上限，使内核在内存触顶时能够极其主动地垃圾回收并向 OS 退还页面。
-    - `GOGC`：若父进程环境未提供自定义设置，默认注入 `"50"`。通过将 GC 触发门槛减半，提高空闲内存的换出频率。
-    - `GOMAXPROCS`：若父进程环境未提供自定义设置，默认注入 `"2"`。限制并发协程的最大调度线程数，规避高核心机器上拉起过多 OS 调度线程导致的虚拟内存（VirtualAlloc）堆栈预留与句柄暴增。
-- **地理数据（Geodata）默认低内存模式**：
-  - 在生成 Clash 运行时配置文件的默认配置模板中（如 `src-tauri/src/config/clash.rs` 里的 `IClashTemp::template()` 接口中），必须显式写入 `"geodata-loader": "memconservative"`。
-  - 这将指示内核在加载 IP 与 Geosite 分流规则数据库时采用内存保守布局，将启动基线物理内存压缩约 20MB ~ 30MB。
+
