@@ -85,10 +85,14 @@ impl Tray {
             };
 
             // 根据当前轻量模式状态初始化菜单项的勾选和可用状态
-            if let Some(_item) = LITE_MODE_MENU_ITEM.get() {
-                // set_checked removed - not required
-                // 始终保持可点击，以便用户可以切换状态
-                // let _ = item.set_enabled(true); // disabled: method not available
+            if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                let is_in = lightweight::is_in_lightweight_mode();
+                let text = if is_in {
+                    "✓ 轻量模式 / Lite mode"
+                } else {
+                    "轻量模式 / Lite mode"
+                };
+                let _ = item.set_text(text);
             }
 
             let quit = match MenuItem::with_id(&app_handle_clone, MenuIds::EXIT, "退出 (Exit)", true, None::<&str>) {
@@ -214,45 +218,50 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     if event.id.as_ref().is_empty() {
         return;
     }
-    let _app_clone = app.clone(); // 修复编译警告：添加下划线前缀
-    AsyncHandler::spawn(|| async move {
-        match event.id.as_ref() {
-            MenuIds::LITE_MODE => {
-                // 切换轻量模式，根据当前状态决定进入还是退出
-                if lightweight::is_in_lightweight_mode() {
-                    // 当前已在轻量模式，尝试退出
-                    if lightweight::exit_lightweight_mode().await {
-                        logging!(info, Type::Tray, "已退出轻量模式");
+    let id = event.id;
+    let _ = app.run_on_main_thread(move || {
+        AsyncHandler::spawn(|| async move {
+            match id.as_ref() {
+                MenuIds::LITE_MODE => {
+                    // 切换轻量模式，根据当前状态决定进入还是退出
+                    if lightweight::is_in_lightweight_mode() {
+                        // 当前已在轻量模式，尝试退出
+                        if lightweight::exit_lightweight_mode().await {
+                            logging!(info, Type::Tray, "已退出轻量模式");
+                        } else {
+                            logging!(error, Type::Tray, "退出轻量模式失败");
+                        }
                     } else {
-                        logging!(error, Type::Tray, "退出轻量模式失败");
+                        // 当前不在轻量模式，尝试进入
+                        if lightweight::entry_lightweight_mode().await {
+                            logging!(info, Type::Tray, "已进入轻量模式");
+                        } else {
+                            logging!(error, Type::Tray, "进入轻量模式失败");
+                        }
                     }
-                } else {
-                    // 当前不在轻量模式，尝试进入
-                    if lightweight::entry_lightweight_mode().await {
-                        logging!(info, Type::Tray, "已进入轻量模式");
-                    } else {
-                        logging!(error, Type::Tray, "进入轻量模式失败");
-                    }
+                    // 同步更新托盘 UI（勾选状态）
+                    crate::core::tray::update_lite_mode_menu(lightweight::is_in_lightweight_mode());
                 }
-                // 同步更新托盘 UI（勾选状态）
-                crate::core::tray::update_lite_mode_menu(lightweight::is_in_lightweight_mode());
+                MenuIds::EXIT => {
+                    feat::quit().await;
+                }
+                _ => {
+                    logging!(debug, Type::Tray, "Unhandled tray menu event: {:?}", id);
+                }
             }
-            MenuIds::EXIT => {
-                feat::quit().await;
-            }
-            _ => {
-                logging!(debug, Type::Tray, "Unhandled tray menu event: {:?}", event.id);
-            }
-        }
+        });
     });
 }
 
 /// 更新托盘轻量模式菜单的勾选状态并保持可点击
-pub fn update_lite_mode_menu(_is_in: bool) { // unused variable renamed
-    if let Some(_item) = LITE_MODE_MENU_ITEM.get() {
-        // set_checked removed - not required
-        // 始终保持可点击，以便用户可以切换状态
-        // let _ = item.set_enabled(true); // disabled: method not available
+pub fn update_lite_mode_menu(is_in: bool) {
+    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+        let text = if is_in {
+            "✓ 轻量模式 / Lite mode"
+        } else {
+            "轻量模式 / Lite mode"
+        };
+        let _ = item.set_text(text);
     }
 }
 

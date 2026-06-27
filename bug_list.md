@@ -148,6 +148,11 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.9.3`
 
+### BUG-270: System Tray Menu checkmark missing and window creation deadlock in lightweight mode
+ - **现象描述**：进入轻量模式后，右键托盘菜单中“轻量模式”选项前没有勾号；且在此状态下点击该菜单选项，主窗口虽被拉起但会瞬间被卡死（UI无响应，整个应用陷入死锁，只能通过进程管理器强制结束）。
+ - **当前状态**：`排查中`
+ - **目标版本**：`v1.9.6`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
