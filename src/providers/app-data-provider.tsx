@@ -354,6 +354,8 @@ export const AppDataProvider = ({
   }, [refreshProxy, refreshRules, refreshRuleProviders])
 
   const refreshAll = useCallback(async () => {
+    // WARN-001 修复：全量刷新时强制绕过 isMiniStatus 精简路径，确保代理列表完整加载
+    forceFullProxiesRef.current = true
     await Promise.all([
       refreshProxy(),
       refreshClashConfig(),

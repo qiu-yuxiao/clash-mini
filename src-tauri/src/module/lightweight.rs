@@ -104,7 +104,8 @@ pub async fn entry_lightweight_mode() -> bool {
     if !transition_and_log(LightweightState::Normal, LightweightState::In) {
         logging!(debug, Type::Lightweight, "无需进入轻量模式，跳过调用");
         refresh_lightweight_tray_state().await;
-        crate::core::tray::update_lite_mode_menu(false);
+        // BUG-001 修复：按当前实际状态更新对勾，防止在已处于轻量模式时错误清除对勾标记
+        crate::core::tray::update_lite_mode_menu(is_in_lightweight_mode());
         return false;
     }
     let result = WindowManager::destroy_main_window();

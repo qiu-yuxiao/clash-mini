@@ -72,7 +72,9 @@ impl Config {
         let handle = Handle::app_handle();
         let is_admin = is_current_app_handle_admin(handle);
         #[cfg(target_os = "windows")]
-        let is_service_installed = service::is_service_installed();
+        let is_service_installed = tokio::task::spawn_blocking(service::is_service_installed)
+            .await
+            .unwrap_or(false);
         #[cfg(not(target_os = "windows"))]
         let is_service_installed = service::is_service_available().await.is_ok();
 

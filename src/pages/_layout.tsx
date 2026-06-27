@@ -313,8 +313,14 @@ async function triggerAutoSelectAndRefresh(
   }
 
   // 不管 auto-select 是否成功，以下操作永远执行
-  // 后端已切换节点，立即通过 refreshAll 刷新所有提供者、节点及规则配置
-  await refreshAll()
+  // BUG-002 修复：refreshAll 的网络异常在此捕获，不向外传播，避免触发 profile 重试链
+  try {
+    await refreshAll()
+  } catch (err) {
+    console.warn('[Layout] refreshAll after auto-select failed (non-critical):', err)
+    // 降级：至少保证代理列表被刷新
+    try { await refreshProxy({ forceFull: true }) } catch {}
+  }
   // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
   if (setHeadState) {
     setHeadState('PROXY', { sortType: 1 })
@@ -1192,6 +1198,8 @@ const Layout = () => {
             // Success: reset retry counter
             startupRetryCountRef.current = 0
             isStartingUpRef.current = false
+            // WARN-002 修复：记录启动完成时间，防止首次窗口聚焦时触发冗余的二次全量刷新
+            lastFullTestTimeRef.current = Date.now()
           })
           .catch((err) => {
             if (cancelled) return

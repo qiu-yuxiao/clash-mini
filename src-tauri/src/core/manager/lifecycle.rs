@@ -105,7 +105,10 @@ impl CoreManager {
             return;
         }
 
-        if !service::is_service_installed() {
+        let is_service_installed = tokio::task::spawn_blocking(service::is_service_installed)
+            .await
+            .unwrap_or(false);
+        if !is_service_installed {
             logging!(warn, Type::Service, "Clash Verge Service is not installed, skipping wait.");
             return;
         }
