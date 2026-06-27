@@ -164,9 +164,9 @@
  - **目标版本**：`v1.9.8`
 
 ### BUG-273: Main Window Hangs/Freezes on Second Awakening in Auto Lightweight Mode
- - **现象描述**：在静默启动或正常启动模式下，主窗口第一次唤醒/创建工作正常。当再次将程序切换为轻量模式（销毁主窗口）并进行第二次唤醒/创建主窗口时，整个外壳程序无响应卡死死掉（WebView2 未渲染且无法显示）。这是由于进入轻量模式时在 Windows 下强行对主进程调用了物理内存工作集修剪 (`SetProcessWorkingSetSize(handle, -1, -1)`)，此时 WebView2 相关的 DLL（如 `EmbeddedBrowserWebView.dll`）、COM IPC 信道、线程同步原语等被强制写入页面文件（Pagefile），在二次初始化 WebView2 时引发严重的缺页异常风暴与共享内存/句柄状态同步死锁，导致 WebView2 初始化挂起卡死。
- - **当前状态**：`已打包验证 (v1.9.8)`
- - **目标版本**：`v1.9.8`
+ - **现象描述**：在静默启动或正常启动模式下，主窗口第一次唤醒/创建工作正常。当再次将程序切换为轻量模式（销毁主窗口）并进行第二次唤醒/创建主窗口时，整个外壳程序无响应卡死死掉（WebView2 未渲染且无法显示）。这是由于进入轻量模式时在 Windows 下强行对主进程调用了物理内存工作集修剪 (`SetProcessWorkingSetSize(handle, -1, -1)`)，或将 WebView2 内存目标级别设为 `LOW`，此时 WebView2 相关的 DLL（如 `EmbeddedBrowserWebView.dll`）、COM IPC 信道、线程同步原语等被强制写入页面文件（Pagefile），在二次初始化 WebView2 时引发严重的缺页异常风暴与共享内存/句柄状态同步死锁，导致 WebView2 初始化挂起卡死。
+ - **当前状态**：`已打包验证 (v1.9.9)`
+ - **目标版本**：`v1.9.9`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
