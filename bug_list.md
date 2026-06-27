@@ -153,8 +153,8 @@
  - **当前状态**：`代码已修正，已打包验证 (v1.9.7)`
  - **目标版本**：`v1.9.7`
 
-### BUG-271: Clash Verge Service connection timeout during cold boot under TUN mode
- - **现象描述**：在开启开机自启、静默启动且使用 TUN 模式的场景下，冷机启动时由于系统高负载导致服务启动慢，触发了 3 秒的硬编码重试超时，进而导致程序无特权降级为 Sidecar 模式，无法创建虚拟网卡，代理功能完全失效。
+### BUG-271: Clash Verge Service connection timeout and config overwrite to manual mode during cold boot under TUN mode
+ - **现象描述**：在开启开机自启、静默启动且使用 TUN 模式的场景下，冷机启动时由于系统高负载导致服务启动慢。这不仅会导致后台监测线程触发 3 秒的硬编码重试超时而降级，更会在超早期初始化时由于 `is_service_available` 为 `false` 触发配置覆盖保护，强行将配置文件 `verge.yaml` 中的 `enable_tun_mode` 抹除为 `false`，使用户模式被迫退化并永久变更为“手动模式”。
  - **当前状态**：`代码已修正，待用户确认 (本地已提交)`
  - **目标版本**：`v1.9.8`
 
