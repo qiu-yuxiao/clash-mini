@@ -1,3 +1,32 @@
+## v1.9.4
+
+### 🚀 New Features
+
+- **Allow IPv6 开关**：在基础设置卡片中新增 "Allow IPv6" 开关，默认关闭。用户可按需开启 Mihomo 内核 IPv6 支持。布局同步重构为 2×2 网格，紧凑对称。
+- **托盘菜单双向轻量模式切换**：托盘菜单"轻量模式"改为文本勾选（✔/无勾）指示当前状态，点击可在进入/退出轻量模式间双向切换，替代原有"进入后禁用菜单项"的单向设计。
+
+### 🐞 Fixed Bugs
+
+- **内存与资源泄漏修复**：
+  - 移除 `SetProcessWorkingSetSize` 物理修剪（防止 WebView2 挂起/死锁）
+  - 移除 `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL` 内存级别干预（交由 OS 自动管理）
+  - 为 Mihomo 内核注入 `GOMEMLIMIT=96MiB` / `GOGC=50` / `GOMAXPROCS=2` 环境变量，约束 Go runtime 内存占用
+  - 配置模板新增 `geodata-loader: memconservative`，按需加载 Geo 数据库
+  - 服务等待增加 `is_service_installed` 前置检查，超时后弹错误对话框
+  - 轻量模式进入/退出多次调用 `update_lite_mode_menu` 确保托盘状态一致
+- **refreshAll 网络错误重试修复**：`triggerAutoSelectAndRefresh` 中 refreshAll 错误不再向外传播，降级到 `refreshProxy({forceFull:true})`
+- **启动冗余刷新修复**：启动完成时记录时间戳，防止首次窗口聚焦触发二次全量刷新
+- **全量刷新绕过精简路径**：`refreshAll` 强制设置 `forceFullProxiesRef`，确保代理列表完整加载
+
+### 🏗️ Code Quality
+
+- 彻底删除废弃的 `optimize_window_memory` 函数及 5 处残留调用
+- 合并 `handleAllowLanChange` / `handleIpv6Change` 为通用 `handleClashBoolChange(field)`
+- 恢复 `allowLan` camelCase 序列化 WARNING 注释
+- 补充协议第四十七~五十号规范条目
+
+---
+
 ## v1.9.3
 
 ### 🐞 Fixed Bugs
