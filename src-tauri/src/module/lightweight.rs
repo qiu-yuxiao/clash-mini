@@ -221,5 +221,7 @@ pub async fn exit_lightweight_mode() -> bool {
     crate::core::tray::update_lite_mode_menu(false);
     // 唤醒常驻监测线程以立即重置为前台周期（15秒）
     crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
+    // 触发 UI 刷新节点信息
+    crate::core::handle::Handle::refresh_clash();
     true
 }
