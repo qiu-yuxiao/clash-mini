@@ -182,12 +182,20 @@ Log-Step "Waiting for CI build to complete (polling every 3 minutes)"
 
 function Get-RunInfo {
     # Get newest workflow run id, status, and conclusion
-    $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
-    if (-not $json) { return $null }
-    $obj = ($json -join "`n") | ConvertFrom-Json
-    $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
-           Sort-Object -Property id -Descending | Select-Object -First 1
-    return $run
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
+        if (-not $json) { return $null }
+        $obj = ($json -join "`n") | ConvertFrom-Json
+        $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
+               Sort-Object -Property id -Descending | Select-Object -First 1
+        return $run
+    } catch {
+        return $null
+    } finally {
+        $ErrorActionPreference = $oldEAP
+    }
 }
 
 function Get-RunLogs {
