@@ -2562,3 +2562,13 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 - **标签字体**：`fontSize: '13px'`、`fontWeight: 'bold'`，与流量接管模式的分段控件文本一致。
 - **列间距**：2×2 网格使用 `columnGap: 1.5`（12px），配合格子内部 `px: 0.5`（左右各 4px），两组开关之间的总视觉间距为 20px，与标签-开关之间的自然间距保持视觉协调。
+
+
+## ⚡ 五十二、 壳进程内存占用基准说明
+
+v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7-8MB 上升至约 35MB。此为**正确行为**，原因如下：
+
+- **移除 `SetProcessWorkingSetSize` 欺骗性修剪**：v1.9.3 及之前版本在进入轻量模式时会调用 `SetProcessWorkingSetSize(MAX, MAX)` 暴力修剪工作集，Windows 将进程的物理内存页强制换出至 pagefile，任务管理器因此显示极低内存占用。但 WebView2 内核恢复操作时触发大量 page fault，导致进程挂起/死锁。v1.9.4 彻底删除此操作，交由 Windows 和 Chromium 自己管理物理内存，35MB 为真实工作集大小。
+- **移除 `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW` 压制**：v1.9.3 在窗口隐藏/失焦时将 WebView2 内存级别强制设为 `LOW`，缩减 Chromium 渲染缓存。此操作同样是 WebView2 死锁诱因之一。v1.9.4 将 `optimize_window_memory` 函数彻底废弃删除，WebView2 运行于默认 `NORMAL` 级别。
+- **基准 35MB 说明**：此为包含 Tauri WebView、React 前端运行时、所有 3D 皮肤渲染上下文的正常工作集。该数值在轻量模式（销毁主窗口）下会显著回落，因 WebView2 进程被回收。
+- 通过 `GOMEMLIMIT=96MiB` / `GOGC=50` / `GOMAXPROCS=2` / `geodata-loader=memconservative` 等措施，Mihomo 内核进程的内存已受到约束，不再不必要膨胀。壳进程的 35MB 为合理且无法再缩减的基准线。
