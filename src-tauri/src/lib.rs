@@ -231,7 +231,7 @@ mod app_init {
 }
 
 #[cfg(target_os = "windows")]
-fn show_error_dialog(title: &str, message: &str) {
+pub(crate) fn show_error_dialog(title: &str, message: &str) {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt as _;
     unsafe extern "system" {
@@ -250,7 +250,7 @@ fn show_error_dialog(title: &str, message: &str) {
 }
 
 #[cfg(target_os = "macos")]
-fn show_error_dialog(title: &str, message: &str) {
+pub(crate) fn show_error_dialog(title: &str, message: &str) {
     eprintln!("[{}] {}", title, message);
     let script = format!(
         "display dialog {:?} with title {:?} buttons {{\"OK\"}} default button \"OK\" with icon stop",
@@ -260,7 +260,7 @@ fn show_error_dialog(title: &str, message: &str) {
 }
 
 #[cfg(target_os = "linux")]
-fn show_error_dialog(title: &str, message: &str) {
+pub(crate) fn show_error_dialog(title: &str, message: &str) {
     eprintln!("[{}] {}", title, message);
     let _ = std::process::Command::new("zenity")
         .args(["--error", &format!("--title={}", title), &format!("--text={}", message)])
@@ -268,7 +268,7 @@ fn show_error_dialog(title: &str, message: &str) {
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-fn show_error_dialog(title: &str, message: &str) {
+pub(crate) fn show_error_dialog(title: &str, message: &str) {
     eprintln!("[{}] {}", title, message);
 }
 

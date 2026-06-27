@@ -41,6 +41,10 @@ impl CoreManager {
             "mini-mihomo"
         };
         let custom_core_path = cores_dir.join(core_name);
+        
+        let gomemlimit = std::env::var("GOMEMLIMIT").unwrap_or_else(|_| "96MiB".to_string());
+        let gogc = std::env::var("GOGC").unwrap_or_else(|_| "50".to_string());
+        let gomaxprocs = std::env::var("GOMAXPROCS").unwrap_or_else(|_| "2".to_string());
 
         let (mut rx, child) = if custom_core_path.exists() {
             logging!(
@@ -52,6 +56,9 @@ impl CoreManager {
             app_handle
                 .shell()
                 .command(custom_core_path)
+                .env("GOMEMLIMIT", gomemlimit)
+                .env("GOGC", gogc)
+                .env("GOMAXPROCS", gomaxprocs)
                 .args([
                     "-d",
                     dirs::path_to_str(&config_dir)?,
@@ -69,6 +76,9 @@ impl CoreManager {
             app_handle
                 .shell()
                 .sidecar(clash_core.as_str())?
+                .env("GOMEMLIMIT", gomemlimit)
+                .env("GOGC", gogc)
+                .env("GOMAXPROCS", gomaxprocs)
                 .args([
                     "-d",
                     dirs::path_to_str(&config_dir)?,

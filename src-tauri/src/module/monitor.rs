@@ -442,8 +442,8 @@ pub fn start_background_monitor() {
         let mut last_gc_time = Instant::now();
         let mut was_online = true;
         let mut is_first_run = true;
-        // 【性能优化】： DNS 探测流量减少器——在线时 60s 探测一次，离线时 5s 探测一次
         let mut last_online_check_time: Option<Instant> = None;
+        let mut was_lightweight = crate::module::lightweight::is_in_lightweight_mode();
 
         loop {
             if is_first_run {
@@ -470,6 +470,14 @@ pub fn start_background_monitor() {
                 }
             }
 
+            let is_lightweight = crate::module::lightweight::is_in_lightweight_mode();
+            let mut exited_lightweight = false;
+            if was_lightweight && !is_lightweight {
+                exited_lightweight = true;
+                logging!(info, Type::Lightweight, "[后台监测] 检测到退出轻量模式，立即准备触发一次全节点延迟测试");
+            }
+            was_lightweight = is_lightweight;
+
             // 定期触发网络连接垃圾回收 (GC) - 每 30 分钟一次
             if last_gc_time.elapsed() >= Duration::from_secs(1800) {
                 last_gc_time = Instant::now();
@@ -492,24 +500,32 @@ pub fn start_background_monitor() {
                 }
             };
 
-            // 1. Profile 发生变化时，立即触发自启动优选
-            if last_profile_uid.as_ref() != Some(&current_profile) {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 活动配置切换: {:?} -> {}",
-                    last_profile_uid,
-                    current_profile
-                );
-                last_profile_uid = Some(current_profile.clone());
-                consecutive_fails = 0;
-                is_retry_mode = false;
-                last_active_node = None;
-                last_auto_select_time = None;
-                current_cooldown = Duration::from_secs(0);
+            // 1. Profile 发生变化，或刚退出轻量模式时，立即触发自启动优选 / 全节点延迟测试
+            if last_profile_uid.as_ref() != Some(&current_profile) || exited_lightweight {
+                if last_profile_uid.as_ref() != Some(&current_profile) {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 活动配置切换: {:?} -> {}",
+                        last_profile_uid,
+                        current_profile
+                    );
+                    last_profile_uid = Some(current_profile.clone());
+                    consecutive_fails = 0;
+                    is_retry_mode = false;
+                    last_active_node = None;
+                    last_auto_select_time = None;
+                    current_cooldown = Duration::from_secs(0);
 
-                // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
-                cancel_active_auto_select();
+                    // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
+                    cancel_active_auto_select();
+                } else if exited_lightweight {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 退出轻量模式，触发唤醒时全节点延迟测试"
+                    );
+                }
 
                 if wait_for_clash_ready().await {
                     loop {
@@ -525,7 +541,7 @@ pub fn start_background_monitor() {
                                 sleep(Duration::from_millis(500)).await;
                             }
                             Err(e) => {
-                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
+                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载/唤醒后自动优选失败: {e}");
                                 break;
                             }
                         }

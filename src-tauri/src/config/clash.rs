@@ -101,6 +101,7 @@ impl IClashTemp {
         map.insert("allow-lan".into(), true.into());
         map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
+        map.insert("geodata-loader".into(), "memconservative".into());
 
         let mut profile_config = Mapping::new();
         profile_config.insert("store-selected".into(), true.into());
