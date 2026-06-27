@@ -13,7 +13,6 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use tauri::{
     AppHandle, Manager as _, Wry,
-    menu::MenuItemExt,
     menu::{IsMenuItem, MenuEvent, MenuItem},
 };
 
