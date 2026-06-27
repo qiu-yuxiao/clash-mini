@@ -105,12 +105,18 @@ impl CoreManager {
             return;
         }
 
-        let max_times = timing::SERVICE_WAIT_MAX.as_millis() / timing::SERVICE_WAIT_INTERVAL.as_millis();
+        if !is_service_installed() {
+            logging!(warn, Type::Service, "Clash Verge Service is not installed, skipping wait.");
+            return;
+        }
+
+        // Wait up to 3 minutes (180,000 milliseconds) for service to boot on startup
+        let max_times = 180000 / timing::SERVICE_WAIT_INTERVAL.as_millis();
         let backoff = ConstantBuilder::default()
             .with_delay(timing::SERVICE_WAIT_INTERVAL)
             .with_max_times(max_times as usize);
 
-        let _ = (|| async {
+        let result = (|| async {
             let mut manager = SERVICE_MANAGER.lock().await;
 
             if matches!(manager.current(), ServiceStatus::Ready) {
@@ -134,5 +140,32 @@ impl CoreManager {
         })
         .retry(backoff)
         .await;
+
+        if result.is_err() {
+            logging!(error, Type::Service, "Clash Verge Service startup timed out after 3 minutes.");
+            std::thread::spawn(|| {
+                crate::show_error_dialog(
+                    "Clash Mini Service Error",
+                    "无法连接到 Clash Verge Service。TUN 模式可能无法正常工作。\n请尝试在系统托盘右键菜单中重新安装或修复服务。",
+                );
+            });
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn is_service_installed() -> bool {
+    use std::os::windows::process::CommandExt as _;
+    let output = std::process::Command::new("sc.exe")
+        .arg("query")
+        .arg("clash_verge_service")
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+
+    if let Ok(out) = output {
+        let stdout = std::string::String::from_utf8_lossy(&out.stdout);
+        out.status.success() && !stdout.contains("does not exist")
+    } else {
+        false
     }
 }
