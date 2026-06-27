@@ -117,7 +117,18 @@ Log-Ok "Local commits successfully pushed"
 
 # Tag conflict check
 $ExistingTag = git tag -l $TagName
-$RemoteTagCheck = git ls-remote origin refs/tags/$TagName
+$RemoteTagCheck = ""
+$MaxTagRetries = 3
+for ($i = 1; $i -le $MaxTagRetries; $i++) {
+    $RemoteTagCheck = git ls-remote origin refs/tags/$TagName 2>$null
+    if ($LASTEXITCODE -eq 0 -or $RemoteTagCheck) {
+        break
+    }
+    if ($i -lt $MaxTagRetries) {
+        Log-Warn "git ls-remote failed (attempt $i/$MaxTagRetries), retrying in 3 seconds..."
+        Start-Sleep -Seconds 3
+    }
+}
 $RemoteTagExists = $false
 if ($RemoteTagCheck) {
     $RemoteTagExists = $true
