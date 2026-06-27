@@ -104,6 +104,7 @@ pub async fn entry_lightweight_mode() -> bool {
     if !transition_and_log(LightweightState::Normal, LightweightState::In) {
         logging!(debug, Type::Lightweight, "无需进入轻量模式，跳过调用");
         refresh_lightweight_tray_state().await;
+        crate::core::tray::update_lite_mode_menu(false);
         return false;
     }
     let result = WindowManager::destroy_main_window();
@@ -111,9 +112,11 @@ pub async fn entry_lightweight_mode() -> bool {
         logging!(warn, Type::Lightweight, "销毁主窗口失败，回滚轻量模式状态");
         transition_and_log(LightweightState::In, LightweightState::Normal);
         refresh_lightweight_tray_state().await;
+        crate::core::tray::update_lite_mode_menu(false);
         return false;
     }
     refresh_lightweight_tray_state().await;
+    crate::core::tray::update_lite_mode_menu(true);
 
     // 💡 建议 2：进入轻量模式时触发 Mihomo 内核的激进连接清理 (GC) - BUG-258
     // 💡 建议 3：彻底熔断外壳 Rust 后端与内核的常驻数据流订阅 - BUG-259
@@ -186,12 +189,13 @@ pub async fn exit_lightweight_mode() -> bool {
             logging!(warn, Type::Lightweight, "智能显示主窗口未完成/被防抖限流，回滚轻量模式状态");
             transition_and_log(LightweightState::Exiting, LightweightState::In);
             refresh_lightweight_tray_state().await;
+            crate::core::tray::update_lite_mode_menu(true);
             return false;
         }
     }
     refresh_lightweight_tray_state().await;
-    // 退出轻量模式后，重新启用托盘菜单中的「轻量模式」选项
-    crate::core::tray::enable_lite_mode_menu_item();
+    // 退出轻量模式后，更新托盘菜单中的「轻量模式」选项状态
+    crate::core::tray::update_lite_mode_menu(false);
     // 唤醒常驻监测线程以立即重置为前台周期（15秒）
     crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
     true

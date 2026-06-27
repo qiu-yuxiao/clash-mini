@@ -84,12 +84,8 @@ impl Tray {
                 }
             };
 
-            // 根据当前轻量模式状态初始化菜单项 enabled 状态
-            if lightweight::is_in_lightweight_mode() {
-                if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-                    let _ = item.set_enabled(false);
-                }
-            }
+            // 根据当前轻量模式状态初始化菜单项状态
+            update_lite_mode_menu(lightweight::is_in_lightweight_mode());
 
             let quit = match MenuItem::with_id(&app_handle_clone, MenuIds::EXIT, "退出 (Exit)", true, None::<&str>) {
                 Ok(item) => item,
@@ -218,14 +214,18 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     AsyncHandler::spawn(|| async move {
         match event.id.as_ref() {
             MenuIds::LITE_MODE => {
-                if lightweight::entry_lightweight_mode().await {
-                    logging!(info, Type::Tray, "已进入轻量模式");
-                    // 进入轻量模式后禁用该菜单项
-                    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-                        let _ = item.set_enabled(false);
+                if lightweight::is_in_lightweight_mode() {
+                    if lightweight::exit_lightweight_mode().await {
+                        logging!(info, Type::Tray, "已退出轻量模式");
+                    } else {
+                        logging!(error, Type::Tray, "退出轻量模式失败");
                     }
                 } else {
-                    logging!(error, Type::Tray, "进入轻量模式失败");
+                    if lightweight::entry_lightweight_mode().await {
+                        logging!(info, Type::Tray, "已进入轻量模式");
+                    } else {
+                        logging!(error, Type::Tray, "进入轻量模式失败");
+                    }
                 }
             }
             MenuIds::EXIT => {
@@ -238,9 +238,14 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     });
 }
 
-/// 供 lightweight.rs 在退出轻量模式时调用，重新启用「轻量模式」菜单项
-pub fn enable_lite_mode_menu_item() {
+/// 根据轻量模式状态更新托盘菜单的对勾及可用性
+pub fn update_lite_mode_menu(is_in: bool) {
     if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+        if is_in {
+            let _ = item.set_text("✔ 轻量模式 / Lite mode");
+        } else {
+            let _ = item.set_text("轻量模式 / Lite mode");
+        }
         let _ = item.set_enabled(true);
     }
 }
