@@ -150,8 +150,18 @@
 
 ### BUG-270: System Tray Menu checkmark missing and window creation deadlock in lightweight mode
  - **现象描述**：进入轻量模式后，右键托盘菜单中“轻量模式”选项前没有勾号；且在此状态下点击该菜单选项，主窗口虽被拉起但会瞬间被卡死（UI无响应，整个应用陷入死锁，只能通过进程管理器强制结束）。
- - **当前状态**：`排查中`
- - **目标版本**：`v1.9.6`
+ - **当前状态**：`代码已修正，已打包验证 (v1.9.7)`
+ - **目标版本**：`v1.9.7`
+
+### BUG-271: Clash Verge Service connection timeout during cold boot under TUN mode
+ - **现象描述**：在开启开机自启、静默启动且使用 TUN 模式的场景下，冷机启动时由于系统高负载导致服务启动慢，触发了 3 秒的硬编码重试超时，进而导致程序无特权降级为 Sidecar 模式，无法创建虚拟网卡，代理功能完全失效。
+ - **当前状态**：`代码已修正，待用户确认 (本地已提交)`
+ - **目标版本**：`v1.9.8`
+
+### BUG-272: Missing Node Latency Display after Awakening from Lightweight Mode
+ - **现象描述**：主窗口从轻量模式唤醒后，前台 Webview 重新创建，旧有的 Webview 内存延迟缓存全部丢失。且由于唤醒瞬间发送的 `refresh_clash` 广播事件早于前端 JS 初始化完毕，导致广播丢失；同时 Clash 内核对 Selector 分组节点不进行自动健康检测，导致唤醒后节点的延迟数据长期无法刷新。
+ - **当前状态**：`代码已修正，待用户确认 (本地已提交)`
+ - **目标版本**：`v1.9.8`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
