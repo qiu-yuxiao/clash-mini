@@ -84,11 +84,11 @@ impl Tray {
                 }
             };
 
-            // 根据当前轻量模式状态初始化菜单项 enabled 状态
-            if lightweight::is_in_lightweight_mode() {
-                if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-                    let _ = item.set_enabled(false);
-                }
+            // 根据当前轻量模式状态初始化菜单项的勾选和可用状态
+            if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                let _ = item.set_checked(lightweight::is_in_lightweight_mode());
+                // 始终保持可点击，以便用户可以切换状态
+                let _ = item.set_enabled(true);
             }
 
             let quit = match MenuItem::with_id(&app_handle_clone, MenuIds::EXIT, "退出 (Exit)", true, None::<&str>) {
@@ -247,15 +247,14 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     });
 }
 
-/// 供 lightweight.rs 在退出轻量模式时调用，重新启用「轻量模式」菜单项
-/// 根据轻量模式状态更新托盘菜单的勾选和可用状态
-+pub fn update_lite_mode_menu(is_in: bool) {
-+    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-+        let _ = item.set_checked(is_in);
-+        // 始终保持可点击，以便用户可以切换状态
-+        let _ = item.set_enabled(true);
-+    }
-+}
+/// 更新托盘轻量模式菜单的勾选状态并保持可点击
+pub fn update_lite_mode_menu(is_in: bool) {
+    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+        let _ = item.set_checked(is_in);
+        // 始终保持可点击，以便用户可以切换状态
+        let _ = item.set_enabled(true);
+    }
+}
 
 /// 进入轻量模式后禁用「轻量模式」菜单项
 /// 供 lib.rs 的事件处理句柄（窗口关闭时）和 tray 自身菜单点击时调用

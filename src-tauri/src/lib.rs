@@ -420,7 +420,7 @@ pub fn run() {
                         logging!(error, Type::Lightweight, "[窗口关闭] 轻量模式进入失败");
                     } else {
                         // 禁用托盘菜单的「轻量模式」选项，与右键菜单入口逻辑一致
-                        core::tray::update_lite_mode_menu(false);
+                        core::tray::update_lite_mode_menu(true);
                     }
                 });
             }
