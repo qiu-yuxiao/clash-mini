@@ -105,7 +105,7 @@ impl CoreManager {
             return;
         }
 
-        if !is_service_installed() {
+        if !service::is_service_installed() {
             logging!(warn, Type::Service, "Clash Verge Service is not installed, skipping wait.");
             return;
         }
@@ -153,19 +153,3 @@ impl CoreManager {
     }
 }
 
-#[cfg(target_os = "windows")]
-fn is_service_installed() -> bool {
-    use std::os::windows::process::CommandExt as _;
-    let output = std::process::Command::new("sc.exe")
-        .arg("query")
-        .arg("clash_verge_service")
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .output();
-
-    if let Ok(out) = output {
-        let stdout = std::string::String::from_utf8_lossy(&out.stdout);
-        out.status.success() && !stdout.contains("does not exist")
-    } else {
-        false
-    }
-}
