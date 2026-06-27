@@ -1,8 +1,6 @@
 import {
   Box,
   Typography,
-  List,
-  ListItem,
   TextField,
   useTheme,
 } from '@mui/material'
@@ -17,16 +15,32 @@ interface BasicSettingsCardProps {
   clashConfig: any
   patchVerge: (val: any) => Promise<void>
   handleAllowLanChange: (checked: boolean) => void
+  handleIpv6Change: (checked: boolean) => void
   mixedPortVal: number
   setMixedPortVal: (val: number) => void
   handleSavePort: () => void
 }
+
+const gridItemSx = () => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  px: 0.5,
+  py: 0.15,
+})
+
+const labelSx = (isRetro3DDark: boolean) => ({
+  fontSize: '12px',
+  color: isRetro3DDark ? '#2C1F03' : 'inherit',
+  whiteSpace: 'nowrap' as const,
+})
 
 export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   verge,
   clashConfig,
   patchVerge,
   handleAllowLanChange,
+  handleIpv6Change,
   mixedPortVal,
   setMixedPortVal,
   handleSavePort,
@@ -66,22 +80,17 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           defaultValue: '基础设置',
         })}
       </Typography>
-      <List dense sx={{ py: 0 }}>
-        <ListItem
-          sx={{
-            py: 0.1,
-            px: 0.5,
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: '13px',
-              color: isRetro3DDark ? '#2C1F03' : 'inherit',
-            }}
-          >
+      {/* 2×2 Grid: row1 = auto-launch + Allow LAN, row2 = silent-start + Allow IPv6 */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 0,
+        }}
+      >
+        {/* Row 1, Col 1: 开机自动启动 */}
+        <Box sx={gridItemSx()}>
+          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
             {t('settings.sections.system.fields.autoLaunch', {
               defaultValue: '开机自动启动',
             })}
@@ -93,26 +102,31 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               patchVerge({ enable_auto_launch: checked })
             }
             sx={{
-              transform: 'scale(0.9)',
+              transform: 'scale(0.85)',
               transformOrigin: 'right center',
             }}
           />
-        </ListItem>
-        <ListItem
-          sx={{
-            py: 0.1,
-            px: 0.5,
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: '13px',
-              color: isRetro3DDark ? '#2C1F03' : 'inherit',
+        </Box>
+        {/* Row 1, Col 2: Allow LAN */}
+        <Box sx={gridItemSx()}>
+          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
+            Allow LAN
+          </Typography>
+          <Switch
+            size="small"
+            checked={clashConfig?.allowLan ?? false}
+            onChange={(_, checked: boolean) => {
+              handleAllowLanChange(checked)
             }}
-          >
+            sx={{
+              transform: 'scale(0.85)',
+              transformOrigin: 'right center',
+            }}
+          />
+        </Box>
+        {/* Row 2, Col 1: 启动时最小化 */}
+        <Box sx={gridItemSx()}>
+          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
             {t('settings.sections.system.fields.silentStart', {
               defaultValue: '启动时最小化',
             })}
@@ -124,60 +138,37 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               patchVerge({ enable_silent_start: checked })
             }
             sx={{
-              transform: 'scale(0.9)',
+              transform: 'scale(0.85)',
               transformOrigin: 'right center',
             }}
           />
-        </ListItem>
-        <ListItem
-          sx={{
-            py: 0.1,
-            px: 0.5,
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: '13px',
-              color: isRetro3DDark ? '#2C1F03' : 'inherit',
-            }}
-          >
-            Allow LAN
+        </Box>
+        {/* Row 2, Col 2: Allow IPv6 */}
+        <Box sx={gridItemSx()}>
+          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
+            Allow IPv6
           </Typography>
           <Switch
             size="small"
-            // WARNING: DO NOT change 'allowLan' to 'allow-lan'!
-            // Although Clash core uses 'allow-lan', the Tauri backend serializes the BaseConfig struct
-            // to camelCase ('allowLan') when sending it to the frontend.
-            // Refer to #[serde(rename_all(serialize = "camelCase"))] on BaseConfig in models.rs.
-            checked={clashConfig?.allowLan ?? false}
+            checked={clashConfig?.ipv6 ?? false}
             onChange={(_, checked: boolean) => {
-              handleAllowLanChange(checked)
+              handleIpv6Change(checked)
             }}
             sx={{
-              transform: 'scale(0.9)',
+              transform: 'scale(0.85)',
               transformOrigin: 'right center',
             }}
           />
-        </ListItem>
-        <ListItem
+        </Box>
+        {/* Mixed Port: full-width row below grid */}
+        <Box
           sx={{
-            py: 0.25,
-            px: 0.5,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            ...gridItemSx(),
+            gridColumn: '1 / -1',
+            mt: 0.25,
           }}
         >
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: '13px',
-              color: isRetro3DDark ? '#2C1F03' : 'inherit',
-            }}
-          >
+          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
             Mixed Port
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -214,8 +205,8 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               sx={get3DInputStyle(theme)}
             />
           </Box>
-        </ListItem>
-      </List>
+        </Box>
+      </Box>
     </Box>
   )
 }

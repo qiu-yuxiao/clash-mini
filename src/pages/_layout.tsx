@@ -1024,6 +1024,15 @@ const Layout = () => {
     }
   }
 
+  const handleIpv6Change = async (checked: boolean) => {
+    try {
+      await patchClashConfig({ 'ipv6': checked })
+      await refreshClashConfig()
+    } catch (err: any) {
+      showNotice.error(err?.message || err)
+    }
+  }
+
   // Connections manager states
   const [match, setMatch] = useState<(input: string) => boolean>(
     () => () => true,
@@ -1943,6 +1952,7 @@ const Layout = () => {
                   clashConfig={clashConfig}
                   patchVerge={patchVerge}
                   handleAllowLanChange={handleAllowLanChange}
+                  handleIpv6Change={handleIpv6Change}
                   mixedPortVal={mixedPortVal}
                   setMixedPortVal={setMixedPortVal}
                   handleSavePort={handleSavePort}

@@ -2506,3 +2506,21 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 
 
+
+
+## ⚡ 四十八、 基础设置卡片布局优化与 Allow IPv6 开关增设规范
+
+为了在基础设置区域合理纳入 IPv6 控制开关，同时提升界面空间利用率，制定以下规范：
+
+- **2x2 网格布局重构**：
+  - 在 `src/pages/_layout/components/basic-settings-card.tsx` 中，将原有的单列 List 布局重构为 CSS Grid 两列布局（`gridTemplateColumns: '1fr 1fr'`）。
+  - 第一行放置`开机自动启动`与 `Allow LAN` 开关，第二行放置`启动时最小化`与新增的 `Allow IPv6` 开关，实现紧凑且对称的信息呈现。
+- **Allow IPv6 开关数据绑定**：
+  - 开关状态绑定至 `clashConfig?.ipv6`（camelCase），与 `Allow LAN` 的绑定方式保持一致。
+  - 在 `src/pages/_layout.tsx` 中新增 `handleIpv6Change` 函数，通过 `patchClashConfig({ 'ipv6': checked })` 将开关状态同步至 Mihomo 内核，并调用 `refreshClashConfig()` 刷新前端配置缓存。
+- **Mixed Port 输入栏位置调整**：
+  - `Mixed Port` 文本输入框调整至网格布局下方，独立成行，保持原有的全宽展示效果。
+- **视觉风格一致性**：
+  - 新增开关及整体网格布局严格复用现有的 MUI `Switch` 组件及 `get3DCardStyle` / `get3DInputStyle` 等 3D 拟物样式函数，确保在全部六种皮肤（`retro-3d` / `original` / `modern-flat` / `frosted-glass` / `cyberpunk` / `monochrome`）下渲染正确且风格统一。
+- **默认值安全策略**：
+  - `src-tauri/src/config/clash.rs` 的 `template()` 方法中 `ipv6` 字段保持默认为 `false`，确保升级用户和全新用户的初始行为不变；用户可通过 UI 开关按需开启。
