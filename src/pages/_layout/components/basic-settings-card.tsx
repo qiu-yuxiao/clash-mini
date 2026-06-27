@@ -30,7 +30,8 @@ const gridItemSx = () => ({
 })
 
 const labelSx = (isRetro3DDark: boolean) => ({
-  fontSize: '12px',
+  fontSize: '13px',
+  fontWeight: 'bold',
   color: isRetro3DDark ? '#2C1F03' : 'inherit',
   whiteSpace: 'nowrap' as const,
 })
@@ -85,7 +86,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
         sx={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 0,
+          columnGap: 1.5,
         }}
       >
         {/* Row 1, Col 1: 开机自动启动 */}
