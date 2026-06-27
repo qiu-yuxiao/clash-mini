@@ -231,7 +231,7 @@ mod app_init {
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn show_error_dialog(title: &str, message: &str) {
+fn show_error_dialog(title: &str, message: &str) {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt as _;
     unsafe extern "system" {
@@ -250,7 +250,7 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn show_error_dialog(title: &str, message: &str) {
+fn show_error_dialog(title: &str, message: &str) {
     eprintln!("[{}] {}", title, message);
     let script = format!(
         "display dialog {:?} with title {:?} buttons {{\"OK\"}} default button \"OK\" with icon stop",
@@ -260,7 +260,7 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
 }
 
 #[cfg(target_os = "linux")]
-pub(crate) fn show_error_dialog(title: &str, message: &str) {
+fn show_error_dialog(title: &str, message: &str) {
     eprintln!("[{}] {}", title, message);
     let _ = std::process::Command::new("zenity")
         .args(["--error", &format!("--title={}", title), &format!("--text={}", message)])
@@ -268,7 +268,7 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub(crate) fn show_error_dialog(title: &str, message: &str) {
+fn show_error_dialog(title: &str, message: &str) {
     eprintln!("[{}] {}", title, message);
 }
 
@@ -418,9 +418,6 @@ pub fn run() {
                     let entered = lightweight::entry_lightweight_mode().await;
                     if !entered {
                         logging!(error, Type::Lightweight, "[窗口关闭] 轻量模式进入失败");
-                    } else {
-                        // 禁用托盘菜单的「轻量模式」选项，与右键菜单入口逻辑一致
-                        core::tray::update_lite_mode_menu(true);
                     }
                 });
             }

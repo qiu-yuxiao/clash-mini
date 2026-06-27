@@ -662,20 +662,3 @@ pub async fn handle_service_operation(status: &ServiceStatus) -> Result<()> {
     Tray::global().update_menu().await?;
     Ok(())
 }
-
-#[cfg(target_os = "windows")]
-pub fn is_service_installed() -> bool {
-    use std::os::windows::process::CommandExt as _;
-    let output = std::process::Command::new("sc.exe")
-        .arg("query")
-        .arg("clash_verge_service")
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
-        .output();
-
-    if let Ok(out) = output {
-        let stdout = std::string::String::from_utf8_lossy(&out.stdout);
-        out.status.success() && !stdout.contains("does not exist")
-    } else {
-        false
-    }
-}

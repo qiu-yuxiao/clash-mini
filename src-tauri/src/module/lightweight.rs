@@ -160,6 +160,31 @@ pub async fn entry_lightweight_mode() -> bool {
                 "[轻量模式] 彻底熔断外壳与内核的常驻数据流订阅成功"
             );
         }
+
+        // 在 Windows 下强行物理修剪主进程的工作集 (Working Set)
+        #[cfg(target_os = "windows")]
+        {
+            unsafe extern "system" {
+                fn GetCurrentProcess() -> *mut std::ffi::c_void;
+                fn SetProcessWorkingSetSize(
+                    hProcess: *mut std::ffi::c_void,
+                    dwMinimumWorkingSetSize: usize,
+                    dwMaximumWorkingSetSize: usize,
+                ) -> i32;
+            }
+            unsafe {
+                let handle = GetCurrentProcess();
+                if SetProcessWorkingSetSize(handle, usize::MAX, usize::MAX) != 0 {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[轻量模式] 成功物理修剪壳进程工作集 (Working Set)"
+                    );
+                } else {
+                    logging!(warn, Type::Lightweight, "[轻量模式] 物理修剪壳进程工作集失败");
+                }
+            }
+        }
     });
 
     true
@@ -193,10 +218,8 @@ pub async fn exit_lightweight_mode() -> bool {
     }
     refresh_lightweight_tray_state().await;
     // 退出轻量模式后，重新启用托盘菜单中的「轻量模式」选项
-    crate::core::tray::update_lite_mode_menu(false);
+    crate::core::tray::enable_lite_mode_menu_item();
     // 唤醒常驻监测线程以立即重置为前台周期（15秒）
     crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
-    // 触发 UI 刷新节点信息
-    crate::core::handle::Handle::refresh_clash();
     true
 }

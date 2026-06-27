@@ -48,21 +48,6 @@ function Log-Info  { param($msg) Write-Host "  [..]   $msg" }
 # Timestamp prefix
 function Now { return (Get-Date -Format "HH:mm") }
 
-# Robust helper to execute gh api command with error suppression
-function Invoke-GhApi {
-    param([string]$Uri)
-    $oldEAP = $ErrorActionPreference
-    $ErrorActionPreference = "SilentlyContinue"
-    try {
-        $json = gh api $Uri 2>$null
-        return $json
-    } catch {
-        return $null
-    } finally {
-        $ErrorActionPreference = $oldEAP
-    }
-}
-
 # ─────────────────────────────────────────────
 # Stage 0: Token Load (Highest priority, never print)
 # ─────────────────────────────────────────────
@@ -117,23 +102,7 @@ Log-Ok "Local commits successfully pushed"
 
 # Tag conflict check
 $ExistingTag = git tag -l $TagName
-$RemoteTagCheck = ""
-$MaxTagRetries = 3
-$oldEAP = $ErrorActionPreference
-$ErrorActionPreference = "SilentlyContinue"
-for ($i = 1; $i -le $MaxTagRetries; $i++) {
-    $RemoteTagCheck = git ls-remote origin refs/tags/$TagName 2>$null
-    if ($LASTEXITCODE -eq 0 -or $RemoteTagCheck) {
-        break
-    }
-    if ($i -lt $MaxTagRetries) {
-        $ErrorActionPreference = $oldEAP
-        Log-Warn "git ls-remote failed (attempt $i/$MaxTagRetries), retrying in 3 seconds..."
-        $ErrorActionPreference = "SilentlyContinue"
-        Start-Sleep -Seconds 3
-    }
-}
-$ErrorActionPreference = $oldEAP
+$RemoteTagCheck = git ls-remote origin refs/tags/$TagName
 $RemoteTagExists = $false
 if ($RemoteTagCheck) {
     $RemoteTagExists = $true
@@ -144,7 +113,7 @@ if ($ExistingTag -or $RemoteTagExists) {
     Log-Warn "Tag $TagName already exists (Local: [$(if($ExistingTag){"Yes"}else{"No"})], Remote: [$(if($RemoteTagExists){"Yes"}else{"No"})])."
     Log-Info "Checking if a workflow run already exists for this release..."
     
-    $json = Invoke-GhApi "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5"
+    $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
     if ($json) {
         $obj = ($json -join "`n") | ConvertFrom-Json
         $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
@@ -213,7 +182,7 @@ Log-Step "Waiting for CI build to complete (polling every 3 minutes)"
 
 function Get-RunInfo {
     # Get newest workflow run id, status, and conclusion
-    $json = Invoke-GhApi "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5"
+    $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
     if (-not $json) { return $null }
     $obj = ($json -join "`n") | ConvertFrom-Json
     $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
@@ -286,7 +255,7 @@ $LastRunId    = $null
             elseif ($Conclusion -eq "failure" -or $Conclusion -eq "cancelled") {
                 $LogUrl = Get-RunLogs $Run.id
                 # Determine if retryable (network errors checked via failed job name)
-                $FailedJobsJson = Invoke-GhApi "repos/$GitHubRepo/actions/runs/$($Run.id)/jobs"
+                $FailedJobsJson = gh api "repos/$GitHubRepo/actions/runs/$($Run.id)/jobs" 2>$null
                 $FailedJobs = ($FailedJobsJson -join "`n") | ConvertFrom-Json | Select-Object -ExpandProperty jobs |
                               Where-Object { $_.conclusion -eq "failure" }
                 $IsRetryable = $false
@@ -340,7 +309,7 @@ Log-Step "Waiting for Release draft to publish"
 $ReleaseReady = $false
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 15
-    $ReleaseJson = Invoke-GhApi "repos/$GitHubRepo/releases/tags/$TagName"
+    $ReleaseJson = gh api "repos/$GitHubRepo/releases/tags/$TagName" 2>$null
     if ($ReleaseJson) {
         $Rel = ($ReleaseJson -join "`n") | ConvertFrom-Json
         if (-not $Rel.draft) {

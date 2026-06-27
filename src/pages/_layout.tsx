@@ -42,7 +42,6 @@ import { useProfiles } from '@/hooks/use-profiles'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
-import { useVisibility } from '@/hooks/use-visibility'
 import { useWindowDecorations } from '@/hooks/use-window'
 import {
   useClashConfigData,
@@ -1274,17 +1273,6 @@ const Layout = () => {
       document.removeEventListener('visibilitychange', handleFocusOrVisible)
     }
   }, [])
-
-  // 监听 Tauri 窗口可见性（onFocusChanged），补足 DOM visibilitychange 在窗口程序化 hide/show 时不触发的问题
-  // 当窗口从隐藏变为可见时（如退出轻量模式），触发全节点延迟测速刷新
-  const isVisible = useVisibility()
-  const prevVisibleRef = useRef(isVisible)
-  useEffect(() => {
-    if (!prevVisibleRef.current && isVisible) {
-      triggerWakeupLatencyTestRef.current()
-    }
-    prevVisibleRef.current = isVisible
-  }, [isVisible])
 
   const themeReady = useMemo(() => Boolean(theme), [theme])
   useLoadingOverlay(themeReady)

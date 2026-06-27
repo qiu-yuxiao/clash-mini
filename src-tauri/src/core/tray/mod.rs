@@ -84,15 +84,11 @@ impl Tray {
                 }
             };
 
-            // 根据当前轻量模式状态初始化菜单项的勾选和可用状态
-            if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-                let is_in = lightweight::is_in_lightweight_mode();
-                let text = if is_in {
-                    "✓ 轻量模式 / Lite mode"
-                } else {
-                    "轻量模式 / Lite mode"
-                };
-                let _ = item.set_text(text);
+            // 根据当前轻量模式状态初始化菜单项 enabled 状态
+            if lightweight::is_in_lightweight_mode() {
+                if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                    let _ = item.set_enabled(false);
+                }
             }
 
             let quit = match MenuItem::with_id(&app_handle_clone, MenuIds::EXIT, "退出 (Exit)", true, None::<&str>) {
@@ -218,56 +214,33 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     if event.id.as_ref().is_empty() {
         return;
     }
-    let id = event.id;
-    let _ = app.run_on_main_thread(move || {
-        AsyncHandler::spawn(|| async move {
-            match id.as_ref() {
-                MenuIds::LITE_MODE => {
-                    // 切换轻量模式，根据当前状态决定进入还是退出
-                    if lightweight::is_in_lightweight_mode() {
-                        // 当前已在轻量模式，尝试退出
-                        if lightweight::exit_lightweight_mode().await {
-                            logging!(info, Type::Tray, "已退出轻量模式");
-                        } else {
-                            logging!(error, Type::Tray, "退出轻量模式失败");
-                        }
-                    } else {
-                        // 当前不在轻量模式，尝试进入
-                        if lightweight::entry_lightweight_mode().await {
-                            logging!(info, Type::Tray, "已进入轻量模式");
-                        } else {
-                            logging!(error, Type::Tray, "进入轻量模式失败");
-                        }
+    let _app_clone = app.clone(); // 修复编译警告：添加下划线前缀
+    AsyncHandler::spawn(|| async move {
+        match event.id.as_ref() {
+            MenuIds::LITE_MODE => {
+                if lightweight::entry_lightweight_mode().await {
+                    logging!(info, Type::Tray, "已进入轻量模式");
+                    // 进入轻量模式后禁用该菜单项
+                    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+                        let _ = item.set_enabled(false);
                     }
-                    // 同步更新托盘 UI（勾选状态）
-                    crate::core::tray::update_lite_mode_menu(lightweight::is_in_lightweight_mode());
-                }
-                MenuIds::EXIT => {
-                    feat::quit().await;
-                }
-                _ => {
-                    logging!(debug, Type::Tray, "Unhandled tray menu event: {:?}", id);
+                } else {
+                    logging!(error, Type::Tray, "进入轻量模式失败");
                 }
             }
-        });
+            MenuIds::EXIT => {
+                feat::quit().await;
+            }
+            _ => {
+                logging!(debug, Type::Tray, "Unhandled tray menu event: {:?}", event.id);
+            }
+        }
     });
 }
 
-/// 更新托盘轻量模式菜单的勾选状态并保持可点击
-pub fn update_lite_mode_menu(is_in: bool) {
+/// 供 lightweight.rs 在退出轻量模式时调用，重新启用「轻量模式」菜单项
+pub fn enable_lite_mode_menu_item() {
     if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-        let text = if is_in {
-            "✓ 轻量模式 / Lite mode"
-        } else {
-            "轻量模式 / Lite mode"
-        };
-        let _ = item.set_text(text);
+        let _ = item.set_enabled(true);
     }
-}
-
-/// 进入轻量模式后禁用「轻量模式」菜单项
-/// 供 lib.rs 的事件处理句柄（窗口关闭时）和 tray 自身菜单点击时调用
-/// 已废弃的函数，保留兼容性调用（不再使用）
-pub const fn _disable_lite_mode_menu_item() {
-    // 过去的实现已被新的 update_lite_mode_menu 替代，保持空实现避免编译错误
 }

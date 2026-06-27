@@ -105,18 +105,12 @@ impl CoreManager {
             return;
         }
 
-        if !service::is_service_installed() {
-            logging!(warn, Type::Service, "Clash Verge Service is not installed, skipping wait.");
-            return;
-        }
-
-        // Wait up to 3 minutes (180,000 milliseconds) for service to boot on startup
-        let max_times = 180000 / timing::SERVICE_WAIT_INTERVAL.as_millis();
+        let max_times = timing::SERVICE_WAIT_MAX.as_millis() / timing::SERVICE_WAIT_INTERVAL.as_millis();
         let backoff = ConstantBuilder::default()
             .with_delay(timing::SERVICE_WAIT_INTERVAL)
             .with_max_times(max_times as usize);
 
-        let result = (|| async {
+        let _ = (|| async {
             let mut manager = SERVICE_MANAGER.lock().await;
 
             if matches!(manager.current(), ServiceStatus::Ready) {
@@ -125,7 +119,6 @@ impl CoreManager {
 
             // If the service IPC path is not ready yet, treat it as transient and retry.
             // Running init/refresh too early can mark service state unavailable and break later config reloads.
-            #[cfg(unix)]
             if !service::is_service_ipc_path_exists() {
                 return Err(anyhow::anyhow!("Service IPC not ready"));
             }
@@ -141,16 +134,5 @@ impl CoreManager {
         })
         .retry(backoff)
         .await;
-
-        if result.is_err() {
-            logging!(error, Type::Service, "Clash Verge Service startup timed out after 3 minutes.");
-            std::thread::spawn(|| {
-                crate::show_error_dialog(
-                    "Clash Mini Service Error",
-                    "无法连接到 Clash Verge Service。TUN 模式可能无法正常工作。\n请尝试在系统托盘右键菜单中重新安装或修复服务。",
-                );
-            });
-        }
     }
 }
-
