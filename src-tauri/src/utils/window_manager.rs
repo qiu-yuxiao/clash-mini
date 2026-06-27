@@ -214,7 +214,6 @@ impl WindowManager {
             match window.hide() {
                 Ok(_) => {
                     logging!(info, Type::Window, "窗口已成功隐藏");
-                    Self::optimize_window_memory(window, true);
                     WindowOperationResult::Hidden
                 }
                 Err(e) => {
@@ -287,7 +286,6 @@ impl WindowManager {
 
         if operations_successful {
             logging!(info, Type::Window, "窗口激活成功");
-            Self::optimize_window_memory(window, false);
             WindowOperationResult::Shown
         } else {
             logging!(warn, Type::Window, "窗口激活部分失败");
@@ -362,11 +360,5 @@ impl WindowManager {
         let is_minimized = Self::is_main_window_minimized(window.as_ref());
 
         format!("窗口状态: {state:?} | 可见: {is_visible} | 有焦点: {is_focused} | 最小化: {is_minimized}")
-    }
-
-    /// 优化窗口内存占用（已彻底废弃，防止强制修剪工作集导致的 WebView2 进程挂起/死锁）
-    #[allow(unused_variables, clippy::missing_const_for_fn)]
-    pub fn optimize_window_memory(window: &WebviewWindow<Wry>, is_inactive: bool) {
-        // 彻底停用人工内存干预，交由操作系统和 Chromium 内核自动管理
     }
 }

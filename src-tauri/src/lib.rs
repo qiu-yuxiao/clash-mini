@@ -346,13 +346,6 @@ pub fn run() {
                         }
                         tauri::WindowEvent::Focused(focused) => {
                             event_handlers::handle_window_focus(*focused);
-                            let is_minimized = webview_window.is_minimized().unwrap_or(false);
-                            let is_visible = webview_window.is_visible().unwrap_or(false);
-                            if !focused && (is_minimized || !is_visible) {
-                                WindowManager::optimize_window_memory(&webview_window, true);
-                            } else if *focused {
-                                WindowManager::optimize_window_memory(&webview_window, false);
-                            }
                         }
                         #[cfg(target_os = "macos")]
                         tauri::WindowEvent::Destroyed => {

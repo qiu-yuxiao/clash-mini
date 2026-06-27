@@ -1015,18 +1015,9 @@ const Layout = () => {
   )
 
   // Minimal Settings Actions
-  const handleAllowLanChange = async (checked: boolean) => {
+  const handleClashBoolChange = (field: string) => async (checked: boolean) => {
     try {
-      await patchClashConfig({ 'allow-lan': checked })
-      await refreshClashConfig()
-    } catch (err: any) {
-      showNotice.error(err?.message || err)
-    }
-  }
-
-  const handleIpv6Change = async (checked: boolean) => {
-    try {
-      await patchClashConfig({ 'ipv6': checked })
+      await patchClashConfig({ [field]: checked })
       await refreshClashConfig()
     } catch (err: any) {
       showNotice.error(err?.message || err)
@@ -1951,8 +1942,8 @@ const Layout = () => {
                   verge={verge}
                   clashConfig={clashConfig}
                   patchVerge={patchVerge}
-                  handleAllowLanChange={handleAllowLanChange}
-                  handleIpv6Change={handleIpv6Change}
+                  handleAllowLanChange={handleClashBoolChange('allow-lan')}
+                  handleIpv6Change={handleClashBoolChange('ipv6')}
                   mixedPortVal={mixedPortVal}
                   setMixedPortVal={setMixedPortVal}
                   handleSavePort={handleSavePort}

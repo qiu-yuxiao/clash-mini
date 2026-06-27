@@ -1,8 +1,4 @@
-use crate::{
-    config::Config,
-    core::tray::Tray,
-    process::AsyncHandler,
-};
+use crate::{config::Config, core::tray::Tray, process::AsyncHandler};
 
 use clash_verge_logging::{Type, logging};
 
@@ -96,7 +92,6 @@ pub async fn entry_lightweight_mode() -> bool {
     if !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false) {
         if let Some(window) = WindowManager::get_main_window() {
             let _ = window.hide();
-            WindowManager::optimize_window_memory(&window, true);
         }
         return true;
     }
@@ -126,9 +121,13 @@ pub async fn entry_lightweight_mode() -> bool {
             return;
         }
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-        
-        logging!(info, Type::Lightweight, "[轻量模式] 触发进入时连接清理与数据订阅熔断...");
-        
+
+        logging!(
+            info,
+            Type::Lightweight,
+            "[轻量模式] 触发进入时连接清理与数据订阅熔断..."
+        );
+
         if !is_in_lightweight_mode() {
             return;
         }
@@ -164,8 +163,6 @@ pub async fn entry_lightweight_mode() -> bool {
                 "[轻量模式] 彻底熔断外壳与内核的常驻数据流订阅成功"
             );
         }
-
-
     });
 
     true
@@ -187,7 +184,11 @@ pub async fn exit_lightweight_mode() -> bool {
             transition_and_log(LightweightState::Exiting, LightweightState::Normal);
         }
         _ => {
-            logging!(warn, Type::Lightweight, "智能显示主窗口未完成/被防抖限流，回滚轻量模式状态");
+            logging!(
+                warn,
+                Type::Lightweight,
+                "智能显示主窗口未完成/被防抖限流，回滚轻量模式状态"
+            );
             transition_and_log(LightweightState::Exiting, LightweightState::In);
             refresh_lightweight_tray_state().await;
             crate::core::tray::update_lite_mode_menu(true);

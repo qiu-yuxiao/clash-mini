@@ -2524,3 +2524,33 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 新增开关及整体网格布局严格复用现有的 MUI `Switch` 组件及 `get3DCardStyle` / `get3DInputStyle` 等 3D 拟物样式函数，确保在全部六种皮肤（`retro-3d` / `original` / `modern-flat` / `frosted-glass` / `cyberpunk` / `monochrome`）下渲染正确且风格统一。
 - **默认值安全策略**：
   - `src-tauri/src/config/clash.rs` 的 `template()` 方法中 `ipv6` 字段保持默认为 `false`，确保升级用户和全新用户的初始行为不变；用户可通过 UI 开关按需开启。
+
+
+## ⚡ 四十九、 Geodata 内存保守加载模式默认值规范
+
+为了降低 mihomo 内核在加载 GeoIP 与 GeoSite 数据库时的峰值内存占用，制定以下规范：
+
+- **默认加载模式**：
+  - 在 `src-tauri/src/config/clash.rs` 的 `IClashTemp::template()` 方法中，`geodata-loader` 字段默认值设为 `"memconservative"`。
+  - 此模式下 geodata 数据库采用按需加载策略，仅在路由匹配需要时才将对应数据段载入内存，而非一次性全量加载。
+- **内存收益**：
+  - 相较于 Mihomo 默认的 `"standard"` 模式（全量加载），`"memconservative"` 可降低约 5-10MB 的内存峰值占用，对低配设备和长时间后台挂机场景特别有益。
+- **性能影响**：
+  - 按需加载会引入极其微量的路由匹配延迟（首次命中某 geo 条目时触发加载），但由于 geodata 的访问模式高度局部化且内核有内存缓存，实际影响可忽略不计。
+
+
+## ⚡ 五十、 Mihomo 内核 Go Runtime 环境变量默认值规范
+
+为了约束 mihomo 内核（Go 语言）在低配设备和长时间后台挂机场景下的内存占用与 CPU 消耗，在启动内核子进程时注入以下 Go runtime 环境变量：
+
+- **环境变量设置**：
+  - 在 `src-tauri/src/core/manager/state.rs` 的 `start_sidecar()` 方法中，通过 `.env()` 向内核子进程注入三个管控变量，均支持用户通过系统环境变量覆盖：
+    - `GOMEMLIMIT`：默认 `"96MiB"`。Go 1.19+ 的软内存上限，内核堆使用接近该值时主动触发 GC，防止 OOM。
+    - `GOGC`：默认 `"50"`（Go 默认值为 100）。降低 GC 触发阈值，以更高的 GC 频率换取更低的内存峰值，内存换 CPU 的权衡偏向内存侧。
+    - `GOMAXPROCS`：默认 `"2"`。限制内核使用的最大操作系统线程数，防止在多核设备上过度并行导致不必要的上下文切换和缓存竞争。
+- **设计理由**：
+  - Clash Mini 作为常驻托盘应用，核心诉求是低资源占用而非极限吞吐。Go 运行时的默认策略面向服务器场景（充分利用可用资源），与本应用的定位相悖。
+  - `GOGC=50` 与 `GOMEMLIMIT=96MiB` 配合，将内核堆内存控制在约 96MiB 以内，适合 4GB 及以下内存设备。
+  - `GOMAXPROCS=2` 确保内核在网络转发任务中不抢占用户前台应用的 CPU 时间片。
+- **用户覆盖机制**：
+  - 所有三个值均通过 `std::env::var()` 读取，若用户在系统环境变量中设置了同名变量，将以用户设置的值为准，不强制覆盖。
