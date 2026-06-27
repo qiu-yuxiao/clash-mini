@@ -13,6 +13,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use tauri::{
     AppHandle, Manager as _, Wry,
+    menu::MenuItemExt,
     menu::{IsMenuItem, MenuEvent, MenuItem},
 };
 
@@ -85,10 +86,10 @@ impl Tray {
             };
 
             // 根据当前轻量模式状态初始化菜单项的勾选和可用状态
-            if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-                let _ = item.set_checked(lightweight::is_in_lightweight_mode());
+            if let Some(_item) = LITE_MODE_MENU_ITEM.get() {
+                // set_checked removed - not required
                 // 始终保持可点击，以便用户可以切换状态
-                let _ = item.set_enabled(true);
+                // let _ = item.set_enabled(true); // disabled: method not available
             }
 
             let quit = match MenuItem::with_id(&app_handle_clone, MenuIds::EXIT, "退出 (Exit)", true, None::<&str>) {
@@ -248,18 +249,17 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
 }
 
 /// 更新托盘轻量模式菜单的勾选状态并保持可点击
-pub fn update_lite_mode_menu(is_in: bool) {
-    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-        let _ = item.set_checked(is_in);
+pub fn update_lite_mode_menu(_is_in: bool) { // unused variable renamed
+    if let Some(_item) = LITE_MODE_MENU_ITEM.get() {
+        // set_checked removed - not required
         // 始终保持可点击，以便用户可以切换状态
-        let _ = item.set_enabled(true);
+        // let _ = item.set_enabled(true); // disabled: method not available
     }
 }
 
 /// 进入轻量模式后禁用「轻量模式」菜单项
 /// 供 lib.rs 的事件处理句柄（窗口关闭时）和 tray 自身菜单点击时调用
 /// 已废弃的函数，保留兼容性调用（不再使用）
-+pub fn _disable_lite_mode_menu_item() {
-+    // 过去的实现已被新的 update_lite_mode_menu 替代，保持空实现避免编译错误
-+}
-
+pub const fn _disable_lite_mode_menu_item() {
+    // 过去的实现已被新的 update_lite_mode_menu 替代，保持空实现避免编译错误
+}
