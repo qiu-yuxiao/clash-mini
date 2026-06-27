@@ -119,16 +119,21 @@ Log-Ok "Local commits successfully pushed"
 $ExistingTag = git tag -l $TagName
 $RemoteTagCheck = ""
 $MaxTagRetries = 3
+$oldEAP = $ErrorActionPreference
+$ErrorActionPreference = "SilentlyContinue"
 for ($i = 1; $i -le $MaxTagRetries; $i++) {
     $RemoteTagCheck = git ls-remote origin refs/tags/$TagName 2>$null
     if ($LASTEXITCODE -eq 0 -or $RemoteTagCheck) {
         break
     }
     if ($i -lt $MaxTagRetries) {
+        $ErrorActionPreference = $oldEAP
         Log-Warn "git ls-remote failed (attempt $i/$MaxTagRetries), retrying in 3 seconds..."
+        $ErrorActionPreference = "SilentlyContinue"
         Start-Sleep -Seconds 3
     }
 }
+$ErrorActionPreference = $oldEAP
 $RemoteTagExists = $false
 if ($RemoteTagCheck) {
     $RemoteTagExists = $true
