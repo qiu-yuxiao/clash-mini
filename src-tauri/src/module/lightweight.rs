@@ -161,30 +161,7 @@ pub async fn entry_lightweight_mode() -> bool {
             );
         }
 
-        // 在 Windows 下强行物理修剪主进程的工作集 (Working Set)
-        #[cfg(target_os = "windows")]
-        {
-            unsafe extern "system" {
-                fn GetCurrentProcess() -> *mut std::ffi::c_void;
-                fn SetProcessWorkingSetSize(
-                    hProcess: *mut std::ffi::c_void,
-                    dwMinimumWorkingSetSize: usize,
-                    dwMaximumWorkingSetSize: usize,
-                ) -> i32;
-            }
-            unsafe {
-                let handle = GetCurrentProcess();
-                if SetProcessWorkingSetSize(handle, usize::MAX, usize::MAX) != 0 {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[轻量模式] 成功物理修剪壳进程工作集 (Working Set)"
-                    );
-                } else {
-                    logging!(warn, Type::Lightweight, "[轻量模式] 物理修剪壳进程工作集失败");
-                }
-            }
-        }
+
     });
 
     true
