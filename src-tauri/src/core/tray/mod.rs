@@ -218,15 +218,24 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
     AsyncHandler::spawn(|| async move {
         match event.id.as_ref() {
             MenuIds::LITE_MODE => {
-                if lightweight::entry_lightweight_mode().await {
-                    logging!(info, Type::Tray, "已进入轻量模式");
-                    // 进入轻量模式后禁用该菜单项
-                    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-                        let _ = item.set_enabled(false);
+                // 切换轻量模式，根据当前状态决定进入还是退出
+                if lightweight::is_in_lightweight_mode() {
+                    // 当前已在轻量模式，尝试退出
+                    if lightweight::exit_lightweight_mode().await {
+                        logging!(info, Type::Tray, "已退出轻量模式");
+                    } else {
+                        logging!(error, Type::Tray, "退出轻量模式失败");
                     }
                 } else {
-                    logging!(error, Type::Tray, "进入轻量模式失败");
+                    // 当前不在轻量模式，尝试进入
+                    if lightweight::entry_lightweight_mode().await {
+                        logging!(info, Type::Tray, "已进入轻量模式");
+                    } else {
+                        logging!(error, Type::Tray, "进入轻量模式失败");
+                    }
                 }
+                // 同步更新托盘 UI（勾选状态）
+                crate::core::tray::update_lite_mode_menu(lightweight::is_in_lightweight_mode());
             }
             MenuIds::EXIT => {
                 feat::quit().await;
@@ -239,16 +248,19 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
 }
 
 /// 供 lightweight.rs 在退出轻量模式时调用，重新启用「轻量模式」菜单项
-pub fn enable_lite_mode_menu_item() {
-    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-        let _ = item.set_enabled(true);
-    }
-}
+/// 根据轻量模式状态更新托盘菜单的勾选和可用状态
++pub fn update_lite_mode_menu(is_in: bool) {
++    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
++        let _ = item.set_checked(is_in);
++        // 始终保持可点击，以便用户可以切换状态
++        let _ = item.set_enabled(true);
++    }
++}
 
 /// 进入轻量模式后禁用「轻量模式」菜单项
 /// 供 lib.rs 的事件处理句柄（窗口关闭时）和 tray 自身菜单点击时调用
-pub fn disable_lite_mode_menu_item() {
-    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
-        let _ = item.set_enabled(false);
-    }
-}
+/// 已废弃的函数，保留兼容性调用（不再使用）
++pub fn _disable_lite_mode_menu_item() {
++    // 过去的实现已被新的 update_lite_mode_menu 替代，保持空实现避免编译错误
++}
+
