@@ -155,17 +155,17 @@
 
 ### BUG-271: Clash Verge Service connection timeout and config overwrite to manual mode during cold boot under TUN mode
  - **现象描述**：在开启开机自启、静默启动且使用 TUN 模式的场景下，冷机启动时由于系统高负载导致服务启动慢。这不仅会导致后台监测线程触发 3 秒的硬编码重试超时而降级，更会在超早期初始化时由于 `is_service_available` 为 `false` 触发配置覆盖保护，强行将配置文件 `verge.yaml` 中的 `enable_tun_mode` 抹除为 `false`，使用户模式被迫退化并永久变更为“手动模式”。
- - **当前状态**：`代码已修正，待用户确认 (本地已提交)`
+ - **当前状态**：`已打包验证 (v1.9.8)`
  - **目标版本**：`v1.9.8`
 
 ### BUG-272: Missing Node Latency Display after Awakening from Lightweight Mode
  - **现象描述**：主窗口从轻量模式唤醒后，前台 Webview 重新创建，旧有的 Webview 内存延迟缓存全部丢失。且由于唤醒瞬间发送的 `refresh_clash` 广播事件早于前端 JS 初始化完毕，导致广播丢失；同时 Clash 内核对 Selector 分组节点不进行自动健康检测，导致唤醒后节点的延迟数据长期无法刷新。
- - **当前状态**：`代码已修正，待用户确认 (本地已提交)`
+ - **当前状态**：`已打包验证 (v1.9.8)`
  - **目标版本**：`v1.9.8`
 
 ### BUG-273: Main Window Hangs/Freezes on Second Awakening in Auto Lightweight Mode
  - **现象描述**：在静默启动或正常启动模式下，主窗口第一次唤醒/创建工作正常。当再次将程序切换为轻量模式（销毁主窗口）并进行第二次唤醒/创建主窗口时，整个外壳程序无响应卡死死掉（WebView2 未渲染且无法显示）。这是由于进入轻量模式时在 Windows 下强行对主进程调用了物理内存工作集修剪 (`SetProcessWorkingSetSize(handle, -1, -1)`)，此时 WebView2 相关的 DLL（如 `EmbeddedBrowserWebView.dll`）、COM IPC 信道、线程同步原语等被强制写入页面文件（Pagefile），在二次初始化 WebView2 时引发严重的缺页异常风暴与共享内存/句柄状态同步死锁，导致 WebView2 初始化挂起卡死。
- - **当前状态**：`代码已修正，待用户确认 (本地已提交)`
+ - **当前状态**：`已打包验证 (v1.9.8)`
  - **目标版本**：`v1.9.8`
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
