@@ -290,6 +290,7 @@ async function frontendAutoSelect(
 
 async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
+  refreshAll: () => Promise<any>,
   t: (key: string, opts?: any) => string,
   fallbackTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
@@ -312,8 +313,8 @@ async function triggerAutoSelectAndRefresh(
   }
 
   // 不管 auto-select 是否成功，以下操作永远执行
-  // 后端已切换节点，立即刷新前端显示
-  await refreshProxy({ forceFull: true })
+  // 后端已切换节点，立即通过 refreshAll 刷新所有提供者、节点及规则配置
+  await refreshAll()
   // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
   if (setHeadState) {
     setHeadState('PROXY', { sortType: 1 })
@@ -779,7 +780,7 @@ const Layout = () => {
     activateSelected,
     patchProfiles,
   } = useProfiles()
-  const { refreshProxy } = useAppRefreshers()
+  const { refreshProxy, refreshAll } = useAppRefreshers()
   const profileItems = useMemo(
     () =>
       (profiles.items || []).filter(
@@ -1113,6 +1114,8 @@ const Layout = () => {
 
   const refreshProxyRef = useRef(refreshProxy)
   refreshProxyRef.current = refreshProxy
+  const refreshAllRef = useRef(refreshAll)
+  refreshAllRef.current = refreshAll
   const setHeadStateForSortRef = useRef(setHeadStateForSort)
   setHeadStateForSortRef.current = setHeadStateForSort
   const tRef = useRef(t)
@@ -1143,7 +1146,7 @@ const Layout = () => {
       lastFullTestTimeRef.current = now
       console.log('[Layout] 窗口唤醒，触发后台节点测速以刷新延迟')
       await DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
-      await refreshProxyRef.current({ forceFull: true })
+      await refreshAllRef.current()
     } catch (err) {
       console.error('[Layout] 唤醒测速失败:', err)
     }
@@ -1181,6 +1184,7 @@ const Layout = () => {
             if (cancelled || isImportingRef.current) return
             await triggerAutoSelectAndRefresh(
               refreshProxyRef.current,
+              refreshAllRef.current,
               tRef.current,
               fallbackTimerRef,
               setHeadStateForSortRef.current,
