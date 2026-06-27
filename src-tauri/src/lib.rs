@@ -19,7 +19,7 @@ use crate::constants::files;
 use crate::{
     core::handle,
     process::AsyncHandler,
-    utils::{resolve, server, window_manager::WindowManager},
+    utils::{resolve, server},
 };
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
@@ -392,7 +392,7 @@ pub fn run() {
 
             if !has_visible_windows {
                 handle::Handle::global().set_activation_policy_regular();
-                let _ = WindowManager::show_main_window().await;
+                let _ = crate::utils::window_manager::WindowManager::show_main_window().await;
             }
         }
 
