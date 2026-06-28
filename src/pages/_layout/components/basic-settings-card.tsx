@@ -86,7 +86,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
         sx={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          columnGap: 1.5,
+          columnGap: 3,
         }}
       >
         {/* Row 1, Col 1: 开机自动启动 */}
