@@ -184,6 +184,7 @@ Write-Host "  CI Monitor Dashboard: https://github.com/$GitHubRepo/actions" -For
 # ─────────────────────────────────────────────
 Log-Step "Waiting for CI build to complete (polling every 3 minutes)"
 
+function Get-RunInfo {
     try {
         $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
         if (-not $json) { return $null }
@@ -194,6 +195,7 @@ Log-Step "Waiting for CI build to complete (polling every 3 minutes)"
     } catch {
         return $null
     }
+}
 
 function Get-RunLogs {
     param($RunId)
