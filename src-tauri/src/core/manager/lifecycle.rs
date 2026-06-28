@@ -3,22 +3,11 @@ use crate::cmd::StringifyErr as _;
 use crate::config::{Config, IVerge};
 use crate::core::handle::Handle;
 use crate::core::manager::CLASH_LOGGER;
-use crate::core::service::{SERVICE_MANAGER, ServiceManager, ServiceStatus};
+use crate::core::service::{SERVICE_MANAGER, ServiceStatus};
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 use smartstring::alias::String;
-
-/// sidecar→service 交接结果
-#[cfg(target_os = "windows")]
-enum HandoffOutcome {
-    /// 服务尚未就绪
-    NotReady,
-    /// 已完成或无需交接
-    Done,
-    /// 交接失败并已回退
-    Failed,
-}
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
@@ -27,18 +16,10 @@ impl CoreManager {
             self.after_core_process();
         }
 
-        let result = match *self.get_running_mode() {
+        match *self.get_running_mode() {
             RunningMode::Service => self.start_core_by_service().await,
             RunningMode::NotRunning | RunningMode::Sidecar => self.start_core_by_sidecar().await,
-        };
-
-        // sidecar 启动成功后,后台等待服务就绪再交接 (TUN 模式)
-        #[cfg(target_os = "windows")]
-        if result.is_ok() && matches!(*self.get_running_mode(), RunningMode::Sidecar) {
-            self.spawn_service_handoff_watcher().await;
         }
-
-        result
     }
 
     pub async fn stop_core(&self) -> Result<()> {
@@ -67,7 +48,6 @@ impl CoreManager {
     }
 
     pub async fn restart_core(&self) -> Result<()> {
-        let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
         self.stop_core().await?;
         self.start_core().await
@@ -120,30 +100,12 @@ impl CoreManager {
             return;
         }
 
-        let is_admin = crate::utils::sysinfo::is_current_app_handle_admin(Handle::app_handle());
-        if is_admin {
-            return;
-        }
-
-        let is_service_installed = tokio::task::spawn_blocking(service::is_service_installed)
-            .await
-            .unwrap_or(false);
-        if !is_service_installed {
-            logging!(
-                warn,
-                Type::Service,
-                "Clash Verge Service is not installed, skipping wait."
-            );
-            return;
-        }
-
-        // Wait up to 3 minutes (180,000 milliseconds) for service to boot on startup
-        let max_times = 180000 / timing::SERVICE_WAIT_INTERVAL.as_millis();
+        let max_times = timing::SERVICE_WAIT_MAX.as_millis() / timing::SERVICE_WAIT_INTERVAL.as_millis();
         let backoff = ConstantBuilder::default()
             .with_delay(timing::SERVICE_WAIT_INTERVAL)
             .with_max_times(max_times as usize);
 
-        let result = (|| async {
+        let _ = (|| async {
             let mut manager = SERVICE_MANAGER.lock().await;
 
             if matches!(manager.current(), ServiceStatus::Ready) {
@@ -158,7 +120,7 @@ impl CoreManager {
 
             manager.init().await?;
             drop(manager);
-            let _ = ServiceManager::refresh().await;
+            let _ = service::ServiceManager::refresh().await;
 
             let manager = SERVICE_MANAGER.lock().await;
             if matches!(manager.current(), ServiceStatus::Ready) {
@@ -169,147 +131,5 @@ impl CoreManager {
         })
         .retry(backoff)
         .await;
-
-        if result.is_err() {
-            logging!(
-                error,
-                Type::Service,
-                "Clash Verge Service startup timed out after 3 minutes."
-            );
-            std::thread::spawn(|| {
-                crate::show_error_dialog(
-                    "Clash Mini Service Error",
-                    "无法连接到 Clash Verge Service。TUN 模式可能无法正常工作。\n请尝试在系统托盘右键菜单中重新安装或修复服务。",
-                );
-            });
-        }
-    }
-
-    /// 在窗口内等待服务就绪,再从 sidecar 交接到 service
-    #[cfg(target_os = "windows")]
-    async fn spawn_service_handoff_watcher(&self) {
-        use crate::constants::timing;
-        use crate::process::AsyncHandler;
-        use std::sync::atomic::Ordering;
-        use std::time::Instant;
-
-        // 仅 TUN 模式需要服务交接
-        let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
-        if !needs_service {
-            return;
-        }
-
-        // 单实例,避免并发交接
-        if self.handoff_watcher_running.swap(true, Ordering::AcqRel) {
-            return;
-        }
-
-        logging!(
-            info,
-            Type::Core,
-            "service not ready at startup; sidecar active, watching for handoff"
-        );
-
-        AsyncHandler::spawn(|| async move {
-            let manager = Self::global();
-            let started = Instant::now();
-            loop {
-                if started.elapsed() >= timing::SERVICE_HANDOFF_WINDOW {
-                    logging!(
-                        info,
-                        Type::Core,
-                        "service handoff window elapsed; staying in sidecar mode"
-                    );
-                    break;
-                }
-                tokio::time::sleep(timing::SERVICE_HANDOFF_INTERVAL).await;
-
-                // 模式已变更时退出
-                if !matches!(*manager.get_running_mode(), RunningMode::Sidecar) {
-                    break;
-                }
-                match manager.try_handoff_sidecar_to_service().await {
-                    // 已交接或无需交接
-                    HandoffOutcome::Done => break,
-                    // 已回退 sidecar,停止重试
-                    HandoffOutcome::Failed => {
-                        logging!(warn, Type::Core, "handoff attempt failed; staying in sidecar mode");
-                        break;
-                    }
-                    HandoffOutcome::NotReady => {}
-                }
-            }
-            manager.handoff_watcher_running.store(false, Ordering::Release);
-        });
-    }
-
-    /// 服务就绪后停止 sidecar,再以 service 重启内核
-    #[cfg(target_os = "windows")]
-    async fn try_handoff_sidecar_to_service(&self) -> HandoffOutcome {
-        use crate::core::service;
-
-        // 主动刷新服务状态,避免缓存状态阻止交接
-        if !service::is_service_ipc_path_exists() {
-            return HandoffOutcome::NotReady;
-        }
-        {
-            let mut manager = SERVICE_MANAGER.lock().await;
-            if manager.init().await.is_err() {
-                return HandoffOutcome::NotReady;
-            }
-        }
-        let _ = ServiceManager::refresh().await;
-        if !matches!(SERVICE_MANAGER.lock().await.current(), ServiceStatus::Ready) {
-            return HandoffOutcome::NotReady;
-        }
-
-        // 先抢 config 锁;失败则让位给正在进行的更新。
-        if !self.try_start_config_update() {
-            return HandoffOutcome::NotReady;
-        }
-        defer! {
-            self.finish_config_update();
-        }
-
-        // 再取 lifecycle 锁;锁序固定为 config→lifecycle。
-        let _life = self.lifecycle_lock.lock().await;
-
-        // 持锁后复检运行模式和 TUN 状态
-        if !matches!(*self.get_running_mode(), RunningMode::Sidecar)
-            || !Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false)
-        {
-            return HandoffOutcome::Done;
-        }
-
-        logging!(
-            info,
-            Type::Core,
-            "service became ready; handing off from sidecar to service"
-        );
-        self.stop_core_by_sidecar().await;
-
-        match self.start_core_by_service().await {
-            Ok(()) => {
-                logging!(info, Type::Core, "handoff to service mode succeeded");
-                HandoffOutcome::Done
-            }
-            Err(e) => {
-                logging!(
-                    error,
-                    Type::Core,
-                    "handoff to service failed: {}; restarting sidecar",
-                    e
-                );
-                if let Err(e2) = self.start_core_by_sidecar().await {
-                    logging!(
-                        error,
-                        Type::Core,
-                        "failed to restart sidecar after handoff failure: {}",
-                        e2
-                    );
-                }
-                HandoffOutcome::Failed
-            }
-        }
     }
 }
