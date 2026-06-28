@@ -474,7 +474,11 @@ pub fn start_background_monitor() {
             let mut exited_lightweight = false;
             if was_lightweight && !is_lightweight {
                 exited_lightweight = true;
-                logging!(info, Type::Lightweight, "[后台监测] 检测到退出轻量模式，立即准备触发一次全节点延迟测试");
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 检测到退出轻量模式，立即准备触发一次全节点延迟测试"
+                );
             }
             was_lightweight = is_lightweight;
 

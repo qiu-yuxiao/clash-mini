@@ -118,3 +118,53 @@ Compile all findings into a Markdown report.
   - Exact file path (using Markdown file:/// links) and code snippet/line references.
   - Concrete physical explanation of the issue and a proposed fix.
 - [ ] Specifies whether any of the post-1.8.9 changes are redundant or could be simplified.
+
+## Follow-up — 2026-06-27T15:38:11Z
+
+Perform a comprehensive, routine code review of the Clash Mini codebase (including the recent local commits on top of v1.9.3) before releasing the new version, ensuring code quality, correctness, and reliability. Absolutely no code modifications should be made to the workspace.
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: development
+
+## Requirements
+
+### R1. No Code Modifications Constraint
+Under no circumstances should the subagents modify, add, or delete any source files, configurations, or scripts in the repository. The task must remain strictly read-only.
+
+### R2. Rust Backend Code Review Focus
+Review the Rust backend code (`src-tauri/src/` and sub-modules) and prioritize:
+- Memory safety, handle/socket resource leaks, thread footprint management, and CPU usage optimizations.
+- Core stability and waiting/initialization sequences under different network or startup conditions.
+- Lightweight mode transitions, state machine correctness, atomic safety, and tray menu bidirectional toggle integration.
+
+### R3. React Frontend Code Review Focus
+Review the React frontend code (`src/` and hooks) and prioritize:
+- React rendering performance, hook dependencies, state-provider efficiency (especially `AppDataProvider`).
+- Window resize, visibility state events, and wakeup latency testing.
+- Prevention of double-refresh issues, correct cleanup of timers, and hook unmount lifecycles.
+
+### R4. Tauri IPC Command Layer Review Focus
+Review the interface between frontend and backend and prioritize:
+- Safety and bounds validation of arguments passed via Tauri commands.
+- Secure path validation for filesystem read/write commands.
+- Consistent error propagation and robust UI error dialog presentation.
+
+### R5. Code Review Report Generation
+Compile all findings into a detailed Markdown report containing concrete code references (with file:/// links), severity ratings (Critical, Warning, Optimization), and recommended modifications.
+
+## Acceptance Criteria
+
+### Security Constraints
+- [ ] No file in the workspace has been modified (`git status` is completely clean).
+
+### Verification
+- [ ] The generated report `code_review_report.md` is saved at `C:\Users\sun_y\.gemini\antigravity\brain\94f078ae-2fb9-46a3-b3b6-9b8ae4e2dd48/code_review_report.md`.
+- [ ] The report covers Rust Backend, React Frontend, and Tauri IPC layers with specific focus on lightweight transitions, resource leaks, double refreshes, and command safety.
+- [ ] Every identified issue contains:
+  - Severity level (`Critical`, `Warning`, or `Optimization`).
+  - File path with link (e.g., `[main.rs](file:///path/to/main.rs#L10)`) and line numbers.
+  - Concrete explanation of the issue and recommended improvement.
+
+## Follow-up — 2026-06-27T15:43:28Z
+
+Please provide a status update on the routine code review. Has the review team finished auditing the codebase and generating the report?

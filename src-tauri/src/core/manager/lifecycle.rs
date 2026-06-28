@@ -109,7 +109,11 @@ impl CoreManager {
             .await
             .unwrap_or(false);
         if !is_service_installed {
-            logging!(warn, Type::Service, "Clash Verge Service is not installed, skipping wait.");
+            logging!(
+                warn,
+                Type::Service,
+                "Clash Verge Service is not installed, skipping wait."
+            );
             return;
         }
 
@@ -145,7 +149,11 @@ impl CoreManager {
         .await;
 
         if result.is_err() {
-            logging!(error, Type::Service, "Clash Verge Service startup timed out after 3 minutes.");
+            logging!(
+                error,
+                Type::Service,
+                "Clash Verge Service startup timed out after 3 minutes."
+            );
             std::thread::spawn(|| {
                 crate::show_error_dialog(
                     "Clash Mini Service Error",

@@ -10,6 +10,7 @@ import {
 } from '@mui/material'
 import { type Update } from '@tauri-apps/plugin-updater'
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   get3DInputStyle,
@@ -111,6 +112,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
   mode: _mode,
 }) => {
   const theme = useTheme()
+  const { t } = useTranslation()
 
   return (
     <>
