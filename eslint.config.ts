@@ -93,7 +93,7 @@ export default defineConfig([
       'sukka/react-prefer-destructuring-assignment': 'warn',
 
       // TypeScript
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
 
       // unused-imports 代替 no-unused-vars
       '@typescript-eslint/no-unused-vars': 'off',

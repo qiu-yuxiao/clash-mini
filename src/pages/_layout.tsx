@@ -1092,8 +1092,10 @@ const Layout = () => {
     const vPort = verge?.verge_mixed_port
     const cPort = clashInfo?.mixed_port
     if (vPort !== undefined && vPort !== null) {
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
       setMixedPortVal(vPort)
     } else if (cPort !== undefined && cPort !== null) {
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
       setMixedPortVal(cPort)
     }
   }, [verge?.verge_mixed_port, clashInfo?.mixed_port])

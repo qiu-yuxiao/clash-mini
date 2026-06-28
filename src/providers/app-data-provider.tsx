@@ -46,7 +46,6 @@ const TQ_DEFAULTS = {
   retry: 2,
 } as const
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function useStableFn<T extends (...args: any[]) => any>(fn: T): T {
   const ref = useRef(fn)
   ref.current = fn
@@ -97,7 +96,6 @@ export const AppDataProvider = ({
         const groupProxy = await getProxyByName('PROXY')
         if (groupProxy) {
           const activeNodeName = groupProxy.now || ''
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let activeNode: any = null
           if (activeNodeName) {
             try {
@@ -140,7 +138,6 @@ export const AppDataProvider = ({
                       provider: '',
                     }
                   })
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   .filter((item: any) => !isDummyNode(item.name))
               : [],
           }

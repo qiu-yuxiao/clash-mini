@@ -1,5 +1,4 @@
 import { Typography } from '@mui/material'
-import { useTheme } from '@mui/material/styles'
 import React, { ReactNode } from 'react'
 
 import { BaseErrorBoundary } from './base-error-boundary'
@@ -14,8 +13,6 @@ interface Props {
 
 export const BasePage: React.FC<Props> = (props) => {
   const { title, header, contentStyle, full, children } = props
-  const theme = useTheme()
-
   return (
     <BaseErrorBoundary>
       <div className="base-page">
