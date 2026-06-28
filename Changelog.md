@@ -1,3 +1,24 @@
+## v1.9.9
+
+### 🎯 Core Improvements
+
+- **启动流程稳定性提升**：对齐 Clash Verge Rev v1.7.6 的启动流程实现，添加 `lifecycle_lock` 机制防止内核启动/停止/重启时的竞态条件，彻底解决程序启动不稳定的问题。
+
+### 🐞 Fixed Bugs
+
+- **内核启动竞态条件**：添加 `tokio::sync::Mutex` 锁保护 `start_core()`、`stop_core()`、`restart_core()` 操作，确保同一时间只有一个操作执行。
+- **幂等性检查**：在 `start_core()` 和 `stop_core()` 中添加正确的幂等性检查，避免重复操作。
+- **退出保护**：在启动过程中检查 `is_exiting()` 标志，避免在应用退出时启动新内核。
+- **失败回滚**：启动失败时自动回滚 `running_mode` 状态，允许后续重试。
+- **Windows 服务切换**：实现 `spawn_service_handoff_watcher()` 机制，在 sidecar 启动后自动检测并切换到 service 模式（TUN 模式需要）。
+
+### 📝 Documentation
+
+- 新增 `CLASH_MINI_STARTUP_ANALYSIS.md`：详细分析 Clash Mini 与 Clash Verge Rev 的启动流程差异。
+- 新增 `STARTUP_ALIGNMENT_PLAN.md`：启动流程对齐计划的 checklist。
+
+---
+
 ## v1.9.8
 
 ### 🐞 Fixed Bugs
