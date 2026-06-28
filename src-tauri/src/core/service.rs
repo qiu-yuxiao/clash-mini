@@ -20,6 +20,7 @@ use tokio::sync::Mutex;
 pub enum ServiceStatus {
     Ready,
     NeedsReinstall,
+    Reinstalling,
     InstallRequired,
     UninstallRequired,
     ReinstallRequired,
@@ -539,9 +540,26 @@ impl ServiceManager {
     pub async fn refresh(&mut self) -> Result<()> {
         let status = self.check_service_comprehensive().await;
         if matches!(status, ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired) {
-            tokio::task::spawn_blocking(move || {
-                let _ = reinstall_service();
-            });
+            // 先更新状态为"重装中"，防止重复触发
+            self.0 = ServiceStatus::Reinstalling;
+            // 等待重装完成，避免 fire-and-forget 导致并发重装
+            let result = tokio::task::spawn_blocking(reinstall_service).await;
+            match result {
+                Ok(Ok(())) => {
+                    // 重装成功，重新检查状态
+                    let new_status = self.check_service_comprehensive().await;
+                    self.0 = new_status.clone();
+                    logging_error!(Type::Service, self.handle_service_status(&new_status).await);
+                }
+                Ok(Err(e)) => {
+                    logging!(error, Type::Service, "重装服务失败: {}", e);
+                    self.0 = ServiceStatus::NeedsReinstall;
+                }
+                Err(e) => {
+                    logging!(error, Type::Service, "重装服务任务失败: {}", e);
+                    self.0 = ServiceStatus::NeedsReinstall;
+                }
+            }
         } else {
             self.0 = status.clone();
             logging_error!(Type::Service, self.handle_service_status(&status).await);
@@ -551,6 +569,10 @@ impl ServiceManager {
 
     /// 综合服务状态检查（一次性完成所有检查）
     pub async fn check_service_comprehensive(&self) -> ServiceStatus {
+        // 如果正在重装中，直接返回该状态，防止重复触发
+        if self.0 == ServiceStatus::Reinstalling {
+            return ServiceStatus::Reinstalling;
+        }
         if clash_verge_service_ipc::is_reinstall_service_needed().await {
             ServiceStatus::NeedsReinstall
         } else {
@@ -564,6 +586,10 @@ impl ServiceManager {
             ServiceStatus::Ready => {
                 logging!(info, Type::Service, "服务就绪，直接启动");
                 self.0 = ServiceStatus::Ready;
+            }
+            ServiceStatus::Reinstalling => {
+                logging!(info, Type::Service, "服务重装正在进行中，等待完成...");
+                // 重装中，不执行任何操作，等待 spawn_blocking 任务完成
             }
             ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired => {
                 logging!(info, Type::Service, "服务需要重装，执行重装流程");
@@ -611,6 +637,10 @@ pub async fn handle_service_operation(status: &ServiceStatus) -> Result<()> {
     match status {
         ServiceStatus::Ready => {
             logging!(info, Type::Service, "服务就绪，直接启动");
+        }
+        ServiceStatus::Reinstalling => {
+            logging!(info, Type::Service, "服务重装正在进行中，跳过操作");
+            return Ok(());
         }
         ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired => {
             logging!(info, Type::Service, "服务需要重装，执行重装流程");
