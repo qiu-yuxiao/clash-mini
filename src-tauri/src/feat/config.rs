@@ -13,6 +13,13 @@ use serde_yaml_ng::Mapping;
 pub async fn patch_clash(patch: &Mapping) -> Result<()> {
     Config::clash().await.edit_draft(|d| d.patch_config(patch));
 
+    // 保存旧配置用于回滚
+    let old_config = Config::clash().await.latest_arc().0.clone();
+
+    // 将 Draft 提前提交，确保 enhance() 中 get_config_values() 能读取到最新值
+    // （旧流程在 update_config_checked() 之后才 apply，导致生成的运行时配置丢失 draft 修改）
+    Config::clash().await.apply();
+
     let res = async {
         // 激活订阅
         if patch.get("secret").is_some() || patch.get("external-controller").is_some() {
@@ -31,14 +38,15 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
     .await;
     match res {
         Ok(()) => {
-            Config::clash().await.apply();
             // 分离数据获取和异步调用
             let clash_data = Config::clash().await.data_arc();
             clash_data.save_config().await?;
             Ok(())
         }
         Err(err) => {
-            Config::clash().await.discard();
+            // 恢复旧配置
+            Config::clash().await.edit_draft(|d| d.0 = old_config);
+            Config::clash().await.apply();
             Err(err)
         }
     }
