@@ -580,7 +580,22 @@ impl ServiceManager {
         if self.0 == ServiceStatus::Reinstalling {
             return ServiceStatus::Reinstalling;
         }
-        if clash_verge_service_ipc::is_reinstall_service_needed().await {
+
+        let need_reinstall = clash_verge_service_ipc::is_ipc_path_exists()
+            && match clash_verge_service_ipc::get_version().await {
+                Ok(resp) => {
+                    if let Some(ver) = resp.data {
+                        let clean_ver = ver.trim_start_matches('v');
+                        let expected_ver = clash_verge_service_ipc::VERSION.trim_start_matches('v');
+                        clean_ver != expected_ver
+                    } else {
+                        true
+                    }
+                }
+                Err(_) => true,
+            };
+
+        if need_reinstall {
             ServiceStatus::NeedsReinstall
         } else {
             ServiceStatus::Ready
