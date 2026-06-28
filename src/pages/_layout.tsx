@@ -1594,6 +1594,7 @@ const Layout = () => {
           {!drawerOpen && (
             <IconButton
               size="small"
+              aria-label={t('layout.a11y.pinWindow')}
               onClick={() =>
                 patchVerge({
                   enable_always_on_top: !verge?.enable_always_on_top,
@@ -1608,6 +1609,7 @@ const Layout = () => {
               })}
             >
               <PushPinRounded
+                aria-hidden="true"
                 sx={{
                   fontSize: '20px',
                   width: '20px',
@@ -1628,6 +1630,7 @@ const Layout = () => {
 
           <IconButton
             size="small"
+            aria-label={drawerOpen ? t('layout.a11y.closeSettings') : t('layout.a11y.openSettings')}
             onClick={() => setDrawerOpen(!drawerOpen)}
             sx={(theme) => ({
               ...get3DButtonStyle(theme, 'contained', drawerOpen ? 'primary' : 'default'),
@@ -1639,9 +1642,9 @@ const Layout = () => {
             })}
           >
             {drawerOpen ? (
-              <CloseRounded sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+              <CloseRounded aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
             ) : (
-              <SettingsRoundedIcon sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+              <SettingsRoundedIcon aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
             )}
           </IconButton>
 
@@ -1649,6 +1652,7 @@ const Layout = () => {
         </div>
       ) : null,
     [
+      t,
       decorated,
       isDecorationsHidden,
       drawerOpen,
@@ -1763,6 +1767,7 @@ const Layout = () => {
               >
                 <IconButton
                   size="small"
+                  aria-label={drawerOpen ? t('layout.a11y.closeSettings') : t('layout.a11y.openSettings')}
                   onClick={() => setDrawerOpen(!drawerOpen)}
                   sx={(theme) => ({
                     ...get3DButtonStyle(theme, 'contained', drawerOpen ? 'primary' : 'default'),
@@ -1772,9 +1777,9 @@ const Layout = () => {
                   })}
                 >
                   {drawerOpen ? (
-                    <CloseRounded sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+                    <CloseRounded aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
                   ) : (
-                    <SettingsRoundedIcon sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+                    <SettingsRoundedIcon aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
                   )}
                 </IconButton>
               </div>
@@ -1800,6 +1805,7 @@ const Layout = () => {
                 {(decorated || isDecorationsHidden) && (
                 <IconButton
                   size="small"
+                  aria-label={t('layout.a11y.pinWindow')}
                   onClick={() =>
                     patchVerge({
                       enable_always_on_top: !verge?.enable_always_on_top,
@@ -1814,6 +1820,7 @@ const Layout = () => {
                   })}
                 >
                     <PushPinRounded
+                      aria-hidden="true"
                       sx={{
                         fontSize: '20px',
                         width: '20px',

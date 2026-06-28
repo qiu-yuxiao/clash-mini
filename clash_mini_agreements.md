@@ -2572,3 +2572,35 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 - **移除 `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW` 压制**：v1.9.3 在窗口隐藏/失焦时将 WebView2 内存级别强制设为 `LOW`，缩减 Chromium 渲染缓存。此操作同样是 WebView2 死锁诱因之一。v1.9.4 将 `optimize_window_memory` 函数彻底废弃删除，WebView2 运行于默认 `NORMAL` 级别。
 - **基准 35MB 说明**：此为包含 Tauri WebView、React 前端运行时、所有 3D 皮肤渲染上下文的正常工作集。该数值在轻量模式（销毁主窗口）下会显著回落，因 WebView2 进程被回收。
 - 通过 `GOMEMLIMIT=96MiB` / `GOGC=50` / `GOMAXPROCS=2` / `geodata-loader=memconservative` 等措施，Mihomo 内核进程的内存已受到约束，不再不必要膨胀。壳进程的 35MB 为合理且无法再缩减的基准线。
+
+---
+
+### 无障碍 (a11y) 规范
+
+**生效日期**: v1.9.6
+
+#### 1. IconButton 必须包含 aria-label
+
+所有 `<IconButton>` 组件必须提供 `aria-label` 属性，图标元素必须添加 `aria-hidden="true"`：
+
+```tsx
+// ✅ 正确
+<IconButton aria-label={t('layout.a11y.pinWindow')} onClick={...}>
+  <PushPinRounded aria-hidden="true" />
+</IconButton>
+
+// ❌ 错误（屏幕阅读器只读为"按钮"）
+<IconButton onClick={...}>
+  <PushPinRounded />
+</IconButton>
+```
+
+**i18n 键位置**: 各模块的 `*.json` 中定义 `a11y` 字段，如 `layout.json` → `layout.a11y.*`。
+**引用标准**: WCAG 2.2 4.1.2 Name, Role, Value (Level A)
+
+#### 2. 新增 IconButton 的 PR 审查清单
+
+- [ ] 是否有 `aria-label`？
+- [ ] 图标是否有 `aria-hidden="true"`？
+- [ ] `aria-label` 文本是否国际化（使用 `t()`）？
+- [ ] 按钮状态变化时，`aria-label` 是否反映当前语义？

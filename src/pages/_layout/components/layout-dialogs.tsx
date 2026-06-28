@@ -548,6 +548,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
       >
         <IconButton
           size="small"
+          aria-label={t('layout.a11y.closeLogsDialog')}
           onClick={() => setLogsOpen(false)}
           sx={{
             position: 'absolute',
@@ -557,7 +558,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             color: 'text.secondary',
           }}
         >
-          <CloseRounded fontSize="small" />
+          <CloseRounded aria-hidden="true" fontSize="small" />
         </IconButton>
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {logsOpen && <LogsPage />}

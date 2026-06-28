@@ -105,6 +105,7 @@ export const ProxyHead = ({
         size="small"
         color="inherit"
         title={t('proxies.page.tooltips.delayCheck')}
+        aria-label={t('proxies.page.tooltips.delayCheck')}
         onClick={() => {
           debugLog(`[ProxyHead] 点击延迟测试按钮，组: ${groupName}`)
           onCheckDelay()
@@ -112,6 +113,7 @@ export const ProxyHead = ({
         sx={{ width: 26, height: 26, p: 0 }}
       >
         <BoltOutlined
+          aria-hidden="true"
           sx={{
             fontSize: 17,
             animation: isTesting
@@ -132,16 +134,23 @@ export const ProxyHead = ({
             t('proxies.page.tooltips.sortName'),
           ][sortType]
         }
+        aria-label={
+          [
+            t('proxies.page.tooltips.sortDefault'),
+            t('proxies.page.tooltips.sortDelay'),
+            t('proxies.page.tooltips.sortName'),
+          ][sortType]
+        }
         onClick={() =>
           onHeadState({ sortType: ((sortType + 1) % 3) as ProxySortType })
         }
         sx={{ width: 26, height: 26, p: 0 }}
       >
         {sortType !== 1 && sortType !== 2 && (
-          <SortOutlined sx={{ fontSize: 17 }} />
+          <SortOutlined aria-hidden="true" sx={{ fontSize: 17 }} />
         )}
-        {sortType === 1 && <AccessTimeOutlined sx={{ fontSize: 17 }} />}
-        {sortType === 2 && <SortByAlphaOutlined sx={{ fontSize: 17 }} />}
+        {sortType === 1 && <AccessTimeOutlined aria-hidden="true" sx={{ fontSize: 17 }} />}
+        {sortType === 2 && <SortByAlphaOutlined aria-hidden="true" sx={{ fontSize: 17 }} />}
       </IconButton>
 
       <Box

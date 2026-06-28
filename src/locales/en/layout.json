@@ -20,5 +20,11 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "a11y": {
+    "pinWindow": "Pin window on top",
+    "openSettings": "Open settings",
+    "closeSettings": "Close settings",
+    "closeLogsDialog": "Close logs dialog"
   }
 }

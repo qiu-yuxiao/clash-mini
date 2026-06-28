@@ -174,6 +174,12 @@ export interface TranslationResources {
       }
     }
     layout: {
+      a11y: {
+        closeLogsDialog: string
+        closeSettings: string
+        openSettings: string
+        pinWindow: string
+      }
       components: {
         navigation: {
           menu: {
