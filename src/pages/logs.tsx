@@ -177,6 +177,7 @@ const LogPage = () => {
         }}
       >
         <BaseStyledSelect
+          aria-label={t('shared.filters.logLevels.label')}
           value={logState}
           onChange={(e) => handleLogLevelChange(e.target.value as LogFilter)}
         >

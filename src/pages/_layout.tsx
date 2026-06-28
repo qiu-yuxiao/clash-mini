@@ -2001,6 +2001,7 @@ const Layout = () => {
               />
               {/* Language Selector */}
               <Select
+                aria-label={t('layout.a11y.selectLanguage')}
                 value={currentLanguage || 'zh'}
                 onChange={(e) => switchLanguage(e.target.value as string)}
                 displayEmpty

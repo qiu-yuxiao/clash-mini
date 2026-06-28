@@ -23,8 +23,10 @@
   },
   "a11y": {
     "pinWindow": "Pin window on top",
+    "unpinWindow": "Unpin window",
     "openSettings": "Open settings",
     "closeSettings": "Close settings",
-    "closeLogsDialog": "Close logs dialog"
+    "closeLogsDialog": "Close logs dialog",
+    "selectLanguage": "Select language"
   }
 }

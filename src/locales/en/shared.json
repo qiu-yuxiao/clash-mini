@@ -124,6 +124,7 @@
   },
   "filters": {
     "logLevels": {
+      "label": "Select log level",
       "all": "ALL",
       "debug": "DEBUG",
       "info": "INFO",
