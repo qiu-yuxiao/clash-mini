@@ -23,9 +23,6 @@
       "title": "代理规则",
       "select": "选择规则"
     },
-    "a11y": {
-      "nodelist": "代理节点列表"
-    },
     "labels": {
       "proxyCount": "节点数量",
       "delayCheckReset": "进行延迟测试，以取消固定"

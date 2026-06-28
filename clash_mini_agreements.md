@@ -2604,3 +2604,47 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 - [ ] 图标是否有 `aria-hidden="true"`？
 - [ ] `aria-label` 文本是否国际化（使用 `t()`）？
 - [ ] 按钮状态变化时，`aria-label` 是否反映当前语义？
+
+---
+
+## 🔄 新增协议：启动流程保护机制 (2026-06-28)
+
+### 背景
+通过对齐 Clash Verge Rev v1.7.6 的启动流程，解决 Clash Mini 内核启动不稳定的根本问题（启动时内核进程缺失）。
+
+### 协议内容
+
+#### 1. 启动/停止/重启必须持有 `lifecycle_lock`
+- **锁类型**：`tokio::sync::Mutex<()>`
+- **持锁操作**：`start_core()`、`stop_core()`、`restart_core()`
+- **目的**：防止竞态条件，确保内核状态一致性
+
+#### 2. 幂等性检查
+- `start_core_inner()` 必须检查当前运行模式
+- 如果内核已运行（`RunningMode::Service` 或 `RunningMode::Sidecar`），直接返回 `Ok(())`，视为 no-op
+- 重启必须走 `restart_core()`，禁止在已运行时调用 `start_core()`
+
+#### 3. 退出保护
+- `start_core_inner()` 开始时检查 `Handle::global().is_exiting()`
+- 如果程序正在退出，不再启动新内核，直接返回 `Ok(())`
+
+#### 4. 失败回滚
+- 启动失败时，必须将 `running_mode` 回滚为 `RunningMode::NotRunning`
+- 允许后续重试，避免状态卡死
+
+#### 5. Windows Service Handoff 机制
+- 在 Windows + TUN 模式下，如果服务未就绪，后台等待服务启动后再从 sidecar 交接至 service
+- 使用 `handoff_watcher_running` 原子标志确保单实例
+- 使用 `try_start_config_update()` / `finish_config_update()` 防止与配置更新交叉
+
+#### 6. 配置更新锁序
+- **锁序固定**：`config_update_in_progress` → `lifecycle_lock`
+- 先获取配置锁，再获取生命周期锁
+- 防止死锁
+
+#### 7. 参考实现
+- 本协议完全对齐 **Clash Verge Rev v1.7.6** 的实现
+- 源文件：`src-tauri/src/core/manager/mod.rs` 和 `lifecycle.rs`
+- 禁止擅自修改锁逻辑，如需修改必须先在协议中记录设计理由
+
+---

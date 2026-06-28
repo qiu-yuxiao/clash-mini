@@ -186,6 +186,7 @@ impl CoreManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(super) async fn stop_core_by_service(&self) -> Result<()> {
         logging!(info, Type::Core, "Stopping service");
         defer! {

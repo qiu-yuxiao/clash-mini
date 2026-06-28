@@ -23,9 +23,6 @@
       "title": "Proxy Rules",
       "select": "Select Rules"
     },
-    "a11y": {
-      "nodelist": "Proxy node list"
-    },
     "labels": {
       "proxyCount": "Proxy Count",
       "delayCheckReset": "Delay check to cancel fixed"

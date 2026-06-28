@@ -23,7 +23,6 @@
   },
   "a11y": {
     "pinWindow": "Закрепить окно сверху",
-    "unpinWindow": "Открепить окно",
     "openSettings": "Открыть настройки",
     "closeSettings": "Закрыть настройки",
     "closeLogsDialog": "Закрыть диалог логов",

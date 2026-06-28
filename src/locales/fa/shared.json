@@ -124,6 +124,7 @@
   },
   "filters": {
     "logLevels": {
+      "label": "选择日志级别",
       "all": "ALL",
       "debug": "DEBUG",
       "info": "INFO",

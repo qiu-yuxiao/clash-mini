@@ -23,7 +23,6 @@
   },
   "a11y": {
     "pinWindow": "ウィンドウを最前面に固定",
-    "unpinWindow": "ウィンドウの固定を解除",
     "openSettings": "設定を開く",
     "closeSettings": "設定を閉じる",
     "closeLogsDialog": "ログダイアログを閉じる",

@@ -179,6 +179,7 @@ export interface TranslationResources {
         closeSettings: string
         openSettings: string
         pinWindow: string
+        selectLanguage: string
       }
       components: {
         navigation: {
@@ -1352,6 +1353,7 @@ export interface TranslationResources {
           debug: string
           error: string
           info: string
+          label: string
           warn: string
         }
       }

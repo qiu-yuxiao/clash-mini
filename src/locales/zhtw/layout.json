@@ -23,7 +23,6 @@
   },
   "a11y": {
     "pinWindow": "置頂窗口",
-    "unpinWindow": "取消置頂",
     "openSettings": "打開設置",
     "closeSettings": "關閉設置",
     "closeLogsDialog": "關閉日誌對話框",

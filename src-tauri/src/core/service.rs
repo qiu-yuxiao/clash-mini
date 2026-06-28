@@ -421,6 +421,7 @@ pub(super) async fn get_clash_logs_by_service() -> Result<Vec<CompactString>> {
 }
 
 /// 通过服务停止core
+#[allow(dead_code)]
 pub(super) async fn stop_core_by_service() -> Result<()> {
     logging!(info, Type::Service, "通过服务停止核心 (IPC)");
 

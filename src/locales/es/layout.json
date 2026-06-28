@@ -23,7 +23,6 @@
   },
   "a11y": {
     "pinWindow": "Fijar ventana arriba",
-    "unpinWindow": "Desfijar ventana",
     "openSettings": "Abrir configuración",
     "closeSettings": "Cerrar configuración",
     "closeLogsDialog": "Cerrar diálogo de registros",

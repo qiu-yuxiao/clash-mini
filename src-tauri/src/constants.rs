@@ -27,6 +27,10 @@ pub mod timing {
 
     #[cfg(target_os = "windows")]
     pub const SERVICE_WAIT_INTERVAL: Duration = Duration::from_millis(200);
+    #[cfg(target_os = "windows")]
+    pub const SERVICE_HANDOFF_WINDOW: Duration = Duration::from_secs(120);
+    #[cfg(target_os = "windows")]
+    pub const SERVICE_HANDOFF_INTERVAL: Duration = Duration::from_secs(2);
 }
 
 pub mod files {

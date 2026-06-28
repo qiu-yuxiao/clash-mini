@@ -23,7 +23,6 @@
   },
   "a11y": {
     "pinWindow": "창 최상단 고정",
-    "unpinWindow": "창 고정 해제",
     "openSettings": "설정 열기",
     "closeSettings": "설정 닫기",
     "closeLogsDialog": "로그 대화상자 닫기",
