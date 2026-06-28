@@ -1,3 +1,11 @@
+## v1.9.10
+
+### 🐞 Fixed Bugs
+
+- **Allow LAN 开关首次启动无响应**：修复 `patch_clash` 中 Draft 提交时序问题，将 `apply()` 提前到 `update_config_checked()` 之前，确保基础设置（Allow LAN、IPv6、Mode 等）在默认状态下首次切换即可生效。
+
+---
+
 ## v1.9.9
 
 ### 🎯 Core Improvements
