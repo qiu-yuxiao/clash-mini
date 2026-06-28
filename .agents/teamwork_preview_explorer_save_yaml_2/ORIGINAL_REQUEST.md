@@ -1,2 +1,0 @@
-## 2026-06-13T08:39:40Z
-Please investigate `save_yaml` in `src-tauri/src/utils/help.rs`. The objective is to optimize it by implementing a read-before-write check so we do not trigger unnecessary disk writes when content is unchanged. Analyze the code, recommend a implementation plan, and list potential edge cases. Do not edit files directly. Write your findings to: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\.agents\teamwork_preview_explorer_save_yaml_2\handoff.md
