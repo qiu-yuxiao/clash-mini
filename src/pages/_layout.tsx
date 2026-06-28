@@ -1134,8 +1134,12 @@ const Layout = () => {
 
   const triggerWakeupLatencyTest = useCallback(async () => {
     try {
+      // 1. 无论冷却状态如何，窗口唤醒时必须立即刷新本地代理选点状态，确保 UI 上的对勾打在正确的活跃节点上
+      console.log('[Layout] 窗口唤醒，首先刷新本地代理状态')
+      await refreshAllRef.current()
+
       const now = Date.now()
-      // 限制 30 秒内不重复触发全节点自动测速，避免频繁聚焦导致重复测试
+      // 2. 只有测速有 30 秒冷却限制，避免频繁唤醒导致过多垃圾网络探测请求
       if (now - lastFullTestTimeRef.current < 30 * 1000) {
         return
       }
@@ -1153,10 +1157,16 @@ const Layout = () => {
       const timeout = verge?.default_latency_timeout || 10000
       lastFullTestTimeRef.current = now
       console.log('[Layout] 窗口唤醒，触发后台节点测速以刷新延迟')
-      await DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
-      await refreshAllRef.current()
+      
+      // 3. 异步执行全节点测速，由 backend-delay-results 事件驱动增量刷新，不阻塞 UI 渲染
+      DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36).then(async () => {
+        // 测速全部完成后再做一次静默刷新作为备份
+        await refreshAllRef.current()
+      }).catch((err) => {
+        console.error('[Layout] 唤醒后后台测速异常:', err)
+      })
     } catch (err) {
-      console.error('[Layout] 唤醒测速失败:', err)
+      console.error('[Layout] 唤醒刷新与测速失败:', err)
     }
   }, [verge?.default_latency_timeout])
 
