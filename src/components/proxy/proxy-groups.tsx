@@ -774,6 +774,7 @@ function ProxyVirtualList({
   headItem,
   testingGroups,
 }: ProxyVirtualListProps) {
+  const { t } = useTranslation()
   const stickyBackground = 'var(--theme-bg, var(--background-color))'
 
   return (
@@ -818,10 +819,17 @@ function ProxyVirtualList({
           },
         }}
       >
-        <div style={{ height: totalSize, position: 'relative' }}>
+        <div
+          role="list"
+          aria-label={t('proxies.a11y.nodelist')}
+          style={{ height: totalSize, position: 'relative' }}
+        >
           {virtualItems.map((virtualItem) => (
             <div
               key={virtualItem.key}
+              role="listitem"
+              aria-posinset={virtualItem.index + 1}
+              aria-setsize={renderList.length}
               data-index={virtualItem.index}
               ref={measureElement}
               style={{
