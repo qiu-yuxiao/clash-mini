@@ -22,9 +22,11 @@
     }
   },
   "a11y": {
-    "pinWindow": "置顶窗口",
-    "openSettings": "打开设置",
-    "closeSettings": "关闭设置",
-    "closeLogsDialog": "关闭日志对话框"
+    "pinWindow": "창 최상단 고정",
+    "unpinWindow": "창 고정 해제",
+    "openSettings": "설정 열기",
+    "closeSettings": "설정 닫기",
+    "closeLogsDialog": "로그 대화상자 닫기",
+    "selectLanguage": "언어 선택"
   }
 }

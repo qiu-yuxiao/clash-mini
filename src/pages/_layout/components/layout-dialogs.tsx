@@ -149,6 +149,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
           <Box>
             <Typography
+              id="profile-name-label"
               variant="body2"
               sx={{
                 mb: 0.5,
@@ -159,6 +160,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               配置名称
             </Typography>
             <TextField
+              aria-labelledby="profile-name-label"
               fullWidth
               size="small"
               value={editProfileName}
@@ -169,6 +171,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
 
           <Box>
             <Typography
+              id="profile-url-label"
               variant="body2"
               sx={{
                 mb: 0.5,
@@ -179,6 +182,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               订阅地址
             </Typography>
             <TextField
+              aria-labelledby="profile-url-label"
               fullWidth
               size="small"
               value={editProfileUrl}
@@ -190,6 +194,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
 
           <Box>
             <Typography
+              id="profile-interval-label"
               variant="body2"
               sx={{
                 mb: 0.5,
@@ -200,6 +205,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               更新周期 (单位: 小时, 设为 0 禁用)
             </Typography>
             <TextField
+              aria-labelledby="profile-interval-label"
               fullWidth
               size="small"
               type="number"

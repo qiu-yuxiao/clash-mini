@@ -318,7 +318,7 @@ export const ProxyItem = (props: Props) => {
               onDelay()
             }}
             sx={({ palette }) => ({
-              color: delayManager.formatDelayColor(delayValue, timeout),
+              color: delayManager.formatDelayColor(delayValue, timeout, palette.mode === 'dark'),
               cursor: proxy?.provider ? 'default' : 'pointer',
               fontSize: '11px',
               fontWeight: 600,

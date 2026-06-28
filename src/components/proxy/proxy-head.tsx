@@ -119,7 +119,9 @@ export const ProxyHead = ({
             animation: isTesting
               ? `${pulseGlow} 1.2s infinite ease-in-out`
               : 'none',
-            color: isTesting ? 'warning.dark' : 'inherit',
+            color: (theme) => isTesting
+              ? (theme.palette.mode === 'dark' ? 'warning.main' : 'warning.dark')
+              : 'inherit',
           }}
         />
       </IconButton>

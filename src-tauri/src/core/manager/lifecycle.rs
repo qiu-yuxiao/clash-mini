@@ -3,7 +3,7 @@ use crate::cmd::StringifyErr as _;
 use crate::config::{Config, IVerge};
 use crate::core::handle::Handle;
 use crate::core::manager::CLASH_LOGGER;
-use crate::core::service::{SERVICE_MANAGER, ServiceStatus};
+use crate::core::service::{SERVICE_MANAGER, ServiceManager, ServiceStatus};
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
@@ -137,8 +137,10 @@ impl CoreManager {
             }
 
             manager.init().await?;
-            let _ = manager.refresh().await;
+            drop(manager);
+            let _ = ServiceManager::refresh().await;
 
+            let manager = SERVICE_MANAGER.lock().await;
             if matches!(manager.current(), ServiceStatus::Ready) {
                 Ok(())
             } else {

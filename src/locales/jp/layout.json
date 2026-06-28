@@ -22,9 +22,11 @@
     }
   },
   "a11y": {
-    "pinWindow": "置顶窗口",
-    "openSettings": "打开设置",
-    "closeSettings": "关闭设置",
-    "closeLogsDialog": "关闭日志对话框"
+    "pinWindow": "ウィンドウを最前面に固定",
+    "unpinWindow": "ウィンドウの固定を解除",
+    "openSettings": "設定を開く",
+    "closeSettings": "設定を閉じる",
+    "closeLogsDialog": "ログダイアログを閉じる",
+    "selectLanguage": "言語を選択"
   }
 }

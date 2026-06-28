@@ -163,10 +163,11 @@ pub(super) async fn init_service_manager() {
         return;
     }
     let mut manager = SERVICE_MANAGER.lock().await;
-    if manager.init().await.is_ok() {
-        logging_error!(Type::Setup, manager.refresh().await);
-    }
+    let is_ok = manager.init().await.is_ok();
     drop(manager);
+    if is_ok {
+        logging_error!(Type::Setup, ServiceManager::refresh().await);
+    }
 }
 
 pub(super) async fn init_core_manager() {

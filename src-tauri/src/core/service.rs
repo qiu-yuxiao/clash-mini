@@ -397,7 +397,7 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
 pub(super) async fn run_core_by_service(config_file: &PathBuf) -> Result<()> {
     logging!(info, Type::Service, "正在尝试通过服务启动核心");
 
-    SERVICE_MANAGER.lock().await.refresh().await?;
+    ServiceManager::refresh().await?;
 
     logging!(info, Type::Service, "服务已运行且版本匹配，直接使用");
     start_with_existing_service(config_file).await
@@ -537,32 +537,39 @@ impl ServiceManager {
         self.0.clone()
     }
 
-    pub async fn refresh(&mut self) -> Result<()> {
-        let status = self.check_service_comprehensive().await;
+    pub async fn refresh() -> Result<()> {
+        let status = {
+            let manager = SERVICE_MANAGER.lock().await;
+            manager.check_service_comprehensive().await
+        };
         if matches!(status, ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired) {
-            // 先更新状态为"重装中"，防止重复触发
-            self.0 = ServiceStatus::Reinstalling;
-            // 等待重装完成，避免 fire-and-forget 导致并发重装
+            {
+                let mut manager = SERVICE_MANAGER.lock().await;
+                manager.0 = ServiceStatus::Reinstalling;
+            }
             let result = tokio::task::spawn_blocking(reinstall_service).await;
+            let mut manager = SERVICE_MANAGER.lock().await;
             match result {
                 Ok(Ok(())) => {
-                    // 重装成功，重新检查状态
-                    let new_status = self.check_service_comprehensive().await;
-                    self.0 = new_status.clone();
-                    logging_error!(Type::Service, self.handle_service_status(&new_status).await);
+                    let new_status = manager.check_service_comprehensive().await;
+                    manager.0 = new_status.clone();
+                    logging_error!(Type::Service, manager.handle_service_status(&new_status).await);
                 }
                 Ok(Err(e)) => {
                     logging!(error, Type::Service, "重装服务失败: {}", e);
-                    self.0 = ServiceStatus::NeedsReinstall;
+                    manager.0 = ServiceStatus::NeedsReinstall;
                 }
                 Err(e) => {
                     logging!(error, Type::Service, "重装服务任务失败: {}", e);
-                    self.0 = ServiceStatus::NeedsReinstall;
+                    manager.0 = ServiceStatus::NeedsReinstall;
                 }
             }
         } else {
-            self.0 = status.clone();
-            logging_error!(Type::Service, self.handle_service_status(&status).await);
+            let mut manager = SERVICE_MANAGER.lock().await;
+            manager.0 = status.clone();
+            let res = manager.handle_service_status(&status).await;
+            drop(manager);
+            logging_error!(Type::Service, res);
         }
         Ok(())
     }

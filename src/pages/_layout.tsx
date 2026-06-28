@@ -2007,7 +2007,7 @@ const Layout = () => {
                 onChange={(e) => switchLanguage(e.target.value as string)}
                 displayEmpty
                 // @ts-expect-error MUI v9 aria-label type issue
-                aria-label={t('layout.a11y.selectLanguage')}
+                inputProps={{ 'aria-label': t('layout.a11y.selectLanguage') }}
                 renderValue={() => 'Language'}
                 size="small"
                 variant="outlined"
