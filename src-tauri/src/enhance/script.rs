@@ -106,12 +106,12 @@ fn use_script_sync(script: String, config: &Mapping, name: &String) -> Result<(M
         anyhow::bail!("Configuration size exceeds maximum allowed size");
     }
 
-    // 使用 JSON 传递 name 参数避免字符串注入
-    let safe_name_json = serde_json::to_string(&name)?;
+    // 将 name 序列化为 JSON 字符串直接嵌入 JS（serde_json 已做引号转义）
+    let safe_name = serde_json::to_string(if name.is_empty() { "global" } else { name })?;
 
     let code = format!(
         r"try{{
-        const __verge_name = JSON.parse({safe_name_json});
+        const __verge_name = {safe_name};
         {script};
         JSON.stringify(main({config_str},__verge_name)||'')
       }} catch(err) {{
