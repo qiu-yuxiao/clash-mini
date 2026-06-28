@@ -25,13 +25,6 @@
         "paste": "粘贴"
       }
     },
-    "editForm": {
-      "labels": {
-        "name": "配置名称",
-        "url": "订阅地址",
-        "interval": "更新周期 (单位: 小时, 设为 0 禁用)"
-      }
-    },
     "feedback": {
       "errors": {
         "invalidUrl": "无效的订阅链接，请输入以 http:// 或 https:// 开头的地址",

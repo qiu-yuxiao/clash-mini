@@ -31,7 +31,6 @@ type SearchProps = {
   defaultValue?: string
   autoFocus?: boolean
   placeholder?: string
-  label?: string
   matchCase?: boolean
   matchWholeWord?: boolean
   useRegularExpression?: boolean
@@ -79,7 +78,6 @@ export const BaseSearchBox = ({
   defaultValue,
   autoFocus,
   placeholder,
-  label,
   searchState,
   minimal = false,
   matchCase: defaultMatchCase = false,
@@ -192,7 +190,7 @@ export const BaseSearchBox = ({
     <Tooltip title={effectiveErrorMessage || ''} placement="bottom-start">
       <StyledTextField
         autoComplete="new-password"
-        label={label || placeholder || t('shared.placeholders.filter')}
+        hiddenLabel
         fullWidth
         size="small"
         variant="outlined"
@@ -204,7 +202,6 @@ export const BaseSearchBox = ({
         onChange={handleChangeText}
         error={!!effectiveErrorMessage}
         slotProps={{
-          inputLabel: { shrink: true },
           input: {
             sx: { pr: minimal ? 4 : 12 },
             endAdornment: (
