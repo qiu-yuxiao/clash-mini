@@ -22,66 +22,19 @@ enum HandoffOutcome {
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
-        logging!(info, Type::Core, "start_core: acquiring lifecycle_lock");
-        let _life = self.lifecycle_lock.lock().await;
-        logging!(info, Type::Core, "start_core: lifecycle_lock acquired");
-        self.start_core_inner().await
-    }
-
-    /// 调用者须已持有 `lifecycle_lock`。
-    async fn start_core_inner(&self) -> Result<()> {
-        logging!(info, Type::Core, "start_core_inner: start");
-
-        // 退出中不再启动新内核。
-        if Handle::global().is_exiting() {
-            logging!(info, Type::Core, "start_core_inner: exiting, skip");
-            return Ok(());
-        }
-
-        // 已有内核运行时保持幂等,重启请走 restart_core。
-        if !matches!(*self.get_running_mode(), RunningMode::NotRunning) {
-            logging!(
-                info,
-                Type::Core,
-                "start_core called while a core is running; treated as no-op"
-            );
-            return Ok(());
-        }
-
-        let _ = self.prepare_startup().await;
+        self.prepare_startup().await?;
         defer! {
             self.after_core_process();
         }
 
-        // 等待服务期间可能进入退出;未真正启动时回滚状态。
-        if Handle::global().is_exiting() {
-            self.set_running_mode(RunningMode::NotRunning);
-            return Ok(());
-        }
-
-        logging!(
-            info,
-            Type::Core,
-            "start_core_inner: starting core, mode={:?}",
-            *self.get_running_mode()
-        );
         let result = match *self.get_running_mode() {
             RunningMode::Service => self.start_core_by_service().await,
             RunningMode::NotRunning | RunningMode::Sidecar => self.start_core_by_sidecar().await,
         };
 
-        // 启动失败时回滚 mode,允许后续重试。
-        if let Err(ref e) = result {
-            logging!(error, Type::Core, "start_core_inner: failed: {}", e);
-            self.set_running_mode(RunningMode::NotRunning);
-            return result;
-        }
-
-        logging!(info, Type::Core, "start_core_inner: success");
-
-        // 回退 sidecar 后,后台等待服务就绪再交接
+        // sidecar 启动成功后,后台等待服务就绪再交接 (TUN 模式)
         #[cfg(target_os = "windows")]
-        if matches!(*self.get_running_mode(), RunningMode::Sidecar) {
+        if result.is_ok() && matches!(*self.get_running_mode(), RunningMode::Sidecar) {
             self.spawn_service_handoff_watcher().await;
         }
 
@@ -89,15 +42,6 @@ impl CoreManager {
     }
 
     pub async fn stop_core(&self) -> Result<()> {
-        logging!(info, Type::Core, "stop_core: acquiring lifecycle_lock");
-        let _life = self.lifecycle_lock.lock().await;
-        logging!(info, Type::Core, "stop_core: lifecycle_lock acquired");
-        self.stop_core_inner().await
-    }
-
-    /// 调用者须已持有 `lifecycle_lock`。
-    async fn stop_core_inner(&self) -> Result<()> {
-        logging!(info, Type::Core, "stop_core_inner: start");
         CLASH_LOGGER.clear_logs().await;
 
         // WARNING: DO NOT remove or bypass clearing the IPC connection pool here!
@@ -112,16 +56,21 @@ impl CoreManager {
             self.after_core_process();
         }
 
-        logging!(info, Type::Core, "stop_core_inner: done");
-        Ok(())
+        match *self.get_running_mode() {
+            RunningMode::Service => self.stop_core_by_service().await,
+            RunningMode::Sidecar => {
+                self.stop_core_by_sidecar().await;
+                Ok(())
+            }
+            RunningMode::NotRunning => Ok(()),
+        }
     }
 
     pub async fn restart_core(&self) -> Result<()> {
-        // 持锁覆盖 stop+start,避免生命周期操作插入。
         let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
-        self.stop_core_inner().await?;
-        self.start_core_inner().await
+        self.stop_core().await?;
+        self.start_core().await
     }
 
     pub async fn change_core(&self, clash_core: &String) -> Result<(), String> {
