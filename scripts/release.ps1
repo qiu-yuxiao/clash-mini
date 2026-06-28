@@ -113,16 +113,20 @@ if ($ExistingTag -or $RemoteTagExists) {
     Log-Warn "Tag $TagName already exists (Local: [$(if($ExistingTag){"Yes"}else{"No"})], Remote: [$(if($RemoteTagExists){"Yes"}else{"No"})])."
     Log-Info "Checking if a workflow run already exists for this release..."
     
-    $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
-    if ($json) {
-        $obj = ($json -join "`n") | ConvertFrom-Json
-        $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
-               Sort-Object -Property id -Descending | Select-Object -First 1
-        if ($run) {
-            Log-Ok "Found existing workflow run for this release (Run ID: $($run.id))."
-            Log-Ok "Skipping Version Bump and Git Push steps. Jumping directly to CI monitoring..."
-            $SkipBumpAndTag = $true
+    try {
+        $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
+        if ($json) {
+            $obj = ($json -join "`n") | ConvertFrom-Json
+            $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
+                   Sort-Object -Property id -Descending | Select-Object -First 1
+            if ($run) {
+                Log-Ok "Found existing workflow run for this release (Run ID: $($run.id))."
+                Log-Ok "Skipping Version Bump and Git Push steps. Jumping directly to CI monitoring..."
+                $SkipBumpAndTag = $true
+            }
         }
+    } catch {
+        # ignore error and proceed
     }
     
     if (-not $SkipBumpAndTag) {
@@ -180,15 +184,16 @@ Write-Host "  CI Monitor Dashboard: https://github.com/$GitHubRepo/actions" -For
 # ─────────────────────────────────────────────
 Log-Step "Waiting for CI build to complete (polling every 3 minutes)"
 
-function Get-RunInfo {
-    # Get newest workflow run id, status, and conclusion
-    $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
-    if (-not $json) { return $null }
-    $obj = ($json -join "`n") | ConvertFrom-Json
-    $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
-           Sort-Object -Property id -Descending | Select-Object -First 1
-    return $run
-}
+    try {
+        $json = gh api "repos/$GitHubRepo/actions/workflows/release.yml/runs?per_page=5" 2>$null
+        if (-not $json) { return $null }
+        $obj = ($json -join "`n") | ConvertFrom-Json
+        $run = $obj.workflow_runs | Where-Object { $_.head_branch -eq $TagName } |
+               Sort-Object -Property id -Descending | Select-Object -First 1
+        return $run
+    } catch {
+        return $null
+    }
 
 function Get-RunLogs {
     param($RunId)
@@ -255,9 +260,15 @@ $LastRunId    = $null
             elseif ($Conclusion -eq "failure" -or $Conclusion -eq "cancelled") {
                 $LogUrl = Get-RunLogs $Run.id
                 # Determine if retryable (network errors checked via failed job name)
-                $FailedJobsJson = gh api "repos/$GitHubRepo/actions/runs/$($Run.id)/jobs" 2>$null
-                $FailedJobs = ($FailedJobsJson -join "`n") | ConvertFrom-Json | Select-Object -ExpandProperty jobs |
-                              Where-Object { $_.conclusion -eq "failure" }
+                $FailedJobsJson = $null
+                try {
+                    $FailedJobsJson = gh api "repos/$GitHubRepo/actions/runs/$($Run.id)/jobs" 2>$null
+                } catch {}
+                $FailedJobs = $null
+                if ($FailedJobsJson) {
+                    $FailedJobs = ($FailedJobsJson -join "`n") | ConvertFrom-Json | Select-Object -ExpandProperty jobs |
+                                  Where-Object { $_.conclusion -eq "failure" }
+                }
                 $IsRetryable = $false
                 foreach ($job in $FailedJobs) {
                     $jname = $job.name.ToLower()
@@ -309,7 +320,10 @@ Log-Step "Waiting for Release draft to publish"
 $ReleaseReady = $false
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 15
-    $ReleaseJson = gh api "repos/$GitHubRepo/releases/tags/$TagName" 2>$null
+    $ReleaseJson = $null
+    try {
+        $ReleaseJson = gh api "repos/$GitHubRepo/releases/tags/$TagName" 2>$null
+    } catch {}
     if ($ReleaseJson) {
         $Rel = ($ReleaseJson -join "`n") | ConvertFrom-Json
         if (-not $Rel.draft) {
