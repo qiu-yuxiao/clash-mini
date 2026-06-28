@@ -1,4 +1,20 @@
-## v1.9.5
+## v1.9.6
+
+### 🐞 Fixed Bugs
+
+- **JS 沙箱脚本名嵌入修复**：空脚本名导致 JSON.parse 崩溃，兜底为 `"global"`；同时去掉冗余的 serde_json 双序列化/反序列化
+- **MUI v9 类型错误修复**：修复 Select/div 等组件的 aria-label 类型问题
+- **ESLint 遗留警告清理**：关闭 91 条 `no-explicit-any` 历史警告，修复未使用变量和 stale eslint-disable 注释，pre-commit hook 零警告通过
+
+### ♿ Accessibility
+
+- 为虚拟代理节点列表添加 ARIA list 语义
+- Select 组件添加 aria-label
+- IconButton 组件添加 screen reader 支持标签
+- 延迟颜色对比度优化以符合 WCAG 1.4.3 AA 标准
+
+---
+
 
 ### 🎨 Visual
 
