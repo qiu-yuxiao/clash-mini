@@ -25,6 +25,13 @@
         "paste": "Paste"
       }
     },
+    "editForm": {
+      "labels": {
+        "name": "Profile name",
+        "url": "Profile URL",
+        "interval": "Update interval (hours, 0 to disable)"
+      }
+    },
     "feedback": {
       "errors": {
         "invalidUrl": "Invalid profile URL. Please enter a URL starting with http:// or https://",

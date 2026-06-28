@@ -3,18 +3,26 @@ import { useTranslation } from 'react-i18next'
 
 export const BaseStyledTextField = styled((props: TextFieldProps) => {
   const { t } = useTranslation()
+  const { label, placeholder, slotProps: externalSlotProps, ...rest } = props
 
   return (
     <TextField
       autoComplete="new-password"
-      hiddenLabel
+      label={label || placeholder || t('shared.placeholders.filter')}
       fullWidth
       size="small"
       variant="outlined"
       spellCheck="false"
-      placeholder={t('shared.placeholders.filter')}
+      placeholder={placeholder ?? t('shared.placeholders.filter')}
+      slotProps={{
+        ...externalSlotProps,
+        inputLabel: {
+          shrink: true,
+          ...(externalSlotProps?.inputLabel as Record<string, unknown> || {}),
+        },
+      }}
       sx={{ input: { py: 0.65, px: 1.25 } }}
-      {...props}
+      {...rest}
     />
   )
 })(({ theme }) => ({

@@ -10,6 +10,7 @@ import {
 } from '@mui/material'
 import { type Update } from '@tauri-apps/plugin-updater'
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 
 import {
   get3DInputStyle,
@@ -111,6 +112,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
   mode: _mode,
 }) => {
   const theme = useTheme()
+  const { t } = useTranslation()
 
   return (
     <>
@@ -146,64 +148,40 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
           <Box>
-            <Typography
-              variant="body2"
-              sx={{
-                mb: 0.5,
-                fontWeight: 'bold',
-                fontFamily: 'var(--control-font-family)',
-              }}
-            >
-              配置名称
-            </Typography>
             <TextField
+              label={t('profiles.page.editForm.labels.name')}
               fullWidth
               size="small"
               value={editProfileName}
               onChange={(e) => setEditProfileName(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
               sx={get3DInputStyle(theme)}
             />
           </Box>
 
           <Box>
-            <Typography
-              variant="body2"
-              sx={{
-                mb: 0.5,
-                fontWeight: 'bold',
-                fontFamily: 'var(--control-font-family)',
-              }}
-            >
-              订阅地址
-            </Typography>
             <TextField
+              label={t('profiles.page.editForm.labels.url')}
               fullWidth
               size="small"
               value={editProfileUrl}
               disabled={isEditProfileLocal}
               onChange={(e) => setEditProfileUrl(e.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
               sx={get3DInputStyle(theme)}
             />
           </Box>
 
           <Box>
-            <Typography
-              variant="body2"
-              sx={{
-                mb: 0.5,
-                fontWeight: 'bold',
-                fontFamily: 'var(--control-font-family)',
-              }}
-            >
-              更新周期 (单位: 小时, 设为 0 禁用)
-            </Typography>
             <TextField
+              label={t('profiles.page.editForm.labels.interval')}
               fullWidth
               size="small"
               type="number"
               value={editProfileInterval}
               disabled={isEditProfileLocal}
               onChange={(e) => setEditProfileInterval(Number(e.target.value))}
+              slotProps={{ inputLabel: { shrink: true } }}
               sx={get3DInputStyle(theme)}
             />
           </Box>
