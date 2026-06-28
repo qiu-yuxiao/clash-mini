@@ -21,53 +21,6 @@
  - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
  - **目标版本**：`v1.8.0`
 
-### BUG-223: Contrast and Invisible Borders Styling Issue in Frosted Glass Skin
- - **现象描述**：Frosted Glass（毛玻璃）下失效按钮的背景与边框被硬编码为半透明白色，在浅色主题下几乎不可见，对比度低于 2.6:1。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-224: React useMemo Dependency Array Omits theme and skin
- - **现象描述**：顶栏标题渲染在 `useMemo` 中被缓存，但其依赖数组未加入 `theme` 模式与 `skin`（`controlSkin`）变量，导致切换皮肤或深浅色模式时顶栏不刷新。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-233: CSS Specificity Conflict on Dialog/Menu Backgrounds under Frosted Glass
- - **现象描述**：毛玻璃皮肤下的优先级选择器覆盖了全局 Dialog 遮罩的 opacity 配置，将原本不透明背景重写为半透明，导致弹窗文字与网页文字叠显冲突，无法看清。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-234: Hardcoded Opaque Background Colors Overriding Theme Skins
- - **现象描述**：部分组件（如 base-page, unlock 页面等）在 dark mode 判定中强制写死深灰色背景，覆盖了毛玻璃或赛博朋克等特制皮肤的透明度与背景设计。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-235: Scrollbar Hiding Overrides and Layout Conflict
- - **现象描述**：全局 `index.scss` 强行指定了 `* { scrollbar-width: thin !important; }`，覆盖了连接表局部指定的 `scrollbarWidth: 'none'`，导致局部滚动条无法隐藏。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-237: Vertical Clipping Hazard in Compact Proxy Columns under High DPI
- - **现象描述**：代理节点列的行高写死了 `20px` 且强制 `overflow: hidden`，在 Windows 高 DPI 缩放（150%以上）时，文字和延迟标签会被底部横向物理裁剪。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-238: Navigation Menu Scrollbar Truncation
- - **现象描述**：侧边导航菜单硬编码隐藏了滚动条，在低分辨率小屏幕下导致用户无法察觉侧边栏还有可滚动的内容。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.8.1`
-
-### BUG-239: High-frequency polling on proxies and connections causing high CPU/Resource consumption
- - **现象描述**：主页数据刷新采用前端主动发起、每隔 3 秒一次的高频轮询机制（calcuProxies），在闲置或数据无变化时产生持续的 CPU 唤醒与进程通信开销；同时，连接管理面板在后台或被遮挡时缺乏深度可见性判定。
- - **当前状态**：`代码已修正，待用户确认`
- - **需求与改进方案**：
-   1. **轮询重构为事件信号驱动（Event-Driven）**：
-      - 前端彻底关闭每 3 秒一次的 `refetchInterval` 定时请求。
-      - 后端在节点切换成功、测速结束、故障自愈完成以及配置重载等核心状态发生真实改变时，通过 Tauri Event 机制向前端发送轻量级 `"REFRESH_PROXIES"` 信号。
-      - 前端监听该信号事件，仅在收到信号时单次拉取最新数据，实现空闲时 0 轮询开销。
-   2. **连接追踪可见性判定**：
-      - 对设置抽屉中的连接列表（Connections Panel）进行组件级可见性监控，若面板处于遮挡或非活动标签状态，自动暂停高频 WebSocket 追踪。
- - **目标版本**：`v1.8.2`
-
 ### BUG-205: Settings Drawer Horizontal Layout Overflow
  - **现象描述**：在默认/最小窗口宽度（270px）下，设置抽屉的横向布局挤压右侧 Connections 列，导致 active/closed 连接列表宽度被压缩为 0px。经重新审计确认，此为项目 Agreement 设计规范中预期的“物理裁剪遮盖”设计，而非布局缺陷。
  - **验证方法**：已完全撤销本地换行和最小宽度修改，还原为原生单行横向并排布局与 minWidth: 0，确保窄窗口下连接面板被正常裁剪遮挡，窗口拉宽时正常侧向展露。
@@ -80,74 +33,31 @@
  - **当前状态**：`已还原并确认`
  - **目标版本**：`v1.7.2`
 
-### BUG-257: High CPU/Battery Consumption of Background Health Check in Lightweight Mode
- - **现象描述**：当主程序隐藏并进入轻量化模式后，后台监测线程 `start_background_monitor` 仍以固定 15 秒的周期频繁发起活跃代理节点的延迟探测（DNS 解析及 HTTP 请求），这在无人值守、纯后台挂机状态下会导致不必要的 CPU 唤醒、物理网卡工作和电池消耗。需要实现轻量模式下的自适应探测周期，当开启轻量模式时自动将正常检测的间隔时间放宽至 60 秒，并在恢复/退出轻量模式时瞬间重置/唤醒检测。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
-### BUG-258: Active TCP Connections Leftover in Mihomo Kernel on Entering Lightweight Mode
- - **现象描述**：当程序进入轻量化模式（主窗口销毁）时，Mihomo 内核进程中可能依然残留有大量之前网页浏览遗留的活动/空闲 TCP 连接和套接字。在纯后台挂机期间，这些连接依然会占用系统的网络套接字及内核的物理内存。需要在进入轻量模式的瞬间，由 Rust 后端向内核发送清空连接命令，清空所有活跃与空闲连接，使内核进入真正的低能耗状态。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
-### BUG-259: WebSocket Subscription CPU Overhead in Rust Backend on Entering Lightweight Mode
- - **现象描述**：主窗口销毁进入轻量模式后，Rust 后端如果仍维持与 Mihomo 内核的数据流（如流量、日志、连接明细等）WebSocket 订阅，会导致在后台继续进行无用的 JSON 反序列化 and 进程间通信（IPC）计算，产生不必要的 CPU 资源开销。需要在进入轻量模式时主动熔断、清理所有的后台 WebSocket 订阅，等主窗口重建时再重新订阅。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
-### BUG-260: Web Worker Lifecycle Leak in Traffic Monitor on Visibility Toggle
- - **现象描述**：在流量监控 Hook（use-traffic-monitor.ts）中，原先当窗口变为不可见或进入轻量模式时，会销毁并终止 Web Worker 实例（worker.terminate()），而窗口恢复可见时重新实例化一个新的 Web Worker。然而，在 Chromium/WebView2 中频繁地销毁与创建 Worker 线程会由于垃圾回收延迟及 V8 堆内存隔离区残留而导致严重的系统线程句柄与内存泄露。应重构为 Web Worker 单例复用机制，当隐藏时发送 "stop" 消息使其进入休眠，当恢复时发送 "start" 消息唤醒采样，在全局生命周期中只保持单个 Worker 实例。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
-### BUG-261: Settings Drawer Conditional Rendering Memory Leak and Style Bloat
- - **现象描述**：在 _layout.tsx 中，为了优化性能，Settings Drawer 的渲染被改为了根据 drawerOpen 和 isMiniStatus 进行条件挂载 {drawerOpen && !isMiniStatus && ...}。但这在用户频繁拉伸窗口大小或频繁开关设置抽屉时，会导致大量的 Emotion 动态样式表重新计算并在 HTML <head> 中累积未清理的 <style> 标签，且 MUI 组件卸载时可能残留部分全局事件监听器导致 React 内存发生累加性泄露。应将设置抽屉的条件挂载回滚为 1.8.2 的经典 CSS transform 物理移动（例如 translate(100%)）与 pointer-events 隐藏的机制，仅通过 CSS 控制其可见性而不卸载 DOM 树。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.0`
-
-### BUG-262: Missing Node Latency Display after Awakening from Lightweight Mode
- - **现象描述**：导入订阅链接后节点信息正常显示延迟。但是当程序从轻量模式（无论是销毁窗口重建还是隐藏窗口重新显示）被唤醒后，节点列表表格中的延迟信息均显示为 `-` 且无法显示数值。原因为：① 在销毁重建模式下，React StrictMode 双挂载或尺寸改变引发的 Effect 重新挂载，导致前一次初始化被 `cancelled`，而第二次挂载被 `lastProcessedRef` 重复判定拦截，初始化测速被彻底取消；② 在隐藏唤醒模式下，React Layout 不重新挂载，且后台缓存因 30 分钟过期被清空，后端健康检查仅探测活跃节点，从而没有新测速任务被触发。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.1`
-
-### BUG-263: State Machine Race Condition via Raw Stores in lightweight.rs
- - **现象描述**：`try_transition` 在利用 CAS 完成状态转移后，会立即执行 `record_state_and_log` 中非原子的 raw `store` 覆写，在大窗口频繁开合或托盘快速切换时容易造成竞态覆盖，导致后端状态机与实际窗口状态不同步。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.2`
-
-### BUG-264: Web Worker Reuse and Fallback Termination Failure in use-traffic-monitor.ts
- - **现象描述**：Web Worker 运行时报错触发 `onerror` 降级逻辑时，没有清理旧的 worker 线程和实例引用，导致下一次运行循环时误以为 Worker 依然存在并重用该损坏实例。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.2`
-
-### BUG-265: Silent Start lightweight mode initialization failure
- - **现象描述**：静默启动时主窗口尚未创建，进入轻量模式执行 `destroy_main_window` 返回 `Failed` 并回滚状态机。现已修正其在窗口不存在时返回 `NoAction` 并不再回滚状态机。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.2`
-
-### BUG-266: Debounce limit causing window/state-machine desync
- - **现象描述**：防抖限流导致窗口展示操作返回 `NoAction` 时，退出轻量模式依然强行切换状态机至 `Normal`，导致主窗口未显示但后端状态不一致。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.2`
-
-### BUG-267: Leaked useEffect timeout in _layout.tsx
- - **现象描述**：设置抽屉的 `useEffect` 中，当 `drawerOpen` 变为 falsy 时所调用的 `setTimeout` 超时器未被清除，产生组件卸载后的内存泄露风险。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.2`
-
-### BUG-268: Background connection cleanup race condition with wakeup
- - **现象描述**：进入轻量化异步触发的 Mihomo 垃圾连接清理和 WS 熔断任务无活性监控，在主窗口快速唤醒时可能误杀新窗口建立的正常网络与数据订阅连接。
- - **当前状态**：`代码已修正，待用户确认`
-### BUG-269: Leaked Background Logs Web Socket Processing Task in Rust Backend
- - **现象描述**：`ws_logs_checked` 中的日志后台任务没有在接收通道关闭返回 `None` 时断开循环并退出协程，导致协程在后台无限挂起，阻止了主窗口/WebView2 销毁后的资源回收，引发内存和句柄残留。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.3`
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
 | **BUG-262** | Missing Node Latency Display after Awakening from Lightweight Mode | v1.9.1 | 代码已修正，已确认 |
+| **BUG-269** | Leaked Background Logs Web Socket Processing Task in Rust Backend | v1.9.3 | 代码已修正，已确认 |
+| **BUG-268** | Background connection cleanup race condition with wakeup | v1.9.2 | 代码已修正，已确认 |
+| **BUG-267** | Leaked useEffect timeout in _layout.tsx | v1.9.2 | 代码已修正，已确认 |
+| **BUG-266** | Debounce limit causing window/state-machine desync | v1.9.2 | 代码已修正，已确认 |
+| **BUG-265** | Silent Start lightweight mode initialization failure | v1.9.2 | 代码已修正，已确认 |
+| **BUG-264** | Web Worker Reuse and Fallback Termination Failure in use-traffic-monitor.ts | v1.9.2 | 代码已修正，已确认 |
+| **BUG-263** | State Machine Race Condition via Raw Stores in lightweight.rs | v1.9.2 | 代码已修正，已确认 |
+| **BUG-261** | Settings Drawer Conditional Rendering Memory Leak and Style Bloat | v1.9.0 | 代码已修正，已确认 |
+| **BUG-260** | Web Worker Lifecycle Leak in Traffic Monitor on Visibility Toggle | v1.9.0 | 代码已修正，已确认 |
+| **BUG-259** | WebSocket Subscription CPU Overhead in Rust Backend on Entering Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
+| **BUG-258** | Active TCP Connections Leftover in Mihomo Kernel on Entering Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
+| **BUG-257** | High CPU/Battery Consumption of Background Health Check in Lightweight Mode | v1.9.0 | 代码已修正，已确认 |
+| **BUG-239** | High-frequency polling on proxies and connections causing high CPU/Resource consumption | v1.8.2 | 代码已修正，已确认 |
+| **BUG-238** | Navigation Menu Scrollbar Truncation | v1.8.1 | 代码已修正，已确认 |
+| **BUG-237** | Vertical Clipping Hazard in Compact Proxy Columns under High DPI | v1.8.1 | 代码已修正，已确认 |
+| **BUG-235** | Scrollbar Hiding Overrides and Layout Conflict | v1.8.1 | 代码已修正，已确认 |
+| **BUG-234** | Hardcoded Opaque Background Colors Overriding Theme Skins | v1.8.1 | 代码已修正，已确认 |
+| **BUG-233** | CSS Specificity Conflict on Dialog/Menu Backgrounds under Frosted Glass | v1.8.1 | 代码已修正，已确认 |
+| **BUG-224** | React useMemo Dependency Array Omits theme and skin | v1.8.1 | 代码已修正，已确认 |
+| **BUG-223** | Contrast and Invisible Borders Styling Issue in Frosted Glass Skin | v1.8.1 | 代码已修正，已确认 |
 | **BUG-242** | Mismatched window threshold hiding titlebar in normal layout (AUDIT-03) | v1.8.8 | 代码已修正，已确认 |
 | **BUG-256** | Shell Program Exits and Panics on Window Close in Auto Lightweight Mode | v1.8.8 | 代码已修正，已确认 |
 | **BUG-241** | Settings Drawer active and resources polling in mini mode (AUDIT-02) | v1.8.8 | 代码已修正，已确认 |

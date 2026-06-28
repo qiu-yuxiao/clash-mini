@@ -59,7 +59,12 @@ impl CoreManager {
             return Ok(());
         }
 
-        logging!(info, Type::Core, "start_core_inner: starting core, mode={:?}", *self.get_running_mode());
+        logging!(
+            info,
+            Type::Core,
+            "start_core_inner: starting core, mode={:?}",
+            *self.get_running_mode()
+        );
         let result = match *self.get_running_mode() {
             RunningMode::Service => self.start_core_by_service().await,
             RunningMode::NotRunning | RunningMode::Sidecar => self.start_core_by_sidecar().await,

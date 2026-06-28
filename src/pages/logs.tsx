@@ -177,7 +177,6 @@ const LogPage = () => {
         }}
       >
         <BaseStyledSelect
-          // @ts-expect-error MUI v9 aria-label type issue
           aria-label={t('shared.filters.logLevels.label')}
           value={logState}
           onChange={(e) => handleLogLevelChange(e.target.value as LogFilter)}
