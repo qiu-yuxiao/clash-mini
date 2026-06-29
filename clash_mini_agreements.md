@@ -158,7 +158,7 @@
 
 
 
-   * 必须保证 Clash Mini 与原版的配置相互独立。配置文件（如 `clash-verge.yaml`）、数据库以及订阅列表（`profiles.yaml`）在用户本地 of `AppData\Roaming\clash-verge` 目录中独立加载（沿用原版后端逻辑，以防破坏后端稳定性）。
+   * 必须保证 Clash Mini 与原版的配置相互独立。配置文件（如 `verge.yaml`）、数据库以及订阅列表（`profiles.yaml`）在用户本地 of `AppData\Roaming\io.github.clash-mini.clash-mini` 目录中独立加载（沿用原版后端逻辑，以防破坏后端稳定性）。
 
 
 
