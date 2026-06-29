@@ -1,3 +1,17 @@
+## v1.9.13
+
+### 🚀 Layout & Usability
+
+- **图标与卡片同行布局彻底对齐**：彻底修复图钉和齿轮图标因异步 decorated 状态判断延迟而错位至原生窗口标题栏的 Bug。将两个控制图标直接作为 Flex 子项并入活跃出口节点卡片行（行间隔 `gap` 设为 `0` 实现紧密贴合），从底层布局保证在任何情况下三者保持同行对齐。
+- **设置面板右上角关闭按钮优化**：在设置面板打开时，自适应在右上角渲染绝对定位的关闭按钮，使用户能随时返回主视图。
+
+### 📋 Code Quality & Agreement Sync
+
+- **协议条款同步更新**：同步更新 `clash_mini_agreements.md` 对应的顶栏 3D 按钮排版和避让条款，维护协议与实现的一致性。
+- **编译/静态语法清理**：移除多处未使用的局部变量与无效导入（如 `useAppRefreshers`、`onProxies`、`showDelay`），使前端以 **0 Error 0 Warning** 的健康状态顺利通过 Husky pre-commit 钩子检验。
+
+---
+
 ## v1.9.12
 
 ### 🚀 Performance & Stability
