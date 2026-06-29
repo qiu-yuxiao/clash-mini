@@ -324,19 +324,19 @@ async function triggerAutoSelectAndRefresh(
   }
 
   // 不管 auto-select 是否成功，以下操作永远执行
-  // BUG-002 修复：refreshAll 的网络异常在此捕获，不向外传播，避免触发 profile 重试链
+  // BUG-002 修复：refreshProxy 优先，避免 refreshAll 的四路并发 IPC 在节点大量测速完成时阻塞 WebView 主线程
   try {
-    await refreshAll()
+    await refreshProxy({ forceFull: true })
   } catch (err) {
     console.warn(
-      '[Layout] refreshAll after auto-select failed (non-critical):',
+      '[Layout] refreshProxy after auto-select failed (non-critical):',
       err,
     )
-    // 降级：至少保证代理列表被刷新
+    // 降级：尝试全量刷新兜底
     try {
-      await refreshProxy({ forceFull: true })
+      await refreshAll()
     } catch (fallbackErr) {
-      console.warn('[Layout] refreshProxy fallback also failed:', fallbackErr)
+      console.warn('[Layout] refreshAll fallback also failed:', fallbackErr)
     }
   }
   // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
