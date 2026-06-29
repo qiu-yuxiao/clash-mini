@@ -435,7 +435,7 @@ const Layout = () => {
     if (saved !== null) return parseFloat(saved)
     if (skin === 'retro-3d') {
       const oldSaved = localStorage.getItem('clash-mini-depth-factor')
-      return oldSaved !== null ? parseFloat(oldSaved) : 1.0
+      return oldSaved !== null ? parseFloat(oldSaved) : 0.3
     }
     return 1.0
   })
@@ -465,7 +465,7 @@ const Layout = () => {
         setDepthFactor(parseFloat(val1))
       } else if (newSkin === 'retro-3d') {
         const oldSaved = localStorage.getItem('clash-mini-depth-factor')
-        setDepthFactor(oldSaved !== null ? parseFloat(oldSaved) : 1.0)
+        setDepthFactor(oldSaved !== null ? parseFloat(oldSaved) : 0.3)
       } else {
         setDepthFactor(1.0)
       }
