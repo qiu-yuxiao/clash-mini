@@ -1117,7 +1117,7 @@ const Layout = () => {
       // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       setTimeout(() => {
-        batchTestWithFirstBatchSelect('PROXY', names, timeout, 36, false)
+        DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
           .then(async () => {
             await refreshAllRef.current()
           })
