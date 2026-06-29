@@ -85,7 +85,7 @@ export const ProxyItem = (props: Props) => {
   const displayNow = proxy?.now ? proxy.now.replace(/\s\(\d{6}\)$/, '') : ''
 
   // -1/<=0 为不显示，-2 为 loading
-  const { delayValue, isPreset, timeout, onDelay } = useProxyDelayState(
+  const { delayValue, isPreset, timeout } = useProxyDelayState(
     proxy,
     group?.name ?? '',
   )
@@ -122,12 +122,6 @@ export const ProxyItem = (props: Props) => {
           const showDelay = delayValue > 0
 
           return {
-            '&:hover .the-check': {
-              display: !showDelay ? 'inline-block' : 'none',
-            },
-            '&:hover .the-delay': {
-              display: showDelay ? 'inline-block' : 'none',
-            },
             '&:hover .the-icon': { display: 'none' },
             '&:hover': {
               transform: 'translateY(-1.5px)',
@@ -286,46 +280,16 @@ export const ProxyItem = (props: Props) => {
           </Widget>
         )}
 
-        {!proxy?.provider && delayValue !== -2 && (
-          <Widget
-            className="the-check"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              onDelay()
-            }}
-            sx={({ palette }) => ({
-              display: 'none',
-              cursor: 'pointer',
-              fontSize: '11px',
-              border: `1px solid ${alpha(palette.primary.main, 0.3)}`,
-              color: 'primary.main',
-              ':hover': { bgcolor: alpha(palette.primary.main, 0.15) },
-            })}
-          >
-            Check
-          </Widget>
-        )}
-
         {delayValue >= 0 && (
           <Widget
             key={delayValue}
             className="the-delay"
-            onClick={(e) => {
-              if (proxy?.provider) return
-              e.preventDefault()
-              e.stopPropagation()
-              onDelay()
-            }}
             sx={({ palette }) => ({
               color: delayManager.formatDelayColor(delayValue, timeout, palette.mode === 'dark'),
-              cursor: proxy?.provider ? 'default' : 'pointer',
+              cursor: 'default',
               fontSize: '11px',
               fontWeight: 600,
               animation: `${popIn} 0.4s ease-out`,
-              ...(!proxy.provider
-                ? { ':hover': { bgcolor: alpha(palette.primary.main, 0.15) } }
-                : {}),
             })}
           >
             {delayManager.formatDelay(delayValue, timeout)}
