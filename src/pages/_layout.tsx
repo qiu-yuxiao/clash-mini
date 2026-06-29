@@ -216,6 +216,7 @@ async function frontendAutoSelect(
 }
 
 async function triggerAutoSelectAndRefresh(
+  refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
   t: (key: string, opts?: any) => string,
   fallbackTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
@@ -235,6 +236,13 @@ async function triggerAutoSelectAndRefresh(
     } else {
       console.error('[Layout] 自动选点失败:', err)
     }
+  }
+
+  // 选点后刷新前端显示，确保活跃节点标记（对勾）打在正确的节点上
+  try {
+    await refreshProxy({ forceFull: true })
+  } catch (err) {
+    console.warn('[Layout] refreshProxy after auto-select failed:', err)
   }
 
   // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
@@ -1136,6 +1144,7 @@ const Layout = () => {
             await waitForClashReady(tRef.current)
             if (cancelled || isImportingRef.current) return
             await triggerAutoSelectAndRefresh(
+              refreshProxyRef.current,
               tRef.current,
               fallbackTimerRef,
               setHeadStateForSortRef.current,
