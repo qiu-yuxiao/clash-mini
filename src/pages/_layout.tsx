@@ -1677,7 +1677,7 @@ const Layout = () => {
                       : '3px 8px 2px 8px',
                   position: 'relative',
                   zIndex: 9998,
-                  gap: '8px',
+                  gap: 0,
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
