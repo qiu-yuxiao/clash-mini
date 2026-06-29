@@ -454,7 +454,7 @@ pub fn start_background_monitor() {
         let mut current_cooldown = Duration::from_secs(0);
         let mut was_online = true;
         let mut is_first_run = true;
-        let mut last_node_switch_time = Instant::now();
+        let mut last_node_switch_time: Option<Instant> = None;
         let mut last_online_check_time: Option<Instant> = None;
         let mut was_lightweight = crate::module::lightweight::is_in_lightweight_mode();
 
@@ -463,10 +463,10 @@ pub fn start_background_monitor() {
                 is_first_run = false;
             } else {
                 // 定期健康检测的间隔：重试模式下为 3 秒，轻量模式下为 300 秒（5分钟），正常模式下为 60 秒
-                let is_lightweight = crate::module::lightweight::is_in_lightweight_mode();
+                let is_lightweight_before_sleep = crate::module::lightweight::is_in_lightweight_mode();
                 let check_interval = if is_retry_mode {
                     3
-                } else if is_lightweight {
+                } else if is_lightweight_before_sleep {
                     300
                 } else {
                     60
@@ -494,8 +494,6 @@ pub fn start_background_monitor() {
                 );
             }
             was_lightweight = is_lightweight;
-
-
 
             let current_profile = match get_current_profile_uid().await {
                 Some(uid) => uid,
@@ -530,6 +528,9 @@ pub fn start_background_monitor() {
                         Type::Lightweight,
                         "[后台监测] 退出轻量模式，触发唤醒时全节点延迟测试"
                     );
+                    consecutive_fails = 0;
+                    is_retry_mode = false;
+                    current_cooldown = Duration::from_secs(0);
                 }
 
                 if wait_for_clash_ready().await {
@@ -664,7 +665,7 @@ pub fn start_background_monitor() {
                     consecutive_fails = 0;
                     is_retry_mode = false;
                     current_cooldown = Duration::from_secs(0);
-                    last_node_switch_time = Instant::now(); // 记录切换冷却时间戳
+                    last_node_switch_time = Some(Instant::now()); // 记录切换冷却时间戳
                 }
 
                 match check_active_node_health().await {
@@ -693,17 +694,19 @@ pub fn start_background_monitor() {
                                     let now = Instant::now();
 
                                     // 检查 10 分钟切换冷却限制（自动与手动均起作用）
-                                    if last_node_switch_time.elapsed() < Duration::from_secs(600) {
-                                        if status == NodeHealthStatus::Unhealthy {
-                                            logging!(
-                                                info,
-                                                Type::Lightweight,
-                                                "[后台监测] 节点仅为亚健康且处于 10 分钟切换冷却中（已过 {} 秒），跳过自动选点",
-                                                last_node_switch_time.elapsed().as_secs()
-                                            );
-                                            last_check_time = now;
-                                            continue;
-                                        } else {
+                                    // 初始 None 表示尚未发生过任何切换，不应用冷却
+                                    if let Some(last_switch) = last_node_switch_time {
+                                        if last_switch.elapsed() < Duration::from_secs(600) {
+                                            if status == NodeHealthStatus::Unhealthy {
+                                                logging!(
+                                                    info,
+                                                    Type::Lightweight,
+                                                    "[后台监测] 节点仅为亚健康且处于 10 分钟切换冷却中（已过 {} 秒），跳过自动选点",
+                                                    last_switch.elapsed().as_secs()
+                                                );
+                                                last_check_time = now;
+                                                continue;
+                                            }
                                             logging!(
                                                 info,
                                                 Type::Lightweight,

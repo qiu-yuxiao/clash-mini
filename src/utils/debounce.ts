@@ -1,5 +1,5 @@
-export default function debounce<Args extends unknown[], R>(
-  func: (...args: Args) => R,
+export default function debounce<Args extends unknown[]>(
+  func: (...args: Args) => void,
   wait: number,
 ): (...args: Args) => void {
   let timeout: ReturnType<typeof setTimeout> | null = null

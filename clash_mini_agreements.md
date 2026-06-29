@@ -2667,3 +2667,57 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
   - `crates/tauri-plugin-mihomo/dist-js/index.cjs`
 
 ---
+
+## 🔄 新增协议：v1.9.10 全面防御性审计与硬化规范 (2026-06-29)
+
+### 背景
+v1.9.10 发布前对 v1.8.8 至 v1.9.10 之间累计约 1,000 行核心代码净变更进行了全量 diff 审计。审计覆盖 Rust 后端 17 个文件、TypeScript 前端 55 个文件，发现并修复了以下设计缺陷。
+
+### 协议内容
+
+#### 1. ServiceManager.init() 错误信息格式化
+- **问题**：`"服务连接失败: {e}".to_string()` 使用普通字符串字面量，`{e}` 不会被变量替换。
+- **修复**：改为 `format!("服务连接失败: {e}")`。
+- **影响范围**：`src-tauri/src/core/service.rs`。此缺陷从上游 Clash Verge Rev 继承。
+
+#### 2. 节点切换冷却计时器初始化规范
+- **设计规则**：`last_node_switch_time` 必须初始化为 `Option<Instant>` 的 `None`，而非 `Instant::now()`。冷却期仅在发生**实际节点切换**后开始计时。
+- **行为**：启动后首次自愈选点不受 10 分钟冷却限制。切换发生后，`last_node_switch_time` 被置为 `Some(Instant::now())`，之后 10 分钟内 Unhealthy 节点不触发自动切换。
+- **影响范围**：`src-tauri/src/module/monitor.rs`。
+
+#### 3. 窗口操作结果 `NoAction` 在退出轻量模式中的处理规范
+- **设计规则**：`exit_lightweight_mode()` 对 `WindowOperationResult` 的匹配必须将 `NoAction` 与 `Shown`、`Created` 视为同等成功状态。`NoAction` 表示窗口已处于可用状态，不应触发状态机回滚。
+- **原因**：旧代码的 catch-all `_` 分支将 `NoAction` 误判为失败，导致状态机回滚到 `In` 而窗口实际可见，造成 desync。
+- **影响范围**：`src-tauri/src/module/lightweight.rs`。
+
+#### 4. 退出轻量模式时重置故障计数器规范
+- **设计规则**：monitor 守护线程检测到退出轻量模式（`was_lightweight && !is_lightweight`）并触发全节点延迟测试时，必须同步重置 `consecutive_fails = 0`、`is_retry_mode = false`、`current_cooldown = Duration::from_secs(0)`。
+- **原因**：防止轻量模式期间累积的失败计数器被带入正常模式，导致行为不可预测。
+- **影响范围**：`src-tauri/src/module/monitor.rs`。
+
+#### 5. Monitor 循环变量遮蔽禁止规范
+- **设计规则**：monitor 主循环中用于决定 sleep 间隔的轻量模式快照，必须使用独立命名的变量（如 `is_lightweight_before_sleep`），禁止与 sleep 后重新计算的 `is_lightweight` 使用同名变量遮蔽。
+- **影响范围**：`src-tauri/src/module/monitor.rs`。
+
+#### 6. 关闭自动轻量模式时的托盘菜单同步规范
+- **设计规则**：`entry_lightweight_mode()` 在 `enable_auto_light_weight_mode` 为 `false` 时仅隐藏窗口而不进入状态机，但仍必须调用 `refresh_lightweight_tray_state()` 和 `update_lite_mode_menu(false)` 保持托盘菜单显示与实际状态一致。
+- **影响范围**：`src-tauri/src/module/lightweight.rs`。
+
+#### 7. 设置抽屉组件生命周期恢复为条件渲染
+- **设计规则**：设置抽屉（theme-panel）必须使用 `{drawerOpen && !isMiniStatus && (...)}` 条件渲染。关闭时组件从 DOM 物理卸载，WebSocket 订阅和 data fetching 随之断开。严禁使用 CSS transform/opacity 隐藏替代条件卸载。
+- **原因**：始终挂载 + CSS 隐藏会导致 ConnectionsPanel 的 WebSocket 在抽屉关闭后持续运行，抵消轻量模式熔断优化（BUG-259）的效果。
+- **影响范围**：`src/pages/_layout.tsx`。本规则恢复并强化了第 39 条协议（BUG-240）的原始设计。
+
+#### 8. 前端 debounce 泛型约束规范
+- **设计规则**：`debounce` 工具函数的回调参数必须约束为 `(...args: Args) => void`。禁止引入泛型 `R` 暗示返回值可用——`setTimeout` 回调中的返回值被静默丢弃，类型层面必须如实反映。
+- **影响范围**：`src/utils/debounce.ts`。
+
+#### 9. API 类型断言收紧规范
+- **设计规则**：`calcuProxyProviders` 中的 proxy 映射禁止使用 `as unknown as IProxyItem` 双断言绕过类型检查。改为 `as IProxyItem` 单断言，将类型检查点前置到扩展运算符的源对象上。
+- **影响范围**：`src/services/cmds.ts`。
+
+#### 10. Config Draft 提前 apply 时序风险标注
+- **说明**：`patch_clash()` 中 `apply()` 在 `enhance()` 之前调用是为了让 `get_config_values()` 读取到最新值。若 `enhance()` 失败会通过回滚恢复旧配置，中间存在短暂不一致窗口。由于调用路径为同步 Tauri command，实际不存在并发读者，风险可控。已在代码中添加注释说明。
+- **影响范围**：`src-tauri/src/feat/config.rs`。
+
+---

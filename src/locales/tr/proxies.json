@@ -23,9 +23,6 @@
       "title": "Proxy Rules",
       "select": "Select Rules"
     },
-    "a11y": {
-      "nodelist": "代理节点列表"
-    },
     "labels": {
       "proxyCount": "Vekil Sayısı",
       "delayCheckReset": "Sabit iptali için gecikme kontrolü"

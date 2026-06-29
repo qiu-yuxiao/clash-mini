@@ -64,17 +64,13 @@ import DelayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
-import {
-  get3DButtonStyle,
-  get3DCardStyle,
-} from '@/utils/button-styles'
+import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
 import { isDummyNode } from '@/utils/node'
 import {
   closeAllConnections,
   getProxyByName,
   selectNodeForGroup,
 } from 'tauri-plugin-mihomo-api'
-
 
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
@@ -110,7 +106,7 @@ dayjs.extend(relativeTime)
 async function waitForClashReady(
   t: (key: string, opts?: any) => string,
 ): Promise<boolean> {
-  const MAX_WAIT_MS = 10_000  // 修复 BUG-MAJOR-003：从 20 秒减少到 10 秒
+  const MAX_WAIT_MS = 10_000 // 修复 BUG-MAJOR-003：从 20 秒减少到 10 秒
   const POLL_INTERVAL_MS = 500
   const startedAt = Date.now()
 
@@ -139,7 +135,8 @@ async function waitForClashReady(
   // 协议要求：超时后提示用户（使用 MUI snackbar，非原生通知）
   try {
     showNotice.info(
-      t('shared.feedback.notifications.clashNotReady') || 'Clash 内核加载超时，自动选点可能不准确',
+      t('shared.feedback.notifications.clashNotReady') ||
+        'Clash 内核加载超时，自动选点可能不准确',
     )
   } catch {
     // showNotice 不可用则静默失败
@@ -172,9 +169,11 @@ async function frontendAutoSelect(
   }
 
   // 1. 异步拉起 36 路并发测速（非阻塞，让其在后台继续完整跑完以刷新所有节点的延迟）
-  DelayManager.checkListDelay(allNames, groupName, timeout, concurrency).catch((err) => {
-    console.error('[Layout] 后台自动选点测速异常:', err)
-  })
+  DelayManager.checkListDelay(allNames, groupName, timeout, concurrency).catch(
+    (err) => {
+      console.error('[Layout] 后台自动选点测速异常:', err)
+    },
+  )
 
   // 2. 轮询选点逻辑
   const startTime = Date.now()
@@ -200,7 +199,8 @@ async function frontendAutoSelect(
         const delay = DelayManager.getDelay(name, groupName)
         if (delay !== -1 && delay !== -2) {
           testedCount++
-          if (delay >= 30 && delay < timeout) { // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
+          if (delay >= 30 && delay < timeout) {
+            // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
             healthyNodes.push({ name, delay })
           }
         }
@@ -229,7 +229,9 @@ async function frontendAutoSelect(
         hasSelectedTemp = true
         const tempTarget = healthyNodes[0].name
         selectedTempNode = tempTarget
-        console.log(`[Layout] 自动选点触发临时闪连: ${tempTarget} (${healthyNodes[0].delay}ms)`)
+        console.log(
+          `[Layout] 自动选点触发临时闪连: ${tempTarget} (${healthyNodes[0].delay}ms)`,
+        )
         activeSelectionPromise = (async () => {
           try {
             await selectNodeForGroup(groupName, tempTarget)
@@ -253,9 +255,13 @@ async function frontendAutoSelect(
         if (healthyNodes.length >= 1) {
           const targetNode = healthyNodes[0].name
           const targetDelay = healthyNodes[0].delay
-          console.log(`[Layout] 自动选点触发极速终选: ${targetNode} (${targetDelay}ms)`)
+          console.log(
+            `[Layout] 自动选点触发极速终选: ${targetNode} (${targetDelay}ms)`,
+          )
           if (selectedTempNode === targetNode) {
-            console.log(`[Layout] 极速终选节点与临时闪连一致 (${targetNode})，无需重复切换`)
+            console.log(
+              `[Layout] 极速终选节点与临时闪连一致 (${targetNode})，无需重复切换`,
+            )
             if (activeSelectionPromise) {
               try {
                 await activeSelectionPromise
@@ -267,7 +273,10 @@ async function frontendAutoSelect(
                 await activeSelectionPromise
               } catch {}
             }
-            if (activeAutoSelectTimer === timerId || activeAutoSelectTimer === null) {
+            if (
+              activeAutoSelectTimer === timerId ||
+              activeAutoSelectTimer === null
+            ) {
               try {
                 await selectNodeForGroup(groupName, targetNode)
                 await refreshProxy({ forceFull: true })
@@ -300,7 +309,9 @@ async function triggerAutoSelectAndRefresh(
   try {
     const results = await frontendAutoSelect('PROXY', refreshProxy, 10000, 36)
     if (results.length > 0) {
-      console.log(`[Layout] 自动选点完成，最快节点: ${results[0][0]} (${results[0][1]}ms)`)
+      console.log(
+        `[Layout] 自动选点完成，最快节点: ${results[0][0]} (${results[0][1]}ms)`,
+      )
     } else {
       console.log('[Layout] 自动选点无可用节点')
     }
@@ -317,9 +328,16 @@ async function triggerAutoSelectAndRefresh(
   try {
     await refreshAll()
   } catch (err) {
-    console.warn('[Layout] refreshAll after auto-select failed (non-critical):', err)
+    console.warn(
+      '[Layout] refreshAll after auto-select failed (non-critical):',
+      err,
+    )
     // 降级：至少保证代理列表被刷新
-    try { await refreshProxy({ forceFull: true }) } catch {}
+    try {
+      await refreshProxy({ forceFull: true })
+    } catch (fallbackErr) {
+      console.warn('[Layout] refreshProxy fallback also failed:', fallbackErr)
+    }
   }
   // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
   if (setHeadState) {
@@ -342,7 +360,8 @@ async function triggerAutoSelectAndRefresh(
       // 修复 BUG-MAJOR-002：只检查最新一条历史记录，而不是任意历史记录
       const nowNode = await getProxyByName(nowNodeName)
       const history = nowNode?.history || []
-      const latestDelay = history.length > 0 ? history[history.length - 1].delay : -1
+      const latestDelay =
+        history.length > 0 ? history[history.length - 1].delay : -1
       const hasHealth = latestDelay > 50 && latestDelay < 2000
       if (!hasHealth) {
         // 无健康节点，强制全节点测速
@@ -501,16 +520,23 @@ const Layout = () => {
 
   // Core Update states
   const [coreUpdateOpen, setCoreUpdateOpen] = useState(false)
-  const [coreUpdateRelease, setCoreUpdateRelease] = useState<GithubRelease | null>(null)
+  const [coreUpdateRelease, setCoreUpdateRelease] =
+    useState<GithubRelease | null>(null)
   const [coreUpgradeStatus, setCoreUpgradeStatus] = useState<string>('idle')
   const [coreUpgradeProgress, setCoreUpgradeProgress] = useState<number>(0)
   const [coreUpgradeMessage, setCoreUpgradeMessage] = useState<string>('')
   const [coreCheckLoading, setCoreCheckLoading] = useState(false)
 
-  const [isMinimalWidth, setIsMinimalWidth] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 285)
+  const [isMinimalWidth, setIsMinimalWidth] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 285,
+  )
 
-  const [isMiniStatus, setIsMiniStatus] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 285 && window.innerHeight <= 100)
-
+  const [isMiniStatus, setIsMiniStatus] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.innerWidth <= 285 &&
+      window.innerHeight <= 100,
+  )
 
   const handleDepthFactorChange = (val: number) => {
     setDepthFactor(val)
@@ -611,7 +637,8 @@ const Layout = () => {
   }, [switchLanguage])
 
   // Drawer Toggle State
-  const { isSettingsOpen: drawerOpen, setIsSettingsOpen: setDrawerOpen } = useSystemData()
+  const { isSettingsOpen: drawerOpen, setIsSettingsOpen: setDrawerOpen } =
+    useSystemData()
 
   // Profiles State
   const [url, setUrl] = useState('')
@@ -860,7 +887,9 @@ const Layout = () => {
       active = false
       unlistenPromise
         .then((unlisten) => unlisten())
-        .catch((err) => console.warn('Failed to unlisten from core-upgrade-progress:', err))
+        .catch((err) =>
+          console.warn('Failed to unlisten from core-upgrade-progress:', err),
+        )
     }
   }, [mutateVersion])
 
@@ -1110,7 +1139,10 @@ const Layout = () => {
 
   // eslint-disable-next-line @eslint-react/no-unused-state
   const [profileRefreshCounter, setProfileRefreshCounter] = useState(0)
-  const lastProcessedRef = useRef<{ uid: string | null; counter: number }>({ uid: null, counter: -1 })
+  const lastProcessedRef = useRef<{ uid: string | null; counter: number }>({
+    uid: null,
+    counter: -1,
+  })
   const startupRetryCountRef = useRef(0)
   const fallbackTimerRef = useRef<number | null>(null)
   // 解决 BUG-118: handleImportProfile 与 useEffect 双链竞态
@@ -1157,14 +1189,16 @@ const Layout = () => {
       const timeout = verge?.default_latency_timeout || 10000
       lastFullTestTimeRef.current = now
       console.log('[Layout] 窗口唤醒，触发后台节点测速以刷新延迟')
-      
+
       // 3. 异步执行全节点测速，由 backend-delay-results 事件驱动增量刷新，不阻塞 UI 渲染
-      DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36).then(async () => {
-        // 测速全部完成后再做一次静默刷新作为备份
-        await refreshAllRef.current()
-      }).catch((err) => {
-        console.error('[Layout] 唤醒后后台测速异常:', err)
-      })
+      DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
+        .then(async () => {
+          // 测速全部完成后再做一次静默刷新作为备份
+          await refreshAllRef.current()
+        })
+        .catch((err) => {
+          console.error('[Layout] 唤醒后后台测速异常:', err)
+        })
     } catch (err) {
       console.error('[Layout] 唤醒刷新与测速失败:', err)
     }
@@ -1181,10 +1215,14 @@ const Layout = () => {
   useEffect(() => {
     if (currentProfileUid) {
       const isNewProfile = lastProcessedRef.current.uid !== currentProfileUid
-      const isRefreshTriggered = lastProcessedRef.current.counter !== profileRefreshCounter
+      const isRefreshTriggered =
+        lastProcessedRef.current.counter !== profileRefreshCounter
 
       if (isNewProfile || isRefreshTriggered) {
-        lastProcessedRef.current = { uid: currentProfileUid, counter: profileRefreshCounter }
+        lastProcessedRef.current = {
+          uid: currentProfileUid,
+          counter: profileRefreshCounter,
+        }
         const uid = currentProfileUid
         let cancelled = false
         let timerId: any = null
@@ -1215,17 +1253,16 @@ const Layout = () => {
           })
           .catch((err) => {
             if (cancelled) return
-            console.error(
-              `[Layout] Failed to enhance profile ${uid}:`,
-              err,
-            )
+            console.error(`[Layout] Failed to enhance profile ${uid}:`, err)
             // Reset to allow retry/reload
             lastProcessedRef.current.uid = null
 
             // Auto-retry up to 3 times on failure/startup
             if (startupRetryCountRef.current < 3) {
               startupRetryCountRef.current += 1
-              console.log(`[Layout] Retrying profile activation in 2s (Attempt ${startupRetryCountRef.current}/3)`)
+              console.log(
+                `[Layout] Retrying profile activation in 2s (Attempt ${startupRetryCountRef.current}/3)`,
+              )
               timerId = setTimeout(() => {
                 if (!cancelled) {
                   setProfileRefreshCounter((c) => c + 1)
@@ -1344,7 +1381,10 @@ const Layout = () => {
         }
       }
     } catch (err) {
-      console.error('[handleImportProfile] 首次导入失败，尝试 Clash 代理重试:', err)
+      console.error(
+        '[handleImportProfile] 首次导入失败，尝试 Clash 代理重试:',
+        err,
+      )
       try {
         await importProfile(url, { with_proxy: false, self_proxy: true })
         showNotice.success('shared.feedback.notifications.importWithClashProxy')
@@ -1508,7 +1548,9 @@ const Layout = () => {
       try {
         await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
         if (verge?.auto_close_connection) {
-          await closeAllConnections().catch(() => console.warn('[layout] closeAllConnections failed'))
+          await closeAllConnections().catch(() =>
+            console.warn('[layout] closeAllConnections failed'),
+          )
         }
         showNotice.success('已切换至手动模式')
       } catch (err) {
@@ -1613,7 +1655,11 @@ const Layout = () => {
                 })
               }
               sx={(theme) => ({
-                ...get3DButtonStyle(theme, 'contained', verge?.enable_always_on_top ? 'primary' : 'default'),
+                ...get3DButtonStyle(
+                  theme,
+                  'contained',
+                  verge?.enable_always_on_top ? 'primary' : 'default',
+                ),
                 flexShrink: 0,
                 width: '28px',
                 height: '28px',
@@ -1642,10 +1688,18 @@ const Layout = () => {
 
           <IconButton
             size="small"
-            aria-label={drawerOpen ? t('layout.a11y.closeSettings') : t('layout.a11y.openSettings')}
+            aria-label={
+              drawerOpen
+                ? t('layout.a11y.closeSettings')
+                : t('layout.a11y.openSettings')
+            }
             onClick={() => setDrawerOpen(!drawerOpen)}
             sx={(theme) => ({
-              ...get3DButtonStyle(theme, 'contained', drawerOpen ? 'primary' : 'default'),
+              ...get3DButtonStyle(
+                theme,
+                'contained',
+                drawerOpen ? 'primary' : 'default',
+              ),
               flexShrink: 0,
               width: '28px',
               height: '28px',
@@ -1654,9 +1708,15 @@ const Layout = () => {
             })}
           >
             {drawerOpen ? (
-              <CloseRounded aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+              <CloseRounded
+                aria-hidden="true"
+                sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+              />
             ) : (
-              <SettingsRoundedIcon aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+              <SettingsRoundedIcon
+                aria-hidden="true"
+                sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+              />
             )}
           </IconButton>
 
@@ -1779,19 +1839,33 @@ const Layout = () => {
               >
                 <IconButton
                   size="small"
-                  aria-label={drawerOpen ? t('layout.a11y.closeSettings') : t('layout.a11y.openSettings')}
+                  aria-label={
+                    drawerOpen
+                      ? t('layout.a11y.closeSettings')
+                      : t('layout.a11y.openSettings')
+                  }
                   onClick={() => setDrawerOpen(!drawerOpen)}
                   sx={(theme) => ({
-                    ...get3DButtonStyle(theme, 'contained', drawerOpen ? 'primary' : 'default'),
+                    ...get3DButtonStyle(
+                      theme,
+                      'contained',
+                      drawerOpen ? 'primary' : 'default',
+                    ),
                     width: '28px',
                     height: '28px',
                     p: 0,
                   })}
                 >
                   {drawerOpen ? (
-                    <CloseRounded aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+                    <CloseRounded
+                      aria-hidden="true"
+                      sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+                    />
                   ) : (
-                    <SettingsRoundedIcon aria-hidden="true" sx={{ fontSize: '20px', width: '20px', height: '20px' }} />
+                    <SettingsRoundedIcon
+                      aria-hidden="true"
+                      sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+                    />
                   )}
                 </IconButton>
               </div>
@@ -1815,22 +1889,26 @@ const Layout = () => {
                   <ActiveNodeStatusCard />
                 </div>
                 {(decorated || isDecorationsHidden) && (
-                <IconButton
-                  size="small"
-                  aria-label={t('layout.a11y.pinWindow')}
-                  onClick={() =>
-                    patchVerge({
-                      enable_always_on_top: !verge?.enable_always_on_top,
-                    })
-                  }
-                  sx={(theme) => ({
-                    ...get3DButtonStyle(theme, 'contained', verge?.enable_always_on_top ? 'primary' : 'default'),
-                    flexShrink: 0,
-                    width: '28px',
-                    height: '28px',
-                    p: 0,
-                  })}
-                >
+                  <IconButton
+                    size="small"
+                    aria-label={t('layout.a11y.pinWindow')}
+                    onClick={() =>
+                      patchVerge({
+                        enable_always_on_top: !verge?.enable_always_on_top,
+                      })
+                    }
+                    sx={(theme) => ({
+                      ...get3DButtonStyle(
+                        theme,
+                        'contained',
+                        verge?.enable_always_on_top ? 'primary' : 'default',
+                      ),
+                      flexShrink: 0,
+                      width: '28px',
+                      height: '28px',
+                      p: 0,
+                    })}
+                  >
                     <PushPinRounded
                       aria-hidden="true"
                       sx={{
@@ -1868,8 +1946,8 @@ const Layout = () => {
               </div>
             )}
 
-            {/* Settings Drawer (Always mounted, hidden via transform when closed) */}
-            {!isMiniStatus && (
+            {/* Settings Drawer (Conditionally mounted; unmounting avoids idle WebSocket/resource drain) */}
+            {drawerOpen && !isMiniStatus && (
               <div
                 className="theme-panel"
                 style={{
@@ -1888,314 +1966,278 @@ const Layout = () => {
                   padding: '12px',
                   gap: '12px',
                   overflow: 'hidden',
-                  transform: drawerOpen
-                    ? 'translate(0, 0) scale(1)'
-                    : 'translate(100%, -100%) scale(0.95)',
-                  opacity: drawerOpen ? 1 : 0,
-                  pointerEvents: drawerOpen ? 'auto' : 'none',
-                  transition:
-                    'transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.3s ease-in-out',
                 }}
               >
-              {/* Left Settings Column (240px width) */}
-              <Box
-                sx={{
-                  flex: '0 0 240px',
-                  width: '240px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '5px',
-                  overflow: 'hidden',
-                  pr: 1,
-                  borderRight: (theme) => `1px solid ${theme.palette.divider}`,
-                  pb: { xs: 0, '@media (min-height: 831px)': '30px' },
-                }}
-              >
-                {/* Section 1: Subscriptions Import */}
-                <ProfileImportCard
-                  url={url}
-                  setUrl={setUrl}
-                  profileLoading={profileLoading}
-                  profileItems={profileItems}
-                  currentProfileUid={currentProfileUid}
-                  importInputRef={importInputRef}
-                  importInputContextMenu={importInputContextMenu}
-                  setImportInputContextMenu={setImportInputContextMenu}
-                  handleImportProfile={handleImportProfile}
-                  handleSelectProfile={handleSelectProfile}
-                  handleUpdateProfile={handleUpdateProfile}
-                  handleDeleteProfile={handleDeleteProfile}
-                  setProfileMenuAnchorPosition={setProfileMenuAnchorPosition}
-                  setContextMenuProfileUid={setContextMenuProfileUid}
-                />
-
-                {/* Section 2: Takeover Mode + Routing Preference (合并为同一卡片) */}
+                {/* Left Settings Column (240px width) */}
                 <Box
                   sx={{
-                    p: 1,
-                    flexShrink: 0,
-                    ...get3DCardStyle(theme, 'default'),
-                    '&:hover': {
-                      transform: 'none',
-                      boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+                    flex: '0 0 240px',
+                    width: '240px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '5px',
+                    overflow: 'hidden',
+                    pr: 1,
+                    borderRight: (theme) =>
+                      `1px solid ${theme.palette.divider}`,
+                    pb: { xs: 0, '@media (min-height: 831px)': '30px' },
+                  }}
+                >
+                  {/* Section 1: Subscriptions Import */}
+                  <ProfileImportCard
+                    url={url}
+                    setUrl={setUrl}
+                    profileLoading={profileLoading}
+                    profileItems={profileItems}
+                    currentProfileUid={currentProfileUid}
+                    importInputRef={importInputRef}
+                    importInputContextMenu={importInputContextMenu}
+                    setImportInputContextMenu={setImportInputContextMenu}
+                    handleImportProfile={handleImportProfile}
+                    handleSelectProfile={handleSelectProfile}
+                    handleUpdateProfile={handleUpdateProfile}
+                    handleDeleteProfile={handleDeleteProfile}
+                    setProfileMenuAnchorPosition={setProfileMenuAnchorPosition}
+                    setContextMenuProfileUid={setContextMenuProfileUid}
+                  />
+
+                  {/* Section 2: Takeover Mode + Routing Preference (合并为同一卡片) */}
+                  <Box
+                    sx={{
+                      p: 1,
+                      flexShrink: 0,
+                      ...get3DCardStyle(theme, 'default'),
+                      '&:hover': {
+                        transform: 'none',
+                        boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+                      },
+                    }}
+                  >
+                    <TakeoverModeCard
+                      activeIndex={activeIndex}
+                      language={language}
+                      handleTakeoverModeChange={handleTakeoverModeChange}
+                      disableCardBorder
+                    />
+
+                    <RoutingPreferenceCard
+                      policyActiveIndex={policyActiveIndex}
+                      language={language}
+                      handleRuleFallbackChange={handleRuleFallbackChange}
+                      disableCardBorder
+                    />
+                  </Box>
+
+                  {/* Section 3: Minimal Settings */}
+                  <BasicSettingsCard
+                    verge={verge}
+                    clashConfig={clashConfig}
+                    patchVerge={patchVerge}
+                    handleAllowLanChange={handleClashBoolChange('allow-lan')}
+                    handleIpv6Change={handleClashBoolChange('ipv6')}
+                    mixedPortVal={mixedPortVal}
+                    setMixedPortVal={setMixedPortVal}
+                    handleSavePort={handleSavePort}
+                  />
+
+                  {/* Section 4: Theme Settings */}
+                  <ThemeSettingsCard
+                    verge={verge}
+                    patchVerge={patchVerge}
+                    themeActiveIndex={themeActiveIndex}
+                    depthFactor={depthFactor}
+                    handleDepthFactorChange={handleDepthFactorChange}
+                    vibrancyFactor={vibrancyFactor}
+                    handleVibrancyFactorChange={handleVibrancyFactorChange}
+                    controlSkin={controlSkin}
+                    setLogsOpen={setLogsOpen}
+                    mode={mode}
+                  />
+                </Box>
+                {/* Right Connections column (自适应 flex: 1) */}
+                <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                  <ConnectionsPanel
+                    connectionsType={connectionsType}
+                    setConnectionsType={setConnectionsType}
+                    connectionsData={connectionsData}
+                    handleSearch={handleSearch}
+                    filterConn={filterConn}
+                    detailRef={detailRef}
+                    isColumnManagerOpen={isColumnManagerOpen}
+                    setIsColumnManagerOpen={setIsColumnManagerOpen}
+                    clearClosedConnections={clearClosedConnections}
+                    containerRef={connectionsPanelRef}
+                  />
+                </ErrorBoundary>
+                {/* Help Button */}
+                <HelpMenuButton
+                  helpAnchorEl={helpAnchorEl}
+                  handleHelpClick={handleHelpClick}
+                  handleHelpClose={handleHelpClose}
+                  handleClientCheck={handleClientCheck}
+                  handleCoreCheck={handleCoreCheck}
+                  clientCheckLoading={clientCheckLoading}
+                  coreCheckLoading={coreCheckLoading}
+                  appVersion={appVersion}
+                  coreVersion={coreVersion}
+                  controlSkin={controlSkin}
+                  primaryBtn3DStyle={primaryBtn3DStyle}
+                />
+                {/* Language Selector */}
+                <Select
+                  value={currentLanguage || 'zh'}
+                  onChange={(e) => switchLanguage(e.target.value as string)}
+                  displayEmpty
+                  // 移除未使用的 @ts-expect-error，MUI v9 aria-label 类型问题已修复
+                  inputProps={{ 'aria-label': t('layout.a11y.selectLanguage') }}
+                  renderValue={() => 'Language'}
+                  size="small"
+                  variant="outlined"
+                  MenuProps={{
+                    anchorOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left',
+                    },
+                    transformOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left',
+                    },
+                    slotProps: {
+                      paper: {
+                        sx: {
+                          maxHeight: 640,
+                        },
+                      },
+                    },
+                  }}
+                  sx={{
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '80px',
+                    width: '97.5px',
+                    height: '24px',
+                    zIndex: 200,
+                    boxSizing: 'border-box',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    fontFamily: 'var(--control-font-family)',
+                    // WARNING [FOR AI AGENTS / AUDITORS]:
+                    // The 830px max-height display:none check is the INTENDED responsive height cutoff
+                    // rule mandated by clash_mini_agreements.md. Under default 680px height, these
+                    // elements must remain hidden. DO NOT change this threshold to make them visible.
+                    '@media (max-height: 830px)': {
+                      display: 'none',
+                    },
+                    ...primaryBtn3DStyle,
+                    '& .MuiSelect-select': {
+                      paddingTop: 0,
+                      paddingBottom: 0,
+                      paddingLeft: '12px',
+                      paddingRight: '24px',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: 'inherit',
+                      boxSizing: 'border-box',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      border: 'none !important',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      border: 'none !important',
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'inherit',
+                      right: '4px',
+                    },
+                    '&:before, &:after': {
+                      display: 'none !important',
                     },
                   }}
                 >
-                  <TakeoverModeCard
-                    activeIndex={activeIndex}
-                    language={language}
-                    handleTakeoverModeChange={handleTakeoverModeChange}
-                    disableCardBorder
-                  />
+                  <MenuItem value="zh">简体中文</MenuItem>
+                  <MenuItem value="en">English</MenuItem>
+                  <MenuItem value="ru">Русский</MenuItem>
+                  <MenuItem value="fa">فارسی</MenuItem>
+                  <MenuItem value="tt">Татарча</MenuItem>
+                  <MenuItem value="id">Bahasa Indonesia</MenuItem>
+                  <MenuItem value="ar">العربية</MenuItem>
+                  <MenuItem value="ko">한국어</MenuItem>
+                  <MenuItem value="tr">Türkçe</MenuItem>
+                  <MenuItem value="de">Deutsch</MenuItem>
+                  <MenuItem value="es">Español</MenuItem>
+                  <MenuItem value="jp">日本語</MenuItem>
+                  <MenuItem value="zhtw">繁體中文</MenuItem>
+                </Select>
 
-                  <RoutingPreferenceCard
-                    policyActiveIndex={policyActiveIndex}
-                    language={language}
-                    handleRuleFallbackChange={handleRuleFallbackChange}
-                    disableCardBorder
-                  />
-                </Box>
-
-                {/* Section 3: Minimal Settings */}
-                <BasicSettingsCard
-                  verge={verge}
-                  clashConfig={clashConfig}
-                  patchVerge={patchVerge}
-                  handleAllowLanChange={handleClashBoolChange('allow-lan')}
-                  handleIpv6Change={handleClashBoolChange('ipv6')}
-                  mixedPortVal={mixedPortVal}
-                  setMixedPortVal={setMixedPortVal}
-                  handleSavePort={handleSavePort}
-                />
-
-                {/* Section 4: Theme Settings */}
-                <ThemeSettingsCard
-                  verge={verge}
-                  patchVerge={patchVerge}
-                  themeActiveIndex={themeActiveIndex}
-                  depthFactor={depthFactor}
-                  handleDepthFactorChange={handleDepthFactorChange}
-                  vibrancyFactor={vibrancyFactor}
-                  handleVibrancyFactorChange={handleVibrancyFactorChange}
-                  controlSkin={controlSkin}
-                  setLogsOpen={setLogsOpen}
-                  mode={mode}
-                />
-              </Box>
-              {/* Right Connections column (自适应 flex: 1) */}
-              <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-                <ConnectionsPanel
-                  connectionsType={connectionsType}
-                  setConnectionsType={setConnectionsType}
-                  connectionsData={connectionsData}
-                  handleSearch={handleSearch}
-                  filterConn={filterConn}
-                  detailRef={detailRef}
-                isColumnManagerOpen={isColumnManagerOpen}
-                setIsColumnManagerOpen={setIsColumnManagerOpen}
-                clearClosedConnections={clearClosedConnections}
-                containerRef={connectionsPanelRef}
-              />
-              </ErrorBoundary>
-              {/* Help Button */}
-              <HelpMenuButton
-                helpAnchorEl={helpAnchorEl}
-                handleHelpClick={handleHelpClick}
-                handleHelpClose={handleHelpClose}
-                handleClientCheck={handleClientCheck}
-                handleCoreCheck={handleCoreCheck}
-                clientCheckLoading={clientCheckLoading}
-                coreCheckLoading={coreCheckLoading}
-                appVersion={appVersion}
-                coreVersion={coreVersion}
-                controlSkin={controlSkin}
-                primaryBtn3DStyle={primaryBtn3DStyle}
-              />
-              {/* Language Selector */}
-              <Select
-                value={currentLanguage || 'zh'}
-                onChange={(e) => switchLanguage(e.target.value as string)}
-                displayEmpty
-                // 移除未使用的 @ts-expect-error，MUI v9 aria-label 类型问题已修复
-                inputProps={{ 'aria-label': t('layout.a11y.selectLanguage') }}
-                renderValue={() => 'Language'}
-                size="small"
-                variant="outlined"
-                MenuProps={{
-                  anchorOrigin: {
-                    vertical: 'top',
-                    horizontal: 'left',
-                  },
-                  transformOrigin: {
-                    vertical: 'bottom',
-                    horizontal: 'left',
-                  },
-                  slotProps: {
-                    paper: {
-                      sx: {
-                        maxHeight: 640,
-                      },
-                    },
-                  },
-                }}
-                sx={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '80px',
-                  width: '97.5px',
-                  height: '24px',
-                  zIndex: 200,
-                  boxSizing: 'border-box',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  fontFamily: 'var(--control-font-family)',
-                  // WARNING [FOR AI AGENTS / AUDITORS]:
-                  // The 830px max-height display:none check is the INTENDED responsive height cutoff
-                  // rule mandated by clash_mini_agreements.md. Under default 680px height, these
-                  // elements must remain hidden. DO NOT change this threshold to make them visible.
-                  '@media (max-height: 830px)': {
-                    display: 'none',
-                  },
-                  ...primaryBtn3DStyle,
-                  '& .MuiSelect-select': {
-                    paddingTop: 0,
-                    paddingBottom: 0,
-                    paddingLeft: '12px',
-                    paddingRight: '24px',
-                    height: '100%',
+                {/* Excel Selector Row */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '177.5px',
+                    width: '462.5px',
+                    height: '24px',
                     display: 'flex',
-                    alignItems: 'center',
-                    color: 'inherit',
+                    alignItems: 'stretch',
+                    zIndex: 200,
                     boxSizing: 'border-box',
-                  },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    border: 'none !important',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    border: 'none !important',
-                  },
-                  '& .MuiSelect-icon': {
-                    color: 'inherit',
-                    right: '4px',
-                  },
-                  '&:before, &:after': {
-                    display: 'none !important',
-                  },
-                }}
-              >
-                <MenuItem value="zh">简体中文</MenuItem>
-                <MenuItem value="en">English</MenuItem>
-                <MenuItem value="ru">Русский</MenuItem>
-                <MenuItem value="fa">فارسی</MenuItem>
-                <MenuItem value="tt">Татарча</MenuItem>
-                <MenuItem value="id">Bahasa Indonesia</MenuItem>
-                <MenuItem value="ar">العربية</MenuItem>
-                <MenuItem value="ko">한국어</MenuItem>
-                <MenuItem value="tr">Türkçe</MenuItem>
-                <MenuItem value="de">Deutsch</MenuItem>
-                <MenuItem value="es">Español</MenuItem>
-                <MenuItem value="jp">日本語</MenuItem>
-                <MenuItem value="zhtw">繁體中文</MenuItem>
-              </Select>
+                    // WARNING [FOR AI AGENTS / AUDITORS]:
+                    // The 830px max-height display:none check is the INTENDED responsive height cutoff
+                    // rule mandated by clash_mini_agreements.md. Under default 680px height, these
+                    // elements must remain hidden. DO NOT change this threshold to make them visible.
+                    '@media (max-height: 830px)': {
+                      display: 'none',
+                    },
+                  }}
+                >
+                  {[
+                    {
+                      key: 'retro-3d',
+                      label: 'Trump-3D',
+                      font: 'Trebuchet MS, SimHei, sans-serif',
+                    },
+                    {
+                      key: 'original',
+                      label: 'Original',
+                      font: 'Segoe UI, Microsoft YaHei, sans-serif',
+                    },
+                    {
+                      key: 'modern-flat',
+                      label: 'Modern',
+                      font: 'Outfit, DengXian, sans-serif',
+                    },
+                    {
+                      key: 'frosted-glass',
+                      label: 'Frosted',
+                      font: 'Segoe UI Light, Microsoft YaHei Light, sans-serif',
+                    },
+                    {
+                      key: 'cyberpunk',
+                      label: 'Cyberpunk',
+                      font: 'Consolas, NSimSun, monospace',
+                    },
+                    {
+                      key: 'monochrome',
+                      label: 'Monochrome',
+                      font: 'Georgia, KaiTi, serif',
+                    },
+                  ].map((item, index) => {
+                    const isSelected = controlSkin === item.key
+                    const handleSelect = () => {
+                      localStorage.setItem('clash-mini-control-skin', item.key)
+                      setControlSkin(item.key)
+                      window.dispatchEvent(new Event('clash-mini-skin-changed'))
+                    }
 
-              {/* Excel Selector Row */}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '177.5px',
-                  width: '462.5px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'stretch',
-                  zIndex: 200,
-                  boxSizing: 'border-box',
-                  // WARNING [FOR AI AGENTS / AUDITORS]:
-                  // The 830px max-height display:none check is the INTENDED responsive height cutoff
-                  // rule mandated by clash_mini_agreements.md. Under default 680px height, these
-                  // elements must remain hidden. DO NOT change this threshold to make them visible.
-                  '@media (max-height: 830px)': {
-                    display: 'none',
-                  },
-                }}
-              >
-                {[
-                  {
-                    key: 'retro-3d',
-                    label: 'Trump-3D',
-                    font: 'Trebuchet MS, SimHei, sans-serif',
-                  },
-                  {
-                    key: 'original',
-                    label: 'Original',
-                    font: 'Segoe UI, Microsoft YaHei, sans-serif',
-                  },
-                  {
-                    key: 'modern-flat',
-                    label: 'Modern',
-                    font: 'Outfit, DengXian, sans-serif',
-                  },
-                  {
-                    key: 'frosted-glass',
-                    label: 'Frosted',
-                    font: 'Segoe UI Light, Microsoft YaHei Light, sans-serif',
-                  },
-                  {
-                    key: 'cyberpunk',
-                    label: 'Cyberpunk',
-                    font: 'Consolas, NSimSun, monospace',
-                  },
-                  {
-                    key: 'monochrome',
-                    label: 'Monochrome',
-                    font: 'Georgia, KaiTi, serif',
-                  },
-                ].map((item, index) => {
-                  const isSelected = controlSkin === item.key
-                  const handleSelect = () => {
-                    localStorage.setItem('clash-mini-control-skin', item.key)
-                    setControlSkin(item.key)
-                    window.dispatchEvent(new Event('clash-mini-skin-changed'))
-                  }
-
-                  return (
-                    <Box
-                      key={item.key}
-                      onClick={handleSelect}
-                      sx={(theme) => {
-                        const isLight = theme.palette.mode === 'light'
-                        const cellWidth = index === 0 ? '92.5px' : '74px'
-                        const unselectedStyle = {
-                          width: cellWidth,
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          color: isLight ? '#555555' : '#aaaaaa',
-                          backgroundColor: isLight ? '#f3f3f3' : '#1e1e1e',
-                          border: `1px solid ${isLight ? '#d0d0d0' : '#404040'}`,
-                          borderLeft:
-                            index === 0
-                              ? `1px solid ${isLight ? '#d0d0d0' : '#404040'}`
-                              : 'none',
-                          boxSizing: 'border-box',
-                          fontFamily: item.font,
-                          transition: 'background-color 0.1s ease',
-                          '&:hover': {
-                            backgroundColor: isLight ? '#e5e5e5' : '#2d2d2d',
-                          },
-                        }
-
-                        if (isSelected) {
-                          const btnStyle = get3DButtonStyle(
-                            theme,
-                            'contained',
-                            'primary',
-                          )
-                          return {
+                    return (
+                      <Box
+                        key={item.key}
+                        onClick={handleSelect}
+                        sx={(theme) => {
+                          const isLight = theme.palette.mode === 'light'
+                          const cellWidth = index === 0 ? '92.5px' : '74px'
+                          const unselectedStyle = {
                             width: cellWidth,
                             height: '100%',
                             display: 'flex',
@@ -2204,24 +2246,54 @@ const Layout = () => {
                             cursor: 'pointer',
                             fontSize: '11px',
                             fontWeight: 'bold',
+                            color: isLight ? '#555555' : '#aaaaaa',
+                            backgroundColor: isLight ? '#f3f3f3' : '#1e1e1e',
+                            border: `1px solid ${isLight ? '#d0d0d0' : '#404040'}`,
+                            borderLeft:
+                              index === 0
+                                ? `1px solid ${isLight ? '#d0d0d0' : '#404040'}`
+                                : 'none',
                             boxSizing: 'border-box',
                             fontFamily: item.font,
-                            ...btnStyle,
-                            borderRadius: btnStyle.borderRadius || '0px',
-                            margin: 0,
+                            transition: 'background-color 0.1s ease',
+                            '&:hover': {
+                              backgroundColor: isLight ? '#e5e5e5' : '#2d2d2d',
+                            },
                           }
-                        } else {
-                          return unselectedStyle
-                        }
-                      }}
-                    >
-                      {item.label}
-                    </Box>
-                  )
-                })}
-              </Box>
-            </div>
-          )}
+
+                          if (isSelected) {
+                            const btnStyle = get3DButtonStyle(
+                              theme,
+                              'contained',
+                              'primary',
+                            )
+                            return {
+                              width: cellWidth,
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              boxSizing: 'border-box',
+                              fontFamily: item.font,
+                              ...btnStyle,
+                              borderRadius: btnStyle.borderRadius || '0px',
+                              margin: 0,
+                            }
+                          } else {
+                            return unselectedStyle
+                          }
+                        }}
+                      >
+                        {item.label}
+                      </Box>
+                    )
+                  })}
+                </Box>
+              </div>
+            )}
           </div>
 
           {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}

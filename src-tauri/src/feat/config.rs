@@ -18,6 +18,10 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
 
     // 将 Draft 提前提交，确保 enhance() 中 get_config_values() 能读取到最新值
     // （旧流程在 update_config_checked() 之后才 apply，导致生成的运行时配置丢失 draft 修改）
+    //
+    // ⚠️ 注意：apply() 提前意味着在 enhance() 执行期间，任何并发读取 live config
+    // 的操作都会看到新值。若 enhance() 失败，会通过回滚逻辑恢复旧配置。由于 patch_clash
+    // 的调用路径是同步的 Tauri command（用户操作触发），实际不存在并发读者，风险可控。
     Config::clash().await.apply();
 
     let res = async {

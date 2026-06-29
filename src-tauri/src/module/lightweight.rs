@@ -93,6 +93,8 @@ pub async fn entry_lightweight_mode() -> bool {
         if let Some(window) = WindowManager::get_main_window() {
             let _ = window.hide();
         }
+        refresh_lightweight_tray_state().await;
+        crate::core::tray::update_lite_mode_menu(false);
         return true;
     }
 
@@ -180,7 +182,7 @@ pub async fn exit_lightweight_mode() -> bool {
     }
     let result = WindowManager::show_main_window().await;
     match result {
-        WindowOperationResult::Shown | WindowOperationResult::Created => {
+        WindowOperationResult::Shown | WindowOperationResult::Created | WindowOperationResult::NoAction => {
             transition_and_log(LightweightState::Exiting, LightweightState::Normal);
         }
         _ => {

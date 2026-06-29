@@ -501,12 +501,21 @@ impl ServiceManager {
 
     pub async fn init(&self) -> Result<()> {
         if let Err(e) = clash_verge_service_ipc::connect().await {
-            self.set_status(ServiceStatus::Unavailable("服务连接失败: {e}".to_string()));
+            self.set_status(ServiceStatus::Unavailable(format!("服务连接失败: {e}")));
             return Err(e);
         }
         Ok(())
     }
 
+    /// 以无锁方式获取当前服务状态，自动等待进行中的操作完成。
+    ///
+    /// 设计说明：使用 Notify + AtomicBool 双检查模式替代传统的 Mutex::lock().await，
+    /// 避免高并发场景下操作执行期间阻塞所有状态读取者。
+    ///
+    /// 时序保证：
+    /// 1. 先注册 notified() 再检查 operation_running，防止错过通知
+    /// 2. 拿到 status 锁后二次检查 operation_running，防止 TOCTOU 竞态
+    /// 3. 若操作正在进行中，通过 Notify 等待其完成，而非忙等
     pub async fn current(&self) -> ServiceStatus {
         loop {
             let notified = self.operation_done.notified();

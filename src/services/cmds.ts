@@ -3,8 +3,18 @@ import dayjs from 'dayjs'
 import yaml from 'js-yaml'
 
 import { showNotice } from '@/services/notice-service'
-import type { IConfigData, IProxyItem, IProxyGroupItem, ILogItem, IClashInfo } from '@/types/clash'
-import type { IProfileItem, IProfilesConfig, IProfileOption } from '@/types/profile'
+import type {
+  IConfigData,
+  IProxyItem,
+  IProxyGroupItem,
+  ILogItem,
+  IClashInfo,
+} from '@/types/clash'
+import type {
+  IProfileItem,
+  IProfilesConfig,
+  IProfileOption,
+} from '@/types/profile'
 import type { IVergeConfig, ValidationOutcome } from '@/types/verge'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
@@ -32,7 +42,9 @@ export async function enhanceProfiles() {
           // 1. 提取所有原始 proxies 名字
           const proxies = doc.proxies || []
           const proxyNames = Array.isArray(proxies)
-            ? proxies.map((p: { name?: string }) => p && p.name).filter((name): name is string => !!name)
+            ? proxies
+                .map((p: { name?: string }) => p && p.name)
+                .filter((name): name is string => !!name)
             : []
 
           // 2. 提取所有的 proxy-providers 名字
@@ -155,7 +167,9 @@ export async function getRuntimeConfig() {
   return invoke<IConfigData | null>('get_runtime_config')
 }
 
-export async function updateProxyChainConfigInRuntime(proxyChainConfig: unknown) {
+export async function updateProxyChainConfigInRuntime(
+  proxyChainConfig: unknown,
+) {
   return invoke<void>('update_proxy_chain_config_in_runtime', {
     proxyChainConfig,
   })
@@ -191,7 +205,10 @@ export async function calcuProxies(): Promise<{
   // provider name map
   const providerMap = Object.fromEntries(
     Object.entries(providerRecord).flatMap(([provider, item]) =>
-      (item?.proxies ?? []).map((p: IProxyItem) => [p.name, { ...p, provider }]),
+      (item?.proxies ?? []).map((p: IProxyItem) => [
+        p.name,
+        { ...p, provider },
+      ]),
     ),
   )
 
@@ -251,16 +268,18 @@ export async function calcuProxies(): Promise<{
       .concat(globalGroups)
   }
 
-  const proxies = [direct, reject].filter(Boolean).concat(
-    Object.values(proxyRecord).filter(
-      (p) =>
-        !p?.all?.length &&
-        p?.name !== 'DIRECT' &&
-        p?.name !== 'REJECT' &&
-        p?.name &&
-        !isDummyNode(p.name),
-    ),
-  )
+  const proxies = [direct, reject]
+    .filter(Boolean)
+    .concat(
+      Object.values(proxyRecord).filter(
+        (p) =>
+          !p?.all?.length &&
+          p?.name !== 'DIRECT' &&
+          p?.name !== 'REJECT' &&
+          p?.name &&
+          !isDummyNode(p.name),
+      ),
+    )
 
   const _global = {
     ...global,
@@ -289,10 +308,12 @@ export async function calcuProxyProviders() {
       )
       .map(([name, item]) => {
         const provider = (item ?? {}) as Record<string, unknown>
-        const proxyList = provider.proxies as Array<Record<string, unknown>> | undefined
+        const proxyList = provider.proxies as
+          | Array<Record<string, unknown>>
+          | undefined
         const proxies = proxyList
           ? proxyList
-              .map((p) => ({ ...p, provider: name }) as unknown as IProxyItem)
+              .map((p) => ({ ...p, provider: name }) as IProxyItem)
               .filter((p) => p.name && !isDummyNode(p.name))
           : []
         return [
