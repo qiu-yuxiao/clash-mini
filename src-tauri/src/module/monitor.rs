@@ -503,12 +503,14 @@ pub fn start_background_monitor() {
                 }
             };
 
-            // 1. Profile 发生变化时，立即触发自启动优选
+            // 1. Profile 发生变化时，重置监测状态
+            //    Profile 切换仅发生在窗口可见时（用户在界面操作），自动选点由前端负责
+            //    后端不参与，避免与前端批量测速竞争 mihomo 内核
             if last_profile_uid.as_ref() != Some(&current_profile) {
                 logging!(
                     info,
                     Type::Lightweight,
-                    "[后台监测] 活动配置切换: {:?} -> {}",
+                    "[后台监测] 活动配置切换: {:?} -> {}，自动选点交由前端执行",
                     last_profile_uid,
                     current_profile
                 );
@@ -519,31 +521,9 @@ pub fn start_background_monitor() {
                 last_auto_select_time = None;
                 current_cooldown = Duration::from_secs(0);
 
-                // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
+                // 强制中止正在运行的其它后台测速任务，释放资源给前端
                 cancel_active_auto_select();
 
-                if wait_for_clash_ready().await {
-                    loop {
-                        match trigger_backend_auto_select(&current_profile, 0).await {
-                            Ok(results) => {
-                                if !results.is_empty() {
-                                    Handle::notify_delay_results("PROXY".into(), results);
-                                }
-                                break;
-                            }
-                            Err(e) if e.to_string() == "AUTO_SELECT_BUSY" => {
-                                logging!(debug, Type::Lightweight, "[后台监测] 自动选点繁忙，等待重试...");
-                                sleep(Duration::from_millis(500)).await;
-                            }
-                            Err(e) => {
-                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    logging!(warn, Type::Lightweight, "[后台监测] 内核就绪超时，中止本次自愈优选");
-                }
                 last_check_time = Instant::now();
                 continue;
             }

@@ -71,6 +71,7 @@ import { isDummyNode } from '@/utils/node'
 import {
   closeAllConnections,
   getProxyByName,
+  selectNodeForGroup,
 } from 'tauri-plugin-mihomo-api'
 
 // Sub-components
@@ -173,7 +174,8 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
           sortType = groupState.sortType || 0
           filterMatchCase = groupState.filterMatchCase || false
           filterMatchWholeWord = groupState.filterMatchWholeWord || false
-          filterUseRegularExpression = groupState.filterUseRegularExpression || false
+          filterUseRegularExpression =
+            groupState.filterUseRegularExpression || false
         }
       }
     } catch {}
@@ -200,9 +202,55 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
     console.warn('[Layout] 获取过滤节点列表失败，回退到全部节点:', err)
     try {
       const proxyGroup = await getProxyByName(groupName)
-      return (proxyGroup?.all || []).filter((name: string) => !isDummyNode(name))
+      return (proxyGroup?.all || []).filter(
+        (name: string) => !isDummyNode(name),
+      )
     } catch {
       return []
+    }
+  }
+}
+
+async function batchTestWithFirstBatchSelect(
+  groupName: string,
+  names: string[],
+  timeout = 10000,
+  concurrency = 36,
+  selectFirstBatch = true,
+): Promise<void> {
+  if (names.length === 0) return
+
+  const totalStart = Date.now()
+  let selectedOnce = false
+  const results: [string, number][] = []
+
+  for (let i = 0; i < names.length; i += concurrency) {
+    if (Date.now() - totalStart > 15000) break
+
+    const batch = names.slice(i, i + concurrency)
+    await DelayManager.checkListDelay(batch, groupName, timeout, batch.length)
+
+    for (const name of batch) {
+      const delay = DelayManager.getDelay(name, groupName)
+      if (delay > 0 && delay < timeout) {
+        results.push([name, delay])
+      }
+    }
+
+    results.sort((a, b) => a[1] - b[1])
+
+    if (selectFirstBatch && !selectedOnce && results.length > 0) {
+      selectedOnce = true
+      const bestName = results[0][0]
+      const bestDelay = results[0][1]
+      console.log(
+        `[Layout] 自动选点首批完成，最快节点: ${bestName} (${bestDelay}ms)`,
+      )
+      try {
+        await selectNodeForGroup(groupName, bestName)
+      } catch (err) {
+        console.error('[Layout] 自动选点切换失败:', err)
+      }
     }
   }
 }
@@ -231,7 +279,7 @@ async function triggerAutoSelectAndRefresh(
       const names = await getFilteredNodeNames('PROXY')
       if (names.length === 0) return
       const timeout = 10000
-      await DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
+      await batchTestWithFirstBatchSelect('PROXY', names, timeout, 36, true)
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
       }
@@ -256,7 +304,7 @@ async function triggerAutoSelectAndRefresh(
         const names = await getFilteredNodeNames('PROXY')
         if (names.length === 0) return
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
-        await DelayManager.checkListDelay(names, 'PROXY', 5000, 36)
+        await batchTestWithFirstBatchSelect('PROXY', names, 5000, 36, true)
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
         }
@@ -1069,7 +1117,7 @@ const Layout = () => {
       // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       setTimeout(() => {
-        DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
+        batchTestWithFirstBatchSelect('PROXY', names, timeout, 36, false)
           .then(async () => {
             await refreshAllRef.current()
           })
