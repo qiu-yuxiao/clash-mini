@@ -1721,7 +1721,7 @@ const Layout = () => {
                 data-no-drag="true"
                 style={{
                   position: 'absolute',
-                  top: '3px',
+                  top: decorated && !isDecorationsHidden ? '32px' : '3px',
                   right: '8px',
                   zIndex: 120,
                 }}
