@@ -449,7 +449,6 @@ export const ProxyGroups = (props: Props) => {
       if (headState?.sortType === 1) {
         onHeadState(groupName, { sortType: headState.sortType })
       }
-      onProxies()
     }
   })
 
