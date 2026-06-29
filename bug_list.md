@@ -11,6 +11,11 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-272: Optimization of self-healing check intervals and 10-minute node-switching cooldown
+ - **现象描述**：过快（15秒）的常规活跃检测周期和轻量模式周期（60秒）导致高频后台测速请求及不必要的 CPU 消耗；同时，缺乏节点切换冷却期导致在不稳定节点间产生高频的自动切换，打断在线长连接（如游戏和视频）。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.10`
+
 ### BUG-271: Periodic TCP connection GC teardown and ServiceManager Mutex lock contention
  - **现象描述**：后台 `monitor.rs` 守护线程包含每 30 分钟强行切断系统内所有 TCP 连接的暴力 GC 逻辑，导致用户正在进行的下载和游戏断开；同时，`service.rs` 中的 `ServiceManager` 被包装在全局异步 `Mutex` 锁中，增加了高频并发调用时的资源死锁与卡顿风险。
  - **当前状态**：`代码已修正，待用户确认`
