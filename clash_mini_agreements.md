@@ -468,6 +468,10 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
     * **静态化与禁止动态更新**：托盘的图标常驻使用默认的金属质感灰色猫咪头像（`tray-icon.png`），提示语固定为 "Clash Mini"。在托盘启动初始化成功后，**禁止在运行期间调用任何 `set_icon`、`set_tooltip` 或动态重绘 `set_menu` 的 API**，从根本上杜绝修改 API 产生的 `E_FAIL` 报错。
     * **生命周期与托管**：创建成功的 `TrayIcon` 必须托管在 `TrayIconState` 中并注册到 `AppHandle` 的状态管理器中，以确保其生命周期与整个应用程序完全对齐。
 
+#### Windows 原生标题栏文本规范
+
+Windows 原生标题栏必须显示程序名及版本号，格式为 `Clash Mini Ver.x.y.z`。版本号由编译时 `env!("CARGO_PKG_VERSION")` 自动提取，确保每次发版后标题栏自动同步最新版本号。实现位于 `src-tauri/src/utils/resolve/window.rs` 的 `get_bold_window_title()`。
+
 ---
 
 ### 2.3 路由与导航
