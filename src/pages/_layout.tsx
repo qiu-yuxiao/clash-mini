@@ -1721,9 +1721,9 @@ const Layout = () => {
                 data-no-drag="true"
                 style={{
                   position: 'absolute',
-                  top: decorated && !isDecorationsHidden ? '32px' : '3px',
+                  top: decorated && !isDecorationsHidden ? '40px' : '3px',
                   right: '8px',
-                  zIndex: 120,
+                  zIndex: 9999,
                 }}
               >
                 <IconButton
@@ -1769,9 +1769,12 @@ const Layout = () => {
                   alignItems: 'center',
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding: '3px 36px 2px 8px',
+                  padding:
+                    decorated && !isDecorationsHidden
+                      ? '40px 36px 2px 8px'
+                      : '3px 36px 2px 8px',
                   position: 'relative',
-                  zIndex: 110,
+                  zIndex: 9998,
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
