@@ -1199,14 +1199,16 @@ const Layout = () => {
     }
   }, [])
 
-  // 监听窗口大小、焦点及可见度变化，并在唤醒时触发全节点自动测速刷新延迟
+  // 监听窗口大小及可见度变化，窗口从隐藏/后台恢复时触发全节点测速刷新
+  // 注意：不监听 focus 事件，因为 WebView2 在任何鼠标点击（包括标题栏拖动）时都会触发 focus，
+  // 导致每次点击都触发全节点批量测速，造成 UI 冻结
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleResize = () => {
       setIsMinimalWidth(window.innerWidth <= 285)
       setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
     }
-    const handleFocusOrVisible = () => {
+    const handleVisibilityChange = () => {
       handleResize()
       if (document.visibilityState === 'visible') {
         triggerWakeupLatencyTestRef.current()
@@ -1214,13 +1216,11 @@ const Layout = () => {
     }
     const timer = setTimeout(handleResize, 0)
     window.addEventListener('resize', handleResize)
-    window.addEventListener('focus', handleFocusOrVisible)
-    document.addEventListener('visibilitychange', handleFocusOrVisible)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       clearTimeout(timer)
       window.removeEventListener('resize', handleResize)
-      window.removeEventListener('focus', handleFocusOrVisible)
-      document.removeEventListener('visibilitychange', handleFocusOrVisible)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
