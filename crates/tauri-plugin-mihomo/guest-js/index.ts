@@ -214,7 +214,7 @@ export async function getProxies(): Promise<Proxies> {
  */
 export async function getProxyByName(proxyName: string): Promise<Proxy | null> {
   return await invoke<Proxy>('plugin:mihomo|get_proxy_by_name', {
-    proxiesName: proxyName,
+    proxyName,
   })
 }
 
