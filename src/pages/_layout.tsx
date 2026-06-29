@@ -150,7 +150,6 @@ let activeAutoSelectCancelled = false
 
 async function frontendAutoSelect(
   groupName: string,
-  refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
   timeout = 10000,
   concurrency = 36,
 ): Promise<[string, number][]> {
@@ -217,16 +216,12 @@ async function frontendAutoSelect(
 }
 
 async function triggerAutoSelectAndRefresh(
-  refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
-  refreshAll: () => Promise<any>,
   t: (key: string, opts?: any) => string,
   fallbackTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
 ): Promise<void> {
-  // 改用前端 delayProxyByName 路径进行全节点测速并选最快节点
-  // 替代 invoke('trigger_auto_select')，绕过后台 AUTO_SELECT_RUNNING 锁
   try {
-    const results = await frontendAutoSelect('PROXY', refreshProxy, 10000, 36)
+    const results = await frontendAutoSelect('PROXY', 10000, 36)
     if (results.length > 0) {
       console.log(
         `[Layout] 自动选点完成，最快节点: ${results[0][0]} (${results[0][1]}ms)`,
@@ -242,22 +237,6 @@ async function triggerAutoSelectAndRefresh(
     }
   }
 
-  // 不管 auto-select 是否成功，以下操作永远执行
-  // BUG-002 修复：refreshProxy 优先，避免 refreshAll 的四路并发 IPC 在节点大量测速完成时阻塞 WebView 主线程
-  try {
-    await refreshProxy({ forceFull: true })
-  } catch (err) {
-    console.warn(
-      '[Layout] refreshProxy after auto-select failed (non-critical):',
-      err,
-    )
-    // 降级：尝试全量刷新兜底
-    try {
-      await refreshAll()
-    } catch (fallbackErr) {
-      console.warn('[Layout] refreshAll fallback also failed:', fallbackErr)
-    }
-  }
   // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
   if (setHeadState) {
     setHeadState('PROXY', { sortType: 1 })
@@ -293,7 +272,6 @@ async function triggerAutoSelectAndRefresh(
         }
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
         await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
-        await refreshProxy({ forceFull: true })
         // Fallback 测速完成后再次确保排序正确
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
@@ -1158,8 +1136,6 @@ const Layout = () => {
             await waitForClashReady(tRef.current)
             if (cancelled || isImportingRef.current) return
             await triggerAutoSelectAndRefresh(
-              refreshProxyRef.current,
-              refreshAllRef.current,
               tRef.current,
               fallbackTimerRef,
               setHeadStateForSortRef.current,

@@ -143,12 +143,8 @@ export const ProxyGroups = (props: Props) => {
 
   // 统代理选择
   const { handleProxyGroupChange } = useProxySelection({
-    onSuccess: () => {
-      onProxies()
-    },
     onError: (error) => {
       console.error('代理切换失败', error)
-      onProxies()
     },
   })
 

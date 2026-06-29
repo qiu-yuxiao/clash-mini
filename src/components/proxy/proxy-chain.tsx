@@ -399,8 +399,6 @@ export const ProxyChain = ({
       localStorage.setItem('proxy-chain-group', targetGroup || 'GLOBAL')
       localStorage.setItem('proxy-chain-exit-node', lastNode.name)
 
-      // 刷新代理信息以更新连接状态
-      refreshProxy()
       debugLog('Successfully connected to proxy chain')
     } catch (error) {
       console.error('Failed to connect to proxy chain:', error)

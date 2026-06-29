@@ -33,7 +33,6 @@ import {
 
 export const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
-  const { refreshProxy } = useAppRefreshers()
   const { profiles } = useProfiles()
   const currentProfileUid = profiles?.current || ''
   const { verge } = useVerge()
@@ -121,7 +120,6 @@ export const ActiveNodeStatusCard = () => {
       } else {
         await delayManager.checkDelay(activeNodeName, primaryGroup.name, 10000)
       }
-      refreshProxy()
     } catch (err) {
       console.error(err)
     } finally {
@@ -199,7 +197,6 @@ export const ActiveNodeStatusCard = () => {
     if (nextNodeName) {
       try {
         await selectNodeForGroup(primaryGroup.name, nextNodeName)
-        refreshProxy()
       } catch (err) {
         console.error('Failed to select node:', err)
       }
