@@ -1071,12 +1071,10 @@ const Layout = () => {
 
   const triggerWakeupLatencyTest = useCallback(async () => {
     try {
-      // 1. 无论冷却状态如何，窗口唤醒时必须立即刷新本地代理选点状态，确保 UI 上的对勾打在正确的活跃节点上
-      console.log('[Layout] 窗口唤醒，首先刷新本地代理状态')
+      console.log('[Layout] 窗口唤醒，刷新本地代理状态')
       await refreshAllRef.current()
 
       const now = Date.now()
-      // 2. 只有测速有 30 秒冷却限制，避免频繁唤醒导致过多垃圾网络探测请求
       if (now - lastFullTestTimeRef.current < 30 * 1000) {
         return
       }
@@ -1093,17 +1091,19 @@ const Layout = () => {
 
       const timeout = verge?.default_latency_timeout || 10000
       lastFullTestTimeRef.current = now
-      console.log('[Layout] 窗口唤醒，触发后台节点测速以刷新延迟')
+      console.log('[Layout] 窗口唤醒，延迟到渲染完成后触发全节点测速')
 
-      // 3. 异步执行全节点测速，由 backend-delay-results 事件驱动增量刷新，不阻塞 UI 渲染
-      DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
-        .then(async () => {
-          // 测速全部完成后再做一次静默刷新作为备份
-          await refreshAllRef.current()
-        })
-        .catch((err) => {
-          console.error('[Layout] 唤醒后后台测速异常:', err)
-        })
+      // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
+      // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
+      setTimeout(() => {
+        DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
+          .then(async () => {
+            await refreshAllRef.current()
+          })
+          .catch((err) => {
+            console.error('[Layout] 唤醒后后台测速异常:', err)
+          })
+      }, 0)
     } catch (err) {
       console.error('[Layout] 唤醒刷新与测速失败:', err)
     }
