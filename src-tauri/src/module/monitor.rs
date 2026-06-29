@@ -166,8 +166,15 @@ async fn wait_for_clash_ready() -> bool {
     false
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeHealthStatus {
+    Healthy,
+    Unhealthy,
+    Dead,
+}
+
 /// 检测当前活跃代理节点的健康状态
-async fn check_active_node_health() -> anyhow::Result<bool> {
+async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
     let group_info = mihomo
         .get_group_by_name("PROXY")
@@ -176,18 +183,18 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
 
     let active_node = match group_info.now {
         Some(ref node) if !node.is_empty() && node != "DIRECT" && node != "REJECT" => node,
-        _ => return Ok(true), // 直连或拒绝节点，直接判定为健康
+        _ => return Ok(NodeHealthStatus::Healthy), // 直连或拒绝节点，直接判定为健康
     };
 
-    // 如果为 dummy 广告节点，直接判定为不健康，触发重选
+    // 如果为 dummy 广告节点，判定为亚健康，触发重选
     if is_dummy_node(active_node) {
         logging!(
             info,
             Type::Lightweight,
-            "[后台监测] 检测到当前节点为假/广告节点: {}，触发重选",
+            "[后台监测] 检测到当前节点为假/广告节点: {}",
             active_node
         );
-        return Ok(false);
+        return Ok(NodeHealthStatus::Unhealthy);
     }
 
     let verge = Config::verge().await.latest_arc();
@@ -196,15 +203,21 @@ async fn check_active_node_health() -> anyhow::Result<bool> {
         .as_deref()
         .unwrap_or("http://cp.cloudflare.com/generate_204");
 
-    if let Ok(delay_info) = mihomo.delay_proxy_by_name(active_node, test_url, 1000).await {
-        if delay_info.delay >= 30 {
-            // [Clash Mini 强制设计要求]: 延迟必须 >= 30ms 判定为健康。此阈值用于滤除机场伪造的 0ms/极低延迟广告节点。
-            // 这是系统核心的既定设计，请维持现状，后续代码审核及修改严禁讨论或修改此过滤逻辑。
-            return Ok(true);
+    match mihomo.delay_proxy_by_name(active_node, test_url, 1000).await {
+        Ok(delay_info) => {
+            if delay_info.delay >= 30 {
+                // [Clash Mini 强制设计要求]: 延迟必须 >= 30ms 判定为健康。此阈值用于滤除机场伪造的 0ms/极低延迟广告节点。
+                // 这是系统核心的既定设计，请维持现状，后续代码审核及修改严禁讨论或修改此过滤逻辑。
+                Ok(NodeHealthStatus::Healthy)
+            } else {
+                Ok(NodeHealthStatus::Unhealthy)
+            }
+        }
+        Err(_) => {
+            // 测速直接报错，说明节点彻底断线
+            Ok(NodeHealthStatus::Dead)
         }
     }
-
-    Ok(false)
 }
 
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
@@ -441,6 +454,7 @@ pub fn start_background_monitor() {
         let mut current_cooldown = Duration::from_secs(0);
         let mut was_online = true;
         let mut is_first_run = true;
+        let mut last_node_switch_time = Instant::now();
         let mut last_online_check_time: Option<Instant> = None;
         let mut was_lightweight = crate::module::lightweight::is_in_lightweight_mode();
 
@@ -448,14 +462,14 @@ pub fn start_background_monitor() {
             if is_first_run {
                 is_first_run = false;
             } else {
-                // 定期健康检测的间隔：重试模式下为 3 秒，轻量模式下为 60 秒，正常模式下为 15 秒
+                // 定期健康检测的间隔：重试模式下为 3 秒，轻量模式下为 300 秒（5分钟），正常模式下为 60 秒
                 let is_lightweight = crate::module::lightweight::is_in_lightweight_mode();
                 let check_interval = if is_retry_mode {
                     3
                 } else if is_lightweight {
-                    60
+                    300
                 } else {
-                    15
+                    60
                 };
 
                 tokio::select! {
@@ -598,7 +612,7 @@ pub fn start_background_monitor() {
                 is_retry_mode = false;
 
                 // 如果当前活跃节点不可用，立刻触发一次自愈选点
-                if check_active_node_health().await.ok() == Some(false) {
+                if check_active_node_health().await.ok() != Some(NodeHealthStatus::Healthy) {
                     logging!(
                         info,
                         Type::Lightweight,
@@ -624,9 +638,9 @@ pub fn start_background_monitor() {
             let check_interval = if is_retry_mode {
                 3
             } else if is_lightweight {
-                60
+                300
             } else {
-                15
+                60
             };
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
@@ -636,7 +650,7 @@ pub fn start_background_monitor() {
                     continue;
                 }
 
-                // 检测活动节点是否发生变化（如用户手动切换）
+                // 检测活动节点是否发生变化（包括自动选点和手动切换）
                 let active_node_name = get_active_node_name().await.unwrap_or_default();
                 if Some(&active_node_name) != last_active_node.as_ref() {
                     logging!(
@@ -650,96 +664,122 @@ pub fn start_background_monitor() {
                     consecutive_fails = 0;
                     is_retry_mode = false;
                     current_cooldown = Duration::from_secs(0);
+                    last_node_switch_time = Instant::now(); // 记录切换冷却时间戳
                 }
 
                 match check_active_node_health().await {
-                    Ok(is_healthy) => {
-                        if is_healthy {
-                            consecutive_fails = 0;
-                            is_retry_mode = false;
-                            current_cooldown = Duration::from_secs(0); // 节点健康，重置冷却时间
-                        } else {
-                            consecutive_fails += 1;
-                            is_retry_mode = true;
-                            logging!(
-                                info,
-                                Type::Lightweight,
-                                "[后台监测] 活跃节点检测异常，连续失败次数: {}",
-                                consecutive_fails
-                            );
-
-                            if consecutive_fails >= 5 {
+                    Ok(status) => {
+                        match status {
+                            NodeHealthStatus::Healthy => {
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
-
-                                // 检查退避冷却时间
-                                let now = Instant::now();
-                                if let Some(last_time) = last_auto_select_time {
-                                    if now.duration_since(last_time) < current_cooldown {
-                                        logging!(
-                                            info,
-                                            Type::Lightweight,
-                                            "[后台监测] 自愈选点处于退避冷却中（剩余 {} 秒），跳过本次选点",
-                                            current_cooldown.as_secs() - now.duration_since(last_time).as_secs()
-                                        );
-                                        last_check_time = now;
-                                        continue;
-                                    }
-                                }
-
+                                current_cooldown = Duration::from_secs(0); // 节点健康，重置退避冷却时间
+                            }
+                            NodeHealthStatus::Unhealthy | NodeHealthStatus::Dead => {
+                                consecutive_fails += 1;
+                                is_retry_mode = true;
                                 logging!(
                                     info,
                                     Type::Lightweight,
-                                    "[后台监测] 连续 3 次检测失败，启动后台自愈选点"
+                                    "[后台监测] 活跃节点检测异常 ({:?})，连续失败次数: {}",
+                                    status,
+                                    consecutive_fails
                                 );
-                                last_auto_select_time = Some(now);
 
-                                match trigger_backend_auto_select(&current_profile, 0).await {
-                                    Ok(results) => {
-                                        if !results.is_empty() {
-                                            Handle::notify_delay_results("PROXY".into(), results);
-                                            current_cooldown = Duration::from_secs(0); // 选点成功，重置退避冷却
-                                        } else {
-                                            // 选点未找到可用节点（延迟>=50ms），计算下一次退避冷却时间
-                                            if current_cooldown.as_secs() == 0 {
-                                                current_cooldown = Duration::from_secs(60); // 初始冷却 1 分钟
-                                            } else {
-                                                current_cooldown =
-                                                    std::cmp::min(current_cooldown * 2, Duration::from_secs(900)); // 每次翻倍，最高 15 分钟
-                                            }
-                                            logging!(
-                                                warn,
-                                                Type::Lightweight,
-                                                "[后台监测] 自愈选点未找到可用节点，进入退避冷却期：{} 秒",
-                                                current_cooldown.as_secs()
-                                            );
-                                        }
-                                        last_check_time = Instant::now();
-                                    }
-                                    Err(e) => {
-                                        let err_str = e.to_string();
-                                        if err_str == "AUTO_SELECT_BUSY" {
+                                if consecutive_fails >= 5 {
+                                    consecutive_fails = 0;
+                                    is_retry_mode = false;
+
+                                    let now = Instant::now();
+
+                                    // 检查 10 分钟切换冷却限制（自动与手动均起作用）
+                                    if last_node_switch_time.elapsed() < Duration::from_secs(600) {
+                                        if status == NodeHealthStatus::Unhealthy {
                                             logging!(
                                                 info,
                                                 Type::Lightweight,
-                                                "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
+                                                "[后台监测] 节点仅为亚健康且处于 10 分钟切换冷却中（已过 {} 秒），跳过自动选点",
+                                                last_node_switch_time.elapsed().as_secs()
                                             );
+                                            last_check_time = now;
+                                            continue;
                                         } else {
-                                            if current_cooldown.as_secs() == 0 {
-                                                current_cooldown = Duration::from_secs(60);
-                                            } else {
-                                                current_cooldown =
-                                                    std::cmp::min(current_cooldown * 2, Duration::from_secs(900));
-                                            }
                                             logging!(
-                                                warn,
+                                                info,
                                                 Type::Lightweight,
-                                                "[后台监测] 自愈选点失败 ({})，进入退避冷却期：{} 秒",
-                                                err_str,
-                                                current_cooldown.as_secs()
+                                                "[后台监测] 虽然处于 10 分钟切换冷却中，但检测到节点已彻底断线，强制自愈选点"
                                             );
                                         }
-                                        last_check_time = Instant::now();
+                                    }
+
+                                    // 检查退避冷却时间
+                                    if let Some(last_time) = last_auto_select_time {
+                                        if now.duration_since(last_time) < current_cooldown {
+                                            logging!(
+                                                info,
+                                                Type::Lightweight,
+                                                "[后台监测] 自愈选点处于退避冷却中（剩余 {} 秒），跳过本次选点",
+                                                current_cooldown.as_secs() - now.duration_since(last_time).as_secs()
+                                            );
+                                            last_check_time = now;
+                                            continue;
+                                        }
+                                    }
+
+                                    logging!(
+                                        info,
+                                        Type::Lightweight,
+                                        "[后台监测] 连续 5 次检测失败，启动后台自愈选点"
+                                    );
+                                    last_auto_select_time = Some(now);
+
+                                    match trigger_backend_auto_select(&current_profile, 0).await {
+                                        Ok(results) => {
+                                            if !results.is_empty() {
+                                                Handle::notify_delay_results("PROXY".into(), results);
+                                                current_cooldown = Duration::from_secs(0); // 选点成功，重置退避冷却
+                                            } else {
+                                                // 选点未找到可用节点，计算下一次退避冷却时间
+                                                if current_cooldown.as_secs() == 0 {
+                                                    current_cooldown = Duration::from_secs(60); // 初始冷却 1 分钟
+                                                } else {
+                                                    current_cooldown =
+                                                        std::cmp::min(current_cooldown * 2, Duration::from_secs(900)); // 每次翻倍，最高 15 分钟
+                                                }
+                                                logging!(
+                                                    warn,
+                                                    Type::Lightweight,
+                                                    "[后台监测] 自愈选点未找到可用节点，进入退避冷却期：{} 秒",
+                                                    current_cooldown.as_secs()
+                                                );
+                                            }
+                                            last_check_time = Instant::now();
+                                        }
+                                        Err(e) => {
+                                            let err_str = e.to_string();
+                                            if err_str == "AUTO_SELECT_BUSY" {
+                                                logging!(
+                                                    info,
+                                                    Type::Lightweight,
+                                                    "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
+                                                );
+                                            } else {
+                                                if current_cooldown.as_secs() == 0 {
+                                                    current_cooldown = Duration::from_secs(60);
+                                                } else {
+                                                    current_cooldown =
+                                                        std::cmp::min(current_cooldown * 2, Duration::from_secs(900));
+                                                }
+                                                logging!(
+                                                    warn,
+                                                    Type::Lightweight,
+                                                    "[后台监测] 自愈选点失败 ({})，进入退避冷却期：{} 秒",
+                                                    err_str,
+                                                    current_cooldown.as_secs()
+                                                );
+                                            }
+                                            last_check_time = Instant::now();
+                                        }
                                     }
                                 }
                             }
