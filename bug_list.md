@@ -11,6 +11,12 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-270: Typo in tauri-plugin-mihomo JS library getProxyByName argument
+ - **现象描述**：`tauri-plugin-mihomo` 插件的前端 JS 库在调用 Rust 后端的 `get_proxy_by_name` 时，参数键名错误地写成了 `proxiesName`，而 Rust 后端期待的是 `proxyName`（即 `proxy_name` 的驼峰格式）。这导致接口反序列化失败并报错 `command get_proxy_by_name missing required key proxyName`，进而阻塞前端的就绪及初始化渲染，使主窗口无法显示。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.10`
+
+
 ### BUG-215: Active Connection Node status row layout collapse and styling loss under strict CSP
  - **现象描述**：启用严格 CSP 后，WebView2 拒绝加载未显式放行的 `tauri://` 与 `asset://` 协议下的静态 CSS 资源及 Emotion 动态注入的样式，导致页面全部类样式失效，界面彻底退化为无样式灰白色，活动出口节点卡片也由于样式失效而失去 Flex 和高度约束产生崩塌。
  - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`

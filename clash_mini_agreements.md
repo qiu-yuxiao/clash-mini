@@ -2648,3 +2648,19 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 - 禁止擅自修改锁逻辑，如需修改必须先在协议中记录设计理由
 
 ---
+
+
+## 🔄 新增协议：Mihomo 插件 API 参数纠错规范 (2026-06-29)
+
+### 背景
+解决 `tauri-plugin-mihomo` 插件的 JS 库在调用 Rust 后端 `get_proxy_by_name` 时由于参数名称拼写错误导致接口调用失败、进而在窗口启动渲染时阻塞前端的问题。
+
+### 协议内容
+- **接口定义与参数匹配**：`tauri-plugin-mihomo` 插件在前端通过 JS/TS 提供 `getProxyByName` 接口，必须使用与 Rust 接口对应的字段名称。
+- **参数名纠正**：Rust 端参数为 `proxy_name: String`，在前端调用 `invoke('plugin:mihomo|get_proxy_by_name', ...)` 时，传参对象键名在编译为 JSON 时必须匹配 camelCase 转换后的名称 `proxyName`，而非错误的 `proxiesName`。
+- **改动文件范围**：
+  - `crates/tauri-plugin-mihomo/guest-js/index.ts`
+  - `crates/tauri-plugin-mihomo/dist-js/index.js`
+  - `crates/tauri-plugin-mihomo/dist-js/index.cjs`
+
+---
