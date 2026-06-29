@@ -1,3 +1,20 @@
+## v1.9.11
+
+### 📋 Code Review & Audit
+
+- **v1.8.8 → v1.9.10 全面代码审查**：完成从 v1.8.8 到当前版本的所有代码变更审查，确认以下核心改进已正确实现：
+  - ServiceManager 无锁状态机设计（`AtomicBool` + `Notify` 双检查模式）
+  - 监测线程优化（60秒/300秒自适应检查间隔 + 10分钟节点切换冷却）
+  - 启动流程对齐上游（lifecycle_lock + TUN模式隔离）
+  - 前端可访问性修复（WCAG 3.3.2 标准的 aria-labelledby）
+  - 颜色对比度修复（主题感知的 warning.main/warning.dark）
+
+### 🐞 Minor Fixes
+
+- **国际化部分语言待完善**：审查发现部分语言的 a11y 字段仍为英文（ar, fa, id, tr, tt），已记录待后续版本完善
+
+---
+
 ## v1.9.10
 
 ### 🐞 Fixed Bugs
