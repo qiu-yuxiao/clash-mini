@@ -192,6 +192,7 @@
 
    * 保持系统服务注册名 `clash_verge_service` 不变。新用户启动 TUN 模式时自动触发 UAC 安装该服务；若原版已安装，将通过 SCM 共享管道接管服务运行独立的 Clash 核心配置，实现无缝切换。
    * **启动模式避让规范 (TUN-Service 隔离规则)**：为了彻底消除与原版客户端的 SCM 服务抢占纠葛，保护用户的网络代理不被打断，**只有当 Clash Mini 显式开启了 `enable_tun_mode: true`（TUN模式）时，才允许启动服务模式 (`RunningMode::Service`) 进行接管**；若 TUN 模式处于关闭状态 (`enable_tun_mode: false` 或未配置)，无论系统服务是否就绪 (Ready)，主程序启动及内核重载时均必须强制进入旁路模式 (`RunningMode::Sidecar`)，在本地独立启动 `mini-mihomo` 内核进程，从而实现与原版客户端并存运行互不干扰。
+   * **ServiceManager 稳定态管理架构**：为了保证高频并发或多客户端共享 IPC 指令时的极端稳定性，`ServiceManager` 必须采用官方原版基于 `AtomicBool` 与异步 `Notify` 唤醒的防并发高稳状态机结构，并保留本地 `cores/` 目录下自定义内核 `mini-mihomo.exe` 的物理路径检测机制，确保事件响应性能与向后兼容。
 
 
 

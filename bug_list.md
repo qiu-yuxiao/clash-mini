@@ -11,6 +11,11 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-271: Periodic TCP connection GC teardown and ServiceManager Mutex lock contention
+ - **现象描述**：后台 `monitor.rs` 守护线程包含每 30 分钟强行切断系统内所有 TCP 连接的暴力 GC 逻辑，导致用户正在进行的下载和游戏断开；同时，`service.rs` 中的 `ServiceManager` 被包装在全局异步 `Mutex` 锁中，增加了高频并发调用时的资源死锁与卡顿风险。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.10`
+
 ### BUG-270: Typo in tauri-plugin-mihomo JS library getProxyByName call
  - **现象描述**：在 `tauri-plugin-mihomo` 的前端封装 JS/TS 库中，调用 `get_proxy_by_name` 接口时把参数错写为了 `proxiesName`，而 Rust 后端参数定义为 `proxy_name`（由 Tauri 转换后的对应 JS 参数为 `proxyName`）。这导致参数不匹配，反序列化报错 `missing required key proxyName`，阻塞了前端的渲染逻辑，使得窗口启动后无法正常弹出显示。
  - **当前状态**：`代码已修正，待用户确认`
