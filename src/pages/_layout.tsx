@@ -34,7 +34,6 @@ import { GlowBorder } from '@/components/glow-border'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
-import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useHeadStateNew } from '@/components/proxy/use-head-state'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
@@ -60,7 +59,6 @@ import {
   patchClashConfig,
   patchProfile,
   viewProfile,
-  calcuProxies,
 } from '@/services/cmds'
 import DelayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
@@ -71,7 +69,6 @@ import { isDummyNode } from '@/utils/node'
 import {
   closeAllConnections,
   getProxyByName,
-  selectNodeForGroup,
 } from 'tauri-plugin-mihomo-api'
 
 // Sub-components
@@ -146,141 +143,61 @@ async function waitForClashReady(
   return false
 }
 
-let activeAutoSelectCancelled = false
-
-async function frontendAutoSelect(
-  groupName: string,
-  timeout = 10000,
-  concurrency = 36,
-): Promise<[string, number][]> {
-  activeAutoSelectCancelled = false
-
-  const allData = await calcuProxies()
-  const group = allData.groups.find((g) => g.name === groupName)
-  const allProxies = group?.all || []
-
-  let filterText = ''
-  try {
-    const profiles = await getProfiles()
-    const currentUid = profiles?.current || ''
-    const headStateStr = localStorage.getItem('proxy-head-state')
-    if (headStateStr && currentUid) {
-      const headStateStorage = JSON.parse(headStateStr)
-      filterText = headStateStorage?.[currentUid]?.[groupName]?.filterText || ''
-    }
-  } catch {}
-
-  const filteredProxies = filterSort(allProxies, groupName, filterText, 1)
-  const names = filteredProxies.map((p) => p.name).filter(Boolean)
-
-  if (names.length === 0) return []
-
-  const totalStart = Date.now()
-  let selectedOnce = false
-  const results: [string, number][] = []
-
-  for (let i = 0; i < names.length; i += concurrency) {
-    if (activeAutoSelectCancelled) break
-    if (Date.now() - totalStart > 15000) break
-
-    const batch = names.slice(i, i + concurrency)
-    await DelayManager.checkListDelay(batch, groupName, timeout, batch.length)
-
-    if (activeAutoSelectCancelled) break
-
-    for (const name of batch) {
-      const delay = DelayManager.getDelay(name, groupName)
-      if (delay > 0 && delay < timeout) {
-        results.push([name, delay])
-      }
-    }
-
-    results.sort((a, b) => a[1] - b[1])
-
-    if (!selectedOnce && results.length > 0) {
-      selectedOnce = true
-      const bestName = results[0][0]
-      const bestDelay = results[0][1]
-      console.log(
-        `[Layout] 自动选点首批完成，最快节点: ${bestName} (${bestDelay}ms)`,
-      )
-      try {
-        await selectNodeForGroup(groupName, bestName)
-      } catch (err) {
-        console.error('[Layout] 自动选点切换失败:', err)
-      }
-    }
-  }
-
-  return results
-}
-
 async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
-  t: (key: string, opts?: any) => string,
-  fallbackTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
+  fallbackTimerRef: React.MutableRefObject<number | null>,
 ): Promise<void> {
-  try {
-    const results = await frontendAutoSelect('PROXY', 10000, 36)
-    if (results.length > 0) {
-      console.log(
-        `[Layout] 自动选点完成，最快节点: ${results[0][0]} (${results[0][1]}ms)`,
-      )
-    } else {
-      console.log('[Layout] 自动选点无可用节点')
-    }
-  } catch (err: any) {
-    if (err?.message === 'AutoSelectCancelled') {
-      console.log('[Layout] 自动选点任务被取消')
-    } else {
-      console.error('[Layout] 自动选点失败:', err)
-    }
-  }
-
-  // 选点后刷新前端显示，确保活跃节点标记（对勾）打在正确的节点上
+  // 先同步内核已有的节点状态，让 React 完成首帧渲染
   try {
     await refreshProxy({ forceFull: true })
   } catch (err) {
-    console.warn('[Layout] refreshProxy after auto-select failed:', err)
+    console.warn('[Layout] refreshProxy after profile change failed:', err)
   }
 
-  // 协议要求：自动排序置顶 sortType: 1（最快节点排第一行）
+  // 排序置顶
   if (setHeadState) {
     setHeadState('PROXY', { sortType: 1 })
-    console.log('[Layout] 已设置 sortType: 1（按延迟排序）')
   }
-  // 协议要求：6 秒无健康节点 → Fallback 降级，强制全节点测速
-  // 先清理旧定时器，防止重复
+
+  // 批量测速推迟到渲染之后，避免与 React layout/paint 争抢主线程
+  // 启动时由 isStartingUpRef / 30s 冷却挡掉，只有 profile 切换/导入后才真正跑
+  setTimeout(async () => {
+    try {
+      const proxyGroup = await getProxyByName('PROXY')
+      const allNames = (proxyGroup?.all || []).filter(
+        (name: string) => !isDummyNode(name),
+      )
+      if (allNames.length === 0) return
+      const timeout = 10000
+      await DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
+      if (setHeadState) {
+        setHeadState('PROXY', { sortType: 1 })
+      }
+    } catch (err) {
+      console.warn('[Layout] 延迟批量测速失败:', err)
+    }
+  }, 0)
+
+  // 6 秒无健康节点 Fallback
   if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
   fallbackTimerRef.current = setTimeout(async () => {
     try {
       const proxyGroup = await getProxyByName('PROXY')
       const nowNodeName = proxyGroup?.now || ''
-      if (!nowNodeName) {
-        console.log('[Layout] Fallback: 无当前节点，跳过')
-        return
-      }
-      // 检查当前选中节点（now）是否有健康延迟
-      // 与后端 monitor.rs 中的阈值保持一致：delay > 50 && delay < 2000
-      // 修复 BUG-MAJOR-002：只检查最新一条历史记录，而不是任意历史记录
+      if (!nowNodeName) return
       const nowNode = await getProxyByName(nowNodeName)
       const history = nowNode?.history || []
       const latestDelay =
         history.length > 0 ? history[history.length - 1].delay : -1
       const hasHealth = latestDelay > 50 && latestDelay < 2000
       if (!hasHealth) {
-        // 无健康节点，强制全节点测速
         const allNames = (proxyGroup?.all || []).filter(
           (name: string) => !isDummyNode(name),
         )
-        if (allNames.length === 0) {
-          console.log('[Layout] Fallback: 无可用节点，跳过')
-          return
-        }
+        if (allNames.length === 0) return
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
         await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
-        // Fallback 测速完成后再次确保排序正确
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
         }
@@ -1145,9 +1062,8 @@ const Layout = () => {
             if (cancelled || isImportingRef.current) return
             await triggerAutoSelectAndRefresh(
               refreshProxyRef.current,
-              tRef.current,
-              fallbackTimerRef,
               setHeadStateForSortRef.current,
+              fallbackTimerRef,
             )
             // Success: reset retry counter
             startupRetryCountRef.current = 0
@@ -1179,7 +1095,6 @@ const Layout = () => {
           if (timerId) {
             clearTimeout(timerId)
           }
-          activeAutoSelectCancelled = true
           // Reset last processed to allow retry/reload on next mount/run if cancelled before completion
           lastProcessedRef.current.uid = null
         }
@@ -1195,7 +1110,6 @@ const Layout = () => {
         fallbackTimerRef.current = null
         console.log('[Layout] 组件卸载，清理 Fallback 定时器')
       }
-      activeAutoSelectCancelled = true
     }
   }, [])
 
