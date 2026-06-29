@@ -1671,10 +1671,7 @@ const Layout = () => {
                   alignItems: 'center',
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding:
-                    decorated && !isDecorationsHidden
-                      ? '40px 8px 2px 8px'
-                      : '3px 8px 2px 8px',
+                  padding: '3px 8px 2px 8px',
                   position: 'relative',
                   zIndex: 9998,
                   gap: 0,
