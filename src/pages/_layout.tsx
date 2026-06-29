@@ -1534,93 +1534,10 @@ const Layout = () => {
             }}
           />
 
-          {!drawerOpen && (
-            <IconButton
-              size="small"
-              aria-label={t('layout.a11y.pinWindow')}
-              onClick={() =>
-                patchVerge({
-                  enable_always_on_top: !verge?.enable_always_on_top,
-                })
-              }
-              sx={(theme) => ({
-                ...get3DButtonStyle(
-                  theme,
-                  'contained',
-                  verge?.enable_always_on_top ? 'primary' : 'default',
-                ),
-                flexShrink: 0,
-                width: '28px',
-                height: '28px',
-                p: 0,
-              })}
-            >
-              <PushPinRounded
-                aria-hidden="true"
-                sx={{
-                  fontSize: '20px',
-                  width: '20px',
-                  height: '20px',
-                  color: verge?.enable_always_on_top ? '#FF3B30' : '#888888',
-                  filter: verge?.enable_always_on_top
-                    ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
-                    : 'none',
-                  transform: verge?.enable_always_on_top
-                    ? 'rotate(45deg)'
-                    : 'none',
-                  transition:
-                    'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
-                }}
-              />
-            </IconButton>
-          )}
-
-          <IconButton
-            size="small"
-            aria-label={
-              drawerOpen
-                ? t('layout.a11y.closeSettings')
-                : t('layout.a11y.openSettings')
-            }
-            onClick={() => setDrawerOpen(!drawerOpen)}
-            sx={(theme) => ({
-              ...get3DButtonStyle(
-                theme,
-                'contained',
-                drawerOpen ? 'primary' : 'default',
-              ),
-              flexShrink: 0,
-              width: '28px',
-              height: '28px',
-              p: 0,
-              mr: 1,
-            })}
-          >
-            {drawerOpen ? (
-              <CloseRounded
-                aria-hidden="true"
-                sx={{ fontSize: '20px', width: '20px', height: '20px' }}
-              />
-            ) : (
-              <SettingsRoundedIcon
-                aria-hidden="true"
-                sx={{ fontSize: '20px', width: '20px', height: '20px' }}
-              />
-            )}
-          </IconButton>
-
           <WindowControls ref={windowControlsRef} />
         </div>
       ) : null,
-    [
-      t,
-      decorated,
-      isDecorationsHidden,
-      drawerOpen,
-      setDrawerOpen,
-      patchVerge,
-      verge?.enable_always_on_top,
-    ],
+    [decorated, isDecorationsHidden],
   )
 
   if (!themeReady) {
@@ -1715,8 +1632,8 @@ const Layout = () => {
               flexDirection: 'column',
             }}
           >
-            {/* 右上角独立控制按钮（齿轮/关闭） */}
-            {(decorated || isDecorationsHidden) && (
+            {/* 右上角独立控制按钮（仅在设置面板打开时渲染，以允许关闭设置） */}
+            {drawerOpen && (
               <div
                 data-no-drag="true"
                 style={{
@@ -1728,34 +1645,19 @@ const Layout = () => {
               >
                 <IconButton
                   size="small"
-                  aria-label={
-                    drawerOpen
-                      ? t('layout.a11y.closeSettings')
-                      : t('layout.a11y.openSettings')
-                  }
-                  onClick={() => setDrawerOpen(!drawerOpen)}
+                  aria-label={t('layout.a11y.closeSettings')}
+                  onClick={() => setDrawerOpen(false)}
                   sx={(theme) => ({
-                    ...get3DButtonStyle(
-                      theme,
-                      'contained',
-                      drawerOpen ? 'primary' : 'default',
-                    ),
+                    ...get3DButtonStyle(theme, 'contained', 'primary'),
                     width: '28px',
                     height: '28px',
                     p: 0,
                   })}
                 >
-                  {drawerOpen ? (
-                    <CloseRounded
-                      aria-hidden="true"
-                      sx={{ fontSize: '20px', width: '20px', height: '20px' }}
-                    />
-                  ) : (
-                    <SettingsRoundedIcon
-                      aria-hidden="true"
-                      sx={{ fontSize: '20px', width: '20px', height: '20px' }}
-                    />
-                  )}
+                  <CloseRounded
+                    aria-hidden="true"
+                    sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+                  />
                 </IconButton>
               </div>
             )}
@@ -1771,57 +1673,75 @@ const Layout = () => {
                   boxSizing: 'border-box',
                   padding:
                     decorated && !isDecorationsHidden
-                      ? '40px 36px 2px 8px'
-                      : '3px 36px 2px 8px',
+                      ? '40px 8px 2px 8px'
+                      : '3px 8px 2px 8px',
                   position: 'relative',
                   zIndex: 9998,
+                  gap: '8px',
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <ActiveNodeStatusCard />
                 </div>
-                {(decorated || isDecorationsHidden) && (
-                  <IconButton
-                    size="small"
-                    aria-label={t('layout.a11y.pinWindow')}
-                    onClick={() =>
-                      patchVerge({
-                        enable_always_on_top: !verge?.enable_always_on_top,
-                      })
-                    }
-                    sx={(theme) => ({
-                      ...get3DButtonStyle(
-                        theme,
-                        'contained',
-                        verge?.enable_always_on_top ? 'primary' : 'default',
-                      ),
-                      flexShrink: 0,
-                      width: '28px',
-                      height: '28px',
-                      p: 0,
-                    })}
-                  >
-                    <PushPinRounded
-                      aria-hidden="true"
-                      sx={{
-                        fontSize: '20px',
-                        width: '20px',
-                        height: '20px',
-                        color: verge?.enable_always_on_top
-                          ? '#FF3B30'
-                          : '#888888',
-                        filter: verge?.enable_always_on_top
-                          ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
-                          : 'none',
-                        transform: verge?.enable_always_on_top
-                          ? 'rotate(45deg)'
-                          : 'none',
-                        transition:
-                          'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
-                      }}
-                    />
-                  </IconButton>
-                )}
+
+                <IconButton
+                  size="small"
+                  aria-label={t('layout.a11y.pinWindow')}
+                  onClick={() =>
+                    patchVerge({
+                      enable_always_on_top: !verge?.enable_always_on_top,
+                    })
+                  }
+                  sx={(theme) => ({
+                    ...get3DButtonStyle(
+                      theme,
+                      'contained',
+                      verge?.enable_always_on_top ? 'primary' : 'default',
+                    ),
+                    flexShrink: 0,
+                    width: '28px',
+                    height: '28px',
+                    p: 0,
+                  })}
+                >
+                  <PushPinRounded
+                    aria-hidden="true"
+                    sx={{
+                      fontSize: '20px',
+                      width: '20px',
+                      height: '20px',
+                      color: verge?.enable_always_on_top
+                        ? '#FF3B30'
+                        : '#888888',
+                      filter: verge?.enable_always_on_top
+                        ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
+                        : 'none',
+                      transform: verge?.enable_always_on_top
+                        ? 'rotate(45deg)'
+                        : 'none',
+                      transition:
+                        'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                    }}
+                  />
+                </IconButton>
+
+                <IconButton
+                  size="small"
+                  aria-label={t('layout.a11y.openSettings')}
+                  onClick={() => setDrawerOpen(true)}
+                  sx={(theme) => ({
+                    ...get3DButtonStyle(theme, 'contained', 'default'),
+                    flexShrink: 0,
+                    width: '28px',
+                    height: '28px',
+                    p: 0,
+                  })}
+                >
+                  <SettingsRoundedIcon
+                    aria-hidden="true"
+                    sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+                  />
+                </IconButton>
               </div>
             )}
 

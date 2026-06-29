@@ -119,7 +119,6 @@ export const ProxyItem = (props: Props) => {
                 : 'rgba(50, 100, 180, 0.08)'
               : 'transparent'
           const selectColor = mode === 'light' ? primary.main : primary.light
-          const showDelay = delayValue > 0
 
           return {
             '&:hover .the-icon': { display: 'none' },
@@ -285,7 +284,11 @@ export const ProxyItem = (props: Props) => {
             key={delayValue}
             className="the-delay"
             sx={({ palette }) => ({
-              color: delayManager.formatDelayColor(delayValue, timeout, palette.mode === 'dark'),
+              color: delayManager.formatDelayColor(
+                delayValue,
+                timeout,
+                palette.mode === 'dark',
+              ),
               cursor: 'default',
               fontSize: '11px',
               fontWeight: 600,

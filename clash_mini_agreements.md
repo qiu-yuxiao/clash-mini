@@ -198,9 +198,9 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 
    * 下半层流量仪表盘的底部指标卡片行支持自适应响应式（flex-wrap），当窗口宽度小于 560px 时，下载与上传两组指标组会自动换行并垂直堆叠展示，避免在窄窗口下溢出。卡片无外边框（`border: none`），换行后两行之间间距为 0；卡片行与上方图表之间保留 2px 间距（`mt: 0.25`）。
 
-   * 设置/关闭（齿轮/叉号）二合一按钮独立以绝对定位方式放置在最右上角（`position: 'absolute', top: 8px, right: 8px, zIndex: 120`），其宽度 and 高度固定为 `28px`，内部图标大小为 `20px`。齿轮与叉号显示物理中心完全重合对齐，确保切换无跳动。
+   * 设置/关闭二合一按钮在设置面板打开时，独立以绝对定位方式放置在右上角（`position: 'absolute', top: decorated && !isDecorationsHidden ? '40px' : '3px', right: 8px, zIndex: 9999`），其宽度 and 高度固定为 `28px`，内部图标大小为 `20px`。
 
-   * 置顶的「当前活跃出口节点状态显示条」以及置顶图钉按钮在 Flex 容器中排列，且仅在设置页面未打开时（`!drawerOpen`）进行渲染。该容器右侧设置 `paddingRight: '44px'` 避让右上角绝对定位 of 二合一控制按钮，防止发生任何物理重合。
+   * 置顶的「当前活跃出口节点状态显示条」以及置顶图钉按钮、设置齿轮按钮始终在同一行 Flex 容器中排列，且仅在设置页面未打开时（`!drawerOpen`）进行渲染。三者在行内并排展示（图钉与齿轮在节点卡片右侧），防止发生任何物理重合或错位。
 
    * 置顶的「当前活跃出口节点状态显示条」：两端追加展示额外情报（左侧展示当前节点所使用的协议/类型如 Shadowsocks, Trojan 等，右侧展示其 IP 与端口如 127.0.0.1:10801）。当窗口宽度小于 560px 时（即最底部的 4 个流量小卡片折叠成两行时），自动隐藏这两端的额外情报（通过 `@media (max-width: 560px)` 触发 `display: 'none'`)，避免其折行影响紧凑排版。
 
@@ -215,7 +215,7 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 4. **字体与字号**：
 
    * **拟物视觉特效规范**：全面落实 3D 实体拟物与光影立体美学。主界面和控制按钮均升级为具有 Bevel 物理凹凸质感与硬朗造型的拟物控制台设计，支持立体磨砂（Depth）与色彩霓虹（Vibrancy）的双控制变量动态调节，与传统的扁平化风格完全隔离。
-   * **顶栏按钮 3D 风格升级**：主页面右上角顶栏中的「置顶图钉 (Pin)」与「设置齿轮 (Gear)」两个快捷按钮现已升级为遵守六种皮肤风格的 3D 拟物按钮，通过分别调用 `get3DButtonStyle(theme, 'contained', verge?.enable_always_on_top ? 'primary' : 'default')`（图钉按钮）和 `get3DButtonStyle(theme, 'contained', drawerOpen ? 'primary' : 'default')`（设置齿轮按钮）实现动态换肤；两按钮之间的空隙已压缩为零，视觉上紧密相邻。
+   * **顶栏按钮 3D 风格升级**：主页面中活跃节点卡片行右侧的「置顶图钉 (Pin)」与「设置齿轮 (Gear)」两个快捷按钮现已升级为遵守六种皮肤风格的 3D 拟物按钮，通过分别调用 `get3DButtonStyle(theme, 'contained', verge?.enable_always_on_top ? 'primary' : 'default')`（图钉按钮）和 `get3DButtonStyle(theme, 'contained', 'default')`（设置齿轮按钮）实现动态换肤；按钮之间的空隙已压缩，视觉上紧密相邻。
    * **禁用状态按钮样式规范**：为了保证按钮处于禁用（disabled）状态时仍有良好的对比度，所有皮肤在 `get3DButtonStyle` 中必须实现显式的 `&.Mui-disabled` 样式定义，使用 `!important` 覆盖背景、边框、文字颜色和阴影，避免因文本颜色半透明而背景渐变仍然亮起所导致的零反差字形隐形缺陷（如深色模式 3D 黄金按钮置灰）。
 
    * **禁用窗口透明与虚化**：在 Rust 窗口配置（`window.rs`）中将 `transparent` 设为 `false`，彻底注释/移除 `apply_mica`、`apply_acrylic` 和 `apply_blur` 等窗口虚化效果的注入，确保原生窗口完全不透明。

@@ -66,8 +66,6 @@ export const ProxyGroups = (props: Props) => {
   const { pathname } = useLocation()
   const { mode, isChainMode = false, chainConfigData } = props
 
-
-
   const [proxyChain, setProxyChain] = useState<ProxyChainItem[]>(() => {
     try {
       const saved = localStorage.getItem('proxy-chain-items')
@@ -121,7 +119,7 @@ export const ProxyGroups = (props: Props) => {
     [selectedGroup, defaultRuleGroup],
   )
 
-  const { renderList, onProxies, onHeadState } = useRenderList(
+  const { renderList, onHeadState } = useRenderList(
     mode,
     isChainMode,
     activeSelectedGroup,
@@ -419,7 +417,8 @@ export const ProxyGroups = (props: Props) => {
               const proxyItem = proxiesData?.records[name]
               if (!proxyItem) continue
               const delay = delayManager.getDelayFix(proxyItem, groupName)
-              if (delay >= 30 && delay < timeout) { // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
+              if (delay >= 30 && delay < timeout) {
+                // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
                 if (delay < minDelay) {
                   minDelay = delay
                   fastestNodeName = name
@@ -430,7 +429,9 @@ export const ProxyGroups = (props: Props) => {
             if (fastestNodeName) {
               const fastestProxyItem = proxiesData?.records[fastestNodeName]
               if (fastestProxyItem) {
-                debugLog(`[ProxyGroups] 自动优选最快节点: ${fastestNodeName} (延迟: ${minDelay}ms)`)
+                debugLog(
+                  `[ProxyGroups] 自动优选最快节点: ${fastestNodeName} (延迟: ${minDelay}ms)`,
+                )
                 handleProxyGroupChange(group, fastestProxyItem)
               }
             }

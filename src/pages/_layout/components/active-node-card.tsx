@@ -13,10 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import {
-  useProxiesData,
-  useAppRefreshers,
-} from '@/providers/app-data-context'
+import { useProxiesData } from '@/providers/app-data-context'
 import { getProxyAddr } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { get3DCardStyle } from '@/utils/button-styles'
@@ -298,14 +295,18 @@ export const ActiveNodeStatusCard = () => {
         <Chip
           size="small"
           icon={
-            (testing || delay === -2) ? (
-              <CircularProgress size={10} color="inherit" sx={{ width: 10, height: 10 }} />
+            testing || delay === -2 ? (
+              <CircularProgress
+                size={10}
+                color="inherit"
+                sx={{ width: 10, height: 10 }}
+              />
             ) : (
               signalInfo.icon
             )
           }
           label={
-            (testing || delay === -2)
+            testing || delay === -2
               ? t('settings.mini.statusTesting', { defaultValue: '测试中' }) +
                 '...'
               : delayManager.formatDelay(delay)
