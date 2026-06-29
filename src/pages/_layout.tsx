@@ -1071,43 +1071,15 @@ const Layout = () => {
 
   const triggerWakeupLatencyTest = useCallback(async () => {
     try {
-      // 1. 无论冷却状态如何，窗口唤醒时必须立即刷新本地代理选点状态，确保 UI 上的对勾打在正确的活跃节点上
-      console.log('[Layout] 窗口唤醒，首先刷新本地代理状态')
+      // 窗口唤醒时刷新本地代理状态，确保 UI 上的对勾打在正确的活跃节点上
+      console.log('[Layout] 窗口唤醒，刷新本地代理状态')
       await refreshAllRef.current()
-
-      const now = Date.now()
-      // 2. 只有测速有 30 秒冷却限制，避免频繁唤醒导致过多垃圾网络探测请求
-      if (now - lastFullTestTimeRef.current < 30 * 1000) {
-        return
-      }
-
-      if (isStartingUpRef.current) {
-        return
-      }
-
-      const proxyGroup = await getProxyByName('PROXY')
-      const allNames = (proxyGroup?.all || []).filter(
-        (name: string) => !isDummyNode(name),
-      )
-      if (allNames.length === 0) return
-
-      const timeout = verge?.default_latency_timeout || 10000
-      lastFullTestTimeRef.current = now
-      console.log('[Layout] 窗口唤醒，触发后台节点测速以刷新延迟')
-
-      // 3. 异步执行全节点测速，由 backend-delay-results 事件驱动增量刷新，不阻塞 UI 渲染
-      DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
-        .then(async () => {
-          // 测速全部完成后再做一次静默刷新作为备份
-          await refreshAllRef.current()
-        })
-        .catch((err) => {
-          console.error('[Layout] 唤醒后后台测速异常:', err)
-        })
+      // 全节点批量测速由用户点击闪电按钮主动触发，唤醒时不自动执行，
+      // 避免 36 路并发 IPC 淹没 WebView 主线程导致 UI 冻结
     } catch (err) {
       console.error('[Layout] 唤醒刷新与测速失败:', err)
     }
-  }, [verge?.default_latency_timeout])
+  }, [])
 
   const triggerWakeupLatencyTestRef = useRef(triggerWakeupLatencyTest)
   triggerWakeupLatencyTestRef.current = triggerWakeupLatencyTest
