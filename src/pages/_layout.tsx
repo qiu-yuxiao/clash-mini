@@ -34,6 +34,7 @@ import { GlowBorder } from '@/components/glow-border'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
+import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useHeadStateNew } from '@/components/proxy/use-head-state'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
@@ -56,6 +57,7 @@ import {
   isPortInUse,
   patchClashMode,
   getProfiles,
+  calcuProxies,
   patchClashConfig,
   patchProfile,
   viewProfile,
@@ -143,10 +145,72 @@ async function waitForClashReady(
   return false
 }
 
+async function getFilteredNodeNames(groupName: string): Promise<string[]> {
+  try {
+    const allData = await calcuProxies()
+    const group = allData.groups.find((g) => g.name === groupName)
+    const allProxies = group?.all || []
+
+    let currentUid = ''
+    try {
+      const profiles = await getProfiles()
+      currentUid = profiles?.current || ''
+    } catch {}
+
+    let filterText = ''
+    let sortType = 0
+    let filterMatchCase = false
+    let filterMatchWholeWord = false
+    let filterUseRegularExpression = false
+
+    try {
+      const headStateStr = localStorage.getItem('proxy-head-state')
+      if (headStateStr && currentUid) {
+        const headStateStorage = JSON.parse(headStateStr)
+        const groupState = headStateStorage?.[currentUid]?.[groupName]
+        if (groupState) {
+          filterText = groupState.filterText || ''
+          sortType = groupState.sortType || 0
+          filterMatchCase = groupState.filterMatchCase || false
+          filterMatchWholeWord = groupState.filterMatchWholeWord || false
+          filterUseRegularExpression = groupState.filterUseRegularExpression || false
+        }
+      }
+    } catch {}
+
+    const searchState = {
+      matchCase: filterMatchCase,
+      matchWholeWord: filterMatchWholeWord,
+      useRegularExpression: filterUseRegularExpression,
+    }
+
+    const filtered = filterSort(
+      allProxies,
+      groupName,
+      filterText,
+      sortType as 0 | 1 | 2,
+      undefined,
+      searchState,
+    )
+
+    return filtered
+      .map((p) => p.name)
+      .filter((name) => name && !isDummyNode(name))
+  } catch (err) {
+    console.warn('[Layout] 获取过滤节点列表失败，回退到全部节点:', err)
+    try {
+      const proxyGroup = await getProxyByName(groupName)
+      return (proxyGroup?.all || []).filter((name: string) => !isDummyNode(name))
+    } catch {
+      return []
+    }
+  }
+}
+
 async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
-  setHeadState?: (groupName: string, patch: any) => void,
   fallbackTimerRef: React.MutableRefObject<number | null>,
+  setHeadState?: (groupName: string, patch: any) => void,
 ): Promise<void> {
   // 先同步内核已有的节点状态，让 React 完成首帧渲染
   try {
@@ -164,13 +228,10 @@ async function triggerAutoSelectAndRefresh(
   // 启动时由 isStartingUpRef / 30s 冷却挡掉，只有 profile 切换/导入后才真正跑
   setTimeout(async () => {
     try {
-      const proxyGroup = await getProxyByName('PROXY')
-      const allNames = (proxyGroup?.all || []).filter(
-        (name: string) => !isDummyNode(name),
-      )
-      if (allNames.length === 0) return
+      const names = await getFilteredNodeNames('PROXY')
+      if (names.length === 0) return
       const timeout = 10000
-      await DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
+      await DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
       }
@@ -192,12 +253,10 @@ async function triggerAutoSelectAndRefresh(
         history.length > 0 ? history[history.length - 1].delay : -1
       const hasHealth = latestDelay > 50 && latestDelay < 2000
       if (!hasHealth) {
-        const allNames = (proxyGroup?.all || []).filter(
-          (name: string) => !isDummyNode(name),
-        )
-        if (allNames.length === 0) return
+        const names = await getFilteredNodeNames('PROXY')
+        if (names.length === 0) return
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
-        await DelayManager.checkListDelay(allNames, 'PROXY', 5000, 36)
+        await DelayManager.checkListDelay(names, 'PROXY', 5000, 36)
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
         }
@@ -1000,11 +1059,8 @@ const Layout = () => {
         return
       }
 
-      const proxyGroup = await getProxyByName('PROXY')
-      const allNames = (proxyGroup?.all || []).filter(
-        (name: string) => !isDummyNode(name),
-      )
-      if (allNames.length === 0) return
+      const names = await getFilteredNodeNames('PROXY')
+      if (names.length === 0) return
 
       const timeout = verge?.default_latency_timeout || 10000
       lastFullTestTimeRef.current = now
@@ -1013,7 +1069,7 @@ const Layout = () => {
       // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       setTimeout(() => {
-        DelayManager.checkListDelay(allNames, 'PROXY', timeout, 36)
+        DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
           .then(async () => {
             await refreshAllRef.current()
           })
@@ -1062,8 +1118,8 @@ const Layout = () => {
             if (cancelled || isImportingRef.current) return
             await triggerAutoSelectAndRefresh(
               refreshProxyRef.current,
-              setHeadStateForSortRef.current,
               fallbackTimerRef,
+              setHeadStateForSortRef.current,
             )
             // Success: reset retry counter
             startupRetryCountRef.current = 0
