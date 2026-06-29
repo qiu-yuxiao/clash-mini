@@ -77,7 +77,7 @@ impl CoreManager {
         let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
 
         let mode = if needs_service {
-            let value = SERVICE_MANAGER.lock().await.current();
+            let value = SERVICE_MANAGER.current().await;
             match value {
                 ServiceStatus::Ready => RunningMode::Service,
                 _ => RunningMode::Sidecar,
@@ -112,9 +112,7 @@ impl CoreManager {
             .with_max_times(max_times as usize);
 
         let _ = (|| async {
-            let mut manager = SERVICE_MANAGER.lock().await;
-
-            if matches!(manager.current(), ServiceStatus::Ready) {
+            if matches!(SERVICE_MANAGER.current().await, ServiceStatus::Ready) {
                 return Ok(());
             }
 
@@ -124,12 +122,10 @@ impl CoreManager {
                 return Err(anyhow::anyhow!("Service IPC not ready"));
             }
 
-            manager.init().await?;
-            drop(manager);
-            let _ = service::ServiceManager::refresh().await;
+            SERVICE_MANAGER.init().await?;
+            let _ = SERVICE_MANAGER.refresh().await;
 
-            let manager = SERVICE_MANAGER.lock().await;
-            if matches!(manager.current(), ServiceStatus::Ready) {
+            if matches!(SERVICE_MANAGER.current().await, ServiceStatus::Ready) {
                 Ok(())
             } else {
                 Err(anyhow::anyhow!("Service not ready"))

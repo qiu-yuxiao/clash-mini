@@ -439,7 +439,6 @@ pub fn start_background_monitor() {
         let mut last_active_node: Option<String> = None;
         let mut last_auto_select_time: Option<Instant> = None;
         let mut current_cooldown = Duration::from_secs(0);
-        let mut last_gc_time = Instant::now();
         let mut was_online = true;
         let mut is_first_run = true;
         let mut last_online_check_time: Option<Instant> = None;
@@ -482,19 +481,7 @@ pub fn start_background_monitor() {
             }
             was_lightweight = is_lightweight;
 
-            // 定期触发网络连接垃圾回收 (GC) - 每 30 分钟一次
-            if last_gc_time.elapsed() >= Duration::from_secs(1800) {
-                last_gc_time = Instant::now();
-                logging!(info, Type::Lightweight, "[后台监测] 触发定期网络连接垃圾回收 (GC)...");
-                let mihomo = Handle::mihomo().await.clone();
-                if let Err(err) = mihomo.close_all_connections().await {
-                    logging!(
-                        error,
-                        Type::Lightweight,
-                        "[后台监测] 触发定期网络连接垃圾回收 (GC) 失败: {err}"
-                    );
-                }
-            }
+
 
             let current_profile = match get_current_profile_uid().await {
                 Some(uid) => uid,

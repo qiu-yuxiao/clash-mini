@@ -162,11 +162,9 @@ pub(super) async fn init_service_manager() {
     if !is_service_ipc_path_exists() {
         return;
     }
-    let mut manager = SERVICE_MANAGER.lock().await;
-    let is_ok = manager.init().await.is_ok();
-    drop(manager);
+    let is_ok = SERVICE_MANAGER.init().await.is_ok();
     if is_ok {
-        logging_error!(Type::Setup, ServiceManager::refresh().await);
+        logging_error!(Type::Setup, SERVICE_MANAGER.refresh().await);
     }
 }
 
