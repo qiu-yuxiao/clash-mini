@@ -503,35 +503,24 @@ pub fn start_background_monitor() {
                 }
             };
 
-            // 1. Profile 发生变化，或刚退出轻量模式时，立即触发自启动优选 / 全节点延迟测试
-            if last_profile_uid.as_ref() != Some(&current_profile) || exited_lightweight {
-                if last_profile_uid.as_ref() != Some(&current_profile) {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 活动配置切换: {:?} -> {}",
-                        last_profile_uid,
-                        current_profile
-                    );
-                    last_profile_uid = Some(current_profile.clone());
-                    consecutive_fails = 0;
-                    is_retry_mode = false;
-                    last_active_node = None;
-                    last_auto_select_time = None;
-                    current_cooldown = Duration::from_secs(0);
+            // 1. Profile 发生变化时，立即触发自启动优选
+            if last_profile_uid.as_ref() != Some(&current_profile) {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 活动配置切换: {:?} -> {}",
+                    last_profile_uid,
+                    current_profile
+                );
+                last_profile_uid = Some(current_profile.clone());
+                consecutive_fails = 0;
+                is_retry_mode = false;
+                last_active_node = None;
+                last_auto_select_time = None;
+                current_cooldown = Duration::from_secs(0);
 
-                    // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
-                    cancel_active_auto_select();
-                } else if exited_lightweight {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 退出轻量模式，触发唤醒时全节点延迟测试"
-                    );
-                    consecutive_fails = 0;
-                    is_retry_mode = false;
-                    current_cooldown = Duration::from_secs(0);
-                }
+                // 强制中止正在运行的其它后台测速任务，使其尽快释放锁
+                cancel_active_auto_select();
 
                 if wait_for_clash_ready().await {
                     loop {
@@ -547,7 +536,7 @@ pub fn start_background_monitor() {
                                 sleep(Duration::from_millis(500)).await;
                             }
                             Err(e) => {
-                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载/唤醒后自动优选失败: {e}");
+                                logging!(warn, Type::Lightweight, "[后台监测] 配置重载后自动优选失败: {e}");
                                 break;
                             }
                         }
@@ -557,6 +546,14 @@ pub fn start_background_monitor() {
                 }
                 last_check_time = Instant::now();
                 continue;
+            }
+
+            // 退出轻量模式时仅重置计数器，由前端 visibilitychange 触发批量刷新，
+            // 后端不做额外的 auto-select 以避免和前端的 checkListDelay 竞争 mihomo 内核
+            if exited_lightweight {
+                consecutive_fails = 0;
+                is_retry_mode = false;
+                current_cooldown = Duration::from_secs(0);
             }
 
             // 检测物理网络连通性状态（有节流门控，避免每次循环都发起 DNS 查询）
