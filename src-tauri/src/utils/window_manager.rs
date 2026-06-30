@@ -21,6 +21,8 @@ pub enum WindowOperationResult {
     Failed,
     /// 无需操作
     NoAction,
+    /// 被防抖限流
+    RateLimited,
 }
 
 /// 窗口状态
@@ -134,7 +136,7 @@ impl WindowManager {
     pub async fn show_main_window() -> WindowOperationResult {
         // 防抖检查
         if !should_handle_window_operation() {
-            return WindowOperationResult::NoAction;
+            return WindowOperationResult::RateLimited;
         }
 
         logging!(info, Type::Window, "开始智能显示主窗口");
@@ -176,7 +178,7 @@ impl WindowManager {
     /// 切换主窗口显示状态（显示/隐藏）
     pub async fn toggle_main_window() -> WindowOperationResult {
         if !should_handle_window_operation() {
-            return WindowOperationResult::NoAction;
+            return WindowOperationResult::RateLimited;
         }
 
         let (window, state) = Self::get_main_window_with_state();
