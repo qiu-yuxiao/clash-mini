@@ -49,33 +49,27 @@ static LAST_WINDOW_OP_MS: AtomicU64 = AtomicU64::new(0);
 /// 自适应防抖检查：
 /// - 距离上次操作超过 IDLE_THRESHOLD（3s）→ 立即允许（用户长时间未操作，无需防抖）
 /// - 距离上次操作小于 IDLE_THRESHOLD → 使用 DEBOUNCE 间隔（用户在频繁操作，防抽风）
+/// 使用 fetch_update 将 load-判断-store 合并为单个原子操作，避免并发调用时的 TOCTOU 竞态。
 fn should_handle_window_operation() -> bool {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
-    let last = LAST_WINDOW_OP_MS.load(Ordering::Relaxed);
-    let elapsed = now.saturating_sub(last);
-
-    let threshold = if elapsed > WINDOW_IDLE_THRESHOLD_MS || last == 0 {
-        // 空闲超时或首次操作 — 立即响应
-        0
-    } else {
-        // 频繁操作 — 启用防抖
-        WINDOW_OPERATION_DEBOUNCE_MS
-    };
-
-    if elapsed < threshold {
-        logging!(
-            debug,
-            Type::Window,
-            "window operation rate limited (elapsed={elapsed}ms, threshold={threshold}ms)"
-        );
-        return false;
-    }
 
     LAST_WINDOW_OP_MS
-        .compare_exchange(last, now, Ordering::SeqCst, Ordering::Relaxed)
+        .fetch_update(Ordering::SeqCst, Ordering::Relaxed, |last| {
+            let elapsed = now.saturating_sub(last);
+            let threshold = if elapsed > WINDOW_IDLE_THRESHOLD_MS || last == 0 {
+                0
+            } else {
+                WINDOW_OPERATION_DEBOUNCE_MS
+            };
+            if elapsed < threshold {
+                None // 限流
+            } else {
+                Some(now) // 放行并更新时间戳
+            }
+        })
         .is_ok()
 }
 
