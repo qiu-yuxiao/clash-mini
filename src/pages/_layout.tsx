@@ -1222,9 +1222,14 @@ const Layout = () => {
   // 导致每次点击都触发全节点批量测速，造成 UI 冻结
   useEffect(() => {
     if (typeof window === 'undefined') return
+    let rafId: number | null = null
     const handleResize = () => {
-      setIsMinimalWidth(window.innerWidth <= 285)
-      setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        setIsMinimalWidth(window.innerWidth <= 285)
+        setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
+      })
     }
     const handleVisibilityChange = () => {
       handleResize()
@@ -1237,6 +1242,7 @@ const Layout = () => {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       clearTimeout(timer)
+      if (rafId !== null) cancelAnimationFrame(rafId)
       window.removeEventListener('resize', handleResize)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }

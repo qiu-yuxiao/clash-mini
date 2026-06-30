@@ -68,9 +68,14 @@ export const AppDataProvider = ({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    let rafId: number | null = null
     const handleResize = () => {
-      setIsMinimalWidth(window.innerWidth <= 285)
-      setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        setIsMinimalWidth(window.innerWidth <= 285)
+        setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
+      })
     }
     const timer = setTimeout(handleResize, 0)
     window.addEventListener('resize', handleResize)
@@ -78,6 +83,7 @@ export const AppDataProvider = ({
     document.addEventListener('visibilitychange', handleResize)
     return () => {
       clearTimeout(timer)
+      if (rafId !== null) cancelAnimationFrame(rafId)
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('focus', handleResize)
       document.removeEventListener('visibilitychange', handleResize)
