@@ -30,7 +30,7 @@ const DEFAULT_DECORATIONS: bool = true;
 /// 构建新的 WebView 窗口
 pub async fn build_new_window() -> Result<WebviewWindow, String> {
     let app_handle = handle::Handle::app_handle();
-
+    let app_handle_clone = app_handle.clone();
     let config = Config::verge().await;
     let latest = config.latest_arc();
     let always_on_top = latest.enable_always_on_top.unwrap_or(false);
@@ -90,7 +90,15 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
         logging_error!(Type::Window, window.show());
         logging_error!(Type::Window, window.set_focus());
-        let _ = window.set_always_on_top(always_on_top);
+        let label = window.label().to_string();
+        let ah = app_handle_clone.clone();
+        let ah2 = ah.clone();
+        let _ = ah.run_on_main_thread(move || {
+            use tauri::Manager as _;
+            if let Some(w) = ah2.get_webview_window(&label) {
+                let _ = w.set_always_on_top(always_on_top);
+            }
+        });
     });
 
     #[cfg(not(target_os = "windows"))]
@@ -116,7 +124,15 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
         logging_error!(Type::Window, window.show());
         logging_error!(Type::Window, window.set_focus());
-        let _ = window.set_always_on_top(always_on_top);
+        let label = window.label().to_string();
+        let ah = app_handle_clone.clone();
+        let ah2 = ah.clone();
+        let _ = ah.run_on_main_thread(move || {
+            use tauri::Manager as _;
+            if let Some(w) = ah2.get_webview_window(&label) {
+                let _ = w.set_always_on_top(always_on_top);
+            }
+        });
     });
 
     if let Some(theme) = resolved_theme {
