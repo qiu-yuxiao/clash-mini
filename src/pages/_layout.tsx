@@ -61,6 +61,7 @@ import {
   patchClashConfig,
   patchProfile,
   viewProfile,
+  restartCore,
 } from '@/services/cmds'
 import DelayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
@@ -1496,6 +1497,7 @@ const Layout = () => {
 
       try {
         await patchVerge({ enable_system_proxy: false, enable_tun_mode: true })
+        await restartCore()
         showNotice.success('已开启 TUN 模式')
       } catch (err) {
         showNotice.error(err)
