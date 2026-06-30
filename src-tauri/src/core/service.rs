@@ -549,9 +549,25 @@ impl ServiceManager {
         Tray::global().update_menu().await
     }
 
+async fn is_reinstall_service_needed() -> bool {
+    clash_verge_service_ipc::is_ipc_path_exists()
+        && match clash_verge_service_ipc::get_version().await {
+            Ok(resp) => {
+                if let Some(ver) = resp.data {
+                    let clean_ver = ver.trim_start_matches('v');
+                    let expected_ver = clash_verge_service_ipc::VERSION.trim_start_matches('v');
+                    clean_ver != expected_ver
+                } else {
+                    true
+                }
+            }
+            Err(_) => true,
+        }
+}
+
     pub async fn refresh(&self) -> Result<()> {
         self.run_operation(async {
-            self.apply_service_status(if clash_verge_service_ipc::is_reinstall_service_needed().await {
+            self.apply_service_status(if Self::is_reinstall_service_needed().await {
                 ServiceStatus::NeedsReinstall
             } else {
                 ServiceStatus::Ready
@@ -583,7 +599,7 @@ impl ServiceManager {
                 logging!(info, Type::Service, "需要安装服务，执行安装流程");
                 run_service_command(install_service, "install service")?;
                 wait_for_service_ipc(self).await?;
-                if clash_verge_service_ipc::is_reinstall_service_needed().await {
+                if Self::is_reinstall_service_needed().await {
                     logging!(info, Type::Service, "服务版本不匹配，执行重装流程");
                     self.set_status(ServiceStatus::NeedsReinstall);
                     run_service_command(reinstall_service, "reinstall service")?;
