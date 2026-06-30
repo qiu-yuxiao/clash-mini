@@ -73,8 +73,14 @@ export const AppDataProvider = ({
       if (rafId !== null) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        setIsMinimalWidth(window.innerWidth <= 285)
-        setIsMiniStatus(window.innerWidth <= 285 && window.innerHeight <= 100)
+        setIsMinimalWidth((prev) => {
+          const next = window.innerWidth <= 285
+          return prev !== next ? next : prev
+        })
+        setIsMiniStatus((prev) => {
+          const next = window.innerWidth <= 285 && window.innerHeight <= 100
+          return prev !== next ? next : prev
+        })
       })
     }
     const timer = setTimeout(handleResize, 0)
