@@ -191,7 +191,7 @@ impl WindowManager {
 
         match state {
             WindowState::NotExist => Self::handle_not_exist_toggle().await,
-            WindowState::VisibleFocused | WindowState::VisibleUnfocused => Self::hide_main_window(window.as_ref()),
+            WindowState::VisibleFocused | WindowState::VisibleUnfocused => Self::hide_main_window_internal(window.as_ref()),
             WindowState::Minimized | WindowState::Hidden => Self::activate_existing_main_window(window.as_ref()),
         }
     }
@@ -207,23 +207,46 @@ impl WindowManager {
         }
     }
 
-    // 隐藏主窗口
-    fn hide_main_window(window: Option<&WebviewWindow<Wry>>) -> WindowOperationResult {
+    /// 隐藏主窗口
+    pub fn hide_main_window() -> WindowOperationResult {
+        let (window, state) = Self::get_main_window_with_state();
+
+        if state == WindowState::NotExist {
+            return WindowOperationResult::NoAction;
+        }
+
+        if state == WindowState::Hidden || state == WindowState::Minimized {
+            return WindowOperationResult::NoAction;
+        }
+
+        Self::hide_main_window_internal(window.as_ref())
+    }
+
+    // 隐藏主窗口（内部实现）
+    fn hide_main_window_internal(window: Option<&WebviewWindow<Wry>>) -> WindowOperationResult {
         logging!(info, Type::Window, "窗口可见，将隐藏窗口");
-        if let Some(window) = window {
-            match window.hide() {
-                Ok(_) => {
-                    logging!(info, Type::Window, "窗口已成功隐藏");
-                    WindowOperationResult::Hidden
-                }
-                Err(e) => {
-                    logging!(warn, Type::Window, "隐藏窗口失败: {}", e);
-                    WindowOperationResult::Failed
-                }
-            }
-        } else {
+        let Some(window) = window else {
             logging!(warn, Type::Window, "无法获取窗口实例");
-            WindowOperationResult::Failed
+            return WindowOperationResult::Failed;
+        };
+
+        let app_handle = handle::Handle::app_handle();
+        let label = window.label().to_string();
+        let app_handle_clone = app_handle.clone();
+
+        match app_handle.run_on_main_thread(move || {
+            if let Some(w) = app_handle_clone.get_webview_window(&label) {
+                let _ = w.hide();
+            }
+        }) {
+            Ok(_) => {
+                logging!(info, Type::Window, "窗口已成功隐藏");
+                WindowOperationResult::Hidden
+            }
+            Err(e) => {
+                logging!(warn, Type::Window, "调度窗口隐藏到主线程失败: {}", e);
+                WindowOperationResult::Failed
+            }
         }
     }
 
@@ -242,54 +265,65 @@ impl WindowManager {
     fn activate_window(window: &WebviewWindow<Wry>) -> WindowOperationResult {
         logging!(info, Type::Window, "开始激活窗口");
 
-        let mut operations_successful = true;
+        let app_handle = handle::Handle::app_handle();
+        let label = window.label().to_string();
+        let app_handle_clone = app_handle.clone();
 
-        // 1. 如果窗口最小化，先取消最小化
-        if window.is_minimized().unwrap_or(false) {
-            logging!(info, Type::Window, "窗口已最小化，正在取消最小化");
-            if let Err(e) = window.unminimize() {
-                logging!(warn, Type::Window, "取消最小化失败: {}", e);
-                operations_successful = false;
+        let result = std::sync::Arc::new(std::sync::Mutex::new(true));
+        let result_clone = result.clone();
+
+        match app_handle.run_on_main_thread(move || {
+            let Some(w) = app_handle_clone.get_webview_window(&label) else {
+                return;
+            };
+
+            let mut success = true;
+
+            if w.is_minimized().unwrap_or(false) {
+                logging!(info, Type::Window, "窗口已最小化，正在取消最小化");
+                if let Err(e) = w.unminimize() {
+                    logging!(warn, Type::Window, "取消最小化失败: {}", e);
+                    success = false;
+                }
             }
-        }
 
-        // 2. 显示窗口
-        if let Err(e) = window.show() {
-            logging!(warn, Type::Window, "显示窗口失败: {}", e);
-            operations_successful = false;
-        }
-
-        // 3. 设置焦点
-        if let Err(e) = window.set_focus() {
-            logging!(warn, Type::Window, "设置窗口焦点失败: {}", e);
-            operations_successful = false;
-        }
-
-        // 4. 平台特定的激活策略
-        #[cfg(target_os = "macos")]
-        {
-            logging!(info, Type::Window, "应用 macOS 特定的激活策略");
-            handle::Handle::global().set_activation_policy_regular();
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            // Windows 尝试额外的激活方法
-            if let Err(e) = window.set_always_on_top(true) {
-                logging!(debug, Type::Window, "设置置顶失败（非关键错误）: {}", e);
+            if let Err(e) = w.show() {
+                logging!(warn, Type::Window, "显示窗口失败: {}", e);
+                success = false;
             }
-            // 立即取消置顶
-            if let Err(e) = window.set_always_on_top(false) {
-                logging!(debug, Type::Window, "取消置顶失败（非关键错误）: {}", e);
-            }
-        }
 
-        if operations_successful {
-            logging!(info, Type::Window, "窗口激活成功");
-            WindowOperationResult::Shown
-        } else {
-            logging!(warn, Type::Window, "窗口激活部分失败");
-            WindowOperationResult::Failed
+            if let Err(e) = w.set_focus() {
+                logging!(warn, Type::Window, "设置窗口焦点失败: {}", e);
+                success = false;
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                let _ = w.set_always_on_top(true);
+                let _ = w.set_always_on_top(false);
+            }
+
+            *result_clone.lock().unwrap() = success;
+        }) {
+            Ok(_) => {
+                #[cfg(target_os = "macos")]
+                {
+                    logging!(info, Type::Window, "应用 macOS 特定的激活策略");
+                    handle::Handle::global().set_activation_policy_regular();
+                }
+
+                if *result.lock().unwrap() {
+                    logging!(info, Type::Window, "窗口激活成功");
+                    WindowOperationResult::Shown
+                } else {
+                    logging!(warn, Type::Window, "窗口激活部分失败");
+                    WindowOperationResult::Failed
+                }
+            }
+            Err(e) => {
+                logging!(warn, Type::Window, "调度窗口激活到主线程失败: {}", e);
+                WindowOperationResult::Failed
+            }
         }
     }
 
@@ -338,18 +372,35 @@ impl WindowManager {
     }
 
     /// 摧毁窗口
+    /// 必须在主线程执行，避免与 UI 事件循环竞态导致崩溃
     pub fn destroy_main_window() -> WindowOperationResult {
-        if let Some(window) = Self::get_main_window() {
-            let _ = window.destroy();
-            logging!(info, Type::Window, "窗口已摧毁");
-            #[cfg(target_os = "macos")]
-            {
-                logging!(info, Type::Window, "应用 macOS 特定的激活策略");
-                handle::Handle::global().set_activation_policy_accessory();
+        let Some(window) = Self::get_main_window() else {
+            return WindowOperationResult::NoAction;
+        };
+
+        let app_handle = handle::Handle::app_handle();
+        let label = window.label().to_string();
+        let app_handle_clone = app_handle.clone();
+
+        match app_handle.run_on_main_thread(move || {
+            if let Some(w) = app_handle_clone.get_webview_window(&label) {
+                let _ = w.destroy();
             }
-            return WindowOperationResult::Destroyed;
+        }) {
+            Ok(_) => {
+                logging!(info, Type::Window, "窗口已摧毁");
+                #[cfg(target_os = "macos")]
+                {
+                    logging!(info, Type::Window, "应用 macOS 特定的激活策略");
+                    handle::Handle::global().set_activation_policy_accessory();
+                }
+                WindowOperationResult::Destroyed
+            }
+            Err(e) => {
+                logging!(warn, Type::Window, "调度窗口销毁到主线程失败: {}", e);
+                WindowOperationResult::Failed
+            }
         }
-        WindowOperationResult::NoAction
     }
 
     /// 获取详细的窗口状态信息

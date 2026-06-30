@@ -391,10 +391,13 @@ impl SilentUpdater {
     /// Close the update splash window (e.g. after install failure).
     fn close_update_splash(app_handle: &tauri::AppHandle) {
         use tauri::Manager as _;
-        if let Some(window) = app_handle.get_webview_window("update-splash") {
-            let _ = window.close();
-            logging!(info, Type::System, "Update splash window closed");
-        }
+        let app_handle_clone = app_handle.clone();
+        let _ = app_handle.run_on_main_thread(move || {
+            if let Some(window) = app_handle_clone.get_webview_window("update-splash") {
+                let _ = window.close();
+                logging!(info, Type::System, "Update splash window closed");
+            }
+        });
     }
 }
 

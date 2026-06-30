@@ -472,6 +472,15 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 
 Windows 原生标题栏必须显示程序名及版本号，格式为 `Clash Mini Ver.x.y.z`。版本号由编译时 `env!("CARGO_PKG_VERSION")` 自动提取，确保每次发版后标题栏自动同步最新版本号。实现位于 `src-tauri/src/utils/resolve/window.rs` 的 `get_bold_window_title()`。
 
+#### 窗口操作线程安全规范 (BUG-259)
+
+所有窗口操作（`destroy`、`hide`、`show`、`unminimize`、`set_focus`、`set_title`、`set_always_on_top`、`close` 等）**必须在 UI 主线程执行**，禁止在异步线程（tokio 工作线程、监测线程、自定义 spawn 线程等）中直接调用。
+
+- **根本原因**：Tauri/WebView2 的窗口操作与 UI 事件循环共享状态，异步线程直接调用会产生竞态条件，触发 `cannot move state from Destroyed` 等 panic 导致程序崩溃。
+- **解决方案**：统一使用 `app_handle.run_on_main_thread()` 将窗口操作调度到主线程执行。
+- **集中管理**：窗口操作统一通过 `WindowManager` 工具类封装（`destroy_main_window`、`hide_main_window`、`show_main_window`、`activate_window` 等），外部代码禁止直接对 `WebviewWindow` 调用变更类操作。
+- **例外**：状态读取类操作（`is_visible`、`is_minimized`、`is_focused`、`label` 等只读查询）可在任意线程执行。
+
 ---
 
 ### 2.3 路由与导航

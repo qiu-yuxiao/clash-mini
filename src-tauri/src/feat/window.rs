@@ -174,10 +174,6 @@ pub async fn hide() {
         entry_lightweight_mode().await;
     }
 
-    if let Some(window) = WindowManager::get_main_window()
-        && window.is_visible().unwrap_or(false)
-    {
-        let _ = window.hide();
-    }
+    let _ = WindowManager::hide_main_window();
     handle::Handle::global().set_activation_policy_accessory();
 }

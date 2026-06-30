@@ -87,6 +87,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             return;
         }
 
+        logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
         logging_error!(Type::Window, window.show());
         logging_error!(Type::Window, window.set_focus());
     });
@@ -112,6 +113,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             return;
         }
 
+        logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
         logging_error!(Type::Window, window.show());
         logging_error!(Type::Window, window.set_focus());
     });

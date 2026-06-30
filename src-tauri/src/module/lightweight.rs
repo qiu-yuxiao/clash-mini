@@ -90,9 +90,7 @@ pub fn disable_auto_light_weight_mode() {
 pub async fn entry_lightweight_mode() -> bool {
     let verge = Config::verge().await;
     if !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false) {
-        if let Some(window) = WindowManager::get_main_window() {
-            let _ = window.hide();
-        }
+        let _ = WindowManager::hide_main_window();
         refresh_lightweight_tray_state().await;
         crate::core::tray::update_lite_mode_menu(false);
         return true;
