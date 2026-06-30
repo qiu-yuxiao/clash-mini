@@ -556,16 +556,14 @@ pub fn start_background_monitor() {
                         "[后台监测] 前端不可用（{:?}），后端执行自动选点",
                         window_state
                     );
-                    if wait_for_clash_ready().await {
-                        match trigger_backend_auto_select(&current_profile, 0).await {
-                            Ok(results) => {
-                                if !results.is_empty() {
-                                    Handle::notify_delay_results("PROXY".into(), results);
-                                }
+                    match trigger_backend_auto_select(&current_profile, 0).await {
+                        Ok(results) => {
+                            if !results.is_empty() {
+                                Handle::notify_delay_results("PROXY".into(), results);
                             }
-                            Err(e) => {
-                                logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: {e}");
-                            }
+                        }
+                        Err(e) => {
+                            logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: {e}");
                         }
                     }
                 }
