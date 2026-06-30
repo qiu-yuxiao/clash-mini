@@ -16,6 +16,11 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.9.17`
 
+### BUG-274: Lightweight mode exit state machine rate-limited rollback failure
+ - **现象描述**：在轻量模式退出逻辑中，当主窗口显示操作 `show_main_window()` 触发 625ms 防抖限流时，限流逻辑返回 `NoAction`，导致 `exit_lightweight_mode()` 误认为显示成功并强行进入 `Normal` 模式，无法正确回滚轻量模式状态机。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.17`
+
 ### BUG-272: Optimization of self-healing check intervals and 10-minute node-switching cooldown
  - **现象描述**：过快（15秒）的常规活跃检测周期和轻量模式周期（60秒）导致高频后台测速请求及不必要的 CPU 消耗；同时，缺乏节点切换冷却期导致在不稳定节点间产生高频的自动切换，打断在线长连接（如游戏和视频）。
  - **当前状态**：`代码已修正，待用户确认`

@@ -2,6 +2,7 @@
 
 ### 🐞 Fixed Bugs
 
+- **BUG-274: 轻量模式退出时限流回滚失效**：为 `WindowOperationResult` 引入 `RateLimited` 变体，当 `show_main_window` 被防抖限流时返回该变体，并在退出轻量模式时正确捕获并回滚状态机回到 `In` 状态，彻底消除了前后端状态同步偏差。
 - **BUG-273: 缺失管理员权限下的服务轮询跳过检查**：在 Windows `wait_for_service_if_needed` 逻辑的头部，补全了 `is_current_app_handle_admin` 检查，若为管理员运行则立即返回跳过服务重试，从而避免由于延迟导致的内核双进程残留泄漏。
 - **窗口大小与布局微调**：
   - 移除了设置抽屉关闭按钮多余的 40px 顶部偏移，对其到 3px。
