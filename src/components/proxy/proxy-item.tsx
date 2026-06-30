@@ -65,6 +65,9 @@ const Widget = styled(Box)(() => ({
   padding: '1px 3px',
   fontSize: 10,
   borderRadius: '3px',
+  height: '22px',
+  display: 'flex',
+  alignItems: 'center',
 }))
 
 export const ProxyItem = (props: Props) => {
