@@ -11,57 +11,21 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-273: Missing is_current_app_handle_admin loop-skipping check in lifecycle.rs
- - **现象描述**：在 Windows 的 `wait_for_service_if_needed` 逻辑的头部，缺失了对于管理员权限（Administrator）的检测与跳过，导致以管理员权限拉起时依然执行了不必要的 5 秒运行重试与异步服务检测。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.18`
-
-### BUG-274: Lightweight mode exit state machine rate-limited rollback failure
- - **现象描述**：在轻量模式退出逻辑中，当主窗口显示操作 `show_main_window()` 触发 625ms 防抖限流时，限流逻辑返回 `NoAction`，导致 `exit_lightweight_mode()` 误认为显示成功并强行进入 `Normal` 模式，无法正确回滚轻量模式状态机。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.18`
-
-### BUG-272: Optimization of self-healing check intervals and 10-minute node-switching cooldown
- - **现象描述**：过快（15秒）的常规活跃检测周期和轻量模式周期（60秒）导致高频后台测速请求及不必要的 CPU 消耗；同时，缺乏节点切换冷却期导致在不稳定节点间产生高频的自动切换，打断在线长连接（如游戏和视频）。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.10`
-
-### BUG-271: Periodic TCP connection GC teardown and ServiceManager Mutex lock contention
- - **现象描述**：后台 `monitor.rs` 守护线程包含每 30 分钟强行切断系统内所有 TCP 连接的暴力 GC 逻辑，导致用户正在进行的下载和游戏断开；同时，`service.rs` 中的 `ServiceManager` 被包装在全局异步 `Mutex` 锁中，增加了高频并发调用时的资源死锁与卡顿风险。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.10`
-
-### BUG-270: Typo in tauri-plugin-mihomo JS library getProxyByName call
- - **现象描述**：在 `tauri-plugin-mihomo` 的前端封装 JS/TS 库中，调用 `get_proxy_by_name` 接口时把参数错写为了 `proxiesName`，而 Rust 后端参数定义为 `proxy_name`（由 Tauri 转换后的对应 JS 参数为 `proxyName`）。这导致参数不匹配，反序列化报错 `missing required key proxyName`，阻塞了前端的渲染逻辑，使得窗口启动后无法正常弹出显示。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.10`
-
-### BUG-215: Active Connection Node status row layout collapse and styling loss under strict CSP
- - **现象描述**：启用严格 CSP 后，WebView2 拒绝加载未显式放行的 `tauri://` 与 `asset://` 协议下的静态 CSS 资源及 Emotion 动态注入的样式，导致页面全部类样式失效，界面彻底退化为无样式灰白色，活动出口节点卡片也由于样式失效而失去 Flex 和高度约束产生崩塌。
- - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
- - **目标版本**：`v1.8.0`
-
-### BUG-216: Cleanup of temporary CSS bypass styling workarounds
- - **现象描述**：在 1.7.6 临时版本中，为了回避 Emotion 在 CSP 拦截下的尺寸溢出问题，将窗口控制按钮、顶部置顶及设置齿轮图标的样式临时写死为了内联 `style` 属性。
- - **当前状态**：`已随 CSP 回滚至 null 而废弃还原`
- - **目标版本**：`v1.8.0`
-
-### BUG-205: Settings Drawer Horizontal Layout Overflow
- - **现象描述**：在默认/最小窗口宽度（270px）下，设置抽屉的横向布局挤压右侧 Connections 列，导致 active/closed 连接列表宽度被压缩为 0px。经重新审计确认，此为项目 Agreement 设计规范中预期的“物理裁剪遮盖”设计，而非布局缺陷。
- - **验证方法**：已完全撤销本地换行和最小宽度修改，还原为原生单行横向并排布局与 minWidth: 0，确保窄窗口下连接面板被正常裁剪遮挡，窗口拉宽时正常侧向展露。
- - **当前状态**：`已还原并确认`
- - **目标版本**：`v1.7.2`
-
-### BUG-206: Skin Switcher & Language Selector Hidden at Default Window Height
- - **现象描述**：设置抽屉内绝对定位的皮肤切换器和语言选择器，在窗口高度低于 830px 时被完全隐藏。经重新审计确认，此为项目 Agreement 设计规范中预期的“响应式高度裁剪规则”，旨在极窄/极扁高度下保持界面整洁，防止元素重叠，属于非缺陷的设计约束。
- - **验证方法**：已完全撤销本地的高度阈值修改，恢复为原始的 `@media (max-height: 830px)`，确保窄高度窗口下的正常裁剪机制发挥作用。
- - **当前状态**：`已还原并确认`
- - **目标版本**：`v1.7.2`
+（暂无活动中的 Bug）
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
+| **BUG-274** | Lightweight mode exit state machine rate-limited rollback failure | v1.9.18 | 代码已修正，已确认 |
+| **BUG-273** | Missing is_current_app_handle_admin loop-skipping check in lifecycle.rs | v1.9.18 | 代码已修正，已确认 |
+| **BUG-272** | Optimization of self-healing check intervals and 10-minute node-switching cooldown | v1.9.10 | 代码已修正，已确认 |
+| **BUG-271** | Periodic TCP connection GC teardown and ServiceManager Mutex lock contention | v1.9.10 | 代码已修正，已确认 |
+| **BUG-270** | Typo in tauri-plugin-mihomo JS library getProxyByName call | v1.9.10 | 代码已修正，已确认 |
+| **BUG-215** | Active Connection Node status row layout collapse and styling loss under strict CSP | v1.8.0 | 代码已修正，已确认 |
+| **BUG-216** | Cleanup of temporary CSS bypass styling workarounds | v1.8.0 | 代码已修正，已确认 |
+| **BUG-205** | Settings Drawer Horizontal Layout Overflow | v1.7.2 | 代码已修正，已确认 |
+| **BUG-206** | Skin Switcher & Language Selector Hidden at Default Window Height | v1.7.2 | 代码已修正，已确认 |
 | **BUG-262** | Missing Node Latency Display after Awakening from Lightweight Mode | v1.9.1 | 代码已修正，已确认 |
 | **BUG-269** | Leaked Background Logs Web Socket Processing Task in Rust Backend | v1.9.3 | 代码已修正，已确认 |
 | **BUG-268** | Background connection cleanup race condition with wakeup | v1.9.2 | 代码已修正，已确认 |
