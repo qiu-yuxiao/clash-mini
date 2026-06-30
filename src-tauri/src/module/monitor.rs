@@ -516,13 +516,11 @@ pub fn start_background_monitor() {
             };
 
             // 1. Profile 发生变化时，重置监测状态
-            //    Profile 切换仅发生在窗口可见时（用户在界面操作），自动选点由前端负责
-            //    后端不参与，避免与前端批量测速竞争 mihomo 内核
             if last_profile_uid.as_ref() != Some(&current_profile) {
                 logging!(
                     info,
                     Type::Lightweight,
-                    "[后台监测] 活动配置切换: {:?} -> {}，自动选点交由前端执行",
+                    "[后台监测] 活动配置切换: {:?} -> {}",
                     last_profile_uid,
                     current_profile
                 );
@@ -533,8 +531,44 @@ pub fn start_background_monitor() {
                 last_auto_select_time = None;
                 current_cooldown = Duration::from_secs(0);
 
-                // 强制中止正在运行的其它后台测速任务，释放资源给前端
+                // 强制中止正在运行的其它后台测速任务
                 cancel_active_auto_select();
+
+                // 判断前端是否可用：窗口存在且可见时，前端负责自动选点；
+                // 否则（静默启动/轻量模式/窗口销毁）由后端执行
+                let window_state = crate::utils::window_manager::WindowManager::get_main_window_state();
+                let frontend_available = matches!(
+                    window_state,
+                    crate::utils::window_manager::WindowState::VisibleFocused
+                        | crate::utils::window_manager::WindowState::VisibleUnfocused
+                );
+
+                if frontend_available {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 前端可用，自动选点交由前端执行"
+                    );
+                } else {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 前端不可用（{:?}），后端执行自动选点",
+                        window_state
+                    );
+                    if wait_for_clash_ready().await {
+                        match trigger_backend_auto_select(&current_profile, 0).await {
+                            Ok(results) => {
+                                if !results.is_empty() {
+                                    Handle::notify_delay_results("PROXY".into(), results);
+                                }
+                            }
+                            Err(e) => {
+                                logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: {e}");
+                            }
+                        }
+                    }
+                }
 
                 last_check_time = Instant::now();
                 continue;
