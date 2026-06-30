@@ -68,7 +68,6 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title(get_bold_window_title())
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
@@ -98,7 +97,6 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         "main", /* the unique window label */
         tauri::WebviewUrl::App(start_page.into()),
     )
-    .title(get_bold_window_title())
     .center()
     .decorations(DEFAULT_DECORATIONS)
     .fullscreen(false)
