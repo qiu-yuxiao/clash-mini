@@ -242,6 +242,12 @@ pub async fn trigger_backend_auto_select(profile_uid: &str, sort_type: i32) -> a
     }
     let _guard = LockGuard;
 
+    // 确保内核就绪后再进行选点操作
+    if !wait_for_clash_ready().await {
+        logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败：内核尚未就绪");
+        return Ok(vec![]);
+    }
+
     // 直接调用内部函数
     // 如果发生 panic，_guard 会在栈展开时自动释放锁
     let result = trigger_backend_auto_select_inner(profile_uid, sort_type).await;
@@ -461,6 +467,12 @@ pub fn start_background_monitor() {
         loop {
             if is_first_run {
                 is_first_run = false;
+                // 首次启动时等待内核就绪，确保后续 API 调用不会失败
+                if !wait_for_clash_ready().await {
+                    logging!(warn, Type::Lightweight, "[后台监测] 内核未就绪，跳过首次检测周期");
+                    last_check_time = Instant::now();
+                    continue;
+                }
             } else {
                 // 定期健康检测的间隔：重试模式下为 3 秒，轻量模式下为 300 秒（5分钟），正常模式下为 60 秒
                 let is_lightweight_before_sleep = crate::module::lightweight::is_in_lightweight_mode();
