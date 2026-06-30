@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   type Key,
   type MouseEvent,
@@ -402,9 +403,17 @@ export const ProxyGroups = (props: Props) => {
       debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
 
       if (visibleNames.length > 0) {
-        // 通过 delayManager 并发测速：每个节点测速前自动标记 -2 触发流光动画，
-        // 结果实时写回 delayManager 触发界面更新
-        await delayManager.checkListDelay(visibleNames, groupName, timeout)
+        // Lock window resize to prevent WebView2 compositor crash
+        // during virtual list element measurements
+        const win = getCurrentWindow()
+        await win.setResizable(false)
+        try {
+          // 通过 delayManager 并发测速：每个节点测速前自动标记 -2 触发流光动画，
+          // 结果实时写回 delayManager 触发界面更新
+          await delayManager.checkListDelay(visibleNames, groupName, timeout)
+        } finally {
+          await win.setResizable(true)
+        }
 
         // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 30ms 且 < timeout，注：30ms为系统强制设计要求以过滤广告节点）
         if (!isChainMode) {

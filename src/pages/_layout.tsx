@@ -1,6 +1,7 @@
 // Copyright (c) 2026 秋雨潇潇 <qiuyuxiao@gmail.com> (Portions relating to modifications)
 // SPDX-License-Identifier: GPL-3.0-only
 
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   SettingsRounded as SettingsRoundedIcon,
   CloseRounded,
@@ -280,7 +281,13 @@ async function triggerAutoSelectAndRefresh(
       const names = await getFilteredNodeNames('PROXY')
       if (names.length === 0) return
       const timeout = 10000
-      await batchTestWithFirstBatchSelect('PROXY', names, timeout, 36, true)
+      const win = getCurrentWindow()
+      await win.setResizable(false)
+      try {
+        await batchTestWithFirstBatchSelect('PROXY', names, timeout, 36, true)
+      } finally {
+        await win.setResizable(true)
+      }
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
       }
@@ -305,7 +312,13 @@ async function triggerAutoSelectAndRefresh(
         const names = await getFilteredNodeNames('PROXY')
         if (names.length === 0) return
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
-        await batchTestWithFirstBatchSelect('PROXY', names, 5000, 36, true)
+        const win = getCurrentWindow()
+        await win.setResizable(false)
+        try {
+          await batchTestWithFirstBatchSelect('PROXY', names, 5000, 36, true)
+        } finally {
+          await win.setResizable(true)
+        }
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
         }
@@ -1118,13 +1131,18 @@ const Layout = () => {
       // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       setTimeout(() => {
-        DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
-          .then(async () => {
-            await refreshAllRef.current()
-          })
-          .catch((err) => {
-            console.error('[Layout] 唤醒后后台测速异常:', err)
-          })
+        const win = getCurrentWindow()
+        win.setResizable(false).then(() =>
+          DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
+            .then(async () => {
+              await refreshAllRef.current()
+              await win.setResizable(true)
+            })
+            .catch(async (err) => {
+              console.error('[Layout] 唤醒后后台测速异常:', err)
+              await win.setResizable(true)
+            }),
+        )
       }, 0)
     } catch (err) {
       console.error('[Layout] 唤醒刷新与测速失败:', err)
