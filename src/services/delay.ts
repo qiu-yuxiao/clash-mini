@@ -44,10 +44,6 @@ class DelayManager {
 
   private scheduleOnNextFrame(run: () => void): void {
     if (typeof window !== 'undefined') {
-      if (typeof window.requestAnimationFrame === 'function') {
-        window.requestAnimationFrame(run)
-        return
-      }
       if (typeof window.setTimeout === 'function') {
         window.setTimeout(run, 0)
         return
