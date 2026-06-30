@@ -14,13 +14,18 @@ const getIsMinimal = (): boolean => {
 let globalIsMinimal = getIsMinimal()
 const listeners = new Set<(val: boolean) => void>()
 let isListening = false
+let rafId: number | null = null
 
 const handleResize = () => {
-  const minimal = getIsMinimal()
-  if (minimal !== globalIsMinimal) {
-    globalIsMinimal = minimal
-    listeners.forEach((listener) => listener(minimal))
-  }
+  if (rafId !== null) return
+  rafId = requestAnimationFrame(() => {
+    rafId = null
+    const minimal = getIsMinimal()
+    if (minimal !== globalIsMinimal) {
+      globalIsMinimal = minimal
+      listeners.forEach((listener) => listener(minimal))
+    }
+  })
 }
 
 const subscribe = (listener: (val: boolean) => void) => {
