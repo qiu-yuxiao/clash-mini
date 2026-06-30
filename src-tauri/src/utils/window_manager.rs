@@ -267,9 +267,6 @@ impl WindowManager {
         let label = window.label().to_string();
         let app_handle_clone = app_handle.clone();
 
-        let result = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
-        let result_clone = result.clone();
-
         match app_handle.run_on_main_thread(move || {
             let Some(w) = app_handle_clone.get_webview_window(&label) else {
                 return;
@@ -305,7 +302,11 @@ impl WindowManager {
                 }
             }
 
-            result_clone.store(success, std::sync::atomic::Ordering::Relaxed);
+            if success {
+                logging!(info, Type::Window, "窗口激活操作在主线程执行成功");
+            } else {
+                logging!(warn, Type::Window, "窗口激活操作在主线程部分失败");
+            }
         }) {
             Ok(_) => {
                 #[cfg(target_os = "macos")]
@@ -313,14 +314,8 @@ impl WindowManager {
                     logging!(info, Type::Window, "应用 macOS 特定的激活策略");
                     handle::Handle::global().set_activation_policy_regular();
                 }
-
-                if result.load(std::sync::atomic::Ordering::Relaxed) {
-                    logging!(info, Type::Window, "窗口激活成功");
-                    WindowOperationResult::Shown
-                } else {
-                    logging!(warn, Type::Window, "窗口激活部分失败");
-                    WindowOperationResult::Failed
-                }
+                logging!(info, Type::Window, "已成功调度窗口激活任务到主线程");
+                WindowOperationResult::Shown
             }
             Err(e) => {
                 logging!(warn, Type::Window, "调度窗口激活到主线程失败: {}", e);
