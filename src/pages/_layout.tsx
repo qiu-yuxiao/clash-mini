@@ -1130,19 +1130,21 @@ const Layout = () => {
 
       // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
-      setTimeout(() => {
+      setTimeout(async () => {
         const win = getCurrentWindow()
-        win.setResizable(false).then(() =>
-          DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
-            .then(async () => {
-              await refreshAllRef.current()
-              await win.setResizable(true)
-            })
-            .catch(async (err) => {
-              console.error('[Layout] 唤醒后后台测速异常:', err)
-              await win.setResizable(true)
-            }),
-        )
+        try {
+          await win.setResizable(false)
+        } catch {
+          // 窗口可能已关闭或不存在，跳过锁
+        }
+        try {
+          await DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
+          await refreshAllRef.current()
+        } catch (err) {
+          console.error('[Layout] 唤醒后后台测速异常:', err)
+        } finally {
+          try { await win.setResizable(true) } catch { /* 忽略 */ }
+        }
       }, 0)
     } catch (err) {
       console.error('[Layout] 唤醒刷新与测速失败:', err)

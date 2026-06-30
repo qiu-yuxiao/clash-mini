@@ -37,6 +37,10 @@ const subscribe = (listener: (val: boolean) => void) => {
   return () => {
     listeners.delete(listener)
     if (listeners.size === 0 && isListening) {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+        rafId = null
+      }
       window.removeEventListener('resize', handleResize)
       isListening = false
     }
