@@ -126,9 +126,10 @@ export const ProxyItem = (props: Props) => {
           return {
             '&:hover .the-icon': { display: 'none' },
             '&:hover': {
-              transform: 'translateY(-1.5px)',
-              boxShadow:
-                mode === 'light'
+              transform: isTesting ? 'none' : 'translateY(-1.5px)',
+              boxShadow: isTesting
+                ? 'none'
+                : mode === 'light'
                   ? '0 3px 8px rgba(0, 0, 0, 0.08)'
                   : '0 3px 8px rgba(0, 0, 0, 0.3)',
               backgroundImage: isTesting
