@@ -534,13 +534,12 @@ pub fn start_background_monitor() {
                 // 强制中止正在运行的其它后台测速任务
                 cancel_active_auto_select();
 
-                // 判断前端是否可用：窗口存在且可见时，前端负责自动选点；
-                // 否则（静默启动/轻量模式/窗口销毁）由后端执行
+                // 判断前端是否可用：窗口存在（任何状态）即视为前端接管；
+                // 只有窗口彻底销毁（NotExist）才由后端执行自动选点
                 let window_state = crate::utils::window_manager::WindowManager::get_main_window_state();
-                let frontend_available = matches!(
+                let frontend_available = !matches!(
                     window_state,
-                    crate::utils::window_manager::WindowState::VisibleFocused
-                        | crate::utils::window_manager::WindowState::VisibleUnfocused
+                    crate::utils::window_manager::WindowState::NotExist
                 );
 
                 if frontend_available {
