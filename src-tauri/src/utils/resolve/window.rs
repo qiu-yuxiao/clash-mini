@@ -33,6 +33,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     let config = Config::verge().await;
     let latest = config.latest_arc();
+    let always_on_top = latest.enable_always_on_top.unwrap_or(false);
     let start_page = latest.start_page.as_deref().unwrap_or("/");
     let initial_theme_mode = match latest.theme_mode.as_deref() {
         Some("dark") => "dark",
@@ -89,6 +90,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
         logging_error!(Type::Window, window.show());
         logging_error!(Type::Window, window.set_focus());
+        let _ = window.set_always_on_top(always_on_top);
     });
 
     #[cfg(not(target_os = "windows"))]
@@ -114,6 +116,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
         logging_error!(Type::Window, window.show());
         logging_error!(Type::Window, window.set_focus());
+        let _ = window.set_always_on_top(always_on_top);
     });
 
     if let Some(theme) = resolved_theme {
@@ -127,10 +130,6 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     match builder.build() {
         Ok(window) => {
-            if let Some(always_on_top) = latest.enable_always_on_top {
-                let _ = window.set_always_on_top(always_on_top);
-            }
-
             #[cfg(not(target_os = "windows"))]
             {
                 logging_error!(Type::Window, window.set_background_color(Some(background_color)));

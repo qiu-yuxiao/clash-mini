@@ -293,7 +293,15 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         && let Some(always_on_top) = patch.enable_always_on_top
         && let Some(window) = crate::utils::window_manager::WindowManager::get_main_window()
     {
-        let _ = window.set_always_on_top(always_on_top);
+        let app_handle = crate::core::handle::Handle::app_handle();
+        let label = window.label().to_string();
+        let app_handle_clone = app_handle.clone();
+        let _ = app_handle.run_on_main_thread(move || {
+            use tauri::Manager as _;
+            if let Some(w) = app_handle_clone.get_webview_window(&label) {
+                let _ = w.set_always_on_top(always_on_top);
+            }
+        });
     }
     Ok(())
 }
