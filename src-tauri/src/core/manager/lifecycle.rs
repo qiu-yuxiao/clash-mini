@@ -100,6 +100,11 @@ impl CoreManager {
         use crate::{config::Config, constants::timing, core::service};
         use backon::{ConstantBuilder, Retryable as _};
 
+        let is_admin = crate::utils::sysinfo::is_current_app_handle_admin(Handle::app_handle());
+        if is_admin {
+            return;
+        }
+
         let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
 
         if !needs_service {
