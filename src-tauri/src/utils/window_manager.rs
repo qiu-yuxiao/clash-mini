@@ -236,7 +236,9 @@ impl WindowManager {
 
         match app_handle.run_on_main_thread(move || {
             if let Some(w) = app_handle_clone.get_webview_window(&label) {
-                let _ = w.hide();
+                if let Err(e) = w.hide() {
+                    logging!(debug, Type::Window, "隐藏窗口时出错: {}", e);
+                }
             }
         }) {
             Ok(_) => {
@@ -269,7 +271,7 @@ impl WindowManager {
         let label = window.label().to_string();
         let app_handle_clone = app_handle.clone();
 
-        let result = std::sync::Arc::new(std::sync::Mutex::new(true));
+        let result = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
         let result_clone = result.clone();
 
         match app_handle.run_on_main_thread(move || {
@@ -299,11 +301,15 @@ impl WindowManager {
 
             #[cfg(target_os = "windows")]
             {
-                let _ = w.set_always_on_top(true);
-                let _ = w.set_always_on_top(false);
+                if let Err(e) = w.set_always_on_top(true) {
+                    logging!(debug, Type::Window, "设置置顶失败（非关键）: {}", e);
+                }
+                if let Err(e) = w.set_always_on_top(false) {
+                    logging!(debug, Type::Window, "取消置顶失败（非关键）: {}", e);
+                }
             }
 
-            *result_clone.lock().unwrap() = success;
+            result_clone.store(success, std::sync::atomic::Ordering::Relaxed);
         }) {
             Ok(_) => {
                 #[cfg(target_os = "macos")]
@@ -312,7 +318,7 @@ impl WindowManager {
                     handle::Handle::global().set_activation_policy_regular();
                 }
 
-                if *result.lock().unwrap() {
+                if result.load(std::sync::atomic::Ordering::Relaxed) {
                     logging!(info, Type::Window, "窗口激活成功");
                     WindowOperationResult::Shown
                 } else {
@@ -384,7 +390,9 @@ impl WindowManager {
 
         match app_handle.run_on_main_thread(move || {
             if let Some(w) = app_handle_clone.get_webview_window(&label) {
-                let _ = w.destroy();
+                if let Err(e) = w.destroy() {
+                    logging!(debug, Type::Window, "销毁窗口时出错: {}", e);
+                }
             }
         }) {
             Ok(_) => {
