@@ -23,7 +23,7 @@
       },
       "notifications": {
         "tunMode": {
-          "autoDisabled": "TUN Mode automatically disabled due to service unavailable",
+          "autoDisabled": "TUN Mode disabled and reverted to System Proxy due to service unavailable",
           "autoDisableFailed": "Failed to disable TUN Mode automatically"
         }
       }

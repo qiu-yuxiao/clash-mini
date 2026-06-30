@@ -73,7 +73,7 @@ export function useSystemState() {
       !isStartingUp
     ) {
       disablingTunRef.current = true
-      patchVerge({ enable_tun_mode: false })
+      patchVerge({ enable_tun_mode: false, enable_system_proxy: true })
         .then(() => {
           showNotice.info(
             'settings.sections.system.notifications.tunMode.autoDisabled',

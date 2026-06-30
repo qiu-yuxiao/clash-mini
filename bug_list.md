@@ -16,6 +16,11 @@
  - **当前状态**：`代码已修正，待用户确认`
  - **目标版本**：`v1.9.21`
 
+### BUG-276: TUN fallback to manual mode instead of system proxy
+ - **现象描述**：在程序以普通用户权限启动并设置为 TUN 模式时，若系统服务未安装或被停用，在自动检测并回滚关闭 TUN 模式时，前端仅将 `enable_tun_mode` 设为 `false`，导致程序静默回滚至“手动模式”（Manual），使得小白用户失去代理，对用户不友好。
+ - **当前状态**：`代码已修正，待用户确认`
+ - **目标版本**：`v1.9.21`
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。

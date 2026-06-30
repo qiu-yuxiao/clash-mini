@@ -23,7 +23,7 @@
       },
       "notifications": {
         "tunMode": {
-          "autoDisabled": "由于服务不可用，TUN 模式已自动关闭",
+          "autoDisabled": "由于服务不可用，已自动切换回系统代理模式",
           "autoDisableFailed": "自动关闭 TUN 模式失败"
         }
       }
