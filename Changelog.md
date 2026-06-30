@@ -1,3 +1,17 @@
+## v1.9.19
+
+### 🐞 Fixed Bugs
+
+- **TUN 模式下服务自动切换优化**：在前端启用 TUN 模式后自动触发内核重启，使内核能够以管理员权限（Service 模式）重新启动并成功创建虚拟网卡。
+- **WebView2 崩溃保护（并发测速期间锁定窗口调整）**：在前端发起批量测速期间，临时锁定窗口大小调整功能 (`setResizable(false)`)，防止并发渲染与视口测量触发 WebView2 渲染器崩溃。
+- **流光动画/测速卡顿优化**：在节点处于测速状态时，禁用 `ProxyItem` 悬停时的 3D 悬浮位移与阴影特效，降低 WebView2 合成器的渲染负担，防止高频重绘下的渲染器崩溃。
+
+### 🚀 Performance & Stability
+
+- **Resize 事件生命周期优化**：在 `use-window-width` 的最后一个订阅者退订时，自动清理挂起的 `requestAnimationFrame` 任务，防止卸载后回调执行。
+
+---
+
 ## v1.9.18
 
 ### 🐞 Fixed Bugs
