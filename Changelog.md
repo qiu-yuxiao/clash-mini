@@ -1,14 +1,26 @@
-## v1.9.17
+## v1.9.18
 
 ### 🐞 Fixed Bugs
 
 - **BUG-274: 轻量模式退出时限流回滚失效**：为 `WindowOperationResult` 引入 `RateLimited` 变体，当 `show_main_window` 被防抖限流时返回该变体，并在退出轻量模式时正确捕获并回滚状态机回到 `In` 状态，彻底消除了前后端状态同步偏差。
 - **BUG-273: 缺失管理员权限下的服务轮询跳过检查**：在 Windows `wait_for_service_if_needed` 逻辑的头部，补全了 `is_current_app_handle_admin` 检查，若为管理员运行则立即返回跳过服务重试，从而避免由于延迟导致的内核双进程残留泄漏。
+
+### 🚀 Performance & Stability
+
+- **高频 Resize 性能保护**：
+  - 对窗口调整大小事件监听器加入 `requestAnimationFrame` 节流和防抖保护，规避高频渲染风暴。
+  - 通过 React 状态函数式更新的比对逻辑防御了不必要的重渲染。
+
+---
+
+## v1.9.17
+
+### 🚀 Layout & Usability
+
 - **窗口大小与布局微调**：
   - 移除了设置抽屉关闭按钮多余的 40px 顶部偏移，对其到 3px。
   - 恢复 `MINIMAL_WIDTH` 为 270px。
   - 在延迟刷新调度中将 `requestAnimationFrame` 替换为 `setTimeout`，并为延迟 Widget 设置固定高度以防止虚拟列表重测。
-  - 对窗口调整大小事件监听器加入 `requestAnimationFrame` 节流和防抖保护，规避高频渲染风暴。
   - 将任何已存在的窗口视为前端可用，优化后台与前端的数据同步。
 
 ---
