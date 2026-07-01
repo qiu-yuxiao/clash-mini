@@ -96,9 +96,15 @@ export const ProxyItem = memo((props: Props) => {
 
   useEffect(() => {
     if (prevDelayRef.current !== delayValue && delayRef.current) {
-      delayRef.current.style.animation = 'none'
-      void delayRef.current.offsetWidth
-      delayRef.current.style.animation = `${popIn} 0.4s ease-out`
+      delayRef.current.getAnimations().forEach((a) => a.cancel())
+      delayRef.current.animate(
+        [
+          { transform: 'scale(0.85)', opacity: '0.5' },
+          { transform: 'scale(1.08)', opacity: '1', offset: 0.5 },
+          { transform: 'scale(1)', opacity: '1' },
+        ],
+        { duration: 400, easing: 'ease-out' },
+      )
     }
     prevDelayRef.current = delayValue
   }, [delayValue])
@@ -318,7 +324,6 @@ export const ProxyItem = memo((props: Props) => {
               cursor: 'default',
               fontSize: '11px',
               fontWeight: 600,
-              animation: `${popIn} 0.4s ease-out`,
             })}
           >
             {delayManager.formatDelay(delayValue, timeout)}
