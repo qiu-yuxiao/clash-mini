@@ -132,6 +132,12 @@ impl Config {
         let config_result = Self::generate_file(ConfigType::Run).await;
 
         if config_result.is_ok() {
+            // 如果系统服务已在运行，跳过独立验证以避开端口/管道冲突
+            if service::is_service_available().await.is_ok() {
+                logging!(info, Type::Config, "系统服务已运行，跳过独立配置验证");
+                return Ok(None);
+            }
+
             // 验证配置文件
             logging!(info, Type::Config, "开始验证配置");
 
