@@ -119,13 +119,13 @@ fn match_filter(name: &str, config: &FilterConfig, compiled_re: Option<&regex::R
 }
 
 /// 获取当前活动 Profile 的 UID
-async fn get_current_profile_uid() -> Option<String> {
+pub(crate) async fn get_current_profile_uid() -> Option<String> {
     let profiles = Config::profiles().await;
     profiles.data_arc().current.as_ref().map(|s| s.to_string())
 }
 
 /// 等待 Clash 内核 API 及代理组节点列表填充完毕
-async fn wait_for_clash_ready() -> bool {
+pub(crate) async fn wait_for_clash_ready() -> bool {
     let start_time = Instant::now();
 
     // 阶段 1：等待内核 API 接口响应
@@ -164,6 +164,31 @@ async fn wait_for_clash_ready() -> bool {
         "[后台监测] 阶段 2 失败：等待内核加载节点列表超时"
     );
     false
+}
+
+/// 恢复当前活动 Profile 配置文件中所保存的上次选定的各策略组节点
+pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow::Result<()> {
+    let profiles = Config::profiles().await;
+    let latest = profiles.latest_arc();
+    let item = latest.get_item(profile_uid)?;
+    if let Some(selected) = &item.selected {
+        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+        for select in selected {
+            if let (Some(group), Some(node)) = (&select.name, &select.now) {
+                if !node.is_empty() && !group.is_empty() {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 恢复策略组选择节点: {} -> {}",
+                        group,
+                        node
+                    );
+                    let _ = mihomo.select_node_for_group(group, node).await;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -555,6 +580,9 @@ pub fn start_background_monitor() {
                         "[后台监测] 前端不可用（{:?}），后端执行自动选点",
                         window_state
                     );
+                    // 恢复上次选定的节点
+                    let _ = restore_profile_selected_nodes(&current_profile).await;
+                    // 再执行自动选点
                     match trigger_backend_auto_select(&current_profile, 0).await {
                         Ok(results) => {
                             if !results.is_empty() {

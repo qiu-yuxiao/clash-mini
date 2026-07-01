@@ -163,6 +163,21 @@ pub async fn entry_lightweight_mode() -> bool {
                 "[轻量模式] 彻底熔断外壳与内核的常驻数据流订阅成功"
             );
         }
+
+        if !is_in_lightweight_mode() {
+            return;
+        }
+        // 进入轻量模式时触发节点自愈恢复与自动选点
+        if let Some(uid) = crate::module::monitor::get_current_profile_uid().await {
+            if crate::module::monitor::wait_for_clash_ready().await {
+                let _ = crate::module::monitor::restore_profile_selected_nodes(&uid).await;
+                if let Ok(results) = crate::module::monitor::trigger_backend_auto_select(&uid, 0).await {
+                    if !results.is_empty() {
+                        crate::core::handle::Handle::notify_delay_results("PROXY".into(), results);
+                    }
+                }
+            }
+        }
     });
 
     true
