@@ -77,6 +77,12 @@ class DelayManager {
           }
         })
       })
+
+      // React rendering during this flush may drop new updates
+      // into the swapped-in Map. Re-schedule if any were missed.
+      if (this.pendingItemUpdates.size > 0) {
+        this.scheduleItemFlush()
+      }
     })
   }
 
@@ -101,6 +107,10 @@ class DelayManager {
           )
         }
       })
+
+      if (this.pendingGroupUpdates.size > 0) {
+        this.scheduleGroupFlush()
+      }
     })
   }
 
