@@ -1,3 +1,4 @@
+import React, { memo, useEffect, useRef } from 'react'
 import {
   alpha,
   Box,
@@ -10,10 +11,10 @@ import {
 
 const shimmer = keyframes`
   0% {
-    background-position: -200% 0;
+    transform: translateX(-100%);
   }
   100% {
-    background-position: 200% 0;
+    transform: translateX(100%);
   }
 `
 
@@ -29,17 +30,14 @@ const hoverSweep = keyframes`
 const popIn = keyframes`
   0% {
     transform: scale(0.85);
-    filter: brightness(1.4);
     opacity: 0.5;
   }
   50% {
     transform: scale(1.08);
-    filter: brightness(1.2);
     opacity: 1;
   }
   100% {
     transform: scale(1);
-    filter: brightness(1);
     opacity: 1;
   }
 `
@@ -70,7 +68,7 @@ const Widget = styled(Box)(() => ({
   alignItems: 'center',
 }))
 
-export const ProxyItem = (props: Props) => {
+export const ProxyItem = memo((props: Props) => {
   const {
     group,
     proxy,
@@ -93,6 +91,18 @@ export const ProxyItem = (props: Props) => {
     group?.name ?? '',
   )
 
+  const delayRef = useRef<HTMLDivElement>(null)
+  const prevDelayRef = useRef(delayValue)
+
+  useEffect(() => {
+    if (prevDelayRef.current !== delayValue && delayRef.current) {
+      delayRef.current.style.animation = 'none'
+      void delayRef.current.offsetWidth
+      delayRef.current.style.animation = `${popIn} 0.4s ease-out`
+    }
+    prevDelayRef.current = delayValue
+  }, [delayValue])
+
   return (
     <ListItemButton
       dense
@@ -109,6 +119,8 @@ export const ProxyItem = (props: Props) => {
           alignItems: 'center',
           fontSize: '12px',
           overflow: 'hidden',
+          position: 'relative',
+          contain: 'layout style',
           borderBottom: (theme) => `2px solid ${theme.palette.divider}`,
         },
         ({ palette: { mode, primary } }) => {
@@ -125,6 +137,7 @@ export const ProxyItem = (props: Props) => {
 
           return {
             '&:hover .the-icon': { display: 'none' },
+            pointerEvents: isTesting ? 'none' : 'auto',
             '&:hover': {
               transform: isTesting ? 'none' : 'translateY(-1.5px)',
               boxShadow: isTesting
@@ -133,13 +146,13 @@ export const ProxyItem = (props: Props) => {
                   ? '0 3px 8px rgba(0, 0, 0, 0.08)'
                   : '0 3px 8px rgba(0, 0, 0, 0.3)',
               backgroundImage: isTesting
-                ? undefined
+                ? 'none'
                 : mode === 'light'
                   ? 'linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 70%)'
                   : 'linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 70%)',
-              backgroundSize: isTesting ? '400% 100%' : '200% 100%',
+              backgroundSize: isTesting ? undefined : '200% 100%',
               animation: isTesting
-                ? `${shimmer} 1.5s infinite linear`
+                ? 'none'
                 : `${hoverSweep} 0.6s ease-out`,
             },
             '&.Mui-selected': {
@@ -152,15 +165,23 @@ export const ProxyItem = (props: Props) => {
             backgroundColor: bgcolor,
             ...(isTesting
               ? {
-                  backgroundImage:
-                    mode === 'light'
-                      ? 'linear-gradient(90deg, rgba(255,193,7,0.02) 25%, rgba(255,193,7,0.1) 37%, rgba(255,193,7,0.02) 63%)'
-                      : 'linear-gradient(90deg, rgba(255,193,7,0.01) 25%, rgba(255,193,7,0.06) 37%, rgba(255,193,7,0.01) 63%)',
-                  backgroundSize: '400% 100%',
-                  animation: `${shimmer} 1.5s infinite linear`,
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundImage:
+                      mode === 'light'
+                        ? 'linear-gradient(90deg, rgba(255,193,7,0) 25%, rgba(255,193,7,0.15) 50%, rgba(255,193,7,0) 75%)'
+                        : 'linear-gradient(90deg, rgba(255,193,7,0) 25%, rgba(255,193,7,0.08) 50%, rgba(255,193,7,0) 75%)',
+                    animation: `${shimmer} 1.5s infinite linear`,
+                    pointerEvents: 'none',
+                  },
                 }
               : {}),
-            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
           }
         },
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
@@ -285,7 +306,8 @@ export const ProxyItem = (props: Props) => {
 
         {delayValue >= 0 && (
           <Widget
-            key={delayValue}
+            key={proxy?.uid ?? `node-delay-${indexInGroup}`}
+            ref={delayRef}
             className="the-delay"
             sx={({ palette }) => ({
               color: delayManager.formatDelayColor(
@@ -305,4 +327,22 @@ export const ProxyItem = (props: Props) => {
       </Box>
     </ListItemButton>
   )
-}
+}, (prevProps, nextProps) => {
+  const prevHistory = prevProps.proxy?.history
+  const nextHistory = nextProps.proxy?.history
+  const prevLastHistory = prevHistory && prevHistory.length > 0 ? prevHistory[prevHistory.length - 1] : undefined
+  const nextLastHistory = nextHistory && nextHistory.length > 0 ? nextHistory[nextHistory.length - 1] : undefined
+
+  return (
+    prevProps.selected === nextProps.selected &&
+    prevProps.showType === nextProps.showType &&
+    prevProps.indexInGroup === nextProps.indexInGroup &&
+    prevProps.group?.name === nextProps.group?.name &&
+    prevProps.proxy?.name === nextProps.proxy?.name &&
+    prevProps.proxy?.type === nextProps.proxy?.type &&
+    prevProps.proxy?.now === nextProps.proxy?.now &&
+    prevProps.proxy?.history?.length === nextProps.proxy?.history?.length &&
+    prevLastHistory?.time === nextLastHistory?.time &&
+    prevLastHistory?.delay === nextLastHistory?.delay
+  )
+})
