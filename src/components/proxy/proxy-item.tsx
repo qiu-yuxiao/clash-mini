@@ -306,7 +306,7 @@ export const ProxyItem = memo((props: Props) => {
 
         {delayValue >= 0 && (
           <Widget
-            key={proxy?.uid ?? `node-delay-${indexInGroup}`}
+            key={proxy?.name ?? `node-delay-${indexInGroup}`}
             ref={delayRef}
             className="the-delay"
             sx={({ palette }) => ({
