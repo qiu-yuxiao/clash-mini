@@ -603,6 +603,18 @@ impl ServiceManager {
     }
 
     pub async fn refresh(&self) -> Result<()> {
+        #[cfg(target_os = "windows")]
+        {
+            if crate::utils::sysinfo::is_current_app_handle_admin(crate::core::handle::Handle::app_handle()) {
+                if is_service_available().await.is_ok() {
+                    self.set_status(ServiceStatus::Ready);
+                } else {
+                    self.set_status(ServiceStatus::Unavailable("Admin mode, no service needed".into()));
+                }
+                return Ok(());
+            }
+        }
+
         self.run_operation(async {
             if is_service_available().await.is_ok() {
                 self.set_status(ServiceStatus::Ready);
