@@ -791,6 +791,7 @@ function ProxyVirtualList({
         flexDirection: 'column',
         boxSizing: 'border-box',
         overflow: 'hidden',
+        willChange: 'transform',
       }}
     >
       {headItem && (
