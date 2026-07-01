@@ -111,32 +111,60 @@ impl CoreManager {
             return;
         }
 
-        let max_times = timing::SERVICE_WAIT_MAX.as_millis() / timing::SERVICE_WAIT_INTERVAL.as_millis();
-        let backoff = ConstantBuilder::default()
-            .with_delay(timing::SERVICE_WAIT_INTERVAL)
-            .with_max_times(max_times as usize);
-
-        let _ = (|| async {
-            if matches!(SERVICE_MANAGER.current().await, ServiceStatus::Ready) {
-                return Ok(());
-            }
-
-            // If the service IPC path is not ready yet, treat it as transient and retry.
-            // Running init/refresh too early can mark service state unavailable and break later config reloads.
-            if !service::is_service_ipc_path_exists() {
-                return Err(anyhow::anyhow!("Service IPC not ready"));
-            }
-
-            SERVICE_MANAGER.init().await?;
-            let _ = SERVICE_MANAGER.refresh().await;
-
-            if matches!(SERVICE_MANAGER.current().await, ServiceStatus::Ready) {
-                Ok(())
+        let res = async {
+            // 1. 如果完全未安装，则尝试进行安装（触发 UAC）
+            if !service::is_service_installed() {
+                logging!(info, Type::Service, "检测到系统服务未安装，启动安装提权");
+                SERVICE_MANAGER.handle_service_status(ServiceStatus::InstallRequired).await?;
             } else {
-                Err(anyhow::anyhow!("Service not ready"))
+                // 2. 如果已安装，刷新并启动（若停止）
+                SERVICE_MANAGER.refresh().await?;
             }
-        })
-        .retry(backoff)
+
+            // 3. 轮询等待服务就绪
+            let max_times = timing::SERVICE_WAIT_MAX.as_millis() / timing::SERVICE_WAIT_INTERVAL.as_millis();
+            let backoff = ConstantBuilder::default()
+                .with_delay(timing::SERVICE_WAIT_INTERVAL)
+                .with_max_times(max_times as usize);
+
+            (|| async {
+                if matches!(SERVICE_MANAGER.current().await, ServiceStatus::Ready) {
+                    return Ok(());
+                }
+
+                if !service::is_service_ipc_path_exists() {
+                    return Err(anyhow::anyhow!("Service IPC not ready"));
+                }
+
+                SERVICE_MANAGER.init().await?;
+                let _ = SERVICE_MANAGER.refresh().await;
+
+                if matches!(SERVICE_MANAGER.current().await, ServiceStatus::Ready) {
+                    Ok(())
+                } else {
+                    Err(anyhow::anyhow!("Service not ready"))
+                }
+            })
+            .retry(backoff)
+            .await
+        }
         .await;
+
+        if res.is_err() {
+            logging!(error, Type::Service, "系统服务启动或安装失败，执行回退至系统代理");
+            self.fallback_to_system_proxy().await;
+        }
+    }
+
+    async fn fallback_to_system_proxy(&self) {
+        Config::verge().await.edit_draft(|d| {
+            d.enable_tun_mode = Some(false);
+            d.enable_system_proxy = Some(true);
+        });
+        Config::verge().await.apply();
+        if let Err(e) = Config::verge().await.latest_arc().save_file().await {
+            logging!(error, Type::Service, "保存回退配置失败: {}", e);
+        }
+        self.set_running_mode(RunningMode::Sidecar);
     }
 }

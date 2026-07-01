@@ -25,7 +25,7 @@ use tokio::sync::Notify;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ServiceStatus {
     Ready,
-    NeedsReinstall,
+    StartRequired,
     InstallRequired,
     UninstallRequired,
     ReinstallRequired,
@@ -321,6 +321,59 @@ fn check_output_error(output: &std::process::Output) -> Option<(i32, Cow<'_, str
     Some((code, Cow::Borrowed("Unknown error")))
 }
 
+#[cfg(target_os = "windows")]
+pub fn is_service_installed() -> bool {
+    use std::os::windows::process::CommandExt as _;
+    let output = std::process::Command::new("sc.exe")
+        .arg("query")
+        .arg("clash_verge_service")
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+
+    if let Ok(out) = output {
+        let stdout = std::string::String::from_utf8_lossy(&out.stdout);
+        out.status.success() && !stdout.contains("does not exist")
+    } else {
+        false
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn start_service() -> Result<()> {
+    logging!(info, Type::Service, "start service");
+
+    use deelevate::{PrivilegeLevel, Token};
+    use runas::Command as RunasCommand;
+    use std::os::windows::process::CommandExt as _;
+
+    let token = Token::with_current_process()?;
+    let level = token.privilege_level()?;
+    let status = match level {
+        PrivilegeLevel::NotPrivileged => {
+            RunasCommand::new("sc.exe")
+                .arg("start")
+                .arg("clash_verge_service")
+                .show(false)
+                .status()?
+        }
+        _ => {
+            std::process::Command::new("sc.exe")
+                .arg("start")
+                .arg("clash_verge_service")
+                .creation_flags(0x08000000)
+                .status()?
+        }
+    };
+
+    if !status.success() {
+        bail!(
+            "failed to start service with status {}",
+            status.code().unwrap_or(-1)
+        );
+    }
+    Ok(())
+}
+
 fn reinstall_service() -> Result<()> {
     logging!(info, Type::Service, "reinstall service");
 
@@ -549,30 +602,24 @@ impl ServiceManager {
         Tray::global().update_menu().await
     }
 
-async fn is_reinstall_service_needed() -> bool {
-    clash_verge_service_ipc::is_ipc_path_exists()
-        && match clash_verge_service_ipc::get_version().await {
-            Ok(resp) => {
-                if let Some(ver) = resp.data {
-                    let clean_ver = ver.trim_start_matches('v');
-                    let expected_ver = clash_verge_service_ipc::VERSION.trim_start_matches('v');
-                    clean_ver != expected_ver
-                } else {
-                    true
-                }
-            }
-            Err(_) => true,
-        }
-}
-
     pub async fn refresh(&self) -> Result<()> {
         self.run_operation(async {
-            self.apply_service_status(if Self::is_reinstall_service_needed().await {
-                ServiceStatus::NeedsReinstall
-            } else {
-                ServiceStatus::Ready
-            })
-            .await
+            if is_service_available().await.is_ok() {
+                self.set_status(ServiceStatus::Ready);
+                return Ok(());
+            }
+
+            #[cfg(target_os = "windows")]
+            {
+                if is_service_installed() {
+                    logging!(info, Type::Service, "服务已安装但未运行，尝试启动服务");
+                    self.apply_service_status(ServiceStatus::StartRequired).await?;
+                    return Ok(());
+                }
+            }
+
+            self.set_status(ServiceStatus::Unavailable("Service not installed".into()));
+            Ok(())
         })
         .await
     }
@@ -585,7 +632,12 @@ async fn is_reinstall_service_needed() -> bool {
         self.set_status(status.clone());
         match status {
             ServiceStatus::Ready => logging!(info, Type::Service, "服务就绪，直接启动"),
-            ServiceStatus::NeedsReinstall | ServiceStatus::ReinstallRequired => {
+            ServiceStatus::StartRequired => {
+                logging!(info, Type::Service, "执行启动服务流程");
+                run_service_command(start_service, "start service")?;
+                wait_for_service_ipc(self).await?;
+            }
+            ServiceStatus::ReinstallRequired => {
                 logging!(info, Type::Service, "服务需要重装，执行重装流程");
                 run_service_command(reinstall_service, "reinstall service")?;
                 wait_for_service_ipc(self).await?;
@@ -596,15 +648,18 @@ async fn is_reinstall_service_needed() -> bool {
                 wait_for_service_ipc(self).await?;
             }
             ServiceStatus::InstallRequired => {
+                #[cfg(target_os = "windows")]
+                {
+                    if is_service_installed() {
+                        logging!(info, Type::Service, "服务已安装但未运行，转换为启动服务");
+                        self.set_status(ServiceStatus::StartRequired);
+                        run_service_command(start_service, "start service")?;
+                        return wait_for_service_ipc(self).await;
+                    }
+                }
                 logging!(info, Type::Service, "需要安装服务，执行安装流程");
                 run_service_command(install_service, "install service")?;
                 wait_for_service_ipc(self).await?;
-                if Self::is_reinstall_service_needed().await {
-                    logging!(info, Type::Service, "服务版本不匹配，执行重装流程");
-                    self.set_status(ServiceStatus::NeedsReinstall);
-                    run_service_command(reinstall_service, "reinstall service")?;
-                    wait_for_service_ipc(self).await?;
-                }
             }
             ServiceStatus::UninstallRequired => {
                 logging!(info, Type::Service, "服务需要卸载，执行卸载流程");

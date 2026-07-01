@@ -51,6 +51,7 @@ static LAST_WINDOW_OP_MS: AtomicU64 = AtomicU64::new(0);
 /// 自适应防抖检查：
 /// - 距离上次操作超过 IDLE_THRESHOLD（3s）→ 立即允许（用户长时间未操作，无需防抖）
 /// - 距离上次操作小于 IDLE_THRESHOLD → 使用 DEBOUNCE 间隔（用户在频繁操作，防抽风）
+///
 /// 使用 fetch_update 将 load-判断-store 合并为单个原子操作，避免并发调用时的 TOCTOU 竞态。
 fn should_handle_window_operation() -> bool {
     let now = SystemTime::now()
