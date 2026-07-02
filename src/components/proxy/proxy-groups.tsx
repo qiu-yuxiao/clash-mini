@@ -407,12 +407,20 @@ export const ProxyGroups = (props: Props) => {
         // during virtual list element measurements
         const win = getCurrentWindow()
         await win.setResizable(false)
+
+        // Disable titlebar drag-region to prevent Tauri sync-command
+        // deadlock during modal drag loop (DefWindowProc blocks main thread)
+        document
+          .querySelectorAll('[data-tauri-drag-region]')
+          .forEach((el) => el.removeAttribute('data-tauri-drag-region'))
+
         try {
-          // 通过 delayManager 并发测速：每个节点测速前自动标记 -2 触发流光动画，
-          // 结果实时写回 delayManager 触发界面更新
           await delayManager.checkListDelay(visibleNames, groupName, timeout)
         } finally {
           await win.setResizable(true)
+          document
+            .querySelectorAll('[data-tauri-drag-region="false"]')
+            .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
         }
 
         // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 30ms 且 < timeout，注：30ms为系统强制设计要求以过滤广告节点）
