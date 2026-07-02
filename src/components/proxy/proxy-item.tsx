@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef } from 'react'
+import React, { memo } from 'react'
 import {
   alpha,
   Box,
@@ -6,41 +6,7 @@ import {
   styled,
   SxProps,
   Theme,
-  keyframes,
 } from '@mui/material'
-
-const shimmer = keyframes`
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-`
-
-const hoverSweep = keyframes`
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-`
-
-const popIn = keyframes`
-  0% {
-    transform: scale(0.85);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-`
 
 import { BaseLoading } from '@/components/base'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
@@ -85,29 +51,10 @@ export const ProxyItem = memo((props: Props) => {
   const displayName = (proxy?.name ?? '').replace(/\s\(\d{6}\)$/, '')
   const displayNow = proxy?.now ? proxy.now.replace(/\s\(\d{6}\)$/, '') : ''
 
-  // -1/<=0 为不显示，-2 为 loading
   const { delayValue, isPreset, timeout } = useProxyDelayState(
     proxy,
     group?.name ?? '',
   )
-
-  const delayRef = useRef<HTMLDivElement>(null)
-  const prevDelayRef = useRef(delayValue)
-
-  useEffect(() => {
-    if (prevDelayRef.current !== delayValue && delayRef.current) {
-      delayRef.current.getAnimations().forEach((a) => a.cancel())
-      delayRef.current.animate(
-        [
-          { transform: 'scale(0.85)', opacity: '0.5' },
-          { transform: 'scale(1.08)', opacity: '1', offset: 0.5 },
-          { transform: 'scale(1)', opacity: '1' },
-        ],
-        { duration: 400, easing: 'ease-out' },
-      )
-    }
-    prevDelayRef.current = delayValue
-  }, [delayValue])
 
   return (
     <ListItemButton
@@ -125,42 +72,19 @@ export const ProxyItem = memo((props: Props) => {
           alignItems: 'center',
           fontSize: '12px',
           overflow: 'hidden',
-          position: 'relative',
-          contain: 'layout style',
           borderBottom: (theme) => `2px solid ${theme.palette.divider}`,
         },
         ({ palette: { mode, primary } }) => {
           const isOdd = indexInGroup % 2 !== 0
-          const isTesting = delayValue === -2
-          const bgcolor = isTesting
-            ? 'transparent'
-            : isOdd
-              ? mode === 'light'
-                ? 'rgba(0, 120, 215, 0.04)'
-                : 'rgba(50, 100, 180, 0.08)'
-              : 'transparent'
+          const bgcolor = isOdd
+            ? mode === 'light'
+              ? 'rgba(0, 120, 215, 0.04)'
+              : 'rgba(50, 100, 180, 0.08)'
+            : 'transparent'
           const selectColor = mode === 'light' ? primary.main : primary.light
 
           return {
             '&:hover .the-icon': { display: 'none' },
-            pointerEvents: isTesting ? 'none' : 'auto',
-            '&:hover': {
-              transform: isTesting ? 'none' : 'translateY(-1.5px)',
-              boxShadow: isTesting
-                ? 'none'
-                : mode === 'light'
-                  ? '0 3px 8px rgba(0, 0, 0, 0.08)'
-                  : '0 3px 8px rgba(0, 0, 0, 0.3)',
-              backgroundImage: isTesting
-                ? 'none'
-                : mode === 'light'
-                  ? 'linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 70%)'
-                  : 'linear-gradient(120deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0) 70%)',
-              backgroundSize: isTesting ? undefined : '200% 100%',
-              animation: isTesting
-                ? 'none'
-                : `${hoverSweep} 0.6s ease-out`,
-            },
             '&.Mui-selected': {
               borderLeft: `3px solid ${selectColor}`,
               bgcolor:
@@ -169,25 +93,7 @@ export const ProxyItem = memo((props: Props) => {
                   : alpha(primary.main, 0.35),
             },
             backgroundColor: bgcolor,
-            ...(isTesting
-              ? {
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    backgroundImage:
-                      mode === 'light'
-                        ? 'linear-gradient(90deg, rgba(255,193,7,0) 25%, rgba(255,193,7,0.15) 50%, rgba(255,193,7,0) 75%)'
-                        : 'linear-gradient(90deg, rgba(255,193,7,0) 25%, rgba(255,193,7,0.08) 50%, rgba(255,193,7,0) 75%)',
-                    animation: `${shimmer} 1.5s infinite linear`,
-                    pointerEvents: 'none',
-                  },
-                }
-              : {}),
-            transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            transition: 'background-color 0.2s',
           }
         },
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
@@ -195,7 +101,6 @@ export const ProxyItem = memo((props: Props) => {
     >
       {isMinimal ? (
         <>
-          {/* Column 1: Protocol/Type (Width: 55px, centered, border-right divider) */}
           <Box
             sx={{
               width: 55,
@@ -219,7 +124,6 @@ export const ProxyItem = memo((props: Props) => {
             {proxy?.type ?? ''}
           </Box>
 
-          {/* Column 2: Name (Flex growth, centered, border-right divider) */}
           <Box
             title={displayName}
             sx={{
@@ -252,7 +156,6 @@ export const ProxyItem = memo((props: Props) => {
           </Box>
         </>
       ) : (
-        /* Column 1: Name (Flex growth, overflow ellipsis) */
         <Box
           title={`${displayName}${displayNow ? ` - ${displayNow}` : ''}`}
           sx={{
@@ -292,7 +195,6 @@ export const ProxyItem = memo((props: Props) => {
         </Box>
       )}
 
-      {/* Column 3: Delay (Width: 65px, centered) */}
       <Box
         sx={{
           width: 65,
@@ -313,7 +215,6 @@ export const ProxyItem = memo((props: Props) => {
         {delayValue >= 0 && (
           <Widget
             key={proxy?.name ?? `node-delay-${indexInGroup}`}
-            ref={delayRef}
             className="the-delay"
             sx={({ palette }) => ({
               color: delayManager.formatDelayColor(
