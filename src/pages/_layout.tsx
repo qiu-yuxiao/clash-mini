@@ -1597,20 +1597,25 @@ const Layout = () => {
             padding: '0 8px 0 10px',
             boxSizing: 'border-box',
             height: '30px',
+            minHeight: '30px',
+            maxHeight: '30px',
             borderBottom: '1px solid var(--divider-color)',
             background: 'var(--background-color)',
             userSelect: 'none',
             flexShrink: 0,
             gap: '8px',
+            overflow: 'hidden',
           }}
         >
           <img
             src={AppIcon}
             alt=""
             draggable={false}
-            style={{ width: '16px', height: '16px', flexShrink: 0 }}
+            data-tauri-drag-region="true"
+            style={{ width: '16px', height: '16px', flexShrink: 0, pointerEvents: 'none' }}
           />
           <span
+            data-tauri-drag-region="true"
             style={{
               fontSize: '12px',
               fontWeight: 500,
@@ -1619,6 +1624,7 @@ const Layout = () => {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
+              pointerEvents: 'none',
             }}
           >
             Clash Mini Ver.{appVersion}
@@ -1631,6 +1637,7 @@ const Layout = () => {
               flexShrink: 0,
               display: 'flex',
               alignItems: 'center',
+              height: '30px',
             }}
           >
             <WindowControls ref={windowControlsRef} />
