@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import DelayManager from '@/services/delay'
 import debounce from '@/utils/debounce'
 import getSystem from '@/utils/get-system'
 
@@ -179,7 +180,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           if (
             !target.closest(
               'button, a, input, select, textarea, [data-no-drag]',
-            )
+            ) &&
+            !DelayManager.isBatchTesting
           ) {
             dragStartedRef.current = true
             currentWindow?.startDragging().catch(() => console.warn('[window] startDragging failed'))

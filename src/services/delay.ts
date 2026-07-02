@@ -27,6 +27,12 @@ class DelayManager {
   private itemFlushScheduled = false
   private groupFlushScheduled = false
 
+  /** 批量测速进行中标志，用于阻止窗口拖拽等同步 IPC 竞争 */
+  private _isBatchTesting = false
+  get isBatchTesting(): boolean {
+    return this._isBatchTesting
+  }
+
   constructor() {
     if (typeof window !== 'undefined') {
       setInterval(() => {
@@ -300,6 +306,8 @@ class DelayManager {
     timeout: number,
     concurrency = 36,
   ) {
+    this._isBatchTesting = true
+    try {
     debugLog(
       `[DelayManager] 批量测试延迟开始，组: ${group}, 数量: ${nameList.length}, 并发数: ${concurrency}`,
     )
@@ -362,6 +370,9 @@ class DelayManager {
     debugLog(
       `[DelayManager] 批量测试延迟完成，组: ${group}, 总耗时: ${totalTime}ms`,
     )
+    } finally {
+      this._isBatchTesting = false
+    }
   }
 
   /**
