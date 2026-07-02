@@ -440,6 +440,9 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
         log_config: Logger::global().service_writer_config()?,
     };
 
+    // 先清理前次会话可能残留的旧内核（崩溃退出时 clean_async 未执行）
+    let _ = clash_verge_service_ipc::stop_clash().await;
+
     let response = clash_verge_service_ipc::start_clash(&payload)
         .await
         .context("无法连接到Clash Verge Service")?;
