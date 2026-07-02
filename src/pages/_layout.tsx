@@ -283,10 +283,16 @@ async function triggerAutoSelectAndRefresh(
       const timeout = 10000
       const win = getCurrentWindow()
       await win.setResizable(false)
+      document
+        .querySelectorAll('[data-tauri-drag-region="true"]')
+        .forEach((el) => el.setAttribute('data-tauri-drag-region', 'false'))
       try {
         await batchTestWithFirstBatchSelect('PROXY', names, timeout, 36, true)
       } finally {
         await win.setResizable(true)
+        document
+          .querySelectorAll('[data-tauri-drag-region="false"]')
+          .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
       }
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
@@ -314,10 +320,16 @@ async function triggerAutoSelectAndRefresh(
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
         const win = getCurrentWindow()
         await win.setResizable(false)
+        document
+          .querySelectorAll('[data-tauri-drag-region="true"]')
+          .forEach((el) => el.setAttribute('data-tauri-drag-region', 'false'))
         try {
           await batchTestWithFirstBatchSelect('PROXY', names, 5000, 36, true)
         } finally {
           await win.setResizable(true)
+          document
+            .querySelectorAll('[data-tauri-drag-region="false"]')
+            .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
         }
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
@@ -1134,6 +1146,9 @@ const Layout = () => {
         const win = getCurrentWindow()
         try {
           await win.setResizable(false)
+          document
+            .querySelectorAll('[data-tauri-drag-region="true"]')
+            .forEach((el) => el.setAttribute('data-tauri-drag-region', 'false'))
         } catch {
           // 窗口可能已关闭或不存在，跳过锁
         }
@@ -1143,7 +1158,12 @@ const Layout = () => {
         } catch (err) {
           console.error('[Layout] 唤醒后后台测速异常:', err)
         } finally {
-          try { await win.setResizable(true) } catch { /* 忽略 */ }
+          try { 
+            await win.setResizable(true) 
+            document
+              .querySelectorAll('[data-tauri-drag-region="false"]')
+              .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
+          } catch { /* 忽略 */ }
         }
       }, 0)
     } catch (err) {
