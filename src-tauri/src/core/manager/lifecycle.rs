@@ -71,10 +71,12 @@ impl CoreManager {
     }
 
     async fn prepare_startup(&self) -> Result<()> {
-        #[cfg(target_os = "windows")]
-        self.wait_for_service_if_needed().await;
-
         let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
+
+        #[cfg(target_os = "windows")]
+        if needs_service {
+            self.wait_for_service_ready().await;
+        }
 
         let mode = if needs_service {
             let value = SERVICE_MANAGER.current().await;
@@ -96,18 +98,12 @@ impl CoreManager {
     }
 
     #[cfg(target_os = "windows")]
-    async fn wait_for_service_if_needed(&self) {
-        use crate::{config::Config, constants::timing, core::service};
+    async fn wait_for_service_ready(&self) {
+        use crate::{constants::timing, core::service};
         use backon::{ConstantBuilder, Retryable as _};
 
         let is_admin = crate::utils::sysinfo::is_current_app_handle_admin(Handle::app_handle());
         if is_admin {
-            return;
-        }
-
-        let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
-
-        if !needs_service {
             return;
         }
 
