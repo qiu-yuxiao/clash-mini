@@ -35,16 +35,19 @@ class DelayManager {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      setInterval(() => {
-        const now = Date.now()
-        const expiredKeys: string[] = []
-        this.cache.forEach((entry, key) => {
-          if (now - entry.updatedAt > CACHE_TTL) {
-            expiredKeys.push(key)
-          }
-        })
-        expiredKeys.forEach((key) => this.cache.delete(key))
-      }, 2 * 60 * 60 * 1000) // Clean up expired cache every 2 hours
+      setInterval(
+        () => {
+          const now = Date.now()
+          const expiredKeys: string[] = []
+          this.cache.forEach((entry, key) => {
+            if (now - entry.updatedAt > CACHE_TTL) {
+              expiredKeys.push(key)
+            }
+          })
+          expiredKeys.forEach((key) => this.cache.delete(key))
+        },
+        2 * 60 * 60 * 1000,
+      ) // Clean up expired cache every 2 hours
     }
   }
 
@@ -269,7 +272,10 @@ class DelayManager {
               timerId = null
             }
             raceFinished = true
-            console.error(`[DelayManager] delayProxyByName error for ${name}:`, err)
+            console.error(
+              `[DelayManager] delayProxyByName error for ${name}:`,
+              err,
+            )
             return { delay: 1e6 }
           }),
         timeoutPromise.then((res) => {
@@ -306,70 +312,78 @@ class DelayManager {
     timeout: number,
     concurrency = 36,
   ) {
+    // 互斥保护：若已有批量测速正在进行，直接丢弃后续请求
+    // 所有测速目标均为 PROXY 组节点，正在进行的测速会覆盖相同数据，无需重复执行
+    if (this._isBatchTesting) {
+      debugLog(
+        `[DelayManager] 批量测速已在进行中，跳过本次请求，组: ${group}, 节点数: ${nameList.length}`,
+      )
+      return
+    }
     this._isBatchTesting = true
     try {
-    debugLog(
-      `[DelayManager] 批量测试延迟开始，组: ${group}, 数量: ${nameList.length}, 并发数: ${concurrency}`,
-    )
-    const names = nameList.filter(Boolean)
-    // 设置正在延迟测试中
-    names.forEach((name) => this.setDelay(name, group, -2))
+      debugLog(
+        `[DelayManager] 批量测试延迟开始，组: ${group}, 数量: ${nameList.length}, 并发数: ${concurrency}`,
+      )
+      const names = nameList.filter(Boolean)
+      // 设置正在延迟测试中
+      names.forEach((name) => this.setDelay(name, group, -2))
 
-    const listener = this.groupListenerMap.get(group)
-    // 瞬间通知 UI 全组开始测速扫光
-    if (listener) {
-      this.queueGroupNotification(group)
-    }
+      const listener = this.groupListenerMap.get(group)
+      // 瞬间通知 UI 全组开始测速扫光
+      if (listener) {
+        this.queueGroupNotification(group)
+      }
 
-    let index = 0
-    const startTime = Date.now()
+      let index = 0
+      const startTime = Date.now()
 
-    const worker = async (): Promise<void> => {
-      while (true) {
-        const currName = names[index++]
-        if (!currName) return
+      const worker = async (): Promise<void> => {
+        while (true) {
+          const currName = names[index++]
+          if (!currName) return
 
-        try {
-          // 确保API调用前状态为测试中
-          this.setDelay(currName, group, -2)
+          try {
+            // 确保API调用前状态为测试中
+            this.setDelay(currName, group, -2)
 
-          // 添加一些随机延迟，避免所有请求同时发出和返回
-          if (index > 1) {
-            // 第一个不延迟，保持响应性
-            await new Promise((resolve) =>
-              setTimeout(resolve, Math.random() * 200),
+            // 添加一些随机延迟，避免所有请求同时发出和返回
+            if (index > 1) {
+              // 第一个不延迟，保持响应性
+              await new Promise((resolve) =>
+                setTimeout(resolve, Math.random() * 200),
+              )
+            }
+
+            await this.checkDelay(currName, group, timeout)
+            if (listener) {
+              this.queueGroupNotification(group)
+            }
+          } catch (error) {
+            console.error(
+              `[DelayManager] 批量测试单个代理出错，代理: ${currName}`,
+              error,
             )
+            // 设置为错误状态
+            this.setDelay(currName, group, 1e6)
           }
-
-          await this.checkDelay(currName, group, timeout)
-          if (listener) {
-            this.queueGroupNotification(group)
-          }
-        } catch (error) {
-          console.error(
-            `[DelayManager] 批量测试单个代理出错，代理: ${currName}`,
-            error,
-          )
-          // 设置为错误状态
-          this.setDelay(currName, group, 1e6)
         }
       }
-    }
 
-    // 限制并发数，避免发送太多请求
-    const actualConcurrency = Math.min(concurrency, names.length, 36)
-    debugLog(`[DelayManager] 实际并发数: ${actualConcurrency}`)
+      // 限制并发数，避免发送太多请求
+      const actualConcurrency = Math.min(concurrency, names.length, 36)
+      debugLog(`[DelayManager] 实际并发数: ${actualConcurrency}`)
 
-    const promiseList: Promise<void>[] = []
-    for (let i = 0; i < actualConcurrency; i++) {
-      promiseList.push(worker())
-    }
+      const promiseList: Promise<void>[] = []
+      for (let i = 0; i < actualConcurrency; i++) {
+        promiseList.push(worker())
+      }
 
-    await Promise.all(promiseList)
-    const totalTime = Date.now() - startTime
-    debugLog(
-      `[DelayManager] 批量测试延迟完成，组: ${group}, 总耗时: ${totalTime}ms`,
-    )
+      await Promise.all(promiseList)
+      const totalTime = Date.now() - startTime
+      debugLog(
+        `[DelayManager] 批量测试延迟完成，组: ${group}, 总耗时: ${totalTime}ms`,
+      )
     } finally {
       this._isBatchTesting = false
     }
