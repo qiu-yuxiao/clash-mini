@@ -562,17 +562,10 @@ pub fn start_background_monitor() {
                 // 判断前端是否可用：窗口存在（任何状态）即视为前端接管；
                 // 只有窗口彻底销毁（NotExist）才由后端执行自动选点
                 let window_state = crate::utils::window_manager::WindowManager::get_main_window_state();
-                let frontend_available = !matches!(
-                    window_state,
-                    crate::utils::window_manager::WindowState::NotExist
-                );
+                let frontend_available = !matches!(window_state, crate::utils::window_manager::WindowState::NotExist);
 
                 if frontend_available {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 前端可用，自动选点交由前端执行"
-                    );
+                    logging!(info, Type::Lightweight, "[后台监测] 前端可用，自动选点交由前端执行");
                 } else {
                     logging!(
                         info,

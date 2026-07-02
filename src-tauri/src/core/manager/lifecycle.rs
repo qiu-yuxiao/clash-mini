@@ -111,7 +111,9 @@ impl CoreManager {
             // 1. 如果完全未安装，则尝试进行安装（触发 UAC）
             if !service::is_service_installed() {
                 logging!(info, Type::Service, "检测到系统服务未安装，启动安装提权");
-                SERVICE_MANAGER.handle_service_status(ServiceStatus::InstallRequired).await?;
+                SERVICE_MANAGER
+                    .handle_service_status(ServiceStatus::InstallRequired)
+                    .await?;
             } else {
                 // 2. 如果已安装，刷新并启动（若停止）
                 SERVICE_MANAGER.refresh().await?;

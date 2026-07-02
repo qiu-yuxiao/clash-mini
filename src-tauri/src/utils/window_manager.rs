@@ -188,7 +188,9 @@ impl WindowManager {
 
         match state {
             WindowState::NotExist => Self::handle_not_exist_toggle().await,
-            WindowState::VisibleFocused | WindowState::VisibleUnfocused => Self::hide_main_window_internal(window.as_ref()),
+            WindowState::VisibleFocused | WindowState::VisibleUnfocused => {
+                Self::hide_main_window_internal(window.as_ref())
+            }
             WindowState::Minimized | WindowState::Hidden => Self::activate_existing_main_window(window.as_ref()),
         }
     }

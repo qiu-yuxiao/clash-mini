@@ -349,27 +349,20 @@ fn start_service() -> Result<()> {
     let token = Token::with_current_process()?;
     let level = token.privilege_level()?;
     let status = match level {
-        PrivilegeLevel::NotPrivileged => {
-            RunasCommand::new("sc.exe")
-                .arg("start")
-                .arg("clash_verge_service")
-                .show(false)
-                .status()?
-        }
-        _ => {
-            std::process::Command::new("sc.exe")
-                .arg("start")
-                .arg("clash_verge_service")
-                .creation_flags(0x08000000)
-                .status()?
-        }
+        PrivilegeLevel::NotPrivileged => RunasCommand::new("sc.exe")
+            .arg("start")
+            .arg("clash_verge_service")
+            .show(false)
+            .status()?,
+        _ => std::process::Command::new("sc.exe")
+            .arg("start")
+            .arg("clash_verge_service")
+            .creation_flags(0x08000000)
+            .status()?,
     };
 
     if !status.success() {
-        bail!(
-            "failed to start service with status {}",
-            status.code().unwrap_or(-1)
-        );
+        bail!("failed to start service with status {}", status.code().unwrap_or(-1));
     }
     Ok(())
 }
