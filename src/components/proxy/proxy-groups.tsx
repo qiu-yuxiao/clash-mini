@@ -411,8 +411,8 @@ export const ProxyGroups = (props: Props) => {
         // Disable titlebar drag-region to prevent Tauri sync-command
         // deadlock during modal drag loop (DefWindowProc blocks main thread)
         document
-          .querySelectorAll('[data-tauri-drag-region]')
-          .forEach((el) => el.removeAttribute('data-tauri-drag-region'))
+          .querySelectorAll('[data-tauri-drag-region="true"]')
+          .forEach((el) => el.setAttribute('data-tauri-drag-region', 'false'))
 
         try {
           await delayManager.checkListDelay(visibleNames, groupName, timeout)
