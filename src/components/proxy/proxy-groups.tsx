@@ -406,10 +406,6 @@ export const ProxyGroups = (props: Props) => {
         // Lock window resize to prevent WebView2 compositor crash
         // during virtual list element measurements
         const win = getCurrentWindow()
-        const wasDecorated = await win.isDecorated()
-        if (wasDecorated) {
-          await win.setDecorations(false)
-        }
         await win.setResizable(false)
 
         // Disable titlebar drag-region to prevent Tauri sync-command
@@ -425,9 +421,6 @@ export const ProxyGroups = (props: Props) => {
           document
             .querySelectorAll('[data-tauri-drag-region="false"]')
             .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
-          if (wasDecorated) {
-            await win.setDecorations(true)
-          }
         }
 
         // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 30ms 且 < timeout，注：30ms为系统强制设计要求以过滤广告节点）

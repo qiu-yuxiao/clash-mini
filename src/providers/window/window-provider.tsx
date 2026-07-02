@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -13,24 +12,28 @@ const IDLE_HIDE_DELAY_MS = 10_000
 /** Width threshold (CSS px) below which the window is in "traffic monitor" mode */
 const MINIMAL_WIDTH_THRESHOLD = 285
 
+const OS = getSystem()
+const IS_MACOS = OS === 'macos'
+
 export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  // Guard: in non-Tauri environment (e.g. browser dev server), skip window operations
   const isTauri = typeof window !== 'undefined' && !!window.__TAURI_INTERNALS__
-  const currentWindow = useMemo(() => (isTauri ? getCurrentWindow() : null), [isTauri])
-  const [decorated, setDecorated] = useState<boolean | null>(() => {
-    if (typeof window === 'undefined') return true
-    const isTauriEnv = !!window.__TAURI_INTERNALS__
-    if (!isTauriEnv) return false // Render custom titlebar in browser dev server for testing
-    const OS = getSystem()
-    return OS === 'linux' ? false : true
-  })
+  const currentWindow = useMemo(
+    () => (isTauri ? getCurrentWindow() : null),
+    [isTauri],
+  )
+
+  /**
+   * Whether the window has native decorations (title bar + borders).
+   * Windows/Linux: always frameless (custom titlebar).
+   * macOS: always uses native titlebar.
+   */
+  const decorated: boolean = IS_MACOS
+
   const [maximized, setMaximized] = useState<boolean | null>(null)
-  /** FEAT-003: true when we have hidden the native chrome via idle timer */
+  /** FEAT-003: true when custom titlebar is hidden by idle auto-hide timer (stealth mode) */
   const [isDecorationsHidden, setIsDecorationsHidden] = useState(false)
-
-
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDecorationsHiddenRef = useRef(false)
@@ -40,9 +43,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       : false,
   )
 
-  // ── Drag-vs-click detection ─────────────────────────────────────────────────
+  // ── Drag-vs-click detection (for stealth mode) ────────────────────────────
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null)
-  /** FEAT-003: true once startDragging() has been called for the current press */
   const dragStartedRef = useRef(false)
 
   const close = useCallback(async () => {
@@ -57,19 +59,11 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     await currentWindow.minimize()
   }, [currentWindow])
 
-  // ── Restore chrome ──────────────────────────────────────────────────────────
+  // ── Restore chrome (show custom titlebar) ─────────────────────────────────
   const restoreChrome = useCallback(() => {
     if (!isDecorationsHiddenRef.current) return
     isDecorationsHiddenRef.current = false
     setIsDecorationsHidden(false)
-    setDecorated(true)
-    ;(async () => {
-      try {
-        await invoke('restore_window_chrome')
-      } catch (err) {
-        console.warn('[WindowProvider] restore_window_chrome failed:', err)
-      }
-    })()
   }, [])
 
   // ── Resize listener: track maximized state + minimal width ──────────────────
@@ -87,11 +81,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         lastWidth = width
         lastHeight = height
 
-        // Track minimal width state
         const wasMinimal = isMinimalWidthRef.current
         isMinimalWidthRef.current = window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
 
-        // If window is no longer minimal AND chrome is hidden → restore
         if (
           wasMinimal &&
           !isMinimalWidthRef.current &&
@@ -106,7 +98,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
             setMaximized(value)
           }
         } catch (err) {
-          console.warn('[WindowProvider] checkMaximized isMaximized failed:', err)
+          console.warn(
+            '[WindowProvider] checkMaximized isMaximized failed:',
+            err,
+          )
         }
       },
       300,
@@ -130,48 +125,44 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       isMinimalWidthRef.current = window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
     }
 
-    idleTimerRef.current = setTimeout(async () => {
-      // Only hide if currently at minimal width, height <= 100 and not already hidden
-      const currentIsMinimal = typeof window !== 'undefined' ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD : false
-      const currentIsMinimalHeight = typeof window !== 'undefined' ? window.innerHeight <= 100 : false
-      if (!currentIsMinimal || !currentIsMinimalHeight || isDecorationsHiddenRef.current) return
-      try {
-        await invoke('hide_window_chrome')
-        isDecorationsHiddenRef.current = true
-        setIsDecorationsHidden(true)
-        setDecorated(false)
-      } catch (err) {
-        console.warn('[WindowProvider] hide_window_chrome failed:', err)
-      }
+    idleTimerRef.current = setTimeout(() => {
+      const currentIsMinimal =
+        typeof window !== 'undefined'
+          ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
+          : false
+      const currentIsMinimalHeight =
+        typeof window !== 'undefined' ? window.innerHeight <= 100 : false
+      if (
+        !currentIsMinimal ||
+        !currentIsMinimalHeight ||
+        isDecorationsHiddenRef.current
+      )
+        return
+      isDecorationsHiddenRef.current = true
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
+      setIsDecorationsHidden(true)
     }, IDLE_HIDE_DELAY_MS)
   }, [])
 
   // ── Activity listeners: reset timer on any user input ──────────────────────
   useEffect(() => {
-    // Start the idle timer on mount
     resetIdleTimer()
 
     const handleMouseDown = (e: MouseEvent) => {
       mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
       dragStartedRef.current = false
       resetIdleTimer()
-      // NOTE: Do NOT call startDragging() here.
-      // Calling it on mousedown causes the OS to swallow subsequent
-      // click/mouseup events, permanently breaking click-to-restore.
-      // We defer to handleMouseMove and only start dragging after 5px.
     }
 
     const handleMouseMove = (e: MouseEvent) => {
-      // When chrome is visible, just reset idle timer
       if (!isDecorationsHiddenRef.current) {
         resetIdleTimer()
         return
       }
-      // In stealth mode: start dragging once threshold is exceeded
       if (
         mouseDownPosRef.current &&
         !dragStartedRef.current &&
-        (e.buttons & 1) !== 0 // left button held
+        (e.buttons & 1) !== 0
       ) {
         const dx = e.clientX - mouseDownPosRef.current.x
         const dy = e.clientY - mouseDownPosRef.current.y
@@ -184,9 +175,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
             !DelayManager.isBatchTesting
           ) {
             dragStartedRef.current = true
-            currentWindow?.startDragging().catch(() => console.warn('[window] startDragging failed'))
+            currentWindow
+              ?.startDragging()
+              .catch(() => console.warn('[window] startDragging failed'))
           } else {
-            // Interactive target: abort drag tracking
             mouseDownPosRef.current = null
           }
         }
@@ -194,7 +186,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     const handleMouseUp = (e: MouseEvent) => {
-      // Click = mousedown + mouseup without drag → restore chrome
       if (
         isDecorationsHiddenRef.current &&
         mouseDownPosRef.current &&
@@ -231,30 +222,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [resetIdleTimer, restoreChrome, currentWindow])
 
-  // ── Decorations init ────────────────────────────────────────────────────────
-  const refreshDecorated = useCallback(async () => {
-    if (!currentWindow) return false
-    try {
-      const val = await currentWindow.isDecorated()
-      setDecorated(val)
-      return val
-    } catch (err) {
-      console.warn('[WindowProvider] refreshDecorated failed:', err)
-      return false
-    }
-  }, [currentWindow])
-
-  const toggleDecorations = useCallback(async () => {
-    if (!currentWindow) return
-    try {
-      const currentVal = await currentWindow.isDecorated()
-      await currentWindow.setDecorations(!currentVal)
-      setDecorated(!currentVal)
-    } catch (err) {
-      console.warn('[WindowProvider] toggleDecorations failed:', err)
-    }
-  }, [currentWindow])
-
   const toggleMaximize = useCallback(async () => {
     if (!currentWindow) return
     try {
@@ -281,17 +248,14 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     if (!currentWindow) return
-    refreshDecorated()
     currentWindow.setMinimizable?.(true)
-  }, [currentWindow, refreshDecorated])
+  }, [currentWindow])
 
   const contextValue = useMemo(
     () => ({
       decorated,
       maximized,
       isDecorationsHidden,
-      toggleDecorations,
-      refreshDecorated,
       minimize,
       close,
       toggleMaximize,
@@ -302,8 +266,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       decorated,
       maximized,
       isDecorationsHidden,
-      toggleDecorations,
-      refreshDecorated,
       minimize,
       close,
       toggleMaximize,

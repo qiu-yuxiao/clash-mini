@@ -1,7 +1,3 @@
-#[cfg(not(target_os = "windows"))]
-use dark_light::{Mode as SystemTheme, detect as detect_system_theme};
-#[cfg(not(target_os = "windows"))]
-use tauri::utils::config::Color;
 use tauri::webview::PageLoadEvent;
 use tauri::{Theme, WebviewWindow};
 
@@ -9,25 +5,25 @@ use crate::{config::Config, core::handle, utils::resolve::window_script::build_w
 use clash_verge_logging::{Type, logging_error};
 
 #[cfg(not(target_os = "windows"))]
-const DARK_BACKGROUND_COLOR: Color = Color(46, 48, 61, 255); // #2E303D
+use dark_light::{Mode as SystemTheme, detect as detect_system_theme};
 #[cfg(not(target_os = "windows"))]
-const LIGHT_BACKGROUND_COLOR: Color = Color(245, 245, 245, 255); // #F5F5F5
+use tauri::utils::config::Color;
+
+#[cfg(not(target_os = "windows"))]
+const DARK_BACKGROUND_COLOR: Color = Color(46, 48, 61, 255);
+#[cfg(not(target_os = "windows"))]
+const LIGHT_BACKGROUND_COLOR: Color = Color(245, 245, 245, 255);
 const DARK_BACKGROUND_HEX: &str = "#2E303D";
 const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
 
-// 定义默认窗口尺寸常量
 const DEFAULT_WIDTH: f64 = 270.0;
 const DEFAULT_HEIGHT: f64 = 680.0;
 const MAX_WIDTH: f64 = 640.0;
 const MAX_HEIGHT: f64 = 860.0;
 const MINIMAL_WIDTH: f64 = 270.0;
 const MINIMAL_HEIGHT: f64 = 99.0;
-#[cfg(target_os = "linux")]
 const DEFAULT_DECORATIONS: bool = false;
-#[cfg(not(target_os = "linux"))]
-const DEFAULT_DECORATIONS: bool = true;
 
-/// 构建新的 WebView 窗口
 pub async fn build_new_window() -> Result<WebviewWindow, String> {
     let app_handle = handle::Handle::app_handle();
     let app_handle_clone = app_handle.clone();
@@ -63,77 +59,41 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     let initial_script = build_window_initial_script(initial_theme_mode, DARK_BACKGROUND_HEX, LIGHT_BACKGROUND_HEX);
 
+    let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(start_page.into()))
+        .center()
+        .decorations(DEFAULT_DECORATIONS)
+        .fullscreen(false)
+        .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        .max_inner_size(MAX_WIDTH, MAX_HEIGHT)
+        .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
+        .visible(false)
+        .initialization_script(&initial_script)
+        .general_autofill_enabled(false)
+        .on_page_load(move |window, payload| {
+            if payload.event() != PageLoadEvent::Finished {
+                return;
+            }
+
+            logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
+            logging_error!(Type::Window, window.show());
+            logging_error!(Type::Window, window.set_focus());
+            let label = window.label().to_string();
+            let ah = app_handle_clone.clone();
+            let ah2 = ah.clone();
+            let _ = ah.run_on_main_thread(move || {
+                use tauri::Manager as _;
+                if let Some(w) = ah2.get_webview_window(&label) {
+                    let _ = w.set_always_on_top(always_on_top);
+                }
+            });
+        });
+
     #[cfg(target_os = "windows")]
-    let mut builder = tauri::WebviewWindowBuilder::new(
-        app_handle,
-        "main", /* the unique window label */
-        tauri::WebviewUrl::App(start_page.into()),
-    )
-    .center()
-    .decorations(DEFAULT_DECORATIONS)
-    .fullscreen(false)
-    .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-    .max_inner_size(MAX_WIDTH, MAX_HEIGHT)
-    .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
-    .visible(false)
-    .transparent(false) // 禁用透明，原生窗口背景完全不透明
-    .initialization_script(&initial_script)
-    .general_autofill_enabled(false)
-    .additional_browser_args(
-        "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=31457280",
-    )
-    .on_page_load(move |window, payload| {
-        if payload.event() != PageLoadEvent::Finished {
-            return;
-        }
-
-        logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
-        logging_error!(Type::Window, window.show());
-        logging_error!(Type::Window, window.set_focus());
-        let label = window.label().to_string();
-        let ah = app_handle_clone.clone();
-        let ah2 = ah.clone();
-        let _ = ah.run_on_main_thread(move || {
-            use tauri::Manager as _;
-            if let Some(w) = ah2.get_webview_window(&label) {
-                let _ = w.set_always_on_top(always_on_top);
-            }
-        });
-    });
-
-    #[cfg(not(target_os = "windows"))]
-    let mut builder = tauri::WebviewWindowBuilder::new(
-        app_handle,
-        "main", /* the unique window label */
-        tauri::WebviewUrl::App(start_page.into()),
-    )
-    .center()
-    .decorations(DEFAULT_DECORATIONS)
-    .fullscreen(false)
-    .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-    .max_inner_size(MAX_WIDTH, MAX_HEIGHT)
-    .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
-    .visible(false)
-    .initialization_script(&initial_script)
-    .general_autofill_enabled(false)
-    .on_page_load(move |window, payload| {
-        if payload.event() != PageLoadEvent::Finished {
-            return;
-        }
-
-        logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
-        logging_error!(Type::Window, window.show());
-        logging_error!(Type::Window, window.set_focus());
-        let label = window.label().to_string();
-        let ah = app_handle_clone.clone();
-        let ah2 = ah.clone();
-        let _ = ah.run_on_main_thread(move || {
-            use tauri::Manager as _;
-            if let Some(w) = ah2.get_webview_window(&label) {
-                let _ = w.set_always_on_top(always_on_top);
-            }
-        });
-    });
+    {
+        builder = builder.transparent(false).additional_browser_args(
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=31457280",
+        );
+    }
 
     if let Some(theme) = resolved_theme {
         builder = builder.theme(Some(theme));
@@ -151,18 +111,12 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
                 logging_error!(Type::Window, window.set_background_color(Some(background_color)));
             }
 
-            #[cfg(target_os = "windows")]
-            {
-                // 已彻底禁用毛玻璃/亚克力/Mica效果，保持原生窗口不透明
-            }
-
             Ok(window)
         }
         Err(e) => Err(e.to_string()),
     }
 }
 
-// 获取标准窗口标题，自动映射 Cargo.toml 中的版本号
 fn get_bold_window_title() -> String {
     format!("Clash Mini Ver.{}", env!("CARGO_PKG_VERSION"))
 }

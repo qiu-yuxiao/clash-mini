@@ -2,12 +2,10 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { createContext } from 'react'
 
 export interface WindowContextType {
-  decorated: boolean | null
+  decorated: boolean
   maximized: boolean | null
-  /** True when the title bar is currently hidden by the idle auto-hide timer (FEAT-003) */
+  /** True when the custom titlebar is hidden by the idle auto-hide timer (FEAT-003 stealth mode) */
   isDecorationsHidden: boolean
-  toggleDecorations: () => Promise<void>
-  refreshDecorated: () => Promise<boolean>
   minimize: () => Promise<void>
   close: () => Promise<void>
   toggleMaximize: () => Promise<void>

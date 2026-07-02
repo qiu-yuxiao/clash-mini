@@ -1,7 +1,6 @@
 // Copyright (c) 2026 秋雨潇潇 <qiuyuxiao@gmail.com> (Portions relating to modifications)
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   SettingsRounded as SettingsRoundedIcon,
   CloseRounded,
@@ -20,6 +19,7 @@ import {
 import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
@@ -33,6 +33,7 @@ import { AreaErrorFallback } from '@/components/base/base-error-boundary'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import { GlowBorder } from '@/components/glow-border'
 import { NoticeManager } from '@/components/layout/notice-manager'
+import { ResizeHandles } from '@/components/layout/resize-handles'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import { filterSort } from '@/components/proxy/use-filter-sort'
@@ -282,10 +283,6 @@ async function triggerAutoSelectAndRefresh(
       if (names.length === 0) return
       const timeout = 10000
       const win = getCurrentWindow()
-      const wasDecorated = await win.isDecorated()
-      if (wasDecorated) {
-        await win.setDecorations(false)
-      }
       await win.setResizable(false)
       document
         .querySelectorAll('[data-tauri-drag-region="true"]')
@@ -297,9 +294,6 @@ async function triggerAutoSelectAndRefresh(
         document
           .querySelectorAll('[data-tauri-drag-region="false"]')
           .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
-        if (wasDecorated) {
-          await win.setDecorations(true)
-        }
       }
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
@@ -326,10 +320,6 @@ async function triggerAutoSelectAndRefresh(
         if (names.length === 0) return
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
         const win = getCurrentWindow()
-        const wasDecorated = await win.isDecorated()
-        if (wasDecorated) {
-          await win.setDecorations(false)
-        }
         await win.setResizable(false)
         document
           .querySelectorAll('[data-tauri-drag-region="true"]')
@@ -341,9 +331,6 @@ async function triggerAutoSelectAndRefresh(
           document
             .querySelectorAll('[data-tauri-drag-region="false"]')
             .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
-          if (wasDecorated) {
-            await win.setDecorations(true)
-          }
         }
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
@@ -1158,12 +1145,7 @@ const Layout = () => {
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       setTimeout(async () => {
         const win = getCurrentWindow()
-        let wasDecorated = false
         try {
-          wasDecorated = await win.isDecorated()
-          if (wasDecorated) {
-            await win.setDecorations(false)
-          }
           await win.setResizable(false)
           document
             .querySelectorAll('[data-tauri-drag-region="true"]')
@@ -1177,15 +1159,16 @@ const Layout = () => {
         } catch (err) {
           console.error('[Layout] 唤醒后后台测速异常:', err)
         } finally {
-          try { 
-            await win.setResizable(true) 
+          try {
+            await win.setResizable(true)
             document
               .querySelectorAll('[data-tauri-drag-region="false"]')
-              .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
-            if (wasDecorated) {
-              await win.setDecorations(true)
-            }
-          } catch { /* 忽略 */ }
+              .forEach((el) =>
+                el.setAttribute('data-tauri-drag-region', 'true'),
+              )
+          } catch {
+            /* 忽略 */
+          }
         }
       }, 0)
     } catch (err) {
@@ -1684,6 +1667,7 @@ const Layout = () => {
           flexDirection: 'column',
           overflow: 'hidden',
           background: 'transparent',
+          position: 'relative',
         }}
         onContextMenu={(e) => {
           if (
@@ -1697,6 +1681,7 @@ const Layout = () => {
           }
         }}
       >
+        <ResizeHandles />
         {customTitlebar}
 
         {/* FEAT-003: GlowBorder — only visible in stealth mode, replaces native chrome */}
