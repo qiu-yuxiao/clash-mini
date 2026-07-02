@@ -29,6 +29,7 @@ import { ErrorBoundary } from 'react-error-boundary'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router'
 
+import AppIcon from '@/assets/image/app-icon.png'
 import { AreaErrorFallback } from '@/components/base/base-error-boundary'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import { GlowBorder } from '@/components/glow-border'
@@ -1588,33 +1589,55 @@ const Layout = () => {
       !decorated && !isDecorationsHidden ? (
         <div
           className="the_titlebar"
+          data-tauri-drag-region="true"
           style={{
             width: '100%',
             display: 'flex',
-            justifyContent: 'flex-end',
             alignItems: 'center',
-            padding: '10px',
+            padding: '0 8px 0 10px',
             boxSizing: 'border-box',
-            height: '36px',
+            height: '30px',
             borderBottom: '1px solid var(--divider-color)',
             background: 'var(--background-color)',
             userSelect: 'none',
+            flexShrink: 0,
+            gap: '8px',
           }}
         >
-          <div
-            className="the_titlebar-drag-region"
-            data-tauri-drag-region="true"
-            style={{
-              alignSelf: 'stretch',
-              flex: '1 1 0%',
-              minWidth: 0,
-            }}
+          <img
+            src={AppIcon}
+            alt=""
+            draggable={false}
+            style={{ width: '16px', height: '16px', flexShrink: 0 }}
           />
+          <span
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: 'var(--text-primary-color)',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            Clash Mini Ver.{appVersion}
+          </span>
 
-          <WindowControls ref={windowControlsRef} />
+          <div
+            data-tauri-no-drag="true"
+            style={{
+              marginLeft: 'auto',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <WindowControls ref={windowControlsRef} />
+          </div>
         </div>
       ) : null,
-    [decorated, isDecorationsHidden],
+    [decorated, isDecorationsHidden, appVersion],
   )
 
   if (!themeReady) {
@@ -1693,7 +1716,7 @@ const Layout = () => {
             display: 'flex',
             flexDirection: 'column',
             height:
-              decorated || isDecorationsHidden ? '100vh' : 'calc(100vh - 36px)',
+              decorated || isDecorationsHidden ? '100vh' : 'calc(100vh - 30px)',
             width: '100vw',
             overflow: 'hidden',
             position: 'relative',

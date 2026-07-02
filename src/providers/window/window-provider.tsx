@@ -11,6 +11,8 @@ import { WindowContext } from './window-context'
 const IDLE_HIDE_DELAY_MS = 10_000
 /** Width threshold (CSS px) below which the window is in "traffic monitor" mode */
 const MINIMAL_WIDTH_THRESHOLD = 285
+/** Height threshold (CSS px) below which the window is in "traffic monitor" mode */
+const MINIMAL_HEIGHT_THRESHOLD = 130
 
 const OS = getSystem()
 const IS_MACOS = OS === 'macos'
@@ -131,7 +133,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
           : false
       const currentIsMinimalHeight =
-        typeof window !== 'undefined' ? window.innerHeight <= 100 : false
+        typeof window !== 'undefined'
+          ? window.innerHeight <= MINIMAL_HEIGHT_THRESHOLD
+          : false
       if (
         !currentIsMinimal ||
         !currentIsMinimalHeight ||

@@ -345,6 +345,9 @@ pub fn run() {
                         tauri::WindowEvent::Focused(focused) => {
                             event_handlers::handle_window_focus(*focused);
                         }
+                        tauri::WindowEvent::Resized(new_size) => {
+                            event_handlers::handle_window_resized(&webview_window, *new_size);
+                        }
                         #[cfg(target_os = "macos")]
                         tauri::WindowEvent::Destroyed => {
                             event_handlers::handle_window_destroyed();
@@ -411,6 +414,34 @@ pub fn run() {
                         logging!(error, Type::Lightweight, "[窗口关闭] 轻量模式进入失败");
                     }
                 });
+            }
+        }
+
+        pub fn handle_window_resized(window: &tauri::WebviewWindow, new_size: tauri::PhysicalSize<u32>) {
+            use crate::utils::resolve::window::{MINIMAL_HEIGHT, MINIMAL_WIDTH};
+
+            if window.is_minimized().unwrap_or(false) || window.is_maximized().unwrap_or(false) {
+                return;
+            }
+
+            let scale_factor = window.scale_factor().unwrap_or(1.0);
+            let min_width_px = (MINIMAL_WIDTH * scale_factor).round() as u32;
+            let min_height_px = (MINIMAL_HEIGHT * scale_factor).round() as u32;
+
+            let mut need_fix = false;
+            let mut fixed_size = new_size;
+
+            if new_size.width < min_width_px {
+                fixed_size.width = min_width_px;
+                need_fix = true;
+            }
+            if new_size.height < min_height_px {
+                fixed_size.height = min_height_px;
+                need_fix = true;
+            }
+
+            if need_fix {
+                let _ = window.set_size(tauri::Size::Physical(fixed_size));
             }
         }
 
