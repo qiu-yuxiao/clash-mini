@@ -41,7 +41,7 @@
         "https://cdn.jsdelivr.net/gh/qiu-yuxiao/clash-mini@dev/updater/app-update.json"
       ],
       "windows": {
-        "installMode": "passive"
+        "installMode": "basicUi"
       }
     },
     "deep-link": {
