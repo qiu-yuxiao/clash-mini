@@ -282,6 +282,10 @@ async function triggerAutoSelectAndRefresh(
       if (names.length === 0) return
       const timeout = 10000
       const win = getCurrentWindow()
+      const wasDecorated = await win.isDecorated()
+      if (wasDecorated) {
+        await win.setDecorations(false)
+      }
       await win.setResizable(false)
       document
         .querySelectorAll('[data-tauri-drag-region="true"]')
@@ -293,6 +297,9 @@ async function triggerAutoSelectAndRefresh(
         document
           .querySelectorAll('[data-tauri-drag-region="false"]')
           .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
+        if (wasDecorated) {
+          await win.setDecorations(true)
+        }
       }
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
@@ -319,6 +326,10 @@ async function triggerAutoSelectAndRefresh(
         if (names.length === 0) return
         console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
         const win = getCurrentWindow()
+        const wasDecorated = await win.isDecorated()
+        if (wasDecorated) {
+          await win.setDecorations(false)
+        }
         await win.setResizable(false)
         document
           .querySelectorAll('[data-tauri-drag-region="true"]')
@@ -330,6 +341,9 @@ async function triggerAutoSelectAndRefresh(
           document
             .querySelectorAll('[data-tauri-drag-region="false"]')
             .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
+          if (wasDecorated) {
+            await win.setDecorations(true)
+          }
         }
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
@@ -1144,7 +1158,12 @@ const Layout = () => {
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       setTimeout(async () => {
         const win = getCurrentWindow()
+        let wasDecorated = false
         try {
+          wasDecorated = await win.isDecorated()
+          if (wasDecorated) {
+            await win.setDecorations(false)
+          }
           await win.setResizable(false)
           document
             .querySelectorAll('[data-tauri-drag-region="true"]')
@@ -1163,6 +1182,9 @@ const Layout = () => {
             document
               .querySelectorAll('[data-tauri-drag-region="false"]')
               .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
+            if (wasDecorated) {
+              await win.setDecorations(true)
+            }
           } catch { /* 忽略 */ }
         }
       }, 0)
