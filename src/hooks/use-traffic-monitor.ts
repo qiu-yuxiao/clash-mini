@@ -438,7 +438,7 @@ export const useTrafficMonitorEnhanced = (options?: {
 
     const timer = window.setInterval(() => {
       setNow(Date.now())
-    }, 1000)
+    }, 3000)
 
     return () => window.clearInterval(timer)
   }, [isActive, subscribeToSnapshots])

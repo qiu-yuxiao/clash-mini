@@ -14,7 +14,7 @@ const upLineWidth = 2.5
 const downLineAlpha = 0.9
 const downLineWidth = 2.5
 const sampleIntervalMs = 1000
-const frameIntervalMs = 1000 / 15
+const frameIntervalMs = 1000 / 10
 const animationDurationMs = sampleIntervalMs
 
 const zeroTraffic: Traffic = { up: 0, down: 0 }
@@ -44,6 +44,7 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
 
   const cacheRef = useRef<Traffic | null>(null)
   const requestDrawRef = useRef<(animate?: boolean) => void>(() => {})
+  const canvasMetricsRef = useRef<{ rect: DOMRect; dpr: number } | null>(null)
 
   const { palette } = useTheme()
 
@@ -133,12 +134,19 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
       }
     }
 
+    const updateCanvasMetrics = () => {
+      const rect = canvas.getBoundingClientRect()
+      const dpr = window.devicePixelRatio || 1
+      canvasMetricsRef.current = { rect, dpr }
+      return canvasMetricsRef.current
+    }
+
     const drawGraph = (offset = countRef.current) => {
       const list = listRef.current
       const lineStyle = styleRef.current
 
-      const rect = canvas.getBoundingClientRect()
-      const dpr = window.devicePixelRatio || 1
+      const metrics = canvasMetricsRef.current || updateCanvasMetrics()
+      const { rect, dpr } = metrics
       const cssWidth = rect.width
       const cssHeight = rect.height
       const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr))
@@ -261,8 +269,8 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
 
       lastFrameTime = timestamp
 
-      const rect = canvas.getBoundingClientRect()
-      const dx = rect.width / maxPoint
+      const metrics = canvasMetricsRef.current || updateCanvasMetrics()
+      const dx = metrics.rect.width / maxPoint
       const progress = Math.min(
         (timestamp - animationStart) / animationDurationMs,
         1,
@@ -285,11 +293,13 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
       if (!animate) {
         raf = requestAnimationFrame(() => {
           raf = 0
+          updateCanvasMetrics()
           drawGraph()
         })
         return
       }
 
+      updateCanvasMetrics()
       animationStart = performance.now()
       lastFrameTime = animationStart - frameIntervalMs
       raf = requestAnimationFrame(drawAnimatedFrame)
@@ -299,7 +309,10 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
     requestDraw(false)
 
     if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => requestDraw(false))
+      resizeObserver = new ResizeObserver(() => {
+        canvasMetricsRef.current = null
+        requestDraw(false)
+      })
       resizeObserver.observe(canvas)
     }
 
