@@ -2,6 +2,23 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde_yaml_ng::Mapping;
 use std::str;
 
+fn extract_host_port(host_port: &str, default_port: u16) -> Option<(String, u16)> {
+    let host_port = host_port.trim();
+    if host_port.starts_with('[') {
+        let close = host_port.find(']')?;
+        let host = &host_port[1..close];
+        let rest = &host_port[close + 1..];
+        let port = rest.strip_prefix(':').unwrap_or("").parse::<u16>().ok().unwrap_or(default_port);
+        Some((host.to_string(), port))
+    } else {
+        let mut parts = host_port.splitn(2, ':');
+        let host = parts.next()?.trim().to_string();
+        let port_str = parts.next().unwrap_or("").trim();
+        let port = if port_str.is_empty() { default_port } else { port_str.parse::<u16>().ok().unwrap_or(default_port) };
+        Some((host, port))
+    }
+}
+
 #[derive(serde::Deserialize, Debug)]
 struct VMessJson {
     ps: Option<String>,
@@ -177,10 +194,7 @@ fn parse_ss(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let mut hp_parts = host_port.splitn(2, '?');
     let server_port = hp_parts.next()?;
 
-    let mut sp_parts = server_port.splitn(2, ':');
-    let server = sp_parts.next()?.trim().to_string();
-    let port_str = sp_parts.next()?.trim();
-    let port = port_str.parse::<u16>().ok().unwrap_or(8388);
+    let (server, port) = extract_host_port(server_port, 8388)?;
 
     let mut map = serde_yaml_ng::Mapping::new();
     map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("ss"));
@@ -214,10 +228,7 @@ fn parse_trojan(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let host_port = hpq_parts.next()?;
     let query = hpq_parts.next();
 
-    let mut hp_parts = host_port.splitn(2, ':');
-    let server = hp_parts.next()?.trim().to_string();
-    let port_str = hp_parts.next()?.trim();
-    let port = port_str.parse::<u16>().ok().unwrap_or(443);
+    let (server, port) = extract_host_port(host_port, 443)?;
 
     let mut map = serde_yaml_ng::Mapping::new();
     map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("trojan"));
@@ -269,10 +280,7 @@ fn parse_vless(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let host_port = hpq_parts.next()?;
     let query = hpq_parts.next();
 
-    let mut hp_parts = host_port.splitn(2, ':');
-    let server = hp_parts.next()?.trim().to_string();
-    let port_str = hp_parts.next()?.trim();
-    let port = port_str.parse::<u16>().ok().unwrap_or(443);
+    let (server, port) = extract_host_port(host_port, 443)?;
 
     let mut map = serde_yaml_ng::Mapping::new();
     map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("vless"));
@@ -331,6 +339,18 @@ fn parse_vless(link: &str) -> Option<serde_yaml_ng::Mapping> {
                     serde_yaml_ng::Value::from("client-fingerprint"),
                     serde_yaml_ng::Value::from(v.to_string()),
                 );
+            } else if k == "alpn" {
+                let alpn_list: Vec<String> = v
+                    .split(',')
+                    .map(|s| percent_encoding::percent_decode_str(s).decode_utf8_lossy().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                if !alpn_list.is_empty() {
+                    map.insert(
+                        serde_yaml_ng::Value::from("alpn"),
+                        serde_yaml_ng::Value::from(alpn_list),
+                    );
+                }
             } else if k == "path" {
                 path_str = percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string();
             } else if k == "host" {
@@ -408,10 +428,7 @@ fn parse_hysteria2(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let host_port = hpq_parts.next()?;
     let query = hpq_parts.next();
 
-    let mut hp_parts = host_port.splitn(2, ':');
-    let server = hp_parts.next()?.trim().to_string();
-    let port_str = hp_parts.next()?.trim();
-    let port = port_str.parse::<u16>().ok().unwrap_or(443);
+    let (server, port) = extract_host_port(host_port, 443)?;
 
     let mut map = serde_yaml_ng::Mapping::new();
     map.insert(
@@ -457,6 +474,311 @@ fn parse_hysteria2(link: &str) -> Option<serde_yaml_ng::Mapping> {
                     serde_yaml_ng::Value::from(v.to_string()),
                 );
             }
+        }
+    }
+
+    Some(map)
+}
+
+fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
+    let payload = link.strip_prefix("tuic://")?;
+    let mut parts = payload.splitn(2, '#');
+    let base_part = parts.next()?;
+    let remarks = parts
+        .next()
+        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
+        .unwrap_or_else(|| "TUIC Node".to_string());
+
+    // tuic://uuid:password@host:port?...
+    // or tuic://token@host:port?... (v4)
+    let (user_info, host_port_query) = base_part.split_once('@')?;
+
+    let (host_port, query) = host_port_query.split_once('?').map_or(
+        (host_port_query, None as Option<&str>),
+        |(hp, q)| (hp, Some(q)),
+    );
+
+    let (server, port) = extract_host_port(host_port, 443)?;
+
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("tuic"));
+    map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
+    map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
+    map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
+    map.insert(serde_yaml_ng::Value::from("udp"), serde_yaml_ng::Value::from(true));
+
+    // Distinguish v4 (token) and v5 (uuid:password)
+    if let Some((uuid, password)) = user_info.split_once(':') {
+        // v5: uuid:password
+        map.insert(serde_yaml_ng::Value::from("uuid"), serde_yaml_ng::Value::from(uuid.to_string()));
+        map.insert(
+            serde_yaml_ng::Value::from("password"),
+            serde_yaml_ng::Value::from(password.to_string()),
+        );
+    } else {
+        // v4: token
+        map.insert(
+            serde_yaml_ng::Value::from("token"),
+            serde_yaml_ng::Value::from(user_info.to_string()),
+        );
+    }
+
+    if let Some(q) = query {
+        for pair in q.split('&') {
+            let mut kv = pair.splitn(2, '=');
+            let k = kv.next().unwrap_or("").to_lowercase();
+            let v = kv.next().unwrap_or("");
+            if v.is_empty() {
+                continue;
+            }
+            match k.as_str() {
+                "congestion_control" | "congestion-controller" => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("congestion-controller"),
+                        serde_yaml_ng::Value::from(v.to_string()),
+                    );
+                }
+                "alpn" => {
+                    let alpn_list: Vec<String> = v
+                        .split(',')
+                        .map(|s| percent_encoding::percent_decode_str(s).decode_utf8_lossy().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if !alpn_list.is_empty() {
+                        map.insert(
+                            serde_yaml_ng::Value::from("alpn"),
+                            serde_yaml_ng::Value::from(alpn_list),
+                        );
+                    }
+                }
+                "sni" => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("sni"),
+                        serde_yaml_ng::Value::from(v.to_string()),
+                    );
+                }
+                "allow_insecure" if v == "1" || v.to_lowercase() == "true" => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("skip-cert-verify"),
+                        serde_yaml_ng::Value::from(true),
+                    );
+                }
+                "disable_sni" => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("disable-sni"),
+                        serde_yaml_ng::Value::from(v == "1" || v.to_lowercase() == "true"),
+                    );
+                }
+                "udp_relay_mode" => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("udp-relay-mode"),
+                        serde_yaml_ng::Value::from(v.to_string()),
+                    );
+                }
+                "reduce_rtt" => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("reduce-rtt"),
+                        serde_yaml_ng::Value::from(v == "1" || v.to_lowercase() == "true"),
+                    );
+                }
+                "fast_open" => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("fast-open"),
+                        serde_yaml_ng::Value::from(v == "1" || v.to_lowercase() == "true"),
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
+
+    Some(map)
+}
+
+fn parse_wireguard(link: &str) -> Option<serde_yaml_ng::Mapping> {
+    let payload = link.strip_prefix("wireguard://")?;
+    let mut parts = payload.splitn(2, '#');
+    let base_part = parts.next()?;
+    let remarks = parts
+        .next()
+        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
+        .unwrap_or_else(|| "WireGuard Node".to_string());
+
+    // wireguard://private-key@host:port?public-key=xxx&...
+    // private-key may be base64 encoded
+    let (private_key_raw, host_port_query) = base_part.split_once('@')?;
+
+    let (host_port, query) = host_port_query.split_once('?').map_or(
+        (host_port_query, None as Option<&str>),
+        |(hp, q)| (hp, Some(q)),
+    );
+
+    let (server, port) = extract_host_port(host_port, 51820)?;
+
+    // Try base64 decode for private key, fallback to raw
+    let private_key = if let Some(decoded) = decode_base64_robust(private_key_raw) {
+        String::from_utf8(decoded).unwrap_or_else(|_| private_key_raw.to_string())
+    } else {
+        private_key_raw.to_string()
+    };
+
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("wireguard"));
+    map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
+    map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
+    map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
+    map.insert(
+        serde_yaml_ng::Value::from("private-key"),
+        serde_yaml_ng::Value::from(private_key),
+    );
+    map.insert(serde_yaml_ng::Value::from("udp"), serde_yaml_ng::Value::from(true));
+
+    let mut public_key = String::new();
+    let mut reserved_str = String::new();
+    let mut address = String::new();
+    let mut mtu_str = String::new();
+    let mut psk = String::new();
+
+    if let Some(q) = query {
+        for pair in q.split('&') {
+            let mut kv = pair.splitn(2, '=');
+            let k = kv.next().unwrap_or("").to_lowercase();
+            let v = kv.next().unwrap_or("");
+            if v.is_empty() {
+                continue;
+            }
+            match k.as_str() {
+                "public-key" | "publickey" | "pk" => {
+                    public_key = percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string();
+                }
+                "reserved" => {
+                    reserved_str = v.to_string();
+                }
+                "address" | "ip" => {
+                    address = percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string();
+                }
+                "mtu" => {
+                    mtu_str = v.to_string();
+                }
+                "preshared-key" | "pre-shared-key" | "psk" => {
+                    psk = percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string();
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if !public_key.is_empty() {
+        map.insert(
+            serde_yaml_ng::Value::from("public-key"),
+            serde_yaml_ng::Value::from(public_key),
+        );
+    }
+
+    if !reserved_str.is_empty() {
+        // reserved can be "209,98,59" or base64 like "U4An"
+        if reserved_str.contains(',') {
+            let reserved: Vec<u16> = reserved_str
+                .split(',')
+                .filter_map(|s| s.trim().parse::<u16>().ok())
+                .collect();
+            if !reserved.is_empty() {
+                map.insert(
+                    serde_yaml_ng::Value::from("reserved"),
+                    serde_yaml_ng::Value::from(reserved),
+                );
+            }
+        } else if let Some(decoded) = decode_base64_robust(&reserved_str) {
+            let reserved: Vec<u16> = decoded.iter().map(|&b| b as u16).collect();
+            if !reserved.is_empty() {
+                map.insert(
+                    serde_yaml_ng::Value::from("reserved"),
+                    serde_yaml_ng::Value::from(reserved),
+                );
+            }
+        }
+    }
+
+    if !address.is_empty() {
+        // address can be comma-separated ipv4,ipv6
+        let addr_parts: Vec<&str> = address.split(',').map(|s| s.trim()).collect();
+        if let Some(ipv4) = addr_parts.first() {
+            map.insert(serde_yaml_ng::Value::from("ip"), serde_yaml_ng::Value::from(ipv4.to_string()));
+        }
+        if addr_parts.len() > 1 {
+            map.insert(serde_yaml_ng::Value::from("ipv6"), serde_yaml_ng::Value::from(addr_parts[1].to_string()));
+        }
+    }
+
+    if !mtu_str.is_empty() {
+        if let Ok(mtu) = mtu_str.parse::<u16>() {
+            map.insert(serde_yaml_ng::Value::from("mtu"), serde_yaml_ng::Value::from(mtu));
+        }
+    }
+
+    if !psk.is_empty() {
+        map.insert(
+            serde_yaml_ng::Value::from("pre-shared-key"),
+            serde_yaml_ng::Value::from(psk),
+        );
+    }
+
+    // Default allowed-ips
+    let allowed_ips = vec![serde_yaml_ng::Value::from("0.0.0.0/0")];
+    map.insert(
+        serde_yaml_ng::Value::from("allowed-ips"),
+        serde_yaml_ng::Value::from(allowed_ips),
+    );
+
+    Some(map)
+}
+
+fn parse_socks5(link: &str) -> Option<serde_yaml_ng::Mapping> {
+    // Support both socks5:// and socks://
+    let payload = link
+        .strip_prefix("socks5://")
+        .or_else(|| link.strip_prefix("socks://"))?;
+    let mut parts = payload.splitn(2, '#');
+    let base_part = parts.next()?;
+    let remarks = parts
+        .next()
+        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
+        .unwrap_or_else(|| "SOCKS5 Node".to_string());
+
+    // socks5://[username:password@]host:port
+    let (user_info, host_port) = if let Some(at_pos) = base_part.rfind('@') {
+        (Some(&base_part[..at_pos]), &base_part[at_pos + 1..])
+    } else {
+        (None, base_part)
+    };
+
+    let (server, port) = extract_host_port(host_port, 1080)?;
+
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("socks5"));
+    map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
+    map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
+    map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
+    map.insert(serde_yaml_ng::Value::from("udp"), serde_yaml_ng::Value::from(true));
+
+    if let Some(ui) = user_info {
+        if let Some((username, password)) = ui.split_once(':') {
+            map.insert(
+                serde_yaml_ng::Value::from("username"),
+                serde_yaml_ng::Value::from(
+                    percent_encoding::percent_decode_str(username)
+                        .decode_utf8_lossy()
+                        .to_string(),
+                ),
+            );
+            map.insert(
+                serde_yaml_ng::Value::from("password"),
+                serde_yaml_ng::Value::from(
+                    percent_encoding::percent_decode_str(password)
+                        .decode_utf8_lossy()
+                        .to_string(),
+                ),
+            );
         }
     }
 
@@ -523,6 +845,12 @@ pub fn parse_uri_list(content: &str) -> Option<Mapping> {
             parse_vless(line)
         } else if line.starts_with("hysteria2://") {
             parse_hysteria2(line)
+        } else if line.starts_with("tuic://") {
+            parse_tuic(line)
+        } else if line.starts_with("wireguard://") {
+            parse_wireguard(line)
+        } else if line.starts_with("socks5://") || line.starts_with("socks://") {
+            parse_socks5(line)
         } else {
             None
         };
@@ -649,5 +977,196 @@ mod tests {
         let decoded = decode_base64_robust(s).unwrap();
         let decoded_str = String::from_utf8(decoded).unwrap();
         assert_eq!(decoded_str, "hello world\nhello world");
+    }
+
+    #[test]
+    fn test_extract_host_port_ipv4() {
+        let (host, port) = extract_host_port("example.com:8443", 443).unwrap();
+        assert_eq!(host, "example.com");
+        assert_eq!(port, 8443);
+    }
+
+    #[test]
+    fn test_extract_host_port_ipv6() {
+        let (host, port) = extract_host_port("[2401:c080:1000:29ac:5400:6ff:fe43:9d48]:443", 443).unwrap();
+        assert_eq!(host, "2401:c080:1000:29ac:5400:6ff:fe43:9d48");
+        assert_eq!(port, 443);
+    }
+
+    #[test]
+    fn test_extract_host_port_ipv6_custom_port() {
+        let (host, port) = extract_host_port("[::1]:8443", 443).unwrap();
+        assert_eq!(host, "::1");
+        assert_eq!(port, 8443);
+    }
+
+    #[test]
+    fn test_parse_vless_ipv6() {
+        let link = "vless://28beee5e-40ab-3c36-b797-1e4ecf27d0a0@[2401:c080:1000:29ac:5400:6ff:fe43:9d48]:443?encryption=none&type=tcp&fp=ios&host=s3611.wagahaha.xyz&flow=xtls-rprx-vision&security=tls&sni=u729792us3611.wagahaha.xyz&alpn=h2,http/1.1#%E6%9C%AA%E7%9F%A5%20VLESS-160";
+        let map = parse_vless(link).unwrap();
+
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            "vless"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            "未知 VLESS-160"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2401:c080:1000:29ac:5400:6ff:fe43:9d48"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            443
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(),
+            "28beee5e-40ab-3c36-b797-1e4ecf27d0a0"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("flow")).unwrap().as_str().unwrap(),
+            "xtls-rprx-vision"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("tls")).unwrap().as_bool().unwrap(),
+            true
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("servername"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "u729792us3611.wagahaha.xyz"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("client-fingerprint"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "ios"
+        );
+        let alpn = map.get(serde_yaml_ng::Value::from("alpn")).unwrap().as_sequence().unwrap();
+        assert_eq!(alpn.len(), 2);
+        assert_eq!(alpn[0].as_str().unwrap(), "h2");
+        assert_eq!(alpn[1].as_str().unwrap(), "http/1.1");
+    }
+
+    #[test]
+    fn test_parse_trojan_ipv6() {
+        let link = "trojan://password@[2001:db8::1]:443?sni=example.com#test";
+        let map = parse_trojan(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            443
+        );
+    }
+
+    #[test]
+    fn test_parse_hysteria2_ipv6() {
+        let link = "hysteria2://password@[2001:db8::1]:8443?sni=example.com#test";
+        let map = parse_hysteria2(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            8443
+        );
+    }
+
+    #[test]
+    fn test_parse_tuic_v5() {
+        let link = "tuic://00000000-0000-0000-0000-000000000001:password@example.com:10443?congestion_control=cubic&alpn=h3&sni=example.com&allow_insecure=0&udp_relay_mode=native#test-tuic";
+        let map = parse_tuic(link).unwrap();
+
+        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "tuic");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(), "test-tuic");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "example.com");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 10443);
+        assert_eq!(map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(), "00000000-0000-0000-0000-000000000001");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(), "password");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("congestion-controller")).unwrap().as_str().unwrap(), "cubic");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("udp-relay-mode")).unwrap().as_str().unwrap(), "native");
+        let alpn = map.get(serde_yaml_ng::Value::from("alpn")).unwrap().as_sequence().unwrap();
+        assert_eq!(alpn.len(), 1);
+        assert_eq!(alpn[0].as_str().unwrap(), "h3");
+    }
+
+    #[test]
+    fn test_parse_tuic_v4() {
+        let link = "tuic://TOKEN@example.com:443?alpn=h3&udp_relay_mode=quic#v4-node";
+        let map = parse_tuic(link).unwrap();
+
+        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "tuic");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("token")).unwrap().as_str().unwrap(), "TOKEN");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("udp-relay-mode")).unwrap().as_str().unwrap(), "quic");
+    }
+
+    #[test]
+    fn test_parse_tuic_ipv6() {
+        let link = "tuic://uuid:password@[2001:db8::1]:443?sni=example.com#tuic-ipv6";
+        let map = parse_tuic(link).unwrap();
+        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "2001:db8::1");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 443);
+    }
+
+    #[test]
+    fn test_parse_wireguard() {
+        let link = "wireguard://eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=@162.159.192.1:2480?public-key=Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=&address=172.16.0.2&mtu=1408#wg-test";
+        let map = parse_wireguard(link).unwrap();
+
+        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "wireguard");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(), "wg-test");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "162.159.192.1");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 2480);
+        assert_eq!(map.get(serde_yaml_ng::Value::from("public-key")).unwrap().as_str().unwrap(), "Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "172.16.0.2");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("mtu")).unwrap().as_u64().unwrap(), 1408);
+        let allowed = map.get(serde_yaml_ng::Value::from("allowed-ips")).unwrap().as_sequence().unwrap();
+        assert_eq!(allowed.len(), 1);
+        assert_eq!(allowed[0].as_str().unwrap(), "0.0.0.0/0");
+    }
+
+    #[test]
+    fn test_parse_wireguard_ipv6() {
+        let link = "wireguard://eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=@[2001:db8::1]:51820?public-key=Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=&address=172.16.0.2#wg-ipv6";
+        let map = parse_wireguard(link).unwrap();
+        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "2001:db8::1");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 51820);
+    }
+
+    #[test]
+    fn test_parse_socks5_no_auth() {
+        let link = "socks5://example.com:1080#socks-test";
+        let map = parse_socks5(link).unwrap();
+
+        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "socks5");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(), "socks-test");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "example.com");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 1080);
+    }
+
+    #[test]
+    fn test_parse_socks5_with_auth() {
+        let link = "socks5://user:pass@example.com:1080#auth-socks";
+        let map = parse_socks5(link).unwrap();
+
+        assert_eq!(map.get(serde_yaml_ng::Value::from("username")).unwrap().as_str().unwrap(), "user");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(), "pass");
+    }
+
+    #[test]
+    fn test_parse_socks5_ipv6() {
+        let link = "socks5://[2001:db8::1]:1080#ipv6-socks";
+        let map = parse_socks5(link).unwrap();
+        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "2001:db8::1");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 1080);
     }
 }
