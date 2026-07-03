@@ -74,9 +74,22 @@ export const ActiveNodeStatusCard = () => {
     return null
   }, [proxies, activeNodeName])
 
-  const delay = useMemo(() => {
+  const [delay, setDelay] = useState(() => {
     if (!activeNodeName || !primaryGroup?.name || !activeNodeRecord) return -1
     return delayManager.getDelayFix(activeNodeRecord, primaryGroup.name)
+  })
+
+  // 通过 listener 响应式订阅延迟更新，不再依赖 proxiesData 驱动重算
+  useEffect(() => {
+    if (!activeNodeName || !primaryGroup?.name || !activeNodeRecord) return
+    const handler = (update: { delay: number }) => {
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
+      setDelay(update.delay)
+    }
+    delayManager.setListener(activeNodeName, primaryGroup.name, handler)
+    return () => {
+      delayManager.removeListener(activeNodeName, primaryGroup.name)
+    }
   }, [activeNodeName, primaryGroup, activeNodeRecord])
 
   const [testing, setTesting] = useState(false)

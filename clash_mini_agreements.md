@@ -83,6 +83,12 @@
     * **当 IPC 通知成功送达已有实例后，第二实例必须以 `std::process::exit(0)` 静默退出，不得触发任何错误日志或错误对话框。** 原有代码在此处使用了 `bail!("app exists")`，导致 `run()` 中触发 `show_error_dialog`——哪怕窗口已经成功唤醒，用户仍然会看到 "Clash Mini Startup Error" 的弹框提示。
     * 错误对话框仅在 IPC 通知失败（端口占用但 HTTP 请求超时或拒绝连接）时展示，提示用户手动关闭已有实例。
 
+11. **单点测速排序与活跃节点延迟响应规范 (BUG-xxx)**：
+    * 延迟升序排列下，单点测速完成后必须驱动表格列表重排，使节点按新延迟值回到正确位置。
+    * **排序优先级**：正常延迟（rank 0）→ 超时/错误/测试中（rank 3）→ error（rank 4）。`-2`（测试中）等 sentinel 值不得排到 timeout 后面（原为 rank 5，改为 rank 3）。
+    * **活跃节点响应**：`ActiveNodeStatusCard` 的延迟值必须通过 `setListener` 响应式订阅，不得依赖 `proxiesData` 变化驱动重算。
+    * **通知链路**：单点测速完成 (`onDelay`) → `queueGroupNotification(group)` → `useRenderList` PROXY 组 listener 触发 → `useReducer` bump counter → `useMemo` 重算排序。
+
 ---
 
 ### 1.2 壳进程内存占用基准

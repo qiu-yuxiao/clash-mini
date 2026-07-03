@@ -123,7 +123,8 @@ class DelayManager {
     })
   }
 
-  private queueGroupNotification(group: string) {
+  /** 触发组级通知，驱动 useRenderList 等组件重排 */
+  queueGroupNotification(group: string) {
     this.pendingGroupUpdates.add(group)
     this.scheduleGroupFlush()
   }

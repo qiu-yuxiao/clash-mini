@@ -200,8 +200,8 @@ function sortProxies(
         return [3, delay || effectiveTimeout]
       }
       if (delay < 0) {
-        // sentinel delays (-1, -2, etc.) should always sort after real measurements
-        return [5, Number.MAX_SAFE_INTEGER]
+        // sentinel delays (-1, -2 测试中) 降级为 timeout 同级，防止因临时标记导致排序错位
+        return [3, Number.MAX_SAFE_INTEGER]
       }
       return [0, delay]
     }

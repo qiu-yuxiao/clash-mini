@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useReducer, useRef } from 'react'
 
 import { useRuntimeConfig } from '@/hooks/use-clash'
 import { useVerge } from '@/hooks/use-verge'
@@ -112,6 +112,9 @@ export const useRenderList = (
   const [headStates, setHeadState] = useHeadStateNew()
   const latencyTimeout = verge?.default_latency_timeout
 
+  // 延迟更新计数器，每次组级通知递增，驱动 useMemo 重新计算排序
+  const [delayBump, bumpDelay] = useReducer((c: number) => c + 1, 0)
+
   // 获取运行时配置用于链式代理模式
   const { data: runtimeConfig } = useRuntimeConfig(!!isChainMode)
 
@@ -175,6 +178,16 @@ export const useRenderList = (
       delayManager.removeGroupListener('chain-mode')
     }
   }, [isChainMode, runtimeConfig, verge?.default_latency_timeout, refreshProxy])
+
+  // 非链式模式下注册 PROXY 组监听器，单点测速完成后驱动列表重排
+  // 注意：批量测速已通过 checkListDelay 内部 queueGroupNotification 触发，此监听器同时覆盖两类场景
+  useEffect(() => {
+    if (isChainMode) return
+    delayManager.setGroupListener('PROXY', bumpDelay)
+    return () => {
+      delayManager.removeGroupListener('PROXY')
+    }
+  }, [isChainMode])
 
   const groupCacheRef = useRef<Map<string, GroupCache>>(new Map())
   const prevListRef = useRef<IRenderItem[]>([])
@@ -489,6 +502,7 @@ export const useRenderList = (
     }
     prevListRef.current = filtered
     return filtered
+    // eslint-disable-next-line @eslint-react/exhaustive-deps, react-hooks/exhaustive-deps
   }, [
     headStates,
     proxiesData,
@@ -498,6 +512,7 @@ export const useRenderList = (
     runtimeConfig,
     selectedGroup,
     latencyTimeout,
+    delayBump,
   ])
 
   return {

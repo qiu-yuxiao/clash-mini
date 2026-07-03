@@ -76,7 +76,10 @@ export function useProxyDelayState(
     if (!proxy) return
     setDelayState({ delay: -2, updatedAt: Date.now() })
     const currentTimeout = getPreloadConfig()?.default_latency_timeout || 10000
-    setDelayState(await delayManager.checkDelay(proxy.name, groupName, currentTimeout))
+    const result = await delayManager.checkDelay(proxy.name, groupName, currentTimeout)
+    setDelayState(result)
+    // 单点测速完成后通知组级监听，驱动 useRenderList 重排
+    delayManager.queueGroupNotification(groupName)
   })
 
   return {
