@@ -507,8 +507,13 @@ fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
     map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
     map.insert(serde_yaml_ng::Value::from("udp"), serde_yaml_ng::Value::from(true));
 
+    // Percent-decode user_info (uuid:password or token may be encoded)
+    let user_info_decoded = percent_encoding::percent_decode_str(user_info)
+        .decode_utf8_lossy()
+        .to_string();
+
     // Distinguish v4 (token) and v5 (uuid:password)
-    if let Some((uuid, password)) = user_info.split_once(':') {
+    if let Some((uuid, password)) = user_info_decoded.split_once(':') {
         // v5: uuid:password
         map.insert(serde_yaml_ng::Value::from("uuid"), serde_yaml_ng::Value::from(uuid.to_string()));
         map.insert(
@@ -519,7 +524,7 @@ fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
         // v4: token
         map.insert(
             serde_yaml_ng::Value::from("token"),
-            serde_yaml_ng::Value::from(user_info.to_string()),
+            serde_yaml_ng::Value::from(user_info_decoded),
         );
     }
 
@@ -700,13 +705,43 @@ fn parse_wireguard(link: &str) -> Option<serde_yaml_ng::Mapping> {
     }
 
     if !address.is_empty() {
-        // address can be comma-separated ipv4,ipv6
+        // address can be comma-separated ipv4,ipv6 with CIDR (e.g., "10.0.0.2/32,fd00::2/128")
         let addr_parts: Vec<&str> = address.split(',').map(|s| s.trim()).collect();
-        if let Some(ipv4) = addr_parts.first() {
-            map.insert(serde_yaml_ng::Value::from("ip"), serde_yaml_ng::Value::from(ipv4.to_string()));
+
+        // Strip CIDR and classify by address family
+        let mut ipv4_addr: Option<String> = None;
+        let mut ipv6_addrs: Vec<String> = Vec::new();
+
+        for part in addr_parts {
+            // Strip CIDR suffix if present (e.g., /32, /128)
+            let ip_only = part.split_once('/').map_or(part, |(ip, _)| ip);
+
+            if ip_only.contains(':') {
+                // IPv6
+                ipv6_addrs.push(ip_only.to_string());
+            } else if ipv4_addr.is_none() {
+                // IPv4 (take the first one only)
+                ipv4_addr = Some(ip_only.to_string());
+            }
         }
-        if addr_parts.len() > 1 {
-            map.insert(serde_yaml_ng::Value::from("ipv6"), serde_yaml_ng::Value::from(addr_parts[1].to_string()));
+
+        if let Some(ipv4) = ipv4_addr {
+            map.insert(serde_yaml_ng::Value::from("ip"), serde_yaml_ng::Value::from(ipv4));
+        }
+
+        if !ipv6_addrs.is_empty() {
+            // Clash schema: ipv6 can be a single string or an array
+            if ipv6_addrs.len() == 1 {
+                map.insert(
+                    serde_yaml_ng::Value::from("ipv6"),
+                    serde_yaml_ng::Value::from(ipv6_addrs[0].clone()),
+                );
+            } else {
+                map.insert(
+                    serde_yaml_ng::Value::from("ipv6"),
+                    serde_yaml_ng::Value::from(ipv6_addrs),
+                );
+            }
         }
     }
 
@@ -1168,5 +1203,46 @@ mod tests {
         let map = parse_socks5(link).unwrap();
         assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "2001:db8::1");
         assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 1080);
+    }
+
+    // New tests for bug fixes
+
+    #[test]
+    fn test_parse_tuic_percent_encoded() {
+        // UUID with percent-encoded characters: %3D should decode to '='
+        let link = "tuic://uuid%3Dtest:pass%40word@example.com:443#encoded-tuic";
+        let map = parse_tuic(link).unwrap();
+        assert_eq!(map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(), "uuid=test");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(), "pass@word");
+    }
+
+    #[test]
+    fn test_parse_wireguard_address_with_cidr() {
+        // Address with CIDR suffix should be stripped
+        let link = "wireguard://key@server:51820?address=10.0.0.2/32,fd00::2/128#wg-cidr";
+        let map = parse_wireguard(link).unwrap();
+        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "10.0.0.2");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_str().unwrap(), "fd00::2");
+    }
+
+    #[test]
+    fn test_parse_wireguard_ipv6_first() {
+        // IPv6 before IPv4 in address list - should still classify correctly
+        let link = "wireguard://key@server:51820?address=fd00::1/64,10.0.0.1/24#wg-ipv6-first";
+        let map = parse_wireguard(link).unwrap();
+        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "10.0.0.1");
+        assert_eq!(map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_str().unwrap(), "fd00::1");
+    }
+
+    #[test]
+    fn test_parse_wireguard_multiple_ipv6() {
+        // Multiple IPv6 addresses - should be stored as array
+        let link = "wireguard://key@server:51820?address=10.0.0.1/32,fd00::1/64,fd01::2/64#wg-multi-ipv6";
+        let map = parse_wireguard(link).unwrap();
+        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "10.0.0.1");
+        let ipv6_list = map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_sequence().unwrap();
+        assert_eq!(ipv6_list.len(), 2);
+        assert_eq!(ipv6_list[0].as_str().unwrap(), "fd00::1");
+        assert_eq!(ipv6_list[1].as_str().unwrap(), "fd01::2");
     }
 }
