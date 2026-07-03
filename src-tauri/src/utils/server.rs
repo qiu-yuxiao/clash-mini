@@ -6,7 +6,7 @@ use crate::{
     process::AsyncHandler,
     utils::window_manager::WindowManager,
 };
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clash_verge_logging::{Type, logging, logging_error};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -49,8 +49,9 @@ pub async fn check_singleton() -> Result<()> {
                 .send()
                 .await?;
         }
-        logging!(error, Type::Window, "failed to setup singleton listen server");
-        bail!("app exists");
+        // IPC 通知已有实例成功（唤醒窗口 / 处理 deep-link scheme），静默退出不弹错误对话框
+        logging!(info, Type::Window, "已有实例已通知，当前进程静默退出");
+        std::process::exit(0);
     }
     Ok(())
 }

@@ -78,6 +78,11 @@
    * **Sidecar 物理隔离与命名前缀设计**：为了与官方 Clash Verge 客户端彻底物理隔离，这是一项关键的架构设计决定。本项目的 Sidecar 核心二进制名称及运行进程名称由 `verge-mihomo` / `verge-mihomo-alpha` 彻底更名为 `mini-mihomo` / `mini-mihomo-alpha`（即在内核名称前增加 `mini-` 前缀）。这在磁盘的 `sidecar/` 目录级别与操作系统的进程控制级别建立了独立的命名空间。
    * **异步强杀机制与隔离安全**：在主程序退出事件 `clean_async` 中，必须使用 `sysinfo` 库扫描系统运行进程，遍历并强制杀灭（kill）所有进程名包含 `mini-mihomo` 的残留子进程，保证程序退出后无任何孤儿进程驻留。同时，由于前缀隔离设计，该强杀机制绝不会误伤或影响官方 Clash Verge 客户端（其进程名为 `verge-mihomo`）的运行，实现了优雅无冲突的多客户端共存。
 
+10. **单实例 IPC 静默通知规范 (BUG-xxx)**：
+    * 单例检测 (`check_singleton`) 通过嵌入式 HTTP 服务实现：第二实例启动时检测到端口已被占用，必须向已有实例发送 IPC 通知（`/commands/visible` 唤醒窗口，`/commands/scheme` 处理 deep-link scheme）。
+    * **当 IPC 通知成功送达已有实例后，第二实例必须以 `std::process::exit(0)` 静默退出，不得触发任何错误日志或错误对话框。** 原有代码在此处使用了 `bail!("app exists")`，导致 `run()` 中触发 `show_error_dialog`——哪怕窗口已经成功唤醒，用户仍然会看到 "Clash Mini Startup Error" 的弹框提示。
+    * 错误对话框仅在 IPC 通知失败（端口占用但 HTTP 请求超时或拒绝连接）时展示，提示用户手动关闭已有实例。
+
 ---
 
 ### 1.2 壳进程内存占用基准
