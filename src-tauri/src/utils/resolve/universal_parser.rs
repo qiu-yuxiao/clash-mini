@@ -8,13 +8,22 @@ fn extract_host_port(host_port: &str, default_port: u16) -> Option<(String, u16)
         let close = host_port.find(']')?;
         let host = &host_port[1..close];
         let rest = &host_port[close + 1..];
-        let port = rest.strip_prefix(':').unwrap_or("").parse::<u16>().ok().unwrap_or(default_port);
+        let port = rest
+            .strip_prefix(':')
+            .unwrap_or("")
+            .parse::<u16>()
+            .ok()
+            .unwrap_or(default_port);
         Some((host.to_string(), port))
     } else {
         let mut parts = host_port.splitn(2, ':');
         let host = parts.next()?.trim().to_string();
         let port_str = parts.next().unwrap_or("").trim();
-        let port = if port_str.is_empty() { default_port } else { port_str.parse::<u16>().ok().unwrap_or(default_port) };
+        let port = if port_str.is_empty() {
+            default_port
+        } else {
+            port_str.parse::<u16>().ok().unwrap_or(default_port)
+        };
         Some((host, port))
     }
 }
@@ -493,10 +502,9 @@ fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
     // or tuic://token@host:port?... (v4)
     let (user_info, host_port_query) = base_part.split_once('@')?;
 
-    let (host_port, query) = host_port_query.split_once('?').map_or(
-        (host_port_query, None as Option<&str>),
-        |(hp, q)| (hp, Some(q)),
-    );
+    let (host_port, query) = host_port_query
+        .split_once('?')
+        .map_or((host_port_query, None as Option<&str>), |(hp, q)| (hp, Some(q)));
 
     let (server, port) = extract_host_port(host_port, 443)?;
 
@@ -515,7 +523,10 @@ fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
     // Distinguish v4 (token) and v5 (uuid:password)
     if let Some((uuid, password)) = user_info_decoded.split_once(':') {
         // v5: uuid:password
-        map.insert(serde_yaml_ng::Value::from("uuid"), serde_yaml_ng::Value::from(uuid.to_string()));
+        map.insert(
+            serde_yaml_ng::Value::from("uuid"),
+            serde_yaml_ng::Value::from(uuid.to_string()),
+        );
         map.insert(
             serde_yaml_ng::Value::from("password"),
             serde_yaml_ng::Value::from(password.to_string()),
@@ -613,10 +624,9 @@ fn parse_wireguard(link: &str) -> Option<serde_yaml_ng::Mapping> {
     // private-key may be base64 encoded
     let (private_key_raw, host_port_query) = base_part.split_once('@')?;
 
-    let (host_port, query) = host_port_query.split_once('?').map_or(
-        (host_port_query, None as Option<&str>),
-        |(hp, q)| (hp, Some(q)),
-    );
+    let (host_port, query) = host_port_query
+        .split_once('?')
+        .map_or((host_port_query, None as Option<&str>), |(hp, q)| (hp, Some(q)));
 
     let (server, port) = extract_host_port(host_port, 51820)?;
 
@@ -628,7 +638,10 @@ fn parse_wireguard(link: &str) -> Option<serde_yaml_ng::Mapping> {
     };
 
     let mut map = serde_yaml_ng::Mapping::new();
-    map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("wireguard"));
+    map.insert(
+        serde_yaml_ng::Value::from("type"),
+        serde_yaml_ng::Value::from("wireguard"),
+    );
     map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
     map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
     map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
@@ -1082,7 +1095,11 @@ mod tests {
                 .unwrap(),
             "ios"
         );
-        let alpn = map.get(serde_yaml_ng::Value::from("alpn")).unwrap().as_sequence().unwrap();
+        let alpn = map
+            .get(serde_yaml_ng::Value::from("alpn"))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
         assert_eq!(alpn.len(), 2);
         assert_eq!(alpn[0].as_str().unwrap(), "h2");
         assert_eq!(alpn[1].as_str().unwrap(), "http/1.1");
@@ -1121,15 +1138,52 @@ mod tests {
         let link = "tuic://00000000-0000-0000-0000-000000000001:password@example.com:10443?congestion_control=cubic&alpn=h3&sni=example.com&allow_insecure=0&udp_relay_mode=native#test-tuic";
         let map = parse_tuic(link).unwrap();
 
-        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "tuic");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(), "test-tuic");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "example.com");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 10443);
-        assert_eq!(map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(), "00000000-0000-0000-0000-000000000001");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(), "password");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("congestion-controller")).unwrap().as_str().unwrap(), "cubic");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("udp-relay-mode")).unwrap().as_str().unwrap(), "native");
-        let alpn = map.get(serde_yaml_ng::Value::from("alpn")).unwrap().as_sequence().unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            "tuic"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            "test-tuic"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            10443
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(),
+            "00000000-0000-0000-0000-000000000001"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "password"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("congestion-controller"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "cubic"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("udp-relay-mode"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "native"
+        );
+        let alpn = map
+            .get(serde_yaml_ng::Value::from("alpn"))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
         assert_eq!(alpn.len(), 1);
         assert_eq!(alpn[0].as_str().unwrap(), "h3");
     }
@@ -1139,17 +1193,35 @@ mod tests {
         let link = "tuic://TOKEN@example.com:443?alpn=h3&udp_relay_mode=quic#v4-node";
         let map = parse_tuic(link).unwrap();
 
-        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "tuic");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("token")).unwrap().as_str().unwrap(), "TOKEN");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("udp-relay-mode")).unwrap().as_str().unwrap(), "quic");
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            "tuic"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("token")).unwrap().as_str().unwrap(),
+            "TOKEN"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("udp-relay-mode"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "quic"
+        );
     }
 
     #[test]
     fn test_parse_tuic_ipv6() {
         let link = "tuic://uuid:password@[2001:db8::1]:443?sni=example.com#tuic-ipv6";
         let map = parse_tuic(link).unwrap();
-        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "2001:db8::1");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 443);
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            443
+        );
     }
 
     #[test]
@@ -1157,14 +1229,42 @@ mod tests {
         let link = "wireguard://eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=@162.159.192.1:2480?public-key=Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=&address=172.16.0.2&mtu=1408#wg-test";
         let map = parse_wireguard(link).unwrap();
 
-        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "wireguard");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(), "wg-test");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "162.159.192.1");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 2480);
-        assert_eq!(map.get(serde_yaml_ng::Value::from("public-key")).unwrap().as_str().unwrap(), "Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "172.16.0.2");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("mtu")).unwrap().as_u64().unwrap(), 1408);
-        let allowed = map.get(serde_yaml_ng::Value::from("allowed-ips")).unwrap().as_sequence().unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            "wireguard"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            "wg-test"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "162.159.192.1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            2480
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("public-key"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo="
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(),
+            "172.16.0.2"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("mtu")).unwrap().as_u64().unwrap(),
+            1408
+        );
+        let allowed = map
+            .get(serde_yaml_ng::Value::from("allowed-ips"))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
         assert_eq!(allowed.len(), 1);
         assert_eq!(allowed[0].as_str().unwrap(), "0.0.0.0/0");
     }
@@ -1173,8 +1273,14 @@ mod tests {
     fn test_parse_wireguard_ipv6() {
         let link = "wireguard://eCtXsJZ27+4PbhDkHnB923tkUn2Gj59wZw5wFA75MnU=@[2001:db8::1]:51820?public-key=Cr8hWlKvtDt7nrvf+f0brNQQzabAqrjfBvas9pmowjo=&address=172.16.0.2#wg-ipv6";
         let map = parse_wireguard(link).unwrap();
-        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "2001:db8::1");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 51820);
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            51820
+        );
     }
 
     #[test]
@@ -1182,10 +1288,22 @@ mod tests {
         let link = "socks5://example.com:1080#socks-test";
         let map = parse_socks5(link).unwrap();
 
-        assert_eq!(map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(), "socks5");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(), "socks-test");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "example.com");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 1080);
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            "socks5"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            "socks-test"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            1080
+        );
     }
 
     #[test]
@@ -1193,16 +1311,34 @@ mod tests {
         let link = "socks5://user:pass@example.com:1080#auth-socks";
         let map = parse_socks5(link).unwrap();
 
-        assert_eq!(map.get(serde_yaml_ng::Value::from("username")).unwrap().as_str().unwrap(), "user");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(), "pass");
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("username"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "user"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "pass"
+        );
     }
 
     #[test]
     fn test_parse_socks5_ipv6() {
         let link = "socks5://[2001:db8::1]:1080#ipv6-socks";
         let map = parse_socks5(link).unwrap();
-        assert_eq!(map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(), "2001:db8::1");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(), 1080);
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            1080
+        );
     }
 
     // New tests for bug fixes
@@ -1212,8 +1348,17 @@ mod tests {
         // UUID with percent-encoded characters: %3D should decode to '='
         let link = "tuic://uuid%3Dtest:pass%40word@example.com:443#encoded-tuic";
         let map = parse_tuic(link).unwrap();
-        assert_eq!(map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(), "uuid=test");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(), "pass@word");
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("uuid")).unwrap().as_str().unwrap(),
+            "uuid=test"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "pass@word"
+        );
     }
 
     #[test]
@@ -1221,8 +1366,14 @@ mod tests {
         // Address with CIDR suffix should be stripped
         let link = "wireguard://key@server:51820?address=10.0.0.2/32,fd00::2/128#wg-cidr";
         let map = parse_wireguard(link).unwrap();
-        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "10.0.0.2");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_str().unwrap(), "fd00::2");
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(),
+            "10.0.0.2"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_str().unwrap(),
+            "fd00::2"
+        );
     }
 
     #[test]
@@ -1230,8 +1381,14 @@ mod tests {
         // IPv6 before IPv4 in address list - should still classify correctly
         let link = "wireguard://key@server:51820?address=fd00::1/64,10.0.0.1/24#wg-ipv6-first";
         let map = parse_wireguard(link).unwrap();
-        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "10.0.0.1");
-        assert_eq!(map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_str().unwrap(), "fd00::1");
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(),
+            "10.0.0.1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_str().unwrap(),
+            "fd00::1"
+        );
     }
 
     #[test]
@@ -1239,8 +1396,15 @@ mod tests {
         // Multiple IPv6 addresses - should be stored as array
         let link = "wireguard://key@server:51820?address=10.0.0.1/32,fd00::1/64,fd01::2/64#wg-multi-ipv6";
         let map = parse_wireguard(link).unwrap();
-        assert_eq!(map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(), "10.0.0.1");
-        let ipv6_list = map.get(serde_yaml_ng::Value::from("ipv6")).unwrap().as_sequence().unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("ip")).unwrap().as_str().unwrap(),
+            "10.0.0.1"
+        );
+        let ipv6_list = map
+            .get(serde_yaml_ng::Value::from("ipv6"))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
         assert_eq!(ipv6_list.len(), 2);
         assert_eq!(ipv6_list[0].as_str().unwrap(), "fd00::1");
         assert_eq!(ipv6_list[1].as_str().unwrap(), "fd01::2");
