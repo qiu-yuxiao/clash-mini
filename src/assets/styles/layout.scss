@@ -160,9 +160,9 @@
       width: 100%;
       display: flex;
       justify-content: flex-end;
-      padding: 10px;
+      padding: 0 8px 0 10px;
       box-sizing: border-box;
-      height: 36px;
+      height: 30px;
       border-bottom: 1px solid var(--theme-border);
       background: rgba(var(--theme-bg-base-rgb, 240, 245, 255), calc(1 - 0.2 * var(--depth-factor, 1.0))) !important;
       backdrop-filter: blur(calc(8px * var(--depth-factor, 1.0))) !important;
@@ -196,9 +196,9 @@
       width: 100%;
       display: flex;
       justify-content: flex-start;
-      padding: 10px;
+      padding: 0 8px 0 10px;
       box-sizing: border-box;
-      height: 36px;
+      height: 30px;
       border-bottom: 1px solid var(--theme-border);
       background: rgba(var(--theme-bg-base-rgb, 240, 245, 255), calc(1 - 0.2 * var(--depth-factor, 1.0))) !important;
       backdrop-filter: blur(calc(8px * var(--depth-factor, 1.0))) !important;
