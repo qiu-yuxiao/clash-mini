@@ -161,7 +161,7 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 
      * **标题栏拖拽区域**：整个自定义标题栏（除了右侧窗口控制按钮区域）均为可拖拽区域，通过在标题栏最外层容器设置 `data-tauri-drag-region="true"`、在 WindowControls 外包一层 `data-tauri-no-drag="true"` 实现。确保在最窄窗口下仍有充足的拖拽面积。
 
-     * **窗口缩放**：frameless 模式下通过 8 个方向的透明 resize handle（6px 宽）实现边缘拖拽缩放，最大化时自动隐藏。
+     * **窗口缩放**：frameless 模式下通过 8 个方向的透明 resize handle（6px 宽）实现边缘拖拽缩放，最大化时自动隐藏。批量测速期间（`DelayManager.isBatchTesting === true`）resize handle 必须忽略鼠标事件，防止 `startResizeDragging` 进入模态缩放循环导致 IPC 死锁。
 
      * **触发条件**：窗口处于**最小宽度（270px）**且**窗口高度小于等于130px**状态，且连续 **10 秒**无任何操作（鼠标移动、点击、键盘）。上述条件须同时满足。
 

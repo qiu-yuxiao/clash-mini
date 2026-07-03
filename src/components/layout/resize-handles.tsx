@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 
+import DelayManager from '@/services/delay'
 import { useWindow } from '@/hooks/use-window'
 
 const HANDLE_SIZE = 6
@@ -104,6 +105,7 @@ export const ResizeHandles: React.FC = () => {
   const handleMouseDown = useCallback(
     (direction: Direction) => (e: React.MouseEvent) => {
       if (!currentWindow || e.button !== 0) return
+      if (DelayManager.isBatchTesting) return
       e.preventDefault()
       currentWindow.startResizeDragging(direction as any).catch(() => {})
     },
