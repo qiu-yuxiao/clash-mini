@@ -1780,7 +1780,7 @@ const Layout = () => {
                   alignItems: 'center',
                   width: '100%',
                   boxSizing: 'border-box',
-                  padding: '0 8px',
+                  padding: '0px 8px 2px 8px',
                   height: '30px',
                   position: 'relative',
                   zIndex: 9998,
