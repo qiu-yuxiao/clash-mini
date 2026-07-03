@@ -107,10 +107,14 @@ impl CoreManager {
         AsyncHandler::spawn(|| async move {
             while let Some(event) = rx.recv().await {
                 match event {
-                    tauri_plugin_shell::process::CommandEvent::Stdout(line)
-                    | tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                    tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
                         let message = CompactString::from(&*String::from_utf8_lossy(&line));
-                        Logger::global().writer_sidecar_log(Level::Error, &message);
+                        Logger::global().writer_sidecar_log(Level::Info, &message);
+                        CLASH_LOGGER.append_log(message).await;
+                    }
+                    tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                        let message = CompactString::from(&*String::from_utf8_lossy(&line));
+                        Logger::global().writer_sidecar_log(Level::Warn, &message);
                         CLASH_LOGGER.append_log(message).await;
                     }
                     tauri_plugin_shell::process::CommandEvent::Terminated(term) => {

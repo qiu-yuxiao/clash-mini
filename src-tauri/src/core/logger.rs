@@ -77,6 +77,7 @@ impl Logger {
                 .duplicate_to_stdout(log_level.into())
                 .format(clash_verge_logger::console_format)
                 .format_for_files(clash_verge_logger::file_format_with_level)
+                .write_mode(flexi_logger::WriteMode::BufferAndFlush)
                 .rotate(
                     Criterion::Size(log_max_size * 1024),
                     flexi_logger::Naming::TimestampsCustomFormat {
@@ -137,14 +138,16 @@ impl Logger {
         let log_dir = dirs::app_logs_dir()?;
         let log_max_size = self.log_max_size.load(Ordering::SeqCst);
         let log_max_count = self.log_max_count.load(Ordering::SeqCst);
-        let flwb = FileLogWriter::builder(FileSpec::default().directory(log_dir).basename("")).rotate(
-            Criterion::Size(log_max_size * 1024),
-            flexi_logger::Naming::TimestampsCustomFormat {
-                current_infix: Some("latest"),
-                format: "%Y-%m-%d_%H-%M-%S",
-            },
-            Cleanup::KeepLogFiles(log_max_count),
-        );
+        let flwb = FileLogWriter::builder(FileSpec::default().directory(log_dir).basename(""))
+            .write_mode(flexi_logger::WriteMode::BufferAndFlush)
+            .rotate(
+                Criterion::Size(log_max_size * 1024),
+                flexi_logger::Naming::TimestampsCustomFormat {
+                    current_infix: Some("latest"),
+                    format: "%Y-%m-%d_%H-%M-%S",
+                },
+                Cleanup::KeepLogFiles(log_max_count),
+            );
         Ok(flwb)
     }
 
@@ -200,6 +203,7 @@ impl Logger {
                 .suppress_timestamp(),
         )
         .format(clash_verge_logger::file_format_without_level)
+        .write_mode(flexi_logger::WriteMode::BufferAndFlush)
         .rotate(
             Criterion::Size(log_max_size * 1024),
             flexi_logger::Naming::TimestampsCustomFormat {
