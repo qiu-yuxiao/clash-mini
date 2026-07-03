@@ -91,7 +91,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
     #[cfg(target_os = "windows")]
     {
         builder = builder.transparent(false).additional_browser_args(
-            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=31457280",
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-features=CalculateNativeWinOcclusion --disk-cache-size=31457280",
         );
     }
 

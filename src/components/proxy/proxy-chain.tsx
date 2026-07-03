@@ -477,9 +477,25 @@ export const ProxyChain = ({
     updateDelays()
 
     // 设置定时器，每5秒更新一次延迟
-    const interval = setInterval(updateDelays, 5000)
+    let interval: ReturnType<typeof setInterval> | null = setInterval(updateDelays, 5000)
 
-    return () => clearInterval(interval)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (interval) {
+          clearInterval(interval)
+          interval = null
+        }
+      } else if (!interval) {
+        interval = setInterval(updateDelays, 5000)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (interval) clearInterval(interval)
+    }
   }, [proxies?.records]) // 只依赖proxies.records
 
   return (

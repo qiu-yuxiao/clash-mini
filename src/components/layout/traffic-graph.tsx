@@ -59,8 +59,11 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
+    let isPaused = false
 
     const handleData = () => {
+      if (isPaused) return
+
       const data = cacheRef.current ?? zeroTraffic
       cacheRef.current = null
 
@@ -77,9 +80,24 @@ export function TrafficGraph({ ref }: { ref?: Ref<TrafficRef> }) {
       timer = setTimeout(handleData, sampleIntervalMs)
     }
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        isPaused = true
+        if (timer) {
+          clearTimeout(timer)
+          timer = null
+        }
+      } else {
+        isPaused = false
+        handleData()
+      }
+    }
+
     handleData()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       if (timer) clearTimeout(timer)
     }
   }, [])
