@@ -91,7 +91,8 @@ export const ActiveNodeStatusCard = () => {
     return () => {
       delayManager.removeListener(activeNodeName, primaryGroup.name)
     }
-  }, [activeNodeName, primaryGroup, activeNodeRecord])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNodeName, primaryGroup?.name])
 
   const [testing, setTesting] = useState(false)
   const [nodeAddr, setNodeAddr] = useState<string>('')
