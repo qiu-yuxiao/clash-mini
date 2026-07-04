@@ -75,6 +75,7 @@ type GroupCache = {
   headState: HeadState
   col: number
   latencyTimeout: number | undefined
+  delayBump: number
   items: IRenderItem[]
 }
 
@@ -409,7 +410,8 @@ export const useRenderList = (
         cached.all === group.all &&
         cached.headState === headState &&
         cached.col === col &&
-        cached.latencyTimeout === latencyTimeout
+        cached.latencyTimeout === latencyTimeout &&
+        cached.delayBump === delayBump
       ) {
         return cached.items
       }
@@ -490,6 +492,7 @@ export const useRenderList = (
         headState,
         col,
         latencyTimeout,
+        delayBump,
         items: ret,
       })
       return ret
