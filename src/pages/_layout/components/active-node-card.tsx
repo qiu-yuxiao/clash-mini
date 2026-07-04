@@ -31,6 +31,7 @@ export const ActiveNodeStatusCard = () => {
   const currentProfileUid = profiles?.current || ''
   const { verge } = useVerge()
   const latencyTimeout = verge?.default_latency_timeout || 10000
+  const singleTestTimeout = 1000
 
   const primaryGroup = useMemo(() => {
     const groups = proxies?.groups || []
@@ -125,7 +126,7 @@ export const ActiveNodeStatusCard = () => {
     if (!activeNodeName || !primaryGroup?.name) return
     setTesting(true)
     try {
-      await delayManager.checkDelay(activeNodeName, primaryGroup.name, latencyTimeout)
+      await delayManager.checkDelay(activeNodeName, primaryGroup.name, singleTestTimeout)
       delayManager.queueGroupNotification(primaryGroup.name)
     } catch (err) {
       console.error(err)
