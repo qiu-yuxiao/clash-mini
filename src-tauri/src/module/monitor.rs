@@ -492,6 +492,8 @@ pub fn start_background_monitor() {
         let mut was_online = true;
         let mut is_first_run = true;
         let mut last_online_check_time: Option<Instant> = None;
+        let mut last_auto_select_time: Option<Instant> = None;
+        let mut auto_select_fail_count = 0u32;
 
         loop {
             if is_first_run {
@@ -703,6 +705,22 @@ pub fn start_background_monitor() {
                                     consecutive_fails = 0;
                                     is_retry_mode = false;
 
+                                    // 60 秒冷却保护：auto_select 失败后至少等 60 秒再重试
+                                    let now = Instant::now();
+                                    if let Some(last_time) = last_auto_select_time {
+                                        let elapsed = now.duration_since(last_time).as_secs();
+                                        if elapsed < 60 {
+                                            logging!(
+                                                debug,
+                                                Type::Lightweight,
+                                                "[后台监测] 自愈选点在 60 秒冷却中（已过 {} 秒），跳过本次",
+                                                elapsed
+                                            );
+                                            continue;
+                                        }
+                                    }
+                                    last_auto_select_time = Some(now);
+
                                     logging!(
                                         info,
                                         Type::Lightweight,
@@ -713,6 +731,15 @@ pub fn start_background_monitor() {
                                         Ok(results) => {
                                             if !results.is_empty() {
                                                 Handle::notify_delay_results("PROXY".into(), results);
+                                                auto_select_fail_count = 0; // 选点成功，重置失败计数
+                                            } else {
+                                                auto_select_fail_count += 1;
+                                                logging!(
+                                                    warn,
+                                                    Type::Lightweight,
+                                                    "[后台监测] 自愈选点结果为空（所有节点不可达），连续失败次数: {}",
+                                                    auto_select_fail_count
+                                                );
                                             }
                                             last_check_time = Instant::now();
                                         }
@@ -722,18 +749,37 @@ pub fn start_background_monitor() {
                                                 logging!(
                                                     info,
                                                     Type::Lightweight,
-                                                    "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试"
+                                                    "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
                                                 );
+                                                // BUSY 不算失败，回退冷却时间戳，允许下次重试
+                                                last_auto_select_time = last_auto_select_time
+                                                    .filter(|t| t.elapsed().as_secs() < 60);
                                             } else {
+                                                auto_select_fail_count += 1;
                                                 logging!(
                                                     warn,
                                                     Type::Lightweight,
-                                                    "[后台监测] 自愈选点失败 ({})",
-                                                    err_str
+                                                    "[后台监测] 自愈选点失败 ({}), 连续失败次数: {}",
+                                                    err_str,
+                                                    auto_select_fail_count
                                                 );
                                             }
                                             last_check_time = Instant::now();
                                         }
+                                    }
+
+                                    // 连续 5 次 auto_select 失败 → Windows 系统警报
+                                    if auto_select_fail_count >= 5 {
+                                        auto_select_fail_count = 0;
+                                        logging!(
+                                            warn,
+                                            Type::Lightweight,
+                                            "[后台监测] 连续 5 次自愈选点失败，弹出 Windows 提示框"
+                                        );
+                                        crate::show_error_dialog(
+                                            "Clash Mini - 网络警报",
+                                            "后台节点自愈选点连续 5 次失败，所有可用节点可能均已断线。\n\n请检查您的网络连接或节点订阅状态。",
+                                        );
                                     }
                                 }
                             }
