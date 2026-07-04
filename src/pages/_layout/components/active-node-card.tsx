@@ -82,8 +82,11 @@ export const ActiveNodeStatusCard = () => {
   // 通过 listener 响应式订阅延迟更新，不再依赖 proxiesData 驱动重算
   useEffect(() => {
     if (!activeNodeName || !primaryGroup?.name || !activeNodeRecord) return
+
+    // eslint-disable-next-line @eslint-react/set-state-in-effect
+    setDelay(delayManager.getDelayFix(activeNodeRecord, primaryGroup.name))
+
     const handler = (update: { delay: number }) => {
-      // eslint-disable-next-line @eslint-react/set-state-in-effect
       setDelay(update.delay)
     }
     delayManager.setListener(activeNodeName, primaryGroup.name, handler)
