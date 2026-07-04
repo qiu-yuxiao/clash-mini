@@ -17,10 +17,7 @@ import { useProxiesData } from '@/providers/app-data-context'
 import { getProxyAddr } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import { get3DCardStyle } from '@/utils/button-styles'
-import {
-  healthcheckProxyProvider,
-  selectNodeForGroup,
-} from 'tauri-plugin-mihomo-api'
+import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 
 import {
   getFriendlyProtocolName,
@@ -128,11 +125,8 @@ export const ActiveNodeStatusCard = () => {
     if (!activeNodeName || !primaryGroup?.name) return
     setTesting(true)
     try {
-      if (activeNodeRecord?.provider) {
-        await healthcheckProxyProvider(activeNodeRecord.provider)
-      } else {
-        await delayManager.checkDelay(activeNodeName, primaryGroup.name, 10000)
-      }
+      await delayManager.checkDelay(activeNodeName, primaryGroup.name, latencyTimeout)
+      delayManager.queueGroupNotification(primaryGroup.name)
     } catch (err) {
       console.error(err)
     } finally {
