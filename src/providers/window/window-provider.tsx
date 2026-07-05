@@ -163,6 +163,12 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         resetIdleTimer()
         return
       }
+      // 当窗口处于隐藏装饰且已达到最小高度时，阻止进一步的拖拽移动
+      if (isDecorationsHiddenRef.current && typeof window !== 'undefined' && window.innerHeight <= MINIMAL_HEIGHT_THRESHOLD) {
+        // 只恢复 idle 定时器，不触发窗口拖动
+        resetIdleTimer()
+        return
+      }
       if (
         mouseDownPosRef.current &&
         !dragStartedRef.current &&
