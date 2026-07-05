@@ -21,7 +21,7 @@ const DEFAULT_HEIGHT: f64 = 680.0;
 const MAX_WIDTH: f64 = 640.0;
 const MAX_HEIGHT: f64 = 860.0;
 pub const MINIMAL_WIDTH: f64 = 270.0;
-pub const MINIMAL_HEIGHT: f64 = 129.0;
+pub const MINIMAL_HEIGHT: f64 = 135.0;
 const DEFAULT_DECORATIONS: bool = false;
 
 pub async fn build_new_window() -> Result<WebviewWindow, String> {
