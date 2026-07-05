@@ -44,8 +44,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
       : false,
   )
-  // 将 setter 暴露到全局，供 ResizeHandles 通知开始/结束缩放
-
   // ── Drag-vs-click detection (for stealth mode) ────────────────────────────
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null)
   const dragStartedRef = useRef(false)
