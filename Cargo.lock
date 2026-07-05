@@ -1122,6 +1122,7 @@ dependencies = [
  "serde_json",
  "serde_yaml_ng",
  "smartstring",
+ "socket2 0.6.3",
  "sysinfo",
  "sysproxy",
  "tauri",

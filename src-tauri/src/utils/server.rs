@@ -21,17 +21,36 @@ struct QueryParam {
 }
 
 // 关闭 embedded server 的信号发送端
+// 关闭 embedded server 的信号发送端
 static SHUTDOWN_SENDER: OnceCell<Mutex<Option<oneshot::Sender<()>>>> = OnceCell::new();
 
 // 暂存第一个实例初始 bind 成功的 TcpListener，防止 TOCTOU 时间差漏洞
 static SINGLETON_LISTENER: OnceCell<Mutex<Option<std::net::TcpListener>>> = OnceCell::new();
 
+// 创建一个启用了地址与端口重用属性（SO_REUSEADDR / SO_REUSEPORT）的 TCP 绑定
+fn bind_socket(port: u16) -> Result<std::net::TcpListener> {
+    use socket2::{Socket, Domain, Type, Protocol, SockAddr};
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+    socket.set_reuse_address(true)?;
+    
+    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
+    socket.set_reuse_port(true)?;
+    
+    let address = std::net::SocketAddr::new(
+        std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+        port,
+    );
+    socket.bind(&SockAddr::from(address))?;
+    socket.listen(128)?;
+    Ok(std::net::TcpListener::from(socket))
+}
+
 /// check whether there is already exists
 pub async fn check_singleton() -> Result<()> {
     let port = IVerge::get_singleton_port();
     
-    // 立即尝试绑定端口以占位，避免检查与占用之间的时间差
-    match std::net::TcpListener::bind(("127.0.0.1", port)) {
+    // 立即尝试绑定端口以占位，避免检查与占用之间的时间差，并设置 SO_REUSEADDR 解决 TIME_WAIT 冲突
+    match bind_socket(port) {
         Ok(listener) => {
             // 绑定成功，说明当前是第一个运行的实例，将其存入全局变量供后续 embed_server 使用
             let _ = SINGLETON_LISTENER.set(Mutex::new(Some(listener)));
