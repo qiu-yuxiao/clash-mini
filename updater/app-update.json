@@ -1,12 +1,12 @@
 {
   "version": "2.2.6",
   "notes": "Clash Mini v2.2.6",
-  "pub_date": "2026-07-05T10:23:00.000Z",
+  "pub_date": "2026-07-05T11:12:51.684Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU5vNU1xdC9ML3lKS0FUMis3akg2bnM0WGlJc0h1ZnRidHJ5Nys2OFl4dnRPZGd2NEV0enJsMXg3WXpsdHNxVEdDUE1wZzFqQ2M0Ym05WUc3QWUrd2dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzMjQ5NzQxCWZpbGU6Q2xhc2ggTWluaV8yLjIuNl94NjQtc2V0dXAuZXhlCmIwVVY1eXNNbHpQTzZjQmFCYllKdmdYTGpqbmJaNzhQSjdRQ2xrb0NITWZMcjZSM3VZdUV0aFF5cWFHSDN4UzJLZ2VUbmNTRjIzcTBPWEs3SkZ2YUFBPT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v2.2.6/Clash.Mini_2.2.6_x64-setup.exe",
-      "size": 0
+      "size": 42517490
     }
   }
 }
