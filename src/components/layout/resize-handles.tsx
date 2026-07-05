@@ -107,6 +107,7 @@ export const ResizeHandles: React.FC = () => {
       if (!currentWindow || e.button !== 0) return
       if (DelayManager.isBatchTesting) return
       e.preventDefault()
+      e.stopPropagation()
       currentWindow.startResizeDragging(direction as any).catch(() => {})
     },
     [currentWindow],
