@@ -6,6 +6,9 @@ use crate::utils::window_manager::{WindowManager, WindowOperationResult};
 use anyhow::Result;
 use std::sync::atomic::{AtomicU8, Ordering};
 
+// 引入全局异步互斥排队锁，彻底消除轻量模式极速开关时，销毁与创建窗口在异步层面的竞态冲突
+static LIGHTWEIGHT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LightweightState {
@@ -88,6 +91,7 @@ pub fn disable_auto_light_weight_mode() {
 }
 
 pub async fn entry_lightweight_mode() -> bool {
+    let _guard = LIGHTWEIGHT_LOCK.lock().await;
     let verge = Config::verge().await;
     if !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false) {
         let _ = WindowManager::hide_main_window();
@@ -184,6 +188,7 @@ pub async fn entry_lightweight_mode() -> bool {
 }
 
 pub async fn exit_lightweight_mode() -> bool {
+    let _guard = LIGHTWEIGHT_LOCK.lock().await;
     if !transition_and_log(LightweightState::In, LightweightState::Exiting) {
         logging!(
             debug,
