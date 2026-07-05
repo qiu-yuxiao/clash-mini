@@ -94,6 +94,23 @@ export const ResizeHandles: React.FC = () => {
   const { maximized, currentWindow } = useWindow()
   const [canResize, setCanResize] = useState(true)
 
+  // Notify WindowProvider when a resize starts/ends
+  const setResizeActive = useCallback((active: boolean) => {
+    if (typeof window !== 'undefined' && (window as any).__setResizeActive) {
+      ;(window as any).__setResizeActive(active)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+      setResizeActive(false)
+    }
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [setResizeActive])
+
   useEffect(() => {
     if (!currentWindow) return
     currentWindow
@@ -108,9 +125,10 @@ export const ResizeHandles: React.FC = () => {
       if (DelayManager.isBatchTesting) return
       e.preventDefault()
       e.stopPropagation()
+      setResizeActive(true)
       currentWindow.startResizeDragging(direction as any).catch(() => {})
     },
-    [currentWindow],
+    [currentWindow, setResizeActive],
   )
 
   if (maximized || !canResize) return null
