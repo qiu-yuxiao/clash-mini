@@ -127,7 +127,8 @@ export const ActiveNodeStatusCard = () => {
     if (!activeNodeName || !primaryGroup?.name) return
     setTesting(true)
     try {
-      await delayManager.checkDelay(activeNodeName, primaryGroup.name, singleTestTimeout)
+      const res = await delayManager.checkDelay(activeNodeName, primaryGroup.name, singleTestTimeout)
+      setDelay(res.delay)
       delayManager.queueGroupNotification(primaryGroup.name)
     } catch (err) {
       console.error(err)
