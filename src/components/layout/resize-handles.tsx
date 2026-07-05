@@ -126,13 +126,7 @@ export const ResizeHandles: React.FC = () => {
       e.preventDefault()
       e.stopPropagation()
       setResizeActive(true)
-      currentWindow
-        .startResizeDragging(direction as any)
-        .finally(() => {
-          // 缩放模态循环退出后，切换 resizable 状态切断 Windows 可能立即发起的原生 move 操作
-          currentWindow.setResizable(false).then(() => currentWindow.setResizable(true))
-        })
-        .catch(() => {})
+      currentWindow.startResizeDragging(direction as any).catch(() => {})
     },
     [currentWindow, setResizeActive],
   )

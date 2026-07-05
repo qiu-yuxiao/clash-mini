@@ -417,32 +417,10 @@ pub fn run() {
             }
         }
 
-        pub fn handle_window_resized(window: &tauri::WebviewWindow, new_size: tauri::PhysicalSize<u32>) {
-            use crate::utils::resolve::window::{MINIMAL_HEIGHT, MINIMAL_WIDTH};
-
-            if window.is_minimized().unwrap_or(false) || window.is_maximized().unwrap_or(false) {
-                return;
-            }
-
-            let scale_factor = window.scale_factor().unwrap_or(1.0);
-            let min_width_px = (MINIMAL_WIDTH * scale_factor).round() as u32;
-            let min_height_px = (MINIMAL_HEIGHT * scale_factor).round() as u32;
-
-            let mut need_fix = false;
-            let mut fixed_size = new_size;
-
-            if new_size.width < min_width_px {
-                fixed_size.width = min_width_px;
-                need_fix = true;
-            }
-            if new_size.height < min_height_px {
-                fixed_size.height = min_height_px;
-                need_fix = true;
-            }
-
-            if need_fix {
-                let _ = window.set_size(tauri::Size::Physical(fixed_size));
-            }
+        pub fn handle_window_resized(_window: &tauri::WebviewWindow, _new_size: tauri::PhysicalSize<u32>) {
+            // 窗口最小尺寸已在 build_new_window 中通过 min_inner_size 原生设置，
+            // Windows 原生处理会在 WM_SIZING 阶段自动约束，无需在此事后调用 set_size。
+            // 移除 set_size 调用避免与原生缩放模态循环产生竞争。
         }
 
         pub fn handle_window_focus(focused: bool) {
