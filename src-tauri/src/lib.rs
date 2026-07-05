@@ -371,12 +371,19 @@ pub fn run() {
         use tauri::Manager as _;
 
         pub fn handle_ready_resumed(_app_handle: &AppHandle) {
+            use tauri::Manager;
+
             if handle::Handle::global().is_exiting() {
                 logging!(debug, Type::System, "应用正在退出，跳过处理");
                 return;
             }
 
             logging!(info, Type::System, "应用就绪");
+
+            #[cfg(target_os = "windows")]
+            if let Some(window) = _app_handle.get_webview_window("main") {
+                setup_wm_sizing_hook(&window);
+            }
 
             #[cfg(target_os = "macos")]
             if let Some(window) = _app_handle.get_webview_window("main") {
@@ -418,9 +425,8 @@ pub fn run() {
         }
 
         pub fn handle_window_resized(_window: &tauri::WebviewWindow, _new_size: tauri::PhysicalSize<u32>) {
-            // 窗口最小尺寸已在 build_new_window 中通过 min_inner_size 原生设置，
-            // Windows 原生处理会在 WM_SIZING 阶段自动约束，无需在此事后调用 set_size。
-            // 移除 set_size 调用避免与原生缩放模态循环产生竞争。
+            // 窗口最小尺寸由 WM_SIZING 子类化处理器在 Rust 层面拦截并钳制位置和尺寸，
+            // 无需在此事后调用 set_size/set_position 与原生缩放循环竞争。
         }
 
         pub fn handle_window_focus(focused: bool) {
@@ -455,6 +461,96 @@ pub fn run() {
                     let _ = hotkey::Hotkey::global().reset();
                 }
             });
+        }
+
+        #[cfg(target_os = "windows")]
+        use std::sync::atomic::{AtomicPtr, Ordering};
+
+        #[cfg(target_os = "windows")]
+        static OLD_WNDPROC: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
+
+        /// 安装 WM_SIZING 消息处理器，防止上边缘缩放到最小高度后窗口 Y 坐标继续下移。
+        ///
+        /// 标准 WM_GETMINMAXINFO 只钳制尺寸不钳制位置，而上边缘缩放时 Windows 会持续增加 Y 坐标，
+        /// 导致窗口缩到最小时整体向下平移。WM_SIZING 在系统应用矩形之前给出提议矩形，在此处
+        /// 同时钳制尺寸和 Y 位置可根除该问题。
+        #[cfg(target_os = "windows")]
+        fn setup_wm_sizing_hook(window: &tauri::WebviewWindow) {
+            use raw_window_handle::HasWindowHandle as _;
+            use windows::Win32::UI::WindowsAndMessaging::{SetWindowLongPtrW, GWLP_WNDPROC};
+
+            let handle = match window.window_handle() {
+                Ok(h) => h,
+                Err(_) => return,
+            };
+
+            let hwnd = match handle.as_raw() {
+                raw_window_handle::RawWindowHandle::Win32(h) => {
+                    windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
+                }
+                _ => return,
+            };
+
+            unsafe {
+                let new_proc = Some(sizing_wndproc as unsafe extern "system" fn(_, _, _, _) -> _);
+                let old_proc_val = SetWindowLongPtrW(
+                    hwnd,
+                    GWLP_WNDPROC,
+                    std::mem::transmute::<_, isize>(new_proc),
+                );
+                if old_proc_val != 0 {
+                    OLD_WNDPROC.store(old_proc_val as *mut _, Ordering::Release);
+                }
+            }
+        }
+
+        /// WM_SIZING 子类化窗口过程。
+        /// 拦截上边缘缩放（WMSZ_TOP / WMSZ_TOPLEFT / WMSZ_TOPRIGHT），
+        /// 当提议高度小于最小尺寸时，修正 rect.top，使窗口位置和高度同时被钳制。
+        #[cfg(target_os = "windows")]
+        unsafe extern "system" fn sizing_wndproc(
+            hwnd: windows::Win32::Foundation::HWND,
+            msg: u32,
+            wparam: windows::Win32::Foundation::WPARAM,
+            lparam: windows::Win32::Foundation::LPARAM,
+        ) -> windows::Win32::Foundation::LRESULT {
+            use crate::utils::resolve::window::MINIMAL_HEIGHT;
+            use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+            use windows::Win32::UI::HiDpi::GetDpiForWindow;
+            use windows::Win32::UI::WindowsAndMessaging::{
+                CallWindowProcW, DefWindowProcW, WM_SIZING, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT,
+            };
+
+            if msg == WM_SIZING {
+                let side = wparam.0 as u32;
+                if side == WMSZ_TOP || side == WMSZ_TOPLEFT || side == WMSZ_TOPRIGHT {
+                    let rect = &mut *(lparam.0 as *mut windows::Win32::Foundation::RECT);
+                    let dpi = GetDpiForWindow(hwnd);
+                    let scale = (dpi as f64) / 96.0;
+                    let min_height_px = (MINIMAL_HEIGHT * scale).round() as i32;
+                    let height = rect.bottom - rect.top;
+                    if height < min_height_px {
+                        rect.top = rect.bottom - min_height_px;
+                        return windows::Win32::Foundation::LRESULT(1);
+                    }
+                }
+            }
+
+            let old_proc = OLD_WNDPROC.load(Ordering::Acquire);
+            if !old_proc.is_null() {
+                CallWindowProcW(
+                    Some(std::mem::transmute::<
+                        *mut std::ffi::c_void,
+                        unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> windows::Win32::Foundation::LRESULT,
+                    >(old_proc)),
+                    hwnd,
+                    msg,
+                    wparam,
+                    lparam,
+                )
+            } else {
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
         }
 
         #[cfg(target_os = "macos")]
