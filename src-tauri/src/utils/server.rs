@@ -1,6 +1,5 @@
 use super::resolve;
 use crate::{
-    cmd::is_port_in_use,
     config::{Config, DEFAULT_PAC, IVerge},
     module::lightweight,
     process::AsyncHandler,
@@ -24,36 +23,46 @@ struct QueryParam {
 // 关闭 embedded server 的信号发送端
 static SHUTDOWN_SENDER: OnceCell<Mutex<Option<oneshot::Sender<()>>>> = OnceCell::new();
 
+// 暂存第一个实例初始 bind 成功的 TcpListener，防止 TOCTOU 时间差漏洞
+static SINGLETON_LISTENER: OnceCell<Mutex<Option<std::net::TcpListener>>> = OnceCell::new();
+
 /// check whether there is already exists
 pub async fn check_singleton() -> Result<()> {
     let port = IVerge::get_singleton_port();
-    if is_port_in_use(port) {
-        let client = ClientBuilder::new().timeout(Duration::from_millis(500)).build()?;
-        // 需要确保 Send
-        #[allow(clippy::needless_collect)]
-        let argvs: Vec<std::string::String> = std::env::args().collect();
-        if argvs.len() > 1 {
-            #[cfg(not(target_os = "macos"))]
-            {
-                let param = argvs[1].as_str();
-                if param.starts_with("clash:") {
-                    client
-                        .get(format!("http://127.0.0.1:{port}/commands/scheme?param={param}"))
-                        .send()
-                        .await?;
-                }
-            }
-        } else {
-            client
-                .get(format!("http://127.0.0.1:{port}/commands/visible"))
-                .send()
-                .await?;
+    
+    // 立即尝试绑定端口以占位，避免检查与占用之间的时间差
+    match std::net::TcpListener::bind(("127.0.0.1", port)) {
+        Ok(listener) => {
+            // 绑定成功，说明当前是第一个运行的实例，将其存入全局变量供后续 embed_server 使用
+            let _ = SINGLETON_LISTENER.set(Mutex::new(Some(listener)));
+            Ok(())
         }
-        // IPC 通知已有实例成功（唤醒窗口 / 处理 deep-link scheme），静默退出不弹错误对话框
-        logging!(info, Type::Window, "已有实例已通知，当前进程静默退出");
-        std::process::exit(0);
+        Err(_) => {
+            // 绑定失败，说明端口已被第一个实例或者其他服务占用，执行唤醒逻辑
+            let client = ClientBuilder::new().timeout(Duration::from_millis(500)).build()?;
+            let argvs: Vec<std::string::String> = std::env::args().collect();
+            if argvs.len() > 1 {
+                #[cfg(not(target_os = "macos"))]
+                {
+                    let param = argvs[1].as_str();
+                    if param.starts_with("clash:") {
+                        client
+                            .get(format!("http://127.0.0.1:{port}/commands/scheme?param={param}"))
+                            .send()
+                            .await?;
+                    }
+                }
+            } else {
+                client
+                    .get(format!("http://127.0.0.1:{port}/commands/visible"))
+                    .send()
+                    .await?;
+            }
+            // 唤醒已有实例后，当前进程静默退出
+            logging!(info, Type::Window, "已有实例已通知，当前进程静默退出");
+            std::process::exit(0);
+        }
     }
-    Ok(())
 }
 
 /// The embed server only be used to implement singleton process
@@ -64,7 +73,6 @@ pub fn embed_server() {
     SHUTDOWN_SENDER
         .set(Mutex::new(Some(shutdown_tx)))
         .expect("failed to set shutdown signal for embedded server");
-    let port = IVerge::get_singleton_port();
 
     let visible = warp::path!("commands" / "visible").and_then(|| async {
         logging!(info, Type::Window, "检测到从单例模式恢复应用窗口");
@@ -119,10 +127,20 @@ pub fn embed_server() {
 
     let commands = visible.or(scheme).or(pac);
 
+    // 从全局缓存中取出第一个实例抢占的 std::net::TcpListener
+    let std_listener = {
+        let lock = SINGLETON_LISTENER.get().expect("SINGLETON_LISTENER not set");
+        let mut guard = lock.lock();
+        guard.take().expect("TcpListener already taken")
+    };
+    
+    // 设置非阻塞并转换为 tokio 的 TcpListener
+    std_listener.set_nonblocking(true).expect("failed to set nonblocking");
+    let tokio_listener = tokio::net::TcpListener::from_std(std_listener).expect("failed to convert TcpListener");
+
     AsyncHandler::spawn(move || async move {
         warp::serve(commands)
-            .bind(([127, 0, 0, 1], port))
-            .await
+            .incoming(tokio_listener)
             .graceful(async {
                 shutdown_rx.await.ok();
             })
