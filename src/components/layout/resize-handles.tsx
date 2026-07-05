@@ -101,15 +101,28 @@ export const ResizeHandles: React.FC = () => {
     }
   }, [])
 
+  const disableDragRegions = useCallback(() => {
+    document
+      .querySelectorAll('[data-tauri-drag-region="true"]')
+      .forEach((el) => el.setAttribute('data-tauri-drag-region', 'false'))
+  }, [])
+
+  const restoreDragRegions = useCallback(() => {
+    document
+      .querySelectorAll('[data-tauri-drag-region="false"]')
+      .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
+  }, [])
+
   useEffect(() => {
     const handleMouseUp = () => {
       setResizeActive(false)
+      restoreDragRegions()
     }
     document.addEventListener('mouseup', handleMouseUp)
     return () => {
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [setResizeActive])
+  }, [setResizeActive, restoreDragRegions])
 
   useEffect(() => {
     if (!currentWindow) return
@@ -125,10 +138,11 @@ export const ResizeHandles: React.FC = () => {
       if (DelayManager.isBatchTesting) return
       e.preventDefault()
       e.stopPropagation()
+      disableDragRegions()
       setResizeActive(true)
       currentWindow.startResizeDragging(direction as any).catch(() => {})
     },
-    [currentWindow, setResizeActive],
+    [currentWindow, setResizeActive, disableDragRegions],
   )
 
   if (maximized || !canResize) return null
