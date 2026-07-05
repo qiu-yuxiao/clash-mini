@@ -44,14 +44,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
       : false,
   )
-  // 新增：在尺寸缩放期间阻止窗口拖动
-  const isResizingRef = useRef(false)
   // 将 setter 暴露到全局，供 ResizeHandles 通知开始/结束缩放
-  useEffect(() => {
-    (window as any).__setResizeActive = (active: boolean) => {
-      isResizingRef.current = active
-    }
-  }, [])
 
   // ── Drag-vs-click detection (for stealth mode) ────────────────────────────
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null)
@@ -167,18 +160,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     const handleMouseMove = (e: MouseEvent) => {
-      // 统一拦截：若正在进行尺寸缩放或已达到最小高度，则不触发窗口拖动
-      if (isResizingRef.current) {
-        resetIdleTimer()
-        return
-      }
       if (!isDecorationsHiddenRef.current) {
-        resetIdleTimer()
-        return
-      }
-      // 当窗口处于隐藏装饰且已达到最小高度时，阻止进一步的拖拽移动
-      if (isDecorationsHiddenRef.current && typeof window !== 'undefined' && window.innerHeight <= MINIMAL_HEIGHT_THRESHOLD) {
-        // 只恢复 idle 定时器，不触发窗口拖动
         resetIdleTimer()
         return
       }
