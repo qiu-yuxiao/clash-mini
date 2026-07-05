@@ -319,14 +319,14 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
           * `Monochrome` 对应：英文 `Georgia` / 中文 `KaiTi`（楷体）。
 
       * **特殊保留限制**：
-        * 换肤修改范围严格局限于主题皮肤切换。中缝分割双线 `5px double`、设置页 `4px double` 双线边框及表格 `2px` 网格线无论在何种皮肤下均保持现状，不准改动；无边框隐身状态下最外圈的 GlowBorder 采用静态设计（降低 CPU/GPU 渲染负载至 0%），且样式随着选定的皮肤风格进行自适应切换（如 retro-3d 使用金色渐变双线、cyberpunk 使用荧光渐变等，具体以 `glow-border.tsx` 实现为准）。
+        * 换肤修改范围严格局限于主题皮肤切换。中缝分割双线 `5px double`、设置页 `4px double` 双线边框及表格 `2px` 网格线无论在何种皮肤下均保持现状，不准改动；无边框隐身状态下最外圈的 GlowBorder 采用静态设计（降低 CPU/GPU 渲染负载至 0%），且样式随着选定的皮肤风格进行自适应切换（如 retro-3d 使用金色渐变双线、cyberpunk 使用荧光渐变等）。
         * 按钮上的文字采用平滑的 `0.15s` 过渡动画；而大型卡片、背景和左右分栏面板的皮肤样式在切换时使用直接瞬间切换，无过渡动画。
 
-   * **窗口始终置顶 (FEAT-001)**：仅在顶部栏右上角设置齿轮的左侧（以及无边框窗口右侧），新增一个不透明的“置顶图钉 (Pin)”快捷按钮，其常态为灰色，启用时呈鲜红色并伴有高光反光，且图钉倾斜 45 度。当设置页面打开时，隐藏该图钉快捷按钮与当前活跃出口节点状态卡片。后端读取配置并在新窗口创建和 `patch_config` 时动态调用 Tauri 的窗口置顶方法。
+   * **窗口始终置顶 (FEAT-001)**：仅在顶部栏右上角设置齿轮的左侧（以及无边框窗口右侧），新增一个不透明的"置顶图钉 (Pin)"快捷按钮，其常态为灰色，启用时呈鲜红色并伴有高光反光，且图钉倾斜 45 度。当设置页面打开时，隐藏该图钉快捷按钮与当前活跃出口节点状态卡片。
 
    * 订阅列表卡片造型：采用原版精细卡片设计，背景色亮色固定为 `#ffffff`，暗色固定为 `#282A36`。激活项与“本地导入节点”卡片左侧均包含 3px 宽的 `primary.main` 左侧主色边条，文字高亮为 `primary.main`（未激活的普通卡片左侧透明）。由于“本地导入节点”始终并联编译生效，该卡片在 UI 上始终处于高亮激活状态。保留已用/总流量数据、过期时间以及底部高 2px 的主色进度条（若 `total > 0`），字号微调为 11px（名称）和 9px（数据）以防折行。
 
-   * 设置与关闭按钮冲突解决：删除设置页面内部自带的独立 Close 关闭按钮，改在右上角设置齿轮按钮通过 `drawerOpen` 状态二合一动态切换图标（打开时显示 CloseRounded 叉号，关闭时显示 SettingsRoundedIcon 齿轮），激活时背景色与边框均改用 `theme.palette.primary.main` 配色系统。
+   * 设置与关闭按钮冲突解决：删除设置页面内部自带的独立 Close 关闭按钮，改在右上角设置齿轮按钮通过设置面板打开状态二合一动态切换图标（打开时显示叉号，关闭时显示齿轮），激活时背景色与边框均使用主色配色。
 
 9. **主页专属表格：主界面节点列表（三列表格）网格设计**：
 
@@ -350,21 +350,21 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
       * 批量全节点测速的唯一入口为表头左侧的闪电图标按钮。
       * （单点测速功能仅在「当前活跃出口节点」卡片中提供：点击该卡片的延迟数值区域触发单个节点测速，点击节点名称区域在过滤子集中轮换下一个节点。）
 
-    * **表头固定行显示规范 (ProxyHead)**：
-      * 顶部的固定操作行（即 `ProxyHead`）在「规则模式」、「全局代理」和「全局直连」模式下均必须保持显示，绝对禁止在非规则模式下隐藏。
-      * **过滤框常驻显示**：节点过滤搜索输入框（`BaseSearchBox`）**始终可见**，无需点击任何图标按钮切换显隐。原用于切换过滤框的漏斗图标按钮已移除。
-      * **统一表头精简设计 (不限窗口宽度)**：不论宽窄窗口，表头固定操作行（`ProxyHead`）统一进行布局精简，仅保留**闪电测速、排序**两个图标按钮以及常驻显示的过滤搜索输入框。定位、测速URL、显示模式切换等高级/冗余图标按钮已全部移除，以确保在任何视口宽度下界面的极致简洁与功能聚焦。
+    * **表头固定行显示规范**：
+      * 顶部的固定操作行在「规则模式」、「全局代理」和「全局直连」模式下均必须保持显示，绝对禁止在非规则模式下隐藏。
+      * **过滤框常驻显示**：节点过滤搜索输入框**始终可见**，无需点击任何图标按钮切换显隐。原用于切换过滤框的漏斗图标按钮已移除。
+      * **统一表头精简设计（不限窗口宽度）**：不论宽窄窗口，表头固定操作行统一进行布局精简，仅保留**闪电测速、排序**两个图标按钮以及常驻显示的过滤搜索输入框。定位、测速URL、显示模式切换等高级/冗余图标按钮已全部移除，以确保在任何视口宽度下界面的极致简洁与功能聚焦。
 
      * **最窄窗口自适应（极窄模式，宽度 $\le 285px$）**：主界面节点列表由原本的三列排版自适应退化为单列排版（每行 1 个节点）。在单列模式下，每个节点横向展示 3 项要素，其从左至右排版布局为：最左侧为"协议/类型"列（固定宽度 `55px`，右对齐并留微小右边距），正中间为"节点名称"列（flex: 1 左对齐），最右侧为"延迟数值"列（固定宽度 `65px`，居中对齐），以此实现最具标识性的节点名称在视觉物理中轴线上的居中高亮展示，并复用既有的列中缝分隔线与表格分割线。同时，表头固定操作行（`ProxyHead`）已统一进行布局精简，在极窄模式下过滤搜索输入框无高度裁剪，确保三个搜索选项图标完整可见。
 
-     * **数据装载源绑定（BUG-057 v4.1.0）**：v4.1.0 对 BUG-057 进行了根因级修复，涉及三个层面：
-       (1) `_layout.tsx`：`handleImportProfile` 的 try/catch 分支在 `mutateProfiles()` 后立即设置 `lastEnhancedProfileRef.current = targetUid`，防止 useEffect 再次调用 `enhanceProfiles()` 导致双重重载；同时在 `enhanceProfiles()` 后增加 `patchClashMode('rule')` 确保导入后切换到 rule 模式。
-       (2) `use-render-list.ts`：系统托盘图标使用指定的布偶猫咪头像图片，并直接从后端打包嵌入 PNG 字节流，以确保和原版彻底隔离：
+     * **数据装载源绑定（BUG-057 v4.1.0）**：v4.1.0 对 BUG-057 进行了根因级修复，涉及三个层面的改动：
+       (1) 导入配置文件后立即标记已处理，防止重复触发配置增强导致双重重载；配置增强后确保切换到 rule 模式。
+       (2) 系统托盘图标使用指定的布偶猫咪头像图片，并直接从后端打包嵌入 PNG 字节流，以确保和原版彻底隔离：
 
 1. **常驻静态图标**：
    * 采用金属质感灰色猫咪头像：`clash_mini_ragdoll_metal`（`tray-icon.png`）。
-   * 在极简托盘设计下，为确保稳定并避开系统 API 冲突，托盘取消动态图标切换功能，不再随 TUN 或系统代理模式动态变更图片。间隔轮询 `refreshProxy()`，直到节点数据到来后自动停止。
-       (3) `cmds.ts`：`calcuProxies()` 加入空值防御（`proxyResponse?.proxies || {}`、`providerResponse || {}`、`item?.proxies` 安全检查），`generateItem` 对无名称节点返回安全的 unknown 对象。
+   * 在极简托盘设计下，为确保稳定并避开系统 API 冲突，托盘取消动态图标切换功能，不再随 TUN 或系统代理模式动态变更图片。
+       (3) 节点数据计算函数加入空值防御，对无名称节点返回安全默认值。
 
 10. **全局窄滚动条与局部隐藏策略 (BUG-033)**：
 
@@ -410,7 +410,7 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 
     * **Original 皮肤下的底部流量卡片联动 (BUG-062)**：在 Original 皮肤下，最下方的这 4 个流量小卡片应动态跟随双滑动条的调节。其中，滑块一 (Radius) 联动调节卡片的圆角大小（通过 `--border-radius` 变量）；滑块二 (Accent) 联动调节卡片的背景、图标、标签文字与单位文本的色相/色彩（通过 `--download-bg`, `--download-text`, `--upload-bg`, `--upload-text` 等 HSL 动态计算变量），确保在 Original 风格下，底部流量小卡片的颜色不再是死板不动的静态颜色，而是与 Accent 滑块动态同步变动，非 Original 皮肤完全不受此联动影响。
 
-    * **全场景 3D 控件彩色与霓虹与卡片大一统**：主场景中所有的 3D 拟物控件均不能是死板的灰白色，必须具备彩色的主题色元素（Primary Main）。主按钮（由 `get3DButtonStyle` 共享管理）全面重构为放置于桌面的独立 3D 实体按键外观，圆角为 6px，采用辉煌同心圆径向渐变色系（Primary黄金属、Error红宝石、Default钛钢银），拥有 4px 高清实体边框（`calc(3px * var(--depth-factor))`）及 active 下压位移 2px。新增 `get3DCardStyle` 管理主页展示型卡片（主页首行当前出口节点卡片使用钛银默认色，底行 4 个流量指标卡片保持相对独立的金、蓝色系配色）。且所有的 3D 控件（包括 6 个业务按钮、3 组三选一选择器、3 个拨动开关、2 个滑动条及 4 个输入框）必须深度联动色彩霓虹（Vibrancy）因子的调节：
+    * **全场景 3D 控件彩色与霓虹与卡片大一统**：主场景中所有的 3D 拟物控件均不能是死板的灰白色，必须具备彩色的主题色元素（Primary Main）。主按钮全面重构为放置于桌面的独立 3D 实体按键外观，圆角为 6px，采用辉煌同心圆径向渐变色系（Primary黄金属、Error红宝石、Default钛钢银），拥有 4px 高清实体边框及 active 下压位移 2px。卡片管理主页展示型卡片（主页首行当前出口节点卡片使用钛银默认色，底行 4 个流量指标卡片保持相对独立的金、蓝色系配色）。且所有的 3D 控件（包括 6 个业务按钮、3 组三选一选择器、3 个拨动开关、2 个滑动条及 4 个输入框）必须深度联动色彩霓虹（Vibrancy）因子的调节：
 
         - **业务按钮**：随 Vibrancy 的增大，边缘及投影散发出对应主题色的霓虹外发光（Neon Glow）与色彩折射。
 
@@ -452,35 +452,35 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
 
       | :--- | :---: | :--- | :--- |
 
-      | **3D 实体主按钮** | **6 个** | 1. 订阅导入区：“导入订阅链接”按钮<br>2. 基础设置区：“系统调试运行日志”按钮<br>3. 路径控制区：“断开全部”按钮<br>4. 路径控制区：“清空历史”按钮<br>5. 系统运行日志窗口：“清空日志”按钮<br>6. 链接详情中心：“断开连接”/“Block”按钮 | 已通过 `get3DButtonStyle` 集中管理。已应用 6px 圆角、径向渐变、4px 高清边框以及 active 2px 位移。在 `Trump-3D` 皮肤下，boxShadow 采用**3 层无模糊 bevelShadowDark 固态挤压像素层叠（blur-radius: 0）+ 单层接触投影 + 单层顶高光 + 可选霓虹外发光**结构。切忌降级为纯模糊阴影替代方案（如 BUG-115 之前错误简化的单层模糊内阴影），否则将失去物理 3D 侧壁质感（BUG-117）。其他皮肤：在 `Original` 皮肤下，`primary`/`error` 按钮使用单层 elevation 投影 `0 1px 3px rgba(0,0,0,.15)`（hover 增强至 `0 2px 6px`），`default` 按钮保持无影，还原 MUI 默认按钮行为；`Modern` / `Frosted` / `Cyberpunk` / `Monochrome` 各皮肤按钮 boxShadow 为单层或无，保持各自原状不变。 |
+      | **3D 实体主按钮** | **6 个** | 1. 订阅导入区："导入订阅链接"按钮<br>2. 基础设置区："系统调试运行日志"按钮<br>3. 路径控制区："断开全部"按钮<br>4. 路径控制区："清空历史"按钮<br>5. 系统运行日志窗口："清空日志"按钮<br>6. 链接详情中心："断开连接"/"Block"按钮 | 已集中管理。已应用 6px 圆角、径向渐变、4px 高清边框以及 active 2px 位移。在 `Trump-3D` 皮肤下，boxShadow 采用**3 层无模糊固态挤压像素层叠 + 单层接触投影 + 单层顶高光 + 可选霓虹外发光**结构。切忌降级为纯模糊阴影方案。其他皮肤保持各自原状不变。 |
 
       | **3选1滑动选择器** | **3 个** | 1. 流量接管模式 (手动/系统代理/TUN)<br>2. 代理分流策略倾向 (直连兜底/规则可调/代理兜底)<br>3. 主题模式切换 (系统/浅色/深色) | 采用 3D 滑道槽（Groove）配立体浮雕选中滑块，静态霓虹。 |
 
       | **2选1滑动选择器** | **1 个** | 1. 路径控制中心 (活跃连接/历史连接) | 与 3选1 选择器使用相同 3D 滑槽与浮雕滑块的材质设计。 |
 
-      | **3D 物理凹陷输入框** | **4 个** | 1. 订阅链接输入框<br>2. 基础设置 Mixed Port 端口框<br>3. 链接路径搜索过滤框<br>4. 主页代理节点过滤搜索框 | 已通过 `get3DInputStyle` 集中管理。已施加深层物理刻槽与 focus 霓虹发光。 |
+      | **3D 物理凹陷输入框** | **4 个** | 1. 订阅链接输入框<br>2. 基础设置 Mixed Port 端口框<br>3. 链接路径搜索过滤框<br>4. 主页代理节点过滤搜索框 | 已施加深层物理刻槽与聚焦霓虹发光。 |
 
-      | **3D 拨动开关 (Switch)** | **3 个** | 1. 设置：“开机自动启动”<br>2. 设置：“启动时最小化”<br>3. 设置：“Allow LAN” | 重构为小巧的 3D 拨动物理开关，中性灰底槽配主色渐变滑球。 |
+      | **3D 拨动开关 (Switch)** | **3 个** | ... | 重构为小巧的 3D 拨动物理开关，中性灰底槽配主色渐变滑球。 |
 
-      | **3D 参数调节滑轨** | **2 个** | 1. 界面设置：“立体磨砂 (Depth)”滑轨<br>2. 界面设置：“色彩霓虹 (Vibrancy)”滑轨 | 已采用 `get3DSliderStyle` 管理，主色渐变 3D 滑珠配合中性灰滑道槽。 |
+      | **3D 参数调节滑轨** | **2 个** | ... | 主色渐变 3D 滑珠配合中性灰滑道槽。 |
 
-      | **3D 浮雕展示卡片** | **5 个** | 1. 主页第一行：“当前活跃出口节点”状态卡片<br>2. 主页最底行：4 个流量监控指标数据卡片<br>3. 设置左侧分栏 5 个模块卡片（订阅与机场配置、流量接管模式、分流策略倾向、基础设置、主题设置） | 抽象并应用 `get3DCardStyle` 统一管理，支持同心圆径向渐变。在 `Trump-3D` 皮肤下，boxShadow 必须与按钮保持一致：**3 层无模糊 bevelShadowDark 固态挤压像素层叠 + 单层接触投影 + 单层顶高光 + 可选霓虹外发光**。切忌降级为纯模糊阴影方案（BUG-117）。在 `Original` 皮肤下，卡片使用无边框 + elevation 阴影 `0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06)`，还原 MUI Paper 风格。 |
+      | **3D 浮雕展示卡片** | **5 个** | ... | 在 `Trump-3D` 皮肤下，boxShadow 必须与按钮保持一致：**3 层无模糊固态挤压像素层叠 + 单层接触投影 + 单层顶高光 + 可选霓虹外发光**。切忌降级为纯模糊阴影方案。其他皮肤保持各自原状不变。 |
 
 16. **v3.0.5 系统资源占用优化**：
 
-    * **托盘代理数据 2 秒本地缓存（tray/mod.rs）**：新增 `get_cached_proxies()` 异步函数，内部持有 `OnceLock<TokioRwLock<ProxyCache>>` 静态缓存。每次 `create_tray_menu` 触发时优先检查缓存时效（TTL=2s），命中则通过 `Arc::clone` 返回，零 HTTP 请求、零数据拷贝；未命中则向 mihomo 核心发 1000ms 限时请求并刷新缓存。因 `Proxies` 未实现 `Clone`，缓存存储类型为 `Arc<Proxies>`，`create_proxy_submenu_items` 函数签名同步更新为 `Option<Arc<Proxies>>`。同时修复原函数名拼写错误 `create_subcreate_proxy_menu_item`。
+    * **托盘代理数据本地缓存**：托盘代理数据设置短时缓存避免重复请求，命中则直接返回缓存数据；未命中则向内核发限时请求并刷新缓存。
 
-    * **IPC 连接池参数收缩（lib.rs）**：`max_connections` 从 32 降至 16，`idle_timeout` 从 60s 降至 30s。16 个连接覆盖所有正常并发场景（3 个 WebSocket 持久连接 + REST 并发峰值），30s 空闲超时加快无效连接回收，减少内存驻留。
+    * **IPC 连接池参数收缩**：连接池最大连接数减少，空闲超时缩短，加快无效连接回收，减少内存驻留。
 
-    * **延迟检测递归改迭代（delay.ts）**：`checkListDelay` 内部并发 worker 由尾递归 `help()` 重构为 `while` 循环 `worker()`，消除大节点列表下调用栈累积溢出风险。调用栈深度由 O(N/concurrency) 降为恒定 O(1)，行为与原版完全等价。
+    * **延迟检测递归改迭代**：批量延迟测试内部并发 worker 由递归重构为循环，消除大节点列表下调用栈累积溢出风险。
 
 17. **帮助按钮 (Help Button) 规范 (FEAT-005)**：
-    * **按钮图标**：使用带圈的问号小图标（MUI 库中的 `HelpOutlineRounded`），尺寸为 `16px`。
+    * **按钮图标**：使用带圈的问号小图标，尺寸为 `16px`。
     * **布局定位**：采用绝对定位 `position: absolute` 固定在 Upper Pane（上半层区域）底边，高度为 `24px`，宽度为 `24px`，左边距 `left: 12px`，底边距 `bottom: 0`，`zIndex: 200`。
     * **留空保留区**：帮助按钮右边缘（`36px`）至换肤选择器起始位置（`177.5px`）之间的区域必须完全留空，不得放置任何其他界面元素，留给用户后续设计使用。
-    * **动态换肤支持**：按钮的视觉样式必须 100% 随着六种皮肤风格的选择而动态切换，与系统中的其他按钮一致。直接应用 `get3DButtonStyle(theme, 'contained', 'default')` 样式辅助函数，使其在 Trump-3D 下呈现黄金 Bevel 键帽，在 Original 下呈现灰黑/白纯色扁平按钮，在 Frosted Glass 下呈现磨砂透光材质，在 Cyberpunk 下呈现荧光绿 neon 描边外发光等。
+    * **动态换肤支持**：按钮的视觉样式必须 100% 随着六种皮肤风格的选择而动态切换，与系统中的其他按钮一致。
     * **响应式隐藏**：与换肤选择器保持一致的响应式高度裁剪规则，当窗口高度较小时（由媒体查询 `@media (max-height: 830px)` 触发）自动隐藏，防止纵向空间狭窄时产生重叠。
-    * **外部链接跳转**：点击时通过 `@tauri-apps/plugin-shell` 提供的 `open` 异步函数在用户系统的默认浏览器中安全打开 GitHub 项目开始页：`https://github.com/qiu-yuxiao/clash-mini`。
+    * **外部链接跳转**：点击后在用户系统的默认浏览器中安全打开 GitHub 项目开始页：`https://github.com/qiu-yuxiao/clash-mini`。
 
 18. **Windows 系统托盘极简交互与静态化设计规范 (BUG-073)**：
     为了避开 Windows 平台高权限运行下底层托盘 API 频繁更新导致的 `os error -2147467259` (E_FAIL) 错误，系统托盘强制实施极简静态化设计：
@@ -488,20 +488,20 @@ v1.9.4 起壳进程（Clash Mini 主程序）的物理内存占用由原来的 7
       1. 左键点击托盘图标：直接恢复并显示主窗口原状。
       2. 右键点击托盘图标：仅弹出一个包含“退出 (Exit)”选项的静态菜单，点击退出后关闭程序。
     * **静态化与禁止动态更新**：托盘的图标常驻使用默认的金属质感灰色猫咪头像（`tray-icon.png`），提示语固定为 "Clash Mini"。在托盘启动初始化成功后，**禁止在运行期间调用任何 `set_icon`、`set_tooltip` 或动态重绘 `set_menu` 的 API**，从根本上杜绝修改 API 产生的 `E_FAIL` 报错。
-    * **生命周期与托管**：创建成功的 `TrayIcon` 必须托管在 `TrayIconState` 中并注册到 `AppHandle` 的状态管理器中，以确保其生命周期与整个应用程序完全对齐。
+    * **生命周期与托管**：托盘图标创建后必须托管在应用状态管理器中，以确保其生命周期与整个应用程序完全对齐。
 
 #### Windows 原生标题栏文本规范
 
-Windows 原生标题栏必须显示程序名及版本号，格式为 `Clash Mini Ver.x.y.z`。版本号由编译时 `env!("CARGO_PKG_VERSION")` 自动提取，确保每次发版后标题栏自动同步最新版本号。实现位于 `src-tauri/src/utils/resolve/window.rs` 的 `get_bold_window_title()`。
+Windows 原生标题栏必须显示程序名及版本号，格式为 `Clash Mini Ver.x.y.z`。版本号由编译时自动提取，确保每次发版后标题栏自动同步最新版本号。
 
 #### 窗口操作线程安全规范 (BUG-259)
 
-所有窗口操作（`destroy`、`hide`、`show`、`unminimize`、`set_focus`、`set_title`、`set_always_on_top`、`close` 等）**必须在 UI 主线程执行**，禁止在异步线程（tokio 工作线程、监测线程、自定义 spawn 线程等）中直接调用。
+所有窗口操作（隐藏、显示、最小化、聚焦、置顶、关闭等）**必须在 UI 主线程执行**，禁止在异步线程中直接调用。
 
-- **根本原因**：Tauri/WebView2 的窗口操作与 UI 事件循环共享状态，异步线程直接调用会产生竞态条件，触发 `cannot move state from Destroyed` 等 panic 导致程序崩溃。
-- **解决方案**：统一使用 `app_handle.run_on_main_thread()` 将窗口操作调度到主线程执行。
-- **集中管理**：窗口操作统一通过 `WindowManager` 工具类封装（`destroy_main_window`、`hide_main_window`、`show_main_window`、`activate_window` 等），外部代码禁止直接对 `WebviewWindow` 调用变更类操作。
-- **例外**：状态读取类操作（`is_visible`、`is_minimized`、`is_focused`、`label` 等只读查询）可在任意线程执行。
+- **根本原因**：窗口操作与 UI 事件循环共享状态，异步线程直接调用会产生竞态条件，导致程序崩溃。
+- **解决方案**：统一将窗口操作调度到主线程执行。
+- **集中管理**：窗口操作通过窗口管理器统一封装，外部代码禁止直接对窗口对象调用变更类操作。
+- **例外**：状态读取类操作（可见、最小化、聚焦等只读查询）可在任意线程执行。
 
 ---
 
@@ -825,50 +825,25 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 #### 协议内容
 
-#### 1. 启动/停止/重启必须持有 `lifecycle_lock`
-- **锁类型**：`tokio::sync::Mutex<()>`
-- **持锁操作**：`start_core()`、`stop_core()`、`restart_core()`
-- **目的**：防止竞态条件，确保内核状态一致性
+1. **启动/停止/重启必须互斥**：启动、停止、重启操作之间必须互斥执行，防止竞态条件，确保内核状态一致性。
 
-#### 2. 幂等性检查
-- `start_core_inner()` 必须检查当前运行模式
-- 如果内核已运行（`RunningMode::Service` 或 `RunningMode::Sidecar`），直接返回 `Ok(())`，视为 no-op
-- 重启必须走 `restart_core()`，禁止在已运行时调用 `start_core()`
+2. **幂等性检查**：启动内核时必须检查当前运行模式。如果内核已在运行，直接返回成功，视为空操作。重启必须走重启流程，禁止在已运行时再次调用启动。
 
-#### 3. 退出保护
-- `start_core_inner()` 开始时检查 `Handle::global().is_exiting()`
-- 如果程序正在退出，不再启动新内核，直接返回 `Ok(())`
+3. **退出保护**：启动内核时必须检查程序是否正在退出。如果程序正在退出，不再启动新内核，直接返回。
 
-#### 4. 失败回滚
-- 启动失败时，必须将 `running_mode` 回滚为 `RunningMode::NotRunning`
-- 允许后续重试，避免状态卡死
+4. **失败回滚**：启动失败时，必须将运行模式回滚为未运行状态，允许后续重试，避免状态卡死。
 
-#### 5. Windows Service Handoff 机制
-- 在 Windows + TUN 模式下，如果服务未就绪，后台等待服务启动后再从 sidecar 交接至 service
-- 使用 `handoff_watcher_running` 原子标志确保单实例
-- 使用 `try_start_config_update()` / `finish_config_update()` 防止与配置更新交叉
+5. **Windows 服务交接机制**：在 Windows + TUN 模式下，如果服务未就绪，后台等待服务启动后再从旁路模式交接至服务模式。使用原子标志确保交接单实例运行，使用配置更新锁防止与配置更新交叉。
 
-#### 6. 配置更新锁序
-- **锁序固定**：`config_update_in_progress` → `lifecycle_lock`
-- 先获取配置锁，再获取生命周期锁
-- 防止死锁
+6. **配置更新锁序固定**：先获取配置更新锁，再获取生命周期锁，防止死锁。
 
-#### 7. 参考实现
-- 本协议完全对齐 **Clash Verge Rev v1.7.6** 的实现
-- 源文件：`src-tauri/src/core/manager/mod.rs` 和 `lifecycle.rs`
-- 禁止擅自修改锁逻辑，如需修改必须先在协议中记录设计理由
+7. **参考实现**：本协议完全对齐 Clash Verge Rev v1.7.6 的实现。禁止擅自修改锁逻辑，如需修改必须先在协议中记录设计理由。
 
 ---
 
 ### 3.2 运行模式判定
 
-启动时根据 `enable_tun_mode` 配置决定使用 Service 模式还是 Sidecar 模式。TUN 未启用时直接使用 Sidecar 模式，不检查 Service 状态。Windows 平台下需等待 Service IPC 就绪。
-
-**Service IPC 路径检查**：`is_service_available()` 和 `is_service_ipc_path_exists()` 在所有平台上统一检查 IPC 路径，不再按 `#[cfg(unix)]` 区分。
-
-**ServiceManager 状态读取**：`current()` 方法使用 `Notify` + `AtomicBool` 双检查模式替代传统 `Mutex::lock().await`。先注册 `notified()` 再检查 `operation_running` 防止错过通知，拿到 status 锁后二次检查防止 TOCTOU 竞态。
-
-**错误信息格式化**：`ServiceManager.init()` 中连接失败的错误信息须使用 `format!()` 宏，禁止使用普通字符串字面量拼接。
+启动时根据 `enable_tun_mode` 配置决定使用服务模式还是旁路模式。TUN 未启用时直接使用旁路模式，不检查服务状态。Windows 平台下需等待服务 IPC 就绪。
 
 ### 3.3 内核更新
 
@@ -884,26 +859,26 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 弹出菜单的 Paper 容器必须归属 `className="theme-panel"`，确保其背景、磨砂玻璃度 (`backdrop-filter`)、投影高度、实体 3D 边框深浅 (如 `Retro-3D`)、霓虹辉光 (如 `Cyberpunk` 的 neon border) 完全跟随系统当前所选皮肤和滑块设定。
   - 菜单内的操作选项在鼠标 Hover 及点击时，高亮反馈须使用对应皮肤的主调强调色（如 `Retro-3D` 的同心圆黄金色、`Cyberpunk` 的荧光绿等）。
 - **客户端更新静默后台链启动**：
-  - 在 `tauri.conf.json` 中，更新公钥 (`pubkey`) 及服务端点 (`endpoints`) 指向改为 **Clash Mini 分支自身的配置与 GitHub Release 下载路径**（`qiu-yuxiao/clash-mini`），杜绝向原版 Clash Verge 检查而导致覆盖损坏。
-  - 在 `src-tauri/src/lib.rs` 的 app 启动生命周期中，挂载并启动后台更新：启动时调用 `SilentUpdater::global().try_install_on_startup()` 检查本地缓存就绪，运行中通过后台线程循环调用 `SilentUpdater::global().start_background_check()` 实现静默检测与缓存下载。
+  - 更新公钥及服务端点指向改为 **Clash Mini 分支自身的配置与 GitHub Release 下载路径**（`qiu-yuxiao/clash-mini`），杜绝向原版 Clash Verge 检查而导致覆盖损坏。
+  - 在 app 启动生命周期中，挂载并启动后台更新：启动时检查本地缓存就绪，运行中通过后台线程实现静默检测与缓存下载。
 - **Mihomo 内核动态路径与平滑更新**：
-  - **动态路径探测**：修改内核启动逻辑，启动时优先检索用户可写目录（如 `app_home_dir/cores/mini-mihomo.exe`），若存在自定义下载的内核则使用 `Command::new(custom_path)` 运行该内核；否则退回包内嵌入的 `sidecar` 作为兜底。
+  - **动态路径探测**：启动时优先检索用户可写目录下的自定义内核，若存在则直接运行；否则退回包内嵌入的内核作为兜底。
   - **热更文件替换**：通过 GitHub API 获取 MetaCubeX 官方的最新 `mihomo` 版本及架构包链接。下载并解压后，替换可写目录下的内核二进制。如果当前开启了系统服务模式，应先卸载/停用旧服务，替换文件后再重装启动，防止文件写入锁死。
 
 为了解决在无法直接访问 GitHub 服务的网络环境下“检查内核更新”链接点击超时报错，以及内核版本信息展示格式不统一、存在冗余文字的故障，制定以下规范：
 - **后端自动代理多重降级机制 (NetworkManager Fallback)**：
-  - 在 `core_updater.rs` 及一切访问 GitHub API/下载内核资源的后端逻辑中，严禁直接使用不带代理配置的原生 `reqwest::Client` 进行 HTTP 请求。
+  - 在一切访问 GitHub API/下载内核资源的后端逻辑中，严禁直接使用不带代理配置的原生 HTTP 客户端进行请求。
   - 必须使用内置的 `NetworkManager` 对网络请求进行托管：
     1. **第一层级 (Localhost Proxy)**：优先通过本地运行的 `mihomo` 核心端口（默认 `127.0.0.1:10801`）代理进行连接。
     2. **第二层级 (System Proxy)**：若第一层级失败，自动降级并尝试获取 Windows 系统的代理配置（`System Proxy`）进行连接。
     3. **第三层级 (Direct)**：若以上均失败，最终回落至直连（`Direct`）模式发起请求，从而确保在各种网络状态下均能最大程度地保证网络连接的可靠性。
-- **前端内核版本格式化助手 (formatCoreVersion)**：
+- **前端内核版本格式化**：
   - 在前端展示内核更新以及关于页面时，必须使用通用的 `formatCoreVersion` 格式化助手函数对 API 返回的版本字符串进行规范化处理。
   - **前缀剥离与统一前缀**：使用正则表达式 `/^v+/i` 彻底剥离可能存在的多重 `v` 前缀（防止产生类似 `vv1.19.27` 的前缀冗余），并统一格式化为以 `Ver.` 开头的版本号（例如 `Ver.1.19.27`）。
   - **精简描述内容**：在前置描述中删除冗余的 "Mihomo" 字样（例如，不要将括号内和括号外都显示 "Mihomo"），保证排版精炼，避免多重重复。
 
 为了解决在不稳定网络环境下内核更新下载极易因为连接挂起（Stall）而无限期假死的问题，制定以下规范：
-- **数据流读取的超时限制**：在 `core_updater.rs` 下载响应体数据流的循环读取中，对 `response.chunk()` 应用 20 秒超时上限控制（使用 `tokio::time::timeout`）。当数据读取连续挂起超过 20 秒时强行抛出超时错误，打破无限期阻塞。
+- **数据流读取的超时限制**：下载响应体数据流的循环读取中，应用 20 秒超时上限控制。当数据读取连续挂起超过 20 秒时强行抛出超时错误，打破无限期阻塞。
 - **全生命周期的多代理顺序 Fallback**：将“建立代理连接”与“完整读取下载数据流”整个过程合并为一个尝试单元。依次遍历 `Localhost`（本地代理）、`System`（系统代理）、`None`（直连）进行下载。只要在任何代理下载流的任何环节（包括 TCP 连接、HTTP 响应、数据读取流超时）发生错误，必须自动捕获并顺序回退到下一个代理重新尝试，确保下载过程具备最大鲁棒性。
 - **连接与传输超时分离**：TCP 连接超时统一缩短至 `10 秒` 以加速坏代理的 Fallback 探测；整包读取的大客户端超时时间保留为 `300 秒` 以免大文件传输中断。
 
@@ -914,15 +889,10 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 ### 3.4 Mihomo 插件 API
 
 #### 背景
-解决 `tauri-plugin-mihomo` 插件的 JS 库在调用 Rust 后端 `get_proxy_by_name` 时由于参数名称拼写错误导致接口调用失败、进而在窗口启动渲染时阻塞前端的问题。
+解决插件 JS 库在调用 Rust 后端接口时由于参数名称拼写错误导致接口调用失败，进而在窗口启动渲染时阻塞前端的问题。
 
 #### 协议内容
-- **接口定义与参数匹配**：`tauri-plugin-mihomo` 插件在前端通过 JS/TS 提供 `getProxyByName` 接口，必须使用与 Rust 接口对应的字段名称。
-- **参数名纠正**：Rust 端参数为 `proxy_name: String`，在前端调用 `invoke('plugin:mihomo|get_proxy_by_name', ...)` 时，传参对象键名在编译为 JSON 时必须匹配 camelCase 转换后的名称 `proxyName`，而非错误的 `proxiesName`。
-- **改动文件范围**：
-  - `crates/tauri-plugin-mihomo/guest-js/index.ts`
-  - `crates/tauri-plugin-mihomo/dist-js/index.js`
-  - `crates/tauri-plugin-mihomo/dist-js/index.cjs`
+- **接口定义与参数匹配**：插件提供的接口必须使用与 Rust 接口对应的字段名称，前端传参对象键名在序列化时必须正确匹配。
 
 ---
 
@@ -930,7 +900,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 为了确保客户端在任何本地网络环境下能够“开箱即用”，自动规避与其他代理客户端或本地服务的端口抢占冲突，并消除安全隐患，制定以下规范：
 - **安全性提升（更换默认密码）**：
-  - 彻底废弃所有硬编码的 `"set-your-secret"` 默认密码。配置初始化及模板创建时，统一将外部控制密钥 `secret` 默认为 **`"adapted-by-qiu-yuxiao"`**，保护控制接口不受其他未知本地程序窥探。
+  - 彻底废弃所有硬编码的默认密码。配置初始化及模板创建时，统一将外部控制密钥设为 **`"adapted-by-qiu-yuxiao"`**，保护控制接口不受其他未知本地程序窥探。
 - **控制端口的启动冲突自动规避**：
   - 启动阶段，配置管理器动态检测默认控制端口（默认 `9098`） 的可用性。
   - **端口被占检测与复用**：若端口无法 bind，程序向该端口发送验证请求。如果带上 `"adapted-by-qiu-yuxiao"` 密钥的 `/configs` API 请求返回成功，代表该端口正由我们自己上一次运行残留的进程所占用，此时直接复用该端口进行通讯，不视为冲突。
@@ -942,7 +912,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 为了降低 mihomo 内核在加载 GeoIP 与 GeoSite 数据库时的峰值内存占用，制定以下规范：
 
 - **默认加载模式**：
-  - 在 `src-tauri/src/config/clash.rs` 的 `IClashTemp::template()` 方法中，`geodata-loader` 字段默认值设为 `"memconservative"`。
+  - `geodata-loader` 配置字段默认值设为 `"memconservative"`。
   - 此模式下 geodata 数据库采用按需加载策略，仅在路由匹配需要时才将对应数据段载入内存，而非一次性全量加载。
 - **内存收益**：
   - 相较于 Mihomo 默认的 `"standard"` 模式（全量加载），`"memconservative"` 可降低约 5-10MB 的内存峰值占用，对低配设备和长时间后台挂机场景特别有益。
@@ -954,7 +924,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 为了约束 mihomo 内核（Go 语言）在低配设备和长时间后台挂机场景下的内存占用与 CPU 消耗，在启动内核子进程时注入以下 Go runtime 环境变量：
 
 - **环境变量设置**：
-  - 在 `src-tauri/src/core/manager/state.rs` 的 `start_sidecar()` 方法中，通过 `.env()` 向内核子进程注入三个管控变量，均支持用户通过系统环境变量覆盖：
+  - 向内核子进程注入三个管控变量，均支持用户通过系统环境变量覆盖：
     - `GOMEMLIMIT`：默认 `"96MiB"`。Go 1.19+ 的软内存上限，内核堆使用接近该值时主动触发 GC，防止 OOM。
     - `GOGC`：默认 `"50"`（Go 默认值为 100）。降低 GC 触发阈值，以更高的 GC 频率换取更低的内存峰值，内存换 CPU 的权衡偏向内存侧。
     - `GOMAXPROCS`：默认 `"2"`。限制内核使用的最大操作系统线程数，防止在多核设备上过度并行导致不必要的上下文切换和缓存竞争。
@@ -963,7 +933,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - `GOGC=50` 与 `GOMEMLIMIT=96MiB` 配合，将内核堆内存控制在约 96MiB 以内，适合 4GB 及以下内存设备。
   - `GOMAXPROCS=2` 确保内核在网络转发任务中不抢占用户前台应用的 CPU 时间片。
 - **用户覆盖机制**：
-  - 所有三个值均通过 `std::env::var()` 读取，若用户在系统环境变量中设置了同名变量，将以用户设置的值为准，不强制覆盖。
+  - 所有三个值均支持系统环境变量覆盖，不强制使用默认值。
 
 ---
 
@@ -973,22 +943,22 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 点击 Windows 原生标题栏关闭按钮（X）后，程序应立即进入轻量化模式（销毁主窗口释放内存/GPU 资源），而非仅隐藏窗口并等待延迟定时器。原定时器机制（`setup_light_weight_timer`、`cancel_light_weight_timer`、关闭/焦点事件监听器）已全部移除。
 
-- **关闭按钮行为**：`handle_window_close` 在 `window.hide()` 后，通过 `AsyncHandler::spawn` 立即调用 `lightweight::entry_lightweight_mode()`，同步销毁主窗口。
-- **macOS 隐藏行为**：`feat::window::hide()` 中 `add_light_weight_timer` 替换为直接调用 `entry_lightweight_mode`，确保跨平台行为一致。
-- **兼容空壳**：`enable_auto_light_weight_mode` / `disable_auto_light_weight_mode` 保留为无操作的兼容空壳，避免破坏配置热更新路径和前端配置界面的联动逻辑。`enable_auto_light_weight_mode` 配置项本身继续保留以维持配置文件向后兼容。
+- **关闭按钮行为**：关闭按钮被点击后，先隐藏窗口，然后立即进入轻量模式，同步销毁主窗口。
+- **macOS 隐藏行为**：隐藏操作替换为直接进入轻量模式，确保跨平台行为一致。
+- **兼容空壳**：自动轻量模式的启用/禁用保留为空壳，避免破坏配置热更新路径和前端配置界面的联动。配置项本身继续保留以维持向后兼容。
 
-**退出轻量时的窗口操作结果判定**：`exit_lightweight_mode()` 对 `WindowOperationResult` 的匹配须将 `NoAction` 与 `Shown`、`Created` 视为同等成功。`NoAction` 表示窗口已处于可用状态，不应触发状态机回滚。
+**退出轻量时的窗口操作结果判定**：退出轻量模式时，窗口已可用应视为成功，不触发状态机回滚。
 
-**关闭自动轻量时的托盘同步**：`entry_lightweight_mode()` 在 `enable_auto_light_weight_mode` 为 `false` 时仅隐藏窗口，但仍须同步托盘菜单状态。
+**关闭自动轻量时的托盘同步**：关闭自动轻量模式时仅隐藏窗口，但仍须同步托盘菜单状态。
 
-**退出轻量时重置监控计数器**：monitor 检测到退出轻量并触发全节点延迟测试时，须同步重置 `consecutive_fails`、`is_retry_mode`、`current_cooldown`，防止轻量期间累积的状态影响正常模式行为。
+**退出轻量时重置监控计数器**：退出轻量模式时须同步重置失败计数和重试模式，防止轻量期间累积的状态影响正常模式行为。
 
 ### 4.2 连接清理与订阅熔断
 
 为了降低程序在轻量模式下后台挂机时，由之前网页浏览遗留的活动或空闲 TCP 连接对系统套接字及内核内存的持续占用，制定以下规范：
 
 - **瞬间触发垃圾回收 (GC)**：
-  - 在 `src-tauri/src/module/lightweight.rs` 的 `entry_lightweight_mode()` 函数成功执行并记录状态为 `LightweightState::In` 之后，必须立即通过 `AsyncHandler::spawn` 异步调用 `mihomo.close_all_connections().await`。
+  - 进入轻量模式后，必须立即异步向内核发出命令，物理强制切断所有活跃与空闲网络连接。
   - 这将在外壳关闭销毁的瞬间，向内核发出物理清空命令，物理强制切断并关闭当前所有的活跃与空闲网络连接。
 - **低功耗运行状态**：
   - 清空连接的操作不影响任何已确立的代理端口存活和系统的路由分发，但可以彻底促使 `mini-mihomo` 核心快速释放物理套接字句柄和已分配的通信内存缓冲区，使其与外壳同步进入真正的低耗能后台状态。
@@ -996,7 +966,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 为了消除主窗口关闭物理销毁后，Rust 后端依然对内核持续推送的数据事件（如网速、日志、连接明细等）进行无用的反序列化和 IPC 消息管道消耗，制定以下规范：
 
 - **主动熔断 WebSocket 常驻订阅**：
-  - 在 `src-tauri/src/module/lightweight.rs` 的 `entry_lightweight_mode()` 函数成功记录状态为 `LightweightState::In` 之后，必须立即通过 `AsyncHandler::spawn` 异步调用 `mihomo.clear_all_ws_connections().await`。
+  - 进入轻量模式后，必须立即强行断开并清理所有前端的 WebSocket 实时流通道（包括流量、日志、连接等），彻底截断内核到前端的数据分发链路。
   - 此项操作将强行断开并清理 Rust 侧插件状态中保存的所有由前端调用的 WebSocket 实时流通道（包括流量 `/traffic`、日志 `/logs`、连接 `/connections` 等），彻底截断内核到外壳的数据分发链路。
 - **UI 生命周期自动恢复机制**：
   - Rust 侧的订阅清理不需要在退出轻量模式时进行手动重建，因为主窗口重建挂载时，前端 React 组件自身的挂载逻辑（`useEffect`）会自动向 Tauri 后端发送新的 WS 建立指令。
@@ -1007,13 +977,13 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 为了解决在轻量模式下后台持续以高频（15秒周期）检测活动代理节点的延迟，导致不必要的 CPU 唤醒、电池消耗和网络探测流量的问题，制定以下规范：
 
 - **自适应健康检测周期**：
-  - 后台监测线程 `start_background_monitor` 在执行循环时，必须动态检查当前是否处于轻量模式（通过 `crate::module::lightweight::is_in_lightweight_mode()` 获取）。
+  - 后台监测线程在执行循环时，必须动态检查当前是否处于轻量模式。
   - **活跃状态（Normal）**：监测周期放宽为 **60秒**，在保留节点健康感知的同时极大降低 CPU 资源开销。
   - **轻量/后台挂机状态（Lightweight/In）**：监测周期自动放宽至 **300秒（5分钟）**，以最大化降低后台挂机时的系统资源开销。
   - **故障快速重试状态**：无论是否在轻量模式，一旦检测到当前节点异常，进入重试阶段时，检测周期统一维持在 **3秒**，确保连续失败 5 次后快速启动自愈优选。
 - **瞬时唤醒与退出重置机制**：
-  - 在 `src-tauri/src/module/monitor.rs` 中定义全局静态通知对象 `MONITOR_WAKEUP_NOTIFY` (类型为 `tokio::sync::Notify`)。监测线程在 `tokio::select!` 挂起时，除监听定时器和配置切换通知外，还必须监听该唤醒通知。
-  - 在退出轻量模式的入口函数（`exit_lightweight_mode()`）成功恢复/重建主窗口并记录状态为 `Normal` 后，必须显式调用 `MONITOR_WAKEUP_NOTIFY.notify_one()` 发送即时唤醒信号。
+  - 监测线程挂起时，除监听定时器和配置切换通知外，还必须监听轻量模式唤醒通知。
+  - 退出轻量模式成功恢复主窗口后，必须显式发送唤醒信号，使监测线程立即恢复活跃检测。
   - 监测线程接收到该唤醒信号后，将立即跳出当前的 60 秒长休眠，重置检测时间并无延迟地发起一次健康探测，并使探测周期瞬间回归至 60 秒活跃规格，实现前端界面恢复时的“无缝高频监控”。
 
 ### 4.4 窗口唤醒刷新
@@ -1021,7 +991,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 为了解决程序从轻量模式（隐藏窗口或销毁重建窗口）中唤醒后，节点列表中的延迟信息无法恢复且持续显示为 `-` 的问题，制定以下规范：
 
 - **解决双挂载/竞态取消导致初始化中断**：
-  - 在前端 `src/pages/_layout.tsx` 挂载 `useEffect` 的清理函数中，如果因为 StrictMode 重跑或尺寸修改重新渲染导致 Effect 被清理（`cancelled = true`），必须显式将 `lastProcessedRef.current.uid` 重置为 `null`。
+  - 前端布局组件挂载的副作用清理函数中，如果因重渲染导致清理，必须重置已处理标记，确保下次挂载时能正确拉起测速流程。
   - 这能确保下一次挂载和 Effect 运行时能够正确判定为新 Profile 从而再次拉起配置增强、激活选择及全节点测速流程，防止首次启动测速被永远拦截。
 - **自适应窗口可见度唤醒测速**：
   - 在 Layout 顶层事件监听器中，增加对窗口聚焦（`focus`）和文档可见度变化（`visibilitychange`）的拦截。
@@ -1189,36 +1159,36 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 ### 7.1 单一 PROXY 组模型
 
 本项目采用唯一 PROXY 组设计，后端 `enhance_profiles` 已保证配置中始终存在 PROXY 组。前端数据流必须保持精简，严禁引入原版 Clash Verge 的多代理组复杂逻辑：
-- **`calcuProxies()` 精简规范**：
+- **数据计算函数精简规范**：
   - 返回值只保留 `global`、`groups`、`records`，不再返回 `direct`、`reject`、`proxies`。
   - 严禁按 `GLOBAL.all` 顺序重排 groups，严禁构建 `proxies` 扁平列表。
   - PROXY 组创建兑底仅保留 1 层：从已有组的组内节点收集。
-- **`use-render-list.ts` physicalNodes 精简规范**：
+- **渲染列表节点来源精简规范**：
   - physicalNodes 仅从 PROXY 组读取，严禁多层 fallback（原版 6 层 fallback 已删除）。
   - `calcuProxies` 已保证 PROXY 组始终存在，前端无需为此做复杂防御。
 - **轮询统一管理**：
-  - 3 秒数据轮询统一由 `AppDataProvider` 的 `useQuery` 配置驱动，严禁在组件中重复定义 `useQuery(['getProxies'])`。
+  - 数据轮询统一由数据层配置驱动，严禁在组件中重复定义轮询查询。
 - **快捷分流简化**：
-  - `quick-routing.ts` 中代理组名称固定为 `'PROXY'`，严禁动态查找主代理组。
+  - 代理组名称固定为 `'PROXY'`，严禁动态查找。
 
 ### 7.2 订阅导入与内核就绪等待
 
 当用户导入新订阅链接后，`handleImportProfile` 流程中调用 `restartCore()` 重启内核，内核需要数秒至十余秒才能完成初始化并下载 proxy-provider 数据。为确保前端节点表格可靠显示，必须遵循以下规范：
 - **重启后轮询等待机制**：
-  - `restartCore()` 之后严禁立即调用单次 `refreshProxy()` 作为最终数据源。必须启动轮询循环（每 1.5 秒一次，最多 20 秒），每次调用 `calcuProxies()` 检查 PROXY 组是否包含真实节点（排除 DIRECT/REJECT/unknown 类型），确认就绪后方可退出轮询。
-  - 轮询期间应同时调用 `refreshProxyProviders()` 以加速 proxy-provider 数据下载与缓存刷新。
+  - 重启内核之后严禁立即调用单次数据刷新作为最终数据源。必须启动轮询循环（每 1.5 秒一次，最多 20 秒），每次检查 PROXY 组是否包含真实节点，确认就绪后方可退出轮询。
+  - 轮询期间应同时加速数据下载与缓存刷新。
 - **缓存直写与 UI 同步**：
-  - 轮询结束时，必须通过 `queryClient.setQueryData(['getProxies'], lastResult)` 将最新获取的完整节点数据直接注入 react-query 缓存，避免后续 `refreshProxy()` 因 staleTime 节流而跳过刷新。
+  - 轮询结束时，必须将最新获取的完整节点数据直接注入本地缓存，避免后续刷新因缓存节流被跳过。
 - **前端兑底轮询增强**：
-  - `use-render-list.ts` 中的空节点轮询恢复机制在调用 `refreshProxy()` 时必须同步调用 `refreshProxyProviders()`，因为 `calcuProxies()` 依赖 providerMap 构建节点信息，单独刷新 proxy 数据可能无法获取完整的节点详情。
+  - 空节点轮询恢复机制在刷新代理数据时必须同步刷新 providers，因为数据计算函数依赖 provider 映射构建节点信息。
 
 ### 7.3 订阅与配置文件管理
 
 为了解决 Clash Mini 订阅卡片（Profile Card）无法右键操作以及没有编辑对话框的问题，并保持全套 6 种皮肤的完美视觉融合与交互统一，制定本设计协议：
 - **右键菜单拦截与触发 (onContextMenu Interception)**：
-  - 在前端订阅卡片容器（`<Box>`）上，绑定自定义的 `onContextMenu` 事件处理器。
-  - 事件处理器中必须调用 `e.preventDefault()` 和 `e.stopPropagation()`，屏蔽 Windows 系统或上层容器的默认右键菜单，并捕获当前右键点击对应的 Profile 项 `uid` 及其位置坐标（`e.clientX`, `e.clientY`）。
-  - 使用 MUI `<Menu>` 结合 `anchorReference="anchorPosition"`，并将 `anchorPosition={{ top: y, left: x }}` 传递给 `<Menu>`，实现精确在鼠标光标位置弹出菜单。
+  - 在前端订阅卡片容器上，绑定自定义的右键菜单事件处理器。
+  - 事件处理器中必须屏蔽默认右键菜单，并捕获当前右键点击对应的配置项及其位置坐标。
+  - 在鼠标光标位置精确弹出菜单。
 - **右键菜单功能选项 (Context Menu Actions)**：
   - 菜单包含以下 5 项：
     1. `📝 编辑` (Edit)：打开编辑对话框。
@@ -1299,19 +1269,19 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 为了进一步减少程序在后台或托盘静默运行时的物理内存占用，制定以下规范：
 - **WebView2 内存目标等级动态切换 (SetMemoryUsageTargetLevel)**：
-  - 在 Windows 操作系统下，必须在窗口隐藏（Hidden）或最小化（Minimized）等非活动状态（Inactive）下将 WebView2 引擎的内存占用等级（Memory Usage Target Level）主动调整为 `Low`，以引导 WebView2 引擎和 GPU 进程主动释放不必要的缓存及物理内存。
+  - 在 Windows 操作系统下，必须在窗口隐藏或最小化等非活动状态下将 WebView2 引擎的内存占用等级主动调低，以引导 WebView2 引擎和 GPU 进程主动释放不必要的缓存及物理内存。
   - 在窗口恢复显示或激活（Active）状态下，应将内存占用等级自动调整回 `Normal`，以恢复高性能的渲染 and 交互体验。
 - **基于 COM 接口的底层交互实现**：
-  - 必须利用 Tauri 的 `with_webview` 底层接口，并在 unsafe 块下安全调用 Windows COM 接口。
-  - 将 `ICoreWebView2Controller::CoreWebView2()` 返回的 `ICoreWebView2` 通过 `.cast::<ICoreWebView2_19>()` 转换为高版本子接口，并调用 `.SetMemoryUsageTargetLevel(...)` 完成切换，确保兼容性并处理可能的降级/错误日志记录。
+  - 必须利用底层接口，在 unsafe 块下安全调用 Windows COM 接口。
+  - 通过 Windows COM 接口完成 WebView2 内存等级切换，确保兼容性并处理可能的降级。
 
 为了解决程序在后台挂机（轻量模式/托盘模式）时，由于后台日志协程未随通道关闭退出，导致持有 Tauri 窗口引用阻碍 WebView2 销毁释放、残留大量句柄和虚拟内存的问题，制定以下规范：
 
 - **WebSocket 日志协程生命周期熔断**：
-  - 在 `crates/tauri-plugin-mihomo/src/mihomo.rs` 的 `ws_logs_checked` 接口中，后台常驻的日志处理协程必须能感知数据分发通道的关闭状态。
-  - 严禁在 `tokio::select!` 接收循环分支中使用只匹配 `Some` 模式的 `Some(log_line) = rx.recv()`。必须使用常规匹配 `msg = rx.recv()`，并在通道关闭（`None` 分支）时执行 `break` 主动退出协程，确保随 WebSocket 关闭而自动销毁协程。
+  - 后台常驻的日志处理协程必须能感知数据分发通道的关闭状态。
+  - 当通道关闭时必须主动退出协程，确保随 WebSocket 关闭而自动销毁协程。
 - **本地连接池空闲管道激进清空**：
-  - 在轻量模式调用的 `clear_all_ws_connections()` 清理任务中，除了断开所有的 WebSocket 连接，还必须显式调用 `IpcConnectionPool::global().map(|pool| pool.clear_pool())`。
+  - 在清理任务中，除了断开所有的 WebSocket 连接，还必须彻底清空全局连接池中保留的空闲管道连接。
   - 这将在隐身托盘模式下，彻底断开并关闭全局连接池中保留的 3 个空闲本地管道连接（NamedPipe），消除最后几处系统活跃句柄的占用。
 
 ### 8.3 窗口事件处理
@@ -1376,8 +1346,8 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 根据 v1.9.1 发布后进行的代码安全与并发审计，对发现 of 10 项缺陷进行了集中修复，制定以下规范：
 
 - **状态机 CAS 迁移与日志隔离**：所有轻量模式状态转换必须通过原子 `compare_exchange` (CAS) 实现。删除 `record_state_and_log` 中非原子的 raw `store` 写入，将其与状态变更合并至统一 `transition_and_log` 辅助函数中，防止在快速、高频托盘切换时，各分支回滚覆写。
-- **静默启动销毁行为适配**：在 `window_manager.rs` 中，当销毁主窗口发现其不存在时，`destroy_main_window` 返回 `WindowOperationResult::NoAction`。后端在进入轻量模式时，必须将 `Destroyed` 和 `NoAction` 均视为成功，支持在开启静默启动时直接成功初始化后端轻量状态，避免产生状态回滚。
-- **窗口限流状态同步回滚**：当由于防抖（625ms）限制导致 `show_main_window` 返回限流 `NoAction` 时，`exit_lightweight_mode` 不得将其当作成功，必须回滚状态机回到 `In` 并中断退出，防止产生同步偏差。
+- **静默启动销毁行为适配**：当销毁主窗口发现其不存在时，后端在进入轻量模式时，必须将窗口已销毁和无需操作均视为成功，支持在开启静默启动时直接成功初始化后端轻量状态。
+- **窗口限流状态同步回滚**：当由于防抖限制导致窗口显示失败时，退出轻量模式不得将其当作成功，必须回滚状态机并中断退出。
 - **后台连接清理任务的生命周期活性判定**：在进入轻量模式而异步派生出的 `mihomo.close_all_connections()` 和 `clear_all_ws_connections()` 清理任务中，在每一处耗时异步操作前，必须进行 `is_in_lightweight_mode()` 判定。若用户在极短时间内重新激活/显示窗口退出轻量模式，该后台任务必须立即熔断返回，不得继续执行，避免误杀新连接。
 - **Web Worker 销毁与引用重置规范**：在 `use-traffic-monitor.ts` 的 `onerror` 降级逻辑中，必须在调用 `this.stop()` 之前，显式终止当前的 Worker 线程（`worker.terminate()`），清理消息回调，并将 `this.worker` 成员置为 `null`，防止下一次启动循环时由于残留非空引用而误用损坏的旧 Worker 实例。
 - **Web Worker 状态保持与采样控制**：
