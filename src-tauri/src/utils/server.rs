@@ -147,6 +147,7 @@ pub fn embed_server() {
     let commands = visible.or(scheme).or(pac);
 
     // 从全局缓存中取出第一个实例抢占的 std::net::TcpListener
+    #[allow(clippy::expect_used)]
     let std_listener = {
         let lock = SINGLETON_LISTENER.get().expect("SINGLETON_LISTENER not set");
         let mut guard = lock.lock();
@@ -154,7 +155,9 @@ pub fn embed_server() {
     };
     
     // 设置非阻塞并转换为 tokio 的 TcpListener
+    #[allow(clippy::expect_used)]
     std_listener.set_nonblocking(true).expect("failed to set nonblocking");
+    #[allow(clippy::expect_used)]
     let tokio_listener = tokio::net::TcpListener::from_std(std_listener).expect("failed to convert TcpListener");
 
     AsyncHandler::spawn(move || async move {
