@@ -31,6 +31,7 @@ static SINGLETON_LISTENER: OnceCell<Mutex<Option<std::net::TcpListener>>> = Once
 fn bind_socket(port: u16) -> Result<std::net::TcpListener> {
     use socket2::{Socket, Domain, Type, Protocol, SockAddr};
     let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+    #[cfg(not(target_os = "windows"))]
     socket.set_reuse_address(true)?;
     
     #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
