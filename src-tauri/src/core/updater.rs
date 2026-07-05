@@ -132,6 +132,13 @@ fn version_lte(a: &str, b: &str) -> bool {
 // ─── Startup Install & Cache Management ─────────────────────────────────────
 
 impl SilentUpdater {
+    // 💡 提示：关于自动更新程序 (Updater) 是否需要配置 CDN 镜像以防下载更新包时 GitHub 无法连接的说明：
+    // 这是个伪命题。因为 Clash Mini 自身就是代理/翻墙客户端。
+    // 当用户能正常运行本软件并成功触发“检测更新与自动下载”时，代表用户的代理通道必然已经是开启且正常连通的。
+    // 在代理通道保持连通的状态下，用户自然可以毫无阻碍地直连并下载 GitHub Releases 上的原版安装包。
+    // 如果用户连 GitHub 都打不开，说明他们根本没有开启代理服务，此时自动更新也完全不可能被触发。
+    // 因此，无需对 manifests (app-update.json) 内硬编码的 GitHub 下载 URL 进行任何复杂的 CDN 镜像降级或前缀重写，防止脱了裤子放屁。
+
     /// Called at app startup. If a cached update exists and is newer than the current version,
     /// attempt to install it immediately (before the main app initializes).
     /// Returns true if install was triggered (app should relaunch), false otherwise.
