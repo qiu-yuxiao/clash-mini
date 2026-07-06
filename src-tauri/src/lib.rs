@@ -371,7 +371,7 @@ pub fn run() {
         use tauri::Manager as _;
 
         pub fn handle_ready_resumed(_app_handle: &AppHandle) {
-            use tauri::Manager;
+            use tauri::Manager as _;
 
             if handle::Handle::global().is_exiting() {
                 logging!(debug, Type::System, "应用正在退出，跳过处理");
@@ -429,7 +429,7 @@ pub fn run() {
             }
         }
 
-        pub fn handle_window_resized(_window: &tauri::WebviewWindow, _new_size: tauri::PhysicalSize<u32>) {
+        pub const fn handle_window_resized(_window: &tauri::WebviewWindow, _new_size: tauri::PhysicalSize<u32>) {
             // 窗口最小尺寸由 WM_SIZING 子类化处理器在 Rust 层面拦截并钳制位置和尺寸，
             // 无需在此事后调用 set_size/set_position 与原生缩放循环竞争。
         }
@@ -482,7 +482,7 @@ pub fn run() {
         #[cfg(target_os = "windows")]
         fn setup_wm_sizing_hook(window: &tauri::WebviewWindow) {
             use raw_window_handle::HasWindowHandle as _;
-            use windows::Win32::UI::WindowsAndMessaging::{SetWindowLongPtrW, GWLP_WNDPROC};
+            use windows::Win32::UI::WindowsAndMessaging::{GWLP_WNDPROC, SetWindowLongPtrW};
 
             let handle = match window.window_handle() {
                 Ok(h) => h,
@@ -498,11 +498,7 @@ pub fn run() {
 
             unsafe {
                 let new_proc = Some(sizing_wndproc as unsafe extern "system" fn(_, _, _, _) -> _);
-                let old_proc_val = SetWindowLongPtrW(
-                    hwnd,
-                    GWLP_WNDPROC,
-                    std::mem::transmute::<_, isize>(new_proc),
-                );
+                let old_proc_val = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, std::mem::transmute::<Option<unsafe extern "system" fn(windows::Win32::Foundation::HWND, u32, windows::Win32::Foundation::WPARAM, windows::Win32::Foundation::LPARAM) -> windows::Win32::Foundation::LRESULT>, isize>(new_proc));
                 if old_proc_val != 0 {
                     OLD_WNDPROC.store(old_proc_val as *mut _, Ordering::Release);
                 }
@@ -529,32 +525,39 @@ pub fn run() {
             if msg == WM_SIZING {
                 let side = wparam.0 as u32;
                 if side == WMSZ_TOP || side == WMSZ_TOPLEFT || side == WMSZ_TOPRIGHT {
-                    let rect = &mut *(lparam.0 as *mut windows::Win32::Foundation::RECT);
-                    let dpi = GetDpiForWindow(hwnd);
-                    let scale = (dpi as f64) / 96.0;
-                    let min_height_px = (MINIMAL_HEIGHT * scale).round() as i32;
-                    let height = rect.bottom - rect.top;
-                    if height < min_height_px {
-                        rect.top = rect.bottom - min_height_px;
-                        return windows::Win32::Foundation::LRESULT(1);
+                    // SAFETY: lparam 在 WM_SIZING 消息中指向有效的 RECT 结构
+                    unsafe {
+                        let rect = &mut *(lparam.0 as *mut windows::Win32::Foundation::RECT);
+                        let dpi = GetDpiForWindow(hwnd);
+                        let scale = (dpi as f64) / 96.0;
+                        let min_height_px = (MINIMAL_HEIGHT * scale).round() as i32;
+                        let height = rect.bottom - rect.top;
+                        if height < min_height_px {
+                            rect.top = rect.bottom - min_height_px;
+                            return windows::Win32::Foundation::LRESULT(1);
+                        }
                     }
                 }
             }
 
             let old_proc = OLD_WNDPROC.load(Ordering::Acquire);
             if !old_proc.is_null() {
-                CallWindowProcW(
-                    Some(std::mem::transmute::<
-                        *mut std::ffi::c_void,
-                        unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> windows::Win32::Foundation::LRESULT,
-                    >(old_proc)),
-                    hwnd,
-                    msg,
-                    wparam,
-                    lparam,
-                )
+                // SAFETY: old_proc 是之前 SetWindowLongPtrW 返回的有效窗口过程
+                unsafe {
+                    CallWindowProcW(
+                        Some(std::mem::transmute::<
+                            *mut std::ffi::c_void,
+                            unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> windows::Win32::Foundation::LRESULT,
+                        >(old_proc)),
+                        hwnd,
+                        msg,
+                        wparam,
+                        lparam,
+                    )
+                }
             } else {
-                DefWindowProcW(hwnd, msg, wparam, lparam)
+                // SAFETY: DefWindowProcW 是默认窗口过程，对所有参数安全
+                unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
         }
 
@@ -612,9 +615,7 @@ pub fn run() {
             // 处于轻量模式且未在退出流程中时阻止退出，以便先退出轻量模式；
             // 但仅当无退出码（code.is_none()）时才阻止——若带退出码（如系统关机/注销），
             // 应允许退出，避免"阻止退出但无动作"的死锁路径。
-            if module::lightweight::is_in_lightweight_mode()
-                && !handle::Handle::global().is_exiting()
-                && code.is_none()
+            if module::lightweight::is_in_lightweight_mode() && !handle::Handle::global().is_exiting() && code.is_none()
             {
                 api.prevent_exit();
             } else if code.is_none() {
