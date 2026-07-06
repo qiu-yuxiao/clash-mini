@@ -290,5 +290,6 @@
 | **BUG-201** | High-Frequency Tauri IPC Polling in useVisibility | v1.6.3 | 用户已确认 |
 | **BUG-192** | Unthrottled Core Updater IPC Progress Emitter | v1.6.3 | 用户已确认 |
 | **BUG-198** | Unhandled Tauri Listener Promise Rejection in useWindowSnap | v1.6.3 | 用户已确认 |
+| **BUG-202** | Background Auto-Select Failure on Trailing Space / Regex mismatch | v2.3.3 | 代码已修正，已确认 |
 
 
