@@ -184,7 +184,11 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
         info,
         Type::Config,
         "{}",
-        if apply { "DNS config successfully applied" } else { "Config regenerated successfully" }
+        if apply {
+            "DNS config successfully applied"
+        } else {
+            "Config regenerated successfully"
+        }
     );
 
     handle::Handle::refresh_clash();

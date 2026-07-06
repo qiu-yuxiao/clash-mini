@@ -1,10 +1,12 @@
 import {
-  BoltOutlined,
-  SortOutlined,
   AccessTimeOutlined,
+  BoltOutlined,
   SortByAlphaOutlined,
+  SortOutlined,
 } from '@mui/icons-material'
-import { Box, IconButton, SxProps, Theme, keyframes } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material'
+import { Box, IconButton } from '@mui/material'
+import { keyframes } from '@mui/material'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -13,9 +15,8 @@ import { useVerge } from '@/hooks/use-verge'
 import delayManager from '@/services/delay'
 import { debugLog } from '@/utils/debug'
 
-import type { ProxySortType } from './use-filter-sort'
-import type { HeadState } from './use-head-state'
-import { useWindowWidth } from './use-window-width'
+import { ProxySortType } from './use-filter-sort'
+import { HeadState } from './use-head-state'
 
 interface Props {
   sx?: SxProps<Theme>
@@ -23,9 +24,9 @@ interface Props {
   groupName: string
   headState: HeadState
   isTesting?: boolean
-  onLocation: () => void
+  onHeadState: (state: Partial<HeadState>) => void
   onCheckDelay: () => void
-  onHeadState: (val: Partial<HeadState>) => void
+  onLocation?: () => void
 }
 
 const pulseGlow = keyframes`
@@ -35,8 +36,8 @@ const pulseGlow = keyframes`
     opacity: 0.8;
   }
   50% {
-    transform: scale(1.15) rotate(15deg);
-    filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.85));
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.95));
     opacity: 1;
     color: #ffc107;
   }
@@ -57,19 +58,8 @@ export const ProxyHead = ({
   isTesting = false,
   onHeadState,
   onCheckDelay,
-  // We keep onLocation in Props to avoid breaking other files, but we don't use it here.
 }: Props) => {
-  const { width } = useWindowWidth()
-  const isMinimal = width <= 285
-
-  const {
-    sortType,
-    filterText,
-    testUrl,
-    filterMatchCase,
-    filterMatchWholeWord,
-    filterUseRegularExpression,
-  } = headState
+  const { sortType, filterText, testUrl } = headState
 
   const { t } = useTranslation()
   const [autoFocus, setAutoFocus] = useState(false)
@@ -119,9 +109,12 @@ export const ProxyHead = ({
             animation: isTesting
               ? `${pulseGlow} 1.2s infinite ease-in-out`
               : 'none',
-            color: (theme) => isTesting
-              ? (theme.palette.mode === 'dark' ? 'warning.main' : 'warning.dark')
-              : 'inherit',
+            color: (theme) =>
+              isTesting
+                ? theme.palette.mode === 'dark'
+                  ? 'warning.main'
+                  : 'warning.dark'
+                : 'inherit',
           }}
         />
       </IconButton>
@@ -151,8 +144,12 @@ export const ProxyHead = ({
         {sortType !== 1 && sortType !== 2 && (
           <SortOutlined aria-hidden="true" sx={{ fontSize: 17 }} />
         )}
-        {sortType === 1 && <AccessTimeOutlined aria-hidden="true" sx={{ fontSize: 17 }} />}
-        {sortType === 2 && <SortByAlphaOutlined aria-hidden="true" sx={{ fontSize: 17 }} />}
+        {sortType === 1 && (
+          <AccessTimeOutlined aria-hidden="true" sx={{ fontSize: 17 }} />
+        )}
+        {sortType === 2 && (
+          <SortByAlphaOutlined aria-hidden="true" sx={{ fontSize: 17 }} />
+        )}
       </IconButton>
 
       <Box
@@ -164,19 +161,10 @@ export const ProxyHead = ({
       >
         <BaseSearchBox
           autoFocus={autoFocus}
-          minimal={isMinimal}
           value={filterText}
-          searchState={{
-            matchCase: filterMatchCase,
-            matchWholeWord: filterMatchWholeWord,
-            useRegularExpression: filterUseRegularExpression,
-          }}
           onSearch={(_, state) =>
             onHeadState({
               filterText: state.text,
-              filterMatchCase: state.matchCase,
-              filterMatchWholeWord: state.matchWholeWord,
-              filterUseRegularExpression: state.useRegularExpression,
             })
           }
         />

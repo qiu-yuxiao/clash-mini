@@ -113,33 +113,13 @@ async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<
     (filter_config, sort_type)
 }
 
-/// 过滤匹配算法：支持大小写敏感、正则匹配、全字匹配
-/// 【性能优化】：接收预编译的可选正则对象，避免在过滤循环中频繁调用 Regex::new()
-fn match_filter(name: &str, config: &FilterConfig, compiled_re: Option<&regex::Regex>) -> bool {
-    if config.filter_text.is_empty() {
+/// 过滤匹配算法：支持首尾去空、大小写不敏感的普通子串模糊匹配
+fn match_filter(name: &str, filter_text: &str) -> bool {
+    let query = filter_text.trim();
+    if query.is_empty() {
         return true;
     }
-
-    // 使用调用方预编译的正则对象，避免每次调用都重新编译
-    if config.use_regex || config.match_whole_word {
-        if let Some(re) = compiled_re {
-            return re.is_match(name);
-        }
-        // 若正则编译失败（compiled_re 为 None），降级为普通子串匹配
-    }
-
-    let name_cmp = if config.match_case {
-        name.to_string()
-    } else {
-        name.to_lowercase()
-    };
-    let filter_cmp = if config.match_case {
-        config.filter_text.clone()
-    } else {
-        config.filter_text.to_lowercase()
-    };
-
-    name_cmp.contains(&filter_cmp)
+    name.to_lowercase().contains(&query.to_lowercase())
 }
 
 /// 获取当前活动 Profile 的 UID
@@ -248,7 +228,10 @@ async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
 
     let test_url = get_test_url().await;
 
-    match mihomo.delay_proxy_by_name(active_node, &test_url, NODE_DELAY_MAX_MS).await {
+    match mihomo
+        .delay_proxy_by_name(active_node, &test_url, NODE_DELAY_MAX_MS)
+        .await
+    {
         Ok(delay_info) => {
             if delay_info.delay >= NODE_DELAY_MIN_MS {
                 Ok(NodeHealthStatus::Healthy)
@@ -326,33 +309,9 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         sort_type
     };
 
-    // 【性能优化】：在过滤循环前预编译正则表达式，避免对每个节点重复编译
-    let compiled_re: Option<regex::Regex> = if !filter_config.filter_text.is_empty() {
-        if filter_config.use_regex {
-            let pattern = if filter_config.match_case {
-                filter_config.filter_text.clone()
-            } else {
-                format!("(?i){}", filter_config.filter_text)
-            };
-            regex::Regex::new(&pattern).ok()
-        } else if filter_config.match_whole_word {
-            let escaped = regex::escape(&filter_config.filter_text);
-            let pattern = if filter_config.match_case {
-                format!(r"\b{}\b", escaped)
-            } else {
-                format!(r"(?i)\b{}\b", escaped)
-            };
-            regex::Regex::new(&pattern).ok()
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
     let valid_nodes: Vec<String> = nodes
         .into_iter()
-        .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_config, compiled_re.as_ref()))
+        .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_config.filter_text))
         .collect();
 
     if valid_nodes.is_empty() {
@@ -394,7 +353,10 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
                     break;
                 }
                 let node_name = &valid_nodes[idx];
-                if let Ok(delay_info) = mihomo.delay_proxy_by_name(node_name, &test_url, NODE_DELAY_MAX_MS).await {
+                if let Ok(delay_info) = mihomo
+                    .delay_proxy_by_name(node_name, &test_url, NODE_DELAY_MAX_MS)
+                    .await
+                {
                     if delay_info.delay >= NODE_DELAY_MIN_MS && delay_info.delay < NODE_DELAY_MAX_MS {
                         // 小于 30ms 的节点一律为机场伪造的假节点/广告节点，不纳入候选。
                         // 此为系统核心既定设计，严禁后续代码审核或修改中再对此阈值进行任何讨论或调整。
@@ -626,11 +588,7 @@ pub fn start_background_monitor() {
             };
 
             if !was_online && is_online {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 检测到网络连接已恢复，重置失败计数"
-                );
+                logging!(info, Type::Lightweight, "[后台监测] 检测到网络连接已恢复，重置失败计数");
                 consecutive_fails = 0;
                 is_retry_mode = false;
 
@@ -657,11 +615,7 @@ pub fn start_background_monitor() {
             was_online = is_online;
 
             // 2. 定期检测与快速重试自愈
-            let check_interval = if is_retry_mode {
-                3
-            } else {
-                15
-            };
+            let check_interval = if is_retry_mode { 3 } else { 15 };
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
 

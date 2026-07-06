@@ -498,7 +498,22 @@ pub fn run() {
 
             unsafe {
                 let new_proc = Some(sizing_wndproc as unsafe extern "system" fn(_, _, _, _) -> _);
-                let old_proc_val = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, std::mem::transmute::<Option<unsafe extern "system" fn(windows::Win32::Foundation::HWND, u32, windows::Win32::Foundation::WPARAM, windows::Win32::Foundation::LPARAM) -> windows::Win32::Foundation::LRESULT>, isize>(new_proc));
+                let old_proc_val = SetWindowLongPtrW(
+                    hwnd,
+                    GWLP_WNDPROC,
+                    std::mem::transmute::<
+                        Option<
+                            unsafe extern "system" fn(
+                                windows::Win32::Foundation::HWND,
+                                u32,
+                                windows::Win32::Foundation::WPARAM,
+                                windows::Win32::Foundation::LPARAM,
+                            )
+                                -> windows::Win32::Foundation::LRESULT,
+                        >,
+                        isize,
+                    >(new_proc),
+                );
                 if old_proc_val != 0 {
                     OLD_WNDPROC.store(old_proc_val as *mut _, Ordering::Release);
                 }

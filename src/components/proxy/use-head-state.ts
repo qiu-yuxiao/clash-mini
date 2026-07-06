@@ -10,9 +10,6 @@ export interface HeadState {
   showType: boolean
   sortType: ProxySortType
   filterText: string
-  filterMatchCase?: boolean
-  filterMatchWholeWord?: boolean
-  filterUseRegularExpression?: boolean
   textState: 'url' | 'filter' | null
   testUrl: string
 }
@@ -25,9 +22,6 @@ export const DEFAULT_STATE: HeadState = {
   showType: true,
   sortType: 1,
   filterText: '',
-  filterMatchCase: false,
-  filterMatchWholeWord: false,
-  filterUseRegularExpression: false,
   textState: null,
   testUrl: '',
 }
@@ -35,8 +29,14 @@ export const DEFAULT_STATE: HeadState = {
 type HeadStateAction =
   | { type: 'reset' }
   | { type: 'replace'; payload: HeadStateStorage }
-  | { type: 'update'; profileUid: string; groupName: string; patch: Partial<HeadState> }
+  | {
+      type: 'update'
+      profileUid: string
+      groupName: string
+      patch: Partial<HeadState>
+    }
 
+// use-head-state-reducer
 function headStateReducer(
   state: HeadStateStorage,
   action: HeadStateAction,
@@ -113,4 +113,3 @@ export function useHeadStateNew() {
   const currentProfileState = state[current] || {}
   return [currentProfileState, setHeadState] as const
 }
-

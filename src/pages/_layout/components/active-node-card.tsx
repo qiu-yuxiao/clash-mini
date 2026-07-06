@@ -7,7 +7,7 @@ import {
   Chip,
   CircularProgress,
 } from '@mui/material'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { filterSort } from '@/components/proxy/use-filter-sort'
@@ -78,12 +78,18 @@ export const ActiveNodeStatusCard = () => {
     return delayManager.getDelayFix(activeNodeRecord, primaryGroup.name)
   })
 
+  const hasRecord = !!activeNodeRecord
+  const activeNodeRecordRef = useRef(activeNodeRecord)
+  useEffect(() => {
+    activeNodeRecordRef.current = activeNodeRecord
+  }, [activeNodeRecord])
+
   // 通过 listener 响应式订阅延迟更新，不再依赖 proxiesData 驱动重算
   useEffect(() => {
-    if (!activeNodeName || !primaryGroup?.name || !activeNodeRecord) return
+    const record = activeNodeRecordRef.current
+    if (!activeNodeName || !primaryGroup?.name || !record) return
 
-    // eslint-disable-next-line @eslint-react/set-state-in-effect
-    setDelay(delayManager.getDelayFix(activeNodeRecord, primaryGroup.name))
+    setDelay(delayManager.getDelayFix(record, primaryGroup.name))
 
     const handler = (update: { delay: number }) => {
       setDelay(update.delay)
@@ -92,8 +98,7 @@ export const ActiveNodeStatusCard = () => {
     return () => {
       delayManager.removeListener(activeNodeName, primaryGroup.name)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeNodeName, primaryGroup?.name, !!activeNodeRecord])
+  }, [activeNodeName, primaryGroup?.name, hasRecord])
 
   const [testing, setTesting] = useState(false)
   const [nodeAddr, setNodeAddr] = useState<string>('')
@@ -129,7 +134,11 @@ export const ActiveNodeStatusCard = () => {
     if (delayManager.isBatchTesting) return
     setTesting(true)
     try {
-      const res = await delayManager.checkDelay(activeNodeName, primaryGroup.name, singleTestTimeout)
+      const res = await delayManager.checkDelay(
+        activeNodeName,
+        primaryGroup.name,
+        singleTestTimeout,
+      )
       setDelay(res.delay)
       delayManager.queueGroupNotification(primaryGroup.name)
     } catch (err) {
@@ -150,19 +159,7 @@ export const ActiveNodeStatusCard = () => {
         const stateObj = JSON.parse(stateStr)
         const groupState = stateObj[currentProfileUid]?.[primaryGroup.name]
         if (groupState) {
-          const {
-            filterText = '',
-            sortType = 0,
-            filterMatchCase = false,
-            filterMatchWholeWord = false,
-            filterUseRegularExpression = false,
-          } = groupState
-
-          const searchState = {
-            matchCase: filterMatchCase,
-            matchWholeWord: filterMatchWholeWord,
-            useRegularExpression: filterUseRegularExpression,
-          }
+          const { filterText = '', sortType = 0 } = groupState
 
           currentCandidateNodes = filterSort(
             primaryGroup.all,
@@ -170,7 +167,6 @@ export const ActiveNodeStatusCard = () => {
             filterText,
             sortType,
             latencyTimeout,
-            searchState,
           )
         }
       }

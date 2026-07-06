@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 
-import DelayManager from '@/services/delay'
 import { useWindow } from '@/hooks/use-window'
+import DelayManager from '@/services/delay'
 
 const HANDLE_SIZE = 6
 

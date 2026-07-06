@@ -1,15 +1,8 @@
 import delayManager from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
-import { compileStringMatcher } from '@/utils/search-matcher'
 
 // default | delay | alphabet
 export type ProxySortType = 0 | 1 | 2
-
-export type ProxySearchState = {
-  matchCase?: boolean
-  matchWholeWord?: boolean
-  useRegularExpression?: boolean
-}
 
 export function filterSort(
   proxies: IProxyItem[],
@@ -17,73 +10,27 @@ export function filterSort(
   filterText: string,
   sortType: ProxySortType,
   latencyTimeout?: number,
-  searchState?: ProxySearchState,
 ) {
-  const fp = filterProxies(proxies, groupName, filterText, searchState)
+  const fp = filterProxies(proxies, groupName, filterText)
   const sp = sortProxies(fp, groupName, sortType, latencyTimeout)
   return sp
 }
 
 /**
- * 可以通过延迟数/节点类型 过滤
- */
-const regex1 = /delay([=<>])(\d+|timeout|error)/i
-const regex2 = /type=(.*)/i
-
-/**
  * filter the proxy
- * according to the regular conditions
+ * according to simple lowercase includes search with trim
  */
 function filterProxies(
   proxies: IProxyItem[],
-  groupName: string,
+  _groupName: string,
   filterText: string,
-  searchState?: ProxySearchState,
 ) {
   if (!proxies) return []
   const query = (filterText || '').trim()
   if (!query) return proxies
 
-  const res1 = regex1.exec(query)
-  if (res1) {
-    const symbol = res1[1]
-    const symbol2 = res1[2].toLowerCase()
-    const value =
-      symbol2 === 'error' ? 1e5 : symbol2 === 'timeout' ? 3000 : +symbol2
-
-    return proxies.filter((p) => {
-      const delay = delayManager.getDelayFix(p, groupName)
-
-      if (delay < 0) return false
-      if (symbol === '=' && symbol2 === 'error') return delay >= 1e5
-      if (symbol === '=' && symbol2 === 'timeout')
-        return delay < 1e5 && delay >= 3000
-      if (symbol === '=') return delay == value
-      if (symbol === '<') return delay <= value
-      if (symbol === '>') return delay >= value
-      return false
-    })
-  }
-
-  const res2 = regex2.exec(query)
-  if (res2) {
-    const type = res2[1].toLowerCase()
-    return proxies.filter((p) => (p?.type ?? '').toLowerCase().includes(type))
-  }
-
-  const {
-    matchCase = false,
-    matchWholeWord = false,
-    useRegularExpression = false,
-  } = searchState ?? {}
-  const compiled = compileStringMatcher(query, {
-    matchCase,
-    matchWholeWord,
-    useRegularExpression,
-  })
-
-  if (!compiled.isValid) return []
-  return proxies.filter((p) => compiled.matcher(p?.name ?? ''))
+  const target = query.toLowerCase()
+  return proxies.filter((p) => (p?.name ?? '').toLowerCase().includes(target))
 }
 
 /**

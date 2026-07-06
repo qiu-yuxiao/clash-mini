@@ -416,11 +416,6 @@ export const useRenderList = (
         headState.filterText,
         headState.sortType,
         latencyTimeout,
-        {
-          matchCase: headState.filterMatchCase,
-          matchWholeWord: headState.filterMatchWholeWord,
-          useRegularExpression: headState.filterUseRegularExpression,
-        },
       )
 
       if (group.name !== 'PROXY') {

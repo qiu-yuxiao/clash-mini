@@ -49,94 +49,81 @@ interface Props {
   searchState?: SearchState
 }
 
-const LogItem = memo(({ value, searchState }: Props) => {
-  const regex = useMemo(() => {
-    if (!searchState?.text.trim()) return null
-    try {
-      const searchText = searchState.text
-      let pattern: string
-
-      if (searchState.useRegularExpression) {
-        try {
-          new RegExp(searchText)
-          pattern = searchText
-        } catch {
-          pattern = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        }
-      } else {
-        const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        pattern = searchState.matchWholeWord ? `\\b${escaped}\\b` : escaped
+const LogItem = memo(
+  ({ value, searchState }: Props) => {
+    const regex = useMemo(() => {
+      if (!searchState?.text.trim()) return null
+      try {
+        const escaped = searchState.text
+          .trim()
+          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        return new RegExp(escaped, 'gi')
+      } catch {
+        return null
       }
+    }, [searchState?.text])
 
-      const flags = searchState.matchCase ? 'g' : 'gi'
-      return new RegExp(pattern, flags)
-    } catch {
-      return null
+    const renderHighlightText = (text: string) => {
+      if (!regex) return text
+
+      try {
+        regex.lastIndex = 0
+        const elements: ReactNode[] = []
+        let lastIndex = 0
+        let match: RegExpExecArray | null
+
+        while ((match = regex.exec(text)) !== null) {
+          const start = match.index
+          const matchText = match[0]
+
+          if (matchText === '') {
+            regex.lastIndex += 1
+            continue
+          }
+
+          if (start > lastIndex) {
+            elements.push(text.slice(lastIndex, start))
+          }
+
+          elements.push(
+            <span key={`highlight-${start}`} className="highlight">
+              {matchText}
+            </span>,
+          )
+
+          lastIndex = start + matchText.length
+        }
+
+        if (lastIndex < text.length) {
+          elements.push(text.slice(lastIndex))
+        }
+
+        return elements.length ? elements : text
+      } catch {
+        return text
+      }
     }
-  }, [searchState?.text, searchState?.useRegularExpression, searchState?.matchWholeWord, searchState?.matchCase])
 
-  const renderHighlightText = (text: string) => {
-    if (!regex) return text
-
-    try {
-      regex.lastIndex = 0
-      const elements: ReactNode[] = []
-      let lastIndex = 0
-      let match: RegExpExecArray | null
-
-      while ((match = regex.exec(text)) !== null) {
-        const start = match.index
-        const matchText = match[0]
-
-        if (matchText === '') {
-          regex.lastIndex += 1
-          continue
-        }
-
-        if (start > lastIndex) {
-          elements.push(text.slice(lastIndex, start))
-        }
-
-        elements.push(
-          <span key={`highlight-${start}`} className="highlight">
-            {matchText}
-          </span>,
-        )
-
-        lastIndex = start + matchText.length
-      }
-
-      if (lastIndex < text.length) {
-        elements.push(text.slice(lastIndex))
-      }
-
-      return elements.length ? elements : text
-    } catch {
-      return text
-    }
-  }
-
-  return (
-    <Item>
-      <div>
-        <span className="time">{renderHighlightText(value.time || '')}</span>
-        <span className="type" data-type={(value.type || '').toLowerCase()}>
-          {renderHighlightText(value.type || '')}
-        </span>
-      </div>
-      <div>
-        <span className="data">{renderHighlightText(value.payload)}</span>
-      </div>
-    </Item>
-  )
-}, (prev, next) => {
-  return (
-    prev.value === next.value &&
-    prev.searchState?.text === next.searchState?.text &&
-    prev.searchState?.useRegularExpression === next.searchState?.useRegularExpression &&
-    prev.searchState?.matchWholeWord === next.searchState?.matchWholeWord &&
-    prev.searchState?.matchCase === next.searchState?.matchCase
-  )
-})
+    return (
+      <Item>
+        <div>
+          <span className="time">{renderHighlightText(value.time || '')}</span>
+          <span className="type" data-type={(value.type || '').toLowerCase()}>
+            {renderHighlightText(value.type || '')}
+          </span>
+        </div>
+        <div>
+          <span className="data">{renderHighlightText(value.payload)}</span>
+        </div>
+      </Item>
+    )
+  },
+  (prev, next) => {
+    return (
+      prev.value === next.value &&
+      prev.searchState?.text === next.searchState?.text
+    )
+  },
+)
 
 export default LogItem

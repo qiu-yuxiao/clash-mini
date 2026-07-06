@@ -187,11 +187,7 @@ pub async fn exit_lightweight_mode() -> bool {
     }
 
     if !transition_and_log(LightweightState::In, LightweightState::Exiting) {
-        logging!(
-            debug,
-            Type::Lightweight,
-            "轻量模式正在退出中，跳过重复调用"
-        );
+        logging!(debug, Type::Lightweight, "轻量模式正在退出中，跳过重复调用");
         refresh_lightweight_tray_state().await;
         return false;
     }

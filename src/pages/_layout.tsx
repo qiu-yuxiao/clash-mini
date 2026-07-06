@@ -165,9 +165,6 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
 
     let filterText = ''
     let sortType = 0
-    let filterMatchCase = false
-    let filterMatchWholeWord = false
-    let filterUseRegularExpression = false
 
     try {
       const headStateStr = localStorage.getItem('proxy-head-state')
@@ -177,27 +174,15 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
         if (groupState) {
           filterText = groupState.filterText || ''
           sortType = groupState.sortType || 0
-          filterMatchCase = groupState.filterMatchCase || false
-          filterMatchWholeWord = groupState.filterMatchWholeWord || false
-          filterUseRegularExpression =
-            groupState.filterUseRegularExpression || false
         }
       }
     } catch {}
-
-    const searchState = {
-      matchCase: filterMatchCase,
-      matchWholeWord: filterMatchWholeWord,
-      useRegularExpression: filterUseRegularExpression,
-    }
 
     const filtered = filterSort(
       allProxies,
       groupName,
       filterText,
       sortType as 0 | 1 | 2,
-      undefined,
-      searchState,
     )
 
     return filtered
