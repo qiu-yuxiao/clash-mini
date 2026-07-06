@@ -42,8 +42,8 @@ pub(super) async fn check_netflix(client: &Client) -> UnlockItem {
         return netflix_item("Failed", None);
     }
 
-    let status1 = result1.unwrap().status().as_u16();
-    let status2 = result2.unwrap().status().as_u16();
+    let status1 = result1.map(|r| r.status().as_u16()).unwrap_or(0);
+    let status2 = result2.map(|r| r.status().as_u16()).unwrap_or(0);
 
     if status1 == 404 && status2 == 404 {
         return netflix_item("Originals Only", None);
