@@ -31,6 +31,7 @@ export const ActiveNodeStatusCard = () => {
   const currentProfileUid = profiles?.current || ''
   const { verge } = useVerge()
   const latencyTimeout = verge?.default_latency_timeout || 10000
+  // 单点测速固定 1 秒超时，追求快速响应；显示和轮换判定统一用 latencyTimeout
   const singleTestTimeout = 1000
 
   const primaryGroup = useMemo(() => {
@@ -125,6 +126,7 @@ export const ActiveNodeStatusCard = () => {
   const handleTestDelay = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!activeNodeName || !primaryGroup?.name) return
+    if (delayManager.isBatchTesting) return
     setTesting(true)
     try {
       const res = await delayManager.checkDelay(activeNodeName, primaryGroup.name, singleTestTimeout)
@@ -215,7 +217,7 @@ export const ActiveNodeStatusCard = () => {
 
   const { t } = useTranslation()
   const signalInfo = getSignalIcon(delay, t)
-  const delayColor = convertDelayColor(delay)
+  const delayColor = convertDelayColor(delay, latencyTimeout)
   const theme = useTheme()
   const skinFallback = useMemo(() => {
     return typeof window !== 'undefined'
@@ -322,7 +324,7 @@ export const ActiveNodeStatusCard = () => {
             testing || delay === -2
               ? t('settings.mini.statusTesting', { defaultValue: '测试中' }) +
                 '...'
-              : delayManager.formatDelay(delay)
+              : delayManager.formatDelay(delay, latencyTimeout)
           }
           color={delayColor}
           onClick={handleTestDelay}
