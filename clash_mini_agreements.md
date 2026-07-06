@@ -940,7 +940,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 - **关闭按钮行为**：关闭按钮被点击后，先隐藏窗口，然后立即进入轻量模式，同步销毁主窗口。
 - **macOS 隐藏行为**：隐藏操作替换为直接进入轻量模式，确保跨平台行为一致。
-- **兼容空壳**：自动轻量模式的启用/禁用保留为空壳，避免破坏配置热更新路径和前端配置界面的联动。配置项本身继续保留以维持向后兼容。
+- **配置项保留**：`enable_auto_light_weight_mode` 配置项字段保留以维持向后兼容，但不再有任何运行时行为。自动轻量模式启动由 `auto_lightweight_boot` 直接读取 `enable_silent_start` 配置判断，不再经过配置热更新路径。
 
 **退出轻量时的窗口操作结果判定**：退出轻量模式时，窗口已可用应视为成功，不触发状态机回滚。
 
@@ -1341,7 +1341,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **前端生命周期超时器与微任务清理**：
   - 在 `_layout.tsx` 侧边设置面板 of `useEffect` 中，对延迟 0ms 设置可见性 of `setTimeout` 进行 timerId 追踪，并在 effect 的清理函数中执行 `clearTimeout`，彻底杜绝组件销毁或频繁操作时的 React 组件状态泄露与警告。
   - 移除了 mixedPortVal 状态设置时包裹的 `Promise.resolve().then()`，直接在已异步运行的 `useEffect` 中进行同步状态同步。
-- **冗余及废弃组件清理**：从 `enable_auto_light_weight_mode` 中彻底移除已无用处的定时器全局初始化 `Timer::global().init()` 及 `async` 异步修饰词，保证代码的高效简洁。
+- **冗余及废弃组件清理**：已彻底删除 `enable_auto_light_weight_mode` 和 `disable_auto_light_weight_mode` 两个空壳函数及其在 `config.rs` 中的全部引用（标志位、变量提取、消费块），自动轻量模式启动由 `auto_lightweight_boot` 直接读取 `enable_silent_start` 配置判断，保证代码的高效简洁。
 
 ### v1.8.1 全面代码审计
 

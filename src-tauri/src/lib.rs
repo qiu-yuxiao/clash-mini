@@ -418,7 +418,12 @@ pub fn run() {
                 AsyncHandler::spawn(|| async {
                     let entered = lightweight::entry_lightweight_mode().await;
                     if !entered {
-                        logging!(error, Type::Lightweight, "[窗口关闭] 轻量模式进入失败");
+                        logging!(
+                            error,
+                            Type::Lightweight,
+                            "[窗口关闭] 轻量模式进入失败，尝试恢复窗口显示"
+                        );
+                        let _ = crate::utils::window_manager::WindowManager::show_main_window().await;
                     }
                 });
             }
@@ -604,7 +609,13 @@ pub fn run() {
         }
         #[allow(unused_variables)]
         tauri::RunEvent::ExitRequested { api, code, .. } => {
-            if module::lightweight::is_in_lightweight_mode() && !handle::Handle::global().is_exiting() {
+            // 处于轻量模式且未在退出流程中时阻止退出，以便先退出轻量模式；
+            // 但仅当无退出码（code.is_none()）时才阻止——若带退出码（如系统关机/注销），
+            // 应允许退出，避免"阻止退出但无动作"的死锁路径。
+            if module::lightweight::is_in_lightweight_mode()
+                && !handle::Handle::global().is_exiting()
+                && code.is_none()
+            {
                 api.prevent_exit();
             } else if code.is_none() {
                 api.prevent_exit();

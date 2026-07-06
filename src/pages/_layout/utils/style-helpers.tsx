@@ -69,8 +69,9 @@ export function getSignalIcon(delay: number, t: any) {
 
 export function convertDelayColor(
   delayValue: number,
+  timeout = 10000,
 ): 'success' | 'warning' | 'error' | 'primary' | 'default' {
-  const colorStr = delayManager.formatDelayColor(delayValue)
+  const colorStr = delayManager.formatDelayColor(delayValue, timeout)
   if (!colorStr) return 'default'
   const mainColor = colorStr.split('.')[0]
   switch (mainColor) {

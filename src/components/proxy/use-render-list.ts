@@ -4,6 +4,7 @@ import { useRuntimeConfig } from '@/hooks/use-clash'
 import { useVerge } from '@/hooks/use-verge'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import delayManager from '@/services/delay'
+import type { IProxyItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 
 import { filterSort } from './use-filter-sort'
@@ -13,24 +14,6 @@ import {
   type HeadState,
 } from './use-head-state'
 import { useWindowWidth } from './use-window-width'
-
-// 定义代理项接口
-interface IProxyItem {
-  name: string
-  type: string
-  udp: boolean
-  xudp: boolean
-  tfo: boolean
-  mptcp: boolean
-  smux: boolean
-  history: {
-    time: string
-    delay: number
-  }[]
-  provider?: string
-  testUrl?: string
-  [key: string]: any // 添加索引签名以适应其他可能的属性
-}
 
 // 代理组类型
 type ProxyGroup = {
@@ -77,6 +60,7 @@ type GroupCache = {
   latencyTimeout: number | undefined
   delayBump: number
   items: IRenderItem[]
+  groupRef: ProxyGroup
 }
 
 // 优化列布局计算
@@ -120,10 +104,7 @@ export const useRenderList = (
   const { data: runtimeConfig } = useRuntimeConfig(!!isChainMode)
 
   // 计算列数
-  const col = useMemo(
-    () => calculateColumns(width),
-    [width],
-  )
+  const col = useMemo(() => calculateColumns(width), [width])
 
   // 确保代理数据加载
   useEffect(() => {
@@ -131,7 +112,7 @@ export const useRenderList = (
     const { groups, proxies } = proxiesData
 
     if (
-      (mode === 'rule' && !(groups?.length)) ||
+      (mode === 'rule' && !groups?.length) ||
       (mode === 'global' && (proxies?.length ?? 0) < 2)
     ) {
       const handle = setTimeout(() => refreshProxy(), 500)
@@ -148,10 +129,15 @@ export const useRenderList = (
     )
     if (allProxies.length === 0) return
 
-    // 设置组监听器，当有延迟更新时自动刷新
+    // 设置组监听器，当有延迟更新时自动刷新（节流 500ms）
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null
     const groupListener = () => {
-      debugLog('[ChainMode] 延迟更新，刷新UI')
-      refreshProxy()
+      if (throttleTimer) return
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null
+        debugLog('[ChainMode] 延迟更新，刷新UI')
+        refreshProxy()
+      }, 500)
     }
 
     delayManager.setGroupListener('chain-mode', groupListener)
@@ -175,6 +161,7 @@ export const useRenderList = (
 
     return () => {
       clearTimeout(handle)
+      if (throttleTimer) clearTimeout(throttleTimer)
       // 清理组监听器
       delayManager.removeGroupListener('chain-mode')
     }
@@ -202,7 +189,9 @@ export const useRenderList = (
       // 使用正常的规则模式代理组
       const allGroups = proxiesData.groups?.length
         ? proxiesData.groups
-        : proxiesData.global ? [proxiesData.global] : []
+        : proxiesData.global
+          ? [proxiesData.global]
+          : []
 
       // 如果选择了特定代理组，只显示该组的节点
       if (selectedGroup) {
@@ -336,7 +325,8 @@ export const useRenderList = (
     if (isChainMode && runtimeConfig) {
       // 从运行时配置直接获取 proxies 列表
       const allProxies: IProxyItem[] = Object.values(
-        (runtimeConfig as { proxies?: Record<string, IProxyItem> }).proxies || {},
+        (runtimeConfig as { proxies?: Record<string, IProxyItem> }).proxies ||
+          {},
       )
 
       // 为每个节点获取延迟信息
@@ -411,7 +401,8 @@ export const useRenderList = (
         cached.headState === headState &&
         cached.col === col &&
         cached.latencyTimeout === latencyTimeout &&
-        cached.delayBump === delayBump
+        cached.delayBump === delayBump &&
+        cached.groupRef === group
       ) {
         return cached.items
       }
@@ -494,6 +485,7 @@ export const useRenderList = (
         latencyTimeout,
         delayBump,
         items: ret,
+        groupRef: group,
       })
       return ret
     })
@@ -505,7 +497,6 @@ export const useRenderList = (
     }
     prevListRef.current = filtered
     return filtered
-    // eslint-disable-next-line @eslint-react/exhaustive-deps, react-hooks/exhaustive-deps
   }, [
     headStates,
     proxiesData,

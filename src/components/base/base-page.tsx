@@ -1,5 +1,7 @@
 import { Typography } from '@mui/material'
-import React, { ReactNode } from 'react'
+import React, { ReactNode, use } from 'react'
+
+import { DragRegionContext } from '@/providers/drag-region-context'
 
 import { BaseErrorBoundary } from './base-error-boundary'
 
@@ -13,13 +15,18 @@ interface Props {
 
 export const BasePage: React.FC<Props> = (props) => {
   const { title, header, contentStyle, full, children } = props
+  const { enabled: dragRegionEnabled } = use(DragRegionContext)
+  const dragRegion = dragRegionEnabled ? 'true' : 'false'
   return (
     <BaseErrorBoundary>
       <div className="base-page">
-        <header data-tauri-drag-region="true" style={{ userSelect: 'none' }}>
+        <header
+          data-tauri-drag-region={dragRegion}
+          style={{ userSelect: 'none' }}
+        >
           <Typography
             sx={{ fontSize: '20px', fontWeight: '700 ' }}
-            data-tauri-drag-region="true"
+            data-tauri-drag-region={dragRegion}
           >
             {title}
           </Typography>
@@ -29,7 +36,9 @@ export const BasePage: React.FC<Props> = (props) => {
 
         <div
           className={full ? 'base-container no-padding' : 'base-container'}
-          style={{ backgroundColor: 'var(--theme-bg, var(--background-color))' }}
+          style={{
+            backgroundColor: 'var(--theme-bg, var(--background-color))',
+          }}
         >
           <section
             style={{

@@ -18,11 +18,7 @@ import type {
 import type { IVergeConfig, ValidationOutcome } from '@/types/verge'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
-import {
-  getProxies,
-  getProxyProviders,
-  delayProxyByName,
-} from 'tauri-plugin-mihomo-api'
+import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
 export async function getProfiles() {
   return invoke<IProfilesConfig>('get_profiles')
@@ -394,31 +390,6 @@ export async function openCoreDir() {
 
 export async function openLogsDir() {
   return invoke<void>('open_logs_dir').catch((err) => showNotice.error(err))
-}
-
-export async function cmdGetProxyDelay(
-  name: string,
-  timeout: number,
-  url?: string,
-) {
-  // 确保URL不为空
-  const testUrl = url || 'http://cp.cloudflare.com/generate_204'
-
-  try {
-    // 调用 tauri-plugin-mihomo 提供的正常延迟测试函数
-    const result = await delayProxyByName(name, testUrl, timeout)
-
-    // 验证返回结果中是否有delay字段，并且值是一个有效的数字
-    if (result && typeof result.delay === 'number') {
-      return result
-    } else {
-      // 返回一个有效的结果对象，但标记为超时
-      return { delay: 1e6 }
-    }
-  } catch {
-    // 返回一个有效的结果对象，但标记为错误
-    return { delay: 1e6 }
-  }
 }
 
 export async function openDevTools() {

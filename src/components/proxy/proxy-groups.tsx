@@ -21,6 +21,7 @@ import {
   useMemo,
   useRef,
   useState,
+  use,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
@@ -28,6 +29,7 @@ import { useLocation } from 'react-router'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
 import { useProxiesData } from '@/providers/app-data-context'
+import { DragRegionContext } from '@/providers/drag-region-context'
 import { updateProxyChainConfigInRuntime } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
@@ -66,6 +68,8 @@ export const ProxyGroups = (props: Props) => {
   const { t } = useTranslation()
   const { pathname } = useLocation()
   const { mode, isChainMode = false, chainConfigData } = props
+  // 消费拖拽区域状态，批量测速期间禁用 drag-region
+  const { setEnabled: setDragRegionEnabled } = use(DragRegionContext)
 
   const [proxyChain, setProxyChain] = useState<ProxyChainItem[]>(() => {
     try {
@@ -403,24 +407,16 @@ export const ProxyGroups = (props: Props) => {
       debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
 
       if (visibleNames.length > 0) {
-        // Lock window resize to prevent WebView2 compositor crash
-        // during virtual list element measurements
         const win = getCurrentWindow()
-        await win.setResizable(false)
-
-        // Disable titlebar drag-region to prevent Tauri sync-command
-        // deadlock during modal drag loop (DefWindowProc blocks main thread)
-        document
-          .querySelectorAll('[data-tauri-drag-region="true"]')
-          .forEach((el) => el.setAttribute('data-tauri-drag-region', 'false'))
-
         try {
+          await win.setResizable(false)
+          setDragRegionEnabled(false)
           await delayManager.checkListDelay(visibleNames, groupName, timeout)
         } finally {
-          await win.setResizable(true)
-          document
-            .querySelectorAll('[data-tauri-drag-region="false"]')
-            .forEach((el) => el.setAttribute('data-tauri-drag-region', 'true'))
+          if (!delayManager.isBatchTesting) {
+            await win.setResizable(true)
+            setDragRegionEnabled(true)
+          }
         }
 
         // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 30ms 且 < timeout，注：30ms为系统强制设计要求以过滤广告节点）

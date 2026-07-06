@@ -37,6 +37,22 @@ const NODE_DELAY_MIN_MS: u32 = 30;
 /// 健康检测和自动选点测速均以此值作为超时阈值，确保判断标准统一。
 const NODE_DELAY_MAX_MS: u32 = 2000;
 
+/// 正常健康检测间隔（秒）
+const NORMAL_CHECK_INTERVAL_SECS: u64 = 15;
+
+/// 重试模式健康检测间隔（秒）
+const RETRY_CHECK_INTERVAL_SECS: u64 = 3;
+
+/// 从当前 Verge 配置中读取测速 URL，多处复用避免重复代码
+async fn get_test_url() -> String {
+    let verge = Config::verge().await.latest_arc();
+    verge
+        .default_latency_test
+        .as_deref()
+        .unwrap_or("http://cp.cloudflare.com/generate_204")
+        .to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FilterConfig {
     pub filter_text: String,
@@ -230,13 +246,9 @@ async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
         return Ok(NodeHealthStatus::Unhealthy);
     }
 
-    let verge = Config::verge().await.latest_arc();
-    let test_url = verge
-        .default_latency_test
-        .as_deref()
-        .unwrap_or("http://cp.cloudflare.com/generate_204");
+    let test_url = get_test_url().await;
 
-    match mihomo.delay_proxy_by_name(active_node, test_url, NODE_DELAY_MAX_MS).await {
+    match mihomo.delay_proxy_by_name(active_node, &test_url, NODE_DELAY_MAX_MS).await {
         Ok(delay_info) => {
             if delay_info.delay >= NODE_DELAY_MIN_MS {
                 Ok(NodeHealthStatus::Healthy)
@@ -360,12 +372,7 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         valid_nodes.len()
     );
 
-    let verge = Config::verge().await.latest_arc();
-    let test_url = verge
-        .default_latency_test
-        .as_deref()
-        .unwrap_or("http://cp.cloudflare.com/generate_204")
-        .to_string();
+    let test_url = get_test_url().await;
 
     let valid_nodes = Arc::new(valid_nodes);
     let next_index = Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -507,9 +514,9 @@ pub fn start_background_monitor() {
             } else {
                 // 定期健康检测的间隔：重试模式下为 3 秒，正常模式下为 15 秒
                 let check_interval = if is_retry_mode {
-                    3
+                    RETRY_CHECK_INTERVAL_SECS
                 } else {
-                    15
+                    NORMAL_CHECK_INTERVAL_SECS
                 };
 
                 tokio::select! {
@@ -596,12 +603,7 @@ pub fn start_background_monitor() {
 
                 // 【性能优化与动态探测】：直接从当前配置的测速网址中解析域名与端口作为探测目标，
                 // 彻底消除硬编码的第三方网站，测速用什么网络检测就测什么，天然兼顾海内外。
-                let verge = Config::verge().await.latest_arc();
-                let test_url = verge
-                    .default_latency_test
-                    .as_deref()
-                    .unwrap_or("http://cp.cloudflare.com/generate_204")
-                    .to_string();
+                let test_url = get_test_url().await;
 
                 let host_port = match url::Url::parse(&test_url) {
                     Ok(parsed_url) => {
@@ -719,6 +721,7 @@ pub fn start_background_monitor() {
                                             continue;
                                         }
                                     }
+                                    let prev_auto_select_time = last_auto_select_time;
                                     last_auto_select_time = Some(now);
 
                                     logging!(
@@ -752,8 +755,7 @@ pub fn start_background_monitor() {
                                                     "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
                                                 );
                                                 // BUSY 不算失败，回退冷却时间戳，允许下次重试
-                                                last_auto_select_time = last_auto_select_time
-                                                    .filter(|t| t.elapsed().as_secs() < 60);
+                                                last_auto_select_time = prev_auto_select_time;
                                             } else {
                                                 auto_select_fail_count += 1;
                                                 logging!(

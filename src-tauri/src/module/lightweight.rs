@@ -69,25 +69,11 @@ async fn refresh_lightweight_tray_state() {
 
 pub async fn auto_lightweight_boot() -> Result<()> {
     let verge_config = Config::verge().await;
-    let is_enable_auto = verge_config.data_arc().enable_auto_light_weight_mode.unwrap_or(false);
     let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
-    if is_enable_auto {
-        enable_auto_light_weight_mode();
-    }
     if is_silent_start {
         entry_lightweight_mode().await;
     }
     Ok(())
-}
-
-/// 轻量模式延迟触发定时器已废弃（关闭窗口直接触发替代）。
-pub fn enable_auto_light_weight_mode() {
-    logging!(info, Type::Lightweight, "开启自动轻量模式（关闭窗口即刻进入）");
-}
-
-/// 已废弃定时器机制，现为兼容空壳。
-pub fn disable_auto_light_weight_mode() {
-    logging!(info, Type::Lightweight, "关闭自动轻量模式");
 }
 
 pub async fn entry_lightweight_mode() -> bool {
@@ -189,11 +175,22 @@ pub async fn entry_lightweight_mode() -> bool {
 
 pub async fn exit_lightweight_mode() -> bool {
     let _guard = LIGHTWEIGHT_LOCK.lock().await;
+
+    // 状态为 Normal 时，窗口可能仅被隐藏（enable_auto_light_weight_mode=false 路径），
+    // 直接显示窗口即可恢复，避免"窗口隐藏但无法退出"的卡死状态。
+    if get_state() == LightweightState::Normal {
+        logging!(debug, Type::Lightweight, "轻量模式未激活，直接显示窗口");
+        let _ = WindowManager::show_main_window().await;
+        refresh_lightweight_tray_state().await;
+        crate::core::tray::update_lite_mode_menu(false);
+        return true;
+    }
+
     if !transition_and_log(LightweightState::In, LightweightState::Exiting) {
         logging!(
             debug,
             Type::Lightweight,
-            "轻量模式不在退出条件（可能已退出或正在退出），跳过调用"
+            "轻量模式正在退出中，跳过重复调用"
         );
         refresh_lightweight_tray_state().await;
         return false;
@@ -218,7 +215,10 @@ pub async fn exit_lightweight_mode() -> bool {
     refresh_lightweight_tray_state().await;
     // 退出轻量模式后，更新托盘菜单中的「轻量模式」选项状态
     crate::core::tray::update_lite_mode_menu(false);
-    // 唤醒常驻监测线程以立即重置为前台周期（15秒）
+    // 说明：进入轻量模式时已熔断 WebSocket 订阅并清空连接（见 entry_lightweight_mode），
+    // 退出时无需后端手动重建 WS 订阅——前端在窗口显示后会通过 useEffect 自动重新订阅
+    // WebSocket，MihomoManager 的 refresh_proxy 也会自动重连。此处仅唤醒监测线程。
+    // 唤醒常驻监测线程以立即重置为前台周期（15秒），必须放在最后调用
     crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
     true
 }

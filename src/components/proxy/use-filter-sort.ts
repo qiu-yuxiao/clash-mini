@@ -1,6 +1,3 @@
-import { useEffect, useMemo, useReducer, useState } from 'react'
-
-import { useVerge } from '@/hooks/use-verge'
 import delayManager from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 import { compileStringMatcher } from '@/utils/search-matcher'
@@ -12,69 +9,6 @@ export type ProxySearchState = {
   matchCase?: boolean
   matchWholeWord?: boolean
   useRegularExpression?: boolean
-}
-
-export default function useFilterSort(
-  proxies: IProxyItem[],
-  groupName: string,
-  filterText: string,
-  sortType: ProxySortType,
-  searchState?: ProxySearchState,
-) {
-  const { verge } = useVerge()
-  const [_, bumpRefresh] = useReducer((count: number) => count + 1, 0)
-
-  useEffect(() => {
-    let last = 0
-
-    delayManager.setGroupListener(groupName, () => {
-      // 简单节流
-      const now = Date.now()
-      if (now - last > 666) {
-        last = now
-        bumpRefresh()
-      }
-    })
-
-    return () => {
-      delayManager.removeGroupListener(groupName)
-    }
-  }, [groupName])
-
-  // 对输入文本进行防抖处理
-  const [debouncedFilterText, setDebouncedFilterText] = useState(filterText)
-
-  useEffect(() => {
-    const handler = window.setTimeout(() => {
-      setDebouncedFilterText(filterText)
-    }, 150)
-
-    return () => {
-      window.clearTimeout(handler)
-    }
-  }, [filterText])
-
-  const result = useMemo(() => {
-    void _
-    const fp = filterProxies(proxies, groupName, debouncedFilterText, searchState)
-    const sp = sortProxies(
-      fp,
-      groupName,
-      sortType,
-      verge?.default_latency_timeout,
-    )
-    return sp
-  }, [
-    _,
-    proxies,
-    groupName,
-    debouncedFilterText,
-    sortType,
-    searchState,
-    verge?.default_latency_timeout,
-  ])
-
-  return result
 }
 
 export function filterSort(

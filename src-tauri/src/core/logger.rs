@@ -122,10 +122,6 @@ impl Logger {
 
     fn generate_log_spec(log_level: LevelFilter) -> LogSpecification {
         let mut spec = LogSpecBuilder::new();
-        let log_level = std::env::var("RUST_LOG")
-            .ok()
-            .and_then(|v| log::LevelFilter::from_str(&v).ok())
-            .unwrap_or(log_level);
         spec.default(log_level);
         #[cfg(feature = "tracing")]
         spec.module("tauri", log::LevelFilter::Debug)
@@ -216,6 +212,10 @@ impl Logger {
     }
 
     pub fn writer_sidecar_log(&self, level: Level, message: &CompactString) {
+        let level_filter = *self.log_level.read();
+        if level.to_level_filter() > level_filter {
+            return;
+        }
         if let Some(writer) = self.sidecar_file_writer.read().as_ref() {
             let mut now = DeferredNow::default();
             let args = format_args!("{}", message);

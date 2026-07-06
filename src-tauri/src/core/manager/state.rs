@@ -126,7 +126,9 @@ impl CoreManager {
                             CompactString::from("Process terminated")
                         };
                         Logger::global().writer_sidecar_log(Level::Info, &message);
-                        CLASH_LOGGER.clear_logs().await;
+                        if term.code == Some(0) {
+                            CLASH_LOGGER.clear_logs().await;
+                        }
                         break;
                     }
                     _ => {}
