@@ -124,9 +124,7 @@ pub async fn test_delay(url: String) -> CmdResult<u32> {
 /// 保存DNS配置到单独文件
 #[tauri::command]
 pub async fn save_dns_config(dns_config: Mapping) -> CmdResult {
-    use crate::utils::dirs;
     use serde_yaml_ng;
-    use tokio::fs;
 
     // 获取DNS配置文件路径
     let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
@@ -161,47 +159,33 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
         })?;
 
         logging!(info, Type::Config, "Applying DNS config from file");
-
-        // 更新 verge 配置中的 DNS 启用标志为 true
-        let verge = Config::verge().await;
-        verge.edit_draft(|d| {
-            d.enable_dns_settings = Some(true);
-        });
-        verge.apply();
-        let _ = Config::verge().await.data_arc().save_file().await;
-
-        // 应用新配置
-        CoreManager::global()
-            .update_config_checked()
-            .await
-            .stringify_err_log(|err| {
-                let err = format!("Failed to apply config with DNS: {err}");
-                logging!(error, Type::Config, "{err}");
-            })?;
-
-        logging!(info, Type::Config, "DNS config successfully applied");
     } else {
         // 当关闭DNS设置时，重新生成配置（不加载DNS配置文件）
         logging!(info, Type::Config, "DNS settings disabled, regenerating config");
-
-        // 更新 verge 配置中的 DNS 启用标志为 false
-        let verge = Config::verge().await;
-        verge.edit_draft(|d| {
-            d.enable_dns_settings = Some(false);
-        });
-        verge.apply();
-        let _ = Config::verge().await.data_arc().save_file().await;
-
-        CoreManager::global()
-            .update_config_checked()
-            .await
-            .stringify_err_log(|err| {
-                let err = format!("Failed to apply regenerated config: {err}");
-                logging!(error, Type::Config, "{err}");
-            })?;
-
-        logging!(info, Type::Config, "Config regenerated successfully");
     }
+
+    // 更新 verge 配置中的 DNS 启用标志
+    let verge = Config::verge().await;
+    verge.edit_draft(|d| {
+        d.enable_dns_settings = Some(apply);
+    });
+    verge.apply();
+    let _ = Config::verge().await.data_arc().save_file().await;
+
+    // 应用新配置
+    CoreManager::global()
+        .update_config_checked()
+        .await
+        .stringify_err_log(|err| {
+            logging!(error, Type::Config, "Failed to apply config: {err}");
+        })?;
+
+    logging!(
+        info,
+        Type::Config,
+        "{}",
+        if apply { "DNS config successfully applied" } else { "Config regenerated successfully" }
+    );
 
     handle::Handle::refresh_clash();
     Ok(())

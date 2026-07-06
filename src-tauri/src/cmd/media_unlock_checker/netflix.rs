@@ -42,21 +42,8 @@ pub(super) async fn check_netflix(client: &Client) -> UnlockItem {
         return netflix_item("Failed", None);
     }
 
-    let status1 = match result1 {
-        Ok(response) => response.status().as_u16(),
-        Err(e) => {
-            logging!(error, Type::Network, "Failed to get Netflix response 1: {}", e);
-            return netflix_item("Failed", None);
-        }
-    };
-
-    let status2 = match result2 {
-        Ok(response) => response.status().as_u16(),
-        Err(e) => {
-            logging!(error, Type::Network, "Failed to get Netflix response 2: {}", e);
-            return netflix_item("Failed", None);
-        }
-    };
+    let status1 = result1.unwrap().status().as_u16();
+    let status2 = result2.unwrap().status().as_u16();
 
     if status1 == 404 && status2 == 404 {
         return netflix_item("Originals Only", None);

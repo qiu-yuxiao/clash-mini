@@ -103,28 +103,7 @@ impl WindowManager {
     }
 
     pub fn get_main_window_state() -> WindowState {
-        match Self::get_main_window() {
-            Some(window) => {
-                let is_minimized = window.is_minimized().unwrap_or(false);
-                let is_visible = window.is_visible().unwrap_or(false);
-                let is_focused = window.is_focused().unwrap_or(false);
-
-                if is_minimized {
-                    return WindowState::Minimized;
-                }
-
-                if !is_visible {
-                    return WindowState::Hidden;
-                }
-
-                if is_focused {
-                    WindowState::VisibleFocused
-                } else {
-                    WindowState::VisibleUnfocused
-                }
-            }
-            None => WindowState::NotExist,
-        }
+        Self::get_main_window_with_state().1
     }
 
     /// 获取主窗口实例

@@ -1,4 +1,4 @@
-export { BaseDialog, type DialogRef } from './base-dialog'
+export { BaseDialog } from './base-dialog'
 export { BaseEmpty } from './base-empty'
 export { BaseErrorBoundary, AreaErrorFallback } from './base-error-boundary'
 export { BaseFieldset } from './base-fieldset'

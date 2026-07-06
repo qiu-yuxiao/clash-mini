@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
 import delayManager from '@/services/delay'
@@ -23,10 +23,6 @@ export default function useFilterSort(
 ) {
   const { verge } = useVerge()
   const [_, bumpRefresh] = useReducer((count: number) => count + 1, 0)
-  const lastInputRef = useRef<{ text: string; sort: ProxySortType } | null>(
-    null,
-  )
-  const debounceTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     let last = 0
@@ -45,9 +41,22 @@ export default function useFilterSort(
     }
   }, [groupName])
 
-  const compute = useMemo(() => {
-    void _;
-    const fp = filterProxies(proxies, groupName, filterText, searchState)
+  // 对输入文本进行防抖处理
+  const [debouncedFilterText, setDebouncedFilterText] = useState(filterText)
+
+  useEffect(() => {
+    const handler = window.setTimeout(() => {
+      setDebouncedFilterText(filterText)
+    }, 150)
+
+    return () => {
+      window.clearTimeout(handler)
+    }
+  }, [filterText])
+
+  const result = useMemo(() => {
+    void _
+    const fp = filterProxies(proxies, groupName, debouncedFilterText, searchState)
     const sp = sortProxies(
       fp,
       groupName,
@@ -59,42 +68,11 @@ export default function useFilterSort(
     _,
     proxies,
     groupName,
-    filterText,
+    debouncedFilterText,
     sortType,
     searchState,
     verge?.default_latency_timeout,
   ])
-
-  const [result, setResult] = useReducer(
-    (_prev: IProxyItem[], next: IProxyItem[]) => next,
-    compute,
-  )
-
-  useEffect(() => {
-    if (debounceTimerRef.current !== null) {
-      window.clearTimeout(debounceTimerRef.current)
-      debounceTimerRef.current = null
-    }
-
-    const prev = lastInputRef.current
-    const stableInputs =
-      prev && prev.text === filterText && prev.sort === sortType
-
-    lastInputRef.current = { text: filterText, sort: sortType }
-
-    const delay = stableInputs ? 0 : 150
-    debounceTimerRef.current = window.setTimeout(() => {
-      setResult(compute)
-      debounceTimerRef.current = null
-    }, delay)
-
-    return () => {
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current)
-        debounceTimerRef.current = null
-      }
-    }
-  }, [compute, filterText, sortType])
 
   return result
 }
