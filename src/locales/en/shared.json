@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "Clear Input",
-    "filter": "Filter conditions",
-    "matchCase": "Match Case",
-    "matchWholeWord": "Match Whole Word",
-    "useRegex": "Use Regular Expression"
+    "filter": "Filter conditions"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

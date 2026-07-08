@@ -56,9 +56,6 @@ async fn get_test_url() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FilterConfig {
     pub filter_text: String,
-    pub use_regex: bool,
-    pub match_case: bool,
-    pub match_whole_word: bool,
 }
 
 /// 识别广告/假节点
@@ -105,21 +102,18 @@ async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<
 
     let filter_config = FilterConfig {
         filter_text: group_state["filterText"].as_str().unwrap_or("").to_string(),
-        use_regex: group_state["filterUseRegularExpression"].as_bool().unwrap_or(false),
-        match_case: group_state["filterMatchCase"].as_bool().unwrap_or(false),
-        match_whole_word: group_state["filterMatchWholeWord"].as_bool().unwrap_or(false),
     };
     let sort_type = group_state["sortType"].as_i64().map(|v| v as i32);
     (filter_config, sort_type)
 }
 
 /// 过滤匹配算法：支持首尾去空、大小写不敏感的普通子串模糊匹配
-fn match_filter(name: &str, filter_text: &str) -> bool {
-    let query = filter_text.trim();
-    if query.is_empty() {
+/// `filter_lower` 应由调用方预先执行 trim + to_lowercase，避免在 filter 闭包中重复计算
+fn match_filter(name: &str, filter_lower: &str) -> bool {
+    if filter_lower.is_empty() {
         return true;
     }
-    name.to_lowercase().contains(&query.to_lowercase())
+    name.to_lowercase().contains(filter_lower)
 }
 
 /// 获取当前活动 Profile 的 UID
@@ -309,9 +303,11 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         sort_type
     };
 
+    let filter_lower = filter_config.filter_text.trim().to_lowercase();
+
     let valid_nodes: Vec<String> = nodes
         .into_iter()
-        .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_config.filter_text))
+        .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_lower))
         .collect();
 
     if valid_nodes.is_empty() {

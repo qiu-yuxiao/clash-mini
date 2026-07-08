@@ -1374,10 +1374,7 @@ export interface TranslationResources {
       }
       placeholders: {
         filter: string
-        matchCase: string
-        matchWholeWord: string
         resetInput: string
-        useRegex: string
       }
       statuses: {
         disabled: string

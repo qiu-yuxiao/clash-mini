@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "پاک کردن فیلد ورودی",
-    "filter": "شرایط فیلتر",
-    "matchCase": "تطبیق حروف کوچک و بزرگ",
-    "matchWholeWord": "تطبیق کل کلمه",
-    "useRegex": "استفاده از عبارت منظم"
+    "filter": "شرایط فیلتر"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

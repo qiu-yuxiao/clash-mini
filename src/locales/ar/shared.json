@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "مربع إدخال واضح",
-    "filter": "شروط التصفية",
-    "matchCase": "مطابقة الحالة",
-    "matchWholeWord": "مطابقة الكلمة بأكملها",
-    "useRegex": "استخدام التعبيرات العادية"
+    "filter": "شروط التصفية"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

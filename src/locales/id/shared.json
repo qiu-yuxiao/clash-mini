@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "Bersihkan kolom input",
-    "filter": "Kondisi Filter",
-    "matchCase": "Cocokkan Kasus",
-    "matchWholeWord": "Cocokkan Kata Utuh",
-    "useRegex": "Gunakan Ekspresi Reguler"
+    "filter": "Kondisi Filter"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

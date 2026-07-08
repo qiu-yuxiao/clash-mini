@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "Eingabefeld leeren",
-    "filter": "Filterbedingungen",
-    "matchCase": "Groß-/Kleinschreibung beachten",
-    "matchWholeWord": "Ganzes Wort übereinstimmen",
-    "useRegex": "Regulären Ausdruck verwenden"
+    "filter": "Filterbedingungen"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

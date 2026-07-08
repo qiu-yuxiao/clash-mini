@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "кертү кырын чистарту",
-    "filter": "Фильтр шартлары",
-    "matchCase": "Регистрны исәпкә алу",
-    "matchWholeWord": "Сүзнең тулы туры килүе",
-    "useRegex": "Регуляр выражениеләр куллану"
+    "filter": "Фильтр шартлары"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "入力フィールドをクリア",
-    "filter": "フィルタリング条件",
-    "matchCase": "大文字小文字を区別する",
-    "matchWholeWord": "完全一致",
-    "useRegex": "正規表現を使用する"
+    "filter": "フィルタリング条件"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

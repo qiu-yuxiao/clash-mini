@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "입력 필드 지우기",
-    "filter": "필터 조건",
-    "matchCase": "대/소문자 구분",
-    "matchWholeWord": "단어 전체 일치",
-    "useRegex": "정규식 사용"
+    "filter": "필터 조건"
   },
   "validation": {
     "invalidRegex": "잘못된 정규식"

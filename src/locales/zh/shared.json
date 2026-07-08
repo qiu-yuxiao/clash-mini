@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "清空输入框",
-    "filter": "过滤条件",
-    "matchCase": "区分大小写",
-    "matchWholeWord": "全字匹配",
-    "useRegex": "使用正则表达式"
+    "filter": "过滤条件"
   },
   "validation": {
     "invalidRegex": "无效的正则表达式"

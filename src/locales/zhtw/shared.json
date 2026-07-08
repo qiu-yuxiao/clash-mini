@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "清空輸入框",
-    "filter": "篩選條件",
-    "matchCase": "區分大小寫",
-    "matchWholeWord": "完整字詞配對",
-    "useRegex": "使用正規表示式"
+    "filter": "篩選條件"
   },
   "validation": {
     "invalidRegex": "無效的正規表示式"

@@ -151,6 +151,7 @@ export const ActiveNodeStatusCard = () => {
   const handleCycleNode = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!primaryGroup?.name || !primaryGroup?.all) return
+    if (delayManager.isBatchTesting) return
 
     let currentCandidateNodes = primaryGroup.all
     try {

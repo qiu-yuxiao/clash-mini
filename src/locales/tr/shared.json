@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "Giriş alanını temizle",
-    "filter": "Filtre koşulları",
-    "matchCase": "Büyük/Küçük Harf Eşleştir",
-    "matchWholeWord": "Tam Kelime Eşleştir",
-    "useRegex": "Düzenli İfade Kullan"
+    "filter": "Filtre koşulları"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

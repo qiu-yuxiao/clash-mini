@@ -56,10 +56,7 @@
   },
   "placeholders": {
     "resetInput": "Borrar el cuadro de entrada",
-    "filter": "Condiciones de filtrado",
-    "matchCase": "Distinguir mayúsculas y minúsculas",
-    "matchWholeWord": "Coincidencia exacta de palabras",
-    "useRegex": "Usar expresiones regulares"
+    "filter": "Condiciones de filtrado"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"
