@@ -52,10 +52,6 @@ pub struct IVerge {
     /// pause render traffic stats on blur
     pub pause_render_traffic_stats_on_blur: Option<bool>,
 
-    /// common tray icon
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub common_tray_icon: Option<bool>,
-
     /// tray icon
     #[cfg(target_os = "macos")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -75,12 +71,6 @@ pub struct IVerge {
 
     /// collapse navigation bar
     pub collapse_navbar: Option<bool>,
-
-    /// sysproxy tray icon
-    pub sysproxy_tray_icon: Option<bool>,
-
-    /// tun tray icon
-    pub tun_tray_icon: Option<bool>,
 
     /// clash tun mode
     pub enable_tun_mode: Option<bool>,
@@ -406,9 +396,6 @@ impl IVerge {
             menu_icon: Some("monochrome".into()),
             notice_position: Some("top-right".into()),
             collapse_navbar: Some(false),
-            common_tray_icon: Some(false),
-            sysproxy_tray_icon: Some(false),
-            tun_tray_icon: Some(false),
             enable_auto_launch: Some(false),
             enable_silent_start: Some(false),
             enable_hover_jump_navigator: Some(true),
@@ -498,9 +485,6 @@ impl IVerge {
         patch!(menu_order);
         patch!(notice_position);
         patch!(collapse_navbar);
-        patch!(common_tray_icon);
-        patch!(sysproxy_tray_icon);
-        patch!(tun_tray_icon);
 
         patch!(enable_tun_mode);
         patch!(enable_auto_launch);

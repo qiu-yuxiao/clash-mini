@@ -1,6 +1,6 @@
 use crate::{
     config::Config,
-    core::{handle, tray},
+    core::handle,
     feat::clean_async,
     process::AsyncHandler,
     utils,
@@ -85,7 +85,6 @@ pub async fn change_clash_mode(mode: String) {
             let clash_data = clash.data_arc();
             if clash_data.save_config().await.is_ok() {
                 handle::Handle::refresh_clash();
-                tray::Tray::global().update_menu_and_icon().await;
             }
 
             let is_auto_close_connection = Config::verge().await.data_arc().auto_close_connection.unwrap_or(false);

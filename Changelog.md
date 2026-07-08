@@ -1,3 +1,20 @@
+## v2.3.4
+
+### ✨ New Features
+- **托盘图标跟随流量接管模式自动切换**：托盘图标现在根据当前流量接管模式（手动 / 系统代理 / TUN）自动切换；TUN 模式使用专属图标。启动即按当前模式初始化图标，切换模式时实时刷新。
+
+### 🐞 Fixed Bugs
+- 修复 `handleCycleNode` 在批量测速期间未加 `isBatchTesting` 防护，导致节点轮换与测速结果错配的问题（与 `handleTestDelay` 保持对称防护）。
+- 清理 Rust `FilterConfig` 中残留的 `use_regex` / `match_case` / `match_whole_word` 死字段（搜索简化重构遗留）。
+
+### 🧹 Refactor & Cleanup
+- 移除托盘图标的 `common_tray_icon` / `sysproxy_tray_icon` / `tun_tray_icon` 三个无实际效果的死配置开关，图标完全由接管模式自动推导，消除配置层与实现层互相矛盾的“手动指定图标”陷阱。
+- 清理搜索匹配模块死代码 `SearchMatcherOptions` 类型与 `escapeRegex` / `buildRegex` 函数，搜索逻辑统一为纯子串模糊匹配。
+- 删除空壳函数 `update_menu_and_icon()` 及其两处空调用，精简托盘实现。
+- 移除 13 个 locale 中已无引用的 `matchCase` / `matchWholeWord` / `useRegex` 翻译键及对应 SVG 图标（搜索简化重构遗留）。
+
+---
+
 ## v1.9.21
 
 ### 🐞 Fixed Bugs

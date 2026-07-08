@@ -205,9 +205,6 @@ impl Tray {
         self.update_icon(&verge)
     }
 
-    #[allow(clippy::unused_async)]
-    pub async fn update_menu_and_icon(&self) {}
-
     fn should_handle_tray_click(&self) -> bool {
         let allow = self.limiter.check();
         if !allow {

@@ -31,9 +31,6 @@ export interface IVergeConfig {
   notice_position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   collapse_navbar?: boolean
   tray_icon?: 'monochrome' | 'colorful'
-  common_tray_icon?: boolean
-  sysproxy_tray_icon?: boolean
-  tun_tray_icon?: boolean
   enable_tray_speed?: boolean
   enable_always_on_top?: boolean
   // enable_tray_icon?: boolean;

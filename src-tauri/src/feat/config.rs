@@ -30,9 +30,6 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
             Config::generate().await?;
             CoreManager::global().restart_core().await?;
         } else {
-            if patch.get("mode").is_some() {
-                tray::Tray::global().update_menu_and_icon().await;
-            }
             Config::runtime().await.edit_draft(|d| d.patch_config(patch));
             CoreManager::global().update_config_checked().await?;
         }
@@ -94,9 +91,6 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     let tray_icon = &patch.tray_icon;
     #[cfg(not(target_os = "macos"))]
     let tray_icon: Option<String> = None;
-    let common_tray_icon = patch.common_tray_icon;
-    let sysproxy_tray_icon = patch.sysproxy_tray_icon;
-    let tun_tray_icon = patch.tun_tray_icon;
     #[cfg(not(target_os = "windows"))]
     let redir_enabled = patch.verge_redir_enabled;
     #[cfg(not(target_os = "windows"))]
@@ -184,12 +178,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     if language.is_some() {
         update_flags.insert(UpdateFlags::LANGUAGE | UpdateFlags::SYSTRAY_MENU | UpdateFlags::SYSTRAY_TOOLTIP);
     }
-    if common_tray_icon.is_some()
-        || sysproxy_tray_icon.is_some()
-        || tun_tray_icon.is_some()
-        || tray_icon.is_some()
-        || enable_tray_speed.is_some()
-    {
+    if tray_icon.is_some() || enable_tray_speed.is_some() {
         update_flags.insert(UpdateFlags::SYSTRAY_ICON);
     }
     if patch.hotkeys.is_some() {
