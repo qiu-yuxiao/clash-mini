@@ -66,6 +66,7 @@ import {
   patchProfile,
   viewProfile,
   restartCore,
+  triggerAutoSelect,
 } from '@/services/cmds'
 import DelayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
@@ -73,11 +74,7 @@ import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
 import { isDummyNode } from '@/utils/node'
-import {
-  closeAllConnections,
-  getProxyByName,
-  selectNodeForGroup,
-} from 'tauri-plugin-mihomo-api'
+import { closeAllConnections, getProxyByName } from 'tauri-plugin-mihomo-api'
 
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
@@ -204,44 +201,24 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
 async function batchTestWithFirstBatchSelect(
   groupName: string,
   names: string[],
-  timeout = 10000,
-  concurrency = 36,
-  selectFirstBatch = true,
+  select = true,
 ): Promise<void> {
   if (names.length === 0) return
 
-  const totalStart = Date.now()
-  let selectedOnce = false
-  const results: [string, number][] = []
+  const currentUid = (await getProfiles())?.current || ''
+  if (!currentUid) return
 
-  for (let i = 0; i < names.length; i += concurrency) {
-    if (Date.now() - totalStart > 15000) break
+  // 视觉占位：立即将所有待测节点标记为「测速中」以触发流光动画
+  for (const name of names) {
+    DelayManager.setDelay(name, groupName, -2)
+  }
+  DelayManager.queueGroupNotification(groupName)
 
-    const batch = names.slice(i, i + concurrency)
-    await DelayManager.checkListDelay(batch, groupName, timeout, batch.length)
-
-    for (const name of batch) {
-      const delay = DelayManager.getDelay(name, groupName)
-      if (delay > 0 && delay < timeout) {
-        results.push([name, delay])
-      }
-    }
-
-    results.sort((a, b) => a[1] - b[1])
-
-    if (selectFirstBatch && !selectedOnce && results.length > 0) {
-      selectedOnce = true
-      const bestName = results[0][0]
-      const bestDelay = results[0][1]
-      console.log(
-        `[Layout] 自动选点首批完成，最快节点: ${bestName} (${bestDelay}ms)`,
-      )
-      try {
-        await selectNodeForGroup(groupName, bestName)
-      } catch (err) {
-        console.error('[Layout] 自动选点切换失败:', err)
-      }
-    }
+  // 委托后端统一执行群发测速 + 择优；结果经 verge://backend-delay-results 事件回写 UI
+  try {
+    await triggerAutoSelect(currentUid, 0, select)
+  } catch (err) {
+    console.error('[Layout] 后端批量测速/选点失败:', err)
   }
 }
 
@@ -269,12 +246,11 @@ async function triggerAutoSelectAndRefresh(
     try {
       const names = await getFilteredNodeNames('PROXY')
       if (names.length === 0) return
-      const timeout = 10000
       const win = getCurrentWindow()
       try {
         await win.setResizable(false)
         setDragRegionEnabled?.(false)
-        await batchTestWithFirstBatchSelect('PROXY', names, timeout, 36, true)
+        await batchTestWithFirstBatchSelect('PROXY', names, true)
       } finally {
         // 仅在无其他并发测速时才恢复，避免提前解锁
         if (!DelayManager.isBatchTesting) {
@@ -310,7 +286,7 @@ async function triggerAutoSelectAndRefresh(
         try {
           await win.setResizable(false)
           setDragRegionEnabled?.(false)
-          await batchTestWithFirstBatchSelect('PROXY', names, 5000, 36, true)
+          await batchTestWithFirstBatchSelect('PROXY', names, true)
         } finally {
           if (!DelayManager.isBatchTesting) {
             await win.setResizable(true)
@@ -1088,7 +1064,6 @@ const Layout = () => {
       const names = await getFilteredNodeNames('PROXY')
       if (names.length === 0) return
 
-      const timeout = verge?.default_latency_timeout || 10000
       lastFullTestTimeRef.current = now
       console.log('[Layout] 窗口唤醒，延迟到渲染完成后触发全节点测速')
 
@@ -1099,25 +1074,32 @@ const Layout = () => {
         try {
           await win.setResizable(false)
           setDragRegionEnabled(false)
-          await DelayManager.checkListDelay(names, 'PROXY', timeout, 36)
+          // 视觉占位：立即将 PROXY 全节点标记为「测速中」以触发流光动画
+          for (const name of names) {
+            DelayManager.setDelay(name, 'PROXY', -2)
+          }
+          DelayManager.queueGroupNotification('PROXY')
+          // 委托后端静默测速填充缓存；select=false 严禁切换用户当前节点
+          const currentUid = (await getProfiles())?.current || ''
+          if (currentUid) {
+            await triggerAutoSelect(currentUid, 0, false)
+          }
           await refreshAllRef.current()
         } catch (err) {
           console.error('[Layout] 唤醒后后台测速异常:', err)
         } finally {
-          if (!DelayManager.isBatchTesting) {
-            try {
-              await win.setResizable(true)
-              setDragRegionEnabled(true)
-            } catch {
-              /* 忽略 */
-            }
+          try {
+            await win.setResizable(true)
+            setDragRegionEnabled(true)
+          } catch {
+            /* 忽略 */
           }
         }
       }, 0)
     } catch (err) {
       console.error('[Layout] 唤醒刷新与测速失败:', err)
     }
-  }, [verge?.default_latency_timeout])
+  }, [])
 
   const triggerWakeupLatencyTestRef = useRef(triggerWakeupLatencyTest)
   triggerWakeupLatencyTestRef.current = triggerWakeupLatencyTest

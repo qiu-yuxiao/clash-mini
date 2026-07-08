@@ -31,7 +31,10 @@ import { useVerge } from '@/hooks/use-verge'
 import { useProxiesData } from '@/providers/app-data-context'
 import { DragRegionContext } from '@/providers/drag-region-context'
 import { updateProxyChainConfigInRuntime } from '@/services/cmds'
-import delayManager from '@/services/delay'
+import delayManager, {
+  NODE_DELAY_MIN_MS,
+  NODE_DELAY_MAX_MS,
+} from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
@@ -419,7 +422,7 @@ export const ProxyGroups = (props: Props) => {
           }
         }
 
-        // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= 30ms 且 < timeout，注：30ms为系统强制设计要求以过滤广告节点）
+        // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= NODE_DELAY_MIN_MS 且 < NODE_DELAY_MAX_MS，与后端语义对齐；下限 30ms 为系统强制设计以过滤广告/假节点）
         if (!isChainMode) {
           const group = availableGroups.find((g: any) => g.name === groupName)
           if (group) {
@@ -430,7 +433,7 @@ export const ProxyGroups = (props: Props) => {
               const proxyItem = proxiesData?.records[name]
               if (!proxyItem) continue
               const delay = delayManager.getDelayFix(proxyItem, groupName)
-              if (delay >= 30 && delay < timeout) {
+              if (delay >= NODE_DELAY_MIN_MS && delay < NODE_DELAY_MAX_MS) {
                 // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
                 if (delay < minDelay) {
                   minDelay = delay

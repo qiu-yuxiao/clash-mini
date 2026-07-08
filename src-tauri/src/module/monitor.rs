@@ -1,4 +1,4 @@
-use crate::{config::Config, core::handle::Handle, process::AsyncHandler};
+use crate::{config::Config, process::AsyncHandler};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -28,6 +28,19 @@ const NODE_DELAY_MIN_MS: u32 = 30;
 /// 节点延迟上限（毫秒）。超过此值的节点判定为不可用（断流）。
 /// 健康检测和自动选点测速均以此值作为超时阈值，确保判断标准统一。
 const NODE_DELAY_MAX_MS: u32 = 2000;
+
+/// 批量测速（展示用途）对 Clash 内核发起的探针超时上限。
+/// 取值宽松以在 UI 展示真实延迟（与前端 checkListDelay 的 timeout 语义一致）；
+/// 节点「是否可用」的判定阈值仍以 NODE_DELAY_MAX_MS(2000) 为准。
+const NODE_TEST_TIMEOUT_MS: u32 = 10000;
+
+/// 自动选点执行结果
+pub struct AutoSelectOutcome {
+    /// 所有被测节点的延迟（含死节点/超时/错误），用于前端展示
+    pub display: Vec<(String, u32)>,
+    /// 是否存在可用（有效）节点并完成切换
+    pub selected: bool,
+}
 
 /// 正常健康检测间隔（秒）
 const NORMAL_CHECK_INTERVAL_SECS: u64 = 15;
@@ -235,8 +248,13 @@ async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
 }
 
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
-/// sort_type: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序
-pub async fn trigger_backend_auto_select(profile_uid: &str, sort_type: i32) -> anyhow::Result<Vec<(String, u32)>> {
+/// - `sort_type`: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序（仅影响展示顺序）
+/// - `select`: true=测速完成后将 PROXY 切换至最快节点；false=仅测速填充展示，不切换
+pub async fn trigger_backend_auto_select(
+    profile_uid: &str,
+    sort_type: i32,
+    select: bool,
+) -> anyhow::Result<AutoSelectOutcome> {
     // 互斥锁防止并发调用
     if AUTO_SELECT_RUNNING
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -259,12 +277,15 @@ pub async fn trigger_backend_auto_select(profile_uid: &str, sort_type: i32) -> a
     // 确保内核就绪后再进行选点操作
     if !wait_for_clash_ready().await {
         logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败：内核尚未就绪");
-        return Ok(vec![]);
+        return Ok(AutoSelectOutcome {
+            display: vec![],
+            selected: false,
+        });
     }
 
     // 直接调用内部函数
     // 如果发生 panic，_guard 会在栈展开时自动释放锁
-    let result = trigger_backend_auto_select_inner(profile_uid, sort_type).await;
+    let result = trigger_backend_auto_select_inner(profile_uid, sort_type, select).await;
 
     // 正常完成，显式释放锁（_guard 会在函数结束时再次 drop，但这是安全的）
     // 注意：这里我们手动释放锁，确保锁尽早释放
@@ -274,7 +295,11 @@ pub async fn trigger_backend_auto_select(profile_uid: &str, sort_type: i32) -> a
     result
 }
 
-async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) -> anyhow::Result<Vec<(String, u32)>> {
+async fn trigger_backend_auto_select_inner(
+    profile_uid: &str,
+    sort_type: i32,
+    select: bool,
+) -> anyhow::Result<AutoSelectOutcome> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
     let group_info = mihomo
         .get_group_by_name("PROXY")
@@ -283,7 +308,12 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
 
     let nodes = match group_info.all {
         Some(n) => n,
-        None => return Ok(vec![]),
+        None => {
+            return Ok(AutoSelectOutcome {
+                display: vec![],
+                selected: false,
+            });
+        }
     };
 
     // 【性能优化】：一次性读取 proxy_head_state.json，同时获取 filter_config 和 sort_type
@@ -308,7 +338,10 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
             Type::Lightweight,
             "[后台监测] 自动选点失败: 没有可用的非广告且符合过滤条件的节点"
         );
-        return Ok(vec![]);
+        return Ok(AutoSelectOutcome {
+            display: vec![],
+            selected: false,
+        });
     }
 
     logging!(
@@ -341,14 +374,19 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
                     break;
                 }
                 let node_name = &valid_nodes[idx];
-                if let Ok(delay_info) = mihomo
-                    .delay_proxy_by_name(node_name, &test_url, NODE_DELAY_MAX_MS)
+                // 展示用途使用宽松探针超时，捕获真实延迟用于 UI；
+                // 节点可用性判定仍以 NODE_DELAY_MAX_MS(2000) 为准。
+                match mihomo
+                    .delay_proxy_by_name(node_name, &test_url, NODE_TEST_TIMEOUT_MS)
                     .await
                 {
-                    if delay_info.delay >= NODE_DELAY_MIN_MS && delay_info.delay < NODE_DELAY_MAX_MS {
-                        // 小于 30ms 的节点一律为机场伪造的假节点/广告节点，不纳入候选。
-                        // 此为系统核心既定设计，严禁后续代码审核或修改中再对此阈值进行任何讨论或调整。
+                    Ok(delay_info) => {
+                        // 全部上报用于展示（含低于下限的假节点、达到上限的死节点）
                         let _ = res_tx.send((node_name.clone(), delay_info.delay));
+                    }
+                    Err(_) => {
+                        // 测速报错（彻底断线/内核异常），上报为 Error
+                        let _ = res_tx.send((node_name.clone(), 1_000_000));
                     }
                 }
             }
@@ -366,9 +404,14 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         *active = abort_handles;
     }
 
-    let mut results = Vec::new();
-    while let Some(res) = res_rx.recv().await {
-        results.push(res);
+    // 分类收集：display 用于展示（全部节点），candidates 用于选点（仅有效节点）
+    let mut display: Vec<(String, u32)> = Vec::new();
+    let mut candidates: Vec<(String, u32)> = Vec::new();
+    while let Some((name, delay)) = res_rx.recv().await {
+        display.push((name.clone(), delay));
+        if (NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&delay) {
+            candidates.push((name, delay));
+        }
     }
 
     // 等待所有 worker 退出以完成清理
@@ -382,53 +425,66 @@ async fn trigger_backend_auto_select_inner(profile_uid: &str, sort_type: i32) ->
         active.clear();
     }
 
-    // M1 修复：根据 sort_type 选择排序方式
-    // sort_type: 0=原始顺序（已从配置文件读取为1）, 1=按延迟升序, 2=按名称排序
+    // 展示结果按 sort_type 排序（仅影响返回顺序，不影响选点）
     match sort_type {
-        2 => results.sort_by(|a, b| a.0.cmp(&b.0)), // 按名称排序
-        _ => results.sort_by_key(|r| r.1),          // 按延迟升序（默认）
+        2 => display.sort_by(|a, b| a.0.cmp(&b.0)), // 按名称排序
+        _ => display.sort_by_key(|r| r.1),          // 按延迟升序（默认）
     }
 
-    if let Some((fastest_node, delay)) = results.first() {
-        logging!(
-            info,
-            Type::Lightweight,
-            "[后台监测] 测速完成，最优节点: {} ({}ms)",
-            fastest_node,
-            delay
-        );
+    let mut selected = false;
 
-        // 双重校验：确保当前配置 UID 未被篡改
-        let current_uid = get_current_profile_uid().await;
-        if current_uid.as_deref() != Some(profile_uid) {
+    if select {
+        // 选点固定按延迟升序取全局最快节点，不受 sort_type 影响
+        // （修复：原逻辑依赖 results.first()，在 sort_type=2 时会误选首个字母序节点）
+        if let Some((fastest_node, delay)) = candidates.iter().min_by_key(|r| r.1) {
             logging!(
                 info,
                 Type::Lightweight,
-                "[后台监测] 活动配置已在选定期间更改，舍弃本次切换结果"
+                "[后台监测] 测速完成，最优节点: {} ({}ms)",
+                fastest_node,
+                delay
             );
-            return Ok(vec![]);
-        }
 
-        match mihomo.select_node_for_group("PROXY", fastest_node).await {
-            Ok(_) => {
+            // 双重校验：确保当前配置 UID 未被篡改
+            let current_uid = get_current_profile_uid().await;
+            if current_uid.as_deref() != Some(profile_uid) {
                 logging!(
                     info,
                     Type::Lightweight,
-                    "[后台监测] 成功将 PROXY 策略组切换为: {}",
-                    fastest_node
+                    "[后台监测] 活动配置已在选定期间更改，舍弃本次切换结果"
                 );
-                crate::core::handle::Handle::refresh_clash();
-                return Ok(results);
+                return Ok(AutoSelectOutcome {
+                    display,
+                    selected: false,
+                });
             }
-            Err(e) => {
-                logging!(warn, Type::Lightweight, "[后台监测] 切换节点失败: {e}");
+
+            match mihomo.select_node_for_group("PROXY", fastest_node).await {
+                Ok(_) => {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 成功将 PROXY 策略组切换为: {}",
+                        fastest_node
+                    );
+                    crate::core::handle::Handle::refresh_clash();
+                    selected = true;
+                }
+                Err(e) => {
+                    logging!(warn, Type::Lightweight, "[后台监测] 切换节点失败: {e}");
+                }
             }
+        } else {
+            logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: 所有测速节点均不可达");
         }
-    } else {
-        logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: 所有测速节点均不可达");
     }
 
-    Ok(results)
+    // 统一通过事件将展示结果回写前端 UI（所有调用路径一致，含 command 触发）
+    if !display.is_empty() {
+        crate::core::handle::Handle::notify_delay_results("PROXY".into(), display.clone());
+    }
+
+    Ok(AutoSelectOutcome { display, selected })
 }
 
 async fn get_active_node_name() -> Option<String> {
@@ -467,11 +523,8 @@ pub fn start_background_monitor() {
                 if matches!(window_state, crate::utils::window_manager::WindowState::NotExist) {
                     if let Some(uid) = get_current_profile_uid().await {
                         let _ = restore_profile_selected_nodes(&uid).await;
-                        if let Ok(results) = trigger_backend_auto_select(&uid, 0).await {
-                            if !results.is_empty() {
-                                Handle::notify_delay_results("PROXY".into(), results);
-                            }
-                        }
+                        // 委托后端执行初始化自动选点；结果经事件回写前端 UI
+                        let _ = trigger_backend_auto_select(&uid, 0, true).await;
                     }
                 }
             } else {
@@ -549,11 +602,8 @@ pub fn start_background_monitor() {
                         Type::Lightweight,
                         "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点"
                     );
-                    if let Ok(results) = trigger_backend_auto_select(&current_profile, 0).await {
-                        if !results.is_empty() {
-                            Handle::notify_delay_results("PROXY".into(), results);
-                        }
-                    }
+                    // 委托后端执行网络恢复自愈选点；结果经事件回写前端 UI
+                    let _ = trigger_backend_auto_select(&current_profile, 0, true).await;
                 }
             } else if was_online && !is_online {
                 logging!(
@@ -634,17 +684,16 @@ pub fn start_background_monitor() {
                                         "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
                                     );
 
-                                    match trigger_backend_auto_select(&current_profile, 0).await {
-                                        Ok(results) => {
-                                            if !results.is_empty() {
-                                                Handle::notify_delay_results("PROXY".into(), results);
+                                    match trigger_backend_auto_select(&current_profile, 0, true).await {
+                                        Ok(outcome) => {
+                                            if outcome.selected {
                                                 auto_select_fail_count = 0; // 选点成功，重置失败计数
                                             } else {
                                                 auto_select_fail_count += 1;
                                                 logging!(
                                                     warn,
                                                     Type::Lightweight,
-                                                    "[后台监测] 自愈选点结果为空（所有节点不可达），连续失败次数: {}",
+                                                    "[后台监测] 自愈选点未选出可用节点（所有节点不可达），连续失败次数: {}",
                                                     auto_select_fail_count
                                                 );
                                             }

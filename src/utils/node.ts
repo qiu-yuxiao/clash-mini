@@ -19,12 +19,7 @@ export const isDummyNode = (name: string): boolean => {
     lower.includes('购买') ||
     lower.includes('subscribe') ||
     lower.includes('群') ||
-    lower.startsWith('dummy') ||
-    lower.startsWith('(dummy)') ||
-    lower.includes('dummy') ||
     name === 'DIRECT' ||
-    name === 'REJECT' ||
-    name === 'COMPATIBLE' ||
     // 升级匹配项，要求带上协议分隔符，防止误伤以 "http-hk" 等命名的真实代理协议节点
     lower.includes('http://') ||
     lower.includes('https://')

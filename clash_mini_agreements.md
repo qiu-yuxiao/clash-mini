@@ -615,10 +615,13 @@ Windows 原生标题栏必须显示程序名及版本号，格式为 `Clash Mini
 
       * **测速对象限定**：自动测速与自动选点的对象严格限定为主页表格过滤框当前展示的节点子集（即 `filterSort` 后的渲染列表），确保与用户的过滤筛选意图一致。
 
-      * **前后端分工原则**：自动测速与选点由前后端按窗口可见性分工，避免并发竞争：
-        - **窗口可见时（非轻量模式）**：由前端负责分批测速与首批选点（Profile 切换、启动、6秒 Fallback 等场景）。
-        - **窗口不可见时（轻量模式 / 静默启动）**：由后端 monitor 线程负责启动时首次选点、健康监测与自愈选点（启动首次选点、连续失败、网络恢复等场景）。后端监测循环在首次运行且窗口处于 `NotExist` 状态时，会执行一次性后端选点（`restore_profile_selected_nodes` + `trigger_backend_auto_select`），与进入轻量模式（B4）的启动选点经 `AUTO_SELECT_RUNNING` 互斥，不会重复。
-        - Profile 切换仅发生在窗口可见时，后端监测循环内不再保留 Profile 切换分支（旧版 `current_profile != last_profile_uid` 分支已于 v2.3.4 移除），后端不参与，避免与前端批量测速竞争 mihomo 内核；Profile 切换后的节点变更由健康监测自身感知并复位计数器。
+      * **前后端分工原则（F1/F2 收归后端后）**：自动测速与选点统一收敛到**后端单一引擎** `trigger_backend_auto_select`，前端只发信号、不再自行对 PROXY 组发起批量测速与节点切换，从根上消除前后端重复测速与竞争切换 PROXY 的冲突：
+        - **窗口可见时（非轻量模式）**：前端在「测速所有节点按钮 / Profile 切换 / 启动 / 6 秒 Fallback / 窗口唤醒」等场景，统一通过 Tauri 命令 `trigger_auto_select(profile_uid, sort_type, select)` 委托后端执行群发测速与择优；前端仅在触发时把所有待测节点标记为「测速中」（-2）以驱动流光动画，并接收后端经 `verge://backend-delay-results` 事件回传的结果刷新 UI。
+          - 其中**窗口唤醒静默填充（F2）**传 `select=false`：仅测速填充延迟缓存，**严禁**切换用户当前选中的活跃节点。
+          - 其余场景（测速按钮 / Profile 切换 / 启动 / 6 秒 Fallback）传 `select=true`：测速完成后由后端将 PROXY 切换至全局最快健康节点。
+        - **窗口不可见时（轻量模式 / 静默启动）**：后端 monitor 线程同样调用 `trigger_backend_auto_select` 执行启动首次选点、健康监测与自愈选点（连续失败、网络恢复）。前后端复用同一套后端引擎，经 `AUTO_SELECT_RUNNING` 互斥，不会重复执行。
+        - Profile 切换仅发生在窗口可见时，后端监测循环内不再保留 Profile 切换分支（旧版 `current_profile != last_profile_uid` 分支已于 v2.3.4 移除）；前端委托后端测速后，Profile 切换后的节点变更由健康监测自身感知并复位计数器。
+        - 注：本节下文「分批测速 / 首批选点 / 提前终止」等前端批量测速机制（约 612–614、623–625 行）现仅适用于 per-group 闪电按钮（F4）；PROXY 级「测速所有」与窗口唤醒已收归后端单一引擎（F4 的收归为后续步骤）。
 
       * **提前终止条件**：满足以下任一条件时测速结束：
         - 所有过滤子集内的节点均已完成测试（含成功、超时或失败）。
@@ -990,7 +993,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 这能确保下一次挂载和 Effect 运行时能够正确判定为新 Profile 从而再次拉起配置增强、激活选择及全节点测速流程，防止首次启动测速被永远拦截。
 - **自适应窗口可见度唤醒测速**：
   - 在 Layout 顶层事件监听器中，增加对窗口聚焦（`focus`）和文档可见度变化（`visibilitychange`）的拦截。
-  - 当文档状态变为可见（`document.visibilityState === 'visible'`）时，如果组件已完成启动过程（`isStartingUpRef.current === false`），且距离上一次全节点测速已经超过 30 秒（防止用户切出应用导致的重复流量刷新），应立刻自动触发 `DelayManager.checkListDelay` 对 PROXY 策略组执行后台全节点延迟测试，并刷新前端数据展示。
+  - 当文档状态变为可见（`document.visibilityState === 'visible'`）时，如果组件已完成启动过程（`isStartingUpRef.current === false`），且距离上一次全节点测速已经超过 30 秒（防止用户切出应用导致的重复流量刷新），应立刻通过 `trigger_auto_select(uid, 0, false)` 委托后端对 PROXY 策略组执行静默全节点测速填充（select=false，严禁切换用户当前节点），结果经 `verge://backend-delay-results` 事件回传前端刷新展示。
   - 该唤醒测速为非阻塞测速，并且只能静默填充和恢复延迟缓存，严禁修改/篡改用户当前手动选中的活跃代理节点。
 
 ---
@@ -1069,7 +1072,9 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 ### 5.5 批量测速与自动优选
 
-主界面节点表格顶部的闪电按钮用于触发对当前过滤后可见的节点子集进行批量并发测速，并在测速完成后自动切换至最优节点。具体设计要求如下：
+主界面节点表格顶部的闪电按钮（per-group 闪电按钮，即 F4）用于触发对当前过滤后可见的节点子集进行批量并发测速，并在测速完成后自动切换至最优节点。具体设计要求如下：
+
+> 注：本节描述 per-group 闪电按钮（F4）的行为，目前仍由前端 `DelayManager.checkListDelay` 直接测速并选点。PROXY 级「测速所有节点」与窗口唤醒（F1/F2）已收归后端 `trigger_backend_auto_select`（见 §前后端分工原则、§5.6），后续步骤将把 F4 一并收归后端。
 
 - **范围限制**：
   - 测速和自动优选的目标节点必须严格限制在**用户当前在界面列表中实际可见的过滤后节点子集（即“所见即可测，所见即可选”）**。
@@ -1089,12 +1094,12 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 ### 5.6 后台测速前端回传
 
-后台 monitor 常驻线程在**启动（窗口不可见时）/ 进入轻量模式 / 故障自愈（连续失败、网络恢复）**时执行的群发测速结果必须回传至前端 UI 界面，使代理节点列表上的延迟数值实时更新，而非仅用于内部节点切换决策。注：monitor 监测循环内原“Profile 切换”触发的后端选点分支已于 v2.3.4 移除（Profile 切换仅发生在窗口可见时，由前端负责），故后端回传的触发场景不再包含实时 Profile 切换，仅上述三类。
+前端与后端所有群发测速结果（无论由 monitor 常驻线程发起，还是由前端经 `trigger_auto_select` 命令发起）都必须回传至前端 UI 界面，使代理节点列表上的延迟数值实时更新。后端在 `trigger_backend_auto_select` 内部统一通过 `FrontendEvent::DelayResults` 事件回传，触发场景包括：**启动首次选点（窗口不可见时）/ 进入轻量模式（B4）/ 故障自愈（连续失败、网络恢复）/ 前端委托（测速所有按钮、Profile 切换、6 秒 Fallback、窗口唤醒静默填充）**。前端不再自行发起对 PROXY 组的批量测速，因此回传成为 UI 延迟数据的唯一来源。
 
-- **事件通道**：Rust 侧通过 `FrontendEvent::DelayResults { group, results }` 变体，在 `trigger_backend_auto_select` 成功返回非空结果后，以 Tauri 事件 `verge://backend-delay-results` 推送至前端。事件负载为 `{ group: String, results: Vec<(节点名, u32)> }`。
+- **事件通道**：Rust 侧在 `trigger_backend_auto_select` 内部，于测速完成后统一调用 `Handle::notify_delay_results("PROXY", display)` 以 Tauri 事件 `verge://backend-delay-results` 推送至前端，**所有调用路径一致**（monitor 线程与 `trigger_auto_select` 命令均经此回传）。事件负载为 `{ group: String, results: Vec<(节点名, u32)> }`，其中 `display` 包含**全部被测节点**的延迟（含死节点 / 超时 / 错误），确保 UI 既能显示健康节点也能显示失效节点。
 - **前端注入**：`DelayManager` 暴露 `injectBatchResults(group, results)` 公共方法，对批量结果逐条写入缓存并通过 `setDelay` 触发逐节点 UI 刷新，最后通过 `queueGroupNotification` 触发分组级 UI 刷新。
 - **生命周期**：监听器在 `use-layout-events` 中随布局组件生命周期注册/注销，与现有前端测速通路完全解耦。
-- **互不阻塞**：后台推送与前端主动测速两条通路在 Rust 层使用不同入口函数（`trigger_backend_auto_select` vs `delayProxyByName`），前端层共用同一 `DelayManager` 缓存（JS 单线程天然安全），RAF 批量合并确保不产生刷新风暴。
+- **互不阻塞**：monitor 线程与前端命令在 Rust 层共用同一入口 `trigger_backend_auto_select`（经 `AUTO_SELECT_RUNNING` 互斥），前端层共用同一 `DelayManager` 缓存（JS 单线程天然安全），RAF 批量合并确保不产生刷新风暴；前端不再直接调用 `delayProxyByName` 测速 PROXY 组（per-group 闪电按钮 F4 除外，后续将一并收归后端）。
 
 ### 5.7 导航栏节点轮换
 

@@ -24,6 +24,18 @@ export async function getProfiles() {
   return invoke<IProfilesConfig>('get_profiles')
 }
 
+export async function triggerAutoSelect(
+  profileUid: string,
+  sortType: number,
+  select: boolean,
+): Promise<Array<[string, number]>> {
+  return invoke<Array<[string, number]>>('trigger_auto_select', {
+    profileUid,
+    sortType,
+    select,
+  })
+}
+
 export async function enhanceProfiles() {
   try {
     const config = await getProfiles()

@@ -10,6 +10,18 @@ pub async fn sync_tray_proxy_selection() -> CmdResult<()> {
     Ok(())
 }
 
+/// 前端委托后端执行群发测速与择优（根治前后端重复测速/选点冲突）
+/// - `profile_uid`: 当前活动配置 UID
+/// - `sort_type`: 0=从配置读取, 1=按延迟升序, 2=按名称（仅影响展示顺序）
+/// - `select`: true=测速后将 PROXY 切换至最快节点；false=仅测速填充展示，不切换
+#[tauri::command]
+pub async fn trigger_auto_select(profile_uid: String, sort_type: i32, select: bool) -> CmdResult<Vec<(String, u32)>> {
+    let outcome = crate::module::monitor::trigger_backend_auto_select(&profile_uid, sort_type, select)
+        .await
+        .stringify_err()?;
+    Ok(outcome.display)
+}
+
 /// 根据节点名称和provider名称获取其server和port
 #[tauri::command]
 pub async fn get_proxy_addr(
@@ -101,4 +113,3 @@ pub async fn get_proxy_head_state() -> CmdResult<serde_json::Value> {
     let val = serde_json::from_str(&content).stringify_err()?;
     Ok(val)
 }
-

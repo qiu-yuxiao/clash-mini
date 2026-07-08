@@ -161,11 +161,8 @@ pub async fn entry_lightweight_mode() -> bool {
         if let Some(uid) = crate::module::monitor::get_current_profile_uid().await {
             if crate::module::monitor::wait_for_clash_ready().await {
                 let _ = crate::module::monitor::restore_profile_selected_nodes(&uid).await;
-                if let Ok(results) = crate::module::monitor::trigger_backend_auto_select(&uid, 0).await {
-                    if !results.is_empty() {
-                        crate::core::handle::Handle::notify_delay_results("PROXY".into(), results);
-                    }
-                }
+                // 委托后端执行轻量模式进入时的自愈选点；结果经事件回写前端 UI
+                let _ = crate::module::monitor::trigger_backend_auto_select(&uid, 0, true).await;
             }
         }
     });

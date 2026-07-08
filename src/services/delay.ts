@@ -12,6 +12,15 @@ export interface DelayUpdate {
 
 const CACHE_TTL = 30 * 60 * 1000
 
+// 节点延迟判定阈值：与后端 src-tauri/src/module/monitor.rs 的
+// NODE_DELAY_MIN_MS / NODE_DELAY_MAX_MS 保持一致，作为单一真源，严禁各自漂移。
+// - 下限 30ms：过滤机场伪造的超低延迟广告/假节点
+// - 上限 2000ms：超过即视为死节点，不参与自动选点
+//   注意：探针超时仍由 checkListDelay 的 timeout 参数控制（保持宽松以在 UI 显示真实延迟），
+//   此处阈值只决定「候选/选点」资格，与后端语义对齐。
+export const NODE_DELAY_MIN_MS = 30
+export const NODE_DELAY_MAX_MS = 2000
+
 class DelayManager {
   private cache = new Map<string, DelayUpdate>()
   private urlMap = new Map<string, string>()
