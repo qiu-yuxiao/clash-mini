@@ -154,8 +154,43 @@ impl Tray {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
-    pub async fn update_icon(&self, _verge: &IVerge) -> Result<()> {
+    /// 根据当前流量接管模式自动切换托盘图标
+    ///
+    /// 优先级：TUN 模式 > 系统代理 > 默认（手动模式）
+    /// 三套图标均通过 include_bytes! 编译时嵌入，运行时按当前状态选择
+    pub async fn update_icon(&self, verge: &IVerge) -> Result<()> {
+        let tun_enabled = verge.enable_tun_mode.unwrap_or(false);
+        let sys_proxy = verge.enable_system_proxy.unwrap_or(false);
+
+        // 所有图标编译时嵌入，运行时按模式选择
+        let icon_bytes: &'static [u8] = if tun_enabled {
+            &include_bytes!("../../../icons/tray-icon-tun.png")[..]
+        } else if sys_proxy {
+            &include_bytes!("../../../icons/tray-icon-sys.png")[..]
+        } else {
+            &include_bytes!("../../../icons/tray-icon.png")[..]
+        };
+
+        let image = tauri::image::Image::from_bytes(icon_bytes)?;
+        let app_handle = crate::core::handle::Handle::app_handle().clone();
+        let app_handle_for_thread = app_handle.clone();
+
+        app_handle
+            .run_on_main_thread(move || {
+                if let Some(tray) = app_handle_for_thread.tray_by_id("clash-mini-dev-tray") {
+                    let _ = tray.set_icon(Some(image));
+                }
+            })
+            .map_err(|e| anyhow::anyhow!("failed to run on main thread: {e}"))?;
+
+        logging!(
+            debug,
+            Type::Tray,
+            "托盘图标已切换 — tun={}, sys_proxy={}",
+            tun_enabled,
+            sys_proxy
+        );
+
         Ok(())
     }
 
@@ -164,9 +199,10 @@ impl Tray {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
+    /// 启动时刷新托盘状态（图标按当前接管模式初始化）
     pub async fn update_part(&self) -> Result<()> {
-        Ok(())
+        let verge = crate::config::Config::verge().await.latest_arc();
+        self.update_icon(&verge).await
     }
 
     #[allow(clippy::unused_async)]
