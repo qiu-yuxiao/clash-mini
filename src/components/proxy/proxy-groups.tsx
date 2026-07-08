@@ -30,11 +30,12 @@ import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
 import { useProxiesData } from '@/providers/app-data-context'
 import { DragRegionContext } from '@/providers/drag-region-context'
-import { updateProxyChainConfigInRuntime } from '@/services/cmds'
-import delayManager, {
-  NODE_DELAY_MIN_MS,
-  NODE_DELAY_MAX_MS,
-} from '@/services/delay'
+import {
+  getProfiles,
+  triggerAutoSelect,
+  updateProxyChainConfigInRuntime,
+} from '@/services/cmds'
+import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
@@ -386,7 +387,7 @@ export const ProxyGroups = (props: Props) => {
     [handleProxyGroupChange, isChainMode, t],
   )
 
-  // 批量测速当前过滤后可见的节点
+  // 批量测速当前组全部节点并择优切换（委托后端单一引擎）
   const handleCheckAll = useStableCallback(async (groupName: string) => {
     // 防重复触发：测速进行中忽略点击
     if (testingGroups[groupName]) return
@@ -395,7 +396,7 @@ export const ProxyGroups = (props: Props) => {
     setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
     try {
-      // 从当前过滤后可见的渲染列表中提取节点名称（可见即可测）
+      // 从当前过滤后可见的渲染列表中提取节点名称，仅用于「测速中」视觉占位（流光）
       const visibleNames = filteredRenderList
         .filter(
           (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
@@ -409,54 +410,28 @@ export const ProxyGroups = (props: Props) => {
 
       debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
 
-      if (visibleNames.length > 0) {
-        const win = getCurrentWindow()
-        try {
-          await win.setResizable(false)
-          setDragRegionEnabled(false)
-          await delayManager.checkListDelay(
-            visibleNames,
-            groupName,
-            NODE_DELAY_MAX_MS,
-          )
-        } finally {
-          if (!delayManager.isBatchTesting) {
-            await win.setResizable(true)
-            setDragRegionEnabled(true)
-          }
-        }
+      const currentUid = (await getProfiles())?.current || ''
+      if (!currentUid) return
 
-        // 测速完成后，根据协议自动优选最快健康节点（延迟需 >= NODE_DELAY_MIN_MS 且 < NODE_DELAY_MAX_MS，与后端语义对齐；下限 30ms 为系统强制设计以过滤广告/假节点）
-        if (!isChainMode) {
-          const group = availableGroups.find((g: any) => g.name === groupName)
-          if (group) {
-            let fastestNodeName: string | null = null
-            let minDelay = 1e9
+      // 视觉占位：立即将待测节点标记为「测速中」以触发流光动画
+      for (const name of visibleNames) {
+        delayManager.setDelay(name, groupName, -2)
+      }
+      delayManager.queueGroupNotification(groupName)
 
-            for (const name of visibleNames) {
-              const proxyItem = proxiesData?.records[name]
-              if (!proxyItem) continue
-              const delay = delayManager.getDelayFix(proxyItem, groupName)
-              if (delay >= NODE_DELAY_MIN_MS && delay < NODE_DELAY_MAX_MS) {
-                // 阈值设为30ms是为了过滤机场提供商伪造的超低延迟广告节点
-                if (delay < minDelay) {
-                  minDelay = delay
-                  fastestNodeName = name
-                }
-              }
-            }
-
-            if (fastestNodeName) {
-              const fastestProxyItem = proxiesData?.records[fastestNodeName]
-              if (fastestProxyItem) {
-                debugLog(
-                  `[ProxyGroups] 自动优选最快节点: ${fastestNodeName} (延迟: ${minDelay}ms)`,
-                )
-                handleProxyGroupChange(group, fastestProxyItem)
-              }
-            }
-          }
-        }
+      // 委托后端统一执行群发测速 + 择优（select=true）
+      // 关键：传入当前可见节点子集 visibleNames，后端只在「该子集」内测速并挑最快，
+      // 而非 PROXY 全量——所见即所测所选，与自动选点（全量）行为区分开
+      const win = getCurrentWindow()
+      try {
+        await win.setResizable(false)
+        setDragRegionEnabled(false)
+        await triggerAutoSelect(currentUid, visibleNames, 0, true)
+      } catch (err) {
+        console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
+      } finally {
+        await win.setResizable(true)
+        setDragRegionEnabled(true)
       }
     } catch (error) {
       console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)

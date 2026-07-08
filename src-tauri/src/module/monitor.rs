@@ -253,6 +253,7 @@ async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
 /// - `select`: true=测速完成后将 PROXY 切换至最快节点；false=仅测速填充展示，不切换
 pub async fn trigger_backend_auto_select(
     profile_uid: &str,
+    node_names: Option<Vec<String>>,
     sort_type: i32,
     select: bool,
 ) -> anyhow::Result<AutoSelectOutcome> {
@@ -286,7 +287,7 @@ pub async fn trigger_backend_auto_select(
 
     // 直接调用内部函数
     // 如果发生 panic，_guard 会在栈展开时自动释放锁
-    let result = trigger_backend_auto_select_inner(profile_uid, sort_type, select).await;
+    let result = trigger_backend_auto_select_inner(profile_uid, node_names, sort_type, select).await;
 
     // 正常完成，显式释放锁（_guard 会在函数结束时再次 drop，但这是安全的）
     // 注意：这里我们手动释放锁，确保锁尽早释放
@@ -298,26 +299,13 @@ pub async fn trigger_backend_auto_select(
 
 async fn trigger_backend_auto_select_inner(
     profile_uid: &str,
+    node_names: Option<Vec<String>>,
     sort_type: i32,
     select: bool,
 ) -> anyhow::Result<AutoSelectOutcome> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-    let group_info = mihomo
-        .get_group_by_name("PROXY")
-        .await
-        .map_err(|e| anyhow::anyhow!("获取 PROXY 组信息失败: {e}"))?;
 
-    let nodes = match group_info.all {
-        Some(n) => n,
-        None => {
-            return Ok(AutoSelectOutcome {
-                display: vec![],
-                selected: false,
-            });
-        }
-    };
-
-    // 【性能优化】：一次性读取 proxy_head_state.json，同时获取 filter_config 和 sort_type
+    // 解析展示排序方式（sort_type==0 时从 head state 读取）
     let (filter_config, saved_sort_type) = get_filter_and_sort_config(profile_uid).await;
     let sort_type = if sort_type == 0 {
         // 未传入 sort_type 时，从 head state 配置文件读取
@@ -326,12 +314,35 @@ async fn trigger_backend_auto_select_inner(
         sort_type
     };
 
-    let filter_lower = filter_config.filter_text.trim().to_lowercase();
-
-    let valid_nodes: Vec<String> = nodes
-        .into_iter()
-        .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_lower))
-        .collect();
+    // 确定待测节点子集：
+    // - 传入 node_names（非空）：使用调用方指定的子集（如前端当前可见/所选节点），
+    //   仅剔除 dummy，不再套用后端 filter_text（子集已由前端按当前筛选条件给出）
+    // - 未传入：后端自取 PROXY 全量节点，套用 dummy + 保存的 filter_text 过滤（F1/自动选点场景）
+    let valid_nodes: Vec<String> = match node_names {
+        Some(names) if !names.is_empty() => {
+            names.into_iter().filter(|n| !is_dummy_node(n)).collect()
+        }
+        _ => {
+            let group_info = mihomo
+                .get_group_by_name("PROXY")
+                .await
+                .map_err(|e| anyhow::anyhow!("获取 PROXY 组信息失败: {e}"))?;
+            let nodes = match group_info.all {
+                Some(n) => n,
+                None => {
+                    return Ok(AutoSelectOutcome {
+                        display: vec![],
+                        selected: false,
+                    });
+                }
+            };
+            let filter_lower = filter_config.filter_text.trim().to_lowercase();
+            nodes
+                .into_iter()
+                .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_lower))
+                .collect()
+        }
+    };
 
     if valid_nodes.is_empty() {
         logging!(
@@ -524,7 +535,7 @@ pub fn start_background_monitor() {
                     if let Some(uid) = get_current_profile_uid().await {
                         let _ = restore_profile_selected_nodes(&uid).await;
                         // 委托后端执行初始化自动选点；结果经事件回写前端 UI
-                        let _ = trigger_backend_auto_select(&uid, 0, true).await;
+                        let _ = trigger_backend_auto_select(&uid, None, 0, true).await;
                     }
                 }
             } else {
@@ -603,7 +614,7 @@ pub fn start_background_monitor() {
                         "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点"
                     );
                     // 委托后端执行网络恢复自愈选点；结果经事件回写前端 UI
-                    let _ = trigger_backend_auto_select(&current_profile, 0, true).await;
+                    let _ = trigger_backend_auto_select(&current_profile, None, 0, true).await;
                 }
             } else if was_online && !is_online {
                 logging!(
@@ -684,7 +695,7 @@ pub fn start_background_monitor() {
                                         "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
                                     );
 
-                                    match trigger_backend_auto_select(&current_profile, 0, true).await {
+                                    match trigger_backend_auto_select(&current_profile, None, 0, true).await {
                                         Ok(outcome) => {
                                             if outcome.selected {
                                                 auto_select_fail_count = 0; // 选点成功，重置失败计数

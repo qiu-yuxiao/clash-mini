@@ -162,7 +162,7 @@ pub async fn entry_lightweight_mode() -> bool {
             if crate::module::monitor::wait_for_clash_ready().await {
                 let _ = crate::module::monitor::restore_profile_selected_nodes(&uid).await;
                 // 委托后端执行轻量模式进入时的自愈选点；结果经事件回写前端 UI
-                let _ = crate::module::monitor::trigger_backend_auto_select(&uid, 0, true).await;
+                let _ = crate::module::monitor::trigger_backend_auto_select(&uid, None, 0, true).await;
             }
         }
     });

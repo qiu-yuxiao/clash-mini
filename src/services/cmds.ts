@@ -26,13 +26,15 @@ export async function getProfiles() {
 
 export async function triggerAutoSelect(
   profileUid: string,
-  sortType: number,
-  select: boolean,
+  nodeNames?: string[],
+  sortType?: number,
+  select?: boolean,
 ): Promise<Array<[string, number]>> {
   return invoke<Array<[string, number]>>('trigger_auto_select', {
     profileUid,
-    sortType,
-    select,
+    nodeNames: nodeNames ?? null,
+    sortType: sortType ?? 0,
+    select: select ?? true,
   })
 }
 

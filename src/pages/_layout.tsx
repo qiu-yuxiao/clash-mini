@@ -214,9 +214,10 @@ async function batchTestWithFirstBatchSelect(
   }
   DelayManager.queueGroupNotification(groupName)
 
-  // 委托后端统一执行群发测速 + 择优；结果经 verge://backend-delay-results 事件回写 UI
+  // 委托后端统一执行群发测速 + 择优（F1 测速所有节点 → 不传子集，后端自取全量）；
+  // 结果经 verge://backend-delay-results 事件回写 UI
   try {
-    await triggerAutoSelect(currentUid, 0, select)
+    await triggerAutoSelect(currentUid, undefined, 0, select)
   } catch (err) {
     console.error('[Layout] 后端批量测速/选点失败:', err)
   }
@@ -1079,10 +1080,10 @@ const Layout = () => {
             DelayManager.setDelay(name, 'PROXY', -2)
           }
           DelayManager.queueGroupNotification('PROXY')
-          // 委托后端静默测速填充缓存；select=false 严禁切换用户当前节点
+          // 委托后端静默测速填充缓存（不传子集=全量测速）；select=false 严禁切换用户当前节点
           const currentUid = (await getProfiles())?.current || ''
           if (currentUid) {
-            await triggerAutoSelect(currentUid, 0, false)
+            await triggerAutoSelect(currentUid, undefined, 0, false)
           }
           await refreshAllRef.current()
         } catch (err) {
