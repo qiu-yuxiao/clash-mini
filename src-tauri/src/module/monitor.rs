@@ -18,14 +18,6 @@ pub static PROFILE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::con
 /// 用于通知/唤醒后台监测线程（如退出轻量模式时）
 pub static MONITOR_WAKEUP_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
-/// 强制中止正在运行的其它后台测速任务，使其尽快释放锁
-pub fn cancel_active_auto_select() {
-    let mut handles = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
-    for handle in handles.drain(..) {
-        handle.abort();
-    }
-}
-
 /// 并发测速的最大线程数
 const MAX_CONCURRENT_DELAY_TESTS: usize = 32;
 
@@ -449,7 +441,6 @@ async fn get_active_node_name() -> Option<String> {
 pub fn start_background_monitor() {
     AsyncHandler::spawn(move || async move {
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
-        let mut last_profile_uid = None;
         let mut last_check_time = Instant::now();
         let mut consecutive_fails = 0;
         let mut is_retry_mode = false;
@@ -468,6 +459,20 @@ pub fn start_background_monitor() {
                     logging!(warn, Type::Lightweight, "[后台监测] 内核未就绪，跳过首次检测周期");
                     last_check_time = Instant::now();
                     continue;
+                }
+                // 窗口不可见（轻量/纯托盘启动）时，由后端在启动时执行一次初始化自动选点；
+                // 窗口存在则交给前端，此处不动作。进入轻量模式（lightweight.rs B4）也会选点，
+                // 二者由 trigger_backend_auto_select 内部的 AUTO_SELECT_RUNNING 互斥，不会重复执行。
+                let window_state = crate::utils::window_manager::WindowManager::get_main_window_state();
+                if matches!(window_state, crate::utils::window_manager::WindowState::NotExist) {
+                    if let Some(uid) = get_current_profile_uid().await {
+                        let _ = restore_profile_selected_nodes(&uid).await;
+                        if let Ok(results) = trigger_backend_auto_select(&uid, 0).await {
+                            if !results.is_empty() {
+                                Handle::notify_delay_results("PROXY".into(), results);
+                            }
+                        }
+                    }
                 }
             } else {
                 // 定期健康检测的间隔：重试模式下为 3 秒，正常模式下为 15 秒
@@ -491,60 +496,9 @@ pub fn start_background_monitor() {
             let current_profile = match get_current_profile_uid().await {
                 Some(uid) => uid,
                 None => {
-                    last_profile_uid = None;
                     continue;
                 }
             };
-
-            // 1. Profile 发生变化时，重置监测状态
-            if last_profile_uid.as_ref() != Some(&current_profile) {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 活动配置切换: {:?} -> {}",
-                    last_profile_uid,
-                    current_profile
-                );
-                last_profile_uid = Some(current_profile.clone());
-                consecutive_fails = 0;
-                is_retry_mode = false;
-                last_active_node = None;
-
-                // 强制中止正在运行的其它后台测速任务
-                cancel_active_auto_select();
-
-                // 判断前端是否可用：窗口存在（任何状态）即视为前端接管；
-                // 只有窗口彻底销毁（NotExist）才由后端执行自动选点
-                let window_state = crate::utils::window_manager::WindowManager::get_main_window_state();
-                let frontend_available = !matches!(window_state, crate::utils::window_manager::WindowState::NotExist);
-
-                if frontend_available {
-                    logging!(info, Type::Lightweight, "[后台监测] 前端可用，自动选点交由前端执行");
-                } else {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 前端不可用（{:?}），后端执行自动选点",
-                        window_state
-                    );
-                    // 恢复上次选定的节点
-                    let _ = restore_profile_selected_nodes(&current_profile).await;
-                    // 再执行自动选点
-                    match trigger_backend_auto_select(&current_profile, 0).await {
-                        Ok(results) => {
-                            if !results.is_empty() {
-                                Handle::notify_delay_results("PROXY".into(), results);
-                            }
-                        }
-                        Err(e) => {
-                            logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: {e}");
-                        }
-                    }
-                }
-
-                last_check_time = Instant::now();
-                continue;
-            }
 
             // 检测物理网络连通性状态（有节流门控，避免每次循环都发起 DNS 查询）
             let probe_interval = if was_online {

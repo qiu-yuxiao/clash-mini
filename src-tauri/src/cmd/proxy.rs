@@ -102,22 +102,3 @@ pub async fn get_proxy_head_state() -> CmdResult<serde_json::Value> {
     Ok(val)
 }
 
-/// 触发后端自动优选并切换到最快节点（如果是手动触发，则返回最优节点延迟信息）
-#[tauri::command]
-/// 触发后台自动选点
-/// is_manual 参数已废弃（保留向后兼容），无论 true/false 都返回完整结果
-/// sort_type: None=从配置文件读取, Some(0)=同前, Some(1)=按延迟, Some(2)=按名称
-pub async fn trigger_auto_select(
-    _is_manual: bool, // 修复编译警告：添加下划线前缀
-    sort_type: Option<i32>,
-) -> CmdResult<Vec<(std::string::String, u32)>> {
-    let profiles = crate::config::Config::profiles().await;
-    if let Some(ref current_uid) = profiles.data_arc().current {
-        let current_uid_str = current_uid.to_string();
-        let res = crate::module::monitor::trigger_backend_auto_select(&current_uid_str, sort_type.unwrap_or(0))
-            .await
-            .stringify_err()?;
-        return Ok(res);
-    }
-    Ok(vec![])
-}

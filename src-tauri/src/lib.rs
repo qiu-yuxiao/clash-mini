@@ -178,7 +178,6 @@ mod app_init {
             cmd::get_proxy_addr,
             cmd::save_proxy_head_state,
             cmd::get_proxy_head_state,
-            cmd::trigger_auto_select,
             cmd::save_dns_config,
             cmd::apply_dns_config,
             cmd::check_dns_config_exists,
