@@ -617,8 +617,8 @@ Windows 原生标题栏必须显示程序名及版本号，格式为 `Clash Mini
 
       * **前后端分工原则**：自动测速与选点由前后端按窗口可见性分工，避免并发竞争：
         - **窗口可见时（非轻量模式）**：由前端负责分批测速与首批选点（Profile 切换、启动、6秒 Fallback 等场景）。
-        - **窗口不可见时（轻量模式）**：由后端 monitor 线程负责健康监测与自愈选点（连续失败、网络恢复等场景）。
-        - Profile 切换仅发生在窗口可见时，后端不参与，避免与前端批量测速竞争 mihomo 内核。
+        - **窗口不可见时（轻量模式 / 静默启动）**：由后端 monitor 线程负责启动时首次选点、健康监测与自愈选点（启动首次选点、连续失败、网络恢复等场景）。后端监测循环在首次运行且窗口处于 `NotExist` 状态时，会执行一次性后端选点（`restore_profile_selected_nodes` + `trigger_backend_auto_select`），与进入轻量模式（B4）的启动选点经 `AUTO_SELECT_RUNNING` 互斥，不会重复。
+        - Profile 切换仅发生在窗口可见时，后端监测循环内不再保留 Profile 切换分支（旧版 `current_profile != last_profile_uid` 分支已于 v2.3.4 移除），后端不参与，避免与前端批量测速竞争 mihomo 内核；Profile 切换后的节点变更由健康监测自身感知并复位计数器。
 
       * **提前终止条件**：满足以下任一条件时测速结束：
         - 所有过滤子集内的节点均已完成测试（含成功、超时或失败）。
@@ -1089,7 +1089,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 ### 5.6 后台测速前端回传
 
-后台 monitor 常驻线程在 Profile 切换和故障自愈时执行的群发测速结果必须回传至前端 UI 界面，使代理节点列表上的延迟数值实时更新，而非仅用于内部节点切换决策。
+后台 monitor 常驻线程在**启动（窗口不可见时）/ 进入轻量模式 / 故障自愈（连续失败、网络恢复）**时执行的群发测速结果必须回传至前端 UI 界面，使代理节点列表上的延迟数值实时更新，而非仅用于内部节点切换决策。注：monitor 监测循环内原“Profile 切换”触发的后端选点分支已于 v2.3.4 移除（Profile 切换仅发生在窗口可见时，由前端负责），故后端回传的触发场景不再包含实时 Profile 切换，仅上述三类。
 
 - **事件通道**：Rust 侧通过 `FrontendEvent::DelayResults { group, results }` 变体，在 `trigger_backend_auto_select` 成功返回非空结果后，以 Tauri 事件 `verge://backend-delay-results` 推送至前端。事件负载为 `{ group: String, results: Vec<(节点名, u32)> }`。
 - **前端注入**：`DelayManager` 暴露 `injectBatchResults(group, results)` 公共方法，对批量结果逐条写入缓存并通过 `setDelay` 触发逐节点 UI 刷新，最后通过 `queueGroupNotification` 触发分组级 UI 刷新。
@@ -1321,6 +1321,14 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 ---
 
 ## 附录 B: 审计历史
+
+### v2.3.4 设计简化（防断流 / 群发测速择优专项审查，2026-07-08）
+
+针对反复修改留下的废弃代码与自相矛盾逻辑，进行专项审查后做以下设计收敛（commit `942dc26b`，已推送 `origin/dev`）：
+
+- **删除死入口 `trigger_auto_select` 命令**：该 Tauri 命令对外暴露“手动触发后端自动选点”入口，但全仓库无任何调用方（前端无 invoke，Rust 侧仅定义+注册），属反复修改遗留的死代码；已删除命令函数体与 `lib.rs` 注册项，内部执行体 `trigger_backend_auto_select` 保留（仍被启动选点、轻量模式 B4、自愈 B2/B3 使用）。
+- **简化 monitor 的 Profile 切换分支**：移除 `current_profile != last_profile_uid` 整块分支及 `last_profile_uid` 变量（约 47 行），同时移除仅被该分支调用的 `cancel_active_auto_select`。理由：该分支的选点逻辑与进入轻量模式（B4，`lightweight.rs`）完全重复，且稳态下“无窗口 + Profile 切换”不存在（修改激活 profile 的唯一入口是需窗口的前端命令 `patch_profiles_config`）。窗口不可见时的“启动首次后端选点”改由监测循环首次运行、窗口 `NotExist` 时显式执行一次，与 B4 经 `AUTO_SELECT_RUNNING` 互斥不重复；Profile 切换后的节点变更由健康监测自身感知并复位计数器。
+- **前后端分工收口**：§前后端分工原则 与 §5.6 已同步修正——后端回传 / 选点的触发场景收敛为“启动（窗口不可见）/ 进入轻量模式 / 故障自愈”，不再包含实时 Profile 切换（窗口可见时由前端负责）。`ACTIVE_TASKS` 仍保留（属冗余互斥机制，待后续事项 7 一并清理）。
 
 ### v1.9.10 防御性审计 (2026-06-29)
 

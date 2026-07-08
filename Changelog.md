@@ -1,3 +1,14 @@
+## v2.3.5
+
+### 🧹 Refactor & Cleanup
+- 删除无调用方的 Tauri 命令 `trigger_auto_select`（前端从未 `invoke`，纯死入口），精简后端选点入口。
+- 简化 `monitor.rs` 后台监测循环：移除 `current_profile != last_profile_uid` 整段分支（约 47 行）及 `last_profile_uid` 变量。窗口不可见时的启动首次选点改由监测循环首跑一次性执行，并与轻量模式进入（B4）经 `AUTO_SELECT_RUNNING` 互斥、不重复；删除仅被该分支调用的 `cancel_active_auto_select`。前端在线时选点职责不变，仍由前端负责。
+
+### 📝 Docs
+- 同步 `clash_mini_agreements.md`：§前后端分工原则将“启动”按窗口可见性拆分（窗口不可见静默启动改由后端一次性选点）；§5.6 后端测速回传触发场景由“Profile 切换+故障自愈”收敛为“启动(窗口不可见)/进入轻量模式/故障自愈”。
+
+---
+
 ## v2.3.4
 
 ### ✨ New Features
