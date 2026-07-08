@@ -29,10 +29,11 @@ const NODE_DELAY_MIN_MS: u32 = 30;
 /// 健康检测和自动选点测速均以此值作为超时阈值，确保判断标准统一。
 const NODE_DELAY_MAX_MS: u32 = 2000;
 
-/// 批量测速（展示用途）对 Clash 内核发起的探针超时上限。
-/// 取值宽松以在 UI 展示真实延迟（与前端 checkListDelay 的 timeout 语义一致）；
-/// 节点「是否可用」的判定阈值仍以 NODE_DELAY_MAX_MS(2000) 为准。
-const NODE_TEST_TIMEOUT_MS: u32 = 10000;
+/// 批量测速对 Clash 内核发起的探针超时上限。
+/// 与死节点判定阈值 NODE_DELAY_MAX_MS(2000) 统一，确保「探针超时 == 判死阈值」：
+/// 超过 2000ms 的节点一律按不可用（超时）处理，UI 显示 Error/Timeout，不再展示其真实延迟。
+/// 节点「是否可用」的判定阈值同样以 NODE_DELAY_MAX_MS(2000) 为准。
+const NODE_TEST_TIMEOUT_MS: u32 = NODE_DELAY_MAX_MS;
 
 /// 自动选点执行结果
 pub struct AutoSelectOutcome {
@@ -374,8 +375,7 @@ async fn trigger_backend_auto_select_inner(
                     break;
                 }
                 let node_name = &valid_nodes[idx];
-                // 展示用途使用宽松探针超时，捕获真实延迟用于 UI；
-                // 节点可用性判定仍以 NODE_DELAY_MAX_MS(2000) 为准。
+                // 探针超时=判死阈值=2000ms：超过即按不可用处理，简化前后端一致性。
                 match mihomo
                     .delay_proxy_by_name(node_name, &test_url, NODE_TEST_TIMEOUT_MS)
                     .await

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useReducer, useRef } from 'react'
 import { useRuntimeConfig } from '@/hooks/use-clash'
 import { useVerge } from '@/hooks/use-verge'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
-import delayManager from '@/services/delay'
+import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 
@@ -144,7 +144,8 @@ export const useRenderList = (
 
     const calculateDelays = async () => {
       try {
-        const timeout = verge?.default_latency_timeout || 10000
+        // 探针超时固定为死节点阈值 2000ms（与后端 auto-select 一致）
+        const timeout = NODE_DELAY_MAX_MS
         const proxyNames = allProxies.map((proxy) => proxy.name)
 
         debugLog(`[ChainMode] 开始计算 ${proxyNames.length} 个节点的延迟`)
@@ -165,7 +166,7 @@ export const useRenderList = (
       // 清理组监听器
       delayManager.removeGroupListener('chain-mode')
     }
-  }, [isChainMode, runtimeConfig, verge?.default_latency_timeout, refreshProxy])
+  }, [isChainMode, runtimeConfig, refreshProxy])
 
   // 非链式模式下注册 PROXY 组监听器，单点测速完成后驱动列表重排
   // 注意：批量测速已通过 checkListDelay 内部 queueGroupNotification 触发，此监听器同时覆盖两类场景

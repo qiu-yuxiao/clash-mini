@@ -3,7 +3,8 @@
 ### 🧹 Refactor & Cleanup
 - **F1/F2 群发测速择优收归后端（根治前后端重复测速 / 竞争切换 PROXY 冲突）**：前端「测速所有节点」按钮、Profile 切换 / 启动 / 6 秒 Fallback、窗口唤醒静默填充均不再自行对 PROXY 组发起批量测速与节点切换，改为统一通过 Tauri 命令 `trigger_auto_select(profile_uid, sort_type, select)` 委托后端 `trigger_backend_auto_select` 执行；后端测速完成后经既有 `verge://backend-delay-results` 事件回传结果刷新 UI。前端仅在触发时标记节点为「测速中」（-2）以驱动流光动画。
 - 重新引入 `trigger_auto_select` 命令（原 B5 死入口已于 v2.3.5 删除），其职责现为「前端发信号、后端统一做」，与当初的重复选点死逻辑有本质区别。
-- 后端 `trigger_backend_auto_select` 改造：`select` 参数区分「测速+切换」(true) 与「仅测速填充」(false，用于窗口唤醒、严禁切节点)；探针改用宽松超时 `NODE_TEST_TIMEOUT_MS(10000)` 以在 UI 展示真实延迟，节点可用性判定仍以 `NODE_DELAY_MAX_MS(2000)` 为准；回传结果包含**全部被测节点**（含死节点 / 超时 / 错误），避免 UI 只显示健康节点。
+- 后端 `trigger_backend_auto_select` 改造：`select` 参数区分「测速+切换」(true) 与「仅测速填充」(false，用于窗口唤醒、严禁切节点)；回传结果包含**全部被测节点**（含死节点 / 超时 / 错误），避免 UI 只显示健康节点。
+- **探针超时与死节点阈值统一为 2000ms（彻底前后端一致）**：后端 `NODE_TEST_TIMEOUT_MS` 由宽松的 10000ms 收紧为等于 `NODE_DELAY_MAX_MS(2000)`，前端 F4（per-group 闪电按钮）与 chain-mode 的 `checkListDelay` 探针超时均改为 `NODE_DELAY_MAX_MS(2000)`；`verge.default_latency_timeout` 不再参与测速。效果：超过 2000ms 的节点一律按不可用处理，UI 显示 Error/Timeout，不再展示其真实延迟（精度换一致性，符合既定设计）。
 - 修复后端选点 bug：选点固定按延迟升序取全局最快节点，不再依赖 `sort_type`（原逻辑在 `sort_type=2` 时会误选字母序首个节点）。
 
 ### 📝 Docs

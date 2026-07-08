@@ -104,7 +104,9 @@ export const ProxyGroups = (props: Props) => {
     message: string
   }>({ open: false, message: '' })
 
-  const { verge } = useVerge()
+  // F4 手动测速的探针超时固定为死节点阈值 2000ms（与后端 auto-select 一致），
+  // 不再读取 verge.default_latency_timeout；useVerge 仅用于订阅配置变更。
+  useVerge()
   const { proxies: proxiesData } = useProxiesData()
   const groups = proxiesData?.groups
   const availableGroups = useMemo(() => {
@@ -153,8 +155,6 @@ export const ProxyGroups = (props: Props) => {
       console.error('代理切换失败', error)
     },
   })
-
-  const timeout = verge?.default_latency_timeout || 10000
 
   const parentRef = useRef<HTMLDivElement>(null)
   const scrollPositionRef = useRef<Record<string, number>>({})
@@ -414,7 +414,11 @@ export const ProxyGroups = (props: Props) => {
         try {
           await win.setResizable(false)
           setDragRegionEnabled(false)
-          await delayManager.checkListDelay(visibleNames, groupName, timeout)
+          await delayManager.checkListDelay(
+            visibleNames,
+            groupName,
+            NODE_DELAY_MAX_MS,
+          )
         } finally {
           if (!delayManager.isBatchTesting) {
             await win.setResizable(true)
