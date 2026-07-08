@@ -158,7 +158,7 @@ impl Tray {
     ///
     /// 优先级：TUN 模式 > 系统代理 > 默认（手动模式）
     /// 三套图标均通过 include_bytes! 编译时嵌入，运行时按当前状态选择
-    pub async fn update_icon(&self, verge: &IVerge) -> Result<()> {
+    pub fn update_icon(&self, verge: &IVerge) -> Result<()> {
         let tun_enabled = verge.enable_tun_mode.unwrap_or(false);
         let sys_proxy = verge.enable_system_proxy.unwrap_or(false);
 
@@ -202,7 +202,7 @@ impl Tray {
     /// 启动时刷新托盘状态（图标按当前接管模式初始化）
     pub async fn update_part(&self) -> Result<()> {
         let verge = crate::config::Config::verge().await.latest_arc();
-        self.update_icon(&verge).await
+        self.update_icon(&verge)
     }
 
     #[allow(clippy::unused_async)]
