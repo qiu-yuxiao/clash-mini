@@ -256,14 +256,18 @@ export const AppDataProvider = ({
   const { data: sysproxy, refetch: _refetchSysproxy } = useQuery({
     queryKey: ['getSystemProxy'],
     queryFn: getSystemProxy,
-    enabled: isSettingsOpen,
+    // 小窗口尺寸（isMiniStatus）下设置内容块(drawerOpen && !isMiniStatus)整体不挂载，
+    // 仅保留流量图+关闭叉子，故 sysproxy 须与 DOM 同一开关关闭，避免后台空跑 IPC。
+    enabled: isSettingsOpen && !isMiniStatus,
     ...TQ_DEFAULTS,
   })
 
   const { data: runningMode } = useQuery({
     queryKey: ['getRunningMode'],
     queryFn: getRunningMode,
-    enabled: isSettingsOpen,
+    // 小窗口尺寸（isMiniStatus）下设置内容块不挂载，runningMode 仅服务设置 UI，
+    // 须与 DOM 同一开关关闭（isSettingsOpen 即 drawerOpen）。
+    enabled: isSettingsOpen && !isMiniStatus,
     ...TQ_DEFAULTS,
   })
 

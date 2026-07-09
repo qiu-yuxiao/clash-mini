@@ -1086,6 +1086,10 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
     - **大窗口**（窗口宽度 > 285px，即 `!isMinimalWidth`）：表挂载并渲染，同时连接管理开启**高频实时观测模式**——激活 WebSocket 以 16ms 节流频率全面同步活跃与历史连接详情，并执行精细的连接列表 merge/diff 差量计算。
     - **窄窗口**（窗口宽度 = 285px，即 `isMinimalWidth`）：表**完全不挂载、不渲染**（条件渲染 `{!isMinimalWidth && <ConnectionsPanel/>}`），连接数据订阅随之关闭。数据与 DOM 渲染**同时开启、同时关闭**，杜绝"看得见/看不见"与"订阅/不订阅"脱节。
   - 当设置面板关闭（`drawerOpen === false`）或处于窄窗口（`isMinimalWidth === true`）时，连接管理进入**完全静默模式**：彻底断开 WebSocket，停止所有连接数据请求，连接数据冻结在最后已知状态。此模式下**不再**进行任何降频 REST 轮询，以最大限度降低后台资源占用。这是经用户确认的设计决策（BUG-239 修正，v1.8.2）。
+- **设置抽屉在小窗口尺寸下的极简降级（数据订阅与 DOM 挂载同一开关）**：
+  - 当用户在**小窗口尺寸**（`isMiniStatus`：宽 ≤ 285 且 高 ≤ 135）下打开设置抽屉时，设置内容块（`drawerOpen && !isMiniStatus`）整体不挂载，界面仅保留底部流量图与关闭叉子。因此服务于设置 UI 的数据订阅必须同步关闭，不得在后台空跑。
+  - 具体：`getSystemProxy`（`sysproxy`）与 `getRunningMode`（`runningMode`）两个查询的 `enabled` 必须为 `isSettingsOpen && !isMiniStatus`（其中 `isSettingsOpen` 即 `drawerOpen`），与设置内容 DOM 的挂载条件 `drawerOpen && !isMiniStatus` **共用同一尺寸信号、同时开启同时关闭**。小窗口尺寸下这两个查询不触发任何 IPC。
+  - 状态转换说明：用户可在窄窗口（285 × 高 > 135）打开设置抽屉后，将窗口高度拖到 135 变为小窗口，此时 `drawerOpen` 仍为 true 但 `isMiniStatus` 变 true，设置内容与上述两个订阅须即时降级为静默。这是经用户确认的设计决策。
 - **日志组件条件渲染与彻底注销**：
   - 日志显示组件 (`LogsPage`) 必须在布局中实行完全的条件渲染。在日志弹窗 Dialog 关闭时（`logsOpen === false`），直接以 `{logsOpen && <LogsPage />}` 方式进行 React 卸载（Unmount），使其所占用的日志 WebSocket 连接在 Dialog 关闭的第一时间彻底销毁注销，杜绝在后台默默堆积和合并解析数百条日志的行为。
 
