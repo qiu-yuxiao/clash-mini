@@ -953,37 +953,12 @@ const Layout = () => {
   const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>(
     'active',
   )
-  const connectionsPanelRef = useRef<HTMLDivElement>(null)
-  const [isPanelVisible, setIsPanelVisible] = useState(false)
-
-  useEffect(() => {
-    let timerId: any = null
-    if (!drawerOpen) {
-      timerId = setTimeout(() => setIsPanelVisible(false), 0)
-      return () => {
-        if (timerId) clearTimeout(timerId)
-      }
-    }
-    const element = connectionsPanelRef.current
-    if (!element) return
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsPanelVisible(entry.contentRect.width > 10)
-      }
-    })
-
-    observer.observe(element)
-    return () => {
-      observer.disconnect()
-      if (timerId) clearTimeout(timerId)
-    }
-  }, [drawerOpen])
-
+  // 右侧连接/路由表的"挂载"与"数据订阅"共用同一宽度开关（isMinimalWidth）：
+  // 大窗口(宽>285) 同时开，窄窗口(宽=285) 同时关，杜绝"看得见/看不见"与"订阅/不订阅"脱节。
   const {
     response: { data: connectionsData },
     clearClosedConnections,
-  } = useConnectionData({ enabled: drawerOpen && isPanelVisible })
+  } = useConnectionData({ enabled: drawerOpen && !isMinimalWidth })
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const detailRef = useRef<any>(null)
 
@@ -1822,9 +1797,10 @@ const Layout = () => {
                     height: '100%',
                     zIndex: 100,
                     // WARNING [FOR AI AGENTS / AUDITORS]:
-                    // This flex layout must remain as row direction and MUST NOT wrap. In default 270px width,
-                    // the connections panel is intentionally squeezed to 0px (hidden) and physically clipped
-                    // off-screen, per the design agreement. Widening the window will slide it into view.
+                    // This flex layout must remain as row direction and MUST NOT wrap. In narrow window
+                    // (width = 285px, i.e. isMinimalWidth) the right ConnectionsPanel is NOT mounted at all
+                    // (see conditional render `{!isMinimalWidth && <ConnectionsPanel/>}`), so the squeeze-to-0px
+                    // path is never reached there. In large window the panel mounts and this row layout applies.
                     display: 'flex',
                     boxSizing: 'border-box',
                     padding: '12px',
@@ -1920,7 +1896,9 @@ const Layout = () => {
                       mode={mode}
                     />
                   </Box>
-                  {/* Right Connections column (自适应 flex: 1) */}
+                  {/* Right Connections column (自适应 flex: 1) — 仅大窗口(宽>285)挂载；
+                      窄窗口(宽=285)下不挂载、不渲染、不订阅数据，与上方 useConnectionData 共用 isMinimalWidth 信号 */}
+                  {!isMinimalWidth && (
                   <ErrorBoundary FallbackComponent={AreaErrorFallback}>
                     <ConnectionsPanel
                       connectionsType={connectionsType}
@@ -1932,9 +1910,9 @@ const Layout = () => {
                       isColumnManagerOpen={isColumnManagerOpen}
                       setIsColumnManagerOpen={setIsColumnManagerOpen}
                       clearClosedConnections={clearClosedConnections}
-                      containerRef={connectionsPanelRef}
                     />
                   </ErrorBoundary>
+                  )}
                   {/* Help Button */}
                   <HelpMenuButton
                     helpAnchorEl={helpAnchorEl}
