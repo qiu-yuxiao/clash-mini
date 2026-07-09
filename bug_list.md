@@ -11,20 +11,12 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-275: Service reinstall infinite UAC loop under normal user permissions
- - **现象描述**：在普通用户权限下切换至 TUN 模式时，若系统服务已被停止（IPC 路径不存在）或存在带 'v' 前缀的版本差异，底层 `is_reinstall_service_needed` 版本校验由于无法连接或校验不匹配会始终返回 `true`，触发重装服务的 UAC 提权弹窗，从而进入“卸载->安装->重启->重新校验失败->再次重装”的无限循环。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.21`
-
-### BUG-276: TUN fallback to manual mode instead of system proxy
- - **现象描述**：在程序以普通用户权限启动并设置为 TUN 模式时，若系统服务未安装或被停用，在自动检测并回滚关闭 TUN 模式时，前端仅将 `enable_tun_mode` 设为 `false`，导致程序静默回滚至“手动模式”（Manual），使得小白用户失去代理，对用户不友好。
- - **当前状态**：`代码已修正，待用户确认`
- - **目标版本**：`v1.9.21`
-
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
+| **BUG-276** | TUN fallback to manual mode instead of system proxy | v1.9.21 | 代码已修正，已确认 |
+| **BUG-275** | Service reinstall infinite UAC loop under normal user permissions | v1.9.21 | 代码已修正，已确认 |
 | **BUG-274** | Lightweight mode exit state machine rate-limited rollback failure | v1.9.18 | 代码已修正，已确认 |
 | **BUG-273** | Missing is_current_app_handle_admin loop-skipping check in lifecycle.rs | v1.9.18 | 代码已修正，已确认 |
 | **BUG-272** | Optimization of self-healing check intervals and 10-minute node-switching cooldown | v1.9.10 | 代码已修正，已确认 |

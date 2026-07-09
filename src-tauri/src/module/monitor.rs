@@ -319,9 +319,7 @@ async fn trigger_backend_auto_select_inner(
     //   仅剔除 dummy，不再套用后端 filter_text（子集已由前端按当前筛选条件给出）
     // - 未传入：后端自取 PROXY 全量节点，套用 dummy + 保存的 filter_text 过滤（F1/自动选点场景）
     let valid_nodes: Vec<String> = match node_names {
-        Some(names) if !names.is_empty() => {
-            names.into_iter().filter(|n| !is_dummy_node(n)).collect()
-        }
+        Some(names) if !names.is_empty() => names.into_iter().filter(|n| !is_dummy_node(n)).collect(),
         _ => {
             let group_info = mihomo
                 .get_group_by_name("PROXY")

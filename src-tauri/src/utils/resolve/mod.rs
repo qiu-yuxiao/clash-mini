@@ -51,7 +51,7 @@ pub fn resolve_setup_sync() {
 pub fn resolve_setup_async() {
     let app_handle = Handle::app_handle().clone();
     AsyncHandler::spawn(move || async move {
-        if let Err(e) = Tray::global().init(&app_handle) {
+        if let Err(e) = Tray::global().init(&app_handle).await {
             log::error!(target: "app", "[Setup] Failed to initialize tray: {}", e);
         }
 

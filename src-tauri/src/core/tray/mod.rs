@@ -48,7 +48,7 @@ impl Tray {
         Self::default()
     }
 
-    pub fn init(&self, app_handle: &AppHandle) -> Result<()> {
+    pub async fn init(&self, app_handle: &AppHandle) -> Result<()> {
         if handle::Handle::global().is_exiting() {
             logging!(debug, Type::Tray, "应用正在退出，跳过托盘初始化");
             return Ok(());
@@ -56,9 +56,27 @@ impl Tray {
 
         logging!(info, Type::Tray, "正在从AppHandle创建静态系统托盘");
 
-        // Load default icon bytes synchronously depending on OS
-        let icon_bytes = include_bytes!("../../../icons/tray-icon.png").to_vec();
-        let image = tauri::image::Image::from_bytes(&icon_bytes)?;
+        // 提前读取配置，在主线程创建托盘时直接使用正确的图标，避免创建后竞态刷新失败
+        let verge_data = crate::config::Config::verge().await.latest_arc();
+        let tun_enabled = verge_data.enable_tun_mode.unwrap_or(false);
+        let sys_proxy = verge_data.enable_system_proxy.unwrap_or(false);
+
+        let icon_bytes: &'static [u8] = if tun_enabled {
+            &include_bytes!("../../../icons/tray-icon-tun.png")[..]
+        } else if sys_proxy {
+            &include_bytes!("../../../icons/tray-icon-sys.png")[..]
+        } else {
+            &include_bytes!("../../../icons/tray-icon.png")[..]
+        };
+        let image = tauri::image::Image::from_bytes(icon_bytes)?;
+
+        logging!(
+            info,
+            Type::Tray,
+            "托盘初始图标 — tun={}, sys_proxy={}",
+            tun_enabled,
+            sys_proxy
+        );
 
         let app_handle_clone = app_handle.clone();
         app_handle.run_on_main_thread(move || {
