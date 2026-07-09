@@ -12,10 +12,9 @@ import { useTranslation } from 'react-i18next'
 
 import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useProfiles } from '@/hooks/use-profiles'
-import { useVerge } from '@/hooks/use-verge'
 import { useProxiesData } from '@/providers/app-data-context'
 import { getProxyAddr } from '@/services/cmds'
-import delayManager from '@/services/delay'
+import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import { get3DCardStyle } from '@/utils/button-styles'
 import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 
@@ -29,9 +28,9 @@ export const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { profiles } = useProfiles()
   const currentProfileUid = profiles?.current || ''
-  const { verge } = useVerge()
-  const latencyTimeout = verge?.default_latency_timeout || 10000
-  // 单点测速固定 1 秒超时，追求快速响应；显示和轮换判定统一用 latencyTimeout
+  // 判死/显示/轮换阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定、探针超时一致；
+  // 单点测速仍走 singleTestTimeout(1000) 追求快速响应
+  const latencyTimeout = NODE_DELAY_MAX_MS
   const singleTestTimeout = 1000
 
   const primaryGroup = useMemo(() => {

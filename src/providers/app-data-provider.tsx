@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
+import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 import {
   calcuProxies,
   calcuProxyProviders,
@@ -61,14 +62,14 @@ export const AppDataProvider = ({
   const { verge } = useVerge()
 
   const [isMinimalWidth, setIsMinimalWidth] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth <= 285,
+    () => typeof window !== 'undefined' && window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
 
   const [isMiniStatus, setIsMiniStatus] = useState(
     () =>
       typeof window !== 'undefined' &&
-      window.innerWidth <= 285 &&
-      window.innerHeight <= 135,
+      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
+      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
   )
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -85,7 +86,7 @@ export const AppDataProvider = ({
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {
-          const next = window.innerWidth <= 285 && window.innerHeight <= 135
+          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD && window.innerHeight <= MINI_HEIGHT_THRESHOLD
           return prev !== next ? next : prev
         })
       })

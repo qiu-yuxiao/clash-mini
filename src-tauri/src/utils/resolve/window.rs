@@ -20,7 +20,9 @@ const DEFAULT_WIDTH: f64 = 285.0;
 const DEFAULT_HEIGHT: f64 = 680.0;
 const MAX_WIDTH: f64 = 640.0;
 const MAX_HEIGHT: f64 = 860.0;
+// 极简窗口最小尺寸；必须与前端 src/constants.ts 的 MINI_WIDTH_THRESHOLD / MINI_HEIGHT_THRESHOLD 保持一致
 pub const MINIMAL_WIDTH: f64 = 285.0;
+// 极简窗口最小高度；对应前端 MINI_HEIGHT_THRESHOLD
 pub const MINIMAL_HEIGHT: f64 = 135.0;
 const DEFAULT_DECORATIONS: bool = false;
 

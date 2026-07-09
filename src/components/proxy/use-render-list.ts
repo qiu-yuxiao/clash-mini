@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef } from 'react'
 
 import { useRuntimeConfig } from '@/hooks/use-clash'
-import { useVerge } from '@/hooks/use-verge'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
@@ -92,10 +91,9 @@ export const useRenderList = (
   // 使用全局数据提供者
   const { proxies: proxiesData } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
-  const { verge } = useVerge()
   const { width } = useWindowWidth()
   const [headStates, setHeadState] = useHeadStateNew()
-  const latencyTimeout = verge?.default_latency_timeout
+  const latencyTimeout = NODE_DELAY_MAX_MS
 
   // 延迟更新计数器，每次组级通知递增，驱动 useMemo 重新计算排序
   const [delayBump, bumpDelay] = useReducer((c: number) => c + 1, 0)

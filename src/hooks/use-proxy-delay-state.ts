@@ -1,7 +1,7 @@
 import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useReducer } from 'react'
 
-import delayManager, { type DelayUpdate } from '@/services/delay'
+import delayManager, { NODE_DELAY_MAX_MS, type DelayUpdate } from '@/services/delay'
 import { getPreloadConfig } from '@/services/preload'
 import type { IProxyItem } from '@/types/clash'
 
@@ -31,7 +31,8 @@ export function useProxyDelayState(
 ): UseProxyDelayState {
   const isPreset = proxy ? PRESET_PROXY_NAMES.includes(proxy.name) : false
   const [delayState, setDelayState] = useReducer(identity, INITIAL_DELAY)
-  const timeout = getPreloadConfig()?.default_latency_timeout || 10000
+  // 死活着色阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定一致
+  const timeout = NODE_DELAY_MAX_MS
 
   useEffect(() => {
     if (isPreset || !proxy) return

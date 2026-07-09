@@ -233,7 +233,7 @@ async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
         .await
     {
         Ok(delay_info) => {
-            if delay_info.delay >= NODE_DELAY_MIN_MS {
+            if delay_info.delay >= NODE_DELAY_MIN_MS && delay_info.delay < NODE_DELAY_MAX_MS {
                 Ok(NodeHealthStatus::Healthy)
             } else {
                 // 小于 30ms 的节点一律为机场伪造的假节点/广告节点，判定为亚健康并触发重选。
@@ -548,9 +548,12 @@ pub fn start_background_monitor() {
                     _ = sleep(Duration::from_secs(check_interval)) => {}
                     _ = MONITOR_WAKEUP_NOTIFY.notified() => {
                         logging!(debug, Type::Lightweight, "[后台监测] 收到唤醒信号，立即唤醒监测");
+                        // 唤醒即放行一次体检（探活+必要时自愈），不再等下一自然周期
+                        last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                     }
                     _ = PROFILE_SWITCH_NOTIFY.notified() => {
                         logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒");
+                        last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                     }
                 }
             }
@@ -624,7 +627,11 @@ pub fn start_background_monitor() {
             was_online = is_online;
 
             // 2. 定期检测与快速重试自愈
-            let check_interval = if is_retry_mode { 3 } else { 15 };
+            let check_interval = if is_retry_mode {
+                RETRY_CHECK_INTERVAL_SECS
+            } else {
+                NORMAL_CHECK_INTERVAL_SECS
+            };
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
 

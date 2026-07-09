@@ -39,6 +39,7 @@ import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useHeadStateNew } from '@/components/proxy/use-head-state'
+import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
@@ -453,14 +454,14 @@ const Layout = () => {
   const [coreCheckLoading, setCoreCheckLoading] = useState(false)
 
   const [isMinimalWidth, setIsMinimalWidth] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth <= 285,
+    () => typeof window !== 'undefined' && window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
 
   const [isMiniStatus, setIsMiniStatus] = useState(
     () =>
       typeof window !== 'undefined' &&
-      window.innerWidth <= 285 &&
-      window.innerHeight <= 135,
+      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
+      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
   )
 
   const handleDepthFactorChange = (val: number) => {
@@ -1205,7 +1206,7 @@ const Layout = () => {
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {
-          const next = window.innerWidth <= 285 && window.innerHeight <= 135
+          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD && window.innerHeight <= MINI_HEIGHT_THRESHOLD
           return prev !== next ? next : prev
         })
       })

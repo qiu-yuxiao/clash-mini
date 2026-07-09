@@ -396,7 +396,7 @@ export const ProxyGroups = (props: Props) => {
     setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
     try {
-      // 从当前过滤后可见的渲染列表中提取节点名称，仅用于「测速中」视觉占位（流光）
+      // 从当前过滤后可见的渲染列表中提取节点名称；该子集同时作为 F4 批量测速+择优的候选池（防越界关键），并非仅用于视觉占位
       const visibleNames = filteredRenderList
         .filter(
           (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
@@ -430,8 +430,14 @@ export const ProxyGroups = (props: Props) => {
       } catch (err) {
         console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
       } finally {
-        await win.setResizable(true)
-        setDragRegionEnabled(true)
+        // 仅在无其他分组正在测速时才解锁窗口，避免并发测速时被提前解锁导致拖拽异常
+        const otherTesting = Object.entries(testingGroups).some(
+          ([k, v]) => k !== groupName && v,
+        )
+        if (!otherTesting) {
+          await win.setResizable(true)
+          setDragRegionEnabled(true)
+        }
       }
     } catch (error) {
       console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)
