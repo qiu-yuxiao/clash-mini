@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useWindow } from '@/hooks/use-window'
 import DelayManager from '@/services/delay'
 
-const HANDLE_SIZE = 6
+const HANDLE_SIZE = 10
 
 type Direction = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
