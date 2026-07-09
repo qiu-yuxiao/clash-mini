@@ -1202,7 +1202,7 @@ const Layout = () => {
       rafId = requestAnimationFrame(() => {
         rafId = null
         setIsMinimalWidth((prev) => {
-          const next = window.innerWidth <= 285
+          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {
@@ -2168,8 +2168,8 @@ const Layout = () => {
             {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}
             <div
               style={{
-                flex: isMinimalWidth ? '0 0 100px' : '0 0 135px',
-                height: isMinimalWidth ? '100px' : '135px',
+                flex: isMinimalWidth ? '0 0 100px' : `0 0 ${MINI_HEIGHT_THRESHOLD}px`,
+                height: isMinimalWidth ? '100px' : `${MINI_HEIGHT_THRESHOLD}px`,
                 background: 'inherit',
                 padding: isMinimalWidth
                   ? '3px 6px 2px 6px'

@@ -82,7 +82,7 @@ export const AppDataProvider = ({
       rafId = requestAnimationFrame(() => {
         rafId = null
         setIsMinimalWidth((prev) => {
-          const next = window.innerWidth <= 285
+          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {

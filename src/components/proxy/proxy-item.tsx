@@ -13,6 +13,7 @@ import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 
+import { MINI_WIDTH_THRESHOLD } from '@/constants'
 import { useWindowWidth } from './use-window-width'
 
 interface Props {
@@ -47,7 +48,7 @@ export const ProxyItem = memo(
     } = props
 
     const { width } = useWindowWidth()
-    const isMinimal = width <= 285
+    const isMinimal = width <= MINI_WIDTH_THRESHOLD
 
     const displayName = (proxy?.name ?? '').replace(/\s\(\d{6}\)$/, '')
     const displayNow = proxy?.now ? proxy.now.replace(/\s\(\d{6}\)$/, '') : ''

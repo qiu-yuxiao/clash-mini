@@ -6,13 +6,10 @@ import debounce from '@/utils/debounce'
 import getSystem from '@/utils/get-system'
 
 import { WindowContext } from './window-context'
+import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 
 /** FEAT-003: Idle duration (ms) before chrome auto-hides */
 const IDLE_HIDE_DELAY_MS = 10_000
-/** Width threshold (CSS px) below which the window is in "traffic monitor" mode */
-const MINIMAL_WIDTH_THRESHOLD = 285
-/** Height threshold (CSS px) below which the window is in "traffic monitor" mode */
-const MINIMAL_HEIGHT_THRESHOLD = 135
 
 const OS = getSystem()
 const IS_MACOS = OS === 'macos'
@@ -41,7 +38,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const isDecorationsHiddenRef = useRef(false)
   const isMinimalWidthRef = useRef(
     typeof window !== 'undefined'
-      ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
+      ? window.innerWidth <= MINI_WIDTH_THRESHOLD
       : false,
   )
   // ── Drag-vs-click detection (for stealth mode) ────────────────────────────
@@ -83,7 +80,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         lastHeight = height
 
         const wasMinimal = isMinimalWidthRef.current
-        isMinimalWidthRef.current = window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
+        isMinimalWidthRef.current = window.innerWidth <= MINI_WIDTH_THRESHOLD
 
         if (
           wasMinimal &&
@@ -123,17 +120,17 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)
 
     if (typeof window !== 'undefined') {
-      isMinimalWidthRef.current = window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
+      isMinimalWidthRef.current = window.innerWidth <= MINI_WIDTH_THRESHOLD
     }
 
     idleTimerRef.current = setTimeout(() => {
       const currentIsMinimal =
         typeof window !== 'undefined'
-          ? window.innerWidth <= MINIMAL_WIDTH_THRESHOLD
+          ? window.innerWidth <= MINI_WIDTH_THRESHOLD
           : false
       const currentIsMinimalHeight =
         typeof window !== 'undefined'
-          ? window.innerHeight <= MINIMAL_HEIGHT_THRESHOLD
+          ? window.innerHeight <= MINI_HEIGHT_THRESHOLD
           : false
       if (
         !currentIsMinimal ||

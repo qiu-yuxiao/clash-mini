@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 
+import { MINI_WIDTH_THRESHOLD } from '@/constants'
+
 const getIsMinimal = (): boolean => {
   if (typeof document !== 'undefined' && document.body) {
-    return document.body.clientWidth <= 285
+    return document.body.clientWidth <= MINI_WIDTH_THRESHOLD
   }
   if (typeof window !== 'undefined') {
-    return window.innerWidth <= 285
+    return window.innerWidth <= MINI_WIDTH_THRESHOLD
   }
   return false
 }
@@ -54,6 +56,6 @@ export const useWindowWidth = () => {
     return subscribe(setIsMinimal)
   }, [])
 
-  return { width: isMinimal ? 285 : 640 }
+  return { width: isMinimal ? MINI_WIDTH_THRESHOLD : 640 }
 }
 

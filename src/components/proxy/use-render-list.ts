@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef } from 'react'
 
 import { useRuntimeConfig } from '@/hooks/use-clash'
+import { MINI_WIDTH_THRESHOLD } from '@/constants'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
@@ -64,7 +65,7 @@ type GroupCache = {
 
 // 优化列布局计算
 const calculateColumns = (width: number): number => {
-  if (width <= 285) {
+  if (width <= MINI_WIDTH_THRESHOLD) {
     return 1
   }
   return 3 // 依据 Agreement 第九条，宽屏下固定为 3 列排版
