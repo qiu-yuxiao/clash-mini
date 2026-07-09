@@ -460,7 +460,7 @@ const Layout = () => {
     () =>
       typeof window !== 'undefined' &&
       window.innerWidth <= 285 &&
-      window.innerHeight <= 100,
+      window.innerHeight <= 135,
   )
 
   const handleDepthFactorChange = (val: number) => {
@@ -1205,7 +1205,7 @@ const Layout = () => {
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {
-          const next = window.innerWidth <= 285 && window.innerHeight <= 100
+          const next = window.innerWidth <= 285 && window.innerHeight <= 135
           return prev !== next ? next : prev
         })
       })

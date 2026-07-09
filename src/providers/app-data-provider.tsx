@@ -60,9 +60,16 @@ export const AppDataProvider = ({
 }) => {
   const { verge } = useVerge()
 
-  const [isMinimalWidth, setIsMinimalWidth] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 285)
+  const [isMinimalWidth, setIsMinimalWidth] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 285,
+  )
 
-  const [isMiniStatus, setIsMiniStatus] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 285 && window.innerHeight <= 100)
+  const [isMiniStatus, setIsMiniStatus] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.innerWidth <= 285 &&
+      window.innerHeight <= 135,
+  )
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
@@ -78,7 +85,7 @@ export const AppDataProvider = ({
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {
-          const next = window.innerWidth <= 285 && window.innerHeight <= 100
+          const next = window.innerWidth <= 285 && window.innerHeight <= 135
           return prev !== next ? next : prev
         })
       })
@@ -312,7 +319,9 @@ export const AppDataProvider = ({
       }
       lastProxyTimer = setTimeout(() => {
         lastProxyTimer = null
-        refreshProxy().catch(() => console.warn('[app-data] refreshProxy failed'))
+        refreshProxy().catch(() =>
+          console.warn('[app-data] refreshProxy failed'),
+        )
       }, 200)
     }
 
