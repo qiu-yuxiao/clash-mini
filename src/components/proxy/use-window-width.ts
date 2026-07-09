@@ -54,6 +54,6 @@ export const useWindowWidth = () => {
     return subscribe(setIsMinimal)
   }, [])
 
-  return { width: isMinimal ? 270 : 640 }
+  return { width: isMinimal ? 285 : 640 }
 }
 

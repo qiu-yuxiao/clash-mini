@@ -12,7 +12,7 @@ const IDLE_HIDE_DELAY_MS = 10_000
 /** Width threshold (CSS px) below which the window is in "traffic monitor" mode */
 const MINIMAL_WIDTH_THRESHOLD = 285
 /** Height threshold (CSS px) below which the window is in "traffic monitor" mode */
-const MINIMAL_HEIGHT_THRESHOLD = 130
+const MINIMAL_HEIGHT_THRESHOLD = 135
 
 const OS = getSystem()
 const IS_MACOS = OS === 'macos'
