@@ -1090,6 +1090,10 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 当用户在**小窗口尺寸**（`isMiniStatus`：宽 ≤ 285 且 高 ≤ 135）下打开设置抽屉时，设置内容块（`drawerOpen && !isMiniStatus`）整体不挂载，界面仅保留底部流量图与关闭叉子。因此服务于设置 UI 的数据订阅必须同步关闭，不得在后台空跑。
   - 具体：`getSystemProxy`（`sysproxy`）与 `getRunningMode`（`runningMode`）两个查询的 `enabled` 必须为 `isSettingsOpen && !isMiniStatus`（其中 `isSettingsOpen` 即 `drawerOpen`），与设置内容 DOM 的挂载条件 `drawerOpen && !isMiniStatus` **共用同一尺寸信号、同时开启同时关闭**。小窗口尺寸下这两个查询不触发任何 IPC。
   - 状态转换说明：用户可在窄窗口（285 × 高 > 135）打开设置抽屉后，将窗口高度拖到 135 变为小窗口，此时 `drawerOpen` 仍为 true 但 `isMiniStatus` 变 true，设置内容与上述两个订阅须即时降级为静默。这是经用户确认的设计决策。
+- **设置抽屉附加层资源随开关同生同灭（本源 / 附加分层原则）**：
+  - 资源分两层：**本源层** = 主窗口基线（活跃节点栏、节点列表与检索/排序首行、底部流量图及其常驻数据），永远挂载、不纳入抽屉开关讨论；**附加层** = 设置抽屉自身独占的内容与数据，仅在抽屉打开时存在、关闭时即应释放。
+  - `getClashConfig`（`clashConfig`，供设置内 `BasicSettingsCard` 与接管模式 `systemProxyAddress` 使用）属**附加层**：其消费者全在设置内容块（`drawerOpen && !isMiniStatus`）内，主窗口可见区不消费它。因此其查询 `enabled` 必须为 `isSettingsOpen && !isMiniStatus`（其中 `isSettingsOpen` 即 `drawerOpen`），与设置内容 DOM **共用同一开关**——抽屉打开→拉取，抽屉关闭→停止（仅缓存、不再发起 IPC），小窗口尺寸→同样不触发。
+  - 这是"附加层资源随抽屉开关同生同灭"原则的落地：凡仅服务于设置抽屉内容的查询，其 `enabled` 一律挂 `isSettingsOpen && !isMiniStatus`，关抽屉即释放，不得仅挂在 `!isMiniStatus` 上（否则关抽屉后仍在后台空跑）。这是经用户确认的设计决策（2026-07-09）。
 - **日志组件条件渲染与彻底注销**：
   - 日志显示组件 (`LogsPage`) 必须在布局中实行完全的条件渲染。在日志弹窗 Dialog 关闭时（`logsOpen === false`），直接以 `{logsOpen && <LogsPage />}` 方式进行 React 卸载（Unmount），使其所占用的日志 WebSocket 连接在 Dialog 关闭的第一时间彻底销毁注销，杜绝在后台默默堆积和合并解析数百条日志的行为。
 

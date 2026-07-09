@@ -226,9 +226,11 @@ export const AppDataProvider = ({
   } = useQuery({
     queryKey: ['getClashConfig'],
     queryFn: getBaseConfig,
-    // 小窗口（isMiniStatus）下设置抽屉与 basic-settings-card 均不挂载，
-    // 可见区（活跃节点栏/流量条）不消费 clashConfig，故跳过该查询省一次 IPC。
-    enabled: !isMiniStatus,
+    // getClashConfig 属"设置抽屉附加层"资源：消费者仅 BasicSettingsCard / 接管模式
+    // systemProxyAddress，均在设置内容块(drawerOpen && !isMiniStatus)内，主窗口可见区不消费。
+    // 故 enabled 须与设置内容 DOM 同一开关——抽屉打开才拉、关闭即停(仅缓存不 IPC)，
+    // 小窗口尺寸同样不触发。实现"附加层资源随抽屉开关同生同灭"。
+    enabled: isSettingsOpen && !isMiniStatus,
     ...TQ_MIHOMO,
   })
 
