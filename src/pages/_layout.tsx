@@ -105,6 +105,12 @@ import 'dayjs/locale/zh-cn'
 
 dayjs.extend(relativeTime)
 
+// 底部常驻流量条(MiniTrafficPanel)的固定高度(px)。
+// 这是面板自身的显示尺寸，与窗口极小高度开关阈值(MINI_HEIGHT_THRESHOLD)无关，
+// 宽窗高度数值恰好同为 135，纯属巧合，二者不应耦合。
+const TRAFFIC_PANE_HEIGHT_WIDE = 135
+const TRAFFIC_PANE_HEIGHT_MINIMAL = 100
+
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
 
 /** 等待 Clash 内核就绪（PROXY 组中出现非 dummy 节点），最多等 10 秒 */
@@ -2168,8 +2174,12 @@ const Layout = () => {
             {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}
             <div
               style={{
-                flex: isMinimalWidth ? '0 0 100px' : `0 0 ${MINI_HEIGHT_THRESHOLD}px`,
-                height: isMinimalWidth ? '100px' : `${MINI_HEIGHT_THRESHOLD}px`,
+                flex: isMinimalWidth
+                  ? `0 0 ${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
+                  : `0 0 ${TRAFFIC_PANE_HEIGHT_WIDE}px`,
+                height: isMinimalWidth
+                  ? `${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
+                  : `${TRAFFIC_PANE_HEIGHT_WIDE}px`,
                 background: 'inherit',
                 padding: isMinimalWidth
                   ? '3px 6px 2px 6px'
