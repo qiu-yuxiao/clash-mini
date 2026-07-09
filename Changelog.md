@@ -1,3 +1,23 @@
+## v2.3.9
+
+### 🚀 Performance
+
+- **小窗口(285×135)跳过 clashConfig 订阅**：小窗口下设置抽屉与基础设置卡均不挂载、可见区(活跃节点栏/流量条)不消费 `clashConfig`，故小窗口不再发起该配置查询，省一次 IPC。
+- **设置抽屉窄窗口下右侧路由表不挂载、数据与渲染统一开关**：右侧连接表(`ConnectionsPanel`)在窄窗口(宽=285)下整块不进 DOM、不渲染、连接数据 WebSocket 同步关闭，二者锁死在 `isMinimalWidth` 同一信号；删除原先脆弱的 `isPanelVisible` ResizeObserver(边界模糊且仅管数据半边)。
+- **设置抽屉附加层资源随开关同生同灭**：`getSystemProxy` / `getRunningMode` / `getClashConfig` 三个查询的 `enabled` 统一为 `isSettingsOpen && !isMiniStatus`。关闭抽屉即停止订阅(仅留缓存、不再发 IPC)；小窗口尺寸同样不触发。消除「关抽屉后仍空跑 clashConfig」的漏点。
+- **底部流量条高度与窗口阈值解耦**：新增 `TRAFFIC_PANE_HEIGHT_WIDE=135` / `TRAFFIC_PANE_HEIGHT_MINIMAL=100` 独立常量，流量条高度不再与窗口尺寸阈值数值耦合。
+
+### 🧹 Refactor & Cleanup
+
+- **窗口尺寸阈值常量收口**：将散落于多处、易漂移的 `285`(宽) / `135`(高) / 遗留 `130` / `270` 统一收口到 `src/constants.ts` 的 `MINI_WIDTH_THRESHOLD` / `MINI_HEIGHT_THRESHOLD`；修正历史遗漏的 `130→135`、`270→285` 两处阈值漂移。
+- **窗口缩放热区加宽**：无边框窗口 8 向缩放热区 `HANDLE_SIZE` 由 `6` 加宽到 `10`，边缘更易拖拽命中。
+
+### 📝 Docs
+
+- 同步 `clash_mini_agreements.md`：新增「性能/资源梯度」章节与「设置抽屉附加层资源随开关同生同灭(本源/附加分层)」「数据订阅与 DOM 挂载统一开关联(窄窗口不挂载路由表)」等规则，把本轮性能优化从「代码巧合」立为明文约定。
+
+---
+
 ## v2.3.8
 
 ### 🐞 Fixed Bugs (代码审核一致性修复)
