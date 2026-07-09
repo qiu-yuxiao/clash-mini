@@ -226,6 +226,9 @@ export const AppDataProvider = ({
   } = useQuery({
     queryKey: ['getClashConfig'],
     queryFn: getBaseConfig,
+    // 小窗口（isMiniStatus）下设置抽屉与 basic-settings-card 均不挂载，
+    // 可见区（活跃节点栏/流量条）不消费 clashConfig，故跳过该查询省一次 IPC。
+    enabled: !isMiniStatus,
     ...TQ_MIHOMO,
   })
 
