@@ -1,3 +1,5 @@
+#![allow(clippy::unused_async)]
+
 use super::CmdResult;
 use crate::feat;
 use crate::utils::dirs;

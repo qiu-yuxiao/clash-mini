@@ -1,3 +1,5 @@
+#![allow(clippy::unused_async)]
+
 use super::CmdResult;
 use crate::core::autostart;
 use crate::{cmd::StringifyErr as _, feat, utils::dirs};

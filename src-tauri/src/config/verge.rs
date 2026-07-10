@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::{
-    config::{DEFAULT_PAC, deserialize_encrypted, serialize_encrypted},
+    config::DEFAULT_PAC,
     utils::{dirs, help},
 };
 use anyhow::Result;
