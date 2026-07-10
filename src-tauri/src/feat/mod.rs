@@ -1,4 +1,3 @@
-mod backup;
 mod clash;
 mod config;
 mod icon;
@@ -7,7 +6,6 @@ mod proxy;
 mod window;
 
 // Re-export all functions from modules
-pub use backup::*;
 pub use clash::*;
 pub use config::*;
 pub use icon::*;

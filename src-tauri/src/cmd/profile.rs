@@ -1,6 +1,6 @@
 use super::CmdResult;
 use super::StringifyErr as _;
-use crate::cmd::validate::{ValidationNoticeTarget, handle_validation_notice};
+use crate::core::validate::{ValidationNoticeTarget, handle_validation_notice};
 use crate::utils::window_manager::WindowManager;
 use crate::{
     config::{

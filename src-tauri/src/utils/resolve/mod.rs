@@ -14,7 +14,7 @@ use crate::{
         tray::Tray,
     },
     feat,
-    module::{auto_backup::AutoBackupManager, lightweight::auto_lightweight_boot},
+    module::lightweight::auto_lightweight_boot,
     process::AsyncHandler,
     utils::{init, server, window_manager::WindowManager},
 };
@@ -76,7 +76,6 @@ pub fn resolve_setup_async() {
             init_timer(),
             init_hotkey(),
             init_auto_lightweight_boot(),
-            init_auto_backup(),
             init_silent_updater(),
         );
 
@@ -133,10 +132,6 @@ pub(super) async fn init_hotkey() {
 
 pub(super) async fn init_auto_lightweight_boot() {
     logging_error!(Type::Setup, auto_lightweight_boot().await);
-}
-
-pub(super) async fn init_auto_backup() {
-    logging_error!(Type::Setup, AutoBackupManager::global().init().await);
 }
 
 #[allow(clippy::unused_async)]

@@ -1,13 +1,11 @@
 use super::CmdResult;
 use crate::{
     cmd::StringifyErr as _,
-    cmd::validate::{ValidationNoticeTarget, handle_validation_notice},
     config::{Config, IProfiles, PrfItem},
     core::{
         CoreManager, handle,
-        validate::{CoreConfigValidator, ValidationOutcome},
+        validate::{CoreConfigValidator, ValidationOutcome, ValidationNoticeTarget, handle_validation_notice},
     },
-    module::auto_backup::{AutoBackupManager, AutoBackupTrigger},
     utils::dirs,
 };
 use clash_verge_logging::{Type, logging};
@@ -22,11 +20,6 @@ pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdR
         None => return Ok(ValidationOutcome::Valid),
     };
 
-    let backup_trigger = match index.as_str() {
-        "Merge" => Some(AutoBackupTrigger::GlobalMerge),
-        "Script" => Some(AutoBackupTrigger::GlobalScript),
-        _ => None,
-    };
 
     // 在异步操作前获取必要元数据并释放锁
     let (rel_path, is_merge_file, is_script_file, affects_runtime) = {
@@ -84,11 +77,6 @@ pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdR
     )
     .await?;
 
-    if changes_applied.is_valid()
-        && let Some(trigger) = backup_trigger
-    {
-        AutoBackupManager::trigger_backup(trigger);
-    }
 
     Ok(changes_applied)
 }
