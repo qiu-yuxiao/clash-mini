@@ -4,12 +4,6 @@ use crate::utils::dirs;
 use serde_yaml_ng::Value;
 use std::path::PathBuf;
 
-/// 同步托盘和GUI的代理选择状态 (Clash Mini 托盘已精简，无需同步，直接返回)
-#[tauri::command]
-pub async fn sync_tray_proxy_selection() -> CmdResult<()> {
-    Ok(())
-}
-
 /// 前端委托后端执行群发测速与择优（根治前后端重复测速/选点冲突）
 /// - `profile_uid`: 当前活动配置 UID
 /// - `node_names`: 待测节点子集；传非空列表则在「该子集」内测速并挑最快，

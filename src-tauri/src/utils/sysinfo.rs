@@ -126,13 +126,6 @@ pub fn set_app_core_mode<R: Runtime>(app: &AppHandle<R>, mode: impl Into<String>
 }
 
 #[inline]
-pub fn get_app_startup_time<R: Runtime>(app: &AppHandle<R>) -> Instant {
-    let platform_spec = app.state::<RwLock<Platform>>();
-    let spec = platform_spec.read();
-    spec.appinfo.app_startup_time
-}
-
-#[inline]
 pub fn is_current_app_handle_admin<R: Runtime>(app: &AppHandle<R>) -> bool {
     let platform_spec = app.state::<RwLock<Platform>>();
     let spec = platform_spec.read();

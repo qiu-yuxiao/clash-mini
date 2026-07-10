@@ -340,9 +340,11 @@ pub enum ConfigType {
     Check,
 }
 
+const MINIMAL_CONFIG_MIXED_PORT: u16 = 7897;
+
 fn generate_minimal_config() -> serde_yaml_ng::Mapping {
     let mut config = serde_yaml_ng::Mapping::new();
-    config.insert("mixed-port".into(), 7897.into());
+    config.insert("mixed-port".into(), MINIMAL_CONFIG_MIXED_PORT.into());
     config.insert("mode".into(), "rule".into());
     config.insert("allow-lan".into(), false.into());
     config.insert("log-level".into(), "info".into());

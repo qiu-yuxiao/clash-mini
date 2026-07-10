@@ -88,23 +88,6 @@ impl CoreManager {
         self.start_core_inner().await
     }
 
-    pub async fn change_core(&self, clash_core: &String) -> Result<(), String> {
-        if !IVerge::VALID_CLASH_CORES.contains(&clash_core.as_str()) {
-            return Err(format!("Invalid clash core: {}", clash_core).into());
-        }
-
-        Config::verge().await.edit_draft(|d| {
-            d.clash_core = Some(clash_core.to_owned());
-        });
-        Config::verge().await.apply();
-
-        let verge_data = Config::verge().await.latest_arc();
-        verge_data.save_file().await.map_err(|e| e.to_string())?;
-
-        self.update_config_checked().await.stringify_err()?;
-        Ok(())
-    }
-
     async fn prepare_startup(&self) -> Result<()> {
         let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
 

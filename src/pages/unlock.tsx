@@ -25,7 +25,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseEmpty, BasePage } from '@/components/base'
-import { INTERNAL_CONTROL_TIMEOUT_MS } from '@/services/delay'
+import { UNLOCK_TIMEOUT_MS } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 
 interface UnlockItem {
@@ -224,7 +224,7 @@ const UnlockPage = () => {
   const invokeWithTimeout = async <T,>(
     cmd: string,
     args?: any,
-    timeout = INTERNAL_CONTROL_TIMEOUT_MS,
+    timeout = UNLOCK_TIMEOUT_MS,
   ): Promise<T> => {
     return Promise.race([
       invoke<T>(cmd, args),

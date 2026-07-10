@@ -10,13 +10,9 @@ use tauri::Manager as _;
 
 #[cfg(not(feature = "verge-dev"))]
 pub static APP_ID: &str = "io.github.clash-mini.clash-mini";
-#[cfg(not(feature = "verge-dev"))]
-pub static BACKUP_DIR: &str = "clash-mini-backup";
 
 #[cfg(feature = "verge-dev")]
 pub static APP_ID: &str = "io.github.clash-mini.clash-mini.dev";
-#[cfg(feature = "verge-dev")]
-pub static BACKUP_DIR: &str = "clash-mini-backup-dev";
 
 pub static PORTABLE_FLAG: OnceCell<bool> = OnceCell::new();
 
@@ -117,13 +113,6 @@ pub fn app_logs_dir() -> Result<PathBuf> {
 // latest verge log
 pub fn app_latest_log() -> Result<PathBuf> {
     Ok(app_logs_dir()?.join("latest.log"))
-}
-
-/// local backups dir
-pub fn local_backup_dir() -> Result<PathBuf> {
-    let dir = app_home_dir()?.join(BACKUP_DIR);
-    fs::create_dir_all(&dir)?;
-    Ok(dir)
 }
 
 pub fn clash_path() -> Result<PathBuf> {

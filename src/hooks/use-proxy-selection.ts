@@ -2,7 +2,6 @@ import { useCallback, useMemo, useRef } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import { syncTrayProxySelection } from '@/services/cmds'
 import { debugLog } from '@/utils/debug'
 import {
   closeConnection,
@@ -58,13 +57,6 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
     [verge?.auto_close_connection, enableConnectionCleanup],
   )
 
-  // 切换节点
-  const syncTraySelection = useCallback(() => {
-    syncTrayProxySelection().catch((error) => {
-      console.error('[ProxySelection] 托盘状态同步失败:', error)
-    })
-  }, [])
-
   const persistSelection = useCallback(
     (groupName: string, proxyName: string, skipConfigSave: boolean) => {
       if (!current || skipConfigSave) return
@@ -93,7 +85,6 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       try {
         await selectNodeForGroup(groupName, proxyName)
         onSuccess?.()
-        syncTraySelection()
         persistSelection(groupName, proxyName, skipConfigSave)
         debugLog(
           `[ProxySelection] 代理和状态同步完成: ${groupName} -> ${proxyName}`,
@@ -114,7 +105,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         onError?.(error)
       }
     },
-    [config, onError, onSuccess, persistSelection, syncTraySelection],
+    [config, onError, onSuccess, persistSelection],
   )
 
   const flushChangeQueue = useCallback(async () => {

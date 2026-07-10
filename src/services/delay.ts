@@ -23,6 +23,12 @@ export const NODE_DELAY_MIN_MS = 30
 export const NODE_DELAY_MAX_MS = 2000
 export const INTERNAL_CONTROL_TIMEOUT_MS = 3000
 
+// 解锁流媒体 region 探测超时：HTTP 经代理访问外网，可能较慢，需较长超时（还原 15s）
+export const UNLOCK_TIMEOUT_MS = 15000
+
+// 启动后系统态探活宽限：服务初始化可能耗时，宽限期内保持快轮询（还原 10s）
+export const STARTUP_GRACE_MS = 10000
+
 class DelayManager {
   private cache = new Map<string, DelayUpdate>()
   private urlMap = new Map<string, string>()
