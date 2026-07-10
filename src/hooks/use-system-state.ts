@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
+
 import { useVisibility } from '@/hooks/use-visibility'
 import { getRunningMode, isAdmin, isServiceAvailable } from '@/services/cmds'
+import { INTERNAL_CONTROL_TIMEOUT_MS } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 
 import { useVerge } from './use-verge'
@@ -20,7 +22,7 @@ const defaultSystemState = {
 } as SystemState
 
 // Grace period for service initialization during startup
-const STARTUP_GRACE_MS = 10_000
+const STARTUP_GRACE_MS = INTERNAL_CONTROL_TIMEOUT_MS
 
 /**
  * 自定义 hook 用于获取系统运行状态

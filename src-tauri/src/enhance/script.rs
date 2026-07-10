@@ -1,4 +1,5 @@
 use crate::process::AsyncHandler;
+use crate::constants::timing::INTERNAL_CONTROL_TIMEOUT_MS;
 
 use super::use_lowercase;
 use anyhow::{Error, Result};
@@ -13,7 +14,7 @@ const MAX_OUTPUTS: usize = 1000;
 const MAX_OUTPUT_SIZE: usize = 1024 * 1024; // 1MB
 const MAX_JSON_SIZE: usize = 10 * 1024 * 1024; // 10MB
 const MAX_LOOP_ITERATIONS: u64 = 10_000_000;
-const SCRIPT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const SCRIPT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(INTERNAL_CONTROL_TIMEOUT_MS);
 
 pub async fn use_script(script: String, config: Mapping, name: String) -> Result<(Mapping, Vec<(String, String)>)> {
     let handle = AsyncHandler::spawn_blocking(move || use_script_sync(script, &config, &name));

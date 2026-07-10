@@ -21,6 +21,7 @@ const CACHE_TTL = 30 * 60 * 1000
 //   此处阈值同时决定「探针超时」与「候选/选点」资格，前后端语义完全一致。
 export const NODE_DELAY_MIN_MS = 30
 export const NODE_DELAY_MAX_MS = 2000
+export const INTERNAL_CONTROL_TIMEOUT_MS = 3000
 
 class DelayManager {
   private cache = new Map<string, DelayUpdate>()

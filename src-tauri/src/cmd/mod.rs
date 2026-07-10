@@ -24,10 +24,8 @@ pub mod webdav;
 
 // Re-export all command functions for backwards compatibility
 pub use app::*;
-pub use backup::*;
 pub use clash::*;
 pub use core_update::*;
-pub use lightweight::*;
 pub use media_unlock_checker::*;
 pub use network::*;
 pub use profile::*;
@@ -36,10 +34,7 @@ pub use runtime::*;
 pub use save_profile::*;
 pub use service::*;
 pub use system::*;
-pub use uwp::*;
-pub use validate::*;
 pub use verge::*;
-pub use webdav::*;
 
 pub trait StringifyErr<T> {
     fn stringify_err(self) -> CmdResult<T>;

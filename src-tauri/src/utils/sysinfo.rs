@@ -126,7 +126,7 @@ pub fn set_app_core_mode<R: Runtime>(app: &AppHandle<R>, mode: impl Into<String>
 }
 
 #[inline]
-pub fn get_app_uptime<R: Runtime>(app: &AppHandle<R>) -> Instant {
+pub fn get_app_startup_time<R: Runtime>(app: &AppHandle<R>) -> Instant {
     let platform_spec = app.state::<RwLock<Platform>>();
     let spec = platform_spec.read();
     spec.appinfo.app_startup_time
@@ -160,7 +160,7 @@ pub fn get_system_info(state: State<'_, RwLock<Platform>>) -> Result<String, Str
 }
 
 #[tauri::command]
-pub fn get_app_uptime_cmd(state: State<'_, RwLock<Platform>>) -> Result<u128, String> {
+pub fn get_app_uptime(state: State<'_, RwLock<Platform>>) -> Result<u128, String> {
     Ok(state.inner().read().appinfo.app_startup_time.elapsed().as_millis())
 }
 

@@ -130,7 +130,6 @@ export const ActiveNodeStatusCard = () => {
   const handleTestDelay = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!activeNodeName || !primaryGroup?.name) return
-    if (delayManager.isBatchTesting) return
     setTesting(true)
     try {
       const res = await delayManager.checkDelay(
@@ -150,7 +149,6 @@ export const ActiveNodeStatusCard = () => {
   const handleCycleNode = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!primaryGroup?.name || !primaryGroup?.all) return
-    if (delayManager.isBatchTesting) return
 
     let currentCandidateNodes = primaryGroup.all
     try {

@@ -69,6 +69,7 @@ import {
   restartCore,
   triggerAutoSelect,
 } from '@/services/cmds'
+import { NODE_DELAY_MAX_MS } from '@/services/delay'
 import DelayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
@@ -260,11 +261,8 @@ async function triggerAutoSelectAndRefresh(
         setDragRegionEnabled?.(false)
         await batchTestWithFirstBatchSelect('PROXY', names, true)
       } finally {
-        // 仅在无其他并发测速时才恢复，避免提前解锁
-        if (!DelayManager.isBatchTesting) {
-          await win.setResizable(true)
-          setDragRegionEnabled?.(true)
-        }
+        await win.setResizable(true)
+        setDragRegionEnabled?.(true)
       }
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
@@ -296,10 +294,8 @@ async function triggerAutoSelectAndRefresh(
           setDragRegionEnabled?.(false)
           await batchTestWithFirstBatchSelect('PROXY', names, true)
         } finally {
-          if (!DelayManager.isBatchTesting) {
-            await win.setResizable(true)
-            setDragRegionEnabled?.(true)
-          }
+          await win.setResizable(true)
+          setDragRegionEnabled?.(true)
         }
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
@@ -310,7 +306,7 @@ async function triggerAutoSelectAndRefresh(
     } finally {
       fallbackTimerRef.current = null
     }
-  }, 6000)
+  }, NODE_DELAY_MAX_MS)
 }
 
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------

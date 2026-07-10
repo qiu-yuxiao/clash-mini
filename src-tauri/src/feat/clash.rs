@@ -1,4 +1,4 @@
-use crate::{config::Config, core::handle, feat::clean_async, process::AsyncHandler, utils};
+use crate::{config::Config, constants::timing::NODE_DELAY_MAX_MS, core::handle, feat::clean_async, process::AsyncHandler, utils};
 
 use clash_verge_logging::{Type, logging};
 use once_cell::sync::Lazy;
@@ -118,7 +118,7 @@ pub async fn test_delay(url: String) -> anyhow::Result<u32> {
         None
     };
 
-    tokio::time::timeout(Duration::from_secs(10), async {
+    tokio::time::timeout(Duration::from_millis(NODE_DELAY_MAX_MS as u64), async {
         let start = Instant::now();
         let mut buf = vec![0u8; 1024];
 
@@ -160,5 +160,5 @@ pub async fn test_delay(url: String) -> anyhow::Result<u32> {
         Ok((start.elapsed().as_millis() as u32).max(1))
     })
     .await
-    .unwrap_or(Ok(10000u32))
+    .unwrap_or(Ok(NODE_DELAY_MAX_MS))
 }

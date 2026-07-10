@@ -2,7 +2,6 @@ import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import delayManager, { NODE_DELAY_MAX_MS, type DelayUpdate } from '@/services/delay'
-import { getPreloadConfig } from '@/services/preload'
 import type { IProxyItem } from '@/types/clash'
 
 const PRESET_PROXY_NAMES = [
@@ -84,7 +83,7 @@ export function useProxyDelayState(
   const onDelay = useLockFn(async () => {
     if (!proxy) return
     setDelayState({ delay: -2, updatedAt: Date.now() })
-    const currentTimeout = getPreloadConfig()?.default_latency_timeout || NODE_DELAY_MAX_MS
+    const currentTimeout = NODE_DELAY_MAX_MS
     const result = await delayManager.checkDelay(proxy.name, groupName, currentTimeout)
     if (isMountedRef.current) {
       setDelayState(result)
