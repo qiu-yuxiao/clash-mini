@@ -1,6 +1,5 @@
 use crate::{core::handle, utils::resolve::window::build_new_window};
 use clash_verge_logging::{Type, logging};
-use std::pin::Pin;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -321,33 +320,29 @@ impl WindowManager {
         window.map(|w| w.is_minimized().unwrap_or(false)).unwrap_or(false)
     }
 
-    /// 创建新窗口,防抖避免重复调用
-    /// 窗口创建后保持隐藏，由前端 index.html 在 overlay 渲染后调用 show，避免主题闪烁
-    pub fn create_window(should_create: bool) -> Pin<Box<dyn Future<Output = bool> + Send>> {
-        Box::pin(async move {
-            logging!(info, Type::Window, "开始创建主窗口, should_create={}", should_create);
+    pub async fn create_window(should_create: bool) -> bool {
+        logging!(info, Type::Window, "开始创建主窗口, should_create={}", should_create);
 
-            if !should_create {
-                return false;
-            }
+        if !should_create {
+            return false;
+        }
 
-            match build_new_window().await {
-                Ok(_) => {
-                    logging!(info, Type::Window, "新窗口创建成功，等待前端渲染后显示");
+        match build_new_window().await {
+            Ok(_) => {
+                logging!(info, Type::Window, "新窗口创建成功，等待前端渲染后显示");
 
-                    #[cfg(target_os = "macos")]
-                    {
-                        handle::Handle::global().set_activation_policy_regular();
-                    }
-
-                    true
+                #[cfg(target_os = "macos")]
+                {
+                    handle::Handle::global().set_activation_policy_regular();
                 }
-                Err(e) => {
-                    logging!(error, Type::Window, "新窗口创建失败: {}", e);
-                    false
-                }
+
+                true
             }
-        })
+            Err(e) => {
+                logging!(error, Type::Window, "新窗口创建失败: {}", e);
+                false
+            }
+        }
     }
 
     /// 摧毁窗口

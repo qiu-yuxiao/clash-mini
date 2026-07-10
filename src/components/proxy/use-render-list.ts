@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useReducer, useRef } from 'react'
 
-import { useRuntimeConfig } from '@/hooks/use-clash'
 import { MINI_WIDTH_THRESHOLD } from '@/constants'
+import { useRuntimeConfig } from '@/hooks/use-clash'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
-import { debugLog } from '@/utils/debug'
 
 import { filterSort } from './use-filter-sort'
 import {
@@ -119,53 +118,6 @@ export const useRenderList = (
     }
   }, [proxiesData, mode, refreshProxy])
 
-  // 链式代理模式节点自动计算延迟
-  useEffect(() => {
-    if (!isChainMode || !runtimeConfig) return
-
-    const allProxies: IProxyItem[] = Object.values(
-      (runtimeConfig as { proxies?: Record<string, IProxyItem> }).proxies || {},
-    )
-    if (allProxies.length === 0) return
-
-    // 设置组监听器，当有延迟更新时自动刷新（节流 500ms）
-    let throttleTimer: ReturnType<typeof setTimeout> | null = null
-    const groupListener = () => {
-      if (throttleTimer) return
-      throttleTimer = setTimeout(() => {
-        throttleTimer = null
-        debugLog('[ChainMode] 延迟更新，刷新UI')
-        refreshProxy()
-      }, 500)
-    }
-
-    delayManager.setGroupListener('chain-mode', groupListener)
-
-    const calculateDelays = async () => {
-      try {
-        // 探针超时固定为死节点阈值 2000ms（与后端 auto-select 一致）
-        const timeout = NODE_DELAY_MAX_MS
-        const proxyNames = allProxies.map((proxy) => proxy.name)
-
-        debugLog(`[ChainMode] 开始计算 ${proxyNames.length} 个节点的延迟`)
-
-        // 使用 delayManager 计算延迟，每个节点计算完成后会自动触发监听器刷新界面
-        delayManager.checkListDelay(proxyNames, 'chain-mode', timeout)
-      } catch (error) {
-        console.error('Failed to calculate delays for chain mode:', error)
-      }
-    }
-
-    // 延迟执行避免阻塞
-    const handle = setTimeout(calculateDelays, 100)
-
-    return () => {
-      clearTimeout(handle)
-      if (throttleTimer) clearTimeout(throttleTimer)
-      // 清理组监听器
-      delayManager.removeGroupListener('chain-mode')
-    }
-  }, [isChainMode, runtimeConfig, refreshProxy])
 
   // 非链式模式下注册 PROXY 组监听器，单点测速完成后驱动列表重排
   // 注意：批量测速已通过 checkListDelay 内部 queueGroupNotification 触发，此监听器同时覆盖两类场景

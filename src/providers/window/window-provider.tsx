@@ -1,12 +1,12 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 import DelayManager from '@/services/delay'
 import debounce from '@/utils/debounce'
 import getSystem from '@/utils/get-system'
 
 import { WindowContext } from './window-context'
-import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 
 /** FEAT-003: Idle duration (ms) before chrome auto-hides */
 const IDLE_HIDE_DELAY_MS = 10_000

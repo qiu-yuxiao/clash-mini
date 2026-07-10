@@ -124,13 +124,9 @@ export const useClashInfo = () => {
     queryClient.invalidateQueries({ queryKey: ['getClashConfig'] })
   })
 
-  const invalidateClashConfig = useCallback(() =>
-    queryClient.invalidateQueries({ queryKey: ['getClashConfig'] }), [])
-
   return {
     clashInfo,
     mutateInfo,
     patchInfo,
-    invalidateClashConfig,
   }
 }

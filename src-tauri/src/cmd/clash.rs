@@ -198,8 +198,6 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
 /// 检查DNS配置文件是否存在
 #[tauri::command]
 pub async fn check_dns_config_exists() -> CmdResult<bool> {
-    use crate::utils::dirs;
-
     let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
 
     Ok(dns_path.exists())

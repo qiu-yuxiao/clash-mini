@@ -9,11 +9,11 @@ import {
 import React, { memo } from 'react'
 
 import { BaseLoading } from '@/components/base'
+import { MINI_WIDTH_THRESHOLD } from '@/constants'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 
-import { MINI_WIDTH_THRESHOLD } from '@/constants'
 import { useWindowWidth } from './use-window-width'
 
 interface Props {

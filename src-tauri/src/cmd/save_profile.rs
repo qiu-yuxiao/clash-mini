@@ -191,7 +191,6 @@ async fn handle_saved_profile_file(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::config::PrfItem;
 
     #[tokio::test]
     async fn test_save_profile_file_read_before_write() {

@@ -99,7 +99,11 @@ const UnlockPage = () => {
   const [loadingItems, setLoadingItems] = useState<string[]>([])
 
   const sortItemsByName = useCallback((items: UnlockItem[]) => {
-    return [...items].sort((a, b) => a.name.localeCompare(b.name))
+    return [...items].sort((a, b) => {
+      const nameA = a?.name || ''
+      const nameB = b?.name || ''
+      return nameA.localeCompare(nameB)
+    })
   }, [])
 
   const mergeUnlockItems = useCallback(
@@ -201,13 +205,17 @@ const UnlockPage = () => {
 
   useEffect(() => {
     void (async () => {
-      const { items: storedItems, time: storedTime } = loadResultsFromStorage()
+      try {
+        const { items: storedItems, time: storedTime } = loadResultsFromStorage()
 
-      if (storedItems && storedItems.length > 0) {
-        setUnlockItems(sortItemsByName(storedItems))
-        await getUnlockItems(storedItems, storedTime)
-      } else {
-        await getUnlockItems()
+        if (storedItems && storedItems.length > 0) {
+          setUnlockItems(sortItemsByName(storedItems))
+          await getUnlockItems(storedItems, storedTime)
+        } else {
+          await getUnlockItems()
+        }
+      } catch (err) {
+        console.error('Failed to initialize unlock items:', err)
       }
     })()
   }, [getUnlockItems, loadResultsFromStorage, sortItemsByName])

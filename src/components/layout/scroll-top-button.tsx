@@ -26,7 +26,6 @@ export const ScrollTopButton = ({ onClick, show, sx }: Props) => {
                 ? 'rgba(255,255,255,0.2)'
                 : 'rgba(0,0,0,0.2)',
           },
-          visibility: show ? 'visible' : 'hidden',
           ...sx,
         }}
       >

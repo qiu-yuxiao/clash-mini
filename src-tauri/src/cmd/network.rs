@@ -3,7 +3,7 @@ use crate::cmd::StringifyErr as _;
 use crate::core::sysopt::Sysopt;
 use clash_verge_logging::{Type, logging};
 use gethostname::gethostname;
-use network_interface::NetworkInterface;
+use network_interface::{NetworkInterface, NetworkInterfaceConfig as _};
 use serde_yaml_ng::Mapping;
 use std::net::TcpListener;
 use sysproxy::{Autoproxy, Sysproxy};
@@ -83,8 +83,6 @@ pub fn get_network_interfaces() -> Vec<String> {
 /// 获取网络接口详细信息
 #[tauri::command]
 pub fn get_network_interfaces_info() -> CmdResult<Vec<NetworkInterface>> {
-    use network_interface::{NetworkInterface, NetworkInterfaceConfig as _};
-
     let names = get_network_interfaces();
     let interfaces = NetworkInterface::show().stringify_err()?;
 

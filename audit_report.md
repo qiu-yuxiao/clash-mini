@@ -1,301 +1,368 @@
-# Clash Mini Code Audit Report
+# Clash Verge Codebase Audit Report
 
-This report presents the findings of a comprehensive code audit of the Clash Mini repository. The audit evaluated both the Rust backend (`src-tauri` directory) and the TypeScript/React frontend (`src` directory) for code quality, redundant/dead code, and logical simplifications. 
+Conducted on: 2026-07-10
 
-Under no circumstances were any code files modified in the repository, ensuring that `git status` remains clean (except for this generated `audit_report.md`).
-
----
-
-## 1. Redundancy & Unused Code Items
-
-Below are six identified redundancy/unused items spanning both the Rust backend and TypeScript frontend.
-
-### Item 1: Unused Private Struct Fields in Silent Updater
-* **Unused Item**: Private struct fields `pending_bytes`, `pending_update`, and `pending_version` inside the `SilentUpdater` struct.
-* **File Path**: [updater.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/updater.rs#L15-L20)
-* **Code Snippet**:
-  ```rust
-  pub struct SilentUpdater {
-      update_ready: AtomicBool,
-      pending_bytes: RwLock<Option<Vec<u8>>>,
-      pending_update: RwLock<Option<Update>>,
-      pending_version: RwLock<Option<String>>,
-  }
-  ```
-* **Brief Rationale**: These fields are initialized to `None` in the `new()` method and populated during update checking in `check_and_download` (lines 495–497), but they are never read or retrieved anywhere else. The compiler's unused fields warning is bypassed by using `#![allow(dead_code)]` at the top of the module (line 1).
+This report outlines the compliance, complexity, performance, and safety audit findings for the Clash Verge repository.
 
 ---
 
-### Item 2: Unreachable Match Arms (Dead Code) in Netflix Checker
-* **Unused Item**: `Err(e)` branches in `result1` and `result2` pattern matches inside the `check_netflix` function.
-* **File Path**: [netflix.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/media_unlock_checker/netflix.rs#L29-L59)
-* **Code Snippet**:
-  ```rust
-  if let Err(e) = &result1 {
-      logging!(error, Type::Network, "Netflix请求错误: {e}");
-      return netflix_item("Failed", None);
-  }
-  
-  // ...
-  
-  let status1 = match result1 {
-      Ok(response) => response.status().as_u16(),
-      Err(e) => { // Unreachable match arm
-          logging!(error, Type::Network, "Failed to get Netflix response 1: {}", e);
-          return netflix_item("Failed", None);
-      }
-  };
-  ```
-* **Brief Rationale**: Before performing the `match` statement on `result1` (and similarly `result2`), early validation checks via `if let Err(e) = &result1` ensure that any error causes an immediate return. Consequently, the `Err(e)` arm within the match is dead code and can never be reached.
+## 1. Redundant, Unused, or Excessively Complex Items
 
----
+Below are the detected instances of redundant code, unused components, or unnecessary complexity in the project.
 
-### Item 3: Redundant Block-Scoped Import in Clash Command File
-* **Unused Item**: Block-scoped local import `use crate::utils::dirs;` inside `save_dns_config`.
-* **File Path**: [clash.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/clash.rs#L124-L129)
-* **Code Snippet**:
-  ```rust
-  pub async fn save_dns_config(dns_config: Mapping) -> CmdResult {
-      use crate::utils::dirs;
-      // ...
-  }
-  ```
-* **Brief Rationale**: The import of `crate::utils::dirs` is already declared at the file-level scope on line 3, making local scope re-imports redundant and unnecessary.
+### Instance 1: Unused returned function `invalidateClashConfig` in `useClashInfo`
+*   **File Link**: [use-clash.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-clash.ts#L127-L134)
+*   **Code Snippet**:
+    ```typescript
+    const invalidateClashConfig = useCallback(() =>
+      queryClient.invalidateQueries({ queryKey: ['getClashConfig'] }), [])
 
----
-
-### Item 4: Unused Exported TypeScript Interface `DialogRef`
-* **Unused Item**: Exported interface `DialogRef` in base dialog components.
-* **File Path**: [base-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-dialog.tsx#L29-L32)
-* **Code Snippet**:
-  ```typescript
-  export interface DialogRef {
-    open: () => void
-    close: () => void
-  }
-  ```
-* **Brief Rationale**: The interface is defined and exported but is never imported, referenced, or implemented by any other component or type definition in the application.
-
----
-
-### Item 5: Unused Exported Utility Function `setDebugLoggingEnabled`
-* **Unused Item**: Exported utility function `setDebugLoggingEnabled` in debug helpers.
-* **File Path**: [debug.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/debug.ts#L49-L52)
-* **Code Snippet**:
-  ```typescript
-  export const setDebugLoggingEnabled = (enabled: boolean) => {
-    runtimeOverride = enabled
-    cachedDebugEnabled = enabled
-  }
-  ```
-* **Brief Rationale**: Although the function is exported, no other frontend module imports or calls it, rendering it dead code.
-
----
-
-### Item 6: Unused Custom React Hook `useConnectionSetting`
-* **Unused Item**: Exported custom hook `useConnectionSetting`.
-* **File Path**: [use-connection-setting.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-connection-setting.ts#L7-L15)
-* **Code Snippet**:
-  ```typescript
-  export const useConnectionSetting = () =>
-    useLocalStorage<IConnectionSetting>(
-      'connections-setting',
-      defaultConnectionSetting,
-      {
-        serializer: JSON.stringify,
-        deserializer: JSON.parse,
-      },
-    )
-  ```
-* **Brief Rationale**: This React hook is defined and exported from its own file but is never imported or utilized by any other file in the React codebase.
-
----
-
-## 2. Logical Simplification Recommendations
-
-Below are three logical simplification recommendations to improve readability, performance, and structure.
-
-### Recommendation 1: Debouncing Optimization in Proxy Filter/Sort Hook
-* **File Path**: [use-filter-sort.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/use-filter-sort.ts#L48-L97)
-* **'Current logic' analysis and code snippet**:
-  The hook attempts to debounce proxy filtering/sorting. However, because `filterText` is in the `useMemo` dependency array, expensive filtering/sorting operations run synchronously on the render path on every keystroke. The debounce `useEffect` merely delays propagating the calculated list to the view.
-  ```typescript
-  const compute = useMemo(() => {
-    void _;
-    const fp = filterProxies(proxies, groupName, filterText, searchState)
-    const sp = sortProxies(fp, groupName, sortType, verge?.default_latency_timeout)
-    return sp
-  }, [_, proxies, groupName, filterText, sortType, searchState, verge?.default_latency_timeout])
-
-  const [result, setResult] = useReducer((_prev: IProxyItem[], next: IProxyItem[]) => next, compute)
-
-  useEffect(() => {
-    if (debounceTimerRef.current !== null) {
-      window.clearTimeout(debounceTimerRef.current)
+    return {
+      clashInfo,
+      mutateInfo,
+      patchInfo,
+      invalidateClashConfig,
     }
-    const prev = lastInputRef.current
-    const stableInputs = prev && prev.text === filterText && prev.sort === sortType
-    lastInputRef.current = { text: filterText, sort: sortType }
-    const delay = stableInputs ? 0 : 150
-    debounceTimerRef.current = window.setTimeout(() => {
-      setResult(compute)
-      debounceTimerRef.current = null
-    }, delay)
-    return () => {
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current)
+    ```
+*   **Description**: The custom hook `useClashInfo` defines and returns `invalidateClashConfig` on line 134, but no consumer across the React codebase destructures or calls this function.
+
+### Instance 2: Unused React Component `BaseLoadingOverlay`
+*   **File Link**: [base-loading-overlay.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-loading-overlay.tsx#L8-L35)
+*   **Code Snippet**:
+    ```typescript
+    export const BaseLoadingOverlay: React.FC<BaseLoadingOverlayProps> = ({
+      isLoading,
+    }) => {
+      if (!isLoading) return null
+
+      return (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: (theme) =>
+              theme.palette.mode === 'dark'
+                ? 'rgba(0, 0, 0, 0.5)'
+                : 'rgba(255, 255, 255, 0.7)',
+            zIndex: 1000,
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      )
+    }
+    ```
+*   **Description**: The component is defined and exported via `components/base/index.ts` but is never imported or rendered in any interface.
+
+### Instance 3: Unused State Context Hooks
+*   **File Link**: [states.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/states.ts#L8-L13)
+*   **Code Snippet**:
+    ```typescript
+    // save the state of each profile item loading
+    const [LoadingCacheProvider, useLoadingCache, useSetLoadingCache] =
+      createContextState<Record<string, boolean>>({})
+
+    // save update state
+    const [UpdateStateProvider, useUpdateState, useSetUpdateState] =
+      createContextState<boolean>(false)
+    ```
+*   **Description**: These state providers and hooks are created and exported but never imported or consumed by any component.
+
+### Instance 4: Redundant Local Block-Scoped Import in Clash Command File
+*   **File Link**: [clash.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/clash.rs#L201-L201)
+*   **Code Snippet**:
+    ```rust
+    #[tauri::command]
+    pub async fn check_dns_config_exists() -> CmdResult<bool> {
+        use crate::utils::dirs;
+
+        let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
+        Ok(dns_path.exists())
+    }
+    ```
+*   **Description**: The import `use crate::utils::dirs;` is declared block-locally inside command functions, but it is already declared at the file-level scope on line 3.
+
+### Instance 5: Redundant Local Block-Scoped Import in Network Command File
+*   **File Link**: [network.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/network.rs#L86-L86)
+*   **Code Snippet**:
+    ```rust
+    #[tauri::command]
+    pub fn get_network_interfaces_info() -> CmdResult<Vec<NetworkInterface>> {
+        use network_interface::{NetworkInterface, NetworkInterfaceConfig as _};
+        // ...
+    }
+    ```
+*   **Description**: `NetworkInterface` is imported locally on line 86, but it is already imported at the module-level scope on line 6.
+
+### Instance 6: Redundant Import in Save Profile Command Tests Module
+*   **File Link**: [save_profile.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/save_profile.rs#L194-L194)
+*   **Code Snippet**:
+    ```rust
+    mod tests {
+        use super::*;
+        use crate::config::PrfItem;
+    ```
+*   **Description**: The test module imports all parent namespace symbols via `use super::*;`. Since `PrfItem` is already imported at the top of the parent module (line 5), this local import is redundant.
+
+---
+
+## 2. Logic Simplifications
+
+Below are suggestions for simplifying overly complex logic blocks.
+
+### Instance 1: Window Manager `create_window` Future Boxing
+*   **File**: `src-tauri/src/utils/window_manager.rs`
+*   **Current Logic**:
+    ```rust
+    pub fn create_window(should_create: bool) -> Pin<Box<dyn Future<Output = bool> + Send>> {
+        Box::pin(async move {
+            logging!(info, Type::Window, "开始创建主窗口, should_create={}", should_create);
+
+            if !should_create {
+                return false;
+            }
+
+            match build_new_window().await {
+                Ok(_) => {
+                    logging!(info, Type::Window, "新窗口创建成功，等待前端渲染后显示");
+
+                    #[cfg(target_os = "macos")]
+                    {
+                        handle::Handle::global().set_activation_policy_regular();
+                    }
+
+                    true
+                }
+                Err(e) => {
+                    logging!(error, Type::Window, "新窗口创建失败: {}", e);
+                    false
+                }
+            }
+        })
+    }
+    ```
+*   **Suggested Simplified Logic**:
+    ```rust
+    pub async fn create_window(should_create: bool) -> bool {
+        logging!(info, Type::Window, "开始创建主窗口, should_create={}", should_create);
+
+        if !should_create {
+            return false;
+        }
+
+        match build_new_window().await {
+            Ok(_) => {
+                logging!(info, Type::Window, "新窗口创建成功，等待前端渲染后显示");
+
+                #[cfg(target_os = "macos")]
+                {
+                    handle::Handle::global().set_activation_policy_regular();
+                }
+
+                true
+            }
+            Err(e) => {
+                logging!(error, Type::Window, "新窗口创建失败: {}", e);
+                false
+            }
+        }
+    }
+    ```
+*   **Rationale**: In modern Rust, declaring an `async fn` directly handles the future return type without manually returning `Pin<Box<dyn Future>>`. This eliminates heap allocations and cleans up the function signature.
+
+### Instance 2: `ScrollTopButton` Exit Transition Conflict
+*   **File**: `src/components/layout/scroll-top-button.tsx`
+*   **Current Logic**:
+    ```tsx
+    export const ScrollTopButton = ({ onClick, show, sx }: Props) => {
+      return (
+        <Fade in={show}>
+          <IconButton
+            onClick={onClick}
+            sx={{
+              position: 'absolute',
+              bottom: '20px',
+              right: '20px',
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255,255,255,0.1)'
+                  : 'rgba(0,0,0,0.1)',
+              '&:hover': {
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(255,255,255,0.2)'
+                    : 'rgba(0,0,0,0.2)',
+              },
+              visibility: show ? 'visible' : 'hidden',
+              ...sx,
+            }}
+          >
+            <KeyboardArrowUpIcon />
+          </IconButton>
+        </Fade>
+      )
+    }
+    ```
+*   **Suggested Simplified Logic**:
+    ```tsx
+    export const ScrollTopButton = ({ onClick, show, sx }: Props) => {
+      return (
+        <Fade in={show}>
+          <IconButton
+            onClick={onClick}
+            sx={{
+              position: 'absolute',
+              bottom: '20px',
+              right: '20px',
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255,255,255,0.1)'
+                  : 'rgba(0,0,0,0.1)',
+              '&:hover': {
+                backgroundColor: (theme) =>
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(255,255,255,0.2)'
+                    : 'rgba(0,0,0,0.2)',
+              },
+              ...sx,
+            }}
+          >
+            <KeyboardArrowUpIcon />
+          </IconButton>
+        </Fade>
+      )
+    }
+    ```
+*   **Rationale**: MUI's `<Fade>` component internally handles transitions by modifying styles like opacity. Setting `visibility: show ? 'visible' : 'hidden'` interferes with the fade-out exit transition, causing the button to immediately disappear rather than transition smoothly.
+
+### Instance 3: `useListen` Redundant Async Wrapper
+*   **File**: `src/hooks/use-listen.ts`
+*   **Current Logic**:
+    ```typescript
+    export const useListen = () => {
+      const addListener = useCallback(
+        async <T>(eventName: string, handler: EventCallback<T>) => {
+          return await listen(eventName, handler)
+        },
+        [],
+      )
+
+      return {
+        addListener,
       }
     }
-  }, [compute, filterText, sortType])
-  ```
-* **'Proposed simplified logic' explanation and simplified code snippet**:
-  Introduce a debounced state `debouncedFilterText` and configure `useMemo` to depend on `debouncedFilterText` rather than `filterText`. This guarantees that sorting and filtering execute only after typing has stopped for the specified duration. This removes the complex `useReducer`, `lastInputRef`, and `debounceTimerRef` systems.
-  ```typescript
-  const [debouncedFilterText, setDebouncedFilterText] = useState(filterText)
+    ```
+*   **Suggested Simplified Logic**:
+    ```typescript
+    export const useListen = () => {
+      const addListener = useCallback(
+        <T>(eventName: string, handler: EventCallback<T>) => listen(eventName, handler),
+        [],
+      )
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedFilterText(filterText)
-    }, 150)
-    return () => clearTimeout(handler)
-  }, [filterText])
+      return {
+        addListener,
+      }
+    }
+    ```
+*   **Rationale**: `listen` already returns a `Promise<UnlistenFn>`. Marking the outer wrapper function as `async` and awaiting the call inside it is redundant. Simply returning the promise directly simplifies the compiler's execution path.
 
-  const result = useMemo(() => {
-    const fp = filterProxies(proxies, groupName, debouncedFilterText, searchState)
-    return sortProxies(fp, groupName, sortType, verge?.default_latency_timeout)
-  }, [_, proxies, groupName, debouncedFilterText, sortType, searchState, verge?.default_latency_timeout])
-  ```
+### Instance 4: Flattened Match Structure in Claude Media Checker
+*   **File**: `src-tauri/src/cmd/media_unlock_checker/claude.rs`
+*   **Current Logic**:
+    ```rust
+    match client.get(url).send().await {
+        Ok(response) => match response.text().await {
+            Ok(body) => {
+                let mut country_code: Option<String> = None;
+
+                for line in body.lines() {
+                    if let Some(rest) = line.strip_prefix("loc=") {
+                        country_code = Some(rest.trim().to_uppercase());
+                        break;
+                    }
+                }
+
+                if let Some(code) = country_code {
+                    let status = if BLOCKED_CODES.contains(&code.as_str()) {
+                        "No"
+                    } else {
+                        "Yes"
+                    };
+
+                    UnlockItem::checked_region("Claude", status, &code)
+                } else {
+                    UnlockItem::checked("Claude", "Failed", None)
+                }
+            }
+            Err(_) => UnlockItem::checked("Claude", "Failed", None),
+        },
+        Err(_) => UnlockItem::checked("Claude", "Failed", None),
+    }
+    ```
+*   **Suggested Simplified Logic**:
+    ```rust
+    let failed = || UnlockItem::checked("Claude", "Failed", None);
+
+    let response = match client.get(url).send().await {
+        Ok(r) => r,
+        Err(_) => return failed(),
+    };
+
+    let body = match response.text().await {
+        Ok(b) => b,
+        Err(_) => return failed(),
+    };
+
+    let country_code = body
+        .lines()
+        .find_map(|line| line.strip_prefix("loc=").map(|rest| rest.trim().to_uppercase()));
+
+    match country_code {
+        Some(code) => {
+            let status = if BLOCKED_CODES.contains(&code.as_str()) { "No" } else { "Yes" };
+            UnlockItem::checked_region("Claude", status, &code)
+        }
+        None => failed(),
+    }
+    ```
+*   **Rationale**: The current implementation has deeply nested `match` statements and duplicate error-handling paths. Refactoring with early returns and iterator helpers (`find_map`) keeps the code flat, readable, and idiomatic.
 
 ---
 
-### Recommendation 2: Reuse Window State Check in Window Manager
-* **File Path**: [window_manager.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/window_manager.rs#L83-L128)
-* **'Current logic' analysis and code snippet**:
-  The functions `get_main_window_state` and `get_main_window_with_state` duplicate the identical mapping of window state checks (checking minimization, visibility, and focus flags).
-  ```rust
-  pub fn get_main_window_with_state() -> (Option<WebviewWindow<Wry>>, WindowState) {
-      let Some(window) = Self::get_main_window() else {
-          return (None, WindowState::NotExist);
-      };
-      let is_minimized = window.is_minimized().unwrap_or(false);
-      let is_visible = window.is_visible().unwrap_or(false);
-      let is_focused = window.is_focused().unwrap_or(false);
-      let state = if is_minimized {
-          WindowState::Minimized
-      } else if !is_visible {
-          WindowState::Hidden
-      } else if is_focused {
-          WindowState::VisibleFocused
-      } else {
-          WindowState::VisibleUnfocused
-      };
-      (Some(window), state)
-  }
+## 3. Potential Performance Bottlenecks & Safety Hazards
 
-  pub fn get_main_window_state() -> WindowState {
-      match Self::get_main_window() {
-          Some(window) => {
-              let is_minimized = window.is_minimized().unwrap_or(false);
-              let is_visible = window.is_visible().unwrap_or(false);
-              let is_focused = window.is_focused().unwrap_or(false);
-              if is_minimized {
-                  return WindowState::Minimized;
-              }
-              if !is_visible {
-                  return WindowState::Hidden;
-              }
-              if is_focused {
-                  WindowState::VisibleFocused
-              } else {
-                  WindowState::VisibleUnfocused
-              }
-          }
-          None => WindowState::NotExist,
-      }
-  }
-  ```
-* **'Proposed simplified logic' explanation and simplified code snippet**:
-  Delegate the call in `get_main_window_state` to `get_main_window_with_state` and extract the second element of the returned tuple. This eliminates code duplication.
-  ```rust
-  pub fn get_main_window_state() -> WindowState {
-      Self::get_main_window_with_state().1
-  }
-  ```
+Below are the identified hazards and optimization paths.
 
----
+### Instance 1: Lack of Cancellation / Abort Mechanism in Batch Speed Tests
+*   **File Path**: `src/services/delay.ts` (lines 320–401)
+*   **Description of Hazard**: 
+    The `checkListDelay` method triggers a sequence of asynchronous network delay tasks in concurrent workers. However, it lacks support for cancellation tokens (e.g. `AbortSignal`). If the user changes groups, profile subscriptions, or navigates away, the ongoing workers continue running, firing redundant Tauri IPC calls and HTTP requests. Furthermore, it sets a global `this._isBatchTesting = true` flag during the entire run, preventing the user from performing speed tests on any other groups until all tasks finish.
+*   **Optimization Path**:
+    1. Update `checkListDelay` and `checkDelay` to accept an optional `AbortSignal`.
+    2. Pass the signal to the underlying fetch or Tauri command.
+    3. Monitor the signal inside the worker loop and break early if aborted (`signal.aborted`).
+    4. Provide an abort function to component unmount effects to trigger the abort controller.
 
-### Recommendation 3: Consolidation of Apply DNS Configuration Command
-* **File Path**: [clash.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/clash.rs#L144-L208)
-* **'Current logic' analysis and code snippet**:
-  The `apply_dns_config` command duplicates config writing, config applying, and saving logic in both `if apply` (enable DNS) and `else` (disable DNS) paths.
-  ```rust
-  #[tauri::command]
-  pub async fn apply_dns_config(apply: bool) -> CmdResult {
-      if apply {
-          // Validation logic ...
-          let verge = Config::verge().await;
-          verge.edit_draft(|d| { d.enable_dns_settings = Some(true); });
-          verge.apply();
-          let _ = Config::verge().await.data_arc().save_file().await;
-          CoreManager::global().update_config_checked().await...
-          logging!(info, Type::Config, "DNS config successfully applied");
-      } else {
-          // ...
-          let verge = Config::verge().await;
-          verge.edit_draft(|d| { d.enable_dns_settings = Some(false); });
-          verge.apply();
-          let _ = Config::verge().await.data_arc().save_file().await;
-          CoreManager::global().update_config_checked().await...
-          logging!(info, Type::Config, "Config regenerated successfully");
-      }
-      handle::Handle::refresh_clash();
-      Ok(())
-  }
-  ```
-* **'Proposed simplified logic' explanation and simplified code snippet**:
-  Validate the configuration early if `apply` is true. Then update, save, reload core configs, and log using a shared, consolidated block at the end of the function.
-  ```rust
-  #[tauri::command]
-  pub async fn apply_dns_config(apply: bool) -> CmdResult {
-      if apply {
-          let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
-          if !dns_path.exists() {
-              logging!(warn, Type::Config, "DNS config file not found");
-              return Err("DNS config file not found".into());
-          }
-          let dns_yaml = fs::read_to_string(&dns_path).await.stringify_err_log(|e| {
-              logging!(error, Type::Config, "Failed to read DNS config: {e}");
-          })?;
-          let _ = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&dns_yaml).stringify_err_log(|e| {
-              logging!(error, Type::Config, "Failed to parse DNS config: {e}");
-          })?;
-          logging!(info, Type::Config, "Applying DNS config from file");
-      } else {
-          logging!(info, Type::Config, "DNS settings disabled, regenerating config");
-      }
+### Instance 2: Uncaught Exception and Unhandled Promise Rejections in `UnlockPage`
+*   **File Path**: `src/pages/unlock.tsx` (lines 202–213)
+*   **Description of Hazard**:
+    Inside the mount `useEffect`, an async self-invoking function executes `sortItemsByName(storedItems)` and `getUnlockItems(storedItems)`. If the JSON structure in local storage is malformed or properties like `name` are missing from any item, `a.name.localeCompare(b.name)` will throw a synchronous TypeError. Because this executes within an asynchronous wrapper without a `try/catch` block, it bubbles up as an unhandled promise rejection.
+*   **Optimization Path**:
+    1. Wrap the entire contents of the `useEffect` self-invoking async function in a `try ... catch` block.
+    2. Add defensive checks inside `sortItemsByName` (e.g., fallback if `name` is missing or undefined).
 
-      let verge = Config::verge().await;
-      verge.edit_draft(|d| {
-          d.enable_dns_settings = Some(apply);
-      });
-      verge.apply();
-      let _ = Config::verge().await.data_arc().save_file().await;
-
-      CoreManager::global()
-          .update_config_checked()
-          .await
-          .stringify_err_log(|err| {
-              logging!(error, Type::Config, "Failed to apply config: {err}");
-          })?;
-
-      logging!(
-          info,
-          Type::Config,
-          "{}",
-          if apply { "DNS config successfully applied" } else { "Config regenerated successfully" }
-      );
-
-      handle::Handle::refresh_clash();
-      Ok(())
-  }
-  ```
+### Instance 3: Unmounted Component State Updates in `useProxyDelayState`
+*   **File Path**: `src/hooks/use-proxy-delay-state.ts` (lines 76–84)
+*   **Description of Hazard**:
+    `onDelay` performs an asynchronous operation `await delayManager.checkDelay(...)` which can take up to 10 seconds. When the promise resolves, it executes `setDelayState(result)` directly. If the user has switched pages or the component has unmounted, updating state triggers React memory leaks and console errors.
+*   **Optimization Path**:
+    1. Keep track of the component's mounted state using a `useRef(true)` ref.
+    2. Update it to `false` inside a `useEffect` cleanup function.
+    3. Check the ref's current value (`isMounted.current`) before invoking `setDelayState`.

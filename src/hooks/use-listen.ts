@@ -3,9 +3,7 @@ import { useCallback } from 'react'
 
 export const useListen = () => {
   const addListener = useCallback(
-    async <T>(eventName: string, handler: EventCallback<T>) => {
-      return await listen(eventName, handler)
-    },
+    <T>(eventName: string, handler: EventCallback<T>) => listen(eventName, handler),
     [],
   )
 

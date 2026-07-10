@@ -1,4 +1,4 @@
-import delayManager from '@/services/delay'
+import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 
 // default | delay | alphabet
@@ -49,7 +49,7 @@ function sortProxies(
   const effectiveTimeout =
     typeof latencyTimeout === 'number' && latencyTimeout > 0
       ? latencyTimeout
-      : 10000
+      : NODE_DELAY_MAX_MS
 
   if (sortType === 1) {
     const categorizeDelay = (delay: number): [number, number] => {

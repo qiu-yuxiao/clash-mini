@@ -3,7 +3,6 @@ export { BaseEmpty } from './base-empty'
 export { BaseErrorBoundary, AreaErrorFallback } from './base-error-boundary'
 export { BaseFieldset } from './base-fieldset'
 export { BaseLoading } from './base-loading'
-export { BaseLoadingOverlay } from './base-loading-overlay'
 export { BasePage } from './base-page'
 export { BaseSearchBox, type SearchState } from './base-search-box'
 export {

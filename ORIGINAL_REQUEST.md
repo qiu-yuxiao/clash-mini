@@ -304,4 +304,45 @@ Draft a structured Markdown report named `docs/memory_regression_report.md` deta
 - [ ] The report details the Settings Drawer conditional unmounting overhead and React leak potential.
 - [ ] The report provides clear, drop-in replacement code snippets demonstrating how to roll back or refactor these two modules.
 
+## Follow-up — 2026-07-10T03:41:30+08:00
 
+对 Clash Mini 全体代码进行一次全面的合规检查，识别废弃代码、冗余代码、过度复杂的逻辑、潜在性能瓶颈以及安全隐患，并输出详细的审计报告。整个审计过程中，绝对不修改项目中的任何代码。
+
+Working directory: c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge
+Integrity mode: development
+
+## Requirements
+
+### R1. 全体代码合规、复杂度、性能与安全审计 (Comprehensive Code Audit)
+- 审计范围：包含 Rust 后端（`src-tauri` 目录）与 TypeScript 前端（`src` 目录）。
+- 重点排查以下四类问题：
+  1. **废弃与冗余代码**：无用的 import、未使用的变量/函数/组件等。
+  2. **过度复杂的逻辑**：设计繁复、可读性差、由于历史迭代产生的“坏味道”代码。
+  3. **潜在性能瓶颈**：高频轮询、内存泄漏风险、不必要的重复重渲染或计算等。
+  4. **安全隐患与非安全实践**：未处理的 Promise Rejection、潜在的资源泄露或竞态条件等。
+
+### R2. 审计报告产出 (Audit Report Deliverable)
+- 产出一份结构化的 Markdown 报告，保存在项目根目录下，路径为 `c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\audit_report.md`。
+- 报告应包含：
+  - 发现的问题类别分类。
+  - 问题所在文件的绝对文件路径链接与大概行号。
+  - 现状分析（代码的具体缺陷、为什么繁复或多余）。
+  - 重构与优化建议（提供更简洁/更安全的可替代逻辑实现思路）。
+
+### R3. 无害化执行约束 (Zero Code Modification)
+- 智能体团队在执行任务时**绝对禁止修改项目源文件**。整个执行过程中不能产生任何本地文件修改或提交（除了产出的 `audit_report.md` 之外）。可以使用辅助分析脚本进行扫描。
+
+### R4. 网络访问限制 (Network Restrictions)
+- 智能体团队在执行审计工作时，**严禁向外部发起任何网络请求**，所有分析必须在本地进行。
+
+## Acceptance Criteria
+
+### 报告完整性
+- [ ] 审计报告文件已创建于 `c:\Users\sun_y\Documents\AntiGravity_Projects\ClashVerge\audit_report.md`。
+- [ ] 报告中列出的废弃/冗余/复杂度代码项不少于 5 处，且均带有绝对路径文件链接（格式如 `[filename](file:///absolute/path/to/file#L10-L20)`）。
+- [ ] 报告中针对复杂逻辑的重构建议不少于 3 处，需详细对比“当前逻辑”与“建议简化逻辑”。
+- [ ] 报告中至少包含 2 处潜在的性能瓶颈或安全隐患分析，并给出具体修复思路。
+
+### 执行无害性与合规性
+- [ ] 审计全程无任何项目源码文件（如 `*.ts`, `*.tsx`, `*.rs` 等）被改动（验证 `git diff --stat` 输出除 `audit_report.md` 外为空）。
+- [ ] 团队没有进行任何外部网络调用。

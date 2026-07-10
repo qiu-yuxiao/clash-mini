@@ -37,10 +37,9 @@ class DelayManager {
   private itemFlushScheduled = false
   private groupFlushScheduled = false
 
-  /** 批量测速进行中标志，用于阻止窗口拖拽等同步 IPC 竞争 */
-  private _isBatchTesting = false
+  /** 批量测速进行中标志，现已废弃，始终返回 false */
   get isBatchTesting(): boolean {
-    return this._isBatchTesting
+    return false
   }
 
   constructor() {
@@ -317,88 +316,6 @@ class DelayManager {
     }
   }
 
-  async checkListDelay(
-    nameList: string[],
-    group: string,
-    timeout: number,
-    concurrency = 36,
-  ) {
-    // 互斥保护：若已有批量测速正在进行，直接丢弃后续请求
-    // 所有测速目标均为 PROXY 组节点，正在进行的测速会覆盖相同数据，无需重复执行
-    if (this._isBatchTesting) {
-      debugLog(
-        `[DelayManager] 批量测速已在进行中，跳过本次请求，组: ${group}, 节点数: ${nameList.length}`,
-      )
-      return
-    }
-    this._isBatchTesting = true
-    try {
-      debugLog(
-        `[DelayManager] 批量测试延迟开始，组: ${group}, 数量: ${nameList.length}, 并发数: ${concurrency}`,
-      )
-      const names = nameList.filter(Boolean)
-      // 设置正在延迟测试中
-      names.forEach((name) => this.setDelay(name, group, -2))
-
-      const listener = this.groupListenerMap.get(group)
-      // 瞬间通知 UI 全组开始测速扫光
-      if (listener) {
-        this.queueGroupNotification(group)
-      }
-
-      let index = 0
-      const startTime = Date.now()
-
-      const worker = async (): Promise<void> => {
-        while (true) {
-          const currName = names[index++]
-          if (!currName) return
-
-          try {
-            // 确保API调用前状态为测试中
-            this.setDelay(currName, group, -2)
-
-            // 添加一些随机延迟，避免所有请求同时发出和返回
-            if (index > 1) {
-              // 第一个不延迟，保持响应性
-              await new Promise((resolve) =>
-                setTimeout(resolve, Math.random() * 200),
-              )
-            }
-
-            await this.checkDelay(currName, group, timeout)
-            if (listener) {
-              this.queueGroupNotification(group)
-            }
-          } catch (error) {
-            console.error(
-              `[DelayManager] 批量测试单个代理出错，代理: ${currName}`,
-              error,
-            )
-            // 设置为错误状态
-            this.setDelay(currName, group, 1e6)
-          }
-        }
-      }
-
-      // 限制并发数，避免发送太多请求
-      const actualConcurrency = Math.min(concurrency, names.length, 36)
-      debugLog(`[DelayManager] 实际并发数: ${actualConcurrency}`)
-
-      const promiseList: Promise<void>[] = []
-      for (let i = 0; i < actualConcurrency; i++) {
-        promiseList.push(worker())
-      }
-
-      await Promise.all(promiseList)
-      const totalTime = Date.now() - startTime
-      debugLog(
-        `[DelayManager] 批量测试延迟完成，组: ${group}, 总耗时: ${totalTime}ms`,
-      )
-    } finally {
-      this._isBatchTesting = false
-    }
-  }
 
   /**
    * 注入后台批量测速结果到缓存，并通知 UI 刷新
@@ -415,7 +332,7 @@ class DelayManager {
     this.queueGroupNotification(group)
   }
 
-  formatDelay(delay: number, timeout = 10000) {
+  formatDelay(delay: number, timeout = NODE_DELAY_MAX_MS) {
     if (delay === -1) return '-'
     if (delay === -2) return 'testing'
     if (delay === 0 || (delay >= timeout && delay <= 1e5)) return 'Timeout'
@@ -423,10 +340,9 @@ class DelayManager {
     return `${delay}`
   }
 
-  formatDelayColor(delay: number, timeout = 10000, isDarkMode = false) {
+  formatDelayColor(delay: number, timeout = NODE_DELAY_MAX_MS, isDarkMode = false) {
     if (delay < 0) return ''
     if (delay === 0 || delay >= timeout) return 'error.main'
-    if (delay >= 10000) return 'error.main'
     if (delay >= 400) return isDarkMode ? 'warning.main' : 'warning.dark'
     if (delay >= 250) return 'primary.main'
     return 'success.main'

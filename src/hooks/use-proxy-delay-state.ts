@@ -1,5 +1,5 @@
 import { useLockFn } from 'ahooks'
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import delayManager, { NODE_DELAY_MAX_MS, type DelayUpdate } from '@/services/delay'
 import { getPreloadConfig } from '@/services/preload'
@@ -31,6 +31,14 @@ export function useProxyDelayState(
 ): UseProxyDelayState {
   const isPreset = proxy ? PRESET_PROXY_NAMES.includes(proxy.name) : false
   const [delayState, setDelayState] = useReducer(identity, INITIAL_DELAY)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
   // 死活着色阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定一致
   const timeout = NODE_DELAY_MAX_MS
 
@@ -76,11 +84,13 @@ export function useProxyDelayState(
   const onDelay = useLockFn(async () => {
     if (!proxy) return
     setDelayState({ delay: -2, updatedAt: Date.now() })
-    const currentTimeout = getPreloadConfig()?.default_latency_timeout || 10000
+    const currentTimeout = getPreloadConfig()?.default_latency_timeout || NODE_DELAY_MAX_MS
     const result = await delayManager.checkDelay(proxy.name, groupName, currentTimeout)
-    setDelayState(result)
-    // 单点测速完成后通知组级监听，驱动 useRenderList 重排
-    delayManager.queueGroupNotification(groupName)
+    if (isMountedRef.current) {
+      setDelayState(result)
+      // 单点测速完成后通知组级监听，驱动 useRenderList 重排
+      delayManager.queueGroupNotification(groupName)
+    }
   })
 
   return {

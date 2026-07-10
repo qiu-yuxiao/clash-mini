@@ -9,7 +9,7 @@ import {
 } from '@mui/icons-material'
 import { alpha, type Theme } from '@mui/material'
 
-import delayManager from '@/services/delay'
+import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import getSystem from '@/utils/get-system'
 
 const OS = getSystem()
@@ -36,7 +36,7 @@ export function getSignalIcon(delay: number, t: any) {
       text: t('settings.mini.statusError', { defaultValue: '错误' }),
       color: 'error.main',
     }
-  if (delay === 0 || delay >= 10000)
+  if (delay === 0 || delay >= NODE_DELAY_MAX_MS)
     return {
       icon: <SignalError sx={iconStyle} />,
       text: t('settings.mini.statusTimeout', { defaultValue: '超时' }),
@@ -69,8 +69,8 @@ export function getSignalIcon(delay: number, t: any) {
 
 export function convertDelayColor(
   delayValue: number,
-  timeout = 10000,
-): 'success' | 'warning' | 'error' | 'primary' | 'default' {
+  timeout = NODE_DELAY_MAX_MS,
+) {
   const colorStr = delayManager.formatDelayColor(delayValue, timeout)
   if (!colorStr) return 'default'
   const mainColor = colorStr.split('.')[0]
