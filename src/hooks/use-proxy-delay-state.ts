@@ -31,11 +31,15 @@ export function useProxyDelayState(
   const isPreset = proxy ? PRESET_PROXY_NAMES.includes(proxy.name) : false
   const [delayState, setDelayState] = useReducer(identity, INITIAL_DELAY)
   const isMountedRef = useRef(true)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
   }, [])
   // 死活着色阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定一致
@@ -82,13 +86,36 @@ export function useProxyDelayState(
 
   const onDelay = useLockFn(async () => {
     if (!proxy) return
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    abortControllerRef.current = new AbortController()
+
     setDelayState({ delay: -2, updatedAt: Date.now() })
     const currentTimeout = NODE_DELAY_MAX_MS
-    const result = await delayManager.checkDelay(proxy.name, groupName, currentTimeout)
-    if (isMountedRef.current) {
-      setDelayState(result)
-      // 单点测速完成后通知组级监听，驱动 useRenderList 重排
-      delayManager.queueGroupNotification(groupName)
+    try {
+      const result = await delayManager.checkDelay(
+        proxy.name,
+        groupName,
+        currentTimeout,
+        abortControllerRef.current.signal,
+      )
+      if (isMountedRef.current) {
+        setDelayState(result)
+        // 单点测速完成后通知组级监听，驱动 useRenderList 重排
+        delayManager.queueGroupNotification(groupName)
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return
+      }
+      console.error(err)
+    } finally {
+      if (abortControllerRef.current?.signal.aborted) {
+        // do nothing
+      } else {
+        abortControllerRef.current = null
+      }
     }
   })
 

@@ -240,22 +240,27 @@ class DelayManager {
     name: string,
     group: string,
     timeout: number,
+    signal?: AbortSignal,
   ): Promise<DelayUpdate> {
     debugLog(
       `[DelayManager] 开始测试延迟，代理: ${name}, 组: ${group}, 超时: ${timeout}ms`,
     )
 
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
+
     // 先将状态设置为测试中
     this.setDelay(name, group, -2)
 
     const startTime = Date.now()
+    let timerId: ReturnType<typeof setTimeout> | null = null
+    let abortListener: (() => void) | null = null
+    let raceFinished = false
 
     try {
       const url = this.getUrl(group)
       debugLog(`[DelayManager] 调用API测试延迟，代理: ${name}, URL: ${url}`)
-
-      let raceFinished = false
-      let timerId: ReturnType<typeof setTimeout> | null = null
 
       // 设置超时处理, delay = 0 为超时
       const timeoutPromise = new Promise<ProxyDelay>((resolve) => {
@@ -266,22 +271,24 @@ class DelayManager {
         }, timeout)
       })
 
-      // 使用Promise.race来实现超时控制
+      // 监听取消信号
+      const abortPromise = new Promise<ProxyDelay>((_, reject) => {
+        if (signal) {
+          abortListener = () => {
+            reject(new DOMException('Aborted', 'AbortError'))
+          }
+          signal.addEventListener('abort', abortListener)
+        }
+      })
+
+      // 使用Promise.race来实现超时与取消控制
       const result = await Promise.race([
         delayProxyByName(name, url, timeout)
           .then((res) => {
             raceFinished = true
-            if (timerId) {
-              clearTimeout(timerId)
-              timerId = null
-            }
             return res
           })
           .catch((err) => {
-            if (timerId) {
-              clearTimeout(timerId)
-              timerId = null
-            }
             raceFinished = true
             console.error(
               `[DelayManager] delayProxyByName error for ${name}:`,
@@ -293,11 +300,12 @@ class DelayManager {
           raceFinished = true
           return res
         }),
+        abortPromise,
       ])
 
-      // 确保至少显示500ms的加载动画
+      // 确保至少显示500ms的加载动画，除非被取消
       const elapsedTime = Date.now() - startTime
-      if (elapsedTime < 500) {
+      if (elapsedTime < 500 && !signal?.aborted) {
         await new Promise((resolve) => setTimeout(resolve, 500 - elapsedTime))
       }
 
@@ -307,6 +315,10 @@ class DelayManager {
 
       return this.setDelay(name, group, delay, { elapsed })
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        debugLog(`[DelayManager] 延迟测试已取消，代理: ${name}`)
+        throw error
+      }
       // 确保至少显示500ms的加载动画
       await new Promise((resolve) => setTimeout(resolve, 500))
       console.error(`[DelayManager] 延迟测试出错，代理: ${name}`, error)
@@ -314,6 +326,14 @@ class DelayManager {
       const elapsed = Date.now() - startTime
 
       return this.setDelay(name, group, delay, { elapsed })
+    } finally {
+      raceFinished = true
+      if (timerId) {
+        clearTimeout(timerId)
+      }
+      if (signal && abortListener) {
+        signal.removeEventListener('abort', abortListener)
+      }
     }
   }
 

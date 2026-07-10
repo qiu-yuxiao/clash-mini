@@ -11,18 +11,52 @@ use smartstring::alias::String;
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
+        let _life = self.lifecycle_lock.lock().await;
+        self.start_core_inner().await
+    }
+
+    async fn start_core_inner(&self) -> Result<()> {
+        // 退出中不再启动新内核
+        if Handle::global().is_exiting() {
+            return Ok(());
+        }
+
+        // 已有内核运行时保持幂等
+        if !matches!(*self.get_running_mode(), RunningMode::NotRunning) {
+            logging!(info, Type::Core, "start_core called while a core is running; treated as no-op");
+            return Ok(());
+        }
+
         self.prepare_startup().await?;
         defer! {
             self.after_core_process();
         }
 
-        match *self.get_running_mode() {
+        // 等待服务期间可能进入退出
+        if Handle::global().is_exiting() {
+            self.set_running_mode(RunningMode::NotRunning);
+            return Ok(());
+        }
+
+        let result = match *self.get_running_mode() {
             RunningMode::Service => self.start_core_by_service().await,
             RunningMode::NotRunning | RunningMode::Sidecar => self.start_core_by_sidecar().await,
+        };
+
+        // 启动失败时回滚 mode
+        if result.is_err() {
+            self.set_running_mode(RunningMode::NotRunning);
         }
+
+        result
     }
 
     pub async fn stop_core(&self) -> Result<()> {
+        let _life = self.lifecycle_lock.lock().await;
+        self.stop_core_inner().await
+    }
+
+    async fn stop_core_inner(&self) -> Result<()> {
         CLASH_LOGGER.clear_logs().await;
 
         // WARNING: DO NOT remove or bypass clearing the IPC connection pool here!
@@ -48,9 +82,10 @@ impl CoreManager {
     }
 
     pub async fn restart_core(&self) -> Result<()> {
+        let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
-        self.stop_core().await?;
-        self.start_core().await
+        self.stop_core_inner().await?;
+        self.start_core_inner().await
     }
 
     pub async fn change_core(&self, clash_core: &String) -> Result<(), String> {
