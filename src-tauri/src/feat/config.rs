@@ -135,6 +135,9 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     let log_max_size = patch.app_log_max_size;
     let log_max_count = patch.app_log_max_count;
     let enable_always_on_top = patch.enable_always_on_top;
+    let rule_fallback = &patch.rule_fallback;
+    let enable_dns_settings = patch.enable_dns_settings;
+    let enable_builtin_enhanced = patch.enable_builtin_enhanced;
 
     #[cfg(target_os = "windows")]
     let restart_core_needed = socks_enabled.is_some()
@@ -164,7 +167,11 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     if restart_core_needed {
         update_flags.insert(UpdateFlags::RESTART_CORE);
     }
-    if tun_mode.is_some() {
+    if tun_mode.is_some()
+        || rule_fallback.is_some()
+        || enable_dns_settings.is_some()
+        || enable_builtin_enhanced.is_some()
+    {
         update_flags.insert(UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY | UpdateFlags::SYSTRAY_ICON);
     }
     if enable_global_hotkey.is_some()
