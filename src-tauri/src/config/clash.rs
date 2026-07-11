@@ -111,7 +111,7 @@ impl IClashTemp {
         map.insert("dns".into(), dns_config.into());
 
         let mut profile_config = Mapping::new();
-        profile_config.insert("store-selected".into(), false.into());
+        profile_config.insert("store-selected".into(), true.into());
         profile_config.insert("store-fake-ip".into(), false.into());
         map.insert("profile".into(), profile_config.into());
         map.insert(
