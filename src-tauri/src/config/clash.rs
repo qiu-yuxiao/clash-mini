@@ -101,8 +101,6 @@ impl IClashTemp {
         map.insert("allow-lan".into(), true.into());
         map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
-        map.insert("geodata-loader".into(), "memconservative".into());
-        map.insert("geodata-mode".into(), false.into());
         map.insert("tcp-concurrent".into(), false.into());
 
         let mut dns_config = Mapping::new();

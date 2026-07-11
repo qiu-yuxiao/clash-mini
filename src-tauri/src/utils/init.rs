@@ -130,30 +130,13 @@ async fn init_dns_config() -> Result<()> {
     let dns_config = serde_yaml_ng::Mapping::from_iter([
         ("enable".into(), Value::Bool(true)),
         ("listen".into(), Value::String(":53".into())),
-        ("enhanced-mode".into(), Value::String("fake-ip".into())),
-        ("fake-ip-range".into(), Value::String("198.18.0.1/16".into())),
-        ("fake-ip-filter-mode".into(), Value::String("blacklist".into())),
+        ("enhanced-mode".into(), Value::String("redir-host".into())),
         ("cache-algorithm".into(), Value::String("lru".into())),
         ("cache-limit".into(), Value::Number(512.into())),
         ("prefer-h3".into(), Value::Bool(false)),
         ("respect-rules".into(), Value::Bool(false)),
         ("use-hosts".into(), Value::Bool(false)),
         ("use-system-hosts".into(), Value::Bool(false)),
-        (
-            "fake-ip-filter".into(),
-            Value::Sequence(vec![
-                Value::String("*.lan".into()),
-                Value::String("*.local".into()),
-                Value::String("*.arpa".into()),
-                Value::String("time.*.com".into()),
-                Value::String("ntp.*.com".into()),
-                Value::String("time.*.com".into()),
-                Value::String("+.market.xiaomi.com".into()),
-                Value::String("localhost.ptlogin2.qq.com".into()),
-                Value::String("*.msftncsi.com".into()),
-                Value::String("www.msftconnecttest.com".into()),
-            ]),
-        ),
         (
             "default-nameserver".into(),
             Value::Sequence(vec![
@@ -190,8 +173,6 @@ async fn init_dns_config() -> Result<()> {
         (
             "fallback-filter".into(),
             Value::Mapping(serde_yaml_ng::Mapping::from_iter([
-                ("geoip".into(), Value::Bool(true)),
-                ("geoip-code".into(), Value::String("CN".into())),
                 (
                     "ipcidr".into(),
                     Value::Sequence(vec![
@@ -328,7 +309,7 @@ pub async fn init_resources() -> Result<()> {
         std::mem::drop(fs::create_dir_all(&res_dir).await);
     }
 
-    let file_list = ["Country.mmdb", "geoip.dat", "geosite.dat"];
+    let file_list = ["Country.mmdb"];
 
     // copy the resource file
     // if the source file is newer than the destination file, copy it over

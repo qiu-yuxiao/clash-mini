@@ -628,8 +628,7 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     // 创建强制全局 DNS 注入对象（nameserver 仅为 8.8.8.8 和 114.114.114.114，且不包含 listen 端口以避免冲突）
     let mut dns_config = Mapping::new();
     dns_config.insert("enable".into(), Value::Bool(true));
-    dns_config.insert("enhanced-mode".into(), Value::String("fake-ip".into()));
-    dns_config.insert("fake-ip-range".into(), Value::String("198.18.0.1/16".into()));
+    dns_config.insert("enhanced-mode".into(), Value::String("redir-host".into()));
     dns_config.insert("cache-algorithm".into(), Value::String("lru".into()));
     dns_config.insert("cache-limit".into(), Value::Number(512.into()));
     dns_config.insert(
@@ -722,25 +721,20 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         }
     }
 
-    // Add GEOSITE strong rules
-    final_rules.push(Value::from("GEOSITE,google,PROXY"));
-    final_rules.push(Value::from("GEOSITE,github,PROXY"));
-    final_rules.push(Value::from("GEOSITE,telegram,PROXY"));
+    // 注：规则集从 GEOIP/GEOSITE 更换为 GFWList。
+    // GFWList 负责判断被墙域名走代理，GEOIP/GEOSITE 数据库不再需要，
+    // 省去 geoip.dat(~8MB) + geosite.dat(~30MB) + fake-ip NAT 表的常驻开销。
+    // MATCH 兜底策略仍由 rule_fallback 控制，与原逻辑一致。
 
-    // Add local LAN bypass rules (DIRECT) to avoid DNS loopback & LAN routing deadlock under MATCH,PROXY
-    final_rules.push(Value::from("GEOIP,private,DIRECT,no-resolve"));
+    // Add GFWList rule: only explicitly blocked domains go through proxy
+    final_rules.push(Value::from("RULE-SET,gfwlist,PROXY"));
+
+    // Add local LAN bypass rules (DIRECT) to avoid DNS loopback & LAN routing deadlock
     final_rules.push(Value::from("IP-CIDR,127.0.0.0/8,DIRECT,no-resolve"));
     final_rules.push(Value::from("IP-CIDR,172.16.0.0/12,DIRECT,no-resolve"));
     final_rules.push(Value::from("IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"));
     final_rules.push(Value::from("IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"));
     final_rules.push(Value::from("IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"));
-
-    // Add GFWList fallback rule
-    final_rules.push(Value::from("RULE-SET,gfwlist,PROXY"));
-
-    // Add domestic CN rules (DIRECT) to bypass local websites & DNS servers
-    final_rules.push(Value::from("GEOSITE,cn,DIRECT"));
-    final_rules.push(Value::from("GEOIP,CN,DIRECT"));
 
     // Add manual rules from append-rules
     if let Some(Value::Sequence(append)) = config.remove("append-rules") {
@@ -1165,22 +1159,18 @@ append-rules:
         assert_eq!(gfwlist.get("proxy").unwrap().as_str(), Some("PROXY"));
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
-        assert_eq!(rules.len(), 15);
+        // prepend-rules(1) + GFWList(1) + IP-CIDR(5) + append-rules(1) + MATCH(1) = 9
+        // MATCH=PROXY because default rule_fallback is "proxy"
+        assert_eq!(rules.len(), 9);
         assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));
-        assert_eq!(rules[1].as_str(), Some("GEOSITE,google,PROXY"));
-        assert_eq!(rules[2].as_str(), Some("GEOSITE,github,PROXY"));
-        assert_eq!(rules[3].as_str(), Some("GEOSITE,telegram,PROXY"));
-        assert_eq!(rules[4].as_str(), Some("GEOIP,private,DIRECT,no-resolve"));
-        assert_eq!(rules[5].as_str(), Some("IP-CIDR,127.0.0.0/8,DIRECT,no-resolve"));
-        assert_eq!(rules[6].as_str(), Some("IP-CIDR,172.16.0.0/12,DIRECT,no-resolve"));
-        assert_eq!(rules[7].as_str(), Some("IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"));
-        assert_eq!(rules[8].as_str(), Some("IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"));
-        assert_eq!(rules[9].as_str(), Some("IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"));
-        assert_eq!(rules[10].as_str(), Some("RULE-SET,gfwlist,PROXY"));
-        assert_eq!(rules[11].as_str(), Some("GEOSITE,cn,DIRECT"));
-        assert_eq!(rules[12].as_str(), Some("GEOIP,CN,DIRECT"));
-        assert_eq!(rules[13].as_str(), Some("DOMAIN,custom-domain,REJECT"));
-        assert_eq!(rules[14].as_str(), Some("MATCH,DIRECT"));
+        assert_eq!(rules[1].as_str(), Some("RULE-SET,gfwlist,PROXY"));
+        assert_eq!(rules[2].as_str(), Some("IP-CIDR,127.0.0.0/8,DIRECT,no-resolve"));
+        assert_eq!(rules[3].as_str(), Some("IP-CIDR,172.16.0.0/12,DIRECT,no-resolve"));
+        assert_eq!(rules[4].as_str(), Some("IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"));
+        assert_eq!(rules[5].as_str(), Some("IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"));
+        assert_eq!(rules[6].as_str(), Some("IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"));
+        assert_eq!(rules[7].as_str(), Some("DOMAIN,custom-domain,REJECT"));
+        assert_eq!(rules[8].as_str(), Some("MATCH,PROXY"));
 
         // Verify prepend-rules and append-rules keys are removed
         assert!(config.get("prepend-rules").is_none());
