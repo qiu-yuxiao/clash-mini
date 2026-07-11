@@ -375,6 +375,21 @@ impl Timer {
     }
 
     async fn async_task(uid: &String) -> bool {
+        use crate::feat::CURRENT_SWITCHING_PROFILE;
+        use std::sync::atomic::Ordering;
+        use scopeguard::defer;
+
+        if CURRENT_SWITCHING_PROFILE
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            logging!(info, Type::Timer, "当前正在进行配置切换或手动更新，跳过本次定时任务: {}", uid);
+            return false;
+        }
+        defer! {
+            CURRENT_SWITCHING_PROFILE.store(false, Ordering::Release);
+        }
+
         let task_start = std::time::Instant::now();
         logging!(debug, Type::Timer, "Running timer task for profile: {}", uid);
         let mut success = false;

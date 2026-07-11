@@ -19,10 +19,9 @@ use clash_verge_draft::SharedDraft;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 use smartstring::alias::String;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::time::Duration;
-
-static CURRENT_SWITCHING_PROFILE: AtomicBool = AtomicBool::new(false);
+use crate::feat::CURRENT_SWITCHING_PROFILE;
 
 #[tauri::command]
 pub async fn get_profiles() -> CmdResult<SharedDraft<IProfiles>> {
