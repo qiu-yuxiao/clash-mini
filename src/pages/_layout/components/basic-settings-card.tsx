@@ -17,8 +17,7 @@ interface BasicSettingsCardProps {
   handleAllowLanChange: (checked: boolean) => void
   handleIpv6Change: (checked: boolean) => void
   mixedPortVal: number
-  setMixedPortVal: (val: number) => void
-  handleSavePort: () => void
+  handleSavePort: (port: number) => void
 }
 
 const gridItemSx = () => ({
@@ -43,7 +42,6 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   handleAllowLanChange,
   handleIpv6Change,
   mixedPortVal,
-  setMixedPortVal,
   handleSavePort,
 }) => {
   const { t } = useTranslation()
@@ -55,6 +53,19 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   }, [])
   const skin = theme.controlSkin || skinFallback
   const isRetro3DDark = skin === 'retro-3d' && theme.palette.mode === 'dark'
+
+  const [localPort, setLocalPort] = React.useState(mixedPortVal)
+  const inputRef = React.useRef<HTMLInputElement | null>(null)
+
+  React.useEffect(() => {
+    if (document.activeElement !== inputRef.current) {
+      setLocalPort(mixedPortVal)
+    }
+  }, [mixedPortVal])
+
+  const onLocalSave = () => {
+    handleSavePort(localPort)
+  }
 
   return (
     <Box
@@ -178,17 +189,18 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <TextField
+              inputRef={inputRef}
               size="small"
               type="text"
-              value={mixedPortVal}
+              value={localPort}
               onChange={(e) =>
-                setMixedPortVal(
+                setLocalPort(
                   e.target.value
                     ? parseInt(e.target.value, 10) || 0
                     : 0,
                 )
               }
-              onBlur={handleSavePort}
+              onBlur={onLocalSave}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   ;(e.target as HTMLInputElement).blur()

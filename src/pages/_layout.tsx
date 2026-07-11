@@ -1456,17 +1456,17 @@ const Layout = () => {
   }
 
   // Port update
-  const handleSavePort = async () => {
+  const handleSavePort = async (port: number) => {
     if (
-      mixedPortVal === verge?.verge_mixed_port &&
-      mixedPortVal === clashInfo?.mixed_port
+      port === verge?.verge_mixed_port &&
+      port === clashInfo?.mixed_port
     )
       return
     try {
-      const inUse = await isPortInUse(mixedPortVal)
+      const inUse = await isPortInUse(port)
       if (inUse) {
         showNotice.error('settings.modals.clashPort.messages.portInUse', {
-          port: mixedPortVal,
+          port: port,
         })
         setMixedPortVal(
           verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801,
@@ -1474,8 +1474,8 @@ const Layout = () => {
         return
       }
       await Promise.all([
-        patchInfo({ 'mixed-port': mixedPortVal }),
-        patchVerge({ verge_mixed_port: mixedPortVal }),
+        patchInfo({ 'mixed-port': port }),
+        patchVerge({ verge_mixed_port: port }),
       ])
       showNotice.success('代理端口已保存并重载')
     } catch (err) {
@@ -1874,7 +1874,6 @@ const Layout = () => {
                       handleAllowLanChange={handleClashBoolChange('allow-lan')}
                       handleIpv6Change={handleClashBoolChange('ipv6')}
                       mixedPortVal={mixedPortVal}
-                      setMixedPortVal={setMixedPortVal}
                       handleSavePort={handleSavePort}
                     />
 
