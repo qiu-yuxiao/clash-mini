@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "Введите URL для прокси (по одному на строку)",
     "addUrlButton": "Добавить",
     "addUrlSuccess": "Добавлено правил: {{count}}",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "Правила не добавлены (уже существуют или неверный ввод)"
   }
 }

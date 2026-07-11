@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "أدخل الروابط للبروكسي (رابط في كل سطر)",
     "addUrlButton": "إضافة",
     "addUrlSuccess": "تمت إضافة {{count}} قاعدة",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "لم يتم إضافة أي قواعد (موجودة بالفعل или إدخال غير صالح)"
   }
 }

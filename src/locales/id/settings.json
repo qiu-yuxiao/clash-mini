@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "Masukkan URL untuk proxy (satu per baris)",
     "addUrlButton": "Tambah",
     "addUrlSuccess": "{{count}} aturan ditambahkan",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "Tidak ada aturan yang ditambahkan (sudah ada atau input tidak valid)"
   }
 }

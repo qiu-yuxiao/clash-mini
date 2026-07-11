@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "プロキシを通す URL を入力（1行に1つ）",
     "addUrlButton": "追加",
     "addUrlSuccess": "{{count}} 件のルールを追加しました",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "追加されたルールはありません（すでに存在するか、入力が無効です）"
   }
 }

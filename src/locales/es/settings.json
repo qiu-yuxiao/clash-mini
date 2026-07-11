@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "Introduce las URL a proxy (una por línea)",
     "addUrlButton": "Añadir",
     "addUrlSuccess": "Se añadieron {{count}} reglas",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "No se añadieron reglas (ya existen o entrada no válida)"
   }
 }

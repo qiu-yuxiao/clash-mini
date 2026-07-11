@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "Прокси аша үткәрүче URL-ларны кертегез (бер юлга берәү)",
     "addUrlButton": "Өстәү",
     "addUrlSuccess": "{{count}} кагыйдә өстәлде",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "Кагыйдәләр өстәлмәде (бар инде яки дөрес түгел кертелгән)"
   }
 }

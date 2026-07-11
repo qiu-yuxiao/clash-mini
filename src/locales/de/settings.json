@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "URL(s) für den Proxy eingeben (eine pro Zeile)",
     "addUrlButton": "Hinzufügen",
     "addUrlSuccess": "{{count}} Regeln hinzugefügt",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "Keine Regeln hinzugefügt (bereits vorhanden oder ungültige Eingabe)"
   }
 }

@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "نشانی‌های مورد نظر برای پروکسی را وارد کنید (هر خط یک نشانی)",
     "addUrlButton": "افزودن",
     "addUrlSuccess": "{{count}} قانون اضافه شد",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "هیچ قانونی اضافه نشد (قبلاً وجود دارد یا ورودی نامعتبر است)"
   }
 }

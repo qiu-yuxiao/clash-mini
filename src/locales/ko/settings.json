@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "프록시할 URL 입력 (한 줄에 하나씩)",
     "addUrlButton": "추가",
     "addUrlSuccess": "{{count}}개 규칙 추가됨",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "추가된 규칙이 없습니다 (이미 존재하거나 입력이 유효하지 않음)"
   }
 }

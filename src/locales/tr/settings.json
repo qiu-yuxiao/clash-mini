@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "Proxy'den geçirilecek URL'leri girin (satır başına bir tane)",
     "addUrlButton": "Ekle",
     "addUrlSuccess": "{{count}} kural eklendi",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "Kural eklenmedi (zaten var veya geçersiz giriş)"
   }
 }

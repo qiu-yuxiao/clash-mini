@@ -691,6 +691,6 @@
     "addUrlPlaceholder": "請填入需要代理的網址（每行一個）",
     "addUrlButton": "新增",
     "addUrlSuccess": "已新增 {{count}} 條規則",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "沒有新增規則（可能已存在或輸入無效）"
   }
 }
