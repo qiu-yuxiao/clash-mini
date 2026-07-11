@@ -23,6 +23,23 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 use crate::feat::CURRENT_SWITCHING_PROFILE;
 
+/// 尝试获取配置切换锁，失败时记录指定的日志并返回指定的 busy 值。
+/// 成功时自动 defer! 释放锁。
+macro_rules! try_lock_profile_switching {
+    ($log_msg:expr, $on_busy:expr) => {
+        if CURRENT_SWITCHING_PROFILE
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            logging!(info, Type::Cmd, $log_msg);
+            return $on_busy;
+        }
+        defer! {
+            CURRENT_SWITCHING_PROFILE.store(false, Ordering::Release);
+        }
+    };
+}
+
 #[tauri::command]
 pub async fn get_profiles() -> CmdResult<SharedDraft<IProfiles>> {
     logging!(debug, Type::Cmd, "获取配置文件列表");
@@ -59,16 +76,7 @@ pub async fn enhance_profiles() -> CmdResult<ValidationOutcome> {
 /// 导入配置文件
 #[tauri::command]
 pub async fn import_profile(url: std::string::String, option: Option<PrfOption>) -> CmdResult {
-    if CURRENT_SWITCHING_PROFILE
-        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-        .is_err()
-    {
-        logging!(info, Type::Cmd, "当前正在切换或更新配置，放弃导入请求");
-        return Err("当前正在切换或更新配置，请稍候再试".into());
-    }
-    defer! {
-        CURRENT_SWITCHING_PROFILE.store(false, Ordering::Release);
-    }
+    try_lock_profile_switching!("当前正在切换或更新配置，放弃导入请求", Err("当前正在切换或更新配置，请稍候再试".into()));
 
     logging!(info, Type::Cmd, "[导入订阅] 开始导入: {}", help::mask_url(&url));
 
@@ -161,16 +169,7 @@ pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResu
 
 #[tauri::command]
 pub async fn update_profile(index: String, option: Option<PrfOption>) -> CmdResult {
-    if CURRENT_SWITCHING_PROFILE
-        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-        .is_err()
-    {
-        logging!(info, Type::Cmd, "当前正在切换或更新配置，放弃更新请求");
-        return Err("当前正在切换或更新配置，请稍候再试".into());
-    }
-    defer! {
-        CURRENT_SWITCHING_PROFILE.store(false, Ordering::Release);
-    }
+    try_lock_profile_switching!("当前正在切换或更新配置，放弃更新请求", Err("当前正在切换或更新配置，请稍候再试".into()));
 
     match feat::update_profile(&index, option.as_ref(), true, true, true).await {
         Ok(_) => Ok(()),
@@ -310,9 +309,6 @@ async fn perform_config_update(
     current_value: Option<&String>,
     current_profile: Option<&String>,
 ) -> CmdResult<ValidationOutcome> {
-    defer! {
-        CURRENT_SWITCHING_PROFILE.store(false, Ordering::Release);
-    }
     let update_result =
         tokio::time::timeout(Duration::from_secs(30), CoreManager::global().update_config_forced()).await;
 
@@ -327,13 +323,7 @@ async fn perform_config_update(
 /// 修改profiles的配置
 #[tauri::command]
 pub async fn patch_profiles_config(profiles: IProfiles) -> CmdResult<ValidationOutcome> {
-    if CURRENT_SWITCHING_PROFILE
-        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-        .is_err()
-    {
-        logging!(info, Type::Cmd, "当前正在切换配置，放弃请求");
-        return Ok(ValidationOutcome::Busy);
-    }
+    try_lock_profile_switching!("当前正在切换配置，放弃请求", Ok(ValidationOutcome::Busy));
 
     let target_profile = profiles.current.as_ref();
 

@@ -1,5 +1,3 @@
-#![allow(clippy::unused_async)]
-
 use super::CmdResult;
 use crate::feat;
 use crate::utils::dirs;
@@ -165,7 +163,7 @@ pub async fn apply_dns_config(apply: bool) -> CmdResult {
 
 /// 检查DNS配置文件是否存在
 #[tauri::command]
-pub async fn check_dns_config_exists() -> CmdResult<bool> {
+pub fn check_dns_config_exists() -> CmdResult<bool> {
     let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
 
     Ok(dns_path.exists())
