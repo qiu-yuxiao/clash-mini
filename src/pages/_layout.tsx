@@ -87,6 +87,7 @@ import { LayoutDialogs } from './_layout/components/layout-dialogs'
 import { MiniTrafficPanel } from './_layout/components/mini-traffic-panel'
 import { ProfileImportCard } from './_layout/components/profile-import-card'
 import { RoutingPreferenceCard } from './_layout/components/routing-preference-card'
+import { AddUrlDialog } from './_layout/components/add-url-dialog'
 import { TakeoverModeCard } from './_layout/components/takeover-mode-card'
 import { ThemeSettingsCard } from './_layout/components/theme-settings-card'
 import {
@@ -902,14 +903,14 @@ const Layout = () => {
   }
 
   const policyActiveIndex =
-    verge?.rule_fallback === 'direct'
+    verge?.rule_fallback === 'proxy'
       ? 0
-      : verge?.rule_fallback === 'adjustable'
-        ? 1
-        : 2
+      : verge?.rule_fallback === 'addurl'
+        ? 2
+        : 1
 
   const handleRuleFallbackChange = async (
-    fallback: 'direct' | 'adjustable' | 'proxy',
+    fallback: 'direct' | 'proxy' | 'addurl',
   ) => {
     try {
       await patchVerge({ rule_fallback: fallback })
@@ -920,6 +921,12 @@ const Layout = () => {
     } catch (err: any) {
       showNotice.error(err?.message || err)
     }
+  }
+
+  const [addUrlOpen, setAddUrlOpen] = useState(false)
+  const handleAddUrlClick = async () => {
+    await handleRuleFallbackChange('addurl')
+    setAddUrlOpen(true)
   }
 
   const themeModeVal = verge?.theme_mode || 'system'
@@ -1862,8 +1869,10 @@ const Layout = () => {
                         policyActiveIndex={policyActiveIndex}
                         language={language}
                         handleRuleFallbackChange={handleRuleFallbackChange}
+                        onAddUrlClick={handleAddUrlClick}
                         disableCardBorder
                       />
+                      <AddUrlDialog open={addUrlOpen} onClose={() => setAddUrlOpen(false)} />
                     </Box>
 
                     {/* Section 3: Minimal Settings */}

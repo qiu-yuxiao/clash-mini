@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "Manual Mode (No Interception)",
     "takeoverTooltipSystem": "System Proxy Mode",
     "takeoverTooltipTun": "TUN Virtual Adapter Mode",
-    "routingPreference": "Routing Preference",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "Direct Connection Fallback",
-    "routingTooltipRules": "Freely adjust path control on top of preset rules",
-    "routingTooltipProxy": "Proxy Connection Fallback",
     "debugLogs": "System Debug Logs",
     "pathControl": "Path Control (Right-click link)",
     "statusTesting": "Testing",
@@ -687,6 +680,17 @@
     "connectionsHistory": "History",
     "connectionsDisconnectAll": "Disconnect All",
     "connectionsClearHistory": "Clear History",
-    "total": "Total"
+    "total": "Total",
+    "proxyMethod": "Proxy Mode",
+    "globalProxy": "Global Proxy",
+    "gfwlist": "GFWList",
+    "addUrl": "Add URL",
+    "globalProxyTooltip": "Route all traffic through proxy (simple but uses more traffic)",
+    "gfwlistTooltip": "Only sites in GFWList use proxy, others connect directly",
+    "addUrlTooltip": "Manually add URLs that need proxy on top of GFWList",
+    "addUrlPlaceholder": "Enter URLs to proxy (one per line)",
+    "addUrlButton": "Add",
+    "addUrlSuccess": "Added {{count}} rules",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

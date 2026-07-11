@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "Manual Mode (No Interception)",
     "takeoverTooltipSystem": "System Proxy Mode",
     "takeoverTooltipTun": "TUN Virtual Adapter Mode",
-    "routingPreference": "Routing Preference",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "Direct Connection Fallback",
-    "routingTooltipRules": "Freely adjust path control on top of preset rules",
-    "routingTooltipProxy": "Proxy Connection Fallback",
     "debugLogs": "System Debug Logs",
     "pathControl": "Path Control (Right-click link)",
     "statusTesting": "Testing",
@@ -687,6 +680,17 @@
     "connectionsHistory": "History",
     "connectionsDisconnectAll": "Disconnect All",
     "connectionsClearHistory": "Clear History",
-    "total": "Total"
+    "total": "Total",
+    "proxyMethod": "Прокси режимы",
+    "globalProxy": "Гомуми прокси",
+    "gfwlist": "GFWList",
+    "addUrl": "URL өстәү",
+    "globalProxyTooltip": "Барлык трафик прокси аша үтә (гади, ләкин күбрәк трафик куллана)",
+    "gfwlistTooltip": "Бары тик GFWList эчендәге сайтлар прокси куллана, калганнары турыдан-туры",
+    "addUrlTooltip": "GFWList өстенә прокси кирәк булган URL-ларны кулдан өстәгез",
+    "addUrlPlaceholder": "Прокси аша үткәрүче URL-ларны кертегез (бер юлга берәү)",
+    "addUrlButton": "Өстәү",
+    "addUrlSuccess": "{{count}} кагыйдә өстәлде",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

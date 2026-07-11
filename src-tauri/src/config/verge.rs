@@ -215,7 +215,9 @@ pub struct IVerge {
     /// 启用外部控制器
     pub enable_external_controller: Option<bool>,
 
-    /// 分流策略倾向 (直连兜底: "direct" | 代理兜底: "proxy" | 规则可调: "adjustable")
+    /// 代理方式 (全局代理: "proxy" | GFWList: "direct" | 添加网址: "addurl")
+    /// 出厂默认 GFWList（direct）：GFWList 命中的走代理，其余直连。
+    /// "addurl" 与 "direct" 路由行为一致（GFWList + 手动名单），仅作为 UI 中“添加网址”档位的持久态。
     pub rule_fallback: Option<String>,
 }
 
@@ -401,7 +403,7 @@ impl IVerge {
             enable_dns_settings: Some(false),
             home_cards: None,
             enable_external_controller: Some(false),
-            rule_fallback: Some("proxy".into()),
+            rule_fallback: Some("direct".into()),
             ..Self::default()
         }
     }

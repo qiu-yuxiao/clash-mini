@@ -12,7 +12,8 @@ import {
 interface RoutingPreferenceCardProps {
   policyActiveIndex: number
   language?: string
-  handleRuleFallbackChange: (fallback: 'direct' | 'adjustable' | 'proxy') => void
+  handleRuleFallbackChange: (fallback: 'direct' | 'proxy' | 'addurl') => void
+  onAddUrlClick: () => void
   disableCardBorder?: boolean
 }
 
@@ -20,6 +21,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
   policyActiveIndex,
   language,
   handleRuleFallbackChange,
+  onAddUrlClick,
   disableCardBorder,
 }) => {
   const { t } = useTranslation()
@@ -57,9 +59,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
           color: isRetro3DDark ? '#2C1F03' : 'inherit',
         }}
       >
-        {t('settings.mini.routingPreference', {
-          defaultValue: '分流策略倾向',
-        })}
+        {t('settings.mini.proxyMethod', { defaultValue: '代理方式' })}
       </Typography>
       <Box
         sx={(theme) => ({
@@ -71,9 +71,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
           p: '1px',
           height: 22,
           userSelect: 'none',
-          ...get3DSegmentedContainerStyle(
-            theme,
-          ),
+          ...get3DSegmentedContainerStyle(theme),
         })}
       >
         {/* Sliding Background Indicator */}
@@ -92,16 +90,16 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
           <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
         </Box>
 
-        {/* Direct Fallback Option */}
+        {/* Global Proxy Option */}
         <Tooltip
-          title={t('settings.mini.routingTooltipDirect', {
-            defaultValue: '未匹配规则时默认直连',
+          title={t('settings.mini.globalProxyTooltip', {
+            defaultValue: '所有流量都走代理（简单但费流量）',
           })}
           placement="top"
           arrow
         >
           <Box
-            onClick={() => handleRuleFallbackChange('direct')}
+            onClick={() => handleRuleFallbackChange('proxy')}
             sx={{
               flex: 1,
               height: '100%',
@@ -140,22 +138,20 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               },
             }}
           >
-            {t('settings.mini.direct', {
-              defaultValue: '直连兜底',
-            })}
+            {t('settings.mini.globalProxy', { defaultValue: '全局代理' })}
           </Box>
         </Tooltip>
 
-        {/* Rule Adjustable Option */}
+        {/* GFWList Option */}
         <Tooltip
-          title={t('settings.mini.routingTooltipRules', {
-            defaultValue: '在预设规则的基础上任意调整路径控制',
+          title={t('settings.mini.gfwlistTooltip', {
+            defaultValue: '仅 GFWList 中的网站走代理，其余直连',
           })}
           placement="top"
           arrow
         >
           <Box
-            onClick={() => handleRuleFallbackChange('adjustable')}
+            onClick={() => handleRuleFallbackChange('direct')}
             sx={{
               flex: 1,
               height: '100%',
@@ -194,20 +190,20 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               },
             }}
           >
-            {t('settings.mini.rules', { defaultValue: '规则可调' })}
+            {t('settings.mini.gfwlist', { defaultValue: 'GFWList' })}
           </Box>
         </Tooltip>
 
-        {/* Proxy Fallback Option */}
+        {/* Add URL Option */}
         <Tooltip
-          title={t('settings.mini.routingTooltipProxy', {
-            defaultValue: '未匹配规则时默认走代理',
+          title={t('settings.mini.addUrlTooltip', {
+            defaultValue: '在 GFWList 基础上，手动添加需要代理的网址',
           })}
           placement="top"
           arrow
         >
           <Box
-            onClick={() => handleRuleFallbackChange('proxy')}
+            onClick={onAddUrlClick}
             sx={{
               flex: 1,
               height: '100%',
@@ -246,7 +242,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               },
             }}
           >
-            {t('settings.mini.proxy', { defaultValue: '代理兜底' })}
+            {t('settings.mini.addUrl', { defaultValue: '添加网址' })}
           </Box>
         </Tooltip>
       </Box>

@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "프록시를 수동으로 설정합니다",
     "takeoverTooltipSystem": "시스템 전역 프록시를 활성화합니다",
     "takeoverTooltipTun": "가상 네트워크 어댑터로 모든 트래픽을 캡처합니다",
-    "routingPreference": "라우팅 선호도",
-    "direct": "직접",
-    "rules": "규칙",
-    "proxy": "프록시",
-    "routingTooltipDirect": "일치하는 규칙이 없으면 직접 연결합니다",
-    "routingTooltipRules": "설정된 규칙을 바탕으로 경로 제어를 자유롭게 조정합니다",
-    "routingTooltipProxy": "일치하는 규칙이 없으면 프록시를 경유합니다",
     "debugLogs": "시스템 로그",
     "pathControl": "경로 제어(우클릭 링크)",
     "statusTesting": "테스트 중",
@@ -687,6 +680,17 @@
     "connectionsHistory": "기록",
     "connectionsDisconnectAll": "모두 끊기",
     "connectionsClearHistory": "기록 지우기",
-    "total": "총량"
+    "total": "총량",
+    "proxyMethod": "프록시 방식",
+    "globalProxy": "전체 프록시",
+    "gfwlist": "GFWList",
+    "addUrl": "URL 추가",
+    "globalProxyTooltip": "모든 트래픽을 프록시를 통해 전송합니다 (간단하지만 트래픽을 더 사용함)",
+    "gfwlistTooltip": "GFWList의 사이트만 프록시를 사용하고 나머지는 직접 연결합니다",
+    "addUrlTooltip": "GFWList 위에 프록시가 필요한 URL을 수동으로 추가합니다",
+    "addUrlPlaceholder": "프록시할 URL 입력 (한 줄에 하나씩)",
+    "addUrlButton": "추가",
+    "addUrlSuccess": "{{count}}개 규칙 추가됨",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

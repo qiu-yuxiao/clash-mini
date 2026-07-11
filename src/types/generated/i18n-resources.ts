@@ -718,12 +718,21 @@ export interface TranslationResources {
       }
       mini: {
         activeNodeLabel: string
+        addUrl: string
+        addUrlButton: string
+        addUrlNoChange: string
+        addUrlPlaceholder: string
+        addUrlSuccess: string
+        addUrlTooltip: string
         connectionsActive: string
         connectionsClearHistory: string
         connectionsDisconnectAll: string
         connectionsHistory: string
         debugLogs: string
-        direct: string
+        gfwlist: string
+        gfwlistTooltip: string
+        globalProxy: string
+        globalProxyTooltip: string
         importConfig: string
         importPlaceholder: string
         localFile: string
@@ -731,12 +740,7 @@ export interface TranslationResources {
         nodeCount: string
         pathControl: string
         profilesTitle: string
-        proxy: string
-        routingPreference: string
-        routingTooltipDirect: string
-        routingTooltipProxy: string
-        routingTooltipRules: string
-        rules: string
+        proxyMethod: string
         statusDelayExcellent: string
         statusDelayGood: string
         statusDelayHigh: string

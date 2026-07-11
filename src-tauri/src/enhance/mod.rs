@@ -745,7 +745,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 
     // Read verge config to get the rule fallback type
     let verge = Config::verge().await.latest_arc();
-    let rule_fallback = verge.rule_fallback.as_deref().unwrap_or("proxy");
+    let rule_fallback = verge.rule_fallback.as_deref().unwrap_or("direct");
 
     // Add MATCH final rule according to the fallback type
     if rule_fallback == "proxy" {
@@ -1160,7 +1160,7 @@ append-rules:
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
         // prepend-rules(1) + GFWList(1) + IP-CIDR(5) + append-rules(1) + MATCH(1) = 9
-        // MATCH=PROXY because default rule_fallback is "proxy"
+        // MATCH=DIRECT because default rule_fallback is "direct" (GFWList mode)
         assert_eq!(rules.len(), 9);
         assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));
         assert_eq!(rules[1].as_str(), Some("RULE-SET,gfwlist,PROXY"));
@@ -1170,7 +1170,7 @@ append-rules:
         assert_eq!(rules[5].as_str(), Some("IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"));
         assert_eq!(rules[6].as_str(), Some("IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"));
         assert_eq!(rules[7].as_str(), Some("DOMAIN,custom-domain,REJECT"));
-        assert_eq!(rules[8].as_str(), Some("MATCH,PROXY"));
+        assert_eq!(rules[8].as_str(), Some("MATCH,DIRECT"));
 
         // Verify prepend-rules and append-rules keys are removed
         assert!(config.get("prepend-rules").is_none());

@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "完全手动配置代理",
     "takeoverTooltipSystem": "自动启用系统全局代理",
     "takeoverTooltipTun": "开启虚拟网卡接管全机流量",
-    "routingPreference": "分流策略倾向",
-    "direct": "直连兜底",
-    "rules": "规则可调",
-    "proxy": "代理兜底",
-    "routingTooltipDirect": "未匹配规则时默认直连",
-    "routingTooltipRules": "在预设规则的基础上任意调整路径控制",
-    "routingTooltipProxy": "未匹配规则时默认走代理",
     "debugLogs": "系统调试运行日志",
     "pathControl": "路径控制（右键点击链接）",
     "statusTesting": "测试中",
@@ -687,6 +680,17 @@
     "connectionsHistory": "历史",
     "connectionsDisconnectAll": "断开全部",
     "connectionsClearHistory": "清空历史",
-    "total": "总量"
+    "total": "总量",
+    "proxyMethod": "代理方式",
+    "globalProxy": "全局代理",
+    "gfwlist": "GFWList",
+    "addUrl": "添加网址",
+    "globalProxyTooltip": "所有流量都走代理（简单但费流量）",
+    "gfwlistTooltip": "仅 GFWList 中的网站走代理，其余直连",
+    "addUrlTooltip": "在 GFWList 基础上，手动添加需要代理的网址",
+    "addUrlPlaceholder": "请填入需要代理的网址（每行一个）",
+    "addUrlButton": "添加",
+    "addUrlSuccess": "已添加 {{count}} 条规则",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

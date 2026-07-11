@@ -99,7 +99,7 @@ export interface IVergeConfig {
   enable_hover_jump_navigator?: boolean
   hover_jump_navigator_delay?: number
   enable_external_controller?: boolean
-  rule_fallback?: 'direct' | 'adjustable' | 'proxy'
+  rule_fallback?: 'direct' | 'proxy' | 'addurl'
 }
 
 export interface IWebDavFile {

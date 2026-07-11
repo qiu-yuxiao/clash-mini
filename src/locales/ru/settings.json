@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "Ручной режим (без перехвата)",
     "takeoverTooltipSystem": "Режим системного прокси",
     "takeoverTooltipTun": "Режим виртуального адаптера TUN",
-    "routingPreference": "Маршрутизация",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "Прямое подключение по умолчанию",
-    "routingTooltipRules": "Свободная настройка управления маршрутами на основе предустановленных правил",
-    "routingTooltipProxy": "Прокси по умолчанию",
     "debugLogs": "Журналы отладки системы",
     "pathControl": "Управление путями (ПКМ)",
     "statusTesting": "Тестирование",
@@ -687,6 +680,17 @@
     "connectionsHistory": "История",
     "connectionsDisconnectAll": "Отключить все",
     "connectionsClearHistory": "Очистить историю",
-    "total": "Всего"
+    "total": "Всего",
+    "proxyMethod": "Режим прокси",
+    "globalProxy": "Глобальный прокси",
+    "gfwlist": "GFWList",
+    "addUrl": "Добавить URL",
+    "globalProxyTooltip": "Весь трафик идёт через прокси (просто, но расходует больше трафика)",
+    "gfwlistTooltip": "Только сайты из GFWList идут через прокси, остальные — напрямую",
+    "addUrlTooltip": "Вручную добавьте URL, которым нужен прокси, поверх GFWList",
+    "addUrlPlaceholder": "Введите URL для прокси (по одному на строку)",
+    "addUrlButton": "Добавить",
+    "addUrlSuccess": "Добавлено правил: {{count}}",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "حالت دستی (بدون رهگیری)",
     "takeoverTooltipSystem": "حالت پروکسی سیستم",
     "takeoverTooltipTun": "حالت آداپتور مجازی TUN",
-    "routingPreference": "ترجیح مسیریابی",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "اتصال مستقیم پیش‌فرض",
-    "routingTooltipRules": "کنترل مسیر را بر اساس قوانین از پیش تعیین شده آزادانه تنظیم کنید",
-    "routingTooltipProxy": "اتصال پروکسی پیش‌فرض",
     "debugLogs": "لاگ‌های عیب‌یابی سیستم",
     "pathControl": "کنترل مسیر (کلیک راست)",
     "statusTesting": "در حال تست",
@@ -687,6 +680,17 @@
     "connectionsHistory": "تاریخچه",
     "connectionsDisconnectAll": "قطع همه اتصالات",
     "connectionsClearHistory": "پاک کردن تاریخچه",
-    "total": "مجموع"
+    "total": "مجموع",
+    "proxyMethod": "حالت پروکسی",
+    "globalProxy": "پروکسی همگانی",
+    "gfwlist": "GFWList",
+    "addUrl": "افزودن نشانی",
+    "globalProxyTooltip": "تمام ترافیک از طریق پروکسی می‌رود (ساده اما ترافیک بیشتری مصرف می‌کند)",
+    "gfwlistTooltip": "فقط سایت‌های موجود در GFWList از پروکسی استفاده می‌کنند، بقیه مستقیم",
+    "addUrlTooltip": "روی GFWList، نشانی‌هایی که نیاز به پروکسی دارند را دستی اضافه کنید",
+    "addUrlPlaceholder": "نشانی‌های مورد نظر برای پروکسی را وارد کنید (هر خط یک نشانی)",
+    "addUrlButton": "افزودن",
+    "addUrlSuccess": "{{count}} قانون اضافه شد",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

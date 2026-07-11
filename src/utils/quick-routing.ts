@@ -99,3 +99,96 @@ export const addQuickRoutingRule = async (
     showNotice.error(e.message || String(e))
   }
 }
+
+// 把用户输入的一串文本（多个网址/域名，支持换行、逗号、分号分隔）解析成
+// 一条条 Clash 规则（DOMAIN-SUFFIX 或 IP-CIDR），全部以 PROXY 置顶写入 Merge 的 prepend-rules。
+// 返回实际新增的规则条数。
+export const addQuickRoutingRules = async (rawText: string): Promise<number> => {
+  const lines = (rawText || '')
+    .split(/[\n,;]+/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) return 0
+
+  try {
+    const rules = lines
+      .map((line) => buildProxyRule(line))
+      .filter((rule): rule is string => !!rule)
+
+    if (rules.length === 0) return 0
+
+    let mergeYaml = ''
+    try {
+      mergeYaml = await readProfileFile('Merge')
+    } catch (readErr) {
+      console.warn(
+        'Global Merge file not found or failed to read, initializing empty merge:',
+        readErr,
+      )
+      mergeYaml = '{}'
+    }
+    const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
+
+    const existing: string[] = Array.isArray(mergeObj['prepend-rules'])
+      ? (mergeObj['prepend-rules'] as string[])
+      : []
+    const added: string[] = []
+    for (const rule of rules) {
+      if (!existing.includes(rule) && !added.includes(rule)) {
+        added.push(rule)
+      }
+    }
+
+    if (added.length === 0) return 0
+
+    // 手动添加的网址置顶，压过 GFWList 与 MATCH。
+    mergeObj['prepend-rules'] = [...added, ...existing]
+
+    await saveProfileFile('Merge', yaml.dump(mergeObj))
+    await enhanceProfiles()
+
+    return added.length
+  } catch (e: any) {
+    console.error('Failed to add bulk routing rules:', e)
+    showNotice.error(e.message || String(e))
+    return 0
+  }
+}
+
+// 从一段输入（可能带协议头/路径/端口）中提取出用于 PROXY 的 Clash 规则字符串。
+const buildProxyRule = (input: string): string | null => {
+  if (!input) return null
+
+  let value = input.trim()
+  // 去掉协议头 http:// https:// etc.
+  value = value.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '')
+  // 去掉路径、查询、锚点、端口
+  value = value.split('/')[0].split('?')[0].split('#')[0].split(':')[0]
+  value = value.replace(/^www\./, '')
+  value = value.trim()
+  if (!value) return null
+
+  // IP 直接走 IP-CIDR
+  if (/^[0-9.]+$/.test(value)) {
+    return `IP-CIDR,${value}/32,PROXY`
+  }
+  if (/^[0-9a-fA-F:]+$/.test(value)) {
+    return `IP-CIDR,${value}/128,PROXY`
+  }
+
+  // 域名取后缀（二级或三级）
+  const parts = value.split('.')
+  if (parts.length < 2) return null
+  const lastPart = parts[parts.length - 1]
+  const secondLastPart = parts[parts.length - 2]
+  const isDoubleTld =
+    ['com', 'org', 'net', 'gov', 'edu', 'co'].includes(secondLastPart) &&
+    lastPart.length <= 3
+  const domainSuffix =
+    parts.length >= 3 && isDoubleTld
+      ? parts.slice(-3).join('.')
+      : parts.slice(-2).join('.')
+
+  return `DOMAIN-SUFFIX,${domainSuffix},PROXY`
+}

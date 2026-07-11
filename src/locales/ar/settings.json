@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "الوضع اليدوي (بدون اعتراض)",
     "takeoverTooltipSystem": "وضع وكيل النظام",
     "takeoverTooltipTun": "وضع محول TUN الافتراضي",
-    "routingPreference": "تفضيل التوجيه",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "الاتصال المباشر الافتراضي",
-    "routingTooltipRules": "ضبط التحكم في المسار بحرية بناءً على القواعد المحددة مسبقًا",
-    "routingTooltipProxy": "اتصال الوكيل الافتراضي",
     "debugLogs": "سجلات تصحيح أخطاء النظام",
     "pathControl": "التحكم في المسار (انقر بزر الماوس الأيمن)",
     "statusTesting": "جاري الاختبار",
@@ -687,6 +680,17 @@
     "connectionsHistory": "السجل",
     "connectionsDisconnectAll": "قطع اتصال الكل",
     "connectionsClearHistory": "مسح السجل",
-    "total": "الإجمالي"
+    "total": "الإجمالي",
+    "proxyMethod": "وضع البروكسي",
+    "globalProxy": "بروكسي شامل",
+    "gfwlist": "GFWList",
+    "addUrl": "إضافة رابط",
+    "globalProxyTooltip": "تمرير كل حركة المرور عبر البروكسي (بسيط لكن يستهلك بيانات أكثر)",
+    "gfwlistTooltip": "مواقع GFWList فقط تستخدم البروكسي، والباقي اتصال مباشر",
+    "addUrlTooltip": "أضف يدويًا روابط تحتاج بروكسي فوق GFWList",
+    "addUrlPlaceholder": "أدخل الروابط للبروكسي (رابط في كل سطر)",
+    "addUrlButton": "إضافة",
+    "addUrlSuccess": "تمت إضافة {{count}} قاعدة",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "Modo Manual (Sin intercepción)",
     "takeoverTooltipSystem": "Modo Proxy del Sistema",
     "takeoverTooltipTun": "Modo Adaptador Virtual TUN",
-    "routingPreference": "Preferencia de Enrutamiento",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "Conexión Directa por Defecto",
-    "routingTooltipRules": "Ajuste libremente el control de ruta según las reglas preestablecidas",
-    "routingTooltipProxy": "Conexión Proxy por Defecto",
     "debugLogs": "Registros de Depuración del Sistema",
     "pathControl": "Control de Ruta (clic derecho)",
     "statusTesting": "Probando",
@@ -687,6 +680,17 @@
     "connectionsHistory": "Historial",
     "connectionsDisconnectAll": "Desconectar todo",
     "connectionsClearHistory": "Limpiar historial",
-    "total": "Total"
+    "total": "Total",
+    "proxyMethod": "Modo de proxy",
+    "globalProxy": "Proxy global",
+    "gfwlist": "GFWList",
+    "addUrl": "Añadir URL",
+    "globalProxyTooltip": "Todo el tráfico pasa por el proxy (simple pero consume más datos)",
+    "gfwlistTooltip": "Solo los sitios en GFWList usan proxy, el resto conecta directo",
+    "addUrlTooltip": "Añade manualmente URLs que necesitan proxy sobre GFWList",
+    "addUrlPlaceholder": "Introduce las URL a proxy (una por línea)",
+    "addUrlButton": "Añadir",
+    "addUrlSuccess": "Se añadieron {{count}} reglas",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

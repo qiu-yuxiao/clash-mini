@@ -29,45 +29,16 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
     });
 
     if enable {
-        // 读取DNS配置
-        let dns_key = Value::from("dns");
-        let dns_val = config.get(&dns_key);
-        let mut dns_val = dns_val.map_or_else(Mapping::new, |val| {
-            val.as_mapping().cloned().unwrap_or_else(Mapping::new)
-        });
-        let ipv6_key = Value::from("ipv6");
-        let ipv6_val = config.get(&ipv6_key).and_then(|v| v.as_bool()).unwrap_or(false);
-
-        // 检查现有的 enhanced-mode 设置
-        let current_mode = dns_val
-            .get(Value::from("enhanced-mode"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("fake-ip");
-
-        // 只有当 enhanced-mode 是 fake-ip 或未设置时才修改 DNS 配置
-        if current_mode == "fake-ip" || !dns_val.contains_key(Value::from("enhanced-mode")) {
-            revise!(dns_val, "enable", true);
-            revise!(dns_val, "ipv6", ipv6_val);
-
-            if !dns_val.contains_key(Value::from("enhanced-mode")) {
-                revise!(dns_val, "enhanced-mode", "fake-ip");
-            }
-
-            if !dns_val.contains_key(Value::from("fake-ip-range")) {
-                revise!(dns_val, "fake-ip-range", "198.18.0.1/16");
-            }
-
-            #[cfg(target_os = "macos")]
-            {
-                AsyncHandler::spawn(move || async move {
-                    crate::utils::resolve::dns::restore_public_dns().await;
-                    crate::utils::resolve::dns::set_public_dns("114.114.114.114".to_string()).await;
-                });
-            }
+        // TUN 启用时，DNS 由 apply_mandatory_dns_settings 统一配置为 redir-host，
+        // 此处不再强制 fake-ip（原 fake-ip 分支会被流水线末端的 redir-host 覆盖，属死代码）。
+        // 仅 macOS 下接管系统 DNS。
+        #[cfg(target_os = "macos")]
+        {
+            AsyncHandler::spawn(move || async move {
+                crate::utils::resolve::dns::restore_public_dns().await;
+                crate::utils::resolve::dns::set_public_dns("114.114.114.114".to_string()).await;
+            });
         }
-
-        // 当TUN启用时，将修改后的DNS配置写回
-        revise!(config, "dns", dns_val);
     } else {
         // TUN未启用时，仅恢复系统DNS，不修改配置文件中的DNS设置
         #[cfg(target_os = "macos")]

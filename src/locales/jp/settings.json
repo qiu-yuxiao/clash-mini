@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "プロキシを手動で設定します",
     "takeoverTooltipSystem": "システムグローバルプロキシを有効にします",
     "takeoverTooltipTun": "仮想ネットワークアダプターで全トラフィックをキャプチャします",
-    "routingPreference": "ルーティング設定",
-    "direct": "直結",
-    "rules": "ルール",
-    "proxy": "プロキシ",
-    "routingTooltipDirect": "一致するルールがない場合は直接接続します",
-    "routingTooltipRules": "プリセットされたルールの基で自由に経路制御を調整します",
-    "routingTooltipProxy": "一致するルールがない場合はプロキシを経由します",
     "debugLogs": "システムログ",
     "pathControl": "パス制御（右クリックで接続）",
     "statusTesting": "テスト中",
@@ -687,6 +680,17 @@
     "connectionsHistory": "履歴",
     "connectionsDisconnectAll": "すべて切断",
     "connectionsClearHistory": "履歴をクリア",
-    "total": "合計"
+    "total": "合計",
+    "proxyMethod": "プロキシ方式",
+    "globalProxy": "全局プロキシ",
+    "gfwlist": "GFWList",
+    "addUrl": "URLを追加",
+    "globalProxyTooltip": "すべての通信をプロキシ経由にします（簡単ですが通信量が増えます）",
+    "gfwlistTooltip": "GFWList 内のサイトのみプロキシを使用し、それ以外は直接接続します",
+    "addUrlTooltip": "GFWList に加えて、プロキシが必要な URL を手動で追加します",
+    "addUrlPlaceholder": "プロキシを通す URL を入力（1行に1つ）",
+    "addUrlButton": "追加",
+    "addUrlSuccess": "{{count}} 件のルールを追加しました",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

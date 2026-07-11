@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "Mode Manual (Tanpa Intersepsi)",
     "takeoverTooltipSystem": "Mode Proksi Sistem",
     "takeoverTooltipTun": "Mode Adaptor Virtual TUN",
-    "routingPreference": "Preferensi Perutean",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "Sambungan Langsung Default",
-    "routingTooltipRules": "Sesuaikan kontrol jalur secara bebas berdasarkan aturan yang telah ditentukan",
-    "routingTooltipProxy": "Sambungan Proksi Default",
     "debugLogs": "Log Debug Sistem",
     "pathControl": "Kontrol Jalur (Klik kanan)",
     "statusTesting": "Menguji",
@@ -687,6 +680,17 @@
     "connectionsHistory": "Riwayat",
     "connectionsDisconnectAll": "Putuskan Semua",
     "connectionsClearHistory": "Bersihkan Riwayat",
-    "total": "Total"
+    "total": "Total",
+    "proxyMethod": "Mode Proxy",
+    "globalProxy": "Proxy Global",
+    "gfwlist": "GFWList",
+    "addUrl": "Tambah URL",
+    "globalProxyTooltip": "Semua lalu lintas lewat proxy (sederhana tapi memakai lebih banyak kuota)",
+    "gfwlistTooltip": "Hanya situs di GFWList yang lewat proxy, lainnya langsung",
+    "addUrlTooltip": "Tambahkan URL yang butuh proxy di atas GFWList secara manual",
+    "addUrlPlaceholder": "Masukkan URL untuk proxy (satu per baris)",
+    "addUrlButton": "Tambah",
+    "addUrlSuccess": "{{count}} aturan ditambahkan",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }

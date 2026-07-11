@@ -665,13 +665,6 @@
     "takeoverTooltipManual": "Manuel Mod (Müdahale Yok)",
     "takeoverTooltipSystem": "Sistem Vekili Modu",
     "takeoverTooltipTun": "TUN Sanal Bağdaştırıcı Modu",
-    "routingPreference": "Yönlendirme Tercihi",
-    "direct": "DIR",
-    "rules": "RUL",
-    "proxy": "PRX",
-    "routingTooltipDirect": "Doğrudan Bağlantı Varsayılanı",
-    "routingTooltipRules": "Önceden ayarlanmış kurallara göre yol kontrolünü serbestçe ayarlayın",
-    "routingTooltipProxy": "Vekil Bağlantısı Varsayılanı",
     "debugLogs": "Sistem Hata Ayıklama Günlükleri",
     "pathControl": "Yol Kontrolü (Sağ tık)",
     "statusTesting": "Test ediliyor",
@@ -687,6 +680,17 @@
     "connectionsHistory": "Geçmiş",
     "connectionsDisconnectAll": "Tümünü Kes",
     "connectionsClearHistory": "Geçmişi Temizle",
-    "total": "Toplam"
+    "total": "Toplam",
+    "proxyMethod": "Proxy Modu",
+    "globalProxy": "Genel Proxy",
+    "gfwlist": "GFWList",
+    "addUrl": "URL Ekle",
+    "globalProxyTooltip": "Tüm trafik proxy üzerinden gider (basit ama daha çok trafik kullanır)",
+    "gfwlistTooltip": "Yalnızca GFWList'teki siteler proxy kullanır, diğerleri doğrudan bağlanır",
+    "addUrlTooltip": "GFWList üzerine proxy gerektiren URL'leri elle ekleyin",
+    "addUrlPlaceholder": "Proxy'den geçirilecek URL'leri girin (satır başına bir tane)",
+    "addUrlButton": "Ekle",
+    "addUrlSuccess": "{{count}} kural eklendi",
+    "addUrlNoChange": "No rules added (already exist or invalid input)"
   }
 }
