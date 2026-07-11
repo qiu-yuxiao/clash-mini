@@ -212,6 +212,18 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         Config::generate().await?;
         CoreManager::global().restart_core().await?;
     }
+    // SYS_PROXY 必须在 CLASH_CONFIG（TUN 重载）之前执行，原因：
+    // 1. 退场顺序：切换到 TUN 模式时，必须先清除 OS 系统代理，再启动 TUN 网卡，
+    //    否则存在双重流量接管的冲突时间窗口。
+    // 2. 异常隔离：若 CLASH_CONFIG（内核重载/TUN 适配器提权）报错并经 `?` 向上传播，
+    //    将导致此处之后的所有步骤被跳过。将 SYS_PROXY 提前可确保代理清理在任何
+    //    内核错误之前完成，不会因其他步骤失败而被遗漏残留在 OS 注册表中。
+    // 注：对于端口变更场景（RESTART_CORE + SYS_PROXY），RESTART_CORE 仍在本块之前，
+    //    顺序依然正确（先重启内核监听新端口，再更新 OS 代理指向新端口）。
+    if update_flags.contains(UpdateFlags::SYS_PROXY) {
+        sysopt::Sysopt::global().update_sysproxy().await?;
+        sysopt::Sysopt::global().refresh_guard().await;
+    }
     if update_flags.contains(UpdateFlags::CLASH_CONFIG) {
         CoreManager::global().update_config_checked().await?;
         handle::Handle::refresh_clash();
@@ -232,10 +244,7 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     {
         clash_verge_i18n::set_locale(language.as_str());
     }
-    if update_flags.contains(UpdateFlags::SYS_PROXY) {
-        sysopt::Sysopt::global().update_sysproxy().await?;
-        sysopt::Sysopt::global().refresh_guard().await;
-    }
+    // SYS_PROXY 已提前至 CLASH_CONFIG 之前执行（见上方注释），此处不再重复。
     if update_flags.contains(UpdateFlags::HOTKEY)
         && let Some(hotkeys) = &patch.hotkeys
     {

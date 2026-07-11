@@ -215,7 +215,11 @@ impl Sysopt {
             self.reset_sysproxy.store(false, Ordering::SeqCst);
         }
 
-        // close proxy guard
+        // 持锁后再操作 OS，防止与 update_sysproxy 的 spawn_blocking 并发写入
+        // WinINET 注册表，避免"清空"与"写入"乱序导致代理残留断网。
+        let _lock = self.update_lock.lock().await;
+
+        // close proxy guard（必须在锁内执行，确保 Guard 停止后不再向 OS 补写代理）
         self.access_guard().write().set_guard_type(GuardType::None);
 
         // 直接关闭所有代理
