@@ -102,9 +102,16 @@ impl IClashTemp {
         map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
         map.insert("geodata-loader".into(), "memconservative".into());
+        map.insert("geodata-mode".into(), false.into());
+        map.insert("tcp-concurrent".into(), false.into());
+
+        let mut dns_config = Mapping::new();
+        dns_config.insert("enable".into(), true.into());
+        dns_config.insert("cache-size".into(), 512.into());
+        map.insert("dns".into(), dns_config.into());
 
         let mut profile_config = Mapping::new();
-        profile_config.insert("store-selected".into(), true.into());
+        profile_config.insert("store-selected".into(), false.into());
         profile_config.insert("store-fake-ip".into(), false.into());
         map.insert("profile".into(), profile_config.into());
         map.insert(
