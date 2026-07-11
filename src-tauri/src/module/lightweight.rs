@@ -165,9 +165,39 @@ pub async fn entry_lightweight_mode() -> bool {
                 let _ = crate::module::monitor::trigger_backend_auto_select(&uid, None, 0, true).await;
             }
         }
+
+        if !is_in_lightweight_mode() {
+            return;
+        }
+
+        // 短暂延时等待 WebView 销毁完成以及 Mihomo GC 内存归还分配器
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        
+        if is_in_lightweight_mode() {
+            trim_working_set();
+        }
     });
 
     true
+}
+
+#[cfg(target_os = "windows")]
+fn trim_working_set() {
+    use windows::Win32::System::Threading::{GetCurrentProcess, SetProcessWorkingSetSize};
+    unsafe {
+        // -1 (usize::MAX) 表示强制操作系统修剪工作集页表，将进程不活跃内存交换出物理内存，降低占用表现
+        let _ = SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
+    }
+    logging!(
+        info,
+        Type::Lightweight,
+        "[轻量模式] 已强制修剪 Windows 进程工作集内存，释放空闲缓存"
+    );
+}
+
+#[cfg(not(target_os = "windows"))]
+fn trim_working_set() {
+    // 非 Windows 平台（macOS/Linux）依赖原生系统的自动页面换出机制，暂不实现强制释放
 }
 
 pub async fn exit_lightweight_mode() -> bool {
