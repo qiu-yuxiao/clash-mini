@@ -23,13 +23,27 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
     // 的调用路径是同步的 Tauri command（用户操作触发），实际不存在并发读者，风险可控。
     Config::clash().await.apply();
 
+    // 检测 allow-lan 和 ipv6 的实质变动，决定是否需要重启内核。
+    // 这两个底层网络和协议栈属性在热重载时容易导致端口冲突、TUN网卡死锁，因此强制通过重启解决，保证稳定性。
+    let old_allow_lan = old_config.get("allow-lan").and_then(|v| v.as_bool());
+    let old_ipv6 = old_config.get("ipv6").and_then(|v| v.as_bool());
+
+    let new_allow_lan = patch.get("allow-lan").and_then(|v| v.as_bool());
+    let new_ipv6 = patch.get("ipv6").and_then(|v| v.as_bool());
+
+    let allow_lan_changed = new_allow_lan.is_some() && new_allow_lan != old_allow_lan;
+    let ipv6_changed = new_ipv6.is_some() && new_ipv6 != old_ipv6;
+
     let res = async {
-        // 激活订阅
-        if patch.get("secret").is_some() || patch.get("external-controller").is_some() {
+        let need_restart = patch.get("secret").is_some()
+            || patch.get("external-controller").is_some()
+            || allow_lan_changed
+            || ipv6_changed;
+
+        if need_restart {
             Config::generate().await?;
             CoreManager::global().restart_core().await?;
         } else {
-            Config::runtime().await.edit_draft(|d| d.patch_config(patch));
             CoreManager::global().update_config_checked().await?;
         }
         handle::Handle::refresh_clash();
