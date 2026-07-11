@@ -60,6 +60,17 @@ pub async fn enhance_profiles() -> CmdResult<ValidationOutcome> {
 /// 导入配置文件
 #[tauri::command]
 pub async fn import_profile(url: std::string::String, option: Option<PrfOption>) -> CmdResult {
+    if CURRENT_SWITCHING_PROFILE
+        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+        .is_err()
+    {
+        logging!(info, Type::Cmd, "当前正在切换或更新配置，放弃导入请求");
+        return Err("当前正在切换或更新配置，请稍候再试".into());
+    }
+    defer! {
+        CURRENT_SWITCHING_PROFILE.store(false, Ordering::Release);
+    }
+
     logging!(info, Type::Cmd, "[导入订阅] 开始导入: {}", help::mask_url(&url));
 
     // 直接依赖 PrfItem::from_url 自身的超时/重试逻辑，不再使用 tokio::time::timeout 包裹
@@ -89,9 +100,24 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
         }
     }
 
+    let final_current = Config::profiles().await.data_arc().current.clone();
+    let is_current_changed = final_current.is_some() && final_current.as_ref() == item.uid.as_ref();
+
     if let Some(uid) = &item.uid {
         logging!(info, Type::Cmd, "[导入订阅] 发送配置变更通知: {}", uid);
         handle::Handle::notify_profile_changed(uid);
+    }
+
+    if is_current_changed {
+        logging!(info, Type::Cmd, "[导入订阅] 自动激活首个导入的配置，开始刷新内核配置...");
+        crate::process::AsyncHandler::spawn(move || async move {
+            if let Err(e) = CoreManager::global().update_config_forced().await {
+                logging!(error, Type::Cmd, "[导入订阅] 自动刷新配置内核失败: {}", e);
+            } else {
+                handle::Handle::refresh_clash();
+                logging!(info, Type::Cmd, "[导入订阅] 自动激活首个导入配置成功且内核重载完成");
+            }
+        });
     }
 
     logging!(info, Type::Cmd, "[导入订阅] 导入完成: {}", help::mask_url(&url));
@@ -134,9 +160,19 @@ pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResu
     }
 }
 
-/// 更新配置文件
 #[tauri::command]
 pub async fn update_profile(index: String, option: Option<PrfOption>) -> CmdResult {
+    if CURRENT_SWITCHING_PROFILE
+        .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+        .is_err()
+    {
+        logging!(info, Type::Cmd, "当前正在切换或更新配置，放弃更新请求");
+        return Err("当前正在切换或更新配置，请稍候再试".into());
+    }
+    defer! {
+        CURRENT_SWITCHING_PROFILE.store(false, Ordering::Release);
+    }
+
     match feat::update_profile(&index, option.as_ref(), true, true, true).await {
         Ok(_) => Ok(()),
         Err(e) => {
@@ -236,6 +272,8 @@ async fn discard_and_restore(current_profile: Option<&String>) -> CmdResult<()> 
     Config::profiles().await.discard();
     if let Some(prev_profile) = current_profile {
         restore_previous_profile(prev_profile).await?;
+        logging!(info, Type::Cmd, "配置更新失败已回滚，向前端发送配置重置变更事件: {}", prev_profile);
+        handle::Handle::notify_profile_changed(prev_profile);
     }
     Ok(())
 }
