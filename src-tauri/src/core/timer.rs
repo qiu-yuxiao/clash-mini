@@ -353,7 +353,7 @@ impl Timer {
         queue.insert(String::from(uid), Self::interval_duration(interval_minutes))
     }
 
-    pub async fn shutdown(&self) {
+    pub fn shutdown(&self) {
         let _ = self.command_tx.send(TimerCommand::Shutdown);
         logging!(info, Type::Timer, "Timer shutdown signal sent");
     }

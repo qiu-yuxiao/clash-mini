@@ -26,7 +26,7 @@ pub async fn prepare_exit() {
     crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_one();
 
     // 停止 Timer 调度器
-    crate::core::timer::Timer::global().shutdown().await;
+    crate::core::timer::Timer::global().shutdown();
 
     // 关闭所有 WebSocket 订阅
     let mihomo = handle::Handle::mihomo().await.clone();

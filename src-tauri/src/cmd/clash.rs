@@ -211,5 +211,6 @@ pub async fn get_clash_logs() -> CmdResult<Vec<CompactString>> {
 pub async fn close_all_connections() -> CmdResult {
     let mihomo = handle::Handle::mihomo().await;
     mihomo.close_all_connections().await.stringify_err()?;
+    drop(mihomo);
     Ok(())
 }

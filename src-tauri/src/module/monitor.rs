@@ -21,13 +21,15 @@ pub fn abort_all_active_tasks() {
     for handle in active.drain(..) {
         handle.abort();
     }
+    drop(active);
     // 短暂等待，确保任务退出
     std::thread::sleep(std::time::Duration::from_millis(50));
 }
 
 /// 中止后台 monitor 常驻任务
 pub fn abort_monitor() {
-    if let Some(handle) = MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()).take() {
+    let value = MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()).take();
+    if let Some(handle) = value {
         handle.abort();
     }
 }
