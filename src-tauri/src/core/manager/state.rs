@@ -27,6 +27,9 @@ impl CoreManager {
     pub(super) async fn start_core_by_sidecar(&self) -> Result<()> {
         logging!(info, Type::Core, "Starting core in sidecar mode");
 
+        // 启动前先强制清理后台残留的 mini-mihomo 进程，避免孤儿进程占用端口导致新实例无法绑定
+        Self::kill_all_mini_cores().await;
+
         let config_file = Config::generate_file(crate::config::ConfigType::Run).await?;
         let app_handle = handle::Handle::app_handle();
         let clash_core = Config::verge().await.latest_arc().get_valid_clash_core();

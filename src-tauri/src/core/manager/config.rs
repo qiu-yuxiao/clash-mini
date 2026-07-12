@@ -45,6 +45,14 @@ impl CoreManager {
             });
         }
 
+        if !self.try_start_config_update() {
+            logging!(info, Type::Core, "配置更新正在进行中，跳过本次请求");
+            return Ok(ValidationOutcome::Busy);
+        }
+        scopeguard::defer! {
+            self.finish_config_update();
+        }
+
         if !force && !self.should_update_config() {
             logging!(debug, Type::Core, "Skipping config update due to debounce");
             return Ok(ValidationOutcome::Skipped {

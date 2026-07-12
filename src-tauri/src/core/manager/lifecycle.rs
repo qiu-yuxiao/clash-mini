@@ -7,8 +7,7 @@ use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 
-/// 保护 fallback_to_system_proxy 中的配置修改，避免与前端 patch_verge 交错写入
-static FALLBACK_CONFIG_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
@@ -199,15 +198,20 @@ impl CoreManager {
     }
 
     async fn fallback_to_system_proxy(&self) {
-        let _guard = FALLBACK_CONFIG_LOCK.lock().await;
-        Config::verge().await.edit_draft(|d| {
-            d.enable_tun_mode = Some(false);
-            d.enable_system_proxy = Some(true);
-        });
-        Config::verge().await.apply();
-        if let Err(e) = Config::verge().await.latest_arc().save_file().await {
-            logging!(error, Type::Service, "保存回退配置失败: {}", e);
+        logging!(
+            warn,
+            Type::Service,
+            "检测到系统服务未就绪，执行配置回退：关闭 TUN 模式，开启系统代理"
+        );
+        let patch = crate::config::IVerge {
+            enable_tun_mode: Some(false),
+            enable_system_proxy: Some(true),
+            ..Default::default()
+        };
+        if let Err(e) = crate::feat::patch_verge(&patch, false).await {
+            logging!(error, Type::Service, "应用回退配置失败: {}", e);
+            // 兜底设置运行模式，防止状态卡在 Service 导致后续无法启动
+            self.set_running_mode(RunningMode::Sidecar);
         }
-        self.set_running_mode(RunningMode::Sidecar);
     }
 }

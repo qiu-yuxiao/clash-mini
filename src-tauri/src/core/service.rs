@@ -594,7 +594,7 @@ impl ServiceManager {
         }
         defer! {
             self.operation_running.store(false, Ordering::Release);
-            self.operation_done.notify_one();
+            self.operation_done.notify_waiters();
         }
 
         operation.await?;

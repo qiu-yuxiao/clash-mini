@@ -212,9 +212,8 @@ pub(super) async fn init_window() {
 
 pub fn resolve_done() {
     RESOLVE_DONE.store(true, Ordering::Release);
-    // 使用 notify_one() 而非 notify_waiters()：notify_one() 存储许可，
-    // 即使通知时 wait_for_resolve_done 还未 await notified()，后续 await 也能立即返回，避免通知丢失
-    RESOLVE_NOTIFY.notify_one();
+    // 使用 notify_waiters() 唤醒所有等待初始化的协程，避免并发调用时部分协程被饿死
+    RESOLVE_NOTIFY.notify_waiters();
 }
 
 pub fn is_resolve_done() -> bool {

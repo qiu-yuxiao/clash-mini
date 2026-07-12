@@ -35,6 +35,7 @@ pub struct CoreManager {
     state: ArcSwap<State>,
     last_update: ArcSwapOption<Instant>,
     lifecycle_lock: tokio::sync::Mutex<()>,
+    config_update_in_progress: std::sync::atomic::AtomicBool,
 }
 
 #[derive(Debug)]
@@ -58,6 +59,7 @@ impl Default for CoreManager {
             state: ArcSwap::new(Arc::new(State::default())),
             last_update: ArcSwapOption::new(None),
             lifecycle_lock: tokio::sync::Mutex::new(()),
+            config_update_in_progress: std::sync::atomic::AtomicBool::new(false),
         }
     }
 }
@@ -65,6 +67,14 @@ impl Default for CoreManager {
 impl CoreManager {
     fn new() -> Self {
         Self::default()
+    }
+
+    fn try_start_config_update(&self) -> bool {
+        !self.config_update_in_progress.swap(true, std::sync::atomic::Ordering::AcqRel)
+    }
+
+    fn finish_config_update(&self) {
+        self.config_update_in_progress.store(false, std::sync::atomic::Ordering::Release);
     }
 
     pub fn get_running_mode(&self) -> Arc<RunningMode> {
