@@ -134,6 +134,10 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
 
     // 阶段 1：等待内核 API 接口响应
     while start_time.elapsed().as_secs() < 30 {
+        if crate::core::handle::Handle::global().is_exiting() {
+            logging!(info, Type::Lightweight, "[后台监测] 阶段 1 中断：应用正在退出");
+            return false;
+        }
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
         if mihomo.get_base_config().await.is_ok() {
             logging!(info, Type::Lightweight, "[后台监测] 阶段 1 完成：内核 API 已就绪");
@@ -150,6 +154,10 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
     // 阶段 2：等待代理节点列表填充
     let start_time_2 = Instant::now();
     while start_time_2.elapsed().as_secs() < 20 {
+        if crate::core::handle::Handle::global().is_exiting() {
+            logging!(info, Type::Lightweight, "[后台监测] 阶段 2 中断：应用正在退出");
+            return false;
+        }
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
         if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
             if let Some(all) = group_info.all {
