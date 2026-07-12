@@ -6,7 +6,7 @@ use anyhow::Result;
 use arc_swap::{ArcSwap, ArcSwapOption};
 use clash_verge_logger::AsyncLogger;
 use once_cell::sync::Lazy;
-use std::{fmt, sync::Arc, time::Instant, sync::atomic::{AtomicBool, Ordering}};
+use std::{fmt, sync::Arc, time::Instant};
 use tauri_plugin_shell::process::CommandChild;
 
 use crate::singleton;
@@ -34,7 +34,6 @@ impl fmt::Display for RunningMode {
 pub struct CoreManager {
     state: ArcSwap<State>,
     last_update: ArcSwapOption<Instant>,
-    config_update_in_progress: AtomicBool,
     lifecycle_lock: tokio::sync::Mutex<()>,
 }
 
@@ -58,21 +57,12 @@ impl Default for CoreManager {
         Self {
             state: ArcSwap::new(Arc::new(State::default())),
             last_update: ArcSwapOption::new(None),
-            config_update_in_progress: AtomicBool::new(false),
             lifecycle_lock: tokio::sync::Mutex::new(()),
         }
     }
 }
 
 impl CoreManager {
-    pub fn try_start_config_update(&self) -> bool {
-        !self.config_update_in_progress.swap(true, Ordering::AcqRel)
-    }
-
-    pub fn finish_config_update(&self) {
-        self.config_update_in_progress.store(false, Ordering::Release);
-    }
-
     fn new() -> Self {
         Self::default()
     }
