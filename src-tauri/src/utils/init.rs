@@ -309,7 +309,7 @@ pub async fn init_resources() -> Result<()> {
         std::mem::drop(fs::create_dir_all(&res_dir).await);
     }
 
-    let file_list = ["Country.mmdb"];
+    let file_list: [&str; 0] = [];
 
     // copy the resource file
     // if the source file is newer than the destination file, copy it over
