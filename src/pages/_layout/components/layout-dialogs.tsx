@@ -125,7 +125,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             className: 'theme-panel',
             sx: {
               p: 3,
-              minWidth: '360px',
+              width: 'calc(100% - 32px)',
               maxWidth: '450px',
               borderRadius: '8px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -256,8 +256,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             className: 'theme-panel',
             sx: {
               p: 3,
-              minWidth: '400px',
-              maxWidth: '600px',
+              width: 'calc(100% - 32px)',
+              maxWidth: '500px',
               borderRadius: '8px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               fontFamily: 'var(--control-font-family)',
@@ -413,7 +413,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             className: 'theme-panel',
             sx: {
               p: 3,
-              minWidth: '400px',
+              width: 'calc(100% - 32px)',
+              maxWidth: '450px',
               borderRadius: '8px',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               fontFamily: 'var(--control-font-family)',
