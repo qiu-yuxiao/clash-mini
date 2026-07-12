@@ -6,6 +6,44 @@ use crate::utils::window_manager::WindowManager;
 use clash_verge_logging::{Type, logging};
 use tokio::time::{Duration, timeout};
 
+/// 退出前统一准备工作：设置退出标志、中止后台任务、停止定时器等
+pub async fn prepare_exit() {
+    logging!(debug, Type::System, "准备退出，中止所有后台任务");
+    // 设置退出标志
+    handle::Handle::global().set_is_exiting();
+
+    // 中止活跃的测速任务
+    crate::module::monitor::abort_all_active_tasks();
+
+    // 中止后台 monitor 常驻线程
+    crate::module::monitor::abort_monitor();
+
+    // 中止轻量模式 cleanup 任务
+    crate::module::lightweight::abort_lightweight_cleanup();
+
+    // 唤醒 monitor 线程，让它检测到退出标志并尽快终止
+    crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
+    crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_one();
+
+    // 停止 Timer 调度器
+    crate::core::timer::Timer::global().shutdown().await;
+
+    // 关闭所有 WebSocket 订阅
+    let mihomo = handle::Handle::mihomo().await.clone();
+    if let Err(e) = mihomo.clear_all_ws_connections().await {
+        logging!(warn, Type::System, "退出时清理WebSocket订阅失败: {e}");
+    }
+
+    // 刷新日志缓冲区
+    crate::core::logger::Logger::global().flush();
+
+    // 短暂等待后台任务退出
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    utils::server::shutdown_embedded_server();
+    Config::apply_all_and_save_file().await;
+}
+
 pub async fn open_or_close_dashboard() {
     if lightweight::is_in_lightweight_mode() {
         let _ = lightweight::exit_lightweight_mode().await;
@@ -18,11 +56,7 @@ pub async fn open_or_close_dashboard() {
 
 pub async fn quit() {
     logging!(debug, Type::System, "启动退出流程");
-    // 设置退出标志
-    handle::Handle::global().set_is_exiting();
-
-    utils::server::shutdown_embedded_server();
-    Config::apply_all_and_save_file().await;
+    prepare_exit().await;
 
     logging!(info, Type::System, "开始异步清理资源");
     let cleanup_result = clean_async().await;
@@ -33,6 +67,9 @@ pub async fn quit() {
         "资源清理完成，退出代码: {}",
         if cleanup_result { 0 } else { 1 }
     );
+
+    // 最终刷新日志
+    crate::core::logger::Logger::global().shutdown();
 
     let app_handle = handle::Handle::app_handle();
     app_handle.exit(if cleanup_result { 0 } else { 1 });

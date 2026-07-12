@@ -7,8 +7,6 @@ use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 
-
-
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
         // 先在锁外等待服务就绪（可能阻塞很久，如UAC弹窗、服务启动等）

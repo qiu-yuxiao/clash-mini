@@ -24,6 +24,7 @@ import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { useTranslation } from 'react-i18next'
@@ -1301,7 +1302,7 @@ const Layout = () => {
     }
   }
 
-  const handleSelectProfile = async (uid: string) => {
+  const handleSelectProfile = useLockFn(async (uid: string) => {
     if (currentProfileUid === uid) return
     try {
       await patchProfiles({ current: uid })
@@ -1314,7 +1315,7 @@ const Layout = () => {
     } catch (err) {
       showNotice.error(err)
     }
-  }
+  })
 
   const handleUpdateProfile = async (uid: string, e: React.MouseEvent) => {
     e.stopPropagation()

@@ -128,6 +128,19 @@ export const loadLanguage = async (language: string) => {
   }
 }
 
+// TODO(i18n-fallback): 当前翻译 key 不存在时，i18next 默认返回 key 本身作为降级
+// 这是 i18next 的默认行为，优点是开发时能快速发现缺失的 key
+// 已知限制与未来改进方向：
+// 1. 目前仅配置了 fallbackLng（语言级降级：zh -> en 等），未配置 key 级别的默认值
+// 2. 生产环境可考虑开启 saveMissing + 后端上报，自动收集缺失的 key
+// 3. 可通过 returnDefaultValue 选项返回空字符串或更友好的占位符
+// 4. 可结合 i18next-scanner 等工具在构建时扫描所有 key，避免遗漏
+// 5. 对于关键页面的文案，可在代码中提供默认值作为双重保障（t('key', '默认值')）
+//
+// 当前策略评估：
+// - 开发阶段：显示 key 本身便于快速定位缺失翻译，收益大于体验影响
+// - 生产阶段：理论上所有 key 都应已翻译，缺失属于 bug，显示 key 便于上报
+// - 若未来需要更友好的用户体验，可改为返回空字符串或上一级 key
 i18n.use(initReactI18next).init({
   resources: {},
   lng: FALLBACK_LANGUAGE,
@@ -135,6 +148,12 @@ i18n.use(initReactI18next).init({
   interpolation: {
     escapeValue: false,
   },
+  // 参考配置（未来可启用）：
+  // saveMissing: true,           // 上报缺失的 key
+  // missingKeyHandler: (lng, ns, key) => {
+  //   console.warn(`[i18n] Missing key: ${lng}:${ns}:${key}`)
+  // },
+  // returnDefaultValue: false,   // 是否返回默认值而非 key
 })
 
 export const changeLanguage = async (language: string) => {

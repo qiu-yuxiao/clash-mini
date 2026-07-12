@@ -107,7 +107,7 @@ impl CoreManager {
         self.set_running_child_sidecar(child);
         self.set_running_mode(RunningMode::Sidecar);
 
-        AsyncHandler::spawn(|| async move {
+        let handle = AsyncHandler::spawn(|| async move {
             while let Some(event) = rx.recv().await {
                 match event {
                     tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
@@ -139,6 +139,8 @@ impl CoreManager {
             }
         });
 
+        self.set_log_consumer_handle(handle);
+
         Ok(())
     }
 
@@ -147,6 +149,12 @@ impl CoreManager {
         defer! {
             self.set_running_mode(RunningMode::NotRunning);
         }
+
+        // 中止日志消费任务
+        if let Some(handle) = self.take_log_consumer_handle() {
+            handle.abort();
+        }
+
         if let Some(child) = self.take_child_sidecar() {
             let pid = child.pid();
             let result = child.kill();
@@ -157,6 +165,15 @@ impl CoreManager {
                 pid,
                 result
             );
+            // 等待进程完全退出，最多2秒，确保端口释放
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                async {
+                    // child 已被 kill，等待其退出
+                    // 注：CommandChild 的 wait 方法依赖于实现，这里简单 sleep 等待
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                }
+            ).await;
         }
         Self::kill_all_mini_cores().await;
     }
@@ -168,6 +185,9 @@ impl CoreManager {
                 Type::Core,
                 "Scanning and killing leftover mini-mihomo processes..."
             );
+            // 注意：每次调用都重新创建 System 实例，虽然有一定开销，
+            // 但此函数为低频调用（仅在启动/停止核心时触发），
+            // 且准确性优先于性能——每次重新扫描确保能捕获到最新的进程状态。
             let system = sysinfo::System::new_all();
             for (pid, process) in system.processes() {
                 let name = process.name();

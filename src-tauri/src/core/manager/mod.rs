@@ -42,6 +42,7 @@ pub struct CoreManager {
 struct State {
     running_mode: ArcSwap<RunningMode>,
     child_sidecar: ArcSwapOption<CommandChild>,
+    log_consumer_handle: ArcSwapOption<tauri::async_runtime::JoinHandle<()>>,
 }
 
 impl Default for State {
@@ -49,6 +50,7 @@ impl Default for State {
         Self {
             running_mode: ArcSwap::new(Arc::new(RunningMode::NotRunning)),
             child_sidecar: ArcSwapOption::new(None),
+            log_consumer_handle: ArcSwapOption::new(None),
         }
     }
 }
@@ -70,11 +72,14 @@ impl CoreManager {
     }
 
     fn try_start_config_update(&self) -> bool {
-        !self.config_update_in_progress.swap(true, std::sync::atomic::Ordering::AcqRel)
+        !self
+            .config_update_in_progress
+            .swap(true, std::sync::atomic::Ordering::AcqRel)
     }
 
     fn finish_config_update(&self) {
-        self.config_update_in_progress.store(false, std::sync::atomic::Ordering::Release);
+        self.config_update_in_progress
+            .store(false, std::sync::atomic::Ordering::Release);
     }
 
     pub fn get_running_mode(&self) -> Arc<RunningMode> {
@@ -101,6 +106,19 @@ impl CoreManager {
     pub fn set_running_child_sidecar(&self, child: CommandChild) {
         let state = self.state.load();
         state.child_sidecar.store(Some(Arc::new(child)));
+    }
+
+    pub fn take_log_consumer_handle(&self) -> Option<tauri::async_runtime::JoinHandle<()>> {
+        self.state
+            .load()
+            .log_consumer_handle
+            .swap(None)
+            .and_then(|arc| Arc::try_unwrap(arc).ok())
+    }
+
+    pub fn set_log_consumer_handle(&self, handle: tauri::async_runtime::JoinHandle<()>) {
+        let state = self.state.load();
+        state.log_consumer_handle.store(Some(Arc::new(handle)));
     }
 
     pub fn set_last_update(&self, time: Instant) {

@@ -9,6 +9,16 @@ use std::sync::atomic::{AtomicU8, Ordering};
 // 引入全局异步互斥排队锁，彻底消除轻量模式极速开关时，销毁与创建窗口在异步层面的竞态冲突
 static LIGHTWEIGHT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+/// 轻量模式 cleanup 任务的 JoinHandle，用于退出时主动中止
+static LIGHTWEIGHT_CLEANUP_HANDLE: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>> = std::sync::Mutex::new(None);
+
+/// 中止轻量模式 cleanup 后台任务
+pub fn abort_lightweight_cleanup() {
+    if let Some(handle) = LIGHTWEIGHT_CLEANUP_HANDLE.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        handle.abort();
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LightweightState {
@@ -106,7 +116,9 @@ pub async fn entry_lightweight_mode() -> bool {
 
     // 💡 建议 2：进入轻量模式时触发 Mihomo 内核的激进连接清理 (GC) - BUG-258
     // 💡 建议 3：彻底熔断外壳 Rust 后端与内核的常驻数据流订阅 - BUG-259
-    AsyncHandler::spawn(|| async {
+    // 进入前 abort 上一个 cleanup 任务，避免累积
+    abort_lightweight_cleanup();
+    let handle = AsyncHandler::spawn(|| async {
         if !is_in_lightweight_mode() {
             return;
         }
@@ -177,6 +189,8 @@ pub async fn entry_lightweight_mode() -> bool {
             trim_working_set();
         }
     });
+
+    *LIGHTWEIGHT_CLEANUP_HANDLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
 
     true
 }

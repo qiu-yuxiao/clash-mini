@@ -69,6 +69,12 @@ interface ProxyChainItem {
   delay?: number
 }
 
+// Performance optimizations for large proxy lists (1000+ nodes):
+// 1. Virtual scrolling via @tanstack/react-virtual - only renders visible items
+// 2. React.memo on ProxyRender component - prevents unnecessary re-renders
+// 3. useMemo for derived data (filtered lists, computed values)
+// 4. useCallback for event handlers - stable references for memoized children
+// 5. Reference stability optimization in connection data processing
 export const ProxyGroups = (props: Props) => {
   const { t } = useTranslation()
   const { pathname } = useLocation()

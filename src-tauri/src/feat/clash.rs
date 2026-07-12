@@ -1,5 +1,5 @@
 use crate::{
-    config::Config, constants::timing::NODE_DELAY_MAX_MS, core::handle, feat::clean_async, process::AsyncHandler, utils,
+    config::Config, constants::timing::NODE_DELAY_MAX_MS, core::handle, feat::{clean_async, prepare_exit}, process::AsyncHandler,
 };
 
 use clash_verge_logging::{Type, logging};
@@ -11,6 +11,9 @@ use std::sync::Arc;
 /// 互斥保护 change_clash_mode / patch_clash 的并发调用，防止配置修改竞态
 static CLASH_PATCH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+// SAFETY: TLS 配置构建使用的是内置的 ring provider 和安全默认协议版本，
+// 这些都是经过验证的配置，构建失败的概率极低。
+// 这是启动时初始化的全局配置，若失败说明运行环境有严重问题，fail-fast 是合理的。
 #[allow(clippy::expect_used)]
 static TLS_CONFIG: Lazy<Arc<rustls::ClientConfig>> = Lazy::new(|| {
     let root_store = rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -25,21 +28,7 @@ static TLS_CONFIG: Lazy<Arc<rustls::ClientConfig>> = Lazy::new(|| {
 /// Restart the application
 pub async fn restart_app() {
     logging!(debug, Type::System, "启动重启应用流程");
-    // 设置退出标志
-    handle::Handle::global().set_is_exiting();
-
-    // 中止活跃的测速任务，避免与新实例竞争
-    crate::module::monitor::abort_all_active_tasks();
-
-    // 唤醒 monitor 线程，让它检测到退出标志并尽快终止
-    crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
-    crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_one();
-
-    // 短暂等待后台线程退出，减少与新实例竞争的概率
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-    utils::server::shutdown_embedded_server();
-    Config::apply_all_and_save_file().await;
+    prepare_exit().await;
 
     logging!(info, Type::System, "开始异步清理资源");
     let cleanup_result = clean_async().await;
@@ -50,6 +39,9 @@ pub async fn restart_app() {
         "资源清理完成，退出代码: {}",
         if cleanup_result { 0 } else { 1 }
     );
+
+    // 最终刷新日志
+    crate::core::logger::Logger::global().shutdown();
 
     let app_handle = handle::Handle::app_handle();
     app_handle.restart();
@@ -74,12 +66,11 @@ fn after_change_clash_mode() {
 }
 
 /// Change Clash mode (rule/global/direct/script)
-pub async fn change_clash_mode(mode: String) {
+pub async fn change_clash_mode(mode: String) -> anyhow::Result<()> {
     let _guard = CLASH_PATCH_LOCK.lock().await;
 
     let mut mapping = Mapping::new();
     mapping.insert(Value::from("mode"), Value::from(mode.as_str()));
-    // Convert YAML mapping to JSON Value
     let json_value = serde_json::json!({
         "mode": mode
     });
@@ -87,12 +78,10 @@ pub async fn change_clash_mode(mode: String) {
     let mihomo = handle::Handle::mihomo().await.clone();
     match mihomo.patch_base_config(&json_value).await {
         Ok(_) => {
-            // 更新订阅
             let clash = Config::clash().await;
             clash.edit_draft(|d| d.patch_config(&mapping));
             clash.apply();
 
-            // 分离数据获取和异步调用
             let clash_data = clash.data_arc();
             if clash_data.save_config().await.is_ok() {
                 handle::Handle::refresh_clash();
@@ -102,13 +91,22 @@ pub async fn change_clash_mode(mode: String) {
             if is_auto_close_connection {
                 after_change_clash_mode();
             }
+
+            Ok(())
         }
-        Err(err) => logging!(error, Type::Core, "{err}"),
+        Err(err) => {
+            logging!(error, Type::Core, "{err}");
+            Err(anyhow::anyhow!("{err}"))
+        }
     }
 }
 
 /// Test delay to a URL through proxy.
 /// HTTPS: measures TLS handshake time. HTTP: measures HEAD round-trip time.
+/// 
+/// Note: The TCP stream and TLS connector are created inside the timeout block,
+/// so they are automatically dropped when the timeout fires, ensuring no
+/// lingering connections remain in the background.
 pub async fn test_delay(url: String) -> anyhow::Result<u32> {
     use std::sync::Arc;
     use std::time::Duration;

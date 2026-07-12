@@ -92,7 +92,7 @@ export const useClash = () => {
 
   const patchClash = useLockFn(async (patch: Partial<IConfigData>) => {
     await patchClashConfig(patch)
-    mutateClash()
+    await mutateClash()
   })
 
   const version = versionData?.meta

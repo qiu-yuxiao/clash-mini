@@ -38,8 +38,7 @@ pub async fn patch_clash_config(payload: Mapping) -> CmdResult {
 /// 修改Clash模式
 #[tauri::command]
 pub async fn patch_clash_mode(payload: String) -> CmdResult {
-    feat::change_clash_mode(payload).await;
-    Ok(())
+    feat::change_clash_mode(payload).await.stringify_err()
 }
 
 /// 启动核心
@@ -205,4 +204,12 @@ pub async fn validate_dns_config() -> CmdResult<ValidationOutcome> {
 pub async fn get_clash_logs() -> CmdResult<Vec<CompactString>> {
     let logs = CoreManager::global().get_clash_logs().await.unwrap_or_default();
     Ok(logs)
+}
+
+/// 关闭所有连接
+#[tauri::command]
+pub async fn close_all_connections() -> CmdResult {
+    let mihomo = handle::Handle::mihomo().await;
+    mihomo.close_all_connections().await.stringify_err()?;
+    Ok(())
 }

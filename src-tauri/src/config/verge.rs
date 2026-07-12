@@ -9,6 +9,13 @@ use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use smartstring::alias::String;
 
+// TODO: VergeConfig 当前通过 Draft 包装器使用 RwLock<Arc<T>> 嵌套结构，
+// 存在以下潜在问题：
+// 1. 结构复杂，读写路径不直观，容易引入数据不一致风险
+// 2. 草稿（draft）与已提交（committed）数据双轨制，在并发场景下需要谨慎处理
+// 3. 未来可考虑简化为单一的 ArcSwap 或 tokio::sync::RwLock 方案，
+//    或使用更清晰的状态机来管理配置变更流程
+
 /// ### `verge.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct IVerge {

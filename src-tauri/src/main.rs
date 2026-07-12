@@ -7,6 +7,9 @@ fn main() {
     let worker_limit = std::cmp::min(default_parallelism, 16);
     let blocking_limit = 4 * worker_limit;
 
+    // SAFETY: tokio runtime 构建失败仅发生在系统资源极度耗尽时，
+    // 此时应用已无法正常运行，直接 panic 是合理的 fail-fast 策略。
+    // 运行时创建是应用启动的前置条件，若失败则没有合理的降级路径。
     #[allow(clippy::unwrap_used)]
     let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(worker_limit)

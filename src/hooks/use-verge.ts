@@ -21,15 +21,15 @@ export const useVerge = () => {
     staleTime: 5000,
   })
 
-  const mutateVerge = (
+  const mutateVerge = async (
     updaterOrData?:
       | IVergeConfig
       | ((prev: IVergeConfig | undefined) => IVergeConfig | undefined)
       | undefined,
-    _revalidate?: boolean,
+    revalidate?: boolean,
   ) => {
     if (updaterOrData === undefined) {
-      void refetch()
+      await refetch()
       return
     }
     if (typeof updaterOrData === 'function') {
@@ -39,6 +39,9 @@ export const useVerge = () => {
     } else {
       qc.setQueryData(['getVergeConfig'], updaterOrData)
     }
+    if (revalidate !== false) {
+      await refetch()
+    }
   }
 
   const patchVerge = useLockFn(
@@ -47,8 +50,9 @@ export const useVerge = () => {
         await patchVergeConfig(value)
       } catch (err) {
         showNotice.error(err)
+        throw err
       } finally {
-        await refetch()
+        await mutateVerge()
       }
     },
   )

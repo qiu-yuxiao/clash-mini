@@ -70,6 +70,12 @@ fn is_supported_icon_content(content: &[u8]) -> bool {
     tauri::image::Image::from_bytes(content).is_ok() || looks_like_svg(content)
 }
 
+// TODO: Implement LRU-based icon cache eviction strategy
+// Currently the icon cache only grows without bounds. Future improvement should:
+// 1. Track last access time for each cached icon
+// 2. Set a maximum cache size (e.g. 100MB or 500 files)
+// 3. Periodically evict least recently used icons when limit is exceeded
+// 4. Consider adding a cache cleanup on app startup
 pub async fn download_icon_cache(url: String, name: String) -> CmdResult<String> {
     let icon_cache_dir = dirs::app_home_dir().stringify_err()?.join("icons").join("cache");
     let icon_name = normalize_icon_segment(name.as_str())?;

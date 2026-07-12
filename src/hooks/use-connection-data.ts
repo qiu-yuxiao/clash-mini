@@ -38,12 +38,14 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
       fallbackData: initConnData,
       connect: () => MihomoWebSocket.connect_connections(),
       throttleMs: 1000,
-      setupHandlers: ({ next, scheduleReconnect }) => {
+      setupHandlers: ({ next, scheduleReconnect, isMounted }) => {
         let currentEpochId: string | null = null
         let lastSequenceId = -1
 
         return {
           handleMessage: (data) => {
+            if (!isMounted()) return
+
             if (data.startsWith('Websocket error')) {
               next(data)
               void scheduleReconnect()

@@ -95,18 +95,30 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
         .await
         .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
-    // 在 Windows 上，rename 前需要确保目标文件不存在（或先删除）
-    // 使用 std::fs::rename 是原子的（在同一文件系统上）
-    if cfg!(windows) {
-        // Windows 上 rename 不会自动覆盖目标文件，先尝试删除
-        let _ = tokio::fs::remove_file(path).await;
-    }
-
-    let result = std::fs::rename(&tmp_path, path);
+    // Windows 上 rename 不会自动覆盖已有文件：
+    // 先尝试直接 rename（原文件不存在时成功），失败则尝试删除目标文件后重试
+    // 若仍失败，则将临时文件保留（不删除），确保数据不会丢失
+    let result = if cfg!(windows) {
+        match std::fs::rename(&tmp_path, path) {
+            ok @ Ok(_) => ok,
+            Err(_) => {
+                // 删除目标文件后重试（目标文件可能已存在）
+                if let Err(e) = std::fs::remove_file(path) {
+                    // 目标文件删不掉，把临时文件留下
+                    return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (cannot remove existing file)"));
+                }
+                std::fs::rename(&tmp_path, path)
+            }
+        }
+    } else {
+        std::fs::rename(&tmp_path, path)
+    };
 
     if let Err(e) = result {
-        // 重命名失败时清理临时文件
-        let _ = std::fs::remove_file(&tmp_path);
+        // 重命名失败：临时文件还在目标位置（没被移动），但原文件可能已被删除（Windows 分支）
+        // 尝试将临时文件重命名为原文件名的 .backup 后缀，尽可能保留数据
+        let backup_path = path.with_extension("yaml.bak");
+        let _ = std::fs::rename(&tmp_path, &backup_path);
         return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (atomic rename failed)"));
     }
 

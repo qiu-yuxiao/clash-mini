@@ -23,6 +23,14 @@ use crate::{
     utils::dirs::{self, service_log_dir, sidecar_log_dir},
 };
 
+// Log rotation strategy:
+// - Size-based rotation: rotates when log file exceeds max_size (default 128KB)
+// - File count limit: keeps only max_count log files (default 8), deletes oldest when exceeded
+// - Naming: uses timestamps for rotated files, "latest" for current log
+//
+// TODO: Add time-based rotation (e.g. daily rotation) as an additional or
+// alternative strategy. Currently only size-based rotation is implemented.
+// The Cleanup::KeepLogFiles already ensures old files don't accumulate indefinitely.
 pub struct Logger {
     handle: Arc<Mutex<Option<LoggerHandle>>>,
     sidecar_file_writer: Arc<RwLock<Option<FileLogWriter>>>,
@@ -209,6 +217,21 @@ impl Logger {
             Cleanup::KeepLogFiles(log_max_count),
         )
         .try_build()?)
+    }
+
+    pub fn flush(&self) {
+        if let Some(handle) = self.handle.lock().as_ref() {
+            handle.flush();
+        }
+        if let Some(writer) = self.sidecar_file_writer.read().as_ref() {
+            let _ = writer.flush();
+        }
+    }
+
+    pub fn shutdown(&self) {
+        self.flush();
+        // 取走 LoggerHandle，drop 后自动停止日志系统
+        let _ = self.handle.lock().take();
     }
 
     pub fn writer_sidecar_log(&self, level: Level, message: &CompactString) {

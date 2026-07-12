@@ -155,6 +155,7 @@ mod app_init {
             cmd::save_proxy_head_state,
             cmd::get_proxy_head_state,
             cmd::get_clash_logs,
+            cmd::close_all_connections,
             cmd::get_verge_config,
             cmd::patch_verge_config,
             cmd::trigger_auto_select,
@@ -239,6 +240,9 @@ pub fn run() {
 
     let builder = app_init::setup_plugins(tauri::Builder::default())
         .setup(|app| {
+            // SAFETY: APP_HANDLE 是应用启动时初始化的全局单例，
+            // 仅在 setup 阶段设置一次，此时必定未被初始化，因此 expect 不会触发。
+            // 若设置失败说明存在严重的初始化顺序问题，应尽早暴露而非静默继续。
             #[allow(clippy::expect_used)]
             APP_HANDLE
                 .set(app.app_handle().clone())

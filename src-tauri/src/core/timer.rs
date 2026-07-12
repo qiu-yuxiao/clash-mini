@@ -19,6 +19,7 @@ enum TimerCommand {
     Apply(HashMap<String, u64>),
     RunNow(String),
     TaskFinished(String, bool),
+    Shutdown,
 }
 
 struct TaskState {
@@ -187,6 +188,10 @@ impl Timer {
                         Some(TimerCommand::TaskFinished(uid, success)) => {
                             Self::finish_task(&mut queue, &mut tasks, uid, success);
                         }
+                        Some(TimerCommand::Shutdown) => {
+                            logging!(info, Type::Timer, "Timer scheduler shutting down");
+                            break;
+                        }
                         None => break,
                     }
                 }
@@ -346,6 +351,11 @@ impl Timer {
 
     fn schedule_task(queue: &mut DelayQueue<String>, uid: &str, interval_minutes: u64) -> Key {
         queue.insert(String::from(uid), Self::interval_duration(interval_minutes))
+    }
+
+    pub async fn shutdown(&self) {
+        let _ = self.command_tx.send(TimerCommand::Shutdown);
+        logging!(info, Type::Timer, "Timer shutdown signal sent");
     }
 
     pub async fn get_next_update_time(&self, uid: &str) -> Option<i64> {

@@ -78,128 +78,141 @@ export async function triggerAutoSelect(
 }
 
 export async function enhanceProfiles() {
-  try {
-    const config = await getProfiles()
-    const activeUid = config.current
-    if (activeUid) {
-      const rawYaml = await readProfileFile(activeUid)
-      if (rawYaml) {
-        let doc: Record<string, unknown>
-        try {
-          const parsed = yaml.load(rawYaml)
-          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            console.warn(
-              '[ProfileTransformer] YAML 解析结果不是有效对象，跳过增强',
-            )
-            return (
-              (await invoke<ValidationOutcome>('enhance_profiles')).status ===
-              'valid'
-            )
-          }
-          doc = parsed as Record<string, unknown>
-        } catch (yamlErr) {
-          console.error('[ProfileTransformer] YAML 解析失败:', yamlErr)
-          return (
-            (await invoke<ValidationOutcome>('enhance_profiles')).status ===
-            'valid'
+  const config = await getProfiles()
+  const activeUid = config.current
+  if (activeUid) {
+    const rawYaml = await readProfileFile(activeUid)
+    if (rawYaml) {
+      let doc: Record<string, unknown>
+      try {
+        const parsed = yaml.load(rawYaml)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          console.warn(
+            '[ProfileTransformer] YAML 解析结果不是有效对象，跳过增强',
           )
-        }
-        if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
-          let modified = false
+        } else {
+          doc = parsed as Record<string, unknown>
+          if (typeof doc === 'object' && !Array.isArray(doc)) {
+            let modified = false
 
-          // 1. 提取所有原始 proxies 名字
-          const proxies = doc.proxies || []
-          const proxyNames = Array.isArray(proxies)
-            ? proxies
-                .map((p: { name?: string }) => p && p.name)
-                .filter((name): name is string => !!name)
-            : []
-
-          // 2. 提取所有的 proxy-providers 名字
-          const providers = doc['proxy-providers'] || {}
-          const providerNames =
-            providers && typeof providers === 'object'
-              ? Object.keys(providers)
+            // 1. 提取所有原始 proxies 名字
+            const proxies = doc.proxies || []
+            const proxyNames = Array.isArray(proxies)
+              ? proxies
+                  .map((p: { name?: string }) => p && p.name)
+                  .filter((name): name is string => !!name)
               : []
 
-          // 3. 判断是否需要执行过滤 (组数大于 1，或者唯一组的名字不为 PROXY，或者规则非空)
-          const groups = doc['proxy-groups'] || []
-          const hasMultipleGroups =
-            Array.isArray(groups) &&
-            (groups.length > 1 ||
-              (groups.length === 1 && groups[0].name !== 'PROXY'))
-          const hasRules = Array.isArray(doc.rules) && doc.rules.length > 0
+            // 2. 提取所有的 proxy-providers 名字
+            const providers = doc['proxy-providers'] || {}
+            const providerNames =
+              providers && typeof providers === 'object'
+                ? Object.keys(providers)
+                : []
 
-          if (hasMultipleGroups || hasRules) {
-            // 构造唯一的 PROXY 组
-            const newGroup: {
-              name: string
-              type: string
-              proxies?: string[]
-              use?: string[]
-            } = {
-              name: 'PROXY',
-              type: 'select',
+            // 3. 判断是否需要执行过滤
+            const groups = doc['proxy-groups'] || []
+            const hasMultipleGroups =
+              Array.isArray(groups) &&
+              (groups.length > 1 ||
+                (groups.length === 1 && groups[0].name !== 'PROXY'))
+            const hasRules = Array.isArray(doc.rules) && doc.rules.length > 0
+
+            if (hasMultipleGroups || hasRules) {
+              const newGroup: {
+                name: string
+                type: string
+                proxies?: string[]
+                use?: string[]
+              } = {
+                name: 'PROXY',
+                type: 'select',
+              }
+              if (proxyNames.length > 0) {
+                newGroup.proxies = proxyNames
+              }
+              if (providerNames.length > 0) {
+                newGroup.use = providerNames
+              }
+              if (proxyNames.length === 0 && providerNames.length === 0) {
+                newGroup.proxies = ['DIRECT']
+              }
+
+              doc['proxy-groups'] = [newGroup]
+              doc.rules = []
+              modified = true
             }
-            if (proxyNames.length > 0) {
-              newGroup.proxies = proxyNames
+
+            if (modified) {
+              await saveProfileFile(activeUid, yaml.dump(doc))
+              debugLog(
+                `[ProfileTransformer] Successfully cleaned up profile ${activeUid} to single PROXY group and empty rules`,
+              )
             }
-            if (providerNames.length > 0) {
-              newGroup.use = providerNames
-            }
-            if (proxyNames.length === 0 && providerNames.length === 0) {
-              newGroup.proxies = ['DIRECT']
-            }
-
-            // 只保留唯一的 PROXY 组
-            doc['proxy-groups'] = [newGroup]
-
-            // 摒弃并清空机场订阅自带的规则列表，完全托管给 Clash Mini 自身的智能路由
-            doc.rules = []
-
-            modified = true
-          }
-
-          if (modified) {
-            await saveProfileFile(activeUid, yaml.dump(doc))
-            debugLog(
-              `[ProfileTransformer] Successfully cleaned up profile ${activeUid} to single PROXY group and empty rules`,
-            )
           }
         }
+      } catch (yamlErr) {
+        console.warn('[ProfileTransformer] YAML 解析失败，将交由后端增强:', yamlErr)
       }
     }
-  } catch (err) {
-    console.error('[ProfileTransformer] Failed to clean up profile:', err)
   }
 
-  return (
-    (await invoke<ValidationOutcome>('enhance_profiles')).status === 'valid'
+  const result = await withIpcTimeout(
+    invoke<ValidationOutcome>('enhance_profiles'),
+    60_000,
+    'enhanceProfiles',
   )
+  if (result.status !== 'valid') {
+    const msg =
+      result.status === 'invalid'
+        ? result.message
+        : result.status === 'skipped'
+          ? result.reason
+          : 'enhance_profiles failed'
+    throw new Error(msg)
+  }
+  return true
 }
 
 export async function patchProfilesConfig(profiles: IProfilesConfig) {
   return (
-    (await invoke<ValidationOutcome>('patch_profiles_config', { profiles }))
-      .status === 'valid'
+    (
+      await withIpcTimeout(
+        invoke<ValidationOutcome>('patch_profiles_config', { profiles }),
+        30_000,
+        'patchProfilesConfig',
+      )
+    ).status === 'valid'
   )
 }
 
 export async function viewProfile(index: string) {
-  return invoke<void>('view_profile', { index })
+  return withIpcTimeout(
+    invoke<void>('view_profile', { index }),
+    30_000,
+    'viewProfile',
+  )
 }
 
 export async function readProfileFile(index: string) {
-  return invoke<string>('read_profile_file', { index })
+  return withIpcTimeout(
+    invoke<string>('read_profile_file', { index }),
+    10_000,
+    'readProfileFile',
+  )
 }
 
 export async function saveProfileFile(index: string, fileData: string) {
   return (
     (
-      await invoke<ValidationOutcome>('save_profile_file', {
-        index,
-        fileData,
-      })
+      await withIpcTimeout(
+        invoke<ValidationOutcome>('save_profile_file', {
+          index,
+          fileData,
+        }),
+        30_000,
+        'saveProfileFile',
+      )
     ).status === 'valid'
   )
 }
@@ -216,43 +229,75 @@ export async function importProfile(url: string, option?: IProfileOption) {
 }
 
 export async function updateProfile(index: string, option?: IProfileOption) {
-  return invoke<void>('update_profile', { index, option })
+  return withIpcTimeout(
+    invoke<void>('update_profile', { index, option }),
+    30_000,
+    'updateProfile',
+  )
 }
 
 export async function deleteProfile(index: string) {
-  return invoke<void>('delete_profile', { index })
+  return withIpcTimeout(
+    invoke<void>('delete_profile', { index }),
+    30_000,
+    'deleteProfile',
+  )
 }
 
 export async function patchProfile(
   index: string,
   profile: Partial<IProfileItem>,
 ) {
-  return invoke<void>('patch_profile', { index, profile })
+  return withIpcTimeout(
+    invoke<void>('patch_profile', { index, profile }),
+    30_000,
+    'patchProfile',
+  )
 }
 
 export async function getClashInfo() {
-  return invoke<IClashInfo | null>('get_clash_info')
+  return withIpcTimeout(
+    invoke<IClashInfo | null>('get_clash_info'),
+    10_000,
+    'getClashInfo',
+  )
 }
 
 // Get runtime config which controlled by verge
 export async function getRuntimeConfig() {
-  return invoke<IConfigData | null>('get_runtime_config')
+  return withIpcTimeout(
+    invoke<IConfigData | null>('get_runtime_config'),
+    10_000,
+    'getRuntimeConfig',
+  )
 }
 
 export async function updateProxyChainConfigInRuntime(
   proxyChainConfig: unknown,
 ) {
-  return invoke<void>('update_proxy_chain_config_in_runtime', {
-    proxyChainConfig,
-  })
+  return withIpcTimeout(
+    invoke<void>('update_proxy_chain_config_in_runtime', {
+      proxyChainConfig,
+    }),
+    30_000,
+    'updateProxyChainConfigInRuntime',
+  )
 }
 
 export async function patchClashConfig(payload: Partial<IConfigData>) {
-  return invoke<void>('patch_clash_config', { payload })
+  return withIpcTimeout(
+    invoke<void>('patch_clash_config', { payload }),
+    30_000,
+    'patchClashConfig',
+  )
 }
 
 export async function patchClashMode(payload: string) {
-  return invoke<void>('patch_clash_mode', { payload })
+  return withIpcTimeout(
+    invoke<void>('patch_clash_mode', { payload }),
+    30_000,
+    'patchClashMode',
+  )
 }
 
 export async function calcuProxies(): Promise<{
@@ -432,7 +477,11 @@ export async function calcuProxyProviders() {
 export async function getClashLogs() {
   const regex = /time="(.+?)"\s+level=(.+?)\s+msg="(.+?)"/
   const newRegex = /(.+?)\s+(.+?)\s+(.+)/
-  const logs = await invoke<string[]>('get_clash_logs')
+  const logs = await withIpcTimeout(
+    invoke<string[]>('get_clash_logs'),
+    10_000,
+    'getClashLogs',
+  )
 
   return (logs ?? []).reduce<ILogItem[]>((acc, log) => {
     const result = log.match(regex)
@@ -453,7 +502,11 @@ export async function getClashLogs() {
 }
 
 export async function getVergeConfig() {
-  return invoke<IVergeConfig>('get_verge_config')
+  return withIpcTimeout(
+    invoke<IVergeConfig>('get_verge_config'),
+    10_000,
+    'getVergeConfig',
+  )
 }
 
 export async function patchVergeConfig(payload: IVergeConfig) {
@@ -465,20 +518,28 @@ export async function patchVergeConfig(payload: IVergeConfig) {
 }
 
 export async function getSystemProxy() {
-  return invoke<{
-    enable: boolean
-    server: string
-    bypass: string
-  }>('get_sys_proxy')
+  return withIpcTimeout(
+    invoke<{
+      enable: boolean
+      server: string
+      bypass: string
+    }>('get_sys_proxy'),
+    10_000,
+    'getSystemProxy',
+  )
 }
 
 export async function getAutoProxy() {
   try {
     debugLog('[API] 开始调用 get_auto_proxy')
-    const result = await invoke<{
-      enable: boolean
-      url: string
-    }>('get_auto_proxy')
+    const result = await withIpcTimeout(
+      invoke<{
+        enable: boolean
+        url: string
+      }>('get_auto_proxy'),
+      10_000,
+      'getAutoProxy',
+    )
     debugLog('[API] get_auto_proxy 调用成功:', result)
     return result
   } catch (error) {
@@ -491,43 +552,79 @@ export async function getAutoProxy() {
 }
 
 export async function restartCore() {
-  return invoke<void>('restart_core')
+  return withIpcTimeout(
+    invoke<void>('restart_core'),
+    60_000,
+    'restartCore',
+  )
 }
 
 export async function openCoreDir() {
-  return invoke<void>('open_core_dir').catch((err) => showNotice.error(err))
+  return withIpcTimeout(
+    invoke<void>('open_core_dir'),
+    30_000,
+    'openCoreDir',
+  ).catch((err) => showNotice.error(err))
 }
 
 export async function openLogsDir() {
-  return invoke<void>('open_logs_dir').catch((err) => showNotice.error(err))
+  return withIpcTimeout(
+    invoke<void>('open_logs_dir'),
+    30_000,
+    'openLogsDir',
+  ).catch((err) => showNotice.error(err))
 }
 
 export async function openDevTools() {
-  return invoke('open_devtools')
+  return withIpcTimeout(
+    invoke('open_devtools'),
+    10_000,
+    'openDevTools',
+  )
 }
 
 export async function downloadIconCache(url: string, name: string) {
-  return invoke<string>('download_icon_cache', { url, name })
+  return withIpcTimeout(
+    invoke<string>('download_icon_cache', { url, name }),
+    30_000,
+    'downloadIconCache',
+  )
 }
 
 // 获取当前运行模式
 export const getRunningMode = async () => {
-  return invoke<string>('get_running_mode')
+  return withIpcTimeout(
+    invoke<string>('get_running_mode'),
+    10_000,
+    'getRunningMode',
+  )
 }
 
 // 获取应用运行时间
 export const getAppUptime = async () => {
-  return invoke<number>('get_app_uptime')
+  return withIpcTimeout(
+    invoke<number>('get_app_uptime'),
+    10_000,
+    'getAppUptime',
+  )
 }
 
 // 安装系统服务
 export const installService = async () => {
-  return invoke<void>('install_service')
+  return withIpcTimeout(
+    invoke<void>('install_service'),
+    60_000,
+    'installService',
+  )
 }
 
 // 卸载系统服务
 export const uninstallService = async () => {
-  return invoke<void>('uninstall_service')
+  return withIpcTimeout(
+    invoke<void>('uninstall_service'),
+    60_000,
+    'uninstallService',
+  )
 }
 
 // 重装系统服务
@@ -537,7 +634,11 @@ export const uninstallService = async () => {
 // 系统服务是否可用
 export const isServiceAvailable = async () => {
   try {
-    return await invoke<boolean>('is_service_available')
+    return await withIpcTimeout(
+      invoke<boolean>('is_service_available'),
+      10_000,
+      'isServiceAvailable',
+    )
   } catch (error) {
     console.error('Service check failed:', error)
     return false
@@ -546,7 +647,11 @@ export const isServiceAvailable = async () => {
 
 export const isAdmin = async () => {
   try {
-    return await invoke<boolean>('app_is_admin')
+    return await withIpcTimeout(
+      invoke<boolean>('app_is_admin'),
+      10_000,
+      'isAdmin',
+    )
   } catch (error) {
     console.error('检查管理员权限失败:', error)
     return false
@@ -555,7 +660,11 @@ export const isAdmin = async () => {
 
 export const isPortInUse = async (port: number) => {
   try {
-    return await invoke<boolean>('is_port_in_use', { port })
+    return await withIpcTimeout(
+      invoke<boolean>('is_port_in_use', { port }),
+      10_000,
+      'isPortInUse',
+    )
   } catch (error) {
     console.error('检查端口使用状态失败:', error)
     return false
@@ -563,5 +672,9 @@ export const isPortInUse = async (port: number) => {
 }
 
 export async function getProxyAddr(name: string, provider?: string) {
-  return invoke<[string, number] | null>('get_proxy_addr', { name, provider })
+  return withIpcTimeout(
+    invoke<[string, number] | null>('get_proxy_addr', { name, provider }),
+    10_000,
+    'getProxyAddr',
+  )
 }

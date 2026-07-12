@@ -38,6 +38,8 @@ type ShowNotice = ((
 
 type NoticeSubscriber = () => void
 
+const MAX_NOTICES = 50
+
 const DEFAULT_DURATIONS: Readonly<Record<NoticeType, number>> = {
   success: 3000,
   info: 5000,
@@ -312,6 +314,17 @@ const baseShowNotice = (
     normalizedMessage,
     timerId,
   )
+
+  if (notices.length >= MAX_NOTICES) {
+    const overflow = notices.length - MAX_NOTICES + 1
+    for (let i = 0; i < overflow; i++) {
+      const oldest = notices[i]
+      if (oldest?.timerId) {
+        clearTimeout(oldest.timerId)
+      }
+    }
+    notices = notices.slice(overflow)
+  }
 
   notices = [...notices, notice]
   notifySubscribers()

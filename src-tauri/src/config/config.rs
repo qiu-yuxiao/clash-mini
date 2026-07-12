@@ -23,6 +23,34 @@ use std::{collections::HashSet, path::PathBuf};
 use tokio::sync::OnceCell;
 use tokio::time::sleep;
 
+// TODO(config-version): 配置文件目前缺少版本号管理，未来应添加 config_version 字段
+//
+// 背景与问题：
+// - 当前 IClashTemp / IVerge / IProfiles 等配置结构体直接序列化到 YAML 文件
+// - 当配置格式发生破坏性变更（字段重命名、类型变更、结构调整）时，
+//   旧版本配置文件可能导致反序列化失败或数据丢失
+// - 无法判断用户配置来自哪个版本，难以做定向迁移
+//
+// 改进方案：
+// 1. 在各配置顶层添加 config_version: u32 字段（如 verge.yaml / profiles.yaml）
+// 2. 定义当前最新版本号常量（如 const CURRENT_CONFIG_VERSION: u32 = 2）
+// 3. 读取配置时：
+//    - 若 version 缺失，视为版本 1（旧版），执行迁移逻辑
+//    - 若 version < CURRENT_VERSION，按版本号逐步执行迁移函数
+//    - 若 version > CURRENT_VERSION，发出警告但尽量兼容读取
+// 4. 保存配置时，始终写入当前最新版本号
+// 5. 迁移函数应纯函数化，便于单元测试
+//
+// 迁移场景示例：
+// - 字段重命名：enable_auto_launch -> auto_launch
+// - 类型变更：theme_mode: String -> enum ThemeMode
+// - 结构调整：扁平配置 -> 嵌套配置分组
+// - 默认值变化：旧版本用户的配置需要显式设置旧默认值
+//
+// 风险与注意事项：
+// - 迁移失败时应有降级策略（使用默认配置 + 备份原文件）
+// - 迁移前应自动备份原配置文件（如 verge.yaml.bak.v1）
+// - 版本号应独立于应用版本号，仅在配置格式变更时递增
 pub struct Config {
     clash_config: Draft<IClashTemp>,
     verge_config: Draft<IVerge>,

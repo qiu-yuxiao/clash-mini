@@ -12,10 +12,22 @@ static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
 /// 全局持有的正在运行的任务句柄，用于在 Profile 切换时进行主动中止
 static ACTIVE_TASKS: Mutex<Vec<AbortHandle>> = Mutex::new(Vec::new());
 
+/// 后台 monitor 任务的 JoinHandle，用于退出时主动中止
+static MONITOR_TASK_HANDLE: Mutex<Option<tauri::async_runtime::JoinHandle<()>>> = Mutex::new(None);
+
 /// 中止所有活跃的测速任务（应用退出/重启时调用）
 pub fn abort_all_active_tasks() {
     let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
     for handle in active.drain(..) {
+        handle.abort();
+    }
+    // 短暂等待，确保任务退出
+    std::thread::sleep(std::time::Duration::from_millis(50));
+}
+
+/// 中止后台 monitor 常驻任务
+pub fn abort_monitor() {
+    if let Some(handle) = MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()).take() {
         handle.abort();
     }
 }
@@ -572,7 +584,7 @@ async fn get_active_node_name() -> Option<String> {
 
 /// 启动全局后台节点监测常驻线程
 pub fn start_background_monitor() {
-    AsyncHandler::spawn(move || async move {
+    let handle = AsyncHandler::spawn(move || async move {
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
         let mut last_check_time = Instant::now();
         let mut consecutive_fails = 0;
@@ -854,4 +866,6 @@ pub fn start_background_monitor() {
             }
         }
     });
+
+    *MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
 }

@@ -13,7 +13,7 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material'
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useIconCache } from '@/hooks/use-icon-cache'
@@ -40,7 +40,7 @@ interface RenderProps {
   ) => void
 }
 
-export const ProxyRender = (props: RenderProps) => {
+const ProxyRenderComponent = (props: RenderProps) => {
   const { t } = useTranslation()
   const {
     indent,
@@ -250,6 +250,8 @@ export const ProxyRender = (props: RenderProps) => {
 
   return null
 }
+
+export const ProxyRender = memo(ProxyRenderComponent)
 
 const StyledPrimary = styled('span')`
   font-size: 16px;

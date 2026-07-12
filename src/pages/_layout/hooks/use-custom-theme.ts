@@ -99,6 +99,21 @@ ${css}
 
 /**
  * custom theme
+ * 
+ * Known issue: Theme switching may cause brief white screen/flicker.
+ * 
+ * Root cause:
+ * - Theme changes trigger MUI theme recreation and CSS variable updates
+ * - Some browsers may repaint before all CSS variables are applied
+ * - Background image and transparency settings add complexity
+ * 
+ * Future improvement directions:
+ * 1. Use CSS variable transitions: Add transition property to CSS variables
+ *    for smooth color changes (e.g., `transition: background-color 0.2s ease`)
+ * 2. Pre-calculate both themes and toggle via a single class name
+ * 3. Use view-transition API for theme transitions (Chrome 111+)
+ * 4. Ensure all theme-dependent styles use CSS variables instead of inline styles
+ * 5. Consider using `color-scheme` CSS property for native OS theme support
  */
 export const useCustomTheme = () => {
   const appWindow: WebviewWindow = useMemo(() => getCurrentWebviewWindow(), [])

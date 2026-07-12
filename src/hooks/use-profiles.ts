@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useLockFn } from 'ahooks'
 import { useCallback } from 'react'
 
 import {
@@ -40,7 +41,7 @@ export const useProfiles = () => {
     await refetch()
   }, [refetch])
 
-  const patchProfiles = useCallback(async (
+  const patchProfiles = useLockFn(async (
     value: Partial<IProfilesConfig>,
     signal?: AbortSignal,
     options?: { deferRefreshOnSuccess?: boolean },
@@ -68,16 +69,16 @@ export const useProfiles = () => {
       await mutateProfiles()
       throw error
     }
-  }, [mutateProfiles])
+  })
 
-  const patchCurrent = useCallback(async (value: Partial<IProfileItem>) => {
+  const patchCurrent = useLockFn(async (value: Partial<IProfileItem>) => {
     if (profiles?.current) {
       await patchProfile(profiles.current, value)
       if (!value.selected) {
-        mutateProfiles()
+        await mutateProfiles()
       }
     }
-  }, [profiles, mutateProfiles])
+  })
 
   // 根据selected的节点选择
   const activateSelected = useCallback(
