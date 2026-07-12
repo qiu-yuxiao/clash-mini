@@ -396,7 +396,7 @@ impl IVerge {
             // enable_tray_icon: Some(true),
             tray_proxy_groups_display_mode: Some("default".into()),
             tray_inline_outbound_modes: Some(false),
-            enable_global_hotkey: Some(true),
+            enable_global_hotkey: Some(false),
             enable_always_on_top: Some(false),
             enable_auto_light_weight_mode: Some(true),
             auto_light_weight_minutes: Some(5),

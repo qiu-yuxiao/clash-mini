@@ -34,6 +34,9 @@ pub enum ServiceStatus {
 }
 
 pub struct ServiceManager {
+    // 【注意】此处使用 parking_lot::Mutex，而 monitor.rs 中使用 std::sync::Mutex
+    // 两种 Mutex 都是正确的，仅风格不一致。若后续统一，建议全部使用 parking_lot::Mutex
+    // （性能更优且无需 unwrap 处理 poison error）
     status: Mutex<ServiceStatus>,
     operation_running: AtomicBool,
     operation_done: Notify,
@@ -436,6 +439,9 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
     // 先清理前次会话可能残留的旧内核（崩溃退出时 clean_async 未执行）
     let _ = clash_verge_service_ipc::stop_clash().await;
 
+    // stop 后短暂等待，确保端口完全释放，避免 start 时端口冲突
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
     let response = clash_verge_service_ipc::start_clash(&payload)
         .await
         .context("无法连接到Clash Verge Service")?;
@@ -583,19 +589,22 @@ impl ServiceManager {
     }
 
     async fn run_operation(&self, operation: impl Future<Output = Result<()>>) -> Result<()> {
-        {
-            if self.operation_running.swap(true, Ordering::AcqRel) {
-                bail!("service operation already running");
-            }
-            defer! {
-                self.operation_running.store(false, Ordering::Release);
-                self.operation_done.notify_waiters();
-            }
-
-            operation.await?;
+        if self.operation_running.swap(true, Ordering::AcqRel) {
+            bail!("service operation already running");
+        }
+        defer! {
+            self.operation_running.store(false, Ordering::Release);
+            self.operation_done.notify_one();
         }
 
-        Tray::global().update_menu().await
+        operation.await?;
+
+        // 在释放 operation_running 锁之前更新菜单，避免 current() 返回旧状态
+        // 注意：update_menu 可能耗时，但 operation_running 是互斥操作锁，
+        // 持锁期间更新菜单可以保证状态一致性
+        let _ = Tray::global().update_menu().await;
+
+        Ok(())
     }
 
     pub async fn refresh(&self) -> Result<()> {
@@ -642,17 +651,17 @@ impl ServiceManager {
             ServiceStatus::Ready => logging!(info, Type::Service, "服务就绪，直接启动"),
             ServiceStatus::StartRequired => {
                 logging!(info, Type::Service, "执行启动服务流程");
-                run_service_command(start_service, "start service")?;
+                run_service_command(start_service, "start service").await?;
                 wait_for_service_ipc(self).await?;
             }
             ServiceStatus::ReinstallRequired => {
                 logging!(info, Type::Service, "服务需要重装，执行重装流程");
-                run_service_command(reinstall_service, "reinstall service")?;
+                run_service_command(reinstall_service, "reinstall service").await?;
                 wait_for_service_ipc(self).await?;
             }
             ServiceStatus::ForceReinstallRequired => {
                 logging!(info, Type::Service, "服务需要强制重装，执行强制重装流程");
-                run_service_command(force_reinstall_service, "force reinstall service")?;
+                run_service_command(force_reinstall_service, "force reinstall service").await?;
                 wait_for_service_ipc(self).await?;
             }
             ServiceStatus::InstallRequired => {
@@ -661,17 +670,17 @@ impl ServiceManager {
                     if is_service_installed() {
                         logging!(info, Type::Service, "服务已安装但未运行，转换为启动服务");
                         self.set_status(ServiceStatus::StartRequired);
-                        run_service_command(start_service, "start service")?;
+                        run_service_command(start_service, "start service").await?;
                         return wait_for_service_ipc(self).await;
                     }
                 }
                 logging!(info, Type::Service, "需要安装服务，执行安装流程");
-                run_service_command(install_service, "install service")?;
+                run_service_command(install_service, "install service").await?;
                 wait_for_service_ipc(self).await?;
             }
             ServiceStatus::UninstallRequired => {
                 logging!(info, Type::Service, "服务需要卸载，执行卸载流程");
-                run_service_command(uninstall_service, "uninstall service")?;
+                run_service_command(uninstall_service, "uninstall service").await?;
                 self.set_status(ServiceStatus::Unavailable("Service Uninstalled".into()));
             }
             ServiceStatus::Unavailable(reason) => {
@@ -684,8 +693,11 @@ impl ServiceManager {
     }
 }
 
-fn run_service_command(operation: impl FnOnce() -> Result<()>, label: &'static str) -> Result<()> {
-    tokio::task::block_in_place(operation).with_context(|| format!("{label} failed"))
+async fn run_service_command(operation: impl FnOnce() -> Result<()> + Send + 'static, label: &'static str) -> Result<()> {
+    tokio::task::spawn_blocking(operation)
+        .await
+        .unwrap_or_else(|e| Err(anyhow::anyhow!("spawn_blocking join error: {e}")))
+        .with_context(|| format!("{label} failed"))
 }
 
 pub static SERVICE_MANAGER: Lazy<ServiceManager> = Lazy::new(|| ServiceManager {

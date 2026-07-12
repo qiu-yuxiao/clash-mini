@@ -7,6 +7,17 @@ import {
 } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
+let mergeFileLock = Promise.resolve()
+
+async function withMergeFileLock<T>(fn: () => Promise<T>): Promise<T> {
+  const result = mergeFileLock.then(() => fn())
+  mergeFileLock = result.then(
+    () => {},
+    () => {},
+  )
+  return result
+}
+
 // 核心功能：添加快捷分流规则到全局 Merge 的 prepend-rules 中 (置顶生效)
 export const addQuickRoutingRule = async (
   type: 'process' | 'domain',
@@ -56,37 +67,39 @@ export const addQuickRoutingRule = async (
       }
     }
 
-    // 3. 读取全局 Merge 配置文件
-    let mergeYaml = ''
-    try {
-      mergeYaml = await readProfileFile('Merge')
-    } catch (readErr) {
-      console.warn(
-        'Global Merge file not found or failed to read, initializing empty merge:',
-        readErr,
+    await withMergeFileLock(async () => {
+      // 3. 读取全局 Merge 配置文件
+      let mergeYaml = ''
+      try {
+        mergeYaml = await readProfileFile('Merge')
+      } catch (readErr) {
+        console.warn(
+          'Global Merge file not found or failed to read, initializing empty merge:',
+          readErr,
+        )
+        mergeYaml = '{}'
+      }
+      const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
+
+      // 4. 确保 prepend-rules 数组存在
+      mergeObj['prepend-rules'] = mergeObj['prepend-rules'] || []
+
+      // 5. 过滤掉已有的相同属性规则（去重并置顶）
+      const matchPrefix =
+        type === 'process'
+          ? `PROCESS-NAME,${value},`
+          : `DOMAIN-SUFFIX,${domainSuffix},`
+
+      const filteredRules = (mergeObj['prepend-rules'] as string[]).filter(
+        (rule) => !rule.startsWith(matchPrefix) && rule !== newRule,
       )
-      mergeYaml = '{}'
-    }
-    const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
 
-    // 4. 确保 prepend-rules 数组存在
-    mergeObj['prepend-rules'] = mergeObj['prepend-rules'] || []
+      // 置顶写入规则
+      mergeObj['prepend-rules'] = [newRule, ...filteredRules]
 
-    // 5. 过滤掉已有的相同属性规则（去重并置顶）
-    const matchPrefix =
-      type === 'process'
-        ? `PROCESS-NAME,${value},`
-        : `DOMAIN-SUFFIX,${domainSuffix},`
-
-    const filteredRules = (mergeObj['prepend-rules'] as string[]).filter(
-      (rule) => !rule.startsWith(matchPrefix) && rule !== newRule,
-    )
-
-    // 置顶写入规则
-    mergeObj['prepend-rules'] = [newRule, ...filteredRules]
-
-    // 6. 保存并生效
-    await saveProfileFile('Merge', yaml.dump(mergeObj))
+      // 6. 保存
+      await saveProfileFile('Merge', yaml.dump(mergeObj))
+    })
     await enhanceProfiles()
 
     showNotice.success(
@@ -118,37 +131,47 @@ export const addQuickRoutingRules = async (rawText: string): Promise<number> => 
 
     if (rules.length === 0) return 0
 
-    let mergeYaml = ''
-    try {
-      mergeYaml = await readProfileFile('Merge')
-    } catch (readErr) {
-      console.warn(
-        'Global Merge file not found or failed to read, initializing empty merge:',
-        readErr,
-      )
-      mergeYaml = '{}'
-    }
-    const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
-
-    const existing: string[] = Array.isArray(mergeObj['prepend-rules'])
-      ? (mergeObj['prepend-rules'] as string[])
-      : []
-    const added: string[] = []
-    for (const rule of rules) {
-      if (!existing.includes(rule) && !added.includes(rule)) {
-        added.push(rule)
+    let addedCount = 0
+    await withMergeFileLock(async () => {
+      let mergeYaml = ''
+      try {
+        mergeYaml = await readProfileFile('Merge')
+      } catch (readErr) {
+        console.warn(
+          'Global Merge file not found or failed to read, initializing empty merge:',
+          readErr,
+        )
+        mergeYaml = '{}'
       }
-    }
+      const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
 
-    if (added.length === 0) return 0
+      const existing: string[] = Array.isArray(mergeObj['prepend-rules'])
+        ? (mergeObj['prepend-rules'] as string[])
+        : []
+      const added: string[] = []
+      for (const rule of rules) {
+        if (!existing.includes(rule) && !added.includes(rule)) {
+          added.push(rule)
+        }
+      }
 
-    // 手动添加的网址置顶，压过 GFWList 与 MATCH。
-    mergeObj['prepend-rules'] = [...added, ...existing]
+      if (added.length === 0) {
+        return
+      }
 
-    await saveProfileFile('Merge', yaml.dump(mergeObj))
+      addedCount = added.length
+
+      // 手动添加的网址置顶，压过 GFWList 与 MATCH。
+      mergeObj['prepend-rules'] = [...added, ...existing]
+
+      await saveProfileFile('Merge', yaml.dump(mergeObj))
+    })
+
+    if (addedCount === 0) return 0
+
     await enhanceProfiles()
 
-    return added.length
+    return addedCount
   } catch (e: any) {
     console.error('Failed to add bulk routing rules:', e)
     showNotice.error(e.message || String(e))

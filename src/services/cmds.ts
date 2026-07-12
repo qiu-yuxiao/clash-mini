@@ -3,6 +3,34 @@ import dayjs from 'dayjs'
 import yaml from 'js-yaml'
 
 import { showNotice } from '@/services/notice-service'
+
+/**
+ * H-17: IPC 超时包装工具函数
+ * 对关键 IPC 调用包裹超时保护，防止后端卡住时前端 Promise 永远 pending。
+ * 超时后 reject 并附带超时信息，便于调用方统一 catch 处理。
+ */
+export function withIpcTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label = 'IPC',
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} 超时（${ms}ms）`)),
+      ms,
+    )
+    promise.then(
+      (val) => {
+        clearTimeout(timer)
+        resolve(val)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
+}
 import type {
   IConfigData,
   IProxyItem,
@@ -21,7 +49,11 @@ import { isDummyNode } from '@/utils/node'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
 export async function getProfiles() {
-  return invoke<IProfilesConfig>('get_profiles')
+  return withIpcTimeout(
+    invoke<IProfilesConfig>('get_profiles'),
+    30_000,
+    'getProfiles',
+  )
 }
 
 export async function triggerAutoSelect(
@@ -30,12 +62,16 @@ export async function triggerAutoSelect(
   sortType?: number,
   select?: boolean,
 ): Promise<Array<[string, number]>> {
-  return invoke<Array<[string, number]>>('trigger_auto_select', {
-    profileUid,
-    nodeNames: nodeNames ?? null,
-    sortType: sortType ?? 0,
-    select: select ?? true,
-  })
+  return withIpcTimeout(
+    invoke<Array<[string, number]>>('trigger_auto_select', {
+      profileUid,
+      nodeNames: nodeNames ?? null,
+      sortType: sortType ?? 0,
+      select: select ?? true,
+    }),
+    60_000,
+    'triggerAutoSelect',
+  )
 }
 
 export async function enhanceProfiles() {
@@ -45,7 +81,24 @@ export async function enhanceProfiles() {
     if (activeUid) {
       const rawYaml = await readProfileFile(activeUid)
       if (rawYaml) {
-        const doc = yaml.load(rawYaml) as Record<string, unknown>
+        let doc: Record<string, unknown>
+        try {
+          const parsed = yaml.load(rawYaml)
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            console.warn('[ProfileTransformer] YAML 解析结果不是有效对象，跳过增强')
+            return (
+              (await invoke<ValidationOutcome>('enhance_profiles')).status ===
+              'valid'
+            )
+          }
+          doc = parsed as Record<string, unknown>
+        } catch (yamlErr) {
+          console.error('[ProfileTransformer] YAML 解析失败:', yamlErr)
+          return (
+            (await invoke<ValidationOutcome>('enhance_profiles')).status ===
+            'valid'
+          )
+        }
         if (doc && typeof doc === 'object' && !Array.isArray(doc)) {
           let modified = false
 
@@ -147,10 +200,14 @@ export async function saveProfileFile(index: string, fileData: string) {
 }
 
 export async function importProfile(url: string, option?: IProfileOption) {
-  return invoke<void>('import_profile', {
-    url,
-    option: option || { with_proxy: true },
-  })
+  return withIpcTimeout(
+    invoke<void>('import_profile', {
+      url,
+      option: option || { with_proxy: true },
+    }),
+    60_000,
+    'importProfile',
+  )
 }
 
 export async function updateProfile(index: string, option?: IProfileOption) {
@@ -200,31 +257,126 @@ export async function calcuProxies(): Promise<{
   records: Record<string, IProxyItem>
   proxies: IProxyItem[]
 }> {
-  const [proxyResponse, providerResponse] = await Promise.all([
-    getProxies(),
-    calcuProxyProviders(),
-  ])
+  // L-26: 包裹 try-catch，防止计算异常导致后续逻辑中断
+  try {
+    const [proxyResponse, providerResponse] = await Promise.all([
+      getProxies(),
+      calcuProxyProviders(),
+    ])
 
-  const proxyRecord = proxyResponse?.proxies ?? {}
-  const providerRecord = providerResponse ?? {}
+    const proxyRecord = proxyResponse?.proxies ?? {}
+    const providerRecord = providerResponse ?? {}
 
-  // provider name map
-  const providerMap = Object.fromEntries(
-    Object.entries(providerRecord).flatMap(([provider, item]) =>
-      (item?.proxies ?? []).map((p: IProxyItem) => [
-        p.name,
-        { ...p, provider },
-      ]),
-    ),
-  )
+    // provider name map
+    const providerMap = Object.fromEntries(
+      Object.entries(providerRecord).flatMap(([provider, item]) =>
+        (item?.proxies ?? []).map((p: IProxyItem) => [
+          p.name,
+          { ...p, provider },
+        ]),
+      ),
+    )
 
-  // compatible with proxy-providers
-  const generateItem = (name: string) => {
-    if (proxyRecord[name]) return proxyRecord[name]
-    if (providerMap[name]) return providerMap[name]
+    // compatible with proxy-providers
+    const generateItem = (name: string) => {
+      if (proxyRecord[name]) return proxyRecord[name]
+      if (providerMap[name]) return providerMap[name]
+      return {
+        name,
+        type: 'unknown',
+        udp: false,
+        xudp: false,
+        tfo: false,
+        mptcp: false,
+        smux: false,
+        history: [],
+      }
+    }
+
+    const { GLOBAL: global, DIRECT: direct, REJECT: reject } = proxyRecord
+
+    let groups: IProxyGroupItem[] = Object.values(proxyRecord).reduce<
+      IProxyGroupItem[]
+    >((acc, each) => {
+      if (each?.name !== 'GLOBAL' && each?.all) {
+        acc.push({
+          ...each,
+          all: (each.all ?? [])
+            .map((item) => generateItem(item))
+            .filter((item) => item?.name && !isDummyNode(item.name)),
+        })
+      }
+
+      return acc
+    }, [])
+
+    if (global?.all) {
+      const globalGroups: IProxyGroupItem[] = global.all.reduce<
+        IProxyGroupItem[]
+      >((acc, name) => {
+        if (proxyRecord[name]?.all) {
+          acc.push({
+            ...proxyRecord[name],
+            all: (proxyRecord[name].all ?? [])
+              .map((item) => generateItem(item))
+              .filter((item) => item?.name && !isDummyNode(item.name)),
+          })
+        }
+        return acc
+      }, [])
+
+      const globalNames = new Set(globalGroups.map((each) => each.name))
+      groups = groups
+        .filter((group) => {
+          return !globalNames.has(group.name)
+        })
+        .concat(globalGroups)
+    }
+
+    const proxies = [direct, reject]
+      .filter(Boolean)
+      .concat(
+        Object.values(proxyRecord).filter(
+          (p) =>
+            !p?.all?.length &&
+            p?.name !== 'DIRECT' &&
+            p?.name !== 'REJECT' &&
+            p?.name &&
+            !isDummyNode(p.name),
+        ),
+      )
+
+    const _global = {
+      ...global,
+      all: (global?.all?.map((item) => generateItem(item)) || []).filter(
+        (item) => item?.name && !isDummyNode(item.name),
+      ),
+    }
+
     return {
-      name,
-      type: 'unknown',
+      global: _global as IProxyGroupItem,
+      direct: direct as IProxyItem,
+      groups,
+      records: proxyRecord as Record<string, IProxyItem>,
+      proxies: (proxies as IProxyItem[]) ?? [],
+    }
+  } catch (error) {
+    console.error('[cmds] calcuProxies 计算失败:', error)
+    // 返回空结构，避免调用方崩溃
+    const emptyGroup: IProxyGroupItem = {
+      name: 'GLOBAL',
+      type: 'select',
+      udp: false,
+      xudp: false,
+      tfo: false,
+      mptcp: false,
+      smux: false,
+      history: [],
+      all: [],
+    }
+    const direct: IProxyItem = {
+      name: 'DIRECT',
+      type: 'direct',
       udp: false,
       xudp: false,
       tfo: false,
@@ -232,74 +384,13 @@ export async function calcuProxies(): Promise<{
       smux: false,
       history: [],
     }
-  }
-
-  const { GLOBAL: global, DIRECT: direct, REJECT: reject } = proxyRecord
-
-  let groups: IProxyGroupItem[] = Object.values(proxyRecord).reduce<
-    IProxyGroupItem[]
-  >((acc, each) => {
-    if (each?.name !== 'GLOBAL' && each?.all) {
-      acc.push({
-        ...each,
-        all: (each.all ?? [])
-          .map((item) => generateItem(item))
-          .filter((item) => item?.name && !isDummyNode(item.name)),
-      })
+    return {
+      global: emptyGroup,
+      direct,
+      groups: [],
+      records: {},
+      proxies: [],
     }
-
-    return acc
-  }, [])
-
-  if (global?.all) {
-    const globalGroups: IProxyGroupItem[] = global.all.reduce<
-      IProxyGroupItem[]
-    >((acc, name) => {
-      if (proxyRecord[name]?.all) {
-        acc.push({
-          ...proxyRecord[name],
-          all: (proxyRecord[name].all ?? [])
-            .map((item) => generateItem(item))
-            .filter((item) => item?.name && !isDummyNode(item.name)),
-        })
-      }
-      return acc
-    }, [])
-
-    const globalNames = new Set(globalGroups.map((each) => each.name))
-    groups = groups
-      .filter((group) => {
-        return !globalNames.has(group.name)
-      })
-      .concat(globalGroups)
-  }
-
-  const proxies = [direct, reject]
-    .filter(Boolean)
-    .concat(
-      Object.values(proxyRecord).filter(
-        (p) =>
-          !p?.all?.length &&
-          p?.name !== 'DIRECT' &&
-          p?.name !== 'REJECT' &&
-          p?.name &&
-          !isDummyNode(p.name),
-      ),
-    )
-
-  const _global = {
-    ...global,
-    all: (global?.all?.map((item) => generateItem(item)) || []).filter(
-      (item) => item?.name && !isDummyNode(item.name),
-    ),
-  }
-
-  return {
-    global: _global as IProxyGroupItem,
-    direct: direct as IProxyItem,
-    groups,
-    records: proxyRecord as Record<string, IProxyItem>,
-    proxies: (proxies as IProxyItem[]) ?? [],
   }
 }
 
@@ -361,7 +452,11 @@ export async function getVergeConfig() {
 }
 
 export async function patchVergeConfig(payload: IVergeConfig) {
-  return invoke<void>('patch_verge_config', { payload })
+  return withIpcTimeout(
+    invoke<void>('patch_verge_config', { payload }),
+    30_000,
+    'patchVergeConfig',
+  )
 }
 
 export async function getSystemProxy() {

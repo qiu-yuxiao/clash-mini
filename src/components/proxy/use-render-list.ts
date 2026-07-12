@@ -105,6 +105,9 @@ export const useRenderList = (
   const col = useMemo(() => calculateColumns(width), [width])
 
   // 确保代理数据加载
+  // L-19: 限制 refreshProxy 最大重试次数（10次），防止无限轮询
+  const refreshRetryCountRef = useRef(0)
+  const MAX_REFRESH_RETRIES = 10
   useEffect(() => {
     if (!proxiesData) return
     const { groups, proxies } = proxiesData
@@ -113,8 +116,16 @@ export const useRenderList = (
       (mode === 'rule' && !groups?.length) ||
       (mode === 'global' && (proxies?.length ?? 0) < 2)
     ) {
+      if (refreshRetryCountRef.current >= MAX_REFRESH_RETRIES) {
+        console.warn('[useRenderList] 达到最大重试次数，停止自动刷新')
+        return
+      }
+      refreshRetryCountRef.current += 1
       const handle = setTimeout(() => refreshProxy(), 500)
       return () => clearTimeout(handle)
+    } else {
+      // 数据加载成功，重置重试计数
+      refreshRetryCountRef.current = 0
     }
   }, [proxiesData, mode, refreshProxy])
 
@@ -125,9 +136,9 @@ export const useRenderList = (
     if (isChainMode) return
     delayManager.setGroupListener('PROXY', bumpDelay)
     return () => {
-      delayManager.removeGroupListener('PROXY')
+      delayManager.removeGroupListener('PROXY', bumpDelay)
     }
-  }, [isChainMode])
+  }, [isChainMode, bumpDelay])
 
   const groupCacheRef = useRef<Map<string, GroupCache>>(new Map())
   const prevListRef = useRef<IRenderItem[]>([])
@@ -437,6 +448,14 @@ export const useRenderList = (
       return ret
     })
 
+    // L-18: 清理不再存在的组的缓存，防止 profile 切换后内存泄漏
+    const existingGroupNames = new Set(renderGroups.map((g: ProxyGroup) => g.name))
+    cache.forEach((_, key) => {
+      if (!existingGroupNames.has(key)) {
+        cache.delete(key)
+      }
+    })
+
     const filtered = retList.filter((item: IRenderItem) => !item.group?.hidden)
 
     if (!anyChanged && prevListRef.current.length === filtered.length) {
@@ -452,7 +471,6 @@ export const useRenderList = (
     isChainMode,
     runtimeConfig,
     selectedGroup,
-    latencyTimeout,
     delayBump,
   ])
 

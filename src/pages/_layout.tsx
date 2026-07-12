@@ -68,10 +68,12 @@ import {
   viewProfile,
   restartCore,
   triggerAutoSelect,
+  withIpcTimeout,
 } from '@/services/cmds'
 import { NODE_DELAY_MAX_MS } from '@/services/delay'
 import DelayManager from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
+import { batchTestLockRef } from '@/services/batch-test-lock'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
@@ -172,6 +174,9 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
     let filterText = ''
     let sortType = 0
 
+    // L-33: localStorage 仅用于 UI 状态（过滤/排序）的本地持久化，
+    // 不涉及后端核心状态，不同步不会导致功能异常，仅影响用户偏好记忆。
+    // 已通过 currentUid + groupName 双层 key 隔离不同 profile/组的状态。
     try {
       const headStateStr = localStorage.getItem('proxy-head-state')
       if (headStateStr && currentUid) {
@@ -235,6 +240,7 @@ async function batchTestWithFirstBatchSelect(
 async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
   fallbackTimerRef: React.MutableRefObject<number | null>,
+  autoSelectTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
   setDragRegionEnabled?: (v: boolean) => void,
 ): Promise<void> {
@@ -250,20 +256,32 @@ async function triggerAutoSelectAndRefresh(
     setHeadState('PROXY', { sortType: 1 })
   }
 
+  // H-13: 清理前一次的 autoSelect timer，防止泄漏
+  if (autoSelectTimerRef.current !== null) {
+    clearTimeout(autoSelectTimerRef.current)
+    autoSelectTimerRef.current = null
+  }
+
   // 批量测速推迟到渲染之后，避免与 React layout/paint 争抢主线程
   // 启动时由 isStartingUpRef / 30s 冷却挡掉，只有 profile 切换/导入后才真正跑
-  setTimeout(async () => {
+  autoSelectTimerRef.current = setTimeout(async () => {
+    autoSelectTimerRef.current = null // setTimeout 已触发，清除ID
     try {
       const names = await getFilteredNodeNames('PROXY')
       if (names.length === 0) return
       const win = getCurrentWindow()
       try {
+        batchTestLockRef.current++ // H-11: 进入测速锁
         await win.setResizable(false)
         setDragRegionEnabled?.(false)
         await batchTestWithFirstBatchSelect('PROXY', names, true)
       } finally {
-        await win.setResizable(true)
-        setDragRegionEnabled?.(true)
+        // H-11: 引用计数解锁，仅当===0时恢复窗口
+        batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
+        if (batchTestLockRef.current === 0) {
+          await win.setResizable(true)
+          setDragRegionEnabled?.(true)
+        }
       }
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
@@ -273,9 +291,11 @@ async function triggerAutoSelectAndRefresh(
     }
   }, 0)
 
-  // 6 秒无健康节点 Fallback
+  // 10 秒无健康节点 Fallback
   if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
   fallbackTimerRef.current = setTimeout(async () => {
+    // H-12: 保存当前timer的ID，用于finally中的条件赋值
+    const timerId = fallbackTimerRef.current
     try {
       const proxyGroup = await getProxyByName('PROXY')
       const nowNodeName = proxyGroup?.now || ''
@@ -288,15 +308,20 @@ async function triggerAutoSelectAndRefresh(
       if (!hasHealth) {
         const names = await getFilteredNodeNames('PROXY')
         if (names.length === 0) return
-        console.log('[Layout] Fallback: 6秒无健康节点，触发全节点测速')
+        console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
         const win = getCurrentWindow()
         try {
+          batchTestLockRef.current++ // H-11: 进入测速锁
           await win.setResizable(false)
           setDragRegionEnabled?.(false)
           await batchTestWithFirstBatchSelect('PROXY', names, true)
         } finally {
-          await win.setResizable(true)
-          setDragRegionEnabled?.(true)
+          // H-11: 引用计数解锁
+          batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
+          if (batchTestLockRef.current === 0) {
+            await win.setResizable(true)
+            setDragRegionEnabled?.(true)
+          }
         }
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
@@ -305,9 +330,12 @@ async function triggerAutoSelectAndRefresh(
     } catch (fbErr) {
       console.error('[Layout] Fallback 逻辑异常:', fbErr)
     } finally {
-      fallbackTimerRef.current = null
+      // H-12: 条件赋值——仅在ref仍指向本次timer时才清空，防止覆盖新timer的ID
+      if (fallbackTimerRef.current === timerId) {
+        fallbackTimerRef.current = null
+      }
     }
-  }, NODE_DELAY_MAX_MS)
+  }, 10_000)
 }
 
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
@@ -368,6 +396,8 @@ const Layout = () => {
 
   // 拖拽区域启用状态：批量测速期间禁用，替代 querySelectorAll 全量扫描
   const [dragRegionEnabled, setDragRegionEnabled] = useState(true)
+  const setDragRegionEnabledRef = useRef(setDragRegionEnabled)
+  setDragRegionEnabledRef.current = setDragRegionEnabled
   const dragRegionValue = useMemo(
     () => ({ enabled: dragRegionEnabled, setEnabled: setDragRegionEnabled }),
     [dragRegionEnabled],
@@ -825,29 +855,32 @@ const Layout = () => {
     try {
       let downloaded = 0
       let total = 0
-      await clientUpdateObj.downloadAndInstall((progressEvent: any) => {
-        if (progressEvent.event === 'Started') {
-          total = progressEvent.data.contentLength || 0
-          setClientProgressMessage('开始下载软件更新包...')
-        } else if (progressEvent.event === 'Progress') {
-          downloaded += progressEvent.data.chunkLength
-          if (total > 0) {
-            const pct = Math.round((downloaded / total) * 100)
-            setClientProgress(pct)
-            setClientProgressMessage(
-              `已下载 ${pct}% (${(downloaded / 1024 / 1024).toFixed(2)} MB / ${(total / 1024 / 1024).toFixed(2)} MB)`,
-            )
-          } else {
-            setClientProgressMessage(
-              `已下载 ${(downloaded / 1024 / 1024).toFixed(2)} MB`,
-            )
+      const downloadPromise = clientUpdateObj.downloadAndInstall(
+        (progressEvent: any) => {
+          if (progressEvent.event === 'Started') {
+            total = progressEvent.data.contentLength || 0
+            setClientProgressMessage('开始下载软件更新包...')
+          } else if (progressEvent.event === 'Progress') {
+            downloaded += progressEvent.data.chunkLength
+            if (total > 0) {
+              const pct = Math.round((downloaded / total) * 100)
+              setClientProgress(pct)
+              setClientProgressMessage(
+                `已下载 ${pct}% (${(downloaded / 1024 / 1024).toFixed(2)} MB / ${(total / 1024 / 1024).toFixed(2)} MB)`,
+              )
+            } else {
+              setClientProgressMessage(
+                `已下载 ${(downloaded / 1024 / 1024).toFixed(2)} MB`,
+              )
+            }
+          } else if (progressEvent.event === 'Finished') {
+            setClientProgress(100)
+            setClientStatus('done')
+            setClientProgressMessage('下载完成，正在准备安装并重启...')
           }
-        } else if (progressEvent.event === 'Finished') {
-          setClientProgress(100)
-          setClientStatus('done')
-          setClientProgressMessage('下载完成，正在准备安装并重启...')
-        }
-      })
+        },
+      )
+      await withIpcTimeout(downloadPromise, 10 * 60 * 1000, 'downloadAndInstall')
       showNotice.success('更新安装完毕，请重启应用以应用更改')
     } catch (err: any) {
       console.error('Client update error:', err)
@@ -893,7 +926,11 @@ const Layout = () => {
     setCoreUpgradeProgress(0)
     setCoreUpgradeMessage('正在启动内核升级任务...')
     try {
-      await invoke('start_core_upgrade', { release: coreUpdateRelease })
+      await withIpcTimeout(
+        invoke('start_core_upgrade', { release: coreUpdateRelease }),
+        5 * 60 * 1000,
+        'start_core_upgrade',
+      )
     } catch (err: any) {
       console.error('Failed to start core upgrade:', err)
       setCoreUpgradeStatus('error')
@@ -1014,6 +1051,12 @@ const Layout = () => {
   })
   const startupRetryCountRef = useRef(0)
   const fallbackTimerRef = useRef<number | null>(null)
+  // H-13: autoSelect timer ref，组件卸载时清理
+  const autoSelectTimerRef = useRef<number | null>(null)
+  // H-14: wakeup test timer ref，组件卸载时清理
+  const wakeupTestTimerRef = useRef<number | null>(null)
+  // H-15: 唤醒测速防重入互斥锁
+  const isWakeupTestingRef = useRef(false)
   // 解决 BUG-118: handleImportProfile 与 useEffect 双链竞态
   // 当 handleImportProfile 正在处理时，设置此标志让 useEffect 跳过自动选点
   const isImportingRef = useRef(false)
@@ -1034,30 +1077,47 @@ const Layout = () => {
   const lastFullTestTimeRef = useRef<number>(0)
 
   const triggerWakeupLatencyTest = useCallback(async () => {
+    // H-15: 防重入互斥锁，快速Alt+Tab两次不会并发执行
+    if (isWakeupTestingRef.current) return
+
+    // M-33: 原子化冷却检查+设置，避免竞态条件
+    const now = Date.now()
+    if (now - lastFullTestTimeRef.current < 30 * 1000) {
+      return
+    }
+
+    if (isStartingUpRef.current) {
+      return
+    }
+
+    isWakeupTestingRef.current = true
+    lastFullTestTimeRef.current = now
+
     try {
       console.log('[Layout] 窗口唤醒，刷新本地代理状态')
       await refreshAllRef.current()
 
-      const now = Date.now()
-      if (now - lastFullTestTimeRef.current < 30 * 1000) {
-        return
-      }
-
-      if (isStartingUpRef.current) {
-        return
-      }
-
       const names = await getFilteredNodeNames('PROXY')
-      if (names.length === 0) return
+      if (names.length === 0) {
+        isWakeupTestingRef.current = false
+        return
+      }
 
-      lastFullTestTimeRef.current = now
       console.log('[Layout] 窗口唤醒，延迟到渲染完成后触发全节点测速')
+
+      // H-14: 清理前一次的 wakeup test timer，防止泄漏
+      if (wakeupTestTimerRef.current !== null) {
+        clearTimeout(wakeupTestTimerRef.current)
+        wakeupTestTimerRef.current = null
+      }
 
       // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
-      setTimeout(async () => {
+      wakeupTestTimerRef.current = setTimeout(async () => {
+        wakeupTestTimerRef.current = null // setTimeout 已触发，清除ID
         const win = getCurrentWindow()
         try {
+          batchTestLockRef.current++ // H-11: 进入测速锁
           await win.setResizable(false)
           setDragRegionEnabled(false)
           // 视觉占位：立即将 PROXY 全节点标记为「测速中」以触发流光动画
@@ -1074,16 +1134,22 @@ const Layout = () => {
         } catch (err) {
           console.error('[Layout] 唤醒后后台测速异常:', err)
         } finally {
-          try {
-            await win.setResizable(true)
-            setDragRegionEnabled(true)
-          } catch {
-            /* 忽略 */
+          // H-11: 引用计数解锁
+          batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
+          if (batchTestLockRef.current === 0) {
+            try {
+              await win.setResizable(true)
+              setDragRegionEnabled(true)
+            } catch {
+              /* 忽略 */
+            }
           }
+          isWakeupTestingRef.current = false // H-15: 释放互斥锁
         }
       }, 0)
     } catch (err) {
       console.error('[Layout] 唤醒刷新与测速失败:', err)
+      isWakeupTestingRef.current = false // H-15: 异常时也要释放锁
     }
   }, [])
 
@@ -1124,8 +1190,9 @@ const Layout = () => {
             await triggerAutoSelectAndRefresh(
               refreshProxyRef.current,
               fallbackTimerRef,
+              autoSelectTimerRef,
               setHeadStateForSortRef.current,
-              setDragRegionEnabled,
+              setDragRegionEnabledRef.current,
             )
             // Success: reset retry counter
             startupRetryCountRef.current = 0
@@ -1142,14 +1209,19 @@ const Layout = () => {
             // Auto-retry up to 3 times on failure/startup
             if (startupRetryCountRef.current < 3) {
               startupRetryCountRef.current += 1
+              const retryDelay = 2000 * startupRetryCountRef.current
               console.log(
-                `[Layout] Retrying profile activation in 2s (Attempt ${startupRetryCountRef.current}/3)`,
+                `[Layout] Retrying profile activation in ${retryDelay}ms (Attempt ${startupRetryCountRef.current}/3)`,
               )
               timerId = setTimeout(() => {
                 if (!cancelled) {
                   setProfileRefreshCounter((c) => c + 1)
                 }
-              }, 2000)
+              }, retryDelay)
+            } else {
+              showNotice.error(
+                'Profile activation failed after 3 retries. Please check your network or subscription.',
+              )
             }
           })
         return () => {
@@ -1164,13 +1236,25 @@ const Layout = () => {
     }
   }, [currentProfileUid, profileRefreshCounter])
 
-  // 组件卸载时清理 Fallback 及自动选优定时器，防止内存泄漏
+  // 组件卸载时清理 Fallback、自动选优及唤醒测速定时器，防止内存泄漏
   useEffect(() => {
     return () => {
       if (fallbackTimerRef.current) {
         clearTimeout(fallbackTimerRef.current)
         fallbackTimerRef.current = null
         console.log('[Layout] 组件卸载，清理 Fallback 定时器')
+      }
+      // H-13: 清理 autoSelect timer
+      if (autoSelectTimerRef.current !== null) {
+        clearTimeout(autoSelectTimerRef.current)
+        autoSelectTimerRef.current = null
+        console.log('[Layout] 组件卸载，清理 autoSelect 定时器')
+      }
+      // H-14: 清理 wakeup test timer
+      if (wakeupTestTimerRef.current !== null) {
+        clearTimeout(wakeupTestTimerRef.current)
+        wakeupTestTimerRef.current = null
+        console.log('[Layout] 组件卸载，清理 wakeupTest 定时器')
       }
     }
   }, [])
@@ -1300,6 +1384,8 @@ const Layout = () => {
   const handleSelectProfile = async (uid: string) => {
     if (currentProfileUid === uid) return
     try {
+      isStartingUpRef.current = true
+      startupRetryCountRef.current = 0
       await patchProfiles({ current: uid })
       await mutateProfiles()
       closeAllConnections()

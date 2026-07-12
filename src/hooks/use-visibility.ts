@@ -1,5 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
  * useVisibility
@@ -20,6 +20,15 @@ export const useVisibility = () => {
 
   const rawVisible = documentVisible && isWindowVisible && !isMinimized
   const [debouncedVisible, setDebouncedVisible] = useState(rawVisible)
+
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (rawVisible) {
@@ -53,26 +62,27 @@ export const useVisibility = () => {
     }
   }, [])
 
+  // L-29: updateWindowState 使用 useCallback 包装并通过 isMountedRef 判断挂载状态
+  // 避免闭包变量带来的潜在问题，同时确保回调引用稳定（虽然 useEffect 依赖为空本就只注册一次）
+  const updateWindowState = useCallback(async () => {
+    try {
+      const currentWindow = getCurrentWindow()
+      const [minimized, visible] = await Promise.all([
+        currentWindow.isMinimized(),
+        currentWindow.isVisible(),
+      ])
+      if (isMountedRef.current) {
+        setIsMinimized(minimized)
+        setIsWindowVisible(visible)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
   useEffect(() => {
-    let active = true
     let unlistenResized: (() => void) | null = null
     let unlistenFocus: (() => void) | null = null
-
-    const updateWindowState = async () => {
-      try {
-        const currentWindow = getCurrentWindow()
-        const [minimized, visible] = await Promise.all([
-          currentWindow.isMinimized(),
-          currentWindow.isVisible(),
-        ])
-        if (active) {
-          setIsMinimized(minimized)
-          setIsWindowVisible(visible)
-        }
-      } catch {
-        // ignore
-      }
-    }
 
     const initTauri = async () => {
       try {
@@ -82,7 +92,7 @@ export const useVisibility = () => {
         const unR = await currentWindow.onResized(async () => {
           await updateWindowState()
         })
-        if (active) {
+        if (isMountedRef.current) {
           unlistenResized = unR
         } else {
           unR()
@@ -91,7 +101,7 @@ export const useVisibility = () => {
         const unF = await currentWindow.onFocusChanged(async () => {
           await updateWindowState()
         })
-        if (active) {
+        if (isMountedRef.current) {
           unlistenFocus = unF
         } else {
           unF()
@@ -104,7 +114,7 @@ export const useVisibility = () => {
     initTauri()
 
     return () => {
-      active = false
+      isMountedRef.current = false
       if (unlistenResized) {
         unlistenResized()
       }
@@ -112,7 +122,7 @@ export const useVisibility = () => {
         unlistenFocus()
       }
     }
-  }, [])
+  }, [updateWindowState])
 
   return debouncedVisible
 }

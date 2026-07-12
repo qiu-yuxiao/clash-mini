@@ -105,9 +105,14 @@ export const AppDataProvider = ({
   }, [])
 
   const forceFullProxiesRef = useRef(false)
+  const isMiniStatusRef = useRef(isMiniStatus)
+
+  useEffect(() => {
+    isMiniStatusRef.current = isMiniStatus
+  }, [isMiniStatus])
 
   const fetchProxies = async () => {
-    const isMinimal = isMiniStatus
+    const isMinimal = isMiniStatusRef.current
     const forceFull = forceFullProxiesRef.current
     forceFullProxiesRef.current = false
 
@@ -295,6 +300,9 @@ export const AppDataProvider = ({
   const refreshProxyProviders = useStableFn(_refetchProxyProviders)
   const refreshRuleProviders = useStableFn(_refetchRuleProviders)
 
+  // L-32: 事件监听器的 useEffect 依赖于 refresh 函数
+  // 但这些函数都通过 useStableFn 包裹，引用是稳定的，不会导致不必要的重新注册
+  // 如果未来需要更保险的方式，可以用 ref 保存函数引用
   useEffect(() => {
     let active = true
     let unlistenProfile: (() => void) | null = null

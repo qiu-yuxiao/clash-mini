@@ -7,8 +7,15 @@ use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 
+/// 保护 fallback_to_system_proxy 中的配置修改，避免与前端 patch_verge 交错写入
+static FALLBACK_CONFIG_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
+        // 先在锁外等待服务就绪（可能阻塞很久，如UAC弹窗、服务启动等）
+        // 这样 stop/restart 不会被长时间阻塞
+        self.await_service_ready_if_needed().await;
+
         let _life = self.lifecycle_lock.lock().await;
         self.start_core_inner().await
     }
@@ -25,7 +32,7 @@ impl CoreManager {
             return Ok(());
         }
 
-        self.prepare_startup().await?;
+        self.prepare_startup_mode().await?;
         defer! {
             self.after_core_process();
         }
@@ -61,8 +68,13 @@ impl CoreManager {
         // When Clash core restarts, previous connection streams become stale and dead.
         // Failing to clear the pool will result in backend connection errors and speed test failures.
         // Refer to BUG-171/BUG-172 agreements.
-        if let Ok(pool) = tauri_plugin_mihomo::IpcConnectionPool::global() {
-            pool.clear_pool();
+        match tauri_plugin_mihomo::IpcConnectionPool::global() {
+            Ok(pool) => {
+                pool.clear_pool();
+            }
+            Err(e) => {
+                logging!(warn, Type::Core, "获取 IPC 连接池失败，跳过清理: {e}");
+            }
         }
 
         defer! {
@@ -86,13 +98,26 @@ impl CoreManager {
         self.start_core_inner().await
     }
 
-    async fn prepare_startup(&self) -> Result<()> {
+    /// 锁外等待服务就绪（可能耗时很久，如UAC弹窗、服务启动等）
+    /// 避免长时间持有 lifecycle_lock 阻塞 stop/restart
+    #[cfg(target_os = "windows")]
+    async fn await_service_ready_if_needed(&self) {
         let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
-
-        #[cfg(target_os = "windows")]
         if needs_service {
-            self.wait_for_service_ready().await;
+            let is_admin = crate::utils::sysinfo::is_current_app_handle_admin(Handle::app_handle());
+            if !is_admin {
+                self.wait_for_service_ready().await;
+            }
         }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    async fn await_service_ready_if_needed(&self) {
+    }
+
+    /// 锁内设置运行模式（不包含耗时等待）
+    async fn prepare_startup_mode(&self) -> Result<()> {
+        let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
 
         let mode = if needs_service {
             let value = SERVICE_MANAGER.current().await;
@@ -171,6 +196,7 @@ impl CoreManager {
     }
 
     async fn fallback_to_system_proxy(&self) {
+        let _guard = FALLBACK_CONFIG_LOCK.lock().await;
         Config::verge().await.edit_draft(|d| {
             d.enable_tun_mode = Some(false);
             d.enable_system_proxy = Some(true);

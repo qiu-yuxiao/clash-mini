@@ -274,6 +274,11 @@ export const useMihomoWsSubscription = <T>(
         }
       }
 
+      // L-31: 节流采用"前缘触发 + 后缘合并"模式：
+      // - 首条消息立即 flush（保证初始数据/状态变化的及时性）
+      // - 后续在 throttleMs 窗口内的消息合并，只保留最新值
+      // - 窗口结束时 flush 最新值（保证最终一致性）
+      // 这对于 WebSocket 订阅场景是合理的：既保证响应速度，又减少重复渲染。
       wrappedNext = (
         error?: any,
         data?: T | ((current?: T) => T | undefined),

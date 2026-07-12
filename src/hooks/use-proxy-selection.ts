@@ -108,6 +108,12 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
     [config, onError, onSuccess, persistSelection],
   )
 
+  // L-27: flushChangeQueue 看起来有递归调用（finally 中可能再次调用自己），
+  // 但实际上递归深度是可控的：
+  // 1. isProcessingRef 作为互斥锁，同一时间只有一个执行流
+  // 2. while 循环会持续消费队列，直到队列为空才退出
+  // 3. finally 中的递归调用仅在执行过程中又有新请求入队时才触发
+  // 4. 每次递归都处理一批新请求，不会无限循环（请求不会无限快速产生）
   const flushChangeQueue = useCallback(async () => {
     if (isProcessingRef.current) return
     isProcessingRef.current = true

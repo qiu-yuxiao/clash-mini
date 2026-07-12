@@ -278,6 +278,24 @@ class TrafficWorkerClient {
     this.pendingMessages = []
   }
 
+  // L-30: 完全销毁 Worker，释放资源。用于长时间不使用时的清理。
+  destroy() {
+    if (this.worker) {
+      this.worker.onmessage = null
+      this.worker.onerror = null
+      this.worker.terminate()
+      this.worker = null
+    }
+    if (this.inlineMonitor) {
+      this.inlineMonitor.stop()
+      this.inlineMonitor = null
+    }
+    this.mode = null
+    this.ready = false
+    this.pendingMessages = []
+    this.listeners.clear()
+  }
+
   onSnapshot(listener: (snapshot: ITrafficWorkerSnapshotMessage) => void) {
     this.listeners.add(listener)
     return () => {
@@ -351,7 +369,15 @@ class TrafficWorkerClient {
 
 const refCounter = new ReferenceCounter()
 let workerClient: TrafficWorkerClient | null = null
+let destroyTimer: ReturnType<typeof setTimeout> | null = null
+const DESTROY_DELAY_MS = 5 * 60 * 1000 // 5分钟后销毁
+
 const getWorkerClient = () => {
+  // 如果有待销毁的定时器，取消它
+  if (destroyTimer) {
+    clearTimeout(destroyTimer)
+    destroyTimer = null
+  }
   if (!workerClient) {
     workerClient = new TrafficWorkerClient()
   }
@@ -428,6 +454,15 @@ export const useTrafficMonitorEnhanced = (options?: {
       cleanup()
       if (refCounter.getCount() === 0) {
         client.stop()
+        // L-30: 引用计数为 0 时，延迟 5 分钟后销毁 Worker，
+        // 避免频繁创建/销毁的开销，同时保证长时间不使用时能释放资源
+        destroyTimer = setTimeout(() => {
+          if (refCounter.getCount() === 0 && workerClient) {
+            workerClient.destroy()
+            workerClient = null
+          }
+          destroyTimer = null
+        }, DESTROY_DELAY_MS)
       }
     }
   }, [isActive, subscribeToSnapshots])

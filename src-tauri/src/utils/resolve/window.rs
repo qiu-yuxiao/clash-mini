@@ -2,7 +2,7 @@ use tauri::webview::PageLoadEvent;
 use tauri::{Theme, WebviewWindow};
 
 use crate::{config::Config, core::handle, utils::resolve::window_script::build_window_initial_script};
-use clash_verge_logging::{Type, logging_error};
+use clash_verge_logging::{Type, logging, logging_error};
 
 #[cfg(not(target_os = "windows"))]
 use dark_light::{Mode as SystemTheme, detect as detect_system_theme};
@@ -82,6 +82,8 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             let label = window.label().to_string();
             let ah = app_handle_clone.clone();
             let ah2 = ah.clone();
+            // 【注意】on_page_load 回调本身就在主线程执行，此处 run_on_main_thread 是冗余的
+            // 保留是为了安全起见，确保 set_always_on_top 在主线程调用，即使未来回调上下文变化
             let _ = ah.run_on_main_thread(move || {
                 use tauri::Manager as _;
                 if let Some(w) = ah2.get_webview_window(&label) {
@@ -112,6 +114,26 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             {
                 logging_error!(Type::Window, window.set_background_color(Some(background_color)));
             }
+
+            // 超时兜底：如果页面加载超时（默认 10 秒），强制显示窗口
+            // 避免页面加载卡住导致用户看不到窗口
+            let window_clone = window.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                // 检查窗口是否仍然存在且不可见
+                if let Ok(is_visible) = window_clone.is_visible() {
+                    if !is_visible {
+                        // 页面加载超时，强制显示窗口
+                        let _ = window_clone.show();
+                        let _ = window_clone.set_focus();
+                        logging!(
+                            info,
+                            Type::Window,
+                            "页面加载超时，强制显示窗口"
+                        );
+                    }
+                }
+            });
 
             Ok(window)
         }

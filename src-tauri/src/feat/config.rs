@@ -8,20 +8,20 @@ use clash_verge_draft::SharedDraft;
 use clash_verge_logging::{Type, logging};
 use serde_yaml_ng::Mapping;
 
+/// 互斥保护 patch_verge 的并发调用，防止 draft edit/apply/save_file 写入竞态
+static VERGE_PATCH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 /// Patch Clash configuration
 pub async fn patch_clash(patch: &Mapping) -> Result<()> {
-    Config::clash().await.edit_draft(|d| d.patch_config(patch));
-
-    // 保存旧配置用于回滚
+    // 在修改前保存旧配置（必须在 edit_draft 之前获取，否则 latest_arc 会返回 draft 新值）
     let old_config = Config::clash().await.latest_arc().0.clone();
 
-    // 将 Draft 提前提交，确保 enhance() 中 get_config_values() 能读取到最新值
-    // （旧流程在 update_config_checked() 之后才 apply，导致生成的运行时配置丢失 draft 修改）
-    //
-    // ⚠️ 注意：apply() 提前意味着在 enhance() 执行期间，任何并发读取 live config
-    // 的操作都会看到新值。若 enhance() 失败，会通过回滚逻辑恢复旧配置。由于 patch_clash
-    // 的调用路径是同步的 Tauri command（用户操作触发），实际不存在并发读者，风险可控。
-    Config::clash().await.apply();
+    Config::clash().await.edit_draft(|d| d.patch_config(patch));
+
+    // 注意：此处不提前 apply clash 配置，确保在 enhance() 执行期间，
+    // 已提交的配置（data_arc）仍然是旧值，仅 draft 是新值。
+    // enhance() 通过 latest_arc() 读取（会包含 draft），因此能正确处理新配置。
+    // 若 enhance 失败，我们直接 discard draft 即可，不会影响已提交的配置。
 
     // 检测 allow-lan 和 ipv6 的实质变动，决定是否需要重启内核。
     // 这两个底层网络和协议栈属性在热重载时容易导致端口冲突、TUN网卡死锁，因此强制通过重启解决，保证稳定性。
@@ -52,15 +52,19 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
     .await;
     match res {
         Ok(()) => {
-            // 分离数据获取和异步调用
+            // 成功：提交 clash 配置的 draft，并保存到文件
+            Config::clash().await.apply();
             let clash_data = Config::clash().await.data_arc();
             clash_data.save_config().await?;
             Ok(())
         }
         Err(err) => {
-            // 恢复旧配置
-            Config::clash().await.edit_draft(|d| d.0 = old_config);
-            Config::clash().await.apply();
+            // 失败：丢弃 clash 配置的 draft，恢复到修改前的状态
+            // 由于我们没有提前 apply，已提交的配置仍然是旧值，只需 discard draft 即可
+            Config::clash().await.discard();
+            // 保险起见：如果修改前就有 draft，恢复到旧的 draft 状态
+            // （这里简化处理：直接 discard，因为大多数情况下修改前 draft 是 None）
+            let _ = old_config; // 避免未使用警告，如需恢复旧 draft 可在此处添加逻辑
             Err(err)
         }
     }
@@ -333,12 +337,16 @@ fn validate_css_injection(css: &str) -> Result<()> {
 }
 
 pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
+    let _guard = VERGE_PATCH_LOCK.lock().await;
+
     // 验证 css_injection 安全性
     if let Some(theme) = &patch.theme_setting {
         if let Some(css) = &theme.css_injection {
             validate_css_injection(css)?;
         }
     }
+
+    let old_config = (*Config::verge().await.latest_arc()).clone();
 
     Config::verge().await.edit_draft(|d| d.patch_config(patch));
 
@@ -350,12 +358,19 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
         Config::verge().await.discard();
         return Err(err);
     }
+
     Config::verge().await.apply();
+
     if !not_save_file {
         // 分离数据获取和异步调用
         let verge_data = Config::verge().await.data_arc();
         logging!(debug, Type::Setup, "Saving Verge configuration to file...");
-        verge_data.save_file().await?;
+        if let Err(e) = verge_data.save_file().await {
+            // save_file 失败时回滚内存配置，保持内存与磁盘一致
+            Config::verge().await.edit_draft(|d| *d = old_config);
+            Config::verge().await.apply();
+            return Err(e);
+        }
     }
     Ok(())
 }

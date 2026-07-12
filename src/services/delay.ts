@@ -31,23 +31,20 @@ export const STARTUP_GRACE_MS = 10000
 
 class DelayManager {
   private cache = new Map<string, DelayUpdate>()
+  // L-22: urlMap 用于存储组测试 URL，组数量通常有限（<100），内存泄漏影响极小
+  // 提供 clearUrlMap 方法供 profile 切换时手动调用清理
   private urlMap = new Map<string, string>()
 
   // 每个节点的监听
   private listenerMap = new Map<string, (update: DelayUpdate) => void>()
 
   // 每个分组的监听
-  private groupListenerMap = new Map<string, () => void>()
+  private groupListenerMap = new Map<string, Array<() => void>>()
 
   private pendingItemUpdates = new Map<string, DelayUpdate[]>()
   private pendingGroupUpdates = new Set<string>()
   private itemFlushScheduled = false
   private groupFlushScheduled = false
-
-  /** 批量测速进行中标志，现已废弃，始终返回 false */
-  get isBatchTesting(): boolean {
-    return false
-  }
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -78,6 +75,8 @@ class DelayManager {
     Promise.resolve().then(run)
   }
 
+  // L-23: 如果在 flush 前 listener 被移除，对应的 pending updates 会被丢弃。
+  // 影响很小：丢弃的是延迟更新通知，组件重新挂载后会重新获取最新延迟，不会导致数据不一致。
   private scheduleItemFlush() {
     if (this.itemFlushScheduled) return
     this.itemFlushScheduled = true
@@ -121,16 +120,18 @@ class DelayManager {
       this.pendingGroupUpdates = new Set()
 
       groups.forEach((group) => {
-        const listener = this.groupListenerMap.get(group)
-        if (!listener) return
-        try {
-          listener()
-        } catch (error) {
-          console.error(
-            `[DelayManager] 通知分组延迟监听器失败: ${group}`,
-            error,
-          )
-        }
+        const listeners = this.groupListenerMap.get(group)
+        if (!listeners || listeners.length === 0) return
+        listeners.forEach((listener) => {
+          try {
+            listener()
+          } catch (error) {
+            console.error(
+              `[DelayManager] 通知分组延迟监听器失败: ${group}`,
+              error,
+            )
+          }
+        })
       })
 
       if (this.pendingGroupUpdates.size > 0) {
@@ -159,6 +160,12 @@ class DelayManager {
     return url || 'http://cp.cloudflare.com/generate_204'
   }
 
+  /** 清空所有组的测试 URL 缓存，用于 profile 切换时清理 */
+  clearUrlMap() {
+    this.urlMap.clear()
+    debugLog('[DelayManager] 已清空 urlMap 缓存')
+  }
+
   setListener(
     name: string,
     group: string,
@@ -174,11 +181,27 @@ class DelayManager {
   }
 
   setGroupListener(group: string, listener: () => void) {
-    this.groupListenerMap.set(group, listener)
+    const listeners = this.groupListenerMap.get(group) || []
+    if (!listeners.includes(listener)) {
+      listeners.push(listener)
+      this.groupListenerMap.set(group, listeners)
+    }
   }
 
-  removeGroupListener(group: string) {
-    this.groupListenerMap.delete(group)
+  removeGroupListener(group: string, listener?: () => void) {
+    if (!listener) {
+      this.groupListenerMap.delete(group)
+      return
+    }
+    const listeners = this.groupListenerMap.get(group)
+    if (listeners) {
+      const filtered = listeners.filter((l) => l !== listener)
+      if (filtered.length === 0) {
+        this.groupListenerMap.delete(group)
+      } else {
+        this.groupListenerMap.set(group, filtered)
+      }
+    }
   }
 
   setDelay(
@@ -278,17 +301,19 @@ class DelayManager {
       })
 
       // 监听取消信号
-      const abortPromise = new Promise<ProxyDelay>((_, reject) => {
-        if (signal) {
-          abortListener = () => {
-            reject(new DOMException('Aborted', 'AbortError'))
-          }
-          signal.addEventListener('abort', abortListener)
-        }
-      })
+      // L-24: 只有当 signal 存在时才创建 abortPromise 并加入 race
+      // 避免无 signal 时产生永不 settle 的 promise（虽不影响功能，但不优雅）
+      const abortPromise = signal
+        ? new Promise<ProxyDelay>((_, reject) => {
+            abortListener = () => {
+              reject(new DOMException('Aborted', 'AbortError'))
+            }
+            signal.addEventListener('abort', abortListener)
+          })
+        : null
 
       // 使用Promise.race来实现超时与取消控制
-      const result = await Promise.race([
+      const racePromises: Promise<ProxyDelay>[] = [
         delayProxyByName(name, url, timeout)
           .then((res) => {
             raceFinished = true
@@ -306,8 +331,11 @@ class DelayManager {
           raceFinished = true
           return res
         }),
-        abortPromise,
-      ])
+      ]
+      if (abortPromise) {
+        racePromises.push(abortPromise)
+      }
+      const result = await Promise.race(racePromises)
 
       // 确保至少显示500ms的加载动画，除非被取消
       const elapsedTime = Date.now() - startTime

@@ -36,6 +36,7 @@ import {
   updateProxyChainConfigInRuntime,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
+import { batchTestLockRef } from '@/services/batch-test-lock'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
@@ -91,12 +92,30 @@ export const ProxyGroups = (props: Props) => {
   const [testingGroups, setTestingGroups] = useState<Record<string, boolean>>(
     {},
   )
+  // H-16: 用 ref 同步镜像 testingGroups，解决闭包竞态——
+  // setTestingGroups 是异步批处理的，闭包中的值在整个 async 生命周期内都是调用时的快照
+  const testingGroupsRef = useRef<Record<string, boolean>>({})
+  // 包装 setTestingGroups 使其同步更新 ref
+  const updateTestingGroups = useCallback(
+    (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => {
+      setTestingGroups((prev) => {
+        const next = updater(prev)
+        testingGroupsRef.current = next
+        return next
+      })
+    },
+    [],
+  )
 
   useEffect(() => {
-    if (proxyChain.length > 0) {
-      localStorage.setItem('proxy-chain-items', JSON.stringify(proxyChain))
-    } else {
-      localStorage.removeItem('proxy-chain-items')
+    try {
+      if (proxyChain.length > 0) {
+        localStorage.setItem('proxy-chain-items', JSON.stringify(proxyChain))
+      } else {
+        localStorage.removeItem('proxy-chain-items')
+      }
+    } catch {
+      // 隐私模式或存储满时静默失败
     }
   }, [proxyChain])
   const [ruleMenuAnchor, setRuleMenuAnchor] = useState<null | HTMLElement>(null)
@@ -163,6 +182,7 @@ export const ProxyGroups = (props: Props) => {
   const showScrollTopRef = useRef(false)
   const activeStickyIndexRef = useRef<number | null>(null)
   const restoredScrollKeyRef = useRef<string | null>(null)
+  const isMountedRef = useRef(true)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const scrollPositionKey = useMemo(
     () =>
@@ -236,7 +256,11 @@ export const ProxyGroups = (props: Props) => {
           scrollTopRef.current = savedPosition
           const nextShowScrollTop = savedPosition > 100
           showScrollTopRef.current = nextShowScrollTop
-          queueMicrotask(() => setShowScrollTop(nextShowScrollTop))
+          queueMicrotask(() => {
+            if (isMountedRef.current) {
+              setShowScrollTop(nextShowScrollTop)
+            }
+          })
         }
       }
     } catch (e) {
@@ -285,6 +309,7 @@ export const ProxyGroups = (props: Props) => {
 
   // 添加和清理滚动事件监听器
   useEffect(() => {
+    isMountedRef.current = true
     const node = parentRef.current
     if (!node) return
 
@@ -294,12 +319,14 @@ export const ProxyGroups = (props: Props) => {
     node.addEventListener('scroll', listener, options)
 
     return () => {
+      isMountedRef.current = false
       if (restoredScrollKeyRef.current === scrollPositionKey) {
         saveScrollPosition(scrollTopRef.current)
       }
       node.removeEventListener('scroll', listener, options)
+      saveScrollPositionThrottled.cancel()
     }
-  }, [handleScroll, saveScrollPosition, scrollPositionKey])
+  }, [handleScroll, saveScrollPosition, saveScrollPositionThrottled, scrollPositionKey])
 
   // 滚动到顶部
   const scrollToTop = useCallback(() => {
@@ -390,10 +417,10 @@ export const ProxyGroups = (props: Props) => {
   // 批量测速当前组全部节点并择优切换（委托后端单一引擎）
   const handleCheckAll = useStableCallback(async (groupName: string) => {
     // 防重复触发：测速进行中忽略点击
-    if (testingGroups[groupName]) return
+    if (testingGroupsRef.current[groupName]) return
 
     debugLog(`[ProxyGroups] 开始批量测速，组: ${groupName}`)
-    setTestingGroups((prev) => ({ ...prev, [groupName]: true }))
+    updateTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
     try {
       // 从当前过滤后可见的渲染列表中提取节点名称；该子集同时作为 F4 批量测速+择优的候选池（防越界关键），并非仅用于视觉占位
@@ -424,17 +451,16 @@ export const ProxyGroups = (props: Props) => {
       // 而非 PROXY 全量——所见即所测所选，与自动选点（全量）行为区分开
       const win = getCurrentWindow()
       try {
+        batchTestLockRef.current++ // H-11: 进入测速锁
         await win.setResizable(false)
         setDragRegionEnabled(false)
         await triggerAutoSelect(currentUid, visibleNames, 0, true)
       } catch (err) {
         console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
       } finally {
-        // 仅在无其他分组正在测速时才解锁窗口，避免并发测速时被提前解锁导致拖拽异常
-        const otherTesting = Object.entries(testingGroups).some(
-          ([k, v]) => k !== groupName && v,
-        )
-        if (!otherTesting) {
+        // H-11: 引用计数解锁，仅当===0时恢复窗口
+        batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
+        if (batchTestLockRef.current === 0) {
           await win.setResizable(true)
           setDragRegionEnabled(true)
         }
@@ -442,10 +468,12 @@ export const ProxyGroups = (props: Props) => {
     } catch (error) {
       console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)
     } finally {
-      setTestingGroups((prev) => ({ ...prev, [groupName]: false }))
-      const headState = getGroupHeadState(groupName)
-      if (headState?.sortType === 1) {
-        onHeadState(groupName, { sortType: headState.sortType })
+      if (isMountedRef.current) {
+        updateTestingGroups((prev) => ({ ...prev, [groupName]: false }))
+        const headState = getGroupHeadState(groupName)
+        if (headState?.sortType === 1) {
+          onHeadState(groupName, { sortType: headState.sortType })
+        }
       }
     }
   })
@@ -878,7 +906,7 @@ function ProxyVirtualList({
 function throttle<T extends (...args: any[]) => any>(
   func: T,
   wait: number,
-): (...args: Parameters<T>) => void {
+): ((...args: Parameters<T>) => void) & { cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null
   let previous = 0
   let lastArgs: Parameters<T> | null = null
@@ -890,7 +918,7 @@ function throttle<T extends (...args: any[]) => any>(
     func(...args)
   }
 
-  return function (...args: Parameters<T>) {
+  const throttled = function (...args: Parameters<T>) {
     const now = Date.now()
     const remaining = wait - (now - previous)
     lastArgs = args
@@ -909,4 +937,14 @@ function throttle<T extends (...args: any[]) => any>(
       }, remaining)
     }
   }
+
+  throttled.cancel = () => {
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
+    lastArgs = null
+  }
+
+  return throttled
 }

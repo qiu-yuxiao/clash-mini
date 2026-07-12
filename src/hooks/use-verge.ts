@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useLockFn } from 'ahooks'
 
 import { getVergeConfig, patchVergeConfig } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
@@ -41,7 +41,7 @@ export const useVerge = () => {
     }
   }
 
-  const patchVerge = useCallback(
+  const patchVerge = useLockFn(
     async (value: Partial<IVergeConfig>) => {
       try {
         await patchVergeConfig(value)
@@ -51,7 +51,6 @@ export const useVerge = () => {
         await refetch()
       }
     },
-    [refetch],
   )
 
   return {

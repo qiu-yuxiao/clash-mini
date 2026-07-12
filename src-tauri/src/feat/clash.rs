@@ -6,6 +6,9 @@ use serde_yaml_ng::{Mapping, Value};
 use smartstring::alias::String;
 use std::sync::Arc;
 
+/// 互斥保护 change_clash_mode / patch_clash 的并发调用，防止配置修改竞态
+static CLASH_PATCH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[allow(clippy::expect_used)]
 static TLS_CONFIG: Lazy<Arc<rustls::ClientConfig>> = Lazy::new(|| {
     let root_store = rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -22,6 +25,16 @@ pub async fn restart_app() {
     logging!(debug, Type::System, "启动重启应用流程");
     // 设置退出标志
     handle::Handle::global().set_is_exiting();
+
+    // 中止活跃的测速任务，避免与新实例竞争
+    crate::module::monitor::abort_all_active_tasks();
+
+    // 唤醒 monitor 线程，让它检测到退出标志并尽快终止
+    crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
+    crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_one();
+
+    // 短暂等待后台线程退出，减少与新实例竞争的概率
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     utils::server::shutdown_embedded_server();
     Config::apply_all_and_save_file().await;
@@ -60,6 +73,8 @@ fn after_change_clash_mode() {
 
 /// Change Clash mode (rule/global/direct/script)
 pub async fn change_clash_mode(mode: String) {
+    let _guard = CLASH_PATCH_LOCK.lock().await;
+
     let mut mapping = Mapping::new();
     mapping.insert(Value::from("mode"), Value::from(mode.as_str()));
     // Convert YAML mapping to JSON Value
@@ -109,6 +124,8 @@ pub async fn test_delay(url: String) -> anyhow::Result<u32> {
 
     let verge = Config::verge().await.latest_arc();
     let proxy_enabled = verge.enable_system_proxy.unwrap_or(false) || verge.enable_tun_mode.unwrap_or(false);
+    // 【注意】此处读取的 proxy_port 在后续使用时可能已变化（如用户修改端口）
+    // 但 test_delay 是一次性操作，端口在短时间内变化的概率极低，影响可忽略
     let proxy_port = if proxy_enabled {
         Some(match verge.verge_mixed_port {
             Some(p) => p,

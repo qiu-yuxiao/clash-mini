@@ -60,6 +60,26 @@ export function useSystemState() {
 
   const enable_tun_mode = verge?.enable_tun_mode
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isTunModeAvailableRef = useRef(isTunModeAvailable)
+  const isLoadingRef = useRef(isLoading)
+  const isStartingUpRef = useRef(isStartingUp)
+  const patchVergeRef = useRef(patchVerge)
+
+  useEffect(() => {
+    isTunModeAvailableRef.current = isTunModeAvailable
+  }, [isTunModeAvailable])
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading
+  }, [isLoading])
+
+  useEffect(() => {
+    isStartingUpRef.current = isStartingUp
+  }, [isStartingUp])
+
+  useEffect(() => {
+    patchVergeRef.current = patchVerge
+  }, [patchVerge])
 
   useEffect(() => {
     if (enable_tun_mode === undefined) return
@@ -67,12 +87,12 @@ export function useSystemState() {
     if (
       !disablingTunRef.current &&
       enable_tun_mode &&
-      !isTunModeAvailable &&
-      !isLoading &&
-      !isStartingUp
+      !isTunModeAvailableRef.current &&
+      !isLoadingRef.current &&
+      !isStartingUpRef.current
     ) {
       disablingTunRef.current = true
-      patchVerge({ enable_tun_mode: false, enable_system_proxy: true })
+      patchVergeRef.current({ enable_tun_mode: false, enable_system_proxy: true })
         .then(() => {
           showNotice.info(
             'settings.sections.system.notifications.tunMode.autoDisabled',
@@ -100,7 +120,7 @@ export function useSystemState() {
         disablingTunRef.current = false
       }
     }
-  }, [enable_tun_mode, isTunModeAvailable, patchVerge, isLoading, isStartingUp])
+  }, [enable_tun_mode])
 
   return {
     runningMode: systemState.runningMode,

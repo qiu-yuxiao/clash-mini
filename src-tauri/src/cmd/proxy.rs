@@ -17,7 +17,7 @@ pub async fn trigger_auto_select(
     sort_type: i32,
     select: bool,
 ) -> CmdResult<Vec<(String, u32)>> {
-    let outcome = crate::module::monitor::trigger_backend_auto_select(&profile_uid, node_names, sort_type, select)
+    let outcome = crate::module::monitor::trigger_backend_auto_select(&profile_uid, node_names, sort_type, select, false)
         .await
         .stringify_err()?;
     Ok(outcome.display)

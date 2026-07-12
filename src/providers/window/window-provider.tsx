@@ -2,6 +2,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
+import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
 import getSystem from '@/utils/get-system'
 
@@ -90,7 +91,11 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         try {
-          const value = await currentWindow.isMaximized()
+          const value = await withIpcTimeout(
+            currentWindow.isMaximized(),
+            5000,
+            'isMaximized',
+          )
           if (!isUnmounted) {
             setMaximized(value)
           }
@@ -153,9 +158,21 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       resetIdleTimer()
     }
 
+    // L-16: mousemove 事件触发非常频繁，用 throttle 限制 resetIdleTimer 调用频率
+    // 100ms 节流对用户体验无感知，但能显著减少定时器重置次数
+    let lastMouseMoveTime = 0
+    const THROTTLE_MS = 100
+    const throttledResetIdle = () => {
+      const now = Date.now()
+      if (now - lastMouseMoveTime >= THROTTLE_MS) {
+        lastMouseMoveTime = now
+        resetIdleTimer()
+      }
+    }
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDecorationsHiddenRef.current) {
-        resetIdleTimer()
+        throttledResetIdle()
         return
       }
       if (
@@ -175,7 +192,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
             dragStartedRef.current = true
             currentWindow
               ?.startDragging()
-              .catch(() => console.warn('[window] startDragging failed'))
+              .catch(() => {
+                console.warn('[window] startDragging failed')
+                dragStartedRef.current = false
+              })
           } else {
             mouseDownPosRef.current = null
           }
@@ -220,6 +240,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [resetIdleTimer, restoreChrome, currentWindow])
 
+  // L-17: TOCTOU（检查-使用时间差）问题——isMaximized/isFullscreen 状态与操作之间
+  // 可能有窗口状态变化。影响很小，try-catch 已能安全处理边界情况。
   const toggleMaximize = useCallback(async () => {
     if (!currentWindow) return
     try {

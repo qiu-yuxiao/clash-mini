@@ -84,6 +84,12 @@ export function useProxyDelayState(
     updateDelay()
   }, [updateDelay])
 
+  // L-28: abortControllerRef 的清理逻辑说明：
+  // 1. useLockFn 保证 onDelay 不会并发执行，同一时间只有一个活跃的测速请求
+  // 2. 每次调用开始时，如果存在旧的 abortController，先 abort 它
+  // 3. finally 中：如果是被 abort 的，保留引用（因为刚被新请求 abort，新请求已接管）；
+  //    如果正常完成，清空引用
+  // 4. 组件卸载时，useEffect 清理函数会 abort 正在进行的请求
   const onDelay = useLockFn(async () => {
     if (!proxy) return
     if (abortControllerRef.current) {

@@ -44,21 +44,49 @@ pub enum WindowState {
 const WINDOW_OPERATION_DEBOUNCE_MS: u64 = 625;
 /// 空闲判定阈值 — 超过此时间无操作，下次点击跳过防抖（立即响应）
 const WINDOW_IDLE_THRESHOLD_MS: u64 = 3000;
-/// 上次成功执行窗口操作的时间戳（毫秒）
-static LAST_WINDOW_OP_MS: AtomicU64 = AtomicU64::new(0);
 
-/// 自适应防抖检查：
-/// - 距离上次操作超过 IDLE_THRESHOLD（3s）→ 立即允许（用户长时间未操作，无需防抖）
-/// - 距离上次操作小于 IDLE_THRESHOLD → 使用 DEBOUNCE 间隔（用户在频繁操作，防抽风）
+/// 操作类型（用于分开防抖，避免不同操作互相限流）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WindowOpType {
+    Show,
+    Hide,
+    Toggle,
+    Destroy,
+}
+
+impl WindowOpType {
+    const fn as_index(self) -> usize {
+        match self {
+            Self::Show => 0,
+            Self::Hide => 1,
+            Self::Toggle => 2,
+            Self::Destroy => 3,
+        }
+    }
+}
+
+/// 按操作类型分开的上次操作时间戳数组
+/// 索引对应 WindowOpType 的 as_index()
+static LAST_WINDOW_OP_MS: [AtomicU64; 4] = [
+    AtomicU64::new(0), // Show
+    AtomicU64::new(0), // Hide
+    AtomicU64::new(0), // Toggle
+    AtomicU64::new(0), // Destroy
+];
+
+/// 自适应防抖检查（按操作类型分开）：
+/// - 距离上次同类型操作超过 IDLE_THRESHOLD（3s）→ 立即允许
+/// - 距离上次同类型操作小于 IDLE_THRESHOLD → 使用 DEBOUNCE 间隔
 ///
 /// 使用 fetch_update 将 load-判断-store 合并为单个原子操作，避免并发调用时的 TOCTOU 竞态。
-fn should_handle_window_operation() -> bool {
+fn should_handle_window_operation(op_type: WindowOpType) -> bool {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64;
 
-    LAST_WINDOW_OP_MS
+    let last_op_atomic = &LAST_WINDOW_OP_MS[op_type.as_index()];
+    last_op_atomic
         .fetch_update(Ordering::SeqCst, Ordering::Relaxed, |last| {
             let elapsed = now.saturating_sub(last);
             let threshold = if elapsed > WINDOW_IDLE_THRESHOLD_MS || last == 0 {
@@ -114,7 +142,7 @@ impl WindowManager {
     /// 智能显示主窗口
     pub async fn show_main_window() -> WindowOperationResult {
         // 防抖检查
-        if !should_handle_window_operation() {
+        if !should_handle_window_operation(WindowOpType::Show) {
             return WindowOperationResult::RateLimited;
         }
 
@@ -128,6 +156,10 @@ impl WindowManager {
                 logging!(info, Type::Window, "窗口不存在，创建新窗口");
                 if Self::create_window(true).await {
                     logging!(info, Type::Window, "窗口创建成功");
+                    // 【注意】此处 50ms 等待是为了给前端页面渲染留出时间
+                    // 窗口创建后 WebView 需要加载页面，若立即返回 Created，
+                    // 调用方可能在页面未渲染完成时就执行操作导致异常
+                    // 更好的方案是等待 PageLoadEvent，但那需要更复杂的同步机制
                     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                     WindowOperationResult::Created
                 } else {
@@ -156,7 +188,7 @@ impl WindowManager {
 
     /// 切换主窗口显示状态（显示/隐藏）
     pub async fn toggle_main_window() -> WindowOperationResult {
-        if !should_handle_window_operation() {
+        if !should_handle_window_operation(WindowOpType::Toggle) {
             return WindowOperationResult::RateLimited;
         }
 
@@ -248,8 +280,11 @@ impl WindowManager {
         let label = window.label().to_string();
         let app_handle_clone = app_handle.clone();
 
+        let (tx, rx) = std::sync::mpsc::channel::<bool>();
+
         match app_handle.run_on_main_thread(move || {
             let Some(w) = app_handle_clone.get_webview_window(&label) else {
+                let _ = tx.send(false);
                 return;
             };
 
@@ -288,6 +323,8 @@ impl WindowManager {
             } else {
                 logging!(warn, Type::Window, "窗口激活操作在主线程部分失败");
             }
+
+            let _ = tx.send(success);
         }) {
             Ok(_) => {
                 #[cfg(target_os = "macos")]
@@ -296,7 +333,15 @@ impl WindowManager {
                     handle::Handle::global().set_activation_policy_regular();
                 }
                 logging!(info, Type::Window, "已成功调度窗口激活任务到主线程");
-                WindowOperationResult::Shown
+                // 等待主线程执行结果，确保返回值反映实际操作结果
+                match rx.recv() {
+                    Ok(true) => WindowOperationResult::Shown,
+                    Ok(false) => WindowOperationResult::Failed,
+                    Err(_) => {
+                        logging!(warn, Type::Window, "接收窗口激活结果失败");
+                        WindowOperationResult::Failed
+                    }
+                }
             }
             Err(e) => {
                 logging!(warn, Type::Window, "调度窗口激活到主线程失败: {}", e);
@@ -347,7 +392,8 @@ impl WindowManager {
 
     /// 摧毁窗口
     /// 必须在主线程执行，避免与 UI 事件循环竞态导致崩溃
-    pub fn destroy_main_window() -> WindowOperationResult {
+    /// 异步等待主线程闭包执行完毕后返回，确保窗口真正销毁后才释放调用方的锁
+    pub async fn destroy_main_window() -> WindowOperationResult {
         let Some(window) = Self::get_main_window() else {
             return WindowOperationResult::NoAction;
         };
@@ -356,14 +402,19 @@ impl WindowManager {
         let label = window.label().to_string();
         let app_handle_clone = app_handle.clone();
 
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+
         match app_handle.run_on_main_thread(move || {
             if let Some(w) = app_handle_clone.get_webview_window(&label) {
                 if let Err(e) = w.destroy() {
                     logging!(debug, Type::Window, "销毁窗口时出错: {}", e);
                 }
             }
+            let _ = tx.send(());
         }) {
             Ok(_) => {
+                // 等待主线程上的销毁闭包执行完毕
+                let _ = rx.await;
                 logging!(info, Type::Window, "窗口已摧毁");
                 #[cfg(target_os = "macos")]
                 {

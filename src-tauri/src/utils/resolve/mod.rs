@@ -62,7 +62,21 @@ pub fn resolve_setup_async() {
         });
         init_verge_config().await;
         Config::verify_config_initialization().await;
-        init_window().await;
+
+        // 优化启动顺序：先判断是否需要进入轻量模式，避免"创建窗口再销毁"的资源浪费
+        // - 静默启动且启用了自动轻量模式：直接进入轻量模式，不创建窗口
+        // - 其他情况：正常创建窗口
+        let is_silent_start = Config::verge().await.data_arc().enable_silent_start.unwrap_or(false);
+        let enable_auto_lightweight = Config::verge().await.data_arc().enable_auto_light_weight_mode.unwrap_or(false);
+
+        if is_silent_start && enable_auto_lightweight {
+            // 静默启动 + 自动轻量模式：直接进入轻量模式，跳过窗口创建
+        } else {
+            // 正常启动：先创建窗口
+            init_window().await;
+        }
+
+        init_auto_lightweight_boot().await;
 
         let core_init = AsyncHandler::spawn(|| async {
             init_service_manager().await;
@@ -75,7 +89,6 @@ pub fn resolve_setup_async() {
             core_init,
             init_timer(),
             init_hotkey(),
-            init_auto_lightweight_boot(),
             init_silent_updater(),
         );
 
@@ -200,7 +213,9 @@ pub(super) async fn init_window() {
 
 pub fn resolve_done() {
     RESOLVE_DONE.store(true, Ordering::Release);
-    RESOLVE_NOTIFY.notify_waiters();
+    // 使用 notify_one() 而非 notify_waiters()：notify_one() 存储许可，
+    // 即使通知时 wait_for_resolve_done 还未 await notified()，后续 await 也能立即返回，避免通知丢失
+    RESOLVE_NOTIFY.notify_one();
 }
 
 pub fn is_resolve_done() -> bool {
@@ -208,8 +223,12 @@ pub fn is_resolve_done() -> bool {
 }
 
 pub async fn wait_for_resolve_done() {
-    if is_resolve_done() {
-        return;
+    // 先注册 notified() 再检查标志，防止错过通知（与 ServiceManager::current() 同模式）
+    loop {
+        let notified = RESOLVE_NOTIFY.notified();
+        if RESOLVE_DONE.load(Ordering::Acquire) {
+            return;
+        }
+        notified.await;
     }
-    RESOLVE_NOTIFY.notified().await;
 }

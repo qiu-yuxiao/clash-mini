@@ -12,7 +12,7 @@ use anyhow::Result;
 use std::sync::OnceLock;
 use std::time::Duration;
 use tauri::{
-    AppHandle, Manager as _, Wry,
+    AppHandle, Wry,
     menu::{IsMenuItem, MenuEvent, MenuItem},
 };
 
@@ -20,11 +20,6 @@ mod menu_def;
 use menu_def::MenuIds;
 
 const TRAY_CLICK_DEBOUNCE_MS: u64 = 300;
-
-#[allow(dead_code)]
-pub struct TrayIconState {
-    pub tray: std::sync::Arc<tokio::sync::Mutex<Option<TrayIcon>>>,
-}
 
 /// 轻量模式菜单项引用，用于在进入/退出轻量模式时动态设置 enabled 状态
 static LITE_MODE_MENU_ITEM: OnceLock<MenuItem<Wry>> = OnceLock::new();
@@ -146,10 +141,7 @@ impl Tray {
                     let _ = tray.set_tooltip(Some("Clash Mini"));
                     tray.on_tray_icon_event(on_tray_icon_event);
                     tray.on_menu_event(on_menu_event);
-                    app_handle_clone.manage(TrayIconState {
-                        tray: std::sync::Arc::new(tokio::sync::Mutex::new(Some(tray))),
-                    });
-                    log::info!(target: "app", "[Tray] System tray created and managed successfully");
+                    log::info!(target: "app", "[Tray] System tray created successfully");
                 }
                 Err(e) => {
                     log::error!(target: "app", "[Tray] Failed to build tray icon on main thread: {}", e);
@@ -236,6 +228,11 @@ impl Tray {
 }
 
 fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
+    // 退出期间忽略托盘事件，避免在清理阶段触发新的操作
+    if handle::Handle::global().is_exiting() {
+        return;
+    }
+
     if let TrayIconEvent::Click {
         button: MouseButton::Left,
         button_state: MouseButtonState::Down,
@@ -255,10 +252,18 @@ fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
 }
 
 fn on_menu_event(app: &AppHandle, event: MenuEvent) {
-    if !Tray::global().should_handle_tray_click() {
+    // 退出期间忽略菜单事件，避免在清理阶段触发新的操作
+    if handle::Handle::global().is_exiting() {
         return;
     }
+
     if event.id.as_ref().is_empty() {
+        return;
+    }
+
+    // EXIT 菜单项不走防抖，确保用户点退出一定有响应
+    let is_exit = event.id.as_ref() == MenuIds::EXIT;
+    if !is_exit && !Tray::global().should_handle_tray_click() {
         return;
     }
     let _app_clone = app.clone(); // 修复编译警告：添加下划线前缀
@@ -290,13 +295,19 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
 }
 
 /// 根据轻量模式状态更新托盘菜单的对勾及可用性
+/// 必须在主线程执行，与 update_icon 保持一致，避免跨线程修改原生菜单资源
 pub fn update_lite_mode_menu(is_in: bool) {
-    if let Some(item) = LITE_MODE_MENU_ITEM.get() {
+    let Some(item) = LITE_MODE_MENU_ITEM.get() else {
+        return;
+    };
+    let item = item.clone();
+    let app_handle = crate::core::handle::Handle::app_handle().clone();
+    let _ = app_handle.run_on_main_thread(move || {
         if is_in {
             let _ = item.set_text("✔ 轻量模式 / Lite mode");
         } else {
             let _ = item.set_text("轻量模式 / Lite mode");
         }
         let _ = item.set_enabled(true);
-    }
+    });
 }

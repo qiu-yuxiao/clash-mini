@@ -12,6 +12,14 @@ static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
 /// 全局持有的正在运行的任务句柄，用于在 Profile 切换时进行主动中止
 static ACTIVE_TASKS: Mutex<Vec<AbortHandle>> = Mutex::new(Vec::new());
 
+/// 中止所有活跃的测速任务（应用退出/重启时调用）
+pub fn abort_all_active_tasks() {
+    let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
+    for handle in active.drain(..) {
+        handle.abort();
+    }
+}
+
 /// 用于通知后台监测线程：活动配置已被切换
 pub static PROFILE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
@@ -129,10 +137,14 @@ pub(crate) async fn get_current_profile_uid() -> Option<String> {
 }
 
 /// 等待 Clash 内核 API 及代理组节点列表填充完毕
+/// 如果期间检测到 Profile 切换通知，立即返回 false，让调用方重新用新 Profile 操作
 pub(crate) async fn wait_for_clash_ready() -> bool {
     let start_time = Instant::now();
 
     // 阶段 1：等待内核 API 接口响应
+    // 【注意】此处 clone mihomo 后跨 await 使用是安全的：
+    // - MihomoManager 是全局单例，clone 的是 Arc，实例不会被替换
+    // - 若后续改为可热替换，则需每次 await 后重新获取
     while start_time.elapsed().as_secs() < 30 {
         if crate::core::handle::Handle::global().is_exiting() {
             logging!(info, Type::Lightweight, "[后台监测] 阶段 1 中断：应用正在退出");
@@ -143,7 +155,13 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
             logging!(info, Type::Lightweight, "[后台监测] 阶段 1 完成：内核 API 已就绪");
             break;
         }
-        sleep(Duration::from_millis(200)).await;
+        tokio::select! {
+            _ = sleep(Duration::from_millis(200)) => {}
+            _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                logging!(info, Type::Lightweight, "[后台监测] 阶段 1 中断：检测到 Profile 切换");
+                return false;
+            }
+        }
     }
 
     if start_time.elapsed().as_secs() >= 30 {
@@ -167,7 +185,13 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
                 }
             }
         }
-        sleep(Duration::from_millis(500)).await;
+        tokio::select! {
+            _ = sleep(Duration::from_millis(500)) => {}
+            _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                logging!(info, Type::Lightweight, "[后台监测] 阶段 2 中断：检测到 Profile 切换");
+                return false;
+            }
+        }
     }
 
     logging!(
@@ -259,11 +283,13 @@ async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
 /// - `sort_type`: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序（仅影响展示顺序）
 /// - `select`: true=测速完成后将 PROXY 切换至最快节点；false=仅测速填充展示，不切换
+/// - `skip_wait_ready`: true=跳过 wait_for_clash_ready（调用方已确保就绪）
 pub async fn trigger_backend_auto_select(
     profile_uid: &str,
     node_names: Option<Vec<String>>,
     sort_type: i32,
     select: bool,
+    skip_wait_ready: bool,
 ) -> anyhow::Result<AutoSelectOutcome> {
     // 互斥锁防止并发调用
     if AUTO_SELECT_RUNNING
@@ -284,8 +310,8 @@ pub async fn trigger_backend_auto_select(
     }
     let _guard = LockGuard;
 
-    // 确保内核就绪后再进行选点操作
-    if !wait_for_clash_ready().await {
+    // 确保内核就绪后再进行选点操作（调用方已确保就绪时跳过）
+    if !skip_wait_ready && !wait_for_clash_ready().await {
         logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败：内核尚未就绪");
         return Ok(AutoSelectOutcome {
             display: vec![],
@@ -297,10 +323,16 @@ pub async fn trigger_backend_auto_select(
     // 如果发生 panic，_guard 会在栈展开时自动释放锁
     let result = trigger_backend_auto_select_inner(profile_uid, node_names, sort_type, select).await;
 
-    // 正常完成，显式释放锁（_guard 会在函数结束时再次 drop，但这是安全的）
-    // 注意：这里我们手动释放锁，确保锁尽早释放
-    // 但为了简化，我们依赖 _guard 的 Drop 实现
-    // Rust 会在函数返回时自动 drop _guard
+    // 锁已通过 Drop Guard 释放，在此之后执行副作用操作
+    // （refresh_clash 和 notify_delay_results 不影响选点逻辑，放在锁外可减少锁持有时间）
+    if let Ok(outcome) = &result {
+        if outcome.selected {
+            crate::core::handle::Handle::refresh_clash();
+        }
+        if !outcome.display.is_empty() {
+            crate::core::handle::Handle::notify_delay_results("PROXY".into(), outcome.display.clone());
+        }
+    }
 
     result
 }
@@ -372,11 +404,44 @@ async fn trigger_backend_auto_select_inner(
 
     let test_url = get_test_url().await;
 
+    struct WorkerPoolGuard {
+        abort_handles: Vec<AbortHandle>,
+        armed: bool,
+    }
+
+    impl Drop for WorkerPoolGuard {
+        fn drop(&mut self) {
+            if self.armed {
+                for handle in &self.abort_handles {
+                    handle.abort();
+                }
+            }
+        }
+    }
+
+    impl WorkerPoolGuard {
+        const fn new() -> Self {
+            Self {
+                abort_handles: Vec::new(),
+                armed: true,
+            }
+        }
+
+        fn push(&mut self, handle: AbortHandle) {
+            self.abort_handles.push(handle);
+        }
+
+        fn disarm(mut self) -> Vec<AbortHandle> {
+            self.armed = false;
+            std::mem::take(&mut self.abort_handles)
+        }
+    }
+
     let valid_nodes = Arc::new(valid_nodes);
     let next_index = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let (res_tx, mut res_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut workers = Vec::new();
-    let mut abort_handles = Vec::new();
+    let mut pool_guard = WorkerPoolGuard::new();
 
     for _ in 0..MAX_CONCURRENT_DELAY_TESTS {
         let valid_nodes = Arc::clone(&valid_nodes);
@@ -408,14 +473,15 @@ async fn trigger_backend_auto_select_inner(
                 }
             }
         });
-        abort_handles.push(task.abort_handle());
+        pool_guard.push(task.abort_handle());
         workers.push(task);
     }
 
     // 释放主线程持有的发送端，以便当所有 worker 退出时接收通道能够关闭
     drop(res_tx);
 
-    // 将工作池的中止句柄存入全局，以便需要时可以中止它们
+    // 所有 worker spawn 成功，解除 guard 的自动 abort，将句柄存入全局
+    let abort_handles = pool_guard.disarm();
     {
         let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
         *active = abort_handles;
@@ -484,7 +550,6 @@ async fn trigger_backend_auto_select_inner(
                         "[后台监测] 成功将 PROXY 策略组切换为: {}",
                         fastest_node
                     );
-                    crate::core::handle::Handle::refresh_clash();
                     selected = true;
                 }
                 Err(e) => {
@@ -494,11 +559,6 @@ async fn trigger_backend_auto_select_inner(
         } else {
             logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: 所有测速节点均不可达");
         }
-    }
-
-    // 统一通过事件将展示结果回写前端 UI（所有调用路径一致，含 command 触发）
-    if !display.is_empty() {
-        crate::core::handle::Handle::notify_delay_results("PROXY".into(), display.clone());
     }
 
     Ok(AutoSelectOutcome { display, selected })
@@ -525,6 +585,11 @@ pub fn start_background_monitor() {
         let mut auto_select_fail_count = 0u32;
 
         loop {
+            if crate::core::handle::Handle::global().is_exiting() {
+                logging!(info, Type::Lightweight, "[后台监测] 检测到应用退出，监测线程终止");
+                break;
+            }
+
             if is_first_run {
                 is_first_run = false;
                 // 首次启动时等待内核就绪，确保后续 API 调用不会失败
@@ -541,7 +606,7 @@ pub fn start_background_monitor() {
                     if let Some(uid) = get_current_profile_uid().await {
                         let _ = restore_profile_selected_nodes(&uid).await;
                         // 委托后端执行初始化自动选点；结果经事件回写前端 UI
-                        let _ = trigger_backend_auto_select(&uid, None, 0, true).await;
+                        let _ = trigger_backend_auto_select(&uid, None, 0, true, false).await;
                     }
                 }
             } else {
@@ -552,6 +617,10 @@ pub fn start_background_monitor() {
                     NORMAL_CHECK_INTERVAL_SECS
                 };
 
+                // 【注意】tokio::select! 中两个 Notify 的 notified() 分支：
+                // - 若两个 Notify 同时有许可，select! 只会选中一个，另一个的许可会保留到下一次循环
+                // - 由于两个分支最终都会将 last_check_time 提前（效果等价），丢失一次也不会出问题
+                // - Notify::notify_one() 会存储许可，因此不存在"通知完全丢失"的风险
                 tokio::select! {
                     _ = sleep(Duration::from_secs(check_interval)) => {}
                     _ = MONITOR_WAKEUP_NOTIFY.notified() => {
@@ -566,6 +635,7 @@ pub fn start_background_monitor() {
                         for handle in active.drain(..) {
                             handle.abort();
                         }
+                        drop(active);
                         last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                     }
                 }
@@ -628,7 +698,7 @@ pub fn start_background_monitor() {
                         "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点"
                     );
                     // 委托后端执行网络恢复自愈选点；结果经事件回写前端 UI
-                    let _ = trigger_backend_auto_select(&current_profile, None, 0, true).await;
+                    let _ = trigger_backend_auto_select(&current_profile, None, 0, true, false).await;
                 }
             } else if was_online && !is_online {
                 logging!(
@@ -713,7 +783,7 @@ pub fn start_background_monitor() {
                                         "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
                                     );
 
-                                    match trigger_backend_auto_select(&current_profile, None, 0, true).await {
+                                    match trigger_backend_auto_select(&current_profile, None, 0, true, false).await {
                                         Ok(outcome) => {
                                             if outcome.selected {
                                                 auto_select_fail_count = 0; // 选点成功，重置失败计数

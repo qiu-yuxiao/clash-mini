@@ -58,6 +58,7 @@ pub async fn read_seq_map(path: &PathBuf) -> Result<SeqMap> {
 
 /// save the data to the file
 /// can set `prefix` string to add some comments
+/// 使用原子写入（临时文件 + rename）避免 TOCTOU 竞态和写入中途损坏
 pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Option<&str>) -> Result<()> {
     let data_str = with_encryption(|| async { serde_yaml_ng::to_string(data) }).await?;
 
@@ -68,18 +69,52 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
 
     let yaml_bytes = yaml_str.as_bytes();
 
-    let should_write = match tokio::fs::read(path).await {
-        Ok(existing_bytes) => existing_bytes != yaml_bytes,
-        Err(_) => true,
-    };
-
-    if should_write {
-        let path_str = path.as_os_str().to_string_lossy().to_string();
-        tokio::fs::write(path, yaml_bytes)
-            .await
-            .with_context(|| format!("failed to save file \"{path_str}\""))?;
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    // 内容未变化时跳过写入，减少不必要的磁盘 IO
+    if let Ok(existing_bytes) = tokio::fs::read(path).await {
+        if existing_bytes == yaml_bytes {
+            return Ok(());
+        }
     }
+
+    // 原子写入：先写临时文件，再 rename 到目标文件
+    let parent_dir = path
+        .parent()
+        .ok_or_else(|| anyhow!("failed to get parent directory of \"{}\"", path.display()))?;
+
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| anyhow!("failed to get file name of \"{}\"", path.display()))?;
+
+    let tmp_file_name = format!(
+        "{}.tmp_{}",
+        file_name.to_string_lossy(),
+        std::process::id()
+    );
+    let tmp_path = parent_dir.join(tmp_file_name);
+
+    let path_str = path.as_os_str().to_string_lossy().to_string();
+    let tmp_path_str = tmp_path.as_os_str().to_string_lossy().to_string();
+
+    tokio::fs::write(&tmp_path, yaml_bytes)
+        .await
+        .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
+
+    // 在 Windows 上，rename 前需要确保目标文件不存在（或先删除）
+    // 使用 std::fs::rename 是原子的（在同一文件系统上）
+    if cfg!(windows) {
+        // Windows 上 rename 不会自动覆盖目标文件，先尝试删除
+        let _ = tokio::fs::remove_file(path).await;
+    }
+
+    let result = std::fs::rename(&tmp_path, path);
+
+    if let Err(e) = result {
+        // 重命名失败时清理临时文件
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (atomic rename failed)"));
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     Ok(())
 }

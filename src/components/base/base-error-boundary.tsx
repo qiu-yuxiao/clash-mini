@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary'
 
-function ErrorFallback({ error }: FallbackProps) {
+function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   const errorMessage = error instanceof Error ? error.message : String(error)
   const errorStack = error instanceof Error ? error.stack : undefined
 
@@ -15,6 +15,17 @@ function ErrorFallback({ error }: FallbackProps) {
         <summary>Error Stack</summary>
         <pre>{errorStack}</pre>
       </details>
+
+      <button
+        onClick={resetErrorBoundary}
+        style={{
+          marginTop: 12,
+          padding: '8px 16px',
+          cursor: 'pointer',
+        }}
+      >
+        Try again
+      </button>
     </div>
   )
 }
@@ -43,10 +54,17 @@ export const AreaErrorFallback = ({ error }: FallbackProps) => {
 
 interface Props {
   children?: ReactNode
+  resetKey?: unknown
 }
 
-export const BaseErrorBoundary = ({ children }: Props) => {
+// L-21: 增强 BaseErrorBoundary，支持 resetKey 触发重置，避免白屏
+export const BaseErrorBoundary = ({ children, resetKey }: Props) => {
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>{children}</ErrorBoundary>
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      resetKeys={resetKey !== undefined ? [resetKey] : undefined}
+    >
+      {children}
+    </ErrorBoundary>
   )
 }
