@@ -753,6 +753,10 @@ pub fn start_background_monitor() {
                                     }
 
                                     // 连续 5 次 auto_select 失败 → Windows 系统警报
+                                    // 注意：show_error_dialog 内部使用 MessageBoxW 同步阻塞调用，
+                                    // 这会阻塞当前 tokio worker 线程直到用户点击"确定"。
+                                    // 这是有意为之的设计：5次失败说明网络环境已严重恶化，
+                                    // 继续健康检测和自愈已无意义，弹窗期间停下来等用户处理是正确行为。
                                     if auto_select_fail_count >= 5 {
                                         auto_select_fail_count = 0;
                                         logging!(
