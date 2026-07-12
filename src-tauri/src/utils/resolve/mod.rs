@@ -67,7 +67,11 @@ pub fn resolve_setup_async() {
         // - 静默启动且启用了自动轻量模式：直接进入轻量模式，不创建窗口
         // - 其他情况：正常创建窗口
         let is_silent_start = Config::verge().await.data_arc().enable_silent_start.unwrap_or(false);
-        let enable_auto_lightweight = Config::verge().await.data_arc().enable_auto_light_weight_mode.unwrap_or(false);
+        let enable_auto_lightweight = Config::verge()
+            .await
+            .data_arc()
+            .enable_auto_light_weight_mode
+            .unwrap_or(false);
 
         if is_silent_start && enable_auto_lightweight {
             // 静默启动 + 自动轻量模式：直接进入轻量模式，跳过窗口创建
@@ -85,12 +89,7 @@ pub fn resolve_setup_async() {
             init_system_proxy_guard().await;
         });
 
-        let _ = futures::join!(
-            core_init,
-            init_timer(),
-            init_hotkey(),
-            init_silent_updater(),
-        );
+        let _ = futures::join!(core_init, init_timer(), init_hotkey(), init_silent_updater(),);
 
         crate::module::monitor::start_background_monitor();
         Handle::refresh_clash();

@@ -85,11 +85,7 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
         .file_name()
         .ok_or_else(|| anyhow!("failed to get file name of \"{}\"", path.display()))?;
 
-    let tmp_file_name = format!(
-        "{}.tmp_{}",
-        file_name.to_string_lossy(),
-        std::process::id()
-    );
+    let tmp_file_name = format!("{}.tmp_{}", file_name.to_string_lossy(), std::process::id());
     let tmp_path = parent_dir.join(tmp_file_name);
 
     let path_str = path.as_os_str().to_string_lossy().to_string();

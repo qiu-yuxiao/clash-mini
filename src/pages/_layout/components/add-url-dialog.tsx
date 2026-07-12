@@ -1,4 +1,15 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, useTheme, Menu, MenuItem, Divider } from '@mui/material'
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  useTheme,
+  Menu,
+  MenuItem,
+  Divider,
+} from '@mui/material'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import React, { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,7 +29,10 @@ interface AddUrlDialogProps {
   onClose: () => void
 }
 
-export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({ open, onClose }) => {
+export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
+  open,
+  onClose,
+}) => {
   const { t } = useTranslation()
   const theme = useTheme()
   const [text, setText] = useState('')
@@ -139,7 +153,8 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({ open, onClose }) => 
     if (input) {
       const start = input.selectionStart ?? 0
       const end = input.selectionEnd ?? 0
-      const newValue = text.substring(0, start) + textToPaste + text.substring(end)
+      const newValue =
+        text.substring(0, start) + textToPaste + text.substring(end)
       setText(newValue)
       setTimeout(() => {
         input.focus()
@@ -174,6 +189,8 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({ open, onClose }) => 
       <Dialog
         open={open}
         onClose={handleClose}
+        fullWidth
+        maxWidth={false}
         slotProps={{
           paper: {
             sx: {
@@ -264,8 +281,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({ open, onClose }) => 
           onClick={handleCut}
           disabled={
             !inputRef.current ||
-            inputRef.current.selectionStart ===
-              inputRef.current.selectionEnd
+            inputRef.current.selectionStart === inputRef.current.selectionEnd
           }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
@@ -275,8 +291,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({ open, onClose }) => 
           onClick={handleCopy}
           disabled={
             !inputRef.current ||
-            inputRef.current.selectionStart ===
-              inputRef.current.selectionEnd
+            inputRef.current.selectionStart === inputRef.current.selectionEnd
           }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
@@ -295,9 +310,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({ open, onClose }) => 
         >
           🔍 全选
         </MenuItem>
-        <Divider
-          sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }}
-        />
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
           onClick={handleClear}
           disabled={!text}

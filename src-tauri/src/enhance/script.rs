@@ -1,5 +1,5 @@
-use crate::process::AsyncHandler;
 use crate::constants::timing::INTERNAL_CONTROL_TIMEOUT_MS;
+use crate::process::AsyncHandler;
 
 use super::use_lowercase;
 use anyhow::{Error, Result};

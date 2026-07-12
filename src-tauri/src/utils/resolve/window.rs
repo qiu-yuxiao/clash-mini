@@ -126,11 +126,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
                         // 页面加载超时，强制显示窗口
                         let _ = window_clone.show();
                         let _ = window_clone.set_focus();
-                        logging!(
-                            info,
-                            Type::Window,
-                            "页面加载超时，强制显示窗口"
-                        );
+                        logging!(info, Type::Window, "页面加载超时，强制显示窗口");
                     }
                 }
             });

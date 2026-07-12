@@ -19,10 +19,7 @@ import {
 } from '@/utils/button-styles'
 
 import LogsPage from '../../logs'
-import {
-  isSameVersion,
-  formatCoreVersion,
-} from '../utils/style-helpers'
+import { isSameVersion, formatCoreVersion } from '../utils/style-helpers'
 
 interface GithubAsset {
   name: string
@@ -120,6 +117,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
       <Dialog
         open={editProfileOpen}
         onClose={() => setEditProfileOpen(false)}
+        fullWidth
+        maxWidth={false}
         slotProps={{
           paper: {
             className: 'theme-panel',
@@ -251,6 +250,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             setClientUpdateOpen(false)
           }
         }}
+        fullWidth
+        maxWidth={false}
         slotProps={{
           paper: {
             className: 'theme-panel',
@@ -377,8 +378,10 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             disabled={
               clientStatus === 'downloading' ||
               clientStatus === 'done' ||
-              !!(clientUpdateObj &&
-                isSameVersion(appVersion, clientUpdateObj.version))
+              !!(
+                clientUpdateObj &&
+                isSameVersion(appVersion, clientUpdateObj.version)
+              )
             }
             sx={{
               ...get3DButtonStyle(theme, 'contained', 'primary'),
@@ -408,6 +411,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             setCoreUpdateOpen(false)
           }
         }}
+        fullWidth
+        maxWidth={false}
         slotProps={{
           paper: {
             className: 'theme-panel',
@@ -536,13 +541,16 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
       <Dialog
         open={logsOpen}
         onClose={() => setLogsOpen(false)}
-        maxWidth="md"
         fullWidth
+        maxWidth={false}
         slotProps={{
           paper: {
+            className: 'theme-panel',
             sx: {
               background: 'var(--theme-bg, var(--background-color))',
               height: '480px',
+              width: 'calc(100% - 32px)',
+              maxWidth: '800px',
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',

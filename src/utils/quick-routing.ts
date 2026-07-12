@@ -69,7 +69,7 @@ export const addQuickRoutingRule = async (
 
     await withMergeFileLock(async () => {
       // 3. 读取全局 Merge 配置文件
-      let mergeYaml = ''
+      let mergeYaml: string
       try {
         mergeYaml = await readProfileFile('Merge')
       } catch (readErr) {
@@ -116,7 +116,9 @@ export const addQuickRoutingRule = async (
 // 把用户输入的一串文本（多个网址/域名，支持换行、逗号、分号分隔）解析成
 // 一条条 Clash 规则（DOMAIN-SUFFIX 或 IP-CIDR），全部以 PROXY 置顶写入 Merge 的 prepend-rules。
 // 返回实际新增的规则条数。
-export const addQuickRoutingRules = async (rawText: string): Promise<number> => {
+export const addQuickRoutingRules = async (
+  rawText: string,
+): Promise<number> => {
   const lines = (rawText || '')
     .split(/[\n,;]+/)
     .map((l) => l.trim())
@@ -133,7 +135,7 @@ export const addQuickRoutingRules = async (rawText: string): Promise<number> => 
 
     let addedCount = 0
     await withMergeFileLock(async () => {
-      let mergeYaml = ''
+      let mergeYaml: string
       try {
         mergeYaml = await readProfileFile('Merge')
       } catch (readErr) {

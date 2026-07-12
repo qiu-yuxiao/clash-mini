@@ -8,7 +8,12 @@ import {
 } from 'react'
 
 import { useVisibility } from '@/hooks/use-visibility'
-import type { ITrafficDataPoint, ISamplerStats, TrafficWorkerRequestMessage, ITrafficWorkerSnapshotMessage } from '@/types/traffic'
+import type {
+  ITrafficDataPoint,
+  ISamplerStats,
+  TrafficWorkerRequestMessage,
+  ITrafficWorkerSnapshotMessage,
+} from '@/types/traffic'
 import { debugLog } from '@/utils/debug'
 import { TrafficDataSampler, formatTrafficName } from '@/utils/traffic-sampler'
 import { Traffic } from 'tauri-plugin-mihomo-api'
@@ -212,19 +217,26 @@ class TrafficWorkerClient {
       this.ready = true
       this.post(initMessage)
       this.flushQueue()
-      debugLog('[TrafficWorkerClient] Background Web Worker reused successfully')
+      debugLog(
+        '[TrafficWorkerClient] Background Web Worker reused successfully',
+      )
       return
     }
 
     try {
       const worker = new TrafficWorker()
-      worker.onmessage = (event: MessageEvent<ITrafficWorkerSnapshotMessage>) => {
+      worker.onmessage = (
+        event: MessageEvent<ITrafficWorkerSnapshotMessage>,
+      ) => {
         this.listeners.forEach((listener) => {
           listener(event.data)
         })
       }
       worker.onerror = (error) => {
-        debugLog('[TrafficWorkerClient] Web Worker runtime error, falling back to inline:', error)
+        debugLog(
+          '[TrafficWorkerClient] Web Worker runtime error, falling back to inline:',
+          error,
+        )
         worker.onmessage = null
         worker.onerror = null
         try {
@@ -241,7 +253,9 @@ class TrafficWorkerClient {
       this.ready = true
       this.post(initMessage)
       this.flushQueue()
-      debugLog('[TrafficWorkerClient] Background Web Worker started successfully')
+      debugLog(
+        '[TrafficWorkerClient] Background Web Worker started successfully',
+      )
     } catch (e) {
       debugLog(
         '[TrafficWorkerClient] Failed to instantiate background Web Worker, falling back to inline:',
@@ -456,6 +470,7 @@ export const useTrafficMonitorEnhanced = (options?: {
         client.stop()
         // L-30: 引用计数为 0 时，延迟 5 分钟后销毁 Worker，
         // 避免频繁创建/销毁的开销，同时保证长时间不使用时能释放资源
+        // eslint-disable-next-line @eslint-react/web-api-no-leaked-timeout
         destroyTimer = setTimeout(() => {
           if (refCounter.getCount() === 0 && workerClient) {
             workerClient.destroy()

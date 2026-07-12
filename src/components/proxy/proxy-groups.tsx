@@ -30,13 +30,13 @@ import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
 import { useProxiesData } from '@/providers/app-data-context'
 import { DragRegionContext } from '@/providers/drag-region-context'
+import { batchTestLockRef } from '@/services/batch-test-lock'
 import {
   getProfiles,
   triggerAutoSelect,
   updateProxyChainConfigInRuntime,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
-import { batchTestLockRef } from '@/services/batch-test-lock'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
@@ -326,7 +326,12 @@ export const ProxyGroups = (props: Props) => {
       node.removeEventListener('scroll', listener, options)
       saveScrollPositionThrottled.cancel()
     }
-  }, [handleScroll, saveScrollPosition, saveScrollPositionThrottled, scrollPositionKey])
+  }, [
+    handleScroll,
+    saveScrollPosition,
+    saveScrollPositionThrottled,
+    scrollPositionKey,
+  ])
 
   // 滚动到顶部
   const scrollToTop = useCallback(() => {

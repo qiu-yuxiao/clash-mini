@@ -438,7 +438,12 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
             // Only use UAC elevation to clean up the Admin task if it exists.
             if is_task_enabled(other)? {
                 if let Err(err) = remove_task_elevated(other) {
-                    logging!(warn, Type::Setup, "Failed to clean up conflicting admin auto-launch task: {}. Proceeding to create user task.", err);
+                    logging!(
+                        warn,
+                        Type::Setup,
+                        "Failed to clean up conflicting admin auto-launch task: {}. Proceeding to create user task.",
+                        err
+                    );
                 }
             }
             // Create user task using standard privileges (no UAC prompt required).
@@ -471,7 +476,12 @@ pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
     // 2. Only request UAC elevation if an Admin task exists and needs to be deleted.
     if is_task_enabled(TaskMode::Admin)? {
         if let Err(err) = remove_task_elevated(TaskMode::Admin) {
-            logging!(warn, Type::Setup, "Failed to clean up conflicting admin auto-launch task during disable: {}.", err);
+            logging!(
+                warn,
+                Type::Setup,
+                "Failed to clean up conflicting admin auto-launch task during disable: {}.",
+                err
+            );
         }
     }
 

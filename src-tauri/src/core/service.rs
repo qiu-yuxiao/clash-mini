@@ -693,7 +693,10 @@ impl ServiceManager {
     }
 }
 
-async fn run_service_command(operation: impl FnOnce() -> Result<()> + Send + 'static, label: &'static str) -> Result<()> {
+async fn run_service_command(
+    operation: impl FnOnce() -> Result<()> + Send + 'static,
+    label: &'static str,
+) -> Result<()> {
     tokio::task::spawn_blocking(operation)
         .await
         .unwrap_or_else(|e| Err(anyhow::anyhow!("spawn_blocking join error: {e}")))

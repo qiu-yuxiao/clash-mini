@@ -1,6 +1,7 @@
 use super::CmdResult;
 use super::StringifyErr as _;
 use crate::core::validate::{ValidationNoticeTarget, handle_validation_notice};
+use crate::feat::CURRENT_SWITCHING_PROFILE;
 use crate::utils::window_manager::WindowManager;
 use crate::{
     config::{
@@ -21,7 +22,6 @@ use scopeguard::defer;
 use smartstring::alias::String;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use crate::feat::CURRENT_SWITCHING_PROFILE;
 
 /// 尝试获取配置切换锁，失败时记录指定的日志并返回指定的 busy 值。
 /// 成功时自动 defer! 释放锁。
@@ -76,7 +76,10 @@ pub async fn enhance_profiles() -> CmdResult<ValidationOutcome> {
 /// 导入配置文件
 #[tauri::command]
 pub async fn import_profile(url: std::string::String, option: Option<PrfOption>) -> CmdResult {
-    try_lock_profile_switching!("当前正在切换或更新配置，放弃导入请求", Err("当前正在切换或更新配置，请稍候再试".into()));
+    try_lock_profile_switching!(
+        "当前正在切换或更新配置，放弃导入请求",
+        Err("当前正在切换或更新配置，请稍候再试".into())
+    );
 
     logging!(info, Type::Cmd, "[导入订阅] 开始导入: {}", help::mask_url(&url));
 
@@ -116,7 +119,11 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
     }
 
     if is_current_changed {
-        logging!(info, Type::Cmd, "[导入订阅] 自动激活首个导入的配置，开始刷新内核配置...");
+        logging!(
+            info,
+            Type::Cmd,
+            "[导入订阅] 自动激活首个导入的配置，开始刷新内核配置..."
+        );
         crate::process::AsyncHandler::spawn(move || async move {
             if let Err(e) = CoreManager::global().update_config_forced().await {
                 logging!(error, Type::Cmd, "[导入订阅] 自动刷新配置内核失败: {}", e);
@@ -169,7 +176,10 @@ pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResu
 
 #[tauri::command]
 pub async fn update_profile(index: String, option: Option<PrfOption>) -> CmdResult {
-    try_lock_profile_switching!("当前正在切换或更新配置，放弃更新请求", Err("当前正在切换或更新配置，请稍候再试".into()));
+    try_lock_profile_switching!(
+        "当前正在切换或更新配置，放弃更新请求",
+        Err("当前正在切换或更新配置，请稍候再试".into())
+    );
 
     match feat::update_profile(&index, option.as_ref(), true, true, true).await {
         Ok(_) => Ok(()),
@@ -270,7 +280,12 @@ async fn discard_and_restore(current_profile: Option<&String>) -> CmdResult<()> 
     Config::profiles().await.discard();
     if let Some(prev_profile) = current_profile {
         restore_previous_profile(prev_profile).await?;
-        logging!(info, Type::Cmd, "配置更新失败已回滚，向前端发送配置重置变更事件: {}", prev_profile);
+        logging!(
+            info,
+            Type::Cmd,
+            "配置更新失败已回滚，向前端发送配置重置变更事件: {}",
+            prev_profile
+        );
         handle::Handle::notify_profile_changed(prev_profile);
     }
     Ok(())

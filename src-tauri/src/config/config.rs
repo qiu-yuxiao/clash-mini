@@ -196,7 +196,11 @@ impl Config {
             .or_else(|| runtime_data.config.as_ref())
             .cloned()
             .unwrap_or_else(|| {
-                logging!(warn, Type::Config, "No runtime config found, generating minimal config as fallback");
+                logging!(
+                    warn,
+                    Type::Config,
+                    "No runtime config found, generating minimal config as fallback"
+                );
                 generate_minimal_config()
             });
 

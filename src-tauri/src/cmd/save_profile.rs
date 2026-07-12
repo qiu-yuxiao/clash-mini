@@ -4,7 +4,7 @@ use crate::{
     config::{Config, IProfiles, PrfItem},
     core::{
         CoreManager, handle,
-        validate::{CoreConfigValidator, ValidationOutcome, ValidationNoticeTarget, handle_validation_notice},
+        validate::{CoreConfigValidator, ValidationNoticeTarget, ValidationOutcome, handle_validation_notice},
     },
     utils::dirs,
 };
@@ -19,7 +19,6 @@ pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdR
         Some(d) => d,
         None => return Ok(ValidationOutcome::Valid),
     };
-
 
     // 在异步操作前获取必要元数据并释放锁
     let (rel_path, is_merge_file, is_script_file, affects_runtime) = {
@@ -76,7 +75,6 @@ pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdR
         affects_runtime,
     )
     .await?;
-
 
     Ok(changes_applied)
 }

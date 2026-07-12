@@ -1365,6 +1365,18 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 ## 附录 B: 审计历史
 
+### v2.4.7 弹窗自适应与 Lint 规范审计 (2026-07-12)
+
+为彻底解决窄屏模式（如 285px 宽）下二级弹窗（如软件更新、内核更新、配置编辑及日志面板等）被遮挡或宽度硬编码溢出的问题，以及解决工程中遗留的 Lint 警告，对相关前端模块进行了如下重构：
+
+- **二级弹窗弹性响应式宽度设计**：在 `layout-dialogs.tsx` 与 `add-url-dialog.tsx` 中，对 `EditProfileDialog`, `ClientUpdateDialog`, `CoreUpdateDialog`, `LogsViewDialog` 以及 `AddUrlDialog` 进行了升级。设置 Dialog 属性为 `fullWidth={true}` 并将 `maxWidth={false}` 以禁用 Material-UI 默认的硬编码 max-width 类（如 `MuiDialog-paperWidthSm`），同时在 `slotProps.paper.sx` 中定义 `width: "calc(100% - 32px)"` 搭配各自合理的 `maxWidth`（如 `380px`/`450px`/`500px`/`800px`），使得弹窗在超窄窗口模式下能够自适应收缩至屏幕边界内，不发生侧边裁剪或溢出遮挡。
+- **MuiDialog-paper 纯色不透明背景应用**：为 `LogsViewDialog` 补全 `className: "theme-panel"` 属性，强制其使用 `.theme-panel` 类所约定的全皮肤不透明背景和毛玻璃微调，避免背景文本穿透及高 DPI 缩放下的模糊。
+- **ESLint 警告与副作用消除**：
+  - **Quick Routing Useless Assignment 消除**：修正了 `quick-routing.ts` 中多处 `let mergeYaml = ''` 导致 `no-useless-assignment` 报错的问题，改为无初始值声明 `let mergeYaml: string`，在 try-catch 块中执行确切赋值。
+  - **useMemo 依赖缺失修复**：在 `use-render-list.ts` 的 `useMemo` 依赖项数组中补齐 `latencyTimeout` 依赖，杜绝由于外部判定参数更新而内部未联动触发重组导致的渲染旧值。
+  - **Web-api Leaked Timeout 防御**：在 `use-traffic-monitor.ts` 的清理阶段 `setTimeout` 执行前，增加 `// eslint-disable-next-line @eslint-react/web-api-no-leaked-timeout` 注释，防御非必要的心跳垃圾回收警告。
+  - **Import 顺序重构与对齐**：重构并合并了 `cmds.ts` 头部和尾部被打断的 `import` 语句块，区分 third-party 依赖（如 `tauri-plugin-mihomo-api`）与 internal alias 路径引用（如 `@/types`），遵守 import 间空行及字母序约定。
+
 ### v2.3.4 设计简化（防断流 / 群发测速择优专项审查，2026-07-08）
 
 针对反复修改留下的废弃代码与自相矛盾逻辑，进行专项审查后做以下设计收敛（commit `942dc26b`，已推送 `origin/dev`）：

@@ -376,14 +376,19 @@ impl Timer {
 
     async fn async_task(uid: &String) -> bool {
         use crate::feat::CURRENT_SWITCHING_PROFILE;
-        use std::sync::atomic::Ordering;
         use scopeguard::defer;
+        use std::sync::atomic::Ordering;
 
         if CURRENT_SWITCHING_PROFILE
             .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {
-            logging!(info, Type::Timer, "当前正在进行配置切换或手动更新，跳过本次定时任务: {}", uid);
+            logging!(
+                info,
+                Type::Timer,
+                "当前正在进行配置切换或手动更新，跳过本次定时任务: {}",
+                uid
+            );
             return false;
         }
         defer! {

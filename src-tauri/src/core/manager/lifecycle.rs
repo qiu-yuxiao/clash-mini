@@ -28,7 +28,11 @@ impl CoreManager {
 
         // 已有内核运行时保持幂等
         if !matches!(*self.get_running_mode(), RunningMode::NotRunning) {
-            logging!(info, Type::Core, "start_core called while a core is running; treated as no-op");
+            logging!(
+                info,
+                Type::Core,
+                "start_core called while a core is running; treated as no-op"
+            );
             return Ok(());
         }
 
@@ -112,8 +116,7 @@ impl CoreManager {
     }
 
     #[cfg(not(target_os = "windows"))]
-    async fn await_service_ready_if_needed(&self) {
-    }
+    async fn await_service_ready_if_needed(&self) {}
 
     /// 锁内设置运行模式（不包含耗时等待）
     async fn prepare_startup_mode(&self) -> Result<()> {

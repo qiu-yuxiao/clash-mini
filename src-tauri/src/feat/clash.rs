@@ -1,4 +1,6 @@
-use crate::{config::Config, constants::timing::NODE_DELAY_MAX_MS, core::handle, feat::clean_async, process::AsyncHandler, utils};
+use crate::{
+    config::Config, constants::timing::NODE_DELAY_MAX_MS, core::handle, feat::clean_async, process::AsyncHandler, utils,
+};
 
 use clash_verge_logging::{Type, logging};
 use once_cell::sync::Lazy;

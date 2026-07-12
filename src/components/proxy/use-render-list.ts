@@ -129,7 +129,6 @@ export const useRenderList = (
     }
   }, [proxiesData, mode, refreshProxy])
 
-
   // 非链式模式下注册 PROXY 组监听器，单点测速完成后驱动列表重排
   // 注意：批量测速已通过 checkListDelay 内部 queueGroupNotification 触发，此监听器同时覆盖两类场景
   useEffect(() => {
@@ -449,7 +448,9 @@ export const useRenderList = (
     })
 
     // L-18: 清理不再存在的组的缓存，防止 profile 切换后内存泄漏
-    const existingGroupNames = new Set(renderGroups.map((g: ProxyGroup) => g.name))
+    const existingGroupNames = new Set(
+      renderGroups.map((g: ProxyGroup) => g.name),
+    )
     cache.forEach((_, key) => {
       if (!existingGroupNames.has(key)) {
         cache.delete(key)
@@ -472,6 +473,7 @@ export const useRenderList = (
     runtimeConfig,
     selectedGroup,
     delayBump,
+    latencyTimeout,
   ])
 
   return {

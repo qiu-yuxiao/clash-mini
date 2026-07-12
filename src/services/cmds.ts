@@ -3,34 +3,6 @@ import dayjs from 'dayjs'
 import yaml from 'js-yaml'
 
 import { showNotice } from '@/services/notice-service'
-
-/**
- * H-17: IPC 超时包装工具函数
- * 对关键 IPC 调用包裹超时保护，防止后端卡住时前端 Promise 永远 pending。
- * 超时后 reject 并附带超时信息，便于调用方统一 catch 处理。
- */
-export function withIpcTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label = 'IPC',
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} 超时（${ms}ms）`)),
-      ms,
-    )
-    promise.then(
-      (val) => {
-        clearTimeout(timer)
-        resolve(val)
-      },
-      (err) => {
-        clearTimeout(timer)
-        reject(err)
-      },
-    )
-  })
-}
 import type {
   IConfigData,
   IProxyItem,
@@ -47,6 +19,37 @@ import type { IVergeConfig, ValidationOutcome } from '@/types/verge'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
+
+/**
+ * H-17: IPC 超时包装工具函数
+ * 对关键 IPC 调用包裹超时保护，防止后端卡住时前端 Promise 永远 pending。
+ * 超时后 reject 并附带超时信息，便于调用方统一 catch 处理。
+ */
+export function withIpcTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label = 'IPC',
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const msg = `[${label}] IPC call timed out after ${ms}ms`
+      console.error(msg)
+      showNotice.error(msg)
+      reject(new Error(msg))
+    }, ms)
+
+    promise.then(
+      (val) => {
+        clearTimeout(timer)
+        resolve(val)
+      },
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+    )
+  })
+}
 
 export async function getProfiles() {
   return withIpcTimeout(
@@ -85,7 +88,9 @@ export async function enhanceProfiles() {
         try {
           const parsed = yaml.load(rawYaml)
           if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            console.warn('[ProfileTransformer] YAML 解析结果不是有效对象，跳过增强')
+            console.warn(
+              '[ProfileTransformer] YAML 解析结果不是有效对象，跳过增强',
+            )
             return (
               (await invoke<ValidationOutcome>('enhance_profiles')).status ===
               'valid'

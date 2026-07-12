@@ -10,10 +10,10 @@ use tauri_plugin_shell::ShellExt as _;
 use tokio::fs;
 
 use crate::config::{Config, ConfigType};
+use crate::constants::timing::INTERNAL_CONTROL_TIMEOUT_MS;
 use crate::core::handle;
 use crate::singleton;
 use crate::utils::dirs;
-use crate::constants::timing::INTERNAL_CONTROL_TIMEOUT_MS;
 use clash_verge_logging::{Type, logging};
 
 pub struct CoreConfigValidator {
@@ -372,12 +372,25 @@ impl CoreConfigValidator {
                 .sidecar(clash_core.as_str())?
                 .args(["-t", "-d", app_dir_str, "-f", config_path])
         };
-        let output = match tokio::time::timeout(std::time::Duration::from_millis(INTERNAL_CONTROL_TIMEOUT_MS), command.output()).await {
+        let output = match tokio::time::timeout(
+            std::time::Duration::from_millis(INTERNAL_CONTROL_TIMEOUT_MS),
+            command.output(),
+        )
+        .await
+        {
             Ok(Ok(out)) => out,
             Ok(Err(err)) => return Err(err.into()),
             Err(_) => {
-                logging!(error, Type::Validate, "验证进程执行超时 ({}s)", INTERNAL_CONTROL_TIMEOUT_MS / 1000);
-                return Err(anyhow::anyhow!("Validation process timed out after {} seconds", INTERNAL_CONTROL_TIMEOUT_MS / 1000));
+                logging!(
+                    error,
+                    Type::Validate,
+                    "验证进程执行超时 ({}s)",
+                    INTERNAL_CONTROL_TIMEOUT_MS / 1000
+                );
+                return Err(anyhow::anyhow!(
+                    "Validation process timed out after {} seconds",
+                    INTERNAL_CONTROL_TIMEOUT_MS / 1000
+                ));
             }
         };
 
