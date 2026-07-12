@@ -1,3 +1,20 @@
+## v2.4.6
+
+### 🚀 Performance & Memory
+- **极限内存优化与工作集修剪 (Working Set Trimming)**：实装了挂载系统托盘（轻量模式）时的 Windows 工作集暴力回收机制。内核断开连接与 WS 订阅 2 秒后，通过调用 Windows 原生 API 强制要求系统清除并没收该进程物理内存中所有的闲置页。
+- **Mihomo 内核极限限额与瘦身**：将 `GOMEMLIMIT` 锁死为 `64MiB`，并将 `GOGC` 回收阈值压低至 `30`，强制 Go 虚拟机极高频率执行垃圾回收。同时配置 `geodata-mode: false` 强迫内核降级至 MMDB，并压缩 DNS 缓存至 512 条、禁用 `tcp-concurrent` 高并发握手，使常驻内存大幅瘦身，极其平稳。
+
+### 🚀 Features & Routing
+- **代理方式三态滑块**：将路由倾向开关重构为“全局代理 / GFWList / 添加网址”三选一滑块。当处于前两态时分别注入 `MATCH,PROXY` 与 `MATCH,DIRECT` 最终规则，其余行为对齐 GFWList 以 DIRECT 为兜底。
+- **多行添加网址弹框**：当切换到“添加网址”时，允许用户批量粘贴多个 URL/IP/域名（支持换行、分号、逗号分隔）。前端自动清洗协议头、去除端口和路径并识别双重顶级域名（如 `.co.uk`）提取后缀，置顶以 PROXY 组注入全局 Merge 的 `prepend-rules` 列表中立即生效。
+- **TUN DNS 体系清理 (Option A)**：清除了 `use_tun` 中被末端 `redir-host` 全局 DNS 重写机制所覆盖的 fake-ip 死代码，保持 macOS 下接管与还原系统公网 DNS 的后台能力。
+
+### 🐞 Fixed Bugs (代码审核一致性修复)
+- **多订阅并发安全锁与重构**：将 profile 中的本地原子锁提取为 `feat/profile.rs` 的全局排他原子锁。当自动更新定时器（Timer）触发时使用 `compare_exchange` 争抢锁，若前台正在切换或导入配置则自动退避，彻底消除了 YAML 读写冲突与网络闪断。
+- **12 国语言提示硬编码修复**：解决了多行网址导入提示在除英语外的 12 个多国语言包中直接硬编码为英文提示的问题，补齐了全套翻译。
+
+---
+
 ## v2.3.9
 
 ### 🚀 Performance

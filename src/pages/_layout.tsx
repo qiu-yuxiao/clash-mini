@@ -80,6 +80,7 @@ import { closeAllConnections, getProxyByName } from 'tauri-plugin-mihomo-api'
 
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
+import { AddUrlDialog } from './_layout/components/add-url-dialog'
 import { BasicSettingsCard } from './_layout/components/basic-settings-card'
 import { ConnectionsPanel } from './_layout/components/connections-panel'
 import { HelpMenuButton } from './_layout/components/help-menu-button'
@@ -87,7 +88,6 @@ import { LayoutDialogs } from './_layout/components/layout-dialogs'
 import { MiniTrafficPanel } from './_layout/components/mini-traffic-panel'
 import { ProfileImportCard } from './_layout/components/profile-import-card'
 import { RoutingPreferenceCard } from './_layout/components/routing-preference-card'
-import { AddUrlDialog } from './_layout/components/add-url-dialog'
 import { TakeoverModeCard } from './_layout/components/takeover-mode-card'
 import { ThemeSettingsCard } from './_layout/components/theme-settings-card'
 import {
