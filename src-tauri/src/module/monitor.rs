@@ -552,7 +552,12 @@ pub fn start_background_monitor() {
                         last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                     }
                     _ = PROFILE_SWITCH_NOTIFY.notified() => {
-                        logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒");
+                        logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，中止旧测速任务并立即唤醒");
+                        // 中止旧Profile的测速任务，释放AUTO_SELECT_RUNNING锁
+                        let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
+                        for handle in active.drain(..) {
+                            handle.abort();
+                        }
                         last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                     }
                 }
