@@ -137,7 +137,11 @@ export const useRenderList = (mode: string) => {
   const renderList: IRenderItem[] = useMemo(() => {
     if (!proxiesData) return []
 
-    // 正常模式的渲染逻辑
+    // 【核心架构约定 - 切勿误判为多组架构】
+    // Clash Mini 把所有上游代理组的节点合并到唯一一个 PROXY 组中。
+    // calcuProxies() 返回的 groups 数组里虽然可能包含 GLOBAL 等其他组（上游遗留的数据结构），
+    // 但 Mini 的所有节点选择/恢复/切换/测速逻辑只针对 PROXY 组，不应遍历多组。
+    // 如需修改此处，请先确认 Mini 单组架构约定（见 project_memory.md）。
     const renderGroups = proxiesData.groups?.length
       ? proxiesData.groups.filter((group) => group.name === 'PROXY')
       : []
@@ -257,14 +261,7 @@ export const useRenderList = (mode: string) => {
     }
     prevListRef.current = filtered
     return filtered
-  }, [
-    headStates,
-    proxiesData,
-    mode,
-    col,
-    delayBump,
-    latencyTimeout,
-  ])
+  }, [headStates, proxiesData, col, delayBump, latencyTimeout])
 
   return {
     renderList,

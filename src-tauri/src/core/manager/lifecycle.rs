@@ -95,8 +95,21 @@ impl CoreManager {
     pub async fn restart_core(&self) -> Result<()> {
         let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
+
+        // 【核心架构约定】Mini 只有 PROXY 一个有效代理组。
+        // 内核重启会重置 Selector 组的 now 字段为列表第一个节点（通常是广告假节点）。
+        // 这里在 stop 之前保存 PROXY 组的 now，在 start 之后恢复，避免前端显示假节点。
+        let saved_proxy_now = self.snapshot_proxy_group_now().await;
+
         self.stop_core_inner().await?;
-        self.start_core_inner().await
+        self.start_core_inner().await?;
+
+        // 恢复 PROXY 组的节点选择（等内核就绪后）
+        if let Some(node) = saved_proxy_now {
+            self.restore_proxy_group_now(&node).await;
+        }
+
+        Ok(())
     }
 
     /// 锁外等待服务就绪（可能耗时很久，如UAC弹窗、服务启动等）
@@ -210,6 +223,80 @@ impl CoreManager {
             logging!(error, Type::Service, "应用回退配置失败: {}", e);
             // 兜底设置运行模式，防止状态卡在 Service 导致后续无法启动
             self.set_running_mode(RunningMode::Sidecar);
+        }
+    }
+
+    /// 快照当前 PROXY 组的 now 字段（用于内核重启后恢复）
+    /// 【核心架构约定】Mini 只有 PROXY 一个有效代理组，所以只快照 PROXY 组。
+    /// 返回 None 表示无需恢复（读取失败、now 为空、或应用退出中）。
+    async fn snapshot_proxy_group_now(&self) -> Option<std::string::String> {
+        if Handle::global().is_exiting() {
+            return None;
+        }
+        let mihomo = Handle::mihomo().await.clone();
+        match mihomo.get_group_by_name("PROXY").await {
+            Ok(group) => match group.now {
+                Some(node) if !node.is_empty() => {
+                    logging!(info, Type::Core, "快照 PROXY 组当前节点: {}", node);
+                    Some(node)
+                }
+                _ => None,
+            },
+            Err(e) => {
+                logging!(warn, Type::Core, "快照 PROXY 组失败（忽略，重启后不恢复）: {}", e);
+                None
+            }
+        }
+    }
+
+    /// 恢复 PROXY 组的节点选择（内核重启后调用）
+    /// 等待内核 API 就绪后调用 mihomo.select_node_for_group("PROXY", node)
+    /// 失败不抛错（兜底失败时前端可能显示假节点，但不影响代理功能本身）
+    async fn restore_proxy_group_now(&self, node: &str) {
+        if Handle::global().is_exiting() {
+            return;
+        }
+
+        let mihomo = Handle::mihomo().await.clone();
+
+        // 等待内核 API 就绪（最多 30 秒）
+        let start = std::time::Instant::now();
+        let mut api_ready = false;
+        while start.elapsed().as_secs() < 30 {
+            if Handle::global().is_exiting() {
+                return;
+            }
+            if mihomo.get_base_config().await.is_ok() {
+                api_ready = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        if !api_ready {
+            logging!(warn, Type::Core, "等待内核 API 就绪超时，跳过 PROXY 组节点恢复");
+            return;
+        }
+
+        // 等待 PROXY 组节点列表填充（最多 20 秒）
+        let start2 = std::time::Instant::now();
+        while start2.elapsed().as_secs() < 20 {
+            if Handle::global().is_exiting() {
+                return;
+            }
+            if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
+                if let Some(all) = group_info.all {
+                    if !all.is_empty() {
+                        break;
+                    }
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+
+        // 恢复节点选择
+        match mihomo.select_node_for_group("PROXY", node).await {
+            Ok(()) => logging!(info, Type::Core, "已恢复 PROXY 组节点选择: {}", node),
+            Err(e) => logging!(warn, Type::Core, "恢复 PROXY 组节点选择失败: {}", e),
         }
     }
 }

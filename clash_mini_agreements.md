@@ -1208,6 +1208,14 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 数据轮询统一由数据层配置驱动，严禁在组件中重复定义轮询查询。
 - **快捷分流简化**：
   - 代理组名称固定为 `'PROXY'`，严禁动态查找。
+- **节点选择恢复单组化**：
+  - 前端 `activateSelected` 与后端 `restore_profile_selected_nodes` 只处理 PROXY 组，严禁遍历 `selected` 数组中的多组（原版 Clash Verge Rev 的多组遍历逻辑已删除，因 Mini 只有 PROXY 一个有效代理组）。
+  - `selected` 数组在 Mini 中始终只包含一项：`{ name: 'PROXY', now: '...' }`。
+- **内核重启前后 PROXY 组节点状态保持**：
+  - 内核重启（`restart_core`）会重置 Selector 组的 `now` 字段为列表第一个节点（通常是广告假节点）。
+  - `restart_core` 内部必须在 stop 之前快照 PROXY 组的 `now`，在 start 之后等内核就绪并恢复 PROXY 组的节点选择。
+  - 热重载（`update_config_checked`）不会重置 `now` 字段，无需做保存/恢复。
+  - 所有调用 `restart_core` 的地方（`patch_clash`、`restart_app`、IPC 命令等）均自动受益，调用方不需重复实现。
 
 ### 7.2 订阅导入与内核就绪等待
 

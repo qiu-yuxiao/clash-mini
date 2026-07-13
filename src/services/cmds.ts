@@ -152,7 +152,10 @@ export async function enhanceProfiles() {
           }
         }
       } catch (yamlErr) {
-        console.warn('[ProfileTransformer] YAML 解析失败，将交由后端增强:', yamlErr)
+        console.warn(
+          '[ProfileTransformer] YAML 解析失败，将交由后端增强:',
+          yamlErr,
+        )
       }
     }
   }
@@ -288,6 +291,16 @@ export async function patchClashMode(payload: string) {
   )
 }
 
+/**
+ * 计算并返回所有代理数据。
+ *
+ * 【核心架构约定 - 切勿误判为多组架构】
+ * Clash Mini 把所有上游代理组的节点合并到唯一一个 PROXY 组中。
+ * 返回的 `groups` 数组里虽然包含 GLOBAL 等其他组（上游遗留的数据结构），
+ * 但 Mini 的所有节点选择/恢复/切换/测速逻辑只针对 PROXY 组。
+ * 调用方不应遍历 groups 做多组处理，应直接 `groups.find(g => g.name === 'PROXY')` 或等价过滤。
+ * 详见 project_memory.md 中「单一 PROXY 组」核心架构约定。
+ */
 export async function calcuProxies(): Promise<{
   global: IProxyGroupItem
   direct: IProxyItem
@@ -507,11 +520,7 @@ export async function getAutoProxy() {
 }
 
 export async function restartCore() {
-  return withIpcTimeout(
-    invoke<void>('restart_core'),
-    60_000,
-    'restartCore',
-  )
+  return withIpcTimeout(invoke<void>('restart_core'), 60_000, 'restartCore')
 }
 
 export async function openCoreDir() {
@@ -531,11 +540,7 @@ export async function openLogsDir() {
 }
 
 export async function openDevTools() {
-  return withIpcTimeout(
-    invoke('open_devtools'),
-    10_000,
-    'openDevTools',
-  )
+  return withIpcTimeout(invoke('open_devtools'), 10_000, 'openDevTools')
 }
 
 export async function downloadIconCache(url: string, name: string) {

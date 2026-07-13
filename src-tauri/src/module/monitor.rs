@@ -216,24 +216,21 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
     false
 }
 
-/// 恢复当前活动 Profile 配置文件中所保存的上次选定的各策略组节点
+/// 恢复当前活动 Profile 配置文件中所保存的上次选定的 PROXY 组节点
+// 【核心架构约定】Mini 只有 PROXY 一个有效代理组（所有上游代理组已合并），
+// 此函数只处理 PROXY 组，不遍历多组（上游 Clash Verge Rev 的多组遍历逻辑已移除）。
 pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow::Result<()> {
     let profiles = Config::profiles().await;
     let latest = profiles.latest_arc();
     let item = latest.get_item(profile_uid)?;
     if let Some(selected) = &item.selected {
-        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-        for select in selected {
-            if let (Some(group), Some(node)) = (&select.name, &select.now) {
-                if !node.is_empty() && !group.is_empty() {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 恢复策略组选择节点: {} -> {}",
-                        group,
-                        node
-                    );
-                    let _ = mihomo.select_node_for_group(group, node).await;
+        // Mini 单组架构：只恢复 PROXY 组
+        if let Some(entry) = selected.iter().find(|s| s.name.as_deref() == Some("PROXY")) {
+            if let (Some(_group), Some(node)) = (&entry.name, &entry.now) {
+                if !node.is_empty() {
+                    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+                    logging!(info, Type::Lightweight, "[后台监测] 恢复 PROXY 组选择节点: {}", node);
+                    let _ = mihomo.select_node_for_group("PROXY", node).await;
                 }
             }
         }

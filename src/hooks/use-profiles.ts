@@ -41,35 +41,37 @@ export const useProfiles = () => {
     await refetch()
   }, [refetch])
 
-  const patchProfiles = useLockFn(async (
-    value: Partial<IProfilesConfig>,
-    signal?: AbortSignal,
-    options?: { deferRefreshOnSuccess?: boolean },
-  ) => {
-    try {
-      if (signal?.aborted) {
-        throw new DOMException('Operation was aborted', 'AbortError')
-      }
-      const success = await patchProfilesConfig(value)
+  const patchProfiles = useLockFn(
+    async (
+      value: Partial<IProfilesConfig>,
+      signal?: AbortSignal,
+      options?: { deferRefreshOnSuccess?: boolean },
+    ) => {
+      try {
+        if (signal?.aborted) {
+          throw new DOMException('Operation was aborted', 'AbortError')
+        }
+        const success = await patchProfilesConfig(value)
 
-      if (signal?.aborted) {
-        throw new DOMException('Operation was aborted', 'AbortError')
-      }
+        if (signal?.aborted) {
+          throw new DOMException('Operation was aborted', 'AbortError')
+        }
 
-      if (!options?.deferRefreshOnSuccess || !success) {
+        if (!options?.deferRefreshOnSuccess || !success) {
+          await mutateProfiles()
+        }
+
+        return success
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw error
+        }
+
         await mutateProfiles()
-      }
-
-      return success
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
         throw error
       }
-
-      await mutateProfiles()
-      throw error
-    }
-  })
+    },
+  )
 
   const patchCurrent = useLockFn(async (value: Partial<IProfileItem>) => {
     if (profiles?.current) {
@@ -80,7 +82,9 @@ export const useProfiles = () => {
     }
   })
 
-  // 根据selected的节点选择
+  // 根据selected的节点选择恢复 PROXY 组
+  // 【核心架构约定】Mini 只有 PROXY 一个有效代理组，此函数只处理 PROXY 组，
+  // 不遍历多组（上游 Clash Verge Rev 的多组遍历逻辑已移除）
   const activateSelected = useCallback(
     async (profileOverride?: IProfilesConfig) => {
       try {
@@ -110,102 +114,68 @@ export const useProfiles = () => {
           return
         }
 
-        debugLog(
-          `[ActivateSelected] 当前profile有 ${selected.length} 个代理选择配置`,
-        )
-
-        type SelectedEntry = { name?: string; now?: string }
-        const selectedMap = Object.fromEntries(
-          (selected as SelectedEntry[])
-            .filter(
-              (each): each is SelectedEntry & { name: string; now: string } =>
-                each.name != null && each.now != null,
-            )
-            .map((each) => [each.name, each.now]),
-        )
-
-        let hasChange = false
-        const newSelected: typeof selected = []
-        const { global, groups } = proxiesData
-        const selectableTypes = new Set([
-          'Selector',
-          'URLTest',
-          'Fallback',
-          'LoadBalance',
-        ])
-
-        // 处理所有代理组
-        for (const group of [global, ...(groups ?? [])]) {
-          if (!group) {
-            continue
-          }
-
-          const { type, name, now } = group
-          const savedProxy = name === 'GLOBAL' ? 'PROXY' : selectedMap[name]
-          const availableProxies = Array.isArray(group.all) ? group.all : []
-
-          if (!selectableTypes.has(type)) {
-            if (savedProxy != null || now != null) {
-              const preferredProxy = now ? now : savedProxy
-              newSelected.push({ name, now: preferredProxy })
-            }
-            continue
-          }
-
-          if (savedProxy == null) {
-            if (now != null) {
-              newSelected.push({ name, now })
-            }
-            continue
-          }
-
-          const stripSuffix = (n: string) => {
-            return n.replace(/\s\(\d{6}\)$/, '').trim()
-          }
-
-          const matchedProxy = availableProxies.find((proxy) => {
-            const pName = typeof proxy === 'string' ? proxy : proxy?.name
-            if (!pName) return false
-            return stripSuffix(pName) === stripSuffix(savedProxy)
-          })
-
-          if (!matchedProxy) {
-            console.warn(
-              `[ActivateSelected] 保存的代理 ${savedProxy} 不存在于代理组 ${name}`,
-            )
-            hasChange = true
-            newSelected.push({ name, now: now ?? savedProxy })
-            continue
-          }
-
-          const matchedProxyName =
-            typeof matchedProxy === 'string' ? matchedProxy : matchedProxy.name
-
-          if (matchedProxyName !== now) {
-            debugLog(
-              `[ActivateSelected] 需要切换代理组 ${name}: ${now} -> ${matchedProxyName}`,
-            )
-            hasChange = true
-            try {
-              await selectNodeForGroupWithTimeout(name, matchedProxyName)
-            } catch (error: unknown) {
-              console.warn(
-                `[ActivateSelected] 切换代理组 ${name} 失败:`,
-                error instanceof Error ? error.message : String(error),
-              )
-            }
-          }
-
-          newSelected.push({ name, now: matchedProxyName })
-        }
-
-        if (!hasChange) {
-          debugLog('[ActivateSelected] 所有代理选择已经是目标状态，无需更新')
+        // Mini 单组架构：只处理 PROXY 组
+        const proxyGroup = proxiesData.groups?.find((g) => g.name === 'PROXY')
+        if (!proxyGroup) {
+          debugLog('[ActivateSelected] 未找到 PROXY 组，跳过')
           return
         }
 
-        debugLog(`[ActivateSelected] 完成代理切换，保存新的选择配置`)
+        // 从 selected 数组中取 PROXY 组的保存节点
+        const savedEntry = selected.find(
+          (each: any) => each?.name === 'PROXY' && each?.now,
+        )
+        const savedProxyName: string | undefined = savedEntry?.now
+        if (!savedProxyName) {
+          debugLog('[ActivateSelected] selected 中无 PROXY 组的有效记录，跳过')
+          return
+        }
 
+        const availableProxies = Array.isArray(proxyGroup.all)
+          ? proxyGroup.all
+          : []
+        const currentNow = proxyGroup.now || ''
+
+        const stripSuffix = (n: string) => {
+          return n.replace(/\s\(\d{6}\)$/, '').trim()
+        }
+
+        const matchedProxy = availableProxies.find((proxy) => {
+          const pName = typeof proxy === 'string' ? proxy : proxy?.name
+          if (!pName) return false
+          return stripSuffix(pName) === stripSuffix(savedProxyName)
+        })
+
+        if (!matchedProxy) {
+          console.warn(
+            `[ActivateSelected] 保存的代理 ${savedProxyName} 不存在于 PROXY 组`,
+          )
+          return
+        }
+
+        const matchedProxyName =
+          typeof matchedProxy === 'string' ? matchedProxy : matchedProxy.name
+
+        if (matchedProxyName === currentNow) {
+          debugLog('[ActivateSelected] PROXY 组选择已是目标状态，无需更新')
+          return
+        }
+
+        debugLog(
+          `[ActivateSelected] 需要切换 PROXY 组: ${currentNow} -> ${matchedProxyName}`,
+        )
+        try {
+          await selectNodeForGroupWithTimeout('PROXY', matchedProxyName)
+        } catch (error: unknown) {
+          console.warn(
+            '[ActivateSelected] 切换 PROXY 组失败:',
+            error instanceof Error ? error.message : String(error),
+          )
+          return
+        }
+
+        // 写回 selected 数组（仅 PROXY 一项）
+        const newSelected = [{ name: 'PROXY', now: matchedProxyName }]
         try {
           await patchProfile(current.uid, { selected: newSelected })
           debugLog('[ActivateSelected] 代理选择配置保存成功')
