@@ -73,6 +73,9 @@ pub async fn restart_core() -> CmdResult {
     result
 }
 
+// L2-08: 延迟测试失败时返回的魔法数字常量
+pub const DELAY_ERROR_VALUE: u32 = 10000;
+
 /// 测试URL延迟
 #[tauri::command]
 pub async fn test_delay(url: String) -> CmdResult<u32> {
@@ -80,7 +83,7 @@ pub async fn test_delay(url: String) -> CmdResult<u32> {
         Ok(delay) => delay,
         Err(e) => {
             logging!(error, Type::Cmd, "{}", e);
-            10000u32
+            DELAY_ERROR_VALUE
         }
     };
     Ok(result)

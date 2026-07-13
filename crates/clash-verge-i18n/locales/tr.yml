@@ -26,11 +26,6 @@ notifications:
   appHidden:
     title: Uygulama Gizlendi
     body: Clash Mini arka planda çalışıyor.
-  updateReady:
-    title: Clash Mini Update
-    body: A new version (v{version}) has been downloaded and is ready to install.
-    installNow: Install Now
-    later: Later
 service:
   adminInstallPrompt: Clash Mini hizmetini kurmak için yönetici ayrıcalıkları gerekir.
   adminUninstallPrompt: Clash Mini hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.

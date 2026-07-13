@@ -1,5 +1,5 @@
 use tauri::webview::PageLoadEvent;
-use tauri::{Theme, WebviewWindow};
+use tauri::{Manager as _, Theme, WebviewWindow};
 
 use crate::{config::Config, core::handle, utils::resolve::window_script::build_window_initial_script};
 use clash_verge_logging::{Type, logging, logging_error};
@@ -118,8 +118,17 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             // 超时兜底：如果页面加载超时（默认 10 秒），强制显示窗口
             // 避免页面加载卡住导致用户看不到窗口
             let window_clone = window.clone();
+            let window_label = window.label().to_string();
             tokio::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                // L2-04: 退出阶段不操作窗口；通过 label 重新获取确认窗口仍存在
+                if crate::core::handle::Handle::global().is_exiting() {
+                    return;
+                }
+                let app_handle = crate::core::handle::Handle::app_handle();
+                if app_handle.get_webview_window(&window_label).is_none() {
+                    return;
+                }
                 // 检查窗口是否仍然存在且不可见
                 if let Ok(is_visible) = window_clone.is_visible() {
                     if !is_visible {

@@ -7,9 +7,9 @@ import {
   getRuntimeConfig,
   patchClashConfig,
 } from '@/services/cmds'
+import { getVersionWithTimeout } from '@/services/mihomo-api'
 import { queryClient } from '@/services/query-client'
 import type { IConfigData } from '@/types/clash'
-import { getVersion } from 'tauri-plugin-mihomo-api'
 
 type MutateClashUpdater =
   | ((old: IConfigData | undefined) => IConfigData | undefined)
@@ -72,7 +72,7 @@ export const useClash = () => {
 
   const { data: versionData, refetch: mutateVersion } = useQuery({
     queryKey: ['getVersion'],
-    queryFn: getVersion,
+    queryFn: getVersionWithTimeout,
   })
 
   const mutateClash = useCallback((updater?: MutateClashUpdater, revalidate?: boolean) => {

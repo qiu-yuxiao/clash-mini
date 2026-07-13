@@ -1,19 +1,13 @@
-import { ExpandMoreRounded } from '@mui/icons-material'
 import {
-  Alert,
   Box,
-  Chip,
-  IconButton,
   Menu,
   MenuItem,
-  Snackbar,
   Typography,
 } from '@mui/material'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   type Key,
-  type MouseEvent,
   type RefObject,
   useCallback,
   useEffect,
@@ -34,7 +28,6 @@ import { batchTestLockRef } from '@/services/batch-test-lock'
 import {
   getProfiles,
   triggerAutoSelect,
-  updateProxyChainConfigInRuntime,
 } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
@@ -43,7 +36,6 @@ import { isDummyNode } from '@/utils/node'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
-import { ProxyChain } from './proxy-chain'
 import { ProxyHead } from './proxy-head'
 import { ProxyRender } from './proxy-render'
 import { DEFAULT_STATE } from './use-head-state'
@@ -58,15 +50,6 @@ function useStableCallback<T extends (...args: any[]) => any>(fn: T): T {
 
 interface Props {
   mode: string
-  isChainMode?: boolean
-  chainConfigData?: string | null
-}
-
-interface ProxyChainItem {
-  id: string
-  name: string
-  type?: string
-  delay?: number
 }
 
 // Performance optimizations for large proxy lists (1000+ nodes):
@@ -78,22 +61,10 @@ interface ProxyChainItem {
 export const ProxyGroups = (props: Props) => {
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  const { mode, isChainMode = false, chainConfigData } = props
+  const { mode } = props
   // 消费拖拽区域状态，批量测速期间禁用 drag-region
   const { setEnabled: setDragRegionEnabled } = use(DragRegionContext)
 
-  const [proxyChain, setProxyChain] = useState<ProxyChainItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('proxy-chain-items')
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        return Array.isArray(parsed) ? parsed : []
-      }
-    } catch {
-      // ignore
-    }
-    return []
-  })
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [testingGroups, setTestingGroups] = useState<Record<string, boolean>>(
     {},
@@ -113,17 +84,6 @@ export const ProxyGroups = (props: Props) => {
     [],
   )
 
-  useEffect(() => {
-    try {
-      if (proxyChain.length > 0) {
-        localStorage.setItem('proxy-chain-items', JSON.stringify(proxyChain))
-      } else {
-        localStorage.removeItem('proxy-chain-items')
-      }
-    } catch {
-      // 隐私模式或存储满时静默失败
-    }
-  }, [proxyChain])
   const [ruleMenuAnchor, setRuleMenuAnchor] = useState<null | HTMLElement>(null)
   const [duplicateWarning, setDuplicateWarning] = useState<{
     open: boolean
@@ -135,31 +95,8 @@ export const ProxyGroups = (props: Props) => {
   useVerge()
   const { proxies: proxiesData } = useProxiesData()
   const groups = proxiesData?.groups
-  const availableGroups = useMemo(() => {
-    if (!groups) return []
-    // 在链式代理模式下，仅显示支持选择节点的 Selector 代理组
-    return isChainMode
-      ? groups.filter((g: any) => g.type === 'Selector')
-      : groups
-  }, [groups, isChainMode])
 
-  const defaultRuleGroup = useMemo(() => {
-    if (isChainMode && mode === 'rule' && availableGroups.length > 0) {
-      return availableGroups[0].name
-    }
-    return null
-  }, [availableGroups, isChainMode, mode])
-
-  const activeSelectedGroup = useMemo(
-    () => selectedGroup ?? defaultRuleGroup,
-    [selectedGroup, defaultRuleGroup],
-  )
-
-  const { renderList, onHeadState } = useRenderList(
-    mode,
-    isChainMode,
-    activeSelectedGroup,
-  )
+  const { renderList, onHeadState } = useRenderList(mode)
 
   const filteredRenderList = useMemo(() => {
     return renderList.filter((item) => item.type !== 1)
@@ -190,13 +127,7 @@ export const ProxyGroups = (props: Props) => {
   const restoredScrollKeyRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
   const [showScrollTop, setShowScrollTop] = useState(false)
-  const scrollPositionKey = useMemo(
-    () =>
-      isChainMode
-        ? `${mode}:chain:${activeSelectedGroup ?? 'all'}`
-        : `${mode}:normal`,
-    [activeSelectedGroup, isChainMode, mode],
-  )
+  const scrollPositionKey = useMemo(() => `${mode}:normal`, [mode])
   const stickyGroupIndexes = useMemo(
     () =>
       filteredRenderList.flatMap((item, index) =>
@@ -354,15 +285,6 @@ export const ProxyGroups = (props: Props) => {
     setDuplicateWarning({ open: false, message: '' })
   }, [])
 
-  const currentGroup = useMemo(() => {
-    if (!activeSelectedGroup) return null
-    return (
-      availableGroups.find(
-        (group: any) => group.name === activeSelectedGroup,
-      ) ?? null
-    )
-  }, [activeSelectedGroup, availableGroups])
-
   // 处理代理组选择菜单
   const handleGroupMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setRuleMenuAnchor(event.currentTarget)
@@ -375,54 +297,15 @@ export const ProxyGroups = (props: Props) => {
   const handleGroupSelect = (groupName: string) => {
     setSelectedGroup(groupName)
     handleGroupMenuClose()
-
-    if (isChainMode && mode === 'rule') {
-      updateProxyChainConfigInRuntime(null)
-      localStorage.removeItem('proxy-chain-group')
-      localStorage.removeItem('proxy-chain-exit-node')
-      localStorage.removeItem('proxy-chain-items')
-      setProxyChain([])
-    }
   }
 
   const handleChangeProxy = useCallback(
     (group: IProxyGroupItem, proxy: IProxyItem) => {
-      if (isChainMode) {
-        // 使用函数式更新来避免状态延迟问题
-        setProxyChain((prev) => {
-          // 检查是否已经存在相同名称的代理，防止重复添加
-          if (prev.some((item) => item.name === proxy.name)) {
-            const warningMessage = t('proxies.page.chain.duplicateNode')
-            setDuplicateWarning({
-              open: true,
-              message: warningMessage,
-            })
-            return prev // 返回原来的状态，不做任何更改
-          }
-
-          // 安全获取延迟数据，如果没有延迟数据则设为 undefined
-          const delay =
-            proxy?.history?.length > 0
-              ? proxy.history[proxy.history.length - 1].delay
-              : undefined
-
-          const chainItem: ProxyChainItem = {
-            id: `${proxy?.name}_${Date.now()}`,
-            name: proxy?.name,
-            type: proxy?.type,
-            delay: delay,
-          }
-
-          return [...prev, chainItem]
-        })
-        return
-      }
-
       if (!['Selector', 'URLTest', 'Fallback'].includes(group.type)) return
 
       handleProxyGroupChange(group, proxy)
     },
-    [handleProxyGroupChange, isChainMode, t],
+    [handleProxyGroupChange],
   )
 
   // 批量测速当前组全部节点并择优切换（委托后端单一引擎）
@@ -519,7 +402,6 @@ export const ProxyGroups = (props: Props) => {
       renderList={filteredRenderList}
       activeStickyIndex={activeStickyIndex}
       indent={mode === 'rule' || mode === 'script'}
-      isChainMode={isChainMode}
       measureElement={virtualizer.measureElement}
       onLocation={handleLocation}
       onCheckAll={handleCheckAll}
@@ -529,79 +411,6 @@ export const ProxyGroups = (props: Props) => {
       testingGroups={testingGroups}
     />
   )
-
-  if (isChainMode) {
-    // 获取所有代理组
-    const proxyGroups = proxiesData?.groups || []
-    const showRuleHeader = mode === 'rule' && proxyGroups.length > 0
-
-    return (
-      <>
-        <Box sx={{ display: 'flex', height: '100%', gap: 2 }}>
-          <Box
-            sx={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              height: '100%',
-              position: 'relative',
-            }}
-          >
-            {showRuleHeader && (
-              <ChainRuleHeader
-                title={t('proxies.page.rules.title')}
-                selectLabel={t('proxies.page.rules.select')}
-                currentGroup={currentGroup}
-                canSelectGroup={availableGroups.length > 0}
-                onMenuOpen={handleGroupMenuOpen}
-              />
-            )}
-
-            <Box
-              sx={{ flex: 1, minHeight: 0, position: 'relative', mx: 1, mb: 1 }}
-            >
-              {renderProxyList('100%')}
-            </Box>
-            <ScrollTopButton show={showScrollTop} onClick={scrollToTop} />
-          </Box>
-
-          <Box sx={{ width: '400px', minWidth: '300px' }}>
-            <ProxyChain
-              proxyChain={proxyChain}
-              onUpdateChain={setProxyChain}
-              chainConfigData={chainConfigData}
-              mode={mode}
-              selectedGroup={activeSelectedGroup}
-            />
-          </Box>
-        </Box>
-
-        <Snackbar
-          open={duplicateWarning.open}
-          autoHideDuration={3000}
-          onClose={handleCloseDuplicateWarning}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        >
-          <Alert
-            onClose={handleCloseDuplicateWarning}
-            severity="warning"
-            variant="filled"
-          >
-            {duplicateWarning.message}
-          </Alert>
-        </Snackbar>
-
-        <GroupSelectMenu
-          anchorEl={ruleMenuAnchor}
-          groups={availableGroups}
-          selectedGroup={activeSelectedGroup}
-          emptyText="暂无可用代理组"
-          onClose={handleGroupMenuClose}
-          onSelect={handleGroupSelect}
-        />
-      </>
-    )
-  }
 
   return (
     <Box
@@ -635,7 +444,6 @@ interface ProxyVirtualListProps {
   renderList: IRenderItem[]
   activeStickyIndex: number | null
   indent: boolean
-  isChainMode?: boolean
   measureElement: (node: Element | null) => void
   onLocation: (group: IRenderItem['group']) => void
   onCheckAll: (groupName: string) => void
@@ -652,79 +460,6 @@ interface ProxyGroupOption {
   name: string
   type: string
   all?: unknown[]
-}
-
-interface ChainRuleHeaderProps {
-  title: string
-  selectLabel: string
-  currentGroup: ProxyGroupOption | null
-  canSelectGroup: boolean
-  onMenuOpen: (event: MouseEvent<HTMLElement>) => void
-}
-
-function ChainRuleHeader({
-  title,
-  selectLabel,
-  currentGroup,
-  canSelectGroup,
-  onMenuOpen,
-}: ChainRuleHeaderProps) {
-  return (
-    <Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-      <Box
-        sx={{
-          px: 2,
-          py: 1.5,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '16px' }}>
-            {title}
-          </Typography>
-
-          {currentGroup && (
-            <Chip
-              size="small"
-              label={`${currentGroup.name} (${currentGroup.type})`}
-              variant="outlined"
-              sx={{
-                fontSize: '12px',
-                maxWidth: '200px',
-                '& .MuiChip-label': {
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                },
-              }}
-            />
-          )}
-        </Box>
-
-        {canSelectGroup && (
-          <IconButton
-            size="small"
-            onClick={onMenuOpen}
-            sx={{
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: '4px',
-              padding: '4px 8px',
-            }}
-          >
-            <Typography variant="body2" sx={{ mr: 0.5, fontSize: '12px' }}>
-              {selectLabel}
-            </Typography>
-            <ExpandMoreRounded fontSize="small" />
-          </IconButton>
-        )}
-      </Box>
-    </Box>
-  )
 }
 
 interface GroupSelectMenuProps {
@@ -801,7 +536,6 @@ function ProxyVirtualList({
   renderList,
   activeStickyIndex,
   indent,
-  isChainMode,
   measureElement,
   onLocation,
   onCheckAll,
@@ -899,7 +633,6 @@ function ProxyVirtualList({
                 onCheckAll={onCheckAll}
                 onHeadState={onHeadState}
                 onChangeProxy={onChangeProxy}
-                isChainMode={isChainMode}
                 isTesting={
                   testingGroups[renderList[virtualItem.index]?.group?.name]
                 }

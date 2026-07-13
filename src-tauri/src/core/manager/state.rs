@@ -166,14 +166,10 @@ impl CoreManager {
                 result
             );
             // 等待进程完全退出，最多2秒，确保端口释放
-            let _ = tokio::time::timeout(
-                std::time::Duration::from_secs(2),
-                async {
-                    // child 已被 kill，等待其退出
-                    // 注：CommandChild 的 wait 方法依赖于实现，这里简单 sleep 等待
-                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                }
-            ).await;
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            })
+            .await;
         }
         Self::kill_all_mini_cores().await;
     }

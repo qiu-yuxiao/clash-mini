@@ -9,7 +9,6 @@ pub mod service;
 pub mod sysopt;
 pub mod timer;
 pub mod tray;
-pub mod updater;
 pub mod validate;
 
 pub use self::{manager::CoreManager, timer::Timer};

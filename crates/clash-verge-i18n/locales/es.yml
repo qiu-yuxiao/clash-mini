@@ -26,11 +26,6 @@ notifications:
   appHidden:
     title: Aplicación oculta
     body: Clash Mini se está ejecutando en segundo plano.
-  updateReady:
-    title: Clash Mini Update
-    body: A new version (v{version}) has been downloaded and is ready to install.
-    installNow: Install Now
-    later: Later
 service:
   adminInstallPrompt: Instalar el servicio de Clash Mini requiere privilegios de administrador.
   adminUninstallPrompt: Desinstalar el servicio de Clash Mini requiere privilegios de administrador.

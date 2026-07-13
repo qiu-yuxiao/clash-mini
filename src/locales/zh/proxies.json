@@ -6,11 +6,9 @@
       "direct": "直连"
     },
     "actions": {
-      "toggleChain": "链式代理",
       "connect": "连接",
       "disconnect": "断开",
-      "connecting": "连接中...",
-      "clearChainConfig": "删除链式配置"
+      "connecting": "连接中..."
     },
     "provider": {
       "title": "代理集合",
@@ -41,25 +39,11 @@
     "placeholders": {
       "delayCheckUrl": "延迟测试链接"
     },
-    "chain": {
-      "header": "代理链配置",
-      "warning": "链式代理会显著降低网速。如果您没有明确的业务需求，或不了解此项配置，请保持关闭",
-      "empty": "链式代理会显著降低网速。如果您没有明确的业务需求，或不了解此项配置，请保持关闭",
-      "instruction": "顺序点击节点添加到代理链中",
-      "minimumNodes": "链式代理至少需要 2 个节点",
-      "minimumNodesHint": "链式代理至少需要 2 个节点，请再添加一个节点。",
-      "connectFailed": "连接链式代理失败",
-      "disconnectFailed": "断开链式代理失败",
-      "duplicateNode": "该节点已在链式代理表中",
-      "entryNode": "入口",
-      "exitNode": "出口"
-    },
     "messages": {
       "directMode": "全局直连"
     },
     "title": {
-      "default": "代理组",
-      "chainMode": "链式代理模式"
+      "default": "代理组"
     }
   },
   "feedback": {

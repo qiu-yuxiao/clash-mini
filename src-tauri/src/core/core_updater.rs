@@ -8,6 +8,7 @@ use crate::{
 use anyhow::{Context as _, Result, bail};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 use std::fs;
 use std::io;
 use tauri::{AppHandle, Emitter as _};
@@ -85,6 +86,137 @@ impl CoreUpdater {
             .context("failed to deserialize GitHub release JSON")?;
 
         Ok(release)
+    }
+
+    /// 在 release assets 中查找校验和文件并下载其内容。
+    /// 返回值: Ok(Some(文件名 -> sha256 哈希))，未找到返回 Ok(None)。
+    async fn fetch_checksums(
+        client: &reqwest::Client,
+        release: &GithubRelease,
+    ) -> Result<Option<std::collections::HashMap<String, String>>> {
+        // 常见的 GitHub Release 校验和文件命名
+        const CHECKSUM_FILE_NAMES: &[&str] = &["checksums.txt", "sha256sums.txt", "sha256sum.txt"];
+
+        let mut checksum_url: Option<String> = None;
+        for asset in &release.assets {
+            let lower = asset.name.to_lowercase();
+            if CHECKSUM_FILE_NAMES.iter().any(|n| lower == *n) {
+                checksum_url = Some(asset.browser_download_url.clone());
+                break;
+            }
+        }
+
+        let Some(url) = checksum_url else {
+            return Ok(None);
+        };
+
+        let response = client
+            .get(&url)
+            .send()
+            .await
+            .context("failed to download checksum file")?;
+
+        if !response.status().is_success() {
+            logging!(
+                warn,
+                Type::System,
+                "Checksum file download failed with status: {}",
+                response.status()
+            );
+            return Ok(None);
+        }
+
+        let body = response.text().await.context("failed to read checksum file body")?;
+
+        let mut map = std::collections::HashMap::new();
+        for line in body.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            // 常见格式: "<sha>  <filename>" 或 "<sha> *<filename>"
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() < 2 {
+                continue;
+            }
+            let sha = parts[0].to_lowercase();
+            if sha.len() != 64 {
+                continue;
+            }
+            let mut filename = parts[1].to_string();
+            // 去掉二进制模式标记 '*'
+            if let Some(stripped) = filename.strip_prefix('*') {
+                filename = stripped.to_string();
+            }
+            // 解析 base path（保留完整文件名）
+            if let Some(pos) = filename.rsplit('/').next() {
+                map.insert(pos.to_lowercase(), sha);
+            } else {
+                map.insert(filename.to_lowercase(), sha);
+            }
+        }
+
+        if map.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(map))
+    }
+
+    /// 计算下载文件的 SHA256 并与 release 中声明的校验和比对。
+    /// 若 release 中未提供校验和文件，则只记录警告，不阻断。
+    fn verify_download_sha256(
+        file_path: &std::path::Path,
+        asset_name: &str,
+        checksums: Option<&std::collections::HashMap<String, String>>,
+    ) -> Result<()> {
+        let Some(checksums) = checksums else {
+            logging!(
+                warn,
+                Type::System,
+                "No checksum file in release for asset {}, skipping integrity check",
+                asset_name
+            );
+            return Ok(());
+        };
+
+        let lookup = asset_name.to_lowercase();
+        let expected = checksums
+            .iter()
+            .find_map(|(k, v)| if *k == lookup { Some(v.clone()) } else { None });
+
+        let Some(expected_sha) = expected else {
+            logging!(
+                warn,
+                Type::System,
+                "Asset {} not listed in checksum file, skipping integrity check",
+                asset_name
+            );
+            return Ok(());
+        };
+
+        let mut hasher = Sha256::new();
+        let mut file = fs::File::open(file_path).context("failed to open downloaded file for hashing")?;
+        io::copy(&mut file, &mut hasher).context("failed to hash downloaded file")?;
+        let actual_sha = format!("{:x}", hasher.finalize());
+
+        if actual_sha.to_lowercase() != expected_sha.to_lowercase() {
+            bail!(
+                "Integrity check failed for {}: expected {}, got {}",
+                asset_name,
+                expected_sha,
+                actual_sha
+            );
+        }
+
+        logging!(
+            info,
+            Type::System,
+            "Integrity check passed for {} (sha256={})",
+            asset_name,
+            actual_sha
+        );
+        Ok(())
     }
 
     async fn download_body_to_file(
@@ -303,6 +435,39 @@ impl CoreUpdater {
                 let _ = fs::remove_file(&temp_download_path);
             }
             bail!(err_msg);
+        }
+
+        // 完整性校验：尝试从 release 中获取校验和文件并验证下载文件的 SHA256
+        emit_progress("verifying", 85, "正在校验下载文件完整性...");
+        let nm_checksum = NetworkManager::new();
+        let mut checksums_map: Option<std::collections::HashMap<String, String>> = None;
+        for proxy_type in &[ProxyType::Localhost, ProxyType::System, ProxyType::None] {
+            if let Ok(client) = nm_checksum.create_request(*proxy_type, Some(30), None, false).await {
+                match Self::fetch_checksums(&client, &release).await {
+                    Ok(Some(map)) => {
+                        checksums_map = Some(map);
+                        break;
+                    }
+                    Ok(None) => break, // 仓库里就没这个文件，无需重试
+                    Err(e) => {
+                        logging!(
+                            warn,
+                            Type::System,
+                            "fetch_checksums via {:?} failed: {:?}",
+                            proxy_type,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        if let Err(e) = Self::verify_download_sha256(&temp_download_path, &asset.name, checksums_map.as_ref()) {
+            let _ = fs::remove_file(&temp_download_path);
+            emit_progress("error", 0, &format!("完整性校验失败: {:?}", e));
+            // 重新拉起 core 以保证 mihomo 服务可用
+            let _ = CoreManager::global().start_core().await;
+            return Err(e);
         }
 
         // Prepare destination path

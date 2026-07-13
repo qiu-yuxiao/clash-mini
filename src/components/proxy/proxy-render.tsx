@@ -29,7 +29,6 @@ import type { IRenderItem } from './use-render-list'
 interface RenderProps {
   item: IRenderItem
   indent: boolean
-  isChainMode?: boolean
   isTesting?: boolean
   onLocation: (group: IRenderItem['group']) => void
   onCheckAll: (groupName: string) => void
@@ -49,7 +48,6 @@ const ProxyRenderComponent = (props: RenderProps) => {
     onCheckAll,
     onHeadState,
     onChangeProxy,
-    isChainMode: _ = false,
     isTesting,
   } = props
   const { type, group, headState, proxy, proxyCol, col } = item

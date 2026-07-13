@@ -11,16 +11,16 @@ import {
   getRunningMode,
   getSystemProxy,
 } from '@/services/cmds'
+import {
+  getBaseConfigWithTimeout,
+  getRuleProvidersWithTimeout,
+  getRulesWithTimeout,
+  getProxyByNameWithTimeout,
+} from '@/services/mihomo-api'
 import { queryClient } from '@/services/query-client'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { isDummyNode } from '@/utils/node'
 import type { ProxyProvider } from 'tauri-plugin-mihomo-api'
-import {
-  getBaseConfig,
-  getRuleProviders,
-  getRules,
-  getProxyByName,
-} from 'tauri-plugin-mihomo-api'
 
 import {
   ClashConfigContext,
@@ -118,13 +118,13 @@ export const AppDataProvider = ({
 
     if (isMinimal && !forceFull) {
       try {
-        const groupProxy = await getProxyByName('PROXY')
+        const groupProxy = await getProxyByNameWithTimeout('PROXY')
         if (groupProxy) {
           const activeNodeName = groupProxy.now || ''
           let activeNode: any = null
           if (activeNodeName) {
             try {
-              activeNode = await getProxyByName(activeNodeName)
+              activeNode = await getProxyByNameWithTimeout(activeNodeName)
             } catch (e) {
               console.warn('[AppDataProvider] Failed to fetch active node:', e)
             }
@@ -230,7 +230,7 @@ export const AppDataProvider = ({
     refetch: _refetchClashConfig,
   } = useQuery({
     queryKey: ['getClashConfig'],
-    queryFn: getBaseConfig,
+    queryFn: getBaseConfigWithTimeout,
     // getClashConfig 属"设置抽屉附加层"资源：消费者仅 BasicSettingsCard / 接管模式
     // systemProxyAddress，均在设置内容块(drawerOpen && !isMiniStatus)内，主窗口可见区不消费。
     // 故 enabled 须与设置内容 DOM 同一开关——抽屉打开才拉、关闭即停(仅缓存不 IPC)，
@@ -248,14 +248,14 @@ export const AppDataProvider = ({
 
   const { data: ruleProviders, refetch: _refetchRuleProviders } = useQuery({
     queryKey: ['getRuleProviders'],
-    queryFn: getRuleProviders,
+    queryFn: getRuleProvidersWithTimeout,
     enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
   })
 
   const { data: rulesData, refetch: _refetchRules } = useQuery({
     queryKey: ['getRules'],
-    queryFn: getRules,
+    queryFn: getRulesWithTimeout,
     enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
   })

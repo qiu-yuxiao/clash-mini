@@ -439,8 +439,22 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
     // 先清理前次会话可能残留的旧内核（崩溃退出时 clean_async 未执行）
     let _ = clash_verge_service_ipc::stop_clash().await;
 
-    // stop 后短暂等待，确保端口完全释放，避免 start 时端口冲突
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    // L2-02: stop 后轮询端口是否可用，替代固定 500ms 等待
+    let mixed_port = Config::clash().await.data_arc().get_mixed_port();
+    let mut waited = 0u64;
+    let poll_interval = 50u64;
+    let max_wait = 3000u64;
+    loop {
+        if tokio::net::TcpListener::bind(("127.0.0.1", mixed_port)).await.is_ok() {
+            break;
+        }
+        if waited >= max_wait {
+            logging!(warn, Type::Service, "等待端口释放超时({}ms)，继续启动", max_wait);
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(poll_interval)).await;
+        waited += poll_interval;
+    }
 
     let response = clash_verge_service_ipc::start_clash(&payload)
         .await

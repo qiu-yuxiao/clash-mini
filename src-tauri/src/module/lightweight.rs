@@ -10,11 +10,15 @@ use std::sync::atomic::{AtomicU8, Ordering};
 static LIGHTWEIGHT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// 轻量模式 cleanup 任务的 JoinHandle，用于退出时主动中止
-static LIGHTWEIGHT_CLEANUP_HANDLE: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>> = std::sync::Mutex::new(None);
+static LIGHTWEIGHT_CLEANUP_HANDLE: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>> =
+    std::sync::Mutex::new(None);
 
 /// 中止轻量模式 cleanup 后台任务
 pub fn abort_lightweight_cleanup() {
-    let value = LIGHTWEIGHT_CLEANUP_HANDLE.lock().unwrap_or_else(|e| e.into_inner()).take();
+    let value = LIGHTWEIGHT_CLEANUP_HANDLE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take();
     if let Some(handle) = value {
         handle.abort();
     }

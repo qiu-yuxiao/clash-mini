@@ -2,20 +2,20 @@ import { useCallback, useMemo, useRef } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import { debugLog } from '@/utils/debug'
 import {
-  closeConnection,
-  getConnections,
-  selectNodeForGroup,
-} from 'tauri-plugin-mihomo-api'
+  closeConnectionWithTimeout,
+  getConnectionsWithTimeout,
+  selectNodeForGroupWithTimeout,
+} from '@/services/mihomo-api'
+import { debugLog } from '@/utils/debug'
 
 // 缓存连接清理
 const cleanupConnections = async (previousProxy: string) => {
   try {
-    const { connections } = await getConnections()
+    const { connections } = await getConnectionsWithTimeout()
     const cleanupPromises = (connections ?? [])
       .filter((conn) => conn.chains.includes(previousProxy))
-      .map((conn) => closeConnection(conn.id))
+      .map((conn) => closeConnectionWithTimeout(conn.id))
 
     if (cleanupPromises.length > 0) {
       await Promise.allSettled(cleanupPromises)
@@ -83,7 +83,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       debugLog(`[ProxySelection] 代理切换: ${groupName} -> ${proxyName}`)
 
       try {
-        await selectNodeForGroup(groupName, proxyName)
+        await selectNodeForGroupWithTimeout(groupName, proxyName)
         onSuccess?.()
         persistSelection(groupName, proxyName, skipConfigSave)
         debugLog(

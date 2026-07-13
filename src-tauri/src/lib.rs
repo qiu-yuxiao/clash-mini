@@ -93,6 +93,10 @@ mod app_init {
         }
 
         app.deep_link().on_open_url(|event| {
+            // L2-03: 退出阶段不处理 deep link
+            if handle::Handle::global().is_exiting() {
+                return;
+            }
             let urls = event.urls();
             AsyncHandler::spawn(move || async move {
                 if let Some(url) = urls.first()
@@ -150,7 +154,6 @@ mod app_init {
             cmd::patch_clash_config,
             cmd::patch_clash_mode,
             cmd::get_runtime_config,
-            cmd::update_proxy_chain_config_in_runtime,
             cmd::get_proxy_addr,
             cmd::save_proxy_head_state,
             cmd::get_proxy_head_state,
@@ -249,23 +252,6 @@ pub fn run() {
                 .expect("failed to set global app handle");
 
             resolve::init_work_dir_and_logger()?;
-
-            let app_handle = app.app_handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let is_updating = crate::core::updater::SilentUpdater::global()
-                    .try_install_on_startup(&app_handle)
-                    .await;
-                if is_updating {
-                    std::process::exit(0);
-                }
-            });
-
-            let app_handle_bg = app.app_handle().clone();
-            tauri::async_runtime::spawn(async move {
-                crate::core::updater::SilentUpdater::global()
-                    .start_background_check(app_handle_bg)
-                    .await;
-            });
 
             logging!(info, Type::Setup, "开始应用初始化...");
             if let Err(e) = app_init::setup_autostart(app) {

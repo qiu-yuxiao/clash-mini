@@ -6,11 +6,9 @@
       "direct": "Direct"
     },
     "actions": {
-      "toggleChain": "チェーンプロキシ",
       "connect": "Connect",
       "disconnect": "Disconnect",
-      "connecting": "Connecting...",
-      "clearChainConfig": "Delete Chain Config"
+      "connecting": "Connecting..."
     },
     "provider": {
       "title": "プロキシプロバイダー",
@@ -41,25 +39,11 @@
     "placeholders": {
       "delayCheckUrl": "遅延テストURL"
     },
-    "chain": {
-      "header": "Chain Proxy Config",
-      "warning": "Chain proxy will significantly reduce network speed. If you do not have a clear business need, or do not understand this configuration, keep it disabled.",
-      "empty": "Chain proxy will significantly reduce network speed. If you do not have a clear business need, or do not understand this configuration, keep it disabled.",
-      "instruction": "Click nodes in order to add to proxy chain",
-      "minimumNodes": "Chain proxy requires at least 2 nodes",
-      "minimumNodesHint": "Chain proxy requires at least 2 nodes. Please add one more node.",
-      "connectFailed": "Failed to connect to proxy chain",
-      "disconnectFailed": "Failed to disconnect from proxy chain",
-      "duplicateNode": "Proxy node already exists in chain",
-      "entryNode": "入口",
-      "exitNode": "出口"
-    },
     "messages": {
       "directMode": "直接接続モード"
     },
     "title": {
-      "default": "プロキシグループ",
-      "chainMode": "Proxy Chain Mode"
+      "default": "プロキシグループ"
     }
   },
   "feedback": {

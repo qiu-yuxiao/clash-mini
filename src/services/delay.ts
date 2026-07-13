@@ -1,6 +1,7 @@
+import { delayProxyByNameWithTimeout } from '@/services/mihomo-api'
 import type { IProxyItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
-import { delayProxyByName, ProxyDelay } from 'tauri-plugin-mihomo-api'
+import { ProxyDelay } from 'tauri-plugin-mihomo-api'
 
 const hashKey = (name: string, group: string) => `${group ?? ''}::${name}`
 
@@ -46,9 +47,12 @@ class DelayManager {
   private itemFlushScheduled = false
   private groupFlushScheduled = false
 
+  // M2-09: 保存 interval ID，HMR 场景下可清理避免累积
+  private cleanupIntervalId: ReturnType<typeof setInterval> | null = null
+
   constructor() {
     if (typeof window !== 'undefined') {
-      setInterval(
+      this.cleanupIntervalId = setInterval(
         () => {
           const now = Date.now()
           const expiredKeys: string[] = []
@@ -61,6 +65,14 @@ class DelayManager {
         },
         2 * 60 * 60 * 1000,
       ) // Clean up expired cache every 2 hours
+    }
+  }
+
+  /** M2-09: 清理 interval 定时器，HMR 场景下防止累积 */
+  destroy() {
+    if (this.cleanupIntervalId !== null) {
+      clearInterval(this.cleanupIntervalId)
+      this.cleanupIntervalId = null
     }
   }
 
@@ -314,7 +326,7 @@ class DelayManager {
 
       // 使用Promise.race来实现超时与取消控制
       const racePromises: Promise<ProxyDelay>[] = [
-        delayProxyByName(name, url, timeout)
+        delayProxyByNameWithTimeout(name, url)
           .then((res) => {
             raceFinished = true
             return res

@@ -116,6 +116,11 @@ impl Hotkey {
 
     /// Execute the function associated with a hotkey function enum
     fn execute_function(function: HotkeyFunction) {
+        // M2-05: 退出阶段不响应快捷键，避免在资源清理过程中触发新任务
+        if handle::Handle::global().is_exiting() {
+            logging!(debug, Type::Hotkey, "应用退出中，忽略快捷键: {:?}", function);
+            return;
+        }
         match function {
             HotkeyFunction::OpenOrCloseDashboard => {
                 AsyncHandler::spawn(async move || {

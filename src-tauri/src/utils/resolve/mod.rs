@@ -1,6 +1,8 @@
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
+use tauri::async_runtime::JoinHandle;
 
 use crate::{
     config::Config,
@@ -30,6 +32,25 @@ pub mod window_script;
 static RESOLVE_DONE: AtomicBool = AtomicBool::new(false);
 static RESOLVE_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
+/// M2-01: 追踪启动阶段的 detached 任务，退出时统一 abort
+static STARTUP_TASKS: Mutex<Vec<JoinHandle<()>>> = Mutex::new(Vec::new());
+
+/// 将启动任务注册到全局追踪列表
+fn track_startup_task(handle: JoinHandle<()>) {
+    if let Ok(mut tasks) = STARTUP_TASKS.lock() {
+        tasks.push(handle);
+    }
+}
+
+/// M2-01: 退出时中止所有启动阶段任务
+pub fn abort_startup_tasks() {
+    if let Ok(mut tasks) = STARTUP_TASKS.lock() {
+        for handle in tasks.drain(..) {
+            handle.abort();
+        }
+    }
+}
+
 pub fn init_work_dir_and_logger() -> anyhow::Result<()> {
     AsyncHandler::block_on(async {
         init_work_config().await;
@@ -42,24 +63,29 @@ pub fn init_work_dir_and_logger() -> anyhow::Result<()> {
 }
 
 pub fn resolve_setup_sync() {
-    AsyncHandler::spawn(|| async {
+    // M2-01: 追踪启动任务，退出时统一 abort
+    let handle = AsyncHandler::spawn(|| async {
         AsyncHandler::spawn_blocking(init_scheme);
         AsyncHandler::spawn_blocking(init_embed_server);
     });
+    track_startup_task(handle);
 }
 
 pub fn resolve_setup_async() {
     let app_handle = Handle::app_handle().clone();
-    AsyncHandler::spawn(move || async move {
+    // M2-01: 追踪启动任务，退出时统一 abort
+    let handle = AsyncHandler::spawn(move || async move {
         if let Err(e) = Tray::global().init(&app_handle).await {
             log::error!(target: "app", "[Setup] Failed to initialize tray: {}", e);
         }
 
         logging!(info, Type::ClashVergeRev, "Version: {}", env!("CARGO_PKG_VERSION"));
 
-        tokio::spawn(async {
+        // M2-01: 追踪 startup_script 任务
+        let script_handle = AsyncHandler::spawn(|| async {
             init_startup_script().await;
         });
+        track_startup_task(script_handle);
         init_verge_config().await;
         Config::verify_config_initialization().await;
 
@@ -89,13 +115,14 @@ pub fn resolve_setup_async() {
             init_system_proxy_guard().await;
         });
 
-        let _ = futures::join!(core_init, init_timer(), init_hotkey(), init_silent_updater(),);
+        let _ = futures::join!(core_init, init_timer(), init_hotkey());
 
         crate::module::monitor::start_background_monitor();
         Handle::refresh_clash();
         refresh_tray_menu().await;
         resolve_done();
     });
+    track_startup_task(handle);
 }
 
 pub async fn resolve_reset_async() -> Result<(), anyhow::Error> {
@@ -144,11 +171,6 @@ pub(super) async fn init_hotkey() {
 
 pub(super) async fn init_auto_lightweight_boot() {
     logging_error!(Type::Setup, auto_lightweight_boot().await);
-}
-
-#[allow(clippy::unused_async)]
-async fn init_silent_updater() {
-    logging!(info, Type::Setup, "Silent updater disabled for Clash Mini");
 }
 
 pub fn init_signal() {

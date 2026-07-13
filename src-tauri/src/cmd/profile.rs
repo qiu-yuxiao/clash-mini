@@ -141,6 +141,11 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
 /// 调整profile的顺序
 #[tauri::command]
 pub async fn reorder_profile(active_id: String, over_id: String) -> CmdResult {
+    // M2-06: 防止切换期间修改 profiles 结构
+    try_lock_profile_switching!(
+        "当前正在切换配置，排序请求被拒绝",
+        Err("当前正在切换或更新配置，请稍候再试".into())
+    );
     match profiles_reorder_safe(&active_id, &over_id).await {
         Ok(_) => {
             logging!(info, Type::Cmd, "重新排序配置文件");
@@ -157,6 +162,11 @@ pub async fn reorder_profile(active_id: String, over_id: String) -> CmdResult {
 /// 创建一个新的配置文件
 #[tauri::command]
 pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResult {
+    // M2-06: 防止切换期间修改 profiles 结构
+    try_lock_profile_switching!(
+        "当前正在切换配置，创建订阅请求被拒绝",
+        Err("当前正在切换或更新配置，请稍候再试".into())
+    );
     match profiles_append_item_with_filedata_safe(&item, file_data).await {
         Ok(_) => {
             profiles_save_file_safe().await.stringify_err()?;
@@ -193,6 +203,11 @@ pub async fn update_profile(index: String, option: Option<PrfOption>) -> CmdResu
 /// 删除配置文件
 #[tauri::command]
 pub async fn delete_profile(index: String) -> CmdResult {
+    // M2-06: 防止切换期间删除当前活跃 Profile
+    try_lock_profile_switching!(
+        "当前正在切换配置，删除订阅请求被拒绝",
+        Err("当前正在切换或更新配置，请稍候再试".into())
+    );
     // 使用Send-safe helper函数
     let should_update = profiles_delete_item_safe(&index).await.stringify_err()?;
     profiles_save_file_safe().await.stringify_err()?;

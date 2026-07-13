@@ -15,8 +15,8 @@ import { useProfiles } from '@/hooks/use-profiles'
 import { useProxiesData } from '@/providers/app-data-context'
 import { getProxyAddr } from '@/services/cmds'
 import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
+import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
 import { get3DCardStyle } from '@/utils/button-styles'
-import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 
 import {
   getFriendlyProtocolName,
@@ -202,7 +202,7 @@ export const ActiveNodeStatusCard = () => {
 
     if (nextNodeName) {
       try {
-        await selectNodeForGroup(primaryGroup.name, nextNodeName)
+        await selectNodeForGroupWithTimeout(primaryGroup.name, nextNodeName)
       } catch (err) {
         console.error('Failed to select node:', err)
       }

@@ -26,11 +26,6 @@ notifications:
   appHidden:
     title: Кушымта яшерелде
     body: Clash Mini фон режимында эшли.
-  updateReady:
-    title: Clash Mini Update
-    body: A new version (v{version}) has been downloaded and is ready to install.
-    installNow: Install Now
-    later: Later
 service:
   adminInstallPrompt: Clash Mini хезмәтен урнаштыру өчен администратор хокуклары кирәк.
   adminUninstallPrompt: Clash Mini хезмәтен бетерү өчен администратор хокуклары кирәк.

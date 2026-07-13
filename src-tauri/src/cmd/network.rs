@@ -5,7 +5,6 @@ use clash_verge_logging::{Type, logging};
 use gethostname::gethostname;
 use network_interface::{NetworkInterface, NetworkInterfaceConfig as _};
 use serde_yaml_ng::Mapping;
-use std::net::TcpListener;
 use sysproxy::{Autoproxy, Sysproxy};
 
 /// get the system proxy
@@ -98,6 +97,7 @@ pub fn get_network_interfaces_info() -> CmdResult<Vec<NetworkInterface>> {
 }
 
 #[tauri::command]
-pub fn is_port_in_use(port: u16) -> bool {
-    TcpListener::bind(("127.0.0.1", port)).is_err()
+pub async fn is_port_in_use(port: u16) -> bool {
+    // M2-12: 改用异步 TcpListener 避免阻塞 IPC 线程
+    tokio::net::TcpListener::bind(("127.0.0.1", port)).await.is_err()
 }

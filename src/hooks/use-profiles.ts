@@ -8,10 +8,10 @@ import {
   patchProfile,
   patchProfilesConfig,
 } from '@/services/cmds'
+import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
 import { queryClient } from '@/services/query-client'
 import type { IProfileItem, IProfilesConfig } from '@/types/profile'
 import { debugLog } from '@/utils/debug'
-import { selectNodeForGroup } from 'tauri-plugin-mihomo-api'
 
 export const useProfiles = () => {
   const {
@@ -187,7 +187,7 @@ export const useProfiles = () => {
             )
             hasChange = true
             try {
-              await selectNodeForGroup(name, matchedProxyName)
+              await selectNodeForGroupWithTimeout(name, matchedProxyName)
             } catch (error: unknown) {
               console.warn(
                 `[ActivateSelected] 切换代理组 ${name} 失败:`,

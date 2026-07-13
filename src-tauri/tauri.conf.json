@@ -63,12 +63,13 @@
         "enable": true,
         "scope": {
           "allow": [
-            "**"
+            "$APPDATA/**",
+            "$APPLOCALDATA/**"
           ],
           "requireLiteralLeadingDot": false
         }
       },
-      "csp": null
+      "csp": "default-src 'self'; img-src 'self' data: asset: http://asset.localhost https://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
     }
   }
 }

@@ -52,7 +52,13 @@ export const useVerge = () => {
         showNotice.error(err)
         throw err
       } finally {
-        await mutateVerge()
+        // M2-11: refetch 失败时警告状态可能不一致
+        try {
+          await mutateVerge()
+        } catch (refetchErr) {
+          console.error('[useVerge] refetch 失败，前端状态可能与后端不一致:', refetchErr)
+          showNotice.error('配置已更新但刷新失败，状态可能不一致，请重启应用')
+        }
       }
     },
   )

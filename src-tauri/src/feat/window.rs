@@ -21,6 +21,9 @@ pub async fn prepare_exit() {
     // 中止轻量模式 cleanup 任务
     crate::module::lightweight::abort_lightweight_cleanup();
 
+    // M2-01: 中止启动阶段残留的 detached 任务
+    crate::utils::resolve::abort_startup_tasks();
+
     // 唤醒 monitor 线程，让它检测到退出标志并尽快终止
     crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
     crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_one();

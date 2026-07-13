@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox, BaseEmpty } from '@/components/base'
 import { ConnectionTable } from '@/components/connection/connection-table'
+import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
 import {
   get3DButtonStyle,
   get3DSegmentedContainerStyle,
   get3DSegmentedActiveStyle,
   get3DSegmentedActiveTextColor,
 } from '@/utils/button-styles'
-import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 interface ConnectionsPanelProps {
   connectionsType: 'active' | 'closed'
@@ -182,7 +182,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
         <Button
           size="small"
           variant="contained"
-          onClick={() => closeAllConnections()}
+          onClick={() => closeAllConnectionsWithTimeout()}
           sx={{
             fontSize: 11,
             height: 20,

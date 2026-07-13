@@ -272,18 +272,6 @@ export async function getRuntimeConfig() {
   )
 }
 
-export async function updateProxyChainConfigInRuntime(
-  proxyChainConfig: unknown,
-) {
-  return withIpcTimeout(
-    invoke<void>('update_proxy_chain_config_in_runtime', {
-      proxyChainConfig,
-    }),
-    30_000,
-    'updateProxyChainConfigInRuntime',
-  )
-}
-
 export async function patchClashConfig(payload: Partial<IConfigData>) {
   return withIpcTimeout(
     invoke<void>('patch_clash_config', { payload }),
@@ -307,140 +295,107 @@ export async function calcuProxies(): Promise<{
   records: Record<string, IProxyItem>
   proxies: IProxyItem[]
 }> {
-  // L-26: 包裹 try-catch，防止计算异常导致后续逻辑中断
-  try {
-    const [proxyResponse, providerResponse] = await Promise.all([
-      getProxies(),
-      calcuProxyProviders(),
-    ])
+  // M2-14: 移除 try-catch，让错误传播给调用方决定降级策略
+  const [proxyResponse, providerResponse] = await Promise.all([
+    getProxies(),
+    calcuProxyProviders(),
+  ])
 
-    const proxyRecord = proxyResponse?.proxies ?? {}
-    const providerRecord = providerResponse ?? {}
+  const proxyRecord = proxyResponse?.proxies ?? {}
+  const providerRecord = providerResponse ?? {}
 
-    // provider name map
-    const providerMap = Object.fromEntries(
-      Object.entries(providerRecord).flatMap(([provider, item]) =>
-        (item?.proxies ?? []).map((p: IProxyItem) => [
-          p.name,
-          { ...p, provider },
-        ]),
-      ),
-    )
+  // provider name map
+  const providerMap = Object.fromEntries(
+    Object.entries(providerRecord).flatMap(([provider, item]) =>
+      (item?.proxies ?? []).map((p: IProxyItem) => [
+        p.name,
+        { ...p, provider },
+      ]),
+    ),
+  )
 
-    // compatible with proxy-providers
-    const generateItem = (name: string) => {
-      if (proxyRecord[name]) return proxyRecord[name]
-      if (providerMap[name]) return providerMap[name]
-      return {
-        name,
-        type: 'unknown',
-        udp: false,
-        xudp: false,
-        tfo: false,
-        mptcp: false,
-        smux: false,
-        history: [],
-      }
+  // compatible with proxy-providers
+  const generateItem = (name: string) => {
+    if (proxyRecord[name]) return proxyRecord[name]
+    if (providerMap[name]) return providerMap[name]
+    return {
+      name,
+      type: 'unknown',
+      udp: false,
+      xudp: false,
+      tfo: false,
+      mptcp: false,
+      smux: false,
+      history: [],
+    }
+  }
+
+  const { GLOBAL: global, DIRECT: direct, REJECT: reject } = proxyRecord
+
+  let groups: IProxyGroupItem[] = Object.values(proxyRecord).reduce<
+    IProxyGroupItem[]
+  >((acc, each) => {
+    if (each?.name !== 'GLOBAL' && each?.all) {
+      acc.push({
+        ...each,
+        all: (each.all ?? [])
+          .map((item) => generateItem(item))
+          .filter((item) => item?.name && !isDummyNode(item.name)),
+      })
     }
 
-    const { GLOBAL: global, DIRECT: direct, REJECT: reject } = proxyRecord
+    return acc
+  }, [])
 
-    let groups: IProxyGroupItem[] = Object.values(proxyRecord).reduce<
+  if (global?.all) {
+    const globalGroups: IProxyGroupItem[] = global.all.reduce<
       IProxyGroupItem[]
-    >((acc, each) => {
-      if (each?.name !== 'GLOBAL' && each?.all) {
+    >((acc, name) => {
+      if (proxyRecord[name]?.all) {
         acc.push({
-          ...each,
-          all: (each.all ?? [])
+          ...proxyRecord[name],
+          all: (proxyRecord[name].all ?? [])
             .map((item) => generateItem(item))
             .filter((item) => item?.name && !isDummyNode(item.name)),
         })
       }
-
       return acc
     }, [])
 
-    if (global?.all) {
-      const globalGroups: IProxyGroupItem[] = global.all.reduce<
-        IProxyGroupItem[]
-      >((acc, name) => {
-        if (proxyRecord[name]?.all) {
-          acc.push({
-            ...proxyRecord[name],
-            all: (proxyRecord[name].all ?? [])
-              .map((item) => generateItem(item))
-              .filter((item) => item?.name && !isDummyNode(item.name)),
-          })
-        }
-        return acc
-      }, [])
+    const globalNames = new Set(globalGroups.map((each) => each.name))
+    groups = groups
+      .filter((group) => {
+        return !globalNames.has(group.name)
+      })
+      .concat(globalGroups)
+  }
 
-      const globalNames = new Set(globalGroups.map((each) => each.name))
-      groups = groups
-        .filter((group) => {
-          return !globalNames.has(group.name)
-        })
-        .concat(globalGroups)
-    }
-
-    const proxies = [direct, reject]
-      .filter(Boolean)
-      .concat(
-        Object.values(proxyRecord).filter(
-          (p) =>
-            !p?.all?.length &&
-            p?.name !== 'DIRECT' &&
-            p?.name !== 'REJECT' &&
-            p?.name &&
-            !isDummyNode(p.name),
-        ),
-      )
-
-    const _global = {
-      ...global,
-      all: (global?.all?.map((item) => generateItem(item)) || []).filter(
-        (item) => item?.name && !isDummyNode(item.name),
+  const proxies = [direct, reject]
+    .filter(Boolean)
+    .concat(
+      Object.values(proxyRecord).filter(
+        (p) =>
+          !p?.all?.length &&
+          p?.name !== 'DIRECT' &&
+          p?.name !== 'REJECT' &&
+          p?.name &&
+          !isDummyNode(p.name),
       ),
-    }
+    )
 
-    return {
-      global: _global as IProxyGroupItem,
-      direct: direct as IProxyItem,
-      groups,
-      records: proxyRecord as Record<string, IProxyItem>,
-      proxies: (proxies as IProxyItem[]) ?? [],
-    }
-  } catch (error) {
-    console.error('[cmds] calcuProxies 计算失败:', error)
-    // 返回空结构，避免调用方崩溃
-    const emptyGroup: IProxyGroupItem = {
-      name: 'GLOBAL',
-      type: 'select',
-      udp: false,
-      xudp: false,
-      tfo: false,
-      mptcp: false,
-      smux: false,
-      history: [],
-      all: [],
-    }
-    const direct: IProxyItem = {
-      name: 'DIRECT',
-      type: 'direct',
-      udp: false,
-      xudp: false,
-      tfo: false,
-      mptcp: false,
-      smux: false,
-      history: [],
-    }
-    return {
-      global: emptyGroup,
-      direct,
-      groups: [],
-      records: {},
-      proxies: [],
-    }
+  const _global = {
+    ...global,
+    all: (global?.all?.map((item) => generateItem(item)) || []).filter(
+      (item) => item?.name && !isDummyNode(item.name),
+    ),
+  }
+
+  return {
+    global: _global as IProxyGroupItem,
+    direct: direct as IProxyItem,
+    groups,
+    records: proxyRecord as Record<string, IProxyItem>,
+    proxies: (proxies as IProxyItem[]) ?? [],
   }
 }
 

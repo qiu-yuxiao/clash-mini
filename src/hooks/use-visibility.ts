@@ -22,6 +22,8 @@ export const useVisibility = () => {
   const [debouncedVisible, setDebouncedVisible] = useState(rawVisible)
 
   const isMountedRef = useRef(true)
+  // L2-05: 第二个 effect 使用独立的 mounted ref，避免跨 effect 共享导致的状态错乱
+  const tauriMountedRef = useRef(true)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -92,7 +94,7 @@ export const useVisibility = () => {
         const unR = await currentWindow.onResized(async () => {
           await updateWindowState()
         })
-        if (isMountedRef.current) {
+        if (tauriMountedRef.current) {
           unlistenResized = unR
         } else {
           unR()
@@ -101,7 +103,7 @@ export const useVisibility = () => {
         const unF = await currentWindow.onFocusChanged(async () => {
           await updateWindowState()
         })
-        if (isMountedRef.current) {
+        if (tauriMountedRef.current) {
           unlistenFocus = unF
         } else {
           unF()
@@ -113,8 +115,9 @@ export const useVisibility = () => {
 
     initTauri()
 
+    tauriMountedRef.current = true
     return () => {
-      isMountedRef.current = false
+      tauriMountedRef.current = false
       if (unlistenResized) {
         unlistenResized()
       }

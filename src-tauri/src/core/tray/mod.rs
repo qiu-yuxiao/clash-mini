@@ -11,11 +11,11 @@ use super::handle;
 use anyhow::Result;
 use std::sync::OnceLock;
 use std::time::Duration;
-use tokio::sync::Mutex;
 use tauri::{
     AppHandle, Wry,
     menu::{IsMenuItem, MenuEvent, MenuItem},
 };
+use tokio::sync::Mutex;
 
 mod menu_def;
 use menu_def::MenuIds;
@@ -179,7 +179,7 @@ impl Tray {
     ///
     /// 优先级：TUN 模式 > 系统代理 > 默认（手动模式）
     /// 三套图标均通过 include_bytes! 编译时嵌入，运行时按当前状态选择
-    /// 
+    ///
     /// 线程安全：通过 TRAY_UPDATE_LOCK 互斥锁保护，避免并发调用导致 UI 竞态
     pub async fn update_icon(&self, verge: &IVerge) -> Result<()> {
         let _guard = TRAY_UPDATE_LOCK.lock().await;

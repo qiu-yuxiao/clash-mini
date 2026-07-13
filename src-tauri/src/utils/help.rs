@@ -4,9 +4,14 @@ use clash_verge_logging::{Type, logging};
 use nanoid::nanoid;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_yaml_ng::Mapping;
+use std::{path::PathBuf, str::FromStr};
+
+#[cfg(target_os = "windows")]
+use std::os::windows::ffi::OsStrExt as _;
 #[cfg(target_os = "windows")]
 use std::path::Path;
-use std::{path::PathBuf, str::FromStr};
+#[cfg(target_os = "windows")]
+use winapi::um::winbase::{MOVEFILE_REPLACE_EXISTING, MoveFileExW};
 
 /// read data from yaml as struct T
 pub async fn read_yaml<T: DeserializeOwned>(path: &PathBuf) -> Result<T> {
@@ -95,28 +100,16 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
         .await
         .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
-    // Windows 上 rename 不会自动覆盖已有文件：
-    // 先尝试直接 rename（原文件不存在时成功），失败则尝试删除目标文件后重试
-    // 若仍失败，则将临时文件保留（不删除），确保数据不会丢失
+    // 原子替换文件：
+    // - Windows: 使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
+    // - 其他平台: 直接 rename，系统原生支持覆盖
     let result = if cfg!(windows) {
-        match std::fs::rename(&tmp_path, path) {
-            ok @ Ok(_) => ok,
-            Err(_) => {
-                // 删除目标文件后重试（目标文件可能已存在）
-                if let Err(e) = std::fs::remove_file(path) {
-                    // 目标文件删不掉，把临时文件留下
-                    return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (cannot remove existing file)"));
-                }
-                std::fs::rename(&tmp_path, path)
-            }
-        }
+        move_file_ex_replace(&tmp_path, path)
     } else {
         std::fs::rename(&tmp_path, path)
     };
 
     if let Err(e) = result {
-        // 重命名失败：临时文件还在目标位置（没被移动），但原文件可能已被删除（Windows 分支）
-        // 尝试将临时文件重命名为原文件名的 .backup 后缀，尽可能保留数据
         let backup_path = path.with_extension("yaml.bak");
         let _ = std::fs::rename(&tmp_path, &backup_path);
         return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (atomic rename failed)"));
@@ -125,6 +118,20 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn move_file_ex_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
+    let src_wstr: Vec<u16> = src.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let dst_wstr: Vec<u16> = dst.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+
+    let success = unsafe { MoveFileExW(src_wstr.as_ptr(), dst_wstr.as_ptr(), MOVEFILE_REPLACE_EXISTING) };
+
+    if success == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 
 const ALPHABET: [char; 62] = [

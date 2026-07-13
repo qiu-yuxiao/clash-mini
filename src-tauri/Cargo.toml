@@ -22,6 +22,8 @@ tauri-dev = []
 tokio-trace = ["console-subscriber"]
 clippy = ["tauri/test"]
 tracing = []
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3.9", features = ["winbase"] }
 
 [package.metadata.bundle]
 identifier = "io.github.clash-mini.clash-mini"
@@ -82,6 +84,8 @@ tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-window-state = "2.4.1"
 zip = "8.6.0"
 flate2 = "1.1.9"
+sha2 = "0.10.9"
+winapi = { version = "0.3.9", features = ["fileapi"], optional = true }
 reqwest_dav = "0.3.3"
 aes-gcm = { version = "0.10.3", features = ["std"] }
 base64 = "0.22.1"

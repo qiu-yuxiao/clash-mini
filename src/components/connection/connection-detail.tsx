@@ -4,10 +4,10 @@ import dayjs from 'dayjs'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { closeConnectionWithTimeout } from '@/services/mihomo-api'
 import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
-import { closeConnection } from 'tauri-plugin-mihomo-api'
 
 export interface ConnectionDetailRef {
   open: (detail: IConnectionsItem, closed: boolean, el?: HTMLElement) => void
@@ -143,7 +143,7 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
     },
   ]
 
-  const onDelete = useLockFn(async () => closeConnection(data.id))
+  const onDelete = useLockFn(async () => closeConnectionWithTimeout(data.id))
 
   return (
     <Box

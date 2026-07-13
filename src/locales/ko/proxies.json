@@ -6,11 +6,9 @@
       "direct": "직접"
     },
     "actions": {
-      "toggleChain": "체인 프록시",
       "connect": "연결",
       "disconnect": "연결 해제",
-      "connecting": "연결 중...",
-      "clearChainConfig": "체인 구성 삭제"
+      "connecting": "연결 중..."
     },
     "provider": {
       "title": "프록시 제공자",
@@ -41,25 +39,11 @@
     "placeholders": {
       "delayCheckUrl": "지연 확인 URL"
     },
-    "chain": {
-      "header": "체인 프록시 구성",
-      "warning": "체인 프록시는 네트워크 속도를 크게 저하시킬 수 있습니다. 명확한 업무상 필요가 없거나 이 구성을 이해하지 못한다면 비활성화 상태로 두세요.",
-      "empty": "체인 프록시는 네트워크 속도를 크게 저하시킬 수 있습니다. 명확한 업무상 필요가 없거나 이 구성을 이해하지 못한다면 비활성화 상태로 두세요.",
-      "instruction": "프록시 체인에 추가하려면 순서대로 노드를 클릭하세요",
-      "minimumNodes": "체인 프록시는 최소 2개의 노드가 필요합니다",
-      "minimumNodesHint": "체인 프록시는 최소 2개의 노드가 필요합니다. 하나 더 추가하세요.",
-      "connectFailed": "프록시 체인 연결 실패",
-      "disconnectFailed": "프록시 체인 연결 해제 실패",
-      "duplicateNode": "프록시 노드가 체인에 이미 존재합니다",
-      "entryNode": "입구",
-      "exitNode": "출구"
-    },
     "messages": {
       "directMode": "직접 모드"
     },
     "title": {
-      "default": "프록시 그룹",
-      "chainMode": "프록시 체인 모드"
+      "default": "프록시 그룹"
     }
   },
   "feedback": {

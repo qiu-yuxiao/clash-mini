@@ -26,11 +26,6 @@ notifications:
   appHidden:
     title: アプリが非表示
     body: Clash Mini はバックグラウンドで実行中です。
-  updateReady:
-    title: Clash Mini Update
-    body: A new version (v{version}) has been downloaded and is ready to install.
-    installNow: Install Now
-    later: Later
 service:
   adminInstallPrompt: Clash Mini サービスのインストールには管理者権限が必要です。
   adminUninstallPrompt: Clash Mini サービスのアンインストールには管理者権限が必要です。

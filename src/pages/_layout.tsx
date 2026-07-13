@@ -22,9 +22,9 @@ import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { check, type Update } from '@tauri-apps/plugin-updater'
+import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { useTranslation } from 'react-i18next'
@@ -55,6 +55,7 @@ import {
   useSystemData,
 } from '@/providers/app-data-context'
 import { DragRegionContext } from '@/providers/drag-region-context'
+import { batchTestLockRef } from '@/services/batch-test-lock'
 import {
   importProfile,
   updateProfile,
@@ -71,15 +72,13 @@ import {
   triggerAutoSelect,
   withIpcTimeout,
 } from '@/services/cmds'
-import { NODE_DELAY_MAX_MS } from '@/services/delay'
 import DelayManager from '@/services/delay'
+import { closeAllConnectionsWithTimeout, getProxyByNameWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
-import { batchTestLockRef } from '@/services/batch-test-lock'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
 import { isDummyNode } from '@/utils/node'
-import { closeAllConnections, getProxyByName } from 'tauri-plugin-mihomo-api'
 
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
@@ -128,7 +127,7 @@ async function waitForClashReady(
 
   while (Date.now() - startedAt < MAX_WAIT_MS) {
     try {
-      const proxyGroup = await getProxyByName('PROXY')
+      const proxyGroup = await getProxyByNameWithTimeout('PROXY')
       // all 是 string[]，直接用 isDummyNode 判断节点名
       const hasRealNodes = (proxyGroup?.all || []).some(
         (name: string) => !isDummyNode(name),
@@ -203,7 +202,7 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
   } catch (err) {
     console.warn('[Layout] 获取过滤节点列表失败，回退到全部节点:', err)
     try {
-      const proxyGroup = await getProxyByName(groupName)
+      const proxyGroup = await getProxyByNameWithTimeout(groupName)
       return (proxyGroup?.all || []).filter(
         (name: string) => !isDummyNode(name),
       )
@@ -244,6 +243,7 @@ async function triggerAutoSelectAndRefresh(
   autoSelectTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
   setDragRegionEnabled?: (v: boolean) => void,
+  profileUid?: string,
 ): Promise<void> {
   // 先同步内核已有的节点状态，让 React 完成首帧渲染
   try {
@@ -268,6 +268,14 @@ async function triggerAutoSelectAndRefresh(
   autoSelectTimerRef.current = setTimeout(async () => {
     autoSelectTimerRef.current = null // setTimeout 已触发，清除ID
     try {
+      // M2-07: 校验 Profile 未切换，避免对旧 Profile 执行测速
+      if (profileUid) {
+        const currentUid = (await getProfiles())?.current || ''
+        if (currentUid !== profileUid) {
+          console.log('[Layout] autoSelect: Profile 已切换，跳过测速')
+          return
+        }
+      }
       const names = await getFilteredNodeNames('PROXY')
       if (names.length === 0) return
       const win = getCurrentWindow()
@@ -298,10 +306,18 @@ async function triggerAutoSelectAndRefresh(
     // H-12: 保存当前timer的ID，用于finally中的条件赋值
     const timerId = fallbackTimerRef.current
     try {
-      const proxyGroup = await getProxyByName('PROXY')
+      // M2-07: 校验 Profile 未切换，避免对旧 Profile 执行 fallback 测速
+      if (profileUid) {
+        const currentUid = (await getProfiles())?.current || ''
+        if (currentUid !== profileUid) {
+          console.log('[Layout] Fallback: Profile 已切换，跳过 fallback 测速')
+          return
+        }
+      }
+      const proxyGroup = await getProxyByNameWithTimeout('PROXY')
       const nowNodeName = proxyGroup?.now || ''
       if (!nowNodeName) return
-      const nowNode = await getProxyByName(nowNodeName)
+      const nowNode = await getProxyByNameWithTimeout(nowNodeName)
       const history = nowNode?.history || []
       const latestDelay =
         history.length > 0 ? history[history.length - 1].delay : -1
@@ -1112,10 +1128,19 @@ const Layout = () => {
         wakeupTestTimerRef.current = null
       }
 
+      // M2-08: 捕获当前 Profile UID，setTimeout 回调内校验
+      const capturedUid = (await getProfiles())?.current || ''
+
       // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       wakeupTestTimerRef.current = setTimeout(async () => {
         wakeupTestTimerRef.current = null // setTimeout 已触发，清除ID
+        // M2-08: 校验 Profile 未切换，避免对旧 Profile 节点执行测速
+        const currentUid = (await getProfiles())?.current || ''
+        if (currentUid !== capturedUid) {
+          console.log('[Layout] 唤醒测速: Profile 已切换，跳过')
+          return
+        }
         const win = getCurrentWindow()
         try {
           batchTestLockRef.current++ // H-11: 进入测速锁
@@ -1127,7 +1152,6 @@ const Layout = () => {
           }
           DelayManager.queueGroupNotification('PROXY')
           // 委托后端静默测速填充缓存（不传子集=全量测速）；select=false 严禁切换用户当前节点
-          const currentUid = (await getProfiles())?.current || ''
           if (currentUid) {
             await triggerAutoSelect(currentUid, undefined, 0, false)
           }
@@ -1194,6 +1218,7 @@ const Layout = () => {
               autoSelectTimerRef,
               setHeadStateForSortRef.current,
               setDragRegionEnabledRef.current,
+              uid,
             )
             // Success: reset retry counter
             startupRetryCountRef.current = 0
@@ -1388,9 +1413,11 @@ const Layout = () => {
     try {
       isStartingUpRef.current = true
       startupRetryCountRef.current = 0
+      // M2-10: 切换 Profile 时清理旧的测试 URL 缓存
+      DelayManager.clearUrlMap()
       await patchProfiles({ current: uid })
       await mutateProfiles()
-      closeAllConnections()
+      closeAllConnectionsWithTimeout()
       showNotice.success(
         'profiles.page.feedback.notifications.profileSwitched',
         1000,
@@ -1514,8 +1541,8 @@ const Layout = () => {
       try {
         await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
         if (verge?.auto_close_connection) {
-          await closeAllConnections().catch(() =>
-            console.warn('[layout] closeAllConnections failed'),
+          await closeAllConnectionsWithTimeout().catch(() =>
+            console.warn('[layout] closeAllConnectionsWithTimeout failed'),
           )
         }
         showNotice.success('已切换至手动模式')
@@ -1870,8 +1897,6 @@ const Layout = () => {
                   <ErrorBoundary FallbackComponent={AreaErrorFallback}>
                     <ProxyGroups
                       mode={clashConfig?.mode?.toLowerCase() || 'rule'}
-                      isChainMode={false}
-                      chainConfigData={null}
                     />
                   </ErrorBoundary>
                 </div>

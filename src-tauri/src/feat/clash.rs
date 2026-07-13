@@ -1,5 +1,9 @@
 use crate::{
-    config::Config, constants::timing::NODE_DELAY_MAX_MS, core::handle, feat::{clean_async, prepare_exit}, process::AsyncHandler,
+    config::Config,
+    constants::timing::NODE_DELAY_MAX_MS,
+    core::handle,
+    feat::{clean_async, prepare_exit},
+    process::AsyncHandler,
 };
 
 use clash_verge_logging::{Type, logging};
@@ -48,19 +52,11 @@ pub async fn restart_app() {
 }
 
 fn after_change_clash_mode() {
+    // M2-03: 直接调用 close_all_connections，避免逐个关闭数千连接时阻塞
     AsyncHandler::spawn(move || async {
         let mihomo = handle::Handle::mihomo().await.clone();
-        match mihomo.get_connections().await {
-            Ok(connections) => {
-                if let Some(connections_array) = connections.connections {
-                    for connection in connections_array {
-                        let _ = mihomo.close_connection(&connection.id).await;
-                    }
-                }
-            }
-            Err(err) => {
-                logging!(error, Type::Core, "Failed to get connections: {err}");
-            }
+        if let Err(err) = mihomo.close_all_connections().await {
+            logging!(error, Type::Core, "Failed to close all connections: {err}");
         }
     });
 }
@@ -103,7 +99,7 @@ pub async fn change_clash_mode(mode: String) -> anyhow::Result<()> {
 
 /// Test delay to a URL through proxy.
 /// HTTPS: measures TLS handshake time. HTTP: measures HEAD round-trip time.
-/// 
+///
 /// Note: The TCP stream and TLS connector are created inside the timeout block,
 /// so they are automatically dropped when the timeout fires, ensuring no
 /// lingering connections remain in the background.
@@ -137,7 +133,8 @@ pub async fn test_delay(url: String) -> anyhow::Result<u32> {
 
     tokio::time::timeout(Duration::from_millis(NODE_DELAY_MAX_MS as u64), async {
         let start = Instant::now();
-        let mut buf = vec![0u8; 1024];
+        // L2-01: 改用栈数组避免每次堆分配
+        let mut buf = [0u8; 1024];
 
         if is_https {
             let stream = match proxy_port {

@@ -26,11 +26,6 @@ notifications:
   appHidden:
     title: Aplikasi Disembunyikan
     body: Clash Mini berjalan di latar belakang.
-  updateReady:
-    title: Clash Mini Update
-    body: A new version (v{version}) has been downloaded and is ready to install.
-    installNow: Install Now
-    later: Later
 service:
   adminInstallPrompt: Menginstal layanan Clash Mini memerlukan hak administrator.
   adminUninstallPrompt: Menghapus instalasi layanan Clash Mini memerlukan hak administrator.

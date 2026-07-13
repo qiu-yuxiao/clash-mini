@@ -1070,7 +1070,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "clash-mini"
-version = "2.4.7"
+version = "2.4.8"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -1122,6 +1122,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sha2 0.10.9",
  "smartstring",
  "socket2 0.6.3",
  "sysinfo",
@@ -1150,6 +1151,7 @@ dependencies = [
  "warp",
  "webpki-roots",
  "webview2-com",
+ "winapi",
  "windows 0.61.3",
  "winreg 0.56.0",
  "wry",

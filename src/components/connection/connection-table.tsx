@@ -19,10 +19,10 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 
+import { closeConnectionWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
 import type { IConnectionsItem } from '@/types/connection'
 import { addQuickRoutingRule } from '@/utils/quick-routing'
-import { closeConnection } from 'tauri-plugin-mihomo-api'
 
 const ROW_HEIGHT = 20
 
@@ -280,7 +280,7 @@ export const ConnectionTable = (props: Props) => {
     const { row } = contextMenu
     setContextMenu(null)
     try {
-      await closeConnection(row.id)
+      await closeConnectionWithTimeout(row.id)
     } catch (err) {
       console.error(err)
     }
