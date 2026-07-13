@@ -39,4 +39,6 @@ src-tauri/src/bin/
 debug.log
 .agents/
 .agents
+.clash-mini-wiki/
+.clash-mini-wiki
 
