@@ -1417,6 +1417,13 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **动态滚动条与行高适配**：移除了全局 scrollbar-width 中的 `!important` 限制以允许局部隐藏；节点列表项高度从 20px 增加为 24px 并使用 `height: auto` 配合虚拟列表估值重设，彻底解决 Windows 高 DPI 缩放下的文字物理裁剪与错折行问题。
 
 
+### v2.4.9 CSP nonce 兼容修复
+
+启用 CSP 后，Tauri 2.0 构建时自动给 CSP 的 `style-src`/`script-src` 注入 `'nonce-xxx'`，根据 CSP 规范，有 nonce 时 `'unsafe-inline'` 被浏览器忽略。emotion 运行时动态创建的 `<style>` 标签没有 nonce 属性，全部被 CSP 阻断，导致 MUI 组件样式崩溃（内容在但样式失效）。
+
+- **emotion cache nonce 配置规范**：在 `main.tsx` 中通过 `getCspNonce()` 读取 Tauri 2.0 注入的 nonce（依次从 `meta[name="csp-nonce"]`、`script[nonce]`、`style[nonce]` 标签读取），传给 `@emotion/cache` 的 `createCache({ key: 'mui', nonce })`，并用 `CacheProvider` 包裹整个应用树（在 `ComposeContextProvider` 外层），使 emotion 动态创建的 `<style>` 标签带上 nonce 属性通过 CSP。Dev 模式下 Tauri 不注入 nonce，`getCspNonce()` 返回 `undefined`，emotion cache 不设 nonce，不影响开发。影响文件：`src/main.tsx`、`package.json`（新增 `@emotion/cache` 依赖）。
+
+
 ### v2.4.7 ��������Դ����ר���޸�
 
 ���� v2.4.7 ȫ���벢������������Դ����ר����ƣ����ֲ��޸����� 4 ��ȱ�ݣ��ƶ����¹淶��

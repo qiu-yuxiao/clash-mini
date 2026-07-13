@@ -4,6 +4,8 @@ import '@fontsource/outfit/600.css'
 import '@fontsource/outfit/700.css'
 import './assets/styles/index.scss'
 
+import createCache from '@emotion/cache'
+import { CacheProvider } from '@emotion/react'
 import { ResizeObserver } from '@juggle/resize-observer'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ComposeContextProvider } from 'foxact/compose-context-provider'
@@ -31,6 +33,41 @@ if (!window.ResizeObserver) {
   window.ResizeObserver = ResizeObserver
 }
 
+// 读取 Tauri 2.0 构建时注入的 CSP nonce
+// Tauri 会在 CSP 的 style-src/script-src 中自动添加 'nonce-xxx'，
+// 同时给 HTML 中的 inline <script>/<style> 标签添加 nonce 属性。
+// 但 emotion 运行时动态创建的 <style> 标签没有 nonce，会被 CSP 阻断。
+// 这里读取 Tauri 注入的 nonce，传给 emotion cache，让动态样式带 nonce 通过 CSP。
+function getCspNonce(): string | undefined {
+  const meta = document.querySelector(
+    'meta[name="csp-nonce"]',
+  ) as HTMLMetaElement | null
+  if (meta?.content) return meta.content
+
+  const script = document.querySelector(
+    'script[nonce]',
+  ) as HTMLScriptElement | null
+  if (script) {
+    const nonce = script.nonce || script.getAttribute('nonce')
+    if (nonce) return nonce
+  }
+
+  const style = document.querySelector(
+    'style[nonce]',
+  ) as HTMLStyleElement | null
+  if (style) {
+    const nonce = style.nonce || style.getAttribute('nonce')
+    if (nonce) return nonce
+  }
+
+  return undefined
+}
+
+const emotionCache = createCache({
+  key: 'mui',
+  nonce: getCspNonce(),
+})
+
 const mainElementId = 'root'
 const container = document.getElementById(mainElementId)
 
@@ -48,17 +85,19 @@ const initializeApp = (initialThemeMode: 'light' | 'dark') => {
   const root = createRoot(container)
   root.render(
     <React.StrictMode>
-      <ComposeContextProvider contexts={contexts}>
-        <BaseErrorBoundary>
-          <QueryClientProvider client={queryClient}>
-            <WindowProvider>
-              <AppDataProvider>
-                <RouterProvider router={router} />
-              </AppDataProvider>
-            </WindowProvider>
-          </QueryClientProvider>
-        </BaseErrorBoundary>
-      </ComposeContextProvider>
+      <CacheProvider value={emotionCache}>
+        <ComposeContextProvider contexts={contexts}>
+          <BaseErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+              <WindowProvider>
+                <AppDataProvider>
+                  <RouterProvider router={router} />
+                </AppDataProvider>
+              </WindowProvider>
+            </QueryClientProvider>
+          </BaseErrorBoundary>
+        </ComposeContextProvider>
+      </CacheProvider>
     </React.StrictMode>,
   )
 }
