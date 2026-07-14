@@ -323,12 +323,14 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             if let Some(window) = _app_handle.get_webview_window("main") {
                 strip_caption_thickframe_style(&window);
-                // 清除边框样式位后窗口尺寸仍是创建时被 AdjustWindowRectEx 算出的 outer≈300px，
-                // 需主动重置回默认尺寸，否则会变成"300px 的无边框窗口"而非"285px 的无边框窗口"。
-                let _ = window.set_size(tauri::LogicalSize::new(
+                // 清除边框样式位后，Tauri 的 set_size 会调用 tao 的 set_inner_size，
+                // 但 tao 内部用窗口创建时缓存的 style（仍含边框）算出 outer = 285 + 边框 = 300，
+                // 导致 set_size 无效。直接用 SetWindowPos 设置 outer 尺寸绕过 tao 计算。
+                force_set_window_outer_size(
+                    &window,
                     crate::utils::resolve::window::DEFAULT_WIDTH,
                     crate::utils::resolve::window::DEFAULT_HEIGHT,
-                ));
+                );
                 setup_wm_sizing_hook(&window);
             }
 
@@ -477,6 +479,58 @@ pub fn run() {
                     "已清除 WS_CAPTION | WS_THICKFRAME 样式位 (0x{:X} -> 0x{:X})",
                     current,
                     new_style
+                );
+            }
+        }
+
+        /// 直接用 Win32 API 设置窗口 outer 尺寸，绕过 tao 的 set_inner_size 计算。
+        ///
+        /// tao 的 set_inner_size 在计算 outer size 时会用到窗口创建时缓存的 style
+        /// （仍含 WS_CAPTION | WS_THICKFRAME），即使已清除 GWL_STYLE，tao 仍会按
+        /// 有边框算出 outer = inner + 边框 = 285 + 15 = 300，导致 set_size 无效。
+        /// 直接用 SetWindowPos 设置 outer 尺寸，再由 tao 的 WM_NCCALCSIZE 处理
+        /// （decorations=false 时返回 0 insets）让 client = outer = 285。
+        #[cfg(target_os = "windows")]
+        fn force_set_window_outer_size(window: &tauri::WebviewWindow, width: f64, height: f64) {
+            use raw_window_handle::HasWindowHandle as _;
+            use windows::Win32::UI::HiDpi::GetDpiForWindow;
+            use windows::Win32::UI::WindowsAndMessaging::{
+                SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetWindowPos,
+            };
+
+            let handle = match window.window_handle() {
+                Ok(h) => h,
+                Err(_) => return,
+            };
+            let hwnd = match handle.as_raw() {
+                raw_window_handle::RawWindowHandle::Win32(h) => {
+                    windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
+                }
+                _ => return,
+            };
+
+            unsafe {
+                let dpi = GetDpiForWindow(hwnd);
+                let scale = dpi as f64 / 96.0;
+                let physical_w = (width * scale) as i32;
+                let physical_h = (height * scale) as i32;
+                let _ = SetWindowPos(
+                    hwnd,
+                    None,
+                    0,
+                    0,
+                    physical_w,
+                    physical_h,
+                    SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOMOVE,
+                );
+                logging!(
+                    info,
+                    Type::Window,
+                    "强制设置窗口 outer 尺寸: {}x{} (DPI={}, scale={:.2})",
+                    physical_w,
+                    physical_h,
+                    dpi,
+                    scale
                 );
             }
         }
