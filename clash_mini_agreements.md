@@ -216,6 +216,8 @@ Clash Mini 的窗口内容采用"遮挡式"布局，而非"压缩式"布局。
 
      * **窗口最小尺寸强制约束**：窗口在任何情况下不得缩小至小于最小尺寸（285×135 px），包括用户拖拽缩放操作中。最小化和最大化状态下不生效。
 
+     * **Windows 初次启动强制剥除边框样式位**：Tauri 在 Windows 上创建 `decorations(false)` 窗口时，底层 tao 仅设置 `MARKER_DECORATIONS` 标记，并未从 `GWL_STYLE` 中清除 `WS_CAPTION | WS_THICKFRAME`。窗口初次创建那一刻 tao 的 `WM_NCCALCSIZE` 子类化尚未安装，Windows 会按 style 自动补上 resize 边框（SM_CXSIZEFRAME + SM_CXPADDEDBORDER），导致 outer 尺寸比 `inner_size` 设定的 logical 值多出约 15-22px（DPI 96 时约 +15，DPI 144 时约 +22），初次启动实测出现 300 而非 285。修复方案：在 `handle_ready_resumed` 中调用 `strip_caption_thickframe_style(&window)`，用 `SetWindowLongPtrW(GWL_STYLE, ...)` 主动清掉 `WS_CAPTION | WS_THICKFRAME`，再用 `SetWindowPos(SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER)` 触发一次 `WM_NCCALCSIZE` 重算，让 tao 的无边框处理立即生效。
+
    * 当窗口宽度缩小到极限值 285 px 时，下半层的流量折线图会自动从大图表切换为小图表（`TrafficGraph`），以适应窄窗口下的自适应显示。
 
    * **自定义内发光边框规范（FEAT-003 附属）**：
