@@ -675,7 +675,7 @@
     "statusDelayMedium": "Latensi Sedang",
     "statusDelayGood": "Latensi Baik",
     "statusDelayExcellent": "Latensi Sangat Baik",
-    "activeNodeLabel": "Node Keluar Aktif: ",
+    "activeNodeLabel": "Node Aktif: ",
     "connectionsActive": "Aktif",
     "connectionsHistory": "Riwayat",
     "connectionsDisconnectAll": "Putuskan Semua",

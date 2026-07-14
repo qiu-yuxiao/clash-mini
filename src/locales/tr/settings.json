@@ -675,7 +675,7 @@
     "statusDelayMedium": "Orta Gecikme",
     "statusDelayGood": "İyi Gecikme",
     "statusDelayExcellent": "Harika Gecikme",
-    "activeNodeLabel": "Aktif Çıkış Düğümü: ",
+    "activeNodeLabel": "Aktif Düğüm: ",
     "connectionsActive": "Aktif",
     "connectionsHistory": "Geçmiş",
     "connectionsDisconnectAll": "Tümünü Kes",

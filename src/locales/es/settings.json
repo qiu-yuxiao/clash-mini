@@ -675,7 +675,7 @@
     "statusDelayMedium": "Latencia Media",
     "statusDelayGood": "Latencia Buena",
     "statusDelayExcellent": "Latencia Excelente",
-    "activeNodeLabel": "Nodo de salida activo: ",
+    "activeNodeLabel": "Nodo activo: ",
     "connectionsActive": "Activo",
     "connectionsHistory": "Historial",
     "connectionsDisconnectAll": "Desconectar todo",

@@ -675,7 +675,7 @@
     "statusDelayMedium": "중간 지연",
     "statusDelayGood": "좋은 지연",
     "statusDelayExcellent": "최상의 지연",
-    "activeNodeLabel": "현재 활성화된 아웃바운드 노드: ",
+    "activeNodeLabel": "활성 노드: ",
     "connectionsActive": "활성",
     "connectionsHistory": "기록",
     "connectionsDisconnectAll": "모두 끊기",

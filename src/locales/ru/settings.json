@@ -675,7 +675,7 @@
     "statusDelayMedium": "Средний пинг",
     "statusDelayGood": "Хороший пинг",
     "statusDelayExcellent": "Отличный пинг",
-    "activeNodeLabel": "Активный узел выхода: ",
+    "activeNodeLabel": "Активный узел: ",
     "connectionsActive": "Активно",
     "connectionsHistory": "История",
     "connectionsDisconnectAll": "Отключить все",

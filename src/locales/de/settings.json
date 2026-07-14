@@ -675,7 +675,7 @@
     "statusDelayMedium": "Mittlere Latenz",
     "statusDelayGood": "Gute Latenz",
     "statusDelayExcellent": "Hervorragende Latenz",
-    "activeNodeLabel": "Aktiver Outbound-Knoten: ",
+    "activeNodeLabel": "Aktiver Knoten: ",
     "connectionsActive": "Aktiv",
     "connectionsHistory": "Verlauf",
     "connectionsDisconnectAll": "Alle trennen",

@@ -675,7 +675,7 @@
     "statusDelayMedium": "تاخیر متوسط",
     "statusDelayGood": "تاخیر خوب",
     "statusDelayExcellent": "تاخیر عالی",
-    "activeNodeLabel": "گره خروجی فعال: ",
+    "activeNodeLabel": "گره فعال: ",
     "connectionsActive": "فعال",
     "connectionsHistory": "تاریخچه",
     "connectionsDisconnectAll": "قطع همه اتصالات",

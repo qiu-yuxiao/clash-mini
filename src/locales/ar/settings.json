@@ -675,7 +675,7 @@
     "statusDelayMedium": "زمن وصول متوسط",
     "statusDelayGood": "زمن وصول جيد",
     "statusDelayExcellent": "زمن وصول ممتاز",
-    "activeNodeLabel": "عقدة الخروج النشطة: ",
+    "activeNodeLabel": "العقدة النشطة: ",
     "connectionsActive": "نشط",
     "connectionsHistory": "السجل",
     "connectionsDisconnectAll": "قطع اتصال الكل",
