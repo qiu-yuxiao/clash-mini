@@ -1,4 +1,7 @@
-use crate::{config::Config, process::AsyncHandler};
+use crate::{
+    config::{Config, PrfItem, PrfSelected, profiles_patch_item_safe},
+    process::AsyncHandler,
+};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -562,6 +565,22 @@ async fn trigger_backend_auto_select_inner(
                         fastest_node
                     );
                     selected = true;
+                    // 【关键修复】选点成功后同步回写 profile.selected，
+                    // 否则唤醒/进入轻量模式时 restore_profile_selected_nodes
+                    // 和 activateSelected 会用过时的 selected 值把节点切回旧节点。
+                    // 单组架构下 selected 数组只含 PROXY 一项。
+                    let new_selected = vec![PrfSelected {
+                        name: Some("PROXY".into()),
+                        now: Some(fastest_node.clone().into()),
+                    }];
+                    let patch_item = PrfItem {
+                        selected: Some(new_selected),
+                        ..Default::default()
+                    };
+                    let uid_smart: smartstring::alias::String = profile_uid.into();
+                    if let Err(e) = profiles_patch_item_safe(&uid_smart, &patch_item).await {
+                        logging!(warn, Type::Lightweight, "[后台监测] 回写 profile.selected 失败: {e}");
+                    }
                 }
                 Err(e) => {
                     logging!(warn, Type::Lightweight, "[后台监测] 切换节点失败: {e}");
