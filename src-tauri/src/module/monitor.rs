@@ -613,6 +613,9 @@ pub fn start_background_monitor() {
         let mut last_online_check_time: Option<Instant> = None;
         let mut last_auto_select_time: Option<Instant> = None;
         let mut auto_select_fail_count = 0u32;
+        // 连续 API 异常计数：mihomo API 不可达时（get_group_by_name 超时/连接失败）累计，
+        // 达到阈值后触发自愈，避免把内核卡死误判为"内核重载中"而放弃自愈。
+        let mut api_error_count = 0u32;
 
         loop {
             if crate::core::handle::Handle::global().is_exiting() {
@@ -770,6 +773,8 @@ pub fn start_background_monitor() {
 
                 match check_active_node_health().await {
                     Ok(status) => {
+                        // API 调用成功，重置 API 异常计数
+                        api_error_count = 0;
                         match status {
                             NodeHealthStatus::Healthy => {
                                 consecutive_fails = 0;
@@ -874,11 +879,24 @@ pub fn start_background_monitor() {
                         }
                     }
                     Err(e) => {
+                        api_error_count += 1;
+                        // 日志从 debug 升级为 warn：API 异常可能是内核卡死而非重载，
+                        // 需要在 normal 日志级别可见，便于排查。
                         logging!(
-                            debug,
+                            warn,
                             Type::Lightweight,
-                            "[后台监测] 节点健康检查异常 (内核重载中): {e}"
+                            "[后台监测] 节点健康检查异常 (API不可达): {e}，连续异常次数: {}",
+                            api_error_count
                         );
+                        // 连续 3 次 API 异常（正常模式约 45 秒，重试模式约 9 秒），
+                        // 说明不是内核重载的短暂现象，而是 mihomo API 持续不可达。
+                        // 触发自愈选点尝试恢复（若自愈也因 API 不可达而失败，
+                        // auto_select_fail_count 会累计，5 次后弹 Windows 警报）。
+                        if api_error_count >= 3 {
+                            api_error_count = 0;
+                            logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
+                            let _ = trigger_backend_auto_select(&current_profile, None, 0, true, false).await;
+                        }
                     }
                 }
             }
