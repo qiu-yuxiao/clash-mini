@@ -323,6 +323,12 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             if let Some(window) = _app_handle.get_webview_window("main") {
                 strip_caption_thickframe_style(&window);
+                // 清除边框样式位后窗口尺寸仍是创建时被 AdjustWindowRectEx 算出的 outer≈300px，
+                // 需主动重置回默认尺寸，否则会变成"300px 的无边框窗口"而非"285px 的无边框窗口"。
+                let _ = window.set_size(tauri::LogicalSize::new(
+                    crate::utils::resolve::window::DEFAULT_WIDTH,
+                    crate::utils::resolve::window::DEFAULT_HEIGHT,
+                ));
                 setup_wm_sizing_hook(&window);
             }
 
