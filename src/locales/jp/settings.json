@@ -675,7 +675,7 @@
     "statusDelayMedium": "遅延中",
     "statusDelayGood": "遅延良好",
     "statusDelayExcellent": "遅延極小",
-    "activeNodeLabel": "現在のアクティブノード：",
+    "activeNodeLabel": "アクティブノード：",
     "connectionsActive": "アクティブ",
     "connectionsHistory": "履歴",
     "connectionsDisconnectAll": "すべて切断",

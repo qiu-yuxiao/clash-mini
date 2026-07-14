@@ -675,7 +675,7 @@
     "statusDelayMedium": "延遲中等",
     "statusDelayGood": "延遲良好",
     "statusDelayExcellent": "延遲極佳",
-    "activeNodeLabel": "當前活躍出口節點：",
+    "activeNodeLabel": "活躍節點：",
     "connectionsActive": "活躍",
     "connectionsHistory": "歷史",
     "connectionsDisconnectAll": "斷開全部",

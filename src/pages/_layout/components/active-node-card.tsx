@@ -247,7 +247,7 @@ export const ActiveNodeStatusCard = () => {
         }}
       >
         {t('settings.mini.activeNodeLabel', {
-          defaultValue: '当前活跃出口节点：',
+          defaultValue: '活跃节点：',
         })}
       </Typography>
 

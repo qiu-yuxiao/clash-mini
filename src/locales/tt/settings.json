@@ -675,7 +675,7 @@
     "statusDelayMedium": "Medium Latency",
     "statusDelayGood": "Good Latency",
     "statusDelayExcellent": "Excellent Latency",
-    "activeNodeLabel": "Active Outbound Node: ",
+    "activeNodeLabel": "Active Node: ",
     "connectionsActive": "Active",
     "connectionsHistory": "History",
     "connectionsDisconnectAll": "Disconnect All",
