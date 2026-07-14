@@ -115,6 +115,16 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
                 logging_error!(Type::Window, window.set_background_color(Some(background_color)));
             }
 
+            // 窗口创建后立即清除 WS_CAPTION | WS_THICKFRAME 并重置 outer 尺寸为 285×680。
+            // 必须在 build() 之后立即执行，不能放在 RunEvent::Ready（handle_ready_resumed），
+            // 因为 RunEvent::Ready 比窗口创建的异步任务早约 0.5 秒触发，此时 get_webview_window
+            // 返回 None，修复代码被跳过，导致初次启动窗口保持 300px。
+            #[cfg(target_os = "windows")]
+            {
+                strip_caption_thickframe_style(&window);
+                force_set_window_outer_size(&window, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+            }
+
             // 超时兜底：如果页面加载超时（默认 10 秒），强制显示窗口
             // 避免页面加载卡住导致用户看不到窗口
             let window_clone = window.clone();
@@ -148,4 +158,113 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
 fn get_bold_window_title() -> String {
     format!("Clash Mini Ver.{}", env!("CARGO_PKG_VERSION"))
+}
+
+/// 剥掉窗口的 WS_CAPTION 和 WS_THICKFRAME 样式位。
+///
+/// 背景：Tauri 在 Windows 上创建 `decorations(false)` 窗口时，底层 tao 只设置
+/// `MARKER_DECORATIONS` 标记，并未从 GWL_STYLE 中清除 `WS_CAPTION | WS_THICKFRAME`。
+/// 窗口初次创建时，tao 的 WM_NCCALCSIZE 子类化尚未安装，Windows 会按 style 自动
+/// 补上 resize 边框（SM_CXSIZEFRAME + SM_CXPADDEDBORDER），导致 outer 尺寸比
+/// `inner_size` 设定的 logical 值多出约 15-22px（DPI 96 时约 +15，DPI 144 时约 +22），
+/// 初次启动实测出现 300 而非 285。
+///
+/// 此处主动清掉这两位并用 SWP_FRAMECHANGE 触发一次重算，让窗口立即变成真正无边框。
+#[cfg(target_os = "windows")]
+fn strip_caption_thickframe_style(window: &WebviewWindow) {
+    use raw_window_handle::HasWindowHandle as _;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GWL_STYLE, GetWindowLongPtrW, HWND_TOP, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
+        SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WS_CAPTION, WS_THICKFRAME,
+    };
+
+    let handle = match window.window_handle() {
+        Ok(h) => h,
+        Err(_) => return,
+    };
+    let hwnd = match handle.as_raw() {
+        raw_window_handle::RawWindowHandle::Win32(h) => {
+            windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
+        }
+        _ => return,
+    };
+
+    unsafe {
+        let current = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        let mut new_style = current;
+        new_style &= !(WS_CAPTION.0 as isize);
+        new_style &= !(WS_THICKFRAME.0 as isize);
+        if new_style == current {
+            return;
+        }
+        SetWindowLongPtrW(hwnd, GWL_STYLE, new_style);
+        let _ = SetWindowPos(
+            hwnd,
+            Some(HWND_TOP),
+            0,
+            0,
+            0,
+            0,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+        );
+        logging!(
+            info,
+            Type::Window,
+            "已清除 WS_CAPTION | WS_THICKFRAME 样式位 (0x{:X} -> 0x{:X})",
+            current,
+            new_style
+        );
+    }
+}
+
+/// 直接用 Win32 API 设置窗口 outer 尺寸，绕过 tao 的 set_inner_size 计算。
+///
+/// tao 的 set_inner_size 在计算 outer size 时会用到窗口创建时缓存的 style
+/// （仍含 WS_CAPTION | WS_THICKFRAME），即使已清除 GWL_STYLE，tao 仍会按
+/// 有边框算出 outer = inner + 边框 = 285 + 15 = 300，导致 set_size 无效。
+/// 直接用 SetWindowPos 设置 outer 尺寸，再由 tao 的 WM_NCCALCSIZE 处理
+/// （decorations=false 时返回 0 insets）让 client = outer = 285。
+#[cfg(target_os = "windows")]
+fn force_set_window_outer_size(window: &WebviewWindow, width: f64, height: f64) {
+    use raw_window_handle::HasWindowHandle as _;
+    use windows::Win32::UI::HiDpi::GetDpiForWindow;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetWindowPos,
+    };
+
+    let handle = match window.window_handle() {
+        Ok(h) => h,
+        Err(_) => return,
+    };
+    let hwnd = match handle.as_raw() {
+        raw_window_handle::RawWindowHandle::Win32(h) => {
+            windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
+        }
+        _ => return,
+    };
+
+    unsafe {
+        let dpi = GetDpiForWindow(hwnd);
+        let scale = dpi as f64 / 96.0;
+        let physical_w = (width * scale) as i32;
+        let physical_h = (height * scale) as i32;
+        let _ = SetWindowPos(
+            hwnd,
+            None,
+            0,
+            0,
+            physical_w,
+            physical_h,
+            SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOMOVE,
+        );
+        logging!(
+            info,
+            Type::Window,
+            "强制设置窗口 outer 尺寸: {}x{} (DPI={}, scale={:.2})",
+            physical_w,
+            physical_h,
+            dpi,
+            scale
+        );
+    }
 }
