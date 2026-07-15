@@ -18,7 +18,7 @@ import {
   getProxyByNameWithTimeout,
 } from '@/services/mihomo-api'
 import { queryClient } from '@/services/query-client'
-import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
+import type { IProxyGroupItem } from '@/types/clash'
 import { isDummyNode } from '@/utils/node'
 import type { ProxyProvider } from 'tauri-plugin-mihomo-api'
 
