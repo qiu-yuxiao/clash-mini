@@ -73,7 +73,10 @@ import {
   withIpcTimeout,
 } from '@/services/cmds'
 import DelayManager from '@/services/delay'
-import { closeAllConnectionsWithTimeout, getProxyByNameWithTimeout } from '@/services/mihomo-api'
+import {
+  closeAllConnectionsWithTimeout,
+  getProxyByNameWithTimeout,
+} from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
@@ -504,7 +507,9 @@ const Layout = () => {
   const [coreCheckLoading, setCoreCheckLoading] = useState(false)
 
   const [isMinimalWidth, setIsMinimalWidth] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth <= MINI_WIDTH_THRESHOLD,
+    () =>
+      typeof window !== 'undefined' &&
+      window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
 
   const [isMiniStatus, setIsMiniStatus] = useState(
@@ -897,7 +902,11 @@ const Layout = () => {
           }
         },
       )
-      await withIpcTimeout(downloadPromise, 10 * 60 * 1000, 'downloadAndInstall')
+      await withIpcTimeout(
+        downloadPromise,
+        10 * 60 * 1000,
+        'downloadAndInstall',
+      )
       showNotice.success('更新安装完毕，请重启应用以应用更改')
     } catch (err: any) {
       console.error('Client update error:', err)
@@ -1187,78 +1196,122 @@ const Layout = () => {
   // Refer to BUG-171/BUG-172 agreements.
   // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
   useEffect(() => {
-    if (currentProfileUid) {
-      const isNewProfile = lastProcessedRef.current.uid !== currentProfileUid
-      const isRefreshTriggered =
-        lastProcessedRef.current.counter !== profileRefreshCounter
+    if (!currentProfileUid) return
 
-      if (isNewProfile || isRefreshTriggered) {
-        lastProcessedRef.current = {
-          uid: currentProfileUid,
-          counter: profileRefreshCounter,
-        }
-        const uid = currentProfileUid
-        let cancelled = false
-        let timerId: any = null
-        enhanceProfiles()
-          .then(async (success) => {
-            if (!success) {
-              throw new Error('Profile configuration validation failed')
-            }
-            if (cancelled || isImportingRef.current) return
-            console.log(`[Layout] Enhanced active profile: ${uid}`)
-            await activateSelectedRef.current()
-            if (cancelled || isImportingRef.current) return
-            // 等待 Clash 内核就绪（最多 10 秒），然后触发自动选点并刷新前端
-            await waitForClashReady(tRef.current)
-            if (cancelled || isImportingRef.current) return
-            await triggerAutoSelectAndRefresh(
-              refreshProxyRef.current,
-              fallbackTimerRef,
-              autoSelectTimerRef,
-              setHeadStateForSortRef.current,
-              setDragRegionEnabledRef.current,
-              uid,
-            )
-            // Success: reset retry counter
-            startupRetryCountRef.current = 0
-            isStartingUpRef.current = false
-            // WARN-002 修复：记录启动完成时间，防止首次窗口聚焦时触发冗余的二次全量刷新
-            lastFullTestTimeRef.current = Date.now()
-          })
-          .catch((err) => {
-            if (cancelled) return
-            console.error(`[Layout] Failed to enhance profile ${uid}:`, err)
-            // Reset to allow retry/reload
-            lastProcessedRef.current.uid = null
+    // 通过 localStorage 跨窗口重建持久化"已 enhance 过的 uid"，避免轻量模式唤醒时误判为 profile 切换
+    // （useRef 在 React 重新挂载时会重置，无法区分"窗口重建"和"profile 切换"）
+    const enhancedUid = localStorage.getItem('clash-mini-last-enhanced-uid')
+    const isNewProfile = enhancedUid !== currentProfileUid
+    const isRefreshTriggered =
+      lastProcessedRef.current.counter !== profileRefreshCounter
 
-            // Auto-retry up to 3 times on failure/startup
-            if (startupRetryCountRef.current < 3) {
-              startupRetryCountRef.current += 1
-              const retryDelay = 2000 * startupRetryCountRef.current
-              console.log(
-                `[Layout] Retrying profile activation in ${retryDelay}ms (Attempt ${startupRetryCountRef.current}/3)`,
-              )
-              timerId = setTimeout(() => {
-                if (!cancelled) {
-                  setProfileRefreshCounter((c) => c + 1)
-                }
-              }, retryDelay)
-            } else {
-              showNotice.error(
-                'Profile activation failed after 3 retries. Please check your network or subscription.',
-              )
-            }
-          })
-        return () => {
-          cancelled = true
-          if (timerId) {
-            clearTimeout(timerId)
-          }
-          // Reset last processed to allow retry/reload on next mount/run if cancelled before completion
-          lastProcessedRef.current.uid = null
-        }
+    if (!isNewProfile && !isRefreshTriggered) {
+      // 轻量模式唤醒场景：profile 未变，跳过 enhance（避免触发内核 force=true 重置）
+      // 仅恢复节点选择 + 自动选点刷新前端
+      lastProcessedRef.current = {
+        uid: currentProfileUid,
+        counter: profileRefreshCounter,
       }
+      console.log(
+        `[Layout] profile ${currentProfileUid} 未变（可能为轻量模式唤醒），跳过 enhance`,
+      )
+      let cancelled = false
+      ;(async () => {
+        try {
+          if (cancelled || isImportingRef.current) return
+          await activateSelectedRef.current()
+          if (cancelled || isImportingRef.current) return
+          await waitForClashReady(tRef.current)
+          if (cancelled || isImportingRef.current) return
+          await triggerAutoSelectAndRefresh(
+            refreshProxyRef.current,
+            fallbackTimerRef,
+            autoSelectTimerRef,
+            setHeadStateForSortRef.current,
+            setDragRegionEnabledRef.current,
+            currentProfileUid,
+          )
+          startupRetryCountRef.current = 0
+          isStartingUpRef.current = false
+          lastFullTestTimeRef.current = Date.now()
+        } catch (err) {
+          if (!cancelled) {
+            console.error('[Layout] 唤醒后恢复节点选择失败:', err)
+          }
+        }
+      })()
+      return () => {
+        cancelled = true
+      }
+    }
+
+    // profile 切换 / 首次启动 / 手动刷新场景：走完整 enhance 流程
+    lastProcessedRef.current = {
+      uid: currentProfileUid,
+      counter: profileRefreshCounter,
+    }
+    const uid = currentProfileUid
+    let cancelled = false
+    let timerId: any = null
+    enhanceProfiles()
+      .then(async (success) => {
+        if (!success) {
+          throw new Error('Profile configuration validation failed')
+        }
+        if (cancelled || isImportingRef.current) return
+        console.log(`[Layout] Enhanced active profile: ${uid}`)
+        // enhance 成功后才写入 localStorage，防止失败时下次跳过
+        localStorage.setItem('clash-mini-last-enhanced-uid', uid)
+        await activateSelectedRef.current()
+        if (cancelled || isImportingRef.current) return
+        // 等待 Clash 内核就绪（最多 10 秒），然后触发自动选点并刷新前端
+        await waitForClashReady(tRef.current)
+        if (cancelled || isImportingRef.current) return
+        await triggerAutoSelectAndRefresh(
+          refreshProxyRef.current,
+          fallbackTimerRef,
+          autoSelectTimerRef,
+          setHeadStateForSortRef.current,
+          setDragRegionEnabledRef.current,
+          uid,
+        )
+        // Success: reset retry counter
+        startupRetryCountRef.current = 0
+        isStartingUpRef.current = false
+        // WARN-002 修复：记录启动完成时间，防止首次窗口聚焦时触发冗余的二次全量刷新
+        lastFullTestTimeRef.current = Date.now()
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error(`[Layout] Failed to enhance profile ${uid}:`, err)
+        // Reset to allow retry/reload
+        lastProcessedRef.current.uid = null
+
+        // Auto-retry up to 3 times on failure/startup
+        if (startupRetryCountRef.current < 3) {
+          startupRetryCountRef.current += 1
+          const retryDelay = 2000 * startupRetryCountRef.current
+          console.log(
+            `[Layout] Retrying profile activation in ${retryDelay}ms (Attempt ${startupRetryCountRef.current}/3)`,
+          )
+          timerId = setTimeout(() => {
+            if (!cancelled) {
+              setProfileRefreshCounter((c) => c + 1)
+            }
+          }, retryDelay)
+        } else {
+          showNotice.error(
+            'Profile activation failed after 3 retries. Please check your network or subscription.',
+          )
+        }
+      })
+    return () => {
+      cancelled = true
+      if (timerId) {
+        clearTimeout(timerId)
+      }
+      // Reset last processed to allow retry/reload on next mount/run if cancelled before completion
+      lastProcessedRef.current.uid = null
     }
   }, [currentProfileUid, profileRefreshCounter])
 
@@ -1300,7 +1353,9 @@ const Layout = () => {
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {
-          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD && window.innerHeight <= MINI_HEIGHT_THRESHOLD
+          const next =
+            window.innerWidth <= MINI_WIDTH_THRESHOLD &&
+            window.innerHeight <= MINI_HEIGHT_THRESHOLD
           return prev !== next ? next : prev
         })
       })
@@ -1407,8 +1462,7 @@ const Layout = () => {
     }
   }
 
-  const handleSelectProfile = useLockFn(
-    async (uid: string) => {
+  const handleSelectProfile = useLockFn(async (uid: string) => {
     if (currentProfileUid === uid) return
     try {
       isStartingUpRef.current = true
@@ -1425,8 +1479,7 @@ const Layout = () => {
     } catch (err) {
       showNotice.error(err)
     }
-  },
-  )
+  })
 
   const handleUpdateProfile = async (uid: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -1580,10 +1633,7 @@ const Layout = () => {
 
   // Port update
   const handleSavePort = async (port: number) => {
-    if (
-      port === verge?.verge_mixed_port &&
-      port === clashInfo?.mixed_port
-    )
+    if (port === verge?.verge_mixed_port && port === clashInfo?.mixed_port)
       return
     try {
       const inUse = await isPortInUse(port)
@@ -1986,7 +2036,10 @@ const Layout = () => {
                         onAddUrlClick={handleAddUrlClick}
                         disableCardBorder
                       />
-                      <AddUrlDialog open={addUrlOpen} onClose={() => setAddUrlOpen(false)} />
+                      <AddUrlDialog
+                        open={addUrlOpen}
+                        onClose={() => setAddUrlOpen(false)}
+                      />
                     </Box>
 
                     {/* Section 3: Minimal Settings */}
@@ -2017,19 +2070,19 @@ const Layout = () => {
                   {/* Right Connections column (自适应 flex: 1) — 仅大窗口(宽>285)挂载；
                       窄窗口(宽=285)下不挂载、不渲染、不订阅数据，与上方 useConnectionData 共用 isMinimalWidth 信号 */}
                   {!isMinimalWidth && (
-                  <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-                    <ConnectionsPanel
-                      connectionsType={connectionsType}
-                      setConnectionsType={setConnectionsType}
-                      connectionsData={connectionsData}
-                      handleSearch={handleSearch}
-                      filterConn={filterConn}
-                      detailRef={detailRef}
-                      isColumnManagerOpen={isColumnManagerOpen}
-                      setIsColumnManagerOpen={setIsColumnManagerOpen}
-                      clearClosedConnections={clearClosedConnections}
-                    />
-                  </ErrorBoundary>
+                    <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                      <ConnectionsPanel
+                        connectionsType={connectionsType}
+                        setConnectionsType={setConnectionsType}
+                        connectionsData={connectionsData}
+                        handleSearch={handleSearch}
+                        filterConn={filterConn}
+                        detailRef={detailRef}
+                        isColumnManagerOpen={isColumnManagerOpen}
+                        setIsColumnManagerOpen={setIsColumnManagerOpen}
+                        clearClosedConnections={clearClosedConnections}
+                      />
+                    </ErrorBoundary>
                   )}
                   {/* Help Button */}
                   <HelpMenuButton

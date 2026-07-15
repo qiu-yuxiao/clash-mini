@@ -1058,6 +1058,14 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 必须维护 `api_error_count` 连续异常计数器，每次 `Err` 累加，`Ok` 时清零。
   - 连续 **`3次`** API 异常（正常模式约 45 秒，重试模式约 9 秒）后，必须触发一次自愈选点尝试恢复。若自愈也因 API 不可达而失败，`auto_select_fail_count` 会累计，5 次后弹 Windows 警报。
   - 原因：旧代码把 `Err` 假设为"内核重载中"的短暂现象，只输出 `debug` 日志且不计数不触发自愈。当 mihomo 内核卡死（非重载）时，API 持续不可达，监测线程彻底失效，导致轻量模式下代理断流 12 分钟无法自愈。
+- **轻量模式唤醒不得触发内核 force=true 重置**：
+  - 轻量模式进入/退出本质上是前端 UI 状态切换（窗口销毁/重建），内核应继续为系统提供代理服务，不得被重置。
+  - 后端 `lightweight.rs` 的 `entry_lightweight_mode` / `exit_lightweight_mode` 不得调用任何 `update_config` / `reload_config`；只允许 `close_all_connections`（关闭已建立连接，保留 dialer 状态）和 `clear_all_ws_connections`（熔断前后端 WS 订阅）。
+  - 前端 `_layout.tsx` 的 profile 增强 useEffect 必须能区分"profile 切换"与"窗口重建"两种场景。由于 `useRef` 在 React 重新挂载时会重置，无法区分二者，必须使用 `localStorage` 持久化"已 enhance 过的 profile uid"（key: `clash-mini-last-enhanced-uid`）：
+    - 程序启动时（`main.tsx` 的 `initializeApp`）清除该 key，确保首次启动触发 enhance。
+    - enhance 成功后才写入该 key，防止失败时下次跳过。
+    - 检测到 key 与当前 profile uid 相同时，跳过 `enhanceProfiles()`（避免触发 `update_config_forced` → mihomo `PUT /configs?force=true` → 代理栈重建），仅执行 `activateSelected` 恢复节点选择 + 前端测速刷新。
+  - 原因：mihomo `PUT /configs?force=true` 会重建整个代理栈（dialer、连接池、DNS 缓存、路由表），恢复需 8+ 秒。唤醒时若误触发，后台监测线程在 `wait_for_clash_ready`（仅检测 API 响应 + 节点列表非空，500ms 即通过）通过后立即群发测速，此时 dialer 尚未就绪，导致所有节点 timeout。8 秒后代理栈恢复，第二次测速才成功。
 - **网络连接的防死锁安全**：
   - **客户端超时**：所有的后端监控客户端以及 Local Socket 请求必须配置 **`3秒` 的显式超时限制**，防止核心挂起导致异步监控线程无限期阻塞（注：通用测速 API 如 `delay_proxy_by_name` 等不受此 3 秒上限硬性限制，而使用动态配置 `timeout + 2000ms`，以允许前端高超时设置或排队测速正常返回 Timeout 状态，避免被强行中止导致前台误报 Error）。
 - **无竞态冲突的前端缓存同步**：
@@ -1460,13 +1468,13 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 - **��Ծ�ڵ��ǩ����淶**����������Ծ�ڵ�״̬��Ƭ���е����ֱ�ǩ��ͳһʹ�ü����ʽ��������������ʽ�����ļ���ʹ�� ��Ծ�ڵ㣺�����ķ���ʹ�� ���S���c����Ӣ��ʹ�� Active Node: ������ʹ�� �����ƥ��֥Ω`�ɣ�����������ͬ����ȥ�������ڡ�����ǰ����Outbound�����F�ڤΡ����������δʡ�������Ϊ�ڵ����Ʊ�����������ˮƽ�ռ䣬�����ǩ������ռ�ڵ�������ʾ����
 
-### v2.5.0 ��Ŀ�ĵ�����
+### v2.5.0 ��Ŀ�ĵ�����
 
-- **����ֿ���ʷ����ļ����׾���**�������û�ȷ�ϣ�������������Ŀ��Ŀ¼�¶ѻ��� 10 ����ʷ�׶��Ե� markdown / html ��Ʒ����ĵ�����ͨ�� git rm �Ƴ�����ֻ�������ĵļܹ���ƹ�Լ�ĵ���������Ŀά������ȡ�
+- **����ֿ���ʷ����ļ����׾���**�������û�ȷ�ϣ�������������Ŀ��Ŀ¼�¶ѻ��� 10 ����ʷ�׶��Ե� markdown / html ��Ʒ����ĵ�����ͨ�� git rm �Ƴ�����ֻ�������ĵļܹ���ƹ�Լ�ĵ���������Ŀά������ȡ�
 
-- **��������ֱ�Ӷ�λ�Ż�**���ڻ�Ծ�ڵ㿨Ƭ��� active-node-card.tsx �У������޳�����ʷ�������ʱ�ڵĹؼ���Ȩ�ز½�Ͷ༶ fallback �����߼���ֱ�Ӱ� PROXY ������׼��λ�������飬���ⲻ��Ҫ�ı���������ȶԡ�
-- **��Ծ�ڵ����Լ����Ż�**���� active-node-card.tsx ����У�ȥ���˶༶Ƕ��ѭ������������� GLOBAL ����Ѱ�һ�Ծ�ڵ�Ľ����߼�����Ϊֱ�Ӵ�ȫ��ƽ�� records ӳ������ O(1) ���ӶȽ��й�ϣ���ң���������ڽڵ����ʱ�����㿪����
-- **����Դͷ�������龫������Ⱦ��ȥ filter ��**���� calcuProxies ���ݷ���cmds.ts�����ع��� groups ����Դ��װ��ֱ����Դͷ����ȡ������ PROXY ��һ�����飬��ȫ�޳��˷� PROXY ��Ķ��������ȥ����ϲ����㡣ǰ���б���Ⱦ�� use-render-list.ts Ҳͬ�����򣬲�����Ҫ�� groups ִ�к��� filter ���ˣ�ȷ��ȫ�ֵ��������������ļ��򻯺�һ���ԡ�
-- **��Ⱦ�б�����֧������ƽ�̾���**���� use-render-list.ts �г���ɾ���˲��ɴ�ķ� PROXY �۵�����������жϣ�if group.name !== 'PROXY'�����Լ���Ϊ true �� isOpen �۵�չ��״̬�жϣ��������б������߼�ƽ��չ���������˲���Ҫ�������߼�����㿪����
-- **��Ⱦ�������ṹ������������**���� proxy-render.tsx ��ȥ���˶�Ӧ type === 0 �Ĵ�Ƭ�۵���������Ⱦ�߼�������������֮��Ϊ����������� Styled �����StyledPrimary��StyledSubtitle��StyledTypeBox����δʹ�õ� Material UI Icons �������ExpandLessRounded��ExpandMoreRounded��ListItemButton��ListItemText��Chip��Tooltip �ȣ����룬��С����Ⱦ����������
-- **�������л��˵������״̬����**���� proxy-groups.tsx �У���������˴�δ�����õ� GroupSelectMenu �������л��˵������ ProxyGroupOption��GroupSelectMenuProps �ӿڶ��壬��ͬ���Ƴ��� ProxyGroups ����������� selectedGroup ״̬�Լ����õ� groups ���ݽ⹹�������������������ڴ���״̬ά��������
+- **��������ֱ�Ӷ�λ�Ż�**���ڻ�Ծ�ڵ㿨Ƭ��� active-node-card.tsx �У������޳�����ʷ�������ʱ�ڵĹؼ���Ȩ�ز½�Ͷ༶ fallback �����߼���ֱ�Ӱ� PROXY ������׼��λ�������飬���ⲻ��Ҫ�ı���������ȶԡ�
+- **��Ծ�ڵ����Լ����Ż�**���� active-node-card.tsx ����У�ȥ���˶༶Ƕ��ѭ������������� GLOBAL ����Ѱ�һ�Ծ�ڵ�Ľ����߼�����Ϊֱ�Ӵ�ȫ��ƽ�� records ӳ������ O(1) ���ӶȽ��й�ϣ���ң���������ڽڵ����ʱ�����㿪����
+- **����Դͷ�������龫������Ⱦ��ȥ filter ��**���� calcuProxies ���ݷ���cmds.ts�����ع��� groups ����Դ��װ��ֱ����Դͷ����ȡ������ PROXY ��һ�����飬��ȫ�޳��˷� PROXY ��Ķ��������ȥ����ϲ����㡣ǰ���б���Ⱦ�� use-render-list.ts Ҳͬ�����򣬲�����Ҫ�� groups ִ�к��� filter ���ˣ�ȷ��ȫ�ֵ��������������ļ��򻯺�һ���ԡ�
+- **��Ⱦ�б�����֧������ƽ�̾���**���� use-render-list.ts �г���ɾ���˲��ɴ�ķ� PROXY �۵�����������жϣ�if group.name !== 'PROXY'�����Լ���Ϊ true �� isOpen �۵�չ��״̬�жϣ��������б������߼�ƽ��չ���������˲���Ҫ�������߼�����㿪����
+- **��Ⱦ�������ṹ������������**���� proxy-render.tsx ��ȥ���˶�Ӧ type === 0 �Ĵ�Ƭ�۵���������Ⱦ�߼�������������֮��Ϊ����������� Styled �����StyledPrimary��StyledSubtitle��StyledTypeBox����δʹ�õ� Material UI Icons �������ExpandLessRounded��ExpandMoreRounded��ListItemButton��ListItemText��Chip��Tooltip �ȣ����룬��С����Ⱦ����������
+- **�������л��˵������״̬����**���� proxy-groups.tsx �У���������˴�δ�����õ� GroupSelectMenu �������л��˵������ ProxyGroupOption��GroupSelectMenuProps �ӿڶ��壬��ͬ���Ƴ��� ProxyGroups ����������� selectedGroup ״̬�Լ����õ� groups ���ݽ⹹�������������������ڴ���״̬ά��������
