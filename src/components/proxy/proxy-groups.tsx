@@ -65,7 +65,6 @@ export const ProxyGroups = (props: Props) => {
   // 消费拖拽区域状态，批量测速期间禁用 drag-region
   const { setEnabled: setDragRegionEnabled } = use(DragRegionContext)
 
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [testingGroups, setTestingGroups] = useState<Record<string, boolean>>(
     {},
   )
@@ -94,7 +93,7 @@ export const ProxyGroups = (props: Props) => {
   // 不再读取 verge.default_latency_timeout；useVerge 仅用于订阅配置变更。
   useVerge()
   const { proxies: proxiesData } = useProxiesData()
-  const groups = proxiesData?.groups
+
 
   const { renderList, onHeadState } = useRenderList(mode)
 
@@ -456,77 +455,7 @@ interface ProxyVirtualListProps {
   testingGroups: Record<string, boolean>
 }
 
-interface ProxyGroupOption {
-  name: string
-  type: string
-  all?: unknown[]
-}
 
-interface GroupSelectMenuProps {
-  anchorEl: HTMLElement | null
-  groups: ProxyGroupOption[]
-  selectedGroup: string | null
-  emptyText: string
-  onClose: () => void
-  onSelect: (groupName: string) => void
-}
-
-function GroupSelectMenu({
-  anchorEl,
-  groups,
-  selectedGroup,
-  emptyText,
-  onClose,
-  onSelect,
-}: GroupSelectMenuProps) {
-  return (
-    <Menu
-      anchorEl={anchorEl}
-      open={Boolean(anchorEl)}
-      onClose={onClose}
-      slotProps={{
-        paper: {
-          sx: {
-            maxHeight: 300,
-            minWidth: 200,
-          },
-        },
-      }}
-    >
-      {groups.map((group) => (
-        <MenuItem
-          key={group.name}
-          onClick={() => onSelect(group.name)}
-          selected={selectedGroup === group.name}
-          sx={{ fontSize: '14px', py: 1 }}
-        >
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-            }}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              {group.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {group.type} · {group.all?.length ?? 0} 节点
-            </Typography>
-          </Box>
-        </MenuItem>
-      ))}
-
-      {groups.length === 0 && (
-        <MenuItem disabled>
-          <Typography variant="body2" color="text.secondary">
-            {emptyText}
-          </Typography>
-        </MenuItem>
-      )}
-    </Menu>
-  )
-}
 
 function ProxyVirtualList({
   parentRef,
