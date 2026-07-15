@@ -34,17 +34,7 @@ export const ActiveNodeStatusCard = () => {
   const singleTestTimeout = 1000
 
   const primaryGroup = useMemo(() => {
-    const groups = proxies?.groups || []
-    const primaryKeywords = ['auto', 'select', 'proxy', '节点选择', '自动选择']
-    return (
-      groups.find((group: any) =>
-        primaryKeywords.some((keyword) =>
-          (group?.name ?? '').toLowerCase().includes(keyword.toLowerCase()),
-        ),
-      ) ||
-      groups.filter((g: any) => g?.name !== 'GLOBAL')[0] ||
-      groups[0]
-    )
+    return proxies?.groups?.find((g: any) => g?.name === 'PROXY') ?? null
   }, [proxies])
 
   const activeNodeName = primaryGroup?.now || ''
