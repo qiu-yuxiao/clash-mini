@@ -2,7 +2,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
-import { withIpcTimeout } from '@/services/cmds'
+import { frontendLog, withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
 import getSystem from '@/utils/get-system'
 
@@ -91,23 +91,27 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         const t0 = performance.now()
-        console.log(`[WindowProvider] onResized -> isMaximized() calling...`)
+        frontendLog(
+          'info',
+          `[WindowProvider] onResized -> isMaximized() calling...`,
+        )
         try {
           const value = await withIpcTimeout(
             currentWindow.isMaximized(),
             5000,
             'isMaximized',
           )
-          console.log(
+          frontendLog(
+            'info',
             `[WindowProvider] isMaximized() resolved = ${value}, took ${Math.round(performance.now() - t0)}ms`,
           )
           if (!isUnmounted) {
             setMaximized(value)
           }
         } catch (err) {
-          console.error(
-            `[WindowProvider] isMaximized FAILED took ${Math.round(performance.now() - t0)}ms:`,
-            err,
+          frontendLog(
+            'error',
+            `[WindowProvider] isMaximized FAILED took ${Math.round(performance.now() - t0)}ms: ${err}`,
           )
         }
       },

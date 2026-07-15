@@ -178,6 +178,7 @@ mod app_init {
             cmd::check_media_unlock,
             cmd::check_core_update,
             cmd::start_core_upgrade,
+            cmd::frontend_log,
         ]
     }
 }
@@ -272,6 +273,35 @@ pub fn run() {
             crate::utils::sysinfo::init_platform(app);
 
             logging!(info, Type::Setup, "初始化已启动");
+
+            // UI 线程心跳探针：每 2 秒向 UI 线程投递闭包，
+            // 若 5 秒内未执行则写入警告日志，用于精确定位 UI 线程卡死时间点
+            crate::process::AsyncHandler::spawn(|| async move {
+                use std::sync::Arc;
+                use std::sync::atomic::{AtomicBool, Ordering};
+                use std::time::Duration;
+                let alive = Arc::new(AtomicBool::new(false));
+                loop {
+                    if handle::Handle::global().is_exiting() {
+                        break;
+                    }
+                    let app_handle = handle::Handle::app_handle();
+                    alive.store(false, Ordering::SeqCst);
+                    let alive_clone = alive.clone();
+                    let _ = app_handle.run_on_main_thread(move || {
+                        alive_clone.store(true, Ordering::SeqCst);
+                    });
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    if !alive.load(Ordering::SeqCst) {
+                        logging!(
+                            error,
+                            Type::System,
+                            "[心跳探针] UI 线程 5 秒未响应，可能已卡死"
+                        );
+                    }
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(app_init::generate_handlers())

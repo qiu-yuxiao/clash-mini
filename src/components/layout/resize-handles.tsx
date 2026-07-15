@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react'
 
 import { useWindow } from '@/hooks/use-window'
+import { frontendLog } from '@/services/cmds'
 
 const HANDLE_SIZE = 10
 
@@ -98,20 +99,22 @@ export const ResizeHandles: React.FC = () => {
       e.preventDefault()
       e.stopPropagation()
       const t0 = performance.now()
-      console.log(
+      frontendLog(
+        'info',
         `[ResizeHandle] mousedown dir=${direction}, calling startResizeDragging...`,
       )
       currentWindow
         .startResizeDragging(direction as any)
         .then(() => {
-          console.log(
+          frontendLog(
+            'info',
             `[ResizeHandle] startResizeDragging resolved dir=${direction}, took ${Math.round(performance.now() - t0)}ms`,
           )
         })
         .catch((err) => {
-          console.error(
-            `[ResizeHandle] startResizeDragging FAILED dir=${direction}, took ${Math.round(performance.now() - t0)}ms`,
-            err,
+          frontendLog(
+            'error',
+            `[ResizeHandle] startResizeDragging FAILED dir=${direction}, took ${Math.round(performance.now() - t0)}ms: ${err}`,
           )
         })
     },

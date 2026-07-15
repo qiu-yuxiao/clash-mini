@@ -21,6 +21,14 @@ import { isDummyNode } from '@/utils/node'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
 /**
+ * 前端日志转发：将诊断日志写入后端 latest.log 文件
+ * 用于 UI 线程卡死时（DevTools 无法打开）仍能在后端日志中看到前端 IPC 调用时间线
+ */
+export function frontendLog(level: 'info' | 'warn' | 'error', message: string) {
+  invoke('frontend_log', { level, message }).catch(() => {})
+}
+
+/**
  * H-17: IPC 超时包装工具函数
  * 对关键 IPC 调用包裹超时保护，防止后端卡住时前端 Promise 永远 pending。
  * 超时后 reject 并附带超时信息，便于调用方统一 catch 处理。

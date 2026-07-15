@@ -1,6 +1,8 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { frontendLog } from '@/services/cmds'
+
 /**
  * useVisibility
  *
@@ -68,7 +70,8 @@ export const useVisibility = () => {
   // 避免闭包变量带来的潜在问题，同时确保回调引用稳定（虽然 useEffect 依赖为空本就只注册一次）
   const updateWindowState = useCallback(async () => {
     const t0 = performance.now()
-    console.log(
+    frontendLog(
+      'info',
       '[useVisibility] updateWindowState calling isMinimized+isVisible...',
     )
     try {
@@ -77,7 +80,8 @@ export const useVisibility = () => {
         currentWindow.isMinimized(),
         currentWindow.isVisible(),
       ])
-      console.log(
+      frontendLog(
+        'info',
         `[useVisibility] IPC resolved min=${minimized} vis=${visible}, took ${Math.round(performance.now() - t0)}ms`,
       )
       if (isMountedRef.current) {
@@ -85,9 +89,9 @@ export const useVisibility = () => {
         setIsWindowVisible(visible)
       }
     } catch (err) {
-      console.error(
-        `[useVisibility] updateWindowState FAILED took ${Math.round(performance.now() - t0)}ms:`,
-        err,
+      frontendLog(
+        'error',
+        `[useVisibility] updateWindowState FAILED took ${Math.round(performance.now() - t0)}ms: ${err}`,
       )
     }
   }, [])
