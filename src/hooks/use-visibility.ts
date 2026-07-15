@@ -68,7 +68,12 @@ export const useVisibility = () => {
 
   // L-29: updateWindowState 使用 useCallback 包装并通过 isMountedRef 判断挂载状态
   // 避免闭包变量带来的潜在问题，同时确保回调引用稳定（虽然 useEffect 依赖为空本就只注册一次）
+  const inFlightRef = useRef(false)
   const updateWindowState = useCallback(async () => {
+    // 防止并发调用堆积：如果上一次 IPC 调用尚未返回，直接跳过
+    // 这能防止 resize 期间的 IPC 洪水（onResized 每像素触发一次）
+    if (inFlightRef.current) return
+    inFlightRef.current = true
     const t0 = performance.now()
     frontendLog(
       'info',
@@ -93,6 +98,8 @@ export const useVisibility = () => {
         'error',
         `[useVisibility] updateWindowState FAILED took ${Math.round(performance.now() - t0)}ms: ${err}`,
       )
+    } finally {
+      inFlightRef.current = false
     }
   }, [])
 
