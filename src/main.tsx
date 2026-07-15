@@ -78,13 +78,6 @@ if (!container) {
 disableWebViewShortcuts()
 
 const initializeApp = (initialThemeMode: 'light' | 'dark') => {
-  // 仅在真正的 App 冷启动时清除持久化标志
-  // 避免智能轻量模式下窗口销毁/重建重新执行 main.tsx 时误擦除该标志
-  const isColdStart = window.location.search.includes('cold_start=true')
-  if (isColdStart) {
-    localStorage.removeItem('clash-mini-last-enhanced-uid')
-  }
-
   const contexts = [
     <ThemeModeProvider key="theme" initialState={initialThemeMode} />,
   ]

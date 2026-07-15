@@ -1,9 +1,4 @@
-import {
-  Box,
-  Menu,
-  MenuItem,
-  Typography,
-} from '@mui/material'
+import { Box } from '@mui/material'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
@@ -21,14 +16,9 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
 
 import { useProxySelection } from '@/hooks/use-proxy-selection'
-import { useVerge } from '@/hooks/use-verge'
-import { useProxiesData } from '@/providers/app-data-context'
 import { DragRegionContext } from '@/providers/drag-region-context'
 import { batchTestLockRef } from '@/services/batch-test-lock'
-import {
-  getProfiles,
-  triggerAutoSelect,
-} from '@/services/cmds'
+import { getProfiles, triggerAutoSelect } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
@@ -59,7 +49,7 @@ interface Props {
 // 4. useCallback for event handlers - stable references for memoized children
 // 5. Reference stability optimization in connection data processing
 export const ProxyGroups = (props: Props) => {
-  const { t } = useTranslation()
+  const { _t } = useTranslation()
   const { pathname } = useLocation()
   const { mode } = props
   // 消费拖拽区域状态，批量测速期间禁用 drag-region
@@ -82,18 +72,6 @@ export const ProxyGroups = (props: Props) => {
     },
     [],
   )
-
-
-  const [duplicateWarning, setDuplicateWarning] = useState<{
-    open: boolean
-    message: string
-  }>({ open: false, message: '' })
-
-  // F4 手动测速的探针超时固定为死节点阈值 2000ms（与后端 auto-select 一致），
-  // 不再读取 verge.default_latency_timeout；useVerge 仅用于订阅配置变更。
-  useVerge()
-  const { proxies: proxiesData } = useProxiesData()
-
 
   const { renderList, onHeadState } = useRenderList(mode)
 
@@ -279,13 +257,6 @@ export const ProxyGroups = (props: Props) => {
     saveScrollPosition(0)
   }, [saveScrollPosition])
 
-  // 关闭重复节点警告
-  const handleCloseDuplicateWarning = useCallback(() => {
-    setDuplicateWarning({ open: false, message: '' })
-  }, [])
-
-
-
   const handleChangeProxy = useCallback(
     (group: IProxyGroupItem, proxy: IProxyItem) => {
       if (!['Selector', 'URLTest', 'Fallback'].includes(group.type)) return
@@ -442,8 +413,6 @@ interface ProxyVirtualListProps {
   headItem?: IRenderItem | null
   testingGroups: Record<string, boolean>
 }
-
-
 
 function ProxyVirtualList({
   parentRef,

@@ -1,10 +1,5 @@
-import {
-  InboxRounded,
-} from '@mui/icons-material'
-import {
-  Box,
-  Typography,
-} from '@mui/material'
+import { InboxRounded } from '@mui/icons-material'
+import { Box, Typography } from '@mui/material'
 import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -32,7 +27,7 @@ interface RenderProps {
 }
 
 const ProxyRenderComponent = (props: RenderProps) => {
-  const { t } = useTranslation()
+  const { _t } = useTranslation()
   const {
     indent,
     item,
@@ -47,8 +42,8 @@ const ProxyRenderComponent = (props: RenderProps) => {
   const enable_group_icon = verge?.enable_group_icon ?? true
   const mode = useThemeMode()
   const isDark = mode === 'light' ? false : true
-  const itembackgroundcolor = isDark ? '#282A36' : '#ffffff'
-  const iconCachePath = useIconCache({
+  const _itembackgroundcolor = isDark ? '#282A36' : '#ffffff'
+  const _iconCachePath = useIconCache({
     icon: group?.icon,
     cacheKey: (group?.name ?? '').replaceAll(' ', ''),
     enabled: enable_group_icon,
@@ -90,7 +85,6 @@ const ProxyRenderComponent = (props: RenderProps) => {
     item.indexInGroup,
     col,
   ])
-
 
   if (type === 1) {
     return (
@@ -160,5 +154,3 @@ const ProxyRenderComponent = (props: RenderProps) => {
 }
 
 export const ProxyRender = memo(ProxyRenderComponent)
-
-

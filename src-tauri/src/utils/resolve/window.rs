@@ -1,18 +1,14 @@
 use tauri::webview::PageLoadEvent;
 use tauri::{Manager as _, Theme, WebviewWindow};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{config::Config, core::handle, utils::resolve::window_script::build_window_initial_script};
 use clash_verge_logging::{Type, logging, logging_error};
 
 #[cfg(not(target_os = "windows"))]
 use dark_light::{Mode as SystemTheme, detect as detect_system_theme};
-#[cfg(not(target_os = "windows"))]
 use tauri::utils::config::Color;
 
-#[cfg(not(target_os = "windows"))]
 const DARK_BACKGROUND_COLOR: Color = Color(46, 48, 61, 255);
-#[cfg(not(target_os = "windows"))]
 const LIGHT_BACKGROUND_COLOR: Color = Color(245, 245, 245, 255);
 const DARK_BACKGROUND_HEX: &str = "#2E303D";
 const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
@@ -26,8 +22,6 @@ pub const MINIMAL_WIDTH: f64 = 285.0;
 // 极简窗口最小高度；对应前端 MINI_HEIGHT_THRESHOLD
 pub const MINIMAL_HEIGHT: f64 = 135.0;
 const DEFAULT_DECORATIONS: bool = false;
-
-static IS_COLD_START: AtomicBool = AtomicBool::new(true);
 
 pub async fn build_new_window() -> Result<WebviewWindow, String> {
     let app_handle = handle::Handle::app_handle();
@@ -55,7 +49,13 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         _ => !matches!(detect_system_theme().ok(), Some(SystemTheme::Light)),
     };
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "windows")]
+    let prefers_dark_background = match resolved_theme {
+        Some(Theme::Dark) => true,
+        Some(Theme::Light) => false,
+        _ => false,
+    };
+
     let background_color = if prefers_dark_background {
         DARK_BACKGROUND_COLOR
     } else {
@@ -64,14 +64,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     let initial_script = build_window_initial_script(initial_theme_mode, DARK_BACKGROUND_HEX, LIGHT_BACKGROUND_HEX);
 
-    let is_cold = IS_COLD_START.compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst).is_ok();
-    let url_with_query = if is_cold {
-        format!("{}?cold_start=true", start_page)
-    } else {
-        start_page.to_string()
-    };
-
-    let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(url_with_query.into()))
+    let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(start_page.into()))
         .center()
         .decorations(DEFAULT_DECORATIONS)
         .fullscreen(false)
@@ -113,10 +106,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         builder = builder.theme(Some(theme));
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        builder = builder.background_color(background_color);
-    }
+    builder = builder.background_color(background_color);
 
     match builder.build() {
         Ok(window) => {
