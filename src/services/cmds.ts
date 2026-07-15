@@ -345,43 +345,13 @@ export async function calcuProxies(): Promise<{
 
   const { GLOBAL: global, DIRECT: direct, REJECT: reject } = proxyRecord
 
-  let groups: IProxyGroupItem[] = Object.values(proxyRecord).reduce<
-    IProxyGroupItem[]
-  >((acc, each) => {
-    if (each?.name !== 'GLOBAL' && each?.all) {
-      acc.push({
-        ...each,
-        all: (each.all ?? [])
-          .map((item) => generateItem(item))
-          .filter((item) => item?.name && !isDummyNode(item.name)),
-      })
-    }
-
-    return acc
-  }, [])
-
-  if (global?.all) {
-    const globalGroups: IProxyGroupItem[] = global.all.reduce<
-      IProxyGroupItem[]
-    >((acc, name) => {
-      if (proxyRecord[name]?.all) {
-        acc.push({
-          ...proxyRecord[name],
-          all: (proxyRecord[name].all ?? [])
-            .map((item) => generateItem(item))
-            .filter((item) => item?.name && !isDummyNode(item.name)),
-        })
-      }
-      return acc
-    }, [])
-
-    const globalNames = new Set(globalGroups.map((each) => each.name))
-    groups = groups
-      .filter((group) => {
-        return !globalNames.has(group.name)
-      })
-      .concat(globalGroups)
-  }
+  const proxyGroup = proxyRecord['PROXY']
+  const groups: IProxyGroupItem[] = proxyGroup ? [{
+    ...proxyGroup,
+    all: (proxyGroup.all ?? [])
+      .map((item) => generateItem(item))
+      .filter((item) => item?.name && !isDummyNode(item.name)),
+  }] : []
 
   const proxies = [direct, reject]
     .filter(Boolean)

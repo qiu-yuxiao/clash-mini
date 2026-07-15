@@ -142,9 +142,7 @@ export const useRenderList = (mode: string) => {
     // calcuProxies() 返回的 groups 数组里虽然可能包含 GLOBAL 等其他组（上游遗留的数据结构），
     // 但 Mini 的所有节点选择/恢复/切换/测速逻辑只针对 PROXY 组，不应遍历多组。
     // 如需修改此处，请先确认 Mini 单组架构约定（见 project_memory.md）。
-    const renderGroups = proxiesData.groups?.length
-      ? proxiesData.groups.filter((group) => group.name === 'PROXY')
-      : []
+    const renderGroups = proxiesData.groups || []
 
     const cache = groupCacheRef.current
     let anyChanged = false
