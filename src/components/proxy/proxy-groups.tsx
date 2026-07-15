@@ -49,7 +49,7 @@ interface Props {
 // 4. useCallback for event handlers - stable references for memoized children
 // 5. Reference stability optimization in connection data processing
 export const ProxyGroups = (props: Props) => {
-  const { _t } = useTranslation()
+  const { t: _t } = useTranslation()
   const { pathname } = useLocation()
   const { mode } = props
   // 消费拖拽区域状态，批量测速期间禁用 drag-region

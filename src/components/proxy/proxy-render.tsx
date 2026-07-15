@@ -27,7 +27,7 @@ interface RenderProps {
 }
 
 const ProxyRenderComponent = (props: RenderProps) => {
-  const { _t } = useTranslation()
+  const { t: _t } = useTranslation()
   const {
     indent,
     item,
