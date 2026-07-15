@@ -19,7 +19,6 @@ import {
 import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { useLockFn } from 'ahooks'
@@ -54,8 +53,6 @@ import {
   useAppRefreshers,
   useSystemData,
 } from '@/providers/app-data-context'
-import { DragRegionContext } from '@/providers/drag-region-context'
-import { batchTestLockRef } from '@/services/batch-test-lock'
 import {
   importProfile,
   updateProfile,
@@ -245,7 +242,6 @@ async function triggerAutoSelectAndRefresh(
   fallbackTimerRef: React.MutableRefObject<number | null>,
   autoSelectTimerRef: React.MutableRefObject<number | null>,
   setHeadState?: (groupName: string, patch: any) => void,
-  setDragRegionEnabled?: (v: boolean) => void,
   profileUid?: string,
 ): Promise<void> {
   // 先同步内核已有的节点状态，让 React 完成首帧渲染
@@ -281,20 +277,7 @@ async function triggerAutoSelectAndRefresh(
       }
       const names = await getFilteredNodeNames('PROXY')
       if (names.length === 0) return
-      const win = getCurrentWindow()
-      try {
-        batchTestLockRef.current++ // H-11: 进入测速锁
-        await win.setResizable(false)
-        setDragRegionEnabled?.(false)
-        await batchTestWithFirstBatchSelect('PROXY', names, true)
-      } finally {
-        // H-11: 引用计数解锁，仅当===0时恢复窗口
-        batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
-        if (batchTestLockRef.current === 0) {
-          await win.setResizable(true)
-          setDragRegionEnabled?.(true)
-        }
-      }
+      await batchTestWithFirstBatchSelect('PROXY', names, true)
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
       }
@@ -329,20 +312,7 @@ async function triggerAutoSelectAndRefresh(
         const names = await getFilteredNodeNames('PROXY')
         if (names.length === 0) return
         console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
-        const win = getCurrentWindow()
-        try {
-          batchTestLockRef.current++ // H-11: 进入测速锁
-          await win.setResizable(false)
-          setDragRegionEnabled?.(false)
-          await batchTestWithFirstBatchSelect('PROXY', names, true)
-        } finally {
-          // H-11: 引用计数解锁
-          batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
-          if (batchTestLockRef.current === 0) {
-            await win.setResizable(true)
-            setDragRegionEnabled?.(true)
-          }
-        }
+        await batchTestWithFirstBatchSelect('PROXY', names, true)
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
         }
@@ -413,15 +383,6 @@ const Layout = () => {
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
       : 'retro-3d'
   })
-
-  // 拖拽区域启用状态：批量测速期间禁用，替代 querySelectorAll 全量扫描
-  const [dragRegionEnabled, setDragRegionEnabled] = useState(true)
-  const setDragRegionEnabledRef = useRef(setDragRegionEnabled)
-  setDragRegionEnabledRef.current = setDragRegionEnabled
-  const dragRegionValue = useMemo(
-    () => ({ enabled: dragRegionEnabled, setEnabled: setDragRegionEnabled }),
-    [dragRegionEnabled],
-  )
 
   // Dual Sliders State (Depth & Vibrancy Factors)
   const [depthFactor, setDepthFactor] = useState<number>(() => {
@@ -1150,11 +1111,7 @@ const Layout = () => {
           console.log('[Layout] 唤醒测速: Profile 已切换，跳过')
           return
         }
-        const win = getCurrentWindow()
         try {
-          batchTestLockRef.current++ // H-11: 进入测速锁
-          await win.setResizable(false)
-          setDragRegionEnabled(false)
           // 视觉占位：立即将 PROXY 全节点标记为「测速中」以触发流光动画
           for (const name of names) {
             DelayManager.setDelay(name, 'PROXY', -2)
@@ -1168,16 +1125,6 @@ const Layout = () => {
         } catch (err) {
           console.error('[Layout] 唤醒后后台测速异常:', err)
         } finally {
-          // H-11: 引用计数解锁
-          batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
-          if (batchTestLockRef.current === 0) {
-            try {
-              await win.setResizable(true)
-              setDragRegionEnabled(true)
-            } catch {
-              /* 忽略 */
-            }
-          }
           isWakeupTestingRef.current = false // H-15: 释放互斥锁
         }
       }, 0)
@@ -1231,7 +1178,6 @@ const Layout = () => {
             fallbackTimerRef,
             autoSelectTimerRef,
             setHeadStateForSortRef.current,
-            setDragRegionEnabledRef.current,
             currentProfileUid,
           )
           startupRetryCountRef.current = 0
@@ -1275,7 +1221,6 @@ const Layout = () => {
           fallbackTimerRef,
           autoSelectTimerRef,
           setHeadStateForSortRef.current,
-          setDragRegionEnabledRef.current,
           uid,
         )
         // Success: reset retry counter
@@ -1669,7 +1614,7 @@ const Layout = () => {
       !decorated && !isDecorationsHidden ? (
         <div
           className="the_titlebar"
-          data-tauri-drag-region={dragRegionEnabled ? 'true' : 'false'}
+          data-tauri-drag-region="true"
           style={{
             width: '100%',
             display: 'flex',
@@ -1691,7 +1636,7 @@ const Layout = () => {
             src={AppIcon}
             alt=""
             draggable={false}
-            data-tauri-drag-region={dragRegionEnabled ? 'true' : 'false'}
+            data-tauri-drag-region="true"
             style={{
               width: '16px',
               height: '16px',
@@ -1700,7 +1645,7 @@ const Layout = () => {
             }}
           />
           <span
-            data-tauri-drag-region={dragRegionEnabled ? 'true' : 'false'}
+            data-tauri-drag-region="true"
             style={{
               fontSize: '12px',
               fontWeight: 500,
@@ -1729,7 +1674,7 @@ const Layout = () => {
           </div>
         </div>
       ) : null,
-    [decorated, isDecorationsHidden, appVersion, dragRegionEnabled],
+    [decorated, isDecorationsHidden, appVersion],
   )
 
   if (!themeReady) {
@@ -1752,517 +1697,533 @@ const Layout = () => {
   // Handle Unlock page rendering
   if (pathname === '/unlock') {
     return (
-      <DragRegionContext value={dragRegionValue}>
-        <ThemeProvider theme={theme}>
-          <NoticeManager position={verge?.notice_position} />
-          <Paper square elevation={0} className={`${OS} layout`}>
-            {customTitlebar}
-            <div className="layout-content" style={{ padding: 20 }}>
-              <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-                <Outlet />
-              </ErrorBoundary>
-            </div>
-          </Paper>
-        </ThemeProvider>
-      </DragRegionContext>
+      <ThemeProvider theme={theme}>
+        <NoticeManager position={verge?.notice_position} />
+        <Paper square elevation={0} className={`${OS} layout`}>
+          {customTitlebar}
+          <div className="layout-content" style={{ padding: 20 }}>
+            <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+              <Outlet />
+            </ErrorBoundary>
+          </div>
+        </Paper>
+      </ThemeProvider>
     )
   }
 
   return (
-    <DragRegionContext value={dragRegionValue}>
-      <ThemeProvider theme={theme}>
-        <NoticeManager position={verge?.notice_position} />
+    <ThemeProvider theme={theme}>
+      <NoticeManager position={verge?.notice_position} />
 
-        <Paper
-          square
-          elevation={0}
-          className={`${OS} layout`}
-          {...(isDecorationsHidden
-            ? { 'data-tauri-drag-region': dragRegionEnabled ? 'true' : 'false' }
-            : {})}
+      <Paper
+        square
+        elevation={0}
+        className={`${OS} layout`}
+        {...(isDecorationsHidden ? { 'data-tauri-drag-region': 'true' } : {})}
+        style={{
+          width: '100vw',
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          background: 'transparent',
+          position: 'relative',
+        }}
+        onContextMenu={(e) => {
+          if (
+            OS === 'windows' &&
+            !['input', 'textarea'].includes(
+              e.currentTarget.tagName.toLowerCase(),
+            ) &&
+            !e.currentTarget.isContentEditable
+          ) {
+            e.preventDefault()
+          }
+        }}
+      >
+        <ResizeHandles />
+        {customTitlebar}
+
+        {/* FEAT-003: GlowBorder — only visible in stealth mode, replaces native chrome */}
+        {isDecorationsHidden && <GlowBorder />}
+
+        <div
+          className="layout-content"
           style={{
-            width: '100vw',
-            height: '100vh',
             display: 'flex',
             flexDirection: 'column',
+            height:
+              decorated || isDecorationsHidden ? '100vh' : 'calc(100vh - 30px)',
+            width: '100vw',
             overflow: 'hidden',
-            background: 'transparent',
             position: 'relative',
-          }}
-          onContextMenu={(e) => {
-            if (
-              OS === 'windows' &&
-              !['input', 'textarea'].includes(
-                e.currentTarget.tagName.toLowerCase(),
-              ) &&
-              !e.currentTarget.isContentEditable
-            ) {
-              e.preventDefault()
-            }
+            boxSizing: 'border-box',
           }}
         >
-          <ResizeHandles />
-          {customTitlebar}
-
-          {/* FEAT-003: GlowBorder — only visible in stealth mode, replaces native chrome */}
-          {isDecorationsHidden && <GlowBorder />}
-
+          {/* Upper Pane: Node Selection (80% + 30px) */}
           <div
-            className="layout-content"
             style={{
+              flex: isMinimalWidth ? '1 1 0%' : '80 0 calc(0% + 30px)',
+              height: isMinimalWidth ? 'auto' : 'calc(80% + 30px)',
+              position: 'relative',
+              overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
-              height:
-                decorated || isDecorationsHidden
-                  ? '100vh'
-                  : 'calc(100vh - 30px)',
-              width: '100vw',
-              overflow: 'hidden',
-              position: 'relative',
-              boxSizing: 'border-box',
             }}
           >
-            {/* Upper Pane: Node Selection (80% + 30px) */}
-            <div
-              style={{
-                flex: isMinimalWidth ? '1 1 0%' : '80 0 calc(0% + 30px)',
-                height: isMinimalWidth ? 'auto' : 'calc(80% + 30px)',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              {/* 右上角独立控制按钮（仅在设置面板打开时渲染，以允许关闭设置） */}
-              {drawerOpen && (
-                <div
-                  data-no-drag="true"
-                  style={{
-                    position: 'absolute',
-                    top: '3px',
-                    right: '8px',
-                    zIndex: 9999,
-                  }}
+            {/* 右上角独立控制按钮（仅在设置面板打开时渲染，以允许关闭设置） */}
+            {drawerOpen && (
+              <div
+                data-no-drag="true"
+                style={{
+                  position: 'absolute',
+                  top: '3px',
+                  right: '8px',
+                  zIndex: 9999,
+                }}
+              >
+                <IconButton
+                  size="small"
+                  aria-label={t('layout.a11y.closeSettings')}
+                  onClick={() => setDrawerOpen(false)}
+                  sx={(theme) => ({
+                    ...get3DButtonStyle(theme, 'contained', 'primary'),
+                    width: '28px',
+                    height: '28px',
+                    p: 0,
+                  })}
                 >
-                  <IconButton
-                    size="small"
-                    aria-label={t('layout.a11y.closeSettings')}
-                    onClick={() => setDrawerOpen(false)}
-                    sx={(theme) => ({
-                      ...get3DButtonStyle(theme, 'contained', 'primary'),
-                      width: '28px',
-                      height: '28px',
-                      p: 0,
-                    })}
-                  >
-                    <CloseRounded
-                      aria-hidden="true"
-                      sx={{ fontSize: '20px', width: '20px', height: '20px' }}
-                    />
-                  </IconButton>
-                </div>
-              )}
+                  <CloseRounded
+                    aria-hidden="true"
+                    sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+                  />
+                </IconButton>
+              </div>
+            )}
 
-              {/*置顶当前节点与快捷控制栏（仅在未打开设置时渲染）*/}
-              {!drawerOpen && (
-                <div
-                  data-no-drag="true"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '0px 8px 2px 8px',
-                    height: '30px',
-                    position: 'relative',
-                    zIndex: 9998,
-                    gap: 0,
-                  }}
+            {/*置顶当前节点与快捷控制栏（仅在未打开设置时渲染）*/}
+            {!drawerOpen && (
+              <div
+                data-no-drag="true"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '0px 8px 2px 8px',
+                  height: '30px',
+                  position: 'relative',
+                  zIndex: 9998,
+                  gap: 0,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <ActiveNodeStatusCard />
+                </div>
+
+                <IconButton
+                  size="small"
+                  aria-label={t('layout.a11y.pinWindow')}
+                  onClick={() =>
+                    patchVerge({
+                      enable_always_on_top: !verge?.enable_always_on_top,
+                    })
+                  }
+                  sx={(theme) => ({
+                    ...get3DButtonStyle(
+                      theme,
+                      'contained',
+                      verge?.enable_always_on_top ? 'primary' : 'default',
+                    ),
+                    flexShrink: 0,
+                    width: '28px',
+                    height: '28px',
+                    p: 0,
+                  })}
                 >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <ActiveNodeStatusCard />
-                  </div>
+                  <PushPinRounded
+                    aria-hidden="true"
+                    sx={{
+                      fontSize: '20px',
+                      width: '20px',
+                      height: '20px',
+                      color: verge?.enable_always_on_top
+                        ? '#FF3B30'
+                        : '#888888',
+                      filter: verge?.enable_always_on_top
+                        ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
+                        : 'none',
+                      transform: verge?.enable_always_on_top
+                        ? 'rotate(45deg)'
+                        : 'none',
+                      transition:
+                        'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
+                    }}
+                  />
+                </IconButton>
 
-                  <IconButton
-                    size="small"
-                    aria-label={t('layout.a11y.pinWindow')}
-                    onClick={() =>
-                      patchVerge({
-                        enable_always_on_top: !verge?.enable_always_on_top,
-                      })
-                    }
-                    sx={(theme) => ({
-                      ...get3DButtonStyle(
-                        theme,
-                        'contained',
-                        verge?.enable_always_on_top ? 'primary' : 'default',
-                      ),
-                      flexShrink: 0,
-                      width: '28px',
-                      height: '28px',
-                      p: 0,
-                    })}
-                  >
-                    <PushPinRounded
-                      aria-hidden="true"
-                      sx={{
-                        fontSize: '20px',
-                        width: '20px',
-                        height: '20px',
-                        color: verge?.enable_always_on_top
-                          ? '#FF3B30'
-                          : '#888888',
-                        filter: verge?.enable_always_on_top
-                          ? 'drop-shadow(0 0 3px rgba(255, 59, 48, 0.85)) drop-shadow(0 1px 1px rgba(255, 255, 255, 0.45))'
-                          : 'none',
-                        transform: verge?.enable_always_on_top
-                          ? 'rotate(45deg)'
-                          : 'none',
-                        transition:
-                          'transform 0.2s ease, color 0.2s ease, filter 0.2s ease',
-                      }}
-                    />
-                  </IconButton>
+                <IconButton
+                  size="small"
+                  aria-label={t('layout.a11y.openSettings')}
+                  onClick={() => setDrawerOpen(true)}
+                  sx={(theme) => ({
+                    ...get3DButtonStyle(theme, 'contained', 'default'),
+                    flexShrink: 0,
+                    width: '28px',
+                    height: '28px',
+                    p: 0,
+                  })}
+                >
+                  <SettingsRoundedIcon
+                    aria-hidden="true"
+                    sx={{ fontSize: '20px', width: '20px', height: '20px' }}
+                  />
+                </IconButton>
+              </div>
+            )}
 
-                  <IconButton
-                    size="small"
-                    aria-label={t('layout.a11y.openSettings')}
-                    onClick={() => setDrawerOpen(true)}
-                    sx={(theme) => ({
-                      ...get3DButtonStyle(theme, 'contained', 'default'),
-                      flexShrink: 0,
-                      width: '28px',
-                      height: '28px',
-                      p: 0,
-                    })}
-                  >
-                    <SettingsRoundedIcon
-                      aria-hidden="true"
-                      sx={{ fontSize: '20px', width: '20px', height: '20px' }}
-                    />
-                  </IconButton>
-                </div>
-              )}
+            {/*节点组选择列表*/}
+            {!isMiniStatus && (
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                  <ProxyGroups
+                    mode={clashConfig?.mode?.toLowerCase() || 'rule'}
+                  />
+                </ErrorBoundary>
+              </div>
+            )}
 
-              {/*节点组选择列表*/}
-              {!isMiniStatus && (
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-                    <ProxyGroups
-                      mode={clashConfig?.mode?.toLowerCase() || 'rule'}
-                    />
-                  </ErrorBoundary>
-                </div>
-              )}
-
-              {/* Settings Drawer (Conditionally mounted; unmounting avoids idle WebSocket/resource drain) */}
-              {drawerOpen && !isMiniStatus && (
-                <div
-                  className="theme-panel"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    zIndex: 100,
-                    // WARNING [FOR AI AGENTS / AUDITORS]:
-                    // This flex layout must remain as row direction and MUST NOT wrap. In narrow window
-                    // (width = 285px, i.e. isMinimalWidth) the right ConnectionsPanel is NOT mounted at all
-                    // (see conditional render `{!isMinimalWidth && <ConnectionsPanel/>}`), so the squeeze-to-0px
-                    // path is never reached there. In large window the panel mounts and this row layout applies.
+            {/* Settings Drawer (Conditionally mounted; unmounting avoids idle WebSocket/resource drain) */}
+            {drawerOpen && !isMiniStatus && (
+              <div
+                className="theme-panel"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  zIndex: 100,
+                  // WARNING [FOR AI AGENTS / AUDITORS]:
+                  // This flex layout must remain as row direction and MUST NOT wrap. In narrow window
+                  // (width = 285px, i.e. isMinimalWidth) the right ConnectionsPanel is NOT mounted at all
+                  // (see conditional render `{!isMinimalWidth && <ConnectionsPanel/>}`), so the squeeze-to-0px
+                  // path is never reached there. In large window the panel mounts and this row layout applies.
+                  display: 'flex',
+                  boxSizing: 'border-box',
+                  padding: '12px',
+                  gap: '12px',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Left Settings Column (240px width) */}
+                <Box
+                  sx={{
+                    flex: '0 0 240px',
+                    width: '240px',
                     display: 'flex',
-                    boxSizing: 'border-box',
-                    padding: '12px',
-                    gap: '12px',
+                    flexDirection: 'column',
+                    gap: '5px',
                     overflow: 'hidden',
+                    pr: 1,
+                    borderRight: (theme) =>
+                      `1px solid ${theme.palette.divider}`,
+                    pb: { xs: 0, '@media (min-height: 831px)': '30px' },
                   }}
                 >
-                  {/* Left Settings Column (240px width) */}
+                  {/* Section 1: Subscriptions Import */}
+                  <ProfileImportCard
+                    url={url}
+                    setUrl={setUrl}
+                    profileLoading={profileLoading}
+                    profileItems={profileItems}
+                    currentProfileUid={currentProfileUid}
+                    importInputRef={importInputRef}
+                    importInputContextMenu={importInputContextMenu}
+                    setImportInputContextMenu={setImportInputContextMenu}
+                    handleImportProfile={handleImportProfile}
+                    handleSelectProfile={handleSelectProfile}
+                    handleUpdateProfile={handleUpdateProfile}
+                    handleDeleteProfile={handleDeleteProfile}
+                    setProfileMenuAnchorPosition={setProfileMenuAnchorPosition}
+                    setContextMenuProfileUid={setContextMenuProfileUid}
+                  />
+
+                  {/* Section 2: Takeover Mode + Routing Preference (合并为同一卡片) */}
                   <Box
                     sx={{
-                      flex: '0 0 240px',
-                      width: '240px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '5px',
-                      overflow: 'hidden',
-                      pr: 1,
-                      borderRight: (theme) =>
-                        `1px solid ${theme.palette.divider}`,
-                      pb: { xs: 0, '@media (min-height: 831px)': '30px' },
+                      p: 1,
+                      flexShrink: 0,
+                      ...get3DCardStyle(theme, 'default'),
+                      '&:hover': {
+                        transform: 'none',
+                        boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+                      },
                     }}
                   >
-                    {/* Section 1: Subscriptions Import */}
-                    <ProfileImportCard
-                      url={url}
-                      setUrl={setUrl}
-                      profileLoading={profileLoading}
-                      profileItems={profileItems}
-                      currentProfileUid={currentProfileUid}
-                      importInputRef={importInputRef}
-                      importInputContextMenu={importInputContextMenu}
-                      setImportInputContextMenu={setImportInputContextMenu}
-                      handleImportProfile={handleImportProfile}
-                      handleSelectProfile={handleSelectProfile}
-                      handleUpdateProfile={handleUpdateProfile}
-                      handleDeleteProfile={handleDeleteProfile}
-                      setProfileMenuAnchorPosition={
-                        setProfileMenuAnchorPosition
-                      }
-                      setContextMenuProfileUid={setContextMenuProfileUid}
+                    <TakeoverModeCard
+                      activeIndex={activeIndex}
+                      language={language}
+                      handleTakeoverModeChange={handleTakeoverModeChange}
+                      disableCardBorder
                     />
 
-                    {/* Section 2: Takeover Mode + Routing Preference (合并为同一卡片) */}
-                    <Box
-                      sx={{
-                        p: 1,
-                        flexShrink: 0,
-                        ...get3DCardStyle(theme, 'default'),
-                        '&:hover': {
-                          transform: 'none',
-                          boxShadow: get3DCardStyle(theme, 'default').boxShadow,
-                        },
-                      }}
-                    >
-                      <TakeoverModeCard
-                        activeIndex={activeIndex}
-                        language={language}
-                        handleTakeoverModeChange={handleTakeoverModeChange}
-                        disableCardBorder
-                      />
-
-                      <RoutingPreferenceCard
-                        policyActiveIndex={policyActiveIndex}
-                        language={language}
-                        handleRuleFallbackChange={handleRuleFallbackChange}
-                        onAddUrlClick={handleAddUrlClick}
-                        disableCardBorder
-                      />
-                      <AddUrlDialog
-                        open={addUrlOpen}
-                        onClose={() => setAddUrlOpen(false)}
-                      />
-                    </Box>
-
-                    {/* Section 3: Minimal Settings */}
-                    <BasicSettingsCard
-                      verge={verge}
-                      clashConfig={clashConfig}
-                      patchVerge={patchVerge}
-                      handleAllowLanChange={handleClashBoolChange('allow-lan')}
-                      handleIpv6Change={handleClashBoolChange('ipv6')}
-                      mixedPortVal={mixedPortVal}
-                      handleSavePort={handleSavePort}
+                    <RoutingPreferenceCard
+                      policyActiveIndex={policyActiveIndex}
+                      language={language}
+                      handleRuleFallbackChange={handleRuleFallbackChange}
+                      onAddUrlClick={handleAddUrlClick}
+                      disableCardBorder
                     />
-
-                    {/* Section 4: Theme Settings */}
-                    <ThemeSettingsCard
-                      verge={verge}
-                      patchVerge={patchVerge}
-                      themeActiveIndex={themeActiveIndex}
-                      depthFactor={depthFactor}
-                      handleDepthFactorChange={handleDepthFactorChange}
-                      vibrancyFactor={vibrancyFactor}
-                      handleVibrancyFactorChange={handleVibrancyFactorChange}
-                      controlSkin={controlSkin}
-                      setLogsOpen={setLogsOpen}
-                      mode={mode}
+                    <AddUrlDialog
+                      open={addUrlOpen}
+                      onClose={() => setAddUrlOpen(false)}
                     />
                   </Box>
-                  {/* Right Connections column (自适应 flex: 1) — 仅大窗口(宽>285)挂载；
-                      窄窗口(宽=285)下不挂载、不渲染、不订阅数据，与上方 useConnectionData 共用 isMinimalWidth 信号 */}
-                  {!isMinimalWidth && (
-                    <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-                      <ConnectionsPanel
-                        connectionsType={connectionsType}
-                        setConnectionsType={setConnectionsType}
-                        connectionsData={connectionsData}
-                        handleSearch={handleSearch}
-                        filterConn={filterConn}
-                        detailRef={detailRef}
-                        isColumnManagerOpen={isColumnManagerOpen}
-                        setIsColumnManagerOpen={setIsColumnManagerOpen}
-                        clearClosedConnections={clearClosedConnections}
-                      />
-                    </ErrorBoundary>
-                  )}
-                  {/* Help Button */}
-                  <HelpMenuButton
-                    helpAnchorEl={helpAnchorEl}
-                    handleHelpClick={handleHelpClick}
-                    handleHelpClose={handleHelpClose}
-                    handleClientCheck={handleClientCheck}
-                    handleCoreCheck={handleCoreCheck}
-                    clientCheckLoading={clientCheckLoading}
-                    coreCheckLoading={coreCheckLoading}
-                    appVersion={appVersion}
-                    coreVersion={coreVersion}
-                    controlSkin={controlSkin}
-                    primaryBtn3DStyle={primaryBtn3DStyle}
+
+                  {/* Section 3: Minimal Settings */}
+                  <BasicSettingsCard
+                    verge={verge}
+                    clashConfig={clashConfig}
+                    patchVerge={patchVerge}
+                    handleAllowLanChange={handleClashBoolChange('allow-lan')}
+                    handleIpv6Change={handleClashBoolChange('ipv6')}
+                    mixedPortVal={mixedPortVal}
+                    handleSavePort={handleSavePort}
                   />
-                  {/* Language Selector */}
-                  <Select
-                    value={currentLanguage || 'zh'}
-                    onChange={(e) => switchLanguage(e.target.value as string)}
-                    displayEmpty
-                    // 移除未使用的 @ts-expect-error，MUI v9 aria-label 类型问题已修复
-                    inputProps={{
-                      'aria-label': t('layout.a11y.selectLanguage'),
-                    }}
-                    renderValue={() => 'Language'}
-                    size="small"
-                    variant="outlined"
-                    MenuProps={{
-                      anchorOrigin: {
-                        vertical: 'top',
-                        horizontal: 'left',
-                      },
-                      transformOrigin: {
-                        vertical: 'bottom',
-                        horizontal: 'left',
-                      },
-                      slotProps: {
-                        paper: {
-                          sx: {
-                            maxHeight: 640,
-                          },
+
+                  {/* Section 4: Theme Settings */}
+                  <ThemeSettingsCard
+                    verge={verge}
+                    patchVerge={patchVerge}
+                    themeActiveIndex={themeActiveIndex}
+                    depthFactor={depthFactor}
+                    handleDepthFactorChange={handleDepthFactorChange}
+                    vibrancyFactor={vibrancyFactor}
+                    handleVibrancyFactorChange={handleVibrancyFactorChange}
+                    controlSkin={controlSkin}
+                    setLogsOpen={setLogsOpen}
+                    mode={mode}
+                  />
+                </Box>
+                {/* Right Connections column (自适应 flex: 1) — 仅大窗口(宽>285)挂载；
+                      窄窗口(宽=285)下不挂载、不渲染、不订阅数据，与上方 useConnectionData 共用 isMinimalWidth 信号 */}
+                {!isMinimalWidth && (
+                  <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                    <ConnectionsPanel
+                      connectionsType={connectionsType}
+                      setConnectionsType={setConnectionsType}
+                      connectionsData={connectionsData}
+                      handleSearch={handleSearch}
+                      filterConn={filterConn}
+                      detailRef={detailRef}
+                      isColumnManagerOpen={isColumnManagerOpen}
+                      setIsColumnManagerOpen={setIsColumnManagerOpen}
+                      clearClosedConnections={clearClosedConnections}
+                    />
+                  </ErrorBoundary>
+                )}
+                {/* Help Button */}
+                <HelpMenuButton
+                  helpAnchorEl={helpAnchorEl}
+                  handleHelpClick={handleHelpClick}
+                  handleHelpClose={handleHelpClose}
+                  handleClientCheck={handleClientCheck}
+                  handleCoreCheck={handleCoreCheck}
+                  clientCheckLoading={clientCheckLoading}
+                  coreCheckLoading={coreCheckLoading}
+                  appVersion={appVersion}
+                  coreVersion={coreVersion}
+                  controlSkin={controlSkin}
+                  primaryBtn3DStyle={primaryBtn3DStyle}
+                />
+                {/* Language Selector */}
+                <Select
+                  value={currentLanguage || 'zh'}
+                  onChange={(e) => switchLanguage(e.target.value as string)}
+                  displayEmpty
+                  // 移除未使用的 @ts-expect-error，MUI v9 aria-label 类型问题已修复
+                  inputProps={{
+                    'aria-label': t('layout.a11y.selectLanguage'),
+                  }}
+                  renderValue={() => 'Language'}
+                  size="small"
+                  variant="outlined"
+                  MenuProps={{
+                    anchorOrigin: {
+                      vertical: 'top',
+                      horizontal: 'left',
+                    },
+                    transformOrigin: {
+                      vertical: 'bottom',
+                      horizontal: 'left',
+                    },
+                    slotProps: {
+                      paper: {
+                        sx: {
+                          maxHeight: 640,
                         },
                       },
-                    }}
-                    sx={{
-                      position: 'absolute',
-                      bottom: '0',
-                      left: '80px',
-                      width: '97.5px',
-                      height: '24px',
-                      zIndex: 200,
-                      boxSizing: 'border-box',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      fontFamily: 'var(--control-font-family)',
-                      // WARNING [FOR AI AGENTS / AUDITORS]:
-                      // The 830px max-height display:none check is the INTENDED responsive height cutoff
-                      // rule mandated by clash_mini_agreements.md. Under default 680px height, these
-                      // elements must remain hidden. DO NOT change this threshold to make them visible.
-                      '@media (max-height: 830px)': {
-                        display: 'none',
-                      },
-                      ...primaryBtn3DStyle,
-                      '& .MuiSelect-select': {
-                        paddingTop: 0,
-                        paddingBottom: 0,
-                        paddingLeft: '12px',
-                        paddingRight: '24px',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        color: 'inherit',
-                        boxSizing: 'border-box',
-                      },
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        border: 'none !important',
-                      },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                        border: 'none !important',
-                      },
-                      '& .MuiSelect-icon': {
-                        color: 'inherit',
-                        right: '4px',
-                      },
-                      '&:before, &:after': {
-                        display: 'none !important',
-                      },
-                    }}
-                  >
-                    <MenuItem value="zh">简体中文</MenuItem>
-                    <MenuItem value="en">English</MenuItem>
-                    <MenuItem value="ru">Русский</MenuItem>
-                    <MenuItem value="fa">فارسی</MenuItem>
-                    <MenuItem value="tt">Татарча</MenuItem>
-                    <MenuItem value="id">Bahasa Indonesia</MenuItem>
-                    <MenuItem value="ar">العربية</MenuItem>
-                    <MenuItem value="ko">한국어</MenuItem>
-                    <MenuItem value="tr">Türkçe</MenuItem>
-                    <MenuItem value="de">Deutsch</MenuItem>
-                    <MenuItem value="es">Español</MenuItem>
-                    <MenuItem value="jp">日本語</MenuItem>
-                    <MenuItem value="zhtw">繁體中文</MenuItem>
-                  </Select>
-
-                  {/* Excel Selector Row */}
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      bottom: '0',
-                      left: '177.5px',
-                      width: '462.5px',
-                      height: '24px',
+                    },
+                  }}
+                  sx={{
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '80px',
+                    width: '97.5px',
+                    height: '24px',
+                    zIndex: 200,
+                    boxSizing: 'border-box',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    fontFamily: 'var(--control-font-family)',
+                    // WARNING [FOR AI AGENTS / AUDITORS]:
+                    // The 830px max-height display:none check is the INTENDED responsive height cutoff
+                    // rule mandated by clash_mini_agreements.md. Under default 680px height, these
+                    // elements must remain hidden. DO NOT change this threshold to make them visible.
+                    '@media (max-height: 830px)': {
+                      display: 'none',
+                    },
+                    ...primaryBtn3DStyle,
+                    '& .MuiSelect-select': {
+                      paddingTop: 0,
+                      paddingBottom: 0,
+                      paddingLeft: '12px',
+                      paddingRight: '24px',
+                      height: '100%',
                       display: 'flex',
-                      alignItems: 'stretch',
-                      zIndex: 200,
+                      alignItems: 'center',
+                      color: 'inherit',
                       boxSizing: 'border-box',
-                      // WARNING [FOR AI AGENTS / AUDITORS]:
-                      // The 830px max-height display:none check is the INTENDED responsive height cutoff
-                      // rule mandated by clash_mini_agreements.md. Under default 680px height, these
-                      // elements must remain hidden. DO NOT change this threshold to make them visible.
-                      '@media (max-height: 830px)': {
-                        display: 'none',
-                      },
-                    }}
-                  >
-                    {[
-                      {
-                        key: 'retro-3d',
-                        label: 'Trump-3D',
-                        font: 'Trebuchet MS, SimHei, sans-serif',
-                      },
-                      {
-                        key: 'original',
-                        label: 'Original',
-                        font: 'Segoe UI, Microsoft YaHei, sans-serif',
-                      },
-                      {
-                        key: 'modern-flat',
-                        label: 'Modern',
-                        font: 'Outfit, DengXian, sans-serif',
-                      },
-                      {
-                        key: 'frosted-glass',
-                        label: 'Frosted',
-                        font: 'Segoe UI Light, Microsoft YaHei Light, sans-serif',
-                      },
-                      {
-                        key: 'cyberpunk',
-                        label: 'Cyberpunk',
-                        font: 'Consolas, NSimSun, monospace',
-                      },
-                      {
-                        key: 'monochrome',
-                        label: 'Monochrome',
-                        font: 'Georgia, KaiTi, serif',
-                      },
-                    ].map((item, index) => {
-                      const isSelected = controlSkin === item.key
-                      const handleSelect = () => {
-                        localStorage.setItem(
-                          'clash-mini-control-skin',
-                          item.key,
-                        )
-                        setControlSkin(item.key)
-                        window.dispatchEvent(
-                          new Event('clash-mini-skin-changed'),
-                        )
-                      }
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      border: 'none !important',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      border: 'none !important',
+                    },
+                    '& .MuiSelect-icon': {
+                      color: 'inherit',
+                      right: '4px',
+                    },
+                    '&:before, &:after': {
+                      display: 'none !important',
+                    },
+                  }}
+                >
+                  <MenuItem value="zh">简体中文</MenuItem>
+                  <MenuItem value="en">English</MenuItem>
+                  <MenuItem value="ru">Русский</MenuItem>
+                  <MenuItem value="fa">فارسی</MenuItem>
+                  <MenuItem value="tt">Татарча</MenuItem>
+                  <MenuItem value="id">Bahasa Indonesia</MenuItem>
+                  <MenuItem value="ar">العربية</MenuItem>
+                  <MenuItem value="ko">한국어</MenuItem>
+                  <MenuItem value="tr">Türkçe</MenuItem>
+                  <MenuItem value="de">Deutsch</MenuItem>
+                  <MenuItem value="es">Español</MenuItem>
+                  <MenuItem value="jp">日本語</MenuItem>
+                  <MenuItem value="zhtw">繁體中文</MenuItem>
+                </Select>
 
-                      return (
-                        <Box
-                          key={item.key}
-                          onClick={handleSelect}
-                          sx={(theme) => {
-                            const isLight = theme.palette.mode === 'light'
-                            const cellWidth = index === 0 ? '92.5px' : '74px'
-                            const unselectedStyle = {
+                {/* Excel Selector Row */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: '0',
+                    left: '177.5px',
+                    width: '462.5px',
+                    height: '24px',
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    zIndex: 200,
+                    boxSizing: 'border-box',
+                    // WARNING [FOR AI AGENTS / AUDITORS]:
+                    // The 830px max-height display:none check is the INTENDED responsive height cutoff
+                    // rule mandated by clash_mini_agreements.md. Under default 680px height, these
+                    // elements must remain hidden. DO NOT change this threshold to make them visible.
+                    '@media (max-height: 830px)': {
+                      display: 'none',
+                    },
+                  }}
+                >
+                  {[
+                    {
+                      key: 'retro-3d',
+                      label: 'Trump-3D',
+                      font: 'Trebuchet MS, SimHei, sans-serif',
+                    },
+                    {
+                      key: 'original',
+                      label: 'Original',
+                      font: 'Segoe UI, Microsoft YaHei, sans-serif',
+                    },
+                    {
+                      key: 'modern-flat',
+                      label: 'Modern',
+                      font: 'Outfit, DengXian, sans-serif',
+                    },
+                    {
+                      key: 'frosted-glass',
+                      label: 'Frosted',
+                      font: 'Segoe UI Light, Microsoft YaHei Light, sans-serif',
+                    },
+                    {
+                      key: 'cyberpunk',
+                      label: 'Cyberpunk',
+                      font: 'Consolas, NSimSun, monospace',
+                    },
+                    {
+                      key: 'monochrome',
+                      label: 'Monochrome',
+                      font: 'Georgia, KaiTi, serif',
+                    },
+                  ].map((item, index) => {
+                    const isSelected = controlSkin === item.key
+                    const handleSelect = () => {
+                      localStorage.setItem('clash-mini-control-skin', item.key)
+                      setControlSkin(item.key)
+                      window.dispatchEvent(new Event('clash-mini-skin-changed'))
+                    }
+
+                    return (
+                      <Box
+                        key={item.key}
+                        onClick={handleSelect}
+                        sx={(theme) => {
+                          const isLight = theme.palette.mode === 'light'
+                          const cellWidth = index === 0 ? '92.5px' : '74px'
+                          const unselectedStyle = {
+                            width: cellWidth,
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            color: isLight ? '#555555' : '#aaaaaa',
+                            backgroundColor: isLight ? '#f3f3f3' : '#1e1e1e',
+                            border: `1px solid ${isLight ? '#d0d0d0' : '#404040'}`,
+                            borderLeft:
+                              index === 0
+                                ? `1px solid ${isLight ? '#d0d0d0' : '#404040'}`
+                                : 'none',
+                            boxSizing: 'border-box',
+                            fontFamily: item.font,
+                            transition: 'background-color 0.1s ease',
+                            '&:hover': {
+                              backgroundColor: isLight ? '#e5e5e5' : '#2d2d2d',
+                            },
+                          }
+
+                          if (isSelected) {
+                            const btnStyle = get3DButtonStyle(
+                              theme,
+                              'contained',
+                              'primary',
+                            )
+                            return {
                               width: cellWidth,
                               height: '100%',
                               display: 'flex',
@@ -2271,267 +2232,226 @@ const Layout = () => {
                               cursor: 'pointer',
                               fontSize: '11px',
                               fontWeight: 'bold',
-                              color: isLight ? '#555555' : '#aaaaaa',
-                              backgroundColor: isLight ? '#f3f3f3' : '#1e1e1e',
-                              border: `1px solid ${isLight ? '#d0d0d0' : '#404040'}`,
-                              borderLeft:
-                                index === 0
-                                  ? `1px solid ${isLight ? '#d0d0d0' : '#404040'}`
-                                  : 'none',
                               boxSizing: 'border-box',
                               fontFamily: item.font,
-                              transition: 'background-color 0.1s ease',
-                              '&:hover': {
-                                backgroundColor: isLight
-                                  ? '#e5e5e5'
-                                  : '#2d2d2d',
-                              },
+                              ...btnStyle,
+                              borderRadius: btnStyle.borderRadius || '0px',
+                              margin: 0,
                             }
-
-                            if (isSelected) {
-                              const btnStyle = get3DButtonStyle(
-                                theme,
-                                'contained',
-                                'primary',
-                              )
-                              return {
-                                width: cellWidth,
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                boxSizing: 'border-box',
-                                fontFamily: item.font,
-                                ...btnStyle,
-                                borderRadius: btnStyle.borderRadius || '0px',
-                                margin: 0,
-                              }
-                            } else {
-                              return unselectedStyle
-                            }
-                          }}
-                        >
-                          {item.label}
-                        </Box>
-                      )
-                    })}
-                  </Box>
-                </div>
-              )}
-            </div>
-
-            {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}
-            <div
-              style={{
-                flex: isMinimalWidth
-                  ? `0 0 ${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
-                  : `0 0 ${TRAFFIC_PANE_HEIGHT_WIDE}px`,
-                height: isMinimalWidth
-                  ? `${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
-                  : `${TRAFFIC_PANE_HEIGHT_WIDE}px`,
-                background: 'inherit',
-                padding: isMinimalWidth
-                  ? '3px 6px 2px 6px'
-                  : '8px 12px 2px 12px',
-                display: 'flex',
-                gap: isMinimalWidth ? '6px' : 0,
-                overflow: 'hidden',
-                boxSizing: 'border-box',
-              }}
-            >
-              <MiniTrafficPanel isMinimalWidth={isMinimalWidth} />
-            </div>
+                          } else {
+                            return unselectedStyle
+                          }
+                        }}
+                      >
+                        {item.label}
+                      </Box>
+                    )
+                  })}
+                </Box>
+              </div>
+            )}
           </div>
-        </Paper>
 
-        {/* Popups & dialogs */}
-        <ConnectionDetail ref={detailRef} />
-
-        {/* Profile Card Context Menu (BUG-072) */}
-        <Menu
-          anchorReference="anchorPosition"
-          anchorPosition={
-            profileMenuAnchorPosition !== null
-              ? {
-                  top: profileMenuAnchorPosition.top,
-                  left: profileMenuAnchorPosition.left,
-                }
-              : undefined
-          }
-          open={profileMenuAnchorPosition !== null}
-          onClose={() => setProfileMenuAnchorPosition(null)}
-          slotProps={{
-            paper: {
-              className: 'theme-panel',
-              sx: {
-                minWidth: '160px',
-                borderRadius: '6px',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                '& .MuiList-root': {
-                  padding: '4px 0',
-                },
-              },
-            },
-          }}
-        >
-          <MenuItem
-            onClick={handleEditProfileClick}
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            📝 编辑
-          </MenuItem>
-          <MenuItem
-            onClick={handleEditProfileFileClick}
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            📄 编辑文件
-          </MenuItem>
-          <Divider
-            sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }}
-          />
-          <MenuItem
-            onClick={handleCopyProfileLinkClick}
-            disabled={isContextMenuLocal || !contextMenuTargetItem?.url}
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            🔗 复制链接
-          </MenuItem>
-          <MenuItem
-            onClick={handleUpdateProfileClick}
-            disabled={isContextMenuLocal}
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            🔄 更新
-          </MenuItem>
-          <Divider
-            sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }}
-          />
-          <MenuItem
-            onClick={handleDeleteProfileClick}
-            sx={{
-              ...getMenuItemHoverStyle(theme, controlSkin),
-              color: 'error.main',
+          {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}
+          <div
+            style={{
+              flex: isMinimalWidth
+                ? `0 0 ${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
+                : `0 0 ${TRAFFIC_PANE_HEIGHT_WIDE}px`,
+              height: isMinimalWidth
+                ? `${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
+                : `${TRAFFIC_PANE_HEIGHT_WIDE}px`,
+              background: 'inherit',
+              padding: isMinimalWidth ? '3px 6px 2px 6px' : '8px 12px 2px 12px',
+              display: 'flex',
+              gap: isMinimalWidth ? '6px' : 0,
+              overflow: 'hidden',
+              boxSizing: 'border-box',
             }}
           >
-            ❌ 删除
-          </MenuItem>
-        </Menu>
+            <MiniTrafficPanel isMinimalWidth={isMinimalWidth} />
+          </div>
+        </div>
+      </Paper>
 
-        {/* Import Input Context Menu (BUG-091) */}
-        <Menu
-          anchorReference="anchorPosition"
-          anchorPosition={
-            importInputContextMenu !== null
-              ? {
-                  top: importInputContextMenu.mouseY,
-                  left: importInputContextMenu.mouseX,
-                }
-              : undefined
-          }
-          open={importInputContextMenu !== null}
-          onClose={() => setImportInputContextMenu(null)}
-          slotProps={{
-            paper: {
-              className: 'theme-panel',
-              sx: {
-                minWidth: '160px',
-                borderRadius: '6px',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                '& .MuiList-root': {
-                  padding: '4px 0',
-                },
+      {/* Popups & dialogs */}
+      <ConnectionDetail ref={detailRef} />
+
+      {/* Profile Card Context Menu (BUG-072) */}
+      <Menu
+        anchorReference="anchorPosition"
+        anchorPosition={
+          profileMenuAnchorPosition !== null
+            ? {
+                top: profileMenuAnchorPosition.top,
+                left: profileMenuAnchorPosition.left,
+              }
+            : undefined
+        }
+        open={profileMenuAnchorPosition !== null}
+        onClose={() => setProfileMenuAnchorPosition(null)}
+        slotProps={{
+          paper: {
+            className: 'theme-panel',
+            sx: {
+              minWidth: '160px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              '& .MuiList-root': {
+                padding: '4px 0',
               },
             },
+          },
+        }}
+      >
+        <MenuItem
+          onClick={handleEditProfileClick}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📝 编辑
+        </MenuItem>
+        <MenuItem
+          onClick={handleEditProfileFileClick}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📄 编辑文件
+        </MenuItem>
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <MenuItem
+          onClick={handleCopyProfileLinkClick}
+          disabled={isContextMenuLocal || !contextMenuTargetItem?.url}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🔗 复制链接
+        </MenuItem>
+        <MenuItem
+          onClick={handleUpdateProfileClick}
+          disabled={isContextMenuLocal}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🔄 更新
+        </MenuItem>
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <MenuItem
+          onClick={handleDeleteProfileClick}
+          sx={{
+            ...getMenuItemHoverStyle(theme, controlSkin),
+            color: 'error.main',
           }}
         >
-          <MenuItem
-            onClick={handleImportInputCut}
-            disabled={
-              !importInputRef.current ||
-              importInputRef.current.selectionStart ===
-                importInputRef.current.selectionEnd
-            }
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            ✂️ 剪切
-          </MenuItem>
-          <MenuItem
-            onClick={handleImportInputCopy}
-            disabled={
-              !importInputRef.current ||
-              importInputRef.current.selectionStart ===
-                importInputRef.current.selectionEnd
-            }
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            📋 复制
-          </MenuItem>
-          <MenuItem
-            onClick={handleImportInputPaste}
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            📥 粘贴
-          </MenuItem>
-          <MenuItem
-            onClick={handleImportInputSelectAll}
-            disabled={!url}
-            sx={getMenuItemHoverStyle(theme, controlSkin)}
-          >
-            🔍 全选
-          </MenuItem>
-          <Divider
-            sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }}
-          />
-          <MenuItem
-            onClick={handleImportInputClear}
-            disabled={!url}
-            sx={{
-              ...getMenuItemHoverStyle(theme, controlSkin),
-              color: 'error.main',
-            }}
-          >
-            🧹 清空
-          </MenuItem>
-        </Menu>
+          ❌ 删除
+        </MenuItem>
+      </Menu>
 
-        <LayoutDialogs
-          editProfileOpen={editProfileOpen}
-          setEditProfileOpen={setEditProfileOpen}
-          editProfileName={editProfileName}
-          setEditProfileName={setEditProfileName}
-          editProfileUrl={editProfileUrl}
-          setEditProfileUrl={setEditProfileUrl}
-          editProfileInterval={editProfileInterval}
-          setEditProfileInterval={setEditProfileInterval}
-          isEditProfileLocal={isEditProfileLocal}
-          handleSaveProfile={handleSaveProfile}
-          defaultBtn3DStyle={defaultBtn3DStyle}
-          primaryBtn3DStyle={primaryBtn3DStyle}
-          clientUpdateOpen={clientUpdateOpen}
-          setClientUpdateOpen={setClientUpdateOpen}
-          clientStatus={clientStatus}
-          appVersion={appVersion}
-          clientUpdateObj={clientUpdateObj}
-          clientProgress={clientProgress}
-          clientProgressMessage={clientProgressMessage}
-          handleClientUpgrade={handleClientUpgrade}
-          coreUpdateOpen={coreUpdateOpen}
-          setCoreUpdateOpen={setCoreUpdateOpen}
-          coreUpgradeStatus={coreUpgradeStatus}
-          coreVersion={coreVersion}
-          coreUpdateRelease={coreUpdateRelease}
-          coreUpgradeProgress={coreUpgradeProgress}
-          coreUpgradeMessage={coreUpgradeMessage}
-          handleCoreUpgrade={handleCoreUpgrade}
-          logsOpen={logsOpen}
-          setLogsOpen={setLogsOpen}
-          mode={mode}
-        />
-      </ThemeProvider>
-    </DragRegionContext>
+      {/* Import Input Context Menu (BUG-091) */}
+      <Menu
+        anchorReference="anchorPosition"
+        anchorPosition={
+          importInputContextMenu !== null
+            ? {
+                top: importInputContextMenu.mouseY,
+                left: importInputContextMenu.mouseX,
+              }
+            : undefined
+        }
+        open={importInputContextMenu !== null}
+        onClose={() => setImportInputContextMenu(null)}
+        slotProps={{
+          paper: {
+            className: 'theme-panel',
+            sx: {
+              minWidth: '160px',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              '& .MuiList-root': {
+                padding: '4px 0',
+              },
+            },
+          },
+        }}
+      >
+        <MenuItem
+          onClick={handleImportInputCut}
+          disabled={
+            !importInputRef.current ||
+            importInputRef.current.selectionStart ===
+              importInputRef.current.selectionEnd
+          }
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          ✂️ 剪切
+        </MenuItem>
+        <MenuItem
+          onClick={handleImportInputCopy}
+          disabled={
+            !importInputRef.current ||
+            importInputRef.current.selectionStart ===
+              importInputRef.current.selectionEnd
+          }
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📋 复制
+        </MenuItem>
+        <MenuItem
+          onClick={handleImportInputPaste}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📥 粘贴
+        </MenuItem>
+        <MenuItem
+          onClick={handleImportInputSelectAll}
+          disabled={!url}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🔍 全选
+        </MenuItem>
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <MenuItem
+          onClick={handleImportInputClear}
+          disabled={!url}
+          sx={{
+            ...getMenuItemHoverStyle(theme, controlSkin),
+            color: 'error.main',
+          }}
+        >
+          🧹 清空
+        </MenuItem>
+      </Menu>
+
+      <LayoutDialogs
+        editProfileOpen={editProfileOpen}
+        setEditProfileOpen={setEditProfileOpen}
+        editProfileName={editProfileName}
+        setEditProfileName={setEditProfileName}
+        editProfileUrl={editProfileUrl}
+        setEditProfileUrl={setEditProfileUrl}
+        editProfileInterval={editProfileInterval}
+        setEditProfileInterval={setEditProfileInterval}
+        isEditProfileLocal={isEditProfileLocal}
+        handleSaveProfile={handleSaveProfile}
+        defaultBtn3DStyle={defaultBtn3DStyle}
+        primaryBtn3DStyle={primaryBtn3DStyle}
+        clientUpdateOpen={clientUpdateOpen}
+        setClientUpdateOpen={setClientUpdateOpen}
+        clientStatus={clientStatus}
+        appVersion={appVersion}
+        clientUpdateObj={clientUpdateObj}
+        clientProgress={clientProgress}
+        clientProgressMessage={clientProgressMessage}
+        handleClientUpgrade={handleClientUpgrade}
+        coreUpdateOpen={coreUpdateOpen}
+        setCoreUpdateOpen={setCoreUpdateOpen}
+        coreUpgradeStatus={coreUpgradeStatus}
+        coreVersion={coreVersion}
+        coreUpdateRelease={coreUpdateRelease}
+        coreUpgradeProgress={coreUpgradeProgress}
+        coreUpgradeMessage={coreUpgradeMessage}
+        handleCoreUpgrade={handleCoreUpgrade}
+        logsOpen={logsOpen}
+        setLogsOpen={setLogsOpen}
+        mode={mode}
+      />
+    </ThemeProvider>
   )
 }
 

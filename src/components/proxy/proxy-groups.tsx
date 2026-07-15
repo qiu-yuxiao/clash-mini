@@ -1,6 +1,5 @@
 import { Box } from '@mui/material'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   type Key,
   type RefObject,
@@ -10,14 +9,11 @@ import {
   useMemo,
   useRef,
   useState,
-  use,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router'
 
 import { useProxySelection } from '@/hooks/use-proxy-selection'
-import { DragRegionContext } from '@/providers/drag-region-context'
-import { batchTestLockRef } from '@/services/batch-test-lock'
 import { getProfiles, triggerAutoSelect } from '@/services/cmds'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
@@ -52,8 +48,6 @@ export const ProxyGroups = (props: Props) => {
   const { t: _t } = useTranslation()
   const { pathname } = useLocation()
   const { mode } = props
-  // 消费拖拽区域状态，批量测速期间禁用 drag-region
-  const { setEnabled: setDragRegionEnabled } = use(DragRegionContext)
 
   const [testingGroups, setTestingGroups] = useState<Record<string, boolean>>(
     {},
@@ -301,21 +295,10 @@ export const ProxyGroups = (props: Props) => {
       // 委托后端统一执行群发测速 + 择优（select=true）
       // 关键：传入当前可见节点子集 visibleNames，后端只在「该子集」内测速并挑最快，
       // 而非 PROXY 全量——所见即所测所选，与自动选点（全量）行为区分开
-      const win = getCurrentWindow()
       try {
-        batchTestLockRef.current++ // H-11: 进入测速锁
-        await win.setResizable(false)
-        setDragRegionEnabled(false)
         await triggerAutoSelect(currentUid, visibleNames, 0, true)
       } catch (err) {
         console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
-      } finally {
-        // H-11: 引用计数解锁，仅当===0时恢复窗口
-        batchTestLockRef.current = Math.max(0, batchTestLockRef.current - 1)
-        if (batchTestLockRef.current === 0) {
-          await win.setResizable(true)
-          setDragRegionEnabled(true)
-        }
       }
     } catch (error) {
       console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)

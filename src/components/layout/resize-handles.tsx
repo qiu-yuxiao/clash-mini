@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback } from 'react'
 
 import { useWindow } from '@/hooks/use-window'
 
@@ -91,15 +91,6 @@ const handles: { direction: Direction; style: React.CSSProperties }[] = [
 
 export const ResizeHandles: React.FC = () => {
   const { maximized, currentWindow } = useWindow()
-  const [canResize, setCanResize] = useState(true)
-
-  useEffect(() => {
-    if (!currentWindow) return
-    currentWindow
-      .isResizable()
-      .then(setCanResize)
-      .catch(() => {})
-  }, [currentWindow])
 
   const handleMouseDown = useCallback(
     (direction: Direction) => (e: React.MouseEvent) => {
@@ -111,7 +102,7 @@ export const ResizeHandles: React.FC = () => {
     [currentWindow],
   )
 
-  if (maximized || !canResize) return null
+  if (maximized) return null
 
   return (
     <>
