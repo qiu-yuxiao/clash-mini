@@ -1,5 +1,6 @@
 use tauri::webview::PageLoadEvent;
 use tauri::{Manager as _, Theme, WebviewWindow};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{config::Config, core::handle, utils::resolve::window_script::build_window_initial_script};
 use clash_verge_logging::{Type, logging, logging_error};
@@ -25,6 +26,8 @@ pub const MINIMAL_WIDTH: f64 = 285.0;
 // 极简窗口最小高度；对应前端 MINI_HEIGHT_THRESHOLD
 pub const MINIMAL_HEIGHT: f64 = 135.0;
 const DEFAULT_DECORATIONS: bool = false;
+
+static IS_COLD_START: AtomicBool = AtomicBool::new(true);
 
 pub async fn build_new_window() -> Result<WebviewWindow, String> {
     let app_handle = handle::Handle::app_handle();
@@ -61,7 +64,14 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     let initial_script = build_window_initial_script(initial_theme_mode, DARK_BACKGROUND_HEX, LIGHT_BACKGROUND_HEX);
 
-    let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(start_page.into()))
+    let is_cold = IS_COLD_START.compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst).is_ok();
+    let url_with_query = if is_cold {
+        format!("{}?cold_start=true", start_page)
+    } else {
+        start_page.to_string()
+    };
+
+    let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(url_with_query.into()))
         .center()
         .decorations(DEFAULT_DECORATIONS)
         .fullscreen(false)

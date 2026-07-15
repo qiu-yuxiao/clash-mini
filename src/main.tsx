@@ -78,12 +78,12 @@ if (!container) {
 disableWebViewShortcuts()
 
 const initializeApp = (initialThemeMode: 'light' | 'dark') => {
-  // 清除"本会话已 enhance 过的 profile uid"标志
-  // 仅在程序启动时执行（main.tsx 不会被窗口销毁/重建触发），确保：
-  // - 程序首次启动：标志被清除，_layout 的 useEffect 会触发 enhance
-  // - 轻量模式唤醒：main.tsx 不执行，localStorage 中的 uid 得以保留，
-  //   _layout 的 useEffect 检测到 uid 未变，跳过 enhance 避免重置内核
-  localStorage.removeItem('clash-mini-last-enhanced-uid')
+  // 仅在真正的 App 冷启动时清除持久化标志
+  // 避免智能轻量模式下窗口销毁/重建重新执行 main.tsx 时误擦除该标志
+  const isColdStart = window.location.search.includes('cold_start=true')
+  if (isColdStart) {
+    localStorage.removeItem('clash-mini-last-enhanced-uid')
+  }
 
   const contexts = [
     <ThemeModeProvider key="theme" initialState={initialThemeMode} />,
