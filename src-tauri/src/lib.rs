@@ -287,7 +287,7 @@ pub fn run() {
                     }
                     let app_handle = handle::Handle::app_handle();
                     alive.store(false, Ordering::SeqCst);
-                    let alive_clone = alive.clone();
+                    let alive_clone = Arc::clone(&alive);
                     let _ = app_handle.run_on_main_thread(move || {
                         alive_clone.store(true, Ordering::SeqCst);
                     });
