@@ -1202,7 +1202,10 @@ const Layout = () => {
     // （useRef 在 React 重新挂载时会重置，无法区分"窗口重建"和"profile 切换"）
     const enhancedUid = localStorage.getItem('clash-mini-last-enhanced-uid')
     const isNewProfile = enhancedUid !== currentProfileUid
+    // 组件重新挂载时 lastProcessedRef.current.uid 为 null，
+    // 此时 isRefreshTriggered 必为 false，防止轻量模式唤醒误触发 enhance
     const isRefreshTriggered =
+      lastProcessedRef.current.uid !== null &&
       lastProcessedRef.current.counter !== profileRefreshCounter
 
     if (!isNewProfile && !isRefreshTriggered) {
