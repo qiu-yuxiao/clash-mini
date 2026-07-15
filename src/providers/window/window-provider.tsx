@@ -90,18 +90,23 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           restoreChrome()
         }
 
+        const t0 = performance.now()
+        console.log(`[WindowProvider] onResized -> isMaximized() calling...`)
         try {
           const value = await withIpcTimeout(
             currentWindow.isMaximized(),
             5000,
             'isMaximized',
           )
+          console.log(
+            `[WindowProvider] isMaximized() resolved = ${value}, took ${Math.round(performance.now() - t0)}ms`,
+          )
           if (!isUnmounted) {
             setMaximized(value)
           }
         } catch (err) {
-          console.warn(
-            '[WindowProvider] checkMaximized isMaximized failed:',
+          console.error(
+            `[WindowProvider] isMaximized FAILED took ${Math.round(performance.now() - t0)}ms:`,
             err,
           )
         }
@@ -190,12 +195,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
             )
           ) {
             dragStartedRef.current = true
-            currentWindow
-              ?.startDragging()
-              .catch(() => {
-                console.warn('[window] startDragging failed')
-                dragStartedRef.current = false
-              })
+            currentWindow?.startDragging().catch(() => {
+              console.warn('[window] startDragging failed')
+              dragStartedRef.current = false
+            })
           } else {
             mouseDownPosRef.current = null
           }

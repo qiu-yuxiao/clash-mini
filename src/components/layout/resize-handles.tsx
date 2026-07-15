@@ -97,7 +97,23 @@ export const ResizeHandles: React.FC = () => {
       if (!currentWindow || e.button !== 0) return
       e.preventDefault()
       e.stopPropagation()
-      currentWindow.startResizeDragging(direction as any).catch(() => {})
+      const t0 = performance.now()
+      console.log(
+        `[ResizeHandle] mousedown dir=${direction}, calling startResizeDragging...`,
+      )
+      currentWindow
+        .startResizeDragging(direction as any)
+        .then(() => {
+          console.log(
+            `[ResizeHandle] startResizeDragging resolved dir=${direction}, took ${Math.round(performance.now() - t0)}ms`,
+          )
+        })
+        .catch((err) => {
+          console.error(
+            `[ResizeHandle] startResizeDragging FAILED dir=${direction}, took ${Math.round(performance.now() - t0)}ms`,
+            err,
+          )
+        })
     },
     [currentWindow],
   )

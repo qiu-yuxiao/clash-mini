@@ -62,7 +62,9 @@ export const AppDataProvider = ({
   const { verge } = useVerge()
 
   const [isMinimalWidth, setIsMinimalWidth] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth <= MINI_WIDTH_THRESHOLD,
+    () =>
+      typeof window !== 'undefined' &&
+      window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
 
   const [isMiniStatus, setIsMiniStatus] = useState(
@@ -86,7 +88,9 @@ export const AppDataProvider = ({
           return prev !== next ? next : prev
         })
         setIsMiniStatus((prev) => {
-          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD && window.innerHeight <= MINI_HEIGHT_THRESHOLD
+          const next =
+            window.innerWidth <= MINI_WIDTH_THRESHOLD &&
+            window.innerHeight <= MINI_HEIGHT_THRESHOLD
           return prev !== next ? next : prev
         })
       })
@@ -315,9 +319,22 @@ export const AppDataProvider = ({
       }
       lastProxyTimer = setTimeout(() => {
         lastProxyTimer = null
-        refreshProxy().catch(() =>
-          console.warn('[app-data] refreshProxy failed'),
+        const t0 = performance.now()
+        console.log(
+          '[app-data] refresh-proxy-config event -> refreshProxy() calling...',
         )
+        refreshProxy()
+          .then(() => {
+            console.log(
+              `[app-data] refreshProxy resolved, took ${Math.round(performance.now() - t0)}ms`,
+            )
+          })
+          .catch((err) =>
+            console.error(
+              `[app-data] refreshProxy FAILED took ${Math.round(performance.now() - t0)}ms:`,
+              err,
+            ),
+          )
       }, 200)
     }
 

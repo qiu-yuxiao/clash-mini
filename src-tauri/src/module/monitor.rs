@@ -341,10 +341,16 @@ pub async fn trigger_backend_auto_select(
     // （refresh_clash 和 notify_delay_results 不影响选点逻辑，放在锁外可减少锁持有时间）
     if let Ok(outcome) = &result {
         if outcome.selected {
+            logging!(info, Type::Lightweight, "[后台监测] 测速完成，准备调用 refresh_clash()...");
+            let t0 = std::time::Instant::now();
             crate::core::handle::Handle::refresh_clash();
+            logging!(info, Type::Lightweight, "[后台监测] refresh_clash() 完成，耗时 {:?}", t0.elapsed());
         }
         if !outcome.display.is_empty() {
+            logging!(info, Type::Lightweight, "[后台监测] 准备发送 {} 条延迟结果到前端...", outcome.display.len());
+            let t0 = std::time::Instant::now();
             crate::core::handle::Handle::notify_delay_results("PROXY".into(), outcome.display.clone());
+            logging!(info, Type::Lightweight, "[后台监测] notify_delay_results 完成，耗时 {:?}", t0.elapsed());
         }
     }
 

@@ -67,18 +67,28 @@ export const useVisibility = () => {
   // L-29: updateWindowState 使用 useCallback 包装并通过 isMountedRef 判断挂载状态
   // 避免闭包变量带来的潜在问题，同时确保回调引用稳定（虽然 useEffect 依赖为空本就只注册一次）
   const updateWindowState = useCallback(async () => {
+    const t0 = performance.now()
+    console.log(
+      '[useVisibility] updateWindowState calling isMinimized+isVisible...',
+    )
     try {
       const currentWindow = getCurrentWindow()
       const [minimized, visible] = await Promise.all([
         currentWindow.isMinimized(),
         currentWindow.isVisible(),
       ])
+      console.log(
+        `[useVisibility] IPC resolved min=${minimized} vis=${visible}, took ${Math.round(performance.now() - t0)}ms`,
+      )
       if (isMountedRef.current) {
         setIsMinimized(minimized)
         setIsWindowVisible(visible)
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error(
+        `[useVisibility] updateWindowState FAILED took ${Math.round(performance.now() - t0)}ms:`,
+        err,
+      )
     }
   }, [])
 
