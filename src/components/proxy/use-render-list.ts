@@ -175,58 +175,45 @@ export const useRenderList = (mode: string) => {
         latencyTimeout,
       )
 
-      if (group.name !== 'PROXY') {
+      ret.push({
+        type: 1,
+        key: `head-${group.name}`,
+        group,
+        headState,
+      })
+
+      if (!proxies.length) {
         ret.push({
-          type: 0,
-          key: `group-${group.name}`,
+          type: 3,
+          key: `empty-${group.name}`,
           group,
           headState,
         })
-      }
-
-      const isOpen = group.name === 'PROXY' ? true : headState.open
-
-      if (isOpen) {
-        ret.push({
-          type: 1,
-          key: `head-${group.name}`,
-          group,
-          headState,
-        })
-
-        if (!proxies.length) {
-          ret.push({
-            type: 3,
-            key: `empty-${group.name}`,
+      } else if (col > 1) {
+        ret.push(
+          ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
+            type: 4 as const,
+            key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
             group,
             headState,
-          })
-        } else if (col > 1) {
-          ret.push(
-            ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
-              type: 4 as const,
-              key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
-              group,
-              headState,
-              col,
-              proxyCol,
-              provider: proxyCol[0]?.provider,
-              indexInGroup: colIndex,
-            })),
-          )
-        } else {
-          ret.push(
-            ...proxies.map((proxy, proxyIdx) => ({
-              type: 2 as const,
-              key: `${group.name}-${proxy?.name ?? proxyIdx}`,
-              group,
-              proxy,
-              headState,
-              provider: proxy.provider,
-              indexInGroup: proxyIdx,
-            })),
-          )
-        }
+            col,
+            proxyCol,
+            provider: proxyCol[0]?.provider,
+            indexInGroup: colIndex,
+          })),
+        )
+      } else {
+        ret.push(
+          ...proxies.map((proxy, proxyIdx) => ({
+            type: 2 as const,
+            key: `${group.name}-${proxy?.name ?? proxyIdx}`,
+            group,
+            proxy,
+            headState,
+            provider: proxy.provider,
+            indexInGroup: proxyIdx,
+          })),
+        )
       }
 
       cache.set(group.name, {
