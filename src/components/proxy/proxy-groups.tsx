@@ -83,7 +83,7 @@ export const ProxyGroups = (props: Props) => {
     [],
   )
 
-  const [ruleMenuAnchor, setRuleMenuAnchor] = useState<null | HTMLElement>(null)
+
   const [duplicateWarning, setDuplicateWarning] = useState<{
     open: boolean
     message: string
@@ -284,19 +284,7 @@ export const ProxyGroups = (props: Props) => {
     setDuplicateWarning({ open: false, message: '' })
   }, [])
 
-  // 处理代理组选择菜单
-  const handleGroupMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setRuleMenuAnchor(event.currentTarget)
-  }
 
-  const handleGroupMenuClose = () => {
-    setRuleMenuAnchor(null)
-  }
-
-  const handleGroupSelect = (groupName: string) => {
-    setSelectedGroup(groupName)
-    handleGroupMenuClose()
-  }
 
   const handleChangeProxy = useCallback(
     (group: IProxyGroupItem, proxy: IProxyItem) => {
