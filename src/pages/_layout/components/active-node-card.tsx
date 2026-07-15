@@ -41,25 +41,7 @@ export const ActiveNodeStatusCard = () => {
 
   const activeNodeRecord = useMemo(() => {
     if (!activeNodeName) return null
-    if (proxies?.records?.[activeNodeName]) {
-      return proxies.records[activeNodeName]
-    }
-    const groups = proxies?.groups || []
-    for (const group of groups) {
-      if (group?.all) {
-        const found = group.all.find(
-          (node: any) => node?.name === activeNodeName,
-        )
-        if (found) return found
-      }
-    }
-    if (proxies?.global?.all) {
-      const found = proxies.global.all.find(
-        (node: any) => node?.name === activeNodeName,
-      )
-      if (found) return found
-    }
-    return null
+    return proxies?.records?.[activeNodeName] ?? null
   }, [proxies, activeNodeName])
 
   const [delay, setDelay] = useState(() => {
