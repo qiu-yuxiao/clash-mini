@@ -302,8 +302,6 @@ export async function patchClashMode(payload: string) {
  * 详见 project_memory.md 中「单一 PROXY 组」核心架构约定。
  */
 export async function calcuProxies(): Promise<{
-  global: IProxyGroupItem
-  direct: IProxyItem
   groups: IProxyGroupItem[]
   records: Record<string, IProxyItem>
   proxies: IProxyItem[]
@@ -343,8 +341,7 @@ export async function calcuProxies(): Promise<{
     }
   }
 
-  const { GLOBAL: global, DIRECT: direct, REJECT: reject } = proxyRecord
-
+  // Mini 单组架构：只构造 PROXY 组
   const proxyGroup = proxyRecord['PROXY']
   const groups: IProxyGroupItem[] = proxyGroup ? [{
     ...proxyGroup,
@@ -353,29 +350,15 @@ export async function calcuProxies(): Promise<{
       .filter((item) => item?.name && !isDummyNode(item.name)),
   }] : []
 
-  const proxies = [direct, reject]
-    .filter(Boolean)
-    .concat(
-      Object.values(proxyRecord).filter(
-        (p) =>
-          !p?.all?.length &&
-          p?.name !== 'DIRECT' &&
-          p?.name !== 'REJECT' &&
-          p?.name &&
-          !isDummyNode(p.name),
-      ),
-    )
-
-  const _global = {
-    ...global,
-    all: (global?.all?.map((item) => generateItem(item)) || []).filter(
-      (item) => item?.name && !isDummyNode(item.name),
-    ),
-  }
+  // 非组节点（DIRECT/REJECT 及无子节点的叶子节点），供渲染使用
+  const proxies = Object.values(proxyRecord).filter(
+    (p) =>
+      !p?.all?.length &&
+      p?.name &&
+      !isDummyNode(p.name),
+  )
 
   return {
-    global: _global as IProxyGroupItem,
-    direct: direct as IProxyItem,
     groups,
     records: proxyRecord as Record<string, IProxyItem>,
     proxies: (proxies as IProxyItem[]) ?? [],

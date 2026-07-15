@@ -114,8 +114,8 @@ export const useProfiles = () => {
           return
         }
 
-        // Mini 单组架构：只处理 PROXY 组
-        const proxyGroup = proxiesData.groups?.find((g) => g.name === 'PROXY')
+        // Mini 单组架构：groups 只有 PROXY 一个元素
+        const proxyGroup = proxiesData.groups?.[0]
         if (!proxyGroup) {
           debugLog('[ActivateSelected] 未找到 PROXY 组，跳过')
           return

@@ -34,7 +34,7 @@ export const ActiveNodeStatusCard = () => {
   const singleTestTimeout = 1000
 
   const primaryGroup = useMemo(() => {
-    return proxies?.groups?.find((g: any) => g?.name === 'PROXY') ?? null
+    return proxies?.groups?.[0] ?? null
   }, [proxies])
 
   const activeNodeName = primaryGroup?.now || ''

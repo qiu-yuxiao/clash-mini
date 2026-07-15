@@ -17,8 +17,6 @@ export interface SystemProxyInfo {
 
 export interface AppDataContextType {
   proxies: {
-    global: IProxyGroupItem
-    direct: IProxyItem
     groups: IProxyGroupItem[]
     records: Record<string, IProxyItem>
     proxies: IProxyItem[]
@@ -56,8 +54,6 @@ export interface ConnectionSpeedData {
 
 export interface ProxiesContextType {
   proxies: {
-    global: IProxyGroupItem
-    direct: IProxyItem
     groups: IProxyGroupItem[]
     records: Record<string, IProxyItem>
     proxies: IProxyItem[]
@@ -168,8 +164,6 @@ export const useAppData = (): AppDataContextType => {
   const refreshers = useAppRefreshers()
 
   const defaultProxies = {
-    global: { name: 'GLOBAL', type: 'Selector' as const, udp: false, xudp: false, tfo: false, mptcp: false, smux: false, history: [], now: '', all: [] },
-    direct: { name: 'DIRECT', type: 'Direct' as const, udp: true, xudp: false, tfo: false, mptcp: false, smux: false, history: [] },
     groups: [],
     records: {} as Record<string, IProxyItem>,
     proxies: [],

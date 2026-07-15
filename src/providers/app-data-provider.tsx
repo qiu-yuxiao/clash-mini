@@ -168,28 +168,6 @@ export const AppDataProvider = ({
           }
 
           return {
-            global: {
-              name: 'GLOBAL',
-              type: 'Selector',
-              udp: false,
-              xudp: false,
-              tfo: false,
-              mptcp: false,
-              smux: false,
-              history: [],
-              now: '',
-              all: [],
-            } as IProxyGroupItem,
-            direct: {
-              name: 'DIRECT',
-              type: 'Direct',
-              udp: true,
-              xudp: false,
-              tfo: false,
-              mptcp: false,
-              smux: false,
-              history: [],
-            } as IProxyItem,
             groups: [groupItem] as IProxyGroupItem[],
             records:
               activeNodeName && activeNode
