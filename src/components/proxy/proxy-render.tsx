@@ -1,17 +1,9 @@
 import {
-  ExpandLessRounded,
-  ExpandMoreRounded,
   InboxRounded,
 } from '@mui/icons-material'
 import {
-  alpha,
   Box,
-  ListItemText,
-  ListItemButton,
   Typography,
-  styled,
-  Chip,
-  Tooltip,
 } from '@mui/material'
 import { memo, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -99,88 +91,6 @@ const ProxyRenderComponent = (props: RenderProps) => {
     col,
   ])
 
-  if (type === 0) {
-    return (
-      <ListItemButton
-        dense
-        style={{
-          background: itembackgroundcolor,
-          height: '100%',
-          margin: '8px 8px',
-          borderRadius: '8px',
-        }}
-        onClick={() => onHeadState(group?.name ?? '', { open: !headState?.open })}
-      >
-        {enable_group_icon &&
-          group?.icon &&
-          group.icon.trim().startsWith('http') && (
-            <img
-              src={iconCachePath === '' ? group.icon : iconCachePath}
-              width="32px"
-              style={{ marginRight: '12px', borderRadius: '6px' }}
-            />
-          )}
-        {enable_group_icon &&
-          group?.icon &&
-          group.icon.trim().startsWith('data') && (
-            <img
-              src={group.icon}
-              width="32px"
-              style={{ marginRight: '12px', borderRadius: '6px' }}
-            />
-          )}
-        {enable_group_icon &&
-          group?.icon &&
-          group.icon.trim().startsWith('<svg') && (
-            <img
-              src={`data:image/svg+xml;base64,${btoa(group.icon)}`}
-              width="32px"
-            />
-          )}
-        <ListItemText
-          primary={<StyledPrimary>{group?.name ?? ''}</StyledPrimary>}
-          secondary={
-            <Box
-              sx={{
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                pt: '2px',
-              }}
-            >
-              <Box component="span" sx={{ marginTop: '2px' }}>
-                <StyledTypeBox>{group?.type ?? ''}</StyledTypeBox>
-                <StyledSubtitle sx={{ color: 'text.secondary' }}>
-                  {group?.now ? group.now.replace(/\s\(\d{6}\)$/, '') : ''}
-                </StyledSubtitle>
-              </Box>
-            </Box>
-          }
-          slotProps={{
-            secondary: {
-              component: 'div',
-              sx: { display: 'flex', alignItems: 'center', color: '#ccc' },
-            },
-          }}
-        />
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Tooltip title={t('proxies.page.labels.proxyCount')} arrow>
-            <Chip
-              size="small"
-              label={`${group.all?.length ?? 0}`}
-              sx={{
-                mr: 1,
-                backgroundColor: (theme) =>
-                  alpha(theme.palette.primary.main, 0.1),
-                color: (theme) => theme.palette.primary.main,
-              }}
-            />
-          </Tooltip>
-          {headState?.open ? <ExpandLessRounded /> : <ExpandMoreRounded />}
-        </Box>
-      </ListItemButton>
-    )
-  }
 
   if (type === 1) {
     return (
@@ -251,30 +161,4 @@ const ProxyRenderComponent = (props: RenderProps) => {
 
 export const ProxyRender = memo(ProxyRenderComponent)
 
-const StyledPrimary = styled('span')`
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-const StyledSubtitle = styled('span')`
-  font-size: 13px;
-  overflow: hidden;
-  color: text.secondary;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
 
-const StyledTypeBox = styled(Box)(({ theme }) => ({
-  display: 'inline-block',
-  border: '1px solid #ccc',
-  borderColor: alpha(theme.palette.primary.main, 0.5),
-  color: alpha(theme.palette.primary.main, 0.8),
-  borderRadius: 4,
-  fontSize: 10,
-  padding: '0 4px',
-  lineHeight: 1.5,
-  marginRight: '8px',
-}))
