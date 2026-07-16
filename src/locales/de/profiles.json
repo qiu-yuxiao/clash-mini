@@ -129,41 +129,6 @@
         "append": "Nachfolgenden Proxy-Knoten hinzufügen"
       }
     },
-    "groupsEditor": {
-      "title": "Proxy-Gruppen bearbeiten",
-      "errors": {
-        "nameRequired": "Der Proxy-Gruppenname darf nicht leer sein",
-        "nameExists": "Der Proxy-Gruppenname existiert bereits"
-      },
-      "fields": {
-        "type": "Proxy-Gruppentyp",
-        "name": "Proxy-Gruppenname",
-        "icon": "Proxy-Gruppen-Symbol",
-        "proxies": "Proxy einführen",
-        "provider": "Proxy-Sammlung einführen",
-        "healthCheckUrl": "URL für Gesundheitstest",
-        "expectedStatus": "Erwarteter Statuscode",
-        "interval": "Prüfintervall",
-        "maxFailedTimes": "Maximale Anzahl fehlgeschlagener Versuche",
-        "interfaceName": "Ausgangsschnittstelle",
-        "routingMark": "Routierungsmarkierung",
-        "filter": "Knoten filtern",
-        "excludeFilter": "Knoten ausschließen",
-        "excludeType": "Typ der auszuschließenden Knoten",
-        "includeAll": "Alle Ausgangsproxy und Proxy-Sammlungen einführen",
-        "includeAllProxies": "Alle Ausgangsproxy einführen",
-        "includeAllProviders": "Alle Proxy-Sammlungen einführen"
-      },
-      "toggles": {
-        "lazy": "Lazy-Status",
-        "disableUdp": "UDP deaktivieren",
-        "hidden": "Proxy-Gruppe ausblenden"
-      },
-      "actions": {
-        "prepend": "Vorherige Proxy-Gruppe hinzufügen",
-        "append": "Nachfolgende Proxy-Gruppe hinzufügen"
-      }
-    },
     "editor": {
       "actions": {
         "format": "Dokument formatieren"

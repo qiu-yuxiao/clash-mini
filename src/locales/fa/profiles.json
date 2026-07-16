@@ -129,41 +129,6 @@
         "append": "پس‌افزودن پراکسی"
       }
     },
-    "groupsEditor": {
-      "title": "ویرایش گروه‌های پروکسی",
-      "errors": {
-        "nameRequired": "نام گروه مورد نیاز است",
-        "nameExists": "نام گروه قبلا وجود دارد"
-      },
-      "fields": {
-        "type": "نوع گروه",
-        "name": "نام گروه",
-        "icon": "آیکون گروه پراکسی",
-        "proxies": "استفاده از پروکسی‌ها",
-        "provider": "استفاده از ارائه‌دهنده",
-        "healthCheckUrl": "آدرس بررسی سلامت",
-        "expectedStatus": "وضعیت مورد انتظار",
-        "interval": "فاصله زمانی",
-        "maxFailedTimes": "حداکثر تعداد شکست‌ها",
-        "interfaceName": "نام رابط",
-        "routingMark": "علامت مسیریابی",
-        "filter": "فیلتر",
-        "excludeFilter": "فیلتر استثناء",
-        "excludeType": "نوع استثناء",
-        "includeAll": "شامل همه پروکسی‌ها و ارائه‌دهنده‌ها",
-        "includeAllProxies": "شامل همه پروکسی‌ها",
-        "includeAllProviders": "شامل همه ارائه‌دهنده‌ها"
-      },
-      "toggles": {
-        "lazy": "تنبل",
-        "disableUdp": "غیرفعال کردن UDP",
-        "hidden": "مخفی"
-      },
-      "actions": {
-        "prepend": "اضافه کردن گروه به ابتدا",
-        "append": "اضافه کردن گروه به انتها"
-      }
-    },
     "editor": {
       "actions": {
         "format": "فرمت‌بندی سند"

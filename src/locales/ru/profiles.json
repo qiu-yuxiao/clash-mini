@@ -129,41 +129,6 @@
         "append": "Добавить прокси в конец"
       }
     },
-    "groupsEditor": {
-      "title": "Редактировать группы прокси",
-      "errors": {
-        "nameRequired": "Введите имя группы",
-        "nameExists": "Группа с таким именем уже существует"
-      },
-      "fields": {
-        "type": "Тип группы",
-        "name": "Имя группы",
-        "icon": "Значок группы прокси",
-        "proxies": "Использовать прокси",
-        "provider": "Использовать провайдера",
-        "healthCheckUrl": "URL проверки доступности",
-        "expectedStatus": "Ожидаемый статус",
-        "interval": "Интервал",
-        "maxFailedTimes": "Максимальное число ошибок",
-        "interfaceName": "Имя интерфейса",
-        "routingMark": "Марка маршрутизации",
-        "filter": "Фильтр",
-        "excludeFilter": "Исключающий фильтр",
-        "excludeType": "Тип исключения",
-        "includeAll": "Включить все прокси и провайдеры",
-        "includeAllProxies": "Включить все прокси",
-        "includeAllProviders": "Включить всех провайдеров"
-      },
-      "toggles": {
-        "lazy": "Ленивая загрузка",
-        "disableUdp": "Отключить UDP",
-        "hidden": "Скрытая"
-      },
-      "actions": {
-        "prepend": "Добавить группу в начало",
-        "append": "Добавить группу в конец"
-      }
-    },
     "editor": {
       "actions": {
         "format": "Форматировать документ"

@@ -129,41 +129,6 @@
         "append": "Vekil'in Sonuna Ekle"
       }
     },
-    "groupsEditor": {
-      "title": "Vekil Gruplarını Düzenle",
-      "errors": {
-        "nameRequired": "Grup Adı Gerekli",
-        "nameExists": "Grup Adı Zaten Var"
-      },
-      "fields": {
-        "type": "Grup Tipi",
-        "name": "Grup Adı",
-        "icon": "Vekil Grup Simgesi",
-        "proxies": "Vekil'leri Kullan",
-        "provider": "Sağlayıcı Kullan",
-        "healthCheckUrl": "Sağlık Kontrolü URL'si",
-        "expectedStatus": "Beklenen Durum",
-        "interval": "Aralık",
-        "maxFailedTimes": "Maksimum Başarısız Deneme",
-        "interfaceName": "Arayüz Adı",
-        "routingMark": "Yönlendirme İşareti",
-        "filter": "Filtre",
-        "excludeFilter": "Hariç Tutma Filtresi",
-        "excludeType": "Hariç Tutma Tipi",
-        "includeAll": "Tüm Vekil'leri ve Sağlayıcıları Dahil Et",
-        "includeAllProxies": "Tüm Vekil'leri Dahil Et",
-        "includeAllProviders": "Tüm Sağlayıcıları Dahil Et"
-      },
-      "toggles": {
-        "lazy": "Tembel",
-        "disableUdp": "UDP'yi Devre Dışı Bırak",
-        "hidden": "Gizli"
-      },
-      "actions": {
-        "prepend": "Grubun Başına Ekle",
-        "append": "Grubun Sonuna Ekle"
-      }
-    },
     "editor": {
       "actions": {
         "format": "Belgeyi biçimlendir"

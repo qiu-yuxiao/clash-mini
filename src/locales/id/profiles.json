@@ -129,41 +129,6 @@
         "append": "Tambahkan Proksi di Akhir"
       }
     },
-    "groupsEditor": {
-      "title": "Ubah Grup Proksi",
-      "errors": {
-        "nameRequired": "Nama Grup Diperlukan",
-        "nameExists": "Nama Grup Sudah Ada"
-      },
-      "fields": {
-        "type": "Jenis Grup",
-        "name": "Nama Grup",
-        "icon": "Ikon Grup Proksi",
-        "proxies": "Gunakan Proksi",
-        "provider": "Gunakan Penyedia",
-        "healthCheckUrl": "URL Pemeriksaan Kesehatan",
-        "expectedStatus": "Status yang Diharapkan",
-        "interval": "Interval",
-        "maxFailedTimes": "Jumlah Gagal Maksimal",
-        "interfaceName": "Nama Antarmuka",
-        "routingMark": "Tanda Routing",
-        "filter": "Filter",
-        "excludeFilter": "Kecualikan Filter",
-        "excludeType": "Kecualikan Jenis",
-        "includeAll": "Sertakan Semua Proksi dan Penyedia",
-        "includeAllProxies": "Sertakan Semua Proksi",
-        "includeAllProviders": "Sertakan Semua Penyedia"
-      },
-      "toggles": {
-        "lazy": "Malas",
-        "disableUdp": "Nonaktifkan UDP",
-        "hidden": "Tersembunyi"
-      },
-      "actions": {
-        "prepend": "Tambahkan Grup di Awal",
-        "append": "Tambahkan Grup di Akhir"
-      }
-    },
     "editor": {
       "actions": {
         "format": "Format dokumen"

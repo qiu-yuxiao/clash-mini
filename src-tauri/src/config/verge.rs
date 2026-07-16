@@ -200,10 +200,7 @@ pub struct IVerge {
     #[cfg(target_os = "macos")]
     pub enable_tray_speed: Option<bool>,
 
-    // pub enable_tray_icon: Option<bool>,
-    /// show proxy groups directly on tray root menu
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tray_proxy_groups_display_mode: Option<String>,
+
     /// show outbound modes directly on tray root menu
     pub tray_inline_outbound_modes: Option<bool>,
 
@@ -400,8 +397,7 @@ impl IVerge {
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
             #[cfg(target_os = "macos")]
             enable_tray_speed: Some(false),
-            // enable_tray_icon: Some(true),
-            tray_proxy_groups_display_mode: Some("default".into()),
+
             tray_inline_outbound_modes: Some(false),
             enable_global_hotkey: Some(false),
             enable_always_on_top: Some(false),
@@ -499,8 +495,7 @@ impl IVerge {
         patch!(auto_log_clean);
         #[cfg(target_os = "macos")]
         patch!(enable_tray_speed);
-        // patch!(enable_tray_icon);
-        patch!(tray_proxy_groups_display_mode);
+
         patch!(tray_inline_outbound_modes);
         patch!(enable_auto_light_weight_mode);
         patch!(auto_light_weight_minutes);

@@ -129,41 +129,6 @@
         "append": "Append Proxy"
       }
     },
-    "groupsEditor": {
-      "title": "Edit Proxy Groups",
-      "errors": {
-        "nameRequired": "Group Name Required",
-        "nameExists": "Group Name Already Exists"
-      },
-      "fields": {
-        "type": "Group Type",
-        "name": "Group Name",
-        "icon": "Proxy Group Icon",
-        "proxies": "Use Proxies",
-        "provider": "Use Provider",
-        "healthCheckUrl": "Health Check Url",
-        "expectedStatus": "Expected Status",
-        "interval": "Interval",
-        "maxFailedTimes": "Max Failed Times",
-        "interfaceName": "Interface Name",
-        "routingMark": "Routing Mark",
-        "filter": "Filter",
-        "excludeFilter": "Exclude Filter",
-        "excludeType": "Exclude Type",
-        "includeAll": "Include All Proxies and Providers",
-        "includeAllProxies": "Include All Proxies",
-        "includeAllProviders": "Include All Providers"
-      },
-      "toggles": {
-        "lazy": "Lazy",
-        "disableUdp": "Disable UDP",
-        "hidden": "Hidden"
-      },
-      "actions": {
-        "prepend": "Prepend Group",
-        "append": "Append Group"
-      }
-    },
     "editor": {
       "actions": {
         "format": "Format document"

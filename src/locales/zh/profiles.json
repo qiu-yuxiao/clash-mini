@@ -129,41 +129,6 @@
         "append": "添加后置代理节点"
       }
     },
-    "groupsEditor": {
-      "title": "编辑代理组",
-      "errors": {
-        "nameRequired": "代理组名称不能为空",
-        "nameExists": "代理组名称已存在"
-      },
-      "fields": {
-        "type": "代理组类型",
-        "name": "代理组组名",
-        "icon": "代理组图标",
-        "proxies": "引入代理",
-        "provider": "引入代理集合",
-        "healthCheckUrl": "健康检查测试地址",
-        "expectedStatus": "期望状态码",
-        "interval": "检查间隔",
-        "maxFailedTimes": "最大失败次数",
-        "interfaceName": "出站接口",
-        "routingMark": "路由标记",
-        "filter": "过滤节点",
-        "excludeFilter": "排除节点",
-        "excludeType": "排除节点类型",
-        "includeAll": "引入所有出站代理、代理集合",
-        "includeAllProxies": "引入所有出站代理",
-        "includeAllProviders": "引入所有代理集合"
-      },
-      "toggles": {
-        "lazy": "懒惰状态",
-        "disableUdp": "禁用 UDP",
-        "hidden": "隐藏代理组"
-      },
-      "actions": {
-        "prepend": "添加前置代理组",
-        "append": "添加后置代理组"
-      }
-    },
     "editor": {
       "actions": {
         "format": "格式化文档"

@@ -129,41 +129,6 @@
         "append": "Agregar nodo de proxy posterior"
       }
     },
-    "groupsEditor": {
-      "title": "Editar grupos de proxy",
-      "errors": {
-        "nameRequired": "El nombre del grupo de proxy no puede estar vacío",
-        "nameExists": "El nombre del grupo de proxy ya existe"
-      },
-      "fields": {
-        "type": "Tipo de grupo de proxy",
-        "name": "Nombre del grupo de proxy",
-        "icon": "Icono del grupo de proxy",
-        "proxies": "Incluir proxies",
-        "provider": "Incluir proveedor de proxies",
-        "healthCheckUrl": "URL de prueba de salud",
-        "expectedStatus": "Código de estado esperado",
-        "interval": "Intervalo de comprobación",
-        "maxFailedTimes": "Número máximo de fallos",
-        "interfaceName": "Nombre de la interfaz de salida",
-        "routingMark": "Marca de enrutamiento",
-        "filter": "Filtrar nodos",
-        "excludeFilter": "Excluir nodos",
-        "excludeType": "Tipo de nodo a excluir",
-        "includeAll": "Incluir todos los proxies de salida y proveedores de proxies",
-        "includeAllProxies": "Incluir todos los proxies de salida",
-        "includeAllProviders": "Incluir todos los proveedores de proxies"
-      },
-      "toggles": {
-        "lazy": "Estado de inactividad",
-        "disableUdp": "Deshabilitar UDP",
-        "hidden": "Ocultar grupo de proxy"
-      },
-      "actions": {
-        "prepend": "Agregar grupo de proxy previo",
-        "append": "Agregar grupo de proxy posterior"
-      }
-    },
     "editor": {
       "actions": {
         "format": "Formatear documento"

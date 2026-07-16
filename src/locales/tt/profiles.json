@@ -129,41 +129,6 @@
         "append": "Проксины аска өстәү"
       }
     },
-    "groupsEditor": {
-      "title": "Прокси төркемнәрен үзгәртү",
-      "errors": {
-        "nameRequired": "Төркем исеме кирәк",
-        "nameExists": "Әлеге төркем исеме бар инде"
-      },
-      "fields": {
-        "type": "Төркем төре",
-        "name": "Төркем исеме",
-        "icon": "Прокси төркеме иконкасы",
-        "proxies": "Прокси куллану",
-        "provider": "Провайдер куллану",
-        "healthCheckUrl": "Сәламәтлекне тикшерү URL-ы",
-        "expectedStatus": "Көтелгән статус коды",
-        "interval": "Интервал",
-        "maxFailedTimes": "Иң күп хаталы тикшерү саны",
-        "interfaceName": "Интерфейс исеме",
-        "routingMark": "Маршрут билгесе",
-        "filter": "Фильтр",
-        "excludeFilter": "Фильтр аша чыгару",
-        "excludeType": "Чыгару төре",
-        "includeAll": "Барлык прокси һәм провайдерларны кертү",
-        "includeAllProxies": "Барлык проксины кертү",
-        "includeAllProviders": "Барлык провайдерларны кертү"
-      },
-      "toggles": {
-        "lazy": "Сак режим (lazy)",
-        "disableUdp": "UDP'ны сүндерү",
-        "hidden": "Яшерен"
-      },
-      "actions": {
-        "prepend": "Төркемне өскә өстәү",
-        "append": "Төркемне аска өстәү"
-      }
-    },
     "editor": {
       "actions": {
         "format": "Документны форматлау"

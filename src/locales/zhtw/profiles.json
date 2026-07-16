@@ -129,41 +129,6 @@
         "append": "新增後置代理節點"
       }
     },
-    "groupsEditor": {
-      "title": "編輯代理組",
-      "errors": {
-        "nameRequired": "代理組名稱為必填",
-        "nameExists": "代理組名稱已存在"
-      },
-      "fields": {
-        "type": "代理組類型",
-        "name": "代理組名稱",
-        "icon": "代理組圖示",
-        "proxies": "使用代理",
-        "provider": "使用代理集合",
-        "healthCheckUrl": "健康檢查網址",
-        "expectedStatus": "預期狀態碼",
-        "interval": "檢查間隔",
-        "maxFailedTimes": "最大失敗次數",
-        "interfaceName": "輸出介面",
-        "routingMark": "路由標記",
-        "filter": "篩選節點",
-        "excludeFilter": "排除節點",
-        "excludeType": "排除節點類型",
-        "includeAll": "包含所有輸出代理、代理集合",
-        "includeAllProxies": "包含所有輸出代理",
-        "includeAllProviders": "包含所有代理集合"
-      },
-      "toggles": {
-        "lazy": "延遲載入",
-        "disableUdp": "停用 UDP",
-        "hidden": "隱藏代理組"
-      },
-      "actions": {
-        "prepend": "新增前置代理組",
-        "append": "新增後置代理組"
-      }
-    },
     "editor": {
       "actions": {
         "format": "格式化文件"

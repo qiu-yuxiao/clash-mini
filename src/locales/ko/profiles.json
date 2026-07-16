@@ -129,41 +129,6 @@
         "append": "프록시 뒤에 추가"
       }
     },
-    "groupsEditor": {
-      "title": "프록시 그룹 편집",
-      "errors": {
-        "nameRequired": "그룹 이름 필수",
-        "nameExists": "그룹 이름이 이미 존재함"
-      },
-      "fields": {
-        "type": "그룹 유형",
-        "name": "그룹 이름",
-        "icon": "프록시 그룹 아이콘",
-        "proxies": "프록시 사용",
-        "provider": "제공자 사용",
-        "healthCheckUrl": "상태 확인 URL",
-        "expectedStatus": "예상 상태",
-        "interval": "간격",
-        "maxFailedTimes": "최대 실패 횟수",
-        "interfaceName": "인터페이스 이름",
-        "routingMark": "라우팅 마크",
-        "filter": "필터",
-        "excludeFilter": "제외 필터",
-        "excludeType": "제외 유형",
-        "includeAll": "모든 프록시 및 제공자 포함",
-        "includeAllProxies": "모든 프록시 포함",
-        "includeAllProviders": "모든 제공자 포함"
-      },
-      "toggles": {
-        "lazy": "지연 로딩",
-        "disableUdp": "UDP 비활성화",
-        "hidden": "숨김"
-      },
-      "actions": {
-        "prepend": "그룹 앞에 추가",
-        "append": "그룹 뒤에 추가"
-      }
-    },
     "editor": {
       "actions": {
         "format": "문서 포맷"

@@ -131,7 +131,6 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     // enable_auto_light_weight_mode 现由 entry_lightweight_mode 直接读取配置判断，
     // 不再需要空壳函数 enable/disable_auto_light_weight_mode，相关 UpdateFlags 已移除。
     let enable_external_controller = patch.enable_external_controller;
-    let tray_proxy_groups_display_mode = &patch.tray_proxy_groups_display_mode;
     let tray_inline_outbound_modes = patch.tray_inline_outbound_modes;
     let enable_proxy_guard = patch.enable_proxy_guard;
     let proxy_guard_duration = patch.proxy_guard_duration;
@@ -210,9 +209,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     }
     if tray_event.is_some() {
         update_flags.insert(UpdateFlags::SYSTRAY_CLICK_BEHAVIOR);
-    }
-    if tray_proxy_groups_display_mode.is_some() {
-        update_flags.insert(UpdateFlags::SYSTRAY_MENU);
+
     }
     if log_level.is_some() {
         update_flags.insert(UpdateFlags::LOG_LEVEL);

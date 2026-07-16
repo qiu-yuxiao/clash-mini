@@ -5,7 +5,6 @@ export type ValidationOutcome =
   | { status: 'invalid'; kind: string; message: string }
   | { status: 'skipped'; reason: string }
 
-
 export interface IVergeConfig {
   app_log_level?: 'trace' | 'debug' | 'info' | 'warn' | 'error' | string
   app_log_max_size?: number // KB
@@ -33,8 +32,7 @@ export interface IVergeConfig {
   tray_icon?: 'monochrome' | 'colorful'
   enable_tray_speed?: boolean
   enable_always_on_top?: boolean
-  // enable_tray_icon?: boolean;
-  tray_proxy_groups_display_mode?: 'default' | 'inline' | 'disable'
+
   tray_inline_outbound_modes?: boolean
   enable_tun_mode?: boolean
   enable_auto_light_weight_mode?: boolean

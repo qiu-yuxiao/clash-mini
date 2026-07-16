@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
 import dayjs from 'dayjs'
-import yaml from 'js-yaml'
 
 import { showNotice } from '@/services/notice-service'
 import type {
@@ -86,88 +85,6 @@ export async function triggerAutoSelect(
 }
 
 export async function enhanceProfiles() {
-  const config = await getProfiles()
-  const activeUid = config.current
-  if (activeUid) {
-    const rawYaml = await readProfileFile(activeUid)
-    if (rawYaml) {
-      let doc: Record<string, unknown>
-      try {
-        const parsed = yaml.load(rawYaml)
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          console.warn(
-            '[ProfileTransformer] YAML 解析结果不是有效对象，跳过增强',
-          )
-        } else {
-          doc = parsed as Record<string, unknown>
-          if (typeof doc === 'object' && !Array.isArray(doc)) {
-            let modified = false
-
-            // 1. 提取所有原始 proxies 名字
-            const proxies = doc.proxies || []
-            const proxyNames = Array.isArray(proxies)
-              ? proxies
-                  .map((p: { name?: string }) => p && p.name)
-                  .filter((name): name is string => !!name)
-              : []
-
-            // 2. 提取所有的 proxy-providers 名字
-            const providers = doc['proxy-providers'] || {}
-            const providerNames =
-              providers && typeof providers === 'object'
-                ? Object.keys(providers)
-                : []
-
-            // 3. 判断是否需要执行过滤
-            const groups = doc['proxy-groups'] || []
-            const hasMultipleGroups =
-              Array.isArray(groups) &&
-              (groups.length > 1 ||
-                (groups.length === 1 && groups[0].name !== 'PROXY'))
-            const hasRules = Array.isArray(doc.rules) && doc.rules.length > 0
-
-            if (hasMultipleGroups || hasRules) {
-              const newGroup: {
-                name: string
-                type: string
-                proxies?: string[]
-                use?: string[]
-              } = {
-                name: 'PROXY',
-                type: 'select',
-              }
-              if (proxyNames.length > 0) {
-                newGroup.proxies = proxyNames
-              }
-              if (providerNames.length > 0) {
-                newGroup.use = providerNames
-              }
-              if (proxyNames.length === 0 && providerNames.length === 0) {
-                newGroup.proxies = ['DIRECT']
-              }
-
-              doc['proxy-groups'] = [newGroup]
-              doc.rules = []
-              modified = true
-            }
-
-            if (modified) {
-              await saveProfileFile(activeUid, yaml.dump(doc))
-              debugLog(
-                `[ProfileTransformer] Successfully cleaned up profile ${activeUid} to single PROXY group and empty rules`,
-              )
-            }
-          }
-        }
-      } catch (yamlErr) {
-        console.warn(
-          '[ProfileTransformer] YAML 解析失败，将交由后端增强:',
-          yamlErr,
-        )
-      }
-    }
-  }
-
   const result = await withIpcTimeout(
     invoke<ValidationOutcome>('enhance_profiles'),
     60_000,
@@ -351,19 +268,20 @@ export async function calcuProxies(): Promise<{
 
   // Mini 单组架构：只构造 PROXY 组
   const proxyGroup = proxyRecord['PROXY']
-  const groups: IProxyGroupItem[] = proxyGroup ? [{
-    ...proxyGroup,
-    all: (proxyGroup.all ?? [])
-      .map((item) => generateItem(item))
-      .filter((item) => item?.name && !isDummyNode(item.name)),
-  }] : []
+  const groups: IProxyGroupItem[] = proxyGroup
+    ? [
+        {
+          ...proxyGroup,
+          all: (proxyGroup.all ?? [])
+            .map((item) => generateItem(item))
+            .filter((item) => item?.name && !isDummyNode(item.name)),
+        },
+      ]
+    : []
 
   // 非组节点（DIRECT/REJECT 及无子节点的叶子节点），供渲染使用
   const proxies = Object.values(proxyRecord).filter(
-    (p) =>
-      !p?.all?.length &&
-      p?.name &&
-      !isDummyNode(p.name),
+    (p) => !p?.all?.length && p?.name && !isDummyNode(p.name),
   )
 
   return {

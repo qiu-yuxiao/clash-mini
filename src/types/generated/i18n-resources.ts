@@ -275,41 +275,6 @@ export interface TranslationResources {
             readOnly: string
           }
         }
-        groupsEditor: {
-          actions: {
-            append: string
-            prepend: string
-          }
-          errors: {
-            nameExists: string
-            nameRequired: string
-          }
-          fields: {
-            excludeFilter: string
-            excludeType: string
-            expectedStatus: string
-            filter: string
-            healthCheckUrl: string
-            icon: string
-            includeAll: string
-            includeAllProviders: string
-            includeAllProxies: string
-            interfaceName: string
-            interval: string
-            maxFailedTimes: string
-            name: string
-            provider: string
-            proxies: string
-            routingMark: string
-            type: string
-          }
-          title: string
-          toggles: {
-            disableUdp: string
-            hidden: string
-            lazy: string
-          }
-        }
         logViewer: {
           title: string
         }

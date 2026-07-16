@@ -129,41 +129,6 @@
         "append": "إضافة وكيل في النهاية"
       }
     },
-    "groupsEditor": {
-      "title": "تعديل مجموعات الوكلاء",
-      "errors": {
-        "nameRequired": "اسم المجموعة مطلوب",
-        "nameExists": "اسم المجموعة موجود بالفعل"
-      },
-      "fields": {
-        "type": "نوع المجموعة",
-        "name": "اسم المجموعة",
-        "icon": "أيقونة مجموعة الوكلاء",
-        "proxies": "استخدام الوكلاء",
-        "provider": "استخدام المزود",
-        "healthCheckUrl": "رابط فحص الصحة",
-        "expectedStatus": "الحالة المتوقعة",
-        "interval": "الفاصل الزمني",
-        "maxFailedTimes": "الحد الأقصى لمحاولات الفشل",
-        "interfaceName": "اسم الواجهة",
-        "routingMark": "علامة التوجيه",
-        "filter": "تصفية",
-        "excludeFilter": "استبعاد المرشح",
-        "excludeType": "استبعاد النوع",
-        "includeAll": "تضمين جميع الوكلاء والمزودين",
-        "includeAllProxies": "تضمين جميع الوكلاء",
-        "includeAllProviders": "تضمين جميع المزودين"
-      },
-      "toggles": {
-        "lazy": "كسول",
-        "disableUdp": "تعطيل UDP",
-        "hidden": "مخفي"
-      },
-      "actions": {
-        "prepend": "إضافة مجموعة في البداية",
-        "append": "إضافة مجموعة في النهاية"
-      }
-    },
     "editor": {
       "actions": {
         "format": "تنسيق المستند"

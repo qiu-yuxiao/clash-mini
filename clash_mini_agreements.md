@@ -1407,6 +1407,11 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 在 `use-render-list.ts` 中废除 `flatMap` 迭代，改由直接映射唯一的 `PROXY` 组数据做展开与缓存计算，降低渲染时的函数堆栈层数。
   - 从源头砍掉了列表头部 `type === 1` 大标题卡片的塞入，并顺理成章地将 `proxy-groups.tsx` 中用于过滤大标题卡片的 `filteredRenderList` 过滤器（及其 useMemo）进行了物理删除，使虚拟滚动列表直接由原始 `renderList` 驱动。
   - 将 `useRenderList` 暴露的 `headStates` 状态直接引入虚拟列表，使公共 `ProxyHead` 工具栏的状态解构定位从 O(N) 搜寻循环降维为 `headStates['PROXY']` 定向解析，并清理了 React `no-useless-assignment` 与 resize 模块遗留的 ESLint 未使用警告。
+- **第二阶段（Stage-2）暗角死逻辑与冗余大扫除**：
+  - **后端 `cleanup_proxy_groups` 物理截瘫**：物理删除了 `enhance/mod.rs` 中已无实质作用的 `cleanup_proxy_groups`、`rewrite_rules` 和 `rewrite_rule_target` 函数定义与调用。同时清空了 `enforce_mini_agreements` 末尾无用的 `allowed` 名字集合循环和 `rewrite_rules` 转换，使之直接向下游交付 Mapping。剪除了 3 项对应的单元测试，彻底打通了 Rust 后端在编译和 Clippy 检查层面的纯净无死角。
+  - **前端 Profile 切换 YAML 解析覆写拦截物理剔除**：在 `enhanceProfiles` 中，彻底切成了用 JS 解析 YAML 并对 `proxy-groups`/`rules` 执行重置和保存的冗余动作，完全移除了 `js-yaml` 库在 `cmds.ts` 中的依赖，消除了因前端 YAML 二次写盘产生的无谓 CPU 与磁盘 I/O 磨损。
+  - **全语种 325 项 `groupsEditor` i18n 资源大扫除**：运行项目内置的 i18n cleanup 脚本，一举清除了 13 种语言翻译源文件（`profiles.json`）中关于已废弃的策略组编辑弹窗相关的 325 个死翻译文本键，并重新同步生成了 `i18n-keys.ts` 与 `i18n-resources.ts` 类型字典文件，使翻译键总数从 830 降为 805，做到了静态翻译资源的极致做减法。
+  - **“托盘代理组显示模式”死配置字段剥离**：从后端 `verge.rs` 结构体声明/默认值/patch 合并链路、后端 `feat/config.rs` 处理分支以及前端 `types/verge.ts` 接口类型中，彻底除去了已在 Clash Mini 托盘渲染中停用的 `tray_proxy_groups_display_mode` 配置声明，完成了配置模型层面的彻底净化。
 
 ### v2.4.7 弹窗自适应与 Lint 规范审计 (2026-07-12)
 

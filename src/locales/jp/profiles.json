@@ -129,41 +129,6 @@
         "append": "後置プロキシノードを追加"
       }
     },
-    "groupsEditor": {
-      "title": "プロキシグループを編集",
-      "errors": {
-        "nameRequired": "プロキシグループ名は必須です",
-        "nameExists": "プロキシグループ名はすでに存在します"
-      },
-      "fields": {
-        "type": "プロキシグループタイプ",
-        "name": "プロキシグループ名",
-        "icon": "プロキシグループアイコン",
-        "proxies": "プロキシを導入",
-        "provider": "プロキシプロバイダーを導入",
-        "healthCheckUrl": "ヘルスチェックURL",
-        "expectedStatus": "期待するステータスコード",
-        "interval": "チェック間隔",
-        "maxFailedTimes": "最大失敗回数",
-        "interfaceName": "出力インターフェース",
-        "routingMark": "ルーティングマーク",
-        "filter": "ノードをフィルタリング",
-        "excludeFilter": "除外ノード",
-        "excludeType": "除外ノードタイプ",
-        "includeAll": "すべての出力プロキシ、プロキシプロバイダーを導入",
-        "includeAllProxies": "すべての出力プロキシを導入",
-        "includeAllProviders": "すべてのプロキシプロバイダーを導入"
-      },
-      "toggles": {
-        "lazy": "遅延モード",
-        "disableUdp": "UDPを無効にする",
-        "hidden": "プロキシグループを隠す"
-      },
-      "actions": {
-        "prepend": "前置プロキシグループを追加",
-        "append": "後置プロキシグループを追加"
-      }
-    },
     "editor": {
       "actions": {
         "format": "文書を整形する"
