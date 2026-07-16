@@ -1165,6 +1165,11 @@ const Layout = () => {
       console.log(
         `[Layout] profile ${currentProfileUid} 未变（可能为轻量模式唤醒），跳过 enhance`,
       )
+
+      // 🛡️ 优先刷新防线：在唤醒的最初微秒无条件发起一次 refreshProxy，保障首帧列表瞬间显现！
+      // 绝不能吊死在后面的 waitForClashReady 等待链上！
+      refreshProxyRef.current({ forceFull: true }).catch(() => {})
+
       let cancelled = false
       ;(async () => {
         try {
