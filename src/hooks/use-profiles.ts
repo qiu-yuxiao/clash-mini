@@ -121,11 +121,9 @@ export const useProfiles = () => {
           return
         }
 
-        // 从 selected 数组中取 PROXY 组的保存节点
-        const savedEntry = selected.find(
-          (each: any) => each?.name === 'PROXY' && each?.now,
-        )
-        const savedProxyName: string | undefined = savedEntry?.now
+        // Mini 单组架构：selected 数组仅一个元素 {name:'PROXY', now}
+        const savedEntry = selected[0]
+        const savedProxyName: string | undefined = savedEntry?.name === 'PROXY' ? savedEntry.now : undefined
         if (!savedProxyName) {
           debugLog('[ActivateSelected] selected 中无 PROXY 组的有效记录，跳过')
           return

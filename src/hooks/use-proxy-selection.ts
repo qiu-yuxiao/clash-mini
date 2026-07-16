@@ -58,19 +58,10 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   )
 
   const persistSelection = useCallback(
-    (groupName: string, proxyName: string, skipConfigSave: boolean) => {
+    (proxyName: string, skipConfigSave: boolean) => {
       if (!current || skipConfigSave) return
-
-      const selected = current.selected ? [...current.selected] : []
-      const index = selected.findIndex((item) => item.name === groupName)
-
-      if (index < 0) {
-        selected.push({ name: groupName, now: proxyName })
-      } else {
-        selected[index] = { name: groupName, now: proxyName }
-      }
-
-      patchCurrent({ selected }).catch((error) => {
+      // Mini 单组架构：selected 数组仅含 PROXY 一条
+      patchCurrent({ selected: [{ name: 'PROXY', now: proxyName }] }).catch((error) => {
         console.error('[ProxySelection] 保存代理选择失败:', error)
       })
     },
@@ -85,7 +76,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       try {
         await selectNodeForGroupWithTimeout(groupName, proxyName)
         onSuccess?.()
-        persistSelection(groupName, proxyName, skipConfigSave)
+        persistSelection(proxyName, skipConfigSave)
         debugLog(
           `[ProxySelection] 代理和状态同步完成: ${groupName} -> ${proxyName}`,
         )

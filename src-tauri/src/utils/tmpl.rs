@@ -5,8 +5,6 @@ pub const ITEM_LOCAL: &str = "# Profile Template for Clash Verge
 
 proxies: []
 
-proxy-groups: []
-
 rules: []
 ";
 
