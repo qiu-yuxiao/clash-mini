@@ -168,8 +168,7 @@
           "startupScript": "启动脚本",
           "themeSetting": "主题设置",
           "layoutSetting": "界面设置",
-          "misc": "杂项设置",
-          "hotkeySetting": "热键设置"
+          "misc": "杂项设置"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "支持 %host, %port, %secret",
         "placeholderInstruction": "使用 %host, %port, %secret 表示 主机, 端口, 访问密钥"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "启用全局热键"
-      },
-      "title": "热键设置",
-      "functions": {
-        "rule": "规则模式",
-        "global": "全局模式",
-        "openOrCloseDashboard": "打开/关闭面板",
-        "toggleSystemProxy": "打开/关闭系统代理",
-        "toggleTunMode": "打开/关闭 TUN 模式",
-        "entryLightweightMode": "进入轻量模式",
-        "direct": "全局直连",
-        "reactivateProfiles": "重新激活订阅"
       }
     },
     "password": {

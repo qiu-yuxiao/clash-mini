@@ -128,14 +128,6 @@ pub struct IVerge {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub clash_core: Option<String>,
 
-    /// hotkey map
-    /// format: {func},{key}
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hotkeys: Option<Vec<String>>,
-
-    /// enable global hotkey
-    pub enable_global_hotkey: Option<bool>,
-
     /// enable always on top
     pub enable_always_on_top: Option<bool>,
 
@@ -399,7 +391,6 @@ impl IVerge {
             enable_tray_speed: Some(false),
 
             tray_inline_outbound_modes: Some(false),
-            enable_global_hotkey: Some(false),
             enable_always_on_top: Some(false),
             enable_auto_light_weight_mode: Some(true),
             auto_light_weight_minutes: Some(5),
@@ -479,8 +470,6 @@ impl IVerge {
         patch!(theme_setting);
         patch!(web_ui_list);
         patch!(clash_core);
-        patch!(hotkeys);
-        patch!(enable_global_hotkey);
         patch!(enable_always_on_top);
 
         patch!(auto_close_connection);

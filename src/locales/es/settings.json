@@ -168,8 +168,7 @@
           "startupScript": "Script de inicio",
           "themeSetting": "Configuración de tema",
           "layoutSetting": "Configuración de la interfaz",
-          "misc": "Ajustes varios",
-          "hotkeySetting": "Configuración de atajos de teclado"
+          "misc": "Ajustes varios"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "Soporta %host, %port, %secret",
         "placeholderInstruction": "Utilice %host, %port, %secret para representar el host, el puerto y la clave de acceso."
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "Habilitar atajos de teclado globales"
-      },
-      "title": "Configuración de atajos de teclado",
-      "functions": {
-        "rule": "Modo de reglas",
-        "global": "Modo global",
-        "openOrCloseDashboard": "Abrir/cerrar panel",
-        "toggleSystemProxy": "Activar/desactivar el proxy del sistema",
-        "toggleTunMode": "Activar/desactivar el modo TUN",
-        "entryLightweightMode": "Entrar en modo ligero",
-        "direct": "Modo de conexión directa",
-        "reactivateProfiles": "Reactivar suscripciones"
       }
     },
     "password": {

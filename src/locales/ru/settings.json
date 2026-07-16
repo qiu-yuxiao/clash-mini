@@ -168,8 +168,7 @@
           "startupScript": "Скрипт запуска",
           "themeSetting": "Настройки темы",
           "layoutSetting": "Настройки раскладки",
-          "misc": "Расширенные настройки",
-          "hotkeySetting": "Настройки сочетаний клавиш"
+          "misc": "Расширенные настройки"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "Поддерживаются %host, %port, %secret",
         "placeholderInstruction": "Замените хост, порт и секрет на %host, %port, %secret"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "Включить глобальную горячую клавишу"
-      },
-      "title": "Настройки сочетаний клавиш",
-      "functions": {
-        "rule": "Режим правил",
-        "global": "Глобальный режим",
-        "openOrCloseDashboard": "Открыть/закрыть панель управления",
-        "toggleSystemProxy": "Включить/отключить системный прокси",
-        "toggleTunMode": "Включить/отключить режим TUN",
-        "entryLightweightMode": "Войти в режим LightWeight",
-        "direct": "Прямой режим",
-        "reactivateProfiles": "Перезапустить профиль"
       }
     },
     "password": {

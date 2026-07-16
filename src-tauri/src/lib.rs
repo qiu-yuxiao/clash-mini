@@ -328,7 +328,7 @@ pub fn run() {
         use crate::module::lightweight;
         use crate::{
             config::Config,
-            core::{self, handle, hotkey},
+            core::{self, handle},
             process::AsyncHandler,
         };
         use clash_verge_logging::{Type, logging};
@@ -400,38 +400,8 @@ pub fn run() {
             // 无需在此事后调用 set_size/set_position 与原生缩放循环竞争。
         }
 
-        pub fn handle_window_focus(focused: bool) {
-            AsyncHandler::spawn(move || async move {
-                let is_enable_global_hotkey = Config::verge().await.data_arc().enable_global_hotkey.unwrap_or(true);
-
-                if focused {
-                    #[cfg(target_os = "macos")]
-                    {
-                        use crate::core::hotkey::SystemHotkey;
-                        let _ = hotkey::Hotkey::global()
-                            .register_system_hotkey(SystemHotkey::CmdQ)
-                            .await;
-                        let _ = hotkey::Hotkey::global()
-                            .register_system_hotkey(SystemHotkey::CmdW)
-                            .await;
-                    }
-                    if !is_enable_global_hotkey {
-                        let _ = hotkey::Hotkey::global().init(false).await;
-                    }
-                    return;
-                }
-
-                #[cfg(target_os = "macos")]
-                {
-                    use crate::core::hotkey::SystemHotkey;
-                    let _ = hotkey::Hotkey::global().unregister_system_hotkey(SystemHotkey::CmdQ);
-                    let _ = hotkey::Hotkey::global().unregister_system_hotkey(SystemHotkey::CmdW);
-                }
-
-                if !is_enable_global_hotkey {
-                    let _ = hotkey::Hotkey::global().reset();
-                }
-            });
+        pub fn handle_window_focus(_focused: bool) {
+            // 快捷键功能已全部移除
         }
 
         #[cfg(target_os = "windows")]
@@ -544,15 +514,7 @@ pub fn run() {
 
         #[cfg(target_os = "macos")]
         pub fn handle_window_destroyed() {
-            use crate::core::hotkey::SystemHotkey;
-            AsyncHandler::spawn(move || async move {
-                let _ = hotkey::Hotkey::global().unregister_system_hotkey(SystemHotkey::CmdQ);
-                let _ = hotkey::Hotkey::global().unregister_system_hotkey(SystemHotkey::CmdW);
-                let is_enable_global_hotkey = Config::verge().await.data_arc().enable_global_hotkey.unwrap_or(true);
-                if !is_enable_global_hotkey {
-                    let _ = hotkey::Hotkey::global().reset();
-                }
-            });
+            // 快捷键功能已全部移除
         }
     }
 

@@ -168,8 +168,7 @@
           "startupScript": "Башлану скрипты",
           "themeSetting": "Тема көйләүләре",
           "layoutSetting": "Расположение көйләүләре",
-          "misc": "Өстәмә көйләүләр",
-          "hotkeySetting": "Клавиатура төймәләре (hotkey) көйләүләре"
+          "misc": "Өстәмә көйләүләр"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "%host, %port, %secret макросларын хуплау",
         "placeholderInstruction": "Хост, порт, серсүзне %host, %port, %secret белән алмаштырыгыз"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "Глобаль Хоткейны кушу"
-      },
-      "title": "Клавиатура төймәләре (hotkey) көйләүләре",
-      "functions": {
-        "rule": "Кагыйдәләр режимы",
-        "global": "Глобаль режим",
-        "openOrCloseDashboard": "Панельне ачу/ябу",
-        "toggleSystemProxy": "Системалы проксины кабызу/сүндерү",
-        "toggleTunMode": "Tun режимын кабызу/сүндерү",
-        "entryLightweightMode": "Entry Lightweight Mode",
-        "direct": "Туры режим",
-        "reactivateProfiles": "Профильләрне янәдән активлаштыру"
       }
     },
     "password": {

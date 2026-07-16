@@ -168,8 +168,7 @@
           "startupScript": "Startskript",
           "themeSetting": "Thema-Einstellungen",
           "layoutSetting": "Layout-Einstellungen",
-          "misc": "Sonstige Einstellungen",
-          "hotkeySetting": "Tastenkombinationseinstellungen"
+          "misc": "Sonstige Einstellungen"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "Unterstützt %host, %port, %secret",
         "placeholderInstruction": "Verwenden Sie %host, %port, %secret für Host, Port und Zugangsschlüssel"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "Globale Tastenkombinationen aktivieren"
-      },
-      "title": "Tastenkombinationseinstellungen",
-      "functions": {
-        "rule": "Regel-Modus",
-        "global": "Globaler Modus",
-        "openOrCloseDashboard": "Dashboard öffnen/schließen",
-        "toggleSystemProxy": "Systemproxy ein/ausschalten",
-        "toggleTunMode": "TUN-Modus ein/ausschalten",
-        "entryLightweightMode": "Leichtgewichtigen Modus betreten",
-        "direct": "Direktverbindungs-Modus",
-        "reactivateProfiles": "Abonnement erneut aktivieren"
       }
     },
     "password": {

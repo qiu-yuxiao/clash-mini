@@ -1,5 +1,8 @@
 use crate::{
-    core::manager::CoreManager,
+    core::{
+        handle::Handle,
+        manager::CoreManager,
+    },
     utils::{
         dirs,
         network::{NetworkManager, ProxyType},
@@ -465,8 +468,12 @@ impl CoreUpdater {
         if let Err(e) = Self::verify_download_sha256(&temp_download_path, &asset.name, checksums_map.as_ref()) {
             let _ = fs::remove_file(&temp_download_path);
             emit_progress("error", 0, &format!("完整性校验失败: {:?}", e));
-            // 重新拉起 core 以保证 mihomo 服务可用
-            let _ = CoreManager::global().start_core().await;
+            // 重新拉起 core：仅在未退出时执行
+            if !Handle::global().is_exiting() {
+                if let Err(e2) = CoreManager::global().start_core().await {
+                    logging!(warn, Type::System, "Core updater: 恢复性启动 core 失败: {}", e2);
+                }
+            }
             return Err(e);
         }
 
@@ -479,8 +486,13 @@ impl CoreUpdater {
         let custom_core_path = cores_dir.join(core_name);
 
         logging!(info, Type::System, "Core updater stopping core to release file lock...");
-        // Stop core
-        let _ = CoreManager::global().stop_core().await;
+        // Stop core — 若正在退出则跳过，关闭流程会自行停止 core
+        if Handle::global().is_exiting() {
+            return Ok(());
+        }
+        if let Err(e) = CoreManager::global().stop_core().await {
+            logging!(warn, Type::System, "Core updater: 停止 core 失败: {}", e);
+        }
 
         emit_progress("extracting", 90, "正在解压并替换内核程序...");
 
@@ -532,7 +544,11 @@ impl CoreUpdater {
         }
 
         if let Err(e) = extract_res {
-            let _ = CoreManager::global().start_core().await;
+            if !Handle::global().is_exiting() {
+                if let Err(e2) = CoreManager::global().start_core().await {
+                    logging!(warn, Type::System, "Core updater: 恢复性启动 core 失败: {}", e2);
+                }
+            }
             emit_progress("error", 0, &format!("解压替换失败: {:?}", e));
             return Err(e);
         }
@@ -552,8 +568,12 @@ impl CoreUpdater {
             "Core updater successfully updated core binary. Restarting core..."
         );
 
-        // Start core
-        let _ = CoreManager::global().start_core().await;
+        // Start core — 仅在未退出时执行，退出流程会自行处理
+        if !Handle::global().is_exiting() {
+            if let Err(e) = CoreManager::global().start_core().await {
+                logging!(warn, Type::System, "Core updater: 升级后重启 core 失败: {}", e);
+            }
+        }
 
         emit_progress("done", 100, "内核更新成功！核心已成功重启。");
         Ok(())

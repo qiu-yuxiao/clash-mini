@@ -9,7 +9,6 @@ use crate::{
     core::{
         CoreManager, Timer,
         handle::Handle,
-        hotkey::Hotkey,
         logger::Logger,
         service::{SERVICE_MANAGER, ServiceManager, is_service_ipc_path_exists},
         sysopt,
@@ -130,7 +129,7 @@ pub fn resolve_setup_async() {
             }
         });
 
-        let _ = futures::join!(core_init, init_timer(), init_hotkey());
+        let _ = futures::join!(core_init, init_timer());
 
         crate::module::monitor::start_background_monitor();
         Handle::refresh_clash();
@@ -176,12 +175,6 @@ pub(super) async fn init_startup_script() {
 
 pub(super) async fn init_timer() {
     logging_error!(Type::Setup, Timer::global().init().await);
-}
-
-pub(super) async fn init_hotkey() {
-    // if hotkey is not use by global, skip init it
-    let skip_register_hotkeys = !Config::verge().await.latest_arc().enable_global_hotkey.unwrap_or(true);
-    logging_error!(Type::Setup, Hotkey::global().init(skip_register_hotkeys).await);
 }
 
 pub(super) async fn init_auto_lightweight_boot() {

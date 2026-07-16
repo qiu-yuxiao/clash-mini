@@ -78,7 +78,8 @@ export function useHeadStateNew() {
           localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(data))
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.warn('[useHeadState] 从后端加载状态失败，尝试 localStorage 兜底:', err)
         try {
           const data = JSON.parse(
             localStorage.getItem(HEAD_STATE_KEY) ?? 'null',
@@ -86,7 +87,9 @@ export function useHeadStateNew() {
           if (data && typeof data === 'object') {
             dispatch({ type: 'replace', payload: data })
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[useHeadState] localStorage 兜底也失败，状态初始化为空:', e)
+        }
       })
   }, [])
 

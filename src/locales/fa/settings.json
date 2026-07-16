@@ -168,8 +168,7 @@
           "startupScript": "اسکریپت راه‌اندازی",
           "themeSetting": "تنظیمات تم",
           "layoutSetting": "تنظیمات چیدمان",
-          "misc": "متفرقه",
-          "hotkeySetting": "تنظیمات کلیدهای میانبر"
+          "misc": "متفرقه"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "پشتیبانی از %host، %port و %secret",
         "placeholderInstruction": "جایگزین کردن میزبان، پورت و رمز با %host، %port، %secret"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "فعال کردن کلید میانبر سراسری"
-      },
-      "title": "تنظیمات کلیدهای میانبر",
-      "functions": {
-        "rule": "حالت قانون",
-        "global": "حالت جهانی",
-        "openOrCloseDashboard": "باز/بستن داشبورد",
-        "toggleSystemProxy": "فعال/غیرفعال کردن پراکسی سیستم",
-        "toggleTunMode": "فعال/غیرفعال کردن حالت Tun",
-        "entryLightweightMode": "Entry Lightweight Mode",
-        "direct": "حالت مستقیم",
-        "reactivateProfiles": "فعال‌سازی مجدد پروفایل‌ها"
       }
     },
     "password": {

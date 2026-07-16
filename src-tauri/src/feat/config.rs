@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, IVerge},
-    core::{CoreManager, autostart, handle, hotkey, logger::Logger, sysopt, tray},
+    core::{CoreManager, autostart, handle, logger::Logger, sysopt, tray},
 };
 use anyhow::{Result, bail};
 use bitflags::bitflags;
@@ -80,7 +80,6 @@ bitflags! {
         const LAUNCH = 1 << 3;
         const SYS_PROXY = 1 << 4;
         const SYSTRAY_ICON = 1 << 5;
-        const HOTKEY = 1 << 6;
         const SYSTRAY_MENU = 1 << 7;
         const SYSTRAY_TOOLTIP = 1 << 8;
         const SYSTRAY_CLICK_BEHAVIOR = 1 << 9;
@@ -125,7 +124,6 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     #[cfg(not(target_os = "macos"))]
     let enable_tray_speed: Option<bool> = None;
     // let enable_tray_icon = patch.enable_tray_icon;
-    let enable_global_hotkey = patch.enable_global_hotkey;
     let tray_event = &patch.tray_event;
     let home_cards = patch.home_cards.as_ref();
     // enable_auto_light_weight_mode 现由 entry_lightweight_mode 直接读取配置判断，
@@ -177,8 +175,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     {
         update_flags.insert(UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY | UpdateFlags::SYSTRAY_ICON);
     }
-    if enable_global_hotkey.is_some()
-        || home_cards.is_some()
+    if home_cards.is_some()
         || patch.theme_mode.is_some()
         || patch.theme_setting.is_some()
     {
@@ -203,9 +200,6 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     }
     if tray_icon.is_some() || enable_tray_speed.is_some() {
         update_flags.insert(UpdateFlags::SYSTRAY_ICON);
-    }
-    if patch.hotkeys.is_some() {
-        update_flags.insert(UpdateFlags::HOTKEY | UpdateFlags::SYSTRAY_MENU);
     }
     if tray_event.is_some() {
         update_flags.insert(UpdateFlags::SYSTRAY_CLICK_BEHAVIOR);
@@ -251,9 +245,6 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         handle::Handle::refresh_clash();
     }
     if update_flags.contains(UpdateFlags::VERGE_CONFIG) {
-        Config::verge()
-            .await
-            .edit_draft(|d| d.enable_global_hotkey = patch.enable_global_hotkey);
         handle::Handle::refresh_verge();
     }
     if update_flags.contains(UpdateFlags::LAUNCH) {
@@ -267,11 +258,6 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         clash_verge_i18n::set_locale(language.as_str());
     }
     // SYS_PROXY 已提前至 CLASH_CONFIG 之前执行（见上方注释），此处不再重复。
-    if update_flags.contains(UpdateFlags::HOTKEY)
-        && let Some(hotkeys) = &patch.hotkeys
-    {
-        hotkey::Hotkey::global().update(hotkeys.to_owned()).await?;
-    }
     if update_flags.contains(UpdateFlags::SYSTRAY_MENU) {
         tray::Tray::global().update_menu().await?;
     }

@@ -168,8 +168,7 @@
           "startupScript": "起動スクリプト",
           "themeSetting": "テーマ設定",
           "layoutSetting": "レイアウト設定",
-          "misc": "その他の設定",
-          "hotkeySetting": "ホットキー設定"
+          "misc": "その他の設定"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "%host, %port, %secretをサポートします。",
         "placeholderInstruction": "%host, %port, %secretを使用してホスト、ポート、アクセスキーを表します。"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "グローバルホットキーを有効にする"
-      },
-      "title": "ホットキー設定",
-      "functions": {
-        "rule": "ルールモード",
-        "global": "グローバルモード",
-        "openOrCloseDashboard": "ダッシュボードを開く/閉じる",
-        "toggleSystemProxy": "システムプロキシを開く/閉じる",
-        "toggleTunMode": "TUNモードを開く/閉じる",
-        "entryLightweightMode": "軽量モードに入る",
-        "direct": "直接接続モード",
-        "reactivateProfiles": "プロファイルを再アクティブ化"
       }
     },
     "password": {

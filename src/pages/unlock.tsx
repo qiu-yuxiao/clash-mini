@@ -205,10 +205,12 @@ const UnlockPage = () => {
   )
 
   useEffect(() => {
+    let cancelled = false
     void (async () => {
       try {
         const { items: storedItems, time: storedTime } = loadResultsFromStorage()
 
+        if (cancelled) return
         if (storedItems && storedItems.length > 0) {
           setUnlockItems(sortItemsByName(storedItems))
           await getUnlockItems(storedItems, storedTime)
@@ -216,9 +218,12 @@ const UnlockPage = () => {
           await getUnlockItems()
         }
       } catch (err) {
-        console.error('Failed to initialize unlock items:', err)
+        if (!cancelled) {
+          console.error('Failed to initialize unlock items:', err)
+        }
       }
     })()
+    return () => { cancelled = true }
   }, [getUnlockItems, loadResultsFromStorage, sortItemsByName])
 
   const invokeWithTimeout = async <T,>(

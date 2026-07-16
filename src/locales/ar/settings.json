@@ -168,8 +168,7 @@
           "startupScript": "سكريبت بدء التشغيل",
           "themeSetting": "إعدادات السمة",
           "layoutSetting": "إعدادات التخطيط",
-          "misc": "متفرقات",
-          "hotkeySetting": "إعدادات الاختصارات"
+          "misc": "متفرقات"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "يدعم %host و%port و%secret",
         "placeholderInstruction": "استبدل المضيف والمنفذ والمفتاح بـ %host و%port و%secret"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "تمكين مفتاح التشغيل السريع العالمي"
-      },
-      "title": "إعدادات الاختصارات",
-      "functions": {
-        "rule": "وضع القواعد",
-        "global": "الوضع العالمي",
-        "openOrCloseDashboard": "فتح/إغلاق لوحة التحكم",
-        "toggleSystemProxy": "تفعيل/تعطيل وكيل النظام",
-        "toggleTunMode": "تفعيل/تعطيل وضع TUN",
-        "entryLightweightMode": "Entry Lightweight Mode",
-        "direct": "الوضع المباشر",
-        "reactivateProfiles": "إعادة تنشيط الملفات الشخصية"
       }
     },
     "password": {

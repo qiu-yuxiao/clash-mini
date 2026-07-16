@@ -168,8 +168,7 @@
           "startupScript": "시작 스크립트",
           "themeSetting": "테마 설정",
           "layoutSetting": "레이아웃 설정",
-          "misc": "기타",
-          "hotkeySetting": "단축키 설정"
+          "misc": "기타"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "지원되는 자리표시자: %host, %port, %secret",
         "placeholderInstruction": "host, port, secret을 %host, %port, %secret로 바꿔 입력하세요"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "전역 단축키 사용"
-      },
-      "title": "단축키 설정",
-      "functions": {
-        "rule": "규칙 모드",
-        "global": "전역 모드",
-        "openOrCloseDashboard": "대시보드 열기/닫기",
-        "toggleSystemProxy": "시스템 프록시 켜기/끄기",
-        "toggleTunMode": "TUN 모드 켜기/끄기",
-        "entryLightweightMode": "경량 모드 진입",
-        "direct": "직접 모드",
-        "reactivateProfiles": "프로필 재활성화"
       }
     },
     "password": {

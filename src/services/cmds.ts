@@ -24,7 +24,10 @@ import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
  * 用于 UI 线程卡死时（DevTools 无法打开）仍能在后端日志中看到前端 IPC 调用时间线
  */
 export function frontendLog(level: 'info' | 'warn' | 'error', message: string) {
-  invoke('frontend_log', { level, message }).catch(() => {})
+  invoke('frontend_log', { level, message }).catch((err) => {
+    // 日志通道本身失败时，回退到 console（不递归调 frontendLog 避免死循环）
+    console.warn('[frontendLog] 日志转发失败，回退到 console:', err, '原始消息:', message)
+  })
 }
 
 /**

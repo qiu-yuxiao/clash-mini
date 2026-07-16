@@ -168,8 +168,7 @@
           "startupScript": "Skrip Startup",
           "themeSetting": "Pengaturan Tema",
           "layoutSetting": "Pengaturan Tata Letak",
-          "misc": "Lain-lain",
-          "hotkeySetting": "Pengaturan Pintasan"
+          "misc": "Lain-lain"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "Dukung %host, %port, %secret",
         "placeholderInstruction": "Ganti host, port, rahasia dengan %host, %port, %secret"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "Aktifkan Hotkey Global"
-      },
-      "title": "Pengaturan Pintasan",
-      "functions": {
-        "rule": "Mode Aturan",
-        "global": "Mode Global",
-        "openOrCloseDashboard": "Buka/Tutup Dasbor",
-        "toggleSystemProxy": "Aktifkan/Nonaktifkan Proksi Sistem",
-        "toggleTunMode": "Aktifkan/Nonaktifkan Mode Tun",
-        "entryLightweightMode": "Entry Lightweight Mode",
-        "direct": "Mode Langsung",
-        "reactivateProfiles": "Reaktivasi Profil"
       }
     },
     "password": {

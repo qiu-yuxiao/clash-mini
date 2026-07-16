@@ -168,8 +168,7 @@
           "startupScript": "啟動指令碼",
           "themeSetting": "主題設定",
           "layoutSetting": "介面設定",
-          "misc": "雜項設定",
-          "hotkeySetting": "快速鍵設定"
+          "misc": "雜項設定"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "支援 %host, %port, %secret",
         "placeholderInstruction": "使用 %host, %port, %secret 表示 主機, 連接埠, 存取金鑰"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "啟用全域快速鍵"
-      },
-      "title": "快速鍵設定",
-      "functions": {
-        "rule": "規則模式",
-        "global": "全域模式",
-        "openOrCloseDashboard": "開啟/關閉儀表板",
-        "toggleSystemProxy": "開啟/關閉系統代理",
-        "toggleTunMode": "開啟/關閉 虛擬網路介面卡模式",
-        "entryLightweightMode": "進入輕量模式",
-        "direct": "直連模式",
-        "reactivateProfiles": "重新啟用訂閱"
       }
     },
     "password": {

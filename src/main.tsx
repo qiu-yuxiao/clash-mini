@@ -124,23 +124,23 @@ bootstrap().catch((error) => {
     })
 })
 
-// Error handling
-window.addEventListener('error', (event) => {
-  console.error('[main.tsx] Global error:', event.error)
-})
+// Error handling — 仅注册一次，防止 HMR 重复累积
+let _listenersSetup = false
+if (!_listenersSetup) {
+  _listenersSetup = true
+  window.addEventListener('error', (event) => {
+    console.error('[main.tsx] Global error:', event.error)
+  })
 
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('[main.tsx] Unhandled promise rejection:', event.reason)
-})
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('[main.tsx] Unhandled promise rejection:', event.reason)
+  })
 
-// Page close/refresh events
-window.addEventListener('beforeunload', () => {
-  // Clean up all WebSocket instances to prevent memory leaks
-  MihomoWebSocket.cleanupAll()
-})
+  window.addEventListener('beforeunload', () => {
+    MihomoWebSocket.cleanupAll()
+  })
 
-// Page loaded event
-window.addEventListener('DOMContentLoaded', () => {
-  // Clean up all WebSocket instances to prevent memory leaks
-  MihomoWebSocket.cleanupAll()
-})
+  window.addEventListener('DOMContentLoaded', () => {
+    MihomoWebSocket.cleanupAll()
+  })
+}

@@ -110,7 +110,9 @@ impl Config {
                 d.enable_tun_mode = Some(false);
             });
             verge.apply();
-            let _ = tray::Tray::global().update_menu().await;
+            if let Err(e) = tray::Tray::global().update_menu().await {
+                logging!(warn, Type::Core, "更新托盘菜单失败: {}", e);
+            }
 
             // 分离数据获取和异步调用避免Send问题
             let verge_data = Self::verge().await.latest_arc();
@@ -127,7 +129,9 @@ impl Config {
         {
             let profiles = Self::profiles().await.data_arc();
             // Logging error internally
-            let _ = profiles.cleanup_orphaned_files().await;
+            if let Err(e) = profiles.cleanup_orphaned_files().await {
+                logging!(warn, Type::Core, "清理孤立配置文件失败: {}", e);
+            }
         }
 
         Ok(())

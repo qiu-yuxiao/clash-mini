@@ -40,7 +40,6 @@ export interface IVergeConfig {
   enable_auto_launch?: boolean
   enable_silent_start?: boolean
   enable_system_proxy?: boolean
-  enable_global_hotkey?: boolean
   enable_dns_settings?: boolean
   proxy_auto_config?: boolean
   pac_file_content?: string
@@ -61,7 +60,6 @@ export interface IVergeConfig {
   proxy_guard_duration?: number
   system_proxy_bypass?: string
   web_ui_list?: string[]
-  hotkeys?: string[]
   theme_setting?: {
     primary_color?: string
     secondary_color?: string

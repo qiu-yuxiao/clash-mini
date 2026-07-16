@@ -168,8 +168,7 @@
           "startupScript": "Startup Script",
           "themeSetting": "Theme Setting",
           "layoutSetting": "Layout Setting",
-          "misc": "Miscellaneous",
-          "hotkeySetting": "Hotkey Setting"
+          "misc": "Miscellaneous"
         }
       },
       "advanced": {
@@ -590,22 +589,6 @@
       "messages": {
         "supportedPlaceholders": "Support %host, %port, %secret",
         "placeholderInstruction": "Replace host, port, secret with %host, %port, %secret"
-      }
-    },
-    "hotkey": {
-      "toggles": {
-        "enableGlobal": "Enable Global Hotkey"
-      },
-      "title": "Hotkey Setting",
-      "functions": {
-        "rule": "Rule Mode",
-        "global": "Global Mode",
-        "openOrCloseDashboard": "Open/Close Dashboard",
-        "toggleSystemProxy": "Enable/Disable System Proxy",
-        "toggleTunMode": "Enable/Disable Tun Mode",
-        "entryLightweightMode": "Entry Lightweight Mode",
-        "direct": "Direct Mode",
-        "reactivateProfiles": "Reactivate Profiles"
       }
     },
     "password": {
