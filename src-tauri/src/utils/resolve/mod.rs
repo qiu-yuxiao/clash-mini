@@ -111,8 +111,23 @@ pub fn resolve_setup_async() {
         let core_init = AsyncHandler::spawn(|| async {
             init_service_manager().await;
             init_core_manager().await;
-            init_system_proxy().await;
-            init_system_proxy_guard().await;
+
+            // 防护：只有 Core 成功启动后才设置系统代理
+            // start_core 失败时 running_mode 会被回滚为 NotRunning（lifecycle.rs:49-52）
+            // 若此时仍调用 init_system_proxy，会将 OS 代理指向不存在的端口→断网
+            if !matches!(
+                *CoreManager::global().get_running_mode(),
+                crate::core::manager::RunningMode::NotRunning
+            ) {
+                init_system_proxy().await;
+                init_system_proxy_guard().await;
+            } else {
+                logging!(
+                    warn,
+                    Type::Setup,
+                    "Core 启动失败，跳过系统代理设置以保护用户网络连接"
+                );
+            }
         });
 
         let _ = futures::join!(core_init, init_timer(), init_hotkey());
