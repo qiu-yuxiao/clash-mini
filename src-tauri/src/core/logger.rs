@@ -85,7 +85,7 @@ impl Logger {
                 .duplicate_to_stdout(log_level.into())
                 .format(clash_verge_logger::console_format)
                 .format_for_files(clash_verge_logger::file_format_with_level)
-                .write_mode(flexi_logger::WriteMode::BufferAndFlush)
+                .write_mode(flexi_logger::WriteMode::Direct)
                 .rotate(
                     Criterion::Size(log_max_size * 1024),
                     flexi_logger::Naming::TimestampsCustomFormat {
@@ -143,7 +143,7 @@ impl Logger {
         let log_max_size = self.log_max_size.load(Ordering::SeqCst);
         let log_max_count = self.log_max_count.load(Ordering::SeqCst);
         let flwb = FileLogWriter::builder(FileSpec::default().directory(log_dir).basename(""))
-            .write_mode(flexi_logger::WriteMode::BufferAndFlush)
+            .write_mode(flexi_logger::WriteMode::Direct)
             .rotate(
                 Criterion::Size(log_max_size * 1024),
                 flexi_logger::Naming::TimestampsCustomFormat {
@@ -207,7 +207,7 @@ impl Logger {
                 .suppress_timestamp(),
         )
         .format(clash_verge_logger::file_format_without_level)
-        .write_mode(flexi_logger::WriteMode::BufferAndFlush)
+        .write_mode(flexi_logger::WriteMode::Direct)
         .rotate(
             Criterion::Size(log_max_size * 1024),
             flexi_logger::Naming::TimestampsCustomFormat {

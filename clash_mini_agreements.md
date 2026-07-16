@@ -1,7 +1,7 @@
 # Clash Mini 开发设计书
 
 > 本文档是 Clash Mini 项目的权威设计规范与开发指南。所有代码修改必须符合本文档中的规则。
-> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。
+> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。v2.5.3 修复 resize 卡死根因：用自定义 pointer-based resize（pointer capture + setSize/setPosition）替代 Tauri 的 `startResizeDragging`，避免触发 Windows 模态 resize 循环导致 UI 线程永久阻塞。
 
 ## 目录
 
@@ -199,7 +199,7 @@ Clash Mini 的窗口内容采用"遮挡式"布局，而非"压缩式"布局。
 
      * **标题栏拖拽区域**：整个自定义标题栏（除了右侧窗口控制按钮区域）均为可拖拽区域，确保在最窄窗口下仍有充足的拖拽面积。
 
-     * **窗口缩放**：frameless 模式下通过 8 个方向的透明 resize handle（6px 宽）实现边缘拖拽缩放，最大化时自动隐藏。批量测速已整体迁移至后端 `trigger_backend_auto_select` 执行，前端测速期间仅持有一个 IPC 调用等待返回，窗口缩放不会引发 IPC 死锁或主线程争抢，故 resize handle 始终可用，无需在测速期间锁定窗口（已移除 `setResizable(false/true)` 调用及衍生的 `batchTestLockRef` 引用计数锁、`DragRegionContext` 切换机制）。
+     * **窗口缩放**：frameless 模式下通过 8 个方向的透明 resize handle（10px 宽，四角 20px）实现边缘拖拽缩放，最大化时自动隐藏。**禁止使用 Tauri 的 `startResizeDragging`**：该 API 在 Windows 上触发系统模态 resize 循环（`DefWindowProc` 内部循环），期间 `WM_SIZE` 在 UI 线程同步触发 Tauri 的 `emit_to_window`（webview2 COM `ExecuteScript`）和 webview bounds 更新（COM `SetBounds`），这些 COM 调用在模态循环中可能永久阻塞，导致 UI 线程卡死、窗口"未响应"。**必须使用自定义 pointer-based resize**：`onPointerDown` + `setPointerCapture` 捕获指针 → `pointermove` 事件中通过 `requestAnimationFrame` 节流调用 `setSize`/`setPosition` → `pointerup` 释放。resize 期间设置 `window.__isResizing` 全局标志，`onResized` 回调（`useVisibility`、`WindowProvider`）检查该标志跳过 IPC 调用，防止 IPC 洪水。批量测速已整体迁移至后端 `trigger_backend_auto_select` 执行，前端测速期间仅持有一个 IPC 调用等待返回，窗口缩放不会引发 IPC 死锁或主线程争抢，故 resize handle 始终可用，无需在测速期间锁定窗口（已移除 `setResizable(false/true)` 调用及衍生的 `batchTestLockRef` 引用计数锁、`DragRegionContext` 切换机制）。
 
      * **触发条件**：窗口处于**最小宽度（285px）**且**窗口高度小于等于130px**状态，且连续 **10 秒**无任何操作（鼠标移动、点击、键盘）。上述条件须同时满足。
 

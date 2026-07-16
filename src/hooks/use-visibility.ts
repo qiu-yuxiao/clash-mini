@@ -70,6 +70,9 @@ export const useVisibility = () => {
   // 避免闭包变量带来的潜在问题，同时确保回调引用稳定（虽然 useEffect 依赖为空本就只注册一次）
   const inFlightRef = useRef(false)
   const updateWindowState = useCallback(async () => {
+    // resize 期间跳过 IPC 调用，防止 IPC 洪水与 UI 线程阻塞
+    // 自定义 resize 会设置 window.__isResizing 标志
+    if (window.__isResizing) return
     // 防止并发调用堆积：如果上一次 IPC 调用尚未返回，直接跳过
     // 这能防止 resize 期间的 IPC 洪水（onResized 每像素触发一次）
     if (inFlightRef.current) return
