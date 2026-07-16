@@ -3,7 +3,7 @@ use clash_verge_logging::{Type, logging};
 use serde_json::json;
 use smartstring::alias::String;
 
-use tauri::{Emitter as _, WebviewWindow};
+use tauri::Emitter as _;
 
 #[derive(Debug)]
 pub enum FrontendEvent<'a> {
@@ -22,16 +22,6 @@ pub enum FrontendEvent<'a> {
 pub struct NotificationSystem {}
 
 impl NotificationSystem {
-    fn emit_to_window(window: &WebviewWindow, event: FrontendEvent) {
-        let (event_name, Ok(payload)) = Self::serialize_event(event) else {
-            return;
-        };
-
-        if let Err(e) = window.emit(event_name, payload) {
-            logging!(warn, Type::Frontend, "Event emit failed: {}", e);
-        }
-    }
-
     fn serialize_event(event: FrontendEvent) -> (&'static str, Result<serde_json::Value, serde_json::Error>) {
         match event {
             FrontendEvent::RefreshClash => ("verge://refresh-clash-config", Ok(json!("yes"))),
@@ -55,8 +45,18 @@ impl NotificationSystem {
     }
 
     pub(crate) fn send_event(event: FrontendEvent) {
-        if let Some(window) = WindowManager::get_main_window() {
-            Self::emit_to_window(&window, event);
-        }
+        let Some(window) = WindowManager::get_main_window() else {
+            return;
+        };
+
+        let (event_name, Ok(payload)) = Self::serialize_event(event) else {
+            return;
+        };
+
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = window.emit(event_name, payload) {
+                logging!(warn, Type::Frontend, "Event emit failed: {}", e);
+            }
+        });
     }
 }

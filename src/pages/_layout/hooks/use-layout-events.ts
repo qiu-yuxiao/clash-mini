@@ -44,6 +44,7 @@ export const useLayoutEvents = (
 
     register(
       addListener('verge://refresh-clash-config', async () => {
+        if (window.__isResizing) return
         revalidateKeys([
           'getProxies',
           'getVersion',
@@ -55,6 +56,7 @@ export const useLayoutEvents = (
 
     register(
       addListener('verge://refresh-verge-config', () => {
+        if (window.__isResizing) return
         revalidateKeys([
           'getVergeConfig',
           'getSystemProxy',
