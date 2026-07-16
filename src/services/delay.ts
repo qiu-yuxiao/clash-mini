@@ -172,7 +172,7 @@ class DelayManager {
     return url || 'http://cp.cloudflare.com/generate_204'
   }
 
-  /** 清空所有组 of 测试 URL 缓存，用于 profile 切换时清理 */
+  /** 清空所有组的测试 URL 缓存，用于 profile 切换时清理 */
   clearUrlMap() {
     this.urlMap.clear()
     debugLog('[DelayManager] 已清空 urlMap 缓存')
