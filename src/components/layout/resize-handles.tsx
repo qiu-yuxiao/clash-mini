@@ -218,15 +218,22 @@ export const ResizeHandles: React.FC = () => {
         } catch {
           // pointer capture may already be released
         }
-        window.__isResizing = false
+        // 🛡️ 200ms 延迟冷却：给后端清理积压的 setSize 留出宁静期，并安全拦截拖拽结束瞬间的尾部 onResized 事件
+        setTimeout(() => {
+          window.__isResizing = false
+        }, 200)
       }
 
       // 异步获取窗口初始状态
       void (async () => {
         try {
-          scaleFactor = await currentWindow.scaleFactor()
-          const size = await currentWindow.outerSize()
-          const pos = await currentWindow.outerPosition()
+          // 🛡️ 并发化优化：串行 IPC 升级为并发，缩短首帧挂起时间
+          const [scale, size, pos] = await Promise.all([
+            currentWindow.scaleFactor(),
+            currentWindow.outerSize(),
+            currentWindow.outerPosition(),
+          ])
+          scaleFactor = scale
           startWidth = size.width
           startHeight = size.height
           startX = pos.x

@@ -1,7 +1,7 @@
 # Clash Mini 开发设计书
 
 > 本文档是 Clash Mini 项目的权威设计规范与开发指南。所有代码修改必须符合本文档中的规则。
-> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。v2.5.3 修复 resize 卡死根因：用自定义 pointer-based resize（pointer capture + setSize/setPosition）替代 Tauri 的 `startResizeDragging`，避免触发 Windows 模态 resize 循环导致 UI 线程永久阻塞。（2026-07-16）
+> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。v2.5.3 修复 resize 卡死根因：用自定义 pointer-based resize（pointer capture + setSize/setPosition）替代 Tauri 的 `startResizeDragging`，避免触发 Windows 模态 resize 循环导致 UI 线程永久阻塞。v2.5.4 修复高负载测速期间 resize 冻结卡死根因：在前端 `resize-handles.tsx` 引入 200ms 拖拽结束冷却机制 (Cool-down Reset) 以隔离并发刷新洪峰，并并发化 (Promise.all) 获取窗口初始尺寸的 IPC，保障最低限度的跟手流畅度与信道安全，彻底根治了释放鼠标瞬间的 EventPair 死锁。（2026-07-16）
 
 ## 目录
 
@@ -1481,4 +1481,4 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **��Ⱦ�������ṹ������������**���� proxy-render.tsx ��ȥ���˶�Ӧ type === 0 �Ĵ�Ƭ�۵���������Ⱦ�߼�������������֮��Ϊ����������� Styled �����StyledPrimary��StyledSubtitle��StyledTypeBox����δʹ�õ� Material UI Icons �������ExpandLessRounded��ExpandMoreRounded��ListItemButton��ListItemText��Chip��Tooltip �ȣ����룬��С����Ⱦ����������
 - **�������л��˵������״̬����**���� proxy-groups.tsx �У���������˴�δ�����õ� GroupSelectMenu �������л��˵������ ProxyGroupOption��GroupSelectMenuProps �ӿڶ��壬��ͬ���Ƴ��� ProxyGroups ����������� selectedGroup ״̬�Լ����õ� groups ���ݽ⹹�������������������ڴ���״̬ά��������
 - **����ģʽ�����������ж�����**���ں�� build_new_window() ����������ʱ������ԭ�Ӳ������� IS_COLD_START ����Ƿ�Ϊ���̳����������������״����� the start_page URL ����׷�� ?cold_start=true ��־��ǰ�� main.tsx ��Ӧ�޸�Ϊ���� URL ��������������ʱ��ִ�ж� clash-mini-last-enhanced-uid �� localStorage Ĩ�����Ӷ�����������������ģʽ�£��������� destroy ���´���ʱ����־������ñ��������׶ž��˻���ʱ�����ظ�ִ�� enhanceProfiles �ؽ�����ջ������©����
-- **Ⱥ�������봰�����Ų�����������**���ں�� handle.rs �У��ع����¼��ַ� send_event ��ڣ�ʹ�� tauri::async_runtime::spawn �� emit �¼�����������첽 Runtime �߳�ִ�У��Ӷ��������ϳ����ж��� window.emit ͬ������������˲���/��ѡ����ȹ����̵߳�·����ͬʱ����ǰ�� use-layout-events.ts �� config ˢ�¼����㣬������ window.__isResizing ��ק״̬��⣬��Ϊ true ��ֱ�Ӻ���/����ˢ���źţ������������ڼ䷱�ص������ػ棨revalidateKeys�����Ƶ�������ţ�setSize/setPosition���� IPC �ŵ�ӵ�¶�ײ��ʵ�������˽��������
+- **Ⱥ봰Ų**ں handle.rs Уع¼ַ send_event ڣʹ tauri::async_runtime::spawn  emit ¼첽 Runtime ִ߳УӶϳж window.emit ͬ˲/ѡȹ̵߳·ͬʱǰ use-layout-events.ts  config ˢ¼㣬 window.__isResizing ק״̬⣬Ϊ true ֱӺ/ˢźţڼ䷱صػ棨revalidateKeysƵţsetSize/setPosition IPC ŵӵ¶ײʵ˽
