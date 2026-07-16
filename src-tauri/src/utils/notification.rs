@@ -23,7 +23,7 @@ fn notify(title: Cow<'_, str>, body: Cow<'_, str>) {
     app_handle.notification().builder().title(title).body(body).show().ok();
 }
 
-pub async fn notify_event<'a>(event: NotificationEvent<'a>) {
+pub fn notify_event<'a>(event: NotificationEvent<'a>) {
     match event {
         NotificationEvent::DashboardToggled => {
             let title = clash_verge_i18n::t!("notifications.dashboardToggled.title");

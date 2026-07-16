@@ -559,7 +559,6 @@ export interface TranslationResources {
             }
             fields: {
               copyEnvType: string
-              hotkeySetting: string
               language: string
               layoutSetting: string
               misc: string
@@ -903,22 +902,6 @@ export interface TranslationResources {
             fallbackFilter: string
             general: string
             hosts: string
-          }
-        }
-        hotkey: {
-          functions: {
-            direct: string
-            entryLightweightMode: string
-            global: string
-            openOrCloseDashboard: string
-            reactivateProfiles: string
-            rule: string
-            toggleSystemProxy: string
-            toggleTunMode: string
-          }
-          title: string
-          toggles: {
-            enableGlobal: string
           }
         }
         liteMode: {

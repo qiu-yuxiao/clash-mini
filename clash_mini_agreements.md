@@ -1415,6 +1415,10 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **第三阶段（Stage-3）函数命名空间与 groupName 参数去耦**：
   - **Layout 过滤器参数精简**：从 `getFilteredNodeNames` 和 `batchTestWithFirstBatchSelect` 中彻底移除了无脑硬编码传入的 `groupName: string` 形参。同时在 `getFilteredNodeNames` 内部切除了 `allData.groups.find` 的 O(N) 遍历查找逻辑，直接取唯一的 `groups?.[0]`，简化了 3 处外部调用。
   - **延迟管理器降维去耦**：将 `DelayManager` 缓存主键及旗下 10 余处核心方法（如 `getDelay`, `getDelayFix`, `checkDelay`, `setListener` 等）的 `group` 参数设为缺省常数 `'PROXY'`。在完全兼容原有调用的同时，确保今后新增的延迟探测和取值交互彻底摆脱了多策略组命名空间的累赘。
+- **第四阶段（Stage-4）启动及预发布容错优化与 Clippy 漏洞修补**：
+  - **程序启动与容错保护**：核准并合入了 `utils/resolve/mod.rs` 中内核启动失败自动跳过系统代理配置的防断网熔断防护，以及在节点恢复失败时读取 filterText 的智能节点 fallback 机制。
+  - **HMR 监听器与异步安全机制**：在 `main.tsx` 中引入了全局单例 `(window as any).__listenersSetup` 机制，阻断了 HMR 时全局 error/unhandledrejection 监听器的重复绑定与内存泄漏，规避了 ESLint 的 `no-useless-assignment` 硬拦截。同时在 `unlock.tsx` 中补全了异步 cancellation 安全网，终结了频繁切页时的 state 泄漏报错。
+  - **死代码与 Clippy 修复**：清理了 `lib.rs:330` 的无用 config 引入，将被空置 of `handle_window_focus` 改为 `pub const fn`，并且去除了 `notification.rs:26` 中已退役无 await 语句的 `notify_event` 函数的 `async` 声明，顺利通过了最严格的 Clippy 及类型编译验证。
 
 ### v2.4.7 弹窗自适应与 Lint 规范审计 (2026-07-12)
 

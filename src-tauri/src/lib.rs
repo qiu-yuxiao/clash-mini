@@ -327,7 +327,6 @@ pub fn run() {
     mod event_handlers {
         use crate::module::lightweight;
         use crate::{
-            config::Config,
             core::{self, handle},
             process::AsyncHandler,
         };
@@ -400,7 +399,7 @@ pub fn run() {
             // 无需在此事后调用 set_size/set_position 与原生缩放循环竞争。
         }
 
-        pub fn handle_window_focus(_focused: bool) {
+        pub const fn handle_window_focus(_focused: bool) {
             // 快捷键功能已全部移除
         }
 
