@@ -1412,6 +1412,9 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - **前端 Profile 切换 YAML 解析覆写拦截物理剔除**：在 `enhanceProfiles` 中，彻底切成了用 JS 解析 YAML 并对 `proxy-groups`/`rules` 执行重置和保存的冗余动作，完全移除了 `js-yaml` 库在 `cmds.ts` 中的依赖，消除了因前端 YAML 二次写盘产生的无谓 CPU 与磁盘 I/O 磨损。
   - **全语种 325 项 `groupsEditor` i18n 资源大扫除**：运行项目内置的 i18n cleanup 脚本，一举清除了 13 种语言翻译源文件（`profiles.json`）中关于已废弃的策略组编辑弹窗相关的 325 个死翻译文本键，并重新同步生成了 `i18n-keys.ts` 与 `i18n-resources.ts` 类型字典文件，使翻译键总数从 830 降为 805，做到了静态翻译资源的极致做减法。
   - **“托盘代理组显示模式”死配置字段剥离**：从后端 `verge.rs` 结构体声明/默认值/patch 合并链路、后端 `feat/config.rs` 处理分支以及前端 `types/verge.ts` 接口类型中，彻底除去了已在 Clash Mini 托盘渲染中停用的 `tray_proxy_groups_display_mode` 配置声明，完成了配置模型层面的彻底净化。
+- **第三阶段（Stage-3）函数命名空间与 groupName 参数去耦**：
+  - **Layout 过滤器参数精简**：从 `getFilteredNodeNames` 和 `batchTestWithFirstBatchSelect` 中彻底移除了无脑硬编码传入的 `groupName: string` 形参。同时在 `getFilteredNodeNames` 内部切除了 `allData.groups.find` 的 O(N) 遍历查找逻辑，直接取唯一的 `groups?.[0]`，简化了 3 处外部调用。
+  - **延迟管理器降维去耦**：将 `DelayManager` 缓存主键及旗下 10 余处核心方法（如 `getDelay`, `getDelayFix`, `checkDelay`, `setListener` 等）的 `group` 参数设为缺省常数 `'PROXY'`。在完全兼容原有调用的同时，确保今后新增的延迟探测和取值交互彻底摆脱了多策略组命名空间的累赘。
 
 ### v2.4.7 弹窗自适应与 Lint 规范审计 (2026-07-12)
 

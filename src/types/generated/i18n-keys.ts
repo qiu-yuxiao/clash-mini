@@ -153,7 +153,6 @@ export const translationKeys = [
   'profiles.components.menu.editFile',
   'profiles.components.menu.editRules',
   'profiles.components.menu.editProxies',
-  'profiles.components.menu.editGroups',
   'profiles.components.menu.extendConfig',
   'profiles.components.menu.extendScript',
   'profiles.components.menu.openFile',

@@ -3,7 +3,7 @@ import type { IProxyItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { ProxyDelay } from 'tauri-plugin-mihomo-api'
 
-const hashKey = (name: string, group: string) => `${group ?? ''}::${name}`
+const hashKey = (name: string, group?: string) => `${group || 'PROXY'}::${name}`
 
 export interface DelayUpdate {
   delay: number
@@ -153,17 +153,17 @@ class DelayManager {
   }
 
   /** 触发组级通知，驱动 useRenderList 等组件重排 */
-  queueGroupNotification(group: string) {
+  queueGroupNotification(group = 'PROXY') {
     this.pendingGroupUpdates.add(group)
     this.scheduleGroupFlush()
   }
 
-  setUrl(group: string, url: string) {
+  setUrl(group = 'PROXY', url: string) {
     debugLog(`[DelayManager] 设置测试URL，组: ${group}, URL: ${url}`)
     this.urlMap.set(group, url)
   }
 
-  getUrl(group: string) {
+  getUrl(group = 'PROXY') {
     const url = this.urlMap.get(group)
     debugLog(
       `[DelayManager] 获取测试URL，组: ${group}, URL: ${url || '未设置'}`,
@@ -172,7 +172,7 @@ class DelayManager {
     return url || 'http://cp.cloudflare.com/generate_204'
   }
 
-  /** 清空所有组的测试 URL 缓存，用于 profile 切换时清理 */
+  /** 清空所有组 of 测试 URL 缓存，用于 profile 切换时清理 */
   clearUrlMap() {
     this.urlMap.clear()
     debugLog('[DelayManager] 已清空 urlMap 缓存')
@@ -180,19 +180,19 @@ class DelayManager {
 
   setListener(
     name: string,
-    group: string,
+    group = 'PROXY',
     listener: (update: DelayUpdate) => void,
   ) {
     const key = hashKey(name, group)
     this.listenerMap.set(key, listener)
   }
 
-  removeListener(name: string, group: string) {
+  removeListener(name: string, group = 'PROXY') {
     const key = hashKey(name, group)
     this.listenerMap.delete(key)
   }
 
-  setGroupListener(group: string, listener: () => void) {
+  setGroupListener(group = 'PROXY', listener: () => void) {
     const listeners = this.groupListenerMap.get(group) || []
     if (!listeners.includes(listener)) {
       listeners.push(listener)
@@ -200,7 +200,7 @@ class DelayManager {
     }
   }
 
-  removeGroupListener(group: string, listener?: () => void) {
+  removeGroupListener(group = 'PROXY', listener?: () => void) {
     if (!listener) {
       this.groupListenerMap.delete(group)
       return
@@ -218,7 +218,7 @@ class DelayManager {
 
   setDelay(
     name: string,
-    group: string,
+    group = 'PROXY',
     delay: number,
     meta?: { elapsed?: number },
   ): DelayUpdate {
@@ -245,7 +245,7 @@ class DelayManager {
     return update
   }
 
-  getDelayUpdate(name: string, group: string) {
+  getDelayUpdate(name: string, group = 'PROXY') {
     const key = hashKey(name, group)
     const entry = this.cache.get(key)
     if (!entry) return undefined
@@ -258,12 +258,12 @@ class DelayManager {
     return { ...entry }
   }
 
-  getDelay(name: string, group: string) {
+  getDelay(name: string, group = 'PROXY') {
     const update = this.getDelayUpdate(name, group)
     return update ? update.delay : -1
   }
 
-  getDelayFix(proxy: IProxyItem, group: string) {
+  getDelayFix(proxy: IProxyItem, group = 'PROXY') {
     if (!proxy) return -1
     const update = this.getDelayUpdate(proxy.name, group)
     if (update && (update.delay >= 0 || update.delay === -2)) {
@@ -279,7 +279,7 @@ class DelayManager {
 
   async checkDelay(
     name: string,
-    group: string,
+    group = 'PROXY',
     timeout: number,
     signal?: AbortSignal,
   ): Promise<DelayUpdate> {
@@ -383,12 +383,11 @@ class DelayManager {
     }
   }
 
-
   /**
    * 注入后台批量测速结果到缓存，并通知 UI 刷新
    * 由 Tauri 事件 verge://backend-delay-results 驱动
    */
-  injectBatchResults(group: string, results: Array<[string, number]>) {
+  injectBatchResults(group = 'PROXY', results: Array<[string, number]>) {
     debugLog(
       `[DelayManager] 注入后台测速结果，组: ${group}, 数量: ${results.length}`,
     )
@@ -407,7 +406,11 @@ class DelayManager {
     return `${delay}`
   }
 
-  formatDelayColor(delay: number, timeout = NODE_DELAY_MAX_MS, isDarkMode = false) {
+  formatDelayColor(
+    delay: number,
+    timeout = NODE_DELAY_MAX_MS,
+    isDarkMode = false,
+  ) {
     if (delay < 0) return ''
     if (delay === 0 || delay >= timeout) return 'error.main'
     if (delay >= 400) return isDarkMode ? 'warning.main' : 'warning.dark'

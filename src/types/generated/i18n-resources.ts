@@ -225,7 +225,6 @@ export interface TranslationResources {
         }
         menu: {
           editFile: string
-          editGroups: string
           editInfo: string
           editProxies: string
           editRules: string

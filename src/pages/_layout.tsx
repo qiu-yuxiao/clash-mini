@@ -159,10 +159,11 @@ async function waitForClashReady(
   return false
 }
 
-async function getFilteredNodeNames(groupName: string): Promise<string[]> {
+async function getFilteredNodeNames(): Promise<string[]> {
+  const groupName = 'PROXY'
   try {
     const allData = await calcuProxies()
-    const group = allData.groups.find((g) => g.name === groupName)
+    const group = allData.groups?.[0]
     const allProxies = group?.all || []
 
     let currentUid = ''
@@ -213,10 +214,10 @@ async function getFilteredNodeNames(groupName: string): Promise<string[]> {
 }
 
 async function batchTestWithFirstBatchSelect(
-  groupName: string,
   names: string[],
   select = true,
 ): Promise<void> {
+  const groupName = 'PROXY'
   if (names.length === 0) return
 
   const currentUid = (await getProfiles())?.current || ''
@@ -275,9 +276,9 @@ async function triggerAutoSelectAndRefresh(
           return
         }
       }
-      const names = await getFilteredNodeNames('PROXY')
+      const names = await getFilteredNodeNames()
       if (names.length === 0) return
-      await batchTestWithFirstBatchSelect('PROXY', names, true)
+      await batchTestWithFirstBatchSelect(names, true)
       if (setHeadState) {
         setHeadState('PROXY', { sortType: 1 })
       }
@@ -309,10 +310,10 @@ async function triggerAutoSelectAndRefresh(
         history.length > 0 ? history[history.length - 1].delay : -1
       const hasHealth = latestDelay > 50 && latestDelay < 2000
       if (!hasHealth) {
-        const names = await getFilteredNodeNames('PROXY')
+        const names = await getFilteredNodeNames()
         if (names.length === 0) return
         console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
-        await batchTestWithFirstBatchSelect('PROXY', names, true)
+        await batchTestWithFirstBatchSelect(names, true)
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
         }
@@ -1084,7 +1085,7 @@ const Layout = () => {
       console.log('[Layout] 窗口唤醒，刷新本地代理状态')
       await refreshAllRef.current()
 
-      const names = await getFilteredNodeNames('PROXY')
+      const names = await getFilteredNodeNames()
       if (names.length === 0) {
         isWakeupTestingRef.current = false
         return
