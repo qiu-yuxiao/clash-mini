@@ -102,151 +102,25 @@ export const ResizeHandles: React.FC = () => {
       e.preventDefault()
       e.stopPropagation()
 
-      const target = e.currentTarget as HTMLElement
-      const pointerId = e.pointerId
-
-      frontendLog(
-        'info',
-        `[ResizeHandle] pointerdown dir=${direction}, custom resize starting...`,
-      )
-
-      // 捕获指针：确保 pointermove/pointerup 即使鼠标移出窗口也能触发
-      // 这替代了 startResizeDragging 的 Windows 模态 resize 循环
-      try {
-        target.setPointerCapture(pointerId)
-      } catch (err) {
-        frontendLog('error', `[ResizeHandle] setPointerCapture failed: ${err}`)
-        return
-      }
-
-      // 立即设置全局 resize 标志，防止 onResized 回调中的 IPC 调用
-      window.__isResizing = true
-
-      const startScreenX = e.screenX
-      const startScreenY = e.screenY
-
-      // 异步初始化窗口状态（在 await 完成前 update 不会执行）
-      let scaleFactor = 1
-      let startWidth = 0
-      let startHeight = 0
-      let startX = 0
-      let startY = 0
-      let initialized = false
-
-      let rafId: number | null = null
-      let pendingEvent: PointerEvent | null = null
-      let pendingUpdate = false
-      let cleanup: () => void = () => {}
-
-      const update = () => {
-        rafId = null
-        if (!pendingEvent || !initialized || pendingUpdate) return
-        const ev = pendingEvent
-        pendingEvent = null
-        pendingUpdate = true
-
-        const dx = (ev.screenX - startScreenX) * scaleFactor
-        const dy = (ev.screenY - startScreenY) * scaleFactor
-
-        let newWidth = startWidth
-        let newHeight = startHeight
-        let newX = startX
-        let newY = startY
-
-        if (direction.includes('e')) newWidth = startWidth + dx
-        if (direction.includes('s')) newHeight = startHeight + dy
-        if (direction.includes('w')) {
-          newWidth = startWidth - dx
-          newX = startX + dx
-        }
-        if (direction.includes('n')) {
-          newHeight = startHeight - dy
-          newY = startY + dy
-        }
-
-        // 最小尺寸约束
-        if (newWidth < MIN_WIDTH) {
-          if (direction.includes('w')) newX = startX + (startWidth - MIN_WIDTH)
-          newWidth = MIN_WIDTH
-        }
-        if (newHeight < MIN_HEIGHT) {
-          if (direction.includes('n'))
-            newY = startY + (startHeight - MIN_HEIGHT)
-          newHeight = MIN_HEIGHT
-        }
-
-        const hasPositionChange =
-          direction.includes('w') || direction.includes('n')
-        const promises: Promise<unknown>[] = []
-        if (hasPositionChange) {
-          promises.push(
-            currentWindow.setPosition(new PhysicalPosition(newX, newY)),
-          )
-        }
-        promises.push(
-          currentWindow.setSize(new PhysicalSize(newWidth, newHeight)),
-        )
-        Promise.all(promises).finally(() => {
-          pendingUpdate = false
-        })
-      }
-
-      const handlePointerMove = (ev: PointerEvent) => {
-        pendingEvent = ev
-        if (rafId === null) {
-          rafId = requestAnimationFrame(update)
+      // 映射为 Tauri v2 标准的拉伸方向参数
+      const mapDir = (dir: Direction): string => {
+        switch (dir) {
+          case 'n': return 'Top'
+          case 's': return 'Bottom'
+          case 'e': return 'Right'
+          case 'w': return 'Left'
+          case 'ne': return 'TopRight'
+          case 'nw': return 'TopLeft'
+          case 'se': return 'BottomRight'
+          case 'sw': return 'BottomLeft'
         }
       }
 
-      const handlePointerUp = () => {
-        if (rafId !== null) {
-          cancelAnimationFrame(rafId)
-          rafId = null
-        }
-        cleanup()
-        frontendLog(
-          'info',
-          `[ResizeHandle] pointerup dir=${direction}, custom resize ended`,
-        )
-      }
-
-      cleanup = () => {
-        target.removeEventListener('pointermove', handlePointerMove)
-        target.removeEventListener('pointerup', handlePointerUp)
-        try {
-          target.releasePointerCapture(pointerId)
-        } catch {
-          // pointer capture may already be released
-        }
-        // 🛡️ 200ms 延迟冷却：给后端清理积压的 setSize 留出宁静期，并安全拦截拖拽结束瞬间的尾部 onResized 事件
-        setTimeout(() => {
-          window.__isResizing = false
-        }, 200)
-      }
-
-      // 异步获取窗口初始状态
-      void (async () => {
-        try {
-          // 🛡️ 并发化优化：串行 IPC 升级为并发，缩短首帧挂起时间
-          const [scale, size, pos] = await Promise.all([
-            currentWindow.scaleFactor(),
-            currentWindow.outerSize(),
-            currentWindow.outerPosition(),
-          ])
-          scaleFactor = scale
-          startWidth = size.width
-          startHeight = size.height
-          startX = pos.x
-          startY = pos.y
-          initialized = true
-        } catch (err) {
-          frontendLog('error', `[ResizeHandle] init failed: ${err}`)
-          cleanup()
-        }
-      })()
-
-      target.addEventListener('pointermove', handlePointerMove)
-      target.addEventListener('pointerup', handlePointerUp)
+      // 直接调用 Tauri 原生的无损拖拽调整窗口大小 API
+      // 这会开启底层的 Windows 硬件拉伸消息循环，零前端 pointermove 逻辑与 IPC 堆积
+      currentWindow.startResizeDragging(mapDir(direction) as any).catch((err) => {
+        frontendLog('error', `[ResizeHandle] startResizeDragging failed: ${err}`)
+      })
     },
     [currentWindow],
   )
