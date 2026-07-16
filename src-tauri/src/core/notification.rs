@@ -45,6 +45,11 @@ impl NotificationSystem {
     }
 
     pub(crate) fn send_event(event: FrontendEvent) {
+        // 🛡️ 防线一：轻量模式下直接过滤，绝不对已销毁的 Webview 窗口调用 window.emit
+        if crate::module::lightweight::is_in_lightweight_mode() {
+            return;
+        }
+
         let Some(window) = WindowManager::get_main_window() else {
             return;
         };

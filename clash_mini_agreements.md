@@ -1,7 +1,7 @@
 # Clash Mini 开发设计书
 
 > 本文档是 Clash Mini 项目的权威设计规范与开发指南。所有代码修改必须符合本文档中的规则。
-> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。v2.5.3 修复 resize 卡死根因：用自定义 pointer-based resize（pointer capture + setSize/setPosition）替代 Tauri 的 `startResizeDragging`，避免触发 Windows 模态 resize 循环导致 UI 线程永久阻塞。v2.5.4 修复高负载测速期间 resize 冻结卡死根因：在前端 `resize-handles.tsx` 引入 200ms 拖拽结束冷却机制 (Cool-down Reset) 以隔离并发刷新洪峰，并并发化 (Promise.all) 获取窗口初始尺寸的 IPC，保障最低限度的跟手流畅度与信道安全，彻底根治了释放鼠标瞬间的 EventPair 死锁。（2026-07-16）
+> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。v2.5.3 修复 resize 卡死根因：用自定义 pointer-based resize（pointer capture + setSize/setPosition）替代 Tauri 的 `startResizeDragging`，避免触发 Windows 模态 resize 循环导致 UI 线程永久阻塞。v2.5.4 修复高负载测速期间 resize 冻结卡死根因：在前端 `resize-handles.tsx` 引入 200ms 拖拽结束冷却机制 (Cool-down Reset) 以隔离并发刷新洪峰，并并发化 (Promise.all) 获取窗口初始尺寸的 IPC，保障最低限度的跟手流畅度与信道安全，彻底根治了释放鼠标瞬间的 EventPair 死锁。v2.5.6 根治轻量模式挂起断流与崩溃：在后端事件分发 `notification.rs` 头部以及 `monitor.rs` 测速自愈副作用分发处设立双重拦截防线 (`is_in_lightweight_mode`)，绝不对已销毁的 WebView2 窗口进行非法 `window.emit` 调用，彻底避免了 OS 的 Access Violation 硬崩以及 Named Pipe 异常引起的内核断流。（2026-07-16）
 
 ## 目录
 
