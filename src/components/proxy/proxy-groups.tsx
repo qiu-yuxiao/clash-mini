@@ -67,20 +67,13 @@ export const ProxyGroups = (props: Props) => {
     [],
   )
 
-  const { renderList, onHeadState } = useRenderList(mode)
-
-  const filteredRenderList = useMemo(() => {
-    return renderList.filter((item) => item.type !== 1)
-  }, [renderList])
+  const { renderList, onHeadState, headStates } = useRenderList(mode)
 
   const getGroupHeadState = useCallback(
     (groupName: string) => {
-      const headItem = renderList.find(
-        (item) => item.type === 1 && item.group?.name === groupName,
-      )
-      return headItem?.headState
+      return headStates[groupName] || DEFAULT_STATE
     },
-    [renderList],
+    [headStates],
   )
 
   // 统代理选择
@@ -101,10 +94,10 @@ export const ProxyGroups = (props: Props) => {
   const scrollPositionKey = useMemo(() => `${mode}:normal`, [mode])
   const stickyGroupIndexes = useMemo(
     () =>
-      filteredRenderList.flatMap((item, index) =>
+      renderList.flatMap((item, index) =>
         item.type === 0 && !item.group?.hidden ? [index] : [],
       ),
-    [filteredRenderList],
+    [renderList],
   )
 
   const rangeExtractor = useCallback(
@@ -123,10 +116,10 @@ export const ProxyGroups = (props: Props) => {
   )
 
   const virtualizer = useVirtualizer({
-    count: filteredRenderList.length,
+    count: renderList.length,
     getScrollElement: () => parentRef.current,
     estimateSize: (index) => {
-      const item = filteredRenderList[index]
+      const item = renderList[index]
       if (item?.type === 0) return 56
       if (item?.type === 2) return 24
       if (item?.type === 3) return 80
@@ -134,7 +127,7 @@ export const ProxyGroups = (props: Props) => {
       return 56
     },
     overscan: 15,
-    getItemKey: (index) => filteredRenderList[index]?.key ?? index,
+    getItemKey: (index) => renderList[index]?.key ?? index,
     rangeExtractor,
   })
   const virtualItems = virtualizer.getVirtualItems()
@@ -142,7 +135,7 @@ export const ProxyGroups = (props: Props) => {
 
   // 从 localStorage 恢复滚动位置
   useLayoutEffect(() => {
-    if (filteredRenderList.length === 0) return
+    if (renderList.length === 0) return
     const node = parentRef.current
     if (!node) return
     if (
@@ -175,7 +168,7 @@ export const ProxyGroups = (props: Props) => {
       console.error('Error restoring scroll position:', e)
     }
     restoredScrollKeyRef.current = scrollPositionKey
-  }, [pathname, filteredRenderList.length, scrollPositionKey])
+  }, [pathname, renderList.length, scrollPositionKey])
 
   // 改为使用节流函数保存滚动位置
   const saveScrollPosition = useCallback(
@@ -270,7 +263,7 @@ export const ProxyGroups = (props: Props) => {
 
     try {
       // 从当前过滤后可见的渲染列表中提取节点名称；该子集同时作为 F4 批量测速+择优的候选池（防越界关键），并非仅用于视觉占位
-      const visibleNames = filteredRenderList
+      const visibleNames = renderList
         .filter(
           (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
         )
@@ -318,7 +311,7 @@ export const ProxyGroups = (props: Props) => {
     if (!group) return
     const { name, now } = group
 
-    const index = filteredRenderList.findIndex(
+    const index = renderList.findIndex(
       (e) =>
         e.group?.name === name &&
         ((e.type === 2 && e.proxy?.name === now) ||
@@ -330,17 +323,13 @@ export const ProxyGroups = (props: Props) => {
     }
   })
 
-  const activeGroupHeadItem = useMemo(() => {
-    return renderList.find((item) => item.type === 1)
-  }, [renderList])
-
   const renderProxyList = (height: string) => (
     <ProxyVirtualList
       parentRef={parentRef}
       height={height}
       totalSize={virtualizer.getTotalSize()}
       virtualItems={virtualItems}
-      renderList={filteredRenderList}
+      renderList={renderList}
       activeStickyIndex={activeStickyIndex}
       indent={mode === 'rule' || mode === 'script'}
       measureElement={virtualizer.measureElement}
@@ -348,7 +337,7 @@ export const ProxyGroups = (props: Props) => {
       onCheckAll={handleCheckAll}
       onHeadState={onHeadState}
       onChangeProxy={handleChangeProxy}
-      headItem={activeGroupHeadItem}
+      headStates={headStates}
       testingGroups={testingGroups}
     />
   )
@@ -393,7 +382,7 @@ interface ProxyVirtualListProps {
     group: IRenderItem['group'],
     proxy: IRenderItem['proxy'] & { name: string },
   ) => void
-  headItem?: IRenderItem | null
+  headStates: Record<string, HeadState>
   testingGroups: Record<string, boolean>
 }
 
@@ -410,11 +399,14 @@ function ProxyVirtualList({
   onCheckAll,
   onHeadState,
   onChangeProxy,
-  headItem,
+  headStates,
   testingGroups,
 }: ProxyVirtualListProps) {
   const { t } = useTranslation()
   const stickyBackground = 'var(--theme-bg, var(--background-color))'
+
+  const group = renderList[0]?.group
+  const headState = headStates['PROXY'] || DEFAULT_STATE
 
   return (
     <Box
@@ -427,20 +419,20 @@ function ProxyVirtualList({
         overflow: 'hidden',
       }}
     >
-      {headItem && (
+      {group && (
         <ProxyHead
           sx={{
             px: 2,
             py: 0.5,
             borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
           }}
-          url={headItem.group?.testUrl}
-          groupName={headItem.group?.name ?? ''}
-          headState={headItem.headState ?? DEFAULT_STATE}
-          isTesting={testingGroups[headItem.group?.name ?? '']}
-          onLocation={() => onLocation(headItem.group)}
-          onCheckDelay={() => onCheckAll(headItem.group?.name ?? '')}
-          onHeadState={(p) => onHeadState(headItem.group?.name ?? '', p)}
+          url={group.testUrl}
+          groupName={group.name}
+          headState={headState}
+          isTesting={testingGroups[group.name]}
+          onLocation={() => onLocation(group)}
+          onCheckDelay={() => onCheckAll(group.name)}
+          onHeadState={(p) => onHeadState(group.name, p)}
         />
       )}
       <Box

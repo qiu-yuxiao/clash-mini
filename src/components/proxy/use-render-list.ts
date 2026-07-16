@@ -142,108 +142,84 @@ export const useRenderList = (mode: string) => {
     // calcuProxies() 返回的 groups 数组里虽然可能包含 GLOBAL 等其他组（上游遗留的数据结构），
     // 但 Mini 的所有节点选择/恢复/切换/测速逻辑只针对 PROXY 组，不应遍历多组。
     // 如需修改此处，请先确认 Mini 单组架构约定（见 project_memory.md）。
-    const renderGroups = proxiesData.groups || []
+    const group = proxiesData.groups?.[0]
+    if (!group) return []
 
     const cache = groupCacheRef.current
-    let anyChanged = false
 
-    const retList = renderGroups.flatMap((group: ProxyGroup) => {
-      const headState = headStates[group.name] || DEFAULT_STATE
-      const cached = cache.get(group.name)
+    const headState = headStates[group.name] || DEFAULT_STATE
+    const cached = cache.get(group.name)
 
-      if (
-        cached &&
-        cached.now === group.now &&
-        cached.all === group.all &&
-        cached.headState === headState &&
-        cached.col === col &&
-        cached.latencyTimeout === latencyTimeout &&
-        cached.delayBump === delayBump &&
-        cached.groupRef === group
-      ) {
-        return cached.items
-      }
+    if (
+      cached &&
+      cached.now === group.now &&
+      cached.all === group.all &&
+      cached.headState === headState &&
+      cached.col === col &&
+      cached.latencyTimeout === latencyTimeout &&
+      cached.delayBump === delayBump &&
+      cached.groupRef === group
+    ) {
+      return cached.items
+    }
 
-      anyChanged = true
-      const ret: IRenderItem[] = []
+    const ret: IRenderItem[] = []
 
-      const proxies = filterSort(
-        group.all,
-        group.name,
-        headState.filterText,
-        headState.sortType,
-        latencyTimeout,
-      )
+    const proxies = filterSort(
+      group.all,
+      group.name,
+      headState.filterText,
+      headState.sortType,
+      latencyTimeout,
+    )
 
+    if (!proxies.length) {
       ret.push({
-        type: 1,
-        key: `head-${group.name}`,
+        type: 3,
+        key: `empty-${group.name}`,
         group,
         headState,
       })
-
-      if (!proxies.length) {
-        ret.push({
-          type: 3,
-          key: `empty-${group.name}`,
+    } else if (col > 1) {
+      ret.push(
+        ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
+          type: 4 as const,
+          key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
           group,
           headState,
-        })
-      } else if (col > 1) {
-        ret.push(
-          ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
-            type: 4 as const,
-            key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
-            group,
-            headState,
-            col,
-            proxyCol,
-            provider: proxyCol[0]?.provider,
-            indexInGroup: colIndex,
-          })),
-        )
-      } else {
-        ret.push(
-          ...proxies.map((proxy, proxyIdx) => ({
-            type: 2 as const,
-            key: `${group.name}-${proxy?.name ?? proxyIdx}`,
-            group,
-            proxy,
-            headState,
-            provider: proxy.provider,
-            indexInGroup: proxyIdx,
-          })),
-        )
-      }
-
-      cache.set(group.name, {
-        now: group.now,
-        all: group.all,
-        headState,
-        col,
-        latencyTimeout,
-        delayBump,
-        items: ret,
-        groupRef: group,
-      })
-      return ret
-    })
-
-    // L-18: 清理不再存在的组的缓存，防止 profile 切换后内存泄漏
-    const existingGroupNames = new Set(
-      renderGroups.map((g: ProxyGroup) => g.name),
-    )
-    cache.forEach((_, key) => {
-      if (!existingGroupNames.has(key)) {
-        cache.delete(key)
-      }
-    })
-
-    const filtered = retList.filter((item: IRenderItem) => !item.group?.hidden)
-
-    if (!anyChanged && prevListRef.current.length === filtered.length) {
-      return prevListRef.current
+          col,
+          proxyCol,
+          provider: proxyCol[0]?.provider,
+          indexInGroup: colIndex,
+        })),
+      )
+    } else {
+      ret.push(
+        ...proxies.map((proxy, proxyIdx) => ({
+          type: 2 as const,
+          key: `${group.name}-${proxy?.name ?? proxyIdx}`,
+          group,
+          proxy,
+          headState,
+          provider: proxy.provider,
+          indexInGroup: proxyIdx,
+        })),
+      )
     }
+
+    cache.set(group.name, {
+      now: group.now,
+      all: group.all,
+      headState,
+      col,
+      latencyTimeout,
+      delayBump,
+      items: ret,
+      groupRef: group,
+    })
+
+    const filtered = ret.filter((item: IRenderItem) => !item.group?.hidden)
+
     prevListRef.current = filtered
     return filtered
   }, [headStates, proxiesData, col, delayBump, latencyTimeout])
@@ -253,6 +229,7 @@ export const useRenderList = (mode: string) => {
     onProxies: refreshProxy,
     onHeadState: setHeadState,
     currentColumns: col,
+    headStates,
   }
 }
 

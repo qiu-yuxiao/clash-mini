@@ -44,7 +44,6 @@ struct ProfileItems {
     script_item: ChainItem,
     rules_item: ChainItem,
     proxies_item: ChainItem,
-    groups_item: ChainItem,
     global_merge: ChainItem,
     global_script: ChainItem,
     profile_name: String,
@@ -70,10 +69,6 @@ impl Default for ProfileItems {
             proxies_item: ChainItem {
                 uid: "".into(),
                 data: ChainType::Proxies(SeqMap::default()),
-            },
-            groups_item: ChainItem {
-                uid: "".into(),
-                data: ChainType::Groups(SeqMap::default()),
             },
             global_merge: ChainItem {
                 uid: "Merge".into(),
@@ -174,11 +169,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         .current_proxies()
         .cloned()
         .unwrap_or_else(|| "Proxies".into());
-    let groups_uid = current_item
-        .current_groups()
-        .cloned()
-        .unwrap_or_else(|| "Groups".into());
-
     let name = current_item.name.clone().unwrap_or_default();
 
     let merge_item = {
@@ -233,19 +223,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         data: ChainType::Proxies(SeqMap::default()),
     });
 
-    let groups_item = {
-        let item = profiles_arc.get_item(&groups_uid).ok().cloned();
-        if let Some(item) = item {
-            <Option<ChainItem>>::from_async(&item).await
-        } else {
-            None
-        }
-    }
-    .unwrap_or_else(|| ChainItem {
-        uid: "".into(),
-        data: ChainType::Groups(SeqMap::default()),
-    });
-
     let global_merge = {
         let item = profiles_arc.get_item("Merge").ok().cloned();
         if let Some(item) = item {
@@ -280,7 +257,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         script_item,
         rules_item,
         proxies_item,
-        groups_item,
         global_merge,
         global_script,
         profile_name: name,
@@ -324,7 +300,6 @@ async fn process_profile_items(
     mut result_map: HashMap<String, ResultLog>,
     rules_item: ChainItem,
     proxies_item: ChainItem,
-    groups_item: ChainItem,
     merge_item: ChainItem,
     script_item: ChainItem,
     profile_name: &String,
@@ -335,10 +310,6 @@ async fn process_profile_items(
 
     if let ChainType::Proxies(proxies) = proxies_item.data {
         config = use_seq(proxies, config.to_owned(), "proxies");
-    }
-
-    if let ChainType::Groups(groups) = groups_item.data {
-        config = use_seq(groups, config.to_owned(), "proxy-groups");
     }
 
     if let ChainType::Merge(merge) = merge_item.data {
@@ -883,7 +854,6 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     let script_item = profile.script_item;
     let rules_item = profile.rules_item;
     let proxies_item = profile.proxies_item;
-    let groups_item = profile.groups_item;
     let global_merge = profile.global_merge;
     let global_script = profile.global_script;
     let profile_name = profile.profile_name;
@@ -899,7 +869,6 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
         result_map,
         rules_item,
         proxies_item,
-        groups_item,
         merge_item,
         script_item,
         &profile_name,

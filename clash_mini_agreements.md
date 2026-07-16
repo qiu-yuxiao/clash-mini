@@ -1395,6 +1395,19 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 ## 附录 B: 审计历史
 
+### v2.5.7 遗留多代理组（Multi-Group）死代码与冗余彻底整改 (2026-07-16)
+
+为彻底扫清 codebase 中从源程序继承下来的多代理组（Groups）冗余设计，对前后端的数据链、文件系统及渲染路径进行了深度的“做减法”整改：
+
+- **后端死配置及 g*.yaml 磁盘磨损清除**：
+  - 在 `prfitem.rs` 的 local/remote/clone 实例化流程中，物理拦截了 `groups_item` 的自动生成，使 `groups` 默认保持为 `None`，彻底切断了在用户本地 `profiles/` 文件夹中白白磨损生成无用 `g*.yaml` 占位文件的行为。
+  - 从 `profiles.rs` 活动配置扫描 `active_files` 中移除了对 `groups` 配置文件的无谓追踪。
+  - 移除了 `enhance/mod.rs` 中合并 `groups_item` 的死代码分支，同时在 `ProfileItems` 结构体、数据加载与增强增强 `enhance()` 函数签名中移除了 `groups_item` 的所有传递依赖，并修复了 3 处 unused mut 的编译器警告。
+- **前端单 PROXY 组性能优化与 useMemo 物理切除**：
+  - 在 `use-render-list.ts` 中废除 `flatMap` 迭代，改由直接映射唯一的 `PROXY` 组数据做展开与缓存计算，降低渲染时的函数堆栈层数。
+  - 从源头砍掉了列表头部 `type === 1` 大标题卡片的塞入，并顺理成章地将 `proxy-groups.tsx` 中用于过滤大标题卡片的 `filteredRenderList` 过滤器（及其 useMemo）进行了物理删除，使虚拟滚动列表直接由原始 `renderList` 驱动。
+  - 将 `useRenderList` 暴露的 `headStates` 状态直接引入虚拟列表，使公共 `ProxyHead` 工具栏的状态解构定位从 O(N) 搜寻循环降维为 `headStates['PROXY']` 定向解析，并清理了 React `no-useless-assignment` 与 resize 模块遗留的 ESLint 未使用警告。
+
 ### v2.4.7 弹窗自适应与 Lint 规范审计 (2026-07-12)
 
 为彻底解决窄屏模式（如 285px 宽）下二级弹窗（如软件更新、内核更新、配置编辑及日志面板等）被遮挡或宽度硬编码溢出的问题，以及解决工程中遗留的 Lint 警告，对相关前端模块进行了如下重构：

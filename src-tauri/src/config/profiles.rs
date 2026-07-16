@@ -526,13 +526,6 @@ impl IProfiles {
                     {
                         active_files.insert(file);
                     }
-
-                    if let Some(groups_uid) = &option.groups
-                        && let Ok(groups_item) = self.get_item(groups_uid)
-                        && let Some(file) = &groups_item.file
-                    {
-                        active_files.insert(file);
-                    }
                 }
             }
         }

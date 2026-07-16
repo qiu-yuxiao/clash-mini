@@ -1,12 +1,9 @@
-import { PhysicalPosition, PhysicalSize } from '@tauri-apps/api/dpi'
 import React, { useCallback } from 'react'
 
 import { useWindow } from '@/hooks/use-window'
 import { frontendLog } from '@/services/cmds'
 
 const HANDLE_SIZE = 10
-const MIN_WIDTH = 285
-const MIN_HEIGHT = 135
 
 type Direction = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
@@ -105,22 +102,35 @@ export const ResizeHandles: React.FC = () => {
       // 映射为 Tauri v2 标准的拉伸方向参数
       const mapDir = (dir: Direction): string => {
         switch (dir) {
-          case 'n': return 'Top'
-          case 's': return 'Bottom'
-          case 'e': return 'Right'
-          case 'w': return 'Left'
-          case 'ne': return 'TopRight'
-          case 'nw': return 'TopLeft'
-          case 'se': return 'BottomRight'
-          case 'sw': return 'BottomLeft'
+          case 'n':
+            return 'Top'
+          case 's':
+            return 'Bottom'
+          case 'e':
+            return 'Right'
+          case 'w':
+            return 'Left'
+          case 'ne':
+            return 'TopRight'
+          case 'nw':
+            return 'TopLeft'
+          case 'se':
+            return 'BottomRight'
+          case 'sw':
+            return 'BottomLeft'
         }
       }
 
       // 直接调用 Tauri 原生的无损拖拽调整窗口大小 API
       // 这会开启底层的 Windows 硬件拉伸消息循环，零前端 pointermove 逻辑与 IPC 堆积
-      currentWindow.startResizeDragging(mapDir(direction) as any).catch((err) => {
-        frontendLog('error', `[ResizeHandle] startResizeDragging failed: ${err}`)
-      })
+      currentWindow
+        .startResizeDragging(mapDir(direction) as any)
+        .catch((err) => {
+          frontendLog(
+            'error',
+            `[ResizeHandle] startResizeDragging failed: ${err}`,
+          )
+        })
     },
     [currentWindow],
   )

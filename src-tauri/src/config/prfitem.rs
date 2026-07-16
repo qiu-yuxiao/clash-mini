@@ -203,7 +203,7 @@ impl PrfItem {
         let mut script = opt_ref.and_then(|o| o.script.clone());
         let mut rules = opt_ref.and_then(|o| o.rules.clone());
         let mut proxies = opt_ref.and_then(|o| o.proxies.clone());
-        let mut groups = opt_ref.and_then(|o| o.groups.clone());
+        let groups = opt_ref.and_then(|o| o.groups.clone());
 
         if merge.is_none() {
             let merge_item = &mut Self::from_merge(None)?;
@@ -225,11 +225,7 @@ impl PrfItem {
             profiles::profiles_append_item_safe(proxies_item).await?;
             proxies = proxies_item.uid.clone();
         }
-        if groups.is_none() {
-            let groups_item = &mut Self::from_groups()?;
-            profiles::profiles_append_item_safe(groups_item).await?;
-            groups = groups_item.uid.clone();
-        }
+        // groups is skipped to prevent creating dead g*.yaml files
         Ok(Self {
             uid: Some(uid),
             itype: Some("local".into()),
@@ -284,7 +280,7 @@ impl PrfItem {
             let mut script = option.and_then(|o| o.script.clone());
             let mut rules = option.and_then(|o| o.rules.clone());
             let mut proxies = option.and_then(|o| o.proxies.clone());
-            let mut groups = option.and_then(|o| o.groups.clone());
+            let groups = option.and_then(|o| o.groups.clone());
 
             if merge.is_none() {
                 let merge_item = &mut Self::from_merge(None)?;
@@ -306,11 +302,7 @@ impl PrfItem {
                 profiles::profiles_append_item_safe(proxies_item).await?;
                 proxies = proxies_item.uid.clone();
             }
-            if groups.is_none() {
-                let groups_item = &mut Self::from_groups()?;
-                profiles::profiles_append_item_safe(groups_item).await?;
-                groups = groups_item.uid.clone();
-            }
+            // groups is skipped to prevent creating dead g*.yaml files
 
             if url_trimmed.eq_ignore_ascii_case("clear") || url_trimmed.eq_ignore_ascii_case("clean") {
                 let serialized = serde_yaml_ng::to_string(&final_mapping)
@@ -448,7 +440,7 @@ impl PrfItem {
         let mut script = option.and_then(|o| o.script.clone());
         let mut rules = option.and_then(|o| o.rules.clone());
         let mut proxies = option.and_then(|o| o.proxies.clone());
-        let mut groups = option.and_then(|o| o.groups.clone());
+        let groups = option.and_then(|o| o.groups.clone());
 
         // 选择代理类型
         let proxy_type = if self_proxy {
@@ -632,11 +624,7 @@ impl PrfItem {
             profiles::profiles_append_item_safe(proxies_item).await?;
             proxies = proxies_item.uid.clone();
         }
-        if groups.is_none() {
-            let groups_item = &mut Self::from_groups()?;
-            profiles::profiles_append_item_safe(groups_item).await?;
-            groups = groups_item.uid.clone();
-        }
+        // groups is skipped to prevent creating dead g*.yaml files
 
         Ok(Self {
             uid: Some(uid),
