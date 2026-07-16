@@ -48,13 +48,3 @@ append: []
 
 delete: []
 ";
-
-/// enhanced profile
-pub const ITEM_GROUPS: &str = "# Profile Enhancement Groups Template for Clash Verge
-
-prepend: []
-
-append: []
-
-delete: []
-";

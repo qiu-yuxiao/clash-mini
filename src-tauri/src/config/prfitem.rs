@@ -720,21 +720,6 @@ impl PrfItem {
         })
     }
 
-    /// ## Groups type (enhance)
-    pub fn from_groups() -> Result<Self> {
-        let uid = help::get_uid("g").into();
-        let file = format!("{uid}.yaml").into(); // yaml ext
-
-        Ok(Self {
-            uid: Some(uid),
-            itype: Some("groups".into()),
-            file: Some(file),
-            updated: Some(chrono::Local::now().timestamp()),
-            file_data: Some(tmpl::ITEM_GROUPS.into()),
-            ..Default::default()
-        })
-    }
-
     /// get the file data
     pub async fn read_file(&self) -> Result<String> {
         let file = self

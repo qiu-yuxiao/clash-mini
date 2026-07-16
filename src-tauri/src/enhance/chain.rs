@@ -19,7 +19,6 @@ pub enum ChainType {
     Script(String),
     Rules(SeqMap),
     Proxies(SeqMap),
-    Groups(SeqMap),
 }
 
 #[derive(Debug, Clone)]
@@ -55,10 +54,6 @@ pub enum ChainSupport {
 //             "proxies" => Some(ChainItem {
 //                 uid,
 //                 data: ChainType::Proxies(help::read_seq_map(&path).ok()?),
-//             }),
-//             "groups" => Some(ChainItem {
-//                 uid,
-//                 data: ChainType::Groups(help::read_seq_map(&path).ok()?),
 //             }),
 //             _ => None,
 //         }
@@ -101,13 +96,6 @@ impl AsyncChainItemFrom for Option<ChainItem> {
                 Some(ChainItem {
                     uid,
                     data: ChainType::Proxies(seq_map),
-                })
-            }
-            "groups" => {
-                let seq_map = help::read_seq_map(&path).await.ok()?;
-                Some(ChainItem {
-                    uid,
-                    data: ChainType::Groups(seq_map),
                 })
             }
             _ => None,
