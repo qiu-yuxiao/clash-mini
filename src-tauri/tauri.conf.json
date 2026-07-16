@@ -1,5 +1,5 @@
 {
-  "version": "2.5.2",
+  "version": "2.5.3",
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
@@ -11,14 +11,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources"
-    ],
+    "resources": ["resources"],
     "publisher": "Clash Verge Rev",
-    "externalBin": [
-      "sidecar/mini-mihomo",
-      "sidecar/mini-mihomo-alpha"
-    ],
+    "externalBin": ["sidecar/mini-mihomo", "sidecar/mini-mihomo-alpha"],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
     "shortDescription": "Clash Verge Rev",
@@ -46,26 +41,17 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "clash",
-          "clash-mini"
-        ]
+        "schemes": ["clash", "clash-mini"]
       }
     }
   },
   "app": {
     "security": {
-      "capabilities": [
-        "desktop-capability",
-        "migrated"
-      ],
+      "capabilities": ["desktop-capability", "migrated"],
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": [
-            "$APPDATA/**",
-            "$APPLOCALDATA/**"
-          ],
+          "allow": ["$APPDATA/**", "$APPLOCALDATA/**"],
           "requireLiteralLeadingDot": false
         }
       },

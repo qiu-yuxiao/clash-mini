@@ -293,11 +293,7 @@ pub fn run() {
                     });
                     tokio::time::sleep(Duration::from_secs(5)).await;
                     if !alive.load(Ordering::SeqCst) {
-                        logging!(
-                            error,
-                            Type::System,
-                            "[心跳探针] UI 线程 5 秒未响应，可能已卡死"
-                        );
+                        logging!(error, Type::System, "[心跳探针] UI 线程 5 秒未响应，可能已卡死");
                     }
                 }
             });

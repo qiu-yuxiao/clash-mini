@@ -1,7 +1,7 @@
 # Clash Mini 开发设计书
 
 > 本文档是 Clash Mini 项目的权威设计规范与开发指南。所有代码修改必须符合本文档中的规则。
-> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。v2.5.3 修复 resize 卡死根因：用自定义 pointer-based resize（pointer capture + setSize/setPosition）替代 Tauri 的 `startResizeDragging`，避免触发 Windows 模态 resize 循环导致 UI 线程永久阻塞。
+> 维护备注：v2.5.0 调试阶段，为定位 resize 与测速并发死锁，在关键 IPC 节点添加临时日志。v2.5.3 修复 resize 卡死根因：用自定义 pointer-based resize（pointer capture + setSize/setPosition）替代 Tauri 的 `startResizeDragging`，避免触发 Windows 模态 resize 循环导致 UI 线程永久阻塞。（2026-07-16）
 
 ## 目录
 
