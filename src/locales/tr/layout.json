@@ -22,10 +22,10 @@
     }
   },
   "a11y": {
-    "pinWindow": "Pin window on top",
-    "openSettings": "Open settings",
-    "closeSettings": "Close settings",
-    "closeLogsDialog": "Close logs dialog",
-    "selectLanguage": "Select language"
+    "pinWindow": "Pencereyi üstte sabitle",
+    "openSettings": "Ayarları aç",
+    "closeSettings": "Ayarları kapat",
+    "closeLogsDialog": "Günlük iletişim kutusunu kapat",
+    "selectLanguage": "Dil seç"
   }
 }

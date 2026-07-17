@@ -139,19 +139,6 @@ pub fn resolve_setup_async() {
     track_startup_task(handle);
 }
 
-pub async fn resolve_reset_async() -> Result<(), anyhow::Error> {
-    sysopt::Sysopt::global().reset_sysproxy().await?;
-    CoreManager::global().stop_core().await?;
-
-    #[cfg(target_os = "macos")]
-    {
-        use dns::restore_public_dns;
-        restore_public_dns().await;
-    }
-
-    Ok(())
-}
-
 pub(super) fn init_scheme() {
     logging_error!(Type::Setup, init::init_scheme());
 }
@@ -244,10 +231,6 @@ pub fn resolve_done() {
     RESOLVE_DONE.store(true, Ordering::Release);
     // 使用 notify_waiters() 唤醒所有等待初始化的协程，避免并发调用时部分协程被饿死
     RESOLVE_NOTIFY.notify_waiters();
-}
-
-pub fn is_resolve_done() -> bool {
-    RESOLVE_DONE.load(Ordering::Acquire)
 }
 
 pub async fn wait_for_resolve_done() {

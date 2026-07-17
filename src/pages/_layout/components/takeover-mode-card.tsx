@@ -43,7 +43,7 @@ export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
               ...get3DCardStyle(theme, 'default'),
               '&:hover': {
                 transform: 'none',
-                boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+                boxShadow: get3DCardStyle(theme, 'default').boxShadow as string,
               },
             }
       }
@@ -72,9 +72,7 @@ export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
           mb: 1,
           height: 22,
           userSelect: 'none',
-          ...get3DSegmentedContainerStyle(
-            theme,
-          ),
+          ...get3DSegmentedContainerStyle(theme),
         })}
       >
         {/* Sliding Background Indicator */}
@@ -116,9 +114,7 @@ export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
                     ? 'rgba(44, 31, 3, 0.75)'
                     : 'text.secondary',
               fontSize:
-                language === 'zh' || language === 'zhtw'
-                  ? '13px'
-                  : '11px',
+                language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               zIndex: 1,
@@ -170,9 +166,7 @@ export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
                     ? 'rgba(44, 31, 3, 0.75)'
                     : 'text.secondary',
               fontSize:
-                language === 'zh' || language === 'zhtw'
-                  ? '13px'
-                  : '11px',
+                language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               zIndex: 1,
@@ -224,9 +218,7 @@ export const TakeoverModeCard: React.FC<TakeoverModeCardProps> = ({
                     ? 'rgba(44, 31, 3, 0.75)'
                     : 'text.secondary',
               fontSize:
-                language === 'zh' || language === 'zhtw'
-                  ? '13px'
-                  : '11px',
+                language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               zIndex: 1,

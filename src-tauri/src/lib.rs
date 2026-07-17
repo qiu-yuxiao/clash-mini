@@ -209,7 +209,7 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
         "display dialog {:?} with title {:?} buttons {{\"OK\"}} default button \"OK\" with icon stop",
         message, title
     );
-    let _ = std::process::Command::new("osascript").args(["-e", &script]).spawn();
+    let _ = std::process::Command::new("osascript").args(["-e", &script]).status();
 }
 
 #[cfg(target_os = "linux")]
@@ -217,7 +217,7 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
     eprintln!("[{}] {}", title, message);
     let _ = std::process::Command::new("zenity")
         .args(["--error", &format!("--title={}", title), &format!("--text={}", message)])
-        .spawn();
+        .status();
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
@@ -274,7 +274,7 @@ pub fn run() {
 
             logging!(info, Type::Setup, "初始化已启动");
 
-            // UI 线程心跳探针：每 2 秒向 UI 线程投递闭包，
+            // UI 线程心跳探针：每 5 秒向 UI 线程投递闭包，
             // 若 5 秒内未执行则写入警告日志，用于精确定位 UI 线程卡死时间点
             crate::process::AsyncHandler::spawn(|| async move {
                 use std::sync::Arc;
@@ -307,16 +307,6 @@ pub fn run() {
                     match event {
                         tauri::WindowEvent::CloseRequested { .. } => {
                             event_handlers::handle_window_close(&webview_window, event);
-                        }
-                        tauri::WindowEvent::Focused(focused) => {
-                            event_handlers::handle_window_focus(*focused);
-                        }
-                        tauri::WindowEvent::Resized(new_size) => {
-                            event_handlers::handle_window_resized(&webview_window, *new_size);
-                        }
-                        #[cfg(target_os = "macos")]
-                        tauri::WindowEvent::Destroyed => {
-                            event_handlers::handle_window_destroyed();
                         }
                         _ => {}
                     }
@@ -394,15 +384,6 @@ pub fn run() {
             }
         }
 
-        pub const fn handle_window_resized(_window: &tauri::WebviewWindow, _new_size: tauri::PhysicalSize<u32>) {
-            // 窗口最小尺寸由 WM_SIZING 子类化处理器在 Rust 层面拦截并钳制位置和尺寸，
-            // 无需在此事后调用 set_size/set_position 与原生缩放循环竞争。
-        }
-
-        pub const fn handle_window_focus(_focused: bool) {
-            // 快捷键功能已全部移除
-        }
-
         #[cfg(target_os = "windows")]
         use std::sync::atomic::{AtomicPtr, Ordering};
 
@@ -416,6 +397,13 @@ pub fn run() {
         /// 同时钳制尺寸和 Y 位置可根除该问题。
         #[cfg(target_os = "windows")]
         fn setup_wm_sizing_hook(window: &tauri::WebviewWindow) {
+            // 重入保护：Resumed 事件（系统睡眠恢复）会再次调用本函数，
+            // 若不拦截，OLD_WNDPROC 会被覆盖为 sizing_wndproc 自身地址，
+            // 导致 CallWindowProcW 无限递归栈溢出。
+            if !OLD_WNDPROC.load(Ordering::Acquire).is_null() {
+                return;
+            }
+
             use raw_window_handle::HasWindowHandle as _;
             use windows::Win32::UI::WindowsAndMessaging::{GWLP_WNDPROC, SetWindowLongPtrW};
 
@@ -509,11 +497,6 @@ pub fn run() {
                 // SAFETY: DefWindowProcW 是默认窗口过程，对所有参数安全
                 unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
             }
-        }
-
-        #[cfg(target_os = "macos")]
-        pub fn handle_window_destroyed() {
-            // 快捷键功能已全部移除
         }
     }
 

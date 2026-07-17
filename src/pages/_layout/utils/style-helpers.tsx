@@ -16,7 +16,9 @@ const OS = getSystem()
 
 export const portableFlag = false
 
-export function getSignalIcon(delay: number, t: any) {
+type TFunc = (key: string, options?: Record<string, unknown>) => string
+
+export function getSignalIcon(delay: number, t: TFunc) {
   const iconStyle = { fontSize: '12px', width: '12px', height: '12px' }
   if (delay === -2)
     return {
@@ -214,7 +216,7 @@ export const isSameVersion = (ver1?: string, ver2?: string) => {
   return clean(ver1) === clean(ver2)
 }
 
-export const get3DSliderStyle = (theme: any, mode: 'light' | 'dark') => {
+export const get3DSliderStyle = (theme: Theme, mode: 'light' | 'dark') => {
   const isLight = mode === 'light'
   const skin =
     theme.controlSkin ||

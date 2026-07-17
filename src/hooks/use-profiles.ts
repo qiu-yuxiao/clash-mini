@@ -123,7 +123,8 @@ export const useProfiles = () => {
 
         // Mini 单组架构：selected 数组仅一个元素 {name:'PROXY', now}
         const savedEntry = selected[0]
-        const savedProxyName: string | undefined = savedEntry?.name === 'PROXY' ? savedEntry.now : undefined
+        const savedProxyName: string | undefined =
+          savedEntry?.name === 'PROXY' ? savedEntry.now : undefined
         if (!savedProxyName) {
           debugLog('[ActivateSelected] selected 中无 PROXY 组的有效记录，跳过')
           return
@@ -178,7 +179,7 @@ export const useProfiles = () => {
           await patchProfile(current.uid, { selected: newSelected })
           debugLog('[ActivateSelected] 代理选择配置保存成功')
 
-          queryClient.setQueryData(['getProxies'], await calcuProxies())
+          queryClient.invalidateQueries({ queryKey: ['getProxies'] })
         } catch (error: unknown) {
           console.error(
             '[ActivateSelected] 保存代理选择配置失败:',

@@ -1,4 +1,11 @@
-import { Box, Button, Popover, useTheme, alpha } from '@mui/material'
+import {
+  Box,
+  Button,
+  Popover,
+  useTheme,
+  alpha,
+  type Theme,
+} from '@mui/material'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import { useImperativeHandle, useState, type Ref } from 'react'
@@ -52,14 +59,14 @@ export function ConnectionDetail({ ref }: { ref?: Ref<ConnectionDetailRef> }) {
             maxWidth: '520px',
             maxHeight: '480px',
             overflowY: 'auto',
-            background: (theme: any) => theme.palette.background.paper,
+            background: (theme: Theme) => theme.palette.background.paper,
             border: '1px solid',
-            borderColor: (theme: any) => alpha(theme.palette.divider, 0.5),
-            boxShadow: (theme: any) =>
+            borderColor: (theme: Theme) => alpha(theme.palette.divider, 0.5),
+            boxShadow: (theme: Theme) =>
               `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,
             borderRadius: 2,
             p: 2.5,
-            color: (theme: any) => theme.palette.text.primary,
+            color: (theme: Theme) => theme.palette.text.primary,
           },
         },
       }}

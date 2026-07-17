@@ -1,6 +1,6 @@
 import { showNotice } from '@/services/notice-service'
 
-type NavigateFunction = (path: string, options?: any) => void
+type NavigateFunction = (path: string, options?: unknown) => void
 type TranslateFunction = (key: string) => string
 
 export const handleNoticeMessage = (

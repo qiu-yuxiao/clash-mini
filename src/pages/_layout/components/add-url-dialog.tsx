@@ -37,7 +37,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
   const theme = useTheme()
   const [text, setText] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const controlSkin = (theme as any).controlSkin || 'default'
+  const controlSkin = theme.controlSkin || 'default'
 
   // Context Menu State for Input Box (Mouse Paste Bug Fix)
   const [contextMenu, setContextMenu] = useState<{
@@ -71,8 +71,8 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
       }
       setText('')
       onClose()
-    } catch (e: any) {
-      showNotice.error(e?.message || String(e))
+    } catch (e: unknown) {
+      showNotice.error(e instanceof Error ? e.message : String(e))
     } finally {
       setSubmitting(false)
     }

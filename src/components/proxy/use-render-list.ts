@@ -70,7 +70,7 @@ const calculateColumns = (width: number): number => {
 }
 
 // 优化分组逻辑
-const groupProxies = <T = any>(list: T[], size: number): T[][] => {
+const groupProxies = <T = unknown>(list: T[], size: number): T[][] => {
   return list.reduce((acc, item) => {
     const lastGroup = acc[acc.length - 1]
     if (!lastGroup || lastGroup.length >= size) {
@@ -131,7 +131,6 @@ export const useRenderList = (mode: string) => {
   }, [bumpDelay])
 
   const groupCacheRef = useRef<Map<string, GroupCache>>(new Map())
-  const prevListRef = useRef<IRenderItem[]>([])
 
   // 处理渲染列表
   const renderList: IRenderItem[] = useMemo(() => {
@@ -220,15 +219,12 @@ export const useRenderList = (mode: string) => {
 
     const filtered = ret.filter((item: IRenderItem) => !item.group?.hidden)
 
-    prevListRef.current = filtered
     return filtered
   }, [headStates, proxiesData, col, delayBump, latencyTimeout])
 
   return {
     renderList,
-    onProxies: refreshProxy,
     onHeadState: setHeadState,
-    currentColumns: col,
     headStates,
   }
 }

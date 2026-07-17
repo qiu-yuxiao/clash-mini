@@ -7,6 +7,17 @@ const HANDLE_SIZE = 10
 
 type Direction = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
+// Tauri ResizeDirection type (not exported from @tauri-apps/api/window, mirrored here)
+type ResizeDirection =
+  | 'East'
+  | 'North'
+  | 'NorthEast'
+  | 'NorthWest'
+  | 'South'
+  | 'SouthEast'
+  | 'SouthWest'
+  | 'West'
+
 const handles: { direction: Direction; style: React.CSSProperties }[] = [
   {
     direction: 'n',
@@ -124,7 +135,7 @@ export const ResizeHandles: React.FC = () => {
       // 直接调用 Tauri 原生的无损拖拽调整窗口大小 API
       // 这会开启底层的 Windows 硬件拉伸消息循环，零前端 pointermove 逻辑与 IPC 堆积
       currentWindow
-        .startResizeDragging(mapDir(direction) as any)
+        .startResizeDragging(mapDir(direction) as unknown as ResizeDirection)
         .catch((err) => {
           frontendLog(
             'error',

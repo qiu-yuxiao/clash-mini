@@ -22,7 +22,6 @@ const CACHE_TTL = 30 * 60 * 1000
 //   此处阈值同时决定「探针超时」与「候选/选点」资格，前后端语义完全一致。
 export const NODE_DELAY_MIN_MS = 30
 export const NODE_DELAY_MAX_MS = 2000
-export const INTERNAL_CONTROL_TIMEOUT_MS = 3000
 
 // 解锁流媒体 region 探测超时：HTTP 经代理访问外网，可能较慢，需较长超时（还原 15s）
 export const UNLOCK_TIMEOUT_MS = 15000
@@ -65,14 +64,6 @@ class DelayManager {
         },
         2 * 60 * 60 * 1000,
       ) // Clean up expired cache every 2 hours
-    }
-  }
-
-  /** M2-09: 清理 interval 定时器，HMR 场景下防止累积 */
-  destroy() {
-    if (this.cleanupIntervalId !== null) {
-      clearInterval(this.cleanupIntervalId)
-      this.cleanupIntervalId = null
     }
   }
 
@@ -163,7 +154,7 @@ class DelayManager {
     this.urlMap.set(group, url)
   }
 
-  getUrl(group = 'PROXY') {
+  private getUrl(group = 'PROXY') {
     const url = this.urlMap.get(group)
     debugLog(
       `[DelayManager] 获取测试URL，组: ${group}, URL: ${url || '未设置'}`,
@@ -256,11 +247,6 @@ class DelayManager {
     }
 
     return { ...entry }
-  }
-
-  getDelay(name: string, group = 'PROXY') {
-    const update = this.getDelayUpdate(name, group)
-    return update ? update.delay : -1
   }
 
   getDelayFix(proxy: IProxyItem, group = 'PROXY') {

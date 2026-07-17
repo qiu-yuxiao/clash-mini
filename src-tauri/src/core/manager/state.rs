@@ -45,7 +45,7 @@ impl CoreManager {
         };
         let custom_core_path = cores_dir.join(core_name);
 
-        let gomemlimit = std::env::var("GOMEMLIMIT").unwrap_or_else(|_| "64MiB".to_string());
+        let gomemlimit = std::env::var("GOMEMLIMIT").unwrap_or_else(|_| "128MiB".to_string());
         let gogc = std::env::var("GOGC").unwrap_or_else(|_| "100".to_string());
         let gomaxprocs = std::env::var("GOMAXPROCS").unwrap_or_else(|_| "2".to_string());
 

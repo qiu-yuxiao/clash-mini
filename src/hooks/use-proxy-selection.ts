@@ -28,7 +28,7 @@ const cleanupConnections = async (previousProxy: string) => {
 
 interface ProxySelectionOptions {
   onSuccess?: () => void
-  onError?: (error: any) => void
+  onError?: (error: unknown) => void
   enableConnectionCleanup?: boolean
 }
 
@@ -61,9 +61,11 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
     (proxyName: string, skipConfigSave: boolean) => {
       if (!current || skipConfigSave) return
       // Mini 单组架构：selected 数组仅含 PROXY 一条
-      patchCurrent({ selected: [{ name: 'PROXY', now: proxyName }] }).catch((error) => {
-        console.error('[ProxySelection] 保存代理选择失败:', error)
-      })
+      patchCurrent({ selected: [{ name: 'PROXY', now: proxyName }] }).catch(
+        (error) => {
+          console.error('[ProxySelection] 保存代理选择失败:', error)
+        },
+      )
     },
     [current, patchCurrent],
   )

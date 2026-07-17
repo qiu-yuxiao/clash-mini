@@ -33,6 +33,19 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const [maximized, setMaximized] = useState<boolean | null>(null)
   /** FEAT-003: true when custom titlebar is hidden by idle auto-hide timer (stealth mode) */
   const [isDecorationsHidden, setIsDecorationsHidden] = useState(false)
+  /** 窗口宽度 ≤ 285px（窄窗口）：控制路由表格、流量面板布局 */
+  const [isMinimalWidth, setIsMinimalWidth] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.innerWidth <= MINI_WIDTH_THRESHOLD,
+  )
+  /** 窗口宽 ≤ 285 且 高 ≤ 135（最小窗口）：触发数据精简 + DOM卸载 */
+  const [isMiniStatus, setIsMiniStatus] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
+      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
+  )
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDecorationsHiddenRef = useRef(false)
@@ -81,6 +94,17 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
         const wasMinimal = isMinimalWidthRef.current
         isMinimalWidthRef.current = window.innerWidth <= MINI_WIDTH_THRESHOLD
+
+        // 同步窄窗口 / 最小窗口状态到 React state（供消费方订阅）
+        const nextIsMinimalWidth = isMinimalWidthRef.current
+        const nextIsMiniStatus =
+          nextIsMinimalWidth && window.innerHeight <= MINI_HEIGHT_THRESHOLD
+        setIsMinimalWidth((prev) =>
+          prev !== nextIsMinimalWidth ? nextIsMinimalWidth : prev,
+        )
+        setIsMiniStatus((prev) =>
+          prev !== nextIsMiniStatus ? nextIsMiniStatus : prev,
+        )
 
         if (
           wasMinimal &&
@@ -247,7 +271,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [resetIdleTimer, restoreChrome, currentWindow])
 
-  // L-17: TOCTOU（检查-使用时间差）问题——isMaximized/isFullscreen 状态与操作之间
+  // L-17: TOCTOU（检查-使用时间差）问题——isMaximized 状态与操作之间
   // 可能有窗口状态变化。影响很小，try-catch 已能安全处理边界情况。
   const toggleMaximize = useCallback(async () => {
     if (!currentWindow) return
@@ -264,15 +288,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [currentWindow])
 
-  const toggleFullscreen = useCallback(async () => {
-    if (!currentWindow) return
-    try {
-      await currentWindow.setFullscreen(!(await currentWindow.isFullscreen()))
-    } catch (err) {
-      console.warn('[WindowProvider] toggleFullscreen failed:', err)
-    }
-  }, [currentWindow])
-
   useEffect(() => {
     if (!currentWindow) return
     currentWindow.setMinimizable?.(true)
@@ -283,20 +298,22 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       decorated,
       maximized,
       isDecorationsHidden,
+      isMinimalWidth,
+      isMiniStatus,
       minimize,
       close,
       toggleMaximize,
-      toggleFullscreen,
       currentWindow,
     }),
     [
       decorated,
       maximized,
       isDecorationsHidden,
+      isMinimalWidth,
+      isMiniStatus,
       minimize,
       close,
       toggleMaximize,
-      toggleFullscreen,
       currentWindow,
     ],
   )

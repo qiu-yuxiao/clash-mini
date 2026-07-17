@@ -65,7 +65,7 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
                     uploadTotal: data.uploadTotal,
                     downloadTotal: data.downloadTotal,
                     activeConnections: (data.connections ?? []).map(
-                      (conn: any) => ({
+                      (conn: IConnectionsItem) => ({
                         ...conn,
                         curUpload: 0,
                         curDownload: 0,
@@ -213,8 +213,6 @@ export const useConnectionData = (options?: { enabled?: boolean }) => {
         }
       },
     })
-
-
 
   const clearClosedConnections = () => {
     if (!subscriptionCacheKey) return

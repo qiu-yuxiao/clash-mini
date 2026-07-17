@@ -1,7 +1,4 @@
-import {
-  RefreshRounded,
-  DeleteRounded,
-} from '@mui/icons-material'
+import { RefreshRounded, DeleteRounded } from '@mui/icons-material'
 import {
   Box,
   Typography,
@@ -15,6 +12,7 @@ import dayjs from 'dayjs'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
+import type { IProfileItem } from '@/types/profile'
 import {
   get3DCardStyle,
   get3DInputStyle,
@@ -26,16 +24,20 @@ interface ProfileImportCardProps {
   url: string
   setUrl: (url: string) => void
   profileLoading: boolean
-  profileItems: any[]
+  profileItems: IProfileItem[]
   currentProfileUid?: string
-  importInputRef: React.RefObject<any>
+  importInputRef: React.RefObject<HTMLInputElement | null>
   importInputContextMenu: { mouseX: number; mouseY: number } | null
-  setImportInputContextMenu: (val: { mouseX: number; mouseY: number } | null) => void
+  setImportInputContextMenu: (
+    val: { mouseX: number; mouseY: number } | null,
+  ) => void
   handleImportProfile: () => void
   handleSelectProfile: (uid: string) => void
   handleUpdateProfile: (uid: string, e: React.MouseEvent) => void
   handleDeleteProfile: (uid: string, e: React.MouseEvent) => void
-  setProfileMenuAnchorPosition: (val: { left: number; top: number } | null) => void
+  setProfileMenuAnchorPosition: (
+    val: { left: number; top: number } | null,
+  ) => void
   setContextMenuProfileUid: (uid: string | null) => void
 }
 
@@ -84,7 +86,7 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
         ...get3DCardStyle(theme, 'default'),
         '&:hover': {
           transform: 'none',
-          boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+          boxShadow: get3DCardStyle(theme, 'default').boxShadow as string,
         },
       }}
     >
@@ -187,21 +189,14 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
       >
         {profileItems.map((item) => {
           const isActive = item.uid === currentProfileUid
-          const isHighlighted =
-            isActive || item.uid === 'L_Direct_Imports'
+          const isHighlighted = isActive || item.uid === 'L_Direct_Imports'
           const extra = item.extra
           const hasExtra = !!extra
-          const {
-            upload = 0,
-            download = 0,
-            total = 0,
-          } = extra ?? {}
+          const { upload = 0, download = 0, total = 0 } = extra ?? {}
           const progress =
             total > 0
               ? Math.min(
-                  Math.round(
-                    ((download + upload) * 100) / (total + 0.01),
-                  ),
+                  Math.round(((download + upload) * 100) / (total + 0.01)),
                   100,
                 )
               : 0
@@ -227,9 +222,7 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
                 borderRadius: '6px',
                 cursor: 'pointer',
                 bgcolor: (theme) =>
-                  theme.palette.mode === 'light'
-                    ? '#ffffff'
-                    : '#282A36',
+                  theme.palette.mode === 'light' ? '#ffffff' : '#282A36',
                 borderLeft: (theme) =>
                   `3px solid ${isHighlighted ? theme.palette.primary.main : 'transparent'}`,
                 boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
@@ -253,9 +246,7 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
                   sx={{
                     fontSize: '13px',
                     fontWeight: isHighlighted ? 600 : 400,
-                    color: isHighlighted
-                      ? 'primary.main'
-                      : 'text.primary',
+                    color: isHighlighted ? 'primary.main' : 'text.primary',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -278,14 +269,10 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
                   {item.type === 'remote' && (
                     <IconButton
                       size="small"
-                      onClick={(e) =>
-                        handleUpdateProfile(item.uid, e)
-                      }
+                      onClick={(e) => handleUpdateProfile(item.uid, e)}
                       sx={{
                         p: 0.1,
-                        color: isActive
-                          ? 'primary.main'
-                          : 'text.secondary',
+                        color: isActive ? 'primary.main' : 'text.secondary',
                       }}
                     >
                       <RefreshRounded sx={{ fontSize: 12 }} />
@@ -293,9 +280,7 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
                   )}
                   <IconButton
                     size="small"
-                    onClick={(e) =>
-                      handleDeleteProfile(item.uid, e)
-                    }
+                    onClick={(e) => handleDeleteProfile(item.uid, e)}
                     sx={{ p: 0.1, color: 'error.main' }}
                   >
                     <DeleteRounded sx={{ fontSize: 12 }} />
@@ -316,13 +301,10 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
                   }}
                 >
                   <span>
-                    {formatTraffic(upload + download)} /{' '}
-                    {formatTraffic(total)}
+                    {formatTraffic(upload + download)} / {formatTraffic(total)}
                   </span>
                   <span>
-                    {extra?.expire
-                      ? formatExpire(extra.expire)
-                      : '-'}
+                    {extra?.expire ? formatExpire(extra.expire) : '-'}
                   </span>
                 </Box>
               )}
@@ -348,9 +330,7 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
                   </span>
                   <span>
                     {item.updated
-                      ? dayjs(item.updated * 1000).format(
-                          'YYYY-MM-DD',
-                        )
+                      ? dayjs(item.updated * 1000).format('YYYY-MM-DD')
                       : '-'}
                   </span>
                 </Box>

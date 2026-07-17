@@ -22,10 +22,10 @@
     }
   },
   "a11y": {
-    "pinWindow": "Pin window on top",
-    "openSettings": "Open settings",
-    "closeSettings": "Close settings",
-    "closeLogsDialog": "Close logs dialog",
-    "selectLanguage": "Select language"
+    "pinWindow": "Sematkan jendela di atas",
+    "openSettings": "Buka pengaturan",
+    "closeSettings": "Tutup pengaturan",
+    "closeLogsDialog": "Tutup dialog log",
+    "selectLanguage": "Pilih bahasa"
   }
 }

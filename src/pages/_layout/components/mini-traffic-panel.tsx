@@ -4,7 +4,9 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-traffic-graph'
+import type { EnhancedCanvasTrafficGraphRef } from '@/components/home/enhanced-canvas-traffic-graph'
 import { TrafficGraph } from '@/components/layout/traffic-graph'
+import type { TrafficRef } from '@/components/layout/traffic-graph'
 import { useTrafficData } from '@/hooks/use-traffic-data'
 import { useVisibility } from '@/hooks/use-visibility'
 import { useThemeMode } from '@/services/states'
@@ -23,7 +25,9 @@ export const MiniTrafficPanel = ({
   const {
     response: { data: traffic },
   } = useTrafficData({ enabled: pageVisible })
-  const trafficRef = useRef<any>(null)
+  const trafficRef = useRef<TrafficRef | EnhancedCanvasTrafficGraphRef | null>(
+    null,
+  )
 
   useEffect(() => {
     if (trafficRef.current && traffic) {

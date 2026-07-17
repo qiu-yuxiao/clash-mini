@@ -3,8 +3,11 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox, BaseEmpty } from '@/components/base'
+import type { ConnectionDetailRef } from '@/components/connection/connection-detail'
 import { ConnectionTable } from '@/components/connection/connection-table'
+import type { ConnectionMonitorData } from '@/hooks/use-connection-data'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
+import type { IConnectionsItem } from '@/types/connection'
 import {
   get3DButtonStyle,
   get3DSegmentedContainerStyle,
@@ -15,10 +18,10 @@ import {
 interface ConnectionsPanelProps {
   connectionsType: 'active' | 'closed'
   setConnectionsType: (type: 'active' | 'closed') => void
-  connectionsData: any
-  handleSearch: (match: (content: string) => boolean, state: any) => void
-  filterConn: any[]
-  detailRef: React.RefObject<any>
+  connectionsData: ConnectionMonitorData | undefined
+  handleSearch: (match: (content: string) => boolean, state?: unknown) => void
+  filterConn: IConnectionsItem[]
+  detailRef: React.RefObject<ConnectionDetailRef | null>
   isColumnManagerOpen: boolean
   setIsColumnManagerOpen: (open: boolean) => void
   clearClosedConnections: () => void
@@ -91,9 +94,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
             width: '140px',
             height: 18,
             userSelect: 'none',
-            ...get3DSegmentedContainerStyle(
-              theme,
-            ),
+            ...get3DSegmentedContainerStyle(theme),
           })}
         >
           {/* Sliding Background Indicator */}
@@ -223,11 +224,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
           <ConnectionTable
             connections={filterConn}
             onShowDetail={(detail, el) =>
-              detailRef.current?.open(
-                detail,
-                connectionsType === 'closed',
-                el,
-              )
+              detailRef.current?.open(detail, connectionsType === 'closed', el)
             }
             columnManagerOpen={isColumnManagerOpen}
             onCloseColumnManager={() => setIsColumnManagerOpen(false)}

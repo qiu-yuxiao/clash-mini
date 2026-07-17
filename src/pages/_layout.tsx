@@ -15,12 +15,18 @@ import {
   MenuItem,
   Menu,
   Divider,
+  type SxProps,
+  type Theme,
 } from '@mui/material'
 import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
-import { check, type Update } from '@tauri-apps/plugin-updater'
+import {
+  check,
+  type Update,
+  type DownloadEvent,
+} from '@tauri-apps/plugin-updater'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -32,6 +38,7 @@ import { Outlet, useLocation } from 'react-router'
 import AppIcon from '@/assets/image/app-icon.png'
 import { AreaErrorFallback } from '@/components/base/base-error-boundary'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
+import type { ConnectionDetailRef } from '@/components/connection/connection-detail'
 import { GlowBorder } from '@/components/glow-border'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { ResizeHandles } from '@/components/layout/resize-handles'
@@ -39,7 +46,7 @@ import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useHeadStateNew } from '@/components/proxy/use-head-state'
-import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
+import type { HeadState } from '@/components/proxy/use-head-state'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
@@ -69,7 +76,10 @@ import {
   triggerAutoSelect,
   withIpcTimeout,
 } from '@/services/cmds'
-import DelayManager from '@/services/delay'
+import DelayManager, {
+  NODE_DELAY_MAX_MS,
+  NODE_DELAY_MIN_MS,
+} from '@/services/delay'
 import {
   closeAllConnectionsWithTimeout,
   getProxyByNameWithTimeout,
@@ -77,6 +87,7 @@ import {
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
+import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
 import { isDummyNode } from '@/utils/node'
 
@@ -117,10 +128,10 @@ const TRAFFIC_PANE_HEIGHT_MINIMAL = 100
 
 // ---------- Clash 内核就绪等待与自动选点辅助函数 ----------
 
+type TFunc = (key: string, options?: Record<string, unknown>) => string
+
 /** 等待 Clash 内核就绪（PROXY 组中出现非 dummy 节点），最多等 10 秒 */
-async function waitForClashReady(
-  t: (key: string, opts?: any) => string,
-): Promise<boolean> {
+async function waitForClashReady(t: TFunc): Promise<boolean> {
   const MAX_WAIT_MS = 10_000 // 修复 BUG-MAJOR-003：从 20 秒减少到 10 秒
   const POLL_INTERVAL_MS = 500
   const startedAt = Date.now()
@@ -239,10 +250,10 @@ async function batchTestWithFirstBatchSelect(
 }
 
 async function triggerAutoSelectAndRefresh(
-  refreshProxy: (opts?: { forceFull?: boolean }) => Promise<any>,
+  refreshProxy: (opts?: { forceFull?: boolean }) => Promise<unknown>,
   fallbackTimerRef: React.MutableRefObject<number | null>,
   autoSelectTimerRef: React.MutableRefObject<number | null>,
-  setHeadState?: (groupName: string, patch: any) => void,
+  setHeadState?: (groupName: string, patch: Partial<HeadState>) => void,
   profileUid?: string,
 ): Promise<void> {
   // 先同步内核已有的节点状态，让 React 完成首帧渲染
@@ -308,7 +319,8 @@ async function triggerAutoSelectAndRefresh(
       const history = nowNode?.history || []
       const latestDelay =
         history.length > 0 ? history[history.length - 1].delay : -1
-      const hasHealth = latestDelay > 50 && latestDelay < 2000
+      const hasHealth =
+        latestDelay >= NODE_DELAY_MIN_MS && latestDelay < NODE_DELAY_MAX_MS
       if (!hasHealth) {
         const names = await getFilteredNodeNames()
         if (names.length === 0) return
@@ -359,12 +371,14 @@ const ORDER_OPTIONS = [
 
 type OrderKey = (typeof ORDER_OPTIONS)[number]['id']
 
-const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, any>>(
+type OrderFn = (list: IConnectionsItem[]) => IConnectionsItem[]
+
+const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFn>>(
   (acc, option) => {
     acc[option.id] = option.fn
     return acc
   },
-  {} as Record<OrderKey, any>,
+  {} as Record<OrderKey, OrderFn>,
 )
 
 interface GithubAsset {
@@ -375,6 +389,12 @@ interface GithubAsset {
 interface GithubRelease {
   tag_name: string
   assets: GithubAsset[]
+}
+
+interface CoreUpgradeProgressPayload {
+  status: string
+  progress?: number
+  message?: string
 }
 
 const Layout = () => {
@@ -468,19 +488,6 @@ const Layout = () => {
   const [coreUpgradeMessage, setCoreUpgradeMessage] = useState<string>('')
   const [coreCheckLoading, setCoreCheckLoading] = useState(false)
 
-  const [isMinimalWidth, setIsMinimalWidth] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.innerWidth <= MINI_WIDTH_THRESHOLD,
-  )
-
-  const [isMiniStatus, setIsMiniStatus] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
-      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
-  )
-
   const handleDepthFactorChange = (val: number) => {
     setDepthFactor(val)
     localStorage.setItem(`clash-mini-${controlSkin}-val1`, val.toString())
@@ -525,7 +532,8 @@ const Layout = () => {
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
   const { switchLanguage, currentLanguage } = useI18n()
-  const { decorated, isDecorationsHidden } = useWindowDecorations()
+  const { decorated, isDecorationsHidden, isMinimalWidth, isMiniStatus } =
+    useWindowDecorations()
   const { pathname } = useLocation()
 
   // Language Sync Ref to prevent deadlock/rollback loops
@@ -538,6 +546,13 @@ const Layout = () => {
   // Drawer Toggle State
   const { isSettingsOpen: drawerOpen, setIsSettingsOpen: setDrawerOpen } =
     useSystemData()
+
+  // 设置抽屉打开状态下缩到最小窗口时自动关闭（避免遮挡主内容）
+  useEffect(() => {
+    if (drawerOpen && isMiniStatus) {
+      setDrawerOpen(false)
+    }
+  }, [drawerOpen, isMiniStatus, setDrawerOpen])
 
   // Profiles State
   const [url, setUrl] = useState('')
@@ -667,9 +682,9 @@ const Layout = () => {
   const [editProfileUrl, setEditProfileUrl] = useState('')
   const [editProfileInterval, setEditProfileInterval] = useState(0)
 
-  const primaryBtn3DStyle = useMemo(() => {
+  const primaryBtn3DStyle = useMemo<SxProps<Theme>>(() => {
     const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
-    const styleWithImportant: any = {}
+    const styleWithImportant: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(btnStyle)) {
       if (
         ['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(
@@ -684,12 +699,12 @@ const Layout = () => {
     if (btnStyle.background) {
       styleWithImportant.backgroundColor = `${btnStyle.background} !important`
     }
-    return styleWithImportant
+    return styleWithImportant as SxProps<Theme>
   }, [theme])
 
-  const defaultBtn3DStyle = useMemo(() => {
+  const defaultBtn3DStyle = useMemo<SxProps<Theme>>(() => {
     const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
-    const styleWithImportant: any = {}
+    const styleWithImportant: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(btnStyle)) {
       if (
         ['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(
@@ -704,7 +719,7 @@ const Layout = () => {
     if (btnStyle.background) {
       styleWithImportant.backgroundColor = `${btnStyle.background} !important`
     }
-    return styleWithImportant
+    return styleWithImportant as SxProps<Theme>
   }, [theme])
   const {
     profiles = {},
@@ -769,19 +784,22 @@ const Layout = () => {
 
   useEffect(() => {
     let active = true
-    const unlistenPromise = listen<any>('core-upgrade-progress', (event) => {
-      if (!active) return
-      const payload = event.payload
-      setCoreUpgradeStatus(payload.status)
-      setCoreUpgradeProgress(payload.progress)
-      setCoreUpgradeMessage(payload.message)
-      if (payload.status === 'done') {
-        showNotice.success('Mihomo 内核更新成功')
-        mutateVersion()
-      } else if (payload.status === 'error') {
-        showNotice.error(`内核更新失败: ${payload.message}`)
-      }
-    })
+    const unlistenPromise = listen<CoreUpgradeProgressPayload>(
+      'core-upgrade-progress',
+      (event) => {
+        if (!active) return
+        const payload = event.payload
+        setCoreUpgradeStatus(payload.status)
+        setCoreUpgradeProgress(payload.progress ?? 0)
+        setCoreUpgradeMessage(payload.message ?? '')
+        if (payload.status === 'done') {
+          showNotice.success('Mihomo 内核更新成功')
+          mutateVersion()
+        } else if (payload.status === 'error') {
+          showNotice.error(`内核更新失败: ${payload.message}`)
+        }
+      },
+    )
     return () => {
       active = false
       unlistenPromise
@@ -814,9 +832,11 @@ const Layout = () => {
       } else {
         showNotice.info('当前已是最新版本')
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to check for client update:', err)
-      showNotice.error(`检查更新失败: ${err.message || err}`)
+      showNotice.error(
+        `检查更新失败: ${err instanceof Error ? err.message : String(err)}`,
+      )
     } finally {
       setClientCheckLoading(false)
     }
@@ -837,7 +857,7 @@ const Layout = () => {
       let downloaded = 0
       let total = 0
       const downloadPromise = clientUpdateObj.downloadAndInstall(
-        (progressEvent: any) => {
+        (progressEvent: DownloadEvent) => {
           if (progressEvent.event === 'Started') {
             total = progressEvent.data.contentLength || 0
             setClientProgressMessage('开始下载软件更新包...')
@@ -867,11 +887,12 @@ const Layout = () => {
         'downloadAndInstall',
       )
       showNotice.success('更新安装完毕，请重启应用以应用更改')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Client update error:', err)
       setClientStatus('error')
-      setClientProgressMessage(`更新失败: ${err.message || err}`)
-      showNotice.error(`更新失败: ${err.message || err}`)
+      const errMsg = err instanceof Error ? err.message : String(err)
+      setClientProgressMessage(`更新失败: ${errMsg}`)
+      showNotice.error(`更新失败: ${errMsg}`)
     }
   }
 
@@ -879,7 +900,7 @@ const Layout = () => {
     setCoreCheckLoading(true)
     setHelpAnchorEl(null)
     try {
-      const release = await invoke<any>('check_core_update')
+      const release = await invoke<GithubRelease>('check_core_update')
       if (isSameVersion(coreVersion, release.tag_name)) {
         showNotice.info('当前内核已是最新版本')
         return
@@ -889,9 +910,11 @@ const Layout = () => {
       setCoreUpgradeStatus('idle')
       setCoreUpgradeProgress(0)
       setCoreUpgradeMessage('')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to check for core update:', err)
-      showNotice.error(`检查内核更新失败: ${err.message || err}`)
+      showNotice.error(
+        `检查内核更新失败: ${err instanceof Error ? err.message : String(err)}`,
+      )
     } finally {
       setCoreCheckLoading(false)
     }
@@ -916,11 +939,12 @@ const Layout = () => {
         5 * 60 * 1000,
         'start_core_upgrade',
       )
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to start core upgrade:', err)
       setCoreUpgradeStatus('error')
-      setCoreUpgradeMessage(`启动失败: ${err.message || err}`)
-      showNotice.error(`启动内核升级失败: ${err.message || err}`)
+      const errMsg = err instanceof Error ? err.message : String(err)
+      setCoreUpgradeMessage(`启动失败: ${errMsg}`)
+      showNotice.error(`启动内核升级失败: ${errMsg}`)
     }
   }
 
@@ -940,8 +964,8 @@ const Layout = () => {
       await enhanceProfiles()
       await activateSelected()
       await refreshClashConfig()
-    } catch (err: any) {
-      showNotice.error(err?.message || err)
+    } catch (err: unknown) {
+      showNotice.error(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -964,8 +988,8 @@ const Layout = () => {
     try {
       await patchClashConfig({ [field]: checked })
       await refreshClashConfig()
-    } catch (err: any) {
-      showNotice.error(err?.message || err)
+    } catch (err: unknown) {
+      showNotice.error(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -973,8 +997,7 @@ const Layout = () => {
   const [match, setMatch] = useState<(input: string) => boolean>(
     () => () => true,
   )
-  // eslint-disable-next-line unused-imports/no-unused-vars
-  const [curOrderOpt, setCurOrderOpt] = useState<OrderKey>('default')
+  const curOrderOpt: OrderKey = 'default'
   const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>(
     'active',
   )
@@ -985,7 +1008,7 @@ const Layout = () => {
     clearClosedConnections,
   } = useConnectionData({ enabled: drawerOpen && !isMinimalWidth })
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
-  const detailRef = useRef<any>(null)
+  const detailRef = useRef<ConnectionDetailRef | null>(null)
 
   const filterConn = useMemo(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
@@ -1066,8 +1089,10 @@ const Layout = () => {
     if (isWakeupTestingRef.current) return
 
     // M-33: 原子化冷却检查+设置，避免竞态条件
+    // 冷却 5 分钟：用户频繁 Alt+Tab 切换窗口时避免高频测速，
+    // 防止订阅服务器把高频测速视作攻击导致节点封锁
     const now = Date.now()
-    if (now - lastFullTestTimeRef.current < 30 * 1000) {
+    if (now - lastFullTestTimeRef.current < 5 * 60 * 1000) {
       return
     }
 
@@ -1200,7 +1225,7 @@ const Layout = () => {
     }
     const uid = currentProfileUid
     let cancelled = false
-    let timerId: any = null
+    let timerId: ReturnType<typeof setTimeout> | null = null
     enhanceProfiles()
       .then(async (success) => {
         if (!success) {
@@ -1285,41 +1310,19 @@ const Layout = () => {
     }
   }, [])
 
-  // 监听窗口大小及可见度变化，窗口从隐藏/后台恢复时触发全节点测速刷新
+  // 监听窗口可见度变化，窗口从隐藏/后台恢复时触发全节点测速刷新
   // 注意：不监听 focus 事件，因为 WebView2 在任何鼠标点击（包括标题栏拖动）时都会触发 focus，
   // 导致每次点击都触发全节点批量测速，造成 UI 冻结
+  // 窗口尺寸变化由 AppDataProvider 统一管理并通过 SystemContext 下发，此处不再监听 resize
   useEffect(() => {
     if (typeof window === 'undefined') return
-    let rafId: number | null = null
-    const handleResize = () => {
-      if (rafId !== null) return
-      rafId = requestAnimationFrame(() => {
-        rafId = null
-        setIsMinimalWidth((prev) => {
-          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD
-          return prev !== next ? next : prev
-        })
-        setIsMiniStatus((prev) => {
-          const next =
-            window.innerWidth <= MINI_WIDTH_THRESHOLD &&
-            window.innerHeight <= MINI_HEIGHT_THRESHOLD
-          return prev !== next ? next : prev
-        })
-      })
-    }
     const handleVisibilityChange = () => {
-      handleResize()
       if (document.visibilityState === 'visible') {
         triggerWakeupLatencyTestRef.current()
       }
     }
-    const timer = setTimeout(handleResize, 0)
-    window.addEventListener('resize', handleResize)
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
-      clearTimeout(timer)
-      if (rafId !== null) cancelAnimationFrame(rafId)
-      window.removeEventListener('resize', handleResize)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
@@ -1354,7 +1357,9 @@ const Layout = () => {
       setUrl('')
 
       const freshConfig = await getProfiles()
-      const newProfile = freshConfig?.items?.find((p: any) => p.url === trimmed)
+      const newProfile = freshConfig?.items?.find(
+        (p: IProfileItem) => p.url === trimmed,
+      )
       let targetUid = currentProfileUid
       if (newProfile) {
         await patchProfiles({ current: newProfile.uid })
@@ -1381,7 +1386,7 @@ const Layout = () => {
 
         const freshConfig = await getProfiles()
         const newProfile = freshConfig?.items?.find(
-          (p: any) => p.url === trimmed,
+          (p: IProfileItem) => p.url === trimmed,
         )
         let targetUid = currentProfileUid
         if (newProfile) {
@@ -1672,6 +1677,28 @@ const Layout = () => {
             <WindowControls />
           </div>
         </div>
+      ) : !decorated && isDecorationsHidden ? (
+        // 隐藏标题栏模式：原标题栏位置改显示活跃出口节点栏目（流量监控器定位）
+        <div
+          className="the_titlebar"
+          data-tauri-drag-region="true"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 8px',
+            boxSizing: 'border-box',
+            height: '30px',
+            minHeight: '30px',
+            maxHeight: '30px',
+            background: 'var(--background-color)',
+            userSelect: 'none',
+            flexShrink: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <ActiveNodeStatusCard />
+        </div>
       ) : null,
     [decorated, isDecorationsHidden, appVersion],
   )
@@ -1956,7 +1983,8 @@ const Layout = () => {
                       ...get3DCardStyle(theme, 'default'),
                       '&:hover': {
                         transform: 'none',
-                        boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+                        boxShadow: get3DCardStyle(theme, 'default')
+                          .boxShadow as string,
                       },
                     }}
                   >
@@ -1982,8 +2010,8 @@ const Layout = () => {
 
                   {/* Section 3: Minimal Settings */}
                   <BasicSettingsCard
-                    verge={verge}
-                    clashConfig={clashConfig}
+                    verge={verge ?? null}
+                    clashConfig={clashConfig ?? null}
                     patchVerge={patchVerge}
                     handleAllowLanChange={handleClashBoolChange('allow-lan')}
                     handleIpv6Change={handleClashBoolChange('ipv6')}
@@ -1993,7 +2021,7 @@ const Layout = () => {
 
                   {/* Section 4: Theme Settings */}
                   <ThemeSettingsCard
-                    verge={verge}
+                    verge={verge ?? null}
                     patchVerge={patchVerge}
                     themeActiveIndex={themeActiveIndex}
                     depthFactor={depthFactor}

@@ -78,7 +78,6 @@ export interface IVergeConfig {
   auto_close_connection?: boolean
   auto_check_update?: boolean
   default_latency_test?: string
-  default_latency_timeout?: number
   enable_auto_delay_detection?: boolean
   auto_delay_detection_interval_minutes?: number
   enable_builtin_enhanced?: boolean

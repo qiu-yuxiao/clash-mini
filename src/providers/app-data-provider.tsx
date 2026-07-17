@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 import { useVerge } from '@/hooks/use-verge'
+import { useWindowDecorations } from '@/hooks/use-window'
 import {
   calcuProxies,
   calcuProxyProviders,
@@ -21,7 +21,7 @@ import {
 import { queryClient } from '@/services/query-client'
 import type { IProxyGroupItem } from '@/types/clash'
 import { isDummyNode } from '@/utils/node'
-import type { ProxyProvider } from 'tauri-plugin-mihomo-api'
+import type { Proxy, ProxyProvider } from 'tauri-plugin-mihomo-api'
 
 import {
   ClashConfigContext,
@@ -48,7 +48,7 @@ const TQ_DEFAULTS = {
   retry: 2,
 } as const
 
-function useStableFn<T extends (...args: any[]) => any>(fn: T): T {
+function useStableFn<T extends (...args: never[]) => unknown>(fn: T): T {
   const ref = useRef(fn)
   ref.current = fn
   return useCallback((...args: Parameters<T>) => ref.current(...args), []) as T
@@ -62,52 +62,10 @@ export const AppDataProvider = ({
 }) => {
   const { verge } = useVerge()
 
-  const [isMinimalWidth, setIsMinimalWidth] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.innerWidth <= MINI_WIDTH_THRESHOLD,
-  )
-
-  const [isMiniStatus, setIsMiniStatus] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
-      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
-  )
+  // 窗口尺寸状态统一由 WindowProvider 管理并通过 WindowContext 下发
+  const { isMinimalWidth, isMiniStatus } = useWindowDecorations()
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    let rafId: number | null = null
-    const handleResize = () => {
-      if (rafId !== null) return
-      rafId = requestAnimationFrame(() => {
-        rafId = null
-        setIsMinimalWidth((prev) => {
-          const next = window.innerWidth <= MINI_WIDTH_THRESHOLD
-          return prev !== next ? next : prev
-        })
-        setIsMiniStatus((prev) => {
-          const next =
-            window.innerWidth <= MINI_WIDTH_THRESHOLD &&
-            window.innerHeight <= MINI_HEIGHT_THRESHOLD
-          return prev !== next ? next : prev
-        })
-      })
-    }
-    const timer = setTimeout(handleResize, 0)
-    window.addEventListener('resize', handleResize)
-    window.addEventListener('focus', handleResize)
-    document.addEventListener('visibilitychange', handleResize)
-    return () => {
-      clearTimeout(timer)
-      if (rafId !== null) cancelAnimationFrame(rafId)
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('focus', handleResize)
-      document.removeEventListener('visibilitychange', handleResize)
-    }
-  }, [])
 
   const forceFullProxiesRef = useRef(false)
   const isMiniStatusRef = useRef(isMiniStatus)
@@ -126,7 +84,7 @@ export const AppDataProvider = ({
         const groupProxy = await getProxyByNameWithTimeout('PROXY')
         if (groupProxy) {
           const activeNodeName = groupProxy.now || ''
-          let activeNode: any = null
+          let activeNode: (Proxy & { provider?: string }) | null = null
           if (activeNodeName) {
             try {
               activeNode = await getProxyByNameWithTimeout(activeNodeName)
@@ -168,7 +126,7 @@ export const AppDataProvider = ({
                       provider: '',
                     }
                   })
-                  .filter((item: any) => !isDummyNode(item.name))
+                  .filter((item: { name: string }) => !isDummyNode(item.name))
               : [],
           }
 
@@ -196,16 +154,12 @@ export const AppDataProvider = ({
     isPending: isProxiesPending,
     refetch: _refetchProxy,
   } = useQuery({
-    queryKey: ['getProxies'],
+    queryKey: ['getProxies', isMiniStatus],
     queryFn: fetchProxies,
     refetchInterval: false,
     refetchIntervalInBackground: false,
     ...TQ_MIHOMO,
   })
-
-  useEffect(() => {
-    _refetchProxy()
-  }, [isMiniStatus, _refetchProxy])
 
   const {
     data: clashConfig,
@@ -390,14 +344,22 @@ export const AppDataProvider = ({
   const refreshAll = useCallback(async () => {
     // WARN-001 修复：全量刷新时强制绕过 isMiniStatus 精简路径，确保代理列表完整加载
     forceFullProxiesRef.current = true
-    await Promise.all([
+    // 窄窗(宽≤285)下 rules/proxyProviders/ruleProviders 的 Query enabled=false，
+    // 这些接口的 DOM 消费者（路由表格）未挂载，拉取后无消费者且耗费 IPC。
+    // 跳过它们；若用户随后切到宽窗，Query 会因 enabled 变化自动 refetch。
+    const tasks: Promise<unknown>[] = [
       refreshProxy(),
       refreshClashConfig(),
-      refreshRules(),
       refreshSysproxy(),
-      refreshProxyProviders(),
-      refreshRuleProviders(),
-    ])
+    ]
+    if (!isMinimalWidth) {
+      tasks.push(
+        refreshRules(),
+        refreshProxyProviders(),
+        refreshRuleProviders(),
+      )
+    }
+    await Promise.all(tasks)
   }, [
     refreshProxy,
     refreshClashConfig,
@@ -405,6 +367,7 @@ export const AppDataProvider = ({
     refreshSysproxy,
     refreshProxyProviders,
     refreshRuleProviders,
+    isMinimalWidth,
   ])
 
   const proxiesValue = useMemo(

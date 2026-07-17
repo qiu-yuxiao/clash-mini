@@ -3,7 +3,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
-    "longDescription": "Clash Verge Rev",
+    "longDescription": "Clash Mini",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -11,17 +11,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "resources"
-    ],
-    "publisher": "Clash Verge Rev",
-    "externalBin": [
-      "sidecar/mini-mihomo",
-      "sidecar/mini-mihomo-alpha"
-    ],
+    "resources": ["resources"],
+    "publisher": "Clash Mini",
+    "externalBin": ["sidecar/mini-mihomo", "sidecar/mini-mihomo-alpha"],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
-    "shortDescription": "Clash Verge Rev",
+    "shortDescription": "Clash Mini",
     "createUpdaterArtifacts": false
   },
   "build": {
@@ -37,8 +32,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEwMzQ0QzIxODRDREI2NjAKUldSZ3RzMkVJVXcwRUtHTk1RcDE2SE1zVzd2VFE2akhleHZXWTlSbk1QZmYxYlNGWTczcXVaOXgK",
       "endpoints": [
-        "https://raw.githubusercontent.com/qiu-yuxiao/clash-mini/dev/updater/app-update.json",
-        "https://cdn.jsdelivr.net/gh/qiu-yuxiao/clash-mini@dev/updater/app-update.json"
+        "https://raw.githubusercontent.com/qiu-yuxiao/clash-mini/dev/updater/app-update.json"
       ],
       "windows": {
         "installMode": "basicUi"
@@ -46,26 +40,17 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": [
-          "clash",
-          "clash-mini"
-        ]
+        "schemes": ["clash", "clash-mini"]
       }
     }
   },
   "app": {
     "security": {
-      "capabilities": [
-        "desktop-capability",
-        "migrated"
-      ],
+      "capabilities": ["desktop-capability", "migrated"],
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": [
-            "$APPDATA/**",
-            "$APPLOCALDATA/**"
-          ],
+          "allow": ["$APPDATA/**", "$APPLOCALDATA/**"],
           "requireLiteralLeadingDot": false
         }
       },

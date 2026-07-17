@@ -6,7 +6,7 @@ import {
   InfoOutlined,
   BlockRounded,
 } from '@mui/icons-material'
-import { Box, Menu, MenuItem, alpha } from '@mui/material'
+import { Box, Menu, MenuItem, alpha, type Theme } from '@mui/material'
 import {
   ColumnDef,
   flexRender,
@@ -472,9 +472,9 @@ export const ConnectionTable = (props: Props) => {
         slotProps={{
           paper: {
             sx: {
-              background: (theme: any) => theme.palette.background.paper,
+              background: (theme: Theme) => theme.palette.background.paper,
               border: '1px solid',
-              borderColor: (theme: any) => theme.palette.divider,
+              borderColor: (theme: Theme) => theme.palette.divider,
               borderRadius: 1.5,
               boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.25)',
               minWidth: 200,

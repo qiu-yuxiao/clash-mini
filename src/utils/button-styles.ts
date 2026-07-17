@@ -1,7 +1,7 @@
 import { Theme } from '@mui/material'
 
 // Centralized Skin Getter Helper
-const getActiveSkin = (theme: any): string => {
+const getActiveSkin = (theme: Theme): string => {
   // 优先使用 React theme 中的 controlSkin（保证与 React 状态同步）
   if (theme && theme.controlSkin) {
     return theme.controlSkin
@@ -18,7 +18,7 @@ export const get3DButtonStyle = (
   theme: Theme,
   variant: 'contained' | 'outlined',
   colorType: 'primary' | 'error' | 'default' = 'default',
-): any => {
+): Record<string, unknown> => {
   const skin = getActiveSkin(theme)
   const isLight = theme.palette.mode === 'light'
 
@@ -490,10 +490,10 @@ export const get3DButtonStyle = (
 
 // 3D Bevel Card Styling Helper
 export const get3DCardStyle = (
-  theme: any,
+  theme: Theme,
   cardType: 'primary' | 'default' | 'upload' | 'download',
   isLightMode?: boolean,
-): any => {
+): Record<string, unknown> => {
   const skin = getActiveSkin(theme)
   const isLight =
     isLightMode !== undefined
@@ -731,7 +731,7 @@ export const get3DCardStyle = (
 }
 
 // 3D Recessed Input Styling Helper
-export const get3DInputStyle = (theme: Theme): any => {
+export const get3DInputStyle = (theme: Theme): Record<string, unknown> => {
   const skin = getActiveSkin(theme)
   const isLight = theme.palette.mode === 'light'
   const primaryMain = theme.palette.primary.main
@@ -914,7 +914,9 @@ export const get3DInputStyle = (theme: Theme): any => {
 }
 
 // 3D Segmented Control Container Styling Helper
-export const get3DSegmentedContainerStyle = (themeOrIsLight: any): any => {
+export const get3DSegmentedContainerStyle = (
+  themeOrIsLight: Theme | boolean,
+): Record<string, unknown> => {
   const isLight =
     themeOrIsLight && typeof themeOrIsLight === 'object'
       ? themeOrIsLight.palette.mode === 'light'
@@ -987,7 +989,9 @@ export const get3DSegmentedContainerStyle = (themeOrIsLight: any): any => {
 }
 
 // 3D Segmented Active Block Styling Helper
-export const get3DSegmentedActiveStyle = (theme: any): any => {
+export const get3DSegmentedActiveStyle = (
+  theme: Theme,
+): Record<string, unknown> => {
   const skin = getActiveSkin(theme)
   const isLight = theme.palette.mode === 'light'
 
@@ -1098,7 +1102,7 @@ export const get3DSegmentedActiveStyle = (theme: any): any => {
   return {}
 }
 
-export const get3DSegmentedActiveTextColor = (theme: any): string => {
+export const get3DSegmentedActiveTextColor = (theme: Theme): string => {
   const skin = getActiveSkin(theme)
   const isLight = theme.palette.mode === 'light'
   switch (skin) {

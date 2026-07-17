@@ -74,6 +74,9 @@ const NORMAL_CHECK_INTERVAL_SECS: u64 = 15;
 /// 重试模式健康检测间隔（秒）
 const RETRY_CHECK_INTERVAL_SECS: u64 = 3;
 
+/// 离线时主循环间隔（秒）：与离线网络探测间隔对齐，确保 5 秒快速探测不被 15 秒主循环限制
+const OFFLINE_CHECK_INTERVAL_SECS: u64 = 5;
+
 /// 从当前 Verge 配置中读取测速 URL，多处复用避免重复代码
 async fn get_test_url() -> String {
     let verge = Config::verge().await.latest_arc();
@@ -671,9 +674,11 @@ pub fn start_background_monitor() {
                     }
                 }
             } else {
-                // 定期健康检测的间隔：重试模式下为 3 秒，正常模式下为 15 秒
+                // 定期健康检测的间隔：重试模式 3 秒，离线 5 秒（对齐快速探测），正常 15 秒
                 let check_interval = if is_retry_mode {
                     RETRY_CHECK_INTERVAL_SECS
+                } else if !was_online {
+                    OFFLINE_CHECK_INTERVAL_SECS
                 } else {
                     NORMAL_CHECK_INTERVAL_SECS
                 };

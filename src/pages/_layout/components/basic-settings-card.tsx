@@ -1,19 +1,16 @@
-import {
-  Box,
-  Typography,
-  TextField,
-  useTheme,
-} from '@mui/material'
+import { Box, Typography, TextField, useTheme } from '@mui/material'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Switch } from '@/components/base'
+import type { IVergeConfig } from '@/types/verge'
 import { get3DCardStyle, get3DInputStyle } from '@/utils/button-styles'
+import type { BaseConfig } from 'tauri-plugin-mihomo-api'
 
 interface BasicSettingsCardProps {
-  verge: any
-  clashConfig: any
-  patchVerge: (val: any) => Promise<void>
+  verge: IVergeConfig | null
+  clashConfig: BaseConfig | null
+  patchVerge: (val: Partial<IVergeConfig>) => Promise<void>
   handleAllowLanChange: (checked: boolean) => void
   handleIpv6Change: (checked: boolean) => void
   mixedPortVal: number
@@ -75,7 +72,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
         ...get3DCardStyle(theme, 'default'),
         '&:hover': {
           transform: 'none',
-          boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+          boxShadow: get3DCardStyle(theme, 'default').boxShadow as string,
         },
       }}
     >
@@ -195,9 +192,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               value={localPort}
               onChange={(e) =>
                 setLocalPort(
-                  e.target.value
-                    ? parseInt(e.target.value, 10) || 0
-                    : 0,
+                  e.target.value ? parseInt(e.target.value, 10) || 0 : 0,
                 )
               }
               onBlur={onLocalSave}

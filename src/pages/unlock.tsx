@@ -197,7 +197,7 @@ const UnlockPage = () => {
           sortedItems,
           existingItems && existingItems.length > 0 ? existingTime : null,
         )
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to get unlock items:', err)
       }
     },
@@ -208,7 +208,8 @@ const UnlockPage = () => {
     let cancelled = false
     void (async () => {
       try {
-        const { items: storedItems, time: storedTime } = loadResultsFromStorage()
+        const { items: storedItems, time: storedTime } =
+          loadResultsFromStorage()
 
         if (cancelled) return
         if (storedItems && storedItems.length > 0) {
@@ -223,12 +224,14 @@ const UnlockPage = () => {
         }
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [getUnlockItems, loadResultsFromStorage, sortItemsByName])
 
   const invokeWithTimeout = async <T,>(
     cmd: string,
-    args?: any,
+    args?: Record<string, unknown>,
     timeout = UNLOCK_TIMEOUT_MS,
   ): Promise<T> => {
     return Promise.race([
@@ -256,7 +259,7 @@ const UnlockPage = () => {
       saveResultsToStorage(sortedItems, currentTime)
 
       setIsCheckingAll(false)
-    } catch (err: any) {
+    } catch (err: unknown) {
       setIsCheckingAll(false)
       showNotice.error('tests.unlock.page.messages.detectionTimeout', err)
       console.error('Failed to check media unlock:', err)
@@ -294,7 +297,7 @@ const UnlockPage = () => {
       }
 
       setLoadingItems((prev) => prev.filter((item) => item !== name))
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLoadingItems((prev) => prev.filter((item) => item !== name))
       showNotice.error(
         'tests.unlock.page.messages.detectionFailedWithName',
@@ -391,7 +394,10 @@ const UnlockPage = () => {
                   height: '100%',
                   borderRadius: 2,
                   borderLeft: `4px solid ${getStatusBorderColor(item.status)}`,
-                  backgroundColor: 'var(--theme-panel-bg, ' + (isDark ? '#282a36' : '#ffffff') + ')',
+                  backgroundColor:
+                    'var(--theme-panel-bg, ' +
+                    (isDark ? '#282a36' : '#ffffff') +
+                    ')',
                   position: 'relative',
                   overflow: 'hidden',
                   '&:hover': {

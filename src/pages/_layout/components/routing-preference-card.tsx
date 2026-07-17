@@ -45,7 +45,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               ...get3DCardStyle(theme, 'default'),
               '&:hover': {
                 transform: 'none',
-                boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+                boxShadow: get3DCardStyle(theme, 'default').boxShadow as string,
               },
             }
       }
@@ -113,9 +113,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
                     ? 'rgba(44, 31, 3, 0.75)'
                     : 'text.secondary',
               fontSize:
-                language === 'zh' || language === 'zhtw'
-                  ? '13px'
-                  : '11px',
+                language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               zIndex: 1,
@@ -165,9 +163,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
                     ? 'rgba(44, 31, 3, 0.75)'
                     : 'text.secondary',
               fontSize:
-                language === 'zh' || language === 'zhtw'
-                  ? '13px'
-                  : '11px',
+                language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               zIndex: 1,
@@ -217,9 +213,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
                     ? 'rgba(44, 31, 3, 0.75)'
                     : 'text.secondary',
               fontSize:
-                language === 'zh' || language === 'zhtw'
-                  ? '13px'
-                  : '11px',
+                language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
               cursor: 'pointer',
               zIndex: 1,

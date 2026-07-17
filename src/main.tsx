@@ -125,8 +125,8 @@ bootstrap().catch((error) => {
 })
 
 // Error handling — 仅注册一次，防止 HMR 重复累积
-if (!(window as any).__listenersSetup) {
-  ;(window as any).__listenersSetup = true
+if (!window.__listenersSetup) {
+  window.__listenersSetup = true
   window.addEventListener('error', (event) => {
     console.error('[main.tsx] Global error:', event.error)
   })

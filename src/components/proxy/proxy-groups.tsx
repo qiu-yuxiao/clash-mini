@@ -1,5 +1,5 @@
 import { Box } from '@mui/material'
-import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   type Key,
   type RefObject,
@@ -28,7 +28,7 @@ import { DEFAULT_STATE } from './use-head-state'
 import type { HeadState } from './use-head-state'
 import { type IRenderItem, useRenderList } from './use-render-list'
 
-function useStableCallback<T extends (...args: any[]) => any>(fn: T): T {
+function useStableCallback<T extends (...args: never[]) => unknown>(fn: T): T {
   const ref = useRef(fn)
   ref.current = fn
   return useCallback((...args: Parameters<T>) => ref.current(...args), []) as T
@@ -87,40 +87,16 @@ export const ProxyGroups = (props: Props) => {
   const scrollPositionRef = useRef<Record<string, number>>({})
   const scrollTopRef = useRef(0)
   const showScrollTopRef = useRef(false)
-  const activeStickyIndexRef = useRef<number | null>(null)
   const restoredScrollKeyRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const scrollPositionKey = useMemo(() => `${mode}:normal`, [mode])
-  const stickyGroupIndexes = useMemo(
-    () =>
-      renderList.flatMap((item, index) =>
-        item.type === 0 && !item.group?.hidden ? [index] : [],
-      ),
-    [renderList],
-  )
-
-  const rangeExtractor = useCallback(
-    (range: Parameters<typeof defaultRangeExtractor>[0]) => {
-      const activeStickyIndex = [...stickyGroupIndexes]
-        .reverse()
-        .find((index) => index <= range.startIndex)
-      activeStickyIndexRef.current = activeStickyIndex ?? null
-
-      const indexes = defaultRangeExtractor(range)
-      return activeStickyIndex == null || indexes.includes(activeStickyIndex)
-        ? indexes
-        : [activeStickyIndex, ...indexes]
-    },
-    [stickyGroupIndexes],
-  )
 
   const virtualizer = useVirtualizer({
     count: renderList.length,
     getScrollElement: () => parentRef.current,
     estimateSize: (index) => {
       const item = renderList[index]
-      if (item?.type === 0) return 56
       if (item?.type === 2) return 24
       if (item?.type === 3) return 80
       if (item?.type === 4) return 24
@@ -128,10 +104,8 @@ export const ProxyGroups = (props: Props) => {
     },
     overscan: 15,
     getItemKey: (index) => renderList[index]?.key ?? index,
-    rangeExtractor,
   })
   const virtualItems = virtualizer.getVirtualItems()
-  const activeStickyIndex = activeStickyIndexRef.current
 
   // 从 localStorage 恢复滚动位置
   useLayoutEffect(() => {
@@ -330,7 +304,6 @@ export const ProxyGroups = (props: Props) => {
       totalSize={virtualizer.getTotalSize()}
       virtualItems={virtualItems}
       renderList={renderList}
-      activeStickyIndex={activeStickyIndex}
       indent={mode === 'rule' || mode === 'script'}
       measureElement={virtualizer.measureElement}
       onLocation={handleLocation}
@@ -372,7 +345,6 @@ interface ProxyVirtualListProps {
   totalSize: number
   virtualItems: VirtualListItem[]
   renderList: IRenderItem[]
-  activeStickyIndex: number | null
   indent: boolean
   measureElement: (node: Element | null) => void
   onLocation: (group: IRenderItem['group']) => void
@@ -392,7 +364,6 @@ function ProxyVirtualList({
   totalSize,
   virtualItems,
   renderList,
-  activeStickyIndex,
   indent,
   measureElement,
   onLocation,
@@ -403,7 +374,6 @@ function ProxyVirtualList({
   testingGroups,
 }: ProxyVirtualListProps) {
   const { t } = useTranslation()
-  const stickyBackground = 'var(--theme-bg, var(--background-color))'
 
   const group = renderList[0]?.group
   const headState = headStates['PROXY'] || DEFAULT_STATE
@@ -465,26 +435,11 @@ function ProxyVirtualList({
               data-index={virtualItem.index}
               ref={measureElement}
               style={{
-                position:
-                  virtualItem.index === activeStickyIndex
-                    ? 'sticky'
-                    : 'absolute',
+                position: 'absolute',
                 top: 0,
                 left: 0,
-                zIndex: virtualItem.index === activeStickyIndex ? 5 : undefined,
-                display:
-                  virtualItem.index === activeStickyIndex
-                    ? 'flow-root'
-                    : undefined,
-                backgroundColor:
-                  virtualItem.index === activeStickyIndex
-                    ? stickyBackground
-                    : undefined,
                 width: '100%',
-                transform:
-                  virtualItem.index === activeStickyIndex
-                    ? undefined
-                    : `translateY(${virtualItem.start}px)`,
+                transform: `translateY(${virtualItem.start}px)`,
               }}
             >
               <ProxyRender
@@ -508,7 +463,7 @@ function ProxyVirtualList({
 }
 
 // 替换简单防抖函数为更优的节流函数
-function throttle<T extends (...args: any[]) => any>(
+function throttle<T extends (...args: never[]) => unknown>(
   func: T,
   wait: number,
 ): ((...args: Parameters<T>) => void) & { cancel: () => void } {

@@ -1,5 +1,13 @@
 import { HelpOutlineRounded } from '@mui/icons-material'
-import { Button, Menu, MenuItem, Divider, useTheme } from '@mui/material'
+import {
+  Button,
+  Menu,
+  MenuItem,
+  Divider,
+  useTheme,
+  type SxProps,
+  type Theme,
+} from '@mui/material'
 import { open } from '@tauri-apps/plugin-shell'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +28,7 @@ interface HelpMenuButtonProps {
   appVersion: string
   coreVersion: string | undefined
   controlSkin: string
-  primaryBtn3DStyle: any
+  primaryBtn3DStyle: SxProps<Theme>
 }
 
 export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({

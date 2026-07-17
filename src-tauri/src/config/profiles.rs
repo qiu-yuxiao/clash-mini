@@ -239,7 +239,8 @@ impl IProfiles {
                 patch!(each, item, itype);
                 patch!(each, item, name);
                 patch!(each, item, desc);
-                patch!(each, item, file);
+                // 安全修复：禁止通过 IPC 修改 file 字段，防止路径穿越攻击
+                // file 字段由内部函数维护，前端只需修改 name/desc/url/option 等元数据
                 patch!(each, item, url);
                 patch!(each, item, selected);
                 patch!(each, item, extra);

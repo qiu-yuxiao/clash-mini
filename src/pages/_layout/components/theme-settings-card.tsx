@@ -10,6 +10,7 @@ import {
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
+import type { IVergeConfig } from '@/types/verge'
 import {
   get3DCardStyle,
   get3DButtonStyle,
@@ -21,8 +22,8 @@ import {
 import { get3DSliderStyle } from '../utils/style-helpers'
 
 interface ThemeSettingsCardProps {
-  verge: any
-  patchVerge: (val: any) => Promise<void>
+  verge: IVergeConfig | null
+  patchVerge: (val: Partial<IVergeConfig>) => Promise<void>
   themeActiveIndex: number
   depthFactor: number
   handleDepthFactorChange: (val: number) => void
@@ -80,25 +81,36 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
 
   const getSlider1Max = (skin: string): number => {
     switch (skin) {
-      case 'retro-3d': return 1.0
-      case 'original': return 3.0
-      case 'modern-flat': return 3.0
-      case 'frosted-glass': return 5.0
-      case 'monochrome': return 3.0
-      case 'cyberpunk': return 5.0
-      default: return 2.0
+      case 'retro-3d':
+        return 1.0
+      case 'original':
+        return 3.0
+      case 'modern-flat':
+        return 3.0
+      case 'frosted-glass':
+        return 5.0
+      case 'monochrome':
+        return 3.0
+      case 'cyberpunk':
+        return 5.0
+      default:
+        return 2.0
     }
   }
 
   const getSlider2Max = (skin: string): number => {
     switch (skin) {
       case 'retro-3d':
-      case 'modern-flat': return 5.0
-      case 'original': return 3.0
+      case 'modern-flat':
+        return 5.0
+      case 'original':
+        return 3.0
       case 'monochrome':
       case 'frosted-glass':
-      case 'cyberpunk': return 5.0
-      default: return 2.0
+      case 'cyberpunk':
+        return 5.0
+      default:
+        return 2.0
     }
   }
 
@@ -129,11 +141,18 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
         ...get3DCardStyle(theme, 'default'),
         '&:hover': {
           transform: 'none',
-          boxShadow: get3DCardStyle(theme, 'default').boxShadow,
+          boxShadow: get3DCardStyle(theme, 'default').boxShadow as string,
         },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 0.5,
+        }}
+      >
         <Typography
           variant="subtitle2"
           sx={{
@@ -157,9 +176,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             width: '100px',
             height: 18,
             userSelect: 'none',
-            ...get3DSegmentedContainerStyle(
-              theme,
-            ),
+            ...get3DSegmentedContainerStyle(theme),
           })}
         >
           <Box

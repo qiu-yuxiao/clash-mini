@@ -79,7 +79,7 @@ export const addQuickRoutingRule = async (
         )
         mergeYaml = '{}'
       }
-      const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
+      const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, unknown>
 
       // 4. 确保 prepend-rules 数组存在
       mergeObj['prepend-rules'] = mergeObj['prepend-rules'] || []
@@ -107,9 +107,9 @@ export const addQuickRoutingRule = async (
       `手动路径控制规则已置顶生效: ${newRule}`,
       2500,
     )
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to add quick routing rule:', e)
-    showNotice.error(e.message || String(e))
+    showNotice.error(e instanceof Error ? e.message : String(e))
   }
 }
 
@@ -145,7 +145,7 @@ export const addQuickRoutingRules = async (
         )
         mergeYaml = '{}'
       }
-      const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, any>
+      const mergeObj = (yaml.load(mergeYaml) || {}) as Record<string, unknown>
 
       const existing: string[] = Array.isArray(mergeObj['prepend-rules'])
         ? (mergeObj['prepend-rules'] as string[])
@@ -174,9 +174,9 @@ export const addQuickRoutingRules = async (
     await enhanceProfiles()
 
     return addedCount
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Failed to add bulk routing rules:', e)
-    showNotice.error(e.message || String(e))
+    showNotice.error(e instanceof Error ? e.message : String(e))
     return 0
   }
 }

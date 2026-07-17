@@ -140,7 +140,7 @@ const createSharedSubscriptionEntry = (
  * against the current cache entry before calling `queryClient.setQueryData`.
  */
 type NextFn<T> = (
-  error?: any,
+  error?: unknown,
   data?: T | ((current?: T) => T | undefined),
 ) => void
 
@@ -280,7 +280,7 @@ export const useMihomoWsSubscription = <T>(
       // - 窗口结束时 flush 最新值（保证最终一致性）
       // 这对于 WebSocket 订阅场景是合理的：既保证响应速度，又减少重复渲染。
       wrappedNext = (
-        error?: any,
+        error?: unknown,
         data?: T | ((current?: T) => T | undefined),
       ) => {
         if (error !== undefined && error !== null) {

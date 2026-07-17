@@ -16,6 +16,7 @@ import { useProxiesData } from '@/providers/app-data-context'
 import { getProxyAddr } from '@/services/cmds'
 import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
+import type { IProxyItem } from '@/types/clash'
 import { get3DCardStyle } from '@/utils/button-styles'
 
 import {
@@ -147,7 +148,7 @@ export const ActiveNodeStatusCard = () => {
     if (currentCandidateNodes.length === 0) return
 
     const currentIndex = currentCandidateNodes.findIndex(
-      (node: any) => node?.name === activeNodeName,
+      (node: IProxyItem) => node?.name === activeNodeName,
     )
 
     let nextNodeName = ''

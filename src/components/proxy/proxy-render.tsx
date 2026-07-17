@@ -1,15 +1,11 @@
 import { InboxRounded } from '@mui/icons-material'
 import { Box, Typography } from '@mui/material'
 import { memo, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 
 import { useIconCache } from '@/hooks/use-icon-cache'
 import { useVerge } from '@/hooks/use-verge'
-import { useThemeMode } from '@/services/states'
 
-import { ProxyHead } from './proxy-head'
 import { ProxyItem } from './proxy-item'
-import { DEFAULT_STATE } from './use-head-state'
 import type { HeadState } from './use-head-state'
 import type { IRenderItem } from './use-render-list'
 
@@ -27,23 +23,11 @@ interface RenderProps {
 }
 
 const ProxyRenderComponent = (props: RenderProps) => {
-  const { t: _t } = useTranslation()
-  const {
-    indent,
-    item,
-    onLocation,
-    onCheckAll,
-    onHeadState,
-    onChangeProxy,
-    isTesting,
-  } = props
+  const { item, onChangeProxy } = props
   const { type, group, headState, proxy, proxyCol, col } = item
   const { verge } = useVerge()
   const enable_group_icon = verge?.enable_group_icon ?? true
-  const mode = useThemeMode()
-  const isDark = mode === 'light' ? false : true
-  const _itembackgroundcolor = isDark ? '#282A36' : '#ffffff'
-  const _iconCachePath = useIconCache({
+  useIconCache({
     icon: group?.icon,
     cacheKey: (group?.name ?? '').replaceAll(' ', ''),
     enabled: enable_group_icon,
@@ -85,21 +69,6 @@ const ProxyRenderComponent = (props: RenderProps) => {
     item.indexInGroup,
     col,
   ])
-
-  if (type === 1) {
-    return (
-      <ProxyHead
-        sx={{ pl: 2, pr: 3, mt: indent ? 1 : 0.5, mb: 1 }}
-        url={group?.testUrl}
-        groupName={group?.name ?? ''}
-        headState={headState ?? DEFAULT_STATE}
-        isTesting={isTesting}
-        onLocation={() => onLocation(group)}
-        onCheckDelay={() => onCheckAll(group?.name ?? '')}
-        onHeadState={(p) => onHeadState(group?.name ?? '', p)}
-      />
-    )
-  }
 
   if (type === 2) {
     if (!proxy) return null

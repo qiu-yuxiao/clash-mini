@@ -144,9 +144,6 @@ pub struct IVerge {
     /// 默认的延迟测试连接
     pub default_latency_test: Option<String>,
 
-    /// 默认的延迟测试超时时间
-    pub default_latency_timeout: Option<i16>,
-
     /// 是否自动检测当前节点延迟
     pub enable_auto_delay_detection: Option<bool>,
 
@@ -475,7 +472,6 @@ impl IVerge {
         patch!(auto_close_connection);
         patch!(auto_check_update);
         patch!(default_latency_test);
-        patch!(default_latency_timeout);
         patch!(enable_auto_delay_detection);
         patch!(auto_delay_detection_interval_minutes);
         patch!(enable_builtin_enhanced);

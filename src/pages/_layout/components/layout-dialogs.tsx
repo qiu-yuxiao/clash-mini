@@ -7,6 +7,8 @@ import {
   Dialog,
   IconButton,
   useTheme,
+  type SxProps,
+  type Theme,
 } from '@mui/material'
 import { type Update } from '@tauri-apps/plugin-updater'
 import React from 'react'
@@ -43,8 +45,8 @@ interface LayoutDialogsProps {
   setEditProfileInterval: (val: number) => void
   isEditProfileLocal: boolean
   handleSaveProfile: () => void
-  defaultBtn3DStyle: any
-  primaryBtn3DStyle: any
+  defaultBtn3DStyle: SxProps<Theme>
+  primaryBtn3DStyle: SxProps<Theme>
 
   // Client Update Dialog
   clientUpdateOpen: boolean

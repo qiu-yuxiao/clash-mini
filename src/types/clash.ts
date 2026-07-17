@@ -3,7 +3,7 @@ export interface IConfigData {
   mode: string
   ipv6: boolean
   'socket-port': number
-  'allow-lan': boolean
+  allowLan: boolean
   'log-level': string
   'mixed-port': number
   'redir-port': number
@@ -61,7 +61,6 @@ export interface IConfigData {
   'proxy-groups'?: IProxyGroupItem[]
 }
 
-
 export interface IProxyItem {
   name: string
   type: string
@@ -111,7 +110,6 @@ export interface IRuleProviderItem {
   vehicleType: string
 }
 
-
 export interface ILogItem {
   type: string
   time?: string
@@ -129,7 +127,6 @@ export interface IClashLog {
   logOrder: LogOrder
 }
 
-
 /**
  * Some interface for command
  */
@@ -144,7 +141,6 @@ export interface IClashInfo {
   server?: string // external-controller
   secret?: string
 }
-
 
 export interface IProxyGroupConfig {
   name: string
@@ -492,7 +488,9 @@ export interface WireGuardPeerOptions {
   'allowed-ips'?: string[]
 }
 // wireguard
-export interface IProxyWireguardConfig extends IProxyBaseConfig, WireGuardPeerOptions {
+export interface IProxyWireguardConfig
+  extends IProxyBaseConfig,
+    WireGuardPeerOptions {
   name: string
   type: 'wireguard'
   ip?: string
@@ -677,5 +675,3 @@ export type IProxyConfig = (
 ) & {
   smux?: boolean | IProxySmuxConfig['smux']
 }
-
-

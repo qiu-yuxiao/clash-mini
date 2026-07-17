@@ -22,10 +22,10 @@
     }
   },
   "a11y": {
-    "pinWindow": "Pin window on top",
-    "openSettings": "Open settings",
-    "closeSettings": "Close settings",
-    "closeLogsDialog": "Close logs dialog",
-    "selectLanguage": "Select language"
+    "pinWindow": "پین کردن پنجره در بالا",
+    "openSettings": "باز کردن تنظیمات",
+    "closeSettings": "بستن تنظیمات",
+    "closeLogsDialog": "بستن گفتگوی گزارش‌ها",
+    "selectLanguage": "انتخاب زبان"
   }
 }
