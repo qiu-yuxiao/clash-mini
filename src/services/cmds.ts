@@ -15,7 +15,7 @@ import type {
   IProfileOption,
 } from '@/types/profile'
 import type { IVergeConfig, ValidationOutcome } from '@/types/verge'
-import { debugLog } from '@/utils/debug'
+import { debugLog, isDebugLoggingEnabled } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
@@ -24,6 +24,8 @@ import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
  * 用于 UI 线程卡死时（DevTools 无法打开）仍能在后端日志中看到前端 IPC 调用时间线
  */
 export function frontendLog(level: 'info' | 'warn' | 'error', message: string) {
+  // ERROR 始终转发；INFO/WARN 仅在 debug 开启时转发（见 src/utils/debug 的 isDebugLoggingEnabled）
+  if (level !== 'error' && !isDebugLoggingEnabled()) return
   invoke('frontend_log', { level, message }).catch((err) => {
     // 日志通道本身失败时，回退到 console（不递归调 frontendLog 避免死循环）
     console.warn('[frontendLog] 日志转发失败，回退到 console:', err, '原始消息:', message)

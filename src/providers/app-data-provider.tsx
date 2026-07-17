@@ -274,24 +274,9 @@ export const AppDataProvider = ({
       }
       lastProxyTimer = setTimeout(() => {
         lastProxyTimer = null
-        const t0 = performance.now()
-        frontendLog(
-          'info',
-          '[app-data] refresh-proxy-config event -> refreshProxy() calling...',
+        refreshProxy().catch((err) =>
+          frontendLog('error', `[app-data] refreshProxy FAILED: ${err}`),
         )
-        refreshProxy()
-          .then(() => {
-            frontendLog(
-              'info',
-              `[app-data] refreshProxy resolved, took ${Math.round(performance.now() - t0)}ms`,
-            )
-          })
-          .catch((err) =>
-            frontendLog(
-              'error',
-              `[app-data] refreshProxy FAILED took ${Math.round(performance.now() - t0)}ms: ${err}`,
-            ),
-          )
       }, 200)
     }
 

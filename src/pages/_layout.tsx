@@ -144,9 +144,6 @@ async function waitForClashReady(t: TFunc): Promise<boolean> {
         (name: string) => !isDummyNode(name),
       )
       if (hasRealNodes) {
-        console.log(
-          `[waitForClashReady] Clash 内核已就绪，耗时 ${Date.now() - startedAt}ms`,
-        )
         return true
       }
     } catch {
@@ -283,7 +280,6 @@ async function triggerAutoSelectAndRefresh(
       if (profileUid) {
         const currentUid = (await getProfiles())?.current || ''
         if (currentUid !== profileUid) {
-          console.log('[Layout] autoSelect: Profile 已切换，跳过测速')
           return
         }
       }
@@ -308,7 +304,6 @@ async function triggerAutoSelectAndRefresh(
       if (profileUid) {
         const currentUid = (await getProfiles())?.current || ''
         if (currentUid !== profileUid) {
-          console.log('[Layout] Fallback: Profile 已切换，跳过 fallback 测速')
           return
         }
       }
@@ -324,7 +319,6 @@ async function triggerAutoSelectAndRefresh(
       if (!hasHealth) {
         const names = await getFilteredNodeNames()
         if (names.length === 0) return
-        console.log('[Layout] Fallback: 10秒无健康节点，触发全节点测速')
         await batchTestWithFirstBatchSelect(names, true)
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
@@ -1104,7 +1098,6 @@ const Layout = () => {
     lastFullTestTimeRef.current = now
 
     try {
-      console.log('[Layout] 窗口唤醒，刷新本地代理状态')
       await refreshAllRef.current()
 
       const names = await getFilteredNodeNames()
@@ -1113,7 +1106,6 @@ const Layout = () => {
         return
       }
 
-      console.log('[Layout] 窗口唤醒，延迟到渲染完成后触发全节点测速')
 
       // H-14: 清理前一次的 wakeup test timer，防止泄漏
       if (wakeupTestTimerRef.current !== null) {
@@ -1131,7 +1123,6 @@ const Layout = () => {
         // M2-08: 校验 Profile 未切换，避免对旧 Profile 节点执行测速
         const currentUid = (await getProfiles())?.current || ''
         if (currentUid !== capturedUid) {
-          console.log('[Layout] 唤醒测速: Profile 已切换，跳过')
           return
         }
         try {
@@ -1185,9 +1176,6 @@ const Layout = () => {
         uid: currentProfileUid,
         counter: profileRefreshCounter,
       }
-      console.log(
-        `[Layout] profile ${currentProfileUid} 未变（可能为轻量模式唤醒），跳过 enhance`,
-      )
 
       let cancelled = false
       ;(async () => {
@@ -1232,7 +1220,6 @@ const Layout = () => {
           throw new Error('Profile configuration validation failed')
         }
         if (cancelled || isImportingRef.current) return
-        console.log(`[Layout] Enhanced active profile: ${uid}`)
         // enhance 成功后才写入 localStorage，防止失败时下次跳过
         localStorage.setItem('clash-mini-last-enhanced-uid', uid)
         await activateSelectedRef.current()
@@ -1263,9 +1250,6 @@ const Layout = () => {
         if (startupRetryCountRef.current < 3) {
           startupRetryCountRef.current += 1
           const retryDelay = 2000 * startupRetryCountRef.current
-          console.log(
-            `[Layout] Retrying profile activation in ${retryDelay}ms (Attempt ${startupRetryCountRef.current}/3)`,
-          )
           timerId = setTimeout(() => {
             if (!cancelled) {
               setProfileRefreshCounter((c) => c + 1)
@@ -1293,19 +1277,16 @@ const Layout = () => {
       if (fallbackTimerRef.current) {
         clearTimeout(fallbackTimerRef.current)
         fallbackTimerRef.current = null
-        console.log('[Layout] 组件卸载，清理 Fallback 定时器')
       }
       // H-13: 清理 autoSelect timer
       if (autoSelectTimerRef.current !== null) {
         clearTimeout(autoSelectTimerRef.current)
         autoSelectTimerRef.current = null
-        console.log('[Layout] 组件卸载，清理 autoSelect 定时器')
       }
       // H-14: 清理 wakeup test timer
       if (wakeupTestTimerRef.current !== null) {
         clearTimeout(wakeupTestTimerRef.current)
         wakeupTestTimerRef.current = null
-        console.log('[Layout] 组件卸载，清理 wakeupTest 定时器')
       }
     }
   }, [])

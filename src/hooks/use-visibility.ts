@@ -74,30 +74,18 @@ export const useVisibility = () => {
     // 这能防止 resize 期间的 IPC 洪水（onResized 每像素触发一次）
     if (inFlightRef.current) return
     inFlightRef.current = true
-    const t0 = performance.now()
-    frontendLog(
-      'info',
-      '[useVisibility] updateWindowState calling isMinimized+isVisible...',
-    )
     try {
       const currentWindow = getCurrentWindow()
       const [minimized, visible] = await Promise.all([
         currentWindow.isMinimized(),
         currentWindow.isVisible(),
       ])
-      frontendLog(
-        'info',
-        `[useVisibility] IPC resolved min=${minimized} vis=${visible}, took ${Math.round(performance.now() - t0)}ms`,
-      )
       if (isMountedRef.current) {
         setIsMinimized(minimized)
         setIsWindowVisible(visible)
       }
     } catch (err) {
-      frontendLog(
-        'error',
-        `[useVisibility] updateWindowState FAILED took ${Math.round(performance.now() - t0)}ms: ${err}`,
-      )
+      frontendLog('error', `[useVisibility] updateWindowState FAILED: ${err}`)
     } finally {
       inFlightRef.current = false
     }
