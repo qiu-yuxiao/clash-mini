@@ -304,11 +304,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 if let Some(webview_window) = window.get_webview_window("main") {
-                    match event {
-                        tauri::WindowEvent::CloseRequested { .. } => {
-                            event_handlers::handle_window_close(&webview_window, event);
-                        }
-                        _ => {}
+                    if let tauri::WindowEvent::CloseRequested { .. } = event {
+                        event_handlers::handle_window_close(&webview_window, event);
                     }
                 }
             }
