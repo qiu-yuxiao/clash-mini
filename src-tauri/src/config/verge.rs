@@ -189,7 +189,6 @@ pub struct IVerge {
     #[cfg(target_os = "macos")]
     pub enable_tray_speed: Option<bool>,
 
-
     /// show outbound modes directly on tray root menu
     pub tray_inline_outbound_modes: Option<bool>,
 

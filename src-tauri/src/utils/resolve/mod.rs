@@ -121,11 +121,7 @@ pub fn resolve_setup_async() {
                 init_system_proxy().await;
                 init_system_proxy_guard().await;
             } else {
-                logging!(
-                    warn,
-                    Type::Setup,
-                    "Core 启动失败，跳过系统代理设置以保护用户网络连接"
-                );
+                logging!(warn, Type::Setup, "Core 启动失败，跳过系统代理设置以保护用户网络连接");
             }
         });
 

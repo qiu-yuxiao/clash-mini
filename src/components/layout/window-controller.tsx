@@ -6,7 +6,7 @@ import getSystem from '@/utils/get-system'
 
 export function WindowControls() {
   const OS = getSystem()
-  const { maximized, minimize, close, toggleMaximize } = useWindowControls()
+  const { isLargeMode, minimize, close, toggleMaximize } = useWindowControls()
 
   // 通过前端对 tauri 窗口进行翻转全屏时会短暂地与系统图标重叠渲染。
   // 这可能是上游缺陷，保险起见跨平台以窗口的最大化翻转为准。
@@ -39,7 +39,7 @@ export function WindowControls() {
             <Minimize sx={{ width: 14, height: 14 }} />
           </IconButton>
           <IconButton sx={btnSx} onClick={toggleMaximize}>
-            {maximized ? (
+            {isLargeMode ? (
               <FilterNone sx={{ width: 14, height: 14 }} />
             ) : (
               <CropSquare sx={{ width: 14, height: 14 }} />
@@ -55,7 +55,7 @@ export function WindowControls() {
             <Minimize sx={{ width: 16, height: 16 }} />
           </IconButton>
           <IconButton sx={btnSx} onClick={toggleMaximize}>
-            {maximized ? (
+            {isLargeMode ? (
               <FilterNone sx={{ width: 16, height: 16 }} />
             ) : (
               <CropSquare sx={{ width: 16, height: 16 }} />
@@ -80,7 +80,7 @@ export function WindowControls() {
             <Minimize sx={{ width: 16, height: 16 }} />
           </IconButton>
           <IconButton sx={btnSx} onClick={toggleMaximize}>
-            {maximized ? (
+            {isLargeMode ? (
               <FilterNone sx={{ width: 16, height: 16 }} />
             ) : (
               <CropSquare sx={{ width: 16, height: 16 }} />

@@ -435,8 +435,6 @@ async fn apply_builtin_scripts(mut config: Mapping, clash_core: Option<String>, 
     config
 }
 
-
-
 fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     use serde_yaml_ng::Value;
 

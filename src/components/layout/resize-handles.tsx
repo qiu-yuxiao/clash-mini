@@ -102,7 +102,7 @@ const handles: { direction: Direction; style: React.CSSProperties }[] = [
 ]
 
 export const ResizeHandles: React.FC = () => {
-  const { maximized, currentWindow } = useWindow()
+  const { isLargeMode, currentWindow } = useWindow()
 
   const handlePointerDown = useCallback(
     (direction: Direction) => (e: React.PointerEvent) => {
@@ -146,7 +146,7 @@ export const ResizeHandles: React.FC = () => {
     [currentWindow],
   )
 
-  if (maximized) return null
+  if (isLargeMode) return null
 
   return (
     <>

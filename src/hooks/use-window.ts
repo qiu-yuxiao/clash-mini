@@ -11,17 +11,17 @@ export const useWindow = () => {
 }
 
 export const useWindowControls = () => {
-  const { maximized, minimize, toggleMaximize, close, currentWindow } =
+  const { isLargeMode, minimize, toggleMaximize, close, currentWindow } =
     useWindow()
   return {
-    maximized,
+    isLargeMode,
     minimize,
     toggleMaximize,
     close,
     currentWindow,
   } satisfies Pick<
     WindowContextType,
-    'maximized' | 'minimize' | 'toggleMaximize' | 'close' | 'currentWindow'
+    'isLargeMode' | 'minimize' | 'toggleMaximize' | 'close' | 'currentWindow'
   >
 }
 

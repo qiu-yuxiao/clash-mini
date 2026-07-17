@@ -1,8 +1,5 @@
 use crate::{
-    core::{
-        handle::Handle,
-        manager::CoreManager,
-    },
+    core::{handle::Handle, manager::CoreManager},
     utils::{
         dirs,
         network::{NetworkManager, ProxyType},

@@ -298,7 +298,13 @@ impl CoreManager {
         match mihomo.select_node_for_group("PROXY", node).await {
             Ok(()) => logging!(info, Type::Core, "已恢复 PROXY 组节点选择: {}", node),
             Err(e) => {
-                logging!(warn, Type::Core, "恢复 PROXY 组节点选择失败 ({}): {}，尝试回退到子集首个可用节点", node, e);
+                logging!(
+                    warn,
+                    Type::Core,
+                    "恢复 PROXY 组节点选择失败 ({}): {}，尝试回退到子集首个可用节点",
+                    node,
+                    e
+                );
                 // 读取用户保存的 filterText，在子集范围内选点兜底
                 let filter_lower = match Config::profiles().await.latest_arc().current.as_ref() {
                     Some(current_uid) => {
@@ -306,10 +312,15 @@ impl CoreManager {
                             .map(|d| d.join("proxy_head_state.json"))
                             .ok();
                         match path {
-                            Some(p) => tokio::fs::read_to_string(&p).await
+                            Some(p) => tokio::fs::read_to_string(&p)
+                                .await
                                 .ok()
                                 .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
-                                .and_then(|v| v[current_uid.as_str()]["PROXY"]["filterText"].as_str().map(|s| s.trim().to_lowercase()))
+                                .and_then(|v| {
+                                    v[current_uid.as_str()]["PROXY"]["filterText"]
+                                        .as_str()
+                                        .map(|s| s.trim().to_lowercase())
+                                })
                                 .unwrap_or_default(),
                             None => String::new(),
                         }
@@ -318,7 +329,8 @@ impl CoreManager {
                 };
                 if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
                     if let Some(all) = group_info.all {
-                        let fallback_node = all.iter()
+                        let fallback_node = all
+                            .iter()
                             .find(|n| filter_lower.is_empty() || n.to_lowercase().contains(&filter_lower))
                             .or_else(|| all.first());
                         if let Some(fb) = fallback_node {

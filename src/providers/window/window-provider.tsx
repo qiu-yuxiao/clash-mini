@@ -1,18 +1,67 @@
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { getCurrentWindow, LogicalSize, PhysicalPosition, currentMonitor } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
-import { frontendLog, withIpcTimeout } from '@/services/cmds'
+import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
 import getSystem from '@/utils/get-system'
 
-import { WindowContext } from './window-context'
+import { WindowContext, type WindowContextType } from './window-context'
 
 /** FEAT-003: Idle duration (ms) before chrome auto-hides */
 const IDLE_HIDE_DELAY_MS = 10_000
 
+/** 大尺寸模式窗口尺寸（logical px），与后端 resolve/window.rs 的 MAX_WIDTH/MAX_HEIGHT 对齐 */
+const LARGE_MODE_WIDTH = 640
+const LARGE_MODE_HEIGHT = 860
+
 const OS = getSystem()
 const IS_MACOS = OS === 'macos'
+
+/**
+ * 确保窗口在当前屏幕内可见。
+ * 大尺寸模式切换后调用，若窗口右下角超出屏幕边界则调整位置。
+ */
+async function ensureWindowInScreen(
+  win: NonNullable<WindowContextType['currentWindow']>,
+  targetWidth: number = LARGE_MODE_WIDTH,
+  targetHeight: number = LARGE_MODE_HEIGHT,
+): Promise<void> {
+  try {
+    const [pos, monitor] = await Promise.all([
+      withIpcTimeout(win.outerPosition(), 5000, 'outerPosition'),
+      withIpcTimeout(currentMonitor(), 5000, 'currentMonitor'),
+    ])
+    if (!monitor) return
+
+    const factor = monitor.scaleFactor
+    const physW = Math.round(targetWidth * factor)
+    const physH = Math.round(targetHeight * factor)
+    // 使用 workArea（排除任务栏）而非整个 monitor size
+    const monW = monitor.workArea.size.width
+    const monH = monitor.workArea.size.height
+    const monX = monitor.workArea.position.x
+    const monY = monitor.workArea.position.y
+
+    let newX = pos.x
+    let newY = pos.y
+    if (newX + physW > monX + monW) newX = monX + monW - physW
+    if (newY + physH > monY + monH) newY = monY + monH - physH
+    if (newX < monX) newX = monX
+    if (newY < monY) newY = monY
+
+    // 仅在位置需要调整时调用 setPosition，减少 IPC 调用
+    if (newX !== pos.x || newY !== pos.y) {
+      await withIpcTimeout(
+        win.setPosition(new PhysicalPosition(newX, newY)),
+        5000,
+        'setPosition',
+      )
+    }
+  } catch (err) {
+    console.warn('[WindowProvider] ensureWindowInScreen failed:', err)
+  }
+}
 
 export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -30,7 +79,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
    */
   const decorated: boolean = IS_MACOS
 
-  const [maximized, setMaximized] = useState<boolean | null>(null)
+  const [isLargeMode, setIsLargeMode] = useState(false)
   /** FEAT-003: true when custom titlebar is hidden by idle auto-hide timer (stealth mode) */
   const [isDecorationsHidden, setIsDecorationsHidden] = useState(false)
   /** 窗口宽度 ≤ 285px（窄窗口）：控制路由表格、流量面板布局 */
@@ -58,6 +107,17 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null)
   const dragStartedRef = useRef(false)
 
+  // ── 大尺寸模式（替代原生 maximize）─────────────────────────────────────────
+  /** isLargeMode 的 ref 镜像，供 onResized 闭包读取最新值，避免闭包陷阱 */
+  const isLargeModeRef = useRef(false)
+  /**
+   * 最近一次非大尺寸模式的窗口尺寸（logical px）。
+   * 进入大尺寸模式时保存当前尺寸，退出时恢复。
+   * 初始值 {width:285, height:680} 与后端 DEFAULT_WIDTH/DEFAULT_HEIGHT 对齐，
+   * 挂载后通过 innerSize() IPC 校正为实际值（兼容窗口状态恢复插件）。
+   */
+  const lastNonLargeSizeRef = useRef({ width: 285, height: 680 })
+
   const close = useCallback(async () => {
     if (!currentWindow) return
     await new Promise((resolve) => setTimeout(resolve, 20))
@@ -77,7 +137,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsDecorationsHidden(false)
   }, [])
 
-  // ── Resize listener: track maximized state + minimal width ──────────────────
+  // ── Resize listener: track large-mode + minimal width ────────────────────────
   useEffect(() => {
     if (!currentWindow) return
     let isUnmounted = false
@@ -114,30 +174,25 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           restoreChrome()
         }
 
-        const t0 = performance.now()
-        frontendLog(
-          'info',
-          `[WindowProvider] onResized -> isMaximized() calling...`,
-        )
-        try {
-          const value = await withIpcTimeout(
-            currentWindow.isMaximized(),
-            5000,
-            'isMaximized',
-          )
-          frontendLog(
-            'info',
-            `[WindowProvider] isMaximized() resolved = ${value}, took ${Math.round(performance.now() - t0)}ms`,
-          )
-          if (!isUnmounted) {
-            setMaximized(value)
-          }
-        } catch (err) {
-          frontendLog(
-            'error',
-            `[WindowProvider] isMaximized FAILED took ${Math.round(performance.now() - t0)}ms: ${err}`,
-          )
+        // 大尺寸模式逻辑：event.payload 是 PhysicalSize，转换为 logical 比较
+        const factor = window.devicePixelRatio || 1
+        const logicalW = width / factor
+        const logicalH = height / factor
+        const isLargeSize =
+          Math.abs(logicalW - LARGE_MODE_WIDTH) < 1 &&
+          Math.abs(logicalH - LARGE_MODE_HEIGHT) < 1
+
+        if (isLargeModeRef.current && !isLargeSize) {
+          // 从大尺寸模式拖动变小 → 自动退出大尺寸模式
+          isLargeModeRef.current = false
+          setIsLargeMode(false)
+          // 更新 lastNonLargeSizeRef 为当前拖动后的尺寸
+          lastNonLargeSizeRef.current = { width: logicalW, height: logicalH }
+        } else if (!isLargeModeRef.current && !isLargeSize) {
+          // 非大尺寸模式下拖动 → 更新 lastNonLargeSizeRef
+          lastNonLargeSizeRef.current = { width: logicalW, height: logicalH }
         }
+        // isLargeSize=true 且 isLargeModeRef.current=true：toggleMaximize 触发的 setSize，无需处理
       },
       300,
     )
@@ -271,17 +326,53 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [resetIdleTimer, restoreChrome, currentWindow])
 
-  // L-17: TOCTOU（检查-使用时间差）问题——isMaximized 状态与操作之间
+  // L-17: TOCTOU（检查-使用时间差）问题——isLargeMode 状态与操作之间
   // 可能有窗口状态变化。影响很小，try-catch 已能安全处理边界情况。
   const toggleMaximize = useCallback(async () => {
     if (!currentWindow) return
     try {
-      if (await currentWindow.isMaximized()) {
-        await currentWindow.unmaximize()
-        setMaximized(false)
+      if (!isLargeModeRef.current) {
+        // 进入大尺寸模式：保存当前 innerSize，然后设为 640×860
+        const innerSize = await withIpcTimeout(
+          currentWindow.innerSize(),
+          5000,
+          'innerSize',
+        )
+        const factor = window.devicePixelRatio || 1
+        lastNonLargeSizeRef.current = {
+          width: innerSize.width / factor,
+          height: innerSize.height / factor,
+        }
+
+        await withIpcTimeout(
+          currentWindow.setSize(
+            new LogicalSize(LARGE_MODE_WIDTH, LARGE_MODE_HEIGHT),
+          ),
+          5000,
+          'setSize-large',
+        )
+
+        await ensureWindowInScreen(currentWindow)
+
+        isLargeModeRef.current = true
+        setIsLargeMode(true)
       } else {
-        await currentWindow.maximize()
-        setMaximized(true)
+        // 退出大尺寸模式：恢复保存的尺寸
+        const saved = lastNonLargeSizeRef.current
+        await withIpcTimeout(
+          currentWindow.setSize(new LogicalSize(saved.width, saved.height)),
+          5000,
+          'setSize-restore',
+        )
+
+        await ensureWindowInScreen(
+          currentWindow,
+          saved.width,
+          saved.height,
+        )
+
+        isLargeModeRef.current = false
+        setIsLargeMode(false)
       }
     } catch (err) {
       console.warn('[WindowProvider] toggleMaximize failed:', err)
@@ -291,12 +382,45 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (!currentWindow) return
     currentWindow.setMinimizable?.(true)
+    // Windows/Linux 禁用 OS 级 maximize（Win+上箭头、双击标题栏、任务栏右键），
+    // 改由 toggleMaximize 自定义 640×860 大尺寸模式。
+    // macOS 保留原生绿色按钮行为（zoom/fullscreen），不干预。
+    if (!IS_MACOS) {
+      currentWindow.setMaximizable?.(false)
+    }
+    // 初始化 lastNonLargeSizeRef 为当前实际窗口尺寸（兼容窗口状态恢复插件）
+    currentWindow
+      .innerSize()
+      .then((size) => {
+        const factor = window.devicePixelRatio || 1
+        const logicalW = size.width / factor
+        const logicalH = size.height / factor
+
+        // 若窗口状态恢复插件恢复了 640×860（大尺寸模式下关闭程序），
+        // 标记为大尺寸模式，lastNonLargeSizeRef 设为默认初始尺寸
+        const isLargeSize =
+          Math.abs(logicalW - LARGE_MODE_WIDTH) < 1 &&
+          Math.abs(logicalH - LARGE_MODE_HEIGHT) < 1
+        if (isLargeSize) {
+          isLargeModeRef.current = true
+          setIsLargeMode(true)
+          lastNonLargeSizeRef.current = { width: 285, height: 680 }
+        } else {
+          lastNonLargeSizeRef.current = {
+            width: logicalW,
+            height: logicalH,
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('[WindowProvider] 初始化 innerSize 失败:', err)
+      })
   }, [currentWindow])
 
   const contextValue = useMemo(
     () => ({
       decorated,
-      maximized,
+      isLargeMode,
       isDecorationsHidden,
       isMinimalWidth,
       isMiniStatus,
@@ -307,7 +431,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     }),
     [
       decorated,
-      maximized,
+      isLargeMode,
       isDecorationsHidden,
       isMinimalWidth,
       isMiniStatus,
