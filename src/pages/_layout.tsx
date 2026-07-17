@@ -1658,28 +1658,6 @@ const Layout = () => {
             <WindowControls />
           </div>
         </div>
-      ) : !decorated && isDecorationsHidden ? (
-        // 隐藏标题栏模式：原标题栏位置改显示活跃出口节点栏目（流量监控器定位）
-        <div
-          className="the_titlebar"
-          data-tauri-drag-region="true"
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 8px',
-            boxSizing: 'border-box',
-            height: '30px',
-            minHeight: '30px',
-            maxHeight: '30px',
-            background: 'var(--background-color)',
-            userSelect: 'none',
-            flexShrink: 0,
-            overflow: 'hidden',
-          }}
-        >
-          <ActiveNodeStatusCard />
-        </div>
       ) : null,
     [decorated, isDecorationsHidden, appVersion],
   )
