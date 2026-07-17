@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef } from 'react'
 
-import { MINI_WIDTH_THRESHOLD } from '@/constants'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
+import { useWindowDecorations } from '@/hooks/use-window'
 import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 
@@ -11,7 +11,6 @@ import {
   useHeadStateNew,
   type HeadState,
 } from './use-head-state'
-import { useWindowWidth } from './use-window-width'
 
 // 代理组类型
 type ProxyGroup = {
@@ -61,14 +60,6 @@ type GroupCache = {
   groupRef: ProxyGroup
 }
 
-// 优化列布局计算
-const calculateColumns = (width: number): number => {
-  if (width <= MINI_WIDTH_THRESHOLD) {
-    return 1
-  }
-  return 3 // 依据 Agreement 第九条，宽屏下固定为 3 列排版
-}
-
 // 优化分组逻辑
 const groupProxies = <T = unknown>(list: T[], size: number): T[][] => {
   return list.reduce((acc, item) => {
@@ -86,15 +77,16 @@ export const useRenderList = (mode: string) => {
   // 使用全局数据提供者
   const { proxies: proxiesData } = useProxiesData()
   const { refreshProxy } = useAppRefreshers()
-  const { width } = useWindowWidth()
+  const { isMinimalWidth } = useWindowDecorations()
   const [headStates, setHeadState] = useHeadStateNew()
   const latencyTimeout = NODE_DELAY_MAX_MS
 
   // 延迟更新计数器，每次组级通知递增，驱动 useMemo 重新计算排序
   const [delayBump, bumpDelay] = useReducer((c: number) => c + 1, 0)
 
-  // 计算列数
-  const col = useMemo(() => calculateColumns(width), [width])
+  // 计算列数：窄窗口（≤285）单列，宽/大尺寸模式固定 3 列
+  // 复用全 app 唯一的窗口尺寸状态源（window-provider），避免与浏览器 resize 链路脱钩
+  const col = useMemo(() => (isMinimalWidth ? 1 : 3), [isMinimalWidth])
 
   // 确保代理数据加载
   // L-19: 限制 refreshProxy 最大重试次数（10次），防止无限轮询

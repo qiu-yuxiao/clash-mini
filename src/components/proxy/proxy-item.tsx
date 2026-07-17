@@ -9,12 +9,10 @@ import {
 import React, { memo } from 'react'
 
 import { BaseLoading } from '@/components/base'
-import { MINI_WIDTH_THRESHOLD } from '@/constants'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
+import { useWindowDecorations } from '@/hooks/use-window'
 import delayManager from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
-
-import { useWindowWidth } from './use-window-width'
 
 interface Props {
   group: IProxyGroupItem
@@ -47,8 +45,8 @@ export const ProxyItem = memo(
       onClick,
     } = props
 
-    const { width } = useWindowWidth()
-    const isMinimal = width <= MINI_WIDTH_THRESHOLD
+    const { isMinimalWidth } = useWindowDecorations()
+    const isMinimal = isMinimalWidth
 
     const displayName = (proxy?.name ?? '').replace(/\s\(\d{6}\)$/, '')
     const displayNow = proxy?.now ? proxy.now.replace(/\s\(\d{6}\)$/, '') : ''
