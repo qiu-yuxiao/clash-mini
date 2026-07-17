@@ -18,6 +18,9 @@ const LARGE_MODE_HEIGHT = 860
 const OS = getSystem()
 const IS_MACOS = OS === 'macos'
 
+/** 进入大尺寸模式前的窗口尺寸持久化 key（跨会话恢复用） */
+const LAST_NON_LARGE_SIZE_KEY = 'last-non-large-size'
+
 /**
  * 确保窗口在当前屏幕内可见。
  * 大尺寸模式切换后调用，若窗口右下角超出屏幕边界则调整位置。
@@ -61,6 +64,22 @@ async function ensureWindowInScreen(
   } catch (err) {
     console.warn('[WindowProvider] ensureWindowInScreen failed:', err)
   }
+}
+
+/**
+ * 获取窗口所在显示器的缩放因子（physical ↔ logical 转换用）。
+ * 统一使用 monitor.scaleFactor，与 ensureWindowInScreen 同源，
+ * 避免混合 DPI 多屏场景下 window.devicePixelRatio 可能与实际显示器不一致。
+ * 取值失败时回退到 window.devicePixelRatio。
+ */
+async function getScaleFactor(): Promise<number> {
+  try {
+    const monitor = await withIpcTimeout(currentMonitor(), 5000, 'currentMonitor')
+    if (monitor) return monitor.scaleFactor
+  } catch {
+    // 忽略，回退到 window.devicePixelRatio
+  }
+  return typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
 }
 
 export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -175,7 +194,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         // 大尺寸模式逻辑：event.payload 是 PhysicalSize，转换为 logical 比较
-        const factor = window.devicePixelRatio || 1
+        const factor = await getScaleFactor()
         const logicalW = width / factor
         const logicalH = height / factor
         const isLargeSize =
@@ -338,10 +357,17 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           5000,
           'innerSize',
         )
-        const factor = window.devicePixelRatio || 1
+        const factor = await getScaleFactor()
         lastNonLargeSizeRef.current = {
           width: innerSize.width / factor,
           height: innerSize.height / factor,
+        }
+        // 持久化「进入大尺寸前的尺寸」，供下次启动（窗口状态恢复插件恢复了 640×860 时）恢复
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(
+            LAST_NON_LARGE_SIZE_KEY,
+            JSON.stringify(lastNonLargeSizeRef.current),
+          )
         }
 
         await withIpcTimeout(
@@ -391,20 +417,37 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     // 初始化 lastNonLargeSizeRef 为当前实际窗口尺寸（兼容窗口状态恢复插件）
     currentWindow
       .innerSize()
-      .then((size) => {
-        const factor = window.devicePixelRatio || 1
+      .then(async (size) => {
+        const factor = await getScaleFactor()
         const logicalW = size.width / factor
         const logicalH = size.height / factor
 
         // 若窗口状态恢复插件恢复了 640×860（大尺寸模式下关闭程序），
-        // 标记为大尺寸模式，lastNonLargeSizeRef 设为默认初始尺寸
+        // 标记为大尺寸模式，lastNonLargeSizeRef 恢复为持久化的「进入大尺寸前的尺寸」
         const isLargeSize =
           Math.abs(logicalW - LARGE_MODE_WIDTH) < 1 &&
           Math.abs(logicalH - LARGE_MODE_HEIGHT) < 1
         if (isLargeSize) {
           isLargeModeRef.current = true
           setIsLargeMode(true)
-          lastNonLargeSizeRef.current = { width: 285, height: 680 }
+          // 读取持久化的「进入大尺寸前的尺寸」；无记录或数据损坏则回退默认
+          let restored = { width: 285, height: 680 }
+          try {
+            const raw = localStorage.getItem(LAST_NON_LARGE_SIZE_KEY)
+            if (raw) {
+              const parsed = JSON.parse(raw)
+              if (
+                parsed &&
+                typeof parsed.width === 'number' &&
+                typeof parsed.height === 'number'
+              ) {
+                restored = { width: parsed.width, height: parsed.height }
+              }
+            }
+          } catch {
+            // 忽略损坏数据，回退默认
+          }
+          lastNonLargeSizeRef.current = restored
         } else {
           lastNonLargeSizeRef.current = {
             width: logicalW,

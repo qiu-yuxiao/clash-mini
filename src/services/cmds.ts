@@ -423,10 +423,6 @@ export async function openLogsDir() {
   ).catch((err) => showNotice.error(err))
 }
 
-export async function openDevTools() {
-  return withIpcTimeout(invoke('open_devtools'), 10_000, 'openDevTools')
-}
-
 export async function downloadIconCache(url: string, name: string) {
   return withIpcTimeout(
     invoke<string>('download_icon_cache', { url, name }),

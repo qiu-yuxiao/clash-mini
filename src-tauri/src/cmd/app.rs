@@ -2,7 +2,6 @@ use super::CmdResult;
 use crate::core::autostart;
 use crate::{cmd::StringifyErr as _, feat, utils::dirs};
 use smartstring::alias::String;
-use tauri::{AppHandle, Manager as _};
 
 /// 打开应用程序所在目录
 #[tauri::command]
@@ -55,18 +54,6 @@ pub fn open_core_log() -> CmdResult<()> {
     #[cfg(target_os = "windows")]
     let log_path = crate::utils::help::snapshot_path(&log_path).stringify_err()?;
     open::that(log_path).stringify_err()
-}
-
-/// 打开/关闭开发者工具
-#[tauri::command]
-pub fn open_devtools(app_handle: AppHandle) {
-    if let Some(window) = app_handle.get_webview_window("main") {
-        if !window.is_devtools_open() {
-            window.open_devtools();
-        } else {
-            window.close_devtools();
-        }
-    }
 }
 
 /// 退出应用

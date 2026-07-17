@@ -100,7 +100,9 @@ export function useHeadStateNew() {
       try {
         localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(state))
         await invoke('save_proxy_head_state', { state })
-      } catch {}
+      } catch (err) {
+        console.warn('[useHeadState] 保存 head_state 到后端失败:', err)
+      }
     }, 100)
     return () => clearTimeout(timer)
   }, [state])

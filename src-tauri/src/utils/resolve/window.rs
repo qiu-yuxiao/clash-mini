@@ -95,6 +95,14 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             });
         });
 
+    // 非 macOS 平台在窗口创建阶段即禁用 OS 级 maximize（Win+上 / 双击标题栏 / 任务栏右键），
+    // 改由前端 toggleMaximize 自定义 640×860 大尺寸模式。
+    // 提前到创建阶段设置，消除挂载后 setMaximizable 的竞态窗口期。
+    #[cfg(not(target_os = "macos"))]
+    {
+        builder = builder.maximizable(false);
+    }
+
     #[cfg(target_os = "windows")]
     {
         builder = builder.transparent(false).additional_browser_args(

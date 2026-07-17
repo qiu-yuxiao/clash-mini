@@ -163,7 +163,6 @@ mod app_init {
             cmd::patch_verge_config,
             cmd::trigger_auto_select,
             cmd::download_icon_cache,
-            cmd::open_devtools,
             cmd::get_profiles,
             cmd::enhance_profiles,
             cmd::patch_profiles_config,
