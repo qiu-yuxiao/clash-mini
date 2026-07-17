@@ -24,7 +24,7 @@ interface RenderProps {
 
 const ProxyRenderComponent = (props: RenderProps) => {
   const { item, onChangeProxy } = props
-  const { type, group, headState, proxy, proxyCol, col } = item
+  const { type, group, headState, proxyCol, col } = item
   const { verge } = useVerge()
   const enable_group_icon = verge?.enable_group_icon ?? true
   useIconCache({
@@ -70,21 +70,6 @@ const ProxyRenderComponent = (props: RenderProps) => {
     col,
   ])
 
-  if (type === 2) {
-    if (!proxy) return null
-    return (
-      <ProxyItem
-        group={group}
-        proxy={proxy}
-        selected={group?.now === proxy?.name}
-        showType={headState?.showType}
-        indexInGroup={item.indexInGroup}
-        sx={{ py: 0, pl: 2 }}
-        onClick={() => onChangeProxy(group, proxy)}
-      />
-    )
-  }
-
   if (type === 3) {
     return (
       <Box
@@ -111,7 +96,7 @@ const ProxyRenderComponent = (props: RenderProps) => {
           height: 'auto',
           display: 'grid',
           gridTemplateColumns: `repeat(${col || 3}, 1fr)`,
-          pl: 0,
+          pl: 2,
         }}
       >
         {proxyColItemsMemo}

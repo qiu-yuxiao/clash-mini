@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import { useWindowDecorations } from '@/hooks/use-window'
@@ -80,6 +80,7 @@ export const useRenderList = (mode: string) => {
   const { isMinimalWidth } = useWindowDecorations()
   const [headStates, setHeadState] = useHeadStateNew()
   const latencyTimeout = NODE_DELAY_MAX_MS
+  const bumpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 延迟更新计数器，每次组级通知递增，驱动 useMemo 重新计算排序
   const [delayBump, bumpDelay] = useReducer((c: number) => c + 1, 0)
@@ -113,14 +114,27 @@ export const useRenderList = (mode: string) => {
     }
   }, [proxiesData, mode, refreshProxy])
 
-  // 注册 PROXY 组监听器，单点测速完成后驱动列表重排
-  // 注意：批量测速已通过 checkListDelay 内部 queueGroupNotification 触发，此监听器同时覆盖两类场景
-  useEffect(() => {
-    delayManager.setGroupListener('PROXY', bumpDelay)
-    return () => {
-      delayManager.removeGroupListener('PROXY', bumpDelay)
-    }
+  // 注册 PROXY 组监听器：测速/延迟结果回写会高频触发组级通知，
+  // 合并到 120ms 窗口内只递增一次 delayBump，避免主线程被连续 renderList 重算打满
+  //（与窗口 resize / 开抽屉叠加时表现为卡死）。
+  const scheduleBump = useCallback(() => {
+    if (bumpTimerRef.current) return
+    bumpTimerRef.current = setTimeout(() => {
+      bumpTimerRef.current = null
+      bumpDelay()
+    }, 120)
   }, [bumpDelay])
+
+  useEffect(() => {
+    delayManager.setGroupListener('PROXY', scheduleBump)
+    return () => {
+      delayManager.removeGroupListener('PROXY', scheduleBump)
+      if (bumpTimerRef.current) {
+        clearTimeout(bumpTimerRef.current)
+        bumpTimerRef.current = null
+      }
+    }
+  }, [scheduleBump])
 
   const groupCacheRef = useRef<Map<string, GroupCache>>(new Map())
 
@@ -171,29 +185,22 @@ export const useRenderList = (mode: string) => {
         group,
         headState,
       })
-    } else if (col > 1) {
+    } else {
+      // 统一为分组结构（type:4）：列数 col 仅决定「每行几个节点」，
+      // 行 key 用 colIndex（不依赖具体节点名）。窗口在 285 宽上下切换使 col 1↔3 时，
+      // 同行索引的 ProxyItem 实例可被 React 复用，不再像过去
+      // 「type:2 平铺 ↔ type:4 分组」结构切换那样整批卸载+重挂载
+      //（群发测速时拖拽窗口卡死的根因）。
       ret.push(
         ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
           type: 4 as const,
-          key: `col-${group.name}-${proxyCol[0]?.name ?? colIndex}`,
+          key: `col-${group.name}-${colIndex}`,
           group,
           headState,
           col,
           proxyCol,
           provider: proxyCol[0]?.provider,
           indexInGroup: colIndex,
-        })),
-      )
-    } else {
-      ret.push(
-        ...proxies.map((proxy, proxyIdx) => ({
-          type: 2 as const,
-          key: `${group.name}-${proxy?.name ?? proxyIdx}`,
-          group,
-          proxy,
-          headState,
-          provider: proxy.provider,
-          indexInGroup: proxyIdx,
         })),
       )
     }

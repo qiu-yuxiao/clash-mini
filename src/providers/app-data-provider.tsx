@@ -154,12 +154,24 @@ export const AppDataProvider = ({
     isPending: isProxiesPending,
     refetch: _refetchProxy,
   } = useQuery({
-    queryKey: ['getProxies', isMiniStatus],
+    queryKey: ['getProxies'],
     queryFn: fetchProxies,
     refetchInterval: false,
     refetchIntervalInBackground: false,
     ...TQ_MIHOMO,
   })
+
+  // isMiniStatus 翻转（窗口跨 285×135）时精简/全量路径切换。
+  // 之前 queryKey 含 isMiniStatus 会把缓存分裂成两份并行 query、翻转即全量重拉；
+  // 现 queryKey 稳定为 ['getProxies']，翻转时仅作废缓存并重新拉取（单一入口，复用缓存机制）。
+  const isFirstMiniRef = useRef(true)
+  useEffect(() => {
+    if (isFirstMiniRef.current) {
+      isFirstMiniRef.current = false
+      return
+    }
+    queryClient.invalidateQueries({ queryKey: ['getProxies'] })
+  }, [isMiniStatus, queryClient])
 
   const {
     data: clashConfig,
@@ -181,6 +193,9 @@ export const AppDataProvider = ({
     queryFn: calcuProxyProviders,
     enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
+    // 宽度翻转重新启用时复用缓存（5min 内不再重新拉取），避免 resize 期间
+    // 触发额外的 provider 数据 IPC；数据更新由 profile-changed 监听器与 refreshAll 显式触发。
+    staleTime: 5 * 60_000,
   })
 
   const { data: ruleProviders, refetch: _refetchRuleProviders } = useQuery({
@@ -188,6 +203,8 @@ export const AppDataProvider = ({
     queryFn: getRuleProvidersWithTimeout,
     enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
+    // 同上：宽度翻转重新启用时复用缓存，避免额外 IPC
+    staleTime: 5 * 60_000,
   })
 
   const { data: rulesData, refetch: _refetchRules } = useQuery({
@@ -195,6 +212,8 @@ export const AppDataProvider = ({
     queryFn: getRulesWithTimeout,
     enabled: !isMinimalWidth,
     ...TQ_MIHOMO,
+    // 同上：宽度翻转重新启用时复用缓存，避免额外 IPC
+    staleTime: 5 * 60_000,
   })
 
   const { data: sysproxy, refetch: _refetchSysproxy } = useQuery({
