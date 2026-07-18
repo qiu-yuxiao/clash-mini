@@ -588,7 +588,10 @@ async fn trigger_backend_auto_select_inner(
                     // 前端刷新链路，导致活跃节点栏不更新、显示节点与实际节点不一致。
                     // 这里只调 refresh_proxies()（emit verge://refresh-proxy-config 事件），
                     // 不调 refresh_clash()（避免整份配置重载 + auto_close_connection 断流）。
-                    crate::core::handle::Handle::refresh_proxies();
+                    // 轻量模式下界面不可见，无需刷新缓存，跳过多余的跨进程通信。
+                    if !crate::module::lightweight::is_in_lightweight_mode() {
+                        crate::core::handle::Handle::refresh_proxies();
+                    }
                 }
                 Err(e) => {
                     logging!(warn, Type::Lightweight, "[后台监测] 切换节点失败: {e}");
@@ -606,6 +609,17 @@ async fn get_active_node_name() -> Option<String> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
     let group_info = mihomo.get_group_by_name("PROXY").await.ok()?;
     group_info.now.filter(|node| !node.is_empty())
+}
+
+/// 计算下一次健康检测的等待间隔（秒）：重试模式 3 秒、离线 5 秒、正常 15 秒，与唤醒周期对齐。
+fn check_interval_secs(is_retry_mode: bool, was_online: bool) -> u64 {
+    if is_retry_mode {
+        RETRY_CHECK_INTERVAL_SECS
+    } else if !was_online {
+        OFFLINE_CHECK_INTERVAL_SECS
+    } else {
+        NORMAL_CHECK_INTERVAL_SECS
+    }
 }
 
 /// 启动全局后台节点监测常驻线程
@@ -652,13 +666,7 @@ pub fn start_background_monitor() {
                 }
             } else {
                 // 定期健康检测的间隔：重试模式 3 秒，离线 5 秒（对齐快速探测），正常 15 秒
-                let check_interval = if is_retry_mode {
-                    RETRY_CHECK_INTERVAL_SECS
-                } else if !was_online {
-                    OFFLINE_CHECK_INTERVAL_SECS
-                } else {
-                    NORMAL_CHECK_INTERVAL_SECS
-                };
+                let check_interval = check_interval_secs(is_retry_mode, was_online);
 
                 // 【注意】tokio::select! 中两个 Notify 的 notified() 分支：
                 // - 若两个 Notify 同时有许可，select! 只会选中一个，另一个的许可会保留到下一次循环
@@ -757,13 +765,7 @@ pub fn start_background_monitor() {
             was_online = is_online;
 
             // 2. 定期检测与快速重试自愈：重试 3 秒，离线 5 秒，正常 15 秒，对齐唤醒周期
-            let check_interval = if is_retry_mode {
-                RETRY_CHECK_INTERVAL_SECS
-            } else if !was_online {
-                OFFLINE_CHECK_INTERVAL_SECS
-            } else {
-                NORMAL_CHECK_INTERVAL_SECS
-            };
+            let check_interval = check_interval_secs(is_retry_mode, was_online);
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
 

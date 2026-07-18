@@ -20,7 +20,6 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
-use tokio::sync::Notify;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ServiceStatus {
@@ -39,7 +38,6 @@ pub struct ServiceManager {
     // （性能更优且无需 unwrap 处理 poison error）
     status: Mutex<ServiceStatus>,
     operation_running: AtomicBool,
-    operation_done: Notify,
 }
 
 #[cfg(target_os = "windows")]
@@ -592,7 +590,6 @@ impl ServiceManager {
         }
         defer! {
             self.operation_running.store(false, Ordering::Release);
-            self.operation_done.notify_waiters();
         }
 
         operation.await?;
@@ -704,5 +701,4 @@ async fn run_service_command(
 pub static SERVICE_MANAGER: Lazy<ServiceManager> = Lazy::new(|| ServiceManager {
     status: Mutex::new(ServiceStatus::Unavailable("Need Checks".into())),
     operation_running: AtomicBool::new(false),
-    operation_done: Notify::new(),
 });
