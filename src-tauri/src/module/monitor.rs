@@ -746,9 +746,11 @@ pub fn start_background_monitor() {
             }
             was_online = is_online;
 
-            // 2. 定期检测与快速重试自愈
+            // 2. 定期检测与快速重试自愈：重试 3 秒，离线 5 秒，正常 15 秒，对齐唤醒周期
             let check_interval = if is_retry_mode {
                 RETRY_CHECK_INTERVAL_SECS
+            } else if !was_online {
+                OFFLINE_CHECK_INTERVAL_SECS
             } else {
                 NORMAL_CHECK_INTERVAL_SECS
             };

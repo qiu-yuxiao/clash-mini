@@ -1420,6 +1420,10 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - **HMR 监听器与异步安全机制**：在 `main.tsx` 中引入了全局单例 `(window as any).__listenersSetup` 机制，阻断了 HMR 时全局 error/unhandledrejection 监听器的重复绑定与内存泄漏，规避了 ESLint 的 `no-useless-assignment` 硬拦截。同时在 `unlock.tsx` 中补全了异步 cancellation 安全网，终结了频繁切页时的 state 泄漏报错。
   - **死代码与 Clippy 修复**：清理了 `lib.rs:330` 的无用 config 引入，将被空置 of `handle_window_focus` 改为 `pub const fn`，并且去除了 `notification.rs:26` 中已退役无 await 语句的 `notify_event` 函数的 `async` 声明，顺利通过了最严格的 Clippy 及类型编译验证。
 
+- **第五阶段（Stage-5）发布前终极双端审计与安全自愈修正**：
+  - **SCM 服务线程安全优化**：将后端 `SERVICE_MANAGER.current()` 重构为 O(1) 立即返回无锁状态查询，引入 `#[allow(clippy::unused_async)]` 标记，完美根除了服务安装/重装耗时操作进行期间 UI 查询线程被 `notified.await` 强制卡死的假死挂起痛点。
+  - **网络自愈降频错配修补**：在 `monitor.rs` 门禁处将 `check_interval` 判定式与离线（`!was_online`）5秒轮询机制对齐，彻底打通了离线态下以 5s 频次快速检查网络以触发自愈恢复的正确通路。
+
 ### v2.4.7 弹窗自适应与 Lint 规范审计 (2026-07-12)
 
 为彻底解决窄屏模式（如 285px 宽）下二级弹窗（如软件更新、内核更新、配置编辑及日志面板等）被遮挡或宽度硬编码溢出的问题，以及解决工程中遗留的 Lint 警告，对相关前端模块进行了如下重构：

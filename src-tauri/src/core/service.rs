@@ -576,26 +576,10 @@ impl ServiceManager {
         Ok(())
     }
 
-    /// 以无锁方式获取当前服务状态，自动等待进行中的操作完成。
-    ///
-    /// 设计说明：使用 Notify + AtomicBool 双检查模式替代传统的 Mutex::lock().await，
-    /// 避免高并发场景下操作执行期间阻塞所有状态读取者。
-    ///
-    /// 时序保证：
-    /// 1. 先注册 notified() 再检查 operation_running，防止错过通知
-    /// 2. 拿到 status 锁后二次检查 operation_running，防止 TOCTOU 竞态
-    /// 3. 若操作正在进行中，通过 Notify 等待其完成，而非忙等
+    /// 以快速无锁方式获取当前服务状态，避免高并发场景下操作执行期间阻塞状态读取者。
+    #[allow(clippy::unused_async)]
     pub async fn current(&self) -> ServiceStatus {
-        loop {
-            let notified = self.operation_done.notified();
-            if !self.operation_running.load(Ordering::Acquire) {
-                let status = self.status.lock().clone();
-                if !self.operation_running.load(Ordering::Acquire) {
-                    return status;
-                }
-            }
-            notified.await;
-        }
+        self.status.lock().clone()
     }
 
     fn set_status(&self, status: ServiceStatus) {
