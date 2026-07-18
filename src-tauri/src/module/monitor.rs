@@ -612,7 +612,7 @@ async fn get_active_node_name() -> Option<String> {
 }
 
 /// 计算下一次健康检测的等待间隔（秒）：重试模式 3 秒、离线 5 秒、正常 15 秒，与唤醒周期对齐。
-fn check_interval_secs(is_retry_mode: bool, was_online: bool) -> u64 {
+const fn check_interval_secs(is_retry_mode: bool, was_online: bool) -> u64 {
     if is_retry_mode {
         RETRY_CHECK_INTERVAL_SECS
     } else if !was_online {

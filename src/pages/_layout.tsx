@@ -1106,7 +1106,6 @@ const Layout = () => {
         return
       }
 
-
       // H-14: 清理前一次的 wakeup test timer，防止泄漏
       if (wakeupTestTimerRef.current !== null) {
         clearTimeout(wakeupTestTimerRef.current)
@@ -1343,7 +1342,12 @@ const Layout = () => {
       )
       let targetUid = currentProfileUid
       if (newProfile) {
-        await patchProfiles({ current: newProfile.uid })
+        // 后端 import_profile 在首次导入（current 之前为空）时会自动激活并刷新内核，
+        // 这里若再调 patchProfiles 会与后端 update_config_forced 竞争验证锁导致超时。
+        // 仅在 current 未指向 newProfile 时才显式切换。
+        if (freshConfig.current !== newProfile.uid) {
+          await patchProfiles({ current: newProfile.uid })
+        }
         targetUid = newProfile.uid
       }
 
@@ -1371,7 +1375,10 @@ const Layout = () => {
         )
         let targetUid = currentProfileUid
         if (newProfile) {
-          await patchProfiles({ current: newProfile.uid })
+          // 同主分支：避免与后端自动激活的 update_config_forced 竞争验证锁
+          if (freshConfig.current !== newProfile.uid) {
+            await patchProfiles({ current: newProfile.uid })
+          }
           targetUid = newProfile.uid
         }
 
