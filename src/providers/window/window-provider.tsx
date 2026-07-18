@@ -10,6 +10,7 @@ import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
 import getSystem from '@/utils/get-system'
+import { isWindowResizing } from '@/utils/window-resizing'
 
 import { WindowContext, type WindowContextType } from './window-context'
 
@@ -175,6 +176,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     const checkMaximized = debounce(
       async (event: { payload: { width: number; height: number } }) => {
         if (isUnmounted) return
+        // 拖拽调整窗口大小期间（resize-handles 设置 __isResizing）跳过处理，
+        // 避免每像素 churn，也让位给拖拽自身的 setSize/setPosition。
+        // 收尾的 onResized 在 __isResizing 清除后触发，会用最终尺寸正常刷新。
+        if (isWindowResizing()) return
         const { width, height } = event.payload
         if (width === lastWidth && height === lastHeight) return
         lastWidth = width

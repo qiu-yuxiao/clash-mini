@@ -1,17 +1,16 @@
-import { LogicalPosition, LogicalSize } from '@tauri-apps/api/window'
-import React, { useCallback, useRef } from 'react'
+import {
+  currentMonitor,
+  LogicalPosition,
+  LogicalSize,
+} from '@tauri-apps/api/window'
+import React, { useCallback, useEffect, useRef } from 'react'
 
 import { useWindow } from '@/hooks/use-window'
 import { frontendLog } from '@/services/cmds'
+import { computeResizeGeometry } from '@/utils/resize-geometry'
+import { setWindowResizing } from '@/utils/window-resizing'
 
 const HANDLE_SIZE = 10
-
-// 窗口最小/最大尺寸（logical px），与后端 resolve/window.rs 对齐：
-// MINIMAL_WIDTH=285.0, MINIMAL_HEIGHT=135.0, MAX_WIDTH=640.0, MAX_HEIGHT=860.0
-const MIN_WIDTH = 285
-const MIN_HEIGHT = 135
-const MAX_WIDTH = 640
-const MAX_HEIGHT = 860
 
 type Direction = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
@@ -199,6 +198,15 @@ export const ResizeHandles: React.FC = () => {
   // 每次 render 同步 ref，供 scheduleApply 在 rAF 回调中调用最新版本
   applyPendingRef.current = applyPending
 
+  // 组件卸载（含拖拽中途因切模式等卸载）时复位 resizing 标志，
+  // 避免标志残留为 true 导致后续 onResized/updateWindowState 永远跳过 IPC。
+  useEffect(
+    () => () => {
+      setWindowResizing(false)
+    },
+    [],
+  )
+
   const handlePointerDown = useCallback(
     (direction: Direction) => async (e: React.PointerEvent) => {
       if (!currentWindow || e.button !== 0) return
@@ -209,7 +217,7 @@ export const ResizeHandles: React.FC = () => {
       const [pos, size, monitor] = await Promise.all([
         currentWindow.outerPosition(),
         currentWindow.outerSize(),
-        import('@tauri-apps/api/window').then((m) => m.currentMonitor()),
+        currentMonitor(),
       ]).catch((err) => {
         frontendLog('error', `[ResizeHandle] read window state failed: ${err}`)
         return [null, null, null]
@@ -225,11 +233,10 @@ export const ResizeHandles: React.FC = () => {
         frontendLog('warn', `[ResizeHandle] setPointerCapture failed: ${err}`)
       }
 
-      // 设置全局 resizing 标志：use-layout-events 等订阅处会跳过 IPC 调用
-      // 避免 onResized 触发的 updateWindowState 等 IPC 与拖拽的 setSize/setPosition 排队
-      if (typeof window !== 'undefined') {
-        ;(window as unknown as { __isResizing?: boolean }).__isResizing = true
-      }
+      // 设置全局 resizing 标志：window-provider (onResized) 与 use-visibility
+      // (updateWindowState) 在发起 IPC 前读取此标志，拖拽期间跳过 IPC，
+      // 避免与拖拽自身的 setSize/setPosition 抢占连接。
+      setWindowResizing(true)
 
       sessionRef.current = {
         direction,
@@ -262,64 +269,21 @@ export const ResizeHandles: React.FC = () => {
       const dx = e.clientX * session.scaleFactor - session.startPointerX
       const dy = e.clientY * session.scaleFactor - session.startPointerY
 
-      // 起始尺寸/位置（physical）
-      const startW = session.startPhysW
-      const startH = session.startPhysH
-      const startX = session.startPhysX
-      const startY = session.startPhysY
-
-      // 计算新尺寸（physical，先按方向算 raw，再 clamp 到 min/max）
-      let newW = startW
-      let newH = startH
-      let newX = startX
-      let newY = startY
-
-      const dir = session.direction
-      if (dir.includes('e')) newW = startW + dx
-      if (dir.includes('s')) newH = startH + dy
-      if (dir.includes('w')) {
-        newW = startW - dx
-        newX = startX + dx
-      }
-      if (dir.includes('n')) {
-        newH = startH - dy
-        newY = startY + dy
-      }
-
-      // physical → logical 用于 clamp 比较（后端 max_inner_size 也是 logical）
-      const sf = session.scaleFactor
-      const logicalW = newW / sf
-      const logicalH = newH / sf
-
-      // clamp 尺寸到 [MIN, MAX]
-      const clampedW = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, logicalW))
-      const clampedH = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, logicalH))
-
-      // 若尺寸被 clamp（例如达到最小宽度），需要相应回退位置以保持对边不动
-      // 推导：右边缘 = newX + newW，clamp 后 newW 变成 clampedW*sf，
-      //   为保持右边缘不动，newX 需减去 (newW - clampedW*sf) = -dwLogical*sf
-      //   即 newX += dwLogical*sf（dwLogical 为负时往左推，正时往右推）
-      // 下方 dwLogical = clampedW - logicalW，符号与上面推导对齐
-      const dwLogical = clampedW - logicalW
-      const dhLogical = clampedH - logicalH
-      if (dwLogical !== 0 && dir.includes('w')) {
-        newX -= dwLogical * sf
-      }
-      if (dhLogical !== 0 && dir.includes('n')) {
-        newY -= dhLogical * sf
-      }
-
-      // 写入 pending（rAF 节流后统一应用），尺寸用 clamped 后的 logical
-      session.pendingW = clampedW
-      session.pendingH = clampedH
-      // 只有当方向包含 w/n 时才会改位置
-      if (dir.includes('w') || dir.includes('n')) {
-        session.pendingX = newX / sf
-        session.pendingY = newY / sf
-      } else {
-        session.pendingX = null
-        session.pendingY = null
-      }
+      // 计算 clamp 后的新几何（logical），写入 pending（rAF 节流后统一应用）
+      const geo = computeResizeGeometry({
+        direction: session.direction,
+        startPhysW: session.startPhysW,
+        startPhysH: session.startPhysH,
+        startPhysX: session.startPhysX,
+        startPhysY: session.startPhysY,
+        dx,
+        dy,
+        scaleFactor: session.scaleFactor,
+      })
+      session.pendingW = geo.width
+      session.pendingH = geo.height
+      session.pendingX = geo.x
+      session.pendingY = geo.y
 
       scheduleApply(session)
     },
@@ -342,17 +306,18 @@ export const ResizeHandles: React.FC = () => {
         )
       }
 
+      // 拖拽结束：先清除全局 resizing 标志，再应用最后一帧。
+      // 必须在 applyPending 之前清除，否则收尾的 setSize/setPosition 触发的
+      // onResized 仍会看到 __isResizing=true 而被跳过，导致最终尺寸状态
+      // （最小/大窗口判定）不刷新。
+      setWindowResizing(false)
+
       // 取消尚未触发的 rAF，立即应用最后一帧
       if (session.rafId !== null) {
         cancelAnimationFrame(session.rafId)
         session.rafId = null
       }
       void applyPending(session)
-
-      // 清除全局 resizing 标志
-      if (typeof window !== 'undefined') {
-        ;(window as unknown as { __isResizing?: boolean }).__isResizing = false
-      }
 
       sessionRef.current = null
     },

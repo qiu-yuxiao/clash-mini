@@ -2,6 +2,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { frontendLog } from '@/services/cmds'
+import { isWindowResizing } from '@/utils/window-resizing'
 
 /**
  * useVisibility
@@ -70,6 +71,10 @@ export const useVisibility = () => {
   // 避免闭包变量带来的潜在问题，同时确保回调引用稳定（虽然 useEffect 依赖为空本就只注册一次）
   const inFlightRef = useRef(false)
   const updateWindowState = useCallback(async () => {
+    // 拖拽调整窗口大小期间（resize-handles 设置 __isResizing）跳过 IPC，
+    // 避免与拖拽自身的 setSize/setPosition 抢占连接，减少 resize 期间的 IPC 洪水。
+    // 收尾的 onResized 在 __isResizing 清除后触发，会用最新尺寸正常刷新状态。
+    if (isWindowResizing()) return
     // 防止并发调用堆积：如果上一次 IPC 调用尚未返回，直接跳过
     // 这能防止 resize 期间的 IPC 洪水（onResized 每像素触发一次）
     if (inFlightRef.current) return
