@@ -5,7 +5,7 @@ use crate::{
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use tokio::task::AbortHandle;
 use tokio::time::{Duration, Instant, sleep};
 
@@ -42,9 +42,6 @@ pub static PROFILE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::con
 
 /// 用于通知/唤醒后台监测线程（如退出轻量模式时）
 pub static MONITOR_WAKEUP_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
-
-/// 并发测速的最大线程数
-const MAX_CONCURRENT_DELAY_TESTS: usize = 32;
 
 /// 节点延迟下限（毫秒）。小于此值的节点判定为假节点/广告节点。
 /// 此为系统核心既定设计，严禁讨论或调整。
@@ -244,56 +241,101 @@ pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow:
     Ok(())
 }
 
+/// 单节点健康状态（由测量组维护的 history/alive 判定，TUN 下可靠）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NodeHealthStatus {
-    Healthy,
-    Unhealthy,
+enum NodeStatus {
+    /// 测量组尚未测过该节点（数据缺失），不动作、等待测量
+    Unknown,
+    /// 节点不可用（测速超时/失败/假节点）
     Dead,
+    /// 节点健康，附带真实延迟
+    Alive(u32),
 }
 
-/// 检测当前活跃代理节点的健康状态
-async fn check_active_node_health() -> anyhow::Result<NodeHealthStatus> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// 故障转移裁决
+pub enum FailoverVerdict {
+    /// 当前活跃节点健康或数据缺失，无需动作
+    NoAction,
+    /// 活跃节点已死且子集内存在健康候选，应触发选点
+    ShouldFailover,
+    /// 子集内全部节点均不可用
+    AllDead,
+}
+
+/// 依据测量组（PROXY__METRICS，url-test）维护的 history/alive 判定节点状态。
+/// 这是唯一权威健康来源：由 Mihomo 内核周期性直接拨测，TUN 下可靠，
+/// 彻底取代旧设计「后端用 delay_proxy_by_name 自测活跃节点」的不可靠路径。
+fn node_status(proxy: &tauri_plugin_mihomo::models::Proxy) -> NodeStatus {
+    // 测量组尚未测过该节点 → 数据缺失，不误判
+    if proxy.history.is_empty() {
+        return NodeStatus::Unknown;
+    }
+    let last = proxy.history.last().unwrap().delay as u32;
+    // alive=false（测速失败）或延迟超上限 → 死；低于下限 → 机场伪造假节点/广告节点 → 死
+    if !proxy.alive || last >= NODE_DELAY_MAX_MS || last < NODE_DELAY_MIN_MS {
+        NodeStatus::Dead
+    } else {
+        NodeStatus::Alive(last)
+    }
+}
+
+/// 评估当前活跃节点是否需要故障转移。
+/// 返回 Err 表示 Mihomo API 不可达（交由调用方累计 api_error_count）。
+async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+
     let group_info = mihomo
         .get_group_by_name("PROXY")
         .await
         .map_err(|e| anyhow::anyhow!("获取 PROXY 组信息失败: {e}"))?;
 
-    let active_node = match group_info.now {
-        Some(ref node) if !node.is_empty() && node != "DIRECT" && node != "REJECT" => node,
-        _ => return Ok(NodeHealthStatus::Healthy), // 直连或拒绝节点，直接判定为健康
+    let active_node = match &group_info.now {
+        Some(n) if !n.is_empty() && n != "DIRECT" && n != "REJECT" => n.clone(),
+        _ => return Ok(FailoverVerdict::NoAction), // 直连/拒绝节点或无选中，不动作
     };
 
-    // 如果为 dummy 广告节点，判定为亚健康，触发重选
-    if is_dummy_node(active_node) {
-        logging!(
-            info,
-            Type::Lightweight,
-            "[后台监测] 检测到当前节点为假/广告节点: {}",
-            active_node
-        );
-        return Ok(NodeHealthStatus::Unhealthy);
+    // 假/广告节点 → 视为需要重选
+    if is_dummy_node(&active_node) {
+        return Ok(FailoverVerdict::ShouldFailover);
     }
 
-    let test_url = get_test_url().await;
-
-    match mihomo
-        .delay_proxy_by_name(active_node, &test_url, NODE_DELAY_MAX_MS)
+    let proxies = mihomo
+        .get_proxies()
         .await
-    {
-        Ok(delay_info) => {
-            if delay_info.delay >= NODE_DELAY_MIN_MS && delay_info.delay < NODE_DELAY_MAX_MS {
-                Ok(NodeHealthStatus::Healthy)
-            } else {
-                // 小于 30ms 的节点一律为机场伪造的假节点/广告节点，判定为亚健康并触发重选。
-                // 此为系统核心既定设计，严禁后续代码审核或修改中再对此阈值进行任何讨论或调整。
-                Ok(NodeHealthStatus::Unhealthy)
-            }
+        .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
+
+    // 活跃节点本身健康或数据缺失 → 不动作
+    match proxies.proxies.get(&active_node).map(node_status) {
+        Some(NodeStatus::Alive(_)) | Some(NodeStatus::Unknown) | None => {
+            return Ok(FailoverVerdict::NoAction);
         }
-        Err(_) => {
-            // 测速直接报错，说明节点彻底断线
-            Ok(NodeHealthStatus::Dead)
+        Some(NodeStatus::Dead) => {}
+    }
+
+    // 活跃节点已死：在子集（filterText）内寻找健康候选
+    let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
+    let filter_lower = filter_config.filter_text.trim().to_lowercase();
+    let members = group_info.all.clone().unwrap_or_default();
+
+    let mut found_healthy = false;
+    for name in &members {
+        if name == &active_node || is_dummy_node(name) {
+            continue;
         }
+        if !filter_lower.is_empty() && !match_filter(name, &filter_lower) {
+            continue;
+        }
+        if let Some(NodeStatus::Alive(_)) = proxies.proxies.get(name).map(node_status) {
+            found_healthy = true;
+            break;
+        }
+    }
+
+    if found_healthy {
+        Ok(FailoverVerdict::ShouldFailover)
+    } else {
+        Ok(FailoverVerdict::AllDead)
     }
 }
 
@@ -343,23 +385,10 @@ pub async fn trigger_backend_auto_select(
     // 锁已通过 Drop Guard 释放，在此之后执行副作用操作
     // （refresh_clash 和 notify_delay_results 不影响选点逻辑，放在锁外可减少锁持有时间）
     // 🛡️ 防线二：轻量模式下直接跳过副作用分发，避免无用的跨进程通信和撞车风险
+    // 【治本】不再调用 refresh_clash()：整份配置重载 + auto_close_connection 是真实断流推手；
+    // 选点本身已是干净热切换（select_node_for_group），无需重载。仅把真实延迟结果回写前端。
     if !crate::module::lightweight::is_in_lightweight_mode() {
         if let Ok(outcome) = &result {
-            if outcome.selected {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 测速完成，准备调用 refresh_clash()..."
-                );
-                let t0 = std::time::Instant::now();
-                crate::core::handle::Handle::refresh_clash();
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] refresh_clash() 完成，耗时 {:?}",
-                    t0.elapsed()
-                );
-            }
             if !outcome.display.is_empty() {
                 logging!(
                     info,
@@ -449,108 +478,44 @@ async fn trigger_backend_auto_select_inner(
 
     let test_url = get_test_url().await;
 
-    struct WorkerPoolGuard {
-        abort_handles: Vec<AbortHandle>,
-        armed: bool,
-    }
-
-    impl Drop for WorkerPoolGuard {
-        fn drop(&mut self) {
-            if self.armed {
-                for handle in &self.abort_handles {
-                    handle.abort();
-                }
+    // 测量层根因修复：不再用 delay_proxy_by_name 对节点逐个自测
+    // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
+    // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
+    // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
+    let mut delays: std::collections::HashMap<String, u32> =
+        match mihomo.delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS).await {
+            Ok(d) => d,
+            Err(e) => {
+                logging!(warn, Type::Lightweight, "[后台监测] 读取测量组延迟失败: {e}");
+                std::collections::HashMap::new()
             }
-        }
-    }
+        };
 
-    impl WorkerPoolGuard {
-        const fn new() -> Self {
-            Self {
-                abort_handles: Vec::new(),
-                armed: true,
-            }
-        }
-
-        fn push(&mut self, handle: AbortHandle) {
-            self.abort_handles.push(handle);
-        }
-
-        fn disarm(mut self) -> Vec<AbortHandle> {
-            self.armed = false;
-            std::mem::take(&mut self.abort_handles)
-        }
-    }
-
-    let valid_nodes = Arc::new(valid_nodes);
-    let next_index = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let (res_tx, mut res_rx) = tokio::sync::mpsc::unbounded_channel();
-    let mut workers = Vec::new();
-    let mut pool_guard = WorkerPoolGuard::new();
-
-    for _ in 0..MAX_CONCURRENT_DELAY_TESTS {
-        let valid_nodes = Arc::clone(&valid_nodes);
-        let next_index = Arc::clone(&next_index);
-        let res_tx = res_tx.clone();
-        let mihomo = mihomo.clone();
-        let test_url = test_url.clone();
-
-        let task = tokio::spawn(async move {
-            loop {
-                let idx = next_index.fetch_add(1, Ordering::SeqCst);
-                if idx >= valid_nodes.len() {
-                    break;
-                }
-                let node_name = &valid_nodes[idx];
-                // 探针超时=判死阈值=2000ms：超过即按不可用处理，简化前后端一致性。
-                match mihomo
-                    .delay_proxy_by_name(node_name, &test_url, NODE_TEST_TIMEOUT_MS)
-                    .await
-                {
-                    Ok(delay_info) => {
-                        // 全部上报用于展示（含低于下限的假节点、达到上限的死节点）
-                        let _ = res_tx.send((node_name.clone(), delay_info.delay));
-                    }
-                    Err(_) => {
-                        // 测速报错（彻底断线/内核异常），上报为 Error
-                        let _ = res_tx.send((node_name.clone(), 1_000_000));
+    // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history
+    if delays.is_empty() {
+        if let Ok(proxies) = mihomo.get_proxies().await {
+            for name in &valid_nodes {
+                if let Some(p) = proxies.proxies.get(name) {
+                    if let Some(h) = p.history.last() {
+                        delays.insert(name.clone(), h.delay as u32);
                     }
                 }
             }
-        });
-        pool_guard.push(task.abort_handle());
-        workers.push(task);
+        }
     }
 
-    // 释放主线程持有的发送端，以便当所有 worker 退出时接收通道能够关闭
-    drop(res_tx);
-
-    // 所有 worker spawn 成功，解除 guard 的自动 abort，将句柄存入全局
-    let abort_handles = pool_guard.disarm();
-    {
-        let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
-        *active = abort_handles;
-    }
-
-    // 分类收集：display 用于展示（全部节点），candidates 用于选点（仅有效节点）
+    // 分类收集：display 用于展示（全部有效节点），candidates 用于选点（仅有效延迟节点）
     let mut display: Vec<(String, u32)> = Vec::new();
     let mut candidates: Vec<(String, u32)> = Vec::new();
-    while let Some((name, delay)) = res_rx.recv().await {
+    for name in &valid_nodes {
+        let delay = match delays.get(name) {
+            Some(&d) => d,
+            None => 1_000_000, // 测量组尚未就绪/未测得 → 标记 Error，不参与选点
+        };
         display.push((name.clone(), delay));
         if (NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&delay) {
-            candidates.push((name, delay));
+            candidates.push((name.clone(), delay));
         }
-    }
-
-    // 等待所有 worker 退出以完成清理
-    for worker in workers {
-        let _ = worker.await;
-    }
-
-    // 清理全局任务句柄
-    {
-        let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| e.into_inner());
-        active.clear();
     }
 
     // 展示结果按 sort_type 排序（仅影响返回顺序，不影响选点）
@@ -756,8 +721,12 @@ pub fn start_background_monitor() {
                 consecutive_fails = 0;
                 is_retry_mode = false;
 
-                // 如果当前活跃节点不可用，立刻触发一次自愈选点
-                if check_active_node_health().await.ok() != Some(NodeHealthStatus::Healthy) {
+                // 如果当前活跃节点已死（测量组判定），立刻触发一次自愈选点
+                if evaluate_failover(&current_profile)
+                    .await
+                    .map(|v| v != FailoverVerdict::NoAction)
+                    .unwrap_or(false)
+                {
                     logging!(
                         info,
                         Type::Lightweight,
@@ -804,23 +773,23 @@ pub fn start_background_monitor() {
                     is_retry_mode = false;
                 }
 
-                match check_active_node_health().await {
-                    Ok(status) => {
+                match evaluate_failover(&current_profile).await {
+                    Ok(verdict) => {
                         // API 调用成功，重置 API 异常计数
                         api_error_count = 0;
-                        match status {
-                            NodeHealthStatus::Healthy => {
+                        match verdict {
+                            FailoverVerdict::NoAction => {
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
                             }
-                            NodeHealthStatus::Unhealthy | NodeHealthStatus::Dead => {
+                            FailoverVerdict::ShouldFailover | FailoverVerdict::AllDead => {
                                 consecutive_fails += 1;
                                 is_retry_mode = true;
                                 logging!(
                                     info,
                                     Type::Lightweight,
                                     "[后台监测] 活跃节点检测异常 ({:?})，连续失败次数: {}",
-                                    status,
+                                    verdict,
                                     consecutive_fails
                                 );
 

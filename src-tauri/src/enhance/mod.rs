@@ -484,25 +484,56 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         }
     }
 
-    // 3. Construct a single group named "PROXY" with type "select"
+    // 3. Construct the control group "PROXY" with type "select"
+    //    —— 用户/app 控制，选择稳定、手动选点持久（不被内核自动翻回）
+    let proxy_names_value = Value::from(proxy_names.clone());
+    let provider_names_value = Value::from(provider_names.clone());
+
     let mut single_group = Mapping::new();
     single_group.insert(Value::from("name"), Value::from("PROXY"));
     single_group.insert(Value::from("type"), Value::from("select"));
     if !proxy_names.is_empty() {
-        single_group.insert(Value::from("proxies"), Value::from(proxy_names));
+        single_group.insert(Value::from("proxies"), proxy_names_value.clone());
     }
     if !provider_names.is_empty() {
-        single_group.insert(Value::from("use"), Value::from(provider_names));
+        single_group.insert(Value::from("use"), provider_names_value.clone());
     }
     // If both are empty, fallback to DIRECT
     if single_group.get("proxies").is_none() && single_group.get("use").is_none() {
         single_group.insert(Value::from("proxies"), Value::from(vec![Value::from("DIRECT")]));
     }
 
-    // Replace the entire proxy-groups sequence
+    // 3b. Construct the measurement group "PROXY__METRICS" with type "url-test", same membership.
+    //     Mihomo 内核按 interval 周期性直接拨测每个成员，维护其 history/alive（TUN 下可靠）。
+    //     这是节点延迟的唯一权威来源；app 不再用 delay_proxy_by_name 自测活跃节点
+    //     （旧设计在 TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
+    let test_url = Config::verge()
+        .await
+        .latest_arc()
+        .default_latency_test
+        .as_deref()
+        .unwrap_or("http://cp.cloudflare.com/generate_204")
+        .to_string();
+
+    let mut metrics_group = Mapping::new();
+    metrics_group.insert(Value::from("name"), Value::from("PROXY__METRICS"));
+    metrics_group.insert(Value::from("type"), Value::from("url-test"));
+    if !proxy_names.is_empty() {
+        metrics_group.insert(Value::from("proxies"), proxy_names_value.clone());
+    }
+    if !provider_names.is_empty() {
+        metrics_group.insert(Value::from("use"), provider_names_value.clone());
+    }
+    if metrics_group.get("proxies").is_none() && metrics_group.get("use").is_none() {
+        metrics_group.insert(Value::from("proxies"), Value::from(vec![Value::from("DIRECT")]));
+    }
+    metrics_group.insert(Value::from("url"), Value::from(test_url));
+    metrics_group.insert(Value::from("interval"), Value::from(300));
+
+    // Replace the entire proxy-groups sequence with [PROXY (control), PROXY__METRICS (measurement)]
     config.insert(
         Value::from("proxy-groups"),
-        Value::from(vec![Value::from(single_group)]),
+        Value::from(vec![Value::from(single_group), Value::from(metrics_group)]),
     );
 
     // 4. Inject rule-provider for "gfwlist"
@@ -768,12 +799,25 @@ append-rules:
         let mut config: Mapping = serde_yaml_ng::from_str(config_str).unwrap();
         config = enforce_mini_agreements(config).await;
 
-        // 1. Verify single PROXY group
+        // 1. Verify PROXY (control) + PROXY__METRICS (measurement) groups
         let groups = config.get("proxy-groups").and_then(Value::as_sequence).unwrap();
-        assert_eq!(groups.len(), 1);
-        let proxy_group = groups[0].as_mapping().unwrap();
-        assert_eq!(proxy_group.get("name").unwrap().as_str(), Some("PROXY"));
+        assert_eq!(groups.len(), 2);
+
+        let proxy_group = groups
+            .iter()
+            .find(|g| g.get("name").and_then(Value::as_str) == Some("PROXY"))
+            .and_then(Value::as_mapping)
+            .unwrap();
         assert_eq!(proxy_group.get("type").unwrap().as_str(), Some("select"));
+
+        let metrics_group = groups
+            .iter()
+            .find(|g| g.get("name").and_then(Value::as_str) == Some("PROXY__METRICS"))
+            .and_then(Value::as_mapping)
+            .unwrap();
+        assert_eq!(metrics_group.get("type").unwrap().as_str(), Some("url-test"));
+        assert!(metrics_group.get("url").is_some());
+        assert!(metrics_group.get("interval").is_some());
 
         let group_proxies = proxy_group.get("proxies").and_then(Value::as_sequence).unwrap();
         assert_eq!(group_proxies.len(), 2);
