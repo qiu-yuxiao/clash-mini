@@ -395,7 +395,6 @@
         "appLogLevel": "مستوى سجلات التطبيق",
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
-        "autoCloseConnections": "إغلاق الاتصالات تلقائيًا",
         "autoCheckUpdate": "فحص التحديث تلقائيًا",
         "enableBuiltinEnhanced": "تفعيل التحسين المدمج",
         "proxyLayoutColumns": "أعمدة عرض الوكيل",
@@ -406,7 +405,6 @@
         "defaultLatencyTimeout": "مهلة التأخير الافتراضية"
       },
       "tooltips": {
-        "autoCloseConnections": "إنهاء الاتصالات القائمة عند تغيير اختيار مجموعة الوكيل أو وضع الوكيل",
         "enableBuiltinEnhanced": "معالجة توافق ملف التكوين",
         "autoDelayDetection": "يختبر زمن استجابة العقدة الحالية على نحو دوري في الخلفية",
         "defaultLatencyTest": "يُستخدم فقط لاختبار طلب HTTP العميل. لن يؤثر على ملف التكوين"

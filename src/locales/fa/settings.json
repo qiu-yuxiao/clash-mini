@@ -395,7 +395,6 @@
         "appLogLevel": "سطح لاگ برنامه",
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
-        "autoCloseConnections": "بستن خودکار اتصالات",
         "autoCheckUpdate": "بررسی خودکار به‌روزرسانی",
         "enableBuiltinEnhanced": "فعال کردن تقویت داخلی",
         "proxyLayoutColumns": "ستون چیدمان پراکسی",
@@ -406,7 +405,6 @@
         "defaultLatencyTimeout": "زمان انتظار تأخیر پیش‌فرض"
       },
       "tooltips": {
-        "autoCloseConnections": "اتصالات برقرار شده را هنگام تغییر انتخاب گروه پروکسی یا حالت پروکسی خاتمه دهید",
         "enableBuiltinEnhanced": "مدیریت سازگاری برای فایل پیکربندی",
         "autoDelayDetection": "به‌صورت دوره‌ای تأخیر گره فعلی را در پس‌زمینه آزمایش می‌کند",
         "defaultLatencyTest": "فقط برای تست درخواست‌های کلاینت HTTP استفاده می‌شود و بر فایل پیکربندی تأثیری نخواهد داشت"

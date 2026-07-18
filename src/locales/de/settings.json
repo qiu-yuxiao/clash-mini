@@ -395,7 +395,6 @@
         "appLogLevel": "Anwendungs-Protokolliergrad",
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
-        "autoCloseConnections": "Verbindungen automatisch schließen",
         "autoCheckUpdate": "Automatisch auf Updates prüfen",
         "enableBuiltinEnhanced": "Eingebaute Verbesserungen aktivieren",
         "proxyLayoutColumns": "Anzahl der Spalten im Proxy-Layout",
@@ -406,7 +405,6 @@
         "defaultLatencyTimeout": "Test-Timeout"
       },
       "tooltips": {
-        "autoCloseConnections": "Wenn der ausgewählte Knoten in der Proxy-Gruppe oder der Proxy-Modus geändert wird, werden die bestehenden Verbindungen geschlossen.",
         "enableBuiltinEnhanced": "Kompatibilitätsbehandlung der Konfigurationsdatei",
         "autoDelayDetection": "Überprüft regelmäßig im Hintergrund die Latenz des aktuellen Knotens",
         "defaultLatencyTest": "Dies wird nur für HTTP-Client-Anfragentests verwendet und hat keine Auswirkungen auf die Konfigurationsdatei."

@@ -395,7 +395,6 @@
         "appLogLevel": "App Log Level",
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
-        "autoCloseConnections": "Auto Close Connections",
         "autoCheckUpdate": "Auto Check Update",
         "enableBuiltinEnhanced": "Enable Builtin Enhanced",
         "proxyLayoutColumns": "Proxy Layout Columns",
@@ -406,7 +405,6 @@
         "defaultLatencyTimeout": "Default Latency Timeout"
       },
       "tooltips": {
-        "autoCloseConnections": "Terminate established connections when the proxy group selection or proxy mode changes",
         "enableBuiltinEnhanced": "Compatibility handling for the configuration file",
         "autoDelayDetection": "Periodically test the current node latency in the background",
         "defaultLatencyTest": "Used for HTTP client request testing only and won't make a difference to the configuration file"

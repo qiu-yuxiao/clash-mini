@@ -119,7 +119,9 @@ pub async fn entry_lightweight_mode() -> bool {
     refresh_lightweight_tray_state().await;
     crate::core::tray::update_lite_mode_menu(true);
 
-    // 💡 建议 2：进入轻量模式时触发 Mihomo 内核的激进连接清理 (GC) - BUG-258
+    // 💡 说明：进入轻量模式时【不再】激进清空所有网络连接 (GC)。
+    //    按用户要求，轻量模式不等于关闭程序——正在下载的链接不能被切断重连，
+    //    故仅保留下方资源回收动作，不影响用户实际代理流量。
     // 💡 建议 3：彻底熔断外壳 Rust 后端与内核的常驻数据流订阅 - BUG-259
     // 进入前 abort 上一个 cleanup 任务，避免累积
     abort_lightweight_cleanup();
@@ -138,21 +140,6 @@ pub async fn entry_lightweight_mode() -> bool {
         if !is_in_lightweight_mode() {
             return;
         }
-        // 激进清空所有网络连接 (GC)
-        if let Err(err) = mihomo.close_all_connections().await {
-            logging!(
-                error,
-                Type::Lightweight,
-                "[轻量模式] 触发进入时网络连接垃圾回收 (GC) 失败: {err}"
-            );
-        } else {
-            logging!(
-                info,
-                Type::Lightweight,
-                "[轻量模式] 触发进入时网络连接垃圾回收 (GC) 成功"
-            );
-        }
-
         if !is_in_lightweight_mode() {
             return;
         }

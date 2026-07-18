@@ -395,7 +395,6 @@
         "appLogLevel": "Кушымта журналы дәрәҗәсе",
         "appLogMaxSize": "App Log Max Size",
         "appLogMaxCount": "App Log Max Count",
-        "autoCloseConnections": "Тоташуларны автоматик ябу",
         "autoCheckUpdate": "Яңартуларны автоматик тикшерү",
         "enableBuiltinEnhanced": "Эчке камилләштерүне кабызу",
         "proxyLayoutColumns": "Прокси күрсәтү баганалары саны",
@@ -406,7 +405,6 @@
         "defaultLatencyTimeout": "Тоткарлануның стандарт таймауты"
       },
       "tooltips": {
-        "autoCloseConnections": "Прокси төркеме яисә режимын үзгәрткәндә актив тоташуларны өзү",
         "enableBuiltinEnhanced": "Конфигурация файлы белән туры килә торган өстәмә оптимизация",
         "autoDelayDetection": "Фон режимында хәзерге төен тоткарлыгын периодик тикшерә",
         "defaultLatencyTest": "Бу фәкать клиентның HTTP сораулары тесты өчен кулланыла, конфигурация файлына йогынты ясамый"
