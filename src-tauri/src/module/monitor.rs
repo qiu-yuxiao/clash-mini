@@ -514,7 +514,9 @@ async fn trigger_backend_auto_select_inner(
     for name in &valid_nodes {
         let delay = match delays.get(name) {
             Some(&d) => d,
-            None => 1_000_000, // 测量组尚未就绪/未测得 → 标记 Error，不参与选点
+            // 未测得（超时/失败/测量组未就绪）→ 0（timeout 语义）
+            // 与 delay_proxy_by_name 失败时的返回一致，前端显示 "Timeout" 而非 "Error"
+            None => 0,
         };
         display.push((name.clone(), delay));
         if (NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&delay) {
@@ -581,6 +583,12 @@ async fn trigger_backend_auto_select_inner(
                     if let Err(e) = profiles_patch_item_safe(&uid_smart, &patch_item).await {
                         logging!(warn, Type::Lightweight, "[后台监测] 回写 profile.selected 失败: {e}");
                     }
+                    // 【二次bug修复】通知前端刷新代理缓存。
+                    // 49212979 删除了 refresh_clash() 以避免 TUN 断流，但连带删掉了
+                    // 前端刷新链路，导致活跃节点栏不更新、显示节点与实际节点不一致。
+                    // 这里只调 refresh_proxies()（emit verge://refresh-proxy-config 事件），
+                    // 不调 refresh_clash()（避免整份配置重载 + auto_close_connection 断流）。
+                    crate::core::handle::Handle::refresh_proxies();
                 }
                 Err(e) => {
                     logging!(warn, Type::Lightweight, "[后台监测] 切换节点失败: {e}");
