@@ -92,22 +92,12 @@ export const useVisibility = () => {
   }, [])
 
   useEffect(() => {
-    let unlistenResized: (() => void) | null = null
     let unlistenFocus: (() => void) | null = null
 
     const initTauri = async () => {
       try {
         const currentWindow = getCurrentWindow()
         await updateWindowState()
-
-        const unR = await currentWindow.onResized(async () => {
-          await updateWindowState()
-        })
-        if (tauriMountedRef.current) {
-          unlistenResized = unR
-        } else {
-          unR()
-        }
 
         const unF = await currentWindow.onFocusChanged(async () => {
           await updateWindowState()
@@ -127,9 +117,6 @@ export const useVisibility = () => {
     tauriMountedRef.current = true
     return () => {
       tauriMountedRef.current = false
-      if (unlistenResized) {
-        unlistenResized()
-      }
       if (unlistenFocus) {
         unlistenFocus()
       }

@@ -1,4 +1,9 @@
-import { getCurrentWindow, LogicalSize, PhysicalPosition, currentMonitor } from '@tauri-apps/api/window'
+import {
+  getCurrentWindow,
+  LogicalSize,
+  PhysicalPosition,
+  currentMonitor,
+} from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
@@ -74,12 +79,16 @@ async function ensureWindowInScreen(
  */
 async function getScaleFactor(): Promise<number> {
   try {
-    const monitor = await withIpcTimeout(currentMonitor(), 5000, 'currentMonitor')
+    const monitor = await withIpcTimeout(
+      currentMonitor(),
+      5000,
+      'currentMonitor',
+    )
     if (monitor) return monitor.scaleFactor
   } catch {
     // 忽略，回退到 window.devicePixelRatio
   }
-  return typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
+  return typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
 }
 
 export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -194,7 +203,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         // 大尺寸模式逻辑：event.payload 是 PhysicalSize，转换为 logical 比较
-        const factor = await getScaleFactor()
+        const factor = window.devicePixelRatio || 1
         const logicalW = width / factor
         const logicalH = height / factor
         const isLargeSize =
@@ -391,11 +400,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           'setSize-restore',
         )
 
-        await ensureWindowInScreen(
-          currentWindow,
-          saved.width,
-          saved.height,
-        )
+        await ensureWindowInScreen(currentWindow, saved.width, saved.height)
 
         isLargeModeRef.current = false
         setIsLargeMode(false)

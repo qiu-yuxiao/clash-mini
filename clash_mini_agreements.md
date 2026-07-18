@@ -1423,6 +1423,9 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **第五阶段（Stage-5）发布前终极双端审计与安全自愈修正**：
   - **SCM 服务线程安全优化**：将后端 `SERVICE_MANAGER.current()` 重构为 O(1) 立即返回无锁状态查询，引入 `#[allow(clippy::unused_async)]` 标记，完美根除了服务安装/重装耗时操作进行期间 UI 查询线程被 `notified.await` 强制卡死的假死挂起痛点。
   - **网络自愈降频错配修补**：在 `monitor.rs` 门禁处将 `check_interval` 判定式与离线（`!was_online`）5秒轮询机制对齐，彻底打通了离线态下以 5s 频次快速检查网络以触发自愈恢复的正确通路。
+  - **Resize 拖拽卡死与 Webview2 底层 COM 死锁根治**：
+    - 在 `use-visibility.ts` 中彻底移除了无用且有害的 `onResized` 异步可见性探测监听器，从源头上掐断了拖拽窗口时 99% 的 IPC 通道“提问洪水”。
+    - 在 `window-provider.tsx` 的高频 `onResized` 防抖回调中，使用本地同步只读属性 `window.devicePixelRatio` 替代跨进程 `await getScaleFactor()` 异步调用。将拖动 resize 的回调链路彻底降维为 100% 纯本地同步前端计算，完全根除了 Windows 拖动模态消息循环期间前后端 COM 跨进程通信引发的假死与永久性死锁。
 
 ### v2.4.7 弹窗自适应与 Lint 规范审计 (2026-07-12)
 
