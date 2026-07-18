@@ -268,12 +268,14 @@ pub enum FailoverVerdict {
 /// 彻底取代旧设计「后端用 delay_proxy_by_name 自测活跃节点」的不可靠路径。
 fn node_status(proxy: &tauri_plugin_mihomo::models::Proxy) -> NodeStatus {
     // 测量组尚未测过该节点 → 数据缺失，不误判
-    if proxy.history.is_empty() {
-        return NodeStatus::Unknown;
-    }
-    let last = proxy.history.last().unwrap().delay as u32;
-    // alive=false（测速失败）或延迟超上限 → 死；低于下限 → 机场伪造假节点/广告节点 → 死
-    if !proxy.alive || last >= NODE_DELAY_MAX_MS || last < NODE_DELAY_MIN_MS {
+    // 取最近一次 history 延迟；缺失则同样视为 Unknown
+    let last = match proxy.history.last() {
+        Some(h) => h.delay as u32,
+        None => return NodeStatus::Unknown,
+    };
+    // alive=false（测速失败）或延迟不在 [MIN, MAX) 区间 → 死
+    //（低于下限 = 机场伪造假节点/广告节点，达到/超过上限 = 测速超时）
+    if !proxy.alive || !(NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&last) {
         NodeStatus::Dead
     } else {
         NodeStatus::Alive(last)
