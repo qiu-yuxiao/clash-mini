@@ -171,7 +171,8 @@ export const AppDataProvider = ({
       return
     }
     queryClient.invalidateQueries({ queryKey: ['getProxies'] })
-  }, [isMiniStatus, queryClient])
+    // queryClient 是 useQueryClient() 返回的稳定引用，无需作为依赖
+  }, [isMiniStatus])
 
   const {
     data: clashConfig,

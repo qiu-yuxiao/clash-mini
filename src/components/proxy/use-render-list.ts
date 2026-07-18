@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 
-import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import { useWindowDecorations } from '@/hooks/use-window'
+import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
 import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 
