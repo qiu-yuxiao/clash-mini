@@ -4,8 +4,8 @@ use crate::{
 };
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::task::AbortHandle;
 use tokio::time::{Duration, Instant, sleep};
 
@@ -484,14 +484,16 @@ async fn trigger_backend_auto_select_inner(
     // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
     // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
     // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
-    let mut delays: std::collections::HashMap<String, u32> =
-        match mihomo.delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS).await {
-            Ok(d) => d,
-            Err(e) => {
-                logging!(warn, Type::Lightweight, "[后台监测] 读取测量组延迟失败: {e}");
-                std::collections::HashMap::new()
-            }
-        };
+    let mut delays: std::collections::HashMap<String, u32> = match mihomo
+        .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
+        .await
+    {
+        Ok(d) => d,
+        Err(e) => {
+            logging!(warn, Type::Lightweight, "[后台监测] 读取测量组延迟失败: {e}");
+            std::collections::HashMap::new()
+        }
+    };
 
     // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history
     if delays.is_empty() {
