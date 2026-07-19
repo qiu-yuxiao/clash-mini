@@ -1590,3 +1590,4 @@ double-check 发现 985fee2f「强咬合防线」只在校验失败分支生效�
 
 **根因闭环**：三条改动同属"持久 `selected` 被当成权威、且不校验子集"这一根因的三道闸——① 写回前校验、② 恢复前校验、`activateSelected` 成功分支优先信任内核实际节点。落地后，`selected` 既不会被越界节点污染，也不会在恢复/激活时把越界节点强加给内核，前后端活跃节点不一致可根除（HEAD 仍未打 tag，v2.6.4-4 之后）。
 - **`updater/app-update.json` 版本号同步到 2.6.4**：v2.6.4 发版时未同步更新 `updater/app-update.json` 的 `version` 字段（保留为 2.6.3），导致 pre-push hook 的 `check-version-consistency` 任务阻塞 push。本次将 `version` 字段同步到 2.6.4。push 时发现远端已有完整的 v2.6.4 安装包元数据（notes/pub_date/signature/url/size），rebase 解决冲突时采用远端版本，本地临时绕过版本被丢弃。影响文件：`updater/app-update.json`。
+- **`is_dummy_node` 假阴性收口（node.rs）**：上次 double-check 指出的 `starts_with` 假阴性（`【剩余流量】`/`(购买入口)`/`节点-购买入口` 漏进 PROXY）已落地。新增 `normalize_dummy_name`：先剥两端包裹符号（【】()（）[]「」）、再剥 `节点-` 通用前缀，归一化后再 `starts_with` 广告短语。不剥 `CN2-`/`HK-` 等区域/协议前缀，故 `CN2-购买入口` 等真节点仍保住、不破坏既有单测。补 `test_dummy_node_leak_side` 覆盖泄漏侧。与 1~3 同属一次收口，未发包。

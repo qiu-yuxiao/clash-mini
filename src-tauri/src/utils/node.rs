@@ -9,8 +9,11 @@
 /// 此函数由 monitor.rs、enhance/mod.rs、lifecycle.rs 共享，确保从配置生成、
 /// 自愈判定到节点恢复的全链路都剔除伪节点。
 ///
-/// 【修正】中文关键词从 `contains` 改为 `starts_with`，避免误杀真实节点
-///（如 "HK-流量优化"、"日本群组-01" 等）被错误过滤导致用户可用节点丢失。
+/// 【修正】中文关键词从 `contains` 改为「归一化后 starts_with」，避免误杀真实节点
+///（如 "HK-流量优化"、"CN2-购买入口" 等）被错误过滤导致用户可用节点丢失；
+/// 同时修复此前 `starts_with` 引入的假阴性——伪节点用括号/书名号包裹或带
+/// "节点-" 通用前缀（如 "【剩余流量】"、"（购买入口）"、"节点-购买入口"）时，
+/// 广告短语不在最开头会漏进 PROXY。归一化先剥包裹符号与通用前缀再判定。
 pub fn is_dummy_node(name: &str) -> bool {
     let lower = name.to_lowercase();
     // 高置信度：包含 URL scheme 或明确的英文广告词
@@ -23,17 +26,62 @@ pub fn is_dummy_node(name: &str) -> bool {
     {
         return true;
     }
+    // 归一化：剥掉包裹括号/书名号、通用前缀，让广告短语回到开头再判定
+    let normalized = normalize_dummy_name(&lower);
+
     // 中文广告短语：要求完全匹配或以该短语开头。
     // 广告节点通常以这些词开头（如"剩余流量：100GB"），而真实节点很少如此。
     let ad_phrases = [
-        "流量", "过期时间", "网址", "官网", "剩余", "套餐到期", "续费", "公告", "购买", "群",
+        "流量",
+        "过期时间",
+        "网址",
+        "官网",
+        "剩余",
+        "套餐到期",
+        "续费",
+        "公告",
+        "购买",
+        "群",
     ];
     for phrase in &ad_phrases {
-        if lower == *phrase || lower.starts_with(phrase) {
+        if normalized == *phrase || normalized.starts_with(phrase) {
             return true;
         }
     }
     false
+}
+
+/// 把节点名归一化，便于检测「广告短语不在最开头」的伪节点。
+/// 1. 剥掉两端的空白与包裹符号（【】()（）[]「」），可多层；
+/// 2. 剥掉通用前缀「节点-」「节点：」等（"节点-购买入口" 这类纯伪节点）。
+/// 不剥区域/协议前缀（如 "CN2-"、"HK-"），以免误杀真实节点。
+fn normalize_dummy_name(name: &str) -> String {
+    let mut s = name.trim().to_string();
+    let wrappers = [('【', '】'), ('(', ')'), ('（', '）'), ('[', ']'), ('「', '」')];
+    loop {
+        let before = s.len();
+        for &(open, close) in &wrappers {
+            if s.starts_with(open) && s.ends_with(close) && s.len() >= open.len_utf8() + close.len_utf8() {
+                let start = open.len_utf8();
+                let end = s.len() - close.len_utf8();
+                s = s[start..end].to_string();
+                s = s.trim().to_string();
+                break;
+            }
+        }
+        if s.len() == before {
+            break;
+        }
+    }
+    if let Some(rest) = s
+        .strip_prefix("节点-")
+        .or_else(|| s.strip_prefix("节点:"))
+        .or_else(|| s.strip_prefix("节点："))
+        .or_else(|| s.strip_prefix("节点 "))
+    {
+        s = rest.trim().to_string();
+    }
+    s
 }
 
 #[cfg(test)]
@@ -73,5 +121,20 @@ mod tests {
         assert!(!is_dummy_node("香港-续费专线"));
         assert!(!is_dummy_node("日本-过期时间测试"));
         assert!(!is_dummy_node("上海-群节点-01"));
+    }
+
+    #[test]
+    fn test_dummy_node_leak_side() {
+        // 广告短语被包裹/加前缀时也应被识别，修复此前 starts_with 导致的漏判
+        assert!(is_dummy_node("【剩余流量】"));
+        assert!(is_dummy_node("【剩余流量：100GB】"));
+        assert!(is_dummy_node("(购买入口)"));
+        assert!(is_dummy_node("（购买入口）"));
+        assert!(is_dummy_node("[官网]"));
+        assert!(is_dummy_node("「公告频道」"));
+        assert!(is_dummy_node("节点-购买入口"));
+        assert!(is_dummy_node("节点：剩余流量"));
+        // 多层包裹
+        assert!(is_dummy_node("【(剩余流量)】"));
     }
 }
