@@ -1689,4 +1689,78 @@ mihomo 启动时用 `-f config_file` 加载配置，PROXY 组 `now` 的恢复依
 | `restart_core`（`lifecycle.rs:95-116`） | 内部完成 |
 | `apply_config`（`config.rs:121-164`） | 内部完成 |
 | `core_updater` 升级流程（`core_updater.rs:485-590`） | 显式调用 `snapshot_proxy_group_now` + `restore_proxy_group_now` |
+
+### v2.6.5 隐患修复 C：`monitor.rs` 周期性心跳日志 (2026-07-19)
+
+#### 问题根因
+
+`monitor.rs` 的主循环（行 679-870）采用 `tokio::select!` 等待三件事：sleep 到期（15s/3s/5s）、唤醒信号、profile 切换信号。每次循环只在**状态变化**时打日志：
+
+- 节点变化 → info 日志
+- 网络变化 → info/warn 日志
+- 健康检测失败 → info 日志
+- 自愈触发 → info 日志
+
+正常运行无事件时，`evaluate_failover` 返回 `NoAction`，**什么都不打**。结果：正常运行时 monitor.rs 可能连续几小时甚至几天没有任何日志输出。
+
+#### 本次事件暴露的设计盲区
+
+```
+[2026-07-19 16:01:45.034] 检测到活动节点发生变化: Some("日本aw6") -> 日本aw2
+[2026-07-19 21:03:29.875] 检测到网络已断开，暂停健康检测与自愈
+```
+
+中间 4h22m 完全空白，最初误判为"外壳日志写入停止"（v2.6.5 报告里的根因 4）。深度调研后才发现真相：flexi_logger 全程正常，monitor 4h22m 内确实无任何状态变化事件可记录。
+
+**问题**：从运维角度，"完全无日志"既可能是"运行正常无事件"，也可能是"线程已死/被阻塞"。两者无法区分。这与 project_memory 中「UI 线程必须包含心跳探针每5秒检测响应状态」约束冲突——UI 线程有心跳，但后台监测线程没有。
+
+#### 修复方案
+
+每 `MONITOR_HEARTBEAT_CYCLE_COUNT = 20` 个循环周期打一条 debug 级别心跳日志（正常模式 15s/周期 × 20 = 5 分钟一条）：
+
+```
+[后台监测] 心跳: active=Some("日本aw2"), fails=0, online=true, retry_mode=false, api_errors=0, uptime=12345s, cycles=20
+```
+
+包含：
+- `active`：当前活跃节点名（确认 monitor 还能读到 mihomo 状态）
+- `fails`：连续失败计数（确认健康检测还在跑）
+- `online`：网络状态（确认网络探针还工作）
+- `retry_mode`：是否在重试模式
+- `api_errors`：连续 API 异常计数
+- `uptime`：线程运行总时长
+- `cycles`：心跳计数（与阈值比较）
+
+#### 5 分钟周期依据
+
+- UI 线程心跳探针是 5 秒，monitor 心跳取"60 倍"= 5 分钟，与"5 倍原则"一致
+- 正常模式 15s/周期 × 20 = 5 分钟
+- 重试模式 3s/周期 × 20 = 1 分钟（更快暴露异常）
+- 离线模式 5s/周期 × 20 = 100 秒（快速发现网络恢复）
+- 远小于本次事件的 4h22m 空白期，能快速区分"线程已死" vs "正常运行无事件"
+
+#### 选用 debug 级别而非 info 的理由
+
+1. **与项目既有设计一致**：UI 线程心跳探针已是 debug 级别（`lib.rs` 行 275-297）
+2. **不影响生产日志体积**：默认 Info 级别不显示 debug，5 分钟一条的频率也不会污染排障日志
+3. **排障时可见**：用 `RUST_LOG=debug` 启动应用即可看到心跳，立刻判定线程状态
+4. **不引入新线程**：在主循环内打心跳，无需额外探针线程
+
+#### 影响文件
+
+- `src-tauri/src/module/monitor.rs`：新增常量 `MONITOR_HEARTBEAT_CYCLE_COUNT = 20`，主循环新增 `thread_start_time`、`cycle_count` 两个状态变量，循环开头加心跳日志逻辑
+
+#### 修复后的诊断流程
+
+排障时若发现 latest.log 出现长时间空白：
+
+1. 启用 `RUST_LOG=debug` 重启应用
+2. 观察是否有 `[后台监测] 心跳` 日志：
+   - **有心跳** → monitor 线程正常运行，无事件可记录（与本次事件相同）
+   - **无心跳** → monitor 线程已死或被阻塞，需进一步排查
+3. 心跳中的字段还能立即定位异常：
+   - `active=None` → mihomo API 不可达
+   - `fails > 0` → 健康检测在失败
+   - `online=false` → 网络已断开
+   - `api_errors > 0` → mihomo API 异常
 - **`is_dummy_node` 假阴性收口（node.rs）**：上次 double-check 指出的 `starts_with` 假阴性（`【剩余流量】`/`(购买入口)`/`节点-购买入口` 漏进 PROXY）已落地。新增 `normalize_dummy_name`：先剥两端包裹符号（【】()（）[]「」）、再剥 `节点-` 通用前缀，归一化后再 `starts_with` 广告短语。不剥 `CN2-`/`HK-` 等区域/协议前缀，故 `CN2-购买入口` 等真节点仍保住、不破坏既有单测。补 `test_dummy_node_leak_side` 覆盖泄漏侧。与 1~3 同属一次收口，未发包。

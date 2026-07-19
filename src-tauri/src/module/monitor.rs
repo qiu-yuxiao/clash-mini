@@ -74,6 +74,20 @@ const RETRY_CHECK_INTERVAL_SECS: u64 = 3;
 /// 离线时主循环间隔（秒）：与离线网络探测间隔对齐，确保 5 秒快速探测不被 15 秒主循环限制
 const OFFLINE_CHECK_INTERVAL_SECS: u64 = 5;
 
+/// 后台监测线程心跳日志周期（循环次数）
+///
+/// 【设计依据】
+/// - 正常模式 15s/周期，20 个周期 ≈ 5 分钟
+/// - 与 UI 线程心跳探针（5 秒）的"5 倍"原则保持一致：5s × 60 = 5min
+/// - 远小于 v2.6.5 事件中的 4h22m 空白期，能快速区分"线程已死" vs "正常运行无事件"
+/// - debug 级别，不影响生产日志体积（默认 Info 级别不显示）
+///
+/// 【设计盲区修复】
+/// 此前 monitor.rs 主循环只在状态变化时打日志（节点变化/网络变化/失败告警），
+/// 导致正常运行时连续几小时无日志输出，与"线程已死"无法区分。
+/// 加周期性心跳后，排障时启用 RUST_LOG=debug 即可看到心跳，立刻判定线程状态。
+const MONITOR_HEARTBEAT_CYCLE_COUNT: u64 = 20;
+
 /// 从当前 Verge 配置中读取测速 URL，多处复用避免重复代码
 async fn get_test_url() -> String {
     let verge = Config::verge().await.latest_arc();
@@ -663,6 +677,7 @@ const fn check_interval_secs(is_retry_mode: bool, was_online: bool) -> u64 {
 pub fn start_background_monitor() {
     let handle = AsyncHandler::spawn(move || async move {
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
+        let thread_start_time = Instant::now();
         let mut last_check_time = Instant::now();
         let mut consecutive_fails = 0;
         let mut is_retry_mode = false;
@@ -675,11 +690,35 @@ pub fn start_background_monitor() {
         // 连续 API 异常计数：mihomo API 不可达时（get_group_by_name 超时/连接失败）累计，
         // 达到阈值后触发自愈，避免把内核卡死误判为"内核重载中"而放弃自愈。
         let mut api_error_count = 0u32;
+        // 【v2.6.5 隐患 C 修复】周期性心跳计数器
+        // 用于在正常运行无事件时仍能定期输出 debug 心跳日志，与"线程已死"区分
+        let mut cycle_count: u64 = 0;
 
         loop {
             if crate::core::handle::Handle::global().is_exiting() {
                 logging!(info, Type::Lightweight, "[后台监测] 检测到应用退出，监测线程终止");
                 break;
+            }
+
+            // 【v2.6.5 隐患 C 修复】周期性心跳日志
+            // 每 MONITOR_HEARTBEAT_CYCLE_COUNT 个循环周期打一条 debug 心跳，
+            // 让"正常运行无事件"也能留下日志痕迹，与"线程已死"可区分。
+            // debug 级别，生产默认不可见；排障时用 RUST_LOG=debug 启用。
+            cycle_count += 1;
+            if cycle_count.is_multiple_of(MONITOR_HEARTBEAT_CYCLE_COUNT) {
+                let uptime = thread_start_time.elapsed().as_secs();
+                logging!(
+                    debug,
+                    Type::Lightweight,
+                    "[后台监测] 心跳: active={:?}, fails={}, online={}, retry_mode={}, api_errors={}, uptime={}s, cycles={}",
+                    last_active_node,
+                    consecutive_fails,
+                    was_online,
+                    is_retry_mode,
+                    api_error_count,
+                    uptime,
+                    cycle_count,
+                );
             }
 
             if is_first_run {
