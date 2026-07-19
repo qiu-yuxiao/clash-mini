@@ -261,35 +261,6 @@ export const ResizeHandles: React.FC = () => {
     [currentWindow],
   )
 
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      const session = sessionRef.current
-      if (!session || e.pointerId !== session.pointerId) return
-      // 计算鼠标在 physical 坐标系下的位移
-      const dx = e.clientX * session.scaleFactor - session.startPointerX
-      const dy = e.clientY * session.scaleFactor - session.startPointerY
-
-      // 计算 clamp 后的新几何（logical），写入 pending（rAF 节流后统一应用）
-      const geo = computeResizeGeometry({
-        direction: session.direction,
-        startPhysW: session.startPhysW,
-        startPhysH: session.startPhysH,
-        startPhysX: session.startPhysX,
-        startPhysY: session.startPhysY,
-        dx,
-        dy,
-        scaleFactor: session.scaleFactor,
-      })
-      session.pendingW = geo.width
-      session.pendingH = geo.height
-      session.pendingX = geo.x
-      session.pendingY = geo.y
-
-      scheduleApply(session)
-    },
-    [scheduleApply],
-  )
-
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       const session = sessionRef.current
@@ -324,6 +295,43 @@ export const ResizeHandles: React.FC = () => {
     [applyPending],
   )
 
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const session = sessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+
+      // 🛡️ 终极防线：如果检测到鼠标左键已释放（e.buttons 不含左键 1 掩码），
+      // 说明 pointerup 已经丢失。立即在此主动触发收尾清理，斩断假拖动状态。
+      if ((e.buttons & 1) === 0) {
+        handlePointerUp(e)
+        return
+      }
+
+      // 计算鼠标在 physical 坐标系下的位移
+      const dx = e.clientX * session.scaleFactor - session.startPointerX
+      const dy = e.clientY * session.scaleFactor - session.startPointerY
+
+      // 计算 clamp 后的新几何（logical），写入 pending（rAF 节流后统一应用）
+      const geo = computeResizeGeometry({
+        direction: session.direction,
+        startPhysW: session.startPhysW,
+        startPhysH: session.startPhysH,
+        startPhysX: session.startPhysX,
+        startPhysY: session.startPhysY,
+        dx,
+        dy,
+        scaleFactor: session.scaleFactor,
+      })
+      session.pendingW = geo.width
+      session.pendingH = geo.height
+      session.pendingX = geo.x
+      session.pendingY = geo.y
+
+      scheduleApply(session)
+    },
+    [scheduleApply, handlePointerUp],
+  )
+
   if (isLargeMode) return null
 
   return (
@@ -336,6 +344,7 @@ export const ResizeHandles: React.FC = () => {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onLostPointerCapture={handlePointerUp}
           style={{
             position: 'absolute',
             zIndex: 9999,
