@@ -231,6 +231,25 @@ pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow:
         if let Some(entry) = selected.iter().find(|s| s.name.as_deref() == Some("PROXY")) {
             if let (Some(_group), Some(node)) = (&entry.name, &entry.now) {
                 if !node.is_empty() {
+                    // 【治本修复②】恢复前校验节点是否在当前 filterText 子集内，
+                    // 越界（被污染的持久选择）或伪节点不还原，交给定语 auto-select 在子集内重选，
+                    // 避免"轻量唤醒后前端显示节点 ≠ 内核实际选路"的污染复现。
+                    let filter_lower = get_filter_and_sort_config(profile_uid)
+                        .await
+                        .0
+                        .filter_text
+                        .trim()
+                        .to_lowercase();
+                    if is_dummy_node(node) || (!filter_lower.is_empty() && !match_filter(node, &filter_lower)) {
+                        logging!(
+                            warn,
+                            Type::Lightweight,
+                            "[后台监测] 跳过恢复越界/伪节点 {}（不在过滤范围「{}」内，疑似被污染的持久选择），交由自动选点重选",
+                            node,
+                            filter_lower
+                        );
+                        return Ok(());
+                    }
                     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
                     logging!(info, Type::Lightweight, "[后台监测] 恢复 PROXY 组选择节点: {}", node);
                     let _ = mihomo.select_node_for_group("PROXY", node).await;
@@ -571,17 +590,35 @@ async fn trigger_backend_auto_select_inner(
                     // 否则唤醒/进入轻量模式时 restore_profile_selected_nodes
                     // 和 activateSelected 会用过时的 selected 值把节点切回旧节点。
                     // 单组架构下 selected 数组只含 PROXY 一项。
-                    let new_selected = vec![PrfSelected {
-                        name: Some("PROXY".into()),
-                        now: Some(fastest_node.clone().into()),
-                    }];
-                    let patch_item = PrfItem {
-                        selected: Some(new_selected),
-                        ..Default::default()
-                    };
-                    let uid_smart: smartstring::alias::String = profile_uid.into();
-                    if let Err(e) = profiles_patch_item_safe(&uid_smart, &patch_item).await {
-                        logging!(warn, Type::Lightweight, "[后台监测] 回写 profile.selected 失败: {e}");
+                    // 【治本修复①】写回前校验节点是否在当前 filterText 子集内；
+                    // 越界（被污染的持久选择）不写回，避免污染 selected 后再次复现前后端不一致。
+                    let filter_lower = get_filter_and_sort_config(profile_uid)
+                        .await
+                        .0
+                        .filter_text
+                        .trim()
+                        .to_lowercase();
+                    if filter_lower.is_empty() || match_filter(fastest_node, &filter_lower) {
+                        let new_selected = vec![PrfSelected {
+                            name: Some("PROXY".into()),
+                            now: Some(fastest_node.clone().into()),
+                        }];
+                        let patch_item = PrfItem {
+                            selected: Some(new_selected),
+                            ..Default::default()
+                        };
+                        let uid_smart: smartstring::alias::String = profile_uid.into();
+                        if let Err(e) = profiles_patch_item_safe(&uid_smart, &patch_item).await {
+                            logging!(warn, Type::Lightweight, "[后台监测] 回写 profile.selected 失败: {e}");
+                        }
+                    } else {
+                        logging!(
+                            warn,
+                            Type::Lightweight,
+                            "[后台监测] 最优节点 {} 不在当前过滤范围「{}」内，跳过回写 profile.selected 以免污染",
+                            fastest_node,
+                            filter_lower
+                        );
                     }
                     // 【二次bug修复】通知前端刷新代理缓存。
                     // 49212979 删除了 refresh_clash() 以避免 TUN 断流，但连带删掉了
@@ -920,14 +957,8 @@ mod tests {
 
     #[test]
     fn test_resolve_probe_target_ipv4() {
-        assert_eq!(
-            resolve_probe_target("http://1.2.3.4/generate_204"),
-            "1.2.3.4:80"
-        );
-        assert_eq!(
-            resolve_probe_target("https://1.2.3.4:8443/test"),
-            "1.2.3.4:8443"
-        );
+        assert_eq!(resolve_probe_target("http://1.2.3.4/generate_204"), "1.2.3.4:80");
+        assert_eq!(resolve_probe_target("https://1.2.3.4:8443/test"), "1.2.3.4:8443");
     }
 
     #[test]
@@ -937,10 +968,7 @@ mod tests {
             resolve_probe_target("http://[2001:db8::1]/generate_204"),
             "[2001:db8::1]:80"
         );
-        assert_eq!(
-            resolve_probe_target("https://[::1]:8443/test"),
-            "[::1]:8443"
-        );
+        assert_eq!(resolve_probe_target("https://[::1]:8443/test"), "[::1]:8443");
     }
 
     #[test]
@@ -958,9 +986,6 @@ mod tests {
     #[test]
     fn test_resolve_probe_target_malformed() {
         // 非法 URL fallback 到默认目标
-        assert_eq!(
-            resolve_probe_target("not-a-valid-url"),
-            "cp.cloudflare.com:80"
-        );
+        assert_eq!(resolve_probe_target("not-a-valid-url"), "cp.cloudflare.com:80");
     }
 }

@@ -14,6 +14,24 @@ import { queryClient } from '@/services/query-client'
 import type { IProfileItem, IProfilesConfig } from '@/types/profile'
 import { debugLog } from '@/utils/debug'
 
+// 从 localStorage 的 proxy-head-state 读取当前 profile 的过滤词（与后端 match_filter 语义一致：
+// 大小写不敏感子串匹配）。读取失败或为空时返回 ''，等价于"无过滤"，即全部节点都在子集内。
+// 该 key 由 use-head-state.ts 在加载/变更时写入，activateSelected 运行时通常已就绪。
+function readActiveFilterText(uid?: string): string {
+  if (!uid) return ''
+  try {
+    const raw = localStorage.getItem('proxy-head-state')
+    if (!raw) return ''
+    const storage = JSON.parse(raw) as Record<
+      string,
+      Record<string, { filterText?: string }>
+    >
+    return storage?.[uid]?.['PROXY']?.filterText ?? ''
+  } catch {
+    return ''
+  }
+}
+
 export const useProfiles = () => {
   const {
     data: profiles,
@@ -174,6 +192,35 @@ export const useProfiles = () => {
 
         if (matchedProxyName === currentNow) {
           debugLog('[ActivateSelected] PROXY 组选择已是目标状态，无需更新')
+          return
+        }
+
+        // 【治本修复】savedProxyName 可能已被污染（如导入盲选写回的越界节点）。
+        // 仅当它在用户当前 filterText 子集内时才信任并切过去；越界则不再强加给内核，
+        // 而是把本地 selected 校正为内核实际节点 currentNow，避免"前端显示 ≠ 内核实际选路"复现。
+        const filterText = readActiveFilterText(current?.uid)
+        const savedInSubset =
+          filterText.trim() === '' ||
+          savedProxyName.toLowerCase().includes(filterText.trim().toLowerCase())
+
+        if (!savedInSubset) {
+          const msg = `[ActivateSelected] 保存的代理 ${savedProxyName} 不在当前过滤范围「${filterText}」内（疑似被污染的持久选择），不切内核，改为校正 selected 为内核实际节点 ${currentNow}`
+          console.warn(msg)
+          frontendLog('error', msg)
+          // 🛡️【强咬合防线】越界时不切内核，仅把 selected 校准为内核实际节点，保持前后端一致
+          if (currentNow) {
+            const newSelected = [{ name: 'PROXY', now: currentNow }]
+            patchProfile(current.uid, { selected: newSelected })
+              .then(() =>
+                queryClient.invalidateQueries({ queryKey: ['getProxies'] }),
+              )
+              .catch((err) =>
+                console.error(
+                  '[ActivateSelected] 修正 Profile.selected 失败:',
+                  err,
+                ),
+              )
+          }
           return
         }
 

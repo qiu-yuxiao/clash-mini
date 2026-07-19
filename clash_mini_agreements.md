@@ -1579,4 +1579,14 @@ latest.log 在 16:01:45.034 后完全停止记录，但 service_latest.log（mih
 - **前端强校准回写**：在 `use-profiles.ts` 的 `activateSelected` 流程中，针对节点不存在（`!matchedProxy`）及切换 PROXY 组捕获异常的失败分支，增设 selected 字段自动写回校验。在失败分支返回前将本地 Profile 的 `selected` 同步更新为后端实际的 `currentNow`，并触发查询刷新，确保任何失效场景下数据均能自动且实时咬合。
 
 - **rustfmt 格式化 `lifecycle.rs` 与 `server.rs`**：pre-commit hook 的 rust-format 任务对 v2.6.5 修复提交中的 `lifecycle.rs`（fallback 节点 `or_else` 链式调用折行）和 `server.rs`（`logging!` 宏单行化）应用了 rustfmt 风格化，纯排版无逻辑变化。影响文件：`src-tauri/src/core/manager/lifecycle.rs`、`src-tauri/src/utils/server.rs`。
+
+### v2.6.5 补充加固 ②：持久选择污染治本（①② 落地 + activateSelected 信任顺序修正） (2026-07-19)
+
+double-check 发现 985fee2f「强咬合防线」只在校验失败分支生效，成功分支仍把污染/过期的 `selected.now` 强加给内核；且 agreements 已确认、用户点头的治本修复 ①② 此前并未落地。本次收口：
+
+- **治本修复②：`restore_profile_selected_nodes` 恢复前校验子集**（monitor.rs）：轻量唤醒恢复节点前，读取 `proxy_head_state.json` 的 `filterText`，用 `match_filter` 校验节点是否在当前圈定范围；越界（被污染的持久选择）或伪节点（`is_dummy_node`）直接跳过恢复并返回 `Ok(())`，交给定语 `trigger_backend_auto_select` 在子集内重选。消除"唤醒后前端显示节点 ≠ 内核实际选路"的污染复现。影响文件：`src-tauri/src/module/monitor.rs`。
+- **治本修复①：monitor 自动选点回写 selected 前校验子集**（monitor.rs）：自动优选成功、写回 `profile.selected` 前，同样读取 `filterText` 用 `match_filter` 校验 `fastest_node`；越界不写回（仅 warn），避免污染 `selected` 后再次复现前后端不一致。正常自动选点（已按 filterText 过滤候选）不受影响。影响文件：`src-tauri/src/module/monitor.rs`。
+- **`activateSelected` 成功分支信任顺序修正**（use-profiles.ts）：原成功分支无条件把内核 `now` 切到 `selected.now` 并写回，会坐实污染。现增加子集校验：从 `localStorage['proxy-head-state']` 读当前 profile 的 `filterText`，仅当 `savedProxyName` 在子集内才切过去；越界则**不切内核**，改为把 `selected` 校正为内核实际 `currentNow`（复用强咬合防线逻辑）并刷新，保持前后端一致。校验失败分支（节点不存在/切换抛错）的校正逻辑保持不变。影响文件：`src/hooks/use-profiles.ts`。
+
+**根因闭环**：三条改动同属"持久 `selected` 被当成权威、且不校验子集"这一根因的三道闸——① 写回前校验、② 恢复前校验、`activateSelected` 成功分支优先信任内核实际节点。落地后，`selected` 既不会被越界节点污染，也不会在恢复/激活时把越界节点强加给内核，前后端活跃节点不一致可根除（HEAD 仍未打 tag，v2.6.4-4 之后）。
 - **`updater/app-update.json` 版本号同步到 2.6.4**：v2.6.4 发版时未同步更新 `updater/app-update.json` 的 `version` 字段（保留为 2.6.3），导致 pre-push hook 的 `check-version-consistency` 任务阻塞 push。本次将 `version` 字段同步到 2.6.4。push 时发现远端已有完整的 v2.6.4 安装包元数据（notes/pub_date/signature/url/size），rebase 解决冲突时采用远端版本，本地临时绕过版本被丢弃。影响文件：`updater/app-update.json`。
