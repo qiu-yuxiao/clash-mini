@@ -60,6 +60,27 @@ export const useProfiles = () => {
     await refetch()
   }, [refetch])
 
+  const updateProfilesCacheSelected = useCallback(
+    (uid: string, selected: { name: string; now: string }[]) => {
+      queryClient.setQueryData<IProfilesConfig>(['getProfiles'], (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          items: old.items?.map((item) => {
+            if (item && item.uid === uid) {
+              return {
+                ...item,
+                selected,
+              }
+            }
+            return item
+          }),
+        }
+      })
+    },
+    [],
+  )
+
   const patchProfiles = useLockFn(
     async (
       value: Partial<IProfilesConfig>,
@@ -95,6 +116,22 @@ export const useProfiles = () => {
   const patchCurrent = useLockFn(async (value: Partial<IProfileItem>) => {
     if (profiles?.current) {
       await patchProfile(profiles.current, value)
+      // 同步更新 React Query 内存缓存
+      queryClient.setQueryData<IProfilesConfig>(['getProfiles'], (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          items: old.items?.map((item) => {
+            if (item && item.uid === profiles.current) {
+              return {
+                ...item,
+                ...value,
+              }
+            }
+            return item
+          }),
+        }
+      })
       if (!value.selected) {
         await mutateProfiles()
       }
@@ -174,9 +211,12 @@ export const useProfiles = () => {
           if (currentNow) {
             const newSelected = [{ name: 'PROXY', now: currentNow }]
             patchProfile(current.uid, { selected: newSelected })
-              .then(() =>
-                queryClient.invalidateQueries({ queryKey: ['getProxies'] }),
-              )
+              .then(() => {
+                updateProfilesCacheSelected(current.uid, newSelected)
+                return queryClient.invalidateQueries({
+                  queryKey: ['getProxies'],
+                })
+              })
               .catch((err) =>
                 console.error(
                   '[ActivateSelected] 修正 Profile.selected 失败:',
@@ -211,9 +251,12 @@ export const useProfiles = () => {
           if (currentNow) {
             const newSelected = [{ name: 'PROXY', now: currentNow }]
             patchProfile(current.uid, { selected: newSelected })
-              .then(() =>
-                queryClient.invalidateQueries({ queryKey: ['getProxies'] }),
-              )
+              .then(() => {
+                updateProfilesCacheSelected(current.uid, newSelected)
+                return queryClient.invalidateQueries({
+                  queryKey: ['getProxies'],
+                })
+              })
               .catch((err) =>
                 console.error(
                   '[ActivateSelected] 修正 Profile.selected 失败:',
@@ -240,9 +283,12 @@ export const useProfiles = () => {
           if (currentNow) {
             const newSelected = [{ name: 'PROXY', now: currentNow }]
             patchProfile(current.uid, { selected: newSelected })
-              .then(() =>
-                queryClient.invalidateQueries({ queryKey: ['getProxies'] }),
-              )
+              .then(() => {
+                updateProfilesCacheSelected(current.uid, newSelected)
+                return queryClient.invalidateQueries({
+                  queryKey: ['getProxies'],
+                })
+              })
               .catch((err) =>
                 console.error(
                   '[ActivateSelected] 修正 Profile.selected 失败:',
@@ -257,6 +303,7 @@ export const useProfiles = () => {
         const newSelected = [{ name: 'PROXY', now: matchedProxyName }]
         try {
           await patchProfile(current.uid, { selected: newSelected })
+          updateProfilesCacheSelected(current.uid, newSelected)
           debugLog('[ActivateSelected] 代理选择配置保存成功')
 
           queryClient.invalidateQueries({ queryKey: ['getProxies'] })
@@ -273,7 +320,7 @@ export const useProfiles = () => {
         )
       }
     },
-    [profiles],
+    [profiles, updateProfilesCacheSelected],
   )
 
   return {

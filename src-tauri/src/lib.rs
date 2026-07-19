@@ -272,6 +272,13 @@ pub fn run() {
 
             logging!(info, Type::Setup, "初始化已启动");
 
+            // 启动时自动清理图标缓存（保留最新 100 个文件）
+            crate::process::AsyncHandler::spawn(|| async move {
+                if let Err(e) = crate::feat::cleanup_icon_cache(100).await {
+                    logging!(warn, Type::Setup, "清理旧图标缓存失败: {}", e);
+                }
+            });
+
             // UI 线程心跳探针：每 5 秒向 UI 线程投递闭包，
             // 若 5 秒内未执行则写入警告日志，用于精确定位 UI 线程卡死时间点
             crate::process::AsyncHandler::spawn(|| async move {

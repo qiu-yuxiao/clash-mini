@@ -1771,3 +1771,14 @@ mihomo 启动时用 `-f config_file` 加载配置，PROXY 组 `now` 的恢复依
 - **修复方案**：在 `resize-handles.tsx` 的卸载 `useEffect` 清理函数中，增加对 `sessionRef.current.rafId` 的 cancelAnimationFrame 清理，在卸载时彻底切断一切 pending 帧的调度。
 - **影响文件**：
   - `src/components/layout/resize-handles.tsx`
+
+### v2.6.5 补充加固 ④：前端局部错误隔离、图标缓存清理及 profiles 缓存同步 (2026-07-20)
+
+- **前端局部错误隔离**：在 `_layout.tsx` 中使用 `ErrorBoundary` 与 `AreaErrorFallback` 对 `ActiveNodeStatusCard` 和 `MiniTrafficPanel` 进行了局部包裹，实现区域错误隔离。即使这些核心数据展示面板因脏数据崩溃，也不会导致全局界面白屏。
+- **图标缓存自动清理**：在 `icon.rs` 中实现了 `cleanup_icon_cache`，并在 `lib.rs` 的 setup 钩子中以非阻塞后台任务的形式异步触发（限制保留最多 100 个最新文件），解决订阅图标在本地磁盘无限堆积的质量问题。
+- **Profiles 缓存同步优化**：在 `use-profiles.ts` 的 `patchCurrent` 和 `activateSelected` 修正节点的分支中，在调用 `patchProfile` 后立刻通过 `queryClient.setQueryData` 强行将最新的 node 状态以纯内存方式更新到 React Query 缓存中，消除了前台切换和回写时 React 状态短暂发旧的卡顿与脱节问题。
+- **影响文件**：
+  - `src/pages/_layout.tsx`
+  - `src-tauri/src/feat/icon.rs`
+  - `src-tauri/src/lib.rs`
+  - `src/hooks/use-profiles.ts`

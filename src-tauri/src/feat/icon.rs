@@ -70,12 +70,51 @@ fn is_supported_icon_content(content: &[u8]) -> bool {
     tauri::image::Image::from_bytes(content).is_ok() || looks_like_svg(content)
 }
 
-// TODO: Implement LRU-based icon cache eviction strategy
-// Currently the icon cache only grows without bounds. Future improvement should:
-// 1. Track last access time for each cached icon
-// 2. Set a maximum cache size (e.g. 100MB or 500 files)
-// 3. Periodically evict least recently used icons when limit is exceeded
-// 4. Consider adding a cache cleanup on app startup
+/// Clean up old downloaded subscription icons from the cache directory on disk.
+/// Keeps the newest `max_files` based on file modification times.
+pub async fn cleanup_icon_cache(max_files: usize) -> CmdResult<()> {
+    let icon_cache_dir = dirs::app_home_dir().stringify_err()?.join("icons").join("cache");
+    if !icon_cache_dir.exists() {
+        return Ok(());
+    }
+
+    let mut entries = Vec::new();
+    let mut dir = fs::read_dir(&icon_cache_dir).await.stringify_err()?;
+    while let Some(entry) = dir.next_entry().await.stringify_err()? {
+        let path = entry.path();
+        if path.is_file() {
+            if let Ok(metadata) = entry.metadata().await {
+                if let Ok(modified) = metadata.modified() {
+                    entries.push((path, modified));
+                } else {
+                    entries.push((path, std::time::SystemTime::now()));
+                }
+            }
+        }
+    }
+
+    if entries.len() > max_files {
+        // Sort by modification time: oldest first
+        entries.sort_by_key(|&(_, modified)| modified);
+        let to_delete = entries.len() - max_files;
+        let mut deleted_count = 0;
+        for (path, _) in entries.iter().take(to_delete) {
+            if fs::remove_file(path).await.is_ok() {
+                deleted_count += 1;
+            }
+        }
+        logging!(
+            info,
+            Type::Setup,
+            "[图标缓存] 清理完成，删除了 {} 个旧缓存文件，保留 {} 个最新文件",
+            deleted_count,
+            max_files
+        );
+    }
+
+    Ok(())
+}
+
 pub async fn download_icon_cache(url: String, name: String) -> CmdResult<String> {
     let icon_cache_dir = dirs::app_home_dir().stringify_err()?.join("icons").join("cache");
     let icon_name = normalize_icon_segment(name.as_str())?;

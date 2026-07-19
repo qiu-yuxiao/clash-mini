@@ -1810,7 +1810,9 @@ const Layout = () => {
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <ActiveNodeStatusCard />
+                  <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+                    <ActiveNodeStatusCard />
+                  </ErrorBoundary>
                 </div>
 
                 <IconButton
@@ -2262,7 +2264,9 @@ const Layout = () => {
               boxSizing: 'border-box',
             }}
           >
-            <MiniTrafficPanel isMinimalWidth={isMinimalWidth} />
+            <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+              <MiniTrafficPanel isMinimalWidth={isMinimalWidth} />
+            </ErrorBoundary>
           </div>
         </div>
       </Paper>
