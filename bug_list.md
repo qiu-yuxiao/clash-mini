@@ -15,6 +15,8 @@
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
+| **BUG-278** | clash_mini_agreements.md encoding corruption (mojibake across entire file) | v2.6.3 | 代码已修正，已确认 |
+| **BUG-277** | Window size jitter after resize release under high load (pointerup loss) | v2.6.3 | 代码已修正，已确认 |
 | **BUG-276** | TUN fallback to manual mode instead of system proxy | v1.9.21 | 代码已修正，已确认 |
 | **BUG-275** | Service reinstall infinite UAC loop under normal user permissions | v1.9.21 | 代码已修正，已确认 |
 | **BUG-274** | Lightweight mode exit state machine rate-limited rollback failure | v1.9.18 | 代码已修正，已确认 |
