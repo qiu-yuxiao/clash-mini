@@ -1764,3 +1764,10 @@ mihomo 启动时用 `-f config_file` 加载配置，PROXY 组 `now` 的恢复依
    - `online=false` → 网络已断开
    - `api_errors > 0` → mihomo API 异常
 - **`is_dummy_node` 假阴性收口（node.rs）**：上次 double-check 指出的 `starts_with` 假阴性（`【剩余流量】`/`(购买入口)`/`节点-购买入口` 漏进 PROXY）已落地。新增 `normalize_dummy_name`：先剥两端包裹符号（【】()（）[]「」）、再剥 `节点-` 通用前缀，归一化后再 `starts_with` 广告短语。不剥 `CN2-`/`HK-` 等区域/协议前缀，故 `CN2-购买入口` 等真节点仍保住、不破坏既有单测。补 `test_dummy_node_leak_side` 覆盖泄漏侧。与 1~3 同属一次收口，未发包。
+
+### v2.6.5 补充加固 ③：`resize-handles.tsx` 组件卸载时取消 requestAnimationFrame 帧 (2026-07-20)
+
+- **问题**：在拖拽调整窗口大小期间，若组件突然卸载（例如切换模式或布局发生重整），之前排队等待在 `requestAnimationFrame` (`session.rafId`) 的渲染帧仍然会在下一帧被调度并触发 `applyPending`，执行 `setSize` / `setPosition` 等 Tauri IPC 操作。此时组件已销毁，容易造成不必要的资源开销及潜在的 window 状态悬空与内存泄漏。
+- **修复方案**：在 `resize-handles.tsx` 的卸载 `useEffect` 清理函数中，增加对 `sessionRef.current.rafId` 的 cancelAnimationFrame 清理，在卸载时彻底切断一切 pending 帧的调度。
+- **影响文件**：
+  - `src/components/layout/resize-handles.tsx`

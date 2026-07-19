@@ -1,3 +1,18 @@
+## v2.6.5
+
+### 🐞 Fixed Bugs
+- **Tauri Window Activation Deadlock Fix**: Resolved a critical deadlock risk in `activate_window` where blocking mpsc channels held tokio worker threads. Rewritten to use async oneshot channels with a 5-second timeout.
+- **Active Node Synchronization & Auto-Correction**: Fixed active node desync by snapshotting and restoring `PROXY.now` during core updater upgrades and config reloads. Frontend `activateSelected` now auto-corrects database config to match core node on failure or subset mismatch.
+- **Subscription Dummy Node Normalization**: Normalization strips outer braces (e.g. `【】`, `[]`) and prefix markers before checking starts-with matching, preventing hidden advertising nodes from causing self-healing loops.
+- **Warp visible Endpoint Logic Correction**: Fixed inverted logic check on `exit_lightweight_mode` which led to false-positive error logging.
+- **Resize Handles rAF Leak Fix**: Added requestAnimationFrame cancel on component unmount in `resize-handles.tsx` to prevent memory/state leaks.
+
+### 🚀 Features
+- **Heartbeat Monitor Logging**: Added heartbeat logs to the background monitor thread for easier liveness diagnostics.
+- **IPv6 Probe Target Parsing**: Added support for parsing IPv6 test URLs into `[addr]:port` format for host lookup probe.
+
+---
+
 ## v2.6.4
 
 ### 🐞 Fixed Bugs (订阅伪节点混入 PROXY 组触发自愈死循环根治)

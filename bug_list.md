@@ -15,6 +15,11 @@
 
 所有已通过 Master 验证并确认关闭的 Bug，在此进行极简化表格索引。
 
+| **BUG-284** | Memory/State leak from pending requestAnimationFrame on unmount in resize-handles.tsx | v2.6.5 | 代码已修正，已确认 |
+| **BUG-283** | Inverted exit_lightweight_mode return logic check in Warp visible route | v2.6.5 | 代码已修正，已确认 |
+| **BUG-282** | Subscription dummy node matching false negatives (lack of normalization) | v2.6.5 | 代码已修正，已确认 |
+| **BUG-281** | Active proxy node state inconsistency on core update / config reload | v2.6.5 | 代码已修正，已确认 |
+| **BUG-280** | Tauri Window Activation tokio worker thread deadlock risk in activate_window | v2.6.5 | 代码已修正，已确认 |
 | **BUG-279** | Subscription dummy nodes (ads/info entries) leaking into PROXY group causing self-healing infinite loop | v2.6.4 | 代码已修正，已确认 |
 | **BUG-278** | clash_mini_agreements.md encoding corruption (mojibake across entire file) | v2.6.3 | 代码已修正，已确认 |
 | **BUG-277** | Window size jitter after resize release under high load (pointerup loss) | v2.6.3 | 代码已修正，已确认 |
