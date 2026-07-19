@@ -487,6 +487,13 @@ impl CoreUpdater {
         if Handle::global().is_exiting() {
             return Ok(());
         }
+
+        // 【v2.6.5 隐患 B 修复】在 stop 之前快照 PROXY 组的 now
+        // 升级流程此前直接调用 stop_core + start_core，绕过了 restart_core 的节点选择保护。
+        // 如果升级过程中 cache.yaml 丢失/损坏/格式不兼容，重启后 PROXY.now 会重置到列表首个节点。
+        // 这里在 stop 前 snapshot，在 start 后 restore，与 restart_core 路径对称。
+        let saved_proxy_now = CoreManager::global().snapshot_proxy_group_now().await;
+
         if let Err(e) = CoreManager::global().stop_core().await {
             logging!(warn, Type::System, "Core updater: 停止 core 失败: {}", e);
         }
@@ -545,6 +552,11 @@ impl CoreUpdater {
                 if let Err(e2) = CoreManager::global().start_core().await {
                     logging!(warn, Type::System, "Core updater: 恢复性启动 core 失败: {}", e2);
                 }
+                // 【v2.6.5 隐患 B 修复】解压替换失败，恢复性启动后恢复 PROXY 组节点选择
+                // 二进制未被替换，cache.yaml 通常仍可用，但 restore 是兜底保险
+                if let Some(node) = &saved_proxy_now {
+                    CoreManager::global().restore_proxy_group_now(node).await;
+                }
             }
             emit_progress("error", 0, &format!("解压替换失败: {:?}", e));
             return Err(e);
@@ -569,6 +581,12 @@ impl CoreUpdater {
         if !Handle::global().is_exiting() {
             if let Err(e) = CoreManager::global().start_core().await {
                 logging!(warn, Type::System, "Core updater: 升级后重启 core 失败: {}", e);
+            }
+            // 【v2.6.5 隐患 B 修复】升级成功后恢复 PROXY 组节点选择
+            // 升级替换了二进制，cache.yaml 可能因格式不兼容/丢失/损坏而失效，
+            // 显式 restore 确保用户选择不丢失，与 restart_core 路径保持一致
+            if let Some(node) = &saved_proxy_now {
+                CoreManager::global().restore_proxy_group_now(node).await;
             }
         }
 

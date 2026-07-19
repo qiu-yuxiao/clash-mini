@@ -1624,4 +1624,69 @@ double-check 发现 985fee2f「强咬合防线」只在校验失败分支生效�
 
 - `src-tauri/src/utils/window_manager.rs`：核心修复
 - `src-tauri/src/utils/node.rs`：修 clippy `doc_lazy_continuation` 警告（既有问题，与本次修复无关但阻止 clippy 通过）
+
+### v2.6.5 隐患修复 B：`core_updater.rs` 内核升级路径缺失 snapshot+restore (2026-07-19)
+
+#### 问题根因
+
+`core_updater.rs` 的内核升级流程（行 485-580）直接调用 `stop_core()` + `start_core()`，**绕过了 `restart_core()` 的节点选择保护机制**。
+
+`restart_core`（`lifecycle.rs:95-116`）在 stop 前 `snapshot_proxy_group_now`，在 start 后 `restore_proxy_group_now`，确保内核重启后 PROXY 组的 `now` 不丢失。但 `core_updater.rs` 是项目第三条独立的内核重置路径，没有走 `restart_core`，也没有 snapshot+restore，留下了与 v2.6.5 根因 1 完全相同性质的隐患。
+
+#### 风险场景
+
+mihomo 启动时用 `-f config_file` 加载配置，PROXY 组 `now` 的恢复依赖 `cache.yaml`：
+
+- **正常情况**：cache.yaml 在升级过程中保留（升级只替换 `cores/mini-mihomo.exe` 二进制文件），重启后从 cache.yaml 恢复 PROXY.now
+- **异常情况**：
+  1. cache.yaml 因磁盘错误丢失或损坏
+  2. mihomo 升级后内部 cache 格式不兼容（mihomo 升级曾发生过 cache 格式变更）
+  3. 杀软误删 cache.yaml
+  4. 用户手动清理 app_home_dir
+
+异常情况下，升级后 PROXY.now 会重置到列表首个节点（可能是广告假节点或非用户选择的真实节点），用户感知"升级后节点变了"，且可能触发自愈死循环（与 v2.6.4 伪节点过滤修复前的症状一致）。
+
+#### 修复方案
+
+在 `core_updater.rs` 升级流程中：
+
+1. **stop_core 之前** snapshot：保存 PROXY 组当前 `now` 字段（行 491-495 新增）
+2. **解压失败恢复性 start_core 之后** restore：行 555-559 新增（兜底保险，二进制未替换时 cache.yaml 通常仍可用）
+3. **升级成功 start_core 之后** restore：行 585-590 新增（核心修复，cache.yaml 可能因格式不兼容失效）
+
+3 处 `start_core` 调用点中，行 470（校验失败恢复性启动）不需要 restore：此时 stop_core 还没被调用，core 仍在运行，`start_core_inner` 会因"已有内核运行"返回 no-op（`lifecycle.rs:27-34`）。
+
+同时将 `lifecycle.rs` 中 `snapshot_proxy_group_now` 和 `restore_proxy_group_now` 的可见性从 `pub(super)` 提升到 `pub`，因为 `core_updater.rs` 不在 `manager` 子模块下，无法访问 `pub(super)` 方法。
+
+#### 修复后的完整升级流程
+
+```
+[升级前]
+  ├── snapshot PROXY.now（保存用户当前选择）
+  ├── stop_core
+  │
+  ├── 解压替换二进制
+  │   ├── 成功 → 继续
+  │   └── 失败 → start_core（旧二进制）→ restore PROXY.now → 返回错误
+  │
+  ├── start_core（新二进制）
+  ├── restore PROXY.now（与 restart_core 路径对称）
+  │
+  └── [升级完成] 用户选择不丢失
+```
+
+#### 影响文件
+
+- `src-tauri/src/core/core_updater.rs`：3 处改动（snapshot 插入 + 2 处 restore 插入）
+- `src-tauri/src/core/manager/lifecycle.rs`：snapshot/restore 可见性 `pub(super)` → `pub`，并补充可见性说明注释
+
+#### 与 restart_core 路径的对称性
+
+修复后 3 条内核重置路径全部有节点选择保护：
+
+| 路径 | snapshot+restore 位置 |
+|---|---|
+| `restart_core`（`lifecycle.rs:95-116`） | 内部完成 |
+| `apply_config`（`config.rs:121-164`） | 内部完成 |
+| `core_updater` 升级流程（`core_updater.rs:485-590`） | 显式调用 `snapshot_proxy_group_now` + `restore_proxy_group_now` |
 - **`is_dummy_node` 假阴性收口（node.rs）**：上次 double-check 指出的 `starts_with` 假阴性（`【剩余流量】`/`(购买入口)`/`节点-购买入口` 漏进 PROXY）已落地。新增 `normalize_dummy_name`：先剥两端包裹符号（【】()（）[]「」）、再剥 `节点-` 通用前缀，归一化后再 `starts_with` 广告短语。不剥 `CN2-`/`HK-` 等区域/协议前缀，故 `CN2-购买入口` 等真节点仍保住、不破坏既有单测。补 `test_dummy_node_leak_side` 覆盖泄漏侧。与 1~3 同属一次收口，未发包。
