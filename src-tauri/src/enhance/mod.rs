@@ -463,13 +463,20 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
 
 async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
+    //    过滤广告/假节点（"网址"、"官网"、"剩余流量" 等），避免它们进入 PROXY 组后
+    //    被内核 reload_config 选中触发自愈死循环
     let mut proxy_names = Vec::new();
     if let Some(Value::Sequence(proxies)) = config.get("proxies") {
         for p in proxies {
-            if let Some(name) = p.as_mapping().and_then(|m| m.get("name")).and_then(Value::as_str) {
-                proxy_names.push(Value::from(name.to_owned()));
-            } else if let Some(name) = p.as_str() {
-                proxy_names.push(Value::from(name.to_owned()));
+            let name_opt = p
+                .as_mapping()
+                .and_then(|m| m.get("name"))
+                .and_then(Value::as_str)
+                .or_else(|| p.as_str());
+            if let Some(name) = name_opt {
+                if !crate::utils::node::is_dummy_node(name) {
+                    proxy_names.push(Value::from(name.to_owned()));
+                }
             }
         }
     }

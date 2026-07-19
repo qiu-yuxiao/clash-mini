@@ -89,26 +89,9 @@ pub struct FilterConfig {
     pub filter_text: String,
 }
 
-/// 识别广告/假节点
-pub fn is_dummy_node(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    lower.contains("流量")
-        || lower.contains("过期时间")
-        || lower.contains("网址")
-        || lower.contains("官网")
-        || lower.contains("剩余")
-        || lower.contains("expire")
-        || lower.contains("traffic")
-        || lower.contains("website")
-        || lower.contains("http://")
-        || lower.contains("https://")
-        || lower.contains("套餐到期")
-        || lower.contains("续费")
-        || lower.contains("公告")
-        || lower.contains("购买")
-        || lower.contains("subscribe")
-        || lower.contains("群")
-}
+// 识别广告/假节点的实现已迁移到 crate::utils::node::is_dummy_node
+// 以便 enhance/mod.rs 和 lifecycle.rs 共享同一份判定逻辑，避免遗漏
+pub use crate::utils::node::is_dummy_node;
 
 /// 从 `proxy_head_state.json` 一次性读取并解析 FilterConfig 和 sort_type
 /// 【性能优化】：将原来两次独立的磁盘读取和 JSON 解析合并为一次

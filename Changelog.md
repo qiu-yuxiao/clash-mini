@@ -1,3 +1,10 @@
+## v2.6.4
+
+### 🐞 Fixed Bugs (订阅伪节点混入 PROXY 组触发自愈死循环根治)
+- **订阅源伪节点混入 PROXY 组触发自愈死循环根治**：修复了部分订阅源会在节点列表中塞入伪节点（如「网址：https://...」「官网」「剩余流量」「过期时间」「套餐到期」「续费」「公告」「购买」「群」等广告/资讯条目），这些伪节点进入 PROXY 组后，每次内核 `reload_config(true)` 会重置 `select` 策略组的 `now` 字段到列表首个节点（通常是伪节点），后台监测线程识别为异常节点后触发自愈切回真节点，下次 reload 又被重置回伪节点，形成无限死循环导致程序卡死的严重缺陷。本版本将伪节点识别函数 `is_dummy_node` 抽取到 `src-tauri/src/utils/node.rs` 共享模块，在配置生成 (`enhance::enforce_mini_agreements`)、节点恢复 (`lifecycle::restore_proxy_group_now` fallback 路径)、自愈判定 (`monitor::evaluate_failover`) 三个关键节点统一剔除伪节点，从源头到末端全链路根除伪节点进入 PROXY 组的可能，彻底斩断死循环。
+
+---
+
 ## v2.6.3
 
 ### 🐞 Fixed Bugs (Resize 拖拽释放后尺寸乱晃根治)

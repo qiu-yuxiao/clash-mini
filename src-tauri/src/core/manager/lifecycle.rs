@@ -329,10 +329,15 @@ impl CoreManager {
                 };
                 if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
                     if let Some(all) = group_info.all {
+                        // 过滤广告/假节点，避免回退到伪节点触发自愈死循环
                         let fallback_node = all
                             .iter()
+                            .filter(|n| !crate::utils::node::is_dummy_node(n))
                             .find(|n| filter_lower.is_empty() || n.to_lowercase().contains(&filter_lower))
-                            .or_else(|| all.first());
+                            .or_else(|| {
+                                all.iter()
+                                    .find(|n| !crate::utils::node::is_dummy_node(n))
+                            });
                         if let Some(fb) = fallback_node {
                             match mihomo.select_node_for_group("PROXY", fb).await {
                                 Ok(()) => logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb),
