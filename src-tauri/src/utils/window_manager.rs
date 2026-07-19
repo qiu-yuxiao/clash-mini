@@ -201,9 +201,7 @@ impl WindowManager {
             WindowState::VisibleFocused | WindowState::VisibleUnfocused => {
                 Self::hide_main_window_internal(window.as_ref())
             }
-            WindowState::Minimized | WindowState::Hidden => {
-                Self::activate_existing_main_window(window.as_ref()).await
-            }
+            WindowState::Minimized | WindowState::Hidden => Self::activate_existing_main_window(window.as_ref()).await,
         }
     }
 
@@ -346,12 +344,7 @@ impl WindowManager {
                 logging!(info, Type::Window, "已成功调度窗口激活任务到主线程");
                 // 异步等待主线程执行结果，让出 tokio worker 线程，避免死锁
                 // 加 5 秒超时保护：主线程被模态循环占用时不会永久阻塞
-                match tokio::time::timeout(
-                    std::time::Duration::from_secs(5),
-                    rx,
-                )
-                .await
-                {
+                match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
                     Ok(Ok(true)) => WindowOperationResult::Shown,
                     Ok(Ok(false)) => WindowOperationResult::Failed,
                     Ok(Err(_)) => {

@@ -198,11 +198,14 @@ export const ResizeHandles: React.FC = () => {
   // 每次 render 同步 ref，供 scheduleApply 在 rAF 回调中调用最新版本
   applyPendingRef.current = applyPending
 
-  // 组件卸载（含拖拽中途因切模式等卸载）时复位 resizing 标志，
-  // 避免标志残留为 true 导致后续 onResized/updateWindowState 永远跳过 IPC。
+  // 组件卸载（含拖拽中途因切模式等卸载）时复位 resizing 标志并取消 pending 的 rAF 帧，
+  // 避免标志残留为 true 导致后续 onResized/updateWindowState 永远跳过 IPC 以及卸载后的异步调用。
   useEffect(
     () => () => {
       setWindowResizing(false)
+      if (sessionRef.current?.rafId !== null && sessionRef.current?.rafId !== undefined) {
+        cancelAnimationFrame(sessionRef.current.rafId)
+      }
     },
     [],
   )
