@@ -334,10 +334,7 @@ impl CoreManager {
                             .iter()
                             .filter(|n| !crate::utils::node::is_dummy_node(n))
                             .find(|n| filter_lower.is_empty() || n.to_lowercase().contains(&filter_lower))
-                            .or_else(|| {
-                                all.iter()
-                                    .find(|n| !crate::utils::node::is_dummy_node(n))
-                            });
+                            .or_else(|| all.iter().find(|n| !crate::utils::node::is_dummy_node(n)));
                         if let Some(fb) = fallback_node {
                             match mihomo.select_node_for_group("PROXY", fb).await {
                                 Ok(()) => logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb),

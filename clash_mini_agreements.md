@@ -1569,3 +1569,8 @@ latest.log 在 16:01:45.034 后完全停止记录，但 service_latest.log（mih
 #### 不修复：测速 URL 设计盲区（根因3）
 
 默认测速 URL `http://cp.cloudflare.com/generate_204` 仅检测 HTTP 204 响应，无法感知应用层解锁能力（YouTube GeoIP 区域限制）、QUIC/HTTP3 支持、TCP 长连接稳定性、节点对特定 CDN 的路由可达性。这是设计层面的固有盲区，mihomo 自身已警告"some proxy providers hijacking test addresses"。考虑到增加应用层探针（如周期性拨测 YouTube HEAD）会显著增加节点流量消耗且易触发流媒体平台风控误判，本次不修复，留待后续设计层面讨论。
+
+### v2.6.5 补充：rustfmt 格式化与 app-update.json 版本号同步 (2026-07-19)
+
+- **rustfmt 格式化 `lifecycle.rs` 与 `server.rs`**：pre-commit hook 的 rust-format 任务对 v2.6.5 修复提交中的 `lifecycle.rs`（fallback 节点 `or_else` 链式调用折行）和 `server.rs`（`logging!` 宏单行化）应用了 rustfmt 风格化，纯排版无逻辑变化。影响文件：`src-tauri/src/core/manager/lifecycle.rs`、`src-tauri/src/utils/server.rs`。
+- **`updater/app-update.json` 版本号同步到 2.6.4**：v2.6.4 发版时未同步更新 `updater/app-update.json` 的 `version` 字段（保留为 2.6.3），导致 pre-push hook 的 `check-version-consistency` 任务阻塞 push。本次将 `version` 字段同步到 2.6.4。push 时发现远端已有完整的 v2.6.4 安装包元数据（notes/pub_date/signature/url/size），rebase 解决冲突时采用远端版本，本地临时绕过版本被丢弃。影响文件：`updater/app-update.json`。
