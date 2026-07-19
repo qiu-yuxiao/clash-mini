@@ -1763,6 +1763,43 @@ mihomo 启动时用 `-f config_file` 加载配置，PROXY 组 `now` 的恢复依
    - `fails > 0` → 健康检测在失败
    - `online=false` → 网络已断开
    - `api_errors > 0` → mihomo API 异常
+
+### v2.6.5 最终审核补齐：tray/mod.rs 与 server.rs 对称 (2026-07-19)
+
+#### 问题根因
+
+最终全面审核发现：`tray/mod.rs:262` 也有 `if !lightweight::exit_lightweight_mode().await { WindowManager::show_main_window().await; }` 路径，与 `server.rs:99` 单例唤醒路径完全相同，但 v2.6.5 根因 5 修复 server.rs 时**漏改了 tray/mod.rs**。
+
+#### 问题性质
+
+- **逻辑正确**：tray/mod.rs:262 的逻辑本身正确（exit 返回 false 时调用 show 兜底，与 server.rs 修复后一致），不是逻辑反转 bug
+- **可观测性不足**：缺少 warn 日志，无法在排障时从日志中区分"正常退出轻量模式" vs "兜底显示窗口"
+
+#### 修复方案
+
+补齐 warn 日志，与 server.rs 修复对称：
+
+```rust
+if !lightweight::exit_lightweight_mode().await {
+    logging!(warn, Type::Tray, "轻量模式未正常退出，尝试直接显示主窗口兜底");
+    WindowManager::show_main_window().await;
+};
+```
+
+#### 影响文件
+
+- `src-tauri/src/core/tray/mod.rs`：补 1 行 warn 日志 + 2 行注释说明与 server.rs 对称
+
+#### 审核覆盖范围
+
+最终审核已确认以下全部通过：
+
+1. **隐患 A/B/C 修复正确性**：cargo check + clippy + typecheck + eslint 全部通过
+2. **全代码库 `std::sync::mpsc + rx.recv()` 阻塞检查**：剩余 4 处均为 `tokio::sync::mpsc`（异步 channel），不存在阻塞问题
+3. **全代码库 `stop_core + start_core` 绕过 `restart_core` 路径检查**：`window.rs:141` 是退出流程（有 timeout 保护，不影响节点选择）；`core_updater.rs` 已修复（隐患 B）
+4. **PROXY 组节点选择路径完整性**：3 条内核重置路径（`restart_core` / `apply_config` / `core_updater` 升级）全部有 snapshot+restore；全代码库只有 `config.rs:171` 一处调用 `mihomo.reload_config(true, ...)`
+5. **其他后台线程心跳检查**：`lib.rs:284` UI 线程心跳探针已有；`monitor.rs` 后台监测线程心跳已加（隐患 C）；`timer.rs:76` 定时器调度线程和 `state.rs:110` sidecar 日志消费线程是事件驱动，不需要心跳
+6. **逻辑反转错误检查**：`server.rs:99` 已修复；`tray/mod.rs:262` 本次补齐 warn 日志；`lib.rs:375` entry_lightweight_mode 逻辑正确
 - **`is_dummy_node` 假阴性收口（node.rs）**：上次 double-check 指出的 `starts_with` 假阴性（`【剩余流量】`/`(购买入口)`/`节点-购买入口` 漏进 PROXY）已落地。新增 `normalize_dummy_name`：先剥两端包裹符号（【】()（）[]「」）、再剥 `节点-` 通用前缀，归一化后再 `starts_with` 广告短语。不剥 `CN2-`/`HK-` 等区域/协议前缀，故 `CN2-购买入口` 等真节点仍保住、不破坏既有单测。补 `test_dummy_node_leak_side` 覆盖泄漏侧。与 1~3 同属一次收口，未发包。
 
 ### v2.6.5 补充加固 ③：`resize-handles.tsx` 组件卸载时取消 requestAnimationFrame 帧 (2026-07-20)

@@ -259,7 +259,11 @@ fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
         }
 
         AsyncHandler::spawn(|| async move {
+            // exit_lightweight_mode 返回 true 表示成功退出（含直接显示窗口的兜底分支），
+            // 返回 false 表示正在退出中（防抖限流）或显示失败，此时尝试主动 show 兜底。
+            // 与 server.rs 单例唤醒路径（commands/visible 端点）的逻辑保持对称。
             if !lightweight::exit_lightweight_mode().await {
+                logging!(warn, Type::Tray, "轻量模式未正常退出，尝试直接显示主窗口兜底");
                 WindowManager::show_main_window().await;
             };
         });
