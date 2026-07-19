@@ -229,7 +229,7 @@ impl CoreManager {
     /// 快照当前 PROXY 组的 now 字段（用于内核重启后恢复）
     /// 【核心架构约定】Mini 只有 PROXY 一个有效代理组，所以只快照 PROXY 组。
     /// 返回 None 表示无需恢复（读取失败、now 为空、或应用退出中）。
-    async fn snapshot_proxy_group_now(&self) -> Option<std::string::String> {
+    pub(super) async fn snapshot_proxy_group_now(&self) -> Option<std::string::String> {
         if Handle::global().is_exiting() {
             return None;
         }
@@ -252,7 +252,7 @@ impl CoreManager {
     /// 恢复 PROXY 组的节点选择（内核重启后调用）
     /// 等待内核 API 就绪后调用 mihomo.select_node_for_group("PROXY", node)
     /// 失败不抛错（兜底失败时前端可能显示假节点，但不影响代理功能本身）
-    async fn restore_proxy_group_now(&self, node: &str) {
+    pub(super) async fn restore_proxy_group_now(&self, node: &str) {
         if Handle::global().is_exiting() {
             return;
         }

@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 
 import {
   calcuProxies,
+  frontendLog,
   getProfiles,
   patchProfile,
   patchProfilesConfig,
@@ -146,9 +147,10 @@ export const useProfiles = () => {
         })
 
         if (!matchedProxy) {
-          console.warn(
-            `[ActivateSelected] 保存的代理 ${savedProxyName} 不存在于 PROXY 组`,
-          )
+          const msg = `[ActivateSelected] 保存的代理 ${savedProxyName} 不存在于 PROXY 组（订阅可能已更新），PROXY.now 维持 mihomo 内核当前值 ${currentNow}`
+          console.warn(msg)
+          // 写入后端 latest.log，便于排查"前端显示与后端实际不一致"问题
+          frontendLog('error', msg)
           return
         }
 
@@ -166,10 +168,11 @@ export const useProfiles = () => {
         try {
           await selectNodeForGroupWithTimeout('PROXY', matchedProxyName)
         } catch (error: unknown) {
-          console.warn(
-            '[ActivateSelected] 切换 PROXY 组失败:',
-            error instanceof Error ? error.message : String(error),
-          )
+          const msg = `[ActivateSelected] 切换 PROXY 组失败 (target=${matchedProxyName}, current=${currentNow}): ${error instanceof Error ? error.message : String(error)}`
+          console.warn(msg)
+          // 写入后端 latest.log：reload_config 后 mihomo 未就绪或节点已失效时切换会失败，
+          // 此时 mihomo 实际选路与前端 selected 不一致，是断流的常见根因
+          frontendLog('error', msg)
           return
         }
 

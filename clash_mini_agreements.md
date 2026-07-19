@@ -1553,3 +1553,19 @@ v2.6.3 版本在用户导入新订阅后出现内核无限重启 + 自愈死循�
 - **抽取 `is_dummy_node` 到 `utils/node.rs` 共享**：原本 `is_dummy_node` 函数定义在 `monitor.rs` 中，仅用于自愈判定。为让配置生成与节点恢复路径共享同一份判定逻辑，将函数（含 16 个关键字：流量/过期时间/网址/官网/剩余/expire/traffic/website/http:///https:///套餐到期/续费/公告/购买/subscribe/群）迁移到 `src-tauri/src/utils/node.rs`，`monitor.rs` 通过 `pub use crate::utils::node::is_dummy_node` 重导出，保持原 API 兼容。影响文件：`src-tauri/src/utils/node.rs`（新增）、`src-tauri/src/utils/mod.rs`、`src-tauri/src/module/monitor.rs`。
 - **`enforce_mini_agreements` 生成 PROXY 组时过滤伪节点**：在 `enhance/mod.rs` 的 `enforce_mini_agreements` 函数提取 `proxies` 序列中的节点名时，对每个节点名调用 `crate::utils::node::is_dummy_node`，伪节点不进入 `proxy_names` 列表。因 PROXY__METRICS 组复用同一 `proxy_names_value`，两个组都同步过滤。从源头消除伪节点进入内核配置的可能，mihomo `reload_config` 不再可能选到伪节点。影响文件：`src-tauri/src/enhance/mod.rs`。
 - **`lifecycle.rs` 节点恢复 fallback 路径过滤伪节点**：在 `lifecycle.rs` 的 snapshot 节点不存在时的 fallback 路径（`select_node_for_group` 失败后按 filter/generic 选首个节点）中，对 `all` 列表先 `filter(|n| !is_dummy_node(n))` 再 `find`，避免回退到伪节点。虽为边缘场景（snapshot 节点不存在才触发），但符合"不留隐患"方针。影响文件：`src-tauri/src/core/manager/lifecycle.rs`。
+
+### v2.6.5 前后端节点状态不一致根治（前端显示健康节点但实际断流）(2026-07-19)
+
+v2.6.4 版本在轻量模式唤醒后出现"前端活跃节点栏目持续显示日本aw2且标记为健康节点，但实际 YouTube 流量无法接通"的严重缺陷。日志时间线还原：15:53 进入轻量模式 → 16:01:29 唤醒 → 16:01:33 后台监测把 PROXY 切回日本aw2 (102ms 绿色) → 16:01:45 后外壳日志完全停止记录（mihomo 内核日志持续到 19:22）→ 19:06 DIRECT 拨号大量超时 → 19:21 PROXY 拨 YouTube 全部 `context deadline exceeded`。多 bug 叠加导致：
+
+- **根因1（核心）：`apply_config` 成功路径缺失 `restore_proxy_group_now`**：8b483a7b 提交引入 `restore_proxy_group_now`，但只覆盖 `restart_core` 路径，未覆盖 `apply_config` 成功路径。`reload_config(force=true)` 会重置 Selector 组 `now` 到列表首个节点，成功路径不恢复导致 mihomo 实际选路与前端 `profile.selected.now` 不同步。v2.6.4 伪节点过滤修复使首个节点变为真实节点，该漏洞显化：mihomo 走的是列表首个真实节点（可能是死节点），前端 UI 仍显示用户原选节点。修复方案：在 `apply_config` 的 `reload_config` 调用前先调 `snapshot_proxy_group_now`，成功后调 `restore_proxy_group_now`，与 `restart_core` 路径对称。错误路径不重复恢复（`restart_core` 内部已做）。影响文件：`src-tauri/src/core/manager/config.rs`。
+- **根因2：`activateSelected` 失败分支静默 return**：前端 `use-profiles.ts` 的 `activateSelected` 在节点名不匹配或 `selectNodeForGroupWithTimeout` 失败时 `console.warn` 后直接 return，不写回 `selected`、不通知用户、不触发自愈。这是 `apply_config` 漏洞暴露后的兜底防线，但兜底失败时无任何痕迹。修复方案：两个失败分支增加 `frontendLog('error', ...)` 把诊断信息（含目标节点名、当前节点名、失败原因）写入后端 latest.log，便于下次出现同类问题时快速定位。`frontendLog` 对 `error` 级别始终转发，不受 `isDebugLoggingEnabled` 开关影响。影响文件：`src/hooks/use-profiles.ts`。
+- **根因5：`server.rs` 退出轻量模式判断逻辑反转**：`commands/visible` 端点逻辑为 `if !lightweight::exit_lightweight_mode().await { show_main_window() } else { log error "退出失败" }`，逻辑反了：`exit_lightweight_mode` 返回 `true` 表示成功退出，反而进了 error 分支；返回 `false`（防抖限流或显示失败）反而进了 show 兜底分支。导致每次正常唤醒都会误报 ERROR 日志（如 16:01:29.997 的"轻量模式退出失败"），干扰排查方向且污染错误日志。修复方案：调整为 `if !exit_lightweight_mode().await { log warn + show_main_window 兜底 }`，正常情况静默，异常情况 warn 提示并主动 show 兜底。影响文件：`src-tauri/src/utils/server.rs`。
+
+#### 待观察：外壳日志在 16:01:45 后停止记录（根因4）
+
+latest.log 在 16:01:45.034 后完全停止记录，但 service_latest.log（mihomo 内核日志）持续到 19:22+。说明外壳进程（Tauri + Rust）的日志写入停止了，但 mihomo 内核仍在运行。本次修复未直接处理该问题，原因：(1) flexi_logger 使用 `WriteMode::Direct` 同步写盘理论上无缓冲；(2) mihomo API 单次调用已有 `DEFAULT_REQUEST_TIMEOUT` 保护，不会永久卡住；(3) 缺乏复现数据无法定位。本次修复后通过 `frontendLog` 在关键失败分支写入后端日志，若再次出现外壳日志中断，可通过 `frontendLog` 残留的诊断信息进一步定位。若仍频繁出现，再考虑加心跳探针定期 `flush()` 日志。
+
+#### 不修复：测速 URL 设计盲区（根因3）
+
+默认测速 URL `http://cp.cloudflare.com/generate_204` 仅检测 HTTP 204 响应，无法感知应用层解锁能力（YouTube GeoIP 区域限制）、QUIC/HTTP3 支持、TCP 长连接稳定性、节点对特定 CDN 的路由可达性。这是设计层面的固有盲区，mihomo 自身已警告"some proxy providers hijacking test addresses"。考虑到增加应用层探针（如周期性拨测 YouTube HEAD）会显著增加节点流量消耗且易触发流媒体平台风控误判，本次不修复，留待后续设计层面讨论。

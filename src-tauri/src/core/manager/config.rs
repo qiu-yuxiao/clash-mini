@@ -120,10 +120,24 @@ impl CoreManager {
 
     async fn apply_config(&self, path: PathBuf) -> Result<()> {
         let path = dirs::path_to_str(&path)?;
+
+        // 【关键修复】与 restart_core 路径对称：reload_config(force=true) 会重置 Selector 组
+        // 的 now 到列表首个节点，必须在调用前快照、调用后恢复，否则会导致前端显示节点
+        // 与 mihomo 实际选路节点不一致（"前端显示日本aw2但实际走列表首个真实节点"），
+        // 引发应用层断流（YouTube 不通）但 UI 仍显示健康节点的诡异现象。
+        // 历史背景：8b483a7b 提交引入 restore_proxy_group_now 但只覆盖 restart_core 路径；
+        // v2.6.4 伪节点过滤修复使首个节点变为真实节点后，该漏洞显化。
+        let saved_proxy_now = self.snapshot_proxy_group_now().await;
+
         match self.reload_config(path).await {
             Ok(_) => {
                 Config::runtime().await.apply();
                 logging!(info, Type::Core, "Configuration applied");
+
+                // 恢复 PROXY 组的节点选择（与 restart_core 路径对称）
+                if let Some(node) = saved_proxy_now {
+                    self.restore_proxy_group_now(&node).await;
+                }
                 Ok(())
             }
             Err(err) => {
@@ -136,6 +150,7 @@ impl CoreManager {
                     Ok(_) => {
                         Config::runtime().await.apply();
                         logging!(info, Type::Core, "Configuration applied after restart");
+                        // restart_core 内部已做 snapshot + restore，无需重复恢复
                         Ok(())
                     }
                     Err(err) => {

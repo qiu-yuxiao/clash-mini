@@ -94,10 +94,15 @@ pub fn embed_server() {
     let visible = warp::path!("commands" / "visible").and_then(|| async {
         logging!(info, Type::Window, "检测到从单例模式恢复应用窗口");
         tauri::async_runtime::spawn(async {
+            // exit_lightweight_mode 返回 true 表示成功退出（含直接显示窗口的兜底分支），
+            // 返回 false 表示正在退出中（防抖限流）或显示失败，此时尝试主动 show 兜底。
             if !lightweight::exit_lightweight_mode().await {
+                logging!(
+                    warn,
+                    Type::Window,
+                    "轻量模式未正常退出，尝试直接显示主窗口兜底"
+                );
                 WindowManager::show_main_window().await;
-            } else {
-                logging!(error, Type::Window, "轻量模式退出失败，无法恢复应用窗口");
             }
         });
         Ok::<_, warp::Rejection>(warp::reply::with_status::<std::string::String>(
