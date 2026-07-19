@@ -1192,12 +1192,13 @@ const Layout = () => {
             currentProfileUid,
           )
           startupRetryCountRef.current = 0
-          isStartingUpRef.current = false
           lastFullTestTimeRef.current = Date.now()
         } catch (err) {
           if (!cancelled) {
             console.error('[Layout] 唤醒后恢复节点选择失败:', err)
           }
+        } finally {
+          isStartingUpRef.current = false
         }
       })()
       return () => {
@@ -1235,7 +1236,6 @@ const Layout = () => {
         )
         // Success: reset retry counter
         startupRetryCountRef.current = 0
-        isStartingUpRef.current = false
         // WARN-002 修复：记录启动完成时间，防止首次窗口聚焦时触发冗余的二次全量刷新
         lastFullTestTimeRef.current = Date.now()
       })
@@ -1259,6 +1259,11 @@ const Layout = () => {
             'Profile activation failed after 3 retries. Please check your network or subscription.',
           )
         }
+      })
+      .finally(() => {
+        // 无论 enhanceProfiles 成功、失败还是重试耗尽，都必须打开门闩，
+        // 否则唤醒测速和 TUN 自动关闭功能永久阻塞。
+        isStartingUpRef.current = false
       })
     return () => {
       cancelled = true
