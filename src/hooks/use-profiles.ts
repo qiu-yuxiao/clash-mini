@@ -151,6 +151,21 @@ export const useProfiles = () => {
           console.warn(msg)
           // 写入后端 latest.log，便于排查"前端显示与后端实际不一致"问题
           frontendLog('error', msg)
+
+          // 🛡️【强咬合防线】将本地配置 selected 强制修正校准为内核当前实际的运行节点，防止状态脱节
+          if (currentNow) {
+            const newSelected = [{ name: 'PROXY', now: currentNow }]
+            patchProfile(current.uid, { selected: newSelected })
+              .then(() =>
+                queryClient.invalidateQueries({ queryKey: ['getProxies'] }),
+              )
+              .catch((err) =>
+                console.error(
+                  '[ActivateSelected] 修正 Profile.selected 失败:',
+                  err,
+                ),
+              )
+          }
           return
         }
 
@@ -171,8 +186,23 @@ export const useProfiles = () => {
           const msg = `[ActivateSelected] 切换 PROXY 组失败 (target=${matchedProxyName}, current=${currentNow}): ${error instanceof Error ? error.message : String(error)}`
           console.warn(msg)
           // 写入后端 latest.log：reload_config 后 mihomo 未就绪或节点已失效时切换会失败，
-          // 此时 mihomo 实际选路与前端 selected 不一致，是断流的常见根因
+          // 此时 mihomo 实际选路与前端 selected 不一致，是断流 of 常见根因
           frontendLog('error', msg)
+
+          // 🛡️【强咬合防线】切换异常时，将本地配置 selected 强制重置校准为内核当前的真实运行节点
+          if (currentNow) {
+            const newSelected = [{ name: 'PROXY', now: currentNow }]
+            patchProfile(current.uid, { selected: newSelected })
+              .then(() =>
+                queryClient.invalidateQueries({ queryKey: ['getProxies'] }),
+              )
+              .catch((err) =>
+                console.error(
+                  '[ActivateSelected] 修正 Profile.selected 失败:',
+                  err,
+                ),
+              )
+          }
           return
         }
 

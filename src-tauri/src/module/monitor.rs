@@ -84,6 +84,23 @@ async fn get_test_url() -> String {
         .to_string()
 }
 
+/// 将测速 URL 解析为 `lookup_host` 可用的 `"host:port"` 字符串。
+/// 【关键修正】对 IPv6 地址必须使用 `[addr]:port` 格式，裸拼接会导致解析失败。
+fn resolve_probe_target(test_url: &str) -> String {
+    match url::Url::parse(test_url) {
+        Ok(parsed_url) => {
+            let port = parsed_url.port_or_known_default().unwrap_or(80);
+            match parsed_url.host() {
+                Some(url::Host::Ipv6(addr)) => format!("[{}]:{}", addr, port),
+                Some(url::Host::Ipv4(addr)) => format!("{}:{}", addr, port),
+                Some(url::Host::Domain(domain)) => format!("{}:{}", domain, port),
+                None => "cp.cloudflare.com:80".to_string(),
+            }
+        }
+        Err(_) => "cp.cloudflare.com:80".to_string(),
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FilterConfig {
     pub filter_text: String,
@@ -698,17 +715,7 @@ pub fn start_background_monitor() {
                 // 【性能优化与动态探测】：直接从当前配置的测速网址中解析域名与端口作为探测目标，
                 // 彻底消除硬编码的第三方网站，测速用什么网络检测就测什么，天然兼顾海内外。
                 let test_url = get_test_url().await;
-
-                let host_port = match url::Url::parse(&test_url) {
-                    Ok(parsed_url) => {
-                        let host = parsed_url.host_str().unwrap_or("cp.cloudflare.com");
-                        let port = parsed_url
-                            .port()
-                            .unwrap_or_else(|| if parsed_url.scheme() == "https" { 443 } else { 80 });
-                        format!("{}:{}", host, port)
-                    }
-                    Err(_) => "cp.cloudflare.com:80".to_string(),
-                };
+                let host_port = resolve_probe_target(&test_url);
 
                 tokio::time::timeout(Duration::from_secs(2), tokio::net::lookup_host(host_port))
                     .await
@@ -905,4 +912,55 @@ pub fn start_background_monitor() {
     });
 
     *MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_probe_target;
+
+    #[test]
+    fn test_resolve_probe_target_ipv4() {
+        assert_eq!(
+            resolve_probe_target("http://1.2.3.4/generate_204"),
+            "1.2.3.4:80"
+        );
+        assert_eq!(
+            resolve_probe_target("https://1.2.3.4:8443/test"),
+            "1.2.3.4:8443"
+        );
+    }
+
+    #[test]
+    fn test_resolve_probe_target_ipv6() {
+        // IPv6 必须被包装为 [addr]:port，否则 lookup_host 解析失败
+        assert_eq!(
+            resolve_probe_target("http://[2001:db8::1]/generate_204"),
+            "[2001:db8::1]:80"
+        );
+        assert_eq!(
+            resolve_probe_target("https://[::1]:8443/test"),
+            "[::1]:8443"
+        );
+    }
+
+    #[test]
+    fn test_resolve_probe_target_domain() {
+        assert_eq!(
+            resolve_probe_target("http://cp.cloudflare.com/generate_204"),
+            "cp.cloudflare.com:80"
+        );
+        assert_eq!(
+            resolve_probe_target("https://example.com:8443/test"),
+            "example.com:8443"
+        );
+    }
+
+    #[test]
+    fn test_resolve_probe_target_malformed() {
+        // 非法 URL fallback 到默认目标
+        assert_eq!(
+            resolve_probe_target("not-a-valid-url"),
+            "cp.cloudflare.com:80"
+        );
+    }
 }

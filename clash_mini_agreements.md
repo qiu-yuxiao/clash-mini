@@ -1572,5 +1572,11 @@ latest.log 在 16:01:45.034 后完全停止记录，但 service_latest.log（mih
 
 ### v2.6.5 补充：rustfmt 格式化与 app-update.json 版本号同步 (2026-07-19)
 
+### v2.6.5 补充加固：前后端状态强咬合与 selected 配置自动修正校准 (2026-07-19)
+
+为进一步巩固并根治在内核重载（reload_config）和内核重启（restart_core）后的前后端活跃节点显示脱节断流问题，进行了如下二次加固改动：
+- **后端强广播同步**：在 `config.rs`（`apply_config` 成功分支）与 `lifecycle.rs`（`restart_core` 成功分支）的 PROXY 恢复/回退动作之后，立即调用 `Handle::refresh_clash()` 广播事件，告知前端无延迟地刷新并拉取最新的节点及配置运行时客观数据。
+- **前端强校准回写**：在 `use-profiles.ts` 的 `activateSelected` 流程中，针对节点不存在（`!matchedProxy`）及切换 PROXY 组捕获异常的失败分支，增设 selected 字段自动写回校验。在失败分支返回前将本地 Profile 的 `selected` 同步更新为后端实际的 `currentNow`，并触发查询刷新，确保任何失效场景下数据均能自动且实时咬合。
+
 - **rustfmt 格式化 `lifecycle.rs` 与 `server.rs`**：pre-commit hook 的 rust-format 任务对 v2.6.5 修复提交中的 `lifecycle.rs`（fallback 节点 `or_else` 链式调用折行）和 `server.rs`（`logging!` 宏单行化）应用了 rustfmt 风格化，纯排版无逻辑变化。影响文件：`src-tauri/src/core/manager/lifecycle.rs`、`src-tauri/src/utils/server.rs`。
 - **`updater/app-update.json` 版本号同步到 2.6.4**：v2.6.4 发版时未同步更新 `updater/app-update.json` 的 `version` 字段（保留为 2.6.3），导致 pre-push hook 的 `check-version-consistency` 任务阻塞 push。本次将 `version` 字段同步到 2.6.4。push 时发现远端已有完整的 v2.6.4 安装包元数据（notes/pub_date/signature/url/size），rebase 解决冲突时采用远端版本，本地临时绕过版本被丢弃。影响文件：`updater/app-update.json`。

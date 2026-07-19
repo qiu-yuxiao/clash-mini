@@ -138,6 +138,9 @@ impl CoreManager {
                 if let Some(node) = saved_proxy_now {
                     self.restore_proxy_group_now(&node).await;
                 }
+
+                // 【强咬合防线】通知前端获取重载后的最新节点和内核客观配置
+                crate::core::handle::Handle::refresh_clash();
                 Ok(())
             }
             Err(err) => {

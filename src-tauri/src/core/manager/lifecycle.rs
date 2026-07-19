@@ -109,6 +109,9 @@ impl CoreManager {
             self.restore_proxy_group_now(&node).await;
         }
 
+        // 【强咬合防线】重启完成后通知前端拉取最新配置和活跃节点
+        Handle::refresh_clash();
+
         Ok(())
     }
 
