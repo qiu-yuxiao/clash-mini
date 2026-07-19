@@ -178,7 +178,7 @@ impl WindowManager {
                     return WindowOperationResult::NoAction;
                 }
                 if let Some(window) = window {
-                    Self::activate_window(&window)
+                    Self::activate_window(&window).await
                 } else {
                     WindowOperationResult::Failed
                 }
@@ -201,7 +201,9 @@ impl WindowManager {
             WindowState::VisibleFocused | WindowState::VisibleUnfocused => {
                 Self::hide_main_window_internal(window.as_ref())
             }
-            WindowState::Minimized | WindowState::Hidden => Self::activate_existing_main_window(window.as_ref()),
+            WindowState::Minimized | WindowState::Hidden => {
+                Self::activate_existing_main_window(window.as_ref()).await
+            }
         }
     }
 
@@ -262,10 +264,10 @@ impl WindowManager {
     }
 
     // 激活已存在的主窗口
-    fn activate_existing_main_window(window: Option<&WebviewWindow<Wry>>) -> WindowOperationResult {
+    async fn activate_existing_main_window(window: Option<&WebviewWindow<Wry>>) -> WindowOperationResult {
         logging!(info, Type::Window, "窗口存在但被隐藏或最小化，将激活窗口");
         if let Some(window) = window {
-            Self::activate_window(window)
+            Self::activate_window(window).await
         } else {
             logging!(warn, Type::Window, "无法获取窗口实例");
             WindowOperationResult::Failed
@@ -273,14 +275,23 @@ impl WindowManager {
     }
 
     /// 激活窗口（取消最小化、显示、设置焦点）
-    fn activate_window(window: &WebviewWindow<Wry>) -> WindowOperationResult {
+    ///
+    /// 【根因修复】此前用 `std::sync::mpsc::channel` + `rx.recv()` 同步阻塞等待主线程响应，
+    /// 在 async 上下文中会占住 tokio worker 线程；一旦多个 async 任务同时调用
+    /// （托盘点击、单例唤醒、轻量模式退出等多路径），会耗尽 tokio worker（默认 = CPU 核心数），
+    /// 导致整个 runtime 停止调度，引发心跳探针超时、IPC 无响应、UI 卡死等连锁反应。
+    ///
+    /// 现改用 `tokio::sync::oneshot` + `rx.await` 真异步等待，让出 tokio worker 线程；
+    /// 并加 5 秒超时保护，防止主线程被 Windows 模态循环（如原生 resize loop / COM 调用）
+    /// 长时间占用导致永久阻塞。与 `destroy_main_window` 的实现模式保持一致。
+    async fn activate_window(window: &WebviewWindow<Wry>) -> WindowOperationResult {
         logging!(info, Type::Window, "开始激活窗口");
 
         let app_handle = handle::Handle::app_handle();
         let label = window.label().to_string();
         let app_handle_clone = app_handle.clone();
 
-        let (tx, rx) = std::sync::mpsc::channel::<bool>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
 
         match app_handle.run_on_main_thread(move || {
             let Some(w) = app_handle_clone.get_webview_window(&label) else {
@@ -333,12 +344,26 @@ impl WindowManager {
                     handle::Handle::global().set_activation_policy_regular();
                 }
                 logging!(info, Type::Window, "已成功调度窗口激活任务到主线程");
-                // 等待主线程执行结果，确保返回值反映实际操作结果
-                match rx.recv() {
-                    Ok(true) => WindowOperationResult::Shown,
-                    Ok(false) => WindowOperationResult::Failed,
+                // 异步等待主线程执行结果，让出 tokio worker 线程，避免死锁
+                // 加 5 秒超时保护：主线程被模态循环占用时不会永久阻塞
+                match tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    rx,
+                )
+                .await
+                {
+                    Ok(Ok(true)) => WindowOperationResult::Shown,
+                    Ok(Ok(false)) => WindowOperationResult::Failed,
+                    Ok(Err(_)) => {
+                        logging!(warn, Type::Window, "接收窗口激活结果失败（oneshot 发送端被丢弃）");
+                        WindowOperationResult::Failed
+                    }
                     Err(_) => {
-                        logging!(warn, Type::Window, "接收窗口激活结果失败");
+                        logging!(
+                            error,
+                            Type::Window,
+                            "窗口激活超时 5s（主线程可能被模态循环阻塞或 IPC 队列堆积），返回 Failed"
+                        );
                         WindowOperationResult::Failed
                     }
                 }

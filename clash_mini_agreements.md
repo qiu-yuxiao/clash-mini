@@ -1590,4 +1590,38 @@ double-check 发现 985fee2f「强咬合防线」只在校验失败分支生效�
 
 **根因闭环**：三条改动同属"持久 `selected` 被当成权威、且不校验子集"这一根因的三道闸——① 写回前校验、② 恢复前校验、`activateSelected` 成功分支优先信任内核实际节点。落地后，`selected` 既不会被越界节点污染，也不会在恢复/激活时把越界节点强加给内核，前后端活跃节点不一致可根除（HEAD 仍未打 tag，v2.6.4-4 之后）。
 - **`updater/app-update.json` 版本号同步到 2.6.4**：v2.6.4 发版时未同步更新 `updater/app-update.json` 的 `version` 字段（保留为 2.6.3），导致 pre-push hook 的 `check-version-consistency` 任务阻塞 push。本次将 `version` 字段同步到 2.6.4。push 时发现远端已有完整的 v2.6.4 安装包元数据（notes/pub_date/signature/url/size），rebase 解决冲突时采用远端版本，本地临时绕过版本被丢弃。影响文件：`updater/app-update.json`。
+
+### v2.6.5 隐患修复 A：`window_manager.rs` activate_window 同步阻塞根治 (2026-07-19)
+
+#### 问题根因
+
+`WindowManager::activate_window` 此前使用 `std::sync::mpsc::channel::<bool>()` + `rx.recv()` 同步阻塞等待主线程执行 `run_on_main_thread` 闭包的结果。在 `async fn` 上下文中调用 `rx.recv()` 会**占住当前 tokio worker 线程不让出**，tokio 默认 worker 数 = CPU 核心数（通常 4-8 个）。
+
+多路径都会通过 `show_main_window` 间接调用 `activate_window`：单例唤醒（`server.rs::commands/visible`）、托盘左键点击（`tray/mod.rs`）、轻量模式退出（`lightweight.rs::exit_lightweight_mode`）、前端 IPC 调用（`feat::window::show_main_window`）等。一旦主线程被模态循环占用（Windows 原生 resize loop、COM 调用、批量测速 IPC 队列堆积），`tx.send` 迟迟不执行，所有等 `rx.recv()` 的 tokio worker 会被永久占住。worker 耗尽后整个 tokio runtime 停止调度新任务，引发心跳探针超时、IPC 无响应、UI 卡死等连锁反应。
+
+本次事件中 16:01:29.997 出现的"轻量模式退出失败" ERROR 误报（已在 v2.6.5 根因 5 修复），本质上也是同样模式：单例唤醒触发 `exit_lightweight_mode` → `show_main_window` → `activate_window` → 阻塞等主线程。project_memory 中已记录的「批量测速期间必须避免启用拖拽区域以防止 Tauri 同步 IPC 调用与并发测速 IPC 调用排队」「点击 Windows 原生标题栏在批量测速期间触发系统模态消息循环，与 IPC 调用重叠，导致 UI 线程死锁」等教训，本质都是同一类问题：**主线程被占用 + 同步等待主线程 = 死锁**。
+
+#### 修复方案
+
+参照 `destroy_main_window`（同文件行 396-431）的成熟实现模式：
+
+1. 把 `std::sync::mpsc::channel::<bool>()` 改为 `tokio::sync::oneshot::channel::<bool>()`
+2. 把 `rx.recv()` 同步阻塞改为 `rx.await` 真异步等待（让出 tokio worker 线程）
+3. 把 `activate_window` 和 `activate_existing_main_window` 都改为 `async fn`
+4. 加 5 秒 `tokio::time::timeout` 超时保护，防止主线程被永久阻塞时无下限等待
+5. 超时分支记录 `error` 级别日志（含原因诊断信息），便于排查
+6. 上游两处调用点（`show_main_window` 行 181、`toggle_main_window` 行 204）补 `.await`
+
+`hide_main_window` / `hide_main_window_internal` 不在本次修复范围：前者是同步函数，后者采用 fire-and-forget 模式不等主线程结果，不会阻塞 tokio worker。
+
+#### 5 秒超时阈值依据
+
+- 心跳探针超时阈值为 5 秒（`lib.rs` UI 线程心跳探针），与 `activate_window` 超时保持一致，便于联动诊断
+- 正常主线程响应时间应在 100-500ms（窗口操作 + 焦点设置），5 秒是异常诊断阈值
+- 超过 5 秒未响应说明主线程被严重阻塞，继续等待无意义，返回 `Failed` 让调用方走兜底逻辑
+
+#### 影响文件
+
+- `src-tauri/src/utils/window_manager.rs`：核心修复
+- `src-tauri/src/utils/node.rs`：修 clippy `doc_lazy_continuation` 警告（既有问题，与本次修复无关但阻止 clippy 通过）
 - **`is_dummy_node` 假阴性收口（node.rs）**：上次 double-check 指出的 `starts_with` 假阴性（`【剩余流量】`/`(购买入口)`/`节点-购买入口` 漏进 PROXY）已落地。新增 `normalize_dummy_name`：先剥两端包裹符号（【】()（）[]「」）、再剥 `节点-` 通用前缀，归一化后再 `starts_with` 广告短语。不剥 `CN2-`/`HK-` 等区域/协议前缀，故 `CN2-购买入口` 等真节点仍保住、不破坏既有单测。补 `test_dummy_node_leak_side` 覆盖泄漏侧。与 1~3 同属一次收口，未发包。

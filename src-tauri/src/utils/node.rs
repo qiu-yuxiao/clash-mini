@@ -54,6 +54,7 @@ pub fn is_dummy_node(name: &str) -> bool {
 /// 把节点名归一化，便于检测「广告短语不在最开头」的伪节点。
 /// 1. 剥掉两端的空白与包裹符号（【】()（）[]「」），可多层；
 /// 2. 剥掉通用前缀「节点-」「节点：」等（"节点-购买入口" 这类纯伪节点）。
+///
 /// 不剥区域/协议前缀（如 "CN2-"、"HK-"），以免误杀真实节点。
 fn normalize_dummy_name(name: &str) -> String {
     let mut s = name.trim().to_string();
