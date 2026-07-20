@@ -148,12 +148,9 @@ i18n.use(initReactI18next).init({
   interpolation: {
     escapeValue: false,
   },
-  // 参考配置（未来可启用）：
-  // saveMissing: true,           // 上报缺失的 key
-  // missingKeyHandler: (lng, ns, key) => {
-  //   console.warn(`[i18n] Missing key: ${lng}:${ns}:${key}`)
-  // },
-  // returnDefaultValue: false,   // 是否返回默认值而非 key
+  missingKeyHandler: (lngs, ns, key) => {
+    console.warn(`[i18n] Missing key: ${lngs.join('/')}:${ns}:${key}`)
+  },
 })
 
 export const changeLanguage = async (language: string) => {

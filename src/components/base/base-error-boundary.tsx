@@ -35,12 +35,12 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
 
   return (
     <div role="alert" style={{ padding: 16 }}>
-      <h4>Something went wrong:(</h4>
+      <h4>⚠️ 页面发生错误</h4>
 
       <pre>{errorMessage}</pre>
 
-      <details title="Error Stack">
-        <summary>Error Stack</summary>
+      <details title="错误详情">
+        <summary>错误详情</summary>
         <pre>{errorStack}</pre>
       </details>
 
@@ -52,7 +52,7 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
           cursor: 'pointer',
         }}
       >
-        Try again
+        重试
       </button>
     </div>
   )
