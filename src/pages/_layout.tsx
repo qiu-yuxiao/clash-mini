@@ -19,7 +19,6 @@ import {
   type Theme,
 } from '@mui/material'
 import { getVersion as getAppVersion } from '@tauri-apps/api/app'
-import { invoke } from '@tauri-apps/api/core'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -65,11 +64,8 @@ import {
   restartCore,
   triggerAutoSelect,
 } from '@/services/cmds'
-import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
-import {
-  closeAllConnectionsWithTimeout,
-  getProxyByNameWithTimeout,
-} from '@/services/mihomo-api'
+import { getDelayManager } from '@/services/delay'
+import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
@@ -93,12 +89,17 @@ import {
   useLayoutEvents,
   useLoadingOverlay,
 } from './_layout/hooks'
+import { useClientUpdate } from './_layout/hooks/use-client-update'
+import { useCoreUpdate } from './_layout/hooks/use-core-update'
+import { useImportContextMenu } from './_layout/hooks/use-import-context-menu'
+import { useSkinControls } from './_layout/hooks/use-skin-controls'
 import { handleNoticeMessage } from './_layout/utils'
 import {
-  OS,
-  getMenuItemHoverStyle,
-  isSameVersion,
-} from './_layout/utils/style-helpers'
+  waitForClashReady,
+  getFilteredNodeNames,
+  triggerAutoSelectAndRefresh,
+} from './_layout/utils/profile-coordination'
+import { OS, getMenuItemHoverStyle } from './_layout/utils/style-helpers'
 
 import 'dayjs/locale/ru'
 import 'dayjs/locale/zh-cn'
@@ -110,9 +111,6 @@ dayjs.extend(relativeTime)
 // 宽窗高度数值恰好同为 135，纯属巧合，二者不应耦合。
 const TRAFFIC_PANE_HEIGHT_WIDE = 135
 const TRAFFIC_PANE_HEIGHT_MINIMAL = 100
-
-
-import { waitForClashReady, getFilteredNodeNames, batchTestWithFirstBatchSelect, triggerAutoSelectAndRefresh } from './utils/profile-coordination'
 
 // Connections order
 const ORDER_OPTIONS = [
@@ -152,15 +150,11 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFn>>(
   {} as Record<OrderKey, OrderFn>,
 )
 
-import { useCoreUpdate } from './hooks/use-core-update'
-import { useClientUpdate } from './hooks/use-client-update'
-import { useSkinControls } from './hooks/use-skin-controls'
-import { useImportContextMenu } from './hooks/use-import-context-menu'
-
 const Layout = () => {
   // Active Skin State — managed by useSkinControls
   const {
     controlSkin,
+    setControlSkin,
     depthFactor,
     vibrancyFactor,
     handleDepthFactorChange,
@@ -170,6 +164,9 @@ const Layout = () => {
   // Update States
   const [helpAnchorEl, setHelpAnchorEl] = useState<null | HTMLElement>(null)
   const [appVersion, setAppVersion] = useState<string>('')
+
+  // 必须在 useCoreUpdate 之前调用，以提供 coreVersion/mutateVersion
+  const { version: coreVersion, mutateVersion } = useClash()
 
   const {
     clientUpdateOpen,
@@ -344,7 +341,7 @@ const Layout = () => {
 
   // Port State
   const { clashInfo, patchInfo } = useClashInfo()
-  const { version: coreVersion, mutateVersion } = useClash()
+  // coreVersion/mutateVersion 已在前面通过 useClash() 提前获取（供 useCoreUpdate 使用）
   const { clashConfig } = useClashConfigData()
   const { refreshClashConfig } = useAppRefreshers()
 

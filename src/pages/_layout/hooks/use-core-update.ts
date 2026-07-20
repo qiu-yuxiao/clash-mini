@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react'
-import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import { showNotice, withIpcTimeout } from '@/services/cmds'
+import { listen } from '@tauri-apps/api/event'
+import { useEffect, useState } from 'react'
+
+import type {
+  GithubRelease,
+  CoreUpgradeProgressPayload,
+} from '@/pages/_layout/types'
 import { isSameVersion } from '@/pages/_layout/utils/style-helpers'
-import type { GithubRelease, CoreUpgradeProgressPayload } from '@/pages/_layout/types'
+import { withIpcTimeout } from '@/services/cmds'
+import { showNotice } from '@/services/notice-service'
 
 interface UseCoreUpdateParams {
   coreVersion: string
@@ -11,9 +16,14 @@ interface UseCoreUpdateParams {
   setHelpAnchorEl: (el: HTMLElement | null) => void
 }
 
-export function useCoreUpdate({ coreVersion, mutateVersion, setHelpAnchorEl }: UseCoreUpdateParams) {
+export function useCoreUpdate({
+  coreVersion,
+  mutateVersion,
+  setHelpAnchorEl,
+}: UseCoreUpdateParams) {
   const [coreUpdateOpen, setCoreUpdateOpen] = useState(false)
-  const [coreUpdateRelease, setCoreUpdateRelease] = useState<GithubRelease | null>(null)
+  const [coreUpdateRelease, setCoreUpdateRelease] =
+    useState<GithubRelease | null>(null)
   const [coreUpgradeStatus, setCoreUpgradeStatus] = useState<string>('idle')
   const [coreUpgradeProgress, setCoreUpgradeProgress] = useState<number>(0)
   const [coreUpgradeMessage, setCoreUpgradeMessage] = useState<string>('')

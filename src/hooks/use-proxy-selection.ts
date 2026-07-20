@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
+import { frontendLog } from '@/services/cmds'
 import {
   closeConnectionWithTimeout,
   getConnectionsWithTimeout,
@@ -65,7 +66,8 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         (error) => {
           const msg = `[ProxySelection] 保存代理选择失败: ${error instanceof Error ? error.message : String(error)}`
           console.error(msg)
-          reportError(new Error(msg))
+          // 与 use-profiles.ts 诊断体系一致：写入后端 latest.log 便于 UI 卡死时仍可诊断
+          frontendLog('error', msg)
         },
       )
     },

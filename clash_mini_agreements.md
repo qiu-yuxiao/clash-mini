@@ -1811,3 +1811,52 @@ if !lightweight::exit_lightweight_mode().await {
   - `src-tauri/src/feat/icon.rs`
   - `src-tauri/src/lib.rs`
   - `src/hooks/use-profiles.ts`
+
+### v2.6.5 double-check 修复：另一个 Agent 提交的 21 个 commit 编译错误与设计缺陷 (2026-07-20)
+
+#### 问题根因
+
+另一个 Agent 对程序做了大量深度的修正和结构调整，提交了 21 个新改动（a083d352..857d4274），涵盖 fix/refactor/perf 三类。本次 double-check 发现其提交未通过编译和 lint 验证：6 个 cargo clippy 错误 + 15 个 TypeScript 错误 + 20 个 ESLint 警告，根因是 4 个 hook 提取 commit 把文件建在 src/pages/_layout/ 子目录，却在 src/pages/_layout.tsx 里用 ./hooks/、./utils/ 导入（解析到 src/pages/hooks/，不存在），且 profile-coordination.ts 内部还引用了 3 个不存在的导出/模块。
+
+#### 修复内容
+
+**前端 TypeScript 修复（15 个错误清零）**：
+- _layout.tsx：5 处 import 路径修正（./hooks/... → ./_layout/hooks/...，./utils/... → ./_layout/utils/...），并对齐到文件顶部与其他 _layout/ import 一起
+- _layout.tsx：5 个未使用导入清理（invoke / NODE_DELAY_MAX_MS / getProxyByNameWithTimeout / isSameVersion / batchTestWithFirstBatchSelect）
+- _layout.tsx：useClash() 调用提前到 useCoreUpdate() 之前，提供 coreVersion/mutateVersion；原行 347 重复定义删除
+- _layout.tsx：useSkinControls() 解构补齐 setControlSkin
+- profile-coordination.ts：3 处错误引用修正——HeadState 从 @/components/proxy/use-head-state 导入、calcuProxies 从 @/services/cmds 导入、showNotice 从 @/services/notice-service 导入
+- use-core-update.ts / use-client-update.ts：showNotice 从 @/services/notice-service 导入（不再从 cmds.ts 错误导入）
+
+**后端 cargo clippy 修复（6 个错误清零）**：
+- prfitem.rs:614：去掉 serialized_data.into() 的 useless conversion（smartstring → smartstring）
+- profiles.rs:550-553：4 处 .expect("profile file pattern") 加 #[allow(clippy::expect_used)]，注释说明正则模式均为硬编码字面量编译期已验证
+- handle.rs:39：#[allow(clippy::expect_used)] 改为 #[allow(clippy::panic, clippy::expect_used)]，匹配实际代码（unwrap_or_else + panic!）
+
+**ESLint 警告修复（20 个警告清零）**：
+- 通过 eslint --fix 自动修复 13 个 import-x/order 顺序问题
+- 手动整理 _layout.tsx 的 import 区域，把 5 个 import 移到文件顶部对齐
+
+**设计缺陷修复（3 项）**：
+- i18n.ts：missingKeyHandler 启用 saveMissing: true，让 handler 真正被调用（047cdbcb commit 的死代码修复）
+- use-proxy-selection.ts：persistSelection 错误处理从 eportError 统一为 rontendLog('error', msg)，与 use-profiles.ts 诊断体系一致（写入后端 latest.log 便于 UI 卡死时仍可诊断）
+- DelayManager 行为变更（2h→5min 清理间隔、读路径删除 cache.delete）：经评估合理，CACHE_TTL=30min + 清理间隔 5min 已足够，不需修正
+
+#### 影响文件
+
+- 前端：src/pages/_layout.tsx、src/pages/_layout/utils/profile-coordination.ts、src/pages/_layout/hooks/use-core-update.ts、src/pages/_layout/hooks/use-client-update.ts、src/services/i18n.ts、src/hooks/use-proxy-selection.ts
+- 后端：src-tauri/src/config/prfitem.rs、src-tauri/src/config/profiles.rs、src-tauri/src/core/handle.rs
+
+#### 验证
+
+- cargo clippy --all-targets -- -D warnings：退出码 0，无 error 无 warning
+- pnpm run typecheck：退出码 0，无 error
+- pnpm run lint（--max-warnings=0）：退出码 0，无 error 无 warning
+- v2.6.5 隐患 A/B/C 三个修复全部健在，未被破坏
+
+#### 经验教训
+
+- Agent 提交代码前必须跑 cargo clippy / typecheck / lint 三项验证，否则编译错误会立刻暴露
+- TypeScript 的 import 路径解析：./hooks/... 相对于当前文件目录解析，./_layout/hooks/... 才能正确指向 src/pages/_layout/hooks/ 子目录
+- i18next 的 missingKeyHandler 在默认情况下不会被调用，必须启用 saveMissing: true 才能生效
+- 项目硬约束「日志必须包含前端诊断信息通过 frontendLog() IPC 命令写入后端 latest.log」要求所有错误处理统一用 frontendLog，不要混用 reportError

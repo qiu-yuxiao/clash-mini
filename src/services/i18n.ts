@@ -93,7 +93,10 @@ const localeLoaders = Object.entries(localeModules).reduce<
   return acc
 }, {})
 
-export const languages: Record<string, Record<string, unknown>> = supportedLanguages.reduce(
+export const languages: Record<
+  string,
+  Record<string, unknown>
+> = supportedLanguages.reduce(
   (acc, lang) => {
     acc[lang] = {}
     return acc
@@ -148,6 +151,8 @@ i18n.use(initReactI18next).init({
   interpolation: {
     escapeValue: false,
   },
+  // 启用 saveMissing 才能让 missingKeyHandler 真正被调用（i18next 默认不调用）
+  saveMissing: true,
   missingKeyHandler: (lngs, ns, key) => {
     console.warn(`[i18n] Missing key: ${lngs.join('/')}:${ns}:${key}`)
   },

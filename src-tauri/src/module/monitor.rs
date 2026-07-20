@@ -34,10 +34,17 @@ pub fn abort_all_active_tasks() {
 
 /// 中止后台 monitor 常驻任务
 pub fn abort_monitor() {
-    let value = MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| {
-        logging!(warn, Type::Lightweight, "MONITOR_TASK_HANDLE 锁被中毒线程污染，恢复继续");
-        e.into_inner()
-    }).take();
+    let value = MONITOR_TASK_HANDLE
+        .lock()
+        .unwrap_or_else(|e| {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "MONITOR_TASK_HANDLE 锁被中毒线程污染，恢复继续"
+            );
+            e.into_inner()
+        })
+        .take();
     if let Some(handle) = value {
         handle.abort();
     }
@@ -755,26 +762,26 @@ pub fn start_background_monitor() {
                 // - 由于两个分支最终都会将 last_check_time 提前（效果等价），丢失一次也不会出问题
                 // - Notify::notify_one() 会存储许可，因此不存在"通知完全丢失"的风险
                 tokio::select! {
-                    _ = sleep(Duration::from_secs(check_interval)) => {}
-                    _ = MONITOR_WAKEUP_NOTIFY.notified() => {
-                        logging!(debug, Type::Lightweight, "[后台监测] 收到唤醒信号，立即唤醒监测");
-                        // 唤醒即放行一次体检（探活+必要时自愈），不再等下一自然周期
-                        last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
-                    }
-                    _ = PROFILE_SWITCH_NOTIFY.notified() => {
-                        logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，中止旧测速任务并立即唤醒");
-                        // 中止旧Profile的测速任务，释放AUTO_SELECT_RUNNING锁
-                        let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| {
-        logging!(warn, Type::Lightweight, "ACTIVE_TASKS 锁被中毒线程污染，恢复继续");
-        e.into_inner()
-    });
-                        for handle in active.drain(..) {
-                            handle.abort();
-                        }
-                        drop(active);
-                        last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
-                    }
-                }
+                                _ = sleep(Duration::from_secs(check_interval)) => {}
+                                _ = MONITOR_WAKEUP_NOTIFY.notified() => {
+                                    logging!(debug, Type::Lightweight, "[后台监测] 收到唤醒信号，立即唤醒监测");
+                                    // 唤醒即放行一次体检（探活+必要时自愈），不再等下一自然周期
+                                    last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
+                                }
+                                _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                                    logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，中止旧测速任务并立即唤醒");
+                                    // 中止旧Profile的测速任务，释放AUTO_SELECT_RUNNING锁
+                                    let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| {
+                    logging!(warn, Type::Lightweight, "ACTIVE_TASKS 锁被中毒线程污染，恢复继续");
+                    e.into_inner()
+                });
+                                    for handle in active.drain(..) {
+                                        handle.abort();
+                                    }
+                                    drop(active);
+                                    last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
+                                }
+                            }
             }
 
             let current_profile = match get_current_profile_uid().await {
@@ -1004,7 +1011,11 @@ pub fn start_background_monitor() {
     });
 
     *MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| {
-        logging!(warn, Type::Lightweight, "MONITOR_TASK_HANDLE 锁被中毒线程污染，恢复继续");
+        logging!(
+            warn,
+            Type::Lightweight,
+            "MONITOR_TASK_HANDLE 锁被中毒线程污染，恢复继续"
+        );
         e.into_inner()
     }) = Some(handle);
 }

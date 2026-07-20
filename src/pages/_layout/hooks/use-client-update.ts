@@ -1,17 +1,28 @@
+import {
+  check,
+  type Update,
+  type DownloadEvent,
+} from '@tauri-apps/plugin-updater'
 import { useState } from 'react'
-import { check, type Update, type DownloadEvent } from '@tauri-apps/plugin-updater'
-import { showNotice, withIpcTimeout } from '@/services/cmds'
+
 import { isSameVersion } from '@/pages/_layout/utils/style-helpers'
+import { withIpcTimeout } from '@/services/cmds'
+import { showNotice } from '@/services/notice-service'
 
 interface UseClientUpdateParams {
   appVersion: string
   setHelpAnchorEl: (el: HTMLElement | null) => void
 }
 
-export function useClientUpdate({ appVersion, setHelpAnchorEl }: UseClientUpdateParams) {
+export function useClientUpdate({
+  appVersion,
+  setHelpAnchorEl,
+}: UseClientUpdateParams) {
   const [clientUpdateOpen, setClientUpdateOpen] = useState(false)
   const [clientUpdateObj, setClientUpdateObj] = useState<Update | null>(null)
-  const [clientStatus, setClientStatus] = useState<'idle' | 'downloading' | 'error' | 'done'>('idle')
+  const [clientStatus, setClientStatus] = useState<
+    'idle' | 'downloading' | 'error' | 'done'
+  >('idle')
   const [clientProgress, setClientProgress] = useState(0)
   const [clientProgressMessage, setClientProgressMessage] = useState('')
   const [clientCheckLoading, setClientCheckLoading] = useState(false)

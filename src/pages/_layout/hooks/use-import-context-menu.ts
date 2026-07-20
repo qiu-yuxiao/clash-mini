@@ -1,12 +1,15 @@
-import { useRef, useState } from 'react'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { useRef, useState } from 'react'
 
 interface UseImportContextMenuParams {
   url: string
   setUrl: (val: string) => void
 }
 
-export function useImportContextMenu({ url, setUrl }: UseImportContextMenuParams) {
+export function useImportContextMenu({
+  url,
+  setUrl,
+}: UseImportContextMenuParams) {
   const [importInputContextMenu, setImportInputContextMenu] = useState<{
     mouseX: number
     mouseY: number
@@ -31,7 +34,8 @@ export function useImportContextMenu({ url, setUrl }: UseImportContextMenuParams
       const start = input.selectionStart ?? 0
       const end = input.selectionEnd ?? 0
       const currentVal = url || ''
-      const newValue = currentVal.substring(0, start) + textToPaste + currentVal.substring(end)
+      const newValue =
+        currentVal.substring(0, start) + textToPaste + currentVal.substring(end)
       setUrl(newValue)
       setTimeout(() => {
         input.focus()
@@ -51,8 +55,12 @@ export function useImportContextMenu({ url, setUrl }: UseImportContextMenuParams
       const end = input.selectionEnd ?? 0
       const selectedText = (url || '').substring(start, end)
       if (selectedText) {
-        try { await writeText(selectedText) } catch {
-          try { await navigator.clipboard.writeText(selectedText) } catch (e) {
+        try {
+          await writeText(selectedText)
+        } catch {
+          try {
+            await navigator.clipboard.writeText(selectedText)
+          } catch (e) {
             console.error('Failed to copy to clipboard:', e)
           }
         }
@@ -69,12 +77,17 @@ export function useImportContextMenu({ url, setUrl }: UseImportContextMenuParams
       const currentVal = url || ''
       const selectedText = currentVal.substring(start, end)
       if (selectedText) {
-        try { await writeText(selectedText) } catch {
-          try { await navigator.clipboard.writeText(selectedText) } catch (e) {
+        try {
+          await writeText(selectedText)
+        } catch {
+          try {
+            await navigator.clipboard.writeText(selectedText)
+          } catch (e) {
             console.error('Failed to copy to clipboard:', e)
           }
         }
-        const newValue = currentVal.substring(0, start) + currentVal.substring(end)
+        const newValue =
+          currentVal.substring(0, start) + currentVal.substring(end)
         setUrl(newValue)
         setTimeout(() => {
           input.focus()

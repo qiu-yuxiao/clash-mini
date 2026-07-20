@@ -1,9 +1,9 @@
 use serde_yaml_ng::{Mapping, Value};
 
 #[cfg(target_os = "macos")]
-use std::sync::Mutex;
-#[cfg(target_os = "macos")]
 use clash_verge_logging::{Type as LogType, logging};
+#[cfg(target_os = "macos")]
+use std::sync::Mutex;
 
 #[cfg(target_os = "macos")]
 use tauri::async_runtime::JoinHandle;

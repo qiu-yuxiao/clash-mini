@@ -1,10 +1,14 @@
-import { getDelayManager, type HeadState } from '@/services/delay'
-import { calcuProxies } from '@/services/calc-proxies'
-import { showNotice, getProfiles, triggerAutoSelect } from '@/services/cmds'
-import { getProxyByNameWithTimeout } from '@/services/mihomo-api'
-import { isDummyNode } from '@/utils/node'
 import { filterSort } from '@/components/proxy/use-filter-sort'
-import { NODE_DELAY_MIN_MS, NODE_DELAY_MAX_MS } from '@/services/delay'
+import type { HeadState } from '@/components/proxy/use-head-state'
+import { calcuProxies, getProfiles, triggerAutoSelect } from '@/services/cmds'
+import {
+  getDelayManager,
+  NODE_DELAY_MIN_MS,
+  NODE_DELAY_MAX_MS,
+} from '@/services/delay'
+import { getProxyByNameWithTimeout } from '@/services/mihomo-api'
+import { showNotice } from '@/services/notice-service'
+import { isDummyNode } from '@/utils/node'
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string
 

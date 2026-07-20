@@ -281,11 +281,7 @@ impl PrfItem {
 
     /// ## Direct node input
     /// 直连节点输入（非 HTTP URL）——支持 clear/clean 清空、URI-list 解析、与已有节点合并
-    async fn from_url_direct(
-        url: &str,
-        name: Option<&String>,
-        option: Option<&PrfOption>,
-    ) -> Result<Self> {
+    async fn from_url_direct(url: &str, name: Option<&String>, option: Option<&PrfOption>) -> Result<Self> {
         let url_trimmed = url.trim();
         let uid_str = "L_Direct_Imports".to_string();
         let file_name = "L_Direct_Imports.yaml".to_string();
@@ -306,8 +302,8 @@ impl PrfItem {
         } = ensure_enhance_items(option).await?;
 
         if url_trimmed.eq_ignore_ascii_case("clear") || url_trimmed.eq_ignore_ascii_case("clean") {
-            let serialized = serde_yaml_ng::to_string(&final_mapping)
-                .map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
+            let serialized =
+                serde_yaml_ng::to_string(&final_mapping).map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
             fs::write(&path, serialized.as_bytes())
                 .await
                 .with_context(|| format!("failed to write to file \"{file_name}\""))?;
@@ -611,7 +607,7 @@ impl PrfItem {
             }),
             home,
             updated: Some(chrono::Local::now().timestamp()),
-            file_data: Some(serialized_data.into()),
+            file_data: Some(serialized_data),
         })
     }
 
@@ -762,9 +758,7 @@ fn parse_subscription_content(data: &str) -> Result<(Mapping, String)> {
     let decoded_opt = crate::utils::resolve::universal_parser::decode_base64_robust(data);
 
     match serde_yaml_ng::from_str::<Mapping>(data) {
-        Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => {
-            Ok((y, data.to_string().into()))
-        }
+        Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => Ok((y, data.to_string().into())),
         _ => {
             let decoded_str_opt = decoded_opt
                 .as_ref()

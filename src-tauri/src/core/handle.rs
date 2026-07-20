@@ -29,7 +29,8 @@ impl Handle {
     }
 
     pub fn app_handle() -> &'static AppHandle {
-        #[allow(clippy::expect_used)]
+        // 启动早期未初始化时访问 APP_HANDLE 不可恢复——记 error 后 panic 以便日志保留诊断线索
+        #[allow(clippy::panic, clippy::expect_used)]
         APP_HANDLE.get().unwrap_or_else(|| {
             logging!(
                 error,

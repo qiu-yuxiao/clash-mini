@@ -545,6 +545,9 @@ impl IProfiles {
         // p12345678.yaml (proxies)
         // g12345678.yaml (groups)
 
+        // 正则模式均为硬编码字面量，编译期即可验证；运行期 `Regex::new` 不会失败，
+        // 此处 `expect` 是安全的——允许 clippy::expect_used
+        #[allow(clippy::expect_used)]
         static REGEX_CACHE: std::sync::LazyLock<[regex::Regex; 4]> = std::sync::LazyLock::new(|| {
             [
                 regex::Regex::new(r"^[RL][a-zA-Z0-9]+\.yaml$").expect("profile file pattern"),
