@@ -129,16 +129,12 @@ fn uninstall_service() -> Result<()> {
         bail!(format!("uninstaller not found: {uninstall_path:?}"));
     }
 
-    let uninstall_shell: String = uninstall_path.to_string_lossy().replace(" ", "\\ ");
-
     let elevator = crate::utils::help::linux_elevator();
     let status = if linux_running_as_root() {
         StdCommand::new(&uninstall_path).status()?
     } else {
         let result = StdCommand::new(&elevator)
-            .arg("sh")
-            .arg("-c")
-            .arg(&uninstall_shell)
+            .arg(&uninstall_path)
             .status()?;
 
         // 如果 pkexec 执行失败，回退到 sudo
@@ -150,9 +146,7 @@ fn uninstall_service() -> Result<()> {
                 result.code().unwrap_or(-1)
             );
             StdCommand::new("sudo")
-                .arg("sh")
-                .arg("-c")
-                .arg(&uninstall_shell)
+                .arg(&uninstall_path)
                 .status()?
         } else {
             result
@@ -185,16 +179,12 @@ fn install_service() -> Result<()> {
         bail!(format!("installer not found: {install_path:?}"));
     }
 
-    let install_shell: String = install_path.to_string_lossy().replace(" ", "\\ ");
-
     let elevator = crate::utils::help::linux_elevator();
     let output = if linux_running_as_root() {
         StdCommand::new(&install_path).output()?
     } else {
         let result = StdCommand::new(&elevator)
-            .arg("sh")
-            .arg("-c")
-            .arg(&install_shell)
+            .arg(&install_path)
             .output()?;
 
         // 如果 pkexec 执行失败，回退到 sudo
@@ -206,9 +196,7 @@ fn install_service() -> Result<()> {
                 result.status.code().unwrap_or(-1)
             );
             StdCommand::new("sudo")
-                .arg("sh")
-                .arg("-c")
-                .arg(&install_shell)
+                .arg(&install_path)
                 .output()?
         } else {
             result

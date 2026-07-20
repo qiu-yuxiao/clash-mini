@@ -1860,3 +1860,13 @@ if !lightweight::exit_lightweight_mode().await {
 - TypeScript 的 import 路径解析：./hooks/... 相对于当前文件目录解析，./_layout/hooks/... 才能正确指向 src/pages/_layout/hooks/ 子目录
 - i18next 的 missingKeyHandler 在默认情况下不会被调用，必须启用 saveMissing: true 才能生效
 - 项目硬约束「日志必须包含前端诊断信息通过 frontendLog() IPC 命令写入后端 latest.log」要求所有错误处理统一用 frontendLog，不要混用 reportError
+
+### v2.6.5 补充加固 ⑤ (2026-07-20)
+
+**Linux 提权服务安装/卸载命令注入漏洞修复**：
+- 修复文件：`src-tauri/src/core/service.rs`
+- 修复原因：Linux 系统服务安装/卸载指令在路径包含空格时会通过 `replace(" ", "\\ ")` 进行防御，并将其拼接成 shell 字符串传递给 `sh -c` 运行。该防御不充分，容易造成任意命令注入漏洞。
+- 修复实现：直接将路径作为单独的独立参数传递给 `elevator`（如 `pkexec` 或 `sudo`），从而彻底避开 `sh -c` 的外壳解析，从源头上消除命令注入风险。
+
+#### 验证
+- cargo check：退出码 0，编译通过。
