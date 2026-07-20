@@ -1,12 +1,12 @@
 {
   "version": "2.6.7",
-  "notes": "Clash Mini v2.6.7 — 即时探活修复 5 分钟防断流盲区",
-  "pub_date": "2026-07-20T10:57:50.740Z",
+  "notes": "Clash Mini v2.6.7",
+  "pub_date": "2026-07-20T15:55:35.743Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUhoOGJKcVQ0RFdNejZDak5WQStybjRjcjJLNnRWQ0pEMFBFUjlOZHVMTUpiWWw4eTNTRTNIai9vMjloNnVwU3RLMjEraE5ZMlE3R09nYXdHNkg3ZEFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTQ0ODMyCWZpbGU6Q2xhc2ggTWluaV8yLjYuNl94NjQtc2V0dXAuZXhlCkIvWW1tRzgyTHBCTTVPT1kzK09ZMlpaSVhsVy9xeGJaMDgxUm5DcXluWks0TWNYMDg2R3pTRHovdS9vOFZWK0tIcG1SZDZrU1BHWkl3b25IVXZHeERBPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v2.6.6/Clash.Mini_2.6.6_x64-setup.exe",
-      "size": 41483580
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRVBrVmdjY2Q1akdkRmZzSVl1SHdEQnczeGpYZkJIK2pERW9iem1nVSs4THErRy81bDQvSmFiM1hPZk5sTFhSUE81RWRjdjBXTER0NHJ5Ny85YWJnNUFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTYyNjI2CWZpbGU6Q2xhc2ggTWluaV8yLjYuN194NjQtc2V0dXAuZXhlCjNBSTJSV09uOVpLTmZFL1JOL3ZnUC9yM0k4c1BQTkJVdTFkcFMrWjZTUUw0eUpBZEU0bXNha3pVOTl0Z1ltVmt3WVBCaVZPelFPYkxwdjlnL1F0dkJ3PT0K",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v2.6.7/Clash.Mini_2.6.7_x64-setup.exe",
+      "size": 41480087
     }
   }
 }
