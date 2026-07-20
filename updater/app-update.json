@@ -1,12 +1,12 @@
 {
   "version": "2.6.8",
-  "notes": "Clash Mini v2.6.8 — 窗口尺寸恢复 + 即时探活 + resize 优化",
-  "pub_date": "2026-07-20T15:55:35.743Z",
+  "notes": "Clash Mini v2.6.8",
+  "pub_date": "2026-07-20T20:15:16.247Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRVBrVmdjY2Q1akdkRmZzSVl1SHdEQnczeGpYZkJIK2pERW9iem1nVSs4THErRy81bDQvSmFiM1hPZk5sTFhSUE81RWRjdjBXTER0NHJ5Ny85YWJnNUFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTYyNjI2CWZpbGU6Q2xhc2ggTWluaV8yLjYuN194NjQtc2V0dXAuZXhlCjNBSTJSV09uOVpLTmZFL1JOL3ZnUC9yM0k4c1BQTkJVdTFkcFMrWjZTUUw0eUpBZEU0bXNha3pVOTl0Z1ltVmt3WVBCaVZPelFPYkxwdjlnL1F0dkJ3PT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v2.6.7/Clash.Mini_2.6.7_x64-setup.exe",
-      "size": 41480087
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU1CaVgxTUVuQ3JzTjhIcE5kdE1OWE84dXdnd2xmZ3VxbE9wMU1MRzA1VFUvdjVkelZnWTVVdXFEVGxNbzVBMXZSR3pGby9hNHB2bUFpRHNxdExsQ2dZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTc4MzMzCWZpbGU6Q2xhc2ggTWluaV8yLjYuOF94NjQtc2V0dXAuZXhlCmlyS0V6U3h3Q3IyZEVlbFZOUTBqY1pHaHdoYlFSaUVjT2dodUdXREd3TlltaVZuaGpjQVNhcmFpZkUyT3VUUEJQaUJKeGNhMEh3b2xBZEFEMXo5SkRRPT0K",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v2.6.8/Clash.Mini_2.6.8_x64-setup.exe",
+      "size": 41487638
     }
   }
 }
