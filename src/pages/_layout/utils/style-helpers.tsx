@@ -9,7 +9,7 @@ import {
 } from '@mui/icons-material'
 import { alpha, type Theme } from '@mui/material'
 
-import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
+import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import getSystem from '@/utils/get-system'
 
 const OS = getSystem()
@@ -73,7 +73,7 @@ export function convertDelayColor(
   delayValue: number,
   timeout = NODE_DELAY_MAX_MS,
 ) {
-  const colorStr = delayManager.formatDelayColor(delayValue, timeout)
+  const colorStr = getDelayManager().formatDelayColor(delayValue, timeout)
   if (!colorStr) return 'default'
   const mainColor = colorStr.split('.')[0]
   switch (mainColor) {

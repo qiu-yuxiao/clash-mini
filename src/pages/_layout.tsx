@@ -76,10 +76,7 @@ import {
   triggerAutoSelect,
   withIpcTimeout,
 } from '@/services/cmds'
-import DelayManager, {
-  NODE_DELAY_MAX_MS,
-  NODE_DELAY_MIN_MS,
-} from '@/services/delay'
+import { getDelayManager, NODE_DELAY_MAX_MS, NODE_DELAY_MIN_MS } from '@/services/delay'
 import {
   closeAllConnectionsWithTimeout,
   getProxyByNameWithTimeout,
@@ -233,9 +230,9 @@ async function batchTestWithFirstBatchSelect(
 
   // 视觉占位：立即将所有待测节点标记为「测速中」以触发流光动画
   for (const name of names) {
-    DelayManager.setDelay(name, groupName, -2)
+    getDelayManager().setDelay(name, groupName, -2)
   }
-  DelayManager.queueGroupNotification(groupName)
+  getDelayManager().queueGroupNotification(groupName)
 
   // 委托后端统一执行群发测速 + 择优（F1 测速所有节点 → 不传子集，后端自取全量）；
   // 结果经 verge://backend-delay-results 事件回写 UI
@@ -1127,9 +1124,9 @@ const Layout = () => {
         try {
           // 视觉占位：立即将 PROXY 全节点标记为「测速中」以触发流光动画
           for (const name of names) {
-            DelayManager.setDelay(name, 'PROXY', -2)
+            getDelayManager().setDelay(name, 'PROXY', -2)
           }
-          DelayManager.queueGroupNotification('PROXY')
+          getDelayManager().queueGroupNotification('PROXY')
           // 委托后端静默测速填充缓存（不传子集=全量测速）；select=false 严禁切换用户当前节点
           if (currentUid) {
             await triggerAutoSelect(currentUid, undefined, 0, false)
@@ -1413,7 +1410,7 @@ const Layout = () => {
       isStartingUpRef.current = true
       startupRetryCountRef.current = 0
       // M2-10: 切换 Profile 时清理旧的测试 URL 缓存
-      DelayManager.clearUrlMap()
+      getDelayManager().clearUrlMap()
       await patchProfiles({ current: uid })
       await mutateProfiles()
       closeAllConnectionsWithTimeout()

@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useReducer } from 'react'
 
-import delayManager, {
-  NODE_DELAY_MAX_MS,
-  type DelayUpdate,
-} from '@/services/delay'
+import { getDelayManager, NODE_DELAY_MAX_MS, type DelayUpdate } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 
 const PRESET_PROXY_NAMES = [
@@ -37,21 +34,21 @@ export function useProxyDelayState(
 
   useEffect(() => {
     if (isPreset || !proxy) return
-    delayManager.setListener(proxy.name, groupName, setDelayState)
+    getDelayManager().setListener(proxy.name, groupName, setDelayState)
     return () => {
-      delayManager.removeListener(proxy.name, groupName)
+      getDelayManager().removeListener(proxy.name, groupName)
     }
   }, [proxy, groupName, isPreset])
 
   const updateDelay = useCallback(() => {
     if (!proxy) return
-    const cachedUpdate = delayManager.getDelayUpdate(proxy.name, groupName)
+    const cachedUpdate = getDelayManager().getDelayUpdate(proxy.name, groupName)
     if (cachedUpdate) {
       setDelayState({ ...cachedUpdate })
       return
     }
 
-    const fallbackDelay = delayManager.getDelayFix(proxy, groupName)
+    const fallbackDelay = getDelayManager().getDelayFix(proxy, groupName)
     if (fallbackDelay === -1) {
       setDelayState({ delay: -1, updatedAt: 0 })
       return

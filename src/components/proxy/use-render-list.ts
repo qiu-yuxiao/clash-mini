@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react'
 
 import { useWindowDecorations } from '@/hooks/use-window'
 import { useAppRefreshers, useProxiesData } from '@/providers/app-data-context'
-import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
+import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 
 import { filterSort } from './use-filter-sort'
@@ -126,9 +126,9 @@ export const useRenderList = (mode: string) => {
   }, [bumpDelay])
 
   useEffect(() => {
-    delayManager.setGroupListener('PROXY', scheduleBump)
+    getDelayManager().setGroupListener('PROXY', scheduleBump)
     return () => {
-      delayManager.removeGroupListener('PROXY', scheduleBump)
+      getDelayManager().removeGroupListener('PROXY', scheduleBump)
       if (bumpTimerRef.current) {
         clearTimeout(bumpTimerRef.current)
         bumpTimerRef.current = null

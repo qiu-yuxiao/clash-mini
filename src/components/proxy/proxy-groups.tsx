@@ -15,7 +15,7 @@ import { useLocation } from 'react-router'
 
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { getProfiles, triggerAutoSelect } from '@/services/cmds'
-import delayManager from '@/services/delay'
+import { getDelayManager } from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
@@ -255,9 +255,9 @@ export const ProxyGroups = (props: Props) => {
 
       // 视觉占位：立即将待测节点标记为「测速中」以触发流光动画
       for (const name of visibleNames) {
-        delayManager.setDelay(name, groupName, -2)
+        getDelayManager().setDelay(name, groupName, -2)
       }
-      delayManager.queueGroupNotification(groupName)
+      getDelayManager().queueGroupNotification(groupName)
 
       // 委托后端统一执行群发测速 + 择优（select=true）
       // 关键：传入当前可见节点子集 visibleNames，后端只在「该子集」内测速并挑最快，

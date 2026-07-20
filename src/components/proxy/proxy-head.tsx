@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
-import delayManager from '@/services/delay'
+import { getDelayManager } from '@/services/delay'
 import { debugLog } from '@/utils/debug'
 
 import { ProxySortType } from './use-filter-sort'
@@ -76,7 +76,7 @@ export const ProxyHead = ({
     'http://cp.cloudflare.com/generate_204'
 
   useEffect(() => {
-    delayManager.setUrl(groupName, testUrl?.trim() || url || defaultLatencyUrl)
+    getDelayManager().setUrl(groupName, testUrl?.trim() || url || defaultLatencyUrl)
   }, [groupName, testUrl, defaultLatencyUrl, url])
 
   return (

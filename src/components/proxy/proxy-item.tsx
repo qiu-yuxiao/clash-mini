@@ -11,7 +11,7 @@ import React, { memo } from 'react'
 import { BaseLoading } from '@/components/base'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
 import { useWindowDecorations } from '@/hooks/use-window'
-import delayManager from '@/services/delay'
+import { getDelayManager } from '@/services/delay'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 
 interface Props {
@@ -217,7 +217,7 @@ export const ProxyItem = memo(
               key={proxy?.name ?? `node-delay-${indexInGroup}`}
               className="the-delay"
               sx={({ palette }) => ({
-                color: delayManager.formatDelayColor(
+                color: getDelayManager().formatDelayColor(
                   delayValue,
                   timeout,
                   palette.mode === 'dark',
@@ -227,7 +227,7 @@ export const ProxyItem = memo(
                 fontWeight: 600,
               })}
             >
-              {delayManager.formatDelay(delayValue, timeout)}
+              {getDelayManager().formatDelay(delayValue, timeout)}
             </Widget>
           )}
         </Box>

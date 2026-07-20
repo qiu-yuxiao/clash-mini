@@ -62,8 +62,8 @@ class DelayManager {
           })
           expiredKeys.forEach((key) => this.cache.delete(key))
         },
-        2 * 60 * 60 * 1000,
-      ) // Clean up expired cache every 2 hours
+        5 * 60 * 1000,
+      ) // Clean up expired cache every 5 minutes
     }
   }
 
@@ -242,7 +242,6 @@ class DelayManager {
     if (!entry) return undefined
 
     if (Date.now() - entry.updatedAt > CACHE_TTL) {
-      this.cache.delete(key)
       return undefined
     }
 
@@ -385,11 +384,7 @@ class DelayManager {
   }
 
   formatDelay(delay: number, timeout = NODE_DELAY_MAX_MS) {
-    if (delay === -1) return '-'
-    if (delay === -2) return 'testing'
-    if (delay === 0 || (delay >= timeout && delay <= 1e5)) return 'Timeout'
-    if (delay > 1e5) return 'Error'
-    return `${delay}`
+    return formatDelay(delay, timeout)
   }
 
   formatDelayColor(
@@ -397,12 +392,46 @@ class DelayManager {
     timeout = NODE_DELAY_MAX_MS,
     isDarkMode = false,
   ) {
-    if (delay < 0) return ''
-    if (delay === 0 || delay >= timeout) return 'error.main'
-    if (delay >= 400) return isDarkMode ? 'warning.main' : 'warning.dark'
-    if (delay >= 250) return 'primary.main'
-    return 'success.main'
+    return formatDelayColor(delay, timeout, isDarkMode)
+  }
+
+  /** 销毁定时器等资源，用于 HMR / 测试清理 */
+  destroy() {
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId)
+      this.cleanupIntervalId = null
+    }
   }
 }
 
-export default new DelayManager()
+/** 将延迟数值转换为 UI 展示字符串 */
+export function formatDelay(delay: number, timeout = NODE_DELAY_MAX_MS) {
+  if (delay === -1) return '-'
+  if (delay === -2) return 'testing'
+  if (delay === 0 || (delay >= timeout && delay <= 1e5)) return 'Timeout'
+  if (delay > 1e5) return 'Error'
+  return `${delay}`
+}
+
+/** 将延迟数值映射为 MUI 主题色名 */
+export function formatDelayColor(
+  delay: number,
+  timeout = NODE_DELAY_MAX_MS,
+  isDarkMode = false,
+) {
+  if (delay < 0) return ''
+  if (delay === 0 || delay >= timeout) return 'error.main'
+  if (delay >= 400) return isDarkMode ? 'warning.main' : 'warning.dark'
+  if (delay >= 250) return 'primary.main'
+  return 'success.main'
+}
+
+let _instance: DelayManager | null = null
+
+/** 获取 DelayManager 惰性单例（避免模块加载时即创建实例等副作用） */
+export function getDelayManager(): DelayManager {
+  if (!_instance) {
+    _instance = new DelayManager()
+  }
+  return _instance
+}

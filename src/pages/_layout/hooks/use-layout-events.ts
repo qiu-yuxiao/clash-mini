@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 import { useListen } from '@/hooks/use-listen'
-import delayManager from '@/services/delay'
+import { getDelayManager } from '@/services/delay'
 import { queryClient } from '@/services/query-client'
 
 export const useLayoutEvents = (
@@ -77,7 +77,7 @@ export const useLayoutEvents = (
         'verge://backend-delay-results',
         ({ payload }) => {
           if (payload.results && payload.results.length > 0) {
-            delayManager.injectBatchResults(payload.group, payload.results)
+            getDelayManager().injectBatchResults(payload.group, payload.results)
           }
         },
       ),

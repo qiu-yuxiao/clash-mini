@@ -1,4 +1,4 @@
-import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
+import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 
 // default | delay | alphabet
@@ -66,8 +66,8 @@ function sortProxies(
     }
 
     list.sort((a, b) => {
-      const ad = delayManager.getDelayFix(a, groupName)
-      const bd = delayManager.getDelayFix(b, groupName)
+      const ad = getDelayManager().getDelayFix(a, groupName)
+      const bd = getDelayManager().getDelayFix(b, groupName)
       const [ar, av] = categorizeDelay(ad)
       const [br, bv] = categorizeDelay(bd)
 

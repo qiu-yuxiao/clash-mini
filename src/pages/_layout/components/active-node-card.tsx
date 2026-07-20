@@ -14,7 +14,7 @@ import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useProxiesData } from '@/providers/app-data-context'
 import { getProxyAddr } from '@/services/cmds'
-import delayManager, { NODE_DELAY_MAX_MS } from '@/services/delay'
+import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
 import type { IProxyItem } from '@/types/clash'
 import { get3DCardStyle } from '@/utils/button-styles'
@@ -47,7 +47,7 @@ export const ActiveNodeStatusCard = () => {
 
   const [delay, setDelay] = useState(() => {
     if (!activeNodeName || !primaryGroup?.name || !activeNodeRecord) return -1
-    return delayManager.getDelayFix(activeNodeRecord, primaryGroup.name)
+    return getDelayManager().getDelayFix(activeNodeRecord, primaryGroup.name)
   })
 
   const hasRecord = !!activeNodeRecord
@@ -61,14 +61,14 @@ export const ActiveNodeStatusCard = () => {
     const record = activeNodeRecordRef.current
     if (!activeNodeName || !primaryGroup?.name || !record) return
 
-    setDelay(delayManager.getDelayFix(record, primaryGroup.name))
+    setDelay(getDelayManager().getDelayFix(record, primaryGroup.name))
 
     const handler = (update: { delay: number }) => {
       setDelay(update.delay)
     }
-    delayManager.setListener(activeNodeName, primaryGroup.name, handler)
+    getDelayManager().setListener(activeNodeName, primaryGroup.name, handler)
     return () => {
-      delayManager.removeListener(activeNodeName, primaryGroup.name)
+      getDelayManager().removeListener(activeNodeName, primaryGroup.name)
     }
   }, [activeNodeName, primaryGroup?.name, hasRecord])
 
@@ -105,13 +105,13 @@ export const ActiveNodeStatusCard = () => {
     if (!activeNodeName || !primaryGroup?.name) return
     setTesting(true)
     try {
-      const res = await delayManager.checkDelay(
+      const res = await getDelayManager().checkDelay(
         activeNodeName,
         primaryGroup.name,
         singleTestTimeout,
       )
       setDelay(res.delay)
-      delayManager.queueGroupNotification(primaryGroup.name)
+      getDelayManager().queueGroupNotification(primaryGroup.name)
     } catch (err) {
       console.error(err)
     } finally {
@@ -158,7 +158,7 @@ export const ActiveNodeStatusCard = () => {
     for (let i = 1; i <= len; i++) {
       const checkIndex = (currentIndex + i) % len
       const node = currentCandidateNodes[checkIndex]
-      const delay = delayManager.getDelayFix(node, primaryGroup.name)
+      const delay = getDelayManager().getDelayFix(node, primaryGroup.name)
       const isTimeout = delay === 0 || delay >= latencyTimeout
 
       if (!isTimeout) {
@@ -291,7 +291,7 @@ export const ActiveNodeStatusCard = () => {
             testing || delay === -2
               ? t('settings.mini.statusTesting', { defaultValue: '测试中' }) +
                 '...'
-              : delayManager.formatDelay(delay, latencyTimeout)
+              : getDelayManager().formatDelay(delay, latencyTimeout)
           }
           color={delayColor}
           onClick={handleTestDelay}
