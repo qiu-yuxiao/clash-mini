@@ -42,8 +42,11 @@ export function withIpcTimeout<T>(
   ms: number,
   label = 'IPC',
 ): Promise<T> {
+  let settled = false
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
       const msg = `[${label}] IPC call timed out after ${ms}ms`
       console.error(msg)
       showNotice.error(msg)
@@ -52,10 +55,17 @@ export function withIpcTimeout<T>(
 
     promise.then(
       (val) => {
+        if (settled) return
+        settled = true
         clearTimeout(timer)
         resolve(val)
       },
       (err) => {
+        if (settled) {
+          console.warn(`[${label}] IPC 调用在超时后才失败，错误已被丢弃:`, err)
+          return
+        }
+        settled = true
         clearTimeout(timer)
         reject(err)
       },
@@ -348,7 +358,12 @@ export async function getClashLogs() {
     if (result2) {
       const [_, time, type, payload] = result2
       acc.push({ time, type, payload })
+      return acc
     }
+
+    // 两种正则都不匹配时，保留原始日志而非静默丢弃
+    console.warn('[getClashLogs] 无法解析的日志行:', log)
+    acc.push({ time: dayjs().format('MM-DD HH:mm:ss'), type: 'unknown', payload: log })
     return acc
   }, [])
 }
