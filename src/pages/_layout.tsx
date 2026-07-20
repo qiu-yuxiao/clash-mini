@@ -20,7 +20,6 @@ import {
 } from '@mui/material'
 import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import {
   check,
@@ -372,21 +371,7 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFn>>(
   {} as Record<OrderKey, OrderFn>,
 )
 
-interface GithubAsset {
-  name: string
-  browser_download_url: string
-}
-
-interface GithubRelease {
-  tag_name: string
-  assets: GithubAsset[]
-}
-
-interface CoreUpgradeProgressPayload {
-  status: string
-  progress?: number
-  message?: string
-}
+import { useCoreUpdate } from './hooks/use-core-update'
 
 const Layout = () => {
   // Active Skin State
@@ -470,14 +455,17 @@ const Layout = () => {
   const [clientProgressMessage, setClientProgressMessage] = useState('')
   const [clientCheckLoading, setClientCheckLoading] = useState(false)
 
-  // Core Update states
-  const [coreUpdateOpen, setCoreUpdateOpen] = useState(false)
-  const [coreUpdateRelease, setCoreUpdateRelease] =
-    useState<GithubRelease | null>(null)
-  const [coreUpgradeStatus, setCoreUpgradeStatus] = useState<string>('idle')
-  const [coreUpgradeProgress, setCoreUpgradeProgress] = useState<number>(0)
-  const [coreUpgradeMessage, setCoreUpgradeMessage] = useState<string>('')
-  const [coreCheckLoading, setCoreCheckLoading] = useState(false)
+  const {
+    coreUpdateOpen,
+    setCoreUpdateOpen,
+    coreUpdateRelease,
+    coreUpgradeStatus,
+    coreUpgradeProgress,
+    coreUpgradeMessage,
+    coreCheckLoading,
+    handleCoreCheck,
+    handleCoreUpgrade,
+  } = useCoreUpdate({ coreVersion, mutateVersion, setHelpAnchorEl })
 
   const handleDepthFactorChange = (val: number) => {
     setDepthFactor(val)
@@ -773,34 +761,6 @@ const Layout = () => {
       .catch((err) => console.error('Failed to get app version:', err))
   }, [])
 
-  useEffect(() => {
-    let active = true
-    const unlistenPromise = listen<CoreUpgradeProgressPayload>(
-      'core-upgrade-progress',
-      (event) => {
-        if (!active) return
-        const payload = event.payload
-        setCoreUpgradeStatus(payload.status)
-        setCoreUpgradeProgress(payload.progress ?? 0)
-        setCoreUpgradeMessage(payload.message ?? '')
-        if (payload.status === 'done') {
-          showNotice.success('Mihomo 内核更新成功')
-          mutateVersion()
-        } else if (payload.status === 'error') {
-          showNotice.error(`内核更新失败: ${payload.message}`)
-        }
-      },
-    )
-    return () => {
-      active = false
-      unlistenPromise
-        .then((unlisten) => unlisten())
-        .catch((err) =>
-          console.warn('Failed to unlisten from core-upgrade-progress:', err),
-        )
-    }
-  }, [mutateVersion])
-
   const handleHelpClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setHelpAnchorEl(event.currentTarget)
   }
@@ -884,58 +844,6 @@ const Layout = () => {
       const errMsg = err instanceof Error ? err.message : String(err)
       setClientProgressMessage(`更新失败: ${errMsg}`)
       showNotice.error(`更新失败: ${errMsg}`)
-    }
-  }
-
-  const handleCoreCheck = async () => {
-    setCoreCheckLoading(true)
-    setHelpAnchorEl(null)
-    try {
-      const release = await invoke<GithubRelease>('check_core_update')
-      if (isSameVersion(coreVersion, release.tag_name)) {
-        showNotice.info('当前内核已是最新版本')
-        return
-      }
-      setCoreUpdateRelease(release)
-      setCoreUpdateOpen(true)
-      setCoreUpgradeStatus('idle')
-      setCoreUpgradeProgress(0)
-      setCoreUpgradeMessage('')
-    } catch (err: unknown) {
-      console.error('Failed to check for core update:', err)
-      showNotice.error(
-        `检查内核更新失败: ${err instanceof Error ? err.message : String(err)}`,
-      )
-    } finally {
-      setCoreCheckLoading(false)
-    }
-  }
-
-  const handleCoreUpgrade = async () => {
-    if (
-      coreUpdateRelease &&
-      isSameVersion(coreVersion, coreUpdateRelease.tag_name)
-    ) {
-      showNotice.info('当前内核已是最新版本')
-      setCoreUpdateOpen(false)
-      return
-    }
-    if (!coreUpdateRelease) return
-    setCoreUpgradeStatus('checking')
-    setCoreUpgradeProgress(0)
-    setCoreUpgradeMessage('正在启动内核升级任务...')
-    try {
-      await withIpcTimeout(
-        invoke('start_core_upgrade', { release: coreUpdateRelease }),
-        5 * 60 * 1000,
-        'start_core_upgrade',
-      )
-    } catch (err: unknown) {
-      console.error('Failed to start core upgrade:', err)
-      setCoreUpgradeStatus('error')
-      const errMsg = err instanceof Error ? err.message : String(err)
-      setCoreUpgradeMessage(`启动失败: ${errMsg}`)
-      showNotice.error(`启动内核升级失败: ${errMsg}`)
     }
   }
 
