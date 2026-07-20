@@ -581,7 +581,10 @@ impl CoreUpdater {
         // Start core — 仅在未退出时执行，退出流程会自行处理
         if !Handle::global().is_exiting() {
             if let Err(e) = CoreManager::global().start_core().await {
-                logging!(warn, Type::System, "Core updater: 升级后重启 core 失败: {}", e);
+                logging!(error, Type::System, "Core updater: 升级后重启 core 失败: {}", e);
+                // 二进制已成功替换但 core 启动失败，向前端报告真实错误而非假成功
+                emit_progress("error", 0, &format!("内核二进制已更新，但重启失败: {}。请手动重启 Clash Mini。", e));
+                return Err(anyhow::anyhow!("start_core failed after upgrade: {}", e));
             }
             // 【v2.6.5 隐患 B 修复】升级成功后恢复 PROXY 组节点选择
             // 升级替换了二进制，cache.yaml 可能因格式不兼容/丢失/损坏而失效，

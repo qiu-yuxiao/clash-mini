@@ -169,6 +169,12 @@ class DelayManager {
     debugLog('[DelayManager] 已清空 urlMap 缓存')
   }
 
+  /** 清空节点延迟值缓存，用于 Profile 切换时避免同名节点复用旧 Profile 的延迟数据 */
+  clearCache() {
+    this.cache.clear()
+    debugLog('[DelayManager] 已清空延迟缓存')
+  }
+
   setListener(
     name: string,
     group = 'PROXY',
