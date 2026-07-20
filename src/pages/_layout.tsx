@@ -20,7 +20,6 @@ import {
 } from '@mui/material'
 import { getVersion as getAppVersion } from '@tauri-apps/api/app'
 import { invoke } from '@tauri-apps/api/core'
-import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -368,6 +367,7 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFn>>(
 import { useCoreUpdate } from './hooks/use-core-update'
 import { useClientUpdate } from './hooks/use-client-update'
 import { useSkinControls } from './hooks/use-skin-controls'
+import { useImportContextMenu } from './hooks/use-import-context-menu'
 
 const Layout = () => {
   // Active Skin State — managed by useSkinControls
@@ -439,113 +439,16 @@ const Layout = () => {
   const [url, setUrl] = useState('')
   const [profileLoading, setProfileLoading] = useState(false)
 
-  // Context Menu State for Import Subscription Input Field (BUG-091)
-  const [importInputContextMenu, setImportInputContextMenu] = useState<{
-    mouseX: number
-    mouseY: number
-  } | null>(null)
-  const importInputRef = useRef<HTMLInputElement>(null)
-
-  const handleImportInputPaste = async () => {
-    setImportInputContextMenu(null)
-    let textToPaste = ''
-    try {
-      textToPaste = await readText()
-    } catch {
-      try {
-        textToPaste = await navigator.clipboard.readText()
-      } catch (e) {
-        console.error('Failed to read from clipboard:', e)
-      }
-    }
-
-    if (!textToPaste) return
-
-    const input = importInputRef.current
-    if (input) {
-      const start = input.selectionStart ?? 0
-      const end = input.selectionEnd ?? 0
-      const currentVal = url || ''
-      const newValue =
-        currentVal.substring(0, start) + textToPaste + currentVal.substring(end)
-      setUrl(newValue)
-      setTimeout(() => {
-        input.focus()
-        const newCursorPos = start + textToPaste.length
-        input.setSelectionRange(newCursorPos, newCursorPos)
-      }, 0)
-    } else {
-      setUrl(textToPaste)
-    }
-  }
-
-  const handleImportInputCopy = async () => {
-    setImportInputContextMenu(null)
-    const input = importInputRef.current
-    if (input) {
-      const start = input.selectionStart ?? 0
-      const end = input.selectionEnd ?? 0
-      const selectedText = (url || '').substring(start, end)
-      if (selectedText) {
-        try {
-          await writeText(selectedText)
-        } catch {
-          try {
-            await navigator.clipboard.writeText(selectedText)
-          } catch (e) {
-            console.error('Failed to copy to clipboard:', e)
-          }
-        }
-      }
-    }
-  }
-
-  const handleImportInputCut = async () => {
-    setImportInputContextMenu(null)
-    const input = importInputRef.current
-    if (input) {
-      const start = input.selectionStart ?? 0
-      const end = input.selectionEnd ?? 0
-      const currentVal = url || ''
-      const selectedText = currentVal.substring(start, end)
-      if (selectedText) {
-        try {
-          await writeText(selectedText)
-        } catch {
-          try {
-            await navigator.clipboard.writeText(selectedText)
-          } catch (e) {
-            console.error('Failed to copy to clipboard:', e)
-          }
-        }
-        const newValue =
-          currentVal.substring(0, start) + currentVal.substring(end)
-        setUrl(newValue)
-        setTimeout(() => {
-          input.focus()
-          input.setSelectionRange(start, start)
-        }, 0)
-      }
-    }
-  }
-
-  const handleImportInputSelectAll = () => {
-    setImportInputContextMenu(null)
-    const input = importInputRef.current
-    if (input) {
-      input.focus()
-      input.setSelectionRange(0, (url || '').length)
-    }
-  }
-
-  const handleImportInputClear = () => {
-    setImportInputContextMenu(null)
-    setUrl('')
-    const input = importInputRef.current
-    if (input) {
-      input.focus()
-    }
-  }
+  const {
+    importInputContextMenu,
+    setImportInputContextMenu,
+    importInputRef,
+    handlePaste: handleImportInputPaste,
+    handleCopy: handleImportInputCopy,
+    handleCut: handleImportInputCut,
+    handleSelectAll: handleImportInputSelectAll,
+    handleClear: handleImportInputClear,
+  } = useImportContextMenu({ url, setUrl })
 
   // Context Menu State for Profile Card (BUG-072)
   const [profileMenuAnchorPosition, setProfileMenuAnchorPosition] = useState<{
