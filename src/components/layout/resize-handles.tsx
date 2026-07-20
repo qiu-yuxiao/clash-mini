@@ -158,22 +158,25 @@ export const ResizeHandles: React.FC = () => {
         const needsSize = w !== null || h !== null
         const needsPos = x !== null || y !== null
         if (!needsSize && !needsPos) return
-        if (needsSize) {
-          await currentWindow.setSize(
-            new LogicalSize(
-              w ?? session.startPhysW / session.scaleFactor,
-              h ?? session.startPhysH / session.scaleFactor,
-            ),
-          )
-        }
-        if (needsPos) {
-          await currentWindow.setPosition(
-            new LogicalPosition(
-              x ?? session.startPhysX / session.scaleFactor,
-              y ?? session.startPhysY / session.scaleFactor,
-            ),
-          )
-        }
+        // 并行发 IPC：setSize 和 setPosition 之间无依赖，合并为一个往返
+        await Promise.all([
+          needsSize
+            ? currentWindow.setSize(
+                new LogicalSize(
+                  w ?? session.startPhysW / session.scaleFactor,
+                  h ?? session.startPhysH / session.scaleFactor,
+                ),
+              )
+            : Promise.resolve(),
+          needsPos
+            ? currentWindow.setPosition(
+                new LogicalPosition(
+                  x ?? session.startPhysX / session.scaleFactor,
+                  y ?? session.startPhysY / session.scaleFactor,
+                ),
+              )
+            : Promise.resolve(),
+        ])
       } catch (err) {
         frontendLog(
           'error',
