@@ -63,7 +63,9 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
       // Mini 单组架构：selected 数组仅含 PROXY 一条
       patchCurrent({ selected: [{ name: 'PROXY', now: proxyName }] }).catch(
         (error) => {
-          console.error('[ProxySelection] 保存代理选择失败:', error)
+          const msg = `[ProxySelection] 保存代理选择失败: ${error instanceof Error ? error.message : String(error)}`
+          console.error(msg)
+          reportError(new Error(msg))
         },
       )
     },
