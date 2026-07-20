@@ -51,13 +51,20 @@ export const useVerge = () => {
       } catch (err) {
         showNotice.error(err)
         throw err
-      } finally {
-        // M2-11: refetch 失败时警告状态可能不一致
+      }
+
+      // refetch 确保前端状态与后端一致；失败时重试 3 次（间隔 1s/2s/4s）
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           await mutateVerge()
+          return
         } catch (refetchErr) {
-          console.error('[useVerge] refetch 失败，前端状态可能与后端不一致:', refetchErr)
-          showNotice.error('配置已更新但刷新失败，状态可能不一致，请重启应用')
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1000 << attempt))
+          } else {
+            console.error('[useVerge] refetch 3 次均失败:', refetchErr)
+            showNotice.error('配置已更新但刷新失败，状态可能不一致，请重启应用')
+          }
         }
       }
     },
