@@ -64,11 +64,15 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     let initial_script = build_window_initial_script(initial_theme_mode, DARK_BACKGROUND_HEX, LIGHT_BACKGROUND_HEX);
 
+    let (win_w, win_h) = crate::utils::window_manager::restore_window_size()
+        .await
+        .unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
+
     let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(start_page.into()))
         .center()
         .decorations(DEFAULT_DECORATIONS)
         .fullscreen(false)
-        .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        .inner_size(win_w, win_h)
         .max_inner_size(MAX_WIDTH, MAX_HEIGHT)
         .min_inner_size(MINIMAL_WIDTH, MINIMAL_HEIGHT)
         .visible(false)
@@ -132,7 +136,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             #[cfg(target_os = "windows")]
             {
                 strip_caption_style(&window);
-                force_set_window_outer_size(&window, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+                force_set_window_outer_size(&window, win_w, win_h);
             }
 
             // 超时兜底：如果页面加载超时（默认 10 秒），强制显示窗口

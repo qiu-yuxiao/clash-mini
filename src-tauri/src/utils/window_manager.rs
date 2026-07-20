@@ -1,5 +1,6 @@
 use crate::{core::handle, utils::resolve::window::build_new_window};
 use clash_verge_logging::{Type, logging};
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -101,6 +102,41 @@ fn should_handle_window_operation(op_type: WindowOpType) -> bool {
             }
         })
         .is_ok()
+}
+
+/// 持久化的窗口尺寸（退出轻量模式 / 重启时恢复上一次尺寸）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WindowSizeState {
+    width: f64,
+    height: f64,
+}
+
+/// 保存当前窗口 outer 尺寸到 app 数据目录的 `window_state.json`
+async fn save_window_size(width: f64, height: f64) {
+    let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
+        return;
+    };
+    let path = home.join("window_state.json");
+    let state = WindowSizeState { width, height };
+    if let Ok(json) = serde_json::to_string(&state) {
+        let _ = tokio::fs::write(&path, json).await;
+    }
+}
+
+/// 读取上次保存的窗口尺寸，失败或不存在返回 None
+pub async fn restore_window_size() -> Option<(f64, f64)> {
+    let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
+        return None;
+    };
+    let path = home.join("window_state.json");
+    let content = tokio::fs::read_to_string(&path).await.ok()?;
+    let state: WindowSizeState = serde_json::from_str(&content).ok()?;
+    // 兜底：保存值必须大于最小值，防止异常数据导致窗口不可交互
+    if state.width >= 200.0 && state.height >= 200.0 {
+        Some((state.width, state.height))
+    } else {
+        None
+    }
 }
 
 /// 统一的窗口管理器
@@ -415,6 +451,20 @@ impl WindowManager {
         let Some(window) = Self::get_main_window() else {
             return WindowOperationResult::NoAction;
         };
+
+        // 销毁前保存当前窗口尺寸，供下次创建窗口时恢复
+        if let Ok(size) = window.outer_size() {
+            let scale = window
+                .current_monitor()
+                .ok()
+                .flatten()
+                .map(|m| m.scale_factor())
+                .unwrap_or(1.0);
+            save_window_size(
+                size.width as f64 / scale,
+                size.height as f64 / scale,
+            ).await;
+        }
 
         let app_handle = handle::Handle::app_handle();
         let label = window.label().to_string();
