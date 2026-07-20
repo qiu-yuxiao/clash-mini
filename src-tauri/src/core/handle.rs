@@ -29,7 +29,10 @@ impl Handle {
 
     pub fn app_handle() -> &'static AppHandle {
         #[allow(clippy::expect_used)]
-        APP_HANDLE.get().expect("App handle not initialized")
+        APP_HANDLE.get().unwrap_or_else(|| {
+            tracing::error!("App handle accessed before Tauri setup completed — unrecoverable");
+            panic!("App handle not initialized")
+        })
     }
 
     pub async fn mihomo() -> RwLockReadGuard<'static, Mihomo> {

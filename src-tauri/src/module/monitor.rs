@@ -841,7 +841,14 @@ pub fn start_background_monitor() {
                 }
 
                 // 检测活动节点是否发生变化（包括自动选点和手动切换）
-                let active_node_name = get_active_node_name().await.unwrap_or_default();
+                let active_node_name = match get_active_node_name().await {
+                    Some(name) => name,
+                    None => {
+                        // API 不可达（内核崩了/未就绪）——静默跳过本次检测，不把空字符串
+                        // 当作"节点消失"写入日志，也不重置 last_active_node。
+                        continue;
+                    }
+                };
                 if Some(&active_node_name) != last_active_node.as_ref() {
                     logging!(
                         info,
