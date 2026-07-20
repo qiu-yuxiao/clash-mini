@@ -1870,3 +1870,27 @@ if !lightweight::exit_lightweight_mode().await {
 
 #### 验证
 - cargo check：退出码 0，编译通过。
+
+### v2.6.6 事后修复：恢复后台监测的即时活跃节点探活 (2026-07-20)
+
+#### 问题根因
+
+v2.6.2 引入的 `node-health-architecture.md` 设计将活跃节点健康检测从旧 `delay_proxy_by_name`（每 15 秒直接探活）替换为依赖测量组 `PROXY__METRICS`（url-test，interval=300 秒）的 `history.last()` 缓存。旧机制在 TUN 下因自指回环不可靠，替换是正确的；但替换后 `evaluate_failover` 在每次 15 秒检测周期中仅读取 300 秒才刷新一次的陈旧数据，活跃节点在两次 url-test 之间死亡时，检测线程在长达 5 分钟内不会触发防断流切换。
+
+实际故障案例（2026-07-20）：自动选点选中 日本aw1（95ms），aw1 在测量组下一轮刷新前死亡，后台连续 27 分钟未触发自愈，用户发现 YouTube 不可用。
+
+#### 修复实现
+
+在 `evaluate_failover` 中，**每次评估前先调用 `mihomo.delay_group("PROXY__METRICS")` 触发一次即时 url-test**，强制刷新测量组所有成员的健康数据，确保紧接着读取的 `proxy.alive` 与 `history.last()` 反映当前真实状态。
+
+- **为什么仍然是 TUN 安全的**：`delay_group` 沿用的仍是 Mihomo 内核内部拨测路径，不是旧的 `delay_proxy_by_name` 自指回环。测量组本身即为 TUN 安全设计，即时刷新只加速了周期，没换测量源。
+- **为什么没有引入性能问题**：`delay_group` 单次耗时约 1~3 秒（14 个节点各发一次 HTTP HEAD），在 15 秒后台周期中完全可接受，且只有监测线程阻塞，不阻塞 UI。
+
+#### 影响文件
+
+- `src-tauri/src/module/monitor.rs` — `evaluate_failover` 函数新增即时 url-test 触发
+
+#### 验证
+
+- cargo check：退出码 0，编译通过。
+- 逻辑验证：`delay_group` 调用在 dummy-node 快速返回之后、健康状态判定之前，不影响假节点秒级识别路径。

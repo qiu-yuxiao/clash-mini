@@ -330,6 +330,10 @@ fn node_status(proxy: &tauri_plugin_mihomo::models::Proxy) -> NodeStatus {
 
 /// 评估当前活跃节点是否需要故障转移。
 /// 返回 Err 表示 Mihomo API 不可达（交由调用方累计 api_error_count）。
+///
+/// 每一次评估前先对测量组 PROXY__METRICS 发起一次即时 url-test（内核内部拨测，TUN 下可靠），
+/// 确保活跃节点的 `history.last()` 与 `alive` 标志反映最新真实状态，
+/// 而非依赖测量组 300 秒自然周期的陈旧缓存。
 async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
@@ -343,10 +347,21 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         _ => return Ok(FailoverVerdict::NoAction), // 直连/拒绝节点或无选中，不动作
     };
 
-    // 假/广告节点 → 视为需要重选
+    // 假/广告节点 → 视为需要重选（无需等 url-test）
     if is_dummy_node(&active_node) {
         return Ok(FailoverVerdict::ShouldFailover);
     }
+
+    // 【v2.6.6 修复】在读取历史健康数据之前，先对测量组触发一次即时 url-test，
+    // 确保 proxy.alive 与 proxy.history.last() 反映的是当前真实状态，
+    // 而非 300 秒前测量组自然周期的陈旧缓存。
+    // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
+    // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
+    let test_url = get_test_url().await;
+    let _ = mihomo
+        .delay_group("PROXY__METRICS", &test_url, NODE_DELAY_MAX_MS)
+        .await
+        .unwrap_or_default();
 
     let proxies = mihomo
         .get_proxies()
