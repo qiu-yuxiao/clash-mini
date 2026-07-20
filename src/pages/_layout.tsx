@@ -37,9 +37,7 @@ import { NoticeManager } from '@/components/layout/notice-manager'
 import { ResizeHandles } from '@/components/layout/resize-handles'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
-import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useHeadStateNew } from '@/components/proxy/use-head-state'
-import type { HeadState } from '@/components/proxy/use-head-state'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
@@ -61,14 +59,13 @@ import {
   isPortInUse,
   patchClashMode,
   getProfiles,
-  calcuProxies,
   patchClashConfig,
   patchProfile,
   viewProfile,
   restartCore,
   triggerAutoSelect,
 } from '@/services/cmds'
-import { getDelayManager, NODE_DELAY_MAX_MS, NODE_DELAY_MIN_MS } from '@/services/delay'
+import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import {
   closeAllConnectionsWithTimeout,
   getProxyByNameWithTimeout,
@@ -78,7 +75,6 @@ import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
-import { isDummyNode } from '@/utils/node'
 
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
