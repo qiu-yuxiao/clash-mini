@@ -1,6 +1,6 @@
 {
-  "version": "2.6.6",
-  "notes": "Clash Mini v2.6.6",
+  "version": "2.6.7",
+  "notes": "Clash Mini v2.6.7 — 即时探活修复 5 分钟防断流盲区",
   "pub_date": "2026-07-20T10:57:50.740Z",
   "platforms": {
     "windows-x86_64": {
