@@ -6,6 +6,7 @@ use crate::core::service::{SERVICE_MANAGER, ServiceStatus};
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
+use tauri_plugin_mihomo::Mihomo;
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
@@ -313,44 +314,52 @@ impl CoreManager {
                     e
                 );
                 // 读取用户保存的 filterText，在子集范围内选点兜底
-                let filter_lower = match Config::profiles().await.latest_arc().current.as_ref() {
-                    Some(current_uid) => {
-                        let path = crate::utils::dirs::app_home_dir()
-                            .map(|d| d.join("proxy_head_state.json"))
-                            .ok();
-                        match path {
-                            Some(p) => tokio::fs::read_to_string(&p)
-                                .await
-                                .ok()
-                                .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok())
-                                .and_then(|v| {
-                                    v[current_uid.as_str()]["PROXY"]["filterText"]
-                                        .as_str()
-                                        .map(|s| s.trim().to_lowercase())
-                                })
-                                .unwrap_or_default(),
-                            None => String::new(),
-                        }
-                    }
-                    None => String::new(),
-                };
-                if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
-                    if let Some(all) = group_info.all {
-                        // 过滤广告/假节点，避免回退到伪节点触发自愈死循环
-                        let fallback_node = all
-                            .iter()
-                            .filter(|n| !crate::utils::node::is_dummy_node(n))
-                            .find(|n| filter_lower.is_empty() || n.to_lowercase().contains(&filter_lower))
-                            .or_else(|| all.iter().find(|n| !crate::utils::node::is_dummy_node(n)));
-                        if let Some(fb) = fallback_node {
-                            match mihomo.select_node_for_group("PROXY", fb).await {
-                                Ok(()) => logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb),
-                                Err(e2) => logging!(warn, Type::Core, "PROXY 组回退节点选择也失败: {}", e2),
-                            }
-                        }
-                    }
-                }
+                let filter_lower = read_filter_text().await;
+                select_fallback_in_subset(&mihomo, &filter_lower).await;
             }
+        }
+    }
+}
+
+/// 从 proxy_head_state.json 读取当前 profile 的 PROXY 组 filterText
+async fn read_filter_text() -> String {
+    let current_uid = match Config::profiles().await.latest_arc().current.as_ref() {
+        Some(uid) => uid.clone(),
+        None => return String::new(),
+    };
+    let Some(path) = crate::utils::dirs::app_home_dir()
+        .ok()
+        .map(|d| d.join("proxy_head_state.json"))
+    else {
+        return String::new();
+    };
+    let Some(content) = tokio::fs::read_to_string(&path).await.ok() else {
+        return String::new();
+    };
+    let Some(value) = serde_json::from_str::<serde_json::Value>(&content).ok() else {
+        return String::new();
+    };
+    value[current_uid.as_str()]["PROXY"]["filterText"]
+        .as_str()
+        .map(|s| s.trim().to_lowercase())
+        .unwrap_or_default()
+}
+
+/// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底
+async fn select_fallback_in_subset(mihomo: &Mihomo, filter_lower: &str) {
+    let Ok(group_info) = mihomo.get_group_by_name("PROXY").await else {
+        return;
+    };
+    let Some(all) = group_info.all else { return };
+    let fallback = all
+        .iter()
+        .filter(|n| !crate::utils::node::is_dummy_node(n))
+        .find(|n| filter_lower.is_empty() || n.to_lowercase().contains(filter_lower))
+        .or_else(|| all.iter().find(|n| !crate::utils::node::is_dummy_node(n)));
+    if let Some(fb) = fallback {
+        match mihomo.select_node_for_group("PROXY", fb).await {
+            Ok(()) => logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb),
+            Err(e) => logging!(warn, Type::Core, "PROXY 组回退节点选择也失败: {}", e),
         }
     }
 }

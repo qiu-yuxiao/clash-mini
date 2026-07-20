@@ -985,22 +985,14 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 
 ### 4.2 连接清理与订阅熔断
 
-为了降低程序在轻量模式下后台挂机时，由之前网页浏览遗留的活动或空闲 TCP 连接对系统套接字及内核内存的持续占用，制定以下规范：
-
-- **瞬间触发垃圾回收 (GC)**：
-  - 进入轻量模式后，必须立即异步向内核发出命令，物理强制切断所有活跃与空闲网络连接。
-  - 这将在外壳关闭销毁的瞬间，向内核发出物理清空命令，物理强制切断并关闭当前所有的活跃与空闲网络连接。
-- **低功耗运行状态**：
-  - 清空连接的操作不影响任何已确立的代理端口存活和系统的路由分发，但可以彻底促使 `mini-mihomo` 核心快速释放物理套接字句柄和已分配的通信内存缓冲区，使其与外壳同步进入真正的低耗能后台状态。
-
-为了消除主窗口关闭物理销毁后，Rust 后端依然对内核持续推送的数据事件（如网速、日志、连接明细等）进行无用的反序列化和 IPC 消息管道消耗，制定以下规范：
+进入轻量模式后，**不断开已建立的网络连接**（用户铁律：切节点/轻量模式进入均不断链），仅清理以下 Rust 后端开销：
 
 - **主动熔断 WebSocket 常驻订阅**：
   - 进入轻量模式后，必须立即强行断开并清理所有前端的 WebSocket 实时流通道（包括流量、日志、连接等），彻底截断内核到前端的数据分发链路。
-  - 此项操作将强行断开并清理 Rust 侧插件状态中保存的所有由前端调用的 WebSocket 实时流通道（包括流量 `/traffic`、日志 `/logs`、连接 `/connections` 等），彻底截断内核到外壳的数据分发链路。
+  - 此项操作将强行断开并清理 Rust 侧插件状态中保存的所有由前端调用的 WebSocket 实时流通道（包括流量 `/traffic`、日志 `/logs`、连接 `/connections` 等），截断内核到外壳的数据分发链路，使 CPU 和内存消耗降为零。
 - **UI 生命周期自动恢复机制**：
   - Rust 侧的订阅清理不需要在退出轻量模式时进行手动重建，因为主窗口重建挂载时，前端 React 组件自身的挂载逻辑（`useEffect`）会自动向 Tauri 后端发送新的 WS 建立指令。
-  - 该机制不仅能在外壳处于轻量后台时将 CPU 消耗和内存吞吐减少到绝对的 `0.0%`，又能保证窗口唤醒时数据流无感瞬间重连。
+  - 该机制既能在外壳处于轻量后台时将 CPU 消耗和内存吞吐降到最低，又能保证窗口唤醒时数据流无感瞬间重连。
 
 ### 4.3 监测周期自适应
 
@@ -1061,7 +1053,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
   - 原因：旧代码把 `Err` 假设为"内核重载中"的短暂现象，只输出 `debug` 日志且不计数不触发自愈。当 mihomo 内核卡死（非重载）时，API 持续不可达，监测线程彻底失效，导致轻量模式下代理断流 12 分钟无法自愈。
 - **轻量模式唤醒不得触发内核 force=true 重置**：
   - 轻量模式进入/退出本质上是前端 UI 状态切换（窗口销毁/重建），内核应继续为系统提供代理服务，不得被重置。
-  - 后端 `lightweight.rs` 的 `entry_lightweight_mode` / `exit_lightweight_mode` 不得调用任何 `update_config` / `reload_config`；只允许 `close_all_connections`（关闭已建立连接，保留 dialer 状态）和 `clear_all_ws_connections`（熔断前后端 WS 订阅）。
+  - 后端 `lightweight.rs` 的 `entry_lightweight_mode` / `exit_lightweight_mode` 不得调用任何 `update_config` / `reload_config`；只允许 `clear_all_ws_connections`（熔断前后端 WS 订阅）。
   - 前端 `_layout.tsx` 的 profile 增强 useEffect 必须能区分"profile 切换"与"窗口重建"两种场景。由于 `useRef` 在 React 重新挂载时会重置，无法区分二者，必须使用 `localStorage` 持久化"已 enhance 过的 profile uid"（key: `clash-mini-last-enhanced-uid`）：
     - **永不清除该 key**，localStorage 的持久化特性确保跨窗口重建保留状态。
     - enhance 成功后才写入该 key，防止失败时下次跳过。
@@ -1458,7 +1450,7 @@ Retro-3D（Trump-3D）深色模式下 `get3DCardStyle` 生成的 `default` 类�
 - **状态机 CAS 迁移与日志隔离**：所有轻量模式状态转换必须通过原子 `compare_exchange` (CAS) 实现。删除 `record_state_and_log` 中非原子的 raw `store` 写入，将其与状态变更合并至统一 `transition_and_log` 辅助函数中，防止在快速、高频托盘切换时，各分支回滚覆写。
 - **静默启动销毁行为适配**：当销毁主窗口发现其不存在时，后端在进入轻量模式时，必须将窗口已销毁和无需操作均视为成功，支持在开启静默启动时直接成功初始化后端轻量状态。
 - **窗口限流状态同步回滚**：当由于防抖限制导致窗口显示失败时，退出轻量模式不得将其当作成功，必须回滚状态机并中断退出。
-- **后台连接清理任务的生命周期活性判定**：在进入轻量模式而异步派生出的 `mihomo.close_all_connections()` 和 `clear_all_ws_connections()` 清理任务中，在每一处耗时异步操作前，必须进行 `is_in_lightweight_mode()` 判定。若用户在极短时间内重新激活/显示窗口退出轻量模式，该后台任务必须立即熔断返回，不得继续执行，避免误杀新连接。
+- **后台连接清理任务的生命周期活性判定**：在进入轻量模式而异步派生出的 `clear_all_ws_connections()` 清理任务中，在每一处耗时异步操作前，必须进行 `is_in_lightweight_mode()` 判定。若用户在极短时间内重新激活/显示窗口退出轻量模式，该后台任务必须立即熔断返回，不得继续执行。
 - **Web Worker 销毁与引用重置规范**：在 `use-traffic-monitor.ts` 的 `onerror` 降级逻辑中，必须在调用 `this.stop()` 之前，显式终止当前的 Worker 线程（`worker.terminate()`），清理消息回调，并将 `this.worker` 成员置为 `null`，防止下一次启动循环时由于残留非空引用而误用损坏的旧 Worker 实例。
 - **Web Worker 状态保持与采样控制**：
   - 在 `traffic.worker.ts` 的 `init` 消息处理中，只有在 `sampler` 实例不存在时（`if (!sampler)`）才新建实例，防止重入时覆盖历史采样。
