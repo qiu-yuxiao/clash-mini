@@ -154,6 +154,54 @@ impl PrfOption {
 
 const MAX_YAML_SIZE: usize = 50 * 1024 * 1024; // 50MB YAML 解析上限
 
+/// 合并后的增强项 ID 集合
+struct EnhanceItems {
+    merge: Option<String>,
+    script: Option<String>,
+    rules: Option<String>,
+    proxies: Option<String>,
+    groups: Option<String>,
+}
+
+/// 确保 merge / script / rules / proxies 子项都存在，缺失则自动创建。
+/// groups 只读返回不创建（阻止生成死 g*.yaml 文件）。
+async fn ensure_enhance_items(option: Option<&PrfOption>) -> Result<EnhanceItems> {
+    let mut merge = option.and_then(|o| o.merge.clone());
+    let mut script = option.and_then(|o| o.script.clone());
+    let mut rules = option.and_then(|o| o.rules.clone());
+    let mut proxies = option.and_then(|o| o.proxies.clone());
+    let groups = option.and_then(|o| o.groups.clone());
+
+    if merge.is_none() {
+        let merge_item = &mut PrfItem::from_merge(None)?;
+        profiles::profiles_append_item_safe(merge_item).await?;
+        merge = merge_item.uid.clone();
+    }
+    if script.is_none() {
+        let script_item = &mut PrfItem::from_script(None)?;
+        profiles::profiles_append_item_safe(script_item).await?;
+        script = script_item.uid.clone();
+    }
+    if rules.is_none() {
+        let rules_item = &mut PrfItem::from_rules()?;
+        profiles::profiles_append_item_safe(rules_item).await?;
+        rules = rules_item.uid.clone();
+    }
+    if proxies.is_none() {
+        let proxies_item = &mut PrfItem::from_proxies()?;
+        profiles::profiles_append_item_safe(proxies_item).await?;
+        proxies = proxies_item.uid.clone();
+    }
+
+    Ok(EnhanceItems {
+        merge,
+        script,
+        rules,
+        proxies,
+        groups,
+    })
+}
+
 impl PrfItem {
     /// From partial item
     /// must contain `itype`
@@ -199,32 +247,13 @@ impl PrfItem {
         let file = format!("{uid}.yaml").into();
         let opt_ref = option.as_ref();
         let update_interval = opt_ref.and_then(|o| o.update_interval);
-        let mut merge = opt_ref.and_then(|o| o.merge.clone());
-        let mut script = opt_ref.and_then(|o| o.script.clone());
-        let mut rules = opt_ref.and_then(|o| o.rules.clone());
-        let mut proxies = opt_ref.and_then(|o| o.proxies.clone());
-        let groups = opt_ref.and_then(|o| o.groups.clone());
-
-        if merge.is_none() {
-            let merge_item = &mut Self::from_merge(None)?;
-            profiles::profiles_append_item_safe(merge_item).await?;
-            merge = merge_item.uid.clone();
-        }
-        if script.is_none() {
-            let script_item = &mut Self::from_script(None)?;
-            profiles::profiles_append_item_safe(script_item).await?;
-            script = script_item.uid.clone();
-        }
-        if rules.is_none() {
-            let rules_item = &mut Self::from_rules()?;
-            profiles::profiles_append_item_safe(rules_item).await?;
-            rules = rules_item.uid.clone();
-        }
-        if proxies.is_none() {
-            let proxies_item = &mut Self::from_proxies()?;
-            profiles::profiles_append_item_safe(proxies_item).await?;
-            proxies = proxies_item.uid.clone();
-        }
+        let EnhanceItems {
+            merge,
+            script,
+            rules,
+            proxies,
+            groups,
+        } = ensure_enhance_items(option).await?;
         // groups is skipped to prevent creating dead g*.yaml files
         Ok(Self {
             uid: Some(uid),
@@ -250,160 +279,41 @@ impl PrfItem {
         })
     }
 
-    /// ## Remote type
-    /// create a new item from url
-    #[allow(clippy::cognitive_complexity)]
-    pub async fn from_url(
+    /// ## Direct node input
+    /// 直连节点输入（非 HTTP URL）——支持 clear/clean 清空、URI-list 解析、与已有节点合并
+    async fn from_url_direct(
         url: &str,
         name: Option<&String>,
-        desc: Option<&String>,
         option: Option<&PrfOption>,
     ) -> Result<Self> {
-        let is_direct_node_input = {
-            let url_lower = url.trim().to_ascii_lowercase();
-            !url_lower.starts_with("http://") && !url_lower.starts_with("https://")
-        };
+        let url_trimmed = url.trim();
+        let uid_str = "L_Direct_Imports".to_string();
+        let file_name = "L_Direct_Imports.yaml".to_string();
+        let path = dirs::app_profiles_dir()?.join(&file_name);
 
-        if is_direct_node_input {
-            let url_trimmed = url.trim();
-            let uid_str = "L_Direct_Imports".to_string();
-            let file_name = "L_Direct_Imports.yaml".to_string();
-            let path = dirs::app_profiles_dir()?.join(&file_name);
+        let mut final_mapping = Mapping::new();
+        final_mapping.insert(
+            serde_yaml_ng::Value::from("proxies"),
+            serde_yaml_ng::Value::from(Vec::<serde_yaml_ng::Value>::new()),
+        );
 
-            let mut final_mapping = Mapping::new();
-            final_mapping.insert(
-                serde_yaml_ng::Value::from("proxies"),
-                serde_yaml_ng::Value::from(Vec::<serde_yaml_ng::Value>::new()),
-            );
+        let EnhanceItems {
+            merge,
+            script,
+            rules,
+            proxies,
+            groups,
+        } = ensure_enhance_items(option).await?;
 
-            let mut merge = option.and_then(|o| o.merge.clone());
-            let mut script = option.and_then(|o| o.script.clone());
-            let mut rules = option.and_then(|o| o.rules.clone());
-            let mut proxies = option.and_then(|o| o.proxies.clone());
-            let groups = option.and_then(|o| o.groups.clone());
-
-            if merge.is_none() {
-                let merge_item = &mut Self::from_merge(None)?;
-                profiles::profiles_append_item_safe(merge_item).await?;
-                merge = merge_item.uid.clone();
-            }
-            if script.is_none() {
-                let script_item = &mut Self::from_script(None)?;
-                profiles::profiles_append_item_safe(script_item).await?;
-                script = script_item.uid.clone();
-            }
-            if rules.is_none() {
-                let rules_item = &mut Self::from_rules()?;
-                profiles::profiles_append_item_safe(rules_item).await?;
-                rules = rules_item.uid.clone();
-            }
-            if proxies.is_none() {
-                let proxies_item = &mut Self::from_proxies()?;
-                profiles::profiles_append_item_safe(proxies_item).await?;
-                proxies = proxies_item.uid.clone();
-            }
-            // groups is skipped to prevent creating dead g*.yaml files
-
-            if url_trimmed.eq_ignore_ascii_case("clear") || url_trimmed.eq_ignore_ascii_case("clean") {
-                let serialized = serde_yaml_ng::to_string(&final_mapping)
-                    .map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
-                fs::write(&path, serialized.as_bytes())
-                    .await
-                    .with_context(|| format!("failed to write to file \"{file_name}\""))?;
-
-                let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
-                let desc_str = "0".to_string();
-
-                return Ok(Self {
-                    uid: Some(uid_str.into()),
-                    itype: Some("local".into()),
-                    name: Some(name_str),
-                    desc: Some(desc_str.into()),
-                    file: Some(file_name.into()),
-                    url: None,
-                    selected: None,
-                    extra: None,
-                    option: Some(PrfOption {
-                        update_interval: None,
-                        merge,
-                        script,
-                        rules,
-                        proxies,
-                        groups,
-                        ..PrfOption::default()
-                    }),
-                    home: None,
-                    updated: Some(chrono::Local::now().timestamp()),
-                    file_data: Some(serialized.into()),
-                });
-            }
-
-            let parsed = match crate::utils::resolve::universal_parser::parse_uri_list(url) {
-                Some(p) => p,
-                None => bail!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"),
-            };
-
-            final_mapping = parsed;
-
-            if path.exists() {
-                if let Ok(content) = fs::read_to_string(&path).await {
-                    if let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content) {
-                        if let Some(existing_proxies_val) = existing_mapping.get_mut("proxies") {
-                            if let Some(existing_seq) = existing_proxies_val.as_sequence_mut() {
-                                if let Some(new_proxies_val) = final_mapping.get("proxies") {
-                                    if let Some(new_seq) = new_proxies_val.as_sequence() {
-                                        // Merge new proxies into existing ones, avoiding duplicates by (Name, Server, Port)
-                                        for new_p in new_seq {
-                                            let new_name = new_p.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                                            let new_server = new_p.get("server").and_then(|v| v.as_str()).unwrap_or("");
-                                            let new_port = new_p
-                                                .get("port")
-                                                .and_then(|v| match v {
-                                                    serde_yaml_ng::Value::Number(n) => n.as_u64(),
-                                                    _ => None,
-                                                })
-                                                .unwrap_or(0);
-
-                                            let existing_pos = existing_seq.iter().position(|p| {
-                                                let p_name = p.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                                                let p_server = p.get("server").and_then(|v| v.as_str()).unwrap_or("");
-                                                let p_port = p
-                                                    .get("port")
-                                                    .and_then(|v| match v {
-                                                        serde_yaml_ng::Value::Number(n) => n.as_u64(),
-                                                        _ => None,
-                                                    })
-                                                    .unwrap_or(0);
-                                                p_name == new_name && p_server == new_server && p_port == new_port
-                                            });
-
-                                            if let Some(pos) = existing_pos {
-                                                // If exact (Name, Server, Port) match exists, update/overwrite its parameters
-                                                existing_seq[pos] = new_p.clone();
-                                            } else {
-                                                // Otherwise, append as a new node
-                                                existing_seq.push(new_p.clone());
-                                            }
-                                        }
-                                        final_mapping = existing_mapping;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            let serialized =
-                serde_yaml_ng::to_string(&final_mapping).map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
+        if url_trimmed.eq_ignore_ascii_case("clear") || url_trimmed.eq_ignore_ascii_case("clean") {
+            let serialized = serde_yaml_ng::to_string(&final_mapping)
+                .map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
+            fs::write(&path, serialized.as_bytes())
+                .await
+                .with_context(|| format!("failed to write to file \"{file_name}\""))?;
 
             let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
-            let count = final_mapping
-                .get("proxies")
-                .and_then(|v| v.as_sequence())
-                .map(|s| s.len())
-                .unwrap_or(0);
-            let desc_str = count.to_string();
+            let desc_str = "0".to_string();
 
             return Ok(Self {
                 uid: Some(uid_str.into()),
@@ -429,6 +339,109 @@ impl PrfItem {
             });
         }
 
+        let parsed = match crate::utils::resolve::universal_parser::parse_uri_list(url) {
+            Some(p) => p,
+            None => bail!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"),
+        };
+
+        final_mapping = parsed;
+
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path).await {
+                if let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content) {
+                    if let Some(existing_proxies_val) = existing_mapping.get_mut("proxies") {
+                        if let Some(existing_seq) = existing_proxies_val.as_sequence_mut() {
+                            if let Some(new_proxies_val) = final_mapping.get("proxies") {
+                                if let Some(new_seq) = new_proxies_val.as_sequence() {
+                                    for new_p in new_seq {
+                                        let new_name = new_p.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                        let new_server = new_p.get("server").and_then(|v| v.as_str()).unwrap_or("");
+                                        let new_port = new_p
+                                            .get("port")
+                                            .and_then(|v| match v {
+                                                serde_yaml_ng::Value::Number(n) => n.as_u64(),
+                                                _ => None,
+                                            })
+                                            .unwrap_or(0);
+
+                                        let existing_pos = existing_seq.iter().position(|p| {
+                                            let p_name = p.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                            let p_server = p.get("server").and_then(|v| v.as_str()).unwrap_or("");
+                                            let p_port = p
+                                                .get("port")
+                                                .and_then(|v| match v {
+                                                    serde_yaml_ng::Value::Number(n) => n.as_u64(),
+                                                    _ => None,
+                                                })
+                                                .unwrap_or(0);
+                                            p_name == new_name && p_server == new_server && p_port == new_port
+                                        });
+
+                                        if let Some(pos) = existing_pos {
+                                            existing_seq[pos] = new_p.clone();
+                                        } else {
+                                            existing_seq.push(new_p.clone());
+                                        }
+                                    }
+                                    final_mapping = existing_mapping;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let serialized =
+            serde_yaml_ng::to_string(&final_mapping).map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
+
+        let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
+        let count = final_mapping
+            .get("proxies")
+            .and_then(|v| v.as_sequence())
+            .map(|s| s.len())
+            .unwrap_or(0);
+        let desc_str = count.to_string();
+
+        Ok(Self {
+            uid: Some(uid_str.into()),
+            itype: Some("local".into()),
+            name: Some(name_str),
+            desc: Some(desc_str.into()),
+            file: Some(file_name.into()),
+            url: None,
+            selected: None,
+            extra: None,
+            option: Some(PrfOption {
+                update_interval: None,
+                merge,
+                script,
+                rules,
+                proxies,
+                groups,
+                ..PrfOption::default()
+            }),
+            home: None,
+            updated: Some(chrono::Local::now().timestamp()),
+            file_data: Some(serialized.into()),
+        })
+    }
+
+    /// ## Remote type
+    /// create a new item from url
+    #[allow(clippy::cognitive_complexity)]
+    pub async fn from_url(
+        url: &str,
+        name: Option<&String>,
+        desc: Option<&String>,
+        option: Option<&PrfOption>,
+    ) -> Result<Self> {
+        // 直连节点输入（非 HTTP(S) URL）→ 委托给 from_url_direct
+        let url_lower = url.trim().to_ascii_lowercase();
+        if !url_lower.starts_with("http://") && !url_lower.starts_with("https://") {
+            return Self::from_url_direct(url, name, option).await;
+        }
+
         let with_proxy = option.is_some_and(|o| o.with_proxy.unwrap_or(false));
         let self_proxy = option.is_some_and(|o| o.self_proxy.unwrap_or(false));
         let accept_invalid_certs = option.is_some_and(|o| o.danger_accept_invalid_certs.unwrap_or(false));
@@ -436,11 +449,13 @@ impl PrfItem {
         let user_agent = option.and_then(|o| o.user_agent.clone());
         let update_interval = option.and_then(|o| o.update_interval);
         let timeout = option.and_then(|o| o.timeout_seconds).unwrap_or(20);
-        let mut merge = option.and_then(|o| o.merge.clone());
-        let mut script = option.and_then(|o| o.script.clone());
-        let mut rules = option.and_then(|o| o.rules.clone());
-        let mut proxies = option.and_then(|o| o.proxies.clone());
-        let groups = option.and_then(|o| o.groups.clone());
+        let EnhanceItems {
+            merge,
+            script,
+            rules,
+            proxies,
+            groups,
+        } = ensure_enhance_items(option).await?;
 
         // 选择代理类型
         let proxy_type = if self_proxy {
@@ -571,59 +586,8 @@ impl PrfItem {
             bail!("subscription content exceeds maximum allowed size (50MB)");
         }
 
-        // check the data whether the valid yaml format
-        let decoded_opt = crate::utils::resolve::universal_parser::decode_base64_robust(data);
+        let (_yaml, serialized_data) = parse_subscription_content(data)?;
 
-        let (_yaml, serialized_data) = match serde_yaml_ng::from_str::<Mapping>(data) {
-            Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => (y, data.to_string()),
-            _ => {
-                let decoded_str_opt = decoded_opt
-                    .as_ref()
-                    .and_then(|bytes| std::string::String::from_utf8(bytes.clone()).ok());
-
-                let parsed_yaml_from_b64 = decoded_str_opt.as_ref().and_then(|decoded_str| {
-                    serde_yaml_ng::from_str::<Mapping>(decoded_str)
-                        .ok()
-                        .filter(|y| y.contains_key("proxies") || y.contains_key("proxy-providers"))
-                        .map(|y| (y, decoded_str.to_string()))
-                });
-
-                if let Some(res) = parsed_yaml_from_b64 {
-                    res
-                } else {
-                    let parse_content = decoded_str_opt.as_deref().unwrap_or(data);
-                    if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(parse_content) {
-                        let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default();
-                        (parsed, serialized)
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"
-                        ));
-                    }
-                }
-            }
-        };
-
-        if merge.is_none() {
-            let merge_item = &mut Self::from_merge(None)?;
-            profiles::profiles_append_item_safe(merge_item).await?;
-            merge = merge_item.uid.clone();
-        }
-        if script.is_none() {
-            let script_item = &mut Self::from_script(None)?;
-            profiles::profiles_append_item_safe(script_item).await?;
-            script = script_item.uid.clone();
-        }
-        if rules.is_none() {
-            let rules_item = &mut Self::from_rules()?;
-            profiles::profiles_append_item_safe(rules_item).await?;
-            rules = rules_item.uid.clone();
-        }
-        if proxies.is_none() {
-            let proxies_item = &mut Self::from_proxies()?;
-            profiles::profiles_append_item_safe(proxies_item).await?;
-            proxies = proxies_item.uid.clone();
-        }
         // groups is skipped to prevent creating dead g*.yaml files
 
         Ok(Self {
@@ -791,6 +755,43 @@ impl PrfItem {
 #[allow(clippy::unnecessary_wraps)]
 const fn default_allow_auto_update() -> Option<bool> {
     Some(true)
+}
+
+/// 解析订阅响应内容：YAML → Base64 解码 → URI-list 三级回退
+fn parse_subscription_content(data: &str) -> Result<(Mapping, String)> {
+    let decoded_opt = crate::utils::resolve::universal_parser::decode_base64_robust(data);
+
+    match serde_yaml_ng::from_str::<Mapping>(data) {
+        Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => {
+            Ok((y, data.to_string().into()))
+        }
+        _ => {
+            let decoded_str_opt = decoded_opt
+                .as_ref()
+                .and_then(|bytes| std::string::String::from_utf8(bytes.clone()).ok());
+
+            let parsed_yaml_from_b64 = decoded_str_opt.as_ref().and_then(|decoded_str| {
+                serde_yaml_ng::from_str::<Mapping>(decoded_str)
+                    .ok()
+                    .filter(|y| y.contains_key("proxies") || y.contains_key("proxy-providers"))
+                    .map(|y| (y, decoded_str.to_string().into()))
+            });
+
+            if let Some(res) = parsed_yaml_from_b64 {
+                Ok(res)
+            } else {
+                let parse_content = decoded_str_opt.as_deref().unwrap_or(data);
+                if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(parse_content) {
+                    let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default().into();
+                    Ok((parsed, serialized))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"
+                    ))
+                }
+            }
+        }
+    }
 }
 
 /// SSRF 防护：禁止访问内网/回环地址

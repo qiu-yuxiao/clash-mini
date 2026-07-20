@@ -1,4 +1,5 @@
 use crate::{APP_HANDLE, singleton};
+use clash_verge_logging::{Type as LogType, logging};
 use smartstring::alias::String;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::AppHandle;
@@ -30,7 +31,11 @@ impl Handle {
     pub fn app_handle() -> &'static AppHandle {
         #[allow(clippy::expect_used)]
         APP_HANDLE.get().unwrap_or_else(|| {
-            tracing::error!("App handle accessed before Tauri setup completed — unrecoverable");
+            logging!(
+                error,
+                LogType::Core,
+                "App handle accessed before Tauri setup completed — unrecoverable"
+            );
             panic!("App handle not initialized")
         })
     }
