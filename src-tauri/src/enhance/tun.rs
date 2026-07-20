@@ -2,6 +2,8 @@ use serde_yaml_ng::{Mapping, Value};
 
 #[cfg(target_os = "macos")]
 use std::sync::Mutex;
+#[cfg(target_os = "macos")]
+use clash_verge_logging::{Type as LogType, logging};
 
 #[cfg(target_os = "macos")]
 use tauri::async_runtime::JoinHandle;
@@ -16,9 +18,18 @@ static DNS_TASK_HANDLE: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 /// M2-13: 中止上一个 DNS 切换任务（macOS 专用）
 #[cfg(target_os = "macos")]
 fn abort_prev_dns_task() {
-    if let Some(handle) = DNS_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()).take() {
+    if let Some(handle) = dns_lock().take() {
         handle.abort();
     }
+}
+
+/// 获取 DNS 任务锁；中毒时记日志并恢复，防止 macOS 系统 DNS 残留不一致状态
+#[cfg(target_os = "macos")]
+fn dns_lock() -> std::sync::MutexGuard<'static, Option<JoinHandle<()>>> {
+    DNS_TASK_HANDLE.lock().unwrap_or_else(|e| {
+        logging!(warn, LogType::System, "DNS 任务锁被中毒线程污染，恢复后继续执行");
+        e.into_inner()
+    })
 }
 
 macro_rules! revise {
@@ -57,7 +68,7 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
                 crate::utils::resolve::dns::restore_public_dns().await;
                 crate::utils::resolve::dns::set_public_dns("114.114.114.114".to_string()).await;
             });
-            *DNS_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
+            *dns_lock() = Some(handle);
         }
     } else {
         // TUN未启用时，仅恢复系统DNS，不修改配置文件中的DNS设置
@@ -67,7 +78,7 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             let handle = AsyncHandler::spawn(move || async move {
                 crate::utils::resolve::dns::restore_public_dns().await;
             });
-            *DNS_TASK_HANDLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
+            *dns_lock() = Some(handle);
         }
     }
 

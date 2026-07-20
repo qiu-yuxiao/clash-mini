@@ -34,6 +34,7 @@ use tauri_plugin_mihomo::RejectPolicy;
 pub static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
 
 const MAIN_WINDOW_LABEL: &str = "main";
+const MAX_ICON_CACHE_FILES: usize = 100;
 
 /// Application initialization helper functions
 mod app_init {
@@ -275,9 +276,9 @@ pub fn run() {
 
             logging!(info, Type::Setup, "初始化已启动");
 
-            // 启动时自动清理图标缓存（保留最新 100 个文件）
+            // 启动时自动清理图标缓存（保留最新 N 个文件）
             crate::process::AsyncHandler::spawn(|| async move {
-                if let Err(e) = crate::feat::cleanup_icon_cache(100).await {
+                if let Err(e) = crate::feat::cleanup_icon_cache(MAX_ICON_CACHE_FILES).await {
                     logging!(warn, Type::Setup, "清理旧图标缓存失败: {}", e);
                 }
             });
