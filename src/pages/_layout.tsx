@@ -367,74 +367,17 @@ const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFn>>(
 
 import { useCoreUpdate } from './hooks/use-core-update'
 import { useClientUpdate } from './hooks/use-client-update'
+import { useSkinControls } from './hooks/use-skin-controls'
 
 const Layout = () => {
-  // Active Skin State
-  const [controlSkin, setControlSkin] = useState(() => {
-    return typeof window !== 'undefined'
-      ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
-      : 'retro-3d'
-  })
-
-  // Dual Sliders State (Depth & Vibrancy Factors)
-  const [depthFactor, setDepthFactor] = useState<number>(() => {
-    const skin =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
-        : 'retro-3d'
-    const saved = localStorage.getItem(`clash-mini-${skin}-val1`)
-    if (saved !== null) return parseFloat(saved)
-    if (skin === 'retro-3d') {
-      const oldSaved = localStorage.getItem('clash-mini-depth-factor')
-      return oldSaved !== null ? parseFloat(oldSaved) : 0.3
-    }
-    return 1.0
-  })
-
-  const [vibrancyFactor, setVibrancyFactor] = useState<number>(() => {
-    const skin =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
-        : 'retro-3d'
-    const saved = localStorage.getItem(`clash-mini-${skin}-val2`)
-    if (saved !== null) return parseFloat(saved)
-    if (skin === 'retro-3d') {
-      const oldSaved = localStorage.getItem('clash-mini-vibrancy-factor')
-      return oldSaved !== null ? parseFloat(oldSaved) : 1.0
-    }
-    return 1.0
-  })
-
-  useEffect(() => {
-    const handleSkinChanged = () => {
-      const newSkin =
-        localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
-      setControlSkin(newSkin)
-      const val1 = localStorage.getItem(`clash-mini-${newSkin}-val1`)
-      const val2 = localStorage.getItem(`clash-mini-${newSkin}-val2`)
-      if (val1 !== null) {
-        setDepthFactor(parseFloat(val1))
-      } else if (newSkin === 'retro-3d') {
-        const oldSaved = localStorage.getItem('clash-mini-depth-factor')
-        setDepthFactor(oldSaved !== null ? parseFloat(oldSaved) : 0.3)
-      } else {
-        setDepthFactor(1.0)
-      }
-
-      if (val2 !== null) {
-        setVibrancyFactor(parseFloat(val2))
-      } else if (newSkin === 'retro-3d') {
-        const oldSaved = localStorage.getItem('clash-mini-vibrancy-factor')
-        setVibrancyFactor(oldSaved !== null ? parseFloat(oldSaved) : 1.0)
-      } else {
-        setVibrancyFactor(1.0)
-      }
-    }
-    window.addEventListener('clash-mini-skin-changed', handleSkinChanged)
-    return () => {
-      window.removeEventListener('clash-mini-skin-changed', handleSkinChanged)
-    }
-  }, [])
+  // Active Skin State — managed by useSkinControls
+  const {
+    controlSkin,
+    depthFactor,
+    vibrancyFactor,
+    handleDepthFactorChange,
+    handleVibrancyFactorChange,
+  } = useSkinControls()
 
   // Update States
   const [helpAnchorEl, setHelpAnchorEl] = useState<null | HTMLElement>(null)
@@ -463,44 +406,6 @@ const Layout = () => {
     handleCoreCheck,
     handleCoreUpgrade,
   } = useCoreUpdate({ coreVersion, mutateVersion, setHelpAnchorEl })
-
-  const handleDepthFactorChange = (val: number) => {
-    setDepthFactor(val)
-    localStorage.setItem(`clash-mini-${controlSkin}-val1`, val.toString())
-    if (controlSkin === 'retro-3d') {
-      localStorage.setItem('clash-mini-depth-factor', val.toString())
-    }
-  }
-
-  const handleVibrancyFactorChange = (val: number) => {
-    setVibrancyFactor(val)
-    localStorage.setItem(`clash-mini-${controlSkin}-val2`, val.toString())
-    if (controlSkin === 'retro-3d') {
-      localStorage.setItem('clash-mini-vibrancy-factor', val.toString())
-    }
-  }
-
-  useEffect(() => {
-    document.documentElement.style.setProperty(
-      '--depth-factor',
-      depthFactor.toString(),
-    )
-    document.documentElement.style.setProperty(
-      '--control-skin-val1',
-      depthFactor.toString(),
-    )
-  }, [depthFactor, controlSkin])
-
-  useEffect(() => {
-    document.documentElement.style.setProperty(
-      '--vibrancy-factor',
-      vibrancyFactor.toString(),
-    )
-    document.documentElement.style.setProperty(
-      '--control-skin-val2',
-      vibrancyFactor.toString(),
-    )
-  }, [vibrancyFactor, controlSkin])
 
   const mode = useThemeMode()
   const { t } = useTranslation()
