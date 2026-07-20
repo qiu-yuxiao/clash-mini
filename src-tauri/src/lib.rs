@@ -32,6 +32,9 @@ use tauri_plugin_deep_link::DeepLinkExt as _;
 use tauri_plugin_mihomo::RejectPolicy;
 
 pub static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
+
+const MAIN_WINDOW_LABEL: &str = "main";
+
 /// Application initialization helper functions
 mod app_init {
     use super::*;
@@ -307,8 +310,8 @@ pub fn run() {
         })
         .invoke_handler(app_init::generate_handlers())
         .on_window_event(|window, event| {
-            if window.label() == "main" {
-                if let Some(webview_window) = window.get_webview_window("main") {
+            if window.label() == MAIN_WINDOW_LABEL {
+                if let Some(webview_window) = window.get_webview_window(MAIN_WINDOW_LABEL) {
                     if let tauri::WindowEvent::CloseRequested { .. } = event {
                         event_handlers::handle_window_close(&webview_window, event);
                     }
@@ -317,6 +320,7 @@ pub fn run() {
         });
 
     mod event_handlers {
+        use crate::MAIN_WINDOW_LABEL;
         use crate::module::lightweight;
         use crate::{
             core::{self, handle},
@@ -338,12 +342,12 @@ pub fn run() {
             logging!(info, Type::System, "应用就绪");
 
             #[cfg(target_os = "windows")]
-            if let Some(window) = _app_handle.get_webview_window("main") {
+            if let Some(window) = _app_handle.get_webview_window(MAIN_WINDOW_LABEL) {
                 setup_wm_sizing_hook(&window);
             }
 
             #[cfg(target_os = "macos")]
-            if let Some(window) = _app_handle.get_webview_window("main") {
+            if let Some(window) = _app_handle.get_webview_window(MAIN_WINDOW_LABEL) {
                 let _ = window.set_title("Clash Mini");
             }
         }

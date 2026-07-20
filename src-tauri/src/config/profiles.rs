@@ -545,18 +545,16 @@ impl IProfiles {
         // p12345678.yaml (proxies)
         // g12345678.yaml (groups)
 
-        let patterns = [
-            r"^[RL][a-zA-Z0-9]+\.yaml$",  // Remote/Local profiles
-            r"^m[a-zA-Z0-9]+\.yaml$",     // Merge files
-            r"^s[a-zA-Z0-9]+\.js$",       // Script files
-            r"^[rpg][a-zA-Z0-9]+\.yaml$", // Rules/Proxies/Groups files
-        ];
+        static REGEX_CACHE: std::sync::LazyLock<[regex::Regex; 4]> = std::sync::LazyLock::new(|| {
+            [
+                regex::Regex::new(r"^[RL][a-zA-Z0-9]+\.yaml$").expect("profile file pattern"),
+                regex::Regex::new(r"^m[a-zA-Z0-9]+\.yaml$").expect("profile file pattern"),
+                regex::Regex::new(r"^s[a-zA-Z0-9]+\.js$").expect("profile file pattern"),
+                regex::Regex::new(r"^[rpg][a-zA-Z0-9]+\.yaml$").expect("profile file pattern"),
+            ]
+        });
 
-        patterns.iter().any(|pattern| {
-            regex::Regex::new(pattern)
-                .map(|re| re.is_match(filename))
-                .unwrap_or(false)
-        })
+        REGEX_CACHE.iter().any(|re| re.is_match(filename))
     }
 }
 
