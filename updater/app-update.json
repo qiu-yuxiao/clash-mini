@@ -1,7 +1,7 @@
 {
-  "version": "2.6.5",
-  "notes": "Clash Mini v2.6.5",
-  "pub_date": "2026-07-19T18:14:32.583Z",
+  "version": "2.6.6",
+  "notes": "Clash Mini v2.6.6 — 代码质量修复 + Layout 模块化重构",
+  "pub_date": "2026-07-20T18:00:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUFwcjB5dGRKNTBzYW5XZ1FDMDBrdVVIcFlQSWQ2b0duSStxNU9vMlJ4MlFwVmdRaUd3UmRWYk0wNmlUWGlxSWFueWtZQVFWcy9KOERkcE5UTUlVZVFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NDg0NjI3CWZpbGU6Q2xhc2ggTWluaV8yLjYuNV94NjQtc2V0dXAuZXhlCjNPTWpGL3c2a3ppaEoxZWZONmF4MXk5QWlETnI2Y3JMTVdPZXZ3cVFhc3J0NGJSc212MGFFOGFwdFNLREpRd09vQ094YjFkS0UwSUNnanc3L0FFR0NnPT0K",
