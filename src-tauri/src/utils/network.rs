@@ -77,7 +77,7 @@ impl NetworkManager {
             .pool_idle_timeout(Some(Duration::from_secs(15)));
 
         if matches!(tls_root_mode, TlsRootMode::StaticWebpkiRoots) {
-            builder = builder.tls_backend_preconfigured(Self::build_static_webpki_tls_config()?);
+            builder = builder.tls_backend_preconfigured(Self::static_webpki_tls_config()?);
         }
 
         // 设置代理
@@ -107,16 +107,19 @@ impl NetworkManager {
         Ok(builder.build()?)
     }
 
-    fn build_static_webpki_tls_config() -> Result<rustls::ClientConfig> {
+    fn static_webpki_tls_config() -> Result<rustls::ClientConfig> {
+        static CACHE: std::sync::OnceLock<rustls::ClientConfig> = std::sync::OnceLock::new();
+        if let Some(config) = CACHE.get() {
+            return Ok(config.clone());
+        }
         let root_store = rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
         let mut config =
             rustls::ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
                 .with_safe_default_protocol_versions()?
                 .with_root_certificates(root_store)
                 .with_no_client_auth();
-
         config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-
+        let _ = CACHE.set(config.clone());
         Ok(config)
     }
 

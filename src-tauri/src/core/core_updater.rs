@@ -495,7 +495,8 @@ impl CoreUpdater {
         let saved_proxy_now = CoreManager::global().snapshot_proxy_group_now().await;
 
         if let Err(e) = CoreManager::global().stop_core().await {
-            logging!(warn, Type::System, "Core updater: 停止 core 失败: {}", e);
+            logging!(error, Type::System, "Core updater: 停止 core 失败，中止升级: {}", e);
+            return Err(anyhow::anyhow!("failed to stop core before upgrade: {}", e));
         }
 
         emit_progress("extracting", 90, "正在解压并替换内核程序...");
