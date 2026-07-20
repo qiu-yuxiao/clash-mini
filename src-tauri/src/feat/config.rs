@@ -314,6 +314,14 @@ fn validate_css_injection(css: &str) -> Result<()> {
     if css.to_ascii_lowercase().contains("expression(") {
         bail!("CSS injection cannot contain expression()");
     }
+    // 禁止 data: URL（可嵌入任意 HTML/JavaScript）
+    if css.to_ascii_lowercase().contains("url(data:") {
+        bail!("CSS injection cannot contain data: URLs");
+    }
+    // 禁止 -moz-binding（Firefox 旧式 XSS 向量）
+    if css.to_ascii_lowercase().contains("-moz-binding") {
+        bail!("CSS injection cannot contain -moz-binding");
+    }
     Ok(())
 }
 
