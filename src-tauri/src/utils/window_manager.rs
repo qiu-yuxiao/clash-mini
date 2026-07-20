@@ -131,8 +131,9 @@ pub async fn restore_window_size() -> Option<(f64, f64)> {
     let path = home.join("window_state.json");
     let content = tokio::fs::read_to_string(&path).await.ok()?;
     let state: WindowSizeState = serde_json::from_str(&content).ok()?;
-    // 兜底：保存值必须大于最小值，防止异常数据导致窗口不可交互
-    if state.width >= 200.0 && state.height >= 200.0 {
+    // 兜底：保存值必须大于极简窗口最小值，防止异常数据导致窗口不可交互
+    if state.width >= crate::utils::resolve::window::MINIMAL_WIDTH
+        && state.height >= crate::utils::resolve::window::MINIMAL_HEIGHT
         Some((state.width, state.height))
     } else {
         None
