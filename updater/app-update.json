@@ -1,6 +1,6 @@
 {
-  "version": "2.6.7",
-  "notes": "Clash Mini v2.6.7",
+  "version": "2.6.8",
+  "notes": "Clash Mini v2.6.8 — 窗口尺寸恢复 + 即时探活 + resize 优化",
   "pub_date": "2026-07-20T15:55:35.743Z",
   "platforms": {
     "windows-x86_64": {
