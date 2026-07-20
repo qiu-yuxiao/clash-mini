@@ -7,7 +7,12 @@ function readSkin(): string {
   return localStorage.getItem('clash-mini-control-skin') || DEFAULT_SKIN
 }
 
-function readFactor(key: string, skin: string, fallback: number, legacyKey: string): number {
+function readFactor(
+  key: string,
+  skin: string,
+  fallback: number,
+  legacyKey: string,
+): number {
   const saved = localStorage.getItem(`clash-mini-${skin}-${key}`)
   if (saved !== null) return parseFloat(saved)
   if (skin === DEFAULT_SKIN) {
@@ -33,8 +38,12 @@ export function useSkinControls() {
     const handleSkinChanged = () => {
       const newSkin = readSkin()
       setControlSkin(newSkin)
-      setDepthFactor(readFactor('val1', newSkin, 0.3, 'clash-mini-depth-factor'))
-      setVibrancyFactor(readFactor('val2', newSkin, 1.0, 'clash-mini-vibrancy-factor'))
+      setDepthFactor(
+        readFactor('val1', newSkin, 0.3, 'clash-mini-depth-factor'),
+      )
+      setVibrancyFactor(
+        readFactor('val2', newSkin, 1.0, 'clash-mini-vibrancy-factor'),
+      )
     }
     window.addEventListener('clash-mini-skin-changed', handleSkinChanged)
     return () => {
@@ -60,13 +69,25 @@ export function useSkinControls() {
 
   // CSS 变量注入
   useEffect(() => {
-    document.documentElement.style.setProperty('--depth-factor', depthFactor.toString())
-    document.documentElement.style.setProperty('--control-skin-val1', depthFactor.toString())
+    document.documentElement.style.setProperty(
+      '--depth-factor',
+      depthFactor.toString(),
+    )
+    document.documentElement.style.setProperty(
+      '--control-skin-val1',
+      depthFactor.toString(),
+    )
   }, [depthFactor, controlSkin])
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--vibrancy-factor', vibrancyFactor.toString())
-    document.documentElement.style.setProperty('--control-skin-val2', vibrancyFactor.toString())
+    document.documentElement.style.setProperty(
+      '--vibrancy-factor',
+      vibrancyFactor.toString(),
+    )
+    document.documentElement.style.setProperty(
+      '--control-skin-val2',
+      vibrancyFactor.toString(),
+    )
   }, [vibrancyFactor, controlSkin])
 
   return {
