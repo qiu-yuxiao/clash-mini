@@ -1034,7 +1034,26 @@ pub fn start_background_monitor() {
                         if api_error_count >= 3 {
                             api_error_count = 0;
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
-                            let _ = trigger_backend_auto_select(&current_profile, None, 0, true, false).await;
+                            // 承接上方注释承诺：内核 API 不可达导致的自愈失败同样累计
+                            // auto_select_fail_count，连续 5 次后弹出 Windows 警报（与 None 分支一致）。
+                            match trigger_backend_auto_select(&current_profile, None, 0, true, false).await {
+                                Ok(outcome) => {
+                                    if outcome.selected {
+                                        auto_select_fail_count = 0;
+                                    } else {
+                                        auto_select_fail_count += 1;
+                                    }
+                                }
+                                Err(e) => {
+                                    if e.to_string() != "AUTO_SELECT_BUSY" {
+                                        auto_select_fail_count += 1;
+                                    }
+                                }
+                            }
+                            if auto_select_fail_count >= 5 {
+                                auto_select_fail_count = 0;
+                                fire_self_heal_alert();
+                            }
                         }
                     }
                 }
