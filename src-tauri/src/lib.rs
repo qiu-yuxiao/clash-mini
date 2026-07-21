@@ -313,8 +313,21 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == MAIN_WINDOW_LABEL {
                 if let Some(webview_window) = window.get_webview_window(MAIN_WINDOW_LABEL) {
-                    if let tauri::WindowEvent::CloseRequested { .. } = event {
-                        event_handlers::handle_window_close(&webview_window, event);
+                    match event {
+                        tauri::WindowEvent::CloseRequested { .. } => {
+                            event_handlers::handle_window_close(&webview_window, event);
+                        }
+                        tauri::WindowEvent::Resized(size) => {
+                            // 每次窗口尺寸变化都持久化一次（带节流），
+                            // 确保进入轻量模式销毁窗口前 window_state.json 已是当前尺寸
+                            let scale = webview_window.scale_factor().unwrap_or(1.0);
+                            let w = size.width as f64 / scale;
+                            let h = size.height as f64 / scale;
+                            crate::process::AsyncHandler::spawn(move || async move {
+                                crate::utils::window_manager::save_window_size_on_resize(w, h).await;
+                            });
+                        }
+                        _ => {}
                     }
                 }
             }

@@ -1,8 +1,7 @@
 use crate::{core::handle, utils::resolve::window::build_new_window};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager as _, WebviewWindow, Wry};
 
@@ -121,6 +120,22 @@ async fn save_window_size(width: f64, height: f64) {
     if let Ok(json) = serde_json::to_string(&state) {
         let _ = tokio::fs::write(&path, json).await;
     }
+}
+
+/// 窗口尺寸变化时的持久化（带 250ms 节流，避免拖拽期间频繁写盘）
+static LAST_RESIZE_SAVE_MS: AtomicI64 = AtomicI64::new(0);
+
+pub async fn save_window_size_on_resize(width: f64, height: f64) {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    let last = LAST_RESIZE_SAVE_MS.load(Ordering::Relaxed);
+    if now - last < 250 {
+        return;
+    }
+    LAST_RESIZE_SAVE_MS.store(now, Ordering::Relaxed);
+    save_window_size(width, height).await;
 }
 
 /// 读取上次保存的窗口尺寸，失败或不存在返回 None
@@ -454,37 +469,42 @@ impl WindowManager {
             return WindowOperationResult::NoAction;
         };
 
-        // 销毁前保存当前窗口尺寸，供下次创建窗口时恢复
-        if let Ok(size) = window.outer_size() {
-            let scale = window
-                .current_monitor()
-                .ok()
-                .flatten()
-                .map(|m| m.scale_factor())
-                .unwrap_or(1.0);
-            save_window_size(
-                size.width as f64 / scale,
-                size.height as f64 / scale,
-            ).await;
-        }
-
         let app_handle = handle::Handle::app_handle();
         let label = window.label().to_string();
         let app_handle_clone = app_handle.clone();
 
-        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+        // 必须在主线程读取窗口几何量（off-main-thread 读取可能失败，导致尺寸从未保存），
+        // 通过 oneshot 回传，等销毁闭包执行完后再持久化到 window_state.json
+        let (tx, rx) = tokio::sync::oneshot::channel::<Option<(f64, f64)>>();
 
         match app_handle.run_on_main_thread(move || {
+            let saved = if let Some(w) = app_handle_clone.get_webview_window(&label) {
+                if let Ok(size) = w.outer_size() {
+                    let scale = w
+                        .current_monitor()
+                        .ok()
+                        .flatten()
+                        .map(|m| m.scale_factor())
+                        .unwrap_or(1.0);
+                    Some((size.width as f64 / scale, size.height as f64 / scale))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
             if let Some(w) = app_handle_clone.get_webview_window(&label) {
                 if let Err(e) = w.destroy() {
                     logging!(debug, Type::Window, "销毁窗口时出错: {}", e);
                 }
             }
-            let _ = tx.send(());
+            let _ = tx.send(saved);
         }) {
             Ok(_) => {
-                // 等待主线程上的销毁闭包执行完毕
-                let _ = rx.await;
+                // 等待主线程上的销毁闭包执行完毕，并持久化读取到的尺寸
+                if let Ok(Some((w, h))) = rx.await {
+                    save_window_size(w, h).await;
+                }
                 logging!(info, Type::Window, "窗口已摧毁");
                 #[cfg(target_os = "macos")]
                 {
