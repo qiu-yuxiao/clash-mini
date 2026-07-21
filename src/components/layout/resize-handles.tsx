@@ -116,6 +116,11 @@ interface ResizeSession {
   pendingH: number | null
   pendingX: number | null
   pendingY: number | null
+  // 🛡️ [FM-03 防 IPC 洪水] 缓存上一次实际发出的几何值 (logical px)，比对去重
+  lastAppliedW?: number
+  lastAppliedH?: number
+  lastAppliedX?: number
+  lastAppliedY?: number
   // rAF 调度句柄；非 null 表示已有帧排队或正在执行
   rafId: number | null
   // applyPending 是否在飞行中（IPC 未完成），防止下一帧 rAF 触发并发 IPC 调用堆积
@@ -154,27 +159,38 @@ export const ResizeHandles: React.FC = () => {
       session.inFlight = true
       try {
         if (!currentWindow) return
-        // 任一维度需要更新才发 IPC，减少调用次数
-        const needsSize = w !== null || h !== null
-        const needsPos = x !== null || y !== null
+
+        // 计算目标几何（如某维度无需调整则维持上次应用值或初始值）
+        const targetW = w ?? (session.lastAppliedW ?? session.startPhysW / session.scaleFactor)
+        const targetH = h ?? (session.lastAppliedH ?? session.startPhysH / session.scaleFactor)
+        const targetX = x ?? (session.lastAppliedX ?? session.startPhysX / session.scaleFactor)
+        const targetY = y ?? (session.lastAppliedY ?? session.startPhysY / session.scaleFactor)
+
+        // 🛡️ [FM-03 防 IPC 洪水] 尺寸/位置变动与上一次已发出的值对比去重
+        // 拖拽推到最小尺寸 285x135 边界时，高频 pointermove 计算出的目标值均为 285x135，
+        // 经过此判断判定未变动，从而直接跳过发 IPC，彻底消除最小尺寸边界处的 IPC 堆积现象。
+        const needsSize =
+          (w !== null && targetW !== session.lastAppliedW) ||
+          (h !== null && targetH !== session.lastAppliedH)
+        const needsPos =
+          (x !== null && targetX !== session.lastAppliedX) ||
+          (y !== null && targetY !== session.lastAppliedY)
+
         if (!needsSize && !needsPos) return
-        // 并行发 IPC：setSize 和 setPosition 之间无依赖，合并为一个往返
+
+        // 更新上次发出的实际几何记录
+        session.lastAppliedW = targetW
+        session.lastAppliedH = targetH
+        session.lastAppliedX = targetX
+        session.lastAppliedY = targetY
+
+        // 并行发 IPC：setSize 和 setPosition 之间合并调用
         await Promise.all([
           needsSize
-            ? currentWindow.setSize(
-                new LogicalSize(
-                  w ?? session.startPhysW / session.scaleFactor,
-                  h ?? session.startPhysH / session.scaleFactor,
-                ),
-              )
+            ? currentWindow.setSize(new LogicalSize(targetW, targetH))
             : Promise.resolve(),
           needsPos
-            ? currentWindow.setPosition(
-                new LogicalPosition(
-                  x ?? session.startPhysX / session.scaleFactor,
-                  y ?? session.startPhysY / session.scaleFactor,
-                ),
-              )
+            ? currentWindow.setPosition(new LogicalPosition(targetX, targetY))
             : Promise.resolve(),
         ])
       } catch (err) {
@@ -201,10 +217,17 @@ export const ResizeHandles: React.FC = () => {
   // 每次 render 同步 ref，供 scheduleApply 在 rAF 回调中调用最新版本
   applyPendingRef.current = applyPending
 
-  // 组件卸载（含拖拽中途因切模式等卸载）时复位 resizing 标志并取消 pending 的 rAF 帧，
-  // 避免标志残留为 true 导致后续 onResized/updateWindowState 永远跳过 IPC 以及卸载后的异步调用。
+  // 拖拽结束冷却定时器，隔离松手瞬间的并发 IPC 与重绘洪峰
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 组件卸载（含拖拽中途因切模式等卸载）时复位 resizing 标志并取消 pending 的 rAF 帧及冷却定时器，
+  // 避免标志残留导致后续 onResized/updateWindowState 永远跳过 IPC 以及卸载后的异步调用。
   useEffect(
     () => () => {
+      if (cooldownTimerRef.current !== null) {
+        clearTimeout(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
+      }
       setWindowResizing(false)
       if (sessionRef.current?.rafId !== null && sessionRef.current?.rafId !== undefined) {
         cancelAnimationFrame(sessionRef.current.rafId)
@@ -218,6 +241,12 @@ export const ResizeHandles: React.FC = () => {
       if (!currentWindow || e.button !== 0) return
       e.preventDefault()
       e.stopPropagation()
+
+      // 重新按下拖拽：若处于 200ms 冷却期间，立即取消冷却定时器
+      if (cooldownTimerRef.current !== null) {
+        clearTimeout(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
+      }
 
       // 读取窗口当前 outer 位置/尺寸（physical px），所有读取并行发 IPC 减少往返
       const [pos, size, monitor] = await Promise.all([
@@ -283,20 +312,32 @@ export const ResizeHandles: React.FC = () => {
         )
       }
 
-      // 拖拽结束：先清除全局 resizing 标志，再应用最后一帧。
-      // 必须在 applyPending 之前清除，否则收尾的 setSize/setPosition 触发的
-      // onResized 仍会看到 __isResizing=true 而被跳过，导致最终尺寸状态
-      // （最小/大窗口判定）不刷新。
-      setWindowResizing(false)
-
-      // 取消尚未触发的 rAF，立即应用最后一帧
+      // 取消尚未触发的 rAF 帧
       if (session.rafId !== null) {
         cancelAnimationFrame(session.rafId)
         session.rafId = null
       }
-      void applyPending(session)
+
+      // 🛡️ [FM-04 防竞态] 仅在上一帧 IPC 未在途时立即应用收尾帧；
+      // 若上一帧 IPC 正在飞行中 (inFlight === true)，applyPending 的 finally 块
+      // 会在完成后自动拾取 pending 几何并安全应用最后一帧，避免并发 IPC 冲突。
+      if (!session.inFlight) {
+        void applyPending(session)
+      }
 
       sessionRef.current = null
+
+      // 🛡️ [FM-01 冷却恢复] 拖拽结束：启动 200ms 拖拽结束冷却定时器 (Cool-down Reset)，
+      // 延迟重置全局 resizing 标志。
+      // 避免在收尾 setSize/setPosition IPC 尚未完全落地沉淀前就解除拦截，
+      // 导致下游 onResized / updateWindowState 立即涌入并发 IPC 查询和重绘造成松手瞬间卡顿。
+      if (cooldownTimerRef.current !== null) {
+        clearTimeout(cooldownTimerRef.current)
+      }
+      cooldownTimerRef.current = setTimeout(() => {
+        setWindowResizing(false)
+        cooldownTimerRef.current = null
+      }, 200)
     },
     [applyPending],
   )
@@ -314,8 +355,63 @@ export const ResizeHandles: React.FC = () => {
       }
 
       // 计算鼠标在 physical 坐标系下的位移
-      const dx = e.clientX * session.scaleFactor - session.startPointerX
-      const dy = e.clientY * session.scaleFactor - session.startPointerY
+      const currentPointerX = e.clientX * session.scaleFactor
+      const currentPointerY = e.clientY * session.scaleFactor
+      let dx = currentPointerX - session.startPointerX
+      let dy = currentPointerY - session.startPointerY
+
+      // 🛡️ [FM-05 消除反向拖拽死区] 动态锚点滑动 Clamping：
+      // 当鼠标推过最小/最大尺寸边界时，动态滑动 session.startPointerX/Y 锚点，
+      // 使得 dx/dy 紧贴临界边界。一旦鼠标反向移动，可实现 0 延迟即刻拉大/缩小，消除死区粘滞感。
+      const sf = session.scaleFactor
+      const MIN_W_PHYS = 285 * sf
+      const MAX_W_PHYS = 640 * sf
+      const MIN_H_PHYS = 135 * sf
+      const MAX_H_PHYS = 860 * sf
+
+      if (session.direction.includes('e')) {
+        const minDx = MIN_W_PHYS - session.startPhysW
+        const maxDx = MAX_W_PHYS - session.startPhysW
+        if (dx < minDx) {
+          session.startPointerX = currentPointerX - minDx
+          dx = minDx
+        } else if (dx > maxDx) {
+          session.startPointerX = currentPointerX - maxDx
+          dx = maxDx
+        }
+      } else if (session.direction.includes('w')) {
+        const minDx = session.startPhysW - MAX_W_PHYS
+        const maxDx = session.startPhysW - MIN_W_PHYS
+        if (dx < minDx) {
+          session.startPointerX = currentPointerX - minDx
+          dx = minDx
+        } else if (dx > maxDx) {
+          session.startPointerX = currentPointerX - maxDx
+          dx = maxDx
+        }
+      }
+
+      if (session.direction.includes('s')) {
+        const minDy = MIN_H_PHYS - session.startPhysH
+        const maxDy = MAX_H_PHYS - session.startPhysH
+        if (dy < minDy) {
+          session.startPointerY = currentPointerY - minDy
+          dy = minDy
+        } else if (dy > maxDy) {
+          session.startPointerY = currentPointerY - maxDy
+          dy = maxDy
+        }
+      } else if (session.direction.includes('n')) {
+        const minDy = session.startPhysH - MAX_H_PHYS
+        const maxDy = session.startPhysH - MIN_H_PHYS
+        if (dy < minDy) {
+          session.startPointerY = currentPointerY - minDy
+          dy = minDy
+        } else if (dy > maxDy) {
+          session.startPointerY = currentPointerY - maxDy
+          dy = maxDy
+        }
+      }
 
       // 计算 clamp 后的新几何（logical），写入 pending（rAF 节流后统一应用）
       const geo = computeResizeGeometry({

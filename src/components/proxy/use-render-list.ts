@@ -191,17 +191,31 @@ export const useRenderList = (mode: string) => {
       // 同行索引的 ProxyItem 实例可被 React 复用，不再像过去
       // 「type:2 平铺 ↔ type:4 分组」结构切换那样整批卸载+重挂载
       //（群发测速时拖拽窗口卡死的根因）。
+      const prevGroupItems = cached?.items
       ret.push(
-        ...groupProxies(proxies, col).map((proxyCol, colIndex) => ({
-          type: 4 as const,
-          key: `col-${group.name}-${colIndex}`,
-          group,
-          headState,
-          col,
-          proxyCol,
-          provider: proxyCol[0]?.provider,
-          indexInGroup: colIndex,
-        })),
+        ...groupProxies(proxies, col).map((proxyCol, colIndex) => {
+          // 🛡️ [ISSUE-03 优化] 若上一缓存中同位置行的节点与延迟均未发生变化，
+          // 复用上一轮的 proxyCol 数组引用，确保纯展示组件的 React.memo 浅比较不会失效。
+          const prevRow = prevGroupItems?.[colIndex]
+          const prevCol = prevRow?.type === 4 ? prevRow.proxyCol : undefined
+          if (
+            prevCol &&
+            prevCol.length === proxyCol.length &&
+            prevCol.every((item, idx) => item.name === proxyCol[idx]?.name)
+          ) {
+            proxyCol = prevCol
+          }
+          return {
+            type: 4 as const,
+            key: `col-${group.name}-${colIndex}`,
+            group,
+            headState,
+            col,
+            proxyCol,
+            provider: proxyCol[0]?.provider,
+            indexInGroup: colIndex,
+          }
+        }),
       )
     }
 

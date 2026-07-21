@@ -494,6 +494,18 @@ const Layout = () => {
 
   const isStartingUpRef = useRef(true)
   const lastFullTestTimeRef = useRef<number>(0)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (wakeupTestTimerRef.current !== null) {
+        clearTimeout(wakeupTestTimerRef.current)
+        wakeupTestTimerRef.current = null
+      }
+    }
+  }, [])
 
   const triggerWakeupLatencyTest = useCallback(async () => {
     // H-15: 防重入互斥锁，快速Alt+Tab两次不会并发执行
@@ -536,9 +548,11 @@ const Layout = () => {
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       wakeupTestTimerRef.current = setTimeout(async () => {
         wakeupTestTimerRef.current = null // setTimeout 已触发，清除ID
+        if (!isMountedRef.current) return
+
         // M2-08: 校验 Profile 未切换，避免对旧 Profile 节点执行测速
         const currentUid = (await getProfiles())?.current || ''
-        if (currentUid !== capturedUid) {
+        if (currentUid !== capturedUid || !isMountedRef.current) {
           return
         }
         try {
@@ -548,10 +562,12 @@ const Layout = () => {
           }
           getDelayManager().queueGroupNotification('PROXY')
           // 委托后端静默测速填充缓存（不传子集=全量测速）；select=false 严禁切换用户当前节点
-          if (currentUid) {
+          if (currentUid && isMountedRef.current) {
             await triggerAutoSelect(currentUid, undefined, 0, false)
           }
-          await refreshAllRef.current()
+          if (isMountedRef.current) {
+            await refreshAllRef.current()
+          }
         } catch (err) {
           console.error('[Layout] 唤醒后后台测速异常:', err)
         } finally {

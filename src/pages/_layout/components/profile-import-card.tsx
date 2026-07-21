@@ -78,6 +78,19 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
     return dayjs(expire * 1000).format('YYYY-MM-DD')
   }
 
+  const handleItemContextMenu = React.useCallback(
+    (uid: string, e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setProfileMenuAnchorPosition({
+        left: e.clientX,
+        top: e.clientY,
+      })
+      setContextMenuProfileUid(uid)
+    },
+    [setProfileMenuAnchorPosition, setContextMenuProfileUid],
+  )
+
   return (
     <Box
       sx={{
@@ -205,15 +218,7 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
             <Box
               key={item.uid}
               onClick={() => handleSelectProfile(item.uid)}
-              onContextMenu={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setProfileMenuAnchorPosition({
-                  left: e.clientX,
-                  top: e.clientY,
-                })
-                setContextMenuProfileUid(item.uid)
-              }}
+              onContextMenu={(e) => handleItemContextMenu(item.uid, e)}
               sx={{
                 display: 'flex',
                 flexDirection: 'column',

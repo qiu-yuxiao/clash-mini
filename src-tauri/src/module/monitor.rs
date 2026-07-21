@@ -991,10 +991,12 @@ pub fn start_background_monitor() {
                                             Type::Lightweight,
                                             "[后台监测] 连续 5 次自愈选点失败，弹出 Windows 提示框"
                                         );
-                                        crate::show_error_dialog(
-                                            "Clash Mini - 网络警报",
-                                            "后台自动优选节点连续 5 次失败，当前所有代理节点均已失效，无法正常连接网络。\n\n请检查您的网络连接或节点订阅状态。",
-                                        );
+                                        tokio::task::spawn_blocking(|| {
+                                            crate::show_error_dialog(
+                                                "Clash Mini - 网络警报",
+                                                "后台自动优选节点连续 5 次失败，当前所有代理节点均已失效，无法正常连接网络。\n\n请检查您的网络连接或节点订阅状态。",
+                                            );
+                                        });
                                     }
                                 }
                             }

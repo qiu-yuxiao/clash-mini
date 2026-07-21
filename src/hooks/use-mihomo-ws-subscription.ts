@@ -234,13 +234,18 @@ export const useMihomoWsSubscription = <T>(
     enabled: subscriptionCacheKey !== null,
   })
 
+  const connectRef = useRef(connect)
+  connectRef.current = connect
+  const setupHandlersRef = useRef(setupHandlers)
+  setupHandlersRef.current = setupHandlers
+
   useEffect(() => {
     if (!subscriptionCacheKey) return
 
     let isMounted = true
     let entry = sharedSubscriptions.get(subscriptionCacheKey)
     if (!entry) {
-      entry = createSharedSubscriptionEntry(connect)
+      entry = createSharedSubscriptionEntry(() => connectRef.current())
       sharedSubscriptions.set(subscriptionCacheKey, entry)
     }
 
@@ -311,7 +316,7 @@ export const useMihomoWsSubscription = <T>(
       handleMessage: handleTextMessage,
       onConnected,
       cleanup,
-    } = setupHandlers({
+    } = setupHandlersRef.current({
       next: wrappedNext,
       scheduleReconnect: entry.scheduleReconnect,
       isMounted: () => isMounted,

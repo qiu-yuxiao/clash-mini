@@ -170,16 +170,8 @@ pub async fn entry_lightweight_mode() -> bool {
             }
         }
 
-        if !is_in_lightweight_mode() {
-            return;
-        }
-
-        // 短暂延时等待 WebView 销毁完成以及 Mihomo GC 内存归还分配器
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        if is_in_lightweight_mode() {
-            trim_working_set();
-        }
+        // 💡 说明：按 Agreement §1.2 规范，彻底删除 SetProcessWorkingSetSize 欺骗性内存修剪，
+        // 由 Windows 和 Chromium 自然管理物理内存页，彻底根除窗口恢复时的 Severe Page Fault 与 WebView2 挂起。
     });
 
     *LIGHTWEIGHT_CLEANUP_HANDLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
@@ -187,27 +179,12 @@ pub async fn entry_lightweight_mode() -> bool {
     true
 }
 
-#[cfg(target_os = "windows")]
-fn trim_working_set() {
-    use windows::Win32::System::Threading::{GetCurrentProcess, SetProcessWorkingSetSize};
-    unsafe {
-        // -1 (usize::MAX) 表示强制操作系统修剪工作集页表，将进程不活跃内存交换出物理内存，降低占用表现
-        let _ = SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX);
-    }
-    logging!(
-        info,
-        Type::Lightweight,
-        "[轻量模式] 已强制修剪 Windows 进程工作集内存，释放空闲缓存"
-    );
-}
-
-#[cfg(not(target_os = "windows"))]
-fn trim_working_set() {
-    // 非 Windows 平台（macOS/Linux）依赖原生系统的自动页面换出机制，暂不实现强制释放
-}
-
 pub async fn exit_lightweight_mode() -> bool {
     let _guard = LIGHTWEIGHT_LOCK.lock().await;
+
+    // 🛡️ [FM-09 修复] 退出轻量模式时，立即 abort 在途的 cleanup 任务，
+    // 防止 2 秒内快速连续进出时，后台 cleanup 任务在主窗口已经恢复挂载后误分发清理动作。
+    abort_lightweight_cleanup();
 
     // 状态为 Normal 时，窗口可能仅被隐藏（enable_auto_light_weight_mode=false 路径），
     // 直接显示窗口即可恢复，避免"窗口隐藏但无法退出"的卡死状态。

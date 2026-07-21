@@ -196,16 +196,15 @@ export const useProfiles = () => {
         }
 
         // 将 selected 校准为内核当前实际运行的节点，防止前后端状态脱节
-        const calibrateSelected = (uid: string, proxyName: string) => {
+        const calibrateSelected = async (uid: string, proxyName: string) => {
           const newSelected = [{ name: 'PROXY', now: proxyName }]
-          patchProfile(uid, { selected: newSelected })
-            .then(() => {
-              updateProfilesCacheSelected(uid, newSelected)
-              return queryClient.invalidateQueries({ queryKey: ['getProxies'] })
-            })
-            .catch((err) =>
-              console.error('[ActivateSelected] 修正 Profile.selected 失败:', err),
-            )
+          try {
+            await patchProfile(uid, { selected: newSelected })
+            updateProfilesCacheSelected(uid, newSelected)
+            await queryClient.invalidateQueries({ queryKey: ['getProxies'] })
+          } catch (err) {
+            console.error('[ActivateSelected] 修正 Profile.selected 失败:', err)
+          }
         }
 
         const matchedProxy = availableProxies.find((proxy) => {
@@ -222,7 +221,7 @@ export const useProfiles = () => {
 
           // 🛡️【强咬合防线】将本地配置 selected 强制修正校准为内核当前实际的运行节点，防止状态脱节
           if (currentNow) {
-            calibrateSelected(current.uid, currentNow)
+            await calibrateSelected(current.uid, currentNow)
           }
           return
         }
@@ -249,7 +248,7 @@ export const useProfiles = () => {
           frontendLog('error', msg)
           // 🛡️【强咬合防线】越界时不切内核，仅把 selected 校准为内核实际节点，保持前后端一致
           if (currentNow) {
-            calibrateSelected(current.uid, currentNow)
+            await calibrateSelected(current.uid, currentNow)
           }
           return
         }
@@ -268,7 +267,7 @@ export const useProfiles = () => {
 
           // 🛡️【强咬合防线】切换异常时，将本地配置 selected 强制重置校准为内核当前的真实运行节点
           if (currentNow) {
-            calibrateSelected(current.uid, currentNow)
+            await calibrateSelected(current.uid, currentNow)
           }
           return
         }

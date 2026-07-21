@@ -128,5 +128,5 @@ export const useVisibility = () => {
     }
   }, [updateWindowState])
 
-  return debouncedVisible
+  return rawVisible || debouncedVisible
 }

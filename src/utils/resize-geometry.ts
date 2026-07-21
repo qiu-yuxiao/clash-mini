@@ -67,7 +67,7 @@ export function computeResizeGeometry(input: {
   return {
     width: clampedW,
     height: clampedH,
-    x: hasWestOrNorth ? newX / sf : null,
-    y: hasWestOrNorth ? newY / sf : null,
+    x: hasWestOrNorth ? Math.round(newX / sf) : null,
+    y: hasWestOrNorth ? Math.round(newY / sf) : null,
   }
 }

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 
@@ -66,8 +66,8 @@ function headStateReducer(
 export function useHeadStateNew() {
   const { profiles } = useProfiles()
   const current = profiles?.current || ''
-
   const [state, dispatch] = useReducer(headStateReducer, {})
+  const isLoadedRef = useRef(false)
 
   // 1. Load entire storage once on mount
   useEffect(() => {
@@ -91,11 +91,16 @@ export function useHeadStateNew() {
           console.warn('[useHeadState] localStorage 兜底也失败，状态初始化为空:', e)
         }
       })
+      .finally(() => {
+        isLoadedRef.current = true
+      })
   }, [])
 
-  // 2. Save entire storage only when state updates
+  // 2. Save entire storage only when state updates from user interaction
   useEffect(() => {
-    if (Object.keys(state).length === 0) return
+    // 🛡️ [ISSUE-04 修复] 首次挂载从后端/localStorage 加载初始数据时跳过保存，
+    // 仅在初始数据加载完成后、用户后续主动修改 headState 时才发起 IPC 保存。
+    if (!isLoadedRef.current || Object.keys(state).length === 0) return
     const timer = setTimeout(async () => {
       try {
         localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(state))
