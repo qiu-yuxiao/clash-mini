@@ -583,7 +583,11 @@ impl CoreUpdater {
             if let Err(e) = CoreManager::global().start_core().await {
                 logging!(error, Type::System, "Core updater: 升级后重启 core 失败: {}", e);
                 // 二进制已成功替换但 core 启动失败，向前端报告真实错误而非假成功
-                emit_progress("error", 0, &format!("内核二进制已更新，但重启失败: {}。请手动重启 Clash Mini。", e));
+                emit_progress(
+                    "error",
+                    0,
+                    &format!("内核二进制已更新，但重启失败: {}。请手动重启 Clash Mini。", e),
+                );
                 return Err(anyhow::anyhow!("start_core failed after upgrade: {}", e));
             }
             // 【v2.6.5 隐患 B 修复】升级成功后恢复 PROXY 组节点选择

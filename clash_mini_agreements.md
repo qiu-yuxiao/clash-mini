@@ -1894,3 +1894,120 @@ v2.6.2 引入的 `node-health-architecture.md` 设计将活跃节点健康检测
 
 - cargo check：退出码 0，编译通过。
 - 逻辑验证：`delay_group` 调用在 dummy-node 快速返回之后、健康状态判定之前，不影响假节点秒级识别路径。
+
+### v2.6.7 修复：轻量模式唤醒后窗口尺寸恢复（第一版方案） (2026-07-21)
+
+#### 问题根因
+
+v2.6.6 之前，进入轻量模式销毁主窗口后唤醒重建窗口时，`build_new_window` 一律使用 `DEFAULT_WIDTH × DEFAULT_HEIGHT`（285×680）作为初始尺寸，丢失用户拖拽调整后的窗口大小。
+
+#### 修复实现
+
+在 `window_manager.rs` 中新增持久化机制：
+
+1. **`WindowSizeState` 结构**：`{ width, height }` 的 JSON 序列化形式，存放在 `app_home_dir/window_state.json`。
+2. **`save_window_size(width, height)`**：异步写盘。
+3. **`restore_window_size() -> Option<(f64, f64)>`**：读盘并校验；失败返回 `None`，由 `build_new_window` 回退到默认尺寸。
+4. **`destroy_main_window` 销毁前保存**：销毁前调用 `window.outer_size()` 读取当前尺寸并持久化。
+5. **`build_new_window` 启动时恢复**：调用 `restore_window_size().unwrap_or(default)` 应用到 `.inner_size()` 与 Windows 平台的 `force_set_window_outer_size`。
+6. **兜底阈值**：保存值必须 `>= MINIMAL_WIDTH(285) × MINIMAL_HEIGHT(135)`，防止异常数据导致窗口不可交互。
+
+#### 影响文件
+
+- `src-tauri/src/utils/window_manager.rs` — 新增 `WindowSizeState` / `save_window_size` / `restore_window_size` + `destroy_main_window` 销毁前存盘
+- `src-tauri/src/utils/resolve/window.rs` — `build_new_window` 接入 `restore_window_size`
+
+#### 遗留问题（v2.6.8 根治）
+
+第一版方案存在根本缺陷：`destroy_main_window` 是 `async fn`，跑在 tokio worker 线程上，而 Tauri 的 `window.outer_size()` / `current_monitor()` 在**非主线程调用时可能返回 Err 或默认值**，导致 `window_state.json` 从未被写入。结果是 bug 现象未消除——唤醒后窗口仍回退到默认 285×680。
+
+发布前还发现一处编译错误：`if state.width >= ... && state.height >= ...` 漏写左大括号，已在 `45e203aa` 中补齐并附 v2.6.8 发布说明。
+
+### v2.6.8 修复：轻量模式唤醒后窗口尺寸恢复（二次修复根治） (2026-07-21)
+
+#### 未彻底修好的根因
+
+第一版方案调用 `window.outer_size()` 的位置在 tokio 异步上下文（worker 线程），而 Tauri 的窗口几何量查询在非主线程调用时**可能返回 Err 或默认值**——实测表现为尺寸从未被持久化，唤醒后仍回退默认值。
+
+#### 修复实现：双保险设计
+
+**主路径** — `destroy_main_window` 改为在主线程同步读尺寸：
+
+```rust
+let (tx, rx) = tokio::sync::oneshot::channel::<Option<(f64, f64)>>();
+app_handle.run_on_main_thread(move || {
+    let saved = if let Some(w) = app_handle_clone.get_webview_window(&label) {
+        if let Ok(size) = w.outer_size() {
+            let scale = w.current_monitor().ok().flatten()
+                .map(|m| m.scale_factor()).unwrap_or(1.0);
+            Some((size.width as f64 / scale, size.height as f64 / scale))
+        } else { None }
+    } else { None };
+    if let Some(w) = app_handle_clone.get_webview_window(&label) {
+        if let Err(e) = w.destroy() { ... }
+    }
+    let _ = tx.send(saved);
+})?;
+if let Ok(Some((w, h))) = rx.await {
+    save_window_size(w, h).await;
+}
+```
+
+通过 `run_on_main_thread` 在主线程闭包内同步读 `outer_size()`，经 oneshot channel 回传到异步上下文持久化——既满足"主线程读窗口几何量"的硬要求，又能在持久化时使用异步 `tokio::fs::write`。
+
+**兜底路径** — `WindowEvent::Resized` 事件回调节流存盘：
+
+```rust
+.on_window_event(|window, event| {
+    if let tauri::WindowEvent::Resized(size) = event {
+        let scale = webview_window.scale_factor().unwrap_or(1.0);
+        let w = size.width as f64 / scale;
+        let h = size.height as f64 / scale;
+        AsyncHandler::spawn(move || async move {
+            save_window_size_on_resize(w, h).await;
+        });
+    }
+})
+```
+
+`Resized` 事件天然在主线程触发，保证读到的尺寸可靠。`save_window_size_on_resize` 带 250ms 节流（`LAST_RESIZE_SAVE_MS: AtomicI64`），避免拖拽期间频繁写盘。即使主路径因故失败（如 `run_on_main_thread` 调度失败），用户最近一次 resize 后的尺寸也已落盘。
+
+#### 恢复链验证
+
+```
+exit_lightweight_mode → show_main_window (NotExist 分支)
+  → create_window → build_new_window
+  → restore_window_size().await.unwrap_or(default)
+  → .inner_size(win_w, win_h) + force_set_window_outer_size(window, win_w, win_h)
+```
+
+`restore_window_size` 在文件不存在 / JSON 解析失败 / 数值小于 MINIMAL 时均返回 `None`，由 `unwrap_or` 回退到默认值——老用户升级（无 `window_state.json`）也能正常工作，无向后兼容问题。
+
+#### 潜在隐患评估
+
+| # | 隐患 | 触发条件 | 兜底 | 严重度 |
+|---|---|---|---|---|
+| 1 | destroy 瞬间 tao 触发 `Resized(0,0)` 覆盖正确值 | 用户拖拽后立即进轻量模式 | `restore_window_size` 的 `>= MINIMAL` 检查拒绝 0×0，回退默认 285×680 | 中：退化为默认尺寸而非上次尺寸 |
+| 2 | `LAST_RESIZE_SAVE_MS` 节流 TOCTOU 竞态 | 两个 resize 几乎同时到达 | 写盘内容差异小（短时间内窗口尺寸不变） | 低 |
+| 3 | 250ms 节流丢最后一次 resize | 用户拖完 < 250ms 立即进轻量模式 | 主路径 `destroy_main_window` 在主线程同步读 outer_size 已保存正确值 | 低 |
+| 4 | `scale_factor()` 在销毁瞬间返回 Err→`unwrap_or(1.0)` | 销毁期间窗口已无效 | 写入的物理像素值偏大但 `max_inner_size` 截断；罕见场景 | 低 |
+
+所有隐患均有兜底机制拦截，最坏情况退化为默认 285×680（与修复前行为一致），不构成回归。
+
+#### 影响文件
+
+- `src-tauri/src/utils/window_manager.rs` — `destroy_main_window` 改用 `run_on_main_thread + oneshot` 主线程读尺寸；新增 `save_window_size_on_resize`（250ms 节流）；`restore_window_size` 改 `?` 风格（清除 clippy `let...else` 警告）
+- `src-tauri/src/lib.rs` — `on_window_event` 新增 `WindowEvent::Resized` 分支触发节流存盘
+
+#### 验证
+
+- `cargo clippy --all-targets -- -D warnings`：退出码 0
+- `pnpm run typecheck`：退出码 0
+- `pnpm run lint --max-warnings=0`：退出码 0
+
+#### 经验教训
+
+1. **Tauri 窗口几何量查询必须在主线程**：`window.outer_size()` / `current_monitor()` / `scale_factor()` 等 API 在非主线程调用时可能返回 Err 或默认值。`async fn` 默认跑在 tokio worker 线程，需通过 `run_on_main_thread + oneshot` 桥接。
+2. **窗口生命周期事件天然在主线程**：`WindowEvent::Resized` / `CloseRequested` 等回调由 tao 事件循环在主线程派发，是读窗口几何量的可靠时机。
+3. **写盘节流要考虑丢失最后一次的风险**：纯时间窗口节流会丢最后一次写入，需要配合销毁前的同步读取作为兜底。
+4. **第一版为何未被发现**：缺少真实进入/退出轻量模式的端到端测试，编译通过不等于行为正确。后续此类窗口生命周期修改应在退出轻量模式后立即验证 `window_state.json` 是否写入正确值。
