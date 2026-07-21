@@ -210,15 +210,10 @@
           "warningColor": "경고 색상",
           "errorColor": "오류 색상",
           "successColor": "성공 색상",
-          "fontFamily": "글꼴",
-          "cssInjection": "CSS 삽입"
+          "fontFamily": "글꼴"
         },
-        "actions": {
-          "editCss": "CSS 편집"
-        },
-        "dialogs": {
-          "editCssTitle": "CSS 편집"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "레이아웃 설정",

@@ -210,15 +210,10 @@
           "warningColor": "警告顏色",
           "errorColor": "錯誤顏色",
           "successColor": "成功顏色",
-          "fontFamily": "字型系列",
-          "cssInjection": "CSS 注入"
+          "fontFamily": "字型系列"
         },
-        "actions": {
-          "editCss": "編輯 CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "編輯 CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "介面設定",

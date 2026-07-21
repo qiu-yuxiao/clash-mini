@@ -621,14 +621,9 @@ export interface TranslationResources {
             }
           }
           theme: {
-            actions: {
-              editCss: string
-            }
-            dialogs: {
-              editCssTitle: string
-            }
+            actions: {}
+            dialogs: {}
             fields: {
-              cssInjection: string
               errorColor: string
               fontFamily: string
               infoColor: string

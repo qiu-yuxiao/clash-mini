@@ -210,15 +210,10 @@
           "warningColor": "Кисәтү төсе",
           "errorColor": "Хата төсе",
           "successColor": "Уңыш төсе",
-          "fontFamily": "Шрифтлар гаиләсе",
-          "cssInjection": "CSS кертү"
+          "fontFamily": "Шрифтлар гаиләсе"
         },
-        "actions": {
-          "editCss": "Edit CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Edit CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "Расположение көйләүләре",

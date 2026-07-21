@@ -70,7 +70,6 @@ export interface IVergeConfig {
     warning_color?: string
     success_color?: string
     font_family?: string
-    css_injection?: string
     background_image?: string
     background_blend_mode?: string
     background_opacity?: number

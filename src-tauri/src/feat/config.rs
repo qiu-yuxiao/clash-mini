@@ -2,7 +2,7 @@ use crate::{
     config::{Config, IVerge},
     core::{CoreManager, autostart, handle, logger::Logger, sysopt, tray},
 };
-use anyhow::{Result, bail};
+use anyhow::Result;
 use bitflags::bitflags;
 use clash_verge_draft::SharedDraft;
 use clash_verge_logging::{Type, logging};
@@ -297,47 +297,8 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     Ok(())
 }
 
-/// 验证 CSS injection 字符串的安全性
-fn validate_css_injection(css: &str) -> Result<()> {
-    if css.len() > 100_000 {
-        bail!("CSS injection exceeds maximum length of 100KB");
-    }
-    let lower = css.to_ascii_lowercase();
-    // 禁止 @import（可能加载外部资源）— 大小写不敏感
-    if lower.contains("@import") {
-        bail!("CSS injection cannot contain @import rules");
-    }
-    // 禁止 javascript: URL（XSS 向量）
-    if lower.contains("javascript:") {
-        bail!("CSS injection cannot contain javascript: URLs");
-    }
-    // 禁止 IE expression()（旧式 XSS 向量）
-    if lower.contains("expression(") {
-        bail!("CSS injection cannot contain expression()");
-    }
-    // 禁止 data: URL（可嵌入任意 HTML/JavaScript/SVG）
-    // CSS 规范允许 url() 括号内有空白符，正则覆盖 \n \t 等变体
-    static RE_DATA_URL: std::sync::LazyLock<regex::Regex> =
-        std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)url\s*\(\s*data:").unwrap());
-    if RE_DATA_URL.is_match(css) {
-        bail!("CSS injection cannot contain data: URLs");
-    }
-    // 禁止 -moz-binding（Firefox 旧式 XSS 向量）
-    if lower.contains("-moz-binding") {
-        bail!("CSS injection cannot contain -moz-binding");
-    }
-    Ok(())
-}
-
 pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
     let _guard = VERGE_PATCH_LOCK.lock().await;
-
-    // 验证 css_injection 安全性
-    if let Some(theme) = &patch.theme_setting {
-        if let Some(css) = &theme.css_injection {
-            validate_css_injection(css)?;
-        }
-    }
 
     let old_config = (*Config::verge().await.latest_arc()).clone();
 
@@ -372,31 +333,4 @@ pub async fn fetch_verge_config() -> Result<SharedDraft<IVerge>> {
     let draft = Config::verge().await;
     let data = draft.data_arc();
     Ok(data)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn css_validation_blocks_data_url_with_whitespace() {
-        // CSS 规范允许 url() 内部空白符，验证检查覆盖此类绕过
-        assert!(validate_css_injection("body { background: url(\ndata:text/html,<script>alert(1)</script>) }").is_err());
-        assert!(validate_css_injection("body { background: url( data:text/html,<script>alert(1)</script>) }").is_err());
-        assert!(validate_css_injection("body { background: url(\tdata:text/html,<script>alert(1)</script>) }").is_err());
-        // 正常 data: URL（无空白）也应被拦截
-        assert!(validate_css_injection("body { background: url(data:text/html,<script>alert(1)</script>) }").is_err());
-    }
-
-    #[test]
-    fn css_validation_allows_safe_css() {
-        assert!(validate_css_injection("body { background: #fff; color: red; }").is_ok());
-        assert!(validate_css_injection("div { background-image: url(https://example.com/img.png); }").is_ok());
-    }
-
-    #[test]
-    fn css_validation_blocks_import_case_insensitive() {
-        assert!(validate_css_injection("@import url('http://evil.com/style.css');").is_err());
-        assert!(validate_css_injection("@IMPORT url('http://evil.com/style.css');").is_err());
-    }
 }

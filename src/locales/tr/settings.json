@@ -210,15 +210,10 @@
           "warningColor": "Uyarı Rengi",
           "errorColor": "Hata Rengi",
           "successColor": "Başarı Rengi",
-          "fontFamily": "Yazı Tipi Ailesi",
-          "cssInjection": "CSS Enjeksiyonu"
+          "fontFamily": "Yazı Tipi Ailesi"
         },
-        "actions": {
-          "editCss": "Edit CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Edit CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "Düzen Ayarı",

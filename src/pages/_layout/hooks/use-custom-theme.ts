@@ -44,59 +44,6 @@ const getSystemAccentColor = (): string | null => {
   return null
 }
 
-const CSS_INJECTION_SCOPE_ROOT = '[data-css-injection-root]'
-const CSS_INJECTION_SCOPE_LIMIT =
-  ':is(.monaco-editor .view-lines, .monaco-editor .view-line, .monaco-editor .margin, .monaco-editor .margin-view-overlays, .monaco-editor .view-overlays, .monaco-editor [class^="mtk"], .monaco-editor [class*=" mtk"])'
-const TOP_LEVEL_AT_RULES = [
-  '@charset',
-  '@import',
-  '@namespace',
-  '@font-face',
-  '@keyframes',
-  '@counter-style',
-  '@page',
-  '@property',
-  '@font-feature-values',
-  '@color-profile',
-]
-let cssScopeSupport: boolean | null = null
-
-const canUseCssScope = () => {
-  if (cssScopeSupport !== null) {
-    return cssScopeSupport
-  }
-  try {
-    const testStyle = document.createElement('style')
-    testStyle.textContent = '@scope (:root) { }'
-    document.head.appendChild(testStyle)
-    cssScopeSupport = !!testStyle.sheet?.cssRules?.length
-    document.head.removeChild(testStyle)
-  } catch {
-    cssScopeSupport = false
-  }
-  return cssScopeSupport
-}
-
-const wrapCssInjectionWithScope = (css?: string): string | null => {
-  if (!css?.trim()) {
-    return ''
-  }
-  const lowerCss = css.toLowerCase()
-  const hasTopLevelOnlyRule = TOP_LEVEL_AT_RULES.some((rule) =>
-    lowerCss.includes(rule),
-  )
-  if (hasTopLevelOnlyRule) {
-    // 返回 null 表示跳过 CSS 注入（含有 @import/@charset/@namespace 等危险规则）
-    return null
-  }
-  const scopeRoot = CSS_INJECTION_SCOPE_ROOT
-  const scopeLimit = CSS_INJECTION_SCOPE_LIMIT
-  const scopedBlock = `@scope (${scopeRoot}) to (${scopeLimit}) {
-${css}
-}`
-  return scopedBlock
-}
-
 /**
  * custom theme
  * 
@@ -576,7 +523,6 @@ export const useCustomTheme = () => {
       rootEle.style.setProperty('--theme-btn-shadow', 'none')
       rootEle.style.setProperty('--theme-btn-hover-shadow', 'none')
       rootEle.style.setProperty('--theme-btn-active-shadow', 'none')
-      rootEle.setAttribute('data-css-injection-root', 'true')
     }
 
     let styleElement = document.querySelector('style#verge-theme')
@@ -587,17 +533,6 @@ export const useCustomTheme = () => {
     }
 
     if (styleElement) {
-      let effectiveInjectedCss = setting.css_injection ?? ''
-      if (canUseCssScope() && setting.css_injection) {
-        const scopedCss = wrapCssInjectionWithScope(setting.css_injection)
-        if (scopedCss !== null) {
-          effectiveInjectedCss = scopedCss
-        } else {
-          // wrapCssInjectionWithScope 返回 null 表示含有 @import/@charset/@namespace 等危险规则，跳过注入
-          effectiveInjectedCss = ''
-        }
-      }
-
       const globalStyles = `
         /* 恢复窄 3D 滚动条样式 */
         * {
@@ -652,7 +587,7 @@ export const useCustomTheme = () => {
         }
       `
 
-      styleElement.innerHTML = effectiveInjectedCss + globalStyles
+      styleElement.innerHTML = globalStyles
     }
 
     muiTheme.controlSkin = controlSkin

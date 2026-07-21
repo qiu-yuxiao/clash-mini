@@ -210,15 +210,10 @@
           "warningColor": "Color de advertencia",
           "errorColor": "Color de error",
           "successColor": "Color de éxito",
-          "fontFamily": "Familia tipográfica",
-          "cssInjection": "Inyección de CSS"
+          "fontFamily": "Familia tipográfica"
         },
-        "actions": {
-          "editCss": "Edit CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Edit CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "Configuración de la interfaz",

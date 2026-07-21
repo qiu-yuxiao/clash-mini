@@ -210,15 +210,10 @@
           "warningColor": "Цвет предупреждения",
           "errorColor": "Цвет ошибки",
           "successColor": "Цвет успеха",
-          "fontFamily": "Семейство шрифтов",
-          "cssInjection": "Внедрение CSS"
+          "fontFamily": "Семейство шрифтов"
         },
-        "actions": {
-          "editCss": "Редактировать CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Редактирование CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "Настройки раскладки",

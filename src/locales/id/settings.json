@@ -210,15 +210,10 @@
           "warningColor": "Warna Peringatan",
           "errorColor": "Warna Kesalahan",
           "successColor": "Warna Keberhasilan",
-          "fontFamily": "Keluarga Font",
-          "cssInjection": "Injeksi CSS"
+          "fontFamily": "Keluarga Font"
         },
-        "actions": {
-          "editCss": "Edit CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Edit CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "Pengaturan Tata Letak",

@@ -210,15 +210,10 @@
           "warningColor": "Warnfarbe",
           "errorColor": "Fehlerfarbe",
           "successColor": "Erfolgsfarbe",
-          "fontFamily": "Schriftfamilie",
-          "cssInjection": "CSS-Einbindung"
+          "fontFamily": "Schriftfamilie"
         },
-        "actions": {
-          "editCss": "Edit CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Edit CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "Layout-Einstellungen",

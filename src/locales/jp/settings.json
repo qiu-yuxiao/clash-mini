@@ -210,15 +210,10 @@
           "warningColor": "警告色",
           "errorColor": "エラー色",
           "successColor": "成功色",
-          "fontFamily": "フォントファミリー",
-          "cssInjection": "CSSインジェクション"
+          "fontFamily": "フォントファミリー"
         },
-        "actions": {
-          "editCss": "Edit CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Edit CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "レイアウト設定",

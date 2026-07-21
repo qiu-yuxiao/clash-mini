@@ -210,15 +210,10 @@
           "warningColor": "لون التحذير",
           "errorColor": "لون الخطأ",
           "successColor": "لون النجاح",
-          "fontFamily": "عائلة الخط",
-          "cssInjection": "حقن CSS"
+          "fontFamily": "عائلة الخط"
         },
-        "actions": {
-          "editCss": "Edit CSS"
-        },
-        "dialogs": {
-          "editCssTitle": "Edit CSS"
-        }
+        "actions": {},
+        "dialogs": {}
       },
       "layout": {
         "title": "إعدادات التخطيط",
