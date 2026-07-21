@@ -882,8 +882,21 @@ pub fn start_background_monitor() {
                 let active_node_name = match get_active_node_name().await {
                     Some(name) => name,
                     None => {
-                        // API 不可达（内核崩了/未就绪）——静默跳过本次检测，不把空字符串
-                        // 当作"节点消失"写入日志，也不重置 last_active_node。
+                        // API 不可达（内核崩了/未就绪）。这本身也是一次 mihomo API 异常，
+                        // 累计到 api_error_count，与 evaluate_failover 返回的 Err 走同一套
+                        // 计数/阈值——使"内核全死"也能触发自愈尝试与告警日志，而非完全静默。
+                        api_error_count += 1;
+                        logging!(
+                            warn,
+                            Type::Lightweight,
+                            "[后台监测] 读取当前节点失败 (API不可达)，连续异常次数: {}",
+                            api_error_count
+                        );
+                        if api_error_count >= 3 {
+                            api_error_count = 0;
+                            logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
+                            let _ = trigger_backend_auto_select(&current_profile, None, 0, true, false).await;
+                        }
                         continue;
                     }
                 };
