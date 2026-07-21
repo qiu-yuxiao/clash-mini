@@ -211,9 +211,7 @@
           "errorColor": "Цвет ошибки",
           "successColor": "Цвет успеха",
           "fontFamily": "Семейство шрифтов"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "Настройки раскладки",

@@ -211,9 +211,7 @@
           "errorColor": "오류 색상",
           "successColor": "성공 색상",
           "fontFamily": "글꼴"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "레이아웃 설정",

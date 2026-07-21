@@ -211,9 +211,7 @@
           "errorColor": "Хата төсе",
           "successColor": "Уңыш төсе",
           "fontFamily": "Шрифтлар гаиләсе"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "Расположение көйләүләре",

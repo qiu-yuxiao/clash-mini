@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo, useRef } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'

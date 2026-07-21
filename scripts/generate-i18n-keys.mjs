@@ -59,7 +59,7 @@ const buildType = (data, indent = 0) => {
     ? `{
 ${inner}
 ${pad}}`
-    : '{}'
+    : 'Record<string, string>'
 }
 
 const loadNamespaceJson = async () => {

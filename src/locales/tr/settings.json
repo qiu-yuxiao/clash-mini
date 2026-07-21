@@ -211,9 +211,7 @@
           "errorColor": "Hata Rengi",
           "successColor": "Başarı Rengi",
           "fontFamily": "Yazı Tipi Ailesi"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "Düzen Ayarı",

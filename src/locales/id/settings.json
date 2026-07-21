@@ -211,9 +211,7 @@
           "errorColor": "Warna Kesalahan",
           "successColor": "Warna Keberhasilan",
           "fontFamily": "Keluarga Font"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "Pengaturan Tata Letak",

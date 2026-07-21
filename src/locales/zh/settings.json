@@ -211,9 +211,7 @@
           "errorColor": "错误颜色",
           "successColor": "成功颜色",
           "fontFamily": "字体系列"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "界面设置",

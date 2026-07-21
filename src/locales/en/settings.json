@@ -211,9 +211,7 @@
           "errorColor": "Error Color",
           "successColor": "Success Color",
           "fontFamily": "Font Family"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "Layout Setting",

@@ -211,9 +211,7 @@
           "errorColor": "Color de error",
           "successColor": "Color de éxito",
           "fontFamily": "Familia tipográfica"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "Configuración de la interfaz",

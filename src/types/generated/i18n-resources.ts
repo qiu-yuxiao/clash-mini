@@ -621,8 +621,6 @@ export interface TranslationResources {
             }
           }
           theme: {
-            actions: {}
-            dialogs: {}
             fields: {
               errorColor: string
               fontFamily: string

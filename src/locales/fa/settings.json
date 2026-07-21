@@ -211,9 +211,7 @@
           "errorColor": "رنگ خطا",
           "successColor": "رنگ موفقیت",
           "fontFamily": "خانواده فونت"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "تنظیمات چیدمان",

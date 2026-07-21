@@ -855,28 +855,22 @@ pub fn start_background_monitor() {
                 let active_node_name = match get_active_node_name().await {
                     Some(name) => name,
                     None => {
-                        // API 不可达（内核崩了/未就绪）。这本身也是一次 mihomo API 异常，
-                        // 累计到 api_error_count，与 evaluate_failover 返回的 Err 走同一套
-                        // 计数/阈值——使"内核全死"也能触发自愈尝试与告警日志，而非完全静默。
+                        // API 不可达（内核崩了/未就绪）。累计 api_error_count，
+                        // 达到阈值后统一走 self_heal_with_accounting 触发自愈，
+                        // 冷却/失败计数/Windows 警报与主路径、网络恢复路径完全一致，
+                        // 避免绕过 60 秒冷却导致内核全死时背靠背狂拨测。
                         api_error_count += 1;
-                        // 内核 API 不可达等价于一次自愈失败：同样累计 auto_select_fail_count，
-                        // 让"内核全死"在连续 5 次后也能弹出 Windows 警报（与正常选点失败路径一致）。
-                        auto_select_fail_count += 1;
                         logging!(
                             warn,
                             Type::Lightweight,
-                            "[后台监测] 读取当前节点失败 (API不可达)，连续异常次数: {}，连续失败次数: {}",
+                            "[后台监测] 读取当前节点失败 (API不可达)，连续异常次数: {}",
                             api_error_count,
-                            auto_select_fail_count
                         );
                         if api_error_count >= 3 {
                             api_error_count = 0;
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
-                            let _ = trigger_backend_auto_select(&current_profile, None, 0, true, false).await;
-                        }
-                        if auto_select_fail_count >= 5 {
-                            auto_select_fail_count = 0;
-                            fire_self_heal_alert();
+                            // 统一走冷却/计数/警报记账（与主路径、网络恢复、evaluate_failover Err 一致）
+                            self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
                         }
                         continue;
                     }

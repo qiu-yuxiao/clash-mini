@@ -211,9 +211,7 @@
           "errorColor": "لون الخطأ",
           "successColor": "لون النجاح",
           "fontFamily": "عائلة الخط"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "إعدادات التخطيط",

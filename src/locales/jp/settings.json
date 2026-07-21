@@ -211,9 +211,7 @@
           "errorColor": "エラー色",
           "successColor": "成功色",
           "fontFamily": "フォントファミリー"
-        },
-        "actions": {},
-        "dialogs": {}
+        }
       },
       "layout": {
         "title": "レイアウト設定",
