@@ -856,8 +856,8 @@ pub fn start_background_monitor() {
                         Type::Lightweight,
                         "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点"
                     );
-                    // 委托后端执行网络恢复自愈选点；结果经事件回写前端 UI
-                    let _ = trigger_backend_auto_select(&current_profile, None, 0, true, false).await;
+                    // 委托后端执行网络恢复自愈选点（统一走冷却/计数/警报记账，🟡6）
+                    self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
                 }
             } else if was_online && !is_online {
                 logging!(
@@ -945,74 +945,14 @@ pub fn start_background_monitor() {
                                     consecutive_fails = 0;
                                     is_retry_mode = false;
 
-                                    // 60 秒冷却保护：auto_select 失败后至少等 60 秒再重试
-                                    let now = Instant::now();
-                                    if let Some(last_time) = last_auto_select_time {
-                                        let elapsed = now.duration_since(last_time).as_secs();
-                                        if elapsed < 60 {
-                                            logging!(
-                                                debug,
-                                                Type::Lightweight,
-                                                "[后台监测] 自愈选点在 60 秒冷却中（已过 {} 秒），跳过本次",
-                                                elapsed
-                                            );
-                                            continue;
-                                        }
-                                    }
-                                    let prev_auto_select_time = last_auto_select_time;
-                                    last_auto_select_time = Some(now);
-
                                     logging!(
                                         info,
                                         Type::Lightweight,
                                         "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
                                     );
 
-                                    match trigger_backend_auto_select(&current_profile, None, 0, true, false).await {
-                                        Ok(outcome) => {
-                                            if outcome.selected {
-                                                auto_select_fail_count = 0; // 选点成功，重置失败计数
-                                            } else {
-                                                auto_select_fail_count += 1;
-                                                logging!(
-                                                    warn,
-                                                    Type::Lightweight,
-                                                    "[后台监测] 自愈选点未选出可用节点（所有节点不可达），连续失败次数: {}",
-                                                    auto_select_fail_count
-                                                );
-                                            }
-                                            last_check_time = Instant::now();
-                                        }
-                                        Err(e) => {
-                                            let err_str = e.to_string();
-                                            if err_str == "AUTO_SELECT_BUSY" {
-                                                logging!(
-                                                    info,
-                                                    Type::Lightweight,
-                                                    "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
-                                                );
-                                                // BUSY 不算失败，回退冷却时间戳，允许下次重试
-                                                last_auto_select_time = prev_auto_select_time;
-                                            } else {
-                                                auto_select_fail_count += 1;
-                                                logging!(
-                                                    warn,
-                                                    Type::Lightweight,
-                                                    "[后台监测] 自愈选点失败 ({}), 连续失败次数: {}",
-                                                    err_str,
-                                                    auto_select_fail_count
-                                                );
-                                            }
-                                            last_check_time = Instant::now();
-                                        }
-                                    }
-
-                                    // 连续 5 次 auto_select 失败 → Windows 系统警报
-                                    // （fire_self_heal_alert 内含 spawn_blocking + MessageBoxW 阻塞设计说明）
-                                    if auto_select_fail_count >= 5 {
-                                        auto_select_fail_count = 0;
-                                        fire_self_heal_alert();
-                                    }
+                                    // 统一走冷却/计数/警报记账（与网络恢复、API 异常路径一致，🟡6）
+                                    self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
                                 }
                             }
                         }
@@ -1034,26 +974,8 @@ pub fn start_background_monitor() {
                         if api_error_count >= 3 {
                             api_error_count = 0;
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
-                            // 承接上方注释承诺：内核 API 不可达导致的自愈失败同样累计
-                            // auto_select_fail_count，连续 5 次后弹出 Windows 警报（与 None 分支一致）。
-                            match trigger_backend_auto_select(&current_profile, None, 0, true, false).await {
-                                Ok(outcome) => {
-                                    if outcome.selected {
-                                        auto_select_fail_count = 0;
-                                    } else {
-                                        auto_select_fail_count += 1;
-                                    }
-                                }
-                                Err(e) => {
-                                    if e.to_string() != "AUTO_SELECT_BUSY" {
-                                        auto_select_fail_count += 1;
-                                    }
-                                }
-                            }
-                            if auto_select_fail_count >= 5 {
-                                auto_select_fail_count = 0;
-                                fire_self_heal_alert();
-                            }
+                            // 统一走冷却/计数/警报记账（与网络恢复、主路径一致，🟡6）
+                            self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
                         }
                     }
                 }
@@ -1089,6 +1011,87 @@ fn fire_self_heal_alert() {
             "后台自动优选节点连续 5 次失败，当前所有代理节点均已失效，无法正常连接网络。\n\n请检查您的网络连接或节点订阅状态。",
         );
     });
+}
+
+/// 执行一次自愈选点并统一记账：60 秒冷却保护 + auto_select_fail_count 累计 +
+/// 连续 5 次弹 Windows 警报。
+///
+/// 后台监测的三处自愈触发路径（主路径 / 网络恢复 / API 异常）共用本函数，
+/// 避免冷却与计数逻辑各写一份导致行为不一致（🟡6）。
+///
+/// - 冷却：auto_select 失败后至少等 60 秒再重试；处于冷却中直接返回 false 跳过。
+/// - 计数：选点成功归零；失败或非 BUSY 报错加 1；AUTO_SELECT_BUSY 冲突不计失败、
+///   回退冷却时间戳允许下次重试。
+/// - 警报：连续 5 次失败弹 Windows 提示框（fire_self_heal_alert，内部 spawn_blocking）。
+///
+/// 返回 true 表示实际发起了自愈（不在冷却中），false 表示处于冷却中被跳过。
+async fn self_heal_with_accounting(
+    profile_uid: &str,
+    auto_select_fail_count: &mut u32,
+    last_auto_select_time: &mut Option<Instant>,
+    last_check_time: &mut Instant,
+) -> bool {
+    // 60 秒冷却保护：auto_select 失败后至少等 60 秒再重试
+    let now = Instant::now();
+    if let Some(last_time) = *last_auto_select_time {
+        let elapsed = now.duration_since(last_time).as_secs();
+        if elapsed < 60 {
+            logging!(
+                debug,
+                Type::Lightweight,
+                "[后台监测] 自愈选点在 60 秒冷却中（已过 {} 秒），跳过本次",
+                elapsed
+            );
+            return false;
+        }
+    }
+    let prev_auto_select_time = *last_auto_select_time;
+    *last_auto_select_time = Some(now);
+
+    match trigger_backend_auto_select(profile_uid, None, 0, true, false).await {
+        Ok(outcome) => {
+            if outcome.selected {
+                *auto_select_fail_count = 0;
+            } else {
+                *auto_select_fail_count += 1;
+                logging!(
+                    warn,
+                    Type::Lightweight,
+                    "[后台监测] 自愈选点未选出可用节点（所有节点不可达），连续失败次数: {}",
+                    *auto_select_fail_count
+                );
+            }
+        }
+        Err(e) => {
+            let err_str = e.to_string();
+            if err_str == "AUTO_SELECT_BUSY" {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
+                );
+                // BUSY 不算失败，回退冷却时间戳，允许下次重试
+                *last_auto_select_time = prev_auto_select_time;
+            } else {
+                *auto_select_fail_count += 1;
+                logging!(
+                    warn,
+                    Type::Lightweight,
+                    "[后台监测] 自愈选点失败 ({}), 连续失败次数: {}",
+                    err_str,
+                    *auto_select_fail_count
+                );
+            }
+        }
+    }
+    *last_check_time = Instant::now();
+
+    // 连续 5 次 auto_select 失败 → Windows 系统警报
+    if *auto_select_fail_count >= 5 {
+        *auto_select_fail_count = 0;
+        fire_self_heal_alert();
+    }
+    true
 }
 
 #[cfg(test)]

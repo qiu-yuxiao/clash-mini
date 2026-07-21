@@ -14,7 +14,8 @@
 | 🔴2 | proxy_head_state.json 非原子写 | ✅ 已修已提交 `159a4fe9` | 新增 `help::save_json`（原子写范式复用 save_yaml），读取失败补 warn! |
 | 🔴3 | destroy_main_window oneshot 无超时 | ✅ 已修已提交 `4b566b72` | `rx.await` 包 `timeout(5s)`，与 `activate_window` 对齐；超时/oneshot丢弃返 Failed |
 | 🟡4 | 设计书 §4.3/§5.1 周期脱节（60s/300s 空话） | ✅ 已改设计书（路线 B，未动代码） | §4.3 改「后台监测周期恒定」，§5.1「300秒」→「15秒」，BUG-257 设计确认 |
-| 🟡5 | 内核全死时「连续 3 次 API 异常触发自愈」永不触发 | ✅ 已修已提交 `2aac6ee9` | None 分支也累计 `api_error_count`，满 3 次触发自愈，复用现有计数器/阈值（路线 A） |
+| 🟡5 | 内核全死时「连续 3 次 API 异常触发自愈」永不触发；内核死不弹 Windows 警报 | ✅ 已修 `69cb4815`+`33a48961`+`6c3ed33b` | None/Err 分支累计 `api_error_count` 触发自愈；None/Err 分支累计 `auto_select_fail_count` 满 5 次弹 Windows 警报 |
+| 🟡6 | 网络恢复/API异常两条自愈路径绕过 60s 冷却与失败计数 | ✅ 已修（统一 helper） | 抽 `self_heal_with_accounting()`，主/网络恢复/API异常三处自愈统一走冷却+计数+警报记账 |
 
 ## 一、总体判断
 
@@ -63,12 +64,12 @@
 - 影响：设计书 §5.1 专门为「内核卡死」准备的自愈，在内核彻底挂掉（连节点名都拿不到）的场景下一次都不计数——恰恰在最需要它的场景失效。表现就是内核真死时 monitor 安静空转，不断流告警也没有。
 - 定位：`monitor.rs:882-889`，`get_active_node_name()` 返回 None 时 `continue` 发生在 `evaluate_failover` 之前，`api_error_count` 跳过累加。
 - 修复（路线 A）：None 分支同样累加 `api_error_count`，满 3 次触发自愈尝试，复用现有计数器与阈值。内核死亡时不再静默，每轮打 warn 日志、每 3 轮尝试自愈。
-- 残余：该 API 异常自愈触发路径与既有 `:1026` 路径一致，只尝试自愈、不累计 `auto_select_fail_count`，故内核全死时**仍不会弹 Windows 警报**（警报仅由 `consecutive_fails` 路径驱动，需内核存活）。如需内核死也升级到警报，需另加结果记账——列为可选后续。
+- 残余（已补齐）：原「内核全死不弹 Windows 警报」已在 `33a48961`（None 分支）+ `6c3ed33b`（Err 分支）补齐——两条路径现均累计 `auto_select_fail_count`，满 5 次弹 Windows 警报。最终 🟡6 又将三处自愈统一收口到 `self_heal_with_accounting()`（冷却+计数+警报一份实现）。
 
-**🟡 6. 网络恢复/触发的两条自愈路径绕过冷却与失败计数**
+**🟡 6. 网络恢复/触发的两条自愈路径绕过冷却与失败计数** ✅ 已修（统一 helper）
 - 影响：网络抖动（Wi-Fi 反复掉线重连）时可能背靠背触发全组拨测；且这两条路径不更新 `last_auto_select_time`、不累计 `auto_select_fail_count`，导致「连续 5 次失败弹窗告警」对它们永远不可达——真出问题用户收不到告警。
-- 定位：`monitor.rs:853`（网络恢复自愈）、`monitor.rs:1022`（API 异常自愈），对照主路径冷却 :920-935。
-- 修复方向：两条路径统一走主路径的冷却/计数记账。
+- 定位：`monitor.rs`（网络恢复自愈）、`monitor.rs`（API 异常自愈 Err 分支），对照主路径冷却。
+- 修复（治本，用户选路线）：抽 `self_heal_with_accounting(profile_uid, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time)`，三处自愈调用（主路径 `consecutive_fails>=2` / 网络恢复 / API 异常）统一走同一份冷却(60s)+失败计数+5次警报记账，消除三处重复与行为不一致。
 
 **🟡 7. `ACTIVE_TASKS` 是死设施："Profile 切换中止旧测速"是死代码**
 - 影响：切换 Profile 后，旧的选点任务仍持互斥锁跑到自然结束（最坏约 4 秒+），实际防串靠 uid 双重校验（:608-620）兜底——兜底是有效的，但注释承诺的中止机制不存在，误导后来者。
@@ -150,7 +151,7 @@
 |---|---|---|
 | §4.3/§5.1 活跃 60s、轻量 300s 自适应周期；BUG-257 已完成 | 恒 15s，轻量状态不进 sleep 决策（monitor.rs:694-702） | ✅ 已改设计书承认现状（路线 B）：§4.3 改「后台监测周期恒定」，§5.1「300 秒」→「15 秒」 |
 | §5.5 后端并发测速上限 32 | 已改单次 `delay_group`，并发归内核 url-test（commit 49212979 已删 worker 池） | 改设计书描述 |
-| §5.1 连续 3 次 API 异常触发自愈 | 内核全死场景永不计数（见 🟡5） | ✅ 已修代码 `2aac6ee9`（None 分支累计 api_error_count）；仍不弹 Windows 警报，属可选后续 |
+| §5.1 连续 3 次 API 异常触发自愈 | 内核全死场景永不计数（见 🟡5） | ✅ 已修代码（None/Err 分支累计 api_error_count + auto_select_fail_count，见 🟡5 及后续提交）；三处自愈已收口到 `self_heal_with_accounting()`（🟡6） |
 | §5.1「monitor 快照变量防遮蔽」编码规范 | 无对应变量存在 | 删除或恢复机制后保留 |
 | §5.5 F4「仅对子集并发测速」 | 实际对全组拨测、子集内挑最快（无害但字面不符） | 改描述为「全组拨测、子集优选」 |
 
