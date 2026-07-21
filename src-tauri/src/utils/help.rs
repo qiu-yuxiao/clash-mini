@@ -3,6 +3,7 @@ use anyhow::{Context as _, Result, anyhow, bail};
 use clash_verge_logging::{Type, logging};
 use nanoid::nanoid;
 use serde::{Serialize, de::DeserializeOwned};
+use serde_json;
 use serde_yaml_ng::Mapping;
 use std::{path::PathBuf, str::FromStr};
 
@@ -111,6 +112,61 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
 
     if let Err(e) = result {
         let backup_path = path.with_extension("yaml.bak");
+        let _ = std::fs::rename(&tmp_path, &backup_path);
+        return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (atomic rename failed)"));
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+    Ok(())
+}
+
+/// save the data to a JSON file
+/// 使用原子写入（临时文件 + rename）避免写入中途损坏导致读取方解析失败
+/// （例如 proxy_head_state.json 若被撕裂写入，读取方会静默退化为默认值，可能让选点范围越界）
+/// 注意：JSON 文件以明文存储，不套用 save_yaml 的加密层，以兼容现有明文读取方
+pub async fn save_json<T: Serialize + Sync>(path: &PathBuf, data: &T) -> Result<()> {
+    let data_str = serde_json::to_string_pretty(data)
+        .with_context(|| format!("failed to serialize json for \"{}\"", path.display()))?;
+    let json_bytes = data_str.as_bytes();
+
+    // 内容未变化时跳过写入，减少不必要的磁盘 IO
+    if let Ok(existing_bytes) = tokio::fs::read(path).await {
+        if existing_bytes == json_bytes {
+            return Ok(());
+        }
+    }
+
+    // 原子写入：先写临时文件，再 rename 到目标文件
+    let parent_dir = path
+        .parent()
+        .ok_or_else(|| anyhow!("failed to get parent directory of \"{}\"", path.display()))?;
+
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| anyhow!("failed to get file name of \"{}\"", path.display()))?;
+
+    let tmp_file_name = format!("{}.tmp_{}", file_name.to_string_lossy(), std::process::id());
+    let tmp_path = parent_dir.join(tmp_file_name);
+
+    let path_str = path.as_os_str().to_string_lossy().to_string();
+    let tmp_path_str = tmp_path.as_os_str().to_string_lossy().to_string();
+
+    tokio::fs::write(&tmp_path, json_bytes)
+        .await
+        .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
+
+    // 原子替换文件：
+    // - Windows: 使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
+    // - 其他平台: 直接 rename，系统原生支持覆盖
+    let result = if cfg!(windows) {
+        move_file_ex_replace(&tmp_path, path)
+    } else {
+        std::fs::rename(&tmp_path, path)
+    };
+
+    if let Err(e) = result {
+        let backup_path = path.with_extension("json.bak");
         let _ = std::fs::rename(&tmp_path, &backup_path);
         return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (atomic rename failed)"));
     }

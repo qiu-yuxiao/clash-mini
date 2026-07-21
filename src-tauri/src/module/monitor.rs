@@ -150,7 +150,14 @@ async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<
     };
     let json_val: serde_json::Value = match serde_json::from_str(&content) {
         Ok(v) => v,
-        Err(_) => return (FilterConfig::default(), None),
+        Err(e) => {
+            logging!(
+                warn,
+                Type::Config,
+                "[后台监测] proxy_head_state.json 解析失败，退化为默认（全量池）: {e}"
+            );
+            return (FilterConfig::default(), None);
+        }
     };
 
     let group_state = &json_val[profile_uid]["PROXY"];
