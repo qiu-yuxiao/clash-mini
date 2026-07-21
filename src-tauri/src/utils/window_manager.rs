@@ -500,16 +500,43 @@ impl WindowManager {
         }) {
             Ok(_) => {
                 // 等待主线程上的销毁闭包执行完毕，并持久化读取到的尺寸
-                if let Ok(Some((w, h))) = rx.await {
-                    save_window_size(w, h).await;
+                // 加 5 秒超时保护：主线程被模态循环/COM 调用占用时不会永久阻塞（与 activate_window 一致）
+                match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
+                    Ok(Ok(Some((w, h)))) => {
+                        save_window_size(w, h).await;
+                        logging!(info, Type::Window, "窗口已摧毁");
+                        #[cfg(target_os = "macos")]
+                        {
+                            logging!(info, Type::Window, "应用 macOS 特定的激活策略");
+                            handle::Handle::global().set_activation_policy_accessory();
+                        }
+                        WindowOperationResult::Destroyed
+                    }
+                    Ok(Ok(None)) => {
+                        // 主线程执行了闭包但未能读取尺寸（窗口已销毁或读失败），仍视为已销毁
+                        logging!(info, Type::Window, "窗口已摧毁（未获取到尺寸）");
+                        #[cfg(target_os = "macos")]
+                        {
+                            logging!(info, Type::Window, "应用 macOS 特定的激活策略");
+                            handle::Handle::global().set_activation_policy_accessory();
+                        }
+                        WindowOperationResult::Destroyed
+                    }
+                    Ok(Err(_)) => {
+                        // oneshot 发送端被丢弃（主线程闭包未回报），不再乐观宣称已摧毁
+                        logging!(warn, Type::Window, "接收窗口销毁结果失败（oneshot 发送端被丢弃），返回 Failed");
+                        WindowOperationResult::Failed
+                    }
+                    Err(_) => {
+                        // 主线程 5s 内未执行闭包（被模态循环/COM 阻塞），窗口保持原状，避免永久挂死
+                        logging!(
+                            error,
+                            Type::Window,
+                            "窗口销毁超时 5s（主线程可能被模态循环阻塞或 IPC 队列堆积），返回 Failed"
+                        );
+                        WindowOperationResult::Failed
+                    }
                 }
-                logging!(info, Type::Window, "窗口已摧毁");
-                #[cfg(target_os = "macos")]
-                {
-                    logging!(info, Type::Window, "应用 macOS 特定的激活策略");
-                    handle::Handle::global().set_activation_policy_accessory();
-                }
-                WindowOperationResult::Destroyed
             }
             Err(e) => {
                 logging!(warn, Type::Window, "调度窗口销毁到主线程失败: {}", e);
