@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
@@ -44,6 +45,7 @@ interface ProxyChangeRequest {
 export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   const { current, patchCurrent } = useProfiles()
   const { verge } = useVerge()
+  const queryClient = useQueryClient()
   const pendingRequestRef = useRef<ProxyChangeRequest | null>(null)
   const isProcessingRef = useRef(false)
 
@@ -83,6 +85,10 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         await selectNodeForGroupWithTimeout(groupName, proxyName)
         onSuccess?.()
         persistSelection(proxyName, skipConfigSave)
+        // 手动切节点后主动失效 ['getProxies'] 缓存，使活跃节点高亮与内核 now 同步。
+        // 自动选点由后端 refresh_proxies() 经 refresh-proxy-config 事件触发同样的失效，
+        // 手动路径此前漏了这一拍，导致高亮停在旧节点直到下次无关刷新。
+        void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
         debugLog(
           `[ProxySelection] 代理和状态同步完成: ${groupName} -> ${proxyName}`,
         )
@@ -102,7 +108,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
         onError?.(error)
       }
     },
-    [config, onError, onSuccess, persistSelection],
+    [config, onError, onSuccess, persistSelection, queryClient],
   )
 
   // L-27: flushChangeQueue 看起来有递归调用（finally 中可能再次调用自己），
