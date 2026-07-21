@@ -886,16 +886,24 @@ pub fn start_background_monitor() {
                         // 累计到 api_error_count，与 evaluate_failover 返回的 Err 走同一套
                         // 计数/阈值——使"内核全死"也能触发自愈尝试与告警日志，而非完全静默。
                         api_error_count += 1;
+                        // 内核 API 不可达等价于一次自愈失败：同样累计 auto_select_fail_count，
+                        // 让"内核全死"在连续 5 次后也能弹出 Windows 警报（与正常选点失败路径一致）。
+                        auto_select_fail_count += 1;
                         logging!(
                             warn,
                             Type::Lightweight,
-                            "[后台监测] 读取当前节点失败 (API不可达)，连续异常次数: {}",
-                            api_error_count
+                            "[后台监测] 读取当前节点失败 (API不可达)，连续异常次数: {}，连续失败次数: {}",
+                            api_error_count,
+                            auto_select_fail_count
                         );
                         if api_error_count >= 3 {
                             api_error_count = 0;
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
                             let _ = trigger_backend_auto_select(&current_profile, None, 0, true, false).await;
+                        }
+                        if auto_select_fail_count >= 5 {
+                            auto_select_fail_count = 0;
+                            fire_self_heal_alert();
                         }
                         continue;
                     }
@@ -1000,23 +1008,10 @@ pub fn start_background_monitor() {
                                     }
 
                                     // 连续 5 次 auto_select 失败 → Windows 系统警报
-                                    // 注意：show_error_dialog 内部使用 MessageBoxW 同步阻塞调用，
-                                    // 这会阻塞当前 tokio worker 线程直到用户点击"确定"。
-                                    // 这是有意为之的设计：5次失败说明网络环境已严重恶化，
-                                    // 继续健康检测和自愈已无意义，弹窗期间停下来等用户处理是正确行为。
+                                    // （fire_self_heal_alert 内含 spawn_blocking + MessageBoxW 阻塞设计说明）
                                     if auto_select_fail_count >= 5 {
                                         auto_select_fail_count = 0;
-                                        logging!(
-                                            warn,
-                                            Type::Lightweight,
-                                            "[后台监测] 连续 5 次自愈选点失败，弹出 Windows 提示框"
-                                        );
-                                        tokio::task::spawn_blocking(|| {
-                                            crate::show_error_dialog(
-                                                "Clash Mini - 网络警报",
-                                                "后台自动优选节点连续 5 次失败，当前所有代理节点均已失效，无法正常连接网络。\n\n请检查您的网络连接或节点订阅状态。",
-                                            );
-                                        });
+                                        fire_self_heal_alert();
                                     }
                                 }
                             }
@@ -1055,6 +1050,26 @@ pub fn start_background_monitor() {
         );
         e.into_inner()
     }) = Some(handle);
+}
+
+/// 连续 5 次自愈失败 / 内核 API 不可达后，弹出 Windows 系统警报框。
+///
+/// 内部使用 `tokio::task::spawn_blocking` 包住 `show_error_dialog`
+/// （其底层为 MessageBoxW 同步阻塞调用，会阻塞当前 tokio worker 线程直到用户点击"确定"）。
+/// 这是有意为之：连续 5 次失败说明网络环境已严重恶化，继续健康检测与自愈已无意义，
+/// 弹窗期间停下来等用户处理是正确行为。
+fn fire_self_heal_alert() {
+    logging!(
+        warn,
+        Type::Lightweight,
+        "[后台监测] 连续 5 次自愈选点失败，弹出 Windows 提示框"
+    );
+    tokio::task::spawn_blocking(|| {
+        crate::show_error_dialog(
+            "Clash Mini - 网络警报",
+            "后台自动优选节点连续 5 次失败，当前所有代理节点均已失效，无法正常连接网络。\n\n请检查您的网络连接或节点订阅状态。",
+        );
+    });
 }
 
 #[cfg(test)]
