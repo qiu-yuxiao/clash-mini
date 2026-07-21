@@ -140,9 +140,7 @@ pub async fn save_window_size_on_resize(width: f64, height: f64) {
 
 /// 读取上次保存的窗口尺寸，失败或不存在返回 None
 pub async fn restore_window_size() -> Option<(f64, f64)> {
-    let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
-        return None;
-    };
+    let home = crate::utils::dirs::app_home_dir().ok()?;
     let path = home.join("window_state.json");
     let content = tokio::fs::read_to_string(&path).await.ok()?;
     let state: WindowSizeState = serde_json::from_str(&content).ok()?;
