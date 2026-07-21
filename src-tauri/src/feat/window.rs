@@ -12,9 +12,6 @@ pub async fn prepare_exit() {
     // 设置退出标志
     handle::Handle::global().set_is_exiting();
 
-    // 中止活跃的测速任务
-    crate::module::monitor::abort_all_active_tasks();
-
     // 中止后台 monitor 常驻线程
     crate::module::monitor::abort_monitor();
 

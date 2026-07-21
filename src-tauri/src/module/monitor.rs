@@ -6,31 +6,13 @@ use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::task::AbortHandle;
 use tokio::time::{Duration, Instant, sleep};
 
 /// 互斥锁：同一时间只允许一个 trigger_backend_auto_select 运行
 static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// 全局持有的正在运行的任务句柄，用于在 Profile 切换时进行主动中止
-static ACTIVE_TASKS: Mutex<Vec<AbortHandle>> = Mutex::new(Vec::new());
-
 /// 后台 monitor 任务的 JoinHandle，用于退出时主动中止
 static MONITOR_TASK_HANDLE: Mutex<Option<tauri::async_runtime::JoinHandle<()>>> = Mutex::new(None);
-
-/// 中止所有活跃的测速任务（应用退出/重启时调用）
-pub fn abort_all_active_tasks() {
-    let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| {
-        logging!(warn, Type::Lightweight, "ACTIVE_TASKS 锁被中毒线程污染，恢复继续");
-        e.into_inner()
-    });
-    for handle in active.drain(..) {
-        handle.abort();
-    }
-    drop(active);
-    // 短暂等待，确保任务退出
-    std::thread::sleep(std::time::Duration::from_millis(50));
-}
 
 /// 中止后台 monitor 常驻任务
 pub fn abort_monitor() {
@@ -791,16 +773,7 @@ pub fn start_background_monitor() {
                                     last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                                 }
                                 _ = PROFILE_SWITCH_NOTIFY.notified() => {
-                                    logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，中止旧测速任务并立即唤醒");
-                                    // 中止旧Profile的测速任务，释放AUTO_SELECT_RUNNING锁
-                                    let mut active = ACTIVE_TASKS.lock().unwrap_or_else(|e| {
-                    logging!(warn, Type::Lightweight, "ACTIVE_TASKS 锁被中毒线程污染，恢复继续");
-                    e.into_inner()
-                });
-                                    for handle in active.drain(..) {
-                                        handle.abort();
-                                    }
-                                    drop(active);
+                                    logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒监测");
                                     last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                                 }
                             }

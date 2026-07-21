@@ -16,6 +16,7 @@
 | 🟡4 | 设计书 §4.3/§5.1 周期脱节（60s/300s 空话） | ✅ 已改设计书（路线 B，未动代码） | §4.3 改「后台监测周期恒定」，§5.1「300秒」→「15秒」，BUG-257 设计确认 |
 | 🟡5 | 内核全死时「连续 3 次 API 异常触发自愈」永不触发；内核死不弹 Windows 警报 | ✅ 已修 `69cb4815`+`33a48961`+`6c3ed33b` | None/Err 分支累计 `api_error_count` 触发自愈；None/Err 分支累计 `auto_select_fail_count` 满 5 次弹 Windows 警报 |
 | 🟡6 | 网络恢复/API异常两条自愈路径绕过 60s 冷却与失败计数 | ✅ 已修（统一 helper） | 抽 `self_heal_with_accounting()`，主/网络恢复/API异常三处自愈统一走冷却+计数+警报记账 |
+| 🟡7 | `ACTIVE_TASKS` 死设施："Profile 切换中止旧测速"是空转幽灵机制 | ✅ 已修（方式一：删除） | 删 `AbortHandle` 导入/`ACTIVE_TASKS` 队列/`abort_all_active_tasks()` 函数/主循环空转中止块/`window.rs:16` 调用；正确性仍由 uid 双重校验兜底 |
 
 ## 一、总体判断
 
@@ -71,10 +72,10 @@
 - 定位：`monitor.rs`（网络恢复自愈）、`monitor.rs`（API 异常自愈 Err 分支），对照主路径冷却。
 - 修复（治本，用户选路线）：抽 `self_heal_with_accounting(profile_uid, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time)`，三处自愈调用（主路径 `consecutive_fails>=2` / 网络恢复 / API 异常）统一走同一份冷却(60s)+失败计数+5次警报记账，消除三处重复与行为不一致。
 
-**🟡 7. `ACTIVE_TASKS` 是死设施："Profile 切换中止旧测速"是死代码**
+**🟡 7. `ACTIVE_TASKS` 是死设施："Profile 切换中止旧测速"是死代码** ✅ 已修（方式一：删除）
 - 影响：切换 Profile 后，旧的选点任务仍持互斥锁跑到自然结束（最坏约 4 秒+），实际防串靠 uid 双重校验（:608-620）兜底——兜底是有效的，但注释承诺的中止机制不存在，误导后来者。
 - 定位：`monitor.rs:16` 的 Vec 从无 push；`abort_all_active_tasks`（:22）与 :786-798 的调用点全是空转。
-- 修复方向：要么真实现（push AbortHandle），要么删掉设施和注释，别留「幽灵机制」。
+- 修复（用户拍板方式一，commit 见下）：删除 `AbortHandle` 导入、`ACTIVE_TASKS` 队列、`abort_all_active_tasks()` 函数、`monitor.rs` 主循环里那段空转的「中止旧测速」块、以及 `feat/window.rs:16` 的调用。正确性仍由 uid 双重校验兜底，删后零副作用，代码消除「幽灵机制」。
 
 ### 3.2 信息传导
 
