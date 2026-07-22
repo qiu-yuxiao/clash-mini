@@ -80,17 +80,12 @@ bitflags! {
         const LAUNCH = 1 << 3;
         const SYS_PROXY = 1 << 4;
         const SYSTRAY_ICON = 1 << 5;
-        const SYSTRAY_MENU = 1 << 7;
-        const SYSTRAY_TOOLTIP = 1 << 8;
-        const SYSTRAY_CLICK_BEHAVIOR = 1 << 9;
         const LANGUAGE = 1 << 11;
         const LOG_LEVEL = 1 << 12;
         const LOG_FILE = 1 << 13;
         const ALWAYS_ON_TOP = 1 << 14;
 
-        const GROUP_SYS_TRAY = Self::SYSTRAY_MENU.bits()
-                             | Self::SYSTRAY_TOOLTIP.bits()
-                             | Self::SYSTRAY_ICON.bits();
+        const GROUP_SYS_TRAY = Self::SYSTRAY_ICON.bits();
      }
 }
 
@@ -124,12 +119,10 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     #[cfg(not(target_os = "macos"))]
     let enable_tray_speed: Option<bool> = None;
     // let enable_tray_icon = patch.enable_tray_icon;
-    let tray_event = &patch.tray_event;
     let home_cards = patch.home_cards.as_ref();
     // enable_auto_light_weight_mode 现由 entry_lightweight_mode 直接读取配置判断，
     // 不再需要空壳函数 enable/disable_auto_light_weight_mode，相关 UpdateFlags 已移除。
     let enable_external_controller = patch.enable_external_controller;
-    let tray_inline_outbound_modes = patch.tray_inline_outbound_modes;
     let enable_proxy_guard = patch.enable_proxy_guard;
     let proxy_guard_duration = patch.proxy_guard_duration;
     let log_level = &patch.app_log_level;
@@ -173,7 +166,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
         || enable_dns_settings.is_some()
         || enable_builtin_enhanced.is_some()
     {
-        update_flags.insert(UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY | UpdateFlags::SYSTRAY_ICON);
+        update_flags.insert(UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY);
     }
     if home_cards.is_some() || patch.theme_mode.is_some() || patch.theme_setting.is_some() {
         update_flags.insert(UpdateFlags::VERGE_CONFIG);
@@ -182,7 +175,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
         update_flags.insert(UpdateFlags::LAUNCH);
     }
     if system_proxy.is_some() || mixed_port.is_some() {
-        update_flags.insert(UpdateFlags::SYS_PROXY | UpdateFlags::GROUP_SYS_TRAY | UpdateFlags::SYSTRAY_ICON);
+        update_flags.insert(UpdateFlags::SYS_PROXY | UpdateFlags::GROUP_SYS_TRAY);
     }
     if proxy_bypass.is_some()
         || pac_content.is_some()
@@ -193,13 +186,10 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
         update_flags.insert(UpdateFlags::SYS_PROXY);
     }
     if language.is_some() {
-        update_flags.insert(UpdateFlags::LANGUAGE | UpdateFlags::SYSTRAY_MENU | UpdateFlags::SYSTRAY_TOOLTIP);
+        update_flags.insert(UpdateFlags::LANGUAGE);
     }
     if tray_icon.is_some() || enable_tray_speed.is_some() {
         update_flags.insert(UpdateFlags::SYSTRAY_ICON);
-    }
-    if tray_event.is_some() {
-        update_flags.insert(UpdateFlags::SYSTRAY_CLICK_BEHAVIOR);
     }
     if log_level.is_some() {
         update_flags.insert(UpdateFlags::LOG_LEVEL);
@@ -210,10 +200,6 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     if enable_always_on_top.is_some() {
         update_flags.insert(UpdateFlags::ALWAYS_ON_TOP);
     }
-    if tray_inline_outbound_modes.is_some() {
-        update_flags.insert(UpdateFlags::SYSTRAY_MENU);
-    }
-
     update_flags
 }
 

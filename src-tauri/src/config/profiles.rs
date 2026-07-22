@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use serde_yaml_ng::Mapping;
 use smartstring::alias::String;
 use std::collections::HashSet;
-use tokio::fs;
 
 /// Define the `profiles.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -165,7 +164,6 @@ impl IProfiles {
                         .ok_or_else(|| anyhow::anyhow!("file field is required in existing item"))?;
                     let path = dirs::app_profiles_dir()?.join(file.as_str());
                     write_file_if_changed(&path, file_data.as_bytes())
-                        .await
                         .with_context(|| format!("failed to write to file \"{file}\""))?;
                 }
                 return Ok(());
@@ -186,7 +184,6 @@ impl IProfiles {
             let path = dirs::app_profiles_dir()?.join(file.as_str());
 
             write_file_if_changed(&path, file_data.as_bytes())
-                .await
                 .with_context(|| format!("failed to write to file \"{file}\""))?;
         }
 
@@ -288,7 +285,6 @@ impl IProfiles {
                         let path = dirs::app_profiles_dir()?.join(file.as_str());
 
                         write_file_if_changed(&path, file_data.as_bytes())
-                            .await
                             .with_context(|| format!("failed to write to file \"{file}\""))?;
                     }
 
@@ -402,7 +398,7 @@ impl IProfiles {
     }
 
     /// 以 app 中的 profile 列表为准，删除不再需要的文件
-    pub async fn cleanup_orphaned_files(&self) -> Result<()> {
+    pub fn cleanup_orphaned_files(&self) -> Result<()> {
         let profiles_dir = dirs::app_profiles_dir()?;
 
         if !profiles_dir.exists() {
@@ -420,8 +416,9 @@ impl IProfiles {
         let mut deleted_files = 0;
         let mut failed_deletions = 0;
 
-        let mut dir_entries = tokio::fs::read_dir(&profiles_dir).await?;
-        while let Some(entry) = dir_entries.next_entry().await? {
+        let mut dir_entries = std::fs::read_dir(&profiles_dir)?;
+        while let Some(entry) = dir_entries.next() {
+            let entry = entry?;
             let path = entry.path();
 
             if !path.is_file() {
@@ -629,16 +626,16 @@ pub async fn profiles_draft_update_item_safe(index: &String, item: &mut PrfItem)
         .await
 }
 
-async fn write_file_if_changed<P: AsRef<std::path::Path>>(path: P, content: &[u8]) -> std::io::Result<()> {
+fn write_file_if_changed<P: AsRef<std::path::Path>>(path: P, content: &[u8]) -> std::io::Result<()> {
     let path = path.as_ref();
     let mut write_needed = true;
-    if let Ok(existing) = fs::read(path).await {
+    if let Ok(existing) = std::fs::read(path) {
         if existing == content {
             write_needed = false;
         }
     }
     if write_needed {
-        fs::write(path, content).await?;
+        std::fs::write(path, content)?;
     }
     Ok(())
 }
