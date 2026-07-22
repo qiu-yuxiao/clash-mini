@@ -75,13 +75,25 @@ pub async fn change_clash_mode(mode: String) -> anyhow::Result<()> {
     match mihomo.patch_base_config(&json_value).await {
         Ok(_) => {
             let clash = Config::clash().await;
+            let old_config = clash.latest_arc().0.clone();
             clash.edit_draft(|d| d.patch_config(&mapping));
             clash.apply();
 
             let clash_data = clash.data_arc();
-            if clash_data.save_config().is_ok() {
-                handle::Handle::refresh_clash();
+            if let Err(save_err) = clash_data.save_config() {
+                logging!(
+                    error,
+                    Type::Core,
+                    "保存 Clash 配置到文件失败，回滚内存 Draft: {}",
+                    save_err
+                );
+                // 与 patch_clash 对齐：落盘失败时回滚内存 Draft，保证 draft == 文件 == 旧值
+                clash.edit_draft(|d| d.0 = old_config);
+                clash.apply();
+                return Err(save_err);
             }
+
+            handle::Handle::refresh_clash();
 
             let is_auto_close_connection = Config::verge().await.data_arc().auto_close_connection.unwrap_or(false);
             if is_auto_close_connection {
