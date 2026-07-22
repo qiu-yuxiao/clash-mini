@@ -143,7 +143,8 @@ static LAST_RESIZE_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 
 /// 同步版本：在 Resized 事件中直接调用，不 spawn 异步任务。
 /// 0×0 守卫：w.destroy() 会触发 Resized(0,0)，必须拒绝此无效值。
-pub fn save_window_size_on_resize_sync(width: f64, height: f64) {
+/// force 参数：拖拽结束或失焦事件触发尾沿 Persistence 写入时设为 true 强行落盘。
+pub fn save_window_size_on_resize_sync(width: f64, height: f64, force: bool) {
     if width < crate::utils::resolve::window::MINIMAL_WIDTH
         || height < crate::utils::resolve::window::MINIMAL_HEIGHT
     {
@@ -154,7 +155,7 @@ pub fn save_window_size_on_resize_sync(width: f64, height: f64) {
         .unwrap_or_default()
         .as_millis() as i64;
     let last = LAST_RESIZE_SAVE_MS.load(Ordering::Relaxed);
-    if now - last < 250 {
+    if !force && (now - last < 250) {
         return;
     }
     LAST_RESIZE_SAVE_MS.store(now, Ordering::Relaxed);
@@ -167,11 +168,13 @@ pub fn restore_window_size() -> Option<(f64, f64)> {
     let path = home.join("window_state.json");
     let content = std::fs::read_to_string(&path).ok()?;
     let state: WindowSizeState = serde_json::from_str(&content).ok()?;
-    // 兜底：保存值必须大于极简窗口最小值，防止异常数据导致窗口不可交互
+    // 兜底：保存值必须大于等于极简窗口最小值，且限制上限在 MAX_WIDTH 和 MAX_HEIGHT 范围内，防止异常数据导致窗口不可交互
     if state.width >= crate::utils::resolve::window::MINIMAL_WIDTH
         && state.height >= crate::utils::resolve::window::MINIMAL_HEIGHT
     {
-        Some((state.width, state.height))
+        let width = state.width.min(crate::utils::resolve::window::MAX_WIDTH);
+        let height = state.height.min(crate::utils::resolve::window::MAX_HEIGHT);
+        Some((width, height))
     } else {
         None
     }
@@ -526,8 +529,20 @@ impl WindowManager {
                 // 加 5 秒超时保护：主线程被模态循环/COM 调用占用时不会永久阻塞（与 activate_window 一致）
                 match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
                     Ok(Ok(Some((w, h)))) => {
-                        save_window_size_sync(w, h);
-                        logging!(info, Type::Window, "窗口已摧毁");
+                        if w >= crate::utils::resolve::window::MINIMAL_WIDTH
+                            && h >= crate::utils::resolve::window::MINIMAL_HEIGHT
+                        {
+                            save_window_size_sync(w, h);
+                            logging!(info, Type::Window, "窗口已摧毁（尺寸已有效存盘: {}x{}）", w, h);
+                        } else {
+                            logging!(
+                                warn,
+                                Type::Window,
+                                "窗口已摧毁（读到异常尺寸 {}x{} < 最小值，跳过存盘）",
+                                w,
+                                h
+                            );
+                        }
                         #[cfg(target_os = "macos")]
                         {
                             logging!(info, Type::Window, "应用 macOS 特定的激活策略");

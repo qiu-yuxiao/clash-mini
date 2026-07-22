@@ -323,14 +323,28 @@ pub fn run() {
                             event_handlers::handle_window_close(&webview_window, event);
                         }
                         tauri::WindowEvent::Resized(size) => {
-                            // 每次窗口尺寸变化都同步持久化（带节流），
+                            // 每次窗口尺寸变化都同步持久化（带 250ms 节流），
                             // 确保进入轻量模式销毁窗口前 window_state.json 已是当前尺寸。
                             // 必须同步：w.destroy() 会同步触发 Resized(0,0)，
                             // 异步 spawn 会与 destroy 后的正确值写入产生竞态。
                             let scale = webview_window.scale_factor().unwrap_or(1.0);
                             let w = size.width as f64 / scale;
                             let h = size.height as f64 / scale;
-                            crate::utils::window_manager::save_window_size_on_resize_sync(w, h);
+                            crate::utils::window_manager::save_window_size_on_resize_sync(
+                                w, h, false,
+                            );
+                        }
+                        tauri::WindowEvent::Focused(false) => {
+                            // 🛡️ [Item 5 尾沿写入] 窗口失焦/拖拽结束时触发强行落盘 (force = true)，
+                            // 确保 250ms 节流区间内松开鼠标时的最终微小位移也能精准保存到 window_state.json
+                            if let Ok(size) = webview_window.outer_size() {
+                                let scale = webview_window.scale_factor().unwrap_or(1.0);
+                                let w = size.width as f64 / scale;
+                                let h = size.height as f64 / scale;
+                                crate::utils::window_manager::save_window_size_on_resize_sync(
+                                    w, h, true,
+                                );
+                            }
                         }
                         _ => {}
                     }

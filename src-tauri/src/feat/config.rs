@@ -13,6 +13,8 @@ static VERGE_PATCH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(
 
 /// Patch Clash configuration
 pub async fn patch_clash(patch: &Mapping) -> Result<()> {
+    let _guard = crate::feat::clash::CLASH_PATCH_LOCK.lock().await;
+
     // 在修改前保存旧配置（必须在 edit_draft 之前获取，否则 latest_arc 会返回 draft 新值）
     let old_config = Config::clash().await.latest_arc().0.clone();
 
@@ -55,16 +57,24 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
             // 成功：提交 clash 配置的 draft，并保存到文件
             Config::clash().await.apply();
             let clash_data = Config::clash().await.data_arc();
-            clash_data.save_config()?;
+            if let Err(save_err) = clash_data.save_config() {
+                logging!(
+                    error,
+                    Type::Config,
+                    "保存 Clash 配置到文件失败，回滚内存 Draft: {}",
+                    save_err
+                );
+                Config::clash().await.edit_draft(|d| d.0 = old_config);
+                Config::clash().await.apply();
+                return Err(save_err);
+            }
             Ok(())
         }
         Err(err) => {
             // 失败：丢弃 clash 配置的 draft，恢复到修改前的状态
             // 由于我们没有提前 apply，已提交的配置仍然是旧值，只需 discard draft 即可
             Config::clash().await.discard();
-            // 保险起见：如果修改前就有 draft，恢复到旧的 draft 状态
-            // （这里简化处理：直接 discard，因为大多数情况下修改前 draft 是 None）
-            let _ = old_config; // 避免未使用警告，如需恢复旧 draft 可在此处添加逻辑
+            let _ = old_config;
             Err(err)
         }
     }

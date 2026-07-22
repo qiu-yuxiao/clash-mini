@@ -981,7 +981,6 @@ mod tests {
 
         // Save empty string again (should be skipped)
         item.save_file("".into())
-            .await
             .expect("save empty string second time failed");
         let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
         let mtime_second = metadata_second.modified().expect("modified time failed");
@@ -1013,7 +1012,6 @@ mod tests {
 
         // File is missing, saving should succeed and create the file
         item.save_file("some content".into())
-            .await
             .expect("saving to missing file failed");
         assert!(file_path.exists());
         let content = tokio::fs::read_to_string(&file_path).await.expect("read failed");
@@ -1049,7 +1047,6 @@ mod tests {
 
         // 2. Save CRLF equivalent content -> should skip write
         item.save_file("line1\r\nline2\r\n".into())
-            .await
             .expect("save CRLF failed");
         let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
         let mtime_second = metadata_second.modified().expect("mtime failed");
@@ -1059,7 +1056,6 @@ mod tests {
 
         // 3. Save mixed content -> should skip write if normalized equivalent
         item.save_file("line1\r\nline2\n".into())
-            .await
             .expect("save mixed failed");
         let metadata_third = tokio::fs::metadata(&file_path).await.expect("mtime failed");
         let mtime_third = metadata_third.modified().expect("mtime failed");

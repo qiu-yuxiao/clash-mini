@@ -124,6 +124,7 @@ impl IProfiles {
     /// append new item
     /// if the file_data is some
     /// then should save the data to file
+    #[allow(clippy::unused_async)]
     pub async fn append_item(&mut self, item: &mut PrfItem) -> Result<()> {
         if item.itype.as_deref() == Some("remote") && item.url.is_some() {
             if let Some(items) = &self.items {
@@ -255,6 +256,7 @@ impl IProfiles {
 
     /// be used to update the remote item
     /// only patch `updated` `extra` `file_data`
+    #[allow(clippy::unused_async)]
     pub async fn update_item(&mut self, uid: &String, item: &mut PrfItem) -> Result<()> {
         if self.items.is_none() {
             self.items = Some(vec![]);
@@ -416,8 +418,7 @@ impl IProfiles {
         let mut deleted_files = 0;
         let mut failed_deletions = 0;
 
-        let mut dir_entries = std::fs::read_dir(&profiles_dir)?;
-        while let Some(entry) = dir_entries.next() {
+        for entry in std::fs::read_dir(&profiles_dir)? {
             let entry = entry?;
             let path = entry.path();
 

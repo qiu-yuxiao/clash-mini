@@ -13,7 +13,7 @@ use smartstring::alias::String;
 use std::sync::Arc;
 
 /// 互斥保护 change_clash_mode / patch_clash 的并发调用，防止配置修改竞态
-static CLASH_PATCH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+pub static CLASH_PATCH_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 // SAFETY: TLS 配置构建使用的是内置的 ring provider 和安全默认协议版本，
 // 这些都是经过验证的配置，构建失败的概率极低。
