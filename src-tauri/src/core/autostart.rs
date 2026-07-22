@@ -25,7 +25,7 @@ pub async fn update_launch(enable_auto_launch: Option<bool>) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
         let is_admin = is_current_app_handle_admin(Handle::app_handle());
-        schtasks::set_auto_launch(is_enable, is_admin).await?;
+        schtasks::set_auto_launch(is_enable, is_admin)?;
     }
 
     #[cfg(not(target_os = "windows"))]

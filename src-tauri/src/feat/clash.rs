@@ -79,7 +79,7 @@ pub async fn change_clash_mode(mode: String) -> anyhow::Result<()> {
             clash.apply();
 
             let clash_data = clash.data_arc();
-            if clash_data.save_config().await.is_ok() {
+            if clash_data.save_config().is_ok() {
                 handle::Handle::refresh_clash();
             }
 

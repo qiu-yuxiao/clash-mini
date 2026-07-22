@@ -243,7 +243,7 @@ impl IVerge {
     /// 验证并修正配置文件中的clash_core值
     pub async fn validate_and_fix_config() -> Result<()> {
         let config_path = dirs::verge_path()?;
-        let mut config = match help::read_yaml::<Self>(&config_path).await {
+        let mut config = match help::read_yaml::<Self>(&config_path) {
             Ok(config) => config,
             Err(_) => Self::template(),
         };
@@ -275,7 +275,7 @@ impl IVerge {
         // 修正后保存配置
         if needs_fix {
             logging!(info, Type::Config, "正在保存修正后的配置文件...");
-            help::save_yaml(&config_path, &config, Some("# Clash Verge Config")).await?;
+            help::save_yaml(&config_path, &config, Some("# Clash Verge Config"))?;
             logging!(info, Type::Config, "配置文件修正完成，需要重新加载配置");
 
             Self::reload_config_after_fix(config).await?;
@@ -308,9 +308,9 @@ impl IVerge {
         self.clash_core.clone().unwrap_or_else(|| "mini-mihomo".into())
     }
 
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         match dirs::verge_path() {
-            Ok(path) => match help::read_yaml::<Self>(&path).await {
+            Ok(path) => match help::read_yaml::<Self>(&path) {
                 Ok(mut config) => {
                     // compatibility
                     if let Some(start_page) = config.start_page.clone()
@@ -398,8 +398,8 @@ impl IVerge {
     }
 
     /// Save IVerge App Config
-    pub async fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::verge_path()?, &self, Some("# Clash Verge Config")).await
+    pub fn save_file(&self) -> Result<()> {
+        help::save_yaml(&dirs::verge_path()?, &self, Some("# Clash Verge Config"))
     }
 
     /// patch verge config

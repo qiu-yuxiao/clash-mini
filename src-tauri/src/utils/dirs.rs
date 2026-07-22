@@ -1,6 +1,5 @@
 use crate::core::{CoreManager, handle, manager::RunningMode};
 use anyhow::Result;
-use async_trait::async_trait;
 use clash_verge_logging::{Type, logging};
 use once_cell::sync::OnceCell;
 #[cfg(unix)]
@@ -220,16 +219,14 @@ pub fn ipc_path() -> Result<PathBuf> {
 pub fn ipc_path() -> Result<PathBuf> {
     Ok(PathBuf::from(r"\\.\pipe\mini-mihomo"))
 }
-#[async_trait]
 pub trait PathBufExec {
-    async fn remove_if_exists(&self) -> Result<()>;
+    fn remove_if_exists(&self) -> Result<()>;
 }
 
-#[async_trait]
 impl PathBufExec for PathBuf {
-    async fn remove_if_exists(&self) -> Result<()> {
+    fn remove_if_exists(&self) -> Result<()> {
         if self.exists() {
-            tokio::fs::remove_file(self).await?;
+            std::fs::remove_file(self)?;
             logging!(info, Type::File, "Removed file: {:?}", self);
         }
         Ok(())

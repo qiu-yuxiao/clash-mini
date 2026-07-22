@@ -12,7 +12,7 @@ use crate::{
         },
         profiles_append_item_safe,
     },
-    core::{CoreManager, handle, timer::Timer, tray::Tray, validate::ValidationOutcome},
+    core::{CoreManager, handle, timer::Timer, validate::ValidationOutcome},
     feat,
     utils::{dirs, help},
 };
@@ -211,13 +211,6 @@ pub async fn delete_profile(index: String) -> CmdResult {
     // 使用Send-safe helper函数
     let should_update = profiles_delete_item_safe(&index).await.stringify_err()?;
     profiles_save_file_safe().await.stringify_err()?;
-    if let Err(e) = Tray::global().update_tooltip().await {
-        logging!(warn, Type::Cmd, "Warning: 异步更新托盘提示失败: {e}");
-    }
-
-    if let Err(e) = Tray::global().update_menu().await {
-        logging!(warn, Type::Cmd, "Warning: 异步更新托盘菜单失败: {e}");
-    }
     if should_update {
         match CoreManager::global().update_config_forced().await {
             Ok(outcome) if outcome.is_valid() => {
@@ -253,14 +246,12 @@ async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
         .await
         .edit_draft(|d| d.patch_config(&restore_profiles));
     Config::profiles().await.apply();
-    crate::process::AsyncHandler::spawn(|| async move {
-        if let Err(e) = profiles_save_file_safe().await {
-            logging!(warn, Type::Cmd, "Warning: 异步保存恢复配置文件失败: {e}");
-        }
-        if let Err(e) = CoreManager::global().update_config_forced().await {
-            logging!(error, Type::Cmd, "Failed to reload Clash config after restore: {e}");
-        }
-    });
+    if let Err(e) = profiles_save_file_safe().await {
+        logging!(warn, Type::Cmd, "Warning: 异步保存恢复配置文件失败: {e}");
+    }
+    if let Err(e) = CoreManager::global().update_config_forced().await {
+        logging!(error, Type::Cmd, "Failed to reload Clash config after restore: {e}");
+    }
     logging!(info, Type::Cmd, "成功恢复到之前的配置");
     Ok(())
 }
@@ -268,14 +259,6 @@ async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
 async fn handle_success(current_value: Option<&String>) -> CmdResult<ValidationOutcome> {
     Config::profiles().await.apply();
     handle::Handle::refresh_clash();
-
-    if let Err(e) = Tray::global().update_tooltip().await {
-        logging!(warn, Type::Cmd, "Warning: 异步更新托盘提示失败: {e}");
-    }
-
-    if let Err(e) = Tray::global().update_menu().await {
-        logging!(warn, Type::Cmd, "Warning: 异步更新托盘菜单失败: {e}");
-    }
 
     if let Err(e) = profiles_save_file_safe().await {
         logging!(warn, Type::Cmd, "Warning: 异步保存配置文件失败: {e}");
@@ -434,7 +417,7 @@ pub async fn read_profile_file(index: String) -> CmdResult<String> {
             ..Default::default()
         }
     };
-    let data = item.read_file().await.stringify_err()?;
+    let data = item.read_file().stringify_err()?;
     Ok(data)
 }
 

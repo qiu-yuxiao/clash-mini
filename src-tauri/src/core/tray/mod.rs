@@ -9,13 +9,13 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, Tray
 
 use super::handle;
 use anyhow::Result;
+use parking_lot::Mutex;
 use std::sync::OnceLock;
 use std::time::Duration;
 use tauri::{
     AppHandle, Wry,
     menu::{IsMenuItem, MenuEvent, MenuItem},
 };
-use tokio::sync::Mutex;
 
 mod menu_def;
 use menu_def::MenuIds;
@@ -25,15 +25,11 @@ const TRAY_CLICK_DEBOUNCE_MS: u64 = 300;
 /// 轻量模式菜单项引用，用于在进入/退出轻量模式时动态设置 enabled 状态
 static LITE_MODE_MENU_ITEM: OnceLock<MenuItem<Wry>> = OnceLock::new();
 
-/// 托盘更新互斥锁，防止并发调用 update_icon / update_menu 导致竞态
+/// 托盘更新互斥锁，防止并发调用 update_icon 导致竞态
 ///
-/// 线程安全策略说明：
-/// 1. 底层 Tauri 托盘操作必须在主线程执行（通过 run_on_main_thread 调度）
-/// 2. 但多个异步任务可能同时调用 update_*，导致多个 UI 更新排队
-/// 3. 本互斥锁确保同一时间只有一个托盘更新操作在执行
-/// 4. 配合 limiter（点击防抖）进一步降低并发概率
-/// 5. 锁是 tokio::sync::Mutex，支持 .await 不阻塞其他异步任务
-static TRAY_UPDATE_LOCK: Mutex<()> = Mutex::const_new(());
+/// 使用 parking_lot::Mutex 而非 tokio::sync::Mutex，因为持锁期间无 .await 操作
+/// （run_on_main_thread 是同步返回 Result 的调度方法）
+static TRAY_UPDATE_LOCK: Mutex<()> = parking_lot::const_mutex(());
 
 pub struct Tray {
     limiter: SystemLimiter,
@@ -163,26 +159,14 @@ impl Tray {
         Ok(())
     }
 
-    // 以下方法在 Clash Mini 的简化托盘中均不执行实际操作，
-    // 保留接口以兼容上游调用，避免大规模重构。
-    #[allow(clippy::unused_async)]
-    pub async fn update_click_behavior(&self) -> Result<()> {
-        Ok(())
-    }
-
-    #[allow(clippy::unused_async)]
-    pub async fn update_menu(&self) -> Result<()> {
-        Ok(())
-    }
-
     /// 根据当前流量接管模式自动切换托盘图标
     ///
     /// 优先级：TUN 模式 > 系统代理 > 默认（手动模式）
     /// 三套图标均通过 include_bytes! 编译时嵌入，运行时按当前状态选择
     ///
     /// 线程安全：通过 TRAY_UPDATE_LOCK 互斥锁保护，避免并发调用导致 UI 竞态
-    pub async fn update_icon(&self, verge: &IVerge) -> Result<()> {
-        let _guard = TRAY_UPDATE_LOCK.lock().await;
+    pub fn update_icon(&self, verge: &IVerge) -> Result<()> {
+        let _guard = TRAY_UPDATE_LOCK.lock();
 
         let tun_enabled = verge.enable_tun_mode.unwrap_or(false);
         let sys_proxy = verge.enable_system_proxy.unwrap_or(false);
@@ -219,15 +203,10 @@ impl Tray {
         Ok(())
     }
 
-    #[allow(clippy::unused_async)]
-    pub async fn update_tooltip(&self) -> Result<()> {
-        Ok(())
-    }
-
     /// 启动时刷新托盘状态（图标按当前接管模式初始化）
     pub async fn update_part(&self) -> Result<()> {
         let verge = crate::config::Config::verge().await.latest_arc();
-        self.update_icon(&verge).await
+        self.update_icon(&verge)
     }
 
     fn should_handle_tray_click(&self) -> bool {

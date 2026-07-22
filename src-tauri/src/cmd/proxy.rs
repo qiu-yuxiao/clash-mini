@@ -99,7 +99,7 @@ pub async fn get_proxy_addr(
 #[tauri::command]
 pub async fn save_proxy_head_state(state: serde_json::Value) -> CmdResult<()> {
     let path = dirs::app_home_dir().stringify_err()?.join("proxy_head_state.json");
-    crate::utils::help::save_json(&path, &state).await.stringify_err()?;
+    crate::utils::help::save_json(&path, &state).stringify_err()?;
     Ok(())
 }
 

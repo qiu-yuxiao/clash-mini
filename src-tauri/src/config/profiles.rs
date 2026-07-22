@@ -50,7 +50,7 @@ impl IProfiles {
         items.remove(index).file
     }
 
-    pub async fn new() -> Self {
+    pub fn new() -> Self {
         let path = match dirs::profiles_path() {
             Ok(p) => p,
             Err(err) => {
@@ -59,7 +59,7 @@ impl IProfiles {
             }
         };
 
-        match help::read_yaml::<Self>(&path).await {
+        match help::read_yaml::<Self>(&path) {
             Ok(mut profiles) => {
                 let items = profiles.items.get_or_insert_with(Vec::new);
                 for item in items.iter_mut() {
@@ -76,8 +76,8 @@ impl IProfiles {
         }
     }
 
-    pub async fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::profiles_path()?, self, Some("# Profiles Config for Clash Verge")).await
+    pub fn save_file(&self) -> Result<()> {
+        help::save_yaml(&dirs::profiles_path()?, self, Some("# Profiles Config for Clash Verge"))
     }
 
     /// 只修改current，valid和chain
@@ -206,7 +206,7 @@ impl IProfiles {
     }
 
     /// reorder items
-    pub async fn reorder(&mut self, active_id: &String, over_id: &String) -> Result<()> {
+    pub fn reorder(&mut self, active_id: &String, over_id: &String) -> Result<()> {
         let mut items = self.items.take().unwrap_or_default();
         let mut old_index = None;
         let mut new_index = None;
@@ -227,11 +227,11 @@ impl IProfiles {
         let item = items.remove(old_idx);
         items.insert(new_idx, item);
         self.items = Some(items);
-        self.save_file().await
+        self.save_file()
     }
 
     /// update the item value
-    pub async fn patch_item(&mut self, uid: &String, item: &PrfItem) -> Result<()> {
+    pub fn patch_item(&mut self, uid: &String, item: &PrfItem) -> Result<()> {
         let mut items = self.items.take().unwrap_or_default();
 
         for each in items.iter_mut() {
@@ -248,7 +248,7 @@ impl IProfiles {
                 patch!(each, item, option);
 
                 self.items = Some(items);
-                return self.save_file().await;
+                return self.save_file();
             }
         }
 
@@ -297,12 +297,12 @@ impl IProfiles {
             }
         }
 
-        self.save_file().await
+        self.save_file()
     }
 
     /// delete item
     /// if delete the current then return true
-    pub async fn delete_item(&mut self, uid: &String) -> Result<bool> {
+    pub fn delete_item(&mut self, uid: &String) -> Result<bool> {
         let current = self.current.as_ref().unwrap_or(uid);
         let current = current.clone();
         let delete_uids = {
@@ -324,12 +324,12 @@ impl IProfiles {
 
         // remove the main item (if exists) and delete its file
         if let Some(file) = Self::take_item_file_by_uid(&mut items, Some(uid.as_str())) {
-            let _ = dirs::app_profiles_dir()?.join(file.as_str()).remove_if_exists().await;
+            let _ = dirs::app_profiles_dir()?.join(file.as_str()).remove_if_exists();
         }
 
         for delete_uid in delete_uids {
             if let Some(file) = Self::take_item_file_by_uid(&mut items, delete_uid.as_deref()) {
-                let _ = dirs::app_profiles_dir()?.join(file.as_str()).remove_if_exists().await;
+                let _ = dirs::app_profiles_dir()?.join(file.as_str()).remove_if_exists();
             }
         }
 
@@ -345,12 +345,12 @@ impl IProfiles {
         }
 
         self.items = Some(items);
-        self.save_file().await?;
+        self.save_file()?;
         Ok(current == *uid)
     }
 
     /// 获取current指向的订阅内容
-    pub async fn current_mapping(&self) -> Result<Mapping> {
+    pub fn current_mapping(&self) -> Result<Mapping> {
         match (self.current.as_ref(), self.items.as_ref()) {
             (Some(current), Some(items)) => {
                 if let Some(item) = items.iter().find(|e| e.uid.as_ref() == Some(current)) {
@@ -358,7 +358,7 @@ impl IProfiles {
                         Some(file) => dirs::app_profiles_dir()?.join(file.as_str()),
                         None => bail!("failed to get the file field"),
                     };
-                    return help::read_mapping(&file_path).await;
+                    return help::read_mapping(&file_path);
                 }
                 bail!("failed to find the current profile \"uid:{current}\"");
             }
@@ -441,7 +441,7 @@ impl IProfiles {
 
                 // 检查是否为活跃文件
                 if !active_files.contains(file_name) {
-                    match path.to_path_buf().remove_if_exists().await {
+                    match path.to_path_buf().remove_if_exists() {
                         Ok(_) => {
                             deleted_files += 1;
                             logging!(debug, Type::Config, "已清理冗余文件: {file_name}");
@@ -583,7 +583,7 @@ pub async fn profiles_patch_item_safe(index: &String, item: &PrfItem) -> Result<
     Config::profiles()
         .await
         .with_data_modify(|mut profiles| async move {
-            profiles.patch_item(index, item).await?;
+            profiles.patch_item(index, item)?;
             Ok((profiles, ()))
         })
         .await
@@ -593,7 +593,7 @@ pub async fn profiles_delete_item_safe(index: &String) -> Result<bool> {
     Config::profiles()
         .await
         .with_data_modify(|mut profiles| async move {
-            let deleted = profiles.delete_item(index).await?;
+            let deleted = profiles.delete_item(index)?;
             Ok((profiles, deleted))
         })
         .await
@@ -603,7 +603,7 @@ pub async fn profiles_reorder_safe(active_id: &String, over_id: &String) -> Resu
     Config::profiles()
         .await
         .with_data_modify(|mut profiles| async move {
-            profiles.reorder(active_id, over_id).await?;
+            profiles.reorder(active_id, over_id)?;
             Ok((profiles, ()))
         })
         .await
@@ -613,7 +613,7 @@ pub async fn profiles_save_file_safe() -> Result<()> {
     Config::profiles()
         .await
         .with_data_modify(|profiles| async move {
-            profiles.save_file().await?;
+            profiles.save_file()?;
             Ok((profiles, ()))
         })
         .await

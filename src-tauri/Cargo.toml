@@ -108,7 +108,6 @@ tauri-plugin-devtools = { version = "2.1.0" }
 # B) Confirm upstream fixed the issue and then switch back to git.
 tauri-plugin-mihomo = { path = "../crates/tauri-plugin-mihomo" }
 clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger", rev = "e4768e3852c4868ed86e7210df82c1178467820d" }
-async-trait = "0.1.89"
 clash_verge_service_ipc = { version = "2.3.0", features = [
   "client",
 ], git = "https://github.com/clash-verge-rev/clash-verge-service-ipc", rev = "21e661fa141e5ad3c705ee4cdb86efff8df6f769" }

@@ -15,24 +15,24 @@ use std::path::Path;
 use winapi::um::winbase::{MOVEFILE_REPLACE_EXISTING, MoveFileExW};
 
 /// read data from yaml as struct T
-pub async fn read_yaml<T: DeserializeOwned>(path: &PathBuf) -> Result<T> {
-    if !tokio::fs::try_exists(path).await.unwrap_or(false) {
+pub fn read_yaml<T: DeserializeOwned>(path: &PathBuf) -> Result<T> {
+    if !path.exists() {
         bail!("file not found \"{}\"", path.display());
     }
 
-    let yaml_str = tokio::fs::read_to_string(path).await?;
+    let yaml_str = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read the file \"{}\"", path.display()))?;
 
-    Ok(with_encryption(|| async { serde_yaml_ng::from_str::<T>(&yaml_str) }).await?)
+    Ok(with_encryption(|| serde_yaml_ng::from_str::<T>(&yaml_str))?)
 }
 
 /// read mapping from yaml
-pub async fn read_mapping(path: &PathBuf) -> Result<Mapping> {
-    if !tokio::fs::try_exists(path).await.unwrap_or(false) {
+pub fn read_mapping(path: &PathBuf) -> Result<Mapping> {
+    if !path.exists() {
         bail!("file not found \"{}\"", path.display());
     }
 
-    let yaml_str = tokio::fs::read_to_string(path)
-        .await
+    let yaml_str = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read the file \"{}\"", path.display()))?;
 
     // YAML语法检查
@@ -58,15 +58,15 @@ pub async fn read_mapping(path: &PathBuf) -> Result<Mapping> {
 }
 
 /// read mapping from yaml fix #165
-pub async fn read_seq_map(path: &PathBuf) -> Result<SeqMap> {
-    read_yaml(path).await
+pub fn read_seq_map(path: &PathBuf) -> Result<SeqMap> {
+    read_yaml(path)
 }
 
 /// save the data to the file
 /// can set `prefix` string to add some comments
 /// 使用原子写入（临时文件 + rename）避免 TOCTOU 竞态和写入中途损坏
-pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Option<&str>) -> Result<()> {
-    let data_str = with_encryption(|| async { serde_yaml_ng::to_string(data) }).await?;
+pub fn save_yaml<T: Serialize>(path: &PathBuf, data: &T, prefix: Option<&str>) -> Result<()> {
+    let data_str = with_encryption(|| serde_yaml_ng::to_string(data))?;
 
     let yaml_str = match prefix {
         Some(prefix) => format!("{prefix}\n\n{data_str}"),
@@ -76,7 +76,7 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
     let yaml_bytes = yaml_str.as_bytes();
 
     // 内容未变化时跳过写入，减少不必要的磁盘 IO
-    if let Ok(existing_bytes) = tokio::fs::read(path).await {
+    if let Ok(existing_bytes) = std::fs::read(path) {
         if existing_bytes == yaml_bytes {
             return Ok(());
         }
@@ -97,8 +97,7 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
     let path_str = path.as_os_str().to_string_lossy().to_string();
     let tmp_path_str = tmp_path.as_os_str().to_string_lossy().to_string();
 
-    tokio::fs::write(&tmp_path, yaml_bytes)
-        .await
+    std::fs::write(&tmp_path, yaml_bytes)
         .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
     // 原子替换文件：
@@ -116,8 +115,6 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
         return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (atomic rename failed)"));
     }
 
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
     Ok(())
 }
 
@@ -125,13 +122,13 @@ pub async fn save_yaml<T: Serialize + Sync>(path: &PathBuf, data: &T, prefix: Op
 /// 使用原子写入（临时文件 + rename）避免写入中途损坏导致读取方解析失败
 /// （例如 proxy_head_state.json 若被撕裂写入，读取方会静默退化为默认值，可能让选点范围越界）
 /// 注意：JSON 文件以明文存储，不套用 save_yaml 的加密层，以兼容现有明文读取方
-pub async fn save_json<T: Serialize + Sync>(path: &PathBuf, data: &T) -> Result<()> {
+pub fn save_json<T: Serialize>(path: &PathBuf, data: &T) -> Result<()> {
     let data_str = serde_json::to_string_pretty(data)
         .with_context(|| format!("failed to serialize json for \"{}\"", path.display()))?;
     let json_bytes = data_str.as_bytes();
 
     // 内容未变化时跳过写入，减少不必要的磁盘 IO
-    if let Ok(existing_bytes) = tokio::fs::read(path).await {
+    if let Ok(existing_bytes) = std::fs::read(path) {
         if existing_bytes == json_bytes {
             return Ok(());
         }
@@ -152,8 +149,7 @@ pub async fn save_json<T: Serialize + Sync>(path: &PathBuf, data: &T) -> Result<
     let path_str = path.as_os_str().to_string_lossy().to_string();
     let tmp_path_str = tmp_path.as_os_str().to_string_lossy().to_string();
 
-    tokio::fs::write(&tmp_path, json_bytes)
-        .await
+    std::fs::write(&tmp_path, json_bytes)
         .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
     // 原子替换文件：
@@ -170,8 +166,6 @@ pub async fn save_json<T: Serialize + Sync>(path: &PathBuf, data: &T) -> Result<
         let _ = std::fs::rename(&tmp_path, &backup_path);
         return Err(e).with_context(|| format!("failed to save file \"{path_str}\" (atomic rename failed)"));
     }
-
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     Ok(())
 }
@@ -375,7 +369,7 @@ mod tests {
         let data = "hello world".to_string();
 
         // 1. Initial write
-        save_yaml(&file_path, &data, None).await.unwrap();
+        save_yaml(&file_path, &data, None).unwrap();
         let metadata_first = std::fs::metadata(&file_path).unwrap();
         let mtime_first = metadata_first.modified().unwrap();
 
@@ -383,7 +377,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // 2. Write same content again (should skip writing)
-        save_yaml(&file_path, &data, None).await.unwrap();
+        save_yaml(&file_path, &data, None).unwrap();
         let metadata_second = std::fs::metadata(&file_path).unwrap();
         let mtime_second = metadata_second.modified().unwrap();
         assert_eq!(
@@ -393,7 +387,7 @@ mod tests {
 
         // 3. Write different content (should write)
         let new_data = "hello modified".to_string();
-        save_yaml(&file_path, &new_data, None).await.unwrap();
+        save_yaml(&file_path, &new_data, None).unwrap();
         let metadata_third = std::fs::metadata(&file_path).unwrap();
         let mtime_third = metadata_third.modified().unwrap();
         assert_ne!(
@@ -411,7 +405,7 @@ mod tests {
         let file_path = temp_dir.join(get_uid("")).join("test.yaml");
         let data = "hello".to_string();
 
-        let result = save_yaml(&file_path, &data, None).await;
+        let result = save_yaml(&file_path, &data, None);
         assert!(
             result.is_err(),
             "Saving to a non-existent directory should return an error"
@@ -427,7 +421,7 @@ mod tests {
         let data = "hello readonly".to_string();
 
         // 1. Initial write
-        save_yaml(&file_path, &data, None).await.unwrap();
+        save_yaml(&file_path, &data, None).unwrap();
 
         // 2. Set read-only
         let mut perms = fs::metadata(&file_path).unwrap().permissions();
@@ -435,7 +429,7 @@ mod tests {
         fs::set_permissions(&file_path, perms).unwrap();
 
         // 3. Save same content (should succeed because write is skipped)
-        let result_same = save_yaml(&file_path, &data, None).await;
+        let result_same = save_yaml(&file_path, &data, None);
         assert!(
             result_same.is_ok(),
             "Saving same content to read-only file should succeed"
@@ -443,7 +437,7 @@ mod tests {
 
         // 4. Save different content (should fail because write is attempted and denied)
         let new_data = "hello change".to_string();
-        let result_diff = save_yaml(&file_path, &new_data, None).await;
+        let result_diff = save_yaml(&file_path, &new_data, None);
         assert!(
             result_diff.is_err(),
             "Saving different content to read-only file should fail"
@@ -466,7 +460,7 @@ mod tests {
         let prefix = "# Important Comment";
 
         // 1. Initial write with prefix
-        save_yaml(&file_path, &data, Some(prefix)).await.unwrap();
+        save_yaml(&file_path, &data, Some(prefix)).unwrap();
         let metadata_first = fs::metadata(&file_path).unwrap();
         let mtime_first = metadata_first.modified().unwrap();
 
@@ -474,7 +468,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // 2. Save same content and prefix (should skip write)
-        save_yaml(&file_path, &data, Some(prefix)).await.unwrap();
+        save_yaml(&file_path, &data, Some(prefix)).unwrap();
         let metadata_second = fs::metadata(&file_path).unwrap();
         let mtime_second = metadata_second.modified().unwrap();
         assert_eq!(
@@ -484,14 +478,14 @@ mod tests {
 
         // 3. Save same content with different prefix (should write)
         let new_prefix = "# Modified Comment";
-        save_yaml(&file_path, &data, Some(new_prefix)).await.unwrap();
+        save_yaml(&file_path, &data, Some(new_prefix)).unwrap();
         let metadata_third = fs::metadata(&file_path).unwrap();
         let mtime_third = metadata_third.modified().unwrap();
         assert_ne!(mtime_second, mtime_third, "Mtime must change if prefix changes");
 
         // 4. Save same content with no prefix (should write)
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        save_yaml(&file_path, &data, None).await.unwrap();
+        save_yaml(&file_path, &data, None).unwrap();
         let metadata_fourth = fs::metadata(&file_path).unwrap();
         let mtime_fourth = metadata_fourth.modified().unwrap();
         assert_ne!(mtime_third, mtime_fourth, "Mtime must change if prefix is removed");

@@ -38,7 +38,6 @@ pub async fn save_profile_file(index: String, file_data: Option<String>) -> CmdR
         ..Default::default()
     }
     .read_file()
-    .await
     .stringify_err()?;
 
     let unchanged = if original_content == file_data {

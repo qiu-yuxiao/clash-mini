@@ -98,7 +98,7 @@ async fn import_subscription(url: &str, name: Option<&String>) {
     }
 
     Config::profiles().await.apply();
-    logging_error!(Type::Config, Config::profiles().await.data_arc().save_file().await);
+    logging_error!(Type::Config, Config::profiles().await.data_arc().save_file());
     handle::Handle::notice_message(
         "import_sub_url::ok",
         "", // 空 msg 传入，我们不希望导致 后端-前端-后端 死循环，这里只做提醒。

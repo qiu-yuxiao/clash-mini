@@ -112,16 +112,19 @@ struct WindowSizeState {
 
 /// 保存当前窗口 outer 尺寸到 app 数据目录的 `window_state.json`
 ///
-/// 采用 read-modify-write：在已有 JSON 上 merge width/height，
+/// 采用同步 read-modify-write：在已有 JSON 上 merge width/height，
 /// 避免整文件覆盖把 `tauri_plugin_window_state` 管理的 x/y/最大化/全屏 等键抹除
 /// （此前每次 resize 的整盖写会导致轻量唤醒后窗口位置也回退默认）。
-async fn save_window_size(width: f64, height: f64) {
+///
+/// 必须用同步而非异步：`w.destroy()` 会同步触发 `Resized(0,0)` 事件，
+/// 若 resize 保存是异步 spawn，0×0 与 destroy 后的正确值写入顺序由调度器决定（竞态）。
+/// 同步写保证 0×0 在 destroy 闭包返回前就写完，destroy 后的正确值必然最后写入。
+fn save_window_size_sync(width: f64, height: f64) {
     let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
         return;
     };
     let path = home.join("window_state.json");
-    // 读取现有内容（可能含插件写入的 position/maximized/fullscreen/decorations），不存在则用空对象
-    let mut value = match tokio::fs::read_to_string(&path).await {
+    let mut value = match std::fs::read_to_string(&path) {
         Ok(content) => serde_json::from_str::<serde_json::Value>(&content)
             .unwrap_or_else(|_| serde_json::Value::Object(Default::default())),
         Err(_) => serde_json::Value::Object(Default::default()),
@@ -131,14 +134,21 @@ async fn save_window_size(width: f64, height: f64) {
         obj.insert("height".into(), serde_json::Value::from(height));
     }
     if let Ok(json) = serde_json::to_string(&value) {
-        let _ = tokio::fs::write(&path, json).await;
+        let _ = std::fs::write(&path, json);
     }
 }
 
 /// 窗口尺寸变化时的持久化（带 250ms 节流，避免拖拽期间频繁写盘）
 static LAST_RESIZE_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 
-pub async fn save_window_size_on_resize(width: f64, height: f64) {
+/// 同步版本：在 Resized 事件中直接调用，不 spawn 异步任务。
+/// 0×0 守卫：w.destroy() 会触发 Resized(0,0)，必须拒绝此无效值。
+pub fn save_window_size_on_resize_sync(width: f64, height: f64) {
+    if width < crate::utils::resolve::window::MINIMAL_WIDTH
+        || height < crate::utils::resolve::window::MINIMAL_HEIGHT
+    {
+        return;
+    }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -148,14 +158,14 @@ pub async fn save_window_size_on_resize(width: f64, height: f64) {
         return;
     }
     LAST_RESIZE_SAVE_MS.store(now, Ordering::Relaxed);
-    save_window_size(width, height).await;
+    save_window_size_sync(width, height);
 }
 
 /// 读取上次保存的窗口尺寸，失败或不存在返回 None
-pub async fn restore_window_size() -> Option<(f64, f64)> {
+pub fn restore_window_size() -> Option<(f64, f64)> {
     let home = crate::utils::dirs::app_home_dir().ok()?;
     let path = home.join("window_state.json");
-    let content = tokio::fs::read_to_string(&path).await.ok()?;
+    let content = std::fs::read_to_string(&path).ok()?;
     let state: WindowSizeState = serde_json::from_str(&content).ok()?;
     // 兜底：保存值必须大于极简窗口最小值，防止异常数据导致窗口不可交互
     if state.width >= crate::utils::resolve::window::MINIMAL_WIDTH
@@ -516,7 +526,7 @@ impl WindowManager {
                 // 加 5 秒超时保护：主线程被模态循环/COM 调用占用时不会永久阻塞（与 activate_window 一致）
                 match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
                     Ok(Ok(Some((w, h)))) => {
-                        save_window_size(w, h).await;
+                        save_window_size_sync(w, h);
                         logging!(info, Type::Window, "窗口已摧毁");
                         #[cfg(target_os = "macos")]
                         {

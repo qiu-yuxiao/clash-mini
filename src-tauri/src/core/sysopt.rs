@@ -4,7 +4,7 @@ use crate::{
 };
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
-use parking_lot::RwLock;
+use parking_lot::Mutex as PMutex;
 use scopeguard::defer;
 use smartstring::alias::String;
 use std::{
@@ -36,8 +36,8 @@ const fn proxy_apply_steps(sys_enabled: bool, auto_enabled: bool) -> [ProxyApply
 pub struct Sysopt {
     update_lock: TokioMutex<()>,
     reset_sysproxy: AtomicBool,
-    inner_proxy: Arc<RwLock<(Sysproxy, Autoproxy)>>,
-    guard: Arc<RwLock<GuardMonitor>>,
+    inner_proxy: Arc<PMutex<(Sysproxy, Autoproxy)>>,
+    guard: Arc<PMutex<GuardMonitor>>,
 }
 
 impl Default for Sysopt {
@@ -45,8 +45,8 @@ impl Default for Sysopt {
         Self {
             update_lock: TokioMutex::new(()),
             reset_sysproxy: AtomicBool::new(false),
-            inner_proxy: Arc::new(RwLock::new((Sysproxy::default(), Autoproxy::default()))),
-            guard: Arc::new(RwLock::new(GuardMonitor::new(GuardType::None, Duration::from_secs(30)))),
+            inner_proxy: Arc::new(PMutex::new((Sysproxy::default(), Autoproxy::default()))),
+            guard: Arc::new(PMutex::new(GuardMonitor::new(GuardType::None, Duration::from_secs(30)))),
         }
     }
 }
@@ -87,7 +87,7 @@ impl Sysopt {
         Self::default()
     }
 
-    fn access_guard(&self) -> Arc<RwLock<GuardMonitor>> {
+    fn access_guard(&self) -> Arc<PMutex<GuardMonitor>> {
         Arc::clone(&self.guard)
     }
 
@@ -96,12 +96,12 @@ impl Sysopt {
         let verge = Config::verge().await.latest_arc();
         if !verge.enable_system_proxy.unwrap_or_default() {
             logging!(info, Type::Core, "System proxy is disabled.");
-            self.access_guard().write().stop();
+            self.access_guard().lock().stop();
             return;
         }
         if !verge.enable_proxy_guard.unwrap_or_default() {
             logging!(info, Type::Core, "System proxy guard is disabled.");
-            self.access_guard().write().stop();
+            self.access_guard().lock().stop();
             return;
         }
         logging!(
@@ -113,13 +113,13 @@ impl Sysopt {
         {
             let guard = self.access_guard();
             guard
-                .write()
+                .lock()
                 .set_interval(Duration::from_secs(verge.proxy_guard_duration.unwrap_or(30)));
         }
         logging!(info, Type::Core, "Starting system proxy guard...");
         {
             let guard = self.access_guard();
-            guard.write().start();
+            guard.lock().start();
         }
     }
 
@@ -151,7 +151,7 @@ impl Sysopt {
         let bypass = get_bypass().await;
 
         let (sys, auto, guard_type) = {
-            let (sys, auto) = &mut *self.inner_proxy.write();
+            let (sys, auto) = &mut *self.inner_proxy.lock();
             sys.host = proxy_host.clone().into();
             sys.port = port;
             sys.bypass = bypass.into();
@@ -184,7 +184,7 @@ impl Sysopt {
             (sys.clone(), auto.clone(), guard_type)
         };
 
-        self.access_guard().write().set_guard_type(guard_type);
+        self.access_guard().lock().set_guard_type(guard_type);
 
         let apply_steps = proxy_apply_steps(sys.enable, auto.enable);
 
@@ -220,11 +220,11 @@ impl Sysopt {
         let _lock = self.update_lock.lock().await;
 
         // close proxy guard（必须在锁内执行，确保 Guard 停止后不再向 OS 补写代理）
-        self.access_guard().write().set_guard_type(GuardType::None);
+        self.access_guard().lock().set_guard_type(GuardType::None);
 
         // 直接关闭所有代理
         let (sys, auto) = {
-            let (sys, auto) = &mut *self.inner_proxy.write();
+            let (sys, auto) = &mut *self.inner_proxy.lock();
             sys.enable = false;
             auto.enable = false;
             (sys.clone(), auto.clone())

@@ -6,13 +6,14 @@ use aes_gcm::{
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::Cell;
-use std::future::Future;
 
 const NONCE_LENGTH: usize = 12;
 
-// Use task-local context so the flag follows the async task across threads
-tokio::task_local! {
-    static ENCRYPTION_ACTIVE: Cell<bool>;
+// 使用 thread_local 而非 tokio::task_local，因为加密标志只在同步的
+// serde 序列化/反序列化期间使用，不跨 .await 点。
+// thread_local 避免了 with_encryption 的 async 传染。
+thread_local! {
+    static ENCRYPTION_ACTIVE: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Encrypt data
@@ -96,12 +97,21 @@ where
     }
 }
 
-pub async fn with_encryption<F, Fut, R>(f: F) -> R
+/// 在加密上下文中执行闭包。
+///
+/// 同步实现：设置 thread_local 标志后执行闭包，完毕后恢复。
+/// 闭包内执行的 serde 序列化/反序列化通过 is_encryption_active() 读取此标志。
+pub fn with_encryption<F, R>(f: F) -> R
 where
-    F: FnOnce() -> Fut,
-    Fut: Future<Output = R>,
+    F: FnOnce() -> R,
 {
-    ENCRYPTION_ACTIVE.scope(Cell::new(true), f()).await
+    ENCRYPTION_ACTIVE.with(|c| {
+        let old = c.get();
+        c.set(true);
+        let result = f();
+        c.set(old);
+        result
+    })
 }
 
 fn is_encryption_active() -> bool {

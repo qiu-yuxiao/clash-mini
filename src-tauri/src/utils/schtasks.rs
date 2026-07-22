@@ -97,17 +97,17 @@ fn get_startup_dir() -> Result<PathBuf> {
     Ok(startup_dir)
 }
 
-async fn cleanup_legacy_shortcuts() -> Result<()> {
+fn cleanup_legacy_shortcuts() -> Result<()> {
     let startup_dir = get_startup_dir()?;
     let old_winaero_shortcut = startup_dir.join("Clash-WinAero.lnk");
     let winaero_shortcut = startup_dir.join("Clash WinAero.lnk");
     let old_shortcut = startup_dir.join("Clash-Mini.lnk");
     let new_shortcut = startup_dir.join("Clash Mini.lnk");
 
-    old_winaero_shortcut.remove_if_exists().await?;
-    winaero_shortcut.remove_if_exists().await?;
-    old_shortcut.remove_if_exists().await?;
-    new_shortcut.remove_if_exists().await?;
+    old_winaero_shortcut.remove_if_exists()?;
+    winaero_shortcut.remove_if_exists()?;
+    old_shortcut.remove_if_exists()?;
+    new_shortcut.remove_if_exists()?;
     Ok(())
 }
 
@@ -412,11 +412,11 @@ pub fn remove_task_elevated(mode: TaskMode) -> Result<()> {
     }
 }
 
-pub async fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
+pub fn set_auto_launch(is_enable: bool, is_admin: bool) -> Result<()> {
     let target = if is_admin { TaskMode::Admin } else { TaskMode::User };
     let other = if is_admin { TaskMode::User } else { TaskMode::Admin };
 
-    if let Err(err) = cleanup_legacy_shortcuts().await {
+    if let Err(err) = cleanup_legacy_shortcuts() {
         logging!(warn, Type::Setup, "Failed to cleanup legacy startup shortcuts: {}", err);
     }
 

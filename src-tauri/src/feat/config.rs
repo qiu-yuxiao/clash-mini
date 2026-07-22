@@ -55,7 +55,7 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
             // 成功：提交 clash 配置的 draft，并保存到文件
             Config::clash().await.apply();
             let clash_data = Config::clash().await.data_arc();
-            clash_data.save_config().await?;
+            clash_data.save_config()?;
             Ok(())
         }
         Err(err) => {
@@ -254,23 +254,13 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         clash_verge_i18n::set_locale(language.as_str());
     }
     // SYS_PROXY 已提前至 CLASH_CONFIG 之前执行（见上方注释），此处不再重复。
-    if update_flags.contains(UpdateFlags::SYSTRAY_MENU) {
-        tray::Tray::global().update_menu().await?;
-    }
     if update_flags.contains(UpdateFlags::SYSTRAY_ICON) {
         tray::Tray::global()
-            .update_icon(&Config::verge().await.latest_arc())
-            .await?;
+            .update_icon(&Config::verge().await.latest_arc())?;
         #[cfg(target_os = "macos")]
         if patch.enable_tray_speed.is_some() {
             tray::Tray::global().update_speed_task(patch.enable_tray_speed.unwrap_or(false));
         }
-    }
-    if update_flags.contains(UpdateFlags::SYSTRAY_TOOLTIP) {
-        tray::Tray::global().update_tooltip().await?;
-    }
-    if update_flags.contains(UpdateFlags::SYSTRAY_CLICK_BEHAVIOR) {
-        tray::Tray::global().update_click_behavior().await?;
     }
     if update_flags.contains(UpdateFlags::LOG_LEVEL) {
         Logger::global().update_log_level(patch.get_log_level())?;
@@ -319,7 +309,7 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
         // 分离数据获取和异步调用
         let verge_data = Config::verge().await.data_arc();
         logging!(debug, Type::Setup, "Saving Verge configuration to file...");
-        if let Err(e) = verge_data.save_file().await {
+        if let Err(e) = verge_data.save_file() {
             // save_file 失败时回滚内存配置，保持内存与磁盘一致
             Config::verge().await.edit_draft(|d| *d = old_config);
             Config::verge().await.apply();

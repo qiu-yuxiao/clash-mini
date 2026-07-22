@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, IClashTemp},
-    core::{logger::Logger, tray::Tray},
+    core::logger::Logger,
     utils::dirs,
 };
 use anyhow::{Context as _, Result, bail};
@@ -573,11 +573,6 @@ impl ServiceManager {
         }
 
         operation.await?;
-
-        // 在释放 operation_running 锁之前更新菜单，避免 current() 返回旧状态
-        // 注意：update_menu 可能耗时，但 operation_running 是互斥操作锁，
-        // 持锁期间更新菜单可以保证状态一致性
-        let _ = Tray::global().update_menu().await;
 
         Ok(())
     }

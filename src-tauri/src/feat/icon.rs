@@ -164,7 +164,7 @@ pub async fn download_icon_cache(url: String, name: String) -> CmdResult<String>
     let content = response.bytes().await.stringify_err()?;
 
     if !is_supported_icon_content(&content) {
-        let _ = temp_path.remove_if_exists().await;
+        let _ = temp_path.remove_if_exists();
         return Err(format!("Downloaded content is not a valid image: {}", url.as_str()).into());
     }
 
@@ -186,14 +186,14 @@ pub async fn download_icon_cache(url: String, name: String) -> CmdResult<String>
         match fs::rename(&temp_path, &icon_path).await {
             Ok(_) => {}
             Err(_) => {
-                let _ = temp_path.remove_if_exists().await;
+                let _ = temp_path.remove_if_exists();
                 if icon_path.exists() {
                     return Ok(icon_path.to_string_lossy().into());
                 }
             }
         }
     } else {
-        let _ = temp_path.remove_if_exists().await;
+        let _ = temp_path.remove_if_exists();
     }
 
     Ok(icon_path.to_string_lossy().into())
@@ -225,9 +225,9 @@ pub async fn copy_icon_file(path: String, icon_info: IconInfo) -> CmdResult<Stri
     if file_path.exists() {
         if let Some(previous_t) = previous_t {
             let previous_png = ensure_icon_cache_target(&icon_dir, format!("{icon_name}-{previous_t}.png").as_str())?;
-            previous_png.remove_if_exists().await.unwrap_or_default();
+            previous_png.remove_if_exists().unwrap_or_default();
             let previous_ico = ensure_icon_cache_target(&icon_dir, format!("{icon_name}-{previous_t}.ico").as_str())?;
-            previous_ico.remove_if_exists().await.unwrap_or_default();
+            previous_ico.remove_if_exists().unwrap_or_default();
         }
 
         logging!(

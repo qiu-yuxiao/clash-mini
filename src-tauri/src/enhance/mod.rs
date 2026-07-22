@@ -149,7 +149,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
 
     let current = profiles_arc
         .current_mapping()
-        .await
         .with_context(|| format!("failed to read current profile \"{current_profile_uid}\""))?;
 
     let current_item = match profiles_arc.get_item(&current_profile_uid) {
@@ -611,7 +610,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 }
 
 #[allow(clippy::collapsible_if, clippy::needless_borrows_for_generic_args)]
-async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
+fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
     use chrono::{Local, TimeZone as _};
     let mut all_proxies = Vec::new();
     let mut raw_proxies = Vec::new();
@@ -624,7 +623,7 @@ async fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Ve
                     // Read file
                     if let Some(file) = &item.file {
                         if let Ok(file_path) = dirs::app_profiles_dir().map(|d| d.join(file.as_str())) {
-                            if let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path).await {
+                            if let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path) {
                                 if let Some(Value::Sequence(proxies)) = mapping.remove("proxies") {
                                     // Generate suffix from item.updated timestamp
                                     let ts = item.updated.unwrap_or(0);
@@ -710,7 +709,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     let profiles = Config::profiles().await;
     let profiles_arc = profiles.latest_arc();
     drop(profiles);
-    let merged = get_merged_proxies(&profiles_arc).await;
+    let merged = get_merged_proxies(&profiles_arc);
     config.insert(Value::from("proxies"), Value::from(merged));
 
     let merge_item = profile.merge_item;

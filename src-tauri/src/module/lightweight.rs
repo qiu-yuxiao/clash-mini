@@ -1,4 +1,4 @@
-use crate::{config::Config, core::tray::Tray, process::AsyncHandler};
+use crate::{config::Config, process::AsyncHandler};
 
 use clash_verge_logging::{Type, logging};
 
@@ -76,12 +76,6 @@ pub fn is_in_lightweight_mode() -> bool {
     get_state() == LightweightState::In
 }
 
-async fn refresh_lightweight_tray_state() {
-    if let Err(err) = Tray::global().update_menu().await {
-        logging!(warn, Type::Lightweight, "更新托盘轻量模式状态失败: {err}");
-    }
-}
-
 pub async fn auto_lightweight_boot() -> Result<()> {
     let verge_config = Config::verge().await;
     let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
@@ -96,14 +90,12 @@ pub async fn entry_lightweight_mode() -> bool {
     let verge = Config::verge().await;
     if !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false) {
         let _ = WindowManager::hide_main_window();
-        refresh_lightweight_tray_state().await;
         crate::core::tray::update_lite_mode_menu(false);
         return true;
     }
 
     if !transition_and_log(LightweightState::Normal, LightweightState::In) {
         logging!(debug, Type::Lightweight, "无需进入轻量模式，跳过调用");
-        refresh_lightweight_tray_state().await;
         // BUG-001 修复：按当前实际状态更新对勾，防止在已处于轻量模式时错误清除对勾标记
         crate::core::tray::update_lite_mode_menu(is_in_lightweight_mode());
         return false;
@@ -112,7 +104,6 @@ pub async fn entry_lightweight_mode() -> bool {
     if result == WindowOperationResult::Failed {
         logging!(warn, Type::Lightweight, "销毁主窗口失败，回滚轻量模式状态");
         transition_and_log(LightweightState::In, LightweightState::Normal);
-        refresh_lightweight_tray_state().await;
         crate::core::tray::update_lite_mode_menu(false);
         return false;
     }
@@ -139,7 +130,6 @@ pub async fn entry_lightweight_mode() -> bool {
         }
     }
 
-    refresh_lightweight_tray_state().await;
     crate::core::tray::update_lite_mode_menu(true);
 
     // 💡 说明：进入轻量模式时【不再】激进清空所有网络连接 (GC)。
@@ -149,12 +139,6 @@ pub async fn entry_lightweight_mode() -> bool {
     // 防止快速退出轻量后误触发自愈选点（FM-09）。
     abort_lightweight_cleanup();
     let handle = AsyncHandler::spawn(|| async {
-        if !is_in_lightweight_mode() {
-            return;
-        }
-        if !is_in_lightweight_mode() {
-            return;
-        }
         if !is_in_lightweight_mode() {
             return;
         }
@@ -188,14 +172,12 @@ pub async fn exit_lightweight_mode() -> bool {
     if get_state() == LightweightState::Normal {
         logging!(debug, Type::Lightweight, "轻量模式未激活，直接显示窗口");
         let _ = WindowManager::show_main_window().await;
-        refresh_lightweight_tray_state().await;
         crate::core::tray::update_lite_mode_menu(false);
         return true;
     }
 
     if !transition_and_log(LightweightState::In, LightweightState::Exiting) {
         logging!(debug, Type::Lightweight, "轻量模式正在退出中，跳过重复调用");
-        refresh_lightweight_tray_state().await;
         return false;
     }
     let result = WindowManager::show_main_window().await;
@@ -210,12 +192,10 @@ pub async fn exit_lightweight_mode() -> bool {
                 "智能显示主窗口未完成/被防抖限流，回滚轻量模式状态"
             );
             transition_and_log(LightweightState::Exiting, LightweightState::In);
-            refresh_lightweight_tray_state().await;
             crate::core::tray::update_lite_mode_menu(true);
             return false;
         }
     }
-    refresh_lightweight_tray_state().await;
     // 退出轻量模式后，更新托盘菜单中的「轻量模式」选项状态
     crate::core::tray::update_lite_mode_menu(false);
     // 说明：进入轻量模式时已熔断 WebSocket 订阅并清空连接（见 entry_lightweight_mode），

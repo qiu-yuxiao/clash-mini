@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use serde_yaml_ng::Mapping;
 use smartstring::alias::String;
 use std::time::Duration;
-use tokio::fs;
 // TODO, use other re-export
 use reqwest_dav::re_exports::url::form_urlencoded;
 use tauri::Url;
@@ -304,8 +303,7 @@ impl PrfItem {
         if url_trimmed.eq_ignore_ascii_case("clear") || url_trimmed.eq_ignore_ascii_case("clean") {
             let serialized =
                 serde_yaml_ng::to_string(&final_mapping).map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
-            fs::write(&path, serialized.as_bytes())
-                .await
+            std::fs::write(&path, serialized.as_bytes())
                 .with_context(|| format!("failed to write to file \"{file_name}\""))?;
 
             let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
@@ -343,7 +341,7 @@ impl PrfItem {
         final_mapping = parsed;
 
         if path.exists() {
-            if let Ok(content) = fs::read_to_string(&path).await {
+            if let Ok(content) = std::fs::read_to_string(&path) {
                 if let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content) {
                     if let Some(existing_proxies_val) = existing_mapping.get_mut("proxies") {
                         if let Some(existing_seq) = existing_proxies_val.as_sequence_mut() {
@@ -681,25 +679,25 @@ impl PrfItem {
     }
 
     /// get the file data
-    pub async fn read_file(&self) -> Result<String> {
+    pub fn read_file(&self) -> Result<String> {
         let file = self
             .file
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("could not find the file"))?;
         let path = dirs::app_profiles_dir()?.join(file.as_str());
-        let content = fs::read_to_string(path).await.context("failed to read the file")?;
+        let content = std::fs::read_to_string(path).context("failed to read the file")?;
         Ok(content.into())
     }
 
     /// save the file data
-    pub async fn save_file(&self, data: String) -> Result<()> {
+    pub fn save_file(&self, data: String) -> Result<()> {
         let file = self
             .file
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("could not find the file"))?;
         let path = dirs::app_profiles_dir()?.join(file.as_str());
 
-        let should_write = match fs::read_to_string(&path).await {
+        let should_write = match std::fs::read_to_string(&path) {
             Ok(existing_content) => {
                 if existing_content == data {
                     false
@@ -711,8 +709,7 @@ impl PrfItem {
         };
 
         if should_write {
-            fs::write(path, data.as_bytes())
-                .await
+            std::fs::write(path, data.as_bytes())
                 .context("failed to save the file")
         } else {
             Ok(())
@@ -916,7 +913,7 @@ mod tests {
         let initial_data: String = "key: value\r\nlist:\r\n  - item1\r\n".into();
 
         // 1. Initial save (should write)
-        item.save_file(initial_data.clone()).await.expect("initial save failed");
+        item.save_file(initial_data.clone()).expect("initial save failed");
         assert!(file_path.exists());
 
         let metadata_first = tokio::fs::metadata(&file_path).await.expect("metadata failed");
@@ -927,7 +924,7 @@ mod tests {
 
         // 2. Save identical content but with different line endings (should skip writing)
         let identical_data = "key: value\nlist:\n  - item1\n".into();
-        item.save_file(identical_data).await.expect("second save failed");
+        item.save_file(identical_data).expect("second save failed");
 
         let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
         let mtime_second = metadata_second.modified().expect("modified time failed");
@@ -941,7 +938,7 @@ mod tests {
 
         // 3. Save actually different content (should write)
         let different_data = "key: different_value\nlist:\n  - item1\n".into();
-        item.save_file(different_data).await.expect("third save failed");
+        item.save_file(different_data).expect("third save failed");
 
         let metadata_third = tokio::fs::metadata(&file_path).await.expect("metadata failed");
         let mtime_third = metadata_third.modified().expect("modified time failed");
@@ -972,7 +969,7 @@ mod tests {
         };
 
         // Save empty string
-        item.save_file("".into()).await.expect("save empty string failed");
+        item.save_file("".into()).expect("save empty string failed");
         assert!(file_path.exists());
         let content = tokio::fs::read_to_string(&file_path).await.expect("read failed");
         assert_eq!(content, "");
@@ -1044,7 +1041,7 @@ mod tests {
         };
 
         // 1. Save LF content
-        item.save_file("line1\nline2\n".into()).await.expect("save LF failed");
+        item.save_file("line1\nline2\n".into()).expect("save LF failed");
         let metadata_first = tokio::fs::metadata(&file_path).await.expect("metadata failed");
         let mtime_first = metadata_first.modified().expect("mtime failed");
 

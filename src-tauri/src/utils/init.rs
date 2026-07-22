@@ -33,7 +33,7 @@ async fn delete_snapshot_logs(log_dir: &Path) -> Result<()> {
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("log") {
-                let _ = path.remove_if_exists().await;
+                let _ = path.remove_if_exists();
                 logging!(info, Type::Setup, "delete snapshot log file: {}", path.display());
             }
         }
@@ -101,7 +101,7 @@ pub async fn delete_log() -> Result<()> {
 
             let duration = now.signed_duration_since(file_time);
             if duration.num_days() > day {
-                let _ = file.path().remove_if_exists().await;
+                let _ = file.path().remove_if_exists();
                 logging!(info, Type::Setup, "delete log file: {}", file_name);
             }
         }
@@ -123,7 +123,7 @@ pub async fn delete_log() -> Result<()> {
 }
 
 /// 初始化DNS配置文件
-async fn init_dns_config() -> Result<()> {
+fn init_dns_config() -> Result<()> {
     use serde_yaml_ng::Value;
 
     // 创建DNS子配置
@@ -204,7 +204,7 @@ async fn init_dns_config() -> Result<()> {
 
     if !dns_path.exists() {
         logging!(info, Type::Setup, "Creating default DNS config file");
-        help::save_yaml(&dns_path, &default_dns_config, Some("# Clash Verge DNS Config")).await?;
+        help::save_yaml(&dns_path, &default_dns_config, Some("# Clash Verge DNS Config"))?;
     }
 
     Ok(())
@@ -237,7 +237,6 @@ async fn initialize_config_files() -> Result<()> {
     {
         let template = IClashTemp::template().0;
         help::save_yaml(&path, &template, Some("# Clash Verge"))
-            .await
             .map_err(|e| anyhow::anyhow!("Failed to create clash config: {}", e))?;
         logging!(info, Type::Setup, "Created clash config at {:?}", path);
     }
@@ -247,7 +246,6 @@ async fn initialize_config_files() -> Result<()> {
     {
         let template = IVerge::template();
         help::save_yaml(&path, &template, Some("# Clash Verge"))
-            .await
             .map_err(|e| anyhow::anyhow!("Failed to create verge config: {}", e))?;
         logging!(info, Type::Setup, "Created verge config at {:?}", path);
     }
@@ -257,7 +255,6 @@ async fn initialize_config_files() -> Result<()> {
     {
         let template = IProfiles::default();
         help::save_yaml(&path, &template, Some("# Clash Verge"))
-            .await
             .map_err(|e| anyhow::anyhow!("Failed to create profiles config: {}", e))?;
         logging!(info, Type::Setup, "Created profiles config at {:?}", path);
     }
@@ -289,7 +286,7 @@ pub async fn init_config() -> Result<()> {
         logging!(info, Type::Setup, "后台日志清理任务完成");
     });
 
-    if let Err(e) = init_dns_config().await {
+    if let Err(e) = init_dns_config() {
         logging!(warn, Type::Setup, "DNS config initialization failed: {}", e);
     }
 

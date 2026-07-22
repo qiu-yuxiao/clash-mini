@@ -70,7 +70,7 @@
   <text x="224" y="400" font-size="14" font-weight="700" fill="#92400E">③ 内核桥接插件 · tauri-plugin-mihomo</text>
   <g font-size="12" fill="#334155">
     <rect x="220" y="414" width="200" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="433">LocalSocket 连接池 (HTTP+WS)</text>
-    <rect x="440" y="414" width="200" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="450" y="433">IpcConnectionPool (3~16)</text>
+    <rect x="440" y="414" width="200" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="450" y="433">IpcConnectionPool (3~20)</text>
     <rect x="660" y="414" width="215" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="670" y="433">MihomoWebSocket 通道</text>
 
     <rect x="220" y="452" width="322" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="471">Commands: select / delay_group / reload_config</text>

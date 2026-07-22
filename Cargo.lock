@@ -1075,7 +1075,6 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "arc-swap",
- "async-trait",
  "backon",
  "base64 0.22.1",
  "bitflags 2.11.1",

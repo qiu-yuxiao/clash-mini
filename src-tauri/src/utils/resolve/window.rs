@@ -65,7 +65,6 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
     let initial_script = build_window_initial_script(initial_theme_mode, DARK_BACKGROUND_HEX, LIGHT_BACKGROUND_HEX);
 
     let (win_w, win_h) = crate::utils::window_manager::restore_window_size()
-        .await
         .unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
 
     let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(start_page.into()))
