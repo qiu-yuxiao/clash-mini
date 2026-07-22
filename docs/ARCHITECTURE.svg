@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 880" font-family="'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif">
+  <defs>
+    <marker id="arrowDown" markerWidth="10" markerHeight="10" refX="5" refY="8" orient="auto">
+      <path d="M0,0 L5,8 L10,0 Z" fill="#0F172A"/>
+    </marker>
+    <marker id="arrowUp" markerWidth="10" markerHeight="10" refX="5" refY="2" orient="auto">
+      <path d="M0,8 L5,0 L10,8 Z" fill="#0F172A"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1040" height="880" fill="#FFFFFF"/>
+
+  <!-- title -->
+  <text x="40" y="42" font-size="24" font-weight="700" fill="#0F172A">Clash Mini 系统架构图</text>
+  <text x="40" y="66" font-size="13" fill="#475569">Tauri v2 + React/TS 前端 · Mihomo 内核 (sidecar / system service) · tauri-plugin-mihomo (LocalSocket)</text>
+
+  <!-- legend -->
+  <g font-size="12" fill="#334155">
+    <line x1="600" y1="36" x2="624" y2="36" stroke="#0F172A" stroke-width="2.5"/>
+    <text x="630" y="40">命令 / 控制流</text>
+    <line x1="600" y1="56" x2="624" y2="56" stroke="#0F172A" stroke-width="2.5" stroke-dasharray="5 4"/>
+    <text x="630" y="60">遥测 / 事件流</text>
+  </g>
+
+  <!-- ===== side flow arrows ===== -->
+  <!-- command flow: top -> bottom (UI to kernel) -->
+  <line x1="150" y1="150" x2="150" y2="710" stroke="#0F172A" stroke-width="2.5" marker-end="url(#arrowDown)"/>
+  <text x="150" y="430" font-size="12" fill="#0F172A" text-anchor="middle" transform="rotate(-90 150 430)">命令 / 控制流  invoke → tauri command → mihomo → PUT /proxies/PROXY</text>
+
+  <!-- telemetry flow: bottom -> top (kernel to UI) -->
+  <line x1="950" y1="710" x2="950" y2="150" stroke="#0F172A" stroke-width="2.5" stroke-dasharray="5 4" marker-end="url(#arrowUp)"/>
+  <text x="950" y="430" font-size="12" fill="#0F172A" text-anchor="middle" transform="rotate(90 950 430)">遥测 / 事件流  WS push (/traffic,/logs,/connections) + Tauri events</text>
+
+  <!-- ===== Layer 1: Frontend ===== -->
+  <rect x="200" y="100" width="700" height="120" rx="10" fill="#EFF6FF" stroke="#3B82F6" stroke-width="2"/>
+  <rect x="200" y="100" width="8" height="120" rx="4" fill="#3B82F6"/>
+  <text x="224" y="124" font-size="14" font-weight="700" fill="#1E3A8A">① 前端层 · React + TypeScript WebView</text>
+  <g font-size="12" fill="#334155">
+    <rect x="220" y="138" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="228" y="155">pages/_layout.tsx</text>
+    <rect x="390" y="138" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="398" y="155">app-data-provider</text>
+    <rect x="560" y="138" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="568" y="155">cmds.ts / mihomo-api</text>
+    <rect x="730" y="138" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="738" y="155">react-query + foxact</text>
+
+    <rect x="220" y="174" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="228" y="191">use-mihomo-ws-sub</text>
+    <rect x="390" y="174" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="398" y="191">use-proxy-selection</text>
+    <rect x="560" y="174" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="568" y="191">use-traffic-data</text>
+    <rect x="730" y="174" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="738" y="191">MUI + i18n (13语言)</text>
+  </g>
+
+  <!-- ===== Layer 2: Backend ===== -->
+  <rect x="200" y="238" width="700" height="120" rx="10" fill="#ECFDF5" stroke="#22C55E" stroke-width="2"/>
+  <rect x="200" y="238" width="8" height="120" rx="4" fill="#16A34A"/>
+  <text x="224" y="262" font-size="14" font-weight="700" fill="#14532D">② 后端主进程 · Rust (Tauri)</text>
+  <g font-size="12" fill="#334155">
+    <rect x="220" y="276" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="228" y="293">cmd/ IPC 命令层</text>
+    <rect x="390" y="276" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="398" y="293">core/manager 生命周期</text>
+    <rect x="560" y="276" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="568" y="293">enhance/ 生成配置</text>
+    <rect x="730" y="276" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="738" y="293">config/ Draft 状态</text>
+
+    <rect x="220" y="312" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="228" y="329">feat/ patch_verge</text>
+    <rect x="390" y="312" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="398" y="329">module/monitor</text>
+    <rect x="560" y="312" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="568" y="329">module/lightweight</text>
+    <rect x="730" y="312" width="150" height="26" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="738" y="329">core/tray · notification</text>
+  </g>
+
+  <!-- ===== Layer 3: Plugin ===== -->
+  <rect x="200" y="376" width="700" height="120" rx="10" fill="#FFFBEB" stroke="#F59E0B" stroke-width="2"/>
+  <rect x="200" y="376" width="8" height="120" rx="4" fill="#D97706"/>
+  <text x="224" y="400" font-size="14" font-weight="700" fill="#92400E">③ 内核桥接插件 · tauri-plugin-mihomo</text>
+  <g font-size="12" fill="#334155">
+    <rect x="220" y="414" width="200" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="433">LocalSocket 连接池 (HTTP+WS)</text>
+    <rect x="440" y="414" width="200" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="450" y="433">IpcConnectionPool (3~16)</text>
+    <rect x="660" y="414" width="215" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="670" y="433">MihomoWebSocket 通道</text>
+
+    <rect x="220" y="452" width="322" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="471">Commands: select / delay_group / reload_config</text>
+    <rect x="562" y="452" width="313" height="28" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="572" y="471">ws_traffic / ws_memory / ws_connections / ws_logs</text>
+  </g>
+
+  <!-- ===== Layer 4: Kernel ===== -->
+  <rect x="200" y="514" width="700" height="120" rx="10" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="2"/>
+  <rect x="200" y="514" width="8" height="120" rx="4" fill="#7C3AED"/>
+  <text x="224" y="538" font-size="14" font-weight="700" fill="#5B21B6">④ Mihomo 内核 (sidecar / system service)</text>
+  <g font-size="12" fill="#334155">
+    <rect x="220" y="552" width="318" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="572">PROXY (select 组 · 用户/app 控制)</text>
+    <rect x="558" y="552" width="322" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="568" y="572">PROXY__METRICS (url-test 组 · 测量)</text>
+
+    <rect x="220" y="590" width="318" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="610">TUN 驱动 / 系统代理接管</text>
+    <rect x="558" y="590" width="322" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="568" y="610">GFWList 规则分流 + DNS</text>
+  </g>
+
+  <!-- ===== Layer 5: OS / Disk ===== -->
+  <rect x="200" y="652" width="700" height="120" rx="10" fill="#F8FAFC" stroke="#64748B" stroke-width="2"/>
+  <rect x="200" y="652" width="8" height="120" rx="4" fill="#475569"/>
+  <text x="224" y="676" font-size="14" font-weight="700" fill="#1E293B">⑤ OS / 磁盘持久化</text>
+  <g font-size="12" fill="#334155">
+    <rect x="220" y="690" width="200" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="710">verge.yaml / profiles.yaml</text>
+    <rect x="440" y="690" width="200" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="450" y="710">clash-mini.yaml 运行时</text>
+    <rect x="660" y="690" width="215" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="670" y="710">proxy_head_state.json</text>
+
+    <rect x="220" y="728" width="655" height="30" rx="5" fill="#FFFFFF" stroke="#CBD5E1"/><text x="230" y="748">mini-mihomo.sock (Unix socket / Windows 命名管道 \\.\pipe\mini-mihomo)</text>
+  </g>
+
+  <!-- footer -->
+  <text x="40" y="800" font-size="12" fill="#475569">磁盘根目录: &lt;data_dir&gt;/io.github.clash-mini.clash-mini/ · 内核二进制前缀 mini- 与原版物理隔离 · 端口 Mixed 10801 / Controller 9098</text>
+</svg>
