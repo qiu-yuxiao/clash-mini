@@ -10,12 +10,6 @@ export interface IVergeConfig {
   app_log_max_size?: number // KB
   app_log_max_count?: number
   language?: string
-  tray_event?:
-    | 'main_window'
-    | 'tray_menu'
-    | 'system_proxy'
-    | 'tun_mode'
-    | string
   env_type?: 'bash' | 'cmd' | 'powershell' | 'fish' | string
   startup_script?: string
   start_page?: string
@@ -33,7 +27,6 @@ export interface IVergeConfig {
   enable_tray_speed?: boolean
   enable_always_on_top?: boolean
 
-  tray_inline_outbound_modes?: boolean
   enable_tun_mode?: boolean
   enable_auto_light_weight_mode?: boolean
   auto_light_weight_minutes?: number

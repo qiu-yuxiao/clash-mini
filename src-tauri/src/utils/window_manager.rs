@@ -143,8 +143,7 @@ static LAST_RESIZE_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 
 /// 同步版本：在 Resized 事件中直接调用，不 spawn 异步任务。
 /// 0×0 守卫：w.destroy() 会触发 Resized(0,0)，必须拒绝此无效值。
-/// force 参数：拖拽结束或失焦事件触发尾沿 Persistence 写入时设为 true 强行落盘。
-pub fn save_window_size_on_resize_sync(width: f64, height: f64, force: bool) {
+pub fn save_window_size_on_resize_sync(width: f64, height: f64) {
     if width < crate::utils::resolve::window::MINIMAL_WIDTH
         || height < crate::utils::resolve::window::MINIMAL_HEIGHT
     {
@@ -155,7 +154,7 @@ pub fn save_window_size_on_resize_sync(width: f64, height: f64, force: bool) {
         .unwrap_or_default()
         .as_millis() as i64;
     let last = LAST_RESIZE_SAVE_MS.load(Ordering::Relaxed);
-    if !force && (now - last < 250) {
+    if now - last < 250 {
         return;
     }
     LAST_RESIZE_SAVE_MS.store(now, Ordering::Relaxed);

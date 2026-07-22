@@ -35,9 +35,6 @@ pub struct IVerge {
     /// `light` or `dark` or `system`
     pub theme_mode: Option<String>,
 
-    /// tray click event
-    pub tray_event: Option<String>,
-
     /// copy env type
     pub env_type: Option<String>,
 
@@ -188,9 +185,6 @@ pub struct IVerge {
 
     #[cfg(target_os = "macos")]
     pub enable_tray_speed: Option<bool>,
-
-    /// show outbound modes directly on tray root menu
-    pub tray_inline_outbound_modes: Option<bool>,
 
     /// 自动进入轻量模式
     pub enable_auto_light_weight_mode: Option<bool>,
@@ -385,7 +379,6 @@ impl IVerge {
             #[cfg(target_os = "macos")]
             enable_tray_speed: Some(false),
 
-            tray_inline_outbound_modes: Some(false),
             enable_always_on_top: Some(false),
             enable_auto_light_weight_mode: Some(true),
             auto_light_weight_minutes: Some(5),
@@ -420,7 +413,6 @@ impl IVerge {
 
         patch!(language);
         patch!(theme_mode);
-        patch!(tray_event);
         patch!(env_type);
         patch!(start_page);
         patch!(startup_script);
@@ -479,7 +471,6 @@ impl IVerge {
         #[cfg(target_os = "macos")]
         patch!(enable_tray_speed);
 
-        patch!(tray_inline_outbound_modes);
         patch!(enable_auto_light_weight_mode);
         patch!(auto_light_weight_minutes);
         patch!(enable_dns_settings);
