@@ -72,7 +72,7 @@ mod app_init {
                             .max_connections(16)
                             .idle_timeout(std::time::Duration::from_secs(30))
                             .health_check_interval(std::time::Duration::from_secs(60))
-                            .reject_policy(RejectPolicy::Wait)
+                            .reject_policy(RejectPolicy::Timeout(std::time::Duration::from_secs(5)))
                             .build(),
                     )
                     .build(),
