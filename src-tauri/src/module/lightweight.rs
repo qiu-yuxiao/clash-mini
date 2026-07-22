@@ -116,34 +116,14 @@ pub async fn entry_lightweight_mode() -> bool {
         crate::core::tray::update_lite_mode_menu(false);
         return false;
     }
-    refresh_lightweight_tray_state().await;
-    crate::core::tray::update_lite_mode_menu(true);
-
-    // 💡 说明：进入轻量模式时【不再】激进清空所有网络连接 (GC)。
-    //    按用户要求，轻量模式不等于关闭程序——正在下载的链接不能被切断重连，
-    //    故仅保留下方资源回收动作，不影响用户实际代理流量。
     // 💡 建议 3：彻底熔断外壳 Rust 后端与内核的常驻数据流订阅 - BUG-259
-    // 进入前 abort 上一个 cleanup 任务，避免累积
-    abort_lightweight_cleanup();
-    let handle = AsyncHandler::spawn(|| async {
-        if !is_in_lightweight_mode() {
-            return;
-        }
+    // 在销毁窗口后【同步、不可 abort】地立即熔断旧 WS 订阅。
+    // 关键点：entry/exit 共用同一把 LIGHTWEIGHT_LOCK，exit 必须等本函数释放锁后才能
+    // 重建窗口，因此此处 clear 必然先于任何 show_main_window 执行——
+    // 彻底杜绝“快速进→出轻量模式”时 cleanup 任务被 abort 导致旧 WS 沦为孤儿、
+    // 内核 socket 与 tokio 任务累积泄漏的问题。
+    {
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-
-        logging!(
-            info,
-            Type::Lightweight,
-            "[轻量模式] 触发进入时连接清理与数据订阅熔断..."
-        );
-
-        if !is_in_lightweight_mode() {
-            return;
-        }
-        if !is_in_lightweight_mode() {
-            return;
-        }
-        // 清理所有 WebSocket 连接 (熔断订阅)
         if let Err(err) = mihomo.clear_all_ws_connections().await {
             logging!(
                 error,
@@ -157,11 +137,28 @@ pub async fn entry_lightweight_mode() -> bool {
                 "[轻量模式] 彻底熔断外壳与内核的常驻数据流订阅成功"
             );
         }
+    }
 
+    refresh_lightweight_tray_state().await;
+    crate::core::tray::update_lite_mode_menu(true);
+
+    // 💡 说明：进入轻量模式时【不再】激进清空所有网络连接 (GC)。
+    //    按用户要求，轻量模式不等于关闭程序——正在下载的链接不能被切断重连，
+    //    故仅保留下方资源回收动作，不影响用户实际代理流量。
+    // 进入前 abort 上一个 cleanup 任务，避免累积；自愈选点逻辑保留在可 abort 任务中，
+    // 防止快速退出轻量后误触发自愈选点（FM-09）。
+    abort_lightweight_cleanup();
+    let handle = AsyncHandler::spawn(|| async {
         if !is_in_lightweight_mode() {
             return;
         }
-        // 进入轻量模式时触发节点自愈恢复与自动选点
+        if !is_in_lightweight_mode() {
+            return;
+        }
+        if !is_in_lightweight_mode() {
+            return;
+        }
+        // 进入轻量模式时触发节点自愈恢复与自动选点（此逻辑可 abort）
         if let Some(uid) = crate::module::monitor::get_current_profile_uid().await {
             if crate::module::monitor::wait_for_clash_ready().await {
                 let _ = crate::module::monitor::restore_profile_selected_nodes(&uid).await;

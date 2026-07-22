@@ -111,13 +111,26 @@ struct WindowSizeState {
 }
 
 /// 保存当前窗口 outer 尺寸到 app 数据目录的 `window_state.json`
+///
+/// 采用 read-modify-write：在已有 JSON 上 merge width/height，
+/// 避免整文件覆盖把 `tauri_plugin_window_state` 管理的 x/y/最大化/全屏 等键抹除
+/// （此前每次 resize 的整盖写会导致轻量唤醒后窗口位置也回退默认）。
 async fn save_window_size(width: f64, height: f64) {
     let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
         return;
     };
     let path = home.join("window_state.json");
-    let state = WindowSizeState { width, height };
-    if let Ok(json) = serde_json::to_string(&state) {
+    // 读取现有内容（可能含插件写入的 position/maximized/fullscreen/decorations），不存在则用空对象
+    let mut value = match tokio::fs::read_to_string(&path).await {
+        Ok(content) => serde_json::from_str::<serde_json::Value>(&content)
+            .unwrap_or_else(|_| serde_json::Value::Object(Default::default())),
+        Err(_) => serde_json::Value::Object(Default::default()),
+    };
+    if let Some(obj) = value.as_object_mut() {
+        obj.insert("width".into(), serde_json::Value::from(width));
+        obj.insert("height".into(), serde_json::Value::from(height));
+    }
+    if let Ok(json) = serde_json::to_string(&value) {
         let _ = tokio::fs::write(&path, json).await;
     }
 }
