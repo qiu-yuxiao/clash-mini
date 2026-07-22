@@ -133,7 +133,12 @@ mod app_init {
         logging!(info, Type::Setup, "初始化窗口状态管理...");
         let window_state_plugin = tauri_plugin_window_state::Builder::new()
             .with_filename(files::WINDOW_STATE)
-            .with_state_flags(tauri_plugin_window_state::StateFlags::default())
+            .with_state_flags(
+                tauri_plugin_window_state::StateFlags::POSITION
+                    | tauri_plugin_window_state::StateFlags::MAXIMIZED
+                    | tauri_plugin_window_state::StateFlags::FULLSCREEN
+                    | tauri_plugin_window_state::StateFlags::DECORATIONS,
+            )
             .build();
         app.handle().plugin(window_state_plugin)?;
         Ok(())
