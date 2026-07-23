@@ -1,4 +1,6 @@
-use crate::{core::handle, utils::resolve::window::build_new_window};
+use crate::{
+    constants::files, core::handle, utils::resolve::window::build_new_window,
+};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
@@ -112,7 +114,9 @@ struct WindowSizeState {
 
 /// 保存当前窗口 outer 尺寸到 app 数据目录的 `window_state.json`
 ///
-/// 采用同步 read-modify-write：在已有 JSON 上 merge width/height。
+/// 直接写入干净的 `{width, height}` 对象，不保留任何其它字段。
+/// 旧版本（依赖 tauri-plugin-window-state 时）留下的 `x`/`y`/`maximized` 等键
+/// 是无用死数据，写入时一并丢弃，避免 window_state.json 被历史脏键污染。
 ///
 /// 必须用同步而非异步：`w.destroy()` 会同步触发 `Resized(0,0)` 事件，
 /// 若 resize 保存是异步 spawn，0×0 与 destroy 后的正确值写入顺序由调度器决定（竞态）。
@@ -121,17 +125,11 @@ fn save_window_size_sync(width: f64, height: f64) {
     let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
         return;
     };
-    let path = home.join("window_state.json");
-    let mut value = match std::fs::read_to_string(&path) {
-        Ok(content) => serde_json::from_str::<serde_json::Value>(&content)
-            .unwrap_or_else(|_| serde_json::Value::Object(Default::default())),
-        Err(_) => serde_json::Value::Object(Default::default()),
-    };
-    if let Some(obj) = value.as_object_mut() {
-        obj.insert("width".into(), serde_json::Value::from(width));
-        obj.insert("height".into(), serde_json::Value::from(height));
-    }
-    if let Ok(json) = serde_json::to_string(&value) {
+    let path = home.join(files::WINDOW_STATE);
+    let mut obj = serde_json::Map::new();
+    obj.insert("width".into(), serde_json::Value::from(width));
+    obj.insert("height".into(), serde_json::Value::from(height));
+    if let Ok(json) = serde_json::to_string(&serde_json::Value::Object(obj)) {
         let _ = std::fs::write(&path, json);
     }
 }
@@ -162,7 +160,7 @@ pub fn save_window_size_on_resize_sync(width: f64, height: f64) {
 /// 读取上次保存的窗口尺寸，失败或不存在返回 None
 pub fn restore_window_size() -> Option<(f64, f64)> {
     let home = crate::utils::dirs::app_home_dir().ok()?;
-    let path = home.join("window_state.json");
+    let path = home.join(files::WINDOW_STATE);
     let content = std::fs::read_to_string(&path).ok()?;
     let state: WindowSizeState = serde_json::from_str(&content).ok()?;
     // 兜底：保存值必须大于等于极简窗口最小值，且限制上限在 MAX_WIDTH 和 MAX_HEIGHT 范围内，防止异常数据导致窗口不可交互
