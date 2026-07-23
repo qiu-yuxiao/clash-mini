@@ -540,8 +540,13 @@ const resolveServicePermission = async () => {
 // =======================
 // Other resource resolvers (service, mmdb, geosite, geoip, enableLoopback)
 // =======================
+// IMPORTANT: pinned to a known-good daemon release — do NOT fetch from
+// /releases/latest. On 2026-07-23 upstream published v2.5.0, whose daemon fails
+// to start the Windows service (cannot open "C:\ProgramData\clash-verge-service",
+// os error 5 -> ExitCode 1), which broke TUN mode in v2.7.4 / v2.7.5. v2.3.3 is
+// the last release before that regression (it shipped fine in v2.7.3).
 const SERVICE_LATEST_URL =
-  'https://github.com/clash-verge-rev/clash-verge-service-ipc/releases/latest'
+  'https://github.com/clash-verge-rev/clash-verge-service-ipc/releases/tag/v2.3.3'
 const SERVICE_URL_PREFIX =
   'https://github.com/clash-verge-rev/clash-verge-service-ipc/releases/download'
 let SERVICE_VERSION
