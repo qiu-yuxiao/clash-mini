@@ -112,9 +112,7 @@ struct WindowSizeState {
 
 /// 保存当前窗口 outer 尺寸到 app 数据目录的 `window_state.json`
 ///
-/// 采用同步 read-modify-write：在已有 JSON 上 merge width/height，
-/// 避免整文件覆盖把 `tauri_plugin_window_state` 管理的 x/y/最大化/全屏 等键抹除
-/// （此前每次 resize 的整盖写会导致轻量唤醒后窗口位置也回退默认）。
+/// 采用同步 read-modify-write：在已有 JSON 上 merge width/height。
 ///
 /// 必须用同步而非异步：`w.destroy()` 会同步触发 `Resized(0,0)` 事件，
 /// 若 resize 保存是异步 spawn，0×0 与 destroy 后的正确值写入顺序由调度器决定（竞态）。

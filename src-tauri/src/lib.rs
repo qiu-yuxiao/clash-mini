@@ -16,7 +16,6 @@ mod module;
 mod process;
 pub mod utils;
 
-use crate::constants::files;
 use crate::{
     core::handle,
     process::AsyncHandler,
@@ -125,22 +124,6 @@ mod app_init {
                 .app_name(&app.config().identifier);
         }
         app.handle().plugin(auto_start_plugin_builder.build())?;
-        Ok(())
-    }
-
-    /// Setup window state management
-    pub fn setup_window_state(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-        logging!(info, Type::Setup, "初始化窗口状态管理...");
-        let window_state_plugin = tauri_plugin_window_state::Builder::new()
-            .with_filename(files::WINDOW_STATE)
-            .with_state_flags(
-                tauri_plugin_window_state::StateFlags::POSITION
-                    | tauri_plugin_window_state::StateFlags::MAXIMIZED
-                    | tauri_plugin_window_state::StateFlags::FULLSCREEN
-                    | tauri_plugin_window_state::StateFlags::DECORATIONS,
-            )
-            .build();
-        app.handle().plugin(window_state_plugin)?;
         Ok(())
     }
 
@@ -267,10 +250,6 @@ pub fn run() {
             }
 
             app_init::setup_deep_links(app);
-
-            if let Err(e) = app_init::setup_window_state(app) {
-                logging!(error, Type::Setup, "Failed to setup window state: {}", e);
-            }
 
             resolve::resolve_setup_async();
             resolve::resolve_setup_sync();
