@@ -66,7 +66,7 @@ import {
 } from '@/services/cmds'
 import { getDelayManager } from '@/services/delay'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
-import { showNotice } from '@/services/notice-service'
+import { showNotice, hideNotice } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
@@ -396,10 +396,14 @@ const Layout = () => {
 
   // Minimal Settings Actions
   const handleClashBoolChange = (field: string) => async (checked: boolean) => {
+    const waitId = showNotice.info('正在调整，请稍候…', 0)
     try {
       await patchClashConfig({ [field]: checked })
       await refreshClashConfig()
+      hideNotice(waitId)
+      showNotice.success('已更新')
     } catch (err: unknown) {
+      hideNotice(waitId)
       showNotice.error(err instanceof Error ? err.message : String(err))
     }
   }
@@ -970,6 +974,8 @@ const Layout = () => {
   ) => {
     if (targetMode === currentMode) return
 
+    const waitId = showNotice.info('正在调整，请稍候…', 0)
+
     if (targetMode === 'manual') {
       try {
         await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
@@ -978,24 +984,28 @@ const Layout = () => {
             console.warn('[layout] closeAllConnectionsWithTimeout failed'),
           )
         }
+        hideNotice(waitId)
         showNotice.success('已切换至手动模式')
       } catch (err) {
+        hideNotice(waitId)
         showNotice.error(err)
       }
     } else if (targetMode === 'system') {
       try {
         await patchVerge({ enable_system_proxy: true, enable_tun_mode: false })
+        hideNotice(waitId)
         showNotice.success('已开启系统代理')
       } catch (err) {
+        hideNotice(waitId)
         showNotice.error(err)
       }
     } else if (targetMode === 'tun') {
       if (!isTunModeAvailable) {
         try {
-          showNotice.info('正在自动安装/配置虚拟网卡系统服务...')
           await installServiceAndRestartCore()
           await mutateSystemState()
         } catch {
+          hideNotice(waitId)
           showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
           return
         }
@@ -1004,8 +1014,10 @@ const Layout = () => {
       try {
         await patchVerge({ enable_system_proxy: false, enable_tun_mode: true })
         await restartCore()
+        hideNotice(waitId)
         showNotice.success('已开启 TUN 模式')
       } catch (err) {
+        hideNotice(waitId)
         showNotice.error(err)
       }
     }
