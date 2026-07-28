@@ -10,7 +10,7 @@ use tauri_plugin_shell::ShellExt as _;
 use tokio::fs;
 
 use crate::config::{Config, ConfigType};
-use crate::constants::timing::INTERNAL_CONTROL_TIMEOUT_MS;
+use crate::constants::timing::VALIDATE_CONTROL_TIMEOUT_MS;
 use crate::core::handle;
 use crate::singleton;
 use crate::utils::dirs;
@@ -373,7 +373,7 @@ impl CoreConfigValidator {
                 .args(["-t", "-d", app_dir_str, "-f", config_path])
         };
         let output = match tokio::time::timeout(
-            std::time::Duration::from_millis(INTERNAL_CONTROL_TIMEOUT_MS),
+            std::time::Duration::from_millis(VALIDATE_CONTROL_TIMEOUT_MS),
             command.output(),
         )
         .await
@@ -385,11 +385,11 @@ impl CoreConfigValidator {
                     error,
                     Type::Validate,
                     "验证进程执行超时 ({}s)",
-                    INTERNAL_CONTROL_TIMEOUT_MS / 1000
+                    VALIDATE_CONTROL_TIMEOUT_MS / 1000
                 );
                 return Err(anyhow::anyhow!(
                     "Validation process timed out after {} seconds",
-                    INTERNAL_CONTROL_TIMEOUT_MS / 1000
+                    VALIDATE_CONTROL_TIMEOUT_MS / 1000
                 ));
             }
         };
