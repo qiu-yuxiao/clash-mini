@@ -105,23 +105,21 @@ fn should_handle_window_operation(op_type: WindowOpType) -> bool {
         .is_ok()
 }
 
-/// 持久化的窗口尺寸（退出轻量模式 / 重启时恢复上一次尺寸）
+/// 持久化的窗口几何状态（尺寸 + 位置，退出轻量模式 / 重启时统一恢复）
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct WindowSizeState {
-    width: f64,
-    height: f64,
+pub struct SavedWindowState {
+    pub width: f64,
+    pub height: f64,
+    pub x: Option<f64>,
+    pub y: Option<f64>,
 }
 
-/// 保存当前窗口 outer 尺寸到 app 数据目录的 `window_state.json`
+/// 保存当前窗口 outer 尺寸与位置到 app 数据目录的 `window_state.json`
 ///
-/// 直接写入干净的 `{width, height}` 对象，不保留任何其它字段。
-/// 旧版本（依赖 tauri-plugin-window-state 时）留下的 `x`/`y`/`maximized` 等键
-/// 是无用死数据，写入时一并丢弃，避免 window_state.json 被历史脏键污染。
-///
+/// 写入干净的 `{width, height, x, y}` 对象。
 /// 必须用同步而非异步：`w.destroy()` 会同步触发 `Resized(0,0)` 事件，
 /// 若 resize 保存是异步 spawn，0×0 与 destroy 后的正确值写入顺序由调度器决定（竞态）。
-/// 同步写保证 0×0 在 destroy 闭包返回前就写完，destroy 后的正确值必然最后写入。
-fn save_window_size_sync(width: f64, height: f64) {
+pub fn save_window_state_sync(width: f64, height: f64, x: Option<f64>, y: Option<f64>) {
     let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
         return;
     };
@@ -129,17 +127,28 @@ fn save_window_size_sync(width: f64, height: f64) {
     let mut obj = serde_json::Map::new();
     obj.insert("width".into(), serde_json::Value::from(width));
     obj.insert("height".into(), serde_json::Value::from(height));
+    if let Some(x_val) = x {
+        obj.insert("x".into(), serde_json::Value::from(x_val));
+    }
+    if let Some(y_val) = y {
+        obj.insert("y".into(), serde_json::Value::from(y_val));
+    }
     if let Ok(json) = serde_json::to_string(&serde_json::Value::Object(obj)) {
         let _ = std::fs::write(&path, json);
     }
 }
 
-/// 窗口尺寸变化时的持久化（带 250ms 节流，避免拖拽期间频繁写盘）
-static LAST_RESIZE_SAVE_MS: AtomicI64 = AtomicI64::new(0);
+/// 窗口尺寸或位置变化时的持久化（带 250ms 节流，避免拖拽期间频繁写盘）
+static LAST_GEOMETRY_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 
-/// 同步版本：在 Resized 事件中直接调用，不 spawn 异步任务。
+/// 同步版本：在 Resized / Moved 事件中直接调用，不 spawn 异步任务。
 /// 0×0 守卫：w.destroy() 会触发 Resized(0,0)，必须拒绝此无效值。
-pub fn save_window_size_on_resize_sync(width: f64, height: f64) {
+pub fn save_window_state_on_geometry_change_sync(
+    width: f64,
+    height: f64,
+    x: Option<f64>,
+    y: Option<f64>,
+) {
     if width < crate::utils::resolve::window::MINIMAL_WIDTH
         || height < crate::utils::resolve::window::MINIMAL_HEIGHT
     {
@@ -149,27 +158,66 @@ pub fn save_window_size_on_resize_sync(width: f64, height: f64) {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64;
-    let last = LAST_RESIZE_SAVE_MS.load(Ordering::Relaxed);
+    let last = LAST_GEOMETRY_SAVE_MS.load(Ordering::Relaxed);
     if now - last < 250 {
         return;
     }
-    LAST_RESIZE_SAVE_MS.store(now, Ordering::Relaxed);
-    save_window_size_sync(width, height);
+    LAST_GEOMETRY_SAVE_MS.store(now, Ordering::Relaxed);
+    save_window_state_sync(width, height, x, y);
 }
 
-/// 读取上次保存的窗口尺寸，失败或不存在返回 None
-pub fn restore_window_size() -> Option<(f64, f64)> {
+/// 检查给定的坐标 (x, y) 是否落在当前已连接显示器的可视范围内
+pub fn is_position_on_screen(x: f64, y: f64) -> bool {
+    let app_handle = crate::core::handle::Handle::app_handle();
+    if let Ok(monitors) = app_handle.available_monitors() {
+        if monitors.is_empty() {
+            return true;
+        }
+        for monitor in monitors {
+            let scale = monitor.scale_factor();
+            let m_x = monitor.position().x as f64 / scale;
+            let m_y = monitor.position().y as f64 / scale;
+            let m_w = monitor.size().width as f64 / scale;
+            let m_h = monitor.size().height as f64 / scale;
+
+            if x >= (m_x - 100.0) && x <= (m_x + m_w - 50.0) && y >= (m_y - 100.0) && y <= (m_y + m_h - 50.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+    true
+}
+
+/// 读取上次保存的窗口尺寸与位置，失败或不存在返回 None
+pub fn restore_window_state() -> Option<SavedWindowState> {
     let home = crate::utils::dirs::app_home_dir().ok()?;
     let path = home.join(files::WINDOW_STATE);
     let content = std::fs::read_to_string(&path).ok()?;
-    let state: WindowSizeState = serde_json::from_str(&content).ok()?;
-    // 兜底：保存值必须大于等于极简窗口最小值，且限制上限在 MAX_WIDTH 和 MAX_HEIGHT 范围内，防止异常数据导致窗口不可交互
+    let mut state: SavedWindowState = serde_json::from_str(&content).ok()?;
+
+    // 兜底：保存值必须大于等于极简窗口最小值，且限制上限在 MAX_WIDTH 和 MAX_HEIGHT 范围内
     if state.width >= crate::utils::resolve::window::MINIMAL_WIDTH
         && state.height >= crate::utils::resolve::window::MINIMAL_HEIGHT
     {
-        let width = state.width.min(crate::utils::resolve::window::MAX_WIDTH);
-        let height = state.height.min(crate::utils::resolve::window::MAX_HEIGHT);
-        Some((width, height))
+        state.width = state.width.min(crate::utils::resolve::window::MAX_WIDTH);
+        state.height = state.height.min(crate::utils::resolve::window::MAX_HEIGHT);
+
+        // 如果包含位置，校验位置是否依然落在可视屏幕范围内（防止拔插显示器导致丢到外星域）
+        if let (Some(x), Some(y)) = (state.x, state.y) {
+            if !is_position_on_screen(x, y) {
+                logging!(
+                    warn,
+                    Type::Window,
+                    "已保存的窗口位置 ({}, {}) 脱离当前显示器可视范围，安全重置为默认居中",
+                    x,
+                    y
+                );
+                state.x = None;
+                state.y = None;
+            }
+        }
+        Some(state)
     } else {
         None
     }
@@ -492,22 +540,35 @@ impl WindowManager {
         let label = window.label().to_string();
         let app_handle_clone = app_handle.clone();
 
-        // 必须在主线程读取窗口几何量（off-main-thread 读取可能失败，导致尺寸从未保存），
+        // 必须在主线程读取窗口几何量（off-main-thread 读取可能失败，导致尺寸/位置从未保存），
         // 通过 oneshot 回传，等销毁闭包执行完后再持久化到 window_state.json
-        let (tx, rx) = tokio::sync::oneshot::channel::<Option<(f64, f64)>>();
+        let (tx, rx) = tokio::sync::oneshot::channel::<Option<(f64, f64, Option<f64>, Option<f64>)>>();
 
         match app_handle.run_on_main_thread(move || {
             let saved = if let Some(w) = app_handle_clone.get_webview_window(&label) {
-                if let Ok(size) = w.outer_size() {
-                    let scale = w
-                        .current_monitor()
-                        .ok()
-                        .flatten()
-                        .map(|m| m.scale_factor())
-                        .unwrap_or(1.0);
-                    Some((size.width as f64 / scale, size.height as f64 / scale))
-                } else {
-                    None
+                let size = w.outer_size().ok();
+                let pos = w.outer_position().ok();
+                let scale = w
+                    .current_monitor()
+                    .ok()
+                    .flatten()
+                    .map(|m| m.scale_factor())
+                    .unwrap_or(1.0);
+
+                match (size, pos) {
+                    (Some(s), Some(p)) => Some((
+                        s.width as f64 / scale,
+                        s.height as f64 / scale,
+                        Some(p.x as f64 / scale),
+                        Some(p.y as f64 / scale),
+                    )),
+                    (Some(s), None) => Some((
+                        s.width as f64 / scale,
+                        s.height as f64 / scale,
+                        None,
+                        None,
+                    )),
+                    _ => None,
                 }
             } else {
                 None
@@ -520,15 +581,23 @@ impl WindowManager {
             let _ = tx.send(saved);
         }) {
             Ok(_) => {
-                // 等待主线程上的销毁闭包执行完毕，并持久化读取到的尺寸
+                // 等待主线程上的销毁闭包执行完毕，并持久化读取到的尺寸与位置
                 // 加 5 秒超时保护：主线程被模态循环/COM 调用占用时不会永久阻塞（与 activate_window 一致）
                 match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
-                    Ok(Ok(Some((w, h)))) => {
+                    Ok(Ok(Some((w, h, x, y)))) => {
                         if w >= crate::utils::resolve::window::MINIMAL_WIDTH
                             && h >= crate::utils::resolve::window::MINIMAL_HEIGHT
                         {
-                            save_window_size_sync(w, h);
-                            logging!(info, Type::Window, "窗口已摧毁（尺寸已有效存盘: {}x{}）", w, h);
+                            save_window_state_sync(w, h, x, y);
+                            logging!(
+                                info,
+                                Type::Window,
+                                "窗口已摧毁（尺寸与位置已有效存盘: {}x{}, pos: {:?},{:?}）",
+                                w,
+                                h,
+                                x,
+                                y
+                            );
                         } else {
                             logging!(
                                 warn,
