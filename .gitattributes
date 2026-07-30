@@ -1,2 +1,6 @@
+# 统一全仓库文本文件行尾符为 LF，消除 Windows/Linux/Mac 跨平台协作时的行尾符噪音。
+# 历史提交中部分文件为 CRLF，导致 core.autocrlf=true 设置下 git status 持续误报 modified。
+* text=auto eol=lf
+
 .github/workflows/*.lock.yml linguist-generated=true merge=ours
 Changelog.md merge=union
