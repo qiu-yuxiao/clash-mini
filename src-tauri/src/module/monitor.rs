@@ -110,6 +110,20 @@ fn resolve_probe_target(test_url: &str) -> String {
     }
 }
 
+/// 物理网络连通性探测：对当前测速 URL 解析出的 host:port 发起 DNS 查询，
+/// 成功即认为物理网络已就绪。超时上限由调用方指定。
+///
+/// 复用主循环 [后台监测] 已有的探测方式（tokio::net::lookup_host），
+/// 避免引入第三方依赖或硬编码探测目标。
+async fn is_physical_network_online(timeout_secs: u64) -> bool {
+    let test_url = get_test_url().await;
+    let host_port = resolve_probe_target(&test_url);
+    tokio::time::timeout(Duration::from_secs(timeout_secs), tokio::net::lookup_host(host_port))
+        .await
+        .map(|res| res.is_ok())
+        .unwrap_or(false)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FilterConfig {
     pub filter_text: String,
@@ -214,6 +228,29 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
             if let Some(all) = group_info.all {
                 if !all.is_empty() {
                     logging!(info, Type::Lightweight, "[后台监测] 阶段 2 完成：代理节点列表已填充");
+                    // 阶段 3：等待物理网络连通
+                    // 开机启动场景下内核 API 与节点列表就绪早于物理网络（DHCP/DNS 尚未完成），
+                    // 若此时立即测速必然 all timeout。此处阻塞等待网络就绪，从根源消除该现象。
+                    // 超时上限 15 秒：超过后放行，由下游测速/自愈逻辑兜底，避免永久阻塞。
+                    let start_time_3 = Instant::now();
+                    while start_time_3.elapsed().as_secs() < 15 {
+                        if crate::core::handle::Handle::global().is_exiting() {
+                            logging!(info, Type::Lightweight, "[后台监测] 阶段 3 中断：应用正在退出");
+                            return false;
+                        }
+                        if is_physical_network_online(2).await {
+                            logging!(info, Type::Lightweight, "[后台监测] 阶段 3 完成：物理网络已连通");
+                            return true;
+                        }
+                        tokio::select! {
+                            _ = sleep(Duration::from_secs(1)) => {}
+                            _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                                logging!(info, Type::Lightweight, "[后台监测] 阶段 3 中断：检测到 Profile 切换");
+                                return false;
+                            }
+                        }
+                    }
+                    logging!(warn, Type::Lightweight, "[后台监测] 阶段 3 超时：物理网络未连通，放行测速（由下游兜底）");
                     return true;
                 }
             }
