@@ -345,7 +345,9 @@ const Layout = () => {
   const { clashInfo, patchInfo } = useClashInfo()
   // coreVersion/mutateVersion 已在前面通过 useClash() 提前获取（供 useCoreUpdate 使用）
   const { clashConfig } = useClashConfigData()
-  const { refreshClashConfig } = useAppRefreshers()
+  // 注意：handleClashBoolChange 不再主动调 refreshClashConfig()，
+  // 后端 patch_clash 末尾已 refresh_clash() 发 refresh-clash-config 事件，
+  // 前端 use-layout-events 的 250ms 防抖会合并 revalidate（见下方 handler 注释）。
 
   useEffect(() => {
     getAppVersion()
@@ -413,14 +415,23 @@ const Layout = () => {
   // Minimal Settings Actions
   const handleClashBoolChange = (field: string) => async (checked: boolean) => {
     const waitId = showNotice.info('正在调整，请稍候…', 0)
+
+    // 标记长操作开始：allow-lan / ipv6 变更后端会 restart_core
+    // （feat/config.rs 中 allow_lan_changed / ipv6_changed → need_restart →
+    // restart_core），期间 IPC 通道阻塞最长 60s。与 handleTakeoverModeChange /
+    // handleRuleFallbackChange 同理，需抑制 IPC timeout Notice 避免风暴卡死。
+    beginLongOperation()
     try {
       await patchClashConfig({ [field]: checked })
-      await refreshClashConfig()
-      hideNotice(waitId)
+      // 后端 patch_clash 末尾已 refresh_clash() 发 refresh-clash-config 事件，
+      // 前端 use-layout-events 的 250ms 防抖会合并 revalidate；此处主动再调
+      // refreshClashConfig() 属冗余（与 handleRuleFallbackChange 的处理一致），已移除。
       showNotice.success('已更新')
     } catch (err: unknown) {
-      hideNotice(waitId)
       showNotice.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      hideNotice(waitId)
+      endLongOperation()
     }
   }
 
