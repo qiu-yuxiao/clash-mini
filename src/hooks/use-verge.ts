@@ -53,19 +53,14 @@ export const useVerge = () => {
         throw err
       }
 
-      // refetch 确保前端状态与后端一致；失败时重试 3 次（间隔 1s/2s/4s）
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          await mutateVerge()
-          return
-        } catch (refetchErr) {
-          if (attempt < 2) {
-            await new Promise((r) => setTimeout(r, 1000 << attempt))
-          } else {
-            console.error('[useVerge] refetch 3 次均失败:', refetchErr)
-            showNotice.error('配置已更新但刷新失败，状态可能不一致，请重启应用')
-          }
-        }
+      // patchVergeConfig 成功即说明后端已生效，refetch 只为同步前端状态。
+      // mihomo reload 期间 IPC 通道阻塞必然 timeout，重试会反复弹 notice
+      // 并加剧 IPC 风暴（TUN/系统代理切换时的卡死根因）。改为失败 1 次静默放弃，
+      // 依赖后端 verge://refresh-verge-config 事件或下次用户操作自然同步状态。
+      try {
+        await mutateVerge()
+      } catch (refetchErr) {
+        console.error('[useVerge] refetch 失败，等待后端事件同步:', refetchErr)
       }
     },
   )

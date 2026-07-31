@@ -50,7 +50,9 @@ export function useSystemState() {
       ])
       return { runningMode, isAdminMode, isServiceOk } as SystemState
     },
-    refetchInterval: isVisible ? (isStartingUp ? 2000 : 30000) : false,
+    // 启动期（10s 内）5s 轮询一次；启动完成后 30s 轮询一次。
+    // 原值 2s 在 IPC 阻塞期间会堆积 timeout notice，加剧正反馈卡死。
+    refetchInterval: isVisible ? (isStartingUp ? 5000 : 30000) : false,
     refetchIntervalInBackground: false,
   })
 

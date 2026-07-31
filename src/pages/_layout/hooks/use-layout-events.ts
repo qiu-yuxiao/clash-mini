@@ -64,8 +64,14 @@ export const useLayoutEvents = (
       }),
     )
 
-    register(
-      addListener('verge://refresh-verge-config', () => {
+    // refresh-verge-config 事件防抖：与 refresh-clash-config 同理，
+    // 一次 patchVerge 可能触发多次该事件（update_config_checked 内部 + Handle::refresh_verge），
+    // 合并为一次 revalidate 避免短时间内 6 个 query 重复触发 IPC 风暴。
+    let refreshVergeConfigTimer: ReturnType<typeof setTimeout> | null = null
+    const scheduleRevalidateVergeConfig = () => {
+      if (refreshVergeConfigTimer) return
+      refreshVergeConfigTimer = setTimeout(() => {
+        refreshVergeConfigTimer = null
         revalidateKeys([
           'getVergeConfig',
           'getSystemProxy',
@@ -74,6 +80,12 @@ export const useLayoutEvents = (
           'isServiceAvailable',
           'getSystemState',
         ])
+      }, 250)
+    }
+
+    register(
+      addListener('verge://refresh-verge-config', () => {
+        scheduleRevalidateVergeConfig()
       }),
     )
 
@@ -117,6 +129,10 @@ export const useLayoutEvents = (
       if (refreshClashConfigTimer) {
         clearTimeout(refreshClashConfigTimer)
         refreshClashConfigTimer = null
+      }
+      if (refreshVergeConfigTimer) {
+        clearTimeout(refreshVergeConfigTimer)
+        refreshVergeConfigTimer = null
       }
     }
   }, [addListener, handleNotice])
