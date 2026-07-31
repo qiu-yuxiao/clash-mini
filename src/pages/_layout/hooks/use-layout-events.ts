@@ -42,9 +42,8 @@ export const useLayoutEvents = (
         )
     }
 
-    // refresh-clash-config 事件防抖：mihomo reload 期间后端会连续 emit 多次该事件
-    // （patchVerge + enhanceProfiles + refresh_clash 各一次），直接 revalidate 会引发
-    // IPC 风暴。250ms 内多次事件合并为一次 revalidate。
+    // refresh-clash-config 事件防抖：mihomo reload 期间后端会连续 emit 多次该事件，
+    // 直接 revalidate 会引发 IPC 风暴。250ms 内多次事件合并为一次 revalidate。
     let refreshClashConfigTimer: ReturnType<typeof setTimeout> | null = null
     const scheduleRevalidateClashConfig = () => {
       if (refreshClashConfigTimer) return

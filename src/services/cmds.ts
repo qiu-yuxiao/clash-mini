@@ -61,6 +61,12 @@ export function withIpcTimeout<T>(
       if (now - last >= IPC_TIMEOUT_NOTICE_THROTTLE_MS) {
         ipcTimeoutNoticeLabels.set(label, now)
         showNotice.error(msg)
+        // 窗口结束后清理该条目，避免 Map 无限累积
+        setTimeout(() => {
+          if (ipcTimeoutNoticeLabels.get(label) === now) {
+            ipcTimeoutNoticeLabels.delete(label)
+          }
+        }, IPC_TIMEOUT_NOTICE_THROTTLE_MS)
       }
       reject(new Error(msg))
     }, ms)
