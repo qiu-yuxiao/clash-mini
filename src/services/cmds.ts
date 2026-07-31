@@ -39,9 +39,35 @@ export function frontendLog(level: 'info' | 'warn' | 'error', message: string) {
  *
  * 节流：同一 label 在 5 秒内只弹一次超时 Notice，避免并发 IPC 同时超时引发 Notice 风暴
  * （如 mihomo reload 期间多个 revalidate IPC 同时超时的场景）。
+ *
+ * 全局长操作静默：用户主动发起的重型操作（patchVerge / restartCore 等）期间，
+ * mihomo reload 或内核重启会长时间阻塞 IPC 通道，此时已有持久 Notice（"正在调整…"）
+ * 提示用户，额外的 IPC timeout Notice 会与之叠加形成风暴卡死主线程。
+ * 长操作期间所有 IPC timeout 只 console.error 不弹 Notice，且不更新节流时间戳
+ * （这样长操作结束后第一个 timeout 会立即弹，反映真实状态）。
  */
 const ipcTimeoutNoticeLabels = new Map<string, number>()
 const IPC_TIMEOUT_NOTICE_THROTTLE_MS = 5000
+
+// 全局长操作引用计数：>0 表示有用户主动重型操作进行中，IPC timeout 静默
+let longOperationRefCount = 0
+
+/** 标记开始一个用户主动的重型操作（patchVerge / restartCore 等），期间 IPC timeout 静默 */
+export function beginLongOperation(): void {
+  longOperationRefCount += 1
+}
+
+/** 标记结束一个重型操作，引用计数归零后恢复 IPC timeout Notice */
+export function endLongOperation(): void {
+  if (longOperationRefCount > 0) {
+    longOperationRefCount -= 1
+  }
+}
+
+/** 当前是否处于长操作期间 */
+export function isLongOperationRunning(): boolean {
+  return longOperationRefCount > 0
+}
 
 export function withIpcTimeout<T>(
   promise: Promise<T>,
@@ -55,6 +81,12 @@ export function withIpcTimeout<T>(
       settled = true
       const msg = `[${label}] IPC call timed out after ${ms}ms`
       console.error(msg)
+      // 长操作期间静默：不弹 Notice，不更新节流时间戳
+      // （长操作结束后第一个 timeout 会立即弹，反映真实状态）
+      if (isLongOperationRunning()) {
+        reject(new Error(msg))
+        return
+      }
       // 同 label 节流：5 秒内只弹一次 Notice，避免风暴
       const now = Date.now()
       const last = ipcTimeoutNoticeLabels.get(label) ?? 0

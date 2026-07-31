@@ -63,6 +63,8 @@ import {
   viewProfile,
   restartCore,
   triggerAutoSelect,
+  beginLongOperation,
+  endLongOperation,
 } from '@/services/cmds'
 import { getDelayManager } from '@/services/delay'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
@@ -979,50 +981,58 @@ const Layout = () => {
 
     const waitId = showNotice.info('正在调整，请稍候…', 0)
 
-    if (targetMode === 'manual') {
-      try {
-        await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
-        if (verge?.auto_close_connection) {
-          await closeAllConnectionsWithTimeout().catch(() =>
-            console.warn('[layout] closeAllConnectionsWithTimeout failed'),
-          )
-        }
-        hideNotice(waitId)
-        showNotice.success('已切换至手动模式')
-      } catch (err) {
-        hideNotice(waitId)
-        showNotice.error(err)
-      }
-    } else if (targetMode === 'system') {
-      try {
-        await patchVerge({ enable_system_proxy: true, enable_tun_mode: false })
-        hideNotice(waitId)
-        showNotice.success('已开启系统代理')
-      } catch (err) {
-        hideNotice(waitId)
-        showNotice.error(err)
-      }
-    } else if (targetMode === 'tun') {
-      if (!isTunModeAvailable) {
+    // 标记长操作开始：patchVerge / restartCore 期间 mihomo reload 或内核重启
+    // 会阻塞 IPC 通道，此时所有 IPC timeout 静默（已有持久 Notice 提示用户），
+    // 避免与持久 Notice 叠加形成 Notice 风暴卡死主线程。
+    beginLongOperation()
+    try {
+      if (targetMode === 'manual') {
         try {
-          await installServiceAndRestartCore()
-          await mutateSystemState()
-        } catch {
+          await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
+          if (verge?.auto_close_connection) {
+            await closeAllConnectionsWithTimeout().catch(() =>
+              console.warn('[layout] closeAllConnectionsWithTimeout failed'),
+            )
+          }
           hideNotice(waitId)
-          showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
-          return
+          showNotice.success('已切换至手动模式')
+        } catch (err) {
+          hideNotice(waitId)
+          showNotice.error(err)
+        }
+      } else if (targetMode === 'system') {
+        try {
+          await patchVerge({ enable_system_proxy: true, enable_tun_mode: false })
+          hideNotice(waitId)
+          showNotice.success('已开启系统代理')
+        } catch (err) {
+          hideNotice(waitId)
+          showNotice.error(err)
+        }
+      } else if (targetMode === 'tun') {
+        if (!isTunModeAvailable) {
+          try {
+            await installServiceAndRestartCore()
+            await mutateSystemState()
+          } catch {
+            hideNotice(waitId)
+            showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
+            return
+          }
+        }
+
+        try {
+          await patchVerge({ enable_system_proxy: false, enable_tun_mode: true })
+          await restartCore()
+          hideNotice(waitId)
+          showNotice.success('已开启 TUN 模式')
+        } catch (err) {
+          hideNotice(waitId)
+          showNotice.error(err)
         }
       }
-
-      try {
-        await patchVerge({ enable_system_proxy: false, enable_tun_mode: true })
-        await restartCore()
-        hideNotice(waitId)
-        showNotice.success('已开启 TUN 模式')
-      } catch (err) {
-        hideNotice(waitId)
-        showNotice.error(err)
-      }
+    } finally {
+      endLongOperation()
     }
   }
 
