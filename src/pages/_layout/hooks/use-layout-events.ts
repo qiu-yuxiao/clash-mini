@@ -42,14 +42,26 @@ export const useLayoutEvents = (
         )
     }
 
-    register(
-      addListener('verge://refresh-clash-config', async () => {
+    // refresh-clash-config 事件防抖：mihomo reload 期间后端会连续 emit 多次该事件
+    // （patchVerge + enhanceProfiles + refresh_clash 各一次），直接 revalidate 会引发
+    // IPC 风暴。250ms 内多次事件合并为一次 revalidate。
+    let refreshClashConfigTimer: ReturnType<typeof setTimeout> | null = null
+    const scheduleRevalidateClashConfig = () => {
+      if (refreshClashConfigTimer) return
+      refreshClashConfigTimer = setTimeout(() => {
+        refreshClashConfigTimer = null
         revalidateKeys([
           'getProxies',
           'getVersion',
           'getClashConfig',
           'getProxyProviders',
         ])
+      }, 250)
+    }
+
+    register(
+      addListener('verge://refresh-clash-config', async () => {
+        scheduleRevalidateClashConfig()
       }),
     )
 
@@ -103,6 +115,10 @@ export const useLayoutEvents = (
       }
 
       unlisteners.length = 0
+      if (refreshClashConfigTimer) {
+        clearTimeout(refreshClashConfigTimer)
+        refreshClashConfigTimer = null
+      }
     }
   }, [addListener, handleNotice])
 }

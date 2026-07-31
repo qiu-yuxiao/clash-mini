@@ -36,7 +36,13 @@ export function frontendLog(level: 'info' | 'warn' | 'error', message: string) {
  * H-17: IPC 超时包装工具函数
  * 对关键 IPC 调用包裹超时保护，防止后端卡住时前端 Promise 永远 pending。
  * 超时后 reject 并附带超时信息，便于调用方统一 catch 处理。
+ *
+ * 节流：同一 label 在 5 秒内只弹一次超时 Notice，避免并发 IPC 同时超时引发 Notice 风暴
+ * （如 mihomo reload 期间多个 revalidate IPC 同时超时的场景）。
  */
+const ipcTimeoutNoticeLabels = new Map<string, number>()
+const IPC_TIMEOUT_NOTICE_THROTTLE_MS = 5000
+
 export function withIpcTimeout<T>(
   promise: Promise<T>,
   ms: number,
@@ -49,7 +55,13 @@ export function withIpcTimeout<T>(
       settled = true
       const msg = `[${label}] IPC call timed out after ${ms}ms`
       console.error(msg)
-      showNotice.error(msg)
+      // 同 label 节流：5 秒内只弹一次 Notice，避免风暴
+      const now = Date.now()
+      const last = ipcTimeoutNoticeLabels.get(label) ?? 0
+      if (now - last >= IPC_TIMEOUT_NOTICE_THROTTLE_MS) {
+        ipcTimeoutNoticeLabels.set(label, now)
+        showNotice.error(msg)
+      }
       reject(new Error(msg))
     }, ms)
 

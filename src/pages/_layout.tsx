@@ -370,9 +370,12 @@ const Layout = () => {
     fallback: 'direct' | 'proxy' | 'addurl',
   ) => {
     try {
+      // patchVerge({rule_fallback}) 后端会自动 update_config_checked：
+      // 重新生成运行时配置（读取新 rule_fallback 生成 MATCH 兜底规则）并 reload mihomo。
+      // 此处无需再调 enhanceProfiles()，否则会触发第二次冗余 reload，
+      // 叠加 react-query revalidate 可能引发 IPC 阻塞 + Notice 风暴。
       await patchVerge({ rule_fallback: fallback })
       await patchClashMode('rule')
-      await enhanceProfiles()
       await activateSelected()
       await refreshClashConfig()
     } catch (err: unknown) {
