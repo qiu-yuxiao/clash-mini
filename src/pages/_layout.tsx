@@ -371,6 +371,12 @@ const Layout = () => {
   const handleRuleFallbackChange = async (
     fallback: 'direct' | 'proxy' | 'addurl',
   ) => {
+    const waitId = showNotice.info('正在调整代理模式，请稍候…', 0)
+
+    // 标记长操作开始：patchVerge({rule_fallback}) 后端会 update_config_checked
+    // 重新生成运行时配置并 reload mihomo，期间 IPC 通道阻塞。
+    // 与 handleTakeoverModeChange 同理，需抑制 IPC timeout Notice 避免风暴卡死。
+    beginLongOperation()
     try {
       // patchVerge({rule_fallback}) 后端会自动 update_config_checked：
       // 重新生成运行时配置（读取新 rule_fallback 生成 MATCH 兜底规则）并 reload mihomo。
@@ -379,9 +385,14 @@ const Layout = () => {
       await patchVerge({ rule_fallback: fallback })
       await patchClashMode('rule')
       await activateSelected()
-      await refreshClashConfig()
+      // 后端 patchVerge 已触发 verge://refresh-clash-config 事件，
+      // 前端 use-layout-events 中的 250ms 防抖会合并 revalidate，
+      // 此处再调 refreshClashConfig() 属冗余，已移除。
     } catch (err: unknown) {
       showNotice.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      hideNotice(waitId)
+      endLongOperation()
     }
   }
 
