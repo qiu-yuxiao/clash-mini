@@ -818,6 +818,13 @@ const Layout = () => {
           await patchProfiles({ current: newProfile.uid })
         }
         targetUid = newProfile.uid
+        // 后端已自动 update_config_forced（自动激活或 patchProfiles 同步切换），
+        // 等效于 enhance。同步标记避免 useEffect 重复触发 enhanceProfiles 撞锁。
+        localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
+        lastProcessedRef.current = {
+          uid: newProfile.uid,
+          counter: profileRefreshCounter,
+        }
       }
 
       await mutateProfiles()
@@ -849,8 +856,13 @@ const Layout = () => {
             await patchProfiles({ current: newProfile.uid })
           }
           targetUid = newProfile.uid
+          // 同主分支：后端已 reload，同步标记避免 useEffect 重复 enhance 撞锁
+          localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
+          lastProcessedRef.current = {
+            uid: newProfile.uid,
+            counter: profileRefreshCounter,
+          }
         }
-
         await mutateProfiles()
 
         if (targetUid) {
@@ -881,6 +893,10 @@ const Layout = () => {
       getDelayManager().clearUrlMap()
       getDelayManager().clearCache()
       await patchProfiles({ current: uid })
+      // 后端 patch_profiles_config 已同步 update_config_forced（含 generate+validate+reload），
+      // 等效于 enhance。同步标记避免 useEffect 重复触发 enhanceProfiles 造成冗余二次 reload。
+      localStorage.setItem('clash-mini-last-enhanced-uid', uid)
+      lastProcessedRef.current = { uid, counter: profileRefreshCounter }
       await mutateProfiles()
       closeAllConnectionsWithTimeout()
       showNotice.success(

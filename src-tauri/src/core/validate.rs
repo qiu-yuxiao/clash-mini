@@ -514,7 +514,12 @@ pub fn handle_validation_notice(outcome: &ValidationOutcome, target: ValidationN
             logging!(warn, Type::Config, "{} 验证失败: {}", file_type, message);
             handle::Handle::notice_message(status, message.to_owned());
         }
-        ValidationOutcome::Busy | ValidationOutcome::Skipped { .. } => {
+        ValidationOutcome::Busy => {
+            // 并发竞争态，非真实配置错误：另一路 update_config_forced 正在持锁验证。
+            // 只记日志，不弹 notice 避免误导用户为"任务失败"。
+            logging!(warn, Type::Config, "{} 验证跳过（并发竞争）: {}", file_type, outcome);
+        }
+        ValidationOutcome::Skipped { .. } => {
             let message = outcome.to_string();
             logging!(warn, Type::Config, "{} 验证跳过: {}", file_type, message);
             handle::Handle::notice_message("config_validate::error", message);

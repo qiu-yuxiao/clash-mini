@@ -57,13 +57,20 @@ pub async fn enhance_profiles() -> CmdResult<ValidationOutcome> {
             Ok(outcome)
         }
         Ok(outcome) => {
-            logging!(
-                warn,
-                Type::Cmd,
-                "Reactivate profiles command failed validation: {}",
-                outcome
-            );
-            handle_validation_notice(&outcome, ValidationNoticeTarget::Runtime, "运行时配置");
+            // Busy 是并发竞争态（另一路 update_config_forced 正持锁），非真实配置错误，
+            // 只记 info 日志，不走 "failed validation" warn 分支，避免日志措辞误导。
+            // handle_validation_notice 内部对 Busy 也已静默（只记日志不弹 notice）。
+            if matches!(outcome, ValidationOutcome::Busy) {
+                logging!(info, Type::Cmd, "Reactivate profiles skipped: validation already running");
+            } else {
+                logging!(
+                    warn,
+                    Type::Cmd,
+                    "Reactivate profiles command failed validation: {}",
+                    outcome
+                );
+                handle_validation_notice(&outcome, ValidationNoticeTarget::Runtime, "运行时配置");
+            }
             Ok(outcome)
         }
         Err(e) => {
