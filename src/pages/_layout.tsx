@@ -815,16 +815,29 @@ const Layout = () => {
         // 这里若再调 patchProfiles 会与后端 update_config_forced 竞争验证锁导致超时。
         // 仅在 current 未指向 newProfile 时才显式切换。
         if (freshConfig.current !== newProfile.uid) {
-          await patchProfiles({ current: newProfile.uid })
+          // 显式切换：patch_profiles_config 同步 update_config_forced。
+          // 仅当后端确认 enhance 成功（valid）才打标记；返回 Busy（并发持锁未增强）时
+          // 不打标记，交给 useEffect 的现有重试路径，避免谎报导致永久跳过 enhance。
+          const enhanced = await patchProfiles({ current: newProfile.uid })
+          if (enhanced) {
+            localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
+            lastProcessedRef.current = {
+              uid: newProfile.uid,
+              counter: profileRefreshCounter,
+            }
+          }
+        } else {
+          // 首次导入且后端自动激活：update_config_forced 由 import_profile 异步 spawn，
+          // importProfile 命令（void）返回时增强未必完成/可能撞 Busy。沿用原设计依赖后端
+          // spawn 成功（避免二次 enhance 撞锁）。已知边界：若 spawn 最终 Busy 未增强，单
+          // PROXY 压平需下次切换或重启才恢复。
+          localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
+          lastProcessedRef.current = {
+            uid: newProfile.uid,
+            counter: profileRefreshCounter,
+          }
         }
         targetUid = newProfile.uid
-        // 后端已自动 update_config_forced（自动激活或 patchProfiles 同步切换），
-        // 等效于 enhance。同步标记避免 useEffect 重复触发 enhanceProfiles 撞锁。
-        localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
-        lastProcessedRef.current = {
-          uid: newProfile.uid,
-          counter: profileRefreshCounter,
-        }
       }
 
       await mutateProfiles()
@@ -851,17 +864,26 @@ const Layout = () => {
         )
         let targetUid = currentProfileUid
         if (newProfile) {
-          // 同主分支：避免与后端自动激活的 update_config_forced 竞争验证锁
           if (freshConfig.current !== newProfile.uid) {
-            await patchProfiles({ current: newProfile.uid })
+            // 显式切换：同主分支，仅当后端确认 enhance 成功（valid）才打标记，
+            // 返回 Busy 时交给 useEffect 重试路径，避免谎报永久跳过 enhance。
+            const enhanced = await patchProfiles({ current: newProfile.uid })
+            if (enhanced) {
+              localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
+              lastProcessedRef.current = {
+                uid: newProfile.uid,
+                counter: profileRefreshCounter,
+              }
+            }
+          } else {
+            // 同主分支首次导入 auto-activate 分支：依赖后端 spawn，已知 Busy 边界。
+            localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
+            lastProcessedRef.current = {
+              uid: newProfile.uid,
+              counter: profileRefreshCounter,
+            }
           }
           targetUid = newProfile.uid
-          // 同主分支：后端已 reload，同步标记避免 useEffect 重复 enhance 撞锁
-          localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
-          lastProcessedRef.current = {
-            uid: newProfile.uid,
-            counter: profileRefreshCounter,
-          }
         }
         await mutateProfiles()
 
@@ -892,11 +914,15 @@ const Layout = () => {
       // 延迟缓存不清理会导致同名节点在新 Profile 中显示旧 Profile 的延迟，干扰自动选点
       getDelayManager().clearUrlMap()
       getDelayManager().clearCache()
-      await patchProfiles({ current: uid })
+      const enhanced = await patchProfiles({ current: uid })
       // 后端 patch_profiles_config 已同步 update_config_forced（含 generate+validate+reload），
-      // 等效于 enhance。同步标记避免 useEffect 重复触发 enhanceProfiles 造成冗余二次 reload。
-      localStorage.setItem('clash-mini-last-enhanced-uid', uid)
-      lastProcessedRef.current = { uid, counter: profileRefreshCounter }
+      // 等效于 enhance。仅当后端确认 enhance 成功（返回值 valid）才同步标记，
+      // 避免后端因并发持锁返回 Busy（未真正 enhance）时谎报，导致 useEffect 永久跳过
+      // enhanceProfiles —— 那样会漏掉单 PROXY 压平，需重启才自愈。
+      if (enhanced) {
+        localStorage.setItem('clash-mini-last-enhanced-uid', uid)
+        lastProcessedRef.current = { uid, counter: profileRefreshCounter }
+      }
       await mutateProfiles()
       closeAllConnectionsWithTimeout()
       showNotice.success(
