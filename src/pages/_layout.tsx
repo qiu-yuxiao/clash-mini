@@ -1087,6 +1087,10 @@ const Layout = () => {
 
         try {
           await patchVerge({ enable_system_proxy: false, enable_tun_mode: true })
+          // restartCore 前先刷新 systemState，确保 isTunModeAvailable 已为 true。
+          // 否则长操作结束时 use-system-state 的自动关闭 TUN useEffect 可能误判
+          // （依赖 isTunModeAvailableRef，需在 endLongOperation 前更新到位）。
+          await mutateSystemState()
           await restartCore()
           hideNotice(waitId)
           showNotice.success('已开启 TUN 模式')

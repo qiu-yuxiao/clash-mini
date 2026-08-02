@@ -3,7 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 
 
 import { useVisibility } from '@/hooks/use-visibility'
-import { getRunningMode, isAdmin, isServiceAvailable } from '@/services/cmds'
+import {
+  getRunningMode,
+  isAdmin,
+  isServiceAvailable,
+  isLongOperationRunning,
+} from '@/services/cmds'
 import { STARTUP_GRACE_MS } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 
@@ -86,12 +91,19 @@ export function useSystemState() {
   useEffect(() => {
     if (enable_tun_mode === undefined) return
 
+    // 长操作期间（用户主动切换 TUN/系统代理等）禁止自动关闭 TUN：
+    // installServiceAndRestartCore 完成后 isTunModeAvailable 可能短暂为 false
+    // （mihomo 刚重启，服务 IPC 未就绪），此时用户已 patchVerge({enable_tun_mode:true})，
+    // 若自动关闭 TUN 的 patchVerge 与之并发，会导致配置反复修改、mihomo 反复 reload、
+    // IPC 通道阻塞、notice 堆积，最终画面卡死。
+    // 长操作结束后 isTunModeAvailable 已正确刷新，useEffect 不会误触发。
     if (
       !disablingTunRef.current &&
       enable_tun_mode &&
       !isTunModeAvailableRef.current &&
       !isLoadingRef.current &&
-      !isStartingUpRef.current
+      !isStartingUpRef.current &&
+      !isLongOperationRunning()
     ) {
       disablingTunRef.current = true
       patchVergeRef.current({ enable_tun_mode: false, enable_system_proxy: true })
