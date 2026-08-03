@@ -143,6 +143,13 @@ static LAST_GEOMETRY_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 
 /// 同步版本：在 Resized / Moved 事件中直接调用，不 spawn 异步任务。
 /// 0×0 守卫：w.destroy() 会触发 Resized(0,0)，必须拒绝此无效值。
+///
+/// 【I/O 隔离】on_window_event 回调在 Tauri 主线程执行，若在此处同步执行
+/// std::fs::write，开机自启时磁盘忙（杀软扫描/系统启动）会导致单次写入耗时
+/// 超过 250ms 节流间隔，主线程被持续阻塞，最终引发 UI 卡死、心跳探针超时、
+/// tokio worker 被阻塞导致 runtime 调度停止。
+/// 改用 spawn_blocking 将 I/O 投递到阻塞线程池，主线程立即返回。
+/// 安全性：0×0 守卫已拒绝 destroy 触发的无效事件；写入内容幂等，乱序无害。
 pub fn save_window_state_on_geometry_change_sync(
     width: f64,
     height: f64,
@@ -163,7 +170,10 @@ pub fn save_window_state_on_geometry_change_sync(
         return;
     }
     LAST_GEOMETRY_SAVE_MS.store(now, Ordering::Relaxed);
-    save_window_state_sync(width, height, x, y);
+    // 投递到阻塞线程池，避免主线程被磁盘 I/O 阻塞
+    let _handle = tauri::async_runtime::spawn_blocking(move || {
+        save_window_state_sync(width, height, x, y);
+    });
 }
 
 /// 检查给定的坐标 (x, y) 是否落在当前已连接显示器的可视范围内
