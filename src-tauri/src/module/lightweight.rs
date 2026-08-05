@@ -1,4 +1,4 @@
-use crate::{config::Config, process::AsyncHandler};
+use crate::config::Config;
 
 use clash_verge_logging::{Type, logging};
 
@@ -135,27 +135,15 @@ pub async fn entry_lightweight_mode() -> bool {
     // 💡 说明：进入轻量模式时【不再】激进清空所有网络连接 (GC)。
     //    按用户要求，轻量模式不等于关闭程序——正在下载的链接不能被切断重连，
     //    故仅保留下方资源回收动作，不影响用户实际代理流量。
-    // 进入前 abort 上一个 cleanup 任务，避免累积；自愈选点逻辑保留在可 abort 任务中，
-    // 防止快速退出轻量后误触发自愈选点（FM-09）。
+    // 进入前 abort 上一个 cleanup 任务，避免累积（FM-09）。
     abort_lightweight_cleanup();
-    let handle = AsyncHandler::spawn(|| async {
-        if !is_in_lightweight_mode() {
-            return;
-        }
-        // 进入轻量模式时触发节点自愈恢复与自动选点（此逻辑可 abort）
-        if let Some(uid) = crate::module::monitor::get_current_profile_uid().await {
-            if crate::module::monitor::wait_for_clash_ready().await {
-                let _ = crate::module::monitor::restore_profile_selected_nodes(&uid).await;
-                // 委托后端执行轻量模式进入时的自愈选点；结果经事件回写前端 UI
-                let _ = crate::module::monitor::trigger_backend_auto_select(&uid, None, 0, true, false).await;
-            }
-        }
-
-        // 💡 说明：按 Agreement §1.2 规范，彻底删除 SetProcessWorkingSetSize 欺骗性内存修剪，
-        // 由 Windows 和 Chromium 自然管理物理内存页，彻底根除窗口恢复时的 Severe Page Fault 与 WebView2 挂起。
-    });
-
-    *LIGHTWEIGHT_CLEANUP_HANDLE.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
+    // 【方案A】不再 spawn 独立任务调 wait_for_clash_ready + trigger_backend_auto_select，
+    // 改为唤醒监测线程由其统一执行。消除开机自启时轻量模式 spawn 与监测线程首次运行
+    // 并发 wait_for_clash_ready，避免两路同时轮询 mihomo API 叠加 TUN 测速卡住
+    // 命名管道通道导致的 API 不可达死循环。
+    // 监测线程首次运行（窗口不存在时）会执行 restore_profile_selected_nodes + auto_select；
+    // 手动切换轻量模式时被唤醒后走定期体检路径（探活+自愈），足够覆盖。
+    crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
 
     true
 }

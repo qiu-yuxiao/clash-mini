@@ -1090,10 +1090,38 @@ async fn self_heal_with_accounting(
     }
     *last_check_time = Instant::now();
 
-    // 连续 5 次 auto_select 失败 → Windows 系统警报
-    if *auto_select_fail_count >= 5 {
+    // 【方案B】连续 3 次 auto_select 失败 → 重启内核清除 mihomo 命名管道卡死状态。
+    // TUN 模式下测速请求可能卡住 mihomo 的命名管道通道（单通道），导致后续所有 API
+    // 请求超时（API 不可达死循环），自愈选点因 wait_for_clash_ready 阶段 1 必然 30 秒
+    // 超时而无效。重启内核可清除卡死状态，恢复 API 通道。
+    // 重启成功则重置计数；重启失败则弹 Windows 提示框通知用户。
+    if *auto_select_fail_count >= 3 {
         *auto_select_fail_count = 0;
-        fire_self_heal_alert();
+        logging!(
+            warn,
+            Type::Lightweight,
+            "[后台监测] 连续 3 次自愈选点失败，重启内核以恢复 API 通道"
+        );
+        match crate::core::manager::CoreManager::global()
+            .restart_core()
+            .await
+        {
+            Ok(()) => {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 重启内核成功，API 通道应已恢复"
+                );
+            }
+            Err(e) => {
+                logging!(
+                    error,
+                    Type::Lightweight,
+                    "[后台监测] 重启内核失败: {e}，弹出 Windows 提示框"
+                );
+                fire_self_heal_alert();
+            }
+        }
     }
     true
 }
