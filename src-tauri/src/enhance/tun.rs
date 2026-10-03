@@ -59,8 +59,8 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
 
     if enable {
         // 【上游语义】TUN 开启时接管 DNS：仅当 enhanced-mode 为 fake-ip（或未设置）时，
-        // 补齐 enable / ipv6 / enhanced-mode / fake-ip-range，只补缺失键，
-        // 绝不整体覆盖，保留订阅或用户已提供的 nameserver 等字段。
+        // 确保 enable=true 及 ipv6 同步，并补齐缺失的 enhanced-mode=fake-ip、fake-ip-range、
+        // 默认 fake-ip-filter 等键，绝不整体覆盖订阅或用户已提供的 nameserver 等自定义字段。
         // fake-ip 模式下客户端立即拿到假 IP，内核按「域名→规则→转发」处理，
         // 不依赖 redir-host 那样把域名实时解析成真实 IP，TUN 下更健壮。
         let dns_key = Value::from("dns");
@@ -88,6 +88,13 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             }
             if ipv6_val && !dns_val.contains_key(Value::from("fake-ip-range6")) {
                 revise!(dns_val, "fake-ip-range6", "2001:2::0/64");
+            }
+            if !dns_val.contains_key(Value::from("fake-ip-filter")) {
+                let filters: Vec<Value> = crate::constants::tun::DEFAULT_FAKE_IP_FILTER
+                    .iter()
+                    .map(|&s| Value::String(s.into()))
+                    .collect();
+                dns_val.insert(Value::from("fake-ip-filter"), Value::Sequence(filters));
             }
             // 仅 macOS 下接管系统 DNS
             #[cfg(target_os = "macos")]

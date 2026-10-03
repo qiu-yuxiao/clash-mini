@@ -347,6 +347,10 @@ async fn merge_default_config(
             for (key, value) in patch_tun.into_iter() {
                 tun.insert(key, value);
             }
+            // 若 stack 依然为旧默认值 "system"，自动平滑升级为 DEFAULT_STACK（gvisor）
+            if tun.get("stack").and_then(|v| v.as_str()) == Some("system") {
+                tun.insert("stack".into(), crate::constants::tun::DEFAULT_STACK.into());
+            }
             config.insert("tun".into(), tun.into());
         } else if matches!(key.as_str(), Some("dns") | Some("profile")) {
             // dns / profile 是"订阅优先"的复合节点：仅补缺，不覆盖订阅已声明的字段。
@@ -462,7 +466,7 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
 
     // 【修复】改为「仅补全缺失字段」，绝不整体替换 dns 节点。
     // 原实现 config.insert("dns", ...) 只保留 enable / enhanced-mode=redir-host /
-    // cache-* / nameserver=[8.8.8.8,114.114.114.114]，会抹掉订阅或 dns_config.yaml
+    // cache-* / nameserver=[8.8.8.8,114.114.114.114]，会抹掉订阅
     // 提供的 default-nameserver、proxy-server-nameserver、fallback、fallback-filter、
     // nameserver-policy 等字段，并在流水线末端强制 redir-host 覆盖 use_tun 写入的
     // fake-ip。叠加 8.8.8.8 在中国大陆直连不可达，导致 TUN 下 redir-host 需要把域名
@@ -631,7 +635,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
 
     // 注：规则集从 GEOIP/GEOSITE 更换为 GFWList。
     // GFWList 负责判断被墙域名走代理，GEOIP/GEOSITE 数据库不再需要，
-    // 省去 geoip.dat(~8MB) + geosite.dat(~30MB) + fake-ip NAT 表的常驻开销。
+    // 省去 geoip.dat(~8MB) + geosite.dat(~30MB) 文件的常驻内存开销。
     // MATCH 兜底策略仍由 rule_fallback 控制，与原逻辑一致。
 
     // Add GFWList rule: only explicitly blocked domains go through proxy

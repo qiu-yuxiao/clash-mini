@@ -52,4 +52,30 @@ pub mod tun {
     pub const DEFAULT_STACK: &str = "gvisor";
 
     pub const DNS_HIJACK: &[&str] = &["any:53"];
+
+    /// fake-ip 模式下的默认免分配假 IP 过滤名单，防止 Windows NCSI 离线感叹号、局域网访问和 NTP 授时失效
+    pub const DEFAULT_FAKE_IP_FILTER: &[&str] = &[
+        "dns.msftncsi.com",
+        "*.msftconnecttest.com",
+        "*.msftncsi.com",
+        "*.lan",
+        "*.local",
+        "localhost.ptlogin2.qq.com",
+        "time.*.com",
+        "time.*.gov",
+        "time.*.edu.cn",
+        "time.*.apple.com",
+        "time1.*.com",
+        "time2.*.com",
+        "time3.*.com",
+        "time4.*.com",
+        "time5.*.com",
+        "time6.*.com",
+        "time7.*.com",
+        "ntp.*.com",
+        "*.time.edu.cn",
+        "*.ntp.org.cn",
+        "+.pool.ntp.org",
+    ];
 }
+

@@ -33,6 +33,20 @@ impl IClashTemp {
                     }
                 }
 
+                // 平滑迁移旧版配置：
+                // 1. 若 tun.stack 为旧默认值 "system"，平滑升级到跨平台更稳定的 "gvisor"
+                if let Some(tun) = map.get_mut("tun").and_then(|v| v.as_mapping_mut()) {
+                    if tun.get("stack").and_then(|v| v.as_str()) == Some("system") {
+                        tun.insert("stack".into(), tun_const::DEFAULT_STACK.into());
+                    }
+                }
+                // 2. 若 profile.store-fake-ip 为 false（旧模板默认），升级为 true
+                if let Some(profile) = map.get_mut("profile").and_then(|v| v.as_mapping_mut()) {
+                    if profile.get("store-fake-ip").and_then(|v| v.as_bool()) == Some(false) {
+                        profile.insert("store-fake-ip".into(), true.into());
+                    }
+                }
+
                 // 确保 secret 字段存在且不为空，且替换掉默认的容易泄漏的密钥
                 if let Some(val) = map.get_mut("secret")
                     && let Value::String(s) = val
@@ -110,7 +124,7 @@ impl IClashTemp {
 
         let mut profile_config = Mapping::new();
         profile_config.insert("store-selected".into(), true.into());
-        profile_config.insert("store-fake-ip".into(), false.into());
+        profile_config.insert("store-fake-ip".into(), true.into());
         map.insert("profile".into(), profile_config.into());
         map.insert(
             "external-controller".into(),
