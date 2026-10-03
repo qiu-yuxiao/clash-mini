@@ -141,25 +141,25 @@ export async function triggerAutoSelectAndRefresh(
     autoSelectTimerRef.current = null
   }
 
-  autoSelectTimerRef.current = setTimeout(async () => {
-    autoSelectTimerRef.current = null
-    try {
-      if (profileUid) {
-        const currentUid = (await getProfiles())?.current || ''
-        if (currentUid !== profileUid) {
-          return
-        }
+  // 让出主线程一帧让 React 完成当前界面的渲染与排序状态应用
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  try {
+    if (profileUid) {
+      const currentUid = (await getProfiles())?.current || ''
+      if (currentUid !== profileUid) {
+        return
       }
-      const names = await getFilteredNodeNames()
-      if (names.length === 0) return
-      await batchTestWithFirstBatchSelect(names, true)
-      if (setHeadState) {
-        setHeadState('PROXY', { sortType: 1 })
-      }
-    } catch (err) {
-      console.warn('[Layout] 延迟批量测速失败:', err)
     }
-  }, 0)
+    const names = await getFilteredNodeNames()
+    if (names.length === 0) return
+    await batchTestWithFirstBatchSelect(names, true)
+    if (setHeadState) {
+      setHeadState('PROXY', { sortType: 1 })
+    }
+  } catch (err) {
+    console.warn('[Layout] 批量测速失败:', err)
+  }
 
   if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
   fallbackTimerRef.current = setTimeout(async () => {

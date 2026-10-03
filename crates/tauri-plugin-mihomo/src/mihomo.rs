@@ -764,12 +764,14 @@ impl Mihomo {
     }
 
     /// 对指定代理组进行延迟测试, 同时清理代理组已固定的节点
-    /// [Clash Mini 备注]: 此方法对应 Clash Verge 的策略组延迟测速，目前在 Clash Mini 内已无任何调用，保留仅作为备用和对齐内核 API。
+    /// [Clash Mini 备注]: 用于对测量组 PROXY__METRICS 进行批量并发测速（单次 IPC 查询全量节点延迟）。
+    /// 因代理组内可能包含数十甚至上百个节点，HTTP 客户端超时必须留出充足余量（至少 15 秒），
+    /// 避免在开机冷启动、TUN 网卡初建或网络握手初期因 4 秒硬超时而误报 IPC send timeout。
     pub async fn delay_group(&self, group_name: &str, test_url: &str, timeout: u32) -> Result<HashMap<String, u32>> {
         let group_name_encode = urlencoding::encode(group_name);
         let test_url = urlencoding::encode(test_url);
         let suffix_url = format!("/group/{group_name_encode}/delay?url={test_url}&timeout={timeout}");
-        let req_timeout = Duration::from_millis(timeout as u64) + Duration::from_millis(2000);
+        let req_timeout = Duration::from_millis((timeout as u64) + 13000).max(Duration::from_secs(15));
         let client = self.build_request(Method::GET, &suffix_url)?.timeout(req_timeout);
         let response = self.send_by_protocol(client).await?;
         if !response.status().is_success() {

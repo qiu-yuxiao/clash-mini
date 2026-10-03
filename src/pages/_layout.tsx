@@ -662,6 +662,7 @@ const Layout = () => {
             console.error('[Layout] 唤醒后恢复节点选择失败:', err)
           }
         } finally {
+          lastFullTestTimeRef.current = Date.now()
           isStartingUpRef.current = false
         }
       })()
@@ -727,6 +728,7 @@ const Layout = () => {
       .finally(() => {
         // 无论 enhanceProfiles 成功、失败还是重试耗尽，都必须打开门闩，
         // 否则唤醒测速和 TUN 自动关闭功能永久阻塞。
+        lastFullTestTimeRef.current = Date.now()
         isStartingUpRef.current = false
       })
     return () => {
