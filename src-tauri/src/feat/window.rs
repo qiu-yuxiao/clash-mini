@@ -23,7 +23,7 @@ pub async fn prepare_exit() {
 
     // 唤醒 monitor 线程，让它检测到退出标志并尽快终止
     crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
-    crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_one();
+    crate::module::monitor::PROFILE_SWITCH_NOTIFY.notify_waiters();
 
     // 停止 Timer 调度器
     crate::core::timer::Timer::global().shutdown();

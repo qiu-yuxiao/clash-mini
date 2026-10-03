@@ -521,14 +521,29 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     // 注：default-nameserver 补缺默认值已含明文上游，此处统一兜住"订阅已提供但缺明文"的情况。
     for key in ["default-nameserver", "proxy-server-nameserver"] {
         let fallback = Value::String("223.5.5.5".into());
-        if let Some(seq) = dns_config.get_mut(key).and_then(|v| v.as_sequence_mut()) {
-            if !seq.contains(&fallback) {
-                seq.push(fallback);
-                logging!(
-                    info,
-                    Type::Core,
-                    "DNS {key} 追加保底明文上游 223.5.5.5（冷启动防鸡生蛋）"
-                );
+        if let Some(val) = dns_config.get_mut(key) {
+            match val {
+                Value::Sequence(seq) => {
+                    if !seq.contains(&fallback) {
+                        seq.push(fallback);
+                        logging!(
+                            info,
+                            Type::Core,
+                            "DNS {key} 追加保底明文上游 223.5.5.5（冷启动防鸡生蛋）"
+                        );
+                    }
+                }
+                Value::String(s) => {
+                    if s != "223.5.5.5" {
+                        *val = Value::Sequence(vec![Value::String(s.clone()), fallback]);
+                        logging!(
+                            info,
+                            Type::Core,
+                            "DNS {key} 标量提升为列表并追加保底明文上游 223.5.5.5（冷启动防鸡生蛋）"
+                        );
+                    }
+                }
+                _ => {}
             }
         }
     }

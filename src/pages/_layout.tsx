@@ -579,14 +579,14 @@ const Layout = () => {
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       wakeupTestTimerRef.current = setTimeout(async () => {
         wakeupTestTimerRef.current = null // setTimeout 已触发，清除ID
-        if (!isMountedRef.current) return
-
-        // M2-08: 校验 Profile 未切换，避免对旧 Profile 节点执行测速
-        const currentUid = (await getProfiles())?.current || ''
-        if (currentUid !== capturedUid || !isMountedRef.current) {
-          return
-        }
         try {
+          if (!isMountedRef.current) return
+
+          // M2-08: 校验 Profile 未切换，避免对旧 Profile 节点执行测速
+          const currentUid = (await getProfiles())?.current || ''
+          if (currentUid !== capturedUid || !isMountedRef.current) {
+            return
+          }
           // 视觉占位：立即将 PROXY 全节点标记为「测速中」以触发流光动画
           for (const name of names) {
             getDelayManager().setDelay(name, 'PROXY', -2)
@@ -753,10 +753,11 @@ const Layout = () => {
         clearTimeout(autoSelectTimerRef.current)
         autoSelectTimerRef.current = null
       }
-      // H-14: 清理 wakeup test timer
+      // H-14: 清理 wakeup test timer 并释放互斥锁
       if (wakeupTestTimerRef.current !== null) {
         clearTimeout(wakeupTestTimerRef.current)
         wakeupTestTimerRef.current = null
+        isWakeupTestingRef.current = false
       }
     }
   }, [])

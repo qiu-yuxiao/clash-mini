@@ -825,8 +825,8 @@ pub fn start_background_monitor() {
                 if matches!(window_state, crate::utils::window_manager::WindowState::NotExist) {
                     if let Some(uid) = get_current_profile_uid().await {
                         let _ = restore_profile_selected_nodes(&uid).await;
-                        // 委托后端执行初始化自动选点；结果经事件回写前端 UI
-                        let _ = trigger_backend_auto_select(&uid, None, 0, true, false).await;
+                        // 委托后端执行初始化自动选点（前序 wait_for_clash_ready 已通过，跳过冗余等待）；结果经事件回写前端 UI
+                        let _ = trigger_backend_auto_select(&uid, None, 0, true, true).await;
                     }
                 }
             } else {
@@ -871,15 +871,8 @@ pub fn start_background_monitor() {
             let is_online = if need_probe {
                 last_online_check_time = Some(Instant::now());
 
-                // 【性能优化与动态探测】：直接从当前配置的测速网址中解析域名与端口作为探测目标，
-                // 彻底消除硬编码的第三方网站，测速用什么网络检测就测什么，天然兼顾海内外。
-                let test_url = get_test_url().await;
-                let host_port = resolve_probe_target(&test_url);
-
-                tokio::time::timeout(Duration::from_secs(2), tokio::net::lookup_host(host_port))
-                    .await
-                    .map(|res| res.is_ok())
-                    .unwrap_or(false)
+                // 【性能优化与动态探测】：复用 is_physical_network_online 探测物理网络连通性
+                is_physical_network_online(2).await
             } else {
                 // 尚未到探测间隔，复用上次结果
                 was_online
