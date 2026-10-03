@@ -348,6 +348,31 @@ async fn merge_default_config(
                 tun.insert(key, value);
             }
             config.insert("tun".into(), tun.into());
+        } else if matches!(key.as_str(), Some("dns") | Some("profile")) {
+            // dns / profile 是"订阅优先"的复合节点：仅补缺，不覆盖订阅已声明的字段。
+            // 与 tun 不同，二者归订阅所有（Mini 无对应覆写入口），模板只提供兜底默认值。
+            let section_name = key.as_str().unwrap_or_default().to_string();
+            let mut section = config
+                .get_mut(section_name.as_str())
+                .map_or_else(Mapping::new, |val| val.as_mapping().cloned().unwrap_or_else(Mapping::new));
+            let defaults = value.as_mapping().cloned().unwrap_or_else(Mapping::new);
+            for (default_key, default_value) in defaults.into_iter() {
+                let absent = match default_key.as_str() {
+                    Some(name) => !section.contains_key(Value::from(name)),
+                    None => true,
+                };
+                if absent {
+                    section.insert(default_key, default_value);
+                }
+            }
+            config.insert(key, section.into());
+        } else if key.as_str() == Some("tcp-concurrent") {
+            // tcp-concurrent 是 Mini 为省资源自加的标量默认值（上游模板无此键），
+            // 但订阅可能显式声明。与 dns/profile 同理：订阅优先，仅当订阅未声明时补
+            // false，避免强制覆盖订阅的并发连接语义。
+            if !config.contains_key(Value::from("tcp-concurrent")) {
+                config.insert(key, value);
+            }
         } else {
             if key.as_str() == Some("socks-port") && !socks_enabled {
                 config.remove("socks-port");

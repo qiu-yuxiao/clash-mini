@@ -99,7 +99,7 @@ impl IClashTemp {
         map.insert("port".into(), network::ports::DEFAULT_HTTP.into());
         map.insert("log-level".into(), "warning".into());
         map.insert("allow-lan".into(), true.into());
-        map.insert("ipv6".into(), false.into());
+        map.insert("ipv6".into(), true.into());
         map.insert("mode".into(), "rule".into());
         map.insert("tcp-concurrent".into(), false.into());
 
