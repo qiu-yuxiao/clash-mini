@@ -240,6 +240,11 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
                         }
                         if is_physical_network_online(2).await {
                             logging!(info, Type::Lightweight, "[后台监测] 阶段 3 完成：物理网络已连通");
+                            // 阶段 4：等待 mihomo DNS 解析链就绪（实测解析一个稳定域名）。
+                            // 物理网络连通 ≠ DNS 解析可用：冷启动窗口内订阅的加密 DNS（DoH/DoT）
+                            // 服务器域名需先经 default-nameserver 解析，若该链全断，节点域名
+                            // 解析不出，测速必全 timeout。超时上限 15 秒，超过后放行由下游兜底。
+                            wait_dns_resolver_ready().await;
                             return true;
                         }
                         tokio::select! {
@@ -270,6 +275,36 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
         "[后台监测] 阶段 2 失败：等待内核加载节点列表超时"
     );
     false
+}
+
+/// 阶段 4：等待 mihomo DNS 解析链就绪（实测解析一个稳定域名，通后才放行测速）。
+/// 【冷启动 DNS 鸡生蛋防护】订阅的 DNS 若全为加密上游（DoH/DoT），其服务器域名
+/// 需先经 default-nameserver 解析，而后者冷启动窗口内可能因 TUN 接口绑定延迟、
+/// 系统 DNS 被 dns-hijack any:53 劫持回环、8.8.8.8 大陆直连不可达而全断 →
+/// 节点域名解析不出 → 首轮测速全 timeout（v2.8.5 实测：冷启动必全 timeout，
+/// 约一分钟后自愈）。此处实测解析，避免无效测速与全 timeout 的 UI 展示。
+/// 超时上限 15 秒：超过后放行，由下游自愈逻辑兜底，避免永久阻塞。
+async fn wait_dns_resolver_ready() {
+    let start_time = Instant::now();
+    while start_time.elapsed().as_secs() < 15 {
+        if crate::core::handle::Handle::global().is_exiting() {
+            logging!(info, Type::Lightweight, "[后台监测] 阶段 4 中断：应用正在退出");
+            return;
+        }
+        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+        if mihomo.dns_query_ready("www.baidu.com").await.unwrap_or(false) {
+            logging!(info, Type::Lightweight, "[后台监测] 阶段 4 完成：DNS 解析链已就绪");
+            return;
+        }
+        tokio::select! {
+            _ = sleep(Duration::from_secs(1)) => {}
+            _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                logging!(info, Type::Lightweight, "[后台监测] 阶段 4 放行：检测到 Profile 切换");
+                return;
+            }
+        }
+    }
+    logging!(warn, Type::Lightweight, "[后台监测] 阶段 4 超时：DNS 解析链未就绪，放行测速（由下游兜底）");
 }
 
 /// 恢复当前活动 Profile 配置文件中所保存的上次选定的 PROXY 组节点

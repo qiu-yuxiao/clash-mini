@@ -784,6 +784,24 @@ impl Mihomo {
         Ok(response.json::<HashMap<String, u32>>().await?)
     }
 
+    /// 实测 mihomo 内部 DNS 解析链是否就绪（解析一个稳定域名）
+    /// [Clash Mini 备注]: 用于冷启动就绪探测。订阅的 DNS 若全为加密上游（DoH/DoT），
+    /// 其服务器域名需先经 default-nameserver 解析，冷启动窗口内该链可能整体未就绪，
+    /// 此时直接发起测速会因节点域名解析不出而全 timeout。通过 /dns/query 实测解析，
+    /// 返回 200 且响应含解析结果（Answer 条目的 data 字段）才视为 DNS 链可用。
+    /// 客户端超时 3 秒：DNS 链未就绪时该请求会随解析一起挂起，超时即判未就绪。
+    pub async fn dns_query_ready(&self, name: &str) -> Result<bool> {
+        let name_encode = urlencoding::encode(name);
+        let suffix_url = format!("/dns/query?name={name_encode}");
+        let client = self.build_request(Method::GET, &suffix_url)?.timeout(Duration::from_secs(3));
+        let response = self.send_by_protocol(client).await?;
+        if !response.status().is_success() {
+            return Ok(false);
+        }
+        let body = response.text().await?;
+        Ok(body.contains("\"data\""))
+    }
+
     /// 获取代理提供者信息
     pub async fn get_proxy_providers(&self) -> Result<ProxyProviders> {
         let client = self.build_request(Method::GET, "/providers/proxies")?;
