@@ -1,20 +1,14 @@
 use super::CmdResult;
 use crate::feat;
-use crate::utils::dirs;
 use crate::{
     cmd::StringifyErr as _,
     config::{ClashInfo, Config},
-    constants,
-    core::{
-        CoreManager, handle,
-        validate::{CoreConfigValidator, ValidationOutcome},
-    },
+    core::{CoreManager, handle},
 };
 use clash_verge_logging::{Type, logging, logging_error};
 use compact_str::CompactString;
 use serde_yaml_ng::Mapping;
 use smartstring::alias::String;
-use tokio::fs;
 
 /// 复制Clash环境变量
 #[tauri::command]
@@ -87,120 +81,6 @@ pub async fn test_delay(url: String) -> CmdResult<u32> {
         }
     };
     Ok(result)
-}
-
-/// 保存DNS配置到单独文件
-#[tauri::command]
-pub async fn save_dns_config(dns_config: Mapping) -> CmdResult {
-    use serde_yaml_ng;
-
-    // 获取DNS配置文件路径
-    let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
-
-    // 保存DNS配置到文件
-    let yaml_str = serde_yaml_ng::to_string(&dns_config).stringify_err()?;
-    fs::write(&dns_path, yaml_str).await.stringify_err()?;
-    logging!(info, Type::Config, "DNS config saved to {dns_path:?}");
-
-    Ok(())
-}
-
-/// 应用或撤销DNS配置
-#[tauri::command]
-pub async fn apply_dns_config(apply: bool) -> CmdResult {
-    if apply {
-        // 读取DNS配置文件
-        let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
-
-        if !dns_path.exists() {
-            logging!(warn, Type::Config, "DNS config file not found");
-            return Err("DNS config file not found".into());
-        }
-
-        let dns_yaml = fs::read_to_string(&dns_path).await.stringify_err_log(|e| {
-            logging!(error, Type::Config, "Failed to read DNS config: {e}");
-        })?;
-
-        // 解析DNS配置
-        let _patch_config = serde_yaml_ng::from_str::<serde_yaml_ng::Mapping>(&dns_yaml).stringify_err_log(|e| {
-            logging!(error, Type::Config, "Failed to parse DNS config: {e}");
-        })?;
-
-        logging!(info, Type::Config, "Applying DNS config from file");
-    } else {
-        // 当关闭DNS设置时，重新生成配置（不加载DNS配置文件）
-        logging!(info, Type::Config, "DNS settings disabled, regenerating config");
-    }
-
-    // 更新 verge 配置中的 DNS 启用标志
-    let verge = Config::verge().await;
-    verge.edit_draft(|d| {
-        d.enable_dns_settings = Some(apply);
-    });
-    verge.apply();
-    let _ = Config::verge().await.data_arc().save_file();
-
-    // 应用新配置
-    CoreManager::global()
-        .update_config_checked()
-        .await
-        .stringify_err_log(|err| {
-            logging!(error, Type::Config, "Failed to apply config: {err}");
-        })?;
-
-    logging!(
-        info,
-        Type::Config,
-        "{}",
-        if apply {
-            "DNS config successfully applied"
-        } else {
-            "Config regenerated successfully"
-        }
-    );
-
-    handle::Handle::refresh_clash();
-    Ok(())
-}
-
-/// 检查DNS配置文件是否存在
-#[tauri::command]
-pub fn check_dns_config_exists() -> CmdResult<bool> {
-    let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
-
-    Ok(dns_path.exists())
-}
-
-/// 获取DNS配置文件内容
-#[tauri::command]
-pub async fn get_dns_config_content() -> CmdResult<String> {
-    use crate::utils::dirs;
-    use tokio::fs;
-
-    let dns_path = dirs::app_home_dir().stringify_err()?.join(constants::files::DNS_CONFIG);
-
-    if !fs::try_exists(&dns_path).await.stringify_err()? {
-        return Err("DNS config file not found".into());
-    }
-
-    let content = fs::read_to_string(&dns_path).await.stringify_err()?.into();
-    Ok(content)
-}
-
-/// 验证DNS配置文件
-#[tauri::command]
-pub async fn validate_dns_config() -> CmdResult<ValidationOutcome> {
-    let app_dir = dirs::app_home_dir().stringify_err()?;
-    let dns_path = app_dir.join(constants::files::DNS_CONFIG);
-    let dns_path_str = dns_path.to_str().unwrap_or_default();
-
-    if !dns_path.exists() {
-        return Ok(ValidationOutcome::invalid_from_message("DNS config file not found"));
-    }
-
-    CoreConfigValidator::validate_config_file_outcome(dns_path_str, None)
-        .await
-        .stringify_err()
 }
 
 #[tauri::command]

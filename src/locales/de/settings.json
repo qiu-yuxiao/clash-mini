@@ -94,7 +94,6 @@
       "form": {
         "fields": {
           "allowLan": "Netzwerkverbindung im lokalen Netzwerk zulassen",
-          "dnsOverwrite": "DNS-Überschreibung",
           "ipv6": "IPv6",
           "unifiedDelay": "Einheitliche Latenz",
           "logLevel": "Protokolliergrad",
@@ -475,101 +474,6 @@
         "applied": "Einstellungen angewendet",
         "invalidRouteExcludeAddress": "Bitte geben Sie einen gültigen CIDR-Block ein",
         "routeExcludeAddressHint": "Es werden nur IPv4-/IPv6-CIDR-Blöcke unterstützt, z. B. 192.168.0.0/16 oder fd00::/8"
-      }
-    },
-    "dns": {
-      "dialog": {
-        "title": "DNS-Überschreibung",
-        "warning": "Wenn Sie sich nicht mit diesen Einstellungen auskennen, ändern Sie sie nicht und lassen Sie die DNS-Überschreibung aktiviert."
-      },
-      "sections": {
-        "general": "DNS-Einstellungen",
-        "fallbackFilter": "Rückfallfilter-Einstellungen",
-        "hosts": "Hosts-Einstellungen"
-      },
-      "fields": {
-        "enable": "DNS aktivieren",
-        "listen": "DNS-Lauschangabe",
-        "enhancedMode": "Erweiterter Modus",
-        "fakeIpRange": "Fake-IP-Bereich",
-        "fakeIpFilterMode": "Fake-IP-Filtermodus",
-        "ipv6": {
-          "label": "IPv6",
-          "description": "IPv6-DNS-Auflösung aktivieren"
-        },
-        "preferH3": {
-          "label": "HTTP/3 bevorzugen",
-          "description": "DNS DOH verwendet HTTP/3-Protokoll"
-        },
-        "respectRules": {
-          "label": "Routierungsregeln beachten",
-          "description": "DNS-Verbindungen folgen den Routierungsregeln"
-        },
-        "useHosts": {
-          "label": "Hosts verwenden",
-          "description": "Aktivieren Sie die Auflösung von Hosts über die hosts-Datei"
-        },
-        "useSystemHosts": {
-          "label": "System-Hosts verwenden",
-          "description": "Aktivieren Sie die Auflösung von Hosts über die System-hosts-Datei"
-        },
-        "directPolicy": {
-          "label": "Direkte Namenserver folgen der Strategie",
-          "description": "Ob die Namenserver-Strategie befolgt werden soll"
-        },
-        "defaultNameserver": {
-          "label": "Standard-Namenserver",
-          "description": "Standard-DNS-Server, die zum Auflösen von DNS-Servern verwendet werden"
-        },
-        "nameserver": {
-          "label": "Namenserver",
-          "description": "Liste der DNS-Server, getrennt durch Kommas"
-        },
-        "fallback": {
-          "label": "Rückfallserver",
-          "description": "Liste der Rückfall-DNS-Server, getrennt durch Kommas"
-        },
-        "proxy": {
-          "label": "Proxy-Server-Namenserver",
-          "description": "Proxy-Knoten-Namenserver, nur für die Auflösung der Domains von Proxy-Knoten verwendet, getrennt durch Kommas"
-        },
-        "directNameserver": {
-          "label": "Direkter Namenserver",
-          "description": "Direkter Ausgangs-Namenserver, unterstützt das Schlüsselwort system, getrennt durch Kommas"
-        },
-        "fakeIpFilter": {
-          "label": "Fake-IP-Filter",
-          "description": "Domains, die die Fake-IP-Auflösung überspringen, getrennt durch Kommas"
-        },
-        "nameserverPolicy": {
-          "label": "Namenserver-Strategie",
-          "description": "Domain-spezifischer DNS-Server, mehrere Server getrennt durch Semikolons, Format: domain=server1;server2"
-        },
-        "geoipFiltering": {
-          "label": "GeoIP-Filterung",
-          "description": "GeoIP-Rückfallfilterung aktivieren"
-        },
-        "geoipCode": "GeoIP-Ländercode",
-        "fallbackIpCidr": {
-          "label": "Rückfall-IP-CIDR",
-          "description": "IP-CIDRs, die keine Rückfallserver verwenden, getrennt durch Kommas"
-        },
-        "fallbackDomain": {
-          "label": "Rückfall-Domäne",
-          "description": "Domains, die Rückfallserver verwenden, getrennt durch Kommas"
-        },
-        "hosts": {
-          "label": "Hosts",
-          "description": "Benutzerdefinierte Zuordnung von Domains zu IPs oder Domains, getrennt durch Kommas"
-        }
-      },
-      "messages": {
-        "saved": "DNS-Einstellungen wurden gespeichert",
-        "configError": "DNS configuration error:"
-      },
-      "errors": {
-        "invalid": "Invalid configuration",
-        "invalidYaml": "Invalid YAML format"
       }
     },
     "webUI": {

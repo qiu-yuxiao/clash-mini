@@ -94,7 +94,6 @@
       "form": {
         "fields": {
           "allowLan": "LAN接続を許可",
-          "dnsOverwrite": "DNS上書き",
           "ipv6": "IPv6",
           "unifiedDelay": "統一遅延",
           "logLevel": "ログレベル",
@@ -475,101 +474,6 @@
         "applied": "設定が適用されました",
         "invalidRouteExcludeAddress": "有効な CIDR ブロックを入力してください",
         "routeExcludeAddressHint": "IPv4/IPv6 の CIDR のみ対応しています。例: 192.168.0.0/16、fd00::/8"
-      }
-    },
-    "dns": {
-      "dialog": {
-        "title": "DNS上書き",
-        "warning": "ここの設定がわからない場合は、変更しないでください。DNS上書きを有効にしたままにしてください。"
-      },
-      "sections": {
-        "general": "DNS設定",
-        "fallbackFilter": "フォールバックフィルター設定",
-        "hosts": "Hosts設定"
-      },
-      "fields": {
-        "enable": "DNSを有効にする",
-        "listen": "DNS監視アドレス",
-        "enhancedMode": "拡張モード",
-        "fakeIpRange": "Fake IP範囲",
-        "fakeIpFilterMode": "Fake IPフィルターモード",
-        "ipv6": {
-          "label": "IPv6",
-          "description": "IPv6 DNS解決を有効にする"
-        },
-        "preferH3": {
-          "label": "HTTP/3を優先する",
-          "description": "DNS DOHでHTTP/3プロトコルを使用する"
-        },
-        "respectRules": {
-          "label": "ルートルールに従う",
-          "description": "DNS接続はルートルールに従います。"
-        },
-        "useHosts": {
-          "label": "Hostsファイルを使用する",
-          "description": "Hostsファイルを使用してホスト名を解決する"
-        },
-        "useSystemHosts": {
-          "label": "システムのHostsファイルを使用する",
-          "description": "システムのHostsファイルを使用してホスト名を解決する"
-        },
-        "directPolicy": {
-          "label": "直接接続の名前解決サーバーはポリシーに従う",
-          "description": "名前解決サーバーのポリシーに従うかどうか"
-        },
-        "defaultNameserver": {
-          "label": "デフォルトの名前解決サーバー",
-          "description": "名前解決サーバーを解決するために使用されるデフォルトのDNSサーバー"
-        },
-        "nameserver": {
-          "label": "名前解決サーバー",
-          "description": "DNSサーバーのリスト。カンマで区切って指定します。"
-        },
-        "fallback": {
-          "label": "フォールバックサーバー",
-          "description": "フォールバックDNSサーバーのリスト。カンマで区切って指定します。"
-        },
-        "proxy": {
-          "label": "プロキシサーバーの名前解決サーバー",
-          "description": "プロキシノードの名前解決サーバー。プロキシノードのドメイン名を解決するためにのみ使用されます。カンマで区切って指定します。"
-        },
-        "directNameserver": {
-          "label": "直接接続の名前解決サーバー",
-          "description": "直接接続の出口名前解決サーバー。systemキーワードをサポートします。カンマで区切って指定します。"
-        },
-        "fakeIpFilter": {
-          "label": "Fake IPフィルター",
-          "description": "Fake IP解決をスキップするドメイン名。カンマで区切って指定します。"
-        },
-        "nameserverPolicy": {
-          "label": "名前解決サーバーのポリシー",
-          "description": "特定のドメインのDNSサーバー。複数のサーバーはセミコロンで区切って指定します。形式: domain=server1;server2"
-        },
-        "geoipFiltering": {
-          "label": "GeoIPフィルタリング",
-          "description": "フォールバックのGeoIPフィルタリングを有効にする"
-        },
-        "geoipCode": "GeoIP国コード",
-        "fallbackIpCidr": {
-          "label": "フォールバックIP CIDR",
-          "description": "フォールバックサーバーを使用しないIP CIDR。カンマで区切って指定します。"
-        },
-        "fallbackDomain": {
-          "label": "フォールバックドメイン",
-          "description": "フォールバックサーバーを使用するドメイン名。カンマで区切って指定します。"
-        },
-        "hosts": {
-          "label": "Hosts",
-          "description": "カスタムのドメイン名からIPまたはドメイン名へのマッピング。カンマで区切って指定します。"
-        }
-      },
-      "messages": {
-        "saved": "DNS設定が保存されました。",
-        "configError": "DNS configuration error:"
-      },
-      "errors": {
-        "invalid": "Invalid configuration",
-        "invalidYaml": "Invalid YAML format"
       }
     },
     "webUI": {

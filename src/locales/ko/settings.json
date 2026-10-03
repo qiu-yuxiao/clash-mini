@@ -94,7 +94,6 @@
       "form": {
         "fields": {
           "allowLan": "LAN 허용",
-          "dnsOverwrite": "DNS 덮어쓰기",
           "ipv6": "IPv6",
           "unifiedDelay": "지연 통합",
           "logLevel": "로그 레벨",
@@ -475,101 +474,6 @@
         "applied": "설정이 적용되었습니다",
         "invalidRouteExcludeAddress": "유효한 CIDR 대역을 입력하세요",
         "routeExcludeAddressHint": "IPv4/IPv6 CIDR만 지원합니다. 예: 192.168.0.0/16 또는 fd00::/8"
-      }
-    },
-    "dns": {
-      "dialog": {
-        "title": "DNS 덮어쓰기",
-        "warning": "이 설정에 익숙하지 않다면 수정하지 말고 DNS 덮어쓰기를 활성화 상태로 유지하세요"
-      },
-      "sections": {
-        "general": "DNS 설정",
-        "fallbackFilter": "폴백 필터 설정",
-        "hosts": "호스트 설정"
-      },
-      "fields": {
-        "enable": "DNS 사용",
-        "listen": "DNS 리슨",
-        "enhancedMode": "향상 모드",
-        "fakeIpRange": "가짜 IP 범위",
-        "fakeIpFilterMode": "가짜 IP 필터 모드",
-        "ipv6": {
-          "label": "IPv6",
-          "description": "IPv6 DNS 해석 사용"
-        },
-        "preferH3": {
-          "label": "H3 우선",
-          "description": "DNS DOH에서 HTTP/3 사용"
-        },
-        "respectRules": {
-          "label": "규칙 준수",
-          "description": "DNS 연결이 라우팅 규칙을 따릅니다"
-        },
-        "useHosts": {
-          "label": "Hosts 사용",
-          "description": "호스트 파일을 통해 해석하도록 활성화"
-        },
-        "useSystemHosts": {
-          "label": "시스템 Hosts 사용",
-          "description": "시스템 호스트 파일을 통해 해석하도록 활성화"
-        },
-        "directPolicy": {
-          "label": "직접 Nameserver 정책 따르기",
-          "description": "Nameserver 정책을 따를지 여부"
-        },
-        "defaultNameserver": {
-          "label": "기본 Nameserver",
-          "description": "DNS 서버 해석에 사용되는 기본 DNS 서버"
-        },
-        "nameserver": {
-          "label": "Nameserver",
-          "description": "DNS 서버 목록, 쉼표로 구분"
-        },
-        "fallback": {
-          "label": "폴백",
-          "description": "폴백 DNS 서버 목록, 쉼표로 구분"
-        },
-        "proxy": {
-          "label": "프록시 서버 Nameserver",
-          "description": "프록시 노드 도메인 해석용 DNS 서버"
-        },
-        "directNameserver": {
-          "label": "직접 Nameserver",
-          "description": "직접 출구 도메인 해석용 DNS 서버, 'system' 키워드 지원, 쉼표로 구분"
-        },
-        "fakeIpFilter": {
-          "label": "가짜 IP 필터",
-          "description": "가짜 IP 해석을 건너뛰는 도메인, 쉼표로 구분"
-        },
-        "nameserverPolicy": {
-          "label": "Nameserver 정책",
-          "description": "도메인별 DNS 서버, 여러 서버는 세미콜론으로 구분, 형식: domain=server1;server2"
-        },
-        "geoipFiltering": {
-          "label": "GeoIP 필터링",
-          "description": "폴백에 GeoIP 필터링 사용"
-        },
-        "geoipCode": "GeoIP 코드",
-        "fallbackIpCidr": {
-          "label": "폴백 IP CIDR",
-          "description": "폴백 서버를 사용하지 않는 IP CIDR, 쉼표로 구분"
-        },
-        "fallbackDomain": {
-          "label": "폴백 도메인",
-          "description": "폴백 서버를 사용하는 도메인, 쉼표로 구분"
-        },
-        "hosts": {
-          "label": "Hosts",
-          "description": "사용자 정의 도메인→IP 또는 도메인 매핑"
-        }
-      },
-      "messages": {
-        "saved": "DNS 설정이 저장되었습니다",
-        "configError": "DNS 구성 오류:"
-      },
-      "errors": {
-        "invalid": "잘못된 구성",
-        "invalidYaml": "잘못된 YAML 형식"
       }
     },
     "webUI": {

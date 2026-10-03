@@ -94,7 +94,6 @@
       "form": {
         "fields": {
           "allowLan": "區域網路連線",
-          "dnsOverwrite": "DNS 覆寫",
           "ipv6": "IPv6",
           "unifiedDelay": "統一延遲",
           "logLevel": "日誌等級",
@@ -475,101 +474,6 @@
         "applied": "設定已套用",
         "invalidRouteExcludeAddress": "請輸入有效的 CIDR 網段",
         "routeExcludeAddressHint": "僅支援 IPv4/IPv6 CIDR，例如 192.168.0.0/16 或 fd00::/8"
-      }
-    },
-    "dns": {
-      "dialog": {
-        "title": "DNS 覆寫",
-        "warning": "如果你不清楚這裡的設定請不要修改，並保持 DNS 覆寫開啟"
-      },
-      "sections": {
-        "general": "DNS 設定",
-        "fallbackFilter": "備援篩選設定",
-        "hosts": "Hosts 設定"
-      },
-      "fields": {
-        "enable": "啟用 DNS",
-        "listen": "DNS 監聽位址",
-        "enhancedMode": "增強模式",
-        "fakeIpRange": "Fake IP 範圍",
-        "fakeIpFilterMode": "Fake IP 篩選模式",
-        "ipv6": {
-          "label": "IPv6",
-          "description": "啟用 IPv6 DNS 解析"
-        },
-        "preferH3": {
-          "label": "優先使用 HTTP/3",
-          "description": "DNS DOH 使用 HTTP/3 協定"
-        },
-        "respectRules": {
-          "label": "遵循路由規則",
-          "description": "DNS 連線遵循路由規則"
-        },
-        "useHosts": {
-          "label": "使用 Hosts",
-          "description": "啟用透過 hosts 檔案解析網域"
-        },
-        "useSystemHosts": {
-          "label": "使用系統 Hosts",
-          "description": "啟用透過系統 hosts 檔案解析網域"
-        },
-        "directPolicy": {
-          "label": "直連域名伺服器遵循策略",
-          "description": "是否遵循 nameserver-policy 設定"
-        },
-        "defaultNameserver": {
-          "label": "預設域名伺服器",
-          "description": "用於解析 DNS 伺服器的預設 DNS 伺服器"
-        },
-        "nameserver": {
-          "label": "域名伺服器",
-          "description": "DNS 伺服器列表，用逗號分隔"
-        },
-        "fallback": {
-          "label": "備援伺服器",
-          "description": "備援 DNS 伺服器列表，用逗號分隔"
-        },
-        "proxy": {
-          "label": "代理節點 DNS",
-          "description": "代理節點網域解析伺服器，僅用於解析代理節點的網域，用逗號分隔"
-        },
-        "directNameserver": {
-          "label": "直連域名伺服器",
-          "description": "直連輸出網域解析伺服器，支援 system 關鍵字，用逗號分隔"
-        },
-        "fakeIpFilter": {
-          "label": "Fake IP 篩選",
-          "description": "跳過 Fake IP 解析的網域，用逗號分隔"
-        },
-        "nameserverPolicy": {
-          "label": "域名伺服器策略",
-          "description": "特定網域的 DNS 伺服器，多個伺服器使用分號分隔，格式: domain=server1;server2"
-        },
-        "geoipFiltering": {
-          "label": "GeoIP 篩選",
-          "description": "啟用 GeoIP 備援篩選"
-        },
-        "geoipCode": "GeoIP 國家代碼",
-        "fallbackIpCidr": {
-          "label": "備援 IP CIDR",
-          "description": "不使用備援伺服器的 IP CIDR，用逗號分隔"
-        },
-        "fallbackDomain": {
-          "label": "備援網域",
-          "description": "使用備援伺服器的網域，用逗號分隔"
-        },
-        "hosts": {
-          "label": "Hosts",
-          "description": "自訂網域到 IP 或網域的映射，用逗號分隔"
-        }
-      },
-      "messages": {
-        "saved": "DNS 設定已儲存",
-        "configError": "DNS 設定錯誤："
-      },
-      "errors": {
-        "invalid": "無效的設定",
-        "invalidYaml": "YAML 格式無效"
       }
     },
     "webUI": {

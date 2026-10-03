@@ -97,17 +97,15 @@ async fn get_config_values() -> ConfigValues {
         ref enable_builtin_enhanced,
         ref verge_socks_enabled,
         ref verge_http_enabled,
-        ref enable_dns_settings,
         ..
     } = *verge_arc;
 
-    let (clash_core, enable_tun, enable_builtin, socks_enabled, http_enabled, _enable_dns_settings) = (
+    let (clash_core, enable_tun, enable_builtin, socks_enabled, http_enabled) = (
         Some(verge_arc.get_valid_clash_core()),
         enable_tun_mode.unwrap_or(false),
         enable_builtin_enhanced.unwrap_or(true),
         verge_socks_enabled.unwrap_or(false),
         verge_http_enabled.unwrap_or(false),
-        enable_dns_settings.unwrap_or(false),
     );
 
     #[cfg(not(target_os = "windows"))]

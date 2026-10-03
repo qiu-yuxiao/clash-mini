@@ -94,7 +94,6 @@
       "form": {
         "fields": {
           "allowLan": "اجازه LAN",
-          "dnsOverwrite": "بازنویسی DNS",
           "ipv6": "IPv6",
           "unifiedDelay": "معادلDELAY",
           "logLevel": "سطح لاگ",
@@ -475,101 +474,6 @@
         "applied": "تنظیمات اعمال شد",
         "invalidRouteExcludeAddress": "لطفاً یک محدوده CIDR معتبر وارد کنید",
         "routeExcludeAddressHint": "فقط CIDRهای IPv4/IPv6 پشتیبانی می‌شوند، مانند 192.168.0.0/16 یا fd00::/8"
-      }
-    },
-    "dns": {
-      "dialog": {
-        "title": "بازنویسی DNS",
-        "warning": "اگر با این تنظیمات آشنا نیستید، لطفاً آنها را تغییر ندهید و DNS Overwrite را فعال نگه دارید."
-      },
-      "sections": {
-        "general": "تنظیمات DNS",
-        "fallbackFilter": "Fallback Filter Settings",
-        "hosts": "Hosts Settings"
-      },
-      "fields": {
-        "enable": "Enable DNS",
-        "listen": "DNS Listen",
-        "enhancedMode": "Enhanced Mode",
-        "fakeIpRange": "Fake IP Range",
-        "fakeIpFilterMode": "Fake IP Filter Mode",
-        "ipv6": {
-          "label": "IPv6",
-          "description": "Enable IPv6 DNS resolution"
-        },
-        "preferH3": {
-          "label": "Prefer H3",
-          "description": "DNS DOH uses HTTP/3"
-        },
-        "respectRules": {
-          "label": "Respect Rules",
-          "description": "اتصالات DNS از قوانین مسیریابی پیروی می‌کنند"
-        },
-        "useHosts": {
-          "label": "Use Hosts",
-          "description": "Enable to resolve hosts through hosts file"
-        },
-        "useSystemHosts": {
-          "label": "Use System Hosts",
-          "description": "Enable to resolve hosts through system hosts file"
-        },
-        "directPolicy": {
-          "label": "Direct Nameserver Follow Policy",
-          "description": "Whether to follow nameserver policy"
-        },
-        "defaultNameserver": {
-          "label": "Default Nameserver",
-          "description": "Default DNS servers used to resolve DNS servers"
-        },
-        "nameserver": {
-          "label": "Nameserver",
-          "description": "فهرست سرورهای DNS، جدا شده با کاما"
-        },
-        "fallback": {
-          "label": "Fallback",
-          "description": "فهرست سرورهای DNS جایگزین، جدا شده با کاما"
-        },
-        "proxy": {
-          "label": "Proxy Server Nameserver",
-          "description": "DNS servers for proxy node domain resolution"
-        },
-        "directNameserver": {
-          "label": "Direct Nameserver",
-          "description": "DNS servers for direct exit domain resolution, supports 'system' keyword, comma separated"
-        },
-        "fakeIpFilter": {
-          "label": "Fake IP Filter",
-          "description": "Domains that skip fake IP resolution, comma separated"
-        },
-        "nameserverPolicy": {
-          "label": "Nameserver Policy",
-          "description": "Domain-specific DNS server, multiple servers separated by semicolons, format: domain=server1;server2"
-        },
-        "geoipFiltering": {
-          "label": "GeoIP Filtering",
-          "description": "Enable GeoIP filtering for fallback"
-        },
-        "geoipCode": "GeoIP Code",
-        "fallbackIpCidr": {
-          "label": "Fallback IP CIDR",
-          "description": "IP CIDRs not using fallback servers, comma separated"
-        },
-        "fallbackDomain": {
-          "label": "دامنه جایگزین",
-          "description": "دامنه‌هایی که از سرورهای جایگزین استفاده می‌کنند، با کاما از هم جدا شده‌اند"
-        },
-        "hosts": {
-          "label": "میزبان‌ها",
-          "description": "تبدیل دامنه به IP یا نگاشت دامنه سفارشی"
-        }
-      },
-      "messages": {
-        "saved": "تنظیمات DNS ذخیره شد",
-        "configError": "خطای پیکربندی DNS:"
-      },
-      "errors": {
-        "invalid": "پیکربندی نامعتبر",
-        "invalidYaml": "قالب YAML نامعتبر است"
       }
     },
     "webUI": {

@@ -94,7 +94,6 @@
       "form": {
         "fields": {
           "allowLan": "Разрешить доступ из локальной сети",
-          "dnsOverwrite": "Переопределение настроек DNS",
           "ipv6": "IPv6",
           "unifiedDelay": "Точная задержка",
           "logLevel": "Уровень логов",
@@ -475,101 +474,6 @@
         "applied": "Настройки применены",
         "invalidRouteExcludeAddress": "Введите корректный блок CIDR",
         "routeExcludeAddressHint": "Поддерживаются только блоки CIDR IPv4/IPv6, например 192.168.0.0/16 или fd00::/8"
-      }
-    },
-    "dns": {
-      "dialog": {
-        "title": "Переопределение настроек DNS",
-        "warning": "Если вы не знакомы с этими настройками, пожалуйста, не изменяйте и не отключайте их"
-      },
-      "sections": {
-        "general": "Настройки DNS",
-        "fallbackFilter": "Настройки фильтра fallback",
-        "hosts": "Настройки hosts"
-      },
-      "fields": {
-        "enable": "Включить DNS",
-        "listen": "Прослушивание DNS",
-        "enhancedMode": "Расширенный режим",
-        "fakeIpRange": "Диапазон FakeIP",
-        "fakeIpFilterMode": "Режим фильтра FakeIP",
-        "ipv6": {
-          "label": "IPv6",
-          "description": "Включить DNS-разрешение IPv6"
-        },
-        "preferH3": {
-          "label": "Предпочитать H3",
-          "description": "Использовать HTTP/3 для DNS DoH"
-        },
-        "respectRules": {
-          "label": "Приоритизировать правила",
-          "description": "Соединения DNS следуют правилам маршрутизации"
-        },
-        "useHosts": {
-          "label": "Использовать файл hosts",
-          "description": "Включить разрешение хостов через файл hosts"
-        },
-        "useSystemHosts": {
-          "label": "Использовать системный файл hosts",
-          "description": "Включить разрешение хостов через системный файл hosts"
-        },
-        "directPolicy": {
-          "label": "Прямой сервер имен следует политике",
-          "description": "Следовать ли политике DNS-серверов"
-        },
-        "defaultNameserver": {
-          "label": "DNS-сервер по умолчанию",
-          "description": "DNS-серверы по умолчанию, используемые для разрешения адресов серверов DNS"
-        },
-        "nameserver": {
-          "label": "DNS-сервер",
-          "description": "Список DNS-серверов, разделенных запятой"
-        },
-        "fallback": {
-          "label": "Fallback",
-          "description": "Список DNS-серверов, разделенных запятой"
-        },
-        "proxy": {
-          "label": "DNS-сервер прокси",
-          "description": "DNS-серверы для разрешения домена прокси-узлов"
-        },
-        "directNameserver": {
-          "label": "DNS-сервер для прямых соединений",
-          "description": "Список DNS-серверов для прямых соединений, разделённых запятой"
-        },
-        "fakeIpFilter": {
-          "label": "Фильтр FakeIP",
-          "description": "Домены, исключаемые из разрешения FakeIP, разделённые запятой"
-        },
-        "nameserverPolicy": {
-          "label": "Политика DNS-серверов",
-          "description": "DNS-сервер для конкретного домена; несколько серверов разделяются символом ';'"
-        },
-        "geoipFiltering": {
-          "label": "Фильтрация GeoIP",
-          "description": "Включить фильтрацию GeoIP"
-        },
-        "geoipCode": "Код GeoIP",
-        "fallbackIpCidr": {
-          "label": "Fallback IP CIDR",
-          "description": "Диапазоны IP-адресов, не использующие резервные серверы, разделённые запятой"
-        },
-        "fallbackDomain": {
-          "label": "Fallback домены",
-          "description": "Домены, использующие резервные серверы, разделённые запятой"
-        },
-        "hosts": {
-          "label": "Hosts",
-          "description": "Пользовательское сопоставление доменов с IP-адресами или другими доменами"
-        }
-      },
-      "messages": {
-        "saved": "Настройки DNS сохранены",
-        "configError": "Ошибка конфигурации DNS:"
-      },
-      "errors": {
-        "invalid": "Неверная конфигурация",
-        "invalidYaml": "Неверный формат YAML"
       }
     },
     "webUI": {

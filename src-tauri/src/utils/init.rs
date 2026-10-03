@@ -1,7 +1,6 @@
 // #[cfg(not(feature = "tracing"))]
 use crate::{
     config::{Config, IClashTemp, IProfiles, IVerge},
-    constants,
     core::handle,
     logging,
     process::AsyncHandler,
@@ -122,94 +121,6 @@ pub async fn delete_log() -> Result<()> {
     Ok(())
 }
 
-/// 初始化DNS配置文件
-fn init_dns_config() -> Result<()> {
-    use serde_yaml_ng::Value;
-
-    // 创建DNS子配置
-    let dns_config = serde_yaml_ng::Mapping::from_iter([
-        ("enable".into(), Value::Bool(true)),
-        ("listen".into(), Value::String(":53".into())),
-        ("enhanced-mode".into(), Value::String("redir-host".into())),
-        ("cache-algorithm".into(), Value::String("lru".into())),
-        ("cache-limit".into(), Value::Number(512.into())),
-        ("prefer-h3".into(), Value::Bool(false)),
-        ("respect-rules".into(), Value::Bool(false)),
-        ("use-hosts".into(), Value::Bool(false)),
-        ("use-system-hosts".into(), Value::Bool(false)),
-        (
-            "default-nameserver".into(),
-            Value::Sequence(vec![
-                Value::String("system".into()),
-                Value::String("223.6.6.6".into()),
-                Value::String("8.8.8.8".into()),
-                Value::String("2400:3200::1".into()),
-                Value::String("2001:4860:4860::8888".into()),
-            ]),
-        ),
-        (
-            "nameserver".into(),
-            Value::Sequence(vec![
-                Value::String("8.8.8.8".into()),
-                Value::String("https://doh.pub/dns-query".into()),
-                Value::String("https://dns.alidns.com/dns-query".into()),
-            ]),
-        ),
-        ("fallback".into(), Value::Sequence(vec![])),
-        (
-            "nameserver-policy".into(),
-            Value::Mapping(serde_yaml_ng::Mapping::new()),
-        ),
-        (
-            "proxy-server-nameserver".into(),
-            Value::Sequence(vec![
-                Value::String("https://doh.pub/dns-query".into()),
-                Value::String("https://dns.alidns.com/dns-query".into()),
-                Value::String("tls://223.5.5.5".into()),
-            ]),
-        ),
-        ("direct-nameserver".into(), Value::Sequence(vec![])),
-        ("direct-nameserver-follow-policy".into(), Value::Bool(false)),
-        (
-            "fallback-filter".into(),
-            Value::Mapping(serde_yaml_ng::Mapping::from_iter([
-                (
-                    "ipcidr".into(),
-                    Value::Sequence(vec![
-                        Value::String("240.0.0.0/4".into()),
-                        Value::String("0.0.0.0/32".into()),
-                    ]),
-                ),
-                (
-                    "domain".into(),
-                    Value::Sequence(vec![
-                        Value::String("+.google.com".into()),
-                        Value::String("+.facebook.com".into()),
-                        Value::String("+.youtube.com".into()),
-                    ]),
-                ),
-            ])),
-        ),
-    ]);
-
-    // 获取默认DNS和host配置
-    let default_dns_config = serde_yaml_ng::Mapping::from_iter([
-        ("dns".into(), Value::Mapping(dns_config)),
-        ("hosts".into(), Value::Mapping(serde_yaml_ng::Mapping::new())),
-    ]);
-
-    // 检查DNS配置文件是否存在
-    let app_dir = dirs::app_home_dir()?;
-    let dns_path = app_dir.join(constants::files::DNS_CONFIG);
-
-    if !dns_path.exists() {
-        logging!(info, Type::Setup, "Creating default DNS config file");
-        help::save_yaml(&dns_path, &default_dns_config, Some("# Clash Verge DNS Config"))?;
-    }
-
-    Ok(())
-}
-
 /// 确保目录结构存在
 async fn ensure_directories() -> Result<()> {
     let directories = [
@@ -285,10 +196,6 @@ pub async fn init_config() -> Result<()> {
         }
         logging!(info, Type::Setup, "后台日志清理任务完成");
     });
-
-    if let Err(e) = init_dns_config() {
-        logging!(warn, Type::Setup, "DNS config initialization failed: {}", e);
-    }
 
     Ok(())
 }
