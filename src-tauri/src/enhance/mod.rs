@@ -437,25 +437,60 @@ async fn apply_builtin_scripts(mut config: Mapping, clash_core: Option<String>, 
 fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     use serde_yaml_ng::Value;
 
-    // 创建强制全局 DNS 注入对象（nameserver 仅为 8.8.8.8 和 114.114.114.114，且不包含 listen 端口以避免冲突）
-    let mut dns_config = Mapping::new();
-    dns_config.insert("enable".into(), Value::Bool(true));
-    dns_config.insert("enhanced-mode".into(), Value::String("redir-host".into()));
-    dns_config.insert("cache-algorithm".into(), Value::String("lru".into()));
-    dns_config.insert("cache-limit".into(), Value::Number(512.into()));
-    dns_config.insert(
-        "nameserver".into(),
-        Value::Sequence(vec![
-            Value::String("8.8.8.8".into()),
-            Value::String("114.114.114.114".into()),
-        ]),
-    );
+    // 【修复】改为「仅补全缺失字段」，绝不整体替换 dns 节点。
+    // 原实现 config.insert("dns", ...) 只保留 enable / enhanced-mode=redir-host /
+    // cache-* / nameserver=[8.8.8.8,114.114.114.114]，会抹掉订阅或 dns_config.yaml
+    // 提供的 default-nameserver、proxy-server-nameserver、fallback、fallback-filter、
+    // nameserver-policy 等字段，并在流水线末端强制 redir-host 覆盖 use_tun 写入的
+    // fake-ip。叠加 8.8.8.8 在中国大陆直连不可达，导致 TUN 下 redir-host 需要把域名
+    // 实时解析成真实 IP 时出现间歇性解析失败（切换代理模式触发 reload 清 DNS 缓存后恢复）。
+    let mut dns_config = match config.remove("dns") {
+        Some(Value::Mapping(m)) => m,
+        _ => Mapping::new(),
+    };
+
+    // 逐项补全：已存在的一律保留，不覆盖
+    if !dns_config.contains_key(Value::from("enable")) {
+        dns_config.insert("enable".into(), Value::Bool(true));
+    }
+    // 注：不设置 enhanced-mode / fake-ip-range —— 由 use_tun 在 TUN 场景写入 fake-ip，
+    // 非 TUN 场景交由内核默认值（redir-host），避免覆盖用户显式配置。
+    if !dns_config.contains_key(Value::from("nameserver")) {
+        dns_config.insert(
+            "nameserver".into(),
+            Value::Sequence(vec![
+                Value::String("https://doh.pub/dns-query".into()),
+                Value::String("https://dns.alidns.com/dns-query".into()),
+                Value::String("114.114.114.114".into()),
+            ]),
+        );
+    }
+    if !dns_config.contains_key(Value::from("default-nameserver")) {
+        dns_config.insert(
+            "default-nameserver".into(),
+            Value::Sequence(vec![
+                Value::String("223.6.6.6".into()),
+                Value::String("223.5.5.5".into()),
+                Value::String("114.114.114.114".into()),
+            ]),
+        );
+    }
+    if !dns_config.contains_key(Value::from("proxy-server-nameserver")) {
+        dns_config.insert(
+            "proxy-server-nameserver".into(),
+            Value::Sequence(vec![
+                Value::String("https://doh.pub/dns-query".into()),
+                Value::String("https://dns.alidns.com/dns-query".into()),
+                Value::String("tls://223.5.5.5".into()),
+            ]),
+        );
+    }
 
     config.insert("dns".into(), Value::Mapping(dns_config));
     logging!(
         info,
         Type::Core,
-        "applied mandatory global DNS settings (8.8.8.8 & 114.114.114.114)"
+        "补全缺失的 DNS 字段（非覆盖式，保留订阅/用户已有设置）"
     );
     config
 }

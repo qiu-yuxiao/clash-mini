@@ -58,18 +58,49 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
     });
 
     if enable {
-        // TUN 启用时，DNS 由 apply_mandatory_dns_settings 统一配置为 redir-host，
-        // 此处不再强制 fake-ip（原 fake-ip 分支会被流水线末端的 redir-host 覆盖，属死代码）。
-        // 仅 macOS 下接管系统 DNS。
-        #[cfg(target_os = "macos")]
-        {
-            abort_prev_dns_task();
-            let handle = AsyncHandler::spawn(move || async move {
-                crate::utils::resolve::dns::restore_public_dns().await;
-                crate::utils::resolve::dns::set_public_dns("114.114.114.114".to_string()).await;
-            });
-            *dns_lock() = Some(handle);
+        // 【上游语义】TUN 开启时接管 DNS：仅当 enhanced-mode 为 fake-ip（或未设置）时，
+        // 补齐 enable / ipv6 / enhanced-mode / fake-ip-range，只补缺失键，
+        // 绝不整体覆盖，保留订阅或用户已提供的 nameserver 等字段。
+        // fake-ip 模式下客户端立即拿到假 IP，内核按「域名→规则→转发」处理，
+        // 不依赖 redir-host 那样把域名实时解析成真实 IP，TUN 下更健壮。
+        let dns_key = Value::from("dns");
+        let dns_val = config.get(&dns_key);
+        let mut dns_val = dns_val.map_or_else(Mapping::new, |val| {
+            val.as_mapping().cloned().unwrap_or_else(Mapping::new)
+        });
+        let ipv6_val = config
+            .get(Value::from("ipv6"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let current_mode = dns_val
+            .get(Value::from("enhanced-mode"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("fake-ip");
+
+        if current_mode == "fake-ip" || !dns_val.contains_key(Value::from("enhanced-mode")) {
+            revise!(dns_val, "enable", true);
+            revise!(dns_val, "ipv6", ipv6_val);
+            if !dns_val.contains_key(Value::from("enhanced-mode")) {
+                revise!(dns_val, "enhanced-mode", "fake-ip");
+            }
+            if !dns_val.contains_key(Value::from("fake-ip-range")) {
+                revise!(dns_val, "fake-ip-range", "198.18.0.1/16");
+            }
+            if ipv6_val && !dns_val.contains_key(Value::from("fake-ip-range6")) {
+                revise!(dns_val, "fake-ip-range6", "2001:2::0/64");
+            }
+            // 仅 macOS 下接管系统 DNS
+            #[cfg(target_os = "macos")]
+            {
+                abort_prev_dns_task();
+                let handle = AsyncHandler::spawn(move || async move {
+                    crate::utils::resolve::dns::restore_public_dns().await;
+                    crate::utils::resolve::dns::set_public_dns("114.114.114.114".to_string()).await;
+                });
+                *dns_lock() = Some(handle);
+            }
         }
+        revise!(config, "dns", dns_val);
     } else {
         // TUN未启用时，仅恢复系统DNS，不修改配置文件中的DNS设置
         #[cfg(target_os = "macos")]
