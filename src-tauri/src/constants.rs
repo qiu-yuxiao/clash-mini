@@ -47,7 +47,9 @@ pub mod files {
 }
 
 pub mod tun {
-    pub const DEFAULT_STACK: &str = "system";
+    // 对齐上游默认值，改用用户态 gvisor 栈以保证跨平台兼容性。
+    // Mini 无 TUN 设置 UI，若默认 system 栈在个别环境异常，用户将无处回退。
+    pub const DEFAULT_STACK: &str = "gvisor";
 
     pub const DNS_HIJACK: &[&str] = &["any:53"];
 }
