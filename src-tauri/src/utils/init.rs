@@ -226,12 +226,15 @@ pub async fn init_resources() -> Result<()> {
         let src_path = res_dir.join(file);
         let dest_path = app_dir.join(file);
 
-        // 源文件不存在（如开发环境未随包携带）时跳过，避免误报复制失败
-        if !src_path.exists() {
+        // 源文件不存在或为空（如开发环境未随包携带）时跳过，避免误报复制失败
+        let src_len = fs::metadata(&src_path).await.map(|m| m.len()).unwrap_or(0);
+        if !src_path.exists() || src_len == 0 {
             continue;
         }
 
-        if !dest_path.exists() {
+        // 目标文件不存在或大小为0（如此前因网络超时下载失败残留的空文件）时直接覆盖复制
+        let dest_len = fs::metadata(&dest_path).await.map(|m| m.len()).unwrap_or(0);
+        if !dest_path.exists() || dest_len == 0 {
             handle_copy(&src_path, &dest_path, file).await;
             continue;
         }

@@ -428,14 +428,22 @@ async function resolveResource(binInfo) {
   const targetPath = path.join(baseDir, file)
 
   if (!FORCE && fs.existsSync(targetPath) && !downloadURL && !localPath) {
-    log_success(`"${file}" already exists, skipping`)
-    return
+    try {
+      if (fs.statSync(targetPath).size > 0) {
+        log_success(`"${file}" already exists, skipping`)
+        return
+      }
+    } catch {}
   }
 
   if (downloadURL) {
     if (!FORCE && fs.existsSync(targetPath)) {
-      log_success(`"${file}" already exists, skipping download`)
-      return
+      try {
+        if (fs.statSync(targetPath).size > 0) {
+          log_success(`"${file}" already exists, skipping download`)
+          return
+        }
+      } catch {}
     }
     await fsp.mkdir(baseDir, { recursive: true })
     await downloadFile(downloadURL, targetPath)

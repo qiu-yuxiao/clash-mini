@@ -562,9 +562,21 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
     if let Some(q) = query {
         for (k, v) in parse_query_pairs(q) {
             match k.as_str() {
-                "auth" | "auth_str" | "auth-str" => auth_str = Some(v),
+                "auth" | "auth_str" | "auth-str" => {
+                    auth_str = Some(
+                        percent_encoding::percent_decode_str(&v)
+                            .decode_utf8_lossy()
+                            .to_string(),
+                    )
+                }
                 // SNI：v1 链接里通常叫 peer，也兼容直接给 sni
-                "peer" | "sni" => sni = Some(v),
+                "peer" | "sni" => {
+                    sni = Some(
+                        percent_encoding::percent_decode_str(&v)
+                            .decode_utf8_lossy()
+                            .to_string(),
+                    )
+                }
                 "up" | "upmbps" => up = Some(normalize_bandwidth(&v)),
                 "down" | "downmbps" => down = Some(normalize_bandwidth(&v)),
                 // 内核仅支持 udp / wechat-video / faketcp，其它取值忽略，避免写入非法配置
@@ -579,8 +591,20 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
                 }
                 "alpn" => alpn = Some(v),
                 // 混淆密码：不同生成器写作 obfsParam 或 obfs，二者都对应内核的 obfs 字段
-                "obfsparam" | "obfs-password" | "obfs_password" => obfs_param = Some(v),
-                "obfs" => obfs_plain = Some(v),
+                "obfsparam" | "obfs-password" | "obfs_password" => {
+                    obfs_param = Some(
+                        percent_encoding::percent_decode_str(&v)
+                            .decode_utf8_lossy()
+                            .to_string(),
+                    )
+                }
+                "obfs" => {
+                    obfs_plain = Some(
+                        percent_encoding::percent_decode_str(&v)
+                            .decode_utf8_lossy()
+                            .to_string(),
+                    )
+                }
                 _ => {}
             }
         }
@@ -628,7 +652,7 @@ fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
         .unwrap_or_else(|| "AnyTLS Node".to_string());
 
     // anytls 分享链接：anytls://password@host:port?sni=...&insecure=1#name
-    let (password_raw, host_port_query) = base_part.split_once('@')?;
+    let (password_raw, host_port_query) = base_part.rsplit_once('@')?;
     let password = percent_encoding::percent_decode_str(password_raw)
         .decode_utf8_lossy()
         .to_string();
@@ -658,7 +682,13 @@ fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
         let mut alpn: Option<String> = None;
         for (k, v) in parse_query_pairs(q) {
             match k.as_str() {
-                "sni" | "peer" => sni = Some(v),
+                "sni" | "peer" => {
+                    sni = Some(
+                        percent_encoding::percent_decode_str(&v)
+                            .decode_utf8_lossy()
+                            .to_string(),
+                    )
+                }
                 "insecure" | "allowinsecure" | "allow_insecure"
                     if v == "1" || v.eq_ignore_ascii_case("true") =>
                 {
@@ -1801,5 +1831,41 @@ mod tests {
         assert!(parse_anytls("anytls://example.com:443").is_none());
         // 密码为空同样非法
         assert!(parse_anytls("anytls://@example.com:443").is_none());
+    }
+
+    #[test]
+    fn test_parse_anytls_password_with_at() {
+        // 密码含 @ 字符时，应按最后一个 @ 分割 host
+        let link = "anytls://user%40pass@example.com:8443?sni=example.com#anytls-at";
+        let map = parse_anytls(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "user@pass"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "example.com"
+        );
+    }
+
+    #[test]
+    fn test_parse_hysteria_percent_encoded_query() {
+        let link = "hysteria://example.com:443?auth=pass%2Bword%26123&peer=sub.example.com&obfsParam=sec%20ret#hy-decode";
+        let map = parse_hysteria(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("auth-str")).unwrap().as_str().unwrap(),
+            "pass+word&123"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("sni")).unwrap().as_str().unwrap(),
+            "sub.example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("obfs")).unwrap().as_str().unwrap(),
+            "sec ret"
+        );
     }
 }
