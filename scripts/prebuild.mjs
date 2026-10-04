@@ -298,33 +298,35 @@ async function downloadFile(url, outPath) {
   })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    // Write body to file for troubleshooting (viewable in temp directory)
+    // 失败响应体写到 .error 文件便于排查，绝不写入目标文件：
+    // 否则残留的非空垃圾文件会被后续构建当作有效文件而跳过下载
     await fsp.mkdir(path.dirname(outPath), { recursive: true })
-    await fsp.writeFile(outPath, body)
+    await fsp.writeFile(`${outPath}.error`, body)
     throw new Error(`Failed to download ${url}: status ${response.status}`)
   }
 
   const buf = Buffer.from(await response.arrayBuffer())
-  await fsp.mkdir(path.dirname(outPath), { recursive: true })
 
   // Simple magic bytes check
   if (url.endsWith('.gz') || url.endsWith('.tgz')) {
     if (!(buf[0] === 0x1f && buf[1] === 0x8b)) {
-      await fsp.writeFile(outPath, buf)
       throw new Error(
         `Downloaded file for ${url} is not a valid gzip (magic mismatch).`,
       )
     }
   } else if (url.endsWith('.zip')) {
     if (!(buf[0] === 0x50 && buf[1] === 0x4b)) {
-      await fsp.writeFile(outPath, buf)
       throw new Error(
         `Downloaded file for ${url} is not a valid zip (magic mismatch).`,
       )
     }
   }
 
-  await fsp.writeFile(outPath, buf)
+  // 先写临时文件、校验通过后再替换目标文件，避免中途失败留下半截文件
+  await fsp.mkdir(path.dirname(outPath), { recursive: true })
+  const tmpPath = `${outPath}.tmp`
+  await fsp.writeFile(tmpPath, buf)
+  await fsp.rename(tmpPath, outPath)
   log_success(`download finished: ${url}`)
 }
 

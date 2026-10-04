@@ -580,8 +580,13 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
                 "up" | "upmbps" => up = Some(normalize_bandwidth(&v)),
                 "down" | "downmbps" => down = Some(normalize_bandwidth(&v)),
                 // 内核仅支持 udp / wechat-video / faketcp，其它取值忽略，避免写入非法配置
-                "protocol" if matches!(v.as_str(), "udp" | "wechat-video" | "faketcp") => {
-                    protocol = Some(v)
+                "protocol" => {
+                    let proto = percent_encoding::percent_decode_str(&v)
+                        .decode_utf8_lossy()
+                        .to_string();
+                    if matches!(proto.as_str(), "udp" | "wechat-video" | "faketcp") {
+                        protocol = Some(proto);
+                    }
                 }
                 "insecure" if v == "1" || v.eq_ignore_ascii_case("true") => {
                     map.insert(
@@ -1835,9 +1840,20 @@ mod tests {
 
     #[test]
     fn test_parse_anytls_password_with_at() {
-        // 密码含 @ 字符时，应按最后一个 @ 分割 host
-        let link = "anytls://user%40pass@example.com:8443?sni=example.com#anytls-at";
-        let map = parse_anytls(link).unwrap();
+        // 密码里的 @ 经百分号编码：唯一的字面 @ 仍是分隔符，密码需解码
+        let map =
+            parse_anytls("anytls://user%40pass@example.com:8443?sni=example.com#anytls-enc").unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "user@pass"
+        );
+
+        // 密码里含未编码的字面 @：须按最后一个 @ 分割 host（覆盖 rsplit 分支）
+        let map =
+            parse_anytls("anytls://user@pass@example.com:8443?sni=example.com#anytls-at").unwrap();
         assert_eq!(
             map.get(serde_yaml_ng::Value::from("password"))
                 .unwrap()
@@ -1849,11 +1865,15 @@ mod tests {
             map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
             "example.com"
         );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            8443
+        );
     }
 
     #[test]
     fn test_parse_hysteria_percent_encoded_query() {
-        let link = "hysteria://example.com:443?auth=pass%2Bword%26123&peer=sub.example.com&obfsParam=sec%20ret#hy-decode";
+        let link = "hysteria://example.com:443?auth=pass%2Bword%26123&peer=sub.example.com&obfsParam=sec%20ret&protocol=wechat%2Dvideo#hy-decode";
         let map = parse_hysteria(link).unwrap();
         assert_eq!(
             map.get(serde_yaml_ng::Value::from("auth-str")).unwrap().as_str().unwrap(),
@@ -1866,6 +1886,10 @@ mod tests {
         assert_eq!(
             map.get(serde_yaml_ng::Value::from("obfs")).unwrap().as_str().unwrap(),
             "sec ret"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("protocol")).unwrap().as_str().unwrap(),
+            "wechat-video"
         );
     }
 }
