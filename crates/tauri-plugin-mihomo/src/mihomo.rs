@@ -800,12 +800,18 @@ impl Mihomo {
             // 客户端 3 秒超时或连接尚未就绪：DNS 链挂起/未就绪，判定为未就绪并允许调用方继续重试
             Err(Error::Timeout(_)) => return Ok(false),
             Err(Error::Reqwest(ref err)) if err.is_timeout() || err.is_connect() => return Ok(false),
+            // LocalSocket 传输层（Mini 在 Windows 上的实际路径）：
+            // - ConnectionFailed：套接字尚未就绪或连接被中断；
+            // - HttpParseError：连接池内的陈旧连接握手/读体失败（冷启动连接抖动时常见）。
+            // 二者都可能随核心就绪而自愈，归入"未就绪"让调用方继续轮询，避免过早放行。
+            Err(Error::ConnectionFailed(_) | Error::HttpParseError(_)) => return Ok(false),
             Err(Error::Io(ref err))
                 if err.kind() == std::io::ErrorKind::ConnectionRefused
                     || err.kind() == std::io::ErrorKind::TimedOut =>
             {
                 return Ok(false);
             }
+            // 其余（如 ConnectionPoolNotInitialized）属持久性内部故障，重试无意义
             Err(err) => return Err(err),
         };
         if response.status().as_u16() == 404 {
@@ -815,7 +821,13 @@ impl Mihomo {
         if !response.status().is_success() {
             return Ok(false);
         }
-        let body = response.text().await?;
+        let body = match response.text().await {
+            Ok(body) => body,
+            // 收 body 阶段超时/连接中断：与请求阶段同属"未就绪"，允许调用方继续重试，
+            // 避免冷启动时被当成硬错误而直接放行测速
+            Err(err) if err.is_timeout() || err.is_connect() => return Ok(false),
+            Err(err) => return Err(Error::Reqwest(err)),
+        };
         // 不用子串匹配 "data"：Authority/Additional 记录同样含 data，会造成"未就绪"被误判为就绪
         let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) else {
             return Ok(false);
