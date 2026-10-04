@@ -538,7 +538,7 @@ const resolveServicePermission = async () => {
 }
 
 // =======================
-// Other resource resolvers (service, mmdb, geosite, geoip, enableLoopback)
+// Other resource resolvers (service, mmdb, geosite, enableLoopback)
 // =======================
 // IMPORTANT: pinned to a known-good daemon release — do NOT fetch from
 // /releases/latest. On 2026-07-23 upstream published v2.5.0, whose daemon fails
@@ -694,11 +694,6 @@ const resolveGeosite = () =>
     file: 'geosite.dat',
     downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat`,
   })
-const resolveGeoIP = () =>
-  resolveResource({
-    file: 'geoip.dat',
-    downloadURL: `https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat`,
-  })
 const resolveEnableLoopback = () =>
   resolveResource({
     file: 'enableLoopback.exe',
@@ -736,7 +731,6 @@ const tasks = [
   { name: 'service', func: resolveServiceBundle, retry: 5 },
   { name: 'mmdb', func: resolveMmdb, retry: 5 },
   { name: 'geosite', func: resolveGeosite, retry: 5 },
-  { name: 'geoip', func: resolveGeoIP, retry: 5 },
   {
     name: 'enableLoopback',
     func: resolveEnableLoopback,

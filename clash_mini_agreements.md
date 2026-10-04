@@ -181,6 +181,10 @@
 ### 3.6 Geodata 加载策略
 `geodata-loader` 默认 `memconservative`，按需加载 GeoIP/GeoSite（仅路由匹配需要时才载入），降低约 5-10MB 内存峰值，性能影响可忽略。
 
+**随包与离线复制（2026-10-04 裁定）**：内核 GeoIP 库缺失时会联网下载（默认源 github，大陆直连不可达），若订阅带 `fallback-filter.geoip` 或 `GEOSITE` 规则，启动/校验阶段会卡在下载直到超时、订阅被判无效。故按以下清单随包并复制到运行目录：
+- **随包 + 复制到运行目录**：`Country.mmdb`（`fallback-filter.geoip` 与 `GEOIP` 规则默认走它）、`geosite.dat`（`GEOSITE` 规则必需）。
+- **不随包**：`geoip.dat`——仅 `geodata-mode: true` 的罕见订阅才用，普通 `GEOIP` 规则走 `Country.mmdb`，故从构建移除（省约 17MB）。
+
 ### 3.7 Go Runtime 环境变量
 启动内核子进程注入 `GOMEMLIMIT=96MiB` / `GOGC=50` / `GOMAXPROCS=2`（均支持系统环境变量覆盖），将内核堆控制在约 96MiB 内、限制线程数，契合常驻托盘应用低资源定位而非极限吞吐。
 

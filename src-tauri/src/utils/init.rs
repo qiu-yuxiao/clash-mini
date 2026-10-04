@@ -213,12 +213,12 @@ pub async fn init_resources() -> Result<()> {
         std::mem::drop(fs::create_dir_all(&res_dir).await);
     }
 
-    // 需要复制到运行目录的资源文件。
-    // Country.mmdb 是内核加载 GeoIP 的数据库：订阅配置若带 fallback-filter.geoip，
-    // 内核在启动/校验阶段就会加载它。运行目录缺失时内核会联网下载 MMDB，网络不通
-    // 就会一直卡住，直到配置校验超时、订阅被判无效（表现为"导入成功但节点不显示"）。
-    // 随包携带并从 resources 复制到运行目录，保证离线也能加载。
-    let file_list: [&str; 1] = ["Country.mmdb"];
+    // 需要复制到运行目录的资源文件（保证离线可用，避免内核联网下载被墙而卡住校验）。
+    // - Country.mmdb：GeoIP 库，fallback-filter.geoip 与 GEOIP 规则默认走它；
+    //   缺失时内核会联网下载 geoip.metadb（默认源 github 大陆不可达）→ 校验超时、订阅被判无效。
+    // - geosite.dat：GEOSITE 规则必需，机场订阅常见写法，缺失时同样联网下载被墙。
+    // geoip.dat 不再随包：仅 geodata-mode: true 的罕见订阅才用，普通 GEOIP 规则走 mmdb。
+    let file_list: [&str; 2] = ["Country.mmdb", "geosite.dat"];
 
     // copy the resource file
     // if the source file is newer than the destination file, copy it over
