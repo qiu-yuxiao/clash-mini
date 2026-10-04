@@ -33,17 +33,12 @@ impl IClashTemp {
                     }
                 }
 
-                // 平滑迁移旧版配置：
-                // 1. 若 tun.stack 为旧默认值 "system"，平滑升级到跨平台更稳定的 "gvisor"
+                // 归一化 tun.stack：旧版默认值为 "system"，统一为跨平台更稳定的 gvisor。
+                // 这是「值归一化」而非版本化迁移——只要仍是旧默认值就改写，使存量 clash.yaml
+                // 与新版默认保持一致（Mini 无 TUN 设置 UI，不存在用户主动选择 system 的场景）。
                 if let Some(tun) = map.get_mut("tun").and_then(|v| v.as_mapping_mut()) {
                     if tun.get("stack").and_then(|v| v.as_str()) == Some("system") {
                         tun.insert("stack".into(), tun_const::DEFAULT_STACK.into());
-                    }
-                }
-                // 2. 若 profile.store-fake-ip 为 false（旧模板默认），升级为 true
-                if let Some(profile) = map.get_mut("profile").and_then(|v| v.as_mapping_mut()) {
-                    if profile.get("store-fake-ip").and_then(|v| v.as_bool()) == Some(false) {
-                        profile.insert("store-fake-ip".into(), true.into());
                     }
                 }
 
@@ -124,7 +119,9 @@ impl IClashTemp {
 
         let mut profile_config = Mapping::new();
         profile_config.insert("store-selected".into(), true.into());
-        profile_config.insert("store-fake-ip".into(), true.into());
+        // 对齐内核默认值（上游模板未设置该项）：false 关闭 fake-ip 映射持久化，
+        // 避免 cache.db 与常驻映射表随使用增长；且不做任何强制迁移，尊重用户既有配置。
+        profile_config.insert("store-fake-ip".into(), false.into());
         map.insert("profile".into(), profile_config.into());
         map.insert(
             "external-controller".into(),

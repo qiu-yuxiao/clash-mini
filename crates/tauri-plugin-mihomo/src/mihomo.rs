@@ -788,18 +788,32 @@ impl Mihomo {
     /// [Clash Mini 备注]: 用于冷启动就绪探测。订阅的 DNS 若全为加密上游（DoH/DoT），
     /// 其服务器域名需先经 default-nameserver 解析，冷启动窗口内该链可能整体未就绪，
     /// 此时直接发起测速会因节点域名解析不出而全 timeout。通过 /dns/query 实测解析，
-    /// 返回 200 且响应含解析结果（Answer 条目的 data 字段）才视为 DNS 链可用。
+    /// 结构化判定 Rcode(Status)==0 且 Answer 非空，才视为 DNS 链可用。
     /// 客户端超时 3 秒：DNS 链未就绪时该请求会随解析一起挂起，超时即判未就绪。
+    /// 返回值：Ok(true)=就绪；Ok(false)=未就绪；Err=端点不可用等硬错误，调用方应放弃等待。
     pub async fn dns_query_ready(&self, name: &str) -> Result<bool> {
         let name_encode = urlencoding::encode(name);
         let suffix_url = format!("/dns/query?name={name_encode}");
         let client = self.build_request(Method::GET, &suffix_url)?.timeout(Duration::from_secs(3));
         let response = self.send_by_protocol(client).await?;
+        if response.status().as_u16() == 404 {
+            // 内核版本不支持该端点：属硬错误，调用方应立即放弃等待而非空等
+            ret_failed_resp!("dns/query endpoint not supported by core (404)");
+        }
         if !response.status().is_success() {
             return Ok(false);
         }
         let body = response.text().await?;
-        Ok(body.contains("\"data\""))
+        // 不用子串匹配 "data"：Authority/Additional 记录同样含 data，会造成"未就绪"被误判为就绪
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) else {
+            return Ok(false);
+        };
+        let status_ok = json.get("Status").and_then(serde_json::Value::as_u64) == Some(0);
+        let has_answer = json
+            .get("Answer")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|answers| !answers.is_empty());
+        Ok(status_ok && has_answer)
     }
 
     /// 获取代理提供者信息

@@ -187,6 +187,9 @@ pub(crate) async fn get_current_profile_uid() -> Option<String> {
 /// 如果期间检测到 Profile 切换通知，立即返回 false，让调用方重新用新 Profile 操作
 pub(crate) async fn wait_for_clash_ready() -> bool {
     let start_time = Instant::now();
+    // 记录进入等待时的 Profile：PROFILE_SWITCH_NOTIFY 改为 notify_waiters() 后不再存储许可，
+    // 通知可能在等待间隙丢失。故各阶段以「Profile uid 是否变化」为权威判据，通知仅作加速。
+    let initial_uid = get_current_profile_uid().await;
 
     // 阶段 1：等待内核 API 接口响应
     // 【注意】此处 clone mihomo 后跨 await 使用是安全的：
@@ -195,6 +198,10 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
     while start_time.elapsed().as_secs() < 30 {
         if crate::core::handle::Handle::global().is_exiting() {
             logging!(info, Type::Lightweight, "[后台监测] 阶段 1 中断：应用正在退出");
+            return false;
+        }
+        if is_profile_switched(&initial_uid).await {
+            logging!(info, Type::Lightweight, "[后台监测] 阶段 1 中断：检测到 Profile 切换");
             return false;
         }
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
@@ -223,28 +230,36 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
             logging!(info, Type::Lightweight, "[后台监测] 阶段 2 中断：应用正在退出");
             return false;
         }
+        if is_profile_switched(&initial_uid).await {
+            logging!(info, Type::Lightweight, "[后台监测] 阶段 2 中断：检测到 Profile 切换");
+            return false;
+        }
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
         if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
             if let Some(all) = group_info.all {
                 if !all.is_empty() {
                     logging!(info, Type::Lightweight, "[后台监测] 阶段 2 完成：代理节点列表已填充");
-                    // 阶段 3：等待物理网络连通
+                    // 阶段 3：等待物理网络探测通过
                     // 开机启动场景下内核 API 与节点列表就绪早于物理网络（DHCP/DNS 尚未完成），
-                    // 若此时立即测速必然 all timeout。此处阻塞等待网络就绪，从根源消除该现象。
-                    // 超时上限 15 秒：超过后放行，由下游测速/自愈逻辑兜底，避免永久阻塞。
+                    // 若此时立即测速必然 all timeout。此处阻塞等待，从根源消除该现象。
+                    // 【注意】本探测本身是一次 DNS 解析（lookup_host 测速网址域名），因此它失败
+                    // 并不能证明链路不通，更不能据此放行——DNS 链未就绪时它恰好会一直失败。
+                    // 故无论成功还是超时，都继续进入阶段 4，由内核侧确认解析链是否可用。
                     let start_time_3 = Instant::now();
+                    let mut net_probe_ok = false;
                     while start_time_3.elapsed().as_secs() < 15 {
                         if crate::core::handle::Handle::global().is_exiting() {
                             logging!(info, Type::Lightweight, "[后台监测] 阶段 3 中断：应用正在退出");
                             return false;
                         }
+                        if is_profile_switched(&initial_uid).await {
+                            logging!(info, Type::Lightweight, "[后台监测] 阶段 3 中断：检测到 Profile 切换");
+                            return false;
+                        }
                         if is_physical_network_online(2).await {
                             logging!(info, Type::Lightweight, "[后台监测] 阶段 3 完成：物理网络已连通");
-                            // 阶段 4：等待 mihomo DNS 解析链就绪（实测解析一个稳定域名）。
-                            // 物理网络连通 ≠ DNS 解析可用：冷启动窗口内订阅的加密 DNS（DoH/DoT）
-                            // 服务器域名需先经 default-nameserver 解析，若该链全断，节点域名
-                            // 解析不出，测速必全 timeout。超时上限 15 秒，超过后放行由下游兜底。
-                            return wait_dns_resolver_ready().await;
+                            net_probe_ok = true;
+                            break;
                         }
                         tokio::select! {
                             _ = sleep(Duration::from_secs(1)) => {}
@@ -254,8 +269,13 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
                             }
                         }
                     }
-                    logging!(warn, Type::Lightweight, "[后台监测] 阶段 3 超时：物理网络未连通，放行测速（由下游兜底）");
-                    return true;
+                    if !net_probe_ok {
+                        logging!(warn, Type::Lightweight, "[后台监测] 阶段 3 超时：物理网络探测未通过，继续进入阶段 4 兜底");
+                    }
+                    // 阶段 4：等待 mihomo DNS 解析链就绪（实测解析一个稳定域名，通后才放行测速）。
+                    // 阶段 3 只反映系统侧探测结果，仍需内核侧确认解析链可用，
+                    // 否则冷启动首轮测速会全 timeout。
+                    return wait_dns_resolver_ready(&initial_uid).await;
                 }
             }
         }
@@ -276,6 +296,14 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
     false
 }
 
+/// 判断当前 Profile 是否已从进入等待时发生切换（以状态对比为准，通知仅作加速）。
+/// PROFILE_SWITCH_NOTIFY 自 v2.8.8 起改为 notify_waiters()，不再存储许可，
+/// 通知可能在等待间隙丢失；因此各等待阶段以 uid 是否变化作为权威判据，
+/// 避免丢通知导致等待方停滞到自身超时（阶段 1/2/3 最长 30/20/15 秒）。
+async fn is_profile_switched(initial_uid: &Option<String>) -> bool {
+    get_current_profile_uid().await != *initial_uid
+}
+
 /// 阶段 4：等待 mihomo DNS 解析链就绪（实测解析一个稳定域名，通后才放行测速）。
 /// 【冷启动 DNS 鸡生蛋防护】订阅的 DNS 若全为加密上游（DoH/DoT），其服务器域名
 /// 需先经 default-nameserver 解析，而后者冷启动窗口内可能因 TUN 接口绑定延迟、
@@ -283,17 +311,29 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
 /// 节点域名解析不出 → 首轮测速全 timeout（v2.8.5 实测：冷启动必全 timeout，
 /// 约一分钟后自愈）。此处实测解析，避免无效测速与全 timeout 的 UI 展示。
 /// 超时上限 15 秒：超过后放行，由下游自愈逻辑兜底，避免永久阻塞。
-async fn wait_dns_resolver_ready() -> bool {
+async fn wait_dns_resolver_ready(initial_uid: &Option<String>) -> bool {
     let start_time = Instant::now();
     while start_time.elapsed().as_secs() < 15 {
         if crate::core::handle::Handle::global().is_exiting() {
             logging!(info, Type::Lightweight, "[后台监测] 阶段 4 中断：应用正在退出");
             return false;
         }
+        if is_profile_switched(initial_uid).await {
+            logging!(info, Type::Lightweight, "[后台监测] 阶段 4 中断：检测到 Profile 切换");
+            return false;
+        }
         let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-        if mihomo.dns_query_ready("www.baidu.com").await.unwrap_or(false) {
-            logging!(info, Type::Lightweight, "[后台监测] 阶段 4 完成：DNS 解析链已就绪");
-            return true;
+        match mihomo.dns_query_ready("www.baidu.com").await {
+            Ok(true) => {
+                logging!(info, Type::Lightweight, "[后台监测] 阶段 4 完成：DNS 解析链已就绪");
+                return true;
+            }
+            Ok(false) => {}
+            Err(err) => {
+                // 端点不可用等硬错误：继续空等没有意义，直接放行由下游兜底
+                logging!(warn, Type::Lightweight, "[后台监测] 阶段 4 放弃等待（{err}），放行测速");
+                return true;
+            }
         }
         tokio::select! {
             _ = sleep(Duration::from_secs(1)) => {}
@@ -834,9 +874,11 @@ pub fn start_background_monitor() {
                 let check_interval = check_interval_secs(is_retry_mode, was_online);
 
                 // 【注意】tokio::select! 中两个 Notify 的 notified() 分支：
-                // - 若两个 Notify 同时有许可，select! 只会选中一个，另一个的许可会保留到下一次循环
-                // - 由于两个分支最终都会将 last_check_time 提前（效果等价），丢失一次也不会出问题
-                // - Notify::notify_one() 会存储许可，因此不存在"通知完全丢失"的风险
+                // - MONITOR_WAKEUP_NOTIFY 用 notify_one()，会存储许可，不存在完全丢失；
+                // - PROFILE_SWITCH_NOTIFY 自 v2.8.8 起改用 notify_waiters()，不存储许可，
+                //   唤醒信号可能在两次等待之间丢失。因此此处仅把它当作加速手段：即使丢失，
+                //   下一个周期也会重新读取当前 Profile，语义仍然正确（等待阶段则由
+                //   is_profile_switched 的状态对比兜底）。
                 tokio::select! {
                                 _ = sleep(Duration::from_secs(check_interval)) => {}
                                 _ = MONITOR_WAKEUP_NOTIFY.notified() => {

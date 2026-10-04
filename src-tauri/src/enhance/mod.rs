@@ -347,10 +347,8 @@ async fn merge_default_config(
             for (key, value) in patch_tun.into_iter() {
                 tun.insert(key, value);
             }
-            // 若 stack 依然为旧默认值 "system"，自动平滑升级为 DEFAULT_STACK（gvisor）
-            if tun.get("stack").and_then(|v| v.as_str()) == Some("system") {
-                tun.insert("stack".into(), crate::constants::tun::DEFAULT_STACK.into());
-            }
+            // 注：旧默认值 stack=system → gvisor 的归一化统一在 IClashTemp::new() 完成
+            //（clash.yaml 加载时改写），此处不再重复判断，避免同一语义两处维护。
             config.insert("tun".into(), tun.into());
         } else if matches!(key.as_str(), Some("dns") | Some("profile")) {
             // dns / profile 是"订阅优先"的复合节点：仅补缺，不覆盖订阅已声明的字段。
@@ -523,25 +521,21 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
         let fallback = Value::String("223.5.5.5".into());
         if let Some(val) = dns_config.get_mut(key) {
             match val {
-                Value::Sequence(seq) => {
-                    if !seq.contains(&fallback) {
-                        seq.push(fallback);
-                        logging!(
-                            info,
-                            Type::Core,
-                            "DNS {key} 追加保底明文上游 223.5.5.5（冷启动防鸡生蛋）"
-                        );
-                    }
+                Value::Sequence(seq) if !seq.contains(&fallback) => {
+                    seq.push(fallback);
+                    logging!(
+                        info,
+                        Type::Core,
+                        "DNS {key} 追加保底明文上游 223.5.5.5（冷启动防鸡生蛋）"
+                    );
                 }
-                Value::String(s) => {
-                    if s != "223.5.5.5" {
-                        *val = Value::Sequence(vec![Value::String(s.clone()), fallback]);
-                        logging!(
-                            info,
-                            Type::Core,
-                            "DNS {key} 标量提升为列表并追加保底明文上游 223.5.5.5（冷启动防鸡生蛋）"
-                        );
-                    }
+                Value::String(s) if s != "223.5.5.5" => {
+                    *val = Value::Sequence(vec![Value::String(s.clone()), fallback]);
+                    logging!(
+                        info,
+                        Type::Core,
+                        "DNS {key} 标量提升为列表并追加保底明文上游 223.5.5.5（冷启动防鸡生蛋）"
+                    );
                 }
                 _ => {}
             }

@@ -89,12 +89,22 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             if ipv6_val && !dns_val.contains_key(Value::from("fake-ip-range6")) {
                 revise!(dns_val, "fake-ip-range6", "2001:2::0/64");
             }
+            // fake-ip-filter：按条目 merge，而非「键缺失才整体写入」。
+            // 真实订阅几乎都会自带该键，若整体跳过，NCSI/NTP 兜底条目会一条都进不去。
             if !dns_val.contains_key(Value::from("fake-ip-filter")) {
                 let filters: Vec<Value> = crate::constants::tun::DEFAULT_FAKE_IP_FILTER
                     .iter()
                     .map(|&s| Value::String(s.into()))
                     .collect();
                 dns_val.insert(Value::from("fake-ip-filter"), Value::Sequence(filters));
+            } else if let Some(Value::Sequence(seq)) = dns_val.get_mut("fake-ip-filter") {
+                // 仅补缺条目，保留订阅已有条目与顺序；非列表类型保持原样不改写
+                for &item in crate::constants::tun::DEFAULT_FAKE_IP_FILTER {
+                    let entry = Value::String(item.into());
+                    if !seq.contains(&entry) {
+                        seq.push(entry);
+                    }
+                }
             }
             // 仅 macOS 下接管系统 DNS
             #[cfg(target_os = "macos")]

@@ -374,8 +374,9 @@ fn generate_minimal_config() -> serde_yaml_ng::Mapping {
     let mut config = serde_yaml_ng::Mapping::new();
     config.insert("mixed-port".into(), MINIMAL_CONFIG_MIXED_PORT.into());
     config.insert("mode".into(), "rule".into());
-    config.insert("allow-lan".into(), false.into());
-    config.insert("log-level".into(), "info".into());
+    // 与 IClashTemp::template() 的默认值保持一致，避免极端兜底场景下出现自相矛盾的行为
+    config.insert("allow-lan".into(), true.into());
+    config.insert("log-level".into(), "warning".into());
     config
 }
 
