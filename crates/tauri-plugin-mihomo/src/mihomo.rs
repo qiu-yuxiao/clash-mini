@@ -793,9 +793,21 @@ impl Mihomo {
     /// 返回值：Ok(true)=就绪；Ok(false)=未就绪；Err=端点不可用等硬错误，调用方应放弃等待。
     pub async fn dns_query_ready(&self, name: &str) -> Result<bool> {
         let name_encode = urlencoding::encode(name);
-        let suffix_url = format!("/dns/query?name={name_encode}");
+        let suffix_url = format!("/dns/query?name={name_encode}&type=A");
         let client = self.build_request(Method::GET, &suffix_url)?.timeout(Duration::from_secs(3));
-        let response = self.send_by_protocol(client).await?;
+        let response = match self.send_by_protocol(client).await {
+            Ok(resp) => resp,
+            // 客户端 3 秒超时或连接尚未就绪：DNS 链挂起/未就绪，判定为未就绪并允许调用方继续重试
+            Err(Error::Timeout(_)) => return Ok(false),
+            Err(Error::Reqwest(ref err)) if err.is_timeout() || err.is_connect() => return Ok(false),
+            Err(Error::Io(ref err))
+                if err.kind() == std::io::ErrorKind::ConnectionRefused
+                    || err.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                return Ok(false);
+            }
+            Err(err) => return Err(err),
+        };
         if response.status().as_u16() == 404 {
             // 内核版本不支持该端点：属硬错误，调用方应立即放弃等待而非空等
             ret_failed_resp!("dns/query endpoint not supported by core (404)");
