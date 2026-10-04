@@ -151,6 +151,7 @@ if (-not $SkipBumpAndTag) {
         Log-Error "bump_version.py execution failed"
         exit 1
     }
+    cargo check --workspace --quiet 2>$null
 
     # ─────────────────────────────────────────────
     # Stage 3: Git Commit, Push, Tag
@@ -159,7 +160,7 @@ if (-not $SkipBumpAndTag) {
 
     git config --local http.sslBackend openssl
     git config --local http.sslVerify false
-    git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+    git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock
     git commit -m "release: bump version to $Version" --allow-empty --no-verify
     if ($LASTEXITCODE -ne 0) { Log-Error "git commit failed"; exit 1 }
 
