@@ -213,7 +213,12 @@ pub async fn init_resources() -> Result<()> {
         std::mem::drop(fs::create_dir_all(&res_dir).await);
     }
 
-    let file_list: [&str; 0] = [];
+    // 需要复制到运行目录的资源文件。
+    // Country.mmdb 是内核加载 GeoIP 的数据库：订阅配置若带 fallback-filter.geoip，
+    // 内核在启动/校验阶段就会加载它。运行目录缺失时内核会联网下载 MMDB，网络不通
+    // 就会一直卡住，直到配置校验超时、订阅被判无效（表现为"导入成功但节点不显示"）。
+    // 随包携带并从 resources 复制到运行目录，保证离线也能加载。
+    let file_list: [&str; 1] = ["Country.mmdb"];
 
     // copy the resource file
     // if the source file is newer than the destination file, copy it over
@@ -221,7 +226,12 @@ pub async fn init_resources() -> Result<()> {
         let src_path = res_dir.join(file);
         let dest_path = app_dir.join(file);
 
-        if src_path.exists() && !dest_path.exists() {
+        // 源文件不存在（如开发环境未随包携带）时跳过，避免误报复制失败
+        if !src_path.exists() {
+            continue;
+        }
+
+        if !dest_path.exists() {
             handle_copy(&src_path, &dest_path, file).await;
             continue;
         }
