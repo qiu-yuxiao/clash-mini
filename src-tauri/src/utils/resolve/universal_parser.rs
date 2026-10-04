@@ -77,6 +77,32 @@ pub fn decode_base64_robust(s: &str) -> Option<Vec<u8>> {
     None
 }
 
+/// 解析 URI query 串为 (小写键, 原值) 列表，跳过键或值为空的项。
+/// 供各协议解析器复用，避免各处重复的 `split('&')` / `splitn('=')` 逻辑。
+fn parse_query_pairs(query: &str) -> Vec<(String, String)> {
+    let mut pairs = Vec::new();
+    for pair in query.split('&') {
+        let mut kv = pair.splitn(2, '=');
+        let key = kv.next().unwrap_or("").trim().to_lowercase();
+        let value = kv.next().unwrap_or("");
+        if key.is_empty() || value.is_empty() {
+            continue;
+        }
+        pairs.push((key, value.to_string()));
+    }
+    pairs
+}
+
+/// 把分享链接里的带宽值规范成 mihomo 可识别的写法：
+/// 纯数字补 " Mbps"（内核默认单位），已带单位的值原样保留。
+fn normalize_bandwidth(value: &str) -> String {
+    if !value.is_empty() && value.chars().all(|c| c.is_ascii_digit()) {
+        format!("{value} Mbps")
+    } else {
+        value.to_string()
+    }
+}
+
 fn parse_vmess(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let payload = link.strip_prefix("vmess://")?.trim();
     let decoded_bytes = decode_base64_robust(payload)?;
@@ -489,6 +515,183 @@ fn parse_hysteria2(link: &str) -> Option<serde_yaml_ng::Mapping> {
     Some(map)
 }
 
+fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
+    let payload = link.strip_prefix("hysteria://")?.trim();
+    let mut parts = payload.splitn(2, '#');
+    let base_part = parts.next()?;
+    let remarks = parts
+        .next()
+        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
+        .unwrap_or_else(|| "Hysteria Node".to_string());
+
+    // hysteria v1 分享链接：hysteria://host:port?key=value...#name
+    // 认证串通常放在 query（auth / auth_str），少数生成器会写成 userinfo 形式，这里一并兼容。
+    let (host_port_query, userinfo) = match base_part.rsplit_once('@') {
+        Some((user, rest)) => (rest, Some(user)),
+        None => (base_part, None),
+    };
+
+    let (host_port, query) = host_port_query
+        .split_once('?')
+        .map_or((host_port_query, None as Option<&str>), |(hp, q)| (hp, Some(q)));
+
+    let (server, port) = extract_host_port(host_port, 443)?;
+    if server.is_empty() {
+        return None;
+    }
+
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("hysteria"));
+    map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
+    map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
+    map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
+
+    // 认证串：内核字段名为 auth-str
+    let mut auth_str: Option<String> = userinfo
+        .map(|u| percent_encoding::percent_decode_str(u).decode_utf8_lossy().to_string())
+        .filter(|s| !s.is_empty());
+
+    let mut sni: Option<String> = None;
+    let mut up: Option<String> = None;
+    let mut down: Option<String> = None;
+    let mut protocol: Option<String> = None;
+    let mut alpn: Option<String> = None;
+    let mut obfs_param: Option<String> = None;
+    let mut obfs_plain: Option<String> = None;
+
+    if let Some(q) = query {
+        for (k, v) in parse_query_pairs(q) {
+            match k.as_str() {
+                "auth" | "auth_str" | "auth-str" => auth_str = Some(v),
+                // SNI：v1 链接里通常叫 peer，也兼容直接给 sni
+                "peer" | "sni" => sni = Some(v),
+                "up" | "upmbps" => up = Some(normalize_bandwidth(&v)),
+                "down" | "downmbps" => down = Some(normalize_bandwidth(&v)),
+                // 内核仅支持 udp / wechat-video / faketcp，其它取值忽略，避免写入非法配置
+                "protocol" if matches!(v.as_str(), "udp" | "wechat-video" | "faketcp") => {
+                    protocol = Some(v)
+                }
+                "insecure" if v == "1" || v.eq_ignore_ascii_case("true") => {
+                    map.insert(
+                        serde_yaml_ng::Value::from("skip-cert-verify"),
+                        serde_yaml_ng::Value::from(true),
+                    );
+                }
+                "alpn" => alpn = Some(v),
+                // 混淆密码：不同生成器写作 obfsParam 或 obfs，二者都对应内核的 obfs 字段
+                "obfsparam" | "obfs-password" | "obfs_password" => obfs_param = Some(v),
+                "obfs" => obfs_plain = Some(v),
+                _ => {}
+            }
+        }
+    }
+
+    if let Some(v) = auth_str {
+        map.insert(serde_yaml_ng::Value::from("auth-str"), serde_yaml_ng::Value::from(v));
+    }
+    if let Some(v) = sni {
+        map.insert(serde_yaml_ng::Value::from("sni"), serde_yaml_ng::Value::from(v));
+    }
+    if let Some(v) = up {
+        map.insert(serde_yaml_ng::Value::from("up"), serde_yaml_ng::Value::from(v));
+    }
+    if let Some(v) = down {
+        map.insert(serde_yaml_ng::Value::from("down"), serde_yaml_ng::Value::from(v));
+    }
+    if let Some(v) = protocol {
+        map.insert(serde_yaml_ng::Value::from("protocol"), serde_yaml_ng::Value::from(v));
+    }
+    if let Some(v) = obfs_param.or(obfs_plain) {
+        map.insert(serde_yaml_ng::Value::from("obfs"), serde_yaml_ng::Value::from(v));
+    }
+    if let Some(v) = alpn {
+        let alpn_list: Vec<String> = v
+            .split(',')
+            .map(|s| percent_encoding::percent_decode_str(s).decode_utf8_lossy().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !alpn_list.is_empty() {
+            map.insert(serde_yaml_ng::Value::from("alpn"), serde_yaml_ng::Value::from(alpn_list));
+        }
+    }
+
+    Some(map)
+}
+
+fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
+    let payload = link.strip_prefix("anytls://")?.trim();
+    let mut parts = payload.splitn(2, '#');
+    let base_part = parts.next()?;
+    let remarks = parts
+        .next()
+        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
+        .unwrap_or_else(|| "AnyTLS Node".to_string());
+
+    // anytls 分享链接：anytls://password@host:port?sni=...&insecure=1#name
+    let (password_raw, host_port_query) = base_part.split_once('@')?;
+    let password = percent_encoding::percent_decode_str(password_raw)
+        .decode_utf8_lossy()
+        .to_string();
+    if password.is_empty() {
+        return None;
+    }
+
+    let (host_port, query) = host_port_query
+        .split_once('?')
+        .map_or((host_port_query, None as Option<&str>), |(hp, q)| (hp, Some(q)));
+
+    let (server, port) = extract_host_port(host_port, 443)?;
+    if server.is_empty() {
+        return None;
+    }
+
+    let mut map = serde_yaml_ng::Mapping::new();
+    map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("anytls"));
+    map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
+    map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
+    map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
+    map.insert(serde_yaml_ng::Value::from("password"), serde_yaml_ng::Value::from(password));
+    map.insert(serde_yaml_ng::Value::from("udp"), serde_yaml_ng::Value::from(true));
+
+    if let Some(q) = query {
+        let mut sni: Option<String> = None;
+        let mut alpn: Option<String> = None;
+        for (k, v) in parse_query_pairs(q) {
+            match k.as_str() {
+                "sni" | "peer" => sni = Some(v),
+                "insecure" | "allowinsecure" | "allow_insecure"
+                    if v == "1" || v.eq_ignore_ascii_case("true") =>
+                {
+                    map.insert(
+                        serde_yaml_ng::Value::from("skip-cert-verify"),
+                        serde_yaml_ng::Value::from(true),
+                    );
+                }
+                "alpn" => alpn = Some(v),
+                _ => {}
+            }
+        }
+        if let Some(v) = sni {
+            map.insert(serde_yaml_ng::Value::from("sni"), serde_yaml_ng::Value::from(v));
+        }
+        if let Some(v) = alpn {
+            let alpn_list: Vec<String> = v
+                .split(',')
+                .map(|s| percent_encoding::percent_decode_str(s).decode_utf8_lossy().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !alpn_list.is_empty() {
+                map.insert(
+                    serde_yaml_ng::Value::from("alpn"),
+                    serde_yaml_ng::Value::from(alpn_list),
+                );
+            }
+        }
+    }
+
+    Some(map)
+}
+
 fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let payload = link.strip_prefix("tuic://")?;
     let mut parts = payload.splitn(2, '#');
@@ -893,6 +1096,10 @@ pub fn parse_uri_list(content: &str) -> Option<Mapping> {
             parse_vless(line)
         } else if line.starts_with("hysteria2://") {
             parse_hysteria2(line)
+        } else if line.starts_with("hysteria://") {
+            parse_hysteria(line)
+        } else if line.starts_with("anytls://") {
+            parse_anytls(line)
         } else if line.starts_with("tuic://") {
             parse_tuic(line)
         } else if line.starts_with("wireguard://") {
@@ -1408,5 +1615,191 @@ mod tests {
         assert_eq!(ipv6_list.len(), 2);
         assert_eq!(ipv6_list[0].as_str().unwrap(), "fd00::1");
         assert_eq!(ipv6_list[1].as_str().unwrap(), "fd01::2");
+    }
+
+    #[test]
+    fn test_parse_hysteria() {
+        let link = "hysteria://208.87.243.187:15823?upmbps=100&downmbps=100&auth=dongtaiwang.com&insecure=1&peer=apple.com&alpn=h3#hy-test";
+        let map = parse_hysteria(link).unwrap();
+
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            "hysteria"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            "hy-test"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "208.87.243.187"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            15823
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("auth-str")).unwrap().as_str().unwrap(),
+            "dongtaiwang.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("sni")).unwrap().as_str().unwrap(),
+            "apple.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("up")).unwrap().as_str().unwrap(),
+            "100 Mbps"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("down")).unwrap().as_str().unwrap(),
+            "100 Mbps"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("skip-cert-verify"))
+                .unwrap()
+                .as_bool()
+                .unwrap(),
+            true
+        );
+        let alpn = map
+            .get(serde_yaml_ng::Value::from("alpn"))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
+        assert_eq!(alpn.len(), 1);
+        assert_eq!(alpn[0].as_str().unwrap(), "h3");
+    }
+
+    #[test]
+    fn test_parse_hysteria_obfs_param() {
+        // 混淆密码写在 obfsParam，应映射到内核的 obfs 字段（优先于 obfs）
+        let link = "hysteria://51.159.226.1:49003?auth=x&obfs=xplus&obfsParam=secret#hy-obfs";
+        let map = parse_hysteria(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("obfs")).unwrap().as_str().unwrap(),
+            "secret"
+        );
+    }
+
+    #[test]
+    fn test_parse_hysteria_defaults() {
+        // 仅给主机与认证：端口回退 443，缺省字段不应生成
+        let link = "hysteria://example.com?auth=pw#hy-min";
+        let map = parse_hysteria(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            443
+        );
+        assert!(map.get(serde_yaml_ng::Value::from("up")).is_none());
+        assert!(map.get(serde_yaml_ng::Value::from("sni")).is_none());
+        assert!(map.get(serde_yaml_ng::Value::from("skip-cert-verify")).is_none());
+    }
+
+    #[test]
+    fn test_parse_hysteria_ipv6() {
+        let link = "hysteria://[2001:db8::1]:8443?auth=pw&peer=example.com#hy-ipv6";
+        let map = parse_hysteria(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            8443
+        );
+    }
+
+    #[test]
+    fn test_parse_hysteria_invalid() {
+        // 缺少主机名，应判定为非法输入
+        assert!(parse_hysteria("hysteria://?auth=pw").is_none());
+        // 非法 protocol 取值不应写入 protocol 字段
+        let map = parse_hysteria("hysteria://example.com?auth=pw&protocol=tcp#hy-proto").unwrap();
+        assert!(map.get(serde_yaml_ng::Value::from("protocol")).is_none());
+    }
+
+    #[test]
+    fn test_parse_anytls() {
+        let link =
+            "anytls://mypassword@example.com:8443?sni=example.com&insecure=1&alpn=h2,http/1.1#anytls-test";
+        let map = parse_anytls(link).unwrap();
+
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("type")).unwrap().as_str().unwrap(),
+            "anytls"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("name")).unwrap().as_str().unwrap(),
+            "anytls-test"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            8443
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "mypassword"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("sni")).unwrap().as_str().unwrap(),
+            "example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("skip-cert-verify"))
+                .unwrap()
+                .as_bool()
+                .unwrap(),
+            true
+        );
+        let alpn = map
+            .get(serde_yaml_ng::Value::from("alpn"))
+            .unwrap()
+            .as_sequence()
+            .unwrap();
+        assert_eq!(alpn.len(), 2);
+        assert_eq!(alpn[0].as_str().unwrap(), "h2");
+        assert_eq!(alpn[1].as_str().unwrap(), "http/1.1");
+    }
+
+    #[test]
+    fn test_parse_anytls_defaults() {
+        // 省略端口与 query：端口回退 443，无 sni / skip-cert-verify
+        let link = "anytls://pw@example.com#anytls-min";
+        let map = parse_anytls(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            443
+        );
+        assert!(map.get(serde_yaml_ng::Value::from("sni")).is_none());
+        assert!(map.get(serde_yaml_ng::Value::from("skip-cert-verify")).is_none());
+    }
+
+    #[test]
+    fn test_parse_anytls_ipv6() {
+        let link = "anytls://pw@[2001:db8::1]:443?sni=example.com#anytls-ipv6";
+        let map = parse_anytls(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "2001:db8::1"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("port")).unwrap().as_u64().unwrap(),
+            443
+        );
+    }
+
+    #[test]
+    fn test_parse_anytls_invalid() {
+        // 缺少密码（无 @）应判定为非法输入
+        assert!(parse_anytls("anytls://example.com:443").is_none());
+        // 密码为空同样非法
+        assert!(parse_anytls("anytls://@example.com:443").is_none());
     }
 }
