@@ -11,3 +11,8 @@ node_modules
 
 permissions/*
 !permissions/default.toml
+
+# ts-rs 在“仓库根目录”运行 cargo test/build 时使用的默认导出目录。
+# 正常导出目标是 guest-js/bindings/（见 .cargo/config.toml），此处仅为 stray 产物，不应入库。
+# 前置 / 使其仅匹配本目录下的 bindings/，不影响 guest-js/bindings/ 与 dist-js/bindings/。
+/bindings/
