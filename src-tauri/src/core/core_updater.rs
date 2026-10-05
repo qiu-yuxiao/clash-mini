@@ -298,43 +298,9 @@ impl CoreUpdater {
         emit_progress("checking", 5, "正在检测适合您系统架构的内核包...");
 
         // 识别平台架构及匹配文件名
-        let (target_prefix, exact_gz) = if cfg!(target_os = "windows") {
-            if cfg!(target_arch = "x86_64") {
-                ("mihomo-windows-amd64", "mihomo-windows-amd64.exe.gz")
-            } else if cfg!(target_arch = "x86") {
-                ("mihomo-windows-386", "mihomo-windows-386.exe.gz")
-            } else if cfg!(target_arch = "aarch64") {
-                ("mihomo-windows-arm64", "mihomo-windows-arm64.exe.gz")
-            } else {
-                ("", "")
-            }
-        } else if cfg!(target_os = "macos") {
-            if cfg!(target_arch = "x86_64") {
-                ("mihomo-darwin-amd64", "mihomo-darwin-amd64.gz")
-            } else if cfg!(target_arch = "aarch64") {
-                ("mihomo-darwin-arm64", "mihomo-darwin-arm64.gz")
-            } else {
-                ("", "")
-            }
-        } else if cfg!(target_os = "linux") {
-            if cfg!(target_arch = "x86_64") {
-                ("mihomo-linux-amd64", "mihomo-linux-amd64.gz")
-            } else if cfg!(target_arch = "aarch64") {
-                ("mihomo-linux-arm64", "mihomo-linux-arm64.gz")
-            } else if cfg!(target_arch = "arm") {
-                ("mihomo-linux-armv7", "mihomo-linux-armv7.gz")
-            } else {
-                ("", "")
-            }
-        } else {
-            ("", "")
-        };
-
-        if target_prefix.is_empty() {
-            let err_msg = "不支持的操作系统或架构，无法自动升级。";
-            emit_progress("error", 0, err_msg);
-            bail!(err_msg);
-        }
+        // 仅支持 Windows x64（见平台支持范围），内核包名固定，无需再按平台分支
+        let target_prefix = "mihomo-windows-amd64";
+        let exact_gz = "mihomo-windows-amd64.exe.gz";
 
         // 在 Release assets 中寻找对应文件
         let mut target_asset = None;

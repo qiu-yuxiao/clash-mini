@@ -118,6 +118,9 @@ rust_iso3166 = "0.1.14"
 bytes = "1.11.1"
 tokio-util = { version = "0.7.18", features = ["time"] }
 url = "2.5.2"
+# 仅支持 Windows 桌面，原先的 not(android/ios) 平台约束已无意义，直接作为普通依赖
+tauri-plugin-autostart = "2.5.1"
+tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(windows)'.dependencies]
 deelevate = { workspace = true }
@@ -127,11 +130,6 @@ windows = { version = "0.61.3", features = ["Win32_Globalization", "Win32_Founda
 wry = "0.55.1"
 webview2-com = "0.38.2"
 raw-window-handle = "0.6.2"
-
-
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-autostart = "2.5.1"
-tauri-plugin-updater = "2.10.1"
 
 [dev-dependencies]
 criterion = { workspace = true }
