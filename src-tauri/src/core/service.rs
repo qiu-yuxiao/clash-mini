@@ -40,7 +40,6 @@ pub struct ServiceManager {
     operation_running: AtomicBool,
 }
 
-#[cfg(target_os = "windows")]
 fn uninstall_service() -> Result<()> {
     logging!(info, Type::Service, "uninstall service");
 
@@ -72,7 +71,6 @@ fn uninstall_service() -> Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "windows")]
 fn install_service() -> Result<()> {
     use std::process::Output;
     logging!(info, Type::Service, "install service");
@@ -119,173 +117,6 @@ fn install_service() -> Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "linux")]
-fn uninstall_service() -> Result<()> {
-    logging!(info, Type::Service, "uninstall service");
-
-    let uninstall_path = tauri::utils::platform::current_exe()?.with_file_name("clash-verge-service-uninstall");
-
-    if !uninstall_path.exists() {
-        bail!(format!("uninstaller not found: {uninstall_path:?}"));
-    }
-
-    let elevator = crate::utils::help::linux_elevator();
-    let status = if linux_running_as_root() {
-        StdCommand::new(&uninstall_path).status()?
-    } else {
-        let result = StdCommand::new(&elevator).arg(&uninstall_path).status()?;
-
-        // 如果 pkexec 执行失败，回退到 sudo
-        if !result.success() && elevator.contains("pkexec") {
-            logging!(
-                warn,
-                Type::Service,
-                "pkexec failed with code {}, falling back to sudo",
-                result.code().unwrap_or(-1)
-            );
-            StdCommand::new("sudo").arg(&uninstall_path).status()?
-        } else {
-            result
-        }
-    };
-    logging!(
-        info,
-        Type::Service,
-        "uninstall status code:{}",
-        status.code().unwrap_or(-1)
-    );
-
-    if !status.success() {
-        bail!(
-            "failed to uninstall service with status {}",
-            status.code().unwrap_or(-1)
-        );
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn install_service() -> Result<()> {
-    logging!(info, Type::Service, "install service");
-
-    let install_path = tauri::utils::platform::current_exe()?.with_file_name("clash-verge-service-install");
-
-    if !install_path.exists() {
-        bail!(format!("installer not found: {install_path:?}"));
-    }
-
-    let elevator = crate::utils::help::linux_elevator();
-    let output = if linux_running_as_root() {
-        StdCommand::new(&install_path).output()?
-    } else {
-        let result = StdCommand::new(&elevator).arg(&install_path).output()?;
-
-        // 如果 pkexec 执行失败，回退到 sudo
-        if !result.status.success() && elevator.contains("pkexec") {
-            logging!(
-                warn,
-                Type::Service,
-                "pkexec failed with code {}, falling back to sudo",
-                result.status.code().unwrap_or(-1)
-            );
-            StdCommand::new("sudo").arg(&install_path).output()?
-        } else {
-            result
-        }
-    };
-
-    if let Some((code, err)) = check_output_error(&output) {
-        logging!(
-            error,
-            Type::Service,
-            "failed to install service code: {}, details: {}",
-            code,
-            err
-        );
-        bail!("failed to install service code: {}, details: {}", code, err);
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn linux_running_as_root() -> bool {
-    use crate::core::handle;
-    use crate::utils::sysinfo::is_current_app_handle_admin;
-    let app_handle = handle::Handle::app_handle();
-    is_current_app_handle_admin(app_handle)
-}
-
-#[cfg(target_os = "macos")]
-fn uninstall_service() -> Result<()> {
-    logging!(info, Type::Service, "uninstall service");
-
-    let binary_path = dirs::service_path()?;
-    let uninstall_path = binary_path.with_file_name("clash-verge-service-uninstall");
-
-    if !uninstall_path.exists() {
-        bail!(format!("uninstaller not found: {uninstall_path:?}"));
-    }
-
-    let uninstall_shell: String = uninstall_path.to_string_lossy().into_owned();
-
-    // clash_verge_i18n::sync_locale(Config::verge().await.latest_arc().language.as_deref());
-
-    let prompt = clash_verge_i18n::t!("service.adminUninstallPrompt");
-    let command =
-        format!(r#"do shell script "sudo '{uninstall_shell}'" with administrator privileges with prompt "{prompt}""#);
-
-    // logging!(debug, Type::Service, "uninstall command: {}", command);
-
-    let status = StdCommand::new("osascript").args(vec!["-e", &command]).status()?;
-
-    if !status.success() {
-        bail!(
-            "failed to uninstall service with status {}",
-            status.code().unwrap_or(-1)
-        );
-    }
-
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn install_service() -> Result<()> {
-    logging!(info, Type::Service, "install service");
-
-    let binary_path = dirs::service_path()?;
-    let install_path = binary_path.with_file_name("clash-verge-service-install");
-
-    if !install_path.exists() {
-        bail!(format!("installer not found: {install_path:?}"));
-    }
-
-    let install_shell: String = install_path.to_string_lossy().into_owned();
-
-    // clash_verge_i18n::sync_locale(Config::verge().await.latest_arc().language.as_deref());
-
-    let gid = crate::utils::sysinfo::current_gid();
-    let prompt = clash_verge_i18n::t!("service.adminInstallPrompt");
-    let command = format!(
-        r#"do shell script "sudo CLASH_VERGE_SERVICE_GID={gid} '{install_shell}'" with administrator privileges with prompt "{prompt}""#
-    );
-
-    let output = StdCommand::new("osascript").args(vec!["-e", &command]).output()?;
-    if let Some((code, err)) = check_output_error(&output) {
-        logging!(
-            error,
-            Type::Service,
-            "failed to install service code: {}, details: {}",
-            code,
-            err
-        );
-        bail!("failed to install service code: {}, details: {}", code, err);
-    }
-
-    Ok(())
-}
-
 fn check_output_error(output: &std::process::Output) -> Option<(i32, Cow<'_, str>)> {
     if output.status.success() {
         return None;
@@ -302,7 +133,6 @@ fn check_output_error(output: &std::process::Output) -> Option<(i32, Cow<'_, str
     Some((code, Cow::Borrowed("Unknown error")))
 }
 
-#[cfg(target_os = "windows")]
 pub fn is_service_installed() -> bool {
     use std::os::windows::process::CommandExt as _;
     let output = std::process::Command::new("sc.exe")
@@ -319,7 +149,6 @@ pub fn is_service_installed() -> bool {
     }
 }
 
-#[cfg(target_os = "windows")]
 fn start_service() -> Result<()> {
     logging!(info, Type::Service, "start service");
 
@@ -384,12 +213,7 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
 
     let app_dir = dirs::app_home_dir()?;
     let cores_dir = app_dir.join("cores");
-    let core_name = if cfg!(windows) {
-        "mini-mihomo.exe"
-    } else {
-        "mini-mihomo"
-    };
-    let custom_core_path = cores_dir.join(core_name);
+    let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
     let bin_path = if custom_core_path.exists() {
         logging!(
@@ -400,8 +224,7 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
         );
         custom_core_path
     } else {
-        let bin_ext = if cfg!(windows) { ".exe" } else { "" };
-        current_exe()?.with_file_name(format!("{clash_core}{bin_ext}"))
+        current_exe()?.with_file_name(format!("{clash_core}.exe"))
     };
 
     let payload = clash_verge_service_ipc::ClashConfig {
@@ -578,16 +401,13 @@ impl ServiceManager {
     }
 
     pub async fn refresh(&self) -> Result<()> {
-        #[cfg(target_os = "windows")]
-        {
-            if crate::utils::sysinfo::is_current_app_handle_admin(crate::core::handle::Handle::app_handle()) {
-                if is_service_available().await.is_ok() {
-                    self.set_status(ServiceStatus::Ready);
-                } else {
-                    self.set_status(ServiceStatus::Unavailable("Admin mode, no service needed".into()));
-                }
-                return Ok(());
+        if crate::utils::sysinfo::is_current_app_handle_admin(crate::core::handle::Handle::app_handle()) {
+            if is_service_available().await.is_ok() {
+                self.set_status(ServiceStatus::Ready);
+            } else {
+                self.set_status(ServiceStatus::Unavailable("Admin mode, no service needed".into()));
             }
+            return Ok(());
         }
 
         self.run_operation(async {
@@ -596,13 +416,10 @@ impl ServiceManager {
                 return Ok(());
             }
 
-            #[cfg(target_os = "windows")]
-            {
-                if is_service_installed() {
-                    logging!(info, Type::Service, "服务已安装但未运行，尝试启动服务");
-                    self.apply_service_status(ServiceStatus::StartRequired).await?;
-                    return Ok(());
-                }
+            if is_service_installed() {
+                logging!(info, Type::Service, "服务已安装但未运行，尝试启动服务");
+                self.apply_service_status(ServiceStatus::StartRequired).await?;
+                return Ok(());
             }
 
             self.set_status(ServiceStatus::Unavailable("Service not installed".into()));
@@ -635,14 +452,11 @@ impl ServiceManager {
                 wait_for_service_ipc(self).await?;
             }
             ServiceStatus::InstallRequired => {
-                #[cfg(target_os = "windows")]
-                {
-                    if is_service_installed() {
-                        logging!(info, Type::Service, "服务已安装但未运行，转换为启动服务");
-                        self.set_status(ServiceStatus::StartRequired);
-                        run_service_command(start_service, "start service").await?;
-                        return wait_for_service_ipc(self).await;
-                    }
+                if is_service_installed() {
+                    logging!(info, Type::Service, "服务已安装但未运行，转换为启动服务");
+                    self.set_status(ServiceStatus::StartRequired);
+                    run_service_command(start_service, "start service").await?;
+                    return wait_for_service_ipc(self).await;
                 }
                 logging!(info, Type::Service, "需要安装服务，执行安装流程");
                 run_service_command(install_service, "install service").await?;

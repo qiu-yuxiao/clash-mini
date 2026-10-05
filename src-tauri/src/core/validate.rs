@@ -354,12 +354,7 @@ impl CoreConfigValidator {
 
         // 使用子进程运行clash验证配置
         let cores_dir = app_dir.join("cores");
-        let core_name = if cfg!(windows) {
-            "mini-mihomo.exe"
-        } else {
-            "mini-mihomo"
-        };
-        let custom_core_path = cores_dir.join(core_name);
+        let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
         let command = if custom_core_path.exists() {
             app_handle

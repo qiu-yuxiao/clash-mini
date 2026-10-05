@@ -2,8 +2,6 @@ use crate::core::{CoreManager, handle, manager::RunningMode};
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use once_cell::sync::OnceCell;
-#[cfg(unix)]
-use std::iter;
 use std::{fs, path::PathBuf};
 use tauri::Manager as _;
 
@@ -126,13 +124,6 @@ pub fn profiles_path() -> Result<PathBuf> {
     Ok(app_home_dir()?.join(PROFILE_YAML))
 }
 
-#[cfg(target_os = "macos")]
-pub fn service_path() -> Result<PathBuf> {
-    let res_dir = app_resources_dir()?;
-    Ok(res_dir.join("clash-verge-service"))
-}
-
-#[cfg(windows)]
 pub fn service_path() -> Result<PathBuf> {
     let res_dir = app_resources_dir()?;
     Ok(res_dir.join("clash-verge-service.exe"))
@@ -189,33 +180,6 @@ pub fn get_encryption_key() -> Result<Vec<u8>> {
     }
 }
 
-#[cfg(unix)]
-pub fn ensure_mihomo_safe_dir() -> Option<PathBuf> {
-    iter::once("/tmp")
-        .map(PathBuf::from)
-        .find(|path| path.exists())
-        .or_else(|| {
-            std::env::var_os("HOME").and_then(|home| {
-                let home_config = PathBuf::from(home).join(".config");
-                if home_config.exists() || fs::create_dir_all(&home_config).is_ok() {
-                    Some(home_config)
-                } else {
-                    logging!(error, Type::File, "Failed to create safe directory: {home_config:?}");
-                    None
-                }
-            })
-        })
-}
-
-#[cfg(unix)]
-pub fn ipc_path() -> Result<PathBuf> {
-    ensure_mihomo_safe_dir()
-        .map(|base_dir| base_dir.join("mini").join("mini-mihomo.sock"))
-        .or_else(|| app_home_dir().ok().map(|dir| dir.join("mini").join("mini-mihomo.sock")))
-        .ok_or_else(|| anyhow::anyhow!("Failed to determine ipc path"))
-}
-
-#[cfg(target_os = "windows")]
 pub fn ipc_path() -> Result<PathBuf> {
     Ok(PathBuf::from(r"\\.\pipe\mini-mihomo"))
 }

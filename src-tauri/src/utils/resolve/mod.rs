@@ -22,7 +22,6 @@ use crate::{
 use clash_verge_logging::{Type, logging, logging_error};
 use clash_verge_signal;
 
-pub mod dns;
 pub mod scheme;
 pub mod universal_parser;
 pub mod window;
@@ -210,16 +209,8 @@ pub(super) async fn init_window() {
     let args: Vec<String> = std::env::args().collect();
     let has_silent_arg = args.iter().any(|arg| arg == "--silent");
 
-    #[cfg(target_os = "windows")]
     let should_silent = is_silent_start && has_silent_arg;
-    #[cfg(not(target_os = "windows"))]
-    let should_silent = is_silent_start;
 
-    #[cfg(target_os = "macos")]
-    if should_silent {
-        use crate::core::handle::Handle;
-        Handle::global().set_activation_policy_accessory();
-    }
     WindowManager::create_window(!should_silent).await;
 }
 

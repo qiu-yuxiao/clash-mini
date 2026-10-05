@@ -98,10 +98,7 @@ impl Config {
         // init Tun mode
         let handle = Handle::app_handle();
         let is_admin = is_current_app_handle_admin(handle);
-        #[cfg(target_os = "windows")]
         let is_service_installed = service::is_service_installed();
-        #[cfg(not(target_os = "windows"))]
-        let is_service_installed = false;
 
         if !is_admin && !is_service_installed {
             let verge = Self::verge().await;

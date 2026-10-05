@@ -31,11 +31,6 @@ static SINGLETON_LISTENER: OnceCell<Mutex<Option<std::net::TcpListener>>> = Once
 fn bind_socket(port: u16) -> Result<std::net::TcpListener> {
     use socket2::{Domain, Protocol, SockAddr, Socket, Type};
     let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
-    #[cfg(not(target_os = "windows"))]
-    socket.set_reuse_address(true)?;
-
-    #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]
-    socket.set_reuse_port(true)?;
 
     let address = std::net::SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)), port);
     socket.bind(&SockAddr::from(address))?;
@@ -59,15 +54,12 @@ pub async fn check_singleton() -> Result<()> {
             let client = ClientBuilder::new().timeout(Duration::from_millis(500)).build()?;
             let argvs: Vec<std::string::String> = std::env::args().collect();
             if argvs.len() > 1 {
-                #[cfg(not(target_os = "macos"))]
-                {
-                    let param = argvs[1].as_str();
-                    if param.starts_with("clash:") {
-                        client
-                            .get(format!("http://127.0.0.1:{port}/commands/scheme?param={param}"))
-                            .send()
-                            .await?;
-                    }
+                let param = argvs[1].as_str();
+                if param.starts_with("clash:") {
+                    client
+                        .get(format!("http://127.0.0.1:{port}/commands/scheme?param={param}"))
+                        .send()
+                        .await?;
                 }
             } else {
                 client

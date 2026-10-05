@@ -98,11 +98,6 @@ impl IClashTemp {
         tun_config.insert("auto-detect-interface".into(), true.into());
         tun_config.insert("dns-hijack".into(), tun_const::DNS_HIJACK.into());
 
-        #[cfg(not(target_os = "windows"))]
-        map.insert("redir-port".into(), network::ports::DEFAULT_REDIR.into());
-        #[cfg(target_os = "linux")]
-        map.insert("tproxy-port".into(), network::ports::DEFAULT_TPROXY.into());
-
         map.insert("mixed-port".into(), network::ports::DEFAULT_MIXED.into());
         map.insert("socks-port".into(), network::ports::DEFAULT_SOCKS.into());
         map.insert("port".into(), network::ports::DEFAULT_HTTP.into());
@@ -127,12 +122,6 @@ impl IClashTemp {
             "external-controller".into(),
             network::DEFAULT_EXTERNAL_CONTROLLER.into(),
         );
-        #[cfg(unix)]
-        map.insert(
-            "external-controller-unix".into(),
-            Self::guard_external_controller_ipc().into(),
-        );
-        #[cfg(windows)]
         map.insert(
             "external-controller-pipe".into(),
             Self::guard_external_controller_ipc().into(),
@@ -160,31 +149,17 @@ impl IClashTemp {
     }
 
     fn guard(mut config: Mapping) -> Mapping {
-        #[cfg(not(target_os = "windows"))]
-        let redir_port = Self::guard_redir_port(&config);
-        #[cfg(target_os = "linux")]
-        let tproxy_port = Self::guard_tproxy_port(&config);
         let mixed_port = Self::guard_mixed_port(&config);
         let socks_port = Self::guard_socks_port(&config);
         let port = Self::guard_port(&config);
         let ctrl = Self::guard_external_controller(&config);
-        #[cfg(unix)]
-        let external_controller_unix = Self::guard_external_controller_ipc();
-        #[cfg(windows)]
         let external_controller_pipe = Self::guard_external_controller_ipc();
 
-        #[cfg(not(target_os = "windows"))]
-        config.insert("redir-port".into(), redir_port.into());
-        #[cfg(target_os = "linux")]
-        config.insert("tproxy-port".into(), tproxy_port.into());
         config.insert("mixed-port".into(), mixed_port.into());
         config.insert("socks-port".into(), socks_port.into());
         config.insert("port".into(), port.into());
         config.insert("external-controller".into(), ctrl.into());
 
-        #[cfg(unix)]
-        config.insert("external-controller-unix".into(), external_controller_unix.into());
-        #[cfg(windows)]
         config.insert("external-controller-pipe".into(), external_controller_pipe.into());
         config
     }
@@ -229,38 +204,6 @@ impl IClashTemp {
             }),
         }
     }
-    #[cfg(not(target_os = "windows"))]
-    pub fn guard_redir_port(config: &Mapping) -> u16 {
-        let mut port = config
-            .get("redir-port")
-            .and_then(|value| match value {
-                Value::String(val_str) => val_str.parse().ok(),
-                Value::Number(val_num) => val_num.as_u64().map(|u| u as u16),
-                _ => None,
-            })
-            .unwrap_or(7895);
-        if port == 0 {
-            port = 7895;
-        }
-        port
-    }
-
-    #[cfg(target_os = "linux")]
-    pub fn guard_tproxy_port(config: &Mapping) -> u16 {
-        let mut port = config
-            .get("tproxy-port")
-            .and_then(|value| match value {
-                Value::String(val_str) => val_str.parse().ok(),
-                Value::Number(val_num) => val_num.as_u64().map(|u| u as u16),
-                _ => None,
-            })
-            .unwrap_or(network::ports::DEFAULT_TPROXY);
-        if port == 0 {
-            port = network::ports::DEFAULT_TPROXY;
-        }
-        port
-    }
-
     pub fn guard_mixed_port(config: &Mapping) -> u16 {
         let raw_value = config.get("mixed-port");
 

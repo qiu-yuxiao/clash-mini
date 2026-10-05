@@ -129,10 +129,7 @@ pub async fn clean_async() -> bool {
             }
         }
 
-        #[cfg(target_os = "windows")]
         let stop_timeout = Duration::from_secs(2);
-        #[cfg(not(target_os = "windows"))]
-        let stop_timeout = Duration::from_secs(3);
 
         logging!(info, Type::System, "stop core");
         let stopped = match timeout(stop_timeout, CoreManager::global().stop_core()).await {
@@ -153,64 +150,22 @@ pub async fn clean_async() -> bool {
         stopped
     });
 
-    // DNS恢复（仅macOS）
-    let dns_task = tokio::task::spawn(async {
-        #[cfg(target_os = "macos")]
-        match timeout(
-            Duration::from_millis(1000),
-            crate::utils::resolve::dns::restore_public_dns(),
-        )
-        .await
-        {
-            Ok(_) => {
-                logging!(info, Type::Window, "DNS设置已恢复");
-                true
-            }
-            Err(_) => {
-                logging!(warn, Type::Window, "Warning: 恢复DNS设置超时");
-                false
-            }
-        }
-        #[cfg(not(target_os = "macos"))]
-        true
-    });
-
     // 并行执行清理任务
-    let (proxy_result, core_result, dns_result) = tokio::join!(proxy_task, core_task, dns_task);
+    let (proxy_result, core_result) = tokio::join!(proxy_task, core_task);
 
     let proxy_success = proxy_result.unwrap_or_default();
     let core_success = core_result.unwrap_or_default();
-    let dns_success = dns_result.unwrap_or_default();
 
-    let all_success = proxy_success && core_success && dns_success;
+    let all_success = proxy_success && core_success;
 
     logging!(
         info,
         Type::System,
-        "异步关闭操作完成 - 代理: {}, 核心: {}, DNS: {}, 总体: {}",
+        "异步关闭操作完成 - 代理: {}, 核心: {}, 总体: {}",
         proxy_success,
         core_success,
-        dns_success,
         all_success
     );
 
     all_success
-}
-
-#[cfg(target_os = "macos")]
-pub async fn hide() {
-    use crate::module::lightweight::entry_lightweight_mode;
-
-    let enable_auto_light_weight_mode = Config::verge()
-        .await
-        .data_arc()
-        .enable_auto_light_weight_mode
-        .unwrap_or(false);
-
-    if enable_auto_light_weight_mode {
-        entry_lightweight_mode().await;
-    }
-
-    let _ = WindowManager::hide_main_window();
-    handle::Handle::global().set_activation_policy_accessory();
 }

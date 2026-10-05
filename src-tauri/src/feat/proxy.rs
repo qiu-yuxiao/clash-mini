@@ -87,16 +87,7 @@ pub async fn copy_clash_env() {
 
     let clipboard = app_handle.clipboard();
 
-    let default_env = {
-        #[cfg(not(target_os = "windows"))]
-        {
-            "bash"
-        }
-        #[cfg(target_os = "windows")]
-        {
-            "powershell"
-        }
-    };
+    let default_env = "powershell";
     let env_type = verge_cfg.env_type.as_deref().unwrap_or(default_env);
 
     let export_text = match env_type {

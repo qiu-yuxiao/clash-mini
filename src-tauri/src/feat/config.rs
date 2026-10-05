@@ -108,26 +108,10 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     let proxy_bypass = &patch.system_proxy_bypass;
     let language = &patch.language;
     let mixed_port = patch.verge_mixed_port;
-    #[cfg(target_os = "macos")]
-    let tray_icon = &patch.tray_icon;
-    #[cfg(not(target_os = "macos"))]
-    let tray_icon: Option<String> = None;
-    #[cfg(not(target_os = "windows"))]
-    let redir_enabled = patch.verge_redir_enabled;
-    #[cfg(not(target_os = "windows"))]
-    let redir_port = patch.verge_redir_port;
-    #[cfg(target_os = "linux")]
-    let tproxy_enabled = patch.verge_tproxy_enabled;
-    #[cfg(target_os = "linux")]
-    let tproxy_port = patch.verge_tproxy_port;
     let socks_enabled = patch.verge_socks_enabled;
     let socks_port = patch.verge_socks_port;
     let http_enabled = patch.verge_http_enabled;
     let http_port = patch.verge_port;
-    #[cfg(target_os = "macos")]
-    let enable_tray_speed = patch.enable_tray_speed;
-    #[cfg(not(target_os = "macos"))]
-    let enable_tray_speed: Option<bool> = None;
     // let enable_tray_icon = patch.enable_tray_icon;
     let home_cards = patch.home_cards.as_ref();
     // enable_auto_light_weight_mode 现由 entry_lightweight_mode 直接读取配置判断，
@@ -142,29 +126,12 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     let rule_fallback = &patch.rule_fallback;
     let enable_builtin_enhanced = patch.enable_builtin_enhanced;
 
-    #[cfg(target_os = "windows")]
     let restart_core_needed = socks_enabled.is_some()
         || http_enabled.is_some()
         || socks_port.is_some()
         || http_port.is_some()
         || mixed_port.is_some()
         || enable_external_controller.is_some();
-    #[cfg(not(target_os = "windows"))]
-    let mut restart_core_needed = socks_enabled.is_some()
-        || http_enabled.is_some()
-        || socks_port.is_some()
-        || http_port.is_some()
-        || mixed_port.is_some()
-        || enable_external_controller.is_some();
-    #[cfg(not(target_os = "windows"))]
-    {
-        restart_core_needed |= redir_enabled.is_some() || redir_port.is_some();
-    }
-    #[cfg(target_os = "linux")]
-    {
-        restart_core_needed |= tproxy_enabled.is_some() || tproxy_port.is_some();
-        restart_core_needed |= tun_mode == Some(true);
-    }
 
     let mut update_flags = UpdateFlags::empty();
     if restart_core_needed {
@@ -192,9 +159,6 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     }
     if language.is_some() {
         update_flags.insert(UpdateFlags::LANGUAGE);
-    }
-    if tray_icon.is_some() || enable_tray_speed.is_some() {
-        update_flags.insert(UpdateFlags::SYSTRAY_ICON);
     }
     if log_level.is_some() {
         update_flags.insert(UpdateFlags::LOG_LEVEL);
@@ -248,10 +212,6 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     if update_flags.contains(UpdateFlags::SYSTRAY_ICON) {
         tray::Tray::global()
             .update_icon(&Config::verge().await.latest_arc())?;
-        #[cfg(target_os = "macos")]
-        if patch.enable_tray_speed.is_some() {
-            tray::Tray::global().update_speed_task(patch.enable_tray_speed.unwrap_or(false));
-        }
     }
     if update_flags.contains(UpdateFlags::LOG_LEVEL) {
         Logger::global().update_log_level(patch.get_log_level())?;

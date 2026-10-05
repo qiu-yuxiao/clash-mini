@@ -41,7 +41,6 @@ pub fn open_web_url(url: String) -> CmdResult<()> {
 #[tauri::command]
 pub fn open_app_log() -> CmdResult<()> {
     let log_path = dirs::app_latest_log().stringify_err()?;
-    #[cfg(target_os = "windows")]
     let log_path = crate::utils::help::snapshot_path(&log_path).stringify_err()?;
     open::that(log_path).stringify_err()
 }
@@ -51,7 +50,6 @@ pub fn open_app_log() -> CmdResult<()> {
 #[tauri::command]
 pub fn open_core_log() -> CmdResult<()> {
     let log_path = dirs::clash_latest_log().stringify_err()?;
-    #[cfg(target_os = "windows")]
     let log_path = crate::utils::help::snapshot_path(&log_path).stringify_err()?;
     open::that(log_path).stringify_err()
 }

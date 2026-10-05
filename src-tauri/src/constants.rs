@@ -4,10 +4,6 @@ pub mod network {
     pub const DEFAULT_EXTERNAL_CONTROLLER: &str = "127.0.0.1:9098";
 
     pub mod ports {
-        #[cfg(not(target_os = "windows"))]
-        pub const DEFAULT_REDIR: u16 = 7895;
-        #[cfg(target_os = "linux")]
-        pub const DEFAULT_TPROXY: u16 = 7896;
         pub const DEFAULT_MIXED: u16 = 10801;
         pub const DEFAULT_SOCKS: u16 = 10802;
         pub const DEFAULT_HTTP: u16 = 10803;
@@ -25,9 +21,7 @@ pub mod timing {
     pub const CONFIG_UPDATE_DEBOUNCE: Duration = Duration::from_millis(300);
     pub const STARTUP_ERROR_DELAY: Duration = Duration::from_secs(2);
 
-    #[cfg(target_os = "windows")]
     pub const SERVICE_WAIT_MAX: Duration = Duration::from_millis(3000);
-    #[cfg(target_os = "windows")]
     pub const SERVICE_WAIT_INTERVAL: Duration = Duration::from_millis(200);
 
     /// 代理节点判死与探针超时最大延迟限值

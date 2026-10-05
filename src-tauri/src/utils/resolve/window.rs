@@ -4,8 +4,6 @@ use tauri::{Manager as _, Theme, WebviewWindow};
 use crate::{config::Config, core::handle, utils::resolve::window_script::build_window_initial_script};
 use clash_verge_logging::{Type, logging, logging_error};
 
-#[cfg(not(target_os = "windows"))]
-use dark_light::{Mode as SystemTheme, detect as detect_system_theme};
 use tauri::utils::config::Color;
 
 const DARK_BACKGROUND_COLOR: Color = Color(46, 48, 61, 255);
@@ -42,14 +40,6 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         _ => None,
     };
 
-    #[cfg(not(target_os = "windows"))]
-    let prefers_dark_background = match resolved_theme {
-        Some(Theme::Dark) => true,
-        Some(Theme::Light) => false,
-        _ => !matches!(detect_system_theme().ok(), Some(SystemTheme::Light)),
-    };
-
-    #[cfg(target_os = "windows")]
     let prefers_dark_background = match resolved_theme {
         Some(Theme::Dark) => true,
         Some(Theme::Light) => false,
@@ -107,20 +97,14 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             });
         });
 
-    // 非 macOS 平台在窗口创建阶段即禁用 OS 级 maximize（Win+上 / 双击标题栏 / 任务栏右键），
+    // 窗口创建阶段即禁用 OS 级 maximize（Win+上 / 双击标题栏 / 任务栏右键），
     // 改由前端 toggleMaximize 自定义 640×860 大尺寸模式。
     // 提前到创建阶段设置，消除挂载后 setMaximizable 的竞态窗口期。
-    #[cfg(not(target_os = "macos"))]
-    {
-        builder = builder.maximizable(false);
-    }
+    builder = builder.maximizable(false);
 
-    #[cfg(target_os = "windows")]
-    {
-        builder = builder.transparent(false).additional_browser_args(
-            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-features=CalculateNativeWinOcclusion --disk-cache-size=31457280",
-        );
-    }
+    builder = builder.transparent(false).additional_browser_args(
+        "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --enable-features=CalculateNativeWinOcclusion --disk-cache-size=31457280",
+    );
 
     if let Some(theme) = resolved_theme {
         builder = builder.theme(Some(theme));
@@ -130,22 +114,14 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     match builder.build() {
         Ok(window) => {
-            #[cfg(not(target_os = "windows"))]
-            {
-                logging_error!(Type::Window, window.set_background_color(Some(background_color)));
-            }
-
             // 窗口创建后立即清除 WS_CAPTION 并重置 outer 尺寸为 285×680。
             // 必须在 build() 之后立即执行，不能放在 RunEvent::Ready（handle_ready_resumed），
             // 因为 RunEvent::Ready 比窗口创建的异步任务早约 0.5 秒触发，此时 get_webview_window
             // 返回 None，修复代码被跳过，导致初次启动窗口保持 300px。
             // 注意：保留 WS_THICKFRAME（仅清 WS_CAPTION）——WS_THICKFRAME 是 startResizeDragging
             // 生效的前提；可见边框由 tao 的 WM_NCCALCSIZE 子类化消除（decorations=false 时 insets=0）。
-            #[cfg(target_os = "windows")]
-            {
-                strip_caption_style(&window);
-                force_set_window_outer_size(&window, win_w, win_h);
-            }
+            strip_caption_style(&window);
+            force_set_window_outer_size(&window, win_w, win_h);
 
             // 超时兜底：如果页面加载超时（默认 10 秒），强制显示窗口
             // 避免页面加载卡住导致用户看不到窗口
@@ -194,7 +170,6 @@ fn get_bold_window_title() -> String {
 /// 关键：保留 WS_THICKFRAME。WS_THICKFRAME 是 `startResizeDragging` 生效的前提，
 /// 移除它会导致窗口彻底无法调整尺寸。可见边框由 tao 的 WM_NCCALCSIZE 子类化消除
 /// （decorations=false 时返回 0 insets），无需移除 WS_THICKFRAME 来消除可见边框。
-#[cfg(target_os = "windows")]
 fn strip_caption_style(window: &WebviewWindow) {
     use raw_window_handle::HasWindowHandle as _;
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -247,7 +222,6 @@ fn strip_caption_style(window: &WebviewWindow) {
 /// 有边框算出 outer = inner + 边框 = 285 + 15 = 300，导致 set_size 无效。
 /// 直接用 SetWindowPos 设置 outer 尺寸，再由 tao 的 WM_NCCALCSIZE 处理
 /// （decorations=false 时返回 0 insets）让 client = outer = 285。
-#[cfg(target_os = "windows")]
 fn force_set_window_outer_size(window: &WebviewWindow, width: f64, height: f64) {
     use raw_window_handle::HasWindowHandle as _;
     use windows::Win32::UI::HiDpi::GetDpiForWindow;

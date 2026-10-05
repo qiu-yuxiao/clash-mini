@@ -25,8 +25,6 @@ use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use once_cell::sync::OnceCell;
 use tauri::{AppHandle, Manager as _};
-#[cfg(target_os = "macos")]
-use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_deep_link::DeepLinkExt as _;
 use tauri_plugin_mihomo::RejectPolicy;
 
@@ -88,7 +86,7 @@ mod app_init {
 
     /// Setup deep link handling
     pub fn setup_deep_links(app: &tauri::App) {
-        #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+        #[cfg(all(debug_assertions, windows))]
         {
             logging!(info, Type::Setup, "注册深层链接...");
             let _ = app.deep_link().register_all();
@@ -112,17 +110,7 @@ mod app_init {
 
     /// Setup autostart plugin
     pub fn setup_autostart(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-        #[cfg(target_os = "macos")]
-        let mut auto_start_plugin_builder = tauri_plugin_autostart::Builder::new();
-        #[cfg(not(target_os = "macos"))]
         let auto_start_plugin_builder = tauri_plugin_autostart::Builder::new();
-
-        #[cfg(target_os = "macos")]
-        {
-            auto_start_plugin_builder = auto_start_plugin_builder
-                .macos_launcher(MacosLauncher::LaunchAgent)
-                .app_name(&app.config().identifier);
-        }
         app.handle().plugin(auto_start_plugin_builder.build())?;
         Ok(())
     }
@@ -173,7 +161,6 @@ mod app_init {
     }
 }
 
-#[cfg(target_os = "windows")]
 pub(crate) fn show_error_dialog(title: &str, message: &str) {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt as _;
@@ -192,29 +179,6 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
     }
 }
 
-#[cfg(target_os = "macos")]
-pub(crate) fn show_error_dialog(title: &str, message: &str) {
-    eprintln!("[{}] {}", title, message);
-    let script = format!(
-        "display dialog {:?} with title {:?} buttons {{\"OK\"}} default button \"OK\" with icon stop",
-        message, title
-    );
-    let _ = std::process::Command::new("osascript").args(["-e", &script]).status();
-}
-
-#[cfg(target_os = "linux")]
-pub(crate) fn show_error_dialog(title: &str, message: &str) {
-    eprintln!("[{}] {}", title, message);
-    let _ = std::process::Command::new("zenity")
-        .args(["--error", &format!("--title={}", title), &format!("--text={}", message)])
-        .status();
-}
-
-#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub(crate) fn show_error_dialog(title: &str, message: &str) {
-    eprintln!("[{}] {}", title, message);
-}
-
 pub fn run() {
     if let Err(err) = app_init::init_singleton_check() {
         let msg = format!(
@@ -224,11 +188,6 @@ pub fn run() {
         show_error_dialog("Clash Mini Startup Error", &msg);
         return;
     }
-
-    #[cfg(target_os = "linux")]
-    utils::linux::workarounds::apply_nvidia_dmabuf_renderer_workaround();
-    #[cfg(target_os = "linux")]
-    utils::linux::workarounds::apply_wayland_webkit_fix();
 
     let _ = utils::dirs::init_portable_flag();
 
@@ -333,8 +292,6 @@ pub fn run() {
         };
         use clash_verge_logging::{Type, logging};
         use tauri::AppHandle;
-        #[cfg(target_os = "macos")]
-        use tauri::Manager as _;
 
         pub fn handle_ready_resumed(_app_handle: &AppHandle) {
             use tauri::Manager as _;
@@ -346,34 +303,12 @@ pub fn run() {
 
             logging!(info, Type::System, "应用就绪");
 
-            #[cfg(target_os = "windows")]
             if let Some(window) = _app_handle.get_webview_window(MAIN_WINDOW_LABEL) {
                 setup_wm_sizing_hook(&window);
-            }
-
-            #[cfg(target_os = "macos")]
-            if let Some(window) = _app_handle.get_webview_window(MAIN_WINDOW_LABEL) {
-                let _ = window.set_title("Clash Mini");
-            }
-        }
-
-        #[cfg(target_os = "macos")]
-        pub async fn handle_reopen(has_visible_windows: bool) {
-            if lightweight::is_in_lightweight_mode() {
-                lightweight::exit_lightweight_mode().await;
-                return;
-            }
-
-            if !has_visible_windows {
-                handle::Handle::global().set_activation_policy_regular();
-                let _ = crate::utils::window_manager::WindowManager::show_main_window().await;
             }
         }
 
         pub fn handle_window_close(window: &tauri::WebviewWindow, event: &tauri::WindowEvent) {
-            #[cfg(target_os = "macos")]
-            handle::Handle::global().set_activation_policy_accessory();
-
             if core::handle::Handle::global().is_exiting() {
                 return;
             }
@@ -395,10 +330,8 @@ pub fn run() {
             }
         }
 
-        #[cfg(target_os = "windows")]
         use std::sync::atomic::{AtomicPtr, Ordering};
 
-        #[cfg(target_os = "windows")]
         static OLD_WNDPROC: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
 
         /// 安装 WM_SIZING 消息处理器，防止上边缘缩放到最小高度后窗口 Y 坐标继续下移。
@@ -406,7 +339,6 @@ pub fn run() {
         /// 标准 WM_GETMINMAXINFO 只钳制尺寸不钳制位置，而上边缘缩放时 Windows 会持续增加 Y 坐标，
         /// 导致窗口缩到最小时整体向下平移。WM_SIZING 在系统应用矩形之前给出提议矩形，在此处
         /// 同时钳制尺寸和 Y 位置可根除该问题。
-        #[cfg(target_os = "windows")]
         fn setup_wm_sizing_hook(window: &tauri::WebviewWindow) {
             // 重入保护：Resumed 事件（系统睡眠恢复）会再次调用本函数，
             // 若不拦截，OLD_WNDPROC 会被覆盖为 sizing_wndproc 自身地址，
@@ -457,7 +389,6 @@ pub fn run() {
         /// WM_SIZING 子类化窗口过程。
         /// 拦截上边缘缩放（WMSZ_TOP / WMSZ_TOPLEFT / WMSZ_TOPRIGHT），
         /// 当提议高度小于最小尺寸时，修正 rect.top，使窗口位置和高度同时被钳制。
-        #[cfg(target_os = "windows")]
         unsafe extern "system" fn sizing_wndproc(
             hwnd: windows::Win32::Foundation::HWND,
             msg: u32,
@@ -531,17 +462,6 @@ pub fn run() {
                 return;
             }
             event_handlers::handle_ready_resumed(app_handle);
-        }
-        #[cfg(target_os = "macos")]
-        tauri::RunEvent::Reopen {
-            has_visible_windows, ..
-        } => {
-            if core::handle::Handle::global().is_exiting() {
-                return;
-            }
-            AsyncHandler::spawn(move || async move {
-                event_handlers::handle_reopen(has_visible_windows).await;
-            });
         }
         tauri::RunEvent::Exit => {
             logging!(info, Type::System, "Application exited");

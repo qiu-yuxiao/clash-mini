@@ -115,34 +115,9 @@ tokio-rustls = "0.26.4"
 rustls = { version = "0.23.40", features = ["ring"] }
 webpki-roots = "1.0.7"
 rust_iso3166 = "0.1.14"
-# Use the git repo until the next release after v2.0.0.
-dark-light = { git = "https://github.com/rust-dark-light/dark-light", rev = "0f18d2fbcaa5d1c175db8aae7d53428988d7e961" }
 bytes = "1.11.1"
 tokio-util = { version = "0.7.18", features = ["time"] }
 url = "2.5.2"
-
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6.4"
-objc2-foundation = { version = "0.3.2", features = [
-  "NSString",
-  "NSDictionary",
-  "NSAttributedString",
-] }
-objc2-app-kit = { version = "0.3.2", features = [
-  "NSAttributedString",
-  "NSStatusItem",
-  "NSStatusBarButton",
-  "NSButton",
-  "NSControl",
-  "NSResponder",
-  "NSView",
-  "NSFont",
-  "NSFontDescriptor",
-  "NSColor",
-  "NSParagraphStyle",
-  "NSStringDrawing",
-  "NSText",
-] }
 
 [target.'cfg(windows)'.dependencies]
 deelevate = { workspace = true }
@@ -152,9 +127,6 @@ windows = { version = "0.61.3", features = ["Win32_Globalization", "Win32_Founda
 wry = "0.55.1"
 webview2-com = "0.38.2"
 raw-window-handle = "0.6.2"
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2.186"
 
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

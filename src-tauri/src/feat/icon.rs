@@ -271,18 +271,11 @@ mod tests {
         assert!(normalize_icon_segment("   ").is_err());
     }
 
-    #[cfg(target_os = "windows")]
     #[test]
     fn normalize_icon_segment_rejects_windows_absolute_names() {
         for name in [r"C:\temp\icon.png", r"\\server\share\icon.png"] {
             assert!(normalize_icon_segment(name).is_err(), "name should be rejected: {name}");
         }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    #[test]
-    fn normalize_icon_segment_rejects_unix_absolute_names() {
-        assert!(normalize_icon_segment("/tmp/icon.png").is_err());
     }
 
     #[test]

@@ -118,7 +118,6 @@ impl CoreManager {
 
     /// 锁外等待服务就绪（可能耗时很久，如UAC弹窗、服务启动等）
     /// 避免长时间持有 lifecycle_lock 阻塞 stop/restart
-    #[cfg(target_os = "windows")]
     async fn await_service_ready_if_needed(&self) {
         let needs_service = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
         if needs_service {
@@ -128,9 +127,6 @@ impl CoreManager {
             }
         }
     }
-
-    #[cfg(not(target_os = "windows"))]
-    async fn await_service_ready_if_needed(&self) {}
 
     /// 锁内设置运行模式（不包含耗时等待）
     async fn prepare_startup_mode(&self) -> Result<()> {
@@ -155,7 +151,6 @@ impl CoreManager {
         crate::utils::sysinfo::set_app_core_mode(app_handle, self.get_running_mode().to_string());
     }
 
-    #[cfg(target_os = "windows")]
     async fn wait_for_service_ready(&self) {
         use crate::{constants::timing, core::service};
         use backon::{ConstantBuilder, Retryable as _};

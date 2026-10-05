@@ -447,14 +447,11 @@ impl WindowManager {
                 success = false;
             }
 
-            #[cfg(target_os = "windows")]
-            {
-                if let Err(e) = w.set_always_on_top(true) {
-                    logging!(debug, Type::Window, "设置置顶失败（非关键）: {}", e);
-                }
-                if let Err(e) = w.set_always_on_top(false) {
-                    logging!(debug, Type::Window, "取消置顶失败（非关键）: {}", e);
-                }
+            if let Err(e) = w.set_always_on_top(true) {
+                logging!(debug, Type::Window, "设置置顶失败（非关键）: {}", e);
+            }
+            if let Err(e) = w.set_always_on_top(false) {
+                logging!(debug, Type::Window, "取消置顶失败（非关键）: {}", e);
             }
 
             if success {
@@ -466,11 +463,6 @@ impl WindowManager {
             let _ = tx.send(success);
         }) {
             Ok(_) => {
-                #[cfg(target_os = "macos")]
-                {
-                    logging!(info, Type::Window, "应用 macOS 特定的激活策略");
-                    handle::Handle::global().set_activation_policy_regular();
-                }
                 logging!(info, Type::Window, "已成功调度窗口激活任务到主线程");
                 // 异步等待主线程执行结果，让出 tokio worker 线程，避免死锁
                 // 加 5 秒超时保护：主线程被模态循环占用时不会永久阻塞
@@ -523,11 +515,6 @@ impl WindowManager {
         match build_new_window().await {
             Ok(_) => {
                 logging!(info, Type::Window, "新窗口创建成功，等待前端渲染后显示");
-
-                #[cfg(target_os = "macos")]
-                {
-                    handle::Handle::global().set_activation_policy_regular();
-                }
 
                 true
             }
@@ -617,21 +604,11 @@ impl WindowManager {
                                 h
                             );
                         }
-                        #[cfg(target_os = "macos")]
-                        {
-                            logging!(info, Type::Window, "应用 macOS 特定的激活策略");
-                            handle::Handle::global().set_activation_policy_accessory();
-                        }
                         WindowOperationResult::Destroyed
                     }
                     Ok(Ok(None)) => {
                         // 主线程执行了闭包但未能读取尺寸（窗口已销毁或读失败），仍视为已销毁
                         logging!(info, Type::Window, "窗口已摧毁（未获取到尺寸）");
-                        #[cfg(target_os = "macos")]
-                        {
-                            logging!(info, Type::Window, "应用 macOS 特定的激活策略");
-                            handle::Handle::global().set_activation_policy_accessory();
-                        }
                         WindowOperationResult::Destroyed
                     }
                     Ok(Err(_)) => {

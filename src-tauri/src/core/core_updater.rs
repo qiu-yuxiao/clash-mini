@@ -475,12 +475,7 @@ impl CoreUpdater {
         }
 
         // Prepare destination path
-        let core_name = if cfg!(windows) {
-            "mini-mihomo.exe"
-        } else {
-            "mini-mihomo"
-        };
-        let custom_core_path = cores_dir.join(core_name);
+        let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
         logging!(info, Type::System, "Core updater stopping core to release file lock...");
         // Stop core — 若正在退出则跳过，关闭流程会自行停止 core
@@ -561,15 +556,6 @@ impl CoreUpdater {
             }
             emit_progress("error", 0, &format!("解压替换失败: {:?}", e));
             return Err(e);
-        }
-
-        // Set Unix execute permission
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&custom_core_path)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&custom_core_path, perms).context("failed to set execution permission on unix")?;
         }
 
         logging!(

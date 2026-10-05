@@ -126,22 +126,12 @@ impl Tray {
                 }
             };
 
-            #[cfg(target_os = "linux")]
-            let builder = TrayIconBuilder::with_id("clash-mini-dev-tray")
-                .icon(image)
-                .menu(&menu)
-                .icon_as_template(false);
-
-            #[cfg(not(target_os = "linux"))]
             let mut builder = TrayIconBuilder::with_id("clash-mini-dev-tray")
                 .icon(image)
                 .menu(&menu)
                 .icon_as_template(false);
 
-            #[cfg(any(target_os = "macos", target_os = "windows"))]
-            {
-                builder = builder.show_menu_on_left_click(false);
-            }
+            builder = builder.show_menu_on_left_click(false);
 
             match builder.build(&app_handle_clone) {
                 Ok(tray) => {
@@ -216,9 +206,6 @@ impl Tray {
         }
         allow
     }
-
-    #[allow(dead_code)]
-    pub const fn update_speed_task(&self, _enable_tray_speed: bool) {}
 }
 
 fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {

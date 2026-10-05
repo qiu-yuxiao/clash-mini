@@ -9,8 +9,6 @@ use crate::{
 use anyhow::Result;
 use clash_verge_logging::Type;
 use compact_str::CompactString;
-#[cfg(unix)]
-use libc;
 use log::Level;
 use scopeguard::defer;
 use tauri_plugin_shell::ShellExt as _;
@@ -35,15 +33,8 @@ impl CoreManager {
         let clash_core = Config::verge().await.latest_arc().get_valid_clash_core();
         let config_dir = dirs::app_home_dir()?;
 
-        #[cfg(unix)]
-        let previous_mask = unsafe { libc::umask(0o007) };
         let cores_dir = config_dir.join("cores");
-        let core_name = if cfg!(windows) {
-            "mini-mihomo.exe"
-        } else {
-            "mini-mihomo"
-        };
-        let custom_core_path = cores_dir.join(core_name);
+        let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
         let gomemlimit = std::env::var("GOMEMLIMIT").unwrap_or_else(|_| "128MiB".to_string());
         let gogc = std::env::var("GOGC").unwrap_or_else(|_| "100".to_string());
@@ -67,11 +58,7 @@ impl CoreManager {
                     dirs::path_to_str(&config_dir)?,
                     "-f",
                     dirs::path_to_str(&config_file)?,
-                    if cfg!(windows) {
-                        "-ext-ctl-pipe"
-                    } else {
-                        "-ext-ctl-unix"
-                    },
+                    "-ext-ctl-pipe",
                     &IClashTemp::guard_external_controller_ipc(),
                 ])
                 .spawn()?
@@ -87,18 +74,10 @@ impl CoreManager {
                     dirs::path_to_str(&config_dir)?,
                     "-f",
                     dirs::path_to_str(&config_file)?,
-                    if cfg!(windows) {
-                        "-ext-ctl-pipe"
-                    } else {
-                        "-ext-ctl-unix"
-                    },
+                    "-ext-ctl-pipe",
                     &IClashTemp::guard_external_controller_ipc(),
                 ])
                 .spawn()?
-        };
-        #[cfg(unix)]
-        unsafe {
-            libc::umask(previous_mask)
         };
 
         let pid = child.pid();

@@ -111,20 +111,3 @@ impl Handle {
         NotificationSystem::send_event(event);
     }
 }
-
-#[cfg(target_os = "macos")]
-impl Handle {
-    pub fn set_activation_policy(&self, policy: tauri::ActivationPolicy) -> Result<(), String> {
-        Self::app_handle()
-            .set_activation_policy(policy)
-            .map_err(|e| e.to_string().into())
-    }
-
-    pub fn set_activation_policy_regular(&self) {
-        let _ = self.set_activation_policy(tauri::ActivationPolicy::Regular);
-    }
-
-    pub fn set_activation_policy_accessory(&self) {
-        let _ = self.set_activation_policy(tauri::ActivationPolicy::Accessory);
-    }
-}

@@ -5,13 +5,9 @@ use nanoid::nanoid;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json;
 use serde_yaml_ng::Mapping;
-use std::{path::PathBuf, str::FromStr};
-
-#[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt as _;
-#[cfg(target_os = "windows")]
 use std::path::Path;
-#[cfg(target_os = "windows")]
+use std::{path::PathBuf, str::FromStr};
 use winapi::um::winbase::{MOVEFILE_REPLACE_EXISTING, MoveFileExW};
 
 /// read data from yaml as struct T
@@ -100,14 +96,8 @@ pub fn save_yaml<T: Serialize>(path: &PathBuf, data: &T, prefix: Option<&str>) -
     std::fs::write(&tmp_path, yaml_bytes)
         .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
-    // 原子替换文件：
-    // - Windows: 使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
-    // - 其他平台: 直接 rename，系统原生支持覆盖
-    let result = if cfg!(windows) {
-        move_file_ex_replace(&tmp_path, path)
-    } else {
-        std::fs::rename(&tmp_path, path)
-    };
+    // 原子替换文件：使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
+    let result = move_file_ex_replace(&tmp_path, path);
 
     if let Err(e) = result {
         let backup_path = path.with_extension("yaml.bak");
@@ -152,14 +142,8 @@ pub fn save_json<T: Serialize>(path: &PathBuf, data: &T) -> Result<()> {
     std::fs::write(&tmp_path, json_bytes)
         .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
-    // 原子替换文件：
-    // - Windows: 使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
-    // - 其他平台: 直接 rename，系统原生支持覆盖
-    let result = if cfg!(windows) {
-        move_file_ex_replace(&tmp_path, path)
-    } else {
-        std::fs::rename(&tmp_path, path)
-    };
+    // 原子替换文件：使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
+    let result = move_file_ex_replace(&tmp_path, path);
 
     if let Err(e) = result {
         let backup_path = path.with_extension("json.bak");
@@ -170,7 +154,6 @@ pub fn save_json<T: Serialize>(path: &PathBuf, data: &T) -> Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "windows")]
 fn move_file_ex_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
     let src_wstr: Vec<u16> = src.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
     let dst_wstr: Vec<u16> = dst.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
@@ -313,27 +296,6 @@ pub fn open_file(path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "linux")]
-pub fn linux_elevator() -> String {
-    use std::process::Command;
-    match Command::new("which").arg("pkexec").output() {
-        Ok(output) => {
-            if !output.stdout.is_empty() {
-                // Convert the output to a string slice
-                if let Ok(path) = std::str::from_utf8(&output.stdout) {
-                    path.trim().to_string()
-                } else {
-                    "sudo".to_string()
-                }
-            } else {
-                "sudo".to_string()
-            }
-        }
-        Err(_) => "sudo".to_string(),
-    }
-}
-
-#[cfg(target_os = "windows")]
 /// copy the file to the dist path and return the dist path
 pub fn snapshot_path(original_path: &Path) -> Result<PathBuf> {
     let temp_dir = original_path

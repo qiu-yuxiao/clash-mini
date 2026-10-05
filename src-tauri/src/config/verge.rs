@@ -56,11 +56,6 @@ pub struct IVerge {
     /// pause render traffic stats on blur
     pub pause_render_traffic_stats_on_blur: Option<bool>,
 
-    /// tray icon
-    #[cfg(target_os = "macos")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tray_icon: Option<String>,
-
     /// menu icon
     #[serde(skip_serializing_if = "Option::is_none")]
     pub menu_icon: Option<String>,
@@ -158,18 +153,6 @@ pub struct IVerge {
     pub auto_log_clean: Option<i32>,
 
     /// verge 的各种 port 用于覆盖 clash 的各种 port
-    #[cfg(not(target_os = "windows"))]
-    pub verge_redir_port: Option<u16>,
-
-    #[cfg(not(target_os = "windows"))]
-    pub verge_redir_enabled: Option<bool>,
-
-    #[cfg(target_os = "linux")]
-    pub verge_tproxy_port: Option<u16>,
-
-    #[cfg(target_os = "linux")]
-    pub verge_tproxy_enabled: Option<bool>,
-
     pub verge_mixed_port: Option<u16>,
 
     pub verge_socks_port: Option<u16>,
@@ -179,9 +162,6 @@ pub struct IVerge {
     pub verge_port: Option<u16>,
 
     pub verge_http_enabled: Option<bool>,
-
-    #[cfg(target_os = "macos")]
-    pub enable_tray_speed: Option<bool>,
 
     /// 自动进入轻量模式
     pub enable_auto_light_weight_mode: Option<bool>,
@@ -330,17 +310,12 @@ impl IVerge {
             clash_core: Some("mini-mihomo".into()),
             language: Some(clash_verge_i18n::system_language().into()),
             theme_mode: Some("dark".into()),
-            #[cfg(not(target_os = "windows"))]
-            env_type: Some("bash".into()),
-            #[cfg(target_os = "windows")]
             env_type: Some("powershell".into()),
             start_page: Some("/".into()),
             traffic_graph: Some(true),
             enable_memory_usage: Some(true),
             enable_group_icon: Some(true),
             pause_render_traffic_stats_on_blur: Some(true),
-            #[cfg(target_os = "macos")]
-            tray_icon: Some("monochrome".into()),
             menu_icon: Some("monochrome".into()),
             notice_position: Some("top-right".into()),
             collapse_navbar: Some(false),
@@ -352,14 +327,6 @@ impl IVerge {
             proxy_auto_config: Some(false),
             pac_file_content: Some(DEFAULT_PAC.into()),
             proxy_host: Some("127.0.0.1".into()),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_port: Some(7895),
-            #[cfg(not(target_os = "windows"))]
-            verge_redir_enabled: Some(false),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_port: Some(7896),
-            #[cfg(target_os = "linux")]
-            verge_tproxy_enabled: Some(false),
             verge_mixed_port: Some(10801),
             verge_socks_port: Some(10802),
             verge_socks_enabled: Some(false),
@@ -373,8 +340,6 @@ impl IVerge {
             auto_check_update: Some(false),
             enable_builtin_enhanced: Some(true),
             auto_log_clean: Some(2), // 1: 1天, 2: 7天, 3: 30天, 4: 90天
-            #[cfg(target_os = "macos")]
-            enable_tray_speed: Some(false),
 
             enable_always_on_top: Some(false),
             enable_auto_light_weight_mode: Some(true),
@@ -416,8 +381,6 @@ impl IVerge {
         patch!(enable_memory_usage);
         patch!(enable_group_icon);
         patch!(pause_render_traffic_stats_on_blur);
-        #[cfg(target_os = "macos")]
-        patch!(tray_icon);
         patch!(menu_icon);
         patch!(menu_order);
         patch!(notice_position);
@@ -428,14 +391,6 @@ impl IVerge {
         patch!(enable_silent_start);
         patch!(enable_hover_jump_navigator);
         patch!(hover_jump_navigator_delay);
-        #[cfg(not(target_os = "windows"))]
-        patch!(verge_redir_port);
-        #[cfg(not(target_os = "windows"))]
-        patch!(verge_redir_enabled);
-        #[cfg(target_os = "linux")]
-        patch!(verge_tproxy_port);
-        #[cfg(target_os = "linux")]
-        patch!(verge_tproxy_enabled);
         patch!(verge_mixed_port);
         patch!(verge_socks_port);
         patch!(verge_socks_enabled);
@@ -464,8 +419,6 @@ impl IVerge {
         patch!(proxy_layout_column);
         patch!(test_list);
         patch!(auto_log_clean);
-        #[cfg(target_os = "macos")]
-        patch!(enable_tray_speed);
 
         patch!(enable_auto_light_weight_mode);
         patch!(auto_light_weight_minutes);
