@@ -1,5 +1,7 @@
 ## v2.9.1
 
+- **Mihomo(Meta) 内核升级至 v1.19.32**
+
 ### 🚀 Features & Architecture Optimization
 - **工程全面收敛为 Windows x64 单一平台**：
   - 彻底精简并移除 macOS 与 Linux 平台的历史分支代码、构建脚本与资源配置，专注打造极致轻量稳定的 Windows x64 专用客户端。
