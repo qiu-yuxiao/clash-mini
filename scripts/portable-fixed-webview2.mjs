@@ -9,18 +9,8 @@ import AdmZip from 'adm-zip'
 const target = process.argv.slice(2)[0]
 const alpha = process.argv.slice(2)[1]
 
-const ARCH_MAP = {
-  'x86_64-pc-windows-msvc': 'x64',
-  'i686-pc-windows-msvc': 'x86',
-  'aarch64-pc-windows-msvc': 'arm64',
-}
-
-const PROCESS_MAP = {
-  x64: 'x64',
-  ia32: 'x86',
-  arm64: 'arm64',
-}
-const arch = target ? ARCH_MAP[target] : PROCESS_MAP[process.arch]
+// 仅保留 Windows x64 架构
+const arch = 'x64'
 /// Script for ci
 /// Pack portable version (only Windows)
 async function resolvePortable() {

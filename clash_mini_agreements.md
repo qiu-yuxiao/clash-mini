@@ -73,6 +73,8 @@
 - **最低系统版本**：Windows 10 x64（与 `x86_64-pc-windows-msvc` 工具链及 WebView2 110+ 要求一致）。
 - **前端层收敛**：前端平台判定统一收敛为 Windows——`getSystem()` 保留函数签名（兼容 CSS 类名与既有条件渲染调用点）但恒返回 `'windows'`；删除 macOS/Linux 专属的标题栏控件、主题分支、窗口 provider 分支与 context menu 分支；样式表中 `.macos`、`.linux`、`.unknown` 选择器删除，与 `.windows` 合并。前端不再做任何运行时平台探测。
 - **元信息收敛**：`vite.config.mts` 不再注入 `OS_PLATFORM`；`scripts/updater.mjs` 的发布平台清单只保留 `win64`（`windows-x86_64`）目标。
+- **构建脚本收敛**：`portable.mjs` / `portable-fixed-webview2.mjs` 的架构映射表固定为 `x64`；`updater-fixed-webview2.mjs` 的发布清单只保留 `windows-x86_64`。
+- **CI 收敛**：所有构建矩阵只保留 `windows-latest` + `x86_64-pc-windows-msvc`。`autobuild.yml` 删除纯 ARM Linux job，合并 WebView2 构建矩阵为 x64；删除 `build_target`（windows_only/all）选项与永远不会命中的 `schedule` 死条件；`release.txt` 下载地址模板只列 Windows x64 安装包与 WebView2 版。`dev.yml` / `lint-clippy.yml` / `cargo-audit.yml` / `cross_check.yaml` / `telegram-notify.yml` 同步收敛。仅 `ubuntu-latest` 作为轻量 runner（validate / 发通知 / 打 tag）保留，与构建产物无关。
 
 ---
 

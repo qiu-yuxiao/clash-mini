@@ -638,7 +638,7 @@ const tasks = [
         log_info('用户必读.txt not found, skipping copy')
       }
 
-      // Copy 用户必读.txt to src-tauri/resources/ (for macOS, Linux and other bundles)
+      // Copy 用户必读.txt to src-tauri/resources/ (bundled resource)
       const dest_res = path.join(cwd, 'src-tauri', 'resources', '用户必读.txt')
       if (fs.existsSync(src)) {
         await fsp.copyFile(src, dest_res)

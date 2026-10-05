@@ -7,16 +7,8 @@ import { context, getOctokit } from '@actions/github'
 import AdmZip from 'adm-zip'
 
 const target = process.argv.slice(2)[0]
-const ARCH_MAP = {
-  'x86_64-pc-windows-msvc': 'x64',
-  'aarch64-pc-windows-msvc': 'arm64',
-}
-
-const PROCESS_MAP = {
-  x64: 'x64',
-  arm64: 'arm64',
-}
-const arch = target ? ARCH_MAP[target] : PROCESS_MAP[process.arch]
+// 仅保留 Windows x64 架构
+const arch = 'x64'
 /// Script for ci
 /// Pack portable version (only Windows)
 async function resolvePortable() {
