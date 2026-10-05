@@ -9,7 +9,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
 import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
-import getSystem from '@/utils/get-system'
 import { isWindowResizing } from '@/utils/window-resizing'
 
 import { WindowContext, type WindowContextType } from './window-context'
@@ -20,9 +19,6 @@ const IDLE_HIDE_DELAY_MS = 10_000
 /** 大尺寸模式窗口尺寸（logical px），与后端 resolve/window.rs 的 MAX_WIDTH/MAX_HEIGHT 对齐 */
 const LARGE_MODE_WIDTH = 640
 const LARGE_MODE_HEIGHT = 860
-
-const OS = getSystem()
-const IS_MACOS = OS === 'macos'
 
 /** 进入大尺寸模式前的窗口尺寸持久化 key（跨会话恢复用） */
 const LAST_NON_LARGE_SIZE_KEY = 'last-non-large-size'
@@ -103,10 +99,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
   /**
    * Whether the window has native decorations (title bar + borders).
-   * Windows/Linux: always frameless (custom titlebar).
-   * macOS: always uses native titlebar.
+   * Windows：始终 frameless（自定义标题栏）。
    */
-  const decorated: boolean = IS_MACOS
+  const decorated: boolean = false
 
   const [isLargeMode, setIsLargeMode] = useState(false)
   /** FEAT-003: true when custom titlebar is hidden by idle auto-hide timer (stealth mode) */
@@ -418,12 +413,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (!currentWindow) return
     currentWindow.setMinimizable?.(true)
-    // Windows/Linux 禁用 OS 级 maximize（Win+上箭头、双击标题栏、任务栏右键），
+    // Windows 禁用 OS 级 maximize（Win+上箭头、双击标题栏、任务栏右键），
     // 改由 toggleMaximize 自定义 640×860 大尺寸模式。
-    // macOS 保留原生绿色按钮行为（zoom/fullscreen），不干预。
-    if (!IS_MACOS) {
-      currentWindow.setMaximizable?.(false)
-    }
+    currentWindow.setMaximizable?.(false)
     // 初始化 lastNonLargeSizeRef 为当前实际窗口尺寸（兼容窗口状态恢复插件）
     currentWindow
       .innerSize()

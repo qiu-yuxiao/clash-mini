@@ -71,6 +71,8 @@
 - **依赖收敛**：`Cargo.toml` 仅声明 Windows 平台依赖，移除 macOS（objc2 全家桶）与 unix（libc）依赖段；构建脚本与打包配置同理只保留 Windows x64 目标。
 - **Windows 逻辑零改动**：本收敛只做「删非 Windows 分支 / 去平台条件编译」，Windows 分支的行为逻辑一行不改。
 - **最低系统版本**：Windows 10 x64（与 `x86_64-pc-windows-msvc` 工具链及 WebView2 110+ 要求一致）。
+- **前端层收敛**：前端平台判定统一收敛为 Windows——`getSystem()` 保留函数签名（兼容 CSS 类名与既有条件渲染调用点）但恒返回 `'windows'`；删除 macOS/Linux 专属的标题栏控件、主题分支、窗口 provider 分支与 context menu 分支；样式表中 `.macos`、`.linux`、`.unknown` 选择器删除，与 `.windows` 合并。前端不再做任何运行时平台探测。
+- **元信息收敛**：`vite.config.mts` 不再注入 `OS_PLATFORM`；`scripts/updater.mjs` 的发布平台清单只保留 `win64`（`windows-x86_64`）目标。
 
 ---
 

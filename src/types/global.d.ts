@@ -1,18 +1,4 @@
-type Platform =
-  | 'aix'
-  | 'android'
-  | 'darwin'
-  | 'freebsd'
-  | 'haiku'
-  | 'linux'
-  | 'openbsd'
-  | 'sunos'
-  | 'win32'
-  | 'cygwin'
-  | 'netbsd'
-
 /**
- * defines in `vite.config.ts`
+ * Clash Mini 仅支持 Windows 10 x64。
  */
-declare const OS_PLATFORM: Platform
-
+type Platform = 'win32'

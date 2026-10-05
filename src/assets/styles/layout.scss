@@ -152,9 +152,7 @@
   }
 }
 
-.linux,
-.windows,
-.unknown {
+.windows {
   &.layout {
     .the_titlebar {
       width: 100%;
@@ -186,42 +184,6 @@
 
     .layout-content__right .the-content {
       top: 5px;
-    }
-  }
-}
-
-.macos {
-  &.layout {
-    .the_titlebar {
-      width: 100%;
-      display: flex;
-      justify-content: flex-start;
-      padding: 0 8px 0 10px;
-      box-sizing: border-box;
-      height: 30px;
-      border-bottom: 1px solid var(--theme-border);
-      background: rgba(var(--theme-bg-base-rgb, 240, 245, 255), calc(1 - 0.2 * var(--depth-factor, 1.0))) !important;
-      backdrop-filter: blur(calc(8px * var(--depth-factor, 1.0))) !important;
-      box-shadow: 0 1px 4px var(--theme-border-outer);
-
-      &-drag-region {
-        align-self: stretch;
-        flex: 1 1 auto;
-        order: 1;
-      }
-    }
-
-    .layout-content__left {
-      padding-top: 5px;
-    }
-
-    .layout-content__right .the-content {
-      top: 5px;
-    }
-
-    .layout-content__left .the-newbtn {
-      right: 9px;
-      top: 2px;
     }
   }
 }

@@ -37,7 +37,4 @@ export default defineConfig({
       '@root': path.resolve('.'),
     },
   },
-  define: {
-    OS_PLATFORM: `"${process.platform}"`,
-  },
 })

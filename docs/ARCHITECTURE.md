@@ -23,7 +23,7 @@ Clash Mini 是 **Tauri v2 混合桌面应用**，在原版 Clash Verge 基础上
 - **前端**：React 19 + TypeScript + Vite + MUI，状态层用 `@tanstack/react-query`（服务端状态）+ `foxact`（轻量上下文），无 Redux / zustand。
 - **后端**：Rust（Tauri 命令层 + 内核生命周期 + 配置生成 + 监测守护线程），workspace 由 `src-tauri` 与若干 `crates/*` 组成。
 - **内核**：**Mihomo (Clash.Meta)**，以 **sidecar 子进程**或 Windows **系统服务**形式运行，二进制名前缀 `mini-` 与原版 `verge-mihomo` 物理隔离。
-- **内核通信**：专用 Tauri 插件 `tauri-plugin-mihomo`，通过**本地套接字**（Linux/macOS Unix socket，Windows 命名管道 `\\.\pipe\mini-mihomo`）以 HTTP + WebSocket 与内核交互，避免使用 raw TCP（external_controller 禁用时仍能通信）。
+- **内核通信**：专用 Tauri 插件 `tauri-plugin-mihomo`，通过 **Windows 命名管道**（`\\.\pipe\mini-mihomo`）以 HTTP + WebSocket 与内核交互，避免使用 raw TCP（external_controller 禁用时仍能通信）。
 - **核心架构约定**：所有上游代理组被**折叠为唯一 `PROXY` 选择器组** + 一个隐藏的 `PROXY__METRICS`（url-test）测量组；几乎所有逻辑只碰 `PROXY`。
 
 ---

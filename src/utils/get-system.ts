@@ -1,14 +1,6 @@
 // get the system os
-// according to UA
+// Clash Mini 仅支持 Windows 10 x64，故恒返回 'windows'。
+// 保留函数以兼容既有调用点（CSS 类名、条件渲染等）。
 export default function getSystem() {
-  const ua = navigator.userAgent
-  const platform = OS_PLATFORM
-
-  if (ua.includes('Mac OS X') || platform === 'darwin') return 'macos'
-
-  if (/win64|win32/i.test(ua) || platform === 'win32') return 'windows'
-
-  if (/linux/i.test(ua)) return 'linux'
-
-  return 'unknown'
+  return 'windows' as const
 }

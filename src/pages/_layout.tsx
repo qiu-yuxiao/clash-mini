@@ -1259,7 +1259,6 @@ const Layout = () => {
         }}
         onContextMenu={(e) => {
           if (
-            OS === 'windows' &&
             !['input', 'textarea'].includes(
               e.currentTarget.tagName.toLowerCase(),
             ) &&

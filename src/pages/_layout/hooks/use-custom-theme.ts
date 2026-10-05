@@ -9,8 +9,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useVerge } from '@/hooks/use-verge'
 import { defaultDarkTheme, defaultTheme } from '@/pages/_theme'
 import { useSetThemeMode, useThemeMode } from '@/services/states'
-import getSystem from '@/utils/get-system'
-
 const getSystemAccentColor = (): string | null => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return null
@@ -556,7 +554,7 @@ export const useCustomTheme = () => {
 
         /* 背景图处理 */
         body {
-          background-color: ${getSystem() === 'windows' ? 'transparent' : 'var(--background-color)'} !important;
+          background-color: transparent !important;
           ${
             hasUserBackground
               ? `
