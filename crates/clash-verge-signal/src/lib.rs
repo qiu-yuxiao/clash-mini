@@ -2,9 +2,6 @@ use std::sync::OnceLock;
 
 use clash_verge_logging::{Type, logging};
 
-#[cfg(unix)]
-mod unix;
-#[cfg(windows)]
 mod windows;
 
 pub(crate) static RUNTIME: OnceLock<Option<tokio::runtime::Runtime>> = OnceLock::new();
@@ -29,9 +26,5 @@ where
         },
     );
 
-    #[cfg(unix)]
-    unix::register(f);
-
-    #[cfg(windows)]
     windows::register(f);
 }

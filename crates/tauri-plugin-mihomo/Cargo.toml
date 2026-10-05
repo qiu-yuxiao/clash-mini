@@ -33,9 +33,6 @@ bytes = "1.11"
 http-body-util = "0.1"
 crossbeam = "0.8"
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
 [target.'cfg(windows)'.dependencies]
 windows-sys = "0.61"
 
