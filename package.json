@@ -39,7 +39,7 @@
     "i18n:types": "node scripts/generate-i18n-keys.mjs",
     "typecheck": "tsc --noEmit",
     "cargo-check": "cargo check --workspace",
-    "cargo-test": "cross-env CLASH_MINI_TEST_LINK=1 cargo test --lib -- --test-threads=1",
+    "cargo-test": "cross-env CLASH_MINI_TEST_LINK=1 cargo test --lib",
     "test-agreement": "cross-env CLASH_MINI_TEST_LINK=1 cargo test --package clash-mini --lib -- enhance::tests::test_enforce_mini_agreements_logic"
   },
   "dependencies": {

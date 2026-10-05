@@ -177,8 +177,18 @@ async fn handle_saved_profile_file(
 mod tests {
     use super::*;
 
+    // 本模块的三个用例都会通过全局单例 `Config::profiles()` 改写同一份草稿，
+    // 且是整表替换 items（`d.items = Some(vec![item])`）。并行执行时会互相覆盖，
+    // 使 save_profile_file 内 `get_item(&index)` 找不到本用例写入的 index 而失败。
+    // 用进程内异步互斥锁将这三个用例串行化，保证彼此隔离。
+    // 说明：当前仅本模块的测试会改动该全局草稿，故模块级锁即可覆盖。
+    static PROFILES_DRAFT_TEST_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+        std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
     #[tokio::test]
     async fn test_save_profile_file_read_before_write() {
+        let _guard = PROFILES_DRAFT_TEST_LOCK.lock().await;
+
         // Force portable flag to true
         let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
 
@@ -240,6 +250,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_profile_file_edge_cases() {
+        let _guard = PROFILES_DRAFT_TEST_LOCK.lock().await;
+
         // Force portable flag to true
         let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
 
@@ -374,6 +386,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_profile_file_missing_file() {
+        let _guard = PROFILES_DRAFT_TEST_LOCK.lock().await;
+
         // Force portable flag to true
         let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
 
