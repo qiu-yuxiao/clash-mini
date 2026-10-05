@@ -6,7 +6,6 @@ import path from 'path'
 import zlib from 'zlib'
 
 import AdmZip from 'adm-zip'
-import { glob } from 'glob'
 import { HttpsProxyAgent } from 'https-proxy-agent'
 import fetch from 'node-fetch'
 import { extract } from 'tar'
@@ -28,36 +27,22 @@ const FORCE = process.argv.includes('--force') || process.argv.includes('-f')
 const VERSION_CACHE_FILE = path.join(TEMP_DIR, '.version_cache.json')
 const HASH_CACHE_FILE = path.join(TEMP_DIR, '.hash_cache.json')
 
+// Windows x64 only — the project no longer targets other platforms/architectures.
 const PLATFORM_MAP = {
   'x86_64-pc-windows-msvc': 'win32',
-  'i686-pc-windows-msvc': 'win32',
-  'aarch64-pc-windows-msvc': 'win32',
-  'x86_64-apple-darwin': 'darwin',
-  'aarch64-apple-darwin': 'darwin',
-  'x86_64-unknown-linux-gnu': 'linux',
-  'i686-unknown-linux-gnu': 'linux',
-  'aarch64-unknown-linux-gnu': 'linux',
-  'armv7-unknown-linux-gnueabihf': 'linux',
-  'riscv64gc-unknown-linux-gnu': 'linux',
-  'loongarch64-unknown-linux-gnu': 'linux',
 }
 const ARCH_MAP = {
   'x86_64-pc-windows-msvc': 'x64',
-  'i686-pc-windows-msvc': 'ia32',
-  'aarch64-pc-windows-msvc': 'arm64',
-  'x86_64-apple-darwin': 'x64',
-  'aarch64-apple-darwin': 'arm64',
-  'x86_64-unknown-linux-gnu': 'x64',
-  'i686-unknown-linux-gnu': 'ia32',
-  'aarch64-unknown-linux-gnu': 'arm64',
-  'armv7-unknown-linux-gnueabihf': 'arm',
-  'riscv64gc-unknown-linux-gnu': 'riscv64',
-  'loongarch64-unknown-linux-gnu': 'loong64',
 }
 
 const arg1 = process.argv.slice(2)[0]
 const arg2 = process.argv.slice(2)[1]
 const target = arg1 === '--force' || arg1 === '-f' ? arg2 : arg1
+if (target && !PLATFORM_MAP[target]) {
+  throw new Error(
+    `unsupported target "${target}" — only x86_64-pc-windows-msvc is supported`,
+  )
+}
 const { platform, arch } = target
   ? { platform: PLATFORM_MAP[target], arch: ARCH_MAP[target] }
   : process
@@ -70,8 +55,8 @@ const SIDECAR_HOST = target
 
 const RESOURCES_DIR = path.join(cwd, 'src-tauri', 'resources')
 const SIDECAR_DIR = path.join(cwd, 'src-tauri', 'sidecar')
-// Linux service binaries are bundled as externalBin sidecars (see tauri.linux.conf.json)
-const SERVICE_DIR = platform === 'linux' ? SIDECAR_DIR : RESOURCES_DIR
+// Windows ships the service binaries as resources next to the app.
+const SERVICE_DIR = RESOURCES_DIR
 
 // =======================
 // Version Cache
@@ -177,16 +162,6 @@ let META_VERSION
 
 const META_MAP = {
   'win32-x64': 'mihomo-windows-amd64-v2',
-  'win32-ia32': 'mihomo-windows-386',
-  'win32-arm64': 'mihomo-windows-arm64',
-  'darwin-x64': 'mihomo-darwin-amd64-v2-go122',
-  'darwin-arm64': 'mihomo-darwin-arm64-go122',
-  'linux-x64': 'mihomo-linux-amd64-v2',
-  'linux-ia32': 'mihomo-linux-386',
-  'linux-arm64': 'mihomo-linux-arm64',
-  'linux-arm': 'mihomo-linux-armv7',
-  'linux-riscv64': 'mihomo-linux-riscv64',
-  'linux-loong64': 'mihomo-linux-loong64',
 }
 
 async function getLatestReleaseVersion() {
@@ -225,7 +200,9 @@ async function getLatestReleaseVersion() {
 // Validate availability
 // =======================
 if (!META_MAP[`${platform}-${arch}`]) {
-  throw new Error(`clash meta unsupported platform "${platform}-${arch}"`)
+  throw new Error(
+    `unsupported host "${platform}-${arch}" — only win32-x64 (Windows x64) is supported`,
+  )
 }
 
 // =======================
@@ -233,14 +210,12 @@ if (!META_MAP[`${platform}-${arch}`]) {
 // =======================
 function clashMeta() {
   const name = META_MAP[`${platform}-${arch}`]
-  const isWin = platform === 'win32'
-  const urlExt = isWin ? 'zip' : 'gz'
   return {
     name: 'mini-mihomo',
-    targetFile: `mini-mihomo-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
-    exeFile: `${name}${isWin ? '.exe' : ''}`,
-    zipFile: `${name}-${META_VERSION}.${urlExt}`,
-    downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
+    targetFile: `mini-mihomo-${SIDECAR_HOST}.exe`,
+    exeFile: `${name}.exe`,
+    zipFile: `${name}-${META_VERSION}.zip`,
+    downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.zip`,
   }
 }
 
@@ -340,7 +315,6 @@ async function resolveSidecar(binInfo) {
           throw new Error(`Expected binary not found in ${tempDir}`)
         await fsp.rename(path.join(tempDir, candidate), sidecarPath)
       }
-      if (platform !== 'win32') execSync(`chmod 755 ${sidecarPath}`)
       log_success(`unzip finished: "${name}"`)
     } else if (zipFile.endsWith('.tgz')) {
       await extract({ cwd: tempDir, file: tempZip })
@@ -371,7 +345,6 @@ async function resolveSidecar(binInfo) {
           })
           .pipe(writeStream)
           .on('finish', () => {
-            if (platform !== 'win32') execSync(`chmod 755 ${sidecarPath}`)
             resolve()
           })
           .on('error', (e) => {
@@ -476,42 +449,6 @@ const resolvePlugin = async () => {
   }
 }
 
-// service chmod (Keep and use glob)
-const resolveServicePermission = async () => {
-  const serviceExecutables = [
-    'clash-verge-service*',
-    'clash-verge-service-install*',
-    'clash-verge-service-uninstall*',
-  ]
-  const hashCache = await loadHashCache()
-  let hasChanges = false
-
-  for (const f of serviceExecutables) {
-    const files = glob.sync(path.join(SERVICE_DIR, f))
-    for (const filePath of files) {
-      if (fs.existsSync(filePath)) {
-        const currentHash = await calculateFileHash(filePath)
-        const cacheKey = `${filePath}_chmod`
-        if (!FORCE && hashCache[cacheKey] === currentHash) {
-          continue
-        }
-        try {
-          execSync(`chmod 755 ${filePath}`)
-          log_success(`chmod finished: "${filePath}"`)
-        } catch (e) {
-          log_error(`chmod failed for ${filePath}:`, e.message)
-        }
-        hashCache[cacheKey] = currentHash
-        hasChanges = true
-      }
-    }
-  }
-
-  if (hasChanges) {
-    await saveHashCache(hashCache)
-  }
-}
-
 // =======================
 // Other resource resolvers (service, mmdb, geosite, enableLoopback)
 // =======================
@@ -533,11 +470,9 @@ const SERVICE_BINARIES = [
 ]
 
 function serviceFileInfo(name) {
-  const ext = platform === 'win32' ? '.exe' : ''
-  const suffix = platform === 'linux' ? '-' + SIDECAR_HOST : ''
   return {
-    sourceFile: `${name}${ext}`,
-    targetFile: `${name}${suffix}${ext}`,
+    sourceFile: `${name}.exe`,
+    targetFile: `${name}.exe`,
   }
 }
 
@@ -617,7 +552,7 @@ async function resolveServiceBundle() {
 
   await getLatestServiceVersion()
 
-  const archiveExt = platform === 'win32' ? 'zip' : 'tar.gz'
+  const archiveExt = 'zip'
   const archiveFile = `clash-verge-service-ipc-${SERVICE_VERSION}-${SIDECAR_HOST}.${archiveExt}`
   const downloadURL = `${SERVICE_URL_PREFIX}/${SERVICE_VERSION}/${archiveFile}`
   const tempDir = path.join(TEMP_DIR, 'clash-verge-service-ipc')
@@ -629,17 +564,13 @@ async function resolveServiceBundle() {
   try {
     await downloadFile(downloadURL, tempArchive)
 
-    if (platform === 'win32') {
-      const zip = new AdmZip(tempArchive)
-      zip
-        .getEntries()
-        .forEach((entry) =>
-          log_debug('"clash-verge-service-ipc" entry:', entry.entryName),
-        )
-      zip.extractAllTo(tempDir, true)
-    } else {
-      await extract({ cwd: tempDir, file: tempArchive })
-    }
+    const zip = new AdmZip(tempArchive)
+    zip
+      .getEntries()
+      .forEach((entry) =>
+        log_debug('"clash-verge-service-ipc" entry:', entry.entryName),
+      )
+    zip.extractAllTo(tempDir, true)
 
     for (const { sourceFile, targetFile, targetPath } of files) {
       const extractedFile = await findExtractedFile(tempDir, sourceFile)
@@ -648,7 +579,6 @@ async function resolveServiceBundle() {
       }
 
       await fsp.copyFile(extractedFile, targetPath)
-      if (platform !== 'win32') await fsp.chmod(targetPath, 0o755)
       await updateHashCache(targetPath)
       log_success(`Extracted service file: ${targetFile}`)
     }
@@ -675,17 +605,6 @@ const resolveEnableLoopback = () =>
     downloadURL: `https://github.com/Kuingsmile/uwp-tool/releases/download/latest/enableLoopback.exe`,
   })
 
-const resolveSetDnsScript = () =>
-  resolveResource({
-    file: 'set_dns.sh',
-    localPath: path.join(cwd, 'scripts/set_dns.sh'),
-  })
-const resolveUnSetDnsScript = () =>
-  resolveResource({
-    file: 'unset_dns.sh',
-    localPath: path.join(cwd, 'scripts/unset_dns.sh'),
-  })
-
 // =======================
 // Tasks
 // =======================
@@ -705,24 +624,6 @@ const tasks = [
     func: resolveEnableLoopback,
     retry: 5,
     winOnly: true,
-  },
-  {
-    name: 'service_chmod',
-    func: resolveServicePermission,
-    retry: 5,
-    unixOnly: platform === 'linux' || platform === 'darwin',
-  },
-  {
-    name: 'set_dns_script',
-    func: resolveSetDnsScript,
-    retry: 5,
-    macosOnly: true,
-  },
-  {
-    name: 'unset_dns_script',
-    func: resolveUnSetDnsScript,
-    retry: 5,
-    macosOnly: true,
   },
   {
     name: 'copy_readme',
@@ -751,10 +652,7 @@ const tasks = [
 async function runTask() {
   const task = tasks.shift()
   if (!task) return
-  if (task.unixOnly && platform === 'win32') return runTask()
   if (task.winOnly && platform !== 'win32') return runTask()
-  if (task.macosOnly && platform !== 'darwin') return runTask()
-  if (task.linuxOnly && platform !== 'linux') return runTask()
 
   for (let i = 0; i < task.retry; i++) {
     try {
