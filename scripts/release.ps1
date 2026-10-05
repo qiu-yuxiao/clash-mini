@@ -18,7 +18,7 @@ param(
     [string]$Version
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 Set-StrictMode -Version Latest
 
 # Fix encoding issue on Windows PowerShell (CP936 to UTF-8)
@@ -151,7 +151,11 @@ if (-not $SkipBumpAndTag) {
         Log-Error "bump_version.py execution failed"
         exit 1
     }
-    cargo check --workspace --quiet 2>$null
+    cargo check --workspace --quiet 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Log-Error "cargo check failed"
+        exit 1
+    }
 
     # ─────────────────────────────────────────────
     # Stage 3: Git Commit, Push, Tag
