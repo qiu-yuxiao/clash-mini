@@ -814,6 +814,14 @@ mod tests {
         use super::enforce_mini_agreements;
         use serde_yaml_ng::{Mapping, Value};
 
+        // `enforce_mini_agreements` 经 `Config::verge()` → `Config::global()` →
+        // `IClashTemp::new()` → `dirs::clash_path()` → `app_home_dir()` 触达全局
+        // `APP_HANDLE`。单测环境没有 Tauri AppHandle，若走非 portable 分支会
+        // panic（App handle not initialized）。将 PORTABLE_FLAG 置为 true 使
+        // `app_home_dir()` 走 portable 分支（仅依赖 current_exe，不碰 app_handle），
+        // 从而让本测试自包含、可单独运行——与本仓库其它单测（save_profile / prfitem）一致。
+        let _ = crate::utils::dirs::PORTABLE_FLAG.get_or_init(|| true);
+
         let config_str = r#"
 proxies:
   - name: "node-A"
