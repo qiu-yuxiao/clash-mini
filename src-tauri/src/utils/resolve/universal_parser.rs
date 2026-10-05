@@ -548,14 +548,14 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
 
     // hysteria v1 分享链接：hysteria://host:port?key=value...#name
     // 认证串通常放在 query（auth / auth_str），少数生成器会写成 userinfo 形式，这里一并兼容。
-    let (host_port_query, userinfo) = match base_part.rsplit_once('@') {
-        Some((user, rest)) => (rest, Some(user)),
-        None => (base_part, None),
-    };
-
-    let (host_port, query) = host_port_query
+    // 先分离 query，再按最后一个 @ 拆分 userinfo：query 值含 @ 时不会切错。
+    let (auth_host, query) = base_part
         .split_once('?')
-        .map_or((host_port_query, None as Option<&str>), |(hp, q)| (hp, Some(q)));
+        .map_or((base_part, None as Option<&str>), |(ah, q)| (ah, Some(q)));
+    let (host_port, userinfo) = match auth_host.rsplit_once('@') {
+        Some((user, hp)) => (hp, Some(user)),
+        None => (auth_host, None),
+    };
 
     let (server, port) = extract_host_port(host_port, 443)?;
     if server.is_empty() {
@@ -679,17 +679,17 @@ fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
         .unwrap_or_else(|| "AnyTLS Node".to_string());
 
     // anytls 分享链接：anytls://password@host:port?sni=...&insecure=1#name
-    let (password_raw, host_port_query) = base_part.rsplit_once('@')?;
+    // 先分离 query，再按最后一个 @ 拆分 userinfo：query 值含 @ 时不会切错。
+    let (auth_host, query) = base_part
+        .split_once('?')
+        .map_or((base_part, None as Option<&str>), |(ah, q)| (ah, Some(q)));
+    let (password_raw, host_port) = auth_host.rsplit_once('@')?;
     let password = percent_encoding::percent_decode_str(password_raw)
         .decode_utf8_lossy()
         .to_string();
     if password.is_empty() {
         return None;
     }
-
-    let (host_port, query) = host_port_query
-        .split_once('?')
-        .map_or((host_port_query, None as Option<&str>), |(hp, q)| (hp, Some(q)));
 
     let (server, port) = extract_host_port(host_port, 443)?;
     if server.is_empty() {
@@ -1975,6 +1975,52 @@ mod tests {
         assert_eq!(
             map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
             "example.com"
+        );
+    }
+
+    #[test]
+    fn test_parse_hysteria_query_value_contains_at() {
+        // query 值含未编码 @：先分离 query 再拆 @，避免 peer/sni 值中的 @ 干扰 userinfo 拆分
+        let link = "hysteria://auth_str@example.com:443?peer=user@backend.example.com&insecure=1#hy-query-at";
+        let map = parse_hysteria(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("auth-str")).unwrap().as_str().unwrap(),
+            "auth_str"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("sni")).unwrap().as_str().unwrap(),
+            "user@backend.example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("skip-cert-verify")).unwrap().as_bool().unwrap(),
+            true
+        );
+    }
+
+    #[test]
+    fn test_parse_anytls_query_value_contains_at() {
+        // query 值含未编码 @：先分离 query 再拆 @，避免 sni 值中的 @ 干扰 password 拆分
+        let link = "anytls://mypass@example.com:443?sni=user@internal.example.com&insecure=true#anytls-query-at";
+        let map = parse_anytls(link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(),
+            "mypass"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("server")).unwrap().as_str().unwrap(),
+            "example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("sni")).unwrap().as_str().unwrap(),
+            "user@internal.example.com"
+        );
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("skip-cert-verify")).unwrap().as_bool().unwrap(),
+            true
         );
     }
 }
