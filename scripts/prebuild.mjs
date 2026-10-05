@@ -168,31 +168,12 @@ async function updateHashCache(targetPath) {
 }
 
 // =======================
-// Meta maps (stable & alpha)
+// Meta maps
 // =======================
-const META_ALPHA_VERSION_URL =
-  'https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt'
-const META_ALPHA_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha`
-let META_ALPHA_VERSION
-
 const META_VERSION_URL =
   'https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt'
 const META_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download`
 let META_VERSION
-
-const META_ALPHA_MAP = {
-  'win32-x64': 'mihomo-windows-amd64-v2',
-  'win32-ia32': 'mihomo-windows-386',
-  'win32-arm64': 'mihomo-windows-arm64',
-  'darwin-x64': 'mihomo-darwin-amd64-v1-go122',
-  'darwin-arm64': 'mihomo-darwin-arm64-go122',
-  'linux-x64': 'mihomo-linux-amd64-v2',
-  'linux-ia32': 'mihomo-linux-386',
-  'linux-arm64': 'mihomo-linux-arm64',
-  'linux-arm': 'mihomo-linux-armv7',
-  'linux-riscv64': 'mihomo-linux-riscv64',
-  'linux-loong64': 'mihomo-linux-loong64',
-}
 
 const META_MAP = {
   'win32-x64': 'mihomo-windows-amd64-v2',
@@ -246,26 +227,10 @@ async function getLatestReleaseVersion() {
 if (!META_MAP[`${platform}-${arch}`]) {
   throw new Error(`clash meta unsupported platform "${platform}-${arch}"`)
 }
-if (!META_ALPHA_MAP[`${platform}-${arch}`]) {
-  throw new Error(`clash meta alpha unsupported platform "${platform}-${arch}"`)
-}
 
 // =======================
 // Build meta objects
 // =======================
-function clashMetaAlpha() {
-  const name = META_MAP[`${platform}-${arch}`]
-  const isWin = platform === 'win32'
-  const urlExt = isWin ? 'zip' : 'gz'
-  return {
-    name: 'mini-mihomo-alpha',
-    targetFile: `mini-mihomo-alpha-${SIDECAR_HOST}${isWin ? '.exe' : ''}`,
-    exeFile: `${name}${isWin ? '.exe' : ''}`,
-    zipFile: `${name}-${META_VERSION}.${urlExt}`,
-    downloadURL: `${META_URL_PREFIX}/${META_VERSION}/${name}-${META_VERSION}.${urlExt}`,
-  }
-}
-
 function clashMeta() {
   const name = META_MAP[`${platform}-${arch}`]
   const isWin = platform === 'win32'
@@ -725,12 +690,6 @@ const resolveUnSetDnsScript = () =>
 // Tasks
 // =======================
 const tasks = [
-  {
-    name: 'mini-mihomo-alpha',
-    func: () =>
-      getLatestReleaseVersion().then(() => resolveSidecar(clashMetaAlpha())),
-    retry: 5,
-  },
   {
     name: 'mini-mihomo',
     func: () =>

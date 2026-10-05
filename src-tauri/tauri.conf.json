@@ -16,8 +16,7 @@
     ],
     "publisher": "Clash Mini",
     "externalBin": [
-      "sidecar/mini-mihomo",
-      "sidecar/mini-mihomo-alpha"
+      "sidecar/mini-mihomo"
     ],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",

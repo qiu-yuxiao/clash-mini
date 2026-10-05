@@ -23,8 +23,8 @@ pub enum ChainType {
 
 #[derive(Debug, Clone)]
 pub enum ChainSupport {
+    /// 仅 mini-mihomo 内核（alpha 内核支持已移除，保留枚举以便后续扩展内核类型）
     ClashMeta,
-    ClashMetaAlpha,
 }
 
 // impl From<&PrfItem> for Option<ChainItem> {
@@ -111,17 +111,9 @@ impl ChainItem {
         // meta 1.13.2 alpn string 转 数组
         let hy_alpn = Self::to_script("verge_hy_alpn", include_str!("./builtin/meta_hy_alpn.js"));
 
-        // meta 的一些处理
-        let meta_guard_alpha = Self::to_script("verge_meta_guard", include_str!("./builtin/meta_guard.js"));
-
-        // meta 1.13.2 alpn string 转 数组
-        let hy_alpn_alpha = Self::to_script("verge_hy_alpn", include_str!("./builtin/meta_hy_alpn.js"));
-
         vec![
             (ChainSupport::ClashMeta, hy_alpn),
             (ChainSupport::ClashMeta, meta_guard),
-            (ChainSupport::ClashMetaAlpha, hy_alpn_alpha),
-            (ChainSupport::ClashMetaAlpha, meta_guard_alpha),
         ]
     }
 
@@ -136,10 +128,7 @@ impl ChainItem {
 impl ChainSupport {
     pub fn is_support(&self, core: Option<&String>) -> bool {
         match core {
-            Some(core) => matches!(
-                (self, core.as_str()),
-                (Self::ClashMeta, "mini-mihomo") | (Self::ClashMetaAlpha, "mini-mihomo-alpha")
-            ),
+            Some(core) => matches!((self, core.as_str()), (Self::ClashMeta, "mini-mihomo")),
             None => true,
         }
     }

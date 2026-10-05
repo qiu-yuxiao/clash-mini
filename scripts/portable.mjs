@@ -50,7 +50,6 @@ async function resolvePortable() {
 
   zip.addLocalFile(path.join(releaseDir, 'clash-mini.exe'))
   zip.addLocalFile(path.join(releaseDir, 'mini-mihomo.exe'))
-  zip.addLocalFile(path.join(releaseDir, 'mini-mihomo-alpha.exe'))
   zip.addLocalFolder(path.join(releaseDir, 'resources'), 'resources')
   zip.addLocalFolder(configDir, '.config')
   if (fs.existsSync(path.join(process.cwd(), '\u7528\u6237\u5fc5\u8bfb.txt'))) {

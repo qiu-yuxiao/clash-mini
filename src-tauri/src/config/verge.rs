@@ -228,8 +228,8 @@ pub struct IVergeTheme {
 }
 
 impl IVerge {
-    /// 有效的clash核心名称
-    pub const VALID_CLASH_CORES: &'static [&'static str] = &["mini-mihomo", "mini-mihomo-alpha"];
+    /// 有效的clash核心名称（alpha 内核支持已移除；历史配置中的 alpha 值会在校验时自动修正为 mini-mihomo）
+    pub const VALID_CLASH_CORES: &'static [&'static str] = &["mini-mihomo"];
 
     /// 验证并修正配置文件中的clash_core值
     pub async fn validate_and_fix_config() -> Result<()> {
