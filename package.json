@@ -25,11 +25,9 @@
     "release:autobuild": "pnpm release-version autobuild",
     "release:deploytest": "pnpm release-version deploytest",
     "publish-version": "node scripts/publish-version.mjs",
-    "check-run": "node C:\\Users\\sun_y\\.gemini\\antigravity\\brain\\233796e9-dbba-4bae-8c91-0d25cbea3af5\\scratch\\get-failed-run-logs.mjs",
     "push-dev": "git push origin dev",
     "repush-tag": "git push origin :refs/tags/v2.0.2-full && git tag v2.0.2-full && git push origin v2.0.2-full",
     "commit-and-repush": "git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json Cargo.lock src-tauri/packages/windows/installer.nsi && git commit -m \"chore: bump version to 2.0.2-full and fix NSIS path\" --no-verify && git push origin dev && git push origin :refs/tags/v2.0.2-full && git tag -d v2.0.2-full && git tag v2.0.2-full && git push origin v2.0.2-full",
-    "list-runs": "node C:\\Users\\sun_y\\.gemini\\antigravity\\brain\\233796e9-dbba-4bae-8c91-0d25cbea3af5\\scratch\\list-all-runs.mjs",
     "git-log": "git log -n 5 --oneline",
     "git-status": "git status",
     "lint": "eslint -c eslint.config.ts --max-warnings=0 --cache --cache-location .eslintcache src",
@@ -41,8 +39,8 @@
     "i18n:types": "node scripts/generate-i18n-keys.mjs",
     "typecheck": "tsc --noEmit",
     "cargo-check": "cargo check --workspace",
-    "cargo-test": "cargo test",
-    "test-agreement": "cargo test --package clash-mini --lib -- enhance::tests::test_enforce_mini_agreements_logic"
+    "cargo-test": "cross-env CLASH_MINI_TEST_LINK=1 cargo test --lib -- --test-threads=1",
+    "test-agreement": "cross-env CLASH_MINI_TEST_LINK=1 cargo test --package clash-mini --lib -- enhance::tests::test_enforce_mini_agreements_logic"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
