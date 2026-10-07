@@ -1,3 +1,16 @@
+## v2.9.2
+
+### 🐞 Fixed Bugs
+- **单点测速 TUN 回环假死彻底修复（BUG-282）**：
+  - 修复了在 TUN 模式下对当前活跃节点进行单点测速时，因流量回环导致测速必得 Timeout 的严重缺陷。将单点测速通道由直连内核 `/proxies/{name}/delay` 彻底重构为委托后端的统一测量组（`PROXY__METRICS`），与群发测速完全同源，彻底根除 TUN 回环。
+  - 移除了前端自相矛盾的 1000ms 竞速超时截断，统一使用后端 2000ms 探针超时。
+  - 确立单点测速三条核心契约（仅测量不切换节点、全组拨测换取无回环与数据源唯一、未真正执行禁止伪造超时）。
+  - 补齐互斥抢占（`AUTO_SELECT_BUSY`）与未就绪（`AUTO_SELECT_NO_RESULT`）时的友好反馈与原值恢复，杜绝测速假死或谎报超时。
+- **存量代码格式与 Lint 清理**：
+  - 修复 `_layout.tsx` 中的 Biome 与 ESLint 格式警告，精简废弃的 `testUrl` 与 `urlMap` 状态管理。
+
+---
+
 ## v2.9.1
 
 ### 🚀 Features & Architecture Optimization
