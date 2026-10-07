@@ -122,8 +122,8 @@ const ORDER_OPTIONS = [
     fn: (list: IConnectionsItem[]) =>
       list.sort(
         (a, b) =>
-          new Date(b.start || '0').getTime()! -
-          new Date(a.start || '0').getTime()!,
+          new Date(b.start || '0').getTime() -
+          new Date(a.start || '0').getTime(),
       ),
   },
   {
@@ -466,7 +466,7 @@ const Layout = () => {
     })
     if (orderFunc) matchConns = orderFunc(matchConns)
     return matchConns
-  }, [connectionsData, connectionsType, match, curOrderOpt])
+  }, [connectionsData, connectionsType, match])
 
   const handleSearch = useCallback((match: (content: string) => boolean) => {
     setMatch(() => match)
@@ -493,7 +493,6 @@ const Layout = () => {
     }
   }, [language])
 
-  // eslint-disable-next-line @eslint-react/no-unused-state
   const [profileRefreshCounter, setProfileRefreshCounter] = useState(0)
   const lastProcessedRef = useRef<{ uid: string | null; counter: number }>({
     uid: null,
@@ -872,7 +871,10 @@ const Layout = () => {
             // 返回 Busy 时交给 useEffect 重试路径，避免谎报永久跳过 enhance。
             const enhanced = await patchProfiles({ current: newProfile.uid })
             if (enhanced) {
-              localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
+              localStorage.setItem(
+                'clash-mini-last-enhanced-uid',
+                newProfile.uid,
+              )
               lastProcessedRef.current = {
                 uid: newProfile.uid,
                 counter: profileRefreshCounter,
@@ -989,11 +991,11 @@ const Layout = () => {
     setProfileMenuAnchorPosition(null)
     if (!contextMenuProfileUid) return
     const targetItem = profileItems.find((p) => p.uid === contextMenuProfileUid)
-    if (!targetItem || !targetItem.url) return
+    if (!targetItem?.url) return
     try {
       await navigator.clipboard.writeText(targetItem.url)
       showNotice.success('链接已复制到剪贴板')
-    } catch (ignoreErr) {
+    } catch {
       showNotice.error('复制失败')
     }
   }
@@ -1054,7 +1056,10 @@ const Layout = () => {
     try {
       if (targetMode === 'manual') {
         try {
-          await patchVerge({ enable_system_proxy: false, enable_tun_mode: false })
+          await patchVerge({
+            enable_system_proxy: false,
+            enable_tun_mode: false,
+          })
           if (verge?.auto_close_connection) {
             await closeAllConnectionsWithTimeout().catch(() =>
               console.warn('[layout] closeAllConnectionsWithTimeout failed'),
@@ -1068,7 +1073,10 @@ const Layout = () => {
         }
       } else if (targetMode === 'system') {
         try {
-          await patchVerge({ enable_system_proxy: true, enable_tun_mode: false })
+          await patchVerge({
+            enable_system_proxy: true,
+            enable_tun_mode: false,
+          })
           hideNotice(waitId)
           showNotice.success('已开启系统代理')
         } catch (err) {
@@ -1088,7 +1096,10 @@ const Layout = () => {
         }
 
         try {
-          await patchVerge({ enable_system_proxy: false, enable_tun_mode: true })
+          await patchVerge({
+            enable_system_proxy: false,
+            enable_tun_mode: true,
+          })
           // restartCore 前先刷新 systemState，确保 isTunModeAvailable 已为 true。
           // 否则长操作结束时 use-system-state 的自动关闭 TUN useEffect 可能误判
           // （依赖 isTunModeAvailableRef，需在 endLongOperation 前更新到位）。
