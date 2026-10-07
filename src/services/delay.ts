@@ -272,8 +272,16 @@ class DelayManager {
     const startTime = Date.now()
     try {
       const results = await triggerAutoSelect(profileUid, [name], 0, false)
+
+      // 空数组 = 本次测速压根没有执行（内核未就绪 / 无可测节点 / 读不到 PROXY 组）。
+      // 这属于「控制面失败」而非「节点超时」，不得伪造成 Timeout：
+      // 恢复原值并抛出，交由调用方给出可读提示。
+      if (results.length === 0) {
+        throw new Error('AUTO_SELECT_NO_RESULT')
+      }
+
       const matched = results.find(([nodeName]) => nodeName === name)
-      // 后端未返回该节点（超时 / 失败 / 未测得）→ 0（timeout 语义，与后端约定一致）
+      // 后端确实执行了测速但未返回该节点（该节点超时 / 未测得）→ 0（Timeout 语义，与后端约定一致）
       const delay = matched ? matched[1] : 0
 
       // 确保至少显示 500ms 的加载动画
@@ -285,8 +293,8 @@ class DelayManager {
       debugLog(`[DelayManager] 单点测速完成，代理: ${name}, 结果: ${delay}ms`)
       return this.setDelay(name, group, delay, { elapsed: elapsedTime })
     } catch (error) {
-      // 后端繁忙（AUTO_SELECT_BUSY）/ IPC 异常属控制面错误，不代表节点超时：
-      // 恢复原值并抛出，交由调用方决定提示方式
+      // 控制面错误（AUTO_SELECT_BUSY 互斥抢占 / AUTO_SELECT_NO_RESULT 测速未执行 /
+      // IPC 异常）均不代表节点超时：恢复原值并抛出，交由调用方决定提示方式
       console.error(`[DelayManager] 单点测速失败，代理: ${name}`, error)
       this.setDelay(name, group, previous)
       throw error

@@ -10,7 +10,6 @@ export interface HeadState {
   showType: boolean
   sortType: ProxySortType
   filterText: string
-  textState: 'url' | 'filter' | null
 }
 
 type HeadStateStorage = Record<string, Record<string, HeadState>>
@@ -21,7 +20,6 @@ export const DEFAULT_STATE: HeadState = {
   showType: true,
   sortType: 1,
   filterText: '',
-  textState: null,
 }
 
 type HeadStateAction =
@@ -77,7 +75,10 @@ export function useHeadStateNew() {
         }
       })
       .catch((err) => {
-        console.warn('[useHeadState] 从后端加载状态失败，尝试 localStorage 兜底:', err)
+        console.warn(
+          '[useHeadState] 从后端加载状态失败，尝试 localStorage 兜底:',
+          err,
+        )
         try {
           const data = JSON.parse(
             localStorage.getItem(HEAD_STATE_KEY) ?? 'null',
@@ -86,7 +87,10 @@ export function useHeadStateNew() {
             dispatch({ type: 'replace', payload: data })
           }
         } catch (e) {
-          console.warn('[useHeadState] localStorage 兜底也失败，状态初始化为空:', e)
+          console.warn(
+            '[useHeadState] localStorage 兜底也失败，状态初始化为空:',
+            e,
+          )
         }
       })
       .finally(() => {

@@ -29,7 +29,6 @@ type ProxyGroup = {
   all: IProxyItem[]
   hidden?: boolean
   icon?: string
-  testUrl?: string
   provider?: string
 }
 
@@ -45,7 +44,6 @@ export interface IRenderItem {
   // 新增支持图标和其他元数据
   icon?: string
   provider?: string
-  testUrl?: string
   indexInGroup?: number
 }
 

@@ -73,7 +73,6 @@ export interface IProxyItem {
     time: string
     delay: number
   }[]
-  testUrl?: string
   all?: string[]
   now?: string
   hidden?: boolean

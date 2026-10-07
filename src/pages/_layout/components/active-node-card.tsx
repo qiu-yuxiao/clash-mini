@@ -16,6 +16,7 @@ import { useProxiesData } from '@/providers/app-data-context'
 import { getProxyAddr } from '@/services/cmds'
 import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
+import { showNotice } from '@/services/notice-service'
 import type { IProxyItem } from '@/types/clash'
 import { get3DCardStyle } from '@/utils/button-styles'
 
@@ -114,7 +115,17 @@ export const ActiveNodeStatusCard = () => {
       setDelay(res.delay)
       getDelayManager().queueGroupNotification(primaryGroup.name)
     } catch (err) {
-      console.error(err)
+      // 单点测速与群发测速/后台自愈共用后端同一把互斥锁（AUTO_SELECT_RUNNING），
+      // 因此这些失败属控制面竞争/环境问题，必须给出可读提示，不能静默无响应。
+      const msg = String(err instanceof Error ? err.message : err)
+      if (msg.includes('AUTO_SELECT_BUSY')) {
+        showNotice.info('正在测速中，请稍候再试')
+      } else if (msg.includes('AUTO_SELECT_NO_RESULT')) {
+        showNotice.error('测速未执行：内核未就绪或暂无可测节点')
+      } else {
+        showNotice.error(`测速失败：${msg}`)
+      }
+      console.error('[ActiveNodeCard] 单点测速失败:', err)
     } finally {
       setTesting(false)
     }
