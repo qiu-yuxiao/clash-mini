@@ -396,7 +396,6 @@ function ProxyVirtualList({
             py: 0.5,
             borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
           }}
-          url={group.testUrl}
           groupName={group.name}
           headState={headState}
           isTesting={testingGroups[group.name]}

@@ -11,8 +11,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox } from '@/components/base'
-import { useVerge } from '@/hooks/use-verge'
-import { getDelayManager } from '@/services/delay'
 import { debugLog } from '@/utils/debug'
 
 import { ProxySortType } from './use-filter-sort'
@@ -20,7 +18,6 @@ import { HeadState } from './use-head-state'
 
 interface Props {
   sx?: SxProps<Theme>
-  url?: string
   groupName: string
   headState: HeadState
   isTesting?: boolean
@@ -52,14 +49,13 @@ const defaultSx: SxProps<Theme> = {}
 
 export const ProxyHead = ({
   sx = defaultSx,
-  url,
   groupName,
   headState,
   isTesting = false,
   onHeadState,
   onCheckDelay,
 }: Props) => {
-  const { sortType, filterText, testUrl } = headState
+  const { sortType, filterText } = headState
 
   const { t } = useTranslation()
   const [autoFocus, setAutoFocus] = useState(false)
@@ -69,15 +65,6 @@ export const ProxyHead = ({
     const timer = setTimeout(() => setAutoFocus(true), 100)
     return () => clearTimeout(timer)
   }, [])
-
-  const { verge } = useVerge()
-  const defaultLatencyUrl =
-    verge?.default_latency_test?.trim() ||
-    'http://cp.cloudflare.com/generate_204'
-
-  useEffect(() => {
-    getDelayManager().setUrl(groupName, testUrl?.trim() || url || defaultLatencyUrl)
-  }, [groupName, testUrl, defaultLatencyUrl, url])
 
   return (
     <Box

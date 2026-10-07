@@ -913,9 +913,8 @@ const Layout = () => {
     try {
       isStartingUpRef.current = true
       startupRetryCountRef.current = 0
-      // M2-10: 切换 Profile 时清理旧的测试 URL 缓存和节点延迟缓存
+      // M2-10: 切换 Profile 时清理节点延迟缓存
       // 延迟缓存不清理会导致同名节点在新 Profile 中显示旧 Profile 的延迟，干扰自动选点
-      getDelayManager().clearUrlMap()
       getDelayManager().clearCache()
       const enhanced = await patchProfiles({ current: uid })
       // 后端 patch_profiles_config 已同步 update_config_forced（含 generate+validate+reload），

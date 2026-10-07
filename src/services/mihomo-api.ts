@@ -3,7 +3,6 @@ import {
   getProxyProviders,
   getProxyByName,
   selectNodeForGroup,
-  delayProxyByName,
   getConnections,
   closeConnection,
   closeAllConnections,
@@ -16,7 +15,6 @@ import {
 import { withIpcTimeout } from './cmds'
 
 const MIHO_API_TIMEOUT = 15000
-const MIHO_API_LONG_TIMEOUT = 30000
 
 export const getProxiesWithTimeout = () =>
   withIpcTimeout(getProxies(), MIHO_API_TIMEOUT, 'mihomo:getProxies')
@@ -29,9 +27,6 @@ export const getProxyByNameWithTimeout = (name: string) =>
 
 export const selectNodeForGroupWithTimeout = (group: string, node: string) =>
   withIpcTimeout(selectNodeForGroup(group, node), MIHO_API_TIMEOUT, 'mihomo:selectNodeForGroup')
-
-export const delayProxyByNameWithTimeout = (name: string, url?: string, timeout?: number) =>
-  withIpcTimeout(delayProxyByName(name, url || 'http://cp.cloudflare.com/generate_204', timeout || 2000), MIHO_API_LONG_TIMEOUT, 'mihomo:delayProxyByName')
 
 export const getConnectionsWithTimeout = () =>
   withIpcTimeout(getConnections(), MIHO_API_TIMEOUT, 'mihomo:getConnections')

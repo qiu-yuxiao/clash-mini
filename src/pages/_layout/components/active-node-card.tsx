@@ -29,10 +29,9 @@ export const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { profiles } = useProfiles()
   const currentProfileUid = profiles?.current || ''
-  // 判死/显示/轮换阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定、探针超时一致；
-  // 单点测速仍走 singleTestTimeout(1000) 追求快速响应
+  // 判死/显示/轮换/探针阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定、
+  // 探针超时（NODE_TEST_TIMEOUT_MS）一致；单点测速同样委托后端测量组，不再有独立的短超时。
   const latencyTimeout = NODE_DELAY_MAX_MS
-  const singleTestTimeout = 1000
 
   const primaryGroup = useMemo(() => {
     return proxies?.groups?.[0] ?? null
@@ -102,13 +101,15 @@ export const ActiveNodeStatusCard = () => {
 
   const handleTestDelay = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!activeNodeName || !primaryGroup?.name) return
+    if (!activeNodeName || !primaryGroup?.name || !currentProfileUid) return
     setTesting(true)
     try {
+      // 委托后端统一测量组（PROXY__METRICS）单点拨测：避免 TUN 下
+      // /proxies/{name}/delay 对活跃节点自测回环导致的假 Timeout
       const res = await getDelayManager().checkDelay(
+        currentProfileUid,
         activeNodeName,
         primaryGroup.name,
-        singleTestTimeout,
       )
       setDelay(res.delay)
       getDelayManager().queueGroupNotification(primaryGroup.name)

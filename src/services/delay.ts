@@ -1,7 +1,6 @@
-import { delayProxyByNameWithTimeout } from '@/services/mihomo-api'
+import { triggerAutoSelect } from '@/services/cmds'
 import type { IProxyItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
-import { ProxyDelay } from 'tauri-plugin-mihomo-api'
 
 const hashKey = (name: string, group?: string) => `${group || 'PROXY'}::${name}`
 
@@ -31,9 +30,6 @@ export const STARTUP_GRACE_MS = 10000
 
 class DelayManager {
   private cache = new Map<string, DelayUpdate>()
-  // L-22: urlMap 用于存储组测试 URL，组数量通常有限（<100），内存泄漏影响极小
-  // 提供 clearUrlMap 方法供 profile 切换时手动调用清理
-  private urlMap = new Map<string, string>()
 
   // 每个节点的监听
   private listenerMap = new Map<string, (update: DelayUpdate) => void>()
@@ -149,26 +145,6 @@ class DelayManager {
     this.scheduleGroupFlush()
   }
 
-  setUrl(group = 'PROXY', url: string) {
-    debugLog(`[DelayManager] 设置测试URL，组: ${group}, URL: ${url}`)
-    this.urlMap.set(group, url)
-  }
-
-  private getUrl(group = 'PROXY') {
-    const url = this.urlMap.get(group)
-    debugLog(
-      `[DelayManager] 获取测试URL，组: ${group}, URL: ${url || '未设置'}`,
-    )
-    // 如果未设置URL，返回默认URL
-    return url || 'http://cp.cloudflare.com/generate_204'
-  }
-
-  /** 清空所有组的测试 URL 缓存，用于 profile 切换时清理 */
-  clearUrlMap() {
-    this.urlMap.clear()
-    debugLog('[DelayManager] 已清空 urlMap 缓存')
-  }
-
   /** 清空节点延迟值缓存，用于 Profile 切换时避免同名节点复用旧 Profile 的延迟数据 */
   clearCache() {
     this.cache.clear()
@@ -268,109 +244,52 @@ class DelayManager {
     return -1
   }
 
+  /**
+   * 单点测速：委托后端「统一测量」路径（内核测量组 PROXY__METRICS，url-test）拨测，
+   * 与群发测速完全同源（同一测量组、同一测速 URL、同一探针超时）。
+   *
+   * 为什么不走 /proxies/{name}/delay：TUN 下对（活跃）节点自测会发生回环并返回 timeout，
+   * 这是后端已定位并废弃的路径（见 src-tauri/src/module/monitor.rs 的「测量层根因修复」）。
+   *
+   * 探针超时由后端 NODE_TEST_TIMEOUT_MS 决定（= NODE_DELAY_MAX_MS 2000ms，与判死阈值统一）；
+   * 前端不再设置更短的本地竞速超时，避免把「尚未返回」误判为 Timeout。
+   */
   async checkDelay(
+    profileUid: string,
     name: string,
     group = 'PROXY',
-    timeout: number,
-    signal?: AbortSignal,
   ): Promise<DelayUpdate> {
     debugLog(
-      `[DelayManager] 开始测试延迟，代理: ${name}, 组: ${group}, 超时: ${timeout}ms`,
+      `[DelayManager] 开始单点测速（后端测量组），代理: ${name}, 组: ${group}`,
     )
 
-    if (signal?.aborted) {
-      throw new DOMException('Aborted', 'AbortError')
-    }
+    // 记录原值：后端繁忙 / IPC 异常时用于恢复，避免伪造 Timeout 或卡死在「测速中」
+    const previous = this.getDelayUpdate(name, group)?.delay ?? -1
 
     // 先将状态设置为测试中
     this.setDelay(name, group, -2)
 
     const startTime = Date.now()
-    let timerId: ReturnType<typeof setTimeout> | null = null
-    let abortListener: (() => void) | null = null
-    let raceFinished = false
-
     try {
-      const url = this.getUrl(group)
-      debugLog(`[DelayManager] 调用API测试延迟，代理: ${name}, URL: ${url}`)
+      const results = await triggerAutoSelect(profileUid, [name], 0, false)
+      const matched = results.find(([nodeName]) => nodeName === name)
+      // 后端未返回该节点（超时 / 失败 / 未测得）→ 0（timeout 语义，与后端约定一致）
+      const delay = matched ? matched[1] : 0
 
-      // 设置超时处理, delay = 0 为超时
-      const timeoutPromise = new Promise<ProxyDelay>((resolve) => {
-        timerId = setTimeout(() => {
-          if (!raceFinished) {
-            resolve({ delay: 0 })
-          }
-        }, timeout)
-      })
-
-      // 监听取消信号
-      // L-24: 只有当 signal 存在时才创建 abortPromise 并加入 race
-      // 避免无 signal 时产生永不 settle 的 promise（虽不影响功能，但不优雅）
-      const abortPromise = signal
-        ? new Promise<ProxyDelay>((_, reject) => {
-            abortListener = () => {
-              reject(new DOMException('Aborted', 'AbortError'))
-            }
-            signal.addEventListener('abort', abortListener)
-          })
-        : null
-
-      // 使用Promise.race来实现超时与取消控制
-      const racePromises: Promise<ProxyDelay>[] = [
-        delayProxyByNameWithTimeout(name, url)
-          .then((res) => {
-            raceFinished = true
-            return res
-          })
-          .catch((err) => {
-            raceFinished = true
-            console.error(
-              `[DelayManager] delayProxyByName error for ${name}:`,
-              err,
-            )
-            return { delay: 1e6 }
-          }),
-        timeoutPromise.then((res) => {
-          raceFinished = true
-          return res
-        }),
-      ]
-      if (abortPromise) {
-        racePromises.push(abortPromise)
-      }
-      const result = await Promise.race(racePromises)
-
-      // 确保至少显示500ms的加载动画，除非被取消
+      // 确保至少显示 500ms 的加载动画
       const elapsedTime = Date.now() - startTime
-      if (elapsedTime < 500 && !signal?.aborted) {
+      if (elapsedTime < 500) {
         await new Promise((resolve) => setTimeout(resolve, 500 - elapsedTime))
       }
 
-      const delay = result.delay
-      const elapsed = elapsedTime
-      debugLog(`[DelayManager] 延迟测试完成，代理: ${name}, 结果: ${delay}ms`)
-
-      return this.setDelay(name, group, delay, { elapsed })
+      debugLog(`[DelayManager] 单点测速完成，代理: ${name}, 结果: ${delay}ms`)
+      return this.setDelay(name, group, delay, { elapsed: elapsedTime })
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        debugLog(`[DelayManager] 延迟测试已取消，代理: ${name}`)
-        throw error
-      }
-      // 确保至少显示500ms的加载动画
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      console.error(`[DelayManager] 延迟测试出错，代理: ${name}`, error)
-      const delay = 1e6 // error
-      const elapsed = Date.now() - startTime
-
-      return this.setDelay(name, group, delay, { elapsed })
-    } finally {
-      raceFinished = true
-      if (timerId) {
-        clearTimeout(timerId)
-      }
-      if (signal && abortListener) {
-        signal.removeEventListener('abort', abortListener)
-      }
+      // 后端繁忙（AUTO_SELECT_BUSY）/ IPC 异常属控制面错误，不代表节点超时：
+      // 恢复原值并抛出，交由调用方决定提示方式
+      console.error(`[DelayManager] 单点测速失败，代理: ${name}`, error)
+      this.setDelay(name, group, previous)
+      throw error
     }
   }
 

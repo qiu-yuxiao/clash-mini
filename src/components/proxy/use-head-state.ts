@@ -11,7 +11,6 @@ export interface HeadState {
   sortType: ProxySortType
   filterText: string
   textState: 'url' | 'filter' | null
-  testUrl: string
 }
 
 type HeadStateStorage = Record<string, Record<string, HeadState>>
@@ -23,7 +22,6 @@ export const DEFAULT_STATE: HeadState = {
   sortType: 1,
   filterText: '',
   textState: null,
-  testUrl: '',
 }
 
 type HeadStateAction =
