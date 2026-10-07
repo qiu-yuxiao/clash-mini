@@ -482,3 +482,4 @@ flowchart LR
 | **BUG-279** | 8.1 | 测试命令配置 `CLASH_MINI_TEST_LINK=1` 注入 Windows 应用清单，解决单测符号缺失崩溃 |
 | **BUG-280** | 8.1 | 单元测试环境隔离化改造，消除全局 App Handle 与草稿状态竞争，实现单测 100% 稳定通过 |
 | **BUG-281** | 1.2 / 3.1 | 移除 Alpha 测试内核与关闭前端 sourcemap，实现工程单一 Windows 平台收敛与包体骤降 ~10MB |
+| **BUG-282** | 5.2 | 单点测速改走后端统一测量组（PROXY__METRICS），消除 TUN 活跃节点回环假 Timeout 与本地 1000ms 截断 |
