@@ -52,6 +52,31 @@ const NODE_DELAY_MAX_MS: u32 = 2000;
 /// 节点「是否可用」的判定阈值同样以 NODE_DELAY_MAX_MS(2000) 为准。
 const NODE_TEST_TIMEOUT_MS: u32 = NODE_DELAY_MAX_MS;
 
+/// 节点健康数据新鲜度阈值（秒）。
+/// 活跃节点 history 在此时间内视为可信，直接采用缓存判定，不再对测量组发起即时拨测。
+/// 【探测风暴防护】此前每次体检（正常 15s/重试 3s）都全组拨测 70+ 节点，
+/// 稳态约 280 次/分钟探测会自激误报（刚实测 81ms 的节点 17 秒后被判死）。
+const HEALTH_DATA_FRESH_SECS: u64 = 60;
+
+/// 死节点确认拨测的最小间隔（秒）。
+/// 活跃节点被判死后，若其 history 在此时间内（说明刚拨测过），直接信缓存判定，
+/// 避免重试模式 3s 周期下对同一死节点密集重复拨测。
+const DEAD_CONFIRM_MIN_INTERVAL_SECS: u64 = 10;
+
+/// 节点切换宽限期（秒）。
+/// 切换后测量组对新节点的缓存数据必然陈旧（可能是 300 秒自然周期前的死数据），
+/// 宽限期内的失败判定只记日志、不计入连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
+const SWITCH_GRACE_PERIOD_SECS: u64 = 60;
+
+/// 选点兜底 history 的最大可接受年龄（秒）。
+/// 超过此年龄的缓存延迟视为陈旧数据，不参与候选，防止把死节点的旧延迟选为最优。
+const FALLBACK_HISTORY_MAX_AGE_SECS: u64 = 120;
+
+/// 子集测速复用测量组数据的最大年龄（秒）。
+/// 前端发起子集测速时，若所求节点的 history 均在此时间内（刚被测量组拨测过），
+/// 直接复用缓存构建结果，跳过全组拨测。
+const METRICS_REUSE_MAX_AGE_SECS: u64 = 30;
+
 /// 自动选点执行结果
 pub struct AutoSelectOutcome {
     /// 所有被测节点的延迟（含死节点/超时/错误），用于前端展示
@@ -429,12 +454,30 @@ fn node_status(proxy: &tauri_plugin_mihomo::models::Proxy) -> NodeStatus {
     }
 }
 
+/// 节点上次拨测距现在的时长（基于 history 中 RFC3339 时间戳）。
+/// 无论拨测由谁触发（测量组自然周期 / 即时 delay_group）都会刷新该时间，
+/// 因此它是「缓存数据是否新鲜」的权威依据。无 history 或时间解析失败返回 None。
+fn history_age(proxy: &tauri_plugin_mihomo::models::Proxy) -> Option<Duration> {
+    let time_str = &proxy.history.last()?.time;
+    let measured_at = chrono::DateTime::parse_from_rfc3339(time_str).ok()?;
+    let age_secs = chrono::Utc::now()
+        .signed_duration_since(measured_at.with_timezone(&chrono::Utc))
+        .num_seconds();
+    // 时钟偏差导致时间在未来时按 0（刚测过）处理
+    Some(Duration::from_secs(age_secs.max(0) as u64))
+}
+
 /// 评估当前活跃节点是否需要故障转移。
 /// 返回 Err 表示 Mihomo API 不可达（交由调用方累计 api_error_count）。
 ///
-/// 每一次评估前先对测量组 PROXY__METRICS 发起一次即时 url-test（内核内部拨测，TUN 下可靠），
-/// 确保活跃节点的 `history.last()` 与 `alive` 标志反映最新真实状态，
-/// 而非依赖测量组 300 秒自然周期的陈旧缓存。
+/// 【探测降频】按缓存新鲜度决定是否对测量组发起即时拨测，而非每个体检周期都拨测：
+/// - 活跃节点健康且数据新鲜（<HEALTH_DATA_FRESH_SECS）→ 直接信缓存，不拨测；
+/// - 健康但数据陈旧 / 数据缺失（Unknown）→ 拨测刷新后再判；
+/// - 已判死 → 仅当缓存超过 DEAD_CONFIRM_MIN_INTERVAL_SECS 才拨测复核，
+///   10 秒内刚测过的死判定直接可信（重试 3s 周期下避免对同一死节点密集拨测）。
+///
+/// 此前每个体检周期（正常 15s/重试 3s）都全组拨测 70+ 节点，稳态约 280 次/分钟探测，
+/// 会自激误报（实测 81ms 的节点 17 秒后被误判死），故改为按需拨测。
 async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
@@ -453,21 +496,39 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         return Ok(FailoverVerdict::ShouldFailover);
     }
 
-    // 【v2.6.6 修复】在读取历史健康数据之前，先对测量组触发一次即时 url-test，
-    // 确保 proxy.alive 与 proxy.history.last() 反映的是当前真实状态，
-    // 而非 300 秒前测量组自然周期的陈旧缓存。
-    // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
-    // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
-    let test_url = get_test_url().await;
-    let _ = mihomo
-        .delay_group("PROXY__METRICS", &test_url, NODE_DELAY_MAX_MS)
-        .await
-        .unwrap_or_default();
-
-    let proxies = mihomo
+    let mut proxies = mihomo
         .get_proxies()
         .await
         .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
+
+    let need_probe = match proxies.proxies.get(&active_node) {
+        None => false, // 活跃节点不在代理列表（异常），不动作
+        Some(p) => match (node_status(p), history_age(p)) {
+            // 健康且数据新鲜 → 可信，不拨测
+            (NodeStatus::Alive(_), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS) => false,
+            // 死判定且 10 秒内刚拨测过 → 可信，不重复拨测
+            (NodeStatus::Dead, Some(age)) if age < Duration::from_secs(DEAD_CONFIRM_MIN_INTERVAL_SECS) => false,
+            // 其余：健康但陈旧 / 死判定陈旧 / 数据缺失 / 时间戳不可解析 → 拨测确认
+            _ => true,
+        },
+    };
+
+    if need_probe {
+        // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
+        // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
+        let test_url = get_test_url().await;
+        let _ = mihomo
+            .delay_group("PROXY__METRICS", &test_url, NODE_DELAY_MAX_MS)
+            .await
+            .unwrap_or_default();
+
+        // 拨测后重读，确保 proxy.alive 与 proxy.history.last() 反映最新真实状态，
+        // 而非 300 秒前测量组自然周期的陈旧缓存。
+        proxies = mihomo
+            .get_proxies()
+            .await
+            .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
+    }
 
     // 活跃节点本身健康或数据缺失 → 不动作
     match proxies.proxies.get(&active_node).map(node_status) {
@@ -596,6 +657,8 @@ async fn trigger_backend_auto_select_inner(
     // - 传入 node_names（非空）：使用调用方指定的子集（如前端当前可见/所选节点），
     //   仅剔除 dummy，不再套用后端 filter_text（子集已由前端按当前筛选条件给出）
     // - 未传入：后端自取 PROXY 全量节点，套用 dummy + 保存的 filter_text 过滤（F1/自动选点场景）
+    // is_frontend_subset 用于下方「测量组数据新鲜时跳过全组拨测」的判定
+    let is_frontend_subset = matches!(&node_names, Some(names) if !names.is_empty());
     let valid_nodes: Vec<String> = match node_names {
         Some(names) if !names.is_empty() => names.into_iter().filter(|n| !is_dummy_node(n)).collect(),
         _ => {
@@ -642,26 +705,81 @@ async fn trigger_backend_auto_select_inner(
 
     let test_url = get_test_url().await;
 
-    // 测量层根因修复：不再用 delay_proxy_by_name 对节点逐个自测
-    // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
-    // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
-    // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
-    let mut delays: std::collections::HashMap<String, u32> = match mihomo
-        .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
-        .await
-    {
-        Ok(d) => d,
-        Err(e) => {
-            logging!(warn, Type::Lightweight, "[后台监测] 读取测量组延迟失败: {e}");
-            std::collections::HashMap::new()
-        }
-    };
-
-    // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history
-    if delays.is_empty() {
+    // 【子集测速降频】前端发起的子集测速（如手动单点/可见列表测速）：
+    // 若所求节点的测量组 history 均新鲜（<METRICS_REUSE_MAX_AGE_SECS，即刚被拨测过），
+    // 直接复用缓存构建结果，跳过全组拨测——否则一次单点测速也会触发 70+ 节点全组拨测。
+    // 存活节点复用真实延迟；死节点复用死状态（不写入 delays，下游 display 记 0 即 Timeout）。
+    let mut delays: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    let mut reused_cache = false;
+    if is_frontend_subset {
         if let Ok(proxies) = mihomo.get_proxies().await {
+            let threshold = Duration::from_secs(METRICS_REUSE_MAX_AGE_SECS);
+            let mut cached: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+            let mut all_fresh = true;
+            for name in &valid_nodes {
+                match proxies.proxies.get(name) {
+                    Some(p) if history_age(p).is_some_and(|age| age < threshold) => {
+                        if p.alive {
+                            if let Some(h) = p.history.last() {
+                                cached.insert(name.clone(), h.delay as u32);
+                            }
+                        }
+                    }
+                    // 存在无数据/数据陈旧的节点 → 需全组拨测刷新
+                    _ => {
+                        all_fresh = false;
+                        break;
+                    }
+                }
+            }
+            if all_fresh {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 子集测速复用测量组新鲜缓存（{} 个节点，{} 个存活），跳过全组拨测",
+                    valid_nodes.len(),
+                    cached.len()
+                );
+                delays = cached;
+                reused_cache = true;
+            }
+        }
+    }
+
+    if !reused_cache {
+        // 测量层根因修复：不再用 delay_proxy_by_name 对节点逐个自测
+        // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
+        // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
+        // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
+        delays = match mihomo
+            .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
+            .await
+        {
+            Ok(d) => d,
+            Err(e) => {
+                logging!(warn, Type::Lightweight, "[后台监测] 读取测量组延迟失败: {e}");
+                std::collections::HashMap::new()
+            }
+        };
+    }
+
+    // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history。
+    // 只接受内核确认存活（alive）且数据新鲜（<FALLBACK_HISTORY_MAX_AGE_SECS）的条目：
+    // 此前不过滤会把死节点/过期延迟填入候选，导致把不可达节点选为最优。
+    if !reused_cache && delays.is_empty() {
+        if let Ok(proxies) = mihomo.get_proxies().await {
+            let max_age = Duration::from_secs(FALLBACK_HISTORY_MAX_AGE_SECS);
             for name in &valid_nodes {
                 if let Some(p) = proxies.proxies.get(name) {
+                    if !p.alive {
+                        continue;
+                    }
+                    let Some(age) = history_age(p) else {
+                        continue;
+                    };
+                    if age >= max_age {
+                        continue;
+                    }
                     if let Some(h) = p.history.last() {
                         delays.insert(name.clone(), h.delay as u32);
                     }
@@ -811,6 +929,9 @@ pub fn start_background_monitor() {
         let mut consecutive_fails = 0;
         let mut is_retry_mode = false;
         let mut last_active_node: Option<String> = None;
+        // 节点切换时间：切换后 SWITCH_GRACE_PERIOD_SECS 内为宽限期，
+        // 期间失败判定不计入连续失败次数（缓存数据未稳，防误判震荡）
+        let mut last_node_change_time: Option<Instant> = None;
         let mut was_online = true;
         let mut is_first_run = true;
         let mut last_online_check_time: Option<Instant> = None;
@@ -991,6 +1112,7 @@ pub fn start_background_monitor() {
                         active_node_name
                     );
                     last_active_node = Some(active_node_name);
+                    last_node_change_time = Some(Instant::now());
                     consecutive_fails = 0;
                     is_retry_mode = false;
                 }
@@ -1005,28 +1127,44 @@ pub fn start_background_monitor() {
                                 is_retry_mode = false;
                             }
                             FailoverVerdict::ShouldFailover | FailoverVerdict::AllDead => {
-                                consecutive_fails += 1;
-                                is_retry_mode = true;
-                                logging!(
-                                    info,
-                                    Type::Lightweight,
-                                    "[后台监测] 活跃节点检测异常 ({:?})，连续失败次数: {}",
-                                    verdict,
-                                    consecutive_fails
-                                );
-
-                                if consecutive_fails >= 2 {
-                                    consecutive_fails = 0;
-                                    is_retry_mode = false;
-
+                                // 切换宽限期：切到新节点后 60 秒内缓存未稳，失败判定可接受，
+                                // 不累计连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
+                                let in_grace = last_node_change_time
+                                    .map(|t| t.elapsed() < Duration::from_secs(SWITCH_GRACE_PERIOD_SECS))
+                                    .unwrap_or(false);
+                                if in_grace {
                                     logging!(
                                         info,
                                         Type::Lightweight,
-                                        "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
+                                        "[后台监测] 活跃节点检测异常 ({:?})，当前处于切换宽限期，不计入连续失败",
+                                        verdict
+                                    );
+                                    consecutive_fails = 0;
+                                    is_retry_mode = false;
+                                } else {
+                                    consecutive_fails += 1;
+                                    is_retry_mode = true;
+                                    logging!(
+                                        info,
+                                        Type::Lightweight,
+                                        "[后台监测] 活跃节点检测异常 ({:?})，连续失败次数: {}",
+                                        verdict,
+                                        consecutive_fails
                                     );
 
-                                    // 统一走冷却/计数/警报记账（与网络恢复、API 异常路径一致，🟡6）
-                                    self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
+                                    if consecutive_fails >= 2 {
+                                        consecutive_fails = 0;
+                                        is_retry_mode = false;
+
+                                        logging!(
+                                            info,
+                                            Type::Lightweight,
+                                            "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
+                                        );
+
+                                        // 统一走冷却/计数/警报记账（与网络恢复、API 异常路径一致，🟡6）
+                                        self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
+                                    }
                                 }
                             }
                         }
@@ -1110,8 +1248,9 @@ async fn self_heal_with_accounting(
     if let Some(last_time) = *last_auto_select_time {
         let elapsed = now.duration_since(last_time).as_secs();
         if elapsed < 60 {
+            // info 级别：自愈被冷却跳过是关键状态变化，正常日志级别应可见（此前 debug 级导致排障时不可见）
             logging!(
-                debug,
+                info,
                 Type::Lightweight,
                 "[后台监测] 自愈选点在 60 秒冷却中（已过 {} 秒），跳过本次",
                 elapsed

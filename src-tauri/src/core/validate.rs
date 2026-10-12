@@ -7,6 +7,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 use tauri_plugin_shell::ShellExt as _;
+use tauri_plugin_shell::process::CommandEvent;
 use tokio::fs;
 
 use crate::config::{Config, ConfigType};
@@ -367,35 +368,70 @@ impl CoreConfigValidator {
                 .sidecar(clash_core.as_str())?
                 .args(["-t", "-d", app_dir_str, "-f", config_path])
         };
-        let output = match tokio::time::timeout(
-            std::time::Duration::from_millis(VALIDATE_CONTROL_TIMEOUT_MS),
-            command.output(),
-        )
-        .await
-        {
-            Ok(Ok(out)) => out,
-            Ok(Err(err)) => return Err(err.into()),
-            Err(_) => {
-                logging!(
-                    error,
-                    Type::Validate,
-                    "验证进程执行超时 ({}s)",
-                    VALIDATE_CONTROL_TIMEOUT_MS / 1000
-                );
-                return Err(anyhow::anyhow!(
-                    "Validation process timed out after {} seconds",
-                    VALIDATE_CONTROL_TIMEOUT_MS / 1000
-                ));
-            }
-        };
+        // 【进程泄漏修复】不用 command.output()：其内部 spawn 后丢弃了子进程句柄，
+        // tokio::time::timeout 超时只会取消等待，验证进程（mihomo -t）成孤儿常驻。
+        // 改为手动 spawn + 事件收集循环，超时分支显式 kill 子进程，
+        // 且已捕获的部分 stdout/stderr 可直接写入日志辅助定位卡点。
+        let (mut rx, child) = command.spawn()?;
 
-        let status = &output.status;
-        let stderr = &output.stderr;
-        let stdout = &output.stdout;
+        let mut exit_code: Option<i32> = None;
+        let mut stdout: Vec<u8> = Vec::new();
+        let mut stderr: Vec<u8> = Vec::new();
+        let mut timed_out = false;
+        {
+            let timeout = tokio::time::sleep(std::time::Duration::from_millis(VALIDATE_CONTROL_TIMEOUT_MS));
+            tokio::pin!(timeout);
+            loop {
+                tokio::select! {
+                    event = rx.recv() => {
+                        match event {
+                            Some(CommandEvent::Terminated(payload)) => {
+                                exit_code = payload.code;
+                            }
+                            Some(CommandEvent::Stdout(line)) => {
+                                stdout.extend_from_slice(&line);
+                                stdout.push(b'\n');
+                            }
+                            Some(CommandEvent::Stderr(line)) => {
+                                stderr.extend_from_slice(&line);
+                                stderr.push(b'\n');
+                            }
+                            Some(CommandEvent::Error(_)) => {}
+                            // 通道关闭 = 进程结束且输出读完
+                            None => break,
+                            _ => {}
+                        }
+                    }
+                    _ = &mut timeout => {
+                        timed_out = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if timed_out {
+            if let Err(e) = child.kill() {
+                logging!(warn, Type::Validate, "超时后终止验证进程失败: {e}");
+            }
+            logging!(
+                error,
+                Type::Validate,
+                "验证进程执行超时 ({}s)，已终止验证进程。已捕获 stdout {} 字节 / stderr {} 字节；stderr 摘要: {:.512}",
+                VALIDATE_CONTROL_TIMEOUT_MS / 1000,
+                stdout.len(),
+                stderr.len(),
+                std::string::String::from_utf8_lossy(&stderr)
+            );
+            return Err(anyhow::anyhow!(
+                "Validation process timed out after {} seconds",
+                VALIDATE_CONTROL_TIMEOUT_MS / 1000
+            ));
+        }
 
         // 检查进程退出状态和错误输出
         let error_keywords = ["FATA", "fatal", "Parse config error", "level=fatal"];
-        let has_error = !status.success() || contains_any_keyword(stderr, &error_keywords);
+        let has_error = exit_code != Some(0) || contains_any_keyword(&stderr, &error_keywords);
 
         logging!(info, Type::Validate, "-------- 验证结果 --------");
 
@@ -406,17 +442,17 @@ impl CoreConfigValidator {
         if has_error {
             logging!(info, Type::Validate, "发现错误，开始处理错误信息");
             let error_msg: String = if !stdout.is_empty() {
-                str::from_utf8(stdout).unwrap_or_default().into()
+                str::from_utf8(&stdout).unwrap_or_default().into()
             } else if !stderr.is_empty() {
-                str::from_utf8(stderr).unwrap_or_default().into()
-            } else if let Some(code) = status.code() {
+                str::from_utf8(&stderr).unwrap_or_default().into()
+            } else if let Some(code) = exit_code {
                 format!("验证进程异常退出，退出码: {code}").into()
             } else {
                 "验证进程被终止".into()
             };
 
             logging!(info, Type::Validate, "-------- 验证结束 --------");
-            let outcome = if status.code().is_none() {
+            let outcome = if exit_code.is_none() {
                 ValidationOutcome::invalid(ValidationErrorKind::ProcessTerminated, error_msg)
             } else {
                 ValidationOutcome::invalid_from_message(error_msg)
