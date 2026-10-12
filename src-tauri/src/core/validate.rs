@@ -414,6 +414,22 @@ impl CoreConfigValidator {
             if let Err(e) = child.kill() {
                 logging!(warn, Type::Validate, "超时后终止验证进程失败: {e}");
             }
+            // kill 后继续把通道消费到关闭：把子进程被杀前后残余的 stdout/stderr 一并收集，
+            // 使下面的摘要能包含「验证进程为什么卡住/被终止」的最后输出，而非只有 kill 前的部分。
+            // Terminated 事件在此无需再取 code：超时分支已注定走 ProcessTerminated，exit_code 不参与判定。
+            while let Some(event) = rx.recv().await {
+                match event {
+                    CommandEvent::Stdout(line) => {
+                        stdout.extend_from_slice(&line);
+                        stdout.push(b'\n');
+                    }
+                    CommandEvent::Stderr(line) => {
+                        stderr.extend_from_slice(&line);
+                        stderr.push(b'\n');
+                    }
+                    _ => {}
+                }
+            }
             logging!(
                 error,
                 Type::Validate,

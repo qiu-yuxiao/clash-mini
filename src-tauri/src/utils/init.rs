@@ -319,7 +319,8 @@ pub async fn startup_script() -> Result<()> {
     let working_dir = parent_dir.unwrap_or(script_abs.as_path());
 
     // 【进程泄漏修复】不用 command.output()：其内部 spawn 后丢弃了子进程句柄，
-    // 脚本挂起时初始化将永久等待、脚本进程常驻。改为手动 spawn + 事件消费循环 +
+    // 脚本挂起时本任务将永久等待、脚本进程常驻（注：本函数由 AsyncHandler 独立 spawn，
+    // 卡住只阻塞该任务自身，不会阻塞主初始化流程）。改为手动 spawn + 事件消费循环 +
     // 超时显式 kill。脚本输出无需保留（原逻辑同样丢弃），但事件必须消费到通道关闭。
     let (mut rx, child) = app_handle
         .shell()
@@ -346,6 +347,9 @@ pub async fn startup_script() -> Result<()> {
                     if let Err(e) = child.kill() {
                         logging!(warn, Type::Setup, "启动脚本超时后终止进程失败: {e}");
                     }
+                    // kill 后继续把通道消费到关闭，与 validate.rs 的超时分支保持一致：
+                    // 确保子进程真实退出、残余输出排空，不留悬挂的事件发送端。
+                    while rx.recv().await.is_some() {}
                     logging!(
                         error,
                         Type::Setup,
