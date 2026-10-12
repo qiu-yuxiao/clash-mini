@@ -479,6 +479,8 @@ fn history_age(proxy: &tauri_plugin_mihomo::models::Proxy) -> Option<Duration> {
 /// 此前每个体检周期（正常 15s/重试 3s）都全组拨测 70+ 节点，稳态约 280 次/分钟探测，
 /// 会自激误报（实测 81ms 的节点 17 秒后被误判死），故改为按需拨测。
 async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
+    // 【探针 2a】evaluate_failover 入口：若断流时此日志出现但无出口日志 → 卡在下方某个 await
+    logging!(info, Type::Lightweight, "[探针] evaluate_failover 进入");
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
     let group_info = mihomo
@@ -488,11 +490,16 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
 
     let active_node = match &group_info.now {
         Some(n) if !n.is_empty() && n != "DIRECT" && n != "REJECT" => n.clone(),
-        _ => return Ok(FailoverVerdict::NoAction), // 直连/拒绝节点或无选中，不动作
+        _ => {
+            logging!(info, Type::Lightweight, "[探针] evaluate_failover 出口: NoAction(直连/无选中)");
+            return Ok(FailoverVerdict::NoAction); // 直连/拒绝节点或无选中，不动作
+        }
     };
+    logging!(info, Type::Lightweight, "[探针] evaluate_failover 活跃节点: {active_node}");
 
     // 假/广告节点 → 视为需要重选（无需等 url-test）
     if is_dummy_node(&active_node) {
+        logging!(info, Type::Lightweight, "[探针] evaluate_failover 出口: ShouldFailover(伪节点)");
         return Ok(FailoverVerdict::ShouldFailover);
     }
 
@@ -517,10 +524,19 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
         let test_url = get_test_url().await;
+        // 【探针 2c】拨测前：与「拨测后」日志配对，若只出现前一条 → 卡在 delay_group
+        logging!(info, Type::Lightweight, "[探针] evaluate_failover 即将全组拨测(need_probe=true)");
+        let probe_start = Instant::now();
         let _ = mihomo
             .delay_group("PROXY__METRICS", &test_url, NODE_DELAY_MAX_MS)
             .await
             .unwrap_or_default();
+        logging!(
+            info,
+            Type::Lightweight,
+            "[探针] evaluate_failover 全组拨测返回，耗时 {:?}",
+            probe_start.elapsed()
+        );
 
         // 拨测后重读，确保 proxy.alive 与 proxy.history.last() 反映最新真实状态，
         // 而非 300 秒前测量组自然周期的陈旧缓存。
@@ -528,15 +544,19 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
             .get_proxies()
             .await
             .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
+    } else {
+        logging!(info, Type::Lightweight, "[探针] evaluate_failover 跳过拨测(need_probe=false，信缓存)");
     }
 
     // 活跃节点本身健康或数据缺失 → 不动作
     match proxies.proxies.get(&active_node).map(node_status) {
         Some(NodeStatus::Alive(_)) | Some(NodeStatus::Unknown) | None => {
+            logging!(info, Type::Lightweight, "[探针] evaluate_failover 出口: NoAction(活跃节点健康/数据缺失)");
             return Ok(FailoverVerdict::NoAction);
         }
         Some(NodeStatus::Dead) => {}
     }
+    logging!(info, Type::Lightweight, "[探针] evaluate_failover 活跃节点判定为 Dead，扫描子集候选");
 
     // 活跃节点已死：在子集（filterText）内寻找健康候选
     let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
@@ -557,11 +577,13 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         }
     }
 
-    if found_healthy {
-        Ok(FailoverVerdict::ShouldFailover)
+    let verdict = if found_healthy {
+        FailoverVerdict::ShouldFailover
     } else {
-        Ok(FailoverVerdict::AllDead)
-    }
+        FailoverVerdict::AllDead
+    };
+    logging!(info, Type::Lightweight, "[探针] evaluate_failover 出口: {verdict:?}");
+    Ok(verdict)
 }
 
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
@@ -950,11 +972,25 @@ pub fn start_background_monitor() {
                 break;
             }
 
+            cycle_count += 1;
+
+            // 【探针 1】每轮循环开头：断流时若此日志停止出现 → 循环卡死/阻塞；
+            // 若持续出现但不体检 → 时间门控或 is_online 判定把体检挡掉了。
+            logging!(
+                info,
+                Type::Lightweight,
+                "[探针] 主循环第 {} 轮, fails={}, retry={}, online={}, lightweight={}",
+                cycle_count,
+                consecutive_fails,
+                is_retry_mode,
+                was_online,
+                crate::module::lightweight::is_in_lightweight_mode()
+            );
+
             // 【v2.6.5 隐患 C 修复】周期性心跳日志
             // 每 MONITOR_HEARTBEAT_CYCLE_COUNT 个循环周期打一条 debug 心跳，
             // 让"正常运行无事件"也能留下日志痕迹，与"线程已死"可区分。
             // debug 级别，生产默认不可见；排障时用 RUST_LOG=debug 启用。
-            cycle_count += 1;
             if cycle_count.is_multiple_of(MONITOR_HEARTBEAT_CYCLE_COUNT) {
                 let uptime = thread_start_time.elapsed().as_secs();
                 logging!(
@@ -1035,7 +1071,18 @@ pub fn start_background_monitor() {
                 last_online_check_time = Some(Instant::now());
 
                 // 【性能优化与动态探测】：复用 is_physical_network_online 探测物理网络连通性
-                is_physical_network_online(2).await
+                // 【探针 4】探活前后配对：只出现前一条 → 卡在 is_physical_network_online
+                logging!(info, Type::Lightweight, "[探针] 开始物理网络探活(timeout=2s)");
+                let online_probe_start = Instant::now();
+                let online_result = is_physical_network_online(2).await;
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[探针] 物理网络探活返回 is_online={}, 耗时 {:?}",
+                    online_result,
+                    online_probe_start.elapsed()
+                );
+                online_result
             } else {
                 // 尚未到探测间隔，复用上次结果
                 was_online
@@ -1071,13 +1118,24 @@ pub fn start_background_monitor() {
 
             // 2. 定期检测与快速重试自愈：重试 3 秒，离线 5 秒，正常 15 秒，对齐唤醒周期
             let check_interval = check_interval_secs(is_retry_mode, was_online);
+            // 【探针 3】体检门控：能进入下方 if 才会真体检；长期不打印说明被时间门控挡住
+            logging!(
+                info,
+                Type::Lightweight,
+                "[探针] 体检门控判断: 距上次 {}s / 需 {}s → {}",
+                last_check_time.elapsed().as_secs(),
+                check_interval,
+                if last_check_time.elapsed().as_secs() >= check_interval { "将体检" } else { "继续等待" }
+            );
             if last_check_time.elapsed().as_secs() >= check_interval {
                 last_check_time = Instant::now();
 
                 // 如果当前处于离线状态，跳过本次检测
                 if !is_online {
+                    logging!(info, Type::Lightweight, "[探针] 离线状态，跳过本次体检");
                     continue;
                 }
+                logging!(info, Type::Lightweight, "[探针] 进入体检：开始 evaluate_failover");
 
                 // 检测活动节点是否发生变化（包括自动选点和手动切换）
                 let active_node_name = match get_active_node_name().await {
@@ -1243,6 +1301,8 @@ async fn self_heal_with_accounting(
     last_auto_select_time: &mut Option<Instant>,
     last_check_time: &mut Instant,
 ) -> bool {
+    // 【探针 5】自愈入口
+    logging!(info, Type::Lightweight, "[探针] self_heal_with_accounting 进入");
     // 60 秒冷却保护：auto_select 失败后至少等 60 秒再重试
     let now = Instant::now();
     if let Some(last_time) = *last_auto_select_time {
@@ -1260,6 +1320,7 @@ async fn self_heal_with_accounting(
     }
     let prev_auto_select_time = *last_auto_select_time;
     *last_auto_select_time = Some(now);
+    logging!(info, Type::Lightweight, "[探针] 自愈冷却通过，开始调用 trigger_backend_auto_select");
 
     match trigger_backend_auto_select(profile_uid, None, 0, true, false).await {
         Ok(outcome) => {
