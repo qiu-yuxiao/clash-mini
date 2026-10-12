@@ -32,6 +32,9 @@ pub mod timing {
 
     /// 内核配置文件语法验证的最长超时限值 (ms)，给大规则集、GeoIP/MRS文件解析预留充裕时间
     pub const VALIDATE_CONTROL_TIMEOUT_MS: u64 = 10000;
+
+    /// 启动脚本执行的最长超时时限 (ms)。超时后强行终止脚本进程，防止脚本挂起导致初始化永久等待
+    pub const STARTUP_SCRIPT_TIMEOUT_MS: u64 = 30000;
 }
 
 pub mod files {
