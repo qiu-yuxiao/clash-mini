@@ -1,3 +1,12 @@
+## v2.9.5
+
+### 🐞 Fixed Bugs
+- **修复 v2.9.4 引入的阻断性回归：TUN 模式下内核配置解析失败、节点列表完全不显示**：
+  - **根因**：v2.9.4 的 IPv6 防泄漏修复将 `tun.inet6-address` 写为单个字符串，但 mihomo 内核要求该字段为前缀数组（`[]netip.Prefix`），YAML 反序列化直接拒绝，导致配置验证失败、内核无法启动、API 不可达，前端拿不到任何节点。
+  - **修复**：`inet6-address` 改为按内核规范写入 YAML 序列，TUN 模式恢复正常启动与 IPv6 路由接管。
+
+---
+
 ## v2.9.4
 
 ### 🐞 Fixed Bugs & Security Enhancements
