@@ -99,10 +99,13 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
         // 即关闭时内核 DNS 不返回 AAAA 记录，应用拿不到 IPv6 地址、实际走 IPv4。
         // 二者不冲突：顶层 ipv6 管「TUN 是否接管 IPv6 路由（防泄漏）」，dns.ipv6 管「是否使用 IPv6」。
         revise!(config, "ipv6", true);
-        revise!(
-            tun_val,
-            "inet6-address",
-            crate::constants::tun::TUN_INET6_ADDRESS
+        // 【格式修正】内核要求 inet6-address 为前缀数组（[]netip.Prefix），
+        // 写单个字符串会被拒绝：yaml unmarshal 报错、配置验证失败、内核无法启动。
+        tun_val.insert(
+            Value::from("inet6-address"),
+            Value::Sequence(vec![Value::String(
+                crate::constants::tun::TUN_INET6_ADDRESS.into(),
+            )]),
         );
     } else {
         // 非 TUN（系统代理 / 手动）：不注入 fake-ip 等 TUN 专属 DNS 字段，交由内核默认
