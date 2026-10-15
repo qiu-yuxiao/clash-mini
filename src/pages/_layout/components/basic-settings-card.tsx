@@ -3,6 +3,7 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Switch } from '@/components/base'
+import type { IClashInfo } from '@/types/clash'
 import type { IVergeConfig } from '@/types/verge'
 import { get3DCardStyle, get3DInputStyle } from '@/utils/button-styles'
 import type { BaseConfig } from 'tauri-plugin-mihomo-api'
@@ -10,6 +11,7 @@ import type { BaseConfig } from 'tauri-plugin-mihomo-api'
 interface BasicSettingsCardProps {
   verge: IVergeConfig | null
   clashConfig: BaseConfig | null
+  clashInfo?: IClashInfo | null
   patchVerge: (val: Partial<IVergeConfig>) => Promise<void>
   handleAllowLanChange: (checked: boolean) => void
   handleIpv6Change: (checked: boolean) => void
@@ -35,6 +37,7 @@ const labelSx = (isRetro3DDark: boolean) => ({
 export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   verge,
   clashConfig,
+  clashInfo,
   patchVerge,
   handleAllowLanChange,
   handleIpv6Change,
@@ -127,7 +130,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
             // Although Clash core uses 'allow-lan', the Tauri backend serializes the BaseConfig struct
             // to camelCase ('allowLan') when sending it to the frontend.
             // Refer to #[serde(rename_all(serialize = "camelCase"))] on BaseConfig in models.rs.
-            checked={clashConfig?.allowLan ?? false}
+            checked={clashInfo?.allow_lan ?? clashConfig?.allowLan ?? false}
             onChange={(_, checked: boolean) => {
               handleAllowLanChange(checked)
             }}
@@ -163,7 +166,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           </Typography>
           <Switch
             size="small"
-            checked={clashConfig?.ipv6 ?? false}
+            checked={clashInfo?.ipv6 ?? false}
             onChange={(_, checked: boolean) => {
               handleIpv6Change(checked)
             }}

@@ -1,3 +1,15 @@
+## v2.9.6
+
+### 🐞 Fixed Bugs
+- **修复 Allow IPv6 开关在界面上点击后不切换状态的问题**：
+  - **根因**：v2.9.4 为了防止 TUN 模式下 IPv6 绕过代理泄漏，在 TUN 模式下向运行时配置注入了强制顶层 `ipv6: true`（Mihomo 规范要求 `tun.inet6-address` 依赖顶层 `ipv6: true` 才会生效）。但前端设置界面的 Allow IPv6 开关此前直接绑定 Mihomo REST API 返回的运行时配置 `clashConfig.ipv6`，导致在 TUN 模式下无论用户如何点击关闭，页面读取运行时配置恒为开启，开关被强制弹回无法切换。
+  - **修复**：
+    - **UI 绑定与内核防泄漏二分解耦**：后端 `ClashInfo` 暴露用户在 `clash.yaml` 中持久化保存的真实设置字段 `ipv6` 与 `allow_lan`，前端界面开关统一绑定至 `clashInfo`，彻底解耦 UI 开关展示状态与底层 TUN 运行时防泄漏接管逻辑。
+    - **乐观更新与即时响应**：前端切换开关时引入乐观更新与防抖同步，消除切换延迟，保证即点即响应并安全持久化。
+    - **事件同步联动**：在 `verge://refresh-clash-config` 监听链中纳入 `getClashInfo` 重新拉取，确保配置热更新或外部变更时 UI 状态时刻与后端保持精准同步。
+
+---
+
 ## v2.9.5
 
 ### 🐞 Fixed Bugs

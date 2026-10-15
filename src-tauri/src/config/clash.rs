@@ -202,6 +202,14 @@ impl IClashTemp {
                 Value::Number(val_num) => Some(val_num.to_string()),
                 _ => None,
             }),
+            ipv6: config
+                .get("ipv6")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false),
+            allow_lan: config
+                .get("allow-lan")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false),
         }
     }
     pub fn guard_mixed_port(config: &Mapping) -> u16 {
@@ -327,6 +335,10 @@ pub struct ClashInfo {
     pub server: String,
     /// clash secret
     pub secret: Option<String>,
+    /// allow ipv6 (from user's clash.yaml)
+    pub ipv6: bool,
+    /// allow lan (from user's clash.yaml)
+    pub allow_lan: bool,
 }
 
 #[test]
@@ -346,6 +358,8 @@ fn test_clash_info() {
             port: 7899,
             server: server.into(),
             secret: None,
+            ipv6: false,
+            allow_lan: false,
         }
     }
 

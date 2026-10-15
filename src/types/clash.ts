@@ -139,6 +139,8 @@ export interface IClashInfo {
   port?: number // clash http port
   server?: string // external-controller
   secret?: string
+  ipv6?: boolean
+  allow_lan?: boolean
 }
 
 export interface IProxyGroupConfig {

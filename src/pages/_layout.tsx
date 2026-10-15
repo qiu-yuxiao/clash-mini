@@ -69,7 +69,9 @@ import {
 import { getDelayManager } from '@/services/delay'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
 import { showNotice, hideNotice } from '@/services/notice-service'
+import { queryClient } from '@/services/query-client'
 import { useThemeMode } from '@/services/states'
+import type { IClashInfo } from '@/types/clash'
 import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
@@ -342,7 +344,7 @@ const Layout = () => {
     currentMode === 'tun' ? 2 : currentMode === 'system' ? 1 : 0
 
   // Port State
-  const { clashInfo, patchInfo } = useClashInfo()
+  const { clashInfo, mutateInfo, patchInfo } = useClashInfo()
   // coreVersion/mutateVersion 已在前面通过 useClash() 提前获取（供 useCoreUpdate 使用）
   const { clashConfig } = useClashConfigData()
   // 注意：handleClashBoolChange 不再主动调 refreshClashConfig()，
@@ -414,6 +416,14 @@ const Layout = () => {
 
   // Minimal Settings Actions
   const handleClashBoolChange = (field: string) => async (checked: boolean) => {
+    // 乐观更新 UI：立即更新 queryClient 中的 getClashInfo 缓存，提供原生流畅切换体验
+    if (field === 'ipv6' || field === 'allow-lan') {
+      const cacheKey = field === 'allow-lan' ? 'allow_lan' : 'ipv6'
+      queryClient.setQueryData<IClashInfo>(['getClashInfo'], (old) =>
+        old ? { ...old, [cacheKey]: checked } : old,
+      )
+    }
+
     const waitId = showNotice.info('正在调整，请稍候…', 0)
 
     // 标记长操作开始：allow-lan / ipv6 变更后端会 restart_core
@@ -423,11 +433,10 @@ const Layout = () => {
     beginLongOperation()
     try {
       await patchClashConfig({ [field]: checked })
-      // 后端 patch_clash 末尾已 refresh_clash() 发 refresh-clash-config 事件，
-      // 前端 use-layout-events 的 250ms 防抖会合并 revalidate；此处主动再调
-      // refreshClashConfig() 属冗余（与 handleRuleFallbackChange 的处理一致），已移除。
+      await mutateInfo()
       showNotice.success('已更新')
     } catch (err: unknown) {
+      await mutateInfo()
       showNotice.error(err instanceof Error ? err.message : String(err))
     } finally {
       hideNotice(waitId)
@@ -1525,6 +1534,7 @@ const Layout = () => {
                   <BasicSettingsCard
                     verge={verge ?? null}
                     clashConfig={clashConfig ?? null}
+                    clashInfo={clashInfo ?? null}
                     patchVerge={patchVerge}
                     handleAllowLanChange={handleClashBoolChange('allow-lan')}
                     handleIpv6Change={handleClashBoolChange('ipv6')}

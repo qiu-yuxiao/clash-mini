@@ -53,6 +53,7 @@ export const useLayoutEvents = (
           'getProxies',
           'getVersion',
           'getClashConfig',
+          'getClashInfo',
           'getProxyProviders',
         ])
       }, 250)
