@@ -50,6 +50,14 @@ pub mod tun {
 
     pub const DNS_HIJACK: &[&str] = &["any:53"];
 
+    /// TUN 网卡的 IPv6 地址（ULA 段，mihomo 标准默认值）。
+    /// 【作用】让 TUN 具备 IPv6 收包能力，从而把 IPv6 默认路由一并导入 TUN，
+    /// 防止 IPv6 流量绕过代理从物理网卡直连泄漏（实测：不设该项时 IPv6 默认路由
+    /// 仍指向物理网关，所有 IPv6 流量 100% 绕过代理）。
+    /// 【前提】mihomo 官方文档明确该字段「需要同时将顶层配置中的 ipv6 设置为 true 才会生效」，
+    /// 故 use_tun 会在 TUN 启用时强制顶层 ipv6=true（是否「使用」IPv6 另由 dns.ipv6 控制）。
+    pub const TUN_INET6_ADDRESS: &str = "fdfe:dcba:9876::1/126";
+
     /// fake-ip 模式下的默认免分配假 IP 过滤名单，防止 Windows NCSI 离线感叹号、局域网访问和 NTP 授时失效
     pub const DEFAULT_FAKE_IP_FILTER: &[&str] = &[
         "dns.msftncsi.com",

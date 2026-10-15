@@ -36,7 +36,7 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
         let mut dns_val = dns_val.map_or_else(Mapping::new, |val| {
             val.as_mapping().cloned().unwrap_or_else(Mapping::new)
         });
-        let ipv6_val = config
+        let user_ipv6 = config
             .get(Value::from("ipv6"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
@@ -47,14 +47,14 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
 
         if current_mode == "fake-ip" || !dns_val.contains_key(Value::from("enhanced-mode")) {
             revise!(dns_val, "enable", true);
-            revise!(dns_val, "ipv6", ipv6_val);
+            revise!(dns_val, "ipv6", user_ipv6);
             if !dns_val.contains_key(Value::from("enhanced-mode")) {
                 revise!(dns_val, "enhanced-mode", "fake-ip");
             }
             if !dns_val.contains_key(Value::from("fake-ip-range")) {
                 revise!(dns_val, "fake-ip-range", "198.18.0.1/16");
             }
-            if ipv6_val && !dns_val.contains_key(Value::from("fake-ip-range6")) {
+            if user_ipv6 && !dns_val.contains_key(Value::from("fake-ip-range6")) {
                 revise!(dns_val, "fake-ip-range6", "2001:2::0/64");
             }
             // fake-ip-filter：按条目 merge，而非「键缺失才整体写入」。
@@ -76,6 +76,26 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             }
         }
         revise!(config, "dns", dns_val);
+
+        // 【IPv6 防泄漏】TUN 启用时，必须让内核具备 IPv6 收包能力，否则 IPv6 会整体绕过代理。
+        //
+        // 问题：mihomo 官方文档明确 `tun.inet6-address`「需要同时将顶层配置中的 ipv6 设置为 true
+        // 才会生效」。顶层 ipv6=false 时 TUN 不具备 IPv6 能力 → 不把 IPv6 默认路由导入 TUN，
+        // 系统 ::/0 仍指向物理网关 → 所有 IPv6 流量从物理网卡直连泄漏（实测到 Google 的 IPv6
+        // 请求立即失败，且完全不经过代理）。这是「内核禁 IPv6 + 系统开 IPv6」的最差组合。
+        //
+        // 修复：TUN 启用时强制顶层 ipv6=true，并显式指定 TUN 的 IPv6 地址，使 TUN 同时接管
+        // IPv4 与 IPv6 默认路由，IPv6 流量进入内核按规则处理，不再泄漏。
+        //
+        // 注意：用户「Allow IPv6」开关的语义仍然保留 —— 它决定 `dns.ipv6`（见上方 revise!），
+        // 即关闭时内核 DNS 不返回 AAAA 记录，应用拿不到 IPv6 地址、实际走 IPv4。
+        // 二者不冲突：顶层 ipv6 管「TUN 是否接管 IPv6 路由（防泄漏）」，dns.ipv6 管「是否使用 IPv6」。
+        revise!(config, "ipv6", true);
+        revise!(
+            tun_val,
+            "inet6-address",
+            crate::constants::tun::TUN_INET6_ADDRESS
+        );
     } else {
         // TUN未启用时，不修改配置文件中的DNS设置
     }
