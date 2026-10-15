@@ -25,6 +25,15 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
         val.as_mapping().cloned().unwrap_or_else(Mapping::new)
     });
 
+    // 用户「Allow IPv6」开关值（顶层 ipv6）。
+    // 必须在下方 TUN 分支强制 ipv6=true 之前读取，否则会被覆盖成 true。
+    // 【两种模式共用】该开关统一同步到 dns.ipv6，保证「是否使用 IPv6」的语义
+    // 在 TUN / 系统代理 / 手动三种模式下完全一致。
+    let user_ipv6 = config
+        .get(Value::from("ipv6"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
     if enable {
         // 【上游语义】TUN 开启时接管 DNS：仅当 enhanced-mode 为 fake-ip（或未设置）时，
         // 确保 enable=true 及 ipv6 同步，并补齐缺失的 enhanced-mode=fake-ip、fake-ip-range、
@@ -36,10 +45,6 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
         let mut dns_val = dns_val.map_or_else(Mapping::new, |val| {
             val.as_mapping().cloned().unwrap_or_else(Mapping::new)
         });
-        let user_ipv6 = config
-            .get(Value::from("ipv6"))
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
         let current_mode = dns_val
             .get(Value::from("enhanced-mode"))
             .and_then(|v| v.as_str())
@@ -97,7 +102,19 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             crate::constants::tun::TUN_INET6_ADDRESS
         );
     } else {
-        // TUN未启用时，不修改配置文件中的DNS设置
+        // 非 TUN（系统代理 / 手动）：不注入 fake-ip 等 TUN 专属 DNS 字段，交由内核默认
+        // （redir-host）；也不做 IPv6 路由接管 —— 非全局接管场景本就不存在「绕过代理泄漏」。
+        //
+        // 但 dns.ipv6 仍必须跟随「Allow IPv6」开关：否则订阅若自带 dns.ipv6: true，
+        // 用户关闭开关后 DNS 仍会返回 AAAA（拿到 IPv6 地址却连不通，多一次失败尝试），
+        // 与 TUN 模式下「开关即关闭 AAAA」的行为不一致。
+        let dns_key = Value::from("dns");
+        let mut dns_val = config
+            .get(&dns_key)
+            .and_then(|v| v.as_mapping().cloned())
+            .unwrap_or_else(Mapping::new);
+        revise!(dns_val, "ipv6", user_ipv6);
+        revise!(config, "dns", dns_val);
     }
 
     // 更新TUN配置

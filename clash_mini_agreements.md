@@ -241,8 +241,11 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **铁律**：**TUN 启用时，内核必须始终具备 IPv6 接管能力**（顶层 `ipv6: true` + 显式 `tun.inet6-address`），使 IPv4 与 IPv6 的默认路由**一律由 TUN 接管**，IPv6 流量必须进入内核按规则处理，严禁从物理网卡泄漏。
 - **开关语义二分（不得混淆）**：
   - **顶层 `ipv6`** 管「TUN 是否接管 IPv6 路由（防泄漏）」——TUN 启用时恒为 `true`，不由用户开关决定；
-  - **`dns.ipv6`** 管「是否真正使用 IPv6」——由用户「Allow IPv6」开关决定；关闭时内核 DNS 不返回 AAAA，应用拿不到 IPv6 地址、实际走 IPv4。
-- **落地位置**：`src-tauri/src/enhance/tun.rs::use_tun`（TUN 启用分支末尾）；TUN 的 IPv6 地址常量为 `constants::tun::TUN_INET6_ADDRESS`（`fdfe:dcba:9876::1/126`）。
+  - **`dns.ipv6`** 管「是否真正使用 IPv6」——由用户「Allow IPv6」开关决定；关闭时内核 DNS 不返回 AAAA（回空解析），应用拿不到 IPv6 地址、实际走 IPv4。
+- **`dns.ipv6` 在三模式下语义统一（2026-10-16 追加）**：`dns.ipv6` 必须**同时**跟随「Allow IPv6」开关，**TUN / 系统代理 / 手动三种模式一致**，不得只在 TUN 模式下同步。
+  - **非 TUN 模式无需防泄漏**：非 TUN 时系统流量默认不经过内核（仅显式指向代理端口或经系统代理的流量入内核），不存在「全局接管被绕过」的泄漏面，故**不强制** `ipv6: true`、**不写** `inet6-address`。
+  - **但 `dns.ipv6` 仍须跟随开关**：否则订阅若自带 `dns.ipv6: true`，用户关闭开关后非 TUN 模式下 DNS 仍返回 AAAA（拿到 IPv6 地址却连不通，多一次失败尝试），造成两模式行为不一致。
+- **落地位置**：`src-tauri/src/enhance/tun.rs::use_tun`（开关值 `user_ipv6` 在 `if enable` 之前读取，供两分支共用；TUN 分支末尾做路由接管）；TUN 的 IPv6 地址常量为 `constants::tun::TUN_INET6_ADDRESS`（`fdfe:dcba:9876::1/126`）。
 
 ---
 
