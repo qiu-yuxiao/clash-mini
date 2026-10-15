@@ -1,3 +1,16 @@
+## v2.9.4
+
+### 🐞 Fixed Bugs & Security Enhancements
+- **修复 TUN 模式下 IPv6 流量绕过代理直连泄漏（防泄漏铁律）**：
+  - **根因修复**：根据 Mihomo 官方规范，`tun.inet6-address` 必须在顶层配置中显式启用 `ipv6: true` 才会生效。此前当用户关闭「Allow IPv6」时，内核不具备 IPv6 收包能力，系统 `::/0` 路由仍指向物理网关，导致所有 IPv6 流量从物理网卡直连并 100% 绕过代理泄漏。
+  - **路由全面接管**：TUN 启用时强制写入顶层 `ipv6: true` 并显式配置 ULA 地址 `tun.inet6-address`（`fdfe:dcba:9876::1/126`），使 TUN 网卡同时接管 IPv4 与 IPv6 默认路由，彻底杜绝 IPv6 旁路泄漏。
+  - **开关语义二分与多模式统一**：
+    - 顶层 `ipv6` 专职负责 TUN 路由接管与防泄漏；用户「Allow IPv6」开关专职控制 `dns.ipv6`（关闭时内核 DNS 不返回 AAAA 记录，应用自动回落 IPv4）。
+    - 统一 `dns.ipv6` 在 TUN、系统代理与手动模式下的开关语义，关闭后非 TUN 模式下同样屏蔽 AAAA 解析，避免连接不通与无效重试。
+    - 优化非 TUN 模式边缘行为：仅在订阅自带 `dns` 配置时同步开关值，不凭空生成冗余配置块。
+
+---
+
 ## v2.9.3
 
 ### 🐞 Fixed Bugs & Performance Optimizations
