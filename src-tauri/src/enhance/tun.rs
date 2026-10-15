@@ -52,7 +52,6 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
 
         if current_mode == "fake-ip" || !dns_val.contains_key(Value::from("enhanced-mode")) {
             revise!(dns_val, "enable", true);
-            revise!(dns_val, "ipv6", user_ipv6);
             if !dns_val.contains_key(Value::from("enhanced-mode")) {
                 revise!(dns_val, "enhanced-mode", "fake-ip");
             }
@@ -80,6 +79,10 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
                 }
             }
         }
+        // dns.ipv6 跟随「Allow IPv6」开关，对所有 enhanced-mode（fake-ip / redir-host /
+        // 未设置）一律生效，保证 TUN / 系统代理 / 手动三模式下「开关即是否使用 IPv6」语义一致。
+        // 放在 fake-ip 补齐块之外：redir-host 不注入 TUN 专属字段，但开关同步不能缺席。
+        revise!(dns_val, "ipv6", user_ipv6);
         revise!(config, "dns", dns_val);
 
         // 【IPv6 防泄漏】TUN 启用时，必须让内核具备 IPv6 收包能力，否则 IPv6 会整体绕过代理。
@@ -108,13 +111,14 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
         // 但 dns.ipv6 仍必须跟随「Allow IPv6」开关：否则订阅若自带 dns.ipv6: true，
         // 用户关闭开关后 DNS 仍会返回 AAAA（拿到 IPv6 地址却连不通，多一次失败尝试），
         // 与 TUN 模式下「开关即关闭 AAAA」的行为不一致。
+        //
+        // 仅在订阅原本就有 dns 段时同步开关值；订阅无 dns 段时不凭空创建，
+        // 避免生成的运行时配置与订阅产生无谓差异。
         let dns_key = Value::from("dns");
-        let mut dns_val = config
-            .get(&dns_key)
-            .and_then(|v| v.as_mapping().cloned())
-            .unwrap_or_else(Mapping::new);
-        revise!(dns_val, "ipv6", user_ipv6);
-        revise!(config, "dns", dns_val);
+        if let Some(mut dns_val) = config.get(&dns_key).and_then(|v| v.as_mapping().cloned()) {
+            revise!(dns_val, "ipv6", user_ipv6);
+            revise!(config, "dns", dns_val);
+        }
     }
 
     // 更新TUN配置
