@@ -48,7 +48,10 @@ pub mod tun {
     // Mini 无 TUN 设置 UI，若默认 system 栈在个别环境异常，用户将无处回退。
     pub const DEFAULT_STACK: &str = "gvisor";
 
-    pub const DNS_HIJACK: &[&str] = &["any:53"];
+    /// DNS 劫持规则。mihomo 语义：不书写协议时默认按 `udp://` 处理，
+    /// 故必须显式补上 `tcp://any:53` —— 否则走 TCP 的 DNS 查询（大响应、部分解析器）
+    /// 不会被劫持进内核 DNS 模块，而是按规则转发，形成 DNS 泄漏面。
+    pub const DNS_HIJACK: &[&str] = &["any:53", "tcp://any:53"];
 
     /// TUN 网卡的 IPv6 地址（ULA 段，mihomo 标准默认值）。
     /// 【作用】让 TUN 具备 IPv6 收包能力，从而把 IPv6 默认路由一并导入 TUN，

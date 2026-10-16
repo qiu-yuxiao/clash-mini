@@ -787,6 +787,24 @@ async fn trigger_backend_auto_select_inner(
         };
     }
 
+    // 【单点测速语义：必须真实探测】valid_nodes.len() == 1 为用户显式单点测速（强即时意图）。
+    // 若测量组本次未返回任何数据（内核/测量组未就绪），一律判定为「测速未执行」：
+    // 直接返回空结果，由前端提示「测速未执行」并按契约恢复原值 ——
+    // agreements 5.2 第 3 条明确「测速未真正执行时严禁伪造成 Timeout」。
+    // 同样禁止走下方 history 兜底：那会把最多 FALLBACK_HISTORY_MAX_AGE_SECS(120s) 前的旧值
+    // 当作本次实时结果返回（旧死状态 / 旧延迟），与「点击即探活」的意图直接相悖。
+    if is_frontend_subset && valid_nodes.len() == 1 && delays.is_empty() {
+        logging!(
+            warn,
+            Type::Lightweight,
+            "[后台监测] 单点测速未取得测量组数据，判定为「未执行」，返回空结果交由前端提示"
+        );
+        return Ok(AutoSelectOutcome {
+            display: vec![],
+            selected: false,
+        });
+    }
+
     // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history。
     // 只接受内核确认存活（alive）且数据新鲜（<FALLBACK_HISTORY_MAX_AGE_SECS）的条目：
     // 此前不过滤会把死节点/过期延迟填入候选，导致把不可达节点选为最优。

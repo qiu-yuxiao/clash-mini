@@ -59,6 +59,11 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
                 revise!(dns_val, "fake-ip-range", "198.18.0.1/16");
             }
             if user_ipv6 && !dns_val.contains_key(Value::from("fake-ip-range6")) {
+                // 【约束·勿改】该值必须落在 `fc00::/7` 之外！
+                // enhance::enforce_mini_agreements 会注入 `IP-CIDR6,fc00::/7,DIRECT,no-resolve`
+                // 用于让 ULA/局域网 IPv6 直连；若把 fake-ip-range6 改成社区常见的
+                // `fdfe:dcba:9877::/64`（属 ULA），fake IPv6 就会撞上该直连规则。
+                // 当前取值 2001:2::/64（RFC 5180 基准测试段）不在 fc00::/7 内，安全。
                 revise!(dns_val, "fake-ip-range6", "2001:2::0/64");
             }
             // fake-ip-filter：按条目 merge，而非「键缺失才整体写入」。
@@ -111,17 +116,21 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
         // 非 TUN（系统代理 / 手动）：不注入 fake-ip 等 TUN 专属 DNS 字段，交由内核默认
         // （redir-host）；也不做 IPv6 路由接管 —— 非全局接管场景本就不存在「绕过代理泄漏」。
         //
-        // 但 dns.ipv6 仍必须跟随「Allow IPv6」开关：否则订阅若自带 dns.ipv6: true，
-        // 用户关闭开关后 DNS 仍会返回 AAAA（拿到 IPv6 地址却连不通，多一次失败尝试），
-        // 与 TUN 模式下「开关即关闭 AAAA」的行为不一致。
+        // dns.ipv6 一律跟随「Allow IPv6」开关（`user_ipv6`），**无论订阅是否自带 dns 段**：
+        // 否则订阅若自带 `dns.ipv6: true`，用户关闭开关后 DNS 仍会返回 AAAA（拿到 IPv6 地址
+        // 却连不通，多一次失败尝试），造成两模式行为不一致。
         //
-        // 仅在订阅原本就有 dns 段时同步开关值；订阅无 dns 段时不凭空创建，
-        // 避免生成的运行时配置与订阅产生无谓差异。
+        // 【单一真源】本函数是 dns.ipv6 的唯一写入点（两个分支都写）。
+        // 下游 `apply_mandatory_dns_settings` 只补 enable/nameserver 等，不再兜 dns.ipv6 ——
+        // 若在那里读顶层 ipv6 兜底，TUN 模式下读到的会是本函数刚强制过的 `true`（防泄漏接管），
+        // 从而把用户关掉的 IPv6 静默写回开启。此处显式无条件同步即可根除该类风险。
         let dns_key = Value::from("dns");
-        if let Some(mut dns_val) = config.get(&dns_key).and_then(|v| v.as_mapping().cloned()) {
-            revise!(dns_val, "ipv6", user_ipv6);
-            revise!(config, "dns", dns_val);
-        }
+        let mut dns_val = config
+            .get(&dns_key)
+            .and_then(|v| v.as_mapping().cloned())
+            .unwrap_or_else(Mapping::new);
+        revise!(dns_val, "ipv6", user_ipv6);
+        revise!(config, "dns", dns_val);
     }
 
     // 更新TUN配置
