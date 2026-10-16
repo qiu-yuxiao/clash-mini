@@ -727,13 +727,15 @@ async fn trigger_backend_auto_select_inner(
 
     let test_url = get_test_url().await;
 
-    // 【子集测速降频】前端发起的子集测速（如手动单点/可见列表测速）：
+    // 【子集测速降频】前端发起的批量子集测速（如可见列表测速）：
     // 若所求节点的测量组 history 均新鲜（<METRICS_REUSE_MAX_AGE_SECS，即刚被拨测过），
-    // 直接复用缓存构建结果，跳过全组拨测——否则一次单点测速也会触发 70+ 节点全组拨测。
+    // 直接复用缓存构建结果，跳过全组拨测——避免界面批量渲染频繁触发全组拨测。
+    // 注意：当 valid_nodes.len() == 1 时为用户显式单点测速，带有极强的即时探活意图，
+    // 不应复用旧缓存（防止刚恢复的节点在 30 秒内持续返回旧的死状态），必须发起实时探测。
     // 存活节点复用真实延迟；死节点复用死状态（不写入 delays，下游 display 记 0 即 Timeout）。
     let mut delays: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     let mut reused_cache = false;
-    if is_frontend_subset {
+    if is_frontend_subset && valid_nodes.len() > 1 {
         if let Ok(proxies) = mihomo.get_proxies().await {
             let threshold = Duration::from_secs(METRICS_REUSE_MAX_AGE_SECS);
             let mut cached: std::collections::HashMap<String, u32> = std::collections::HashMap::new();

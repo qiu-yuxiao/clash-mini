@@ -439,6 +439,16 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     if !dns_config.contains_key(Value::from("enable")) {
         dns_config.insert("enable".into(), Value::Bool(true));
     }
+    // 同步用户「Allow IPv6」开关至 dns.ipv6：
+    // 若 use_tun 未注入（如非 TUN 模式且原订阅无 dns 块时），此处补全保证开关值有效继承，
+    // 杜绝非 TUN 模式下因原订阅缺 dns 块而丢失与用户设置的一致性。
+    if !dns_config.contains_key(Value::from("ipv6")) {
+        let user_ipv6 = config
+            .get("ipv6")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        dns_config.insert("ipv6".into(), Value::Bool(user_ipv6));
+    }
     // 注：不设置 enhanced-mode / fake-ip-range —— 由 use_tun 在 TUN 场景写入 fake-ip，
     // 非 TUN 场景交由内核默认值（redir-host），避免覆盖用户显式配置。
     if !dns_config.contains_key(Value::from("nameserver")) {
@@ -637,6 +647,11 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     final_rules.push(Value::from("IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"));
     final_rules.push(Value::from("IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"));
     final_rules.push(Value::from("IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"));
+    // IPv6 本地回环、唯一本地地址（ULA，含 TUN 自身段）及链路本地地址直连，
+    // 防止在“代理所有流量”（MATCH,PROXY）下本地/局域网 IPv6 流量被误转至远端代理
+    final_rules.push(Value::from("IP-CIDR6,::1/128,DIRECT,no-resolve"));
+    final_rules.push(Value::from("IP-CIDR6,fc00::/7,DIRECT,no-resolve"));
+    final_rules.push(Value::from("IP-CIDR6,fe80::/10,DIRECT,no-resolve"));
 
     // Add manual rules from append-rules
     if let Some(Value::Sequence(append)) = config.remove("append-rules") {
@@ -892,9 +907,9 @@ append-rules:
         assert_eq!(gfwlist.get("proxy").unwrap().as_str(), Some("PROXY"));
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
-        // prepend-rules(1) + GFWList(1) + IP-CIDR(5) + append-rules(1) + MATCH(1) = 9
+        // prepend-rules(1) + GFWList(1) + IP-CIDR(5) + IP-CIDR6(3) + append-rules(1) + MATCH(1) = 12
         // MATCH=DIRECT because default rule_fallback is "direct" (GFWList mode)
-        assert_eq!(rules.len(), 9);
+        assert_eq!(rules.len(), 12);
         assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));
         assert_eq!(rules[1].as_str(), Some("RULE-SET,gfwlist,PROXY"));
         assert_eq!(rules[2].as_str(), Some("IP-CIDR,127.0.0.0/8,DIRECT,no-resolve"));
@@ -902,8 +917,11 @@ append-rules:
         assert_eq!(rules[4].as_str(), Some("IP-CIDR,192.168.0.0/16,DIRECT,no-resolve"));
         assert_eq!(rules[5].as_str(), Some("IP-CIDR,10.0.0.0/8,DIRECT,no-resolve"));
         assert_eq!(rules[6].as_str(), Some("IP-CIDR,100.64.0.0/10,DIRECT,no-resolve"));
-        assert_eq!(rules[7].as_str(), Some("DOMAIN,custom-domain,REJECT"));
-        assert_eq!(rules[8].as_str(), Some("MATCH,DIRECT"));
+        assert_eq!(rules[7].as_str(), Some("IP-CIDR6,::1/128,DIRECT,no-resolve"));
+        assert_eq!(rules[8].as_str(), Some("IP-CIDR6,fc00::/7,DIRECT,no-resolve"));
+        assert_eq!(rules[9].as_str(), Some("IP-CIDR6,fe80::/10,DIRECT,no-resolve"));
+        assert_eq!(rules[10].as_str(), Some("DOMAIN,custom-domain,REJECT"));
+        assert_eq!(rules[11].as_str(), Some("MATCH,DIRECT"));
 
         // Verify prepend-rules and append-rules keys are removed
         assert!(config.get("prepend-rules").is_none());

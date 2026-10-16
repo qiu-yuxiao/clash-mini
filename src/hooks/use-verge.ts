@@ -46,9 +46,16 @@ export const useVerge = () => {
 
   const patchVerge = useLockFn(
     async (value: Partial<IVergeConfig>) => {
+      // 乐观更新 UI：立即将补丁合并到 queryClient 缓存中，提供 0ms 原生切换手感
+      qc.setQueryData<IVergeConfig>(['getVergeConfig'], (prev) =>
+        prev ? { ...prev, ...value } : prev,
+      )
+
       try {
         await patchVergeConfig(value)
       } catch (err) {
+        // 失败时回滚缓存
+        await refetch().catch(() => {})
         showNotice.error(err)
         throw err
       }
