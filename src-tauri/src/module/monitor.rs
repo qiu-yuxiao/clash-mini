@@ -114,7 +114,7 @@ async fn get_test_url() -> String {
     verge
         .default_latency_test
         .as_deref()
-        .unwrap_or("http://cp.cloudflare.com/generate_204")
+        .unwrap_or("https://cp.cloudflare.com/generate_204")
         .to_string()
 }
 
@@ -123,15 +123,15 @@ async fn get_test_url() -> String {
 fn resolve_probe_target(test_url: &str) -> String {
     match url::Url::parse(test_url) {
         Ok(parsed_url) => {
-            let port = parsed_url.port_or_known_default().unwrap_or(80);
+            let port = parsed_url.port_or_known_default().unwrap_or(443);
             match parsed_url.host() {
                 Some(url::Host::Ipv6(addr)) => format!("[{}]:{}", addr, port),
                 Some(url::Host::Ipv4(addr)) => format!("{}:{}", addr, port),
                 Some(url::Host::Domain(domain)) => format!("{}:{}", domain, port),
-                None => "cp.cloudflare.com:80".to_string(),
+                None => "cp.cloudflare.com:443".to_string(),
             }
         }
-        Err(_) => "cp.cloudflare.com:80".to_string(),
+        Err(_) => "cp.cloudflare.com:443".to_string(),
     }
 }
 
@@ -144,6 +144,19 @@ async fn is_physical_network_online(timeout_secs: u64) -> bool {
     let test_url = get_test_url().await;
     let host_port = resolve_probe_target(&test_url);
     tokio::time::timeout(Duration::from_secs(timeout_secs), tokio::net::lookup_host(host_port))
+        .await
+        .map(|res| res.is_ok())
+        .unwrap_or(false)
+}
+
+/// 快速探测 mihomo 内核 API 是否可达。
+///
+/// 自愈连续失败后决定是否重启内核前调用：若 API 本身可达，说明失败原因是
+/// 节点侧不可达（如国际出口中断），重启内核无益且会造成短暂断流；
+/// 仅当 API 确实无响应时才重启内核以清除命名管道卡死状态。
+async fn is_clash_api_alive() -> bool {
+    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+    tokio::time::timeout(Duration::from_secs(3), mihomo.get_base_config())
         .await
         .map(|res| res.is_ok())
         .unwrap_or(false)
@@ -1384,32 +1397,45 @@ async fn self_heal_with_accounting(
     // TUN 模式下测速请求可能卡住 mihomo 的命名管道通道（单通道），导致后续所有 API
     // 请求超时（API 不可达死循环），自愈选点因 wait_for_clash_ready 阶段 1 必然 30 秒
     // 超时而无效。重启内核可清除卡死状态，恢复 API 通道。
+    //
+    // 【新增判断】重启前先探测 API 是否可达：
+    // - API 可达 → 失败原因是节点侧不可达（如国际出口中断），重启内核无益且会造成
+    //   短暂断流，仅记录日志、重置计数，等待节点恢复后自愈自动接管。
+    // - API 不可达 → 命名管道可能卡死，重启内核恢复通道。
     // 重启成功则重置计数；重启失败则弹 Windows 提示框通知用户。
     if *auto_select_fail_count >= 3 {
         *auto_select_fail_count = 0;
-        logging!(
-            warn,
-            Type::Lightweight,
-            "[后台监测] 连续 3 次自愈选点失败，重启内核以恢复 API 通道"
-        );
-        match crate::core::manager::CoreManager::global()
-            .restart_core()
-            .await
-        {
-            Ok(()) => {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 重启内核成功，API 通道应已恢复"
-                );
-            }
-            Err(e) => {
-                logging!(
-                    error,
-                    Type::Lightweight,
-                    "[后台监测] 重启内核失败: {e}，弹出 Windows 提示框"
-                );
-                fire_self_heal_alert();
+        if is_clash_api_alive().await {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] 连续 3 次自愈选点失败，但内核 API 可达，判定为节点侧不可达（如国际出口中断），跳过内核重启，等待节点恢复"
+            );
+        } else {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，重启内核以恢复 API 通道"
+            );
+            match crate::core::manager::CoreManager::global()
+                .restart_core()
+                .await
+            {
+                Ok(()) => {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 重启内核成功，API 通道应已恢复"
+                    );
+                }
+                Err(e) => {
+                    logging!(
+                        error,
+                        Type::Lightweight,
+                        "[后台监测] 重启内核失败: {e}，弹出 Windows 提示框"
+                    );
+                    fire_self_heal_alert();
+                }
             }
         }
     }
@@ -1450,7 +1476,7 @@ mod tests {
 
     #[test]
     fn test_resolve_probe_target_malformed() {
-        // 非法 URL fallback 到默认目标
-        assert_eq!(resolve_probe_target("not-a-valid-url"), "cp.cloudflare.com:80");
+        // 非法 URL fallback 到默认目标（HTTPS 默认端口 443）
+        assert_eq!(resolve_probe_target("not-a-valid-url"), "cp.cloudflare.com:443");
     }
 }

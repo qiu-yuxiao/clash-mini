@@ -575,7 +575,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         .latest_arc()
         .default_latency_test
         .as_deref()
-        .unwrap_or("http://cp.cloudflare.com/generate_204")
+        .unwrap_or("https://cp.cloudflare.com/generate_204")
         .to_string();
 
     let mut metrics_group = Mapping::new();
