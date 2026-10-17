@@ -4,7 +4,9 @@ use crate::{
 };
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::time::{Duration, Instant, sleep};
 
@@ -76,6 +78,152 @@ const FALLBACK_HISTORY_MAX_AGE_SECS: u64 = 120;
 /// 前端发起子集测速时，若所求节点的 history 均在此时间内（刚被测量组拨测过），
 /// 直接复用缓存构建结果，跳过全组拨测。
 const METRICS_REUSE_MAX_AGE_SECS: u64 = 30;
+
+/// 「失败服务器」冷却时长（秒）。
+///
+/// 【为什么需要】2026-10-18 实测事故：订阅 61 个节点中有 **36 个挤在同一台服务器**
+/// `212.189.51.64`（仅端口不同）。该机间歇性不可达（单窗口 222 次 dial i/o timeout），
+/// 而自愈选点只看延迟、不记「哪台服务器刚坏过」，于是连续两次都选中该机上的节点
+/// （v5-日本01 → 断流 → 再选中 v5-日本01 → 又断流），把一次服务器抖动放大成
+/// 十余分钟的反复断流。
+///
+/// 【机制】活跃节点被判死时，把**它所在服务器**记入冷却表；随后选点优先避开这些
+/// 服务器上的节点（若剔除后无候选则回退全量，保证始终有节点可选）。
+const FAILED_SERVER_COOLDOWN_SECS: u64 = 600;
+
+/// 备用测速 URL（与主 URL 不同域名，均为 HTTPS）。
+///
+/// mihomo 官方警告：部分机场会劫持测试地址、且不兼容重复 HEAD 请求，使用 HTTP
+/// 测速会出现「节点全超时」的假象。主 URL 拨测整体失败时用本 URL 复核一次，
+/// 以区分「测速链路故障（测速失真）」与「节点真的不可达」，避免因测速失真
+/// 触发无意义的切节点抖动 / 误判全部节点死亡。
+const FALLBACK_TEST_URL: &str = "https://www.gstatic.com/generate_204";
+
+/// 服务器级失败登记表：server → 最近一次被判定失败的时刻。
+static FAILED_SERVERS: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
+
+fn failed_servers() -> &'static Mutex<HashMap<String, Instant>> {
+    FAILED_SERVERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 记录一次服务器级失败。活跃节点被判死（且该判定基于**有效测速数据**）时调用。
+fn record_server_failure(server: &str) {
+    if server.is_empty() {
+        return;
+    }
+    let mut map = failed_servers().lock().unwrap_or_else(|e| {
+        logging!(warn, Type::Lightweight, "[后台监测] 失败服务器登记表锁被污染，恢复继续");
+        e.into_inner()
+    });
+    let now = Instant::now();
+    // 顺手清理过期条目，避免表无界增长
+    map.retain(|_, t| now.duration_since(*t).as_secs() < FAILED_SERVER_COOLDOWN_SECS);
+    map.insert(server.to_string(), now);
+}
+
+/// 取出仍在冷却期内的失败服务器集合（顺带清理过期项）。
+fn snapshot_failed_servers() -> HashSet<String> {
+    let mut map = failed_servers().lock().unwrap_or_else(|e| {
+        logging!(warn, Type::Lightweight, "[后台监测] 失败服务器登记表锁被污染，恢复继续");
+        e.into_inner()
+    });
+    let now = Instant::now();
+    map.retain(|_, t| now.duration_since(*t).as_secs() < FAILED_SERVER_COOLDOWN_SECS);
+    map.keys().cloned().collect()
+}
+
+/// 读取运行时配置，构建「节点名 → 服务器地址」映射。
+///
+/// mihomo 的 `/proxies` API **不暴露 server 字段**（只有 name/type/history/alive 等），
+/// 故直接解析生成的 `clash-mini.yaml` 的 `proxies` 段（该段为 enhance 流水线合并后的
+/// 全量内联节点，含 server）。解析失败返回空表 —— 此时「失败服务器避让」自动退化关闭，
+/// 不影响选点正确性。
+async fn load_node_server_map() -> HashMap<String, String> {
+    #[derive(Deserialize)]
+    struct ProxyEntry {
+        name: String,
+        #[serde(default)]
+        server: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct ConfigSlice {
+        #[serde(default)]
+        proxies: Vec<ProxyEntry>,
+    }
+
+    let Ok(dir) = crate::utils::dirs::app_home_dir() else {
+        return HashMap::new();
+    };
+    let path = dir.join(crate::constants::files::RUNTIME_CONFIG);
+    let Ok(text) = tokio::fs::read_to_string(&path).await else {
+        return HashMap::new();
+    };
+    match serde_yaml_ng::from_str::<ConfigSlice>(&text) {
+        Ok(slice) => slice
+            .proxies
+            .into_iter()
+            .filter_map(|e| e.server.filter(|s| !s.is_empty()).map(|s| (e.name, s)))
+            .collect(),
+        Err(e) => {
+            logging!(
+                debug,
+                Type::Lightweight,
+                "[后台监测] 解析运行时配置构建节点→服务器映射失败（失败服务器避让本次关闭）: {e}"
+            );
+            HashMap::new()
+        }
+    }
+}
+
+/// 带「测速失真复核」的整组拨测。
+///
+/// 先用主测速 URL 拨测；若整体失败（mihomo 返回 all proxies timeout 等），
+/// 再用 `FALLBACK_TEST_URL` 复核一次。两次都失败才认定「测速不可用」。
+///
+/// 返回 `Some(map)` = 测速链路可用（map 内为本次测得的节点延迟，可能为空但链路正常）；
+/// `None` = 主/备地址都整体失败，属测速链路问题，**不可据此判定节点已死**。
+async fn probe_metrics_group(
+    mihomo: &tauri_plugin_mihomo::Mihomo,
+    label: &str,
+) -> Option<HashMap<String, u32>> {
+    let test_url = get_test_url().await;
+    match mihomo
+        .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
+        .await
+    {
+        Ok(d) => return Some(d),
+        Err(e) => {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] [{label}] 主测速地址整体失败（{e}），改用备用地址复核: {FALLBACK_TEST_URL}"
+            );
+        }
+    }
+
+    // 主 URL 整体失败 → 可能是机场劫持/不兼容该测试地址（测速失真），换备用 URL 复核
+    match mihomo
+        .delay_group("PROXY__METRICS", FALLBACK_TEST_URL, NODE_TEST_TIMEOUT_MS)
+        .await
+    {
+        Ok(d) => {
+            logging!(
+                info,
+                Type::Lightweight,
+                "[后台监测] [{label}] 备用测速地址可用 → 判定为主测速地址失真，节点侧正常"
+            );
+            Some(d)
+        }
+        Err(e) => {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] [{label}] 主/备测速地址均整体失败（{e}）→ 判定为测速链路不可用（不视为节点已死）"
+            );
+            None
+        }
+    }
+}
 
 /// 自动选点执行结果
 pub struct AutoSelectOutcome {
@@ -536,20 +684,32 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
     if need_probe {
         // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
-        let test_url = get_test_url().await;
         // 【探针 2c】拨测前：与「拨测后」日志配对，若只出现前一条 → 卡在 delay_group
         logging!(info, Type::Lightweight, "[探针] evaluate_failover 即将全组拨测(need_probe=true)");
         let probe_start = Instant::now();
-        let _ = mihomo
-            .delay_group("PROXY__METRICS", &test_url, NODE_DELAY_MAX_MS)
-            .await
-            .unwrap_or_default();
+        // 带「测速失真复核」：主 URL 整体失败时用备用 HTTPS URL 复核一次
+        let measured = probe_metrics_group(&mihomo, "体检").await.is_some();
         logging!(
             info,
             Type::Lightweight,
-            "[探针] evaluate_failover 全组拨测返回，耗时 {:?}",
-            probe_start.elapsed()
+            "[探针] evaluate_failover 全组拨测返回，耗时 {:?}, 测速可用={}",
+            probe_start.elapsed(),
+            measured
         );
+
+        // 【测速失真防护】主/备测速地址都整体失败 = 测速链路不可用，**不是**「节点已死」。
+        // 此时 mihomo 已把全组成员标记为 not-alive，若据此判死会触发无意义的切节点抖动。
+        // 2026-10-18 实测：机场劫持 HTTP 测速地址期间内核返回 `all proxies timeout`，
+        // app 误判「所有测速节点均不可达」，连续多轮自愈全部落空。
+        // 故本轮直接 NoAction（主循环会清零连续失败计数，不触发自愈），等下一周期重试。
+        if !measured {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] 测速链路不可用，本轮不判定活跃节点死活（避免测速失真引发切点抖动）"
+            );
+            return Ok(FailoverVerdict::NoAction);
+        }
 
         // 拨测后重读，确保 proxy.alive 与 proxy.history.last() 反映最新真实状态，
         // 而非 300 秒前测量组自然周期的陈旧缓存。
@@ -738,8 +898,6 @@ async fn trigger_backend_auto_select_inner(
         valid_nodes.len()
     );
 
-    let test_url = get_test_url().await;
-
     // 【子集测速降频】前端发起的批量子集测速（如可见列表测速）：
     // 若所求节点的测量组 history 均新鲜（<METRICS_REUSE_MAX_AGE_SECS，即刚被拨测过），
     // 直接复用缓存构建结果，跳过全组拨测——避免界面批量渲染频繁触发全组拨测。
@@ -788,16 +946,12 @@ async fn trigger_backend_auto_select_inner(
         // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
         // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
         // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
-        delays = match mihomo
-            .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
+        //
+        // 带「测速失真复核」：主测速地址整体失败时改用备用 HTTPS 地址复核一次，
+        // 避免主地址被机场劫持/不兼容时误判「所有测速节点均不可达」。
+        delays = probe_metrics_group(&mihomo, "选点")
             .await
-        {
-            Ok(d) => d,
-            Err(e) => {
-                logging!(warn, Type::Lightweight, "[后台监测] 读取测量组延迟失败: {e}");
-                std::collections::HashMap::new()
-            }
-        };
+            .unwrap_or_default();
     }
 
     // 【单点测速语义：必须真实探测】valid_nodes.len() == 1 为用户显式单点测速（强即时意图）。
@@ -856,6 +1010,45 @@ async fn trigger_backend_auto_select_inner(
         display.push((name.clone(), delay));
         if (NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&delay) {
             candidates.push((name.clone(), delay));
+        }
+    }
+
+    // 【失败服务器避让】剔除「所在服务器最近被判死」的候选节点。
+    //
+    // 起因（2026-10-18 实测）：订阅 61 个节点中 36 个挤在同一台服务器上，该机间歇性不可达
+    // （单窗口 222 次 dial i/o timeout）。若自愈只按延迟选点，会在该机节点上反复来回切换
+    // （实测连续两次选中同一节点 → 断流 → 再选中 → 再断流），把一次服务器抖动放大成
+    // 十余分钟的反复断流。此处按「服务器」而非「节点」避让，才能真正避开整台坏机器。
+    //
+    // 安全阀：仅在「剔除后仍有候选」时生效；若全部候选都在失败服务器上则放弃避让
+    // （宁可切一个可疑节点，也不能无点可选）。display 不受影响，前端展示仍是全量。
+    if !candidates.is_empty() {
+        let failed = snapshot_failed_servers();
+        if !failed.is_empty() {
+            let server_map = load_node_server_map().await;
+            if !server_map.is_empty() {
+                let kept: Vec<(String, u32)> = candidates
+                    .iter()
+                    .filter(|(n, _)| !server_map.get(n).is_some_and(|s| failed.contains(s)))
+                    .cloned()
+                    .collect();
+                if kept.is_empty() {
+                    logging!(
+                        warn,
+                        Type::Lightweight,
+                        "[后台监测] 全部候选都位于失败服务器 {failed:?}，放弃避让以保证有节点可选"
+                    );
+                } else if kept.len() < candidates.len() {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 失败服务器避让：剔除 {} 个候选（服务器 {failed:?}），保留 {} 个",
+                        candidates.len() - kept.len(),
+                        kept.len()
+                    );
+                    candidates = kept;
+                }
+            }
         }
     }
 
@@ -1202,7 +1395,7 @@ pub fn start_background_monitor() {
                         last_active_node,
                         active_node_name
                     );
-                    last_active_node = Some(active_node_name);
+                    last_active_node = Some(active_node_name.clone());
                     last_node_change_time = Some(Instant::now());
                     consecutive_fails = 0;
                     is_retry_mode = false;
@@ -1252,6 +1445,19 @@ pub fn start_background_monitor() {
                                             Type::Lightweight,
                                             "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
                                         );
+
+                                        // 【失败服务器登记】把刚被判死的活跃节点**所在服务器**记入冷却表，
+                                        // 供本次自愈选点避让（详见 FAILED_SERVER_COOLDOWN_SECS 的注释）。
+                                        // 之所以按「服务器」而非「节点」：一台机器上常挂同一机场的多个端口节点，
+                                        // 只避让单节点会让自愈马上又选中同机的兄弟节点，形成死循环。
+                                        // 走到这里说明本轮判定基于**有效测速数据**——测速链路不可用时
+                                        // evaluate_failover 已直接返回 NoAction，不会进到本分支。
+                                        {
+                                            let mut server_map = load_node_server_map().await;
+                                            if let Some(server) = server_map.remove(&active_node_name) {
+                                                record_server_failure(&server);
+                                            }
+                                        }
 
                                         // 统一走冷却/计数/警报记账（与网络恢复、API 异常路径一致，🟡6）
                                         self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
