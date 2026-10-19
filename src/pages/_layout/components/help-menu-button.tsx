@@ -9,8 +9,11 @@ import {
   type Theme,
 } from '@mui/material'
 import { open } from '@tauri-apps/plugin-shell'
-import React from 'react'
+import type React from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { exportDiagnosticBundle } from '@/services/cmds'
+import { showNotice } from '@/services/notice-service'
 
 import {
   getMenuItemHoverStyle,
@@ -128,6 +131,25 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           💡 帮助指南 (Wiki)
+        </MenuItem>
+        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <MenuItem
+          onClick={async () => {
+            handleHelpClose()
+            const zipPath = await exportDiagnosticBundle()
+            if (!zipPath) return
+            showNotice.success(`诊断包已导出：${zipPath}`)
+            // 打开所在目录，方便用户直接取件发出（配置已脱敏，可直接发送）
+            const dir = zipPath.replace(/[\\/][^\\/]+$/, '')
+            if (dir && dir !== zipPath) {
+              await open(dir).catch((err) => {
+                console.error('Failed to open diagnostics dir:', err)
+              })
+            }
+          }}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          📦 导出诊断包
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem

@@ -246,6 +246,8 @@ pub async fn delete_profile(index: String) -> CmdResult {
 async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
     logging!(info, Type::Cmd, "尝试恢复到之前的配置: {}", prev_profile);
     let restore_profiles = IProfiles {
+        // 配置版本仅由 config::migrate 在加载时落值；此处是局部补丁，不参与版本变更
+        config_version: None,
         current: Some(prev_profile.to_owned()),
         items: None,
     };

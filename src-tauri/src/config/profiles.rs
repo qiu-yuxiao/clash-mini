@@ -1,4 +1,5 @@
 use super::{PrfOption, prfitem::PrfItem};
+use crate::config::{IMPLICIT_LEGACY_VERSION, migrate_profiles};
 use crate::utils::{
     dirs::{self, PathBufExec as _},
     help,
@@ -13,6 +14,10 @@ use std::collections::HashSet;
 /// Define the `profiles.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct IProfiles {
+    /// 配置格式版本号（**独立**于应用版本号；缺失视为 v1）。
+    /// 由 `config::migrate` 负责读取时逐级迁移、写入时落当前版本。
+    pub config_version: Option<u32>,
+
     /// same as PrfConfig.current
     pub current: Option<String>,
 
@@ -60,6 +65,14 @@ impl IProfiles {
 
         match help::read_yaml::<Self>(&path) {
             Ok(mut profiles) => {
+                // 【配置版本迁移】缺失 config_version 视为 v1；逐级迁移并落当前版本。
+                // 当前 profiles.yaml 尚无破坏性变更（v1），骨架先就位以便后续扩展。
+                let from_version = profiles
+                    .config_version
+                    .unwrap_or(IMPLICIT_LEGACY_VERSION);
+                let migrated = migrate_profiles(&mut profiles, from_version);
+                profiles.config_version = Some(migrated);
+
                 let items = profiles.items.get_or_insert_with(Vec::new);
                 for item in items.iter_mut() {
                     if item.uid.is_none() {

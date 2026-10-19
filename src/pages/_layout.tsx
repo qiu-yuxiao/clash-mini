@@ -55,10 +55,8 @@ import {
   updateProfile,
   deleteProfile,
   enhanceProfiles,
-  isPortInUse,
   patchClashMode,
   getProfiles,
-  patchClashConfig,
   patchProfile,
   viewProfile,
   restartCore,
@@ -69,9 +67,7 @@ import {
 import { getDelayManager } from '@/services/delay'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
 import { showNotice, hideNotice } from '@/services/notice-service'
-import { queryClient } from '@/services/query-client'
 import { useThemeMode } from '@/services/states'
-import type { IClashInfo } from '@/types/clash'
 import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
@@ -96,6 +92,7 @@ import {
 import { useClientUpdate } from './_layout/hooks/use-client-update'
 import { useCoreUpdate } from './_layout/hooks/use-core-update'
 import { useImportContextMenu } from './_layout/hooks/use-import-context-menu'
+import { useMinimalSettings } from './_layout/hooks/use-minimal-settings'
 import { useSkinControls } from './_layout/hooks/use-skin-controls'
 import { handleNoticeMessage } from './_layout/utils'
 import {
@@ -344,7 +341,7 @@ const Layout = () => {
     currentMode === 'tun' ? 2 : currentMode === 'system' ? 1 : 0
 
   // Port State
-  const { clashInfo, mutateInfo, patchInfo } = useClashInfo()
+  const { clashInfo } = useClashInfo()
   // coreVersion/mutateVersion 已在前面通过 useClash() 提前获取（供 useCoreUpdate 使用）
   const { clashConfig } = useClashConfigData()
   // 注意：handleClashBoolChange 不再主动调 refreshClashConfig()，
@@ -410,39 +407,9 @@ const Layout = () => {
   const themeActiveIndex =
     themeModeVal === 'dark' ? 2 : themeModeVal === 'light' ? 1 : 0
 
-  const [mixedPortVal, setMixedPortVal] = useState(
-    verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801,
-  )
-
-  // Minimal Settings Actions
-  const handleClashBoolChange = (field: string) => async (checked: boolean) => {
-    // 乐观更新 UI：立即更新 queryClient 中的 getClashInfo 缓存，提供原生流畅切换体验
-    if (field === 'ipv6' || field === 'allow-lan') {
-      const cacheKey = field === 'allow-lan' ? 'allow_lan' : 'ipv6'
-      queryClient.setQueryData<IClashInfo>(['getClashInfo'], (old) =>
-        old ? { ...old, [cacheKey]: checked } : old,
-      )
-    }
-
-    const waitId = showNotice.info('正在调整，请稍候…', 0)
-
-    // 标记长操作开始：allow-lan / ipv6 变更后端会 restart_core
-    // （feat/config.rs 中 allow_lan_changed / ipv6_changed → need_restart →
-    // restart_core），期间 IPC 通道阻塞最长 60s。与 handleTakeoverModeChange /
-    // handleRuleFallbackChange 同理，需抑制 IPC timeout Notice 避免风暴卡死。
-    beginLongOperation()
-    try {
-      await patchClashConfig({ [field]: checked })
-      await mutateInfo()
-      showNotice.success('已更新')
-    } catch (err: unknown) {
-      await mutateInfo()
-      showNotice.error(err instanceof Error ? err.message : String(err))
-    } finally {
-      hideNotice(waitId)
-      endLongOperation()
-    }
-  }
+  // 端口编辑态 + allow-lan/ipv6 切换已抽到 use-minimal-settings（详见该 hook 注释）
+  const { mixedPortVal, handleSavePort, handleClashBoolChange } =
+    useMinimalSettings()
 
   // Connections manager states
   const [match, setMatch] = useState<(input: string) => boolean>(
@@ -480,19 +447,6 @@ const Layout = () => {
   const handleSearch = useCallback((match: (content: string) => boolean) => {
     setMatch(() => match)
   }, [])
-
-  // Sync mixed port val
-  useEffect(() => {
-    const vPort = verge?.verge_mixed_port
-    const cPort = clashInfo?.mixed_port
-    if (vPort !== undefined && vPort !== null) {
-      // eslint-disable-next-line @eslint-react/set-state-in-effect
-      setMixedPortVal(vPort)
-    } else if (cPort !== undefined && cPort !== null) {
-      // eslint-disable-next-line @eslint-react/set-state-in-effect
-      setMixedPortVal(cPort)
-    }
-  }, [verge?.verge_mixed_port, clashInfo?.mixed_port])
 
   useEffect(() => {
     if (language && language !== lastLanguageRef.current) {
@@ -1123,32 +1077,6 @@ const Layout = () => {
       }
     } finally {
       endLongOperation()
-    }
-  }
-
-  // Port update
-  const handleSavePort = async (port: number) => {
-    if (port === verge?.verge_mixed_port && port === clashInfo?.mixed_port)
-      return
-    try {
-      const inUse = await isPortInUse(port)
-      if (inUse) {
-        showNotice.error('settings.modals.clashPort.messages.portInUse', {
-          port: port,
-        })
-        setMixedPortVal(
-          verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801,
-        )
-        return
-      }
-      await Promise.all([
-        patchInfo({ 'mixed-port': port }),
-        patchVerge({ verge_mixed_port: port }),
-      ])
-      showNotice.success('代理端口已保存并重载')
-    } catch (err) {
-      showNotice.error(err)
-      setMixedPortVal(verge?.verge_mixed_port ?? clashInfo?.mixed_port ?? 10801)
     }
   }
 
@@ -1826,8 +1754,10 @@ const Layout = () => {
         </div>
       </Paper>
 
-      {/* Popups & dialogs */}
-      <ConnectionDetail ref={detailRef} />
+      {/* Popups & dialogs：单个弹窗渲染异常只做局部降级，不拖垮整页 */}
+      <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+        <ConnectionDetail ref={detailRef} />
+      </ErrorBoundary>
 
       {/* Profile Card Context Menu (BUG-072) */}
       <Menu
@@ -1970,39 +1900,41 @@ const Layout = () => {
         </MenuItem>
       </Menu>
 
-      <LayoutDialogs
-        editProfileOpen={editProfileOpen}
-        setEditProfileOpen={setEditProfileOpen}
-        editProfileName={editProfileName}
-        setEditProfileName={setEditProfileName}
-        editProfileUrl={editProfileUrl}
-        setEditProfileUrl={setEditProfileUrl}
-        editProfileInterval={editProfileInterval}
-        setEditProfileInterval={setEditProfileInterval}
-        isEditProfileLocal={isEditProfileLocal}
-        handleSaveProfile={handleSaveProfile}
-        defaultBtn3DStyle={defaultBtn3DStyle}
-        primaryBtn3DStyle={primaryBtn3DStyle}
-        clientUpdateOpen={clientUpdateOpen}
-        setClientUpdateOpen={setClientUpdateOpen}
-        clientStatus={clientStatus}
-        appVersion={appVersion}
-        clientUpdateObj={clientUpdateObj}
-        clientProgress={clientProgress}
-        clientProgressMessage={clientProgressMessage}
-        handleClientUpgrade={handleClientUpgrade}
-        coreUpdateOpen={coreUpdateOpen}
-        setCoreUpdateOpen={setCoreUpdateOpen}
-        coreUpgradeStatus={coreUpgradeStatus}
-        coreVersion={coreVersion}
-        coreUpdateRelease={coreUpdateRelease}
-        coreUpgradeProgress={coreUpgradeProgress}
-        coreUpgradeMessage={coreUpgradeMessage}
-        handleCoreUpgrade={handleCoreUpgrade}
-        logsOpen={logsOpen}
-        setLogsOpen={setLogsOpen}
-        mode={mode}
-      />
+      <ErrorBoundary FallbackComponent={AreaErrorFallback}>
+        <LayoutDialogs
+          editProfileOpen={editProfileOpen}
+          setEditProfileOpen={setEditProfileOpen}
+          editProfileName={editProfileName}
+          setEditProfileName={setEditProfileName}
+          editProfileUrl={editProfileUrl}
+          setEditProfileUrl={setEditProfileUrl}
+          editProfileInterval={editProfileInterval}
+          setEditProfileInterval={setEditProfileInterval}
+          isEditProfileLocal={isEditProfileLocal}
+          handleSaveProfile={handleSaveProfile}
+          defaultBtn3DStyle={defaultBtn3DStyle}
+          primaryBtn3DStyle={primaryBtn3DStyle}
+          clientUpdateOpen={clientUpdateOpen}
+          setClientUpdateOpen={setClientUpdateOpen}
+          clientStatus={clientStatus}
+          appVersion={appVersion}
+          clientUpdateObj={clientUpdateObj}
+          clientProgress={clientProgress}
+          clientProgressMessage={clientProgressMessage}
+          handleClientUpgrade={handleClientUpgrade}
+          coreUpdateOpen={coreUpdateOpen}
+          setCoreUpdateOpen={setCoreUpdateOpen}
+          coreUpgradeStatus={coreUpgradeStatus}
+          coreVersion={coreVersion}
+          coreUpdateRelease={coreUpdateRelease}
+          coreUpgradeProgress={coreUpgradeProgress}
+          coreUpgradeMessage={coreUpgradeMessage}
+          handleCoreUpgrade={handleCoreUpgrade}
+          logsOpen={logsOpen}
+          setLogsOpen={setLogsOpen}
+          mode={mode}
+        />
+      </ErrorBoundary>
     </ThemeProvider>
   )
 }

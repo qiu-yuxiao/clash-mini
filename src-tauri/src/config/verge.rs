@@ -1,4 +1,7 @@
-use crate::config::Config;
+use crate::config::{
+    Config, CURRENT_VERGE_CONFIG_VERSION, IMPLICIT_LEGACY_VERSION, backup_before_migration,
+    migrate_verge,
+};
 use crate::{
     config::DEFAULT_PAC,
     utils::{dirs, help},
@@ -19,6 +22,11 @@ use smartstring::alias::String;
 /// ### `verge.yaml` schema
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct IVerge {
+    /// 配置格式版本号（**独立**于应用版本号；缺失视为 v1）。
+    /// 仅在配置格式发生破坏性变更（字段重命名/类型变更/结构调整）时递增，
+    /// 由 `config::migrate` 负责读取时逐级迁移、写入时落当前版本。
+    pub config_version: Option<u32>,
+
     /// app log level
     /// silent | error | warn | info | debug | trace
     pub app_log_level: Option<String>,
@@ -283,11 +291,24 @@ impl IVerge {
         match dirs::verge_path() {
             Ok(path) => match help::read_yaml::<Self>(&path) {
                 Ok(mut config) => {
-                    // compatibility
-                    if let Some(start_page) = config.start_page.clone()
-                        && start_page == "/home"
-                    {
-                        config.start_page = Some(String::from("/"));
+                    // 【配置版本迁移】缺失 `config_version` 的历史配置视为 v1，
+                    // 按版本逐级迁移；原先写在这里的 `start_page == "/home"` 临时兼容
+                    // 已收编为正式迁移 `migrate_verge_v1_to_v2`，便于单测与后续扩展。
+                    let from_version = config
+                        .config_version
+                        .unwrap_or(IMPLICIT_LEGACY_VERSION);
+                    let migrated = migrate_verge(&mut config, from_version);
+                    config.config_version = Some(migrated);
+                    if migrated != from_version {
+                        // 仅在真正发生迁移时备份 + 立即落盘，避免每次启动重复迁移。
+                        backup_before_migration(&path, from_version);
+                        if let Err(e) = config.save_file() {
+                            logging!(
+                                warn,
+                                Type::Config,
+                                "配置迁移后写回 verge.yaml 失败（本次迁移仅在内存生效）: {e}"
+                            );
+                        }
                     }
                     config
                 }
@@ -305,8 +326,13 @@ impl IVerge {
 
     pub fn template() -> Self {
         Self {
+            config_version: Some(CURRENT_VERGE_CONFIG_VERSION),
             app_log_max_size: Some(128),
-            app_log_max_count: Some(8),
+            // 保留 40 个文件（128KB/个 ≈ 5MB）：实测日志约 40 分钟轮转一次，
+            // 40 × 40min ≈ 26 小时，可覆盖「过夜后用户才来报障」的场景。
+            // 此前为 8 个（≈ 4.5 小时），实测中排查一次断流事故几乎要翻遍全部日志，
+            // 且若用户次日才反馈，现场已随轮转被删除。
+            app_log_max_count: Some(40),
             clash_core: Some("mini-mihomo".into()),
             language: Some(clash_verge_i18n::system_language().into()),
             theme_mode: Some("dark".into()),

@@ -13,6 +13,8 @@
     "tauri": "tauri",
     "web:dev": "vite",
     "web:build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "web:serve": "vite preview",
     "prebuild": "node scripts/prebuild.mjs",
     "plugin:build": "pnpm --dir crates/tauri-plugin-mihomo build",
@@ -130,7 +132,8 @@
     "typescript": "^6.0.0",
     "typescript-eslint": "^8.57.1",
     "vite": "^8.0.1",
-    "vite-plugin-svgr": "^5.0.0"
+    "vite-plugin-svgr": "^5.0.0",
+    "vitest": "^5.0.5"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [

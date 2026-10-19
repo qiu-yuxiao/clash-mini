@@ -28,7 +28,12 @@ export function frontendLog(level: 'info' | 'warn' | 'error', message: string) {
   if (level !== 'error' && !isDebugLoggingEnabled()) return
   invoke('frontend_log', { level, message }).catch((err) => {
     // 日志通道本身失败时，回退到 console（不递归调 frontendLog 避免死循环）
-    console.warn('[frontendLog] 日志转发失败，回退到 console:', err, '原始消息:', message)
+    console.warn(
+      '[frontendLog] 日志转发失败，回退到 console:',
+      err,
+      '原始消息:',
+      message,
+    )
   })
 }
 
@@ -413,7 +418,11 @@ export async function getClashLogs() {
 
     // 两种正则都不匹配时，保留原始日志而非静默丢弃
     console.warn('[getClashLogs] 无法解析的日志行:', log)
-    acc.push({ time: dayjs().format('MM-DD HH:mm:ss'), type: 'unknown', payload: log })
+    acc.push({
+      time: dayjs().format('MM-DD HH:mm:ss'),
+      type: 'unknown',
+      payload: log,
+    })
     return acc
   }, [])
 }
@@ -486,6 +495,21 @@ export async function openLogsDir() {
     30_000,
     'openLogsDir',
   ).catch((err) => showNotice.error(err))
+}
+
+/**
+ * 导出诊断包（最近日志 + 脱敏配置 + 版本信息），返回 zip 绝对路径。
+ * 打包需要读取并压缩约 24 小时的日志，超时给到 60s。
+ */
+export async function exportDiagnosticBundle() {
+  return withIpcTimeout(
+    invoke<string>('export_diagnostic_bundle'),
+    60_000,
+    'exportDiagnosticBundle',
+  ).catch((err) => {
+    showNotice.error(err)
+    return undefined
+  })
 }
 
 export async function downloadIconCache(url: string, name: string) {

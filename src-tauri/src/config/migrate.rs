@@ -1,0 +1,236 @@
+//! 配置文件版本迁移框架
+//!
+//! ## 背景
+//!
+//! `IClashTemp` / `IVerge` / `IProfiles` 直接序列化到 YAML。当配置格式发生**破坏性变更**
+//!（字段重命名、类型变更、结构调整、默认值语义变化）时，旧配置文件可能反序列化失败或
+//! 静默丢数据，且无法判断用户配置来自哪个版本，难以做定向迁移。
+//!
+//! ## 约定
+//!
+//! - 各配置文件顶层带 `config_version: u32`；**缺失视为 v1**（历史版本）。
+//! - 版本号**独立于应用版本号**，仅在配置格式发生破坏性变更时 +1。
+//! - 读取时按版本号**逐级**执行迁移函数；写入时始终写当前版本号。
+//! - 迁移函数必须是**纯函数**（只改内存结构、不做 IO），便于单元测试。
+//! - 真正执行迁移前先备份原文件为 `<name>.bak.v<from>`，备份失败仍继续迁移但记 warn。
+//! - 配置版本**高于**本程序支持的版本（用户降级）→ 只告警、尽量兼容读取，
+//!   绝不写回降级，避免把高版本配置「改坏」。
+//!
+//! ## 新增一次迁移的步骤
+//!
+//! 1. `CURRENT_*_CONFIG_VERSION` +1；
+//! 2. 写一个 `migrate_verge_vN_to_vN1(&mut IVerge)`；
+//! 3. 在 `migrate_*` 的 `match` 里挂上；
+//! 4. 在文件末尾的 `#[cfg(test)]` 里补一条单测。
+
+use std::path::{Path, PathBuf};
+
+use clash_verge_logging::{Type, logging};
+
+use crate::config::{IProfiles, IVerge};
+
+/// 缺失 `config_version` 的历史配置统一视为 v1。
+pub const IMPLICIT_LEGACY_VERSION: u32 = 1;
+
+/// `verge.yaml` 当前配置版本。
+pub const CURRENT_VERGE_CONFIG_VERSION: u32 = 3;
+
+/// `profiles.yaml` 当前配置版本。
+pub const CURRENT_PROFILES_CONFIG_VERSION: u32 = 1;
+
+/// 迁移前备份原配置文件，返回备份路径（失败返回 `None`）。
+///
+/// 备份文件命名 `<原文件名>.bak.v<from_version>`，便于用户回滚与事后追查。
+pub fn backup_before_migration(path: &Path, from_version: u32) -> Option<PathBuf> {
+    let file_name = path.file_name()?.to_string_lossy().to_string();
+    let backup = path.with_file_name(format!("{file_name}.bak.v{from_version}"));
+    if backup.exists() {
+        // 同一版本只备份一次，避免重复启动时反复覆盖（保留最早那份原始配置）
+        logging!(
+            info,
+            Type::Config,
+            "配置迁移备份已存在，跳过覆盖: {}",
+            backup.display()
+        );
+        return Some(backup);
+    }
+    match std::fs::copy(path, &backup) {
+        Ok(_) => {
+            logging!(
+                info,
+                Type::Config,
+                "配置迁移前已备份: {}",
+                backup.display()
+            );
+            Some(backup)
+        }
+        Err(e) => {
+            logging!(
+                warn,
+                Type::Config,
+                "配置迁移备份失败（继续迁移，原始内容可能已被改写）: {e}"
+            );
+            None
+        }
+    }
+}
+
+/// 对 `IVerge` 执行版本迁移（纯函数）。返回迁移后的版本号。
+pub fn migrate_verge(cfg: &mut IVerge, from_version: u32) -> u32 {
+    let mut version = from_version.max(IMPLICIT_LEGACY_VERSION);
+
+    if version > CURRENT_VERGE_CONFIG_VERSION {
+        logging!(
+            warn,
+            Type::Config,
+            "verge.yaml 配置版本 {version} 高于本程序支持的 {CURRENT_VERGE_CONFIG_VERSION}（可能由更高版本创建）：仅告警，尽量兼容读取，不执行迁移、不写回降级"
+        );
+        return version;
+    }
+
+    while version < CURRENT_VERGE_CONFIG_VERSION {
+        match version {
+            1 => migrate_verge_v1_to_v2(cfg),
+            2 => migrate_verge_v2_to_v3(cfg),
+            other => {
+                logging!(
+                    warn,
+                    Type::Config,
+                    "缺少 verge.yaml v{other} 的迁移实现，停止迁移（配置停在 v{other}）"
+                );
+                break;
+            }
+        }
+        version += 1;
+    }
+
+    version
+}
+
+/// v1 → v2：把历史遗留的 `start_page == "/home"` 归一化为 `"/"`。
+///
+/// 这段兼容原先作为临时补丁写在 `IVerge::new()` 里，收编为正式迁移，
+/// 使后续同类兼容逻辑有统一落点、可被单测覆盖。
+fn migrate_verge_v1_to_v2(cfg: &mut IVerge) {
+    if cfg.start_page.as_deref() == Some("/home") {
+        cfg.start_page = Some("/".into());
+        logging!(
+            info,
+            Type::Config,
+            "配置迁移 v1→v2：start_page \"/home\" 归一化为 \"/\""
+        );
+    }
+}
+
+/// v2 → v3：把日志保留个数从旧默认值 8 提升到 40（≈4.5 小时 → ≈26 小时）。
+///
+/// 背景：128KB × 8 ≈ 4.5 小时。实测一次断流事故排查几乎要翻遍全部日志，
+/// 且用户若次日才反馈，现场已被轮转删除。**仅当用户仍是旧默认值 8 时才调整**，
+/// 用户自定义过的其它值一律尊重。
+fn migrate_verge_v2_to_v3(cfg: &mut IVerge) {
+    const OLD_DEFAULT_COUNT: usize = 8;
+    const NEW_DEFAULT_COUNT: usize = 40;
+    if cfg.app_log_max_count == Some(OLD_DEFAULT_COUNT) {
+        cfg.app_log_max_count = Some(NEW_DEFAULT_COUNT);
+        logging!(
+            info,
+            Type::Config,
+            "配置迁移 v2→v3：日志保留个数 {OLD_DEFAULT_COUNT} → {NEW_DEFAULT_COUNT}（约 4.5 小时 → 约 26 小时）"
+        );
+    }
+}
+
+/// 对 `IProfiles` 执行版本迁移（纯函数）。返回迁移后的版本号。
+///
+/// 目前尚无破坏性变更（当前版本为 v1）。保留完整骨架，便于后续扩展：
+/// 新增迁移时只需 +1 版本号并挂上 `match` 分支。
+pub fn migrate_profiles(_profiles: &mut IProfiles, from_version: u32) -> u32 {
+    let version = from_version.max(IMPLICIT_LEGACY_VERSION);
+
+    if version > CURRENT_PROFILES_CONFIG_VERSION {
+        logging!(
+            warn,
+            Type::Config,
+            "profiles.yaml 配置版本 {version} 高于本程序支持的 {CURRENT_PROFILES_CONFIG_VERSION}：仅告警，尽量兼容读取，不执行迁移"
+        );
+        return version;
+    }
+
+    if version < CURRENT_PROFILES_CONFIG_VERSION {
+        logging!(
+            warn,
+            Type::Config,
+            "缺少 profiles.yaml v{version} 的迁移实现，停止迁移（配置停在 v{version}）"
+        );
+    }
+
+    version
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_config_without_version_is_treated_as_v1() {
+        let mut cfg = IVerge::default();
+        cfg.config_version = None;
+        // 缺失版本 = v1，应迁移到当前版本
+        let v = migrate_verge(&mut cfg, IMPLICIT_LEGACY_VERSION);
+        assert_eq!(v, CURRENT_VERGE_CONFIG_VERSION);
+    }
+
+    #[test]
+    fn v1_to_v2_normalizes_legacy_start_page() {
+        let mut cfg = IVerge::default();
+        cfg.start_page = Some("/home".into());
+        migrate_verge(&mut cfg, 1);
+        assert_eq!(cfg.start_page.as_deref(), Some("/"));
+    }
+
+    #[test]
+    fn v1_to_v2_keeps_other_start_pages() {
+        let mut cfg = IVerge::default();
+        cfg.start_page = Some("/proxy".into());
+        migrate_verge(&mut cfg, 1);
+        assert_eq!(cfg.start_page.as_deref(), Some("/proxy"));
+    }
+
+    #[test]
+    fn migration_is_idempotent() {
+        let mut cfg = IVerge::default();
+        cfg.start_page = Some("/home".into());
+        migrate_verge(&mut cfg, 1);
+        let after_first = cfg.start_page.clone();
+        // 再跑一次（已是最新版本）不应改变任何东西
+        migrate_verge(&mut cfg, CURRENT_VERGE_CONFIG_VERSION);
+        assert_eq!(cfg.start_page, after_first);
+    }
+
+    #[test]
+    fn future_version_is_not_downgraded() {
+        let mut cfg = IVerge::default();
+        cfg.start_page = Some("/home".into());
+        // 高于当前程序支持的版本 → 不迁移、不降级，原样返回
+        let v = migrate_verge(&mut cfg, CURRENT_VERGE_CONFIG_VERSION + 5);
+        assert_eq!(v, CURRENT_VERGE_CONFIG_VERSION + 5);
+        // 迁移函数未被调用，start_page 保持原值
+        assert_eq!(cfg.start_page.as_deref(), Some("/home"));
+    }
+
+    #[test]
+    fn v2_to_v3_raises_legacy_log_count() {
+        let mut cfg = IVerge::default();
+        cfg.app_log_max_count = Some(8);
+        migrate_verge(&mut cfg, 2);
+        assert_eq!(cfg.app_log_max_count, Some(40));
+    }
+
+    #[test]
+    fn v2_to_v3_keeps_custom_log_count() {
+        let mut cfg = IVerge::default();
+        cfg.app_log_max_count = Some(12);
+        migrate_verge(&mut cfg, 2);
+        assert_eq!(cfg.app_log_max_count, Some(12));
+    }
+}
