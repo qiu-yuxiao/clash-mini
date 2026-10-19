@@ -12,12 +12,14 @@
 //! 所有 YAML 在入包前统一走 [`redact_yaml_text`]；解析失败的配置**只写错误说明、不写正文**，
 //! 宁可缺材料也不泄露。
 
-use std::io::Write;
+use std::io::Write as _;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use anyhow::{Context as _, Result};
 use chrono::Local;
 use clash_verge_logging::{Type, logging};
+use regex::Regex;
 use serde_yaml_ng::Value;
 
 use crate::cmd::{CmdResult, StringifyErr as _};
@@ -41,6 +43,31 @@ const SENSITIVE_KEYS: &[&str] = &[
 
 const REDACTED: &str = "***REDACTED***";
 
+/// 日志正文脱敏规则 1：敏感键值对（`token=xxx` / `password: xxx` / `"secret":"xxx"` 等）。
+/// 长词在前避免 alternation 短路（auth-str 必须排在 auth 之前）。
+static LOG_SENSITIVE_KV: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(concat!(
+        r#"(?i)\b(obfs-password|auth-str|password|passwd|secret|token|uuid|auth|sign)\b"#,
+        r#"(\s*[=:]\s*)"?[^\s"&,;]+"?"#,
+    ))
+    .expect("log sensitive kv regex")
+});
+
+/// 日志正文脱敏规则 2：URL userinfo（`user:pass@host`，订阅链接带认证的形态）。
+static LOG_URL_USERINFO: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)[a-z][a-z0-9+.-]*://[^\s@/]+:[^\s@/]+@").expect("log url userinfo regex")
+});
+
+/// 日志正文脱敏（非结构化文本，无法按 YAML 键名递归，改为按敏感字段名匹配）。
+/// 测速地址、网站域名等无害内容原样保留，保证排查价值；覆盖不到的形态由
+/// README 明示「发送前可自行解压检查」兜底。
+fn redact_log_text(text: &str) -> String {
+    let no_userinfo = LOG_URL_USERINFO.replace_all(text, "***REDACTED***@");
+    LOG_SENSITIVE_KV
+        .replace_all(&no_userinfo, "$1$2***REDACTED***")
+        .into_owned()
+}
+
 const BUNDLE_README: &str = "\
 Clash Mini 诊断包
 =================
@@ -48,15 +75,16 @@ Clash Mini 诊断包
 本包由「设置 → 帮助 → 导出诊断包」生成，用于问题排查。
 
 内容：
-  logs/                     最近的轮转日志（按大小轮转，默认保留约 24 小时）
+  logs/                     最近的轮转日志：应用主日志 + service/sidecar 内核日志
   runtime-config.redacted.yaml  内核运行时配置（已脱敏）
   verge.yaml.redacted.yaml      应用配置（已脱敏）
   profiles.yaml.redacted.yaml   订阅配置（已脱敏）
   system-info.txt           版本与运行摘要
 
 脱敏说明：
-  节点密码 / UUID / 密钥 / 订阅链接 / 内核 secret 均已替换为 ***REDACTED***，
-  可直接发送。若仍担心，可自行解压后检查再发出。
+  配置文件已整体脱敏；日志正文已按敏感字段名（password / token / secret /
+  uuid 等）与 URL 用户信息脱敏。节点密码 / UUID / 密钥 / 订阅链接 / 内核
+  secret 均替换为 ***REDACTED***。若仍担心，可自行解压后检查再发出。
 
 排查建议：
   断流请重点看 logs/ 中时间点附近的以下关键字：
@@ -114,17 +142,18 @@ async fn collect_system_info() -> String {
     let clash_info = Config::clash().await.data_arc().get_client_info();
 
     // 节点数：直接数运行时配置里的 proxies（避免额外打内核 API）
-    let mut node_count = 0usize;
-    if let Ok(home) = dirs::app_home_dir()
+    let node_count = if let Ok(home) = dirs::app_home_dir()
         && let Ok(text) = tokio::fs::read_to_string(home.join(crate::constants::files::RUNTIME_CONFIG)).await
         && let Ok(value) = serde_yaml_ng::from_str::<Value>(&text)
     {
-        node_count = value
+        value
             .get("proxies")
             .and_then(|v| v.as_sequence())
             .map(|s| s.len())
-            .unwrap_or(0);
-    }
+            .unwrap_or(0)
+    } else {
+        0
+    };
 
     format!(
         "生成时间        : {}\n\
@@ -176,21 +205,40 @@ async fn export_bundle_inner() -> Result<String> {
         .with_context(|| format!("创建诊断包失败: {}", zip_path.display()))?;
     let mut zip = zip::ZipWriter::new(file);
 
-    // 1) 日志：打包当前全部轮转文件（默认约 24 小时）
+    // 1) 日志：主目录 + 一层子目录（service / sidecar），全部脱敏后入包
+    //    （内核侧日志是断流排查的关键证据，此前只打主日志会漏）
     let mut log_files = 0usize;
     let logs_dir = home.join("logs");
-    if let Ok(mut rd) = tokio::fs::read_dir(&logs_dir).await {
+    let mut stack = vec![logs_dir.clone()];
+    while let Some(dir) = stack.pop() {
+        let Ok(mut rd) = tokio::fs::read_dir(&dir).await else {
+            continue;
+        };
         while let Ok(Some(entry)) = rd.next_entry().await {
             let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
             if path.extension().and_then(|e| e.to_str()) != Some("log") {
                 continue;
             }
-            let Some(name) = path.file_name().map(|n| n.to_string_lossy().to_string()) else {
+            // latest.log 是指向最新轮转文件的符号链接，内容会重复入包，跳过
+            if entry
+                .file_type()
+                .await
+                .map(|t| t.is_symlink())
+                .unwrap_or(false)
+            {
+                continue;
+            }
+            let rel = path.strip_prefix(&logs_dir).unwrap_or(&path);
+            let Some(name) = rel.to_str() else {
                 continue;
             };
             if let Ok(text) = tokio::fs::read_to_string(&path).await {
                 zip.start_file(format!("logs/{name}"), file_opts())?;
-                zip.write_all(text.as_bytes())?;
+                zip.write_all(redact_log_text(&text).as_bytes())?;
                 log_files += 1;
             }
         }
@@ -276,5 +324,28 @@ proxy-providers:
         let out = redact_yaml_text(bad);
         assert!(!out.contains("LEAK_ME"), "解析失败时仍泄露了正文: {out}");
         assert!(out.contains("配置解析失败"));
+    }
+
+    #[test]
+    fn log_redact_masks_kv_and_userinfo_keeps_plain_urls() {
+        let text = concat!(
+            "更新订阅 url=https://sub.example.com/api?token=abc123&flag=1\n",
+            "fetch user:pass@host.example done\n",
+            "测速 https://cp.cloudflare.com/generate_204 失败\n",
+        );
+        let out = redact_log_text(text);
+        assert!(!out.contains("abc123"), "日志 token 未脱敏: {out}");
+        assert!(!out.contains("pass@host"), "日志 userinfo 未脱敏: {out}");
+        // 无害 URL 原样保留，保证排查价值
+        assert!(out.contains("https://cp.cloudflare.com/generate_204"));
+        assert!(out.contains("sub.example.com"), "域名不应整条抹掉: {out}");
+    }
+
+    #[test]
+    fn log_redact_masks_case_insensitive_and_json_style() {
+        let text = "msg=\"Token=XYZ-1\" and {\"password\":\"p-sec\"} end\n";
+        let out = redact_log_text(text);
+        assert!(!out.contains("XYZ-1"), "大小写 Token 未脱敏: {out}");
+        assert!(!out.contains("p-sec"), "JSON 形态 password 未脱敏: {out}");
     }
 }

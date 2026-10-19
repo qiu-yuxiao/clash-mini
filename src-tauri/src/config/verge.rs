@@ -294,21 +294,31 @@ impl IVerge {
                     // 【配置版本迁移】缺失 `config_version` 的历史配置视为 v1，
                     // 按版本逐级迁移；原先写在这里的 `start_page == "/home"` 临时兼容
                     // 已收编为正式迁移 `migrate_verge_v1_to_v2`，便于单测与后续扩展。
+                    // 备份成功才迁移：备份失败则中止（配置保持旧版本原样，下次启动重试），
+                    // 宁可不迁移也不在无备份的情况下改写用户配置。
                     let from_version = config
                         .config_version
                         .unwrap_or(IMPLICIT_LEGACY_VERSION);
+                    if from_version < CURRENT_VERGE_CONFIG_VERSION
+                        && backup_before_migration(&path, from_version).is_none()
+                    {
+                        logging!(
+                            warn,
+                            Type::Config,
+                            "verge.yaml 迁移前备份失败，本次跳过迁移（配置保持 v{from_version}，下次启动重试）"
+                        );
+                        return config;
+                    }
                     let migrated = migrate_verge(&mut config, from_version);
                     config.config_version = Some(migrated);
-                    if migrated != from_version {
-                        // 仅在真正发生迁移时备份 + 立即落盘，避免每次启动重复迁移。
-                        backup_before_migration(&path, from_version);
-                        if let Err(e) = config.save_file() {
-                            logging!(
-                                warn,
-                                Type::Config,
-                                "配置迁移后写回 verge.yaml 失败（本次迁移仅在内存生效）: {e}"
-                            );
-                        }
+                    if migrated != from_version
+                        && let Err(e) = config.save_file()
+                    {
+                        logging!(
+                            warn,
+                            Type::Config,
+                            "配置迁移后写回 verge.yaml 失败（本次迁移仅在内存生效）: {e}"
+                        );
                     }
                     config
                 }

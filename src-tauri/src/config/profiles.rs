@@ -1,5 +1,8 @@
 use super::{PrfOption, prfitem::PrfItem};
-use crate::config::{IMPLICIT_LEGACY_VERSION, migrate_profiles};
+use crate::config::{
+    CURRENT_PROFILES_CONFIG_VERSION, IMPLICIT_LEGACY_VERSION, backup_before_migration,
+    migrate_profiles,
+};
 use crate::utils::{
     dirs::{self, PathBufExec as _},
     help,
@@ -67,11 +70,32 @@ impl IProfiles {
             Ok(mut profiles) => {
                 // 【配置版本迁移】缺失 config_version 视为 v1；逐级迁移并落当前版本。
                 // 当前 profiles.yaml 尚无破坏性变更（v1），骨架先就位以便后续扩展。
+                // 与 verge.yaml 保持对称：备份成功才迁移，迁移后立即落盘；
+                // 备份失败则中止迁移（宁可不迁移也不在无备份时改写用户配置）。
                 let from_version = profiles
                     .config_version
                     .unwrap_or(IMPLICIT_LEGACY_VERSION);
-                let migrated = migrate_profiles(&mut profiles, from_version);
-                profiles.config_version = Some(migrated);
+                if from_version < CURRENT_PROFILES_CONFIG_VERSION
+                    && backup_before_migration(&path, from_version).is_none()
+                {
+                    logging!(
+                        warn,
+                        Type::Config,
+                        "profiles.yaml 迁移前备份失败，本次跳过迁移（配置保持 v{from_version}，下次启动重试）"
+                    );
+                } else {
+                    let migrated = migrate_profiles(&mut profiles, from_version);
+                    profiles.config_version = Some(migrated);
+                    if migrated != from_version
+                        && let Err(e) = profiles.save_file()
+                    {
+                        logging!(
+                            warn,
+                            Type::Config,
+                            "配置迁移后写回 profiles.yaml 失败（本次迁移仅在内存生效）: {e}"
+                        );
+                    }
+                }
 
                 let items = profiles.items.get_or_insert_with(Vec::new);
                 for item in items.iter_mut() {
