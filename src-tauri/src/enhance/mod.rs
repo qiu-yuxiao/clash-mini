@@ -372,6 +372,12 @@ async fn merge_default_config(
             if matches!(key.as_str(), Some("redir-port") | Some("tproxy-port")) {
                 continue;
             }
+            // config_version 是 Clash Mini 自己的**配置格式版本号**（随 clash.yaml 落盘），
+            // 不是 mihomo 配置项，绝不能混进运行时配置。实测内核会忽略未知顶层键（-t 校验通过），
+            // 但运行时配置理应只含内核认识的键，避免将来内核改为严格解析时校验失败。
+            if key.as_str() == Some("config_version") {
+                continue;
+            }
             // 处理 external-controller 键的开关逻辑
             if key.as_str() == Some("external-controller") {
                 let enable_external_controller = Config::verge()

@@ -350,6 +350,11 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   1. **配置生成层**（`enhance::enforce_mini_agreements`）：在将订阅节点注入 `PROXY` 组时强制剥离所有伪节点，防止其进入候选列表。
   2. **状态恢复层**（`lifecycle::restore_proxy_group_now`）：回退恢复节点选择时，强行避开伪节点。
   3. **自愈决策层**（`monitor::evaluate_failover`）：挑选最优节点时，自动跳过任何伪节点，彻底斩断「内核重载默认选中伪节点 $\rightarrow$ 后台自愈切回真节点 $\rightarrow$ 重载再次切回伪节点」的死循环。
+- **前后端判定必须同源（2026-10-20 确立）**：前端 `src/utils/node.ts::isDummyNode` 必须与后端 `utils/node.rs::is_dummy_node` **逐条对齐**，且 `node.test.ts` 与后端测试用例一一对应。
+  - 英文广告词（expire / traffic / website / subscribe）与 URL scheme：允许**子串**匹配。
+  - 中文广告短语：必须**归一化后「完全匹配或以该短语开头」**（先剥两端包裹符号与「节点-」类通用前缀）。
+  - **严禁前端对中文短语用 `includes` 子串匹配**：会把 `日本群组-A`、`美国-网址专线`、`上海-群节点-01`、`HK-流量优化` 这类真实节点误判为伪节点而从前端列表隐藏，造成「**后端能选中、前端却看不到**」的高危不一致。
+  - 取舍：前缀匹配会漏判「广告短语不在开头」的伪节点（如 `【剩余流量】80GB`）。这是**有意为之**——漏判伪节点代价很小（无延迟不会被选中，后端仍有三道拦截），而误杀真实节点会直接让用户少一个可用节点。
 
 ### 5.5 网络在线状态双频探测（DNS 探针）
 
@@ -509,6 +514,7 @@ flowchart LR
 - **迁移函数必须是纯函数**：只改内存结构、不做 IO，且每个迁移都要有对应单测。
 - **迁移前自动备份**：真正发生迁移时先备份为 `<文件名>.bak.v<from>`（同一版本只备份一次，保留最早那份原始配置）。**备份失败则中止本次迁移**（配置保持旧版本原样，下次启动重试），绝不在无备份时改写用户配置。
 - **`clash.yaml` 纳入迁移框架（v2）**：`CURRENT_CLASH_CONFIG_VERSION = 2`。加载 `clash.yaml` 时同样执行对称的检查与备份；`migrate_clash_v1_to_v2` 将破坏性的 `tun.stack: "system"` 自动归一化为 `"gvisor"`（避免在某些系统环境下引起崩溃），迁移后落盘并持久化 `config_version: 2`；`template()` 默认写入当前版本。
+- **`config_version` 严禁混入运行时配置**：它是 Clash Mini 自己的配置格式版本号，**不是 mihomo 配置项**。`enhance::merge_default_config` 必须在兜底分支显式跳过该键（与 `redir-port` / `tproxy-port` 同等处理）。实测内核会忽略未知顶层键（`-t` 自校验通过），但运行时配置只应含内核认识的键——否则将来内核一旦改严格解析，就会重演「配置校验失败、内核起不来」的事故。
 - **落地**：`src-tauri/src/config/migrate.rs`（版本常量、`migrate_verge` / `migrate_profiles` / `migrate_clash`、`backup_before_migration`）及 `src-tauri/src/config/clash.rs`。
 
 ### 8.7 可诊断性：日志保留与诊断包
@@ -519,6 +525,12 @@ flowchart LR
 - **日志大文件尾部截断保护**：日志采集设定单文件 2MB 硬上限（`MAX_LOG_FILE_READ_BYTES`）以及 60 个日志文件采集上限（`MAX_DIAGNOSTIC_LOG_FILES`）。当日志超过 2MB 时，`read_log_file_with_tail_cap` 从尾部 seek 读取最新内容，并自动向后扫描跳过首个不完整行，在保留最关键排障日志的同时确保文件行结构完整，彻底消除内存与磁盘爆满风险。
 - **脱敏是硬要求**：节点 `password` / `uuid` / `psk` / `auth` / `obfs-password`、内核 `secret` / `token`、订阅 `url` 一律替换为 `***REDACTED***`；**YAML 解析失败时只写错误说明、绝不写原始正文**（已由单测覆盖）。**日志正文同样脱敏**：按敏感字段名（`token=` / `password:` / JSON 形态等）与 URL userinfo 正则替换，无害的测速/网站 URL 原样保留排查价值（已由单测覆盖）；README 同时明示「发送前可自行解压检查」。
 - **探针打点已清理**（2026-10-20）：源自断流排查的 18 处 `[探针]` INFO 打点已整体移除；关键状态变化仍由正式的 `[后台监测]` warn/info 日志覆盖。日后如需类似排障打点，用完即清，不留入生产。
+- **日志采集三条硬约束（2026-10-20 补齐）**：
+  1. **条目名必须用正斜杠**：Windows 下 `strip_prefix` 得到的是反斜杠路径，直接入包会生成 `service\xxx.log` 这类畸形条目（ZIP 规范要求 `/`，部分解压工具会解成字面文件名）。
+  2. **条数上限按 mtime 倒序取**：`read_dir` 顺序不确定，若按任意顺序取满上限，会先塞满主日志、把最需要的 `service/` 内核日志挤掉。
+  3. **符号链接一律跳过**：`latest.log` 与最新轮转文件内容重复；更关键的是**链接目录**会形成遍历环，靠条数上限兜不住（会无限压栈）。
+- **认证头脱敏**：`Authorization: xxx` 整行抹除、裸 `Bearer <token>` 单独抹除，且必须在通用 KV 规则**之前**执行——否则 KV 规则只吃掉 `Bearer` 一个词，后面真正的令牌会漏出。
+- **脱敏必须放阻塞线程池**：`redact_log_text` 是 CPU 密集同步正则（最坏 60 个 × 2MB），须经 `spawn_blocking` 执行，不得直接占用 tokio worker。
 
 ### 8.8 前端单测基线与最小覆盖
 

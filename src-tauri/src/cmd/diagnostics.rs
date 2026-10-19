@@ -94,11 +94,28 @@ async fn read_log_file_with_tail_cap(path: &std::path::Path, max_bytes: usize) -
     Ok(format!("{notice}{tail_text}"))
 }
 
+/// 日志正文脱敏规则 0a：认证头整行抹掉（`Authorization: xxx` / `authorization=xxx`）。
+///
+/// 单独成规则的原因：认证头的值常常不是 `key=value` 形态（如 `Bearer eyJ...`），
+/// 普通 KV 规则只吃掉第一个 token（`Bearer`），后面真正的令牌会漏出来。
+static LOG_AUTH_HEADER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)(\bauthorization\s*[=:]\s*)[^\r\n]+").expect("log auth header regex")
+});
+
+/// 日志正文脱敏规则 0b：裸 `Bearer <token>`（日志里没带 Authorization 前缀时兜底）。
+static LOG_BEARER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)(\bbearer\s+)[^\s"&,;]+"#).expect("log bearer regex")
+});
+
 /// 日志正文脱敏（非结构化文本，无法按 YAML 键名递归，改为按敏感字段名匹配）。
 /// 测速地址、网站域名等无害内容原样保留，保证排查价值；覆盖不到的形态由
 /// README 明示「发送前可自行解压检查」兜底。
 fn redact_log_text(text: &str) -> String {
-    let no_userinfo = LOG_URL_USERINFO.replace_all(text, "${1}***REDACTED***@");
+    // 顺序有讲究：认证头先整行抹，再抹裸 Bearer，最后才走通用 KV 与 userinfo，
+    // 否则 KV 规则会把 "Bearer xxx" 拆成 "Bearer" + 泄漏的令牌。
+    let no_auth = LOG_AUTH_HEADER.replace_all(text, "${1}***REDACTED***");
+    let no_bearer = LOG_BEARER.replace_all(&no_auth, "${1}***REDACTED***");
+    let no_userinfo = LOG_URL_USERINFO.replace_all(&no_bearer, "${1}***REDACTED***@");
     LOG_SENSITIVE_KV
         .replace_all(&no_userinfo, "${1}${2}***REDACTED***${3}")
         .into_owned()
@@ -251,21 +268,25 @@ async fn export_bundle_inner() -> Result<String> {
         .with_context(|| format!("创建诊断包失败: {}", zip_path.display()))?;
     let mut zip = zip::ZipWriter::new(file);
 
-    // 1) 日志：主目录 + 一层子目录（service / sidecar），全部脱敏后入包
+    // 1) 日志：递归收集（主目录 + service / sidecar 子目录），全部脱敏后入包
     //    （内核侧日志是断流排查的关键证据，此前只打主日志会漏）
-    let mut log_files = 0usize;
     let logs_dir = home.join("logs");
+    let mut collected: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
     let mut stack = vec![logs_dir.clone()];
     while let Some(dir) = stack.pop() {
-        if log_files >= MAX_DIAGNOSTIC_LOG_FILES {
-            break;
-        }
         let Ok(mut rd) = tokio::fs::read_dir(&dir).await else {
             continue;
         };
         while let Ok(Some(entry)) = rd.next_entry().await {
-            if log_files >= MAX_DIAGNOSTIC_LOG_FILES {
-                break;
+            // 符号链接一律跳过：latest.log 与最新轮转文件内容重复；
+            // 更关键的是**链接目录**会形成遍历环，靠日志条数上限兜不住（会无限压栈）
+            if entry
+                .file_type()
+                .await
+                .map(|t| t.is_symlink())
+                .unwrap_or(false)
+            {
+                continue;
             }
             let path = entry.path();
             if path.is_dir() {
@@ -275,25 +296,41 @@ async fn export_bundle_inner() -> Result<String> {
             if path.extension().and_then(|e| e.to_str()) != Some("log") {
                 continue;
             }
-            // latest.log 是指向最新轮转文件的符号链接，内容会重复入包，跳过
-            if entry
-                .file_type()
+            let mtime = entry
+                .metadata()
                 .await
-                .map(|t| t.is_symlink())
-                .unwrap_or(false)
-            {
-                continue;
-            }
-            let rel = path.strip_prefix(&logs_dir).unwrap_or(&path);
-            let Some(name) = rel.to_str() else {
-                continue;
-            };
-            if let Ok(text) = read_log_file_with_tail_cap(&path, MAX_LOG_FILE_READ_BYTES).await {
-                zip.start_file(format!("logs/{name}"), file_opts())?;
-                zip.write_all(redact_log_text(&text).as_bytes())?;
-                log_files += 1;
-            }
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            collected.push((path, mtime));
         }
+    }
+
+    // 【优先级】按修改时间倒序：条数上限必须优先保住最新日志。
+    // 此前按 read_dir 的任意顺序取，主日志先塞满上限后就轮不到 service 内核日志，
+    // 而被挤掉的恰恰是断流排查最需要的证据。
+    collected.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let mut log_files = 0usize;
+    for (path, _) in collected {
+        if log_files >= MAX_DIAGNOSTIC_LOG_FILES {
+            break;
+        }
+        let rel = path.strip_prefix(&logs_dir).unwrap_or(&path);
+        // 【ZIP 规范】条目名必须使用正斜杠；Windows 下 strip_prefix 得到的是反斜杠路径，
+        // 直接入包会生成 "service\xxx.log" 这类畸形条目，部分解压工具会解成字面文件名。
+        let Some(name) = rel.to_str().map(|s| s.replace('\\', "/")) else {
+            continue;
+        };
+        let Ok(text) = read_log_file_with_tail_cap(&path, MAX_LOG_FILE_READ_BYTES).await else {
+            continue;
+        };
+        // 脱敏是 CPU 密集的同步正则（最坏 60 个 × 2MB），放到阻塞线程池，避免占死 tokio worker
+        let redacted = tokio::task::spawn_blocking(move || redact_log_text(&text))
+            .await
+            .unwrap_or_else(|e| format!("# 日志脱敏任务失败，已跳过正文: {e}\n"));
+        zip.start_file(format!("logs/{name}"), file_opts())?;
+        zip.write_all(redacted.as_bytes())?;
+        log_files += 1;
     }
 
     // 2) 配置：一律脱敏后再入包
@@ -403,7 +440,7 @@ proxy-providers:
 
     #[tokio::test]
     async fn tail_cap_keeps_small_log_intact() {
-        let path = std::env::temp_dir().join("test_small_diag.log");
+        let path = unique_temp("small");
         let content = "line 1\nline 2\nline 3\n";
         tokio::fs::write(&path, content).await.unwrap();
         let res = read_log_file_with_tail_cap(&path, 1024).await.unwrap();
@@ -411,9 +448,22 @@ proxy-providers:
         assert_eq!(res, content);
     }
 
+    /// 生成唯一的临时文件路径：并行测试下用固定名字会互相踩（flaky）。
+    fn unique_temp(tag: &str) -> std::path::PathBuf {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        std::env::temp_dir().join(format!(
+            "clash-mini-diag-test-{tag}-{}-{nanos}.log",
+            std::process::id()
+        ))
+    }
+
     #[tokio::test]
     async fn tail_cap_truncates_large_log_from_end() {
-        let path = std::env::temp_dir().join("test_large_diag.log");
+        let path = unique_temp("large");
         let content = "line 1: ancient\nline 2: middle\nline 3: recent\nline 4: newest\n";
         tokio::fs::write(&path, content).await.unwrap();
         // 限制 35 字节，只保留尾部最新内容
@@ -422,5 +472,22 @@ proxy-providers:
         assert!(res.contains("line 4: newest"));
         assert!(!res.contains("line 1: ancient"));
         assert!(res.contains("已自动截取最新"));
+    }
+
+    #[test]
+    fn log_redact_masks_auth_header_and_bearer() {
+        let text = concat!(
+            "GET /configs Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.PAYLOAD.SIG done\n",
+            "curl -H 'authorization=Basic dXNlcjpwYXNz' ok\n",
+            "retry with bearer TOKEN-abcdef-123 end\n",
+        );
+        let out = redact_log_text(text);
+        // 认证头整行抹掉（含 Bearer 后的真令牌）
+        assert!(!out.contains("PAYLOAD"), "Authorization 整行未脱敏: {out}");
+        assert!(!out.contains("dXNlcjpwYXNz"), "Basic 凭据未脱敏: {out}");
+        // 裸 Bearer 兜底
+        assert!(!out.contains("TOKEN-abcdef-123"), "裸 Bearer 未脱敏: {out}");
+        // 非敏感上下文保留
+        assert!(out.contains("GET /configs"));
     }
 }
