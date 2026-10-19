@@ -45,26 +45,27 @@ const REDACTED: &str = "***REDACTED***";
 
 /// 日志正文脱敏规则 1：敏感键值对（`token=xxx` / `password: xxx` / `"secret":"xxx"` 等）。
 /// 长词在前避免 alternation 短路（auth-str 必须排在 auth 之前）。
+/// 兼容键带引号（JSON 形态 `"password":"xxx"`）及值带引号的情况。
 static LOG_SENSITIVE_KV: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
-        r#"(?i)\b(obfs-password|auth-str|password|passwd|secret|token|uuid|auth|sign)\b"#,
-        r#"(\s*[=:]\s*)"?[^\s"&,;]+"?"#,
+        r#"(?i)(["']?\b(?:obfs-password|auth-str|password|passwd|secret|token|uuid|auth|sign)\b["']?)"#,
+        r#"(\s*[=:]\s*["']?)[^\s"&,;]+(["']?)"#,
     ))
     .expect("log sensitive kv regex")
 });
 
-/// 日志正文脱敏规则 2：URL userinfo（`user:pass@host`，订阅链接带认证的形态）。
+/// 日志正文脱敏规则 2：URL / 连接中的 userinfo（`user:pass@host`，订阅链接或代理带认证的形态）。
 static LOG_URL_USERINFO: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)[a-z][a-z0-9+.-]*://[^\s@/]+:[^\s@/]+@").expect("log url userinfo regex")
+    Regex::new(r"(?i)((?:[a-z][a-z0-9+.-]*://)?)[^\s@/:]+:[^\s@/:]+@").expect("log url userinfo regex")
 });
 
 /// 日志正文脱敏（非结构化文本，无法按 YAML 键名递归，改为按敏感字段名匹配）。
 /// 测速地址、网站域名等无害内容原样保留，保证排查价值；覆盖不到的形态由
 /// README 明示「发送前可自行解压检查」兜底。
 fn redact_log_text(text: &str) -> String {
-    let no_userinfo = LOG_URL_USERINFO.replace_all(text, "***REDACTED***@");
+    let no_userinfo = LOG_URL_USERINFO.replace_all(text, "${1}***REDACTED***@");
     LOG_SENSITIVE_KV
-        .replace_all(&no_userinfo, "$1$2***REDACTED***")
+        .replace_all(&no_userinfo, "${1}${2}***REDACTED***${3}")
         .into_owned()
 }
 
