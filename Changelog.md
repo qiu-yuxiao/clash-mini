@@ -1,5 +1,7 @@
 ## v2.9.8
 
+- **Mihomo(Meta) 内核升级至 v1.19.32**
+
 ### 🐞 Fixed Bugs & Reliability Enhancements
 - **健康检查与测速地址全面 HTTPS 化**：
   - 默认测速 URL 从 `http://cp.cloudflare.com/generate_204` 升级为 `https://cp.cloudflare.com/generate_204`，未指定端口解析兜底由 80 改为 443；
