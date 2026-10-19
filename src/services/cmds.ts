@@ -512,6 +512,11 @@ export async function exportDiagnosticBundle() {
   })
 }
 
+/** 在系统文件管理器中打开并高亮选中目标文件 */
+export async function showInFolder(path: string) {
+  return invoke<void>('show_in_folder', { path })
+}
+
 export async function downloadIconCache(url: string, name: string) {
   return withIpcTimeout(
     invoke<string>('download_icon_cache', { url, name }),

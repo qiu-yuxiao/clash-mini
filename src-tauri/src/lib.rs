@@ -123,6 +123,7 @@ mod app_init {
             cmd::get_sys_proxy,
             cmd::get_auto_proxy,
             cmd::open_logs_dir,
+            cmd::show_in_folder,
             cmd::export_diagnostic_bundle,
             cmd::open_core_dir,
             cmd::restart_core,

@@ -12,8 +12,8 @@ import { open } from '@tauri-apps/plugin-shell'
 import type React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { exportDiagnosticBundle } from '@/services/cmds'
-import { showNotice } from '@/services/notice-service'
+import { exportDiagnosticBundle, showInFolder } from '@/services/cmds'
+import { hideNotice, showNotice } from '@/services/notice-service'
 
 import {
   getMenuItemHoverStyle,
@@ -136,15 +136,26 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
         <MenuItem
           onClick={async () => {
             handleHelpClose()
-            const zipPath = await exportDiagnosticBundle()
-            if (!zipPath) return
-            showNotice.success(`诊断包已导出：${zipPath}`)
-            // 打开所在目录，方便用户直接取件发出（配置已脱敏，可直接发送）
-            const dir = zipPath.replace(/[\\/][^\\/]+$/, '')
-            if (dir && dir !== zipPath) {
-              await open(dir).catch((err) => {
-                console.error('Failed to open diagnostics dir:', err)
+            const waitId = showNotice.info('正在生成诊断包，请稍候…', 0)
+            try {
+              const zipPath = await exportDiagnosticBundle()
+              if (!zipPath) return
+              showNotice.success(`诊断包已导出：${zipPath}`)
+              // 优先使用文件管理器高亮选中该 zip 文件，失败则兜底打开所在目录
+              await showInFolder(zipPath).catch(async (err) => {
+                console.warn(
+                  'showInFolder failed, falling back to open dir:',
+                  err,
+                )
+                const dir = zipPath.replace(/[\\/][^\\/]+$/, '')
+                if (dir && dir !== zipPath) {
+                  await open(dir).catch((openErr) => {
+                    console.error('Failed to open diagnostics dir:', openErr)
+                  })
+                }
               })
+            } finally {
+              hideNotice(waitId)
             }
           }}
           sx={getMenuItemHoverStyle(theme, controlSkin)}

@@ -59,6 +59,41 @@ static LOG_URL_USERINFO: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)((?:[a-z][a-z0-9+.-]*://)?)[^\s@/:]+:[^\s@/:]+@").expect("log url userinfo regex")
 });
 
+/// 单个日志文件最大读取字节数（2MB）。超过该大小的文件自动截取尾部最新内容，
+/// 既能保证断流排查能抓住最新事故现场，又避免调试级别下大日志撑爆内存与 zip。
+const MAX_LOG_FILE_READ_BYTES: usize = 2 * 1024 * 1024;
+
+/// 诊断包包含的最大日志文件总数（防止极端情况下扫描过多碎文件）
+const MAX_DIAGNOSTIC_LOG_FILES: usize = 60;
+
+/// 读取日志文件，若文件超过 `max_bytes` 则截取最新的尾部内容（对齐换行符）。
+async fn read_log_file_with_tail_cap(path: &std::path::Path, max_bytes: usize) -> Result<String> {
+    use tokio::io::{AsyncReadExt as _, AsyncSeekExt as _};
+    let mut file = tokio::fs::File::open(path).await?;
+    let len = file.metadata().await?.len();
+    if len <= max_bytes as u64 {
+        let mut buf = String::with_capacity(len as usize);
+        file.read_to_string(&mut buf).await?;
+        return Ok(buf);
+    }
+
+    let seek_pos = len.saturating_sub(max_bytes as u64);
+    file.seek(std::io::SeekFrom::Start(seek_pos)).await?;
+    let mut bytes = Vec::with_capacity(max_bytes);
+    file.read_to_end(&mut bytes).await?;
+
+    // 丢弃第一条可能被腰斩的不完整行，从首个换行符后开始
+    let valid_start = bytes.iter().position(|&b| b == b'\n').map(|p| p + 1).unwrap_or(0);
+    let tail_text = String::from_utf8_lossy(&bytes[valid_start..]);
+
+    let notice = format!(
+        "[... 日志文件较大（总计 {:.2} MB），诊断包已自动截取最新 {:.2} MB 内容 ...]\n",
+        len as f64 / (1024.0 * 1024.0),
+        bytes.len() as f64 / (1024.0 * 1024.0)
+    );
+    Ok(format!("{notice}{tail_text}"))
+}
+
 /// 日志正文脱敏（非结构化文本，无法按 YAML 键名递归，改为按敏感字段名匹配）。
 /// 测速地址、网站域名等无害内容原样保留，保证排查价值；覆盖不到的形态由
 /// README 明示「发送前可自行解压检查」兜底。
@@ -139,8 +174,9 @@ fn file_opts() -> zip::write::SimpleFileOptions {
 /// 收集版本与运行摘要（不含任何敏感内容）。
 async fn collect_system_info() -> String {
     let verge = Config::verge().await.latest_arc();
+    let clash_cfg = Config::clash().await.data_arc();
     // IClashTemp 是运行时配置结构，没有 ipv6 字段；用户持久化设置要经 get_client_info 取
-    let clash_info = Config::clash().await.data_arc().get_client_info();
+    let clash_info = clash_cfg.get_client_info();
 
     // 节点数：直接数运行时配置里的 proxies（避免额外打内核 API）
     let node_count = if let Ok(home) = dirs::app_home_dir()
@@ -156,11 +192,18 @@ async fn collect_system_info() -> String {
         0
     };
 
+    let clash_version = clash_cfg
+        .0
+        .get("config_version")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32);
+
     format!(
         "生成时间        : {}\n\
          应用版本        : {}\n\
          操作系统        : {} / {}\n\
          verge 配置版本  : {:?}（程序支持 {}）\n\
+         clash 配置版本  : {:?}（程序支持 {}）\n\
          TUN 模式        : {:?}\n\
          系统代理        : {:?}\n\
          Allow IPv6      : {:?}\n\
@@ -176,6 +219,8 @@ async fn collect_system_info() -> String {
         std::env::consts::ARCH,
         verge.config_version,
         crate::config::CURRENT_VERGE_CONFIG_VERSION,
+        clash_version,
+        crate::config::CURRENT_CLASH_CONFIG_VERSION,
         verge.enable_tun_mode,
         verge.enable_system_proxy,
         clash_info.ipv6,
@@ -212,10 +257,16 @@ async fn export_bundle_inner() -> Result<String> {
     let logs_dir = home.join("logs");
     let mut stack = vec![logs_dir.clone()];
     while let Some(dir) = stack.pop() {
+        if log_files >= MAX_DIAGNOSTIC_LOG_FILES {
+            break;
+        }
         let Ok(mut rd) = tokio::fs::read_dir(&dir).await else {
             continue;
         };
         while let Ok(Some(entry)) = rd.next_entry().await {
+            if log_files >= MAX_DIAGNOSTIC_LOG_FILES {
+                break;
+            }
             let path = entry.path();
             if path.is_dir() {
                 stack.push(path);
@@ -237,7 +288,7 @@ async fn export_bundle_inner() -> Result<String> {
             let Some(name) = rel.to_str() else {
                 continue;
             };
-            if let Ok(text) = tokio::fs::read_to_string(&path).await {
+            if let Ok(text) = read_log_file_with_tail_cap(&path, MAX_LOG_FILE_READ_BYTES).await {
                 zip.start_file(format!("logs/{name}"), file_opts())?;
                 zip.write_all(redact_log_text(&text).as_bytes())?;
                 log_files += 1;
@@ -348,5 +399,28 @@ proxy-providers:
         let out = redact_log_text(text);
         assert!(!out.contains("XYZ-1"), "大小写 Token 未脱敏: {out}");
         assert!(!out.contains("p-sec"), "JSON 形态 password 未脱敏: {out}");
+    }
+
+    #[tokio::test]
+    async fn tail_cap_keeps_small_log_intact() {
+        let path = std::env::temp_dir().join("test_small_diag.log");
+        let content = "line 1\nline 2\nline 3\n";
+        tokio::fs::write(&path, content).await.unwrap();
+        let res = read_log_file_with_tail_cap(&path, 1024).await.unwrap();
+        let _ = tokio::fs::remove_file(&path).await;
+        assert_eq!(res, content);
+    }
+
+    #[tokio::test]
+    async fn tail_cap_truncates_large_log_from_end() {
+        let path = std::env::temp_dir().join("test_large_diag.log");
+        let content = "line 1: ancient\nline 2: middle\nline 3: recent\nline 4: newest\n";
+        tokio::fs::write(&path, content).await.unwrap();
+        // 限制 35 字节，只保留尾部最新内容
+        let res = read_log_file_with_tail_cap(&path, 35).await.unwrap();
+        let _ = tokio::fs::remove_file(&path).await;
+        assert!(res.contains("line 4: newest"));
+        assert!(!res.contains("line 1: ancient"));
+        assert!(res.contains("已自动截取最新"));
     }
 }

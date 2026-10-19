@@ -39,6 +39,9 @@ pub const CURRENT_VERGE_CONFIG_VERSION: u32 = 3;
 /// `profiles.yaml` 当前配置版本。
 pub const CURRENT_PROFILES_CONFIG_VERSION: u32 = 1;
 
+/// `clash.yaml` 当前配置版本。
+pub const CURRENT_CLASH_CONFIG_VERSION: u32 = 2;
+
 /// 迁移前备份原配置文件，返回备份路径（失败返回 `None`）。
 ///
 /// 备份文件命名 `<原文件名>.bak.v<from_version>`，便于用户回滚与事后追查。
@@ -168,6 +171,52 @@ pub fn migrate_profiles(_profiles: &mut IProfiles, from_version: u32) -> u32 {
     version
 }
 
+/// 对 `IClashTemp` 底层的 `serde_yaml_ng::Mapping` 执行版本迁移（纯函数）。返回迁移后的版本号。
+pub fn migrate_clash(map: &mut serde_yaml_ng::Mapping, from_version: u32) -> u32 {
+    let mut version = from_version.max(IMPLICIT_LEGACY_VERSION);
+
+    if version > CURRENT_CLASH_CONFIG_VERSION {
+        logging!(
+            warn,
+            Type::Config,
+            "clash.yaml 配置版本 {version} 高于本程序支持的 {CURRENT_CLASH_CONFIG_VERSION}：仅告警，尽量兼容读取，不执行迁移、不写回降级"
+        );
+        return version;
+    }
+
+    while version < CURRENT_CLASH_CONFIG_VERSION {
+        match version {
+            1 => migrate_clash_v1_to_v2(map),
+            other => {
+                logging!(
+                    warn,
+                    Type::Config,
+                    "缺少 clash.yaml v{other} 的迁移实现，停止迁移（配置停在 v{other}）"
+                );
+                break;
+            }
+        }
+        version += 1;
+    }
+
+    version
+}
+
+/// v1 → v2：归一化 tun.stack（旧默认 "system" 改为跨平台更稳定的 "gvisor"）。
+fn migrate_clash_v1_to_v2(map: &mut serde_yaml_ng::Mapping) {
+    if let Some(tun) = map.get_mut("tun").and_then(|v| v.as_mapping_mut()) {
+        if tun.get("stack").and_then(|v| v.as_str()) == Some("system") {
+            tun.insert("stack".into(), crate::constants::tun::DEFAULT_STACK.into());
+            logging!(
+                info,
+                Type::Config,
+                "配置迁移 v1→v2：clash.yaml tun.stack \"system\" 归一化为 \"{}\"",
+                crate::constants::tun::DEFAULT_STACK
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,5 +282,52 @@ mod tests {
         cfg.app_log_max_count = Some(12);
         migrate_verge(&mut cfg, 2);
         assert_eq!(cfg.app_log_max_count, Some(12));
+    }
+
+    #[test]
+    fn legacy_clash_config_without_version_is_treated_as_v1() {
+        let mut map = serde_yaml_ng::Mapping::new();
+        let mut tun = serde_yaml_ng::Mapping::new();
+        tun.insert("stack".into(), "system".into());
+        map.insert("tun".into(), tun.into());
+
+        let v = migrate_clash(&mut map, IMPLICIT_LEGACY_VERSION);
+        assert_eq!(v, CURRENT_CLASH_CONFIG_VERSION);
+
+        let tun_res = map.get("tun").and_then(|t| t.as_mapping()).unwrap();
+        assert_eq!(
+            tun_res.get("stack").and_then(|s| s.as_str()),
+            Some(crate::constants::tun::DEFAULT_STACK)
+        );
+    }
+
+    #[test]
+    fn clash_migration_is_idempotent() {
+        let mut map = serde_yaml_ng::Mapping::new();
+        let mut tun = serde_yaml_ng::Mapping::new();
+        tun.insert("stack".into(), "gvisor".into());
+        map.insert("tun".into(), tun.into());
+
+        let v = migrate_clash(&mut map, CURRENT_CLASH_CONFIG_VERSION);
+        assert_eq!(v, CURRENT_CLASH_CONFIG_VERSION);
+
+        let tun_res = map.get("tun").and_then(|t| t.as_mapping()).unwrap();
+        assert_eq!(tun_res.get("stack").and_then(|s| s.as_str()), Some("gvisor"));
+    }
+
+    #[test]
+    fn future_clash_version_is_not_downgraded() {
+        let mut map = serde_yaml_ng::Mapping::new();
+        let mut tun = serde_yaml_ng::Mapping::new();
+        tun.insert("stack".into(), "system".into());
+        map.insert("tun".into(), tun.into());
+
+        let future_ver = CURRENT_CLASH_CONFIG_VERSION + 3;
+        let v = migrate_clash(&mut map, future_ver);
+        assert_eq!(v, future_ver);
+
+        // 不应被迁移降级改写
+        let tun_res = map.get("tun").and_then(|t| t.as_mapping()).unwrap();
+        assert_eq!(tun_res.get("stack").and_then(|s| s.as_str()), Some("system"));
     }
 }

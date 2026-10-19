@@ -18,8 +18,8 @@ pub struct IClashTemp(pub Mapping);
 impl IClashTemp {
     pub async fn new() -> Self {
         let clash_path_result = dirs::clash_path();
-        let map_result = if let Ok(path) = clash_path_result {
-            help::read_mapping(&path)
+        let map_result = if let Ok(ref path) = clash_path_result {
+            help::read_mapping(path)
         } else {
             Err(anyhow::anyhow!("Failed to get clash path"))
         };
@@ -33,12 +33,35 @@ impl IClashTemp {
                     }
                 }
 
-                // 归一化 tun.stack：旧版默认值为 "system"，统一为跨平台更稳定的 gvisor。
-                // 这是「值归一化」而非版本化迁移——只要仍是旧默认值就改写，使存量 clash.yaml
-                // 与新版默认保持一致（Mini 无 TUN 设置 UI，不存在用户主动选择 system 的场景）。
-                if let Some(tun) = map.get_mut("tun").and_then(|v| v.as_mapping_mut()) {
-                    if tun.get("stack").and_then(|v| v.as_str()) == Some("system") {
-                        tun.insert("stack".into(), tun_const::DEFAULT_STACK.into());
+                // 【配置版本迁移】缺失 config_version 视为 v1；逐级迁移并落当前版本。
+                // 统一对称性：备份成功才迁移，迁移后立即落盘；备份失败则中止迁移（保持原样）。
+                let from_version = map
+                    .get("config_version")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u32)
+                    .unwrap_or(crate::config::IMPLICIT_LEGACY_VERSION);
+
+                if let Ok(ref path) = clash_path_result {
+                    if from_version < crate::config::CURRENT_CLASH_CONFIG_VERSION
+                        && crate::config::backup_before_migration(path, from_version).is_none()
+                    {
+                        logging!(
+                            warn,
+                            Type::Config,
+                            "clash.yaml 迁移前备份失败，本次跳过迁移（配置保持 v{from_version}，下次启动重试）"
+                        );
+                    } else {
+                        let migrated = crate::config::migrate_clash(&mut map, from_version);
+                        map.insert("config_version".into(), migrated.into());
+                        if migrated != from_version
+                            && let Err(e) = help::save_yaml(path, &map, Some("# Clash Verge Config"))
+                        {
+                            logging!(
+                                warn,
+                                Type::Config,
+                                "配置迁移后写回 clash.yaml 失败（本次迁移仅在内存生效）: {e}"
+                            );
+                        }
                     }
                 }
 
@@ -90,6 +113,11 @@ impl IClashTemp {
         let mut map = Mapping::new();
         let mut tun_config = Mapping::new();
         let mut cors_map = Mapping::new();
+
+        map.insert(
+            "config_version".into(),
+            crate::config::CURRENT_CLASH_CONFIG_VERSION.into(),
+        );
 
         tun_config.insert("enable".into(), false.into());
         tun_config.insert("stack".into(), tun_const::DEFAULT_STACK.into());

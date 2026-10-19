@@ -503,24 +503,27 @@ flowchart LR
 
 ### 8.6 配置文件版本号与迁移框架
 
-- **版本号独立于应用版本**：`verge.yaml` / `profiles.yaml` 顶层带 `config_version: u32`，**缺失视为 v1**；仅在配置格式发生破坏性变更（字段重命名 / 类型变更 / 结构调整 / 默认值语义变化）时 +1。
+- **版本号独立于应用版本**：`verge.yaml` / `profiles.yaml` / `clash.yaml` 顶层带 `config_version: u32`，**缺失视为 v1**；仅在配置格式发生破坏性变更（字段重命名 / 类型变更 / 结构调整 / 默认值语义变化）时 +1。
 - **读取即迁移，写入即落版**：加载时按版本**逐级**执行迁移，写回时始终写当前版本。
 - **禁止降级写回**：配置版本**高于**本程序支持的版本（用户降级运行）时，只告警、尽量兼容读取，**不迁移、不写回降级**，避免把高版本配置改坏。
 - **迁移函数必须是纯函数**：只改内存结构、不做 IO，且每个迁移都要有对应单测。
 - **迁移前自动备份**：真正发生迁移时先备份为 `<文件名>.bak.v<from>`（同一版本只备份一次，保留最早那份原始配置）。**备份失败则中止本次迁移**（配置保持旧版本原样，下次启动重试），绝不在无备份时改写用户配置。
-- **落地**：`src-tauri/src/config/migrate.rs`（版本常量、`migrate_verge` / `migrate_profiles`、`backup_before_migration`）。
+- **`clash.yaml` 纳入迁移框架（v2）**：`CURRENT_CLASH_CONFIG_VERSION = 2`。加载 `clash.yaml` 时同样执行对称的检查与备份；`migrate_clash_v1_to_v2` 将破坏性的 `tun.stack: "system"` 自动归一化为 `"gvisor"`（避免在某些系统环境下引起崩溃），迁移后落盘并持久化 `config_version: 2`；`template()` 默认写入当前版本。
+- **落地**：`src-tauri/src/config/migrate.rs`（版本常量、`migrate_verge` / `migrate_profiles` / `migrate_clash`、`backup_before_migration`）及 `src-tauri/src/config/clash.rs`。
 
 ### 8.7 可诊断性：日志保留与诊断包
 
 - **日志保留约 24 小时**：`app_log_max_size` 128KB × `app_log_max_count` 40 ≈ 5MB ≈ 26 小时。此前 8 个（≈4.5 小时）不足以支撑「过夜后才反馈」的排查；旧默认值 8 由配置迁移 v2→v3 自动升到 40，**用户自定义的其它值一律尊重**。
 - **一键导出诊断包**：`export_diagnostic_bundle`（入口在「帮助 → 导出诊断包」）把全部轮转日志（应用主日志 + `service`/`sidecar` 内核日志）+ 脱敏配置 + 版本与运行摘要打成 zip，输出到 `<app_home>/diagnostics/`；`latest.log` 符号链接跳过不重复入包。
+- **原生高亮定位与交互反馈**：诊断包导出成功后，前端通过 Tauri 命令 `show_in_folder`（Windows 原生执行 `explorer /select,"<path>"`，参数逗号后严禁有空格；macOS `open -R`；Linux 优雅兜底）在文件管理器中**直接选中并高亮生成的 zip 文件**，免去用户在目录中翻找；导出生成过程中前端弹出 loading 提示反馈，防止用户重复点击。
+- **日志大文件尾部截断保护**：日志采集设定单文件 2MB 硬上限（`MAX_LOG_FILE_READ_BYTES`）以及 60 个日志文件采集上限（`MAX_DIAGNOSTIC_LOG_FILES`）。当日志超过 2MB 时，`read_log_file_with_tail_cap` 从尾部 seek 读取最新内容，并自动向后扫描跳过首个不完整行，在保留最关键排障日志的同时确保文件行结构完整，彻底消除内存与磁盘爆满风险。
 - **脱敏是硬要求**：节点 `password` / `uuid` / `psk` / `auth` / `obfs-password`、内核 `secret` / `token`、订阅 `url` 一律替换为 `***REDACTED***`；**YAML 解析失败时只写错误说明、绝不写原始正文**（已由单测覆盖）。**日志正文同样脱敏**：按敏感字段名（`token=` / `password:` / JSON 形态等）与 URL userinfo 正则替换，无害的测速/网站 URL 原样保留排查价值（已由单测覆盖）；README 同时明示「发送前可自行解压检查」。
 - **探针打点已清理**（2026-10-20）：源自断流排查的 18 处 `[探针]` INFO 打点已整体移除；关键状态变化仍由正式的 `[后台监测]` warn/info 日志覆盖。日后如需类似排障打点，用完即清，不留入生产。
 
 ### 8.8 前端单测基线与最小覆盖
 
-- **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前覆盖「节点子集过滤」（`compileStringMatcher`）与「流量单位换算」（`parseTraffic`）—— 选点范围与界面数值的正确性来源，最容易被后续改动悄悄改坏。
+- **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
+- **只测纯逻辑**：当前覆盖「节点子集过滤」（`compileStringMatcher`）、「流量单位换算」（`parseTraffic`）、「假节点判定与真实协议节点防误伤」（`isDummyNode`）以及「节点延迟格式化与主题色映射」（`formatDelay` / `formatDelayColor`）—— 选点范围、界面数值与视觉状态呈现的正确性来源，最容易被后续改动悄悄改坏。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ---
@@ -567,3 +570,6 @@ flowchart LR
 | **BUG-280** | 8.1 | 单元测试环境隔离化改造，消除全局 App Handle 与草稿状态竞争，实现单测 100% 稳定通过 |
 | **BUG-281** | 1.2 / 3.1 | 移除 Alpha 测试内核与关闭前端 sourcemap，实现工程单一 Windows 平台收敛与包体骤降 ~10MB |
 | **BUG-282** | 5.2 | 单点测速改走后端统一测量组（PROXY__METRICS），消除 TUN 活跃节点回环假 Timeout 与本地 1000ms 截断 |
+| **BUG-283** | 8.7 | 导出诊断包文件定位高亮（`show_in_folder`）与 2MB 尾部截断保护 |
+| **BUG-284** | 8.6 | `clash.yaml` 纳入版本迁移框架（v1 → v2 自动归一化 tun.stack 为 gvisor） |
+| **BUG-285** | 8.8 | 前端 Vitest 纯逻辑单测基线扩充（`node.test.ts` 与 `delay.test.ts`） |

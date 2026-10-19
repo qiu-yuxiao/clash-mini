@@ -25,6 +25,12 @@ pub fn open_logs_dir() -> CmdResult<()> {
     open::that(log_dir).stringify_err()
 }
 
+/// 在系统文件管理器中打开并高亮选中指定文件或目录
+#[tauri::command]
+pub fn show_in_folder(path: std::path::PathBuf) -> CmdResult<()> {
+    crate::utils::help::show_in_folder(&path).stringify_err()
+}
+
 /// 打开网页链接（仅允许 http/https 协议）
 #[tauri::command]
 pub fn open_web_url(url: String) -> CmdResult<()> {

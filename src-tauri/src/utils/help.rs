@@ -296,6 +296,40 @@ pub fn open_file(path: PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// 在系统文件管理器中打开并高亮选中目标文件
+pub fn show_in_folder(path: &Path) -> Result<()> {
+    if !path.exists() {
+        return Err(anyhow::anyhow!("Target path does not exist: {}", path.display()));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        // Windows explorer /select,"<path>"
+        let mut cmd = Command::new("explorer");
+        cmd.arg(format!("/select,{}", path.display()));
+        cmd.spawn()?;
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn()?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        if let Some(parent) = path.parent() {
+            open::that_detached(parent)?;
+        } else {
+            open::that_detached(path)?;
+        }
+        Ok(())
+    }
+}
+
 /// copy the file to the dist path and return the dist path
 pub fn snapshot_path(original_path: &Path) -> Result<PathBuf> {
     let temp_dir = original_path
