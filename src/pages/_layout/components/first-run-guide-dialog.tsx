@@ -24,6 +24,7 @@ import {
   get3DCardStyle,
   get3DButtonStyle,
   get3DInputStyle,
+  getActiveSkin,
 } from '@/utils/button-styles'
 
 import { getMenuItemHoverStyle } from '../utils/style-helpers'
@@ -253,11 +254,20 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     onLater()
   }
 
+  // 弹窗卡片底色来自 get3DCardStyle：retro-3d 皮肤为金黄渐变，其主题灰白
+  // 次级文字（text.secondary/disabled）反差几乎为零，换用与卡片配套的深棕系
+  // （#2C1F03 即 get3DCardStyle default 的 textColor）；其他皮肤沿用主题色
+  const isRetro3D = getActiveSkin(theme) === 'retro-3d'
+  const secondaryText = isRetro3D ? 'rgba(44, 31, 3, 0.78)' : 'text.secondary'
+  const disabledText = isRetro3D ? 'rgba(44, 31, 3, 0.55)' : 'text.disabled'
+  const readyColor = isRetro3D ? '#1B5E20' : 'success.main'
+  const warningColor = isRetro3D ? '#8C4A03' : 'warning.main'
+
   const statusColor = proxyReady
-    ? 'success.main'
+    ? readyColor
     : gaveUp
-      ? 'warning.main'
-      : 'text.secondary'
+      ? warningColor
+      : secondaryText
 
   return (
     <>
@@ -311,7 +321,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               <Typography
                 variant="body2"
                 sx={{
-                  color: 'text.secondary',
+                  color: secondaryText,
                   lineHeight: 1.6,
                   mb: 2,
                   fontSize: '13.5px',
@@ -379,7 +389,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 
                 <Typography
                   variant="caption"
-                  sx={{ color: 'text.disabled', fontSize: '11px' }}
+                  sx={{ color: disabledText, fontSize: '11px' }}
                 >
                   {t('layout.components.firstRun.enterHint')}
                 </Typography>
@@ -415,7 +425,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
           <>
             <DialogTitle
               sx={{
-                color: 'success.main',
+                color: readyColor,
                 fontWeight: 'bold',
                 fontSize: '16px',
                 px: 2.5,
@@ -451,7 +461,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   variant="body2"
                   sx={{
                     fontWeight: 600,
-                    color: 'success.main',
+                    color: readyColor,
                     mb: 0.5,
                     fontSize: '14px',
                   }}
@@ -471,7 +481,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   {!proxyReady && !gaveUp && (
                     <CircularProgress
                       size={12}
-                      sx={{ color: 'text.secondary' }}
+                      sx={{ color: secondaryText }}
                     />
                   )}
                   <Typography
@@ -495,7 +505,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   <Typography
                     variant="body2"
                     sx={{
-                      color: 'warning.main',
+                      color: warningColor,
                       fontWeight: 600,
                       mt: 0.75,
                       fontSize: '12.5px',
@@ -510,7 +520,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               <Typography
                 variant="body2"
                 sx={{
-                  color: 'text.secondary',
+                  color: secondaryText,
                   lineHeight: 1.6,
                   fontSize: '13px',
                 }}

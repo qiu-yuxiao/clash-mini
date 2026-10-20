@@ -130,8 +130,10 @@ impl IClashTemp {
         map.insert("socks-port".into(), network::ports::DEFAULT_SOCKS.into());
         map.insert("port".into(), network::ports::DEFAULT_HTTP.into());
         map.insert("log-level".into(), "warning".into());
-        map.insert("allow-lan".into(), true.into());
-        map.insert("ipv6".into(), true.into());
+        // 对齐 mihomo 内核默认：allow-lan / ipv6 出厂关闭，避免全新安装即向局域网
+        // 开放代理端口或启用 IPv6；既有用户配置不受影响（模板仅在文件不存在时生成）
+        map.insert("allow-lan".into(), false.into());
+        map.insert("ipv6".into(), false.into());
         map.insert("mode".into(), "rule".into());
         map.insert("tcp-concurrent".into(), false.into());
 

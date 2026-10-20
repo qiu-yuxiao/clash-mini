@@ -1,7 +1,7 @@
 import { Theme } from '@mui/material'
 
 // Centralized Skin Getter Helper
-const getActiveSkin = (theme: Theme): string => {
+export const getActiveSkin = (theme: Theme): string => {
   // 优先使用 React theme 中的 controlSkin（保证与 React 状态同步）
   if (theme && theme.controlSkin) {
     return theme.controlSkin
