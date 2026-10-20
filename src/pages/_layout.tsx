@@ -72,6 +72,7 @@ import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
+import { hasRealProfileItem } from '@/utils/profile-items'
 
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
@@ -337,20 +338,21 @@ const Layout = () => {
     activateSelectedRef.current = activateSelected
   }, [activateSelected])
 
-  // 首次运行向导检测：若无任何有效配置且未完成向导，自动展示引导弹窗
+  // 首次运行向导检测：无任何**真实订阅**且未完成向导时，自动展示引导弹窗
   useEffect(() => {
     const guided = localStorage.getItem(FIRST_RUN_GUIDE_STORAGE_KEY) === 'true'
-    if (
-      !guided &&
-      profiles &&
-      Array.isArray(profiles.items) &&
-      profiles.items.length === 0
-    ) {
-      const timer = setTimeout(() => {
-        setFirstRunGuideOpen(true)
-      }, 500)
-      return () => clearTimeout(timer)
-    }
+    if (guided || !profiles) return
+
+    // 【关键】不能用 items.length === 0 判断：后端 init_config 每次启动都会无条件
+    // 追加 Merge / Script 两个内置项（type 分别为 merge / script），items 恒 ≥ 2，
+    // 那样判定永远不成立、弹窗永不出现。只有「没有任何真实订阅（remote / local）」
+    // 才算首次使用。判定逻辑抽到 utils/profile-items 并有回归单测。
+    if (hasRealProfileItem(profiles.items)) return
+
+    const timer = setTimeout(() => {
+      setFirstRunGuideOpen(true)
+    }, 500)
+    return () => clearTimeout(timer)
   }, [profiles])
 
   // Takeover Mode States

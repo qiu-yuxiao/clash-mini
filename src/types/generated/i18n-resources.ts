@@ -182,6 +182,26 @@ export interface TranslationResources {
         selectLanguage: string
       }
       components: {
+        firstRun: {
+          checking: string
+          enterHint: string
+          errEmpty: string
+          errImport: string
+          errScheme: string
+          finish: string
+          importAndStart: string
+          imported: string
+          intro: string
+          later: string
+          openWiki: string
+          paste: string
+          readyOk: string
+          readyTitle: string
+          readyUnconfirmed: string
+          sysProxyOff: string
+          title: string
+          wikiHint: string
+        }
         navigation: {
           menu: {
             collapseNavBar: string

@@ -19,6 +19,26 @@
         "collapseNavBar": "Collapse navigation bar",
         "expandNavBar": "Expand navigation bar"
       }
+    },
+    "firstRun": {
+      "title": "Selamat datang di Clash Mini",
+      "intro": "Sepertinya ini peluncuran pertama dan belum ada langganan. Tempel tautan di bawah — penguraian node, uji kecepatan, dan pengambilalihan jaringan dilakukan otomatis.",
+      "paste": "Tempel dari papan klip",
+      "enterHint": "Tekan Enter untuk mengimpor",
+      "importAndStart": "Impor dan aktifkan",
+      "later": "Atur manual nanti",
+      "errEmpty": "Masukkan atau tempel tautan langganan",
+      "errScheme": "Tautan harus diawali http:// atau https://",
+      "errImport": "Gagal mengimpor. Periksa tautan lalu coba lagi",
+      "readyTitle": "Langganan diimpor",
+      "imported": "Langganan berhasil diimpor dan diaktifkan",
+      "checking": "Memeriksa konektivitas node…",
+      "readyOk": "Proksi siap, jaringan lancar",
+      "readyUnconfirmed": "Latensi node belum terukur — mungkin masih diuji atau node tidak tersedia",
+      "sysProxyOff": "Proksi sistem mati. Aktifkan di Pengaturan lalu coba lagi",
+      "wikiHint": "Buka Wiki untuk memeriksa koneksi dan melihat fitur lanjutan.",
+      "openWiki": "Buka Wiki untuk menguji",
+      "finish": "Selesai"
     }
   },
   "a11y": {

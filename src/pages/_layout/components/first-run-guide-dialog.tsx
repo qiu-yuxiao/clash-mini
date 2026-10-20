@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,8 +14,12 @@ import {
   Divider,
 } from '@mui/material'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
-import React, { useState, useRef, useEffect } from 'react'
+import type React from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 
+import { useAppData } from '@/providers/app-data-context'
+import { NODE_DELAY_MAX_MS } from '@/services/delay'
 import {
   get3DCardStyle,
   get3DButtonStyle,
@@ -26,6 +31,11 @@ import { getMenuItemHoverStyle } from '../utils/style-helpers'
 export const CLASH_MINI_WIKI_URL =
   'https://github.com/qiu-yuxiao/clash-mini/wiki'
 export const FIRST_RUN_GUIDE_STORAGE_KEY = 'clash-mini-first-run-completed'
+
+/** 就绪判定超时：超时仍未测出有效延迟，就不再宣称「已就绪」，改为如实提示 */
+const READY_TIMEOUT_MS = 20_000
+/** 就绪判定轮询间隔：借用既有代理上下文刷新，不另造测量链路 */
+const READY_POLL_INTERVAL_MS = 1_500
 
 interface FirstRunGuideDialogProps {
   open: boolean
@@ -42,6 +52,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   onOpenWiki,
   onLater,
 }) => {
+  const { t } = useTranslation()
   const theme = useTheme()
   const controlSkin = theme.controlSkin || 'default'
 
@@ -49,6 +60,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   const [url, setUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [gaveUp, setGaveUp] = useState(false)
 
   // Context menu for input
   const [contextMenu, setContextMenu] = useState<{
@@ -56,6 +68,48 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     mouseY: number
   } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // ── 就绪判定：复用既有代理上下文，不新建测量链路 ──
+  const { proxies, sysproxy, refreshProxy } = useAppData()
+  // refreshProxy 的引用不保证稳定，用 ref 持有，避免写进轮询副作用依赖后反复重排
+  const refreshProxyRef = useRef(refreshProxy)
+  useEffect(() => {
+    refreshProxyRef.current = refreshProxy
+  }, [refreshProxy])
+
+  /** 活跃出口节点最近一次延迟（ms）；无数据返回 null */
+  const activeDelay = useMemo(() => {
+    const group = proxies.groups.find((g) => g.name === 'PROXY')
+    const activeName = group?.now
+    if (!activeName) return null
+    const node =
+      proxies.records[activeName] ??
+      proxies.proxies.find((p) => p.name === activeName)
+    const history = node?.history
+    if (!history || history.length === 0) return null
+    const delay = history[history.length - 1]?.delay
+    return typeof delay === 'number' ? delay : null
+  }, [proxies])
+
+  /** 有效延迟（排除 0/超时与假节点阈值）才算真的连通 */
+  const proxyReady =
+    activeDelay !== null && activeDelay > 0 && activeDelay < NODE_DELAY_MAX_MS
+
+  // 进入第二步开始计时：超时仍无有效延迟则放弃「已就绪」的表述
+  useEffect(() => {
+    if (!open || step !== 'ready') return
+    const timer = setTimeout(() => setGaveUp(true), READY_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [open, step])
+
+  // 未就绪且未超时：周期刷新代理数据，等节点测出延迟
+  useEffect(() => {
+    if (!open || step !== 'ready' || proxyReady || gaveUp) return
+    const timer = setInterval(() => {
+      void refreshProxyRef.current?.()
+    }, READY_POLL_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [open, step, proxyReady, gaveUp])
 
   // 弹窗打开时尝试自动聚焦输入框
   useEffect(() => {
@@ -71,6 +125,13 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     setUrl('')
     setSubmitting(false)
     setErrorMessage('')
+    setGaveUp(false)
+    setContextMenu(null)
+  }
+
+  /** 记录「已引导」标记：三个出口共用，避免重复写散落各处 */
+  const markGuided = () => {
+    localStorage.setItem(FIRST_RUN_GUIDE_STORAGE_KEY, 'true')
   }
 
   const handleContextMenu = (event: React.MouseEvent) => {
@@ -95,32 +156,29 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     }
 
     if (!textToPaste) return
-    const trimmed = textToPaste.trim()
-    setUrl(trimmed)
+    setUrl(textToPaste.trim())
     setErrorMessage('')
   }
 
   const handleCopy = async () => {
     setContextMenu(null)
-    if (url) {
+    if (!url) return
+    try {
+      await writeText(url)
+    } catch {
       try {
-        await writeText(url)
-      } catch {
-        try {
-          await navigator.clipboard.writeText(url)
-        } catch (e) {
-          console.error('Failed to copy:', e)
-        }
+        await navigator.clipboard.writeText(url)
+      } catch (e) {
+        console.error('Failed to copy:', e)
       }
     }
   }
 
   const handleCut = async () => {
     setContextMenu(null)
-    if (url) {
-      await handleCopy()
-      setUrl('')
-    }
+    if (!url) return
+    await handleCopy()
+    setUrl('')
   }
 
   const handleSelectAll = () => {
@@ -136,32 +194,33 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   }
 
   const handleSubmitImport = async () => {
+    if (submitting) return
     const trimmed = url.trim()
     if (!trimmed) {
-      setErrorMessage('请输入或粘贴订阅链接')
+      setErrorMessage(t('layout.components.firstRun.errEmpty'))
       inputRef.current?.focus()
       return
     }
 
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-      setErrorMessage('订阅链接必须以 http:// 或 https:// 开头')
+      setErrorMessage(t('layout.components.firstRun.errScheme'))
       return
     }
 
     setSubmitting(true)
     setErrorMessage('')
+    setGaveUp(false)
 
     try {
       const success = await onImport(trimmed)
       if (success) {
-        // 成功后平滑切到第二步：网络就绪与浏览器测试
         setStep('ready')
       } else {
-        setErrorMessage('订阅导入失败，请检查链接是否有效后重试')
+        setErrorMessage(t('layout.components.firstRun.errImport'))
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      setErrorMessage(`导入失败: ${msg}`)
+      console.error('[FirstRunGuide] 导入异常:', err)
+      setErrorMessage(t('layout.components.firstRun.errImport'))
     } finally {
       setSubmitting(false)
     }
@@ -175,31 +234,38 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   }
 
   const handleFinish = () => {
-    localStorage.setItem(FIRST_RUN_GUIDE_STORAGE_KEY, 'true')
+    markGuided()
     resetForm()
     onClose()
   }
 
   const handleOpenWikiAndFinish = () => {
-    localStorage.setItem(FIRST_RUN_GUIDE_STORAGE_KEY, 'true')
+    markGuided()
     resetForm()
     onOpenWiki()
     onClose()
   }
 
   const handleDismissLater = () => {
-    localStorage.setItem(FIRST_RUN_GUIDE_STORAGE_KEY, 'true')
+    markGuided()
     resetForm()
     onLater()
   }
+
+  const statusColor = proxyReady
+    ? 'success.main'
+    : gaveUp
+      ? 'warning.main'
+      : 'text.secondary'
 
   return (
     <>
       <Dialog
         open={open}
-        onClose={(_event, reason) => {
-          // 禁止点击遮罩误关，防止正在导入时中断
-          if (reason === 'backdropClick' && submitting) return
+        onClose={() => {
+          // 导入进行中：点遮罩、按 Esc（reason 为 escapeKeyDown）都不允许关闭，
+          // 避免把正在进行的导入中途打断。
+          if (submitting) return
           if (step === 'ready') {
             handleFinish()
           } else {
@@ -233,11 +299,11 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
-                borderBottom: (t) => `1px solid ${t.palette.divider}`,
+                borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <span>🎉</span>
-              <span>欢迎使用 Clash Mini</span>
+              <span>{t('layout.components.firstRun.title')}</span>
             </DialogTitle>
 
             <DialogContent sx={{ px: 2.5, py: 2 }}>
@@ -250,7 +316,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   fontSize: '13.5px',
                 }}
               >
-                检测到您是首次使用，尚未添加订阅配置。请在下方填入您的代理订阅链接，我们将自动为您完成节点解析、测速与网络接管：
+                {t('layout.components.firstRun.intro')}
               </Typography>
 
               <Box sx={{ mb: 1 }}>
@@ -307,14 +373,14 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     px: 0.5,
                   }}
                 >
-                  📋 一键粘贴剪贴板链接
+                  📋 {t('layout.components.firstRun.paste')}
                 </Button>
 
                 <Typography
                   variant="caption"
                   sx={{ color: 'text.disabled', fontSize: '11px' }}
                 >
-                  按回车键立即导入
+                  {t('layout.components.firstRun.enterHint')}
                 </Typography>
               </Box>
             </DialogContent>
@@ -324,7 +390,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 px: 2.5,
                 py: 1.8,
                 gap: 1,
-                borderTop: (t) => `1px solid ${t.palette.divider}`,
+                borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <Button
@@ -332,7 +398,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 onClick={handleDismissLater}
                 disabled={submitting}
               >
-                稍后手动配置
+                {t('layout.components.firstRun.later')}
               </Button>
               <Button
                 sx={get3DButtonStyle(theme, 'contained', 'primary')}
@@ -340,7 +406,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 loading={submitting}
                 disabled={submitting}
               >
-                立即导入并开启
+                {t('layout.components.firstRun.importAndStart')}
               </Button>
             </DialogActions>
           </>
@@ -356,11 +422,11 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
-                borderBottom: (t) => `1px solid ${t.palette.divider}`,
+                borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <span>🚀</span>
-              <span>代理已就绪，网络畅通！</span>
+              <span>{t('layout.components.firstRun.readyTitle')}</span>
             </DialogTitle>
 
             <DialogContent sx={{ px: 2.5, py: 2 }}>
@@ -368,13 +434,13 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 sx={{
                   p: 1.5,
                   borderRadius: '6px',
-                  bgcolor: (t) =>
-                    t.palette.mode === 'dark'
+                  bgcolor: (t2) =>
+                    t2.palette.mode === 'dark'
                       ? 'rgba(76, 175, 80, 0.12)'
                       : 'rgba(76, 175, 80, 0.08)',
                   border: '1px solid',
-                  borderColor: (t) =>
-                    t.palette.mode === 'dark'
+                  borderColor: (t2) =>
+                    t2.palette.mode === 'dark'
                       ? 'rgba(76, 175, 80, 0.3)'
                       : 'rgba(76, 175, 80, 0.25)',
                   mb: 2,
@@ -389,20 +455,55 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     fontSize: '14px',
                   }}
                 >
-                  ✅ 订阅配置已成功导入并激活！
+                  ✅ {t('layout.components.firstRun.imported')}
                 </Typography>
-                <Typography
-                  variant="body2"
+
+                {/* 就绪状态：测出有效延迟后才宣称连通，否则如实显示「检测中 / 未测出」 */}
+                <Box
                   sx={{
-                    color: 'text.primary',
-                    lineHeight: 1.6,
-                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.75,
+                    mt: 0.5,
                   }}
                 >
-                  系统代理与 TUN
-                  内核已全量就绪。您的浏览器（Edge、Chrome、Firefox
-                  等）现在已经可以直接顺畅访问全球网络。
-                </Typography>
+                  {!proxyReady && !gaveUp && (
+                    <CircularProgress
+                      size={12}
+                      sx={{ color: 'text.secondary' }}
+                    />
+                  )}
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: statusColor,
+                      fontWeight: 600,
+                      lineHeight: 1.5,
+                      fontSize: '13px',
+                    }}
+                  >
+                    {proxyReady
+                      ? t('layout.components.firstRun.readyOk')
+                      : gaveUp
+                        ? t('layout.components.firstRun.readyUnconfirmed')
+                        : t('layout.components.firstRun.checking')}
+                  </Typography>
+                </Box>
+
+                {!sysproxy.enable && (
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: 'warning.main',
+                      fontWeight: 600,
+                      mt: 0.75,
+                      fontSize: '12.5px',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    ⚠️ {t('layout.components.firstRun.sysProxyOff')}
+                  </Typography>
+                )}
               </Box>
 
               <Typography
@@ -413,8 +514,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   fontSize: '13px',
                 }}
               >
-                您可以点击下方按钮，直接在默认浏览器中打开 Clash Mini 项目 Wiki
-                首页，亲测网络连通性并了解更多进阶技巧：
+                {t('layout.components.firstRun.wikiHint')}
               </Typography>
             </DialogContent>
 
@@ -423,20 +523,20 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 px: 2.5,
                 py: 1.8,
                 gap: 1,
-                borderTop: (t) => `1px solid ${t.palette.divider}`,
+                borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <Button
                 sx={get3DButtonStyle(theme, 'outlined', 'default')}
                 onClick={handleFinish}
               >
-                完成并进入主界面
+                {t('layout.components.firstRun.finish')}
               </Button>
               <Button
                 sx={get3DButtonStyle(theme, 'contained', 'primary')}
                 onClick={handleOpenWikiAndFinish}
               >
-                🌐 打开 Wiki 首页测试
+                🌐 {t('layout.components.firstRun.openWiki')}
               </Button>
             </DialogActions>
           </>

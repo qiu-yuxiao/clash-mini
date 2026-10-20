@@ -19,6 +19,26 @@
         "collapseNavBar": "收起导航栏",
         "expandNavBar": "展开导航栏"
       }
+    },
+    "firstRun": {
+      "title": "欢迎使用 Clash Mini",
+      "intro": "检测到您是首次使用，尚未添加订阅。请在下方填入代理订阅链接，我们将自动完成节点解析、测速与网络接管：",
+      "paste": "一键粘贴剪贴板链接",
+      "enterHint": "按回车键立即导入",
+      "importAndStart": "立即导入并开启",
+      "later": "稍后手动配置",
+      "errEmpty": "请输入或粘贴订阅链接",
+      "errScheme": "订阅链接必须以 http:// 或 https:// 开头",
+      "errImport": "订阅导入失败，请检查链接是否有效后重试",
+      "readyTitle": "订阅已导入",
+      "imported": "订阅配置已成功导入并激活",
+      "checking": "正在确认节点连通性…",
+      "readyOk": "代理已就绪，网络通畅",
+      "readyUnconfirmed": "暂未测出节点延迟，可能仍在测速或该节点暂不可用",
+      "sysProxyOff": "系统代理未开启，请在设置中开启后再试",
+      "wikiHint": "你可以打开 Wiki 首页验证连通性，也顺便了解进阶玩法。",
+      "openWiki": "打开 Wiki 首页测试",
+      "finish": "完成并进入主界面"
     }
   },
   "a11y": {

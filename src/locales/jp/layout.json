@@ -19,6 +19,26 @@
         "collapseNavBar": "Collapse navigation bar",
         "expandNavBar": "Expand navigation bar"
       }
+    },
+    "firstRun": {
+      "title": "Clash Mini へようこそ",
+      "intro": "初回起動のようで、まだサブスクリプションがありません。以下にリンクを入力してください。ノード解析・速度測定・ネットワーク接管は自動で行われます。",
+      "paste": "クリップボードから貼り付け",
+      "enterHint": "Enter キーでインポート",
+      "importAndStart": "インポートして有効化",
+      "later": "後で手動設定",
+      "errEmpty": "サブスクリプションのリンクを入力または貼り付けてください",
+      "errScheme": "リンクは http:// または https:// で始まる必要があります",
+      "errImport": "インポートに失敗しました。リンクを確認して再試行してください",
+      "readyTitle": "サブスクリプションをインポートしました",
+      "imported": "サブスクリプションをインポートして有効化しました",
+      "checking": "ノードの接続を確認しています…",
+      "readyOk": "プロキシの準備ができました。ネットワークは正常です",
+      "readyUnconfirmed": "ノードの遅延を測定できませんでした。測定中か、ノードが利用できない可能性があります",
+      "sysProxyOff": "システムプロキシが無効です。設定で有効にしてから再試行してください",
+      "wikiHint": "Wiki を開いて接続を確認し、詳細な使い方をご覧ください。",
+      "openWiki": "Wiki を開いてテスト",
+      "finish": "完了"
     }
   },
   "a11y": {

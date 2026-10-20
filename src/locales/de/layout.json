@@ -19,6 +19,26 @@
         "collapseNavBar": "Collapse navigation bar",
         "expandNavBar": "Expand navigation bar"
       }
+    },
+    "firstRun": {
+      "title": "Willkommen bei Clash Mini",
+      "intro": "Sieht aus, als wäre dies der erste Start und es ist noch kein Abonnement vorhanden. Füge unten deinen Abo-Link ein – Knotenanalyse, Geschwindigkeitstest und Netzwerkübernahme laufen automatisch.",
+      "paste": "Aus Zwischenablage einfügen",
+      "enterHint": "Enter zum Importieren",
+      "importAndStart": "Importieren und aktivieren",
+      "later": "Später manuell einrichten",
+      "errEmpty": "Bitte Abo-Link eingeben oder einfügen",
+      "errScheme": "Der Link muss mit http:// oder https:// beginnen",
+      "errImport": "Import fehlgeschlagen. Link prüfen und erneut versuchen",
+      "readyTitle": "Abonnement importiert",
+      "imported": "Abonnement importiert und aktiviert",
+      "checking": "Knotenverbindung wird geprüft…",
+      "readyOk": "Proxy ist bereit, Netzwerk läuft",
+      "readyUnconfirmed": "Noch keine Knotenlatenz gemessen – evtl. läuft der Test noch oder der Knoten ist nicht verfügbar",
+      "sysProxyOff": "Systemproxy ist aus. In den Einstellungen aktivieren und erneut versuchen",
+      "wikiHint": "Öffne das Wiki, um die Verbindung zu prüfen und mehr zu erfahren.",
+      "openWiki": "Wiki zum Testen öffnen",
+      "finish": "Fertig"
     }
   },
   "a11y": {

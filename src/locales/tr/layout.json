@@ -19,6 +19,26 @@
         "collapseNavBar": "Collapse navigation bar",
         "expandNavBar": "Expand navigation bar"
       }
+    },
+    "firstRun": {
+      "title": "Clash Mini'ye hoş geldiniz",
+      "intro": "İlk açılış gibi görünüyor ve henüz abonelik yok. Abonelik bağlantını aşağıya yapıştır — düğüm ayrıştırma, hız testi ve ağ devralma otomatik yapılır.",
+      "paste": "Panodan yapıştır",
+      "enterHint": "İçe aktarmak için Enter'a bas",
+      "importAndStart": "İçe aktar ve etkinleştir",
+      "later": "Daha sonra elle yapılandır",
+      "errEmpty": "Lütfen bir abonelik bağlantısı gir veya yapıştır",
+      "errScheme": "Bağlantı http:// veya https:// ile başlamalı",
+      "errImport": "İçe aktarma başarısız. Bağlantıyı kontrol edip tekrar dene",
+      "readyTitle": "Abonelik içe aktarıldı",
+      "imported": "Abonelik içe aktarıldı ve etkinleştirildi",
+      "checking": "Düğüm bağlantısı kontrol ediliyor…",
+      "readyOk": "Proxy hazır, ağ çalışıyor",
+      "readyUnconfirmed": "Düğüm gecikmesi henüz ölçülmedi — test sürüyor olabilir ya da düğüm kullanılamıyor",
+      "sysProxyOff": "Sistem proxy'si kapalı. Ayarlardan açıp tekrar dene",
+      "wikiHint": "Bağlantıyı doğrulamak ve daha fazlasını görmek için Wiki'yi aç.",
+      "openWiki": "Test için Wiki'yi aç",
+      "finish": "Bitti"
     }
   },
   "a11y": {

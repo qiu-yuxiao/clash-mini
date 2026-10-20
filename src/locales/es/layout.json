@@ -19,6 +19,26 @@
         "collapseNavBar": "Collapse navigation bar",
         "expandNavBar": "Expand navigation bar"
       }
+    },
+    "firstRun": {
+      "title": "Bienvenido a Clash Mini",
+      "intro": "Parece que es tu primer inicio y aún no hay ninguna suscripción. Pega el enlace abajo: el análisis de nodos, la prueba de velocidad y la toma de red se harán automáticamente.",
+      "paste": "Pegar del portapapeles",
+      "enterHint": "Pulsa Enter para importar",
+      "importAndStart": "Importar y activar",
+      "later": "Configurar manualmente más tarde",
+      "errEmpty": "Introduce o pega un enlace de suscripción",
+      "errScheme": "El enlace debe empezar por http:// o https://",
+      "errImport": "Error al importar. Revisa el enlace e inténtalo de nuevo",
+      "readyTitle": "Suscripción importada",
+      "imported": "Suscripción importada y activada",
+      "checking": "Comprobando la conectividad del nodo…",
+      "readyOk": "El proxy está listo, la red funciona",
+      "readyUnconfirmed": "Aún no se ha medido la latencia del nodo; puede que el test siga en curso o que el nodo no esté disponible",
+      "sysProxyOff": "El proxy del sistema está desactivado. Actívalo en Ajustes e inténtalo de nuevo",
+      "wikiHint": "Abre el Wiki para comprobar la conexión y ver más funciones.",
+      "openWiki": "Abrir el Wiki para probar",
+      "finish": "Listo"
     }
   },
   "a11y": {
