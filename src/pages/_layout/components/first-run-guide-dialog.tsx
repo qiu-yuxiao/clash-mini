@@ -262,9 +262,6 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   const disabledText = isRetro3D ? 'rgba(44, 31, 3, 0.55)' : 'text.disabled'
   const readyColor = isRetro3D ? '#1B5E20' : 'success.main'
   const warningColor = isRetro3D ? '#8C4A03' : 'warning.main'
-  // 主题 primary（默认 #007AFF / 系统强调色）与 error 红在金黄→橙渐变底上同样偏弱
-  const linkColor = isRetro3D ? '#4E2F00' : 'primary.main'
-  const errorColor = isRetro3D ? '#B71C1C' : 'error.main'
 
   const statusColor = proxyReady
     ? readyColor
@@ -356,7 +353,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 <Typography
                   variant="caption"
                   sx={{
-                    color: errorColor,
+                    color: 'error.main',
                     fontWeight: 600,
                     display: 'block',
                     mt: 0.5,
@@ -383,7 +380,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   sx={{
                     fontSize: '12px',
                     textTransform: 'none',
-                    color: linkColor,
+                    color: 'primary.main',
                     px: 0.5,
                   }}
                 >
