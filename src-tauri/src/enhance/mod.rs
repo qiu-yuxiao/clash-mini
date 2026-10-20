@@ -634,10 +634,10 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         }
     }
 
-    // 注：规则集从 GEOIP/GEOSITE 更换为 GFWList。
-    // GFWList 负责判断被墙域名走代理，GEOIP/GEOSITE 数据库不再需要，
-    // 省去 geoip.dat(~8MB) + geosite.dat(~30MB) 文件的常驻内存开销。
-    // MATCH 兜底策略仍由 rule_fallback 控制，与原逻辑一致。
+    // 注：境外域名走代理由 GFWList 规则集判断（规则集从 GEOIP/GEOSITE 更换而来，
+    // 省去 geosite.dat 的常驻内存开销；GEOIP 数据仍随包携带见下）。
+    // MATCH 兜底策略由 rule_fallback 控制；IPv6 境内外分流依赖 Country.mmdb
+    // （随包携带、离线可用，见 utils::init::init_resources），见下方 IPv6 兜底规则。
 
     // Add GFWList rule: only explicitly blocked domains go through proxy
     final_rules.push(Value::from("RULE-SET,gfwlist,PROXY"));
@@ -676,6 +676,15 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
             final_rules.push(rule);
         }
     }
+
+    // 【IPv6 兜底】GFWList 是纯域名规则集（behavior: domain），对 sniffer
+    // parse-pure-ip 提取出的「纯 IPv6 真实地址」无从按域名匹配 → 会全部漏到
+    // MATCH 兜底。若兜底为 DIRECT，境外/投毒 IPv6 就直连超时（实测无 IPv6
+    // 出口时每条 i/o timeout，形成 TUN 断流刷屏）。故在 MATCH 之前为 IPv6 补
+    // 兜底：境内 GeoIP6 直连，其余 IPv6 统一走代理，确保境外 IPv6 经节点出口。
+    // no-resolve：仅对已解析为 IP 的连接生效，避免干扰域名解析过程。
+    final_rules.push(Value::from("GEOIP6,CN,DIRECT,no-resolve"));
+    final_rules.push(Value::from("IP-CIDR6,::/0,PROXY,no-resolve"));
 
     // Read verge config to get the rule fallback type
     let verge = Config::verge().await.latest_arc();
@@ -924,9 +933,10 @@ append-rules:
         assert_eq!(gfwlist.get("proxy").unwrap().as_str(), Some("PROXY"));
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
-        // prepend(1) + GFWList(1) + IP-CIDR(6) + IP-CIDR6(5) + IPv4-mapped(6) + append(1) + MATCH(1) = 21
+        // prepend(1) + GFWList(1) + IP-CIDR(6) + IP-CIDR6(5) + IPv4-mapped(6) + append(1)
+        // + IPv6 兜底(2: GEOIP6,CN + IP-CIDR6,::/0) + MATCH(1) = 23
         // MATCH=DIRECT because default rule_fallback is "direct" (GFWList mode)
-        assert_eq!(rules.len(), 21);
+        assert_eq!(rules.len(), 23);
         assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));
         assert_eq!(rules[1].as_str(), Some("RULE-SET,gfwlist,PROXY"));
         assert_eq!(rules[2].as_str(), Some("IP-CIDR,127.0.0.0/8,DIRECT,no-resolve"));
@@ -965,7 +975,10 @@ append-rules:
             Some("IP-CIDR6,::ffff:169.254.0.0/112,DIRECT,no-resolve")
         );
         assert_eq!(rules[19].as_str(), Some("DOMAIN,custom-domain,REJECT"));
-        assert_eq!(rules[20].as_str(), Some("MATCH,DIRECT"));
+        // IPv6 兜底（在 MATCH 之前，确保境外/投毒 IPv6 不直连超时）
+        assert_eq!(rules[20].as_str(), Some("GEOIP6,CN,DIRECT,no-resolve"));
+        assert_eq!(rules[21].as_str(), Some("IP-CIDR6,::/0,PROXY,no-resolve"));
+        assert_eq!(rules[22].as_str(), Some("MATCH,DIRECT"));
 
         // Verify prepend-rules and append-rules keys are removed
         assert!(config.get("prepend-rules").is_none());

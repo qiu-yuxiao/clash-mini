@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn redact_masks_node_secrets() {
-        let yaml = r#"
+        let yaml = r"
 proxies:
   - name: 日本01
     type: ss
@@ -372,7 +372,7 @@ proxies:
     password: super-secret
     uuid: 0000-1111
     psk: abcdef
-"#;
+";
         let out = redact_yaml_text(yaml);
         assert!(!out.contains("super-secret"), "password 未脱敏: {out}");
         assert!(!out.contains("0000-1111"), "uuid 未脱敏: {out}");
@@ -384,12 +384,12 @@ proxies:
 
     #[test]
     fn redact_masks_subscription_urls() {
-        let yaml = r#"
+        let yaml = r"
 proxy-providers:
   main:
     url: https://airport.example/sub?token=very-secret-token
     interval: 3600
-"#;
+";
         let out = redact_yaml_text(yaml);
         assert!(!out.contains("very-secret-token"), "订阅链接未脱敏: {out}");
         assert!(out.contains("main"));
@@ -398,7 +398,7 @@ proxy-providers:
     #[test]
     fn redact_masks_ws_authorization_header() {
         // VLESS/WS 过 CDN 的订阅常见形态：认证令牌挂在 ws-opts.headers.Authorization
-        let yaml = r#"
+        let yaml = r"
 proxies:
   - name: vless-ws-01
     type: vless
@@ -408,7 +408,7 @@ proxies:
       headers:
         Host: cdn.example.com
         Authorization: Bearer real-token-123
-"#;
+";
         let out = redact_yaml_text(yaml);
         assert!(
             !out.contains("real-token-123"),
