@@ -16,6 +16,14 @@
 ### 🐞 Fixed Bugs
 - **全新安装默认关闭 Allow LAN / Allow IPv6**：`clash.yaml` 生成模板及兜底最小配置中的 `allow-lan` / `ipv6` 统一为 `false`，对齐 Mihomo 内核默认，确保初次启动时两个开关均处于关闭状态；既有用户配置不受影响。
 - **新手引导弹窗文字反差修复**：retro-3d 皮肤下引导弹窗为金黄渐变底，原先的主题灰白次级文字几乎无法辨认；现按皮肤配套深棕系文字及深绿/深琥珀状态色，其他皮肤沿用主题色。
+- **TUN 模式 IPv6 兜底断流修复（全新安装长时断流根因）**：
+  - TUN 接管 IPv6 路由后，GFWList（纯域名规则集）无法匹配「纯 IPv6 真实地址」，此类流量全部漏到 `MATCH` 兜底；默认兜底为 DIRECT，境外/被投毒的 IPv6 目标直连即 `i/o timeout`，现场实测 375 条超时刷屏、表现为 TUN 长时间断流；
+  - 现于 `MATCH` 之前固定注入 IPv6 兜底：`GEOIP6,CN,DIRECT`（境内 IPv6 走随包携带、离线可用的 `Country.mmdb` 直连）+ `IP-CIDR6,::/0,PROXY`（其余 IPv6 经节点 IPv6 出站，实测可用）；
+  - **两条兜底均不带 `no-resolve`**：带 `no-resolve` 的 IP 类规则对域名目标直接跳过（现场 85/375=22.7% 超时目标是域名），去掉后由内核先解析再判定，解析出 IPv6 的域名同样被接住；仅含 A 记录的域名行为不变。
+- **DNS fallback 防投毒链路救活**：
+  - `dns.respect-rules: true` 时，内核为解析域名发出的上游连接同样要过规则匹配；fallback 里的境外 DoH（1.1.1.1 / 8.8.8.8 / 8.8.4.4）会一路漏到 `MATCH,DIRECT`，在大陆直连被墙 → fallback 整链失效 → `fallback-filter.geoip` 防投毒能力等于关闭 → 投毒应答被采信后客户端反复连接不存在的地址，正是断流的深层根因（现场日志实证 `dial DIRECT --> 8.8.8.8:443 error`）；
+  - 现由真实 `dns.fallback` 配置推导规则（不写死 IP，订阅换上游自动跟随），逐条生成 `IP-CIDR/<32 或 /128>,PROXY,no-resolve` 强制上游走代理；插入位置在 `RULE-SET,gfwlist` 之后、用户 `append-rules` 之前，不抢用户自定义规则的最终决定权；域名型上游无法静态表达、跳过。
+- **节点选择快照/还原跳过内置出站**：冷启动「一个真实节点都没有」的窗口期里 PROXY 组以 `DIRECT` 临时兜底，此时照抄进快照、再在真实节点加载后还原必然报 `Selector update error: proxy not exist`；现快照与还原两侧均跳过 `DIRECT`/`REJECT`/`REJECT-DROP`/`PASS`/`COMPATIBLE` 内置出站，交由正常的自动选点流程。
 
 ### 🌐 Internationalization & Accessibility (i18n & A11y)
 - **13 语种深度国际化收口**：
@@ -30,6 +38,7 @@
 ### 🧪 Tests & Engineering Standards
 - **纯函数单测基线扩充**：
   - 新增 `src/utils/profile-items.test.ts` 纯逻辑测试套件，涵盖 6 组有效订阅判定的边界场景（空配置、内置项干扰、多协议项等）；
+  - `enforce_mini_agreements` 规则断言随 IPv6 兜底更新（21→23 条）；新增 `dns_fallback_proxy_rules`（标量/列表混用、scheme、端口、h3 参数、去重）与 `extract_upstream_host`（mihomo 全部上游写法）纯函数测试；
   - 定时器与资源清理：引导组件卸载时严密注销所有超时与轮询计时器，杜绝内存泄漏；
   - 架构协议固化：在规范文档中沉淀有效订阅判定准则与用户可见文案 100% i18n 硬约束。
 
