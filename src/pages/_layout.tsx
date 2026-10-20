@@ -1539,6 +1539,7 @@ const Layout = () => {
                   handleHelpClose={handleHelpClose}
                   handleClientCheck={handleClientCheck}
                   handleCoreCheck={handleCoreCheck}
+                  onReopenFirstRunGuide={() => setFirstRunGuideOpen(true)}
                   clientCheckLoading={clientCheckLoading}
                   coreCheckLoading={coreCheckLoading}
                   appVersion={appVersion}

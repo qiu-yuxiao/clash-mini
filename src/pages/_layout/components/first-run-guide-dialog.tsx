@@ -121,6 +121,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   }, [open])
 
   const resetForm = () => {
+    // 重置回第一步：支持「帮助菜单 → 新手引导」重新打开时从导入步开始
     setStep('input')
     setUrl('')
     setSubmitting(false)

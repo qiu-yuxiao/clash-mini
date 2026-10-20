@@ -26,6 +26,7 @@ interface HelpMenuButtonProps {
   handleHelpClose: () => void
   handleClientCheck: () => void
   handleCoreCheck: () => void
+  onReopenFirstRunGuide: () => void
   clientCheckLoading: boolean
   coreCheckLoading: boolean
   appVersion: string
@@ -40,6 +41,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
   handleHelpClose,
   handleClientCheck,
   handleCoreCheck,
+  onReopenFirstRunGuide,
   clientCheckLoading,
   coreCheckLoading,
   appVersion,
@@ -131,6 +133,15 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           💡 帮助指南 (Wiki)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            handleHelpClose()
+            onReopenFirstRunGuide()
+          }}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🧭 新手引导
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
