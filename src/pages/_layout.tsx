@@ -63,6 +63,7 @@ import {
   triggerAutoSelect,
   beginLongOperation,
   endLongOperation,
+  openWebUrl,
 } from '@/services/cmds'
 import { getDelayManager } from '@/services/delay'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
@@ -77,6 +78,11 @@ import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
 import { AddUrlDialog } from './_layout/components/add-url-dialog'
 import { BasicSettingsCard } from './_layout/components/basic-settings-card'
 import { ConnectionsPanel } from './_layout/components/connections-panel'
+import {
+  FirstRunGuideDialog,
+  CLASH_MINI_WIKI_URL,
+  FIRST_RUN_GUIDE_STORAGE_KEY,
+} from './_layout/components/first-run-guide-dialog'
 import { HelpMenuButton } from './_layout/components/help-menu-button'
 import { LayoutDialogs } from './_layout/components/layout-dialogs'
 import { MiniTrafficPanel } from './_layout/components/mini-traffic-panel'
@@ -252,6 +258,9 @@ const Layout = () => {
   const [editProfileUrl, setEditProfileUrl] = useState('')
   const [editProfileInterval, setEditProfileInterval] = useState(0)
 
+  // First-run Onboarding Guide Dialog State
+  const [firstRunGuideOpen, setFirstRunGuideOpen] = useState(false)
+
   const primaryBtn3DStyle = useMemo<SxProps<Theme>>(() => {
     const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
     const styleWithImportant: Record<string, unknown> = {}
@@ -327,6 +336,22 @@ const Layout = () => {
   useEffect(() => {
     activateSelectedRef.current = activateSelected
   }, [activateSelected])
+
+  // 首次运行向导检测：若无任何有效配置且未完成向导，自动展示引导弹窗
+  useEffect(() => {
+    const guided = localStorage.getItem(FIRST_RUN_GUIDE_STORAGE_KEY) === 'true'
+    if (
+      !guided &&
+      profiles &&
+      Array.isArray(profiles.items) &&
+      profiles.items.length === 0
+    ) {
+      const timer = setTimeout(() => {
+        setFirstRunGuideOpen(true)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [profiles])
 
   // Takeover Mode States
   const { isTunModeAvailable, mutateSystemState } = useSystemState()
@@ -758,17 +783,18 @@ const Layout = () => {
   useLayoutEvents(handleNotice)
 
   // Profile actions
-  const handleImportProfile = async () => {
-    if (!url) return
-    const trimmed = url.trim()
-    if (!trimmed) return
-    if (isImportingRef.current) return
+  const handleImportProfile = async (inputUrl?: string): Promise<boolean> => {
+    const rawUrl = typeof inputUrl === 'string' ? inputUrl : url
+    if (!rawUrl) return false
+    const trimmed = rawUrl.trim()
+    if (!trimmed) return false
+    if (isImportingRef.current) return false
     isImportingRef.current = true
     setProfileLoading(true)
     try {
-      await importProfile(url)
+      await importProfile(trimmed)
       showNotice.success('shared.feedback.notifications.importSuccess')
-      setUrl('')
+      if (!inputUrl) setUrl('')
 
       const freshConfig = await getProfiles()
       const newProfile = freshConfig?.items?.find(
@@ -813,15 +839,16 @@ const Layout = () => {
           setProfileRefreshCounter((c) => c + 1)
         }
       }
+      return true
     } catch (err) {
       console.error(
         '[handleImportProfile] 首次导入失败，尝试 Clash 代理重试:',
         err,
       )
       try {
-        await importProfile(url, { with_proxy: false, self_proxy: true })
+        await importProfile(trimmed, { with_proxy: false, self_proxy: true })
         showNotice.success('shared.feedback.notifications.importWithClashProxy')
-        setUrl('')
+        if (!inputUrl) setUrl('')
 
         const freshConfig = await getProfiles()
         const newProfile = freshConfig?.items?.find(
@@ -861,11 +888,13 @@ const Layout = () => {
             setProfileRefreshCounter((c) => c + 1)
           }
         }
+        return true
       } catch (retryErr) {
         showNotice.error(
           'profiles.page.feedback.notifications.importFail',
           String(retryErr),
         )
+        return false
       }
     } finally {
       isImportingRef.current = false
@@ -1933,6 +1962,20 @@ const Layout = () => {
           logsOpen={logsOpen}
           setLogsOpen={setLogsOpen}
           mode={mode}
+        />
+        <FirstRunGuideDialog
+          open={firstRunGuideOpen}
+          onClose={() => setFirstRunGuideOpen(false)}
+          onImport={handleImportProfile}
+          onOpenWiki={() => {
+            openWebUrl(CLASH_MINI_WIKI_URL).catch((e) => {
+              console.error('[FirstRunGuide] 打开 Wiki 失败:', e)
+            })
+          }}
+          onLater={() => {
+            setFirstRunGuideOpen(false)
+            setDrawerOpen(true)
+          }}
         />
       </ErrorBoundary>
     </ThemeProvider>

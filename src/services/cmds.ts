@@ -612,3 +612,12 @@ export async function getProxyAddr(name: string, provider?: string) {
     'getProxyAddr',
   )
 }
+
+/** 打开外部网页链接（仅允许 http/https 协议） */
+export async function openWebUrl(url: string) {
+  return withIpcTimeout(
+    invoke<void>('open_web_url', { url }),
+    10_000,
+    'openWebUrl',
+  )
+}
