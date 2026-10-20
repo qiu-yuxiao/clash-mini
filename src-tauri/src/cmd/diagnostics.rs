@@ -27,12 +27,15 @@ use crate::config::Config;
 use crate::utils::dirs;
 
 /// 敏感键名（小写比较）。命中后其标量值整体替换为占位符。
+/// 注：`authorization` 覆盖 ws-opts.headers.Authorization 等节点级认证头
+/// （与日志脱敏规则 0a 的 Authorization 整行抹除保持同一标准）。
 const SENSITIVE_KEYS: &[&str] = &[
     "password",
     "uuid",
     "psk",
     "auth",
     "auth-str",
+    "authorization",
     "obfs-password",
     "secret",
     "token",
@@ -404,6 +407,29 @@ proxy-providers:
         let out = redact_yaml_text(yaml);
         assert!(!out.contains("very-secret-token"), "订阅链接未脱敏: {out}");
         assert!(out.contains("main"));
+    }
+
+    #[test]
+    fn redact_masks_ws_authorization_header() {
+        // VLESS/WS 过 CDN 的订阅常见形态：认证令牌挂在 ws-opts.headers.Authorization
+        let yaml = r#"
+proxies:
+  - name: vless-ws-01
+    type: vless
+    server: cdn.example.com
+    port: 443
+    ws-opts:
+      headers:
+        Host: cdn.example.com
+        Authorization: Bearer real-token-123
+"#;
+        let out = redact_yaml_text(yaml);
+        assert!(
+            !out.contains("real-token-123"),
+            "ws-opts.headers.Authorization 未脱敏: {out}"
+        );
+        // 同层非敏感 header 保留，保证排查价值
+        assert!(out.contains("cdn.example.com"), "非敏感 header 不应整块抹掉: {out}");
     }
 
     #[test]

@@ -42,6 +42,19 @@ pub const CURRENT_PROFILES_CONFIG_VERSION: u32 = 1;
 /// `clash.yaml` 当前配置版本。
 pub const CURRENT_CLASH_CONFIG_VERSION: u32 = 2;
 
+/// 读取配置 Mapping 中的 `config_version`；缺失视为 v1（历史版本）。
+///
+/// 【顺序约束·勿改】调用方必须在**模板/默认值合并之前**调用本函数：
+/// 模板通常自带 `config_version = 当前版本`，若先合并模板再检测，
+/// 存量配置（无 config_version）的起始版本会被误判为最新版，
+/// v1→vN 迁移将永远不会触发（clash.yaml 集成曾因顺序颠倒踩过此坑）。
+pub fn detect_config_version(map: &serde_yaml_ng::Mapping) -> u32 {
+    map.get("config_version")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32)
+        .unwrap_or(IMPLICIT_LEGACY_VERSION)
+}
+
 /// 迁移前备份原配置文件，返回备份路径（失败返回 `None`）。
 ///
 /// 备份文件命名 `<原文件名>.bak.v<from_version>`，便于用户回滚与事后追查。
@@ -329,5 +342,55 @@ mod tests {
         // 不应被迁移降级改写
         let tun_res = map.get("tun").and_then(|t| t.as_mapping()).unwrap();
         assert_eq!(tun_res.get("stack").and_then(|s| s.as_str()), Some("system"));
+    }
+
+    #[test]
+    fn detect_config_version_defaults_to_v1_when_missing() {
+        let map = serde_yaml_ng::Mapping::new();
+        assert_eq!(detect_config_version(&map), IMPLICIT_LEGACY_VERSION);
+    }
+
+    #[test]
+    fn detect_config_version_reads_explicit_version() {
+        let mut map = serde_yaml_ng::Mapping::new();
+        map.insert("config_version".into(), 3u32.into());
+        assert_eq!(detect_config_version(&map), 3);
+    }
+
+    /// 回归：模板合并会注入 `config_version = 当前版本`。若版本检测发生在合并之后，
+    /// 存量配置会被误判为最新版、v1→v2 迁移（tun.stack "system" 归一化）整体失效。
+    /// 检测必须先于模板合并 —— 本用例锁定该顺序契约。
+    #[test]
+    fn detection_must_precede_template_merge() {
+        // 存量配置：无 config_version，tun.stack 为旧默认 "system"
+        let mut legacy = serde_yaml_ng::Mapping::new();
+        let mut tun = serde_yaml_ng::Mapping::new();
+        tun.insert("stack".into(), "system".into());
+        legacy.insert("tun".into(), tun.into());
+
+        // 合并前检测：正确识别为 v1
+        let from_version = detect_config_version(&legacy);
+        assert_eq!(from_version, IMPLICIT_LEGACY_VERSION);
+
+        // 模拟模板合并（注入 config_version = 当前版本）：合并后检测会被污染为最新版，
+        // 这正是集成顺序颠倒时迁移失效的机理
+        let mut merged = legacy.clone();
+        merged.insert(
+            "config_version".into(),
+            CURRENT_CLASH_CONFIG_VERSION.into(),
+        );
+        assert_eq!(
+            detect_config_version(&merged),
+            CURRENT_CLASH_CONFIG_VERSION
+        );
+
+        // 以合并前检测到的 v1 为起始版本，tun.stack "system" 才会被归一化
+        let v = migrate_clash(&mut legacy, from_version);
+        assert_eq!(v, CURRENT_CLASH_CONFIG_VERSION);
+        let tun_res = legacy.get("tun").and_then(|t| t.as_mapping()).unwrap();
+        assert_eq!(
+            tun_res.get("stack").and_then(|s| s.as_str()),
+            Some(crate::constants::tun::DEFAULT_STACK)
+        );
     }
 }

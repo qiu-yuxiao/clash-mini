@@ -26,6 +26,12 @@ impl IClashTemp {
 
         match map_result {
             Ok(mut map) => {
+                // 【配置版本迁移·顺序关键】缺失 config_version 视为 v1。
+                // 必须在下方模板合并**之前**检测：模板自带 config_version=当前版本，
+                // 若先合并再检测，存量配置（无 config_version）的起始版本会被污染为最新版，
+                // v1→v2 迁移（tun.stack "system" 归一化）将永远不会触发。
+                let from_version = crate::config::detect_config_version(&map);
+
                 let template_map = Self::template().0;
                 for (key, value) in template_map.into_iter() {
                     if !map.contains_key(&key) {
@@ -33,13 +39,7 @@ impl IClashTemp {
                     }
                 }
 
-                // 【配置版本迁移】缺失 config_version 视为 v1；逐级迁移并落当前版本。
                 // 统一对称性：备份成功才迁移，迁移后立即落盘；备份失败则中止迁移（保持原样）。
-                let from_version = map
-                    .get("config_version")
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as u32)
-                    .unwrap_or(crate::config::IMPLICIT_LEGACY_VERSION);
 
                 if let Ok(ref path) = clash_path_result {
                     if from_version < crate::config::CURRENT_CLASH_CONFIG_VERSION

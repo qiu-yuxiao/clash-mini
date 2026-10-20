@@ -528,7 +528,9 @@ flowchart LR
 - **迁移前自动备份**：真正发生迁移时先备份为 `<文件名>.bak.v<from>`（同一版本只备份一次，保留最早那份原始配置）。**备份失败则中止本次迁移**（配置保持旧版本原样，下次启动重试），绝不在无备份时改写用户配置。
 - **`clash.yaml` 纳入迁移框架（v2）**：`CURRENT_CLASH_CONFIG_VERSION = 2`。加载 `clash.yaml` 时同样执行对称的检查与备份；`migrate_clash_v1_to_v2` 将破坏性的 `tun.stack: "system"` 自动归一化为 `"gvisor"`（避免在某些系统环境下引起崩溃），迁移后落盘并持久化 `config_version: 2`；`template()` 默认写入当前版本。
 - **`config_version` 严禁混入运行时配置**：它是 Clash Mini 自己的配置格式版本号，**不是 mihomo 配置项**。`enhance::merge_default_config` 必须在兜底分支显式跳过该键（与 `redir-port` / `tproxy-port` 同等处理）。实测内核会忽略未知顶层键（`-t` 自校验通过），但运行时配置只应含内核认识的键——否则将来内核一旦改严格解析，就会重演「配置校验失败、内核起不来」的事故。
-- **落地**：`src-tauri/src/config/migrate.rs`（版本常量、`migrate_verge` / `migrate_profiles` / `migrate_clash`、`backup_before_migration`）及 `src-tauri/src/config/clash.rs`。
+- **版本检测必须早于模板合并（顺序铁律，勿改）**：`clash.yaml` 的加载路径是「读 Mapping → 合并 `template()` 缺失键 → 迁移」，而 `template()` 自带 `config_version = 当前版本`。若在合并**之后**才读 `config_version`，存量配置（无该键）会被合并注入成最新版，`from_version < CURRENT` 永久为假，**所有迁移静默失效**。因此版本检测统一走 `migrate::detect_config_version(&map)`，且**必须在 `template()` 合并之前调用**（`IClashTemp::new` 已按此实现，并由 `detection_must_precede_template_merge` 单测锁定）。`verge.yaml` / `profiles.yaml` 直接反序列化读取该字段、不经过模板合并，天然免疫此坑。
+  - 该缺陷曾长期潜伏（v2.9.9 引入迁移框架时即存在）：`tun.stack: "system" → "gvisor"` 的 v1→v2 迁移实际从未执行过。所幸旧逻辑在 `migrated == from_version` 时不落盘，被污染的版本号**没有写回文件**，故修复后存量配置下次启动即自愈，无需数据修复。
+- **落地**：`src-tauri/src/config/migrate.rs`（版本常量、`detect_config_version`、`migrate_verge` / `migrate_profiles` / `migrate_clash`、`backup_before_migration`）及 `src-tauri/src/config/clash.rs`。
 
 ### 8.7 可诊断性：日志保留与诊断包
 
@@ -609,4 +611,6 @@ flowchart LR
 | **BUG-285** | 8.8 | 前端 Vitest 纯逻辑单测基线扩充（`node.test.ts` 与 `delay.test.ts`） |
 | **BUG-286** | 2.12 | 首次安装引导向导弹窗（直接填入订阅）与就绪打开项目 Wiki 测试验证通道 |
 | **BUG-287** | 8.9 | 剩余硬编码文案 i18n 收口；修正节点列表 `aria-label` 错误 key（`proxies` → `proxies.page.a11y.nodelist`）并为帮助按钮补可读名称 |
+| **BUG-288** | 8.6 | `clash.yaml` 版本检测提到模板合并之前，修复 v1→v2 迁移（`tun.stack` 归一化）长期静默失效 |
+| **BUG-289** | 8.7 | 诊断包脱敏补齐 `authorization` 键，覆盖 `ws-opts.headers.Authorization` 节点级令牌泄露 |
 
