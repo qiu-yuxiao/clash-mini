@@ -13,6 +13,10 @@ use_try_shorthand = false
 use_field_init_shorthand = false
 force_explicit_abi = true
 
-# -- wait for stable --
-imports_granularity = "Crate"
-group_imports = "StdExternalCrate"
+# 原上游此处留有 imports_granularity = "Crate" 与 group_imports = "StdExternalCrate"，
+# 但这两项至今仍是 rustfmt 的 nightly-only 特性（rustfmt 1.9 / stable 会打印
+# "unstable features are only available in nightly channel" 并**静默忽略**）。
+# 项目的 rust-toolchain.toml 与 CI（rustfmt.yml: dtolnay/rust-toolchain@stable）
+# 都固定在 stable，保留它们只会造成「本地与 CI 口径看似不同、实际都被忽略」的假象，
+# 因此移除。移除后回到默认 "Preserve"：不改写、不合并既有 import 分组，
+# 现有代码的 import 排版保持原样，不会产生任何重构 diff。
