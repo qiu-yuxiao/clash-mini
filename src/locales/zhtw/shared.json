@@ -1,5 +1,10 @@
 {
   "actions": {
+    "cut": "剪下",
+    "copy": "複製",
+    "paste": "貼上",
+    "selectAll": "全選",
+    "clearInput": "清空",
     "cancel": "取消",
     "close": "關閉",
     "confirm": "確認",
@@ -79,12 +84,14 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
+      "clashNotReady": "Clash 核心載入逾時，自動選點可能不準確",
       "importSuccess": "匯入設定檔成功",
       "importSubscriptionSuccess": "匯入訂閱成功",
       "importWithClashProxy": "使用 Clash 代理匯入訂閱成功",
       "updateAvailable": "有可用更新",
       "saved": "儲存成功",
       "common": {
+        "deleteSuccess": "刪除成功",
         "copySuccess": "複製成功",
         "saveSuccess": "設定儲存完成",
         "saveFailed": "設定儲存失敗",
@@ -117,6 +124,11 @@
         "keyError": "覆寫檔案鍵錯誤，變更已撤銷",
         "generalError": "覆寫檔案錯誤，變更已撤銷"
       }
+    },
+    "errorBoundary": {
+      "pageTitle": "頁面發生錯誤",
+      "areaTitle": "該區域發生錯誤",
+      "details": "錯誤詳情"
     }
   },
   "filters": {

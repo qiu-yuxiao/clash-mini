@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (modifizierte Teile)",
         "title": "Thema-Einstellungen",
         "fields": {
           "primaryColor": "Hauptfarbe",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "Klicken, um zum nächsten Knoten zu wechseln",
+    "testingInProgress": "Geschwindigkeitstest läuft, bitte später erneut versuchen",
+    "testNotExecuted": "Test nicht ausgeführt: Core nicht bereit oder keine testbaren Knoten",
+    "testFailed": "Geschwindigkeitstest fehlgeschlagen: {{message}}",
+    "adjusting": "Anpassung läuft, bitte warten…",
+    "updated": "Aktualisiert",
+    "portSaved": "Proxy-Port gespeichert und neu geladen",
     "profilesTitle": "Profile & Abonnements",
     "importConfig": "Konfiguration importieren",
     "importPlaceholder": "Abonnement-Link oder Knotenkonfiguration eingeben...",

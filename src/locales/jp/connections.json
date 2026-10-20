@@ -2,6 +2,9 @@
   "page": {
     "title": "接続"
   },
+  "notices": {
+    "copied": "コピーしました: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "ホスト",
@@ -26,6 +29,21 @@
       "active": "Active",
       "closed": "Closed",
       "closeConnection": "接続を閉じる"
+    },
+    "miniTable": {
+      "hostColumn": "接続先",
+      "chainsColumn": "経路",
+      "chainsDirect": "ダイレクト",
+      "chainsReject": "ブロック",
+      "chainsProxy": "プロキシ"
+    },
+    "contextMenu": {
+      "setDirect": "グローバルダイレクトに設定",
+      "setProxy": "プロキシ振り分けに設定",
+      "setReject": "ブロック (REJECT)",
+      "disconnect": "この接続を切断",
+      "copyAddress": "接続アドレスをコピー",
+      "viewDetail": "詳細を表示"
     },
     "columnManager": {
       "title": "列",

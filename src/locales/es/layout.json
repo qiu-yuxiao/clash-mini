@@ -30,6 +30,42 @@
       "checkAppUpdate": "Buscar actualizaciones de la app",
       "checkCoreUpdate": "Buscar actualizaciones del núcleo"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "Editar perfil",
+        "nameLabel": "Nombre del perfil",
+        "urlLabel": "URL de suscripción",
+        "intervalLabel": "Intervalo de actualización (en horas, 0 para desactivar)"
+      },
+      "update": {
+        "currentVersion": "Versión actual: {{version}}",
+        "latestVersion": "Última versión: {{version}}",
+        "unknown": "Desconocido",
+        "updating": "Actualizando...",
+        "upToDate": "Ya está actualizado",
+        "updateNow": "Actualizar ahora"
+      },
+      "client": {
+        "title": "Actualización de la aplicación",
+        "changelog": "Registro de cambios:",
+        "changelogEmpty": "Aún no hay registro de cambios detallado",
+        "prepareRestart": "Preparando reinicio"
+      },
+      "core": {
+        "title": "Actualización del núcleo Mihomo",
+        "fetching": "Obteniendo...",
+        "updateDone": "Actualización completada"
+      },
+      "progress": {
+        "coreStarting": "Iniciando la tarea de actualización del núcleo...",
+        "coreStartFailed": "Error al iniciar: {{message}}",
+        "clientDownloading": "Descargando actualización...",
+        "clientDownloadStarted": "Comenzando la descarga del paquete de actualización...",
+        "clientDownloadProgress": "Descargado {{percent}}% ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "Descargado {{downloaded}} MB",
+        "clientDownloadFinished": "Descarga completada, preparando instalación y reinicio..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Hogar",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "Ajustando el modo proxy, espere…",
+    "adjusting": "Ajustando, espere…",
+    "updatingSubscription": "Actualizando suscripción...",
+    "subscriptionUpdated": "Suscripción actualizada correctamente",
+    "profileLinkCopied": "Enlace copiado al portapapeles",
+    "copyFailed": "Error al copiar",
+    "profileSaved": "Configuración modificada correctamente",
+    "switchedToManualMode": "Cambiado a modo manual",
+    "systemProxyEnabled": "Proxy del sistema activado",
+    "tunServiceConfigFailed": "Error al configurar el servicio del modo TUN. Intente ejecutar como administrador.",
+    "tunModeEnabled": "Modo TUN activado",
+    "coreUpdateSuccess": "Núcleo Mihomo actualizado correctamente",
+    "coreUpdateFailed": "Error al actualizar el núcleo: {{message}}",
+    "coreUpToDate": "El núcleo ya está actualizado",
+    "coreCheckFailed": "Error al buscar actualizaciones del núcleo: {{message}}",
+    "coreUpgradeStartFailed": "Error al iniciar la actualización del núcleo: {{message}}",
+    "clientUpToDate": "Ya tiene la última versión",
+    "clientCheckFailed": "Error al buscar actualizaciones: {{message}}",
+    "clientInstallCompleted": "Actualización instalada. Reinicie la aplicación para aplicar los cambios.",
+    "clientUpdateFailed": "Error al actualizar: {{message}}"
   },
   "a11y": {
     "pinWindow": "Fijar ventana arriba",

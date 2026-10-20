@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (수정 부분)",
         "title": "테마 설정",
         "fields": {
           "primaryColor": "기본 색상",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "클릭하여 다음 노드로 전환",
+    "testingInProgress": "속도 테스트가 진행 중입니다. 잠시 후 다시 시도해 주세요",
+    "testNotExecuted": "테스트 미실행: 코어가 준비되지 않았거나 테스트 가능한 노드가 없습니다",
+    "testFailed": "속도 테스트 실패: {{message}}",
+    "adjusting": "조정하는 중입니다. 잠시만 기다려 주세요…",
+    "updated": "업데이트됨",
+    "portSaved": "프록시 포트가 저장되고 다시 로드되었습니다",
     "profilesTitle": "구독 및 프로필",
     "importConfig": "구성 가져오기",
     "importPlaceholder": "구독 링크 또는 노드 구성을 입력하세요...",

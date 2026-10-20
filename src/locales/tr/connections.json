@@ -2,6 +2,9 @@
   "page": {
     "title": "Bağlantılar"
   },
+  "notices": {
+    "copied": "Kopyalandı: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "Ana Bilgisayar",
@@ -26,6 +29,21 @@
       "active": "Active",
       "closed": "Closed",
       "closeConnection": "Bağlantıyı Kapat"
+    },
+    "miniTable": {
+      "hostColumn": "Hedef",
+      "chainsColumn": "Rota",
+      "chainsDirect": "Doğrudan",
+      "chainsReject": "Engellendi",
+      "chainsProxy": "Proxy"
+    },
+    "contextMenu": {
+      "setDirect": "Genel doğrudan bağlantı olarak ayarla",
+      "setProxy": "Proxy yönlendirmesi olarak ayarla",
+      "setReject": "Engelle (REJECT)",
+      "disconnect": "Bu bağlantıyı kes",
+      "copyAddress": "Bağlantı adresini kopyala",
+      "viewDetail": "Ayrıntıları görüntüle"
     },
     "columnManager": {
       "title": "Sütunlar",

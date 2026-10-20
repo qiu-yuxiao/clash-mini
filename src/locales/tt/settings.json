@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (үзгәртелгән өлешләр)",
         "title": "Тема көйләүләре",
         "fields": {
           "primaryColor": "Төп төс",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "Киләсе төенгә күчү өчен басыгыз",
+    "testingInProgress": "Тизлек тикшерүе бара, соңрак кабат карагыз",
+    "testNotExecuted": "Тикшерү үтәлмәде: төп программа әзер түгел яки тикшерергә мөмкин төен юк",
+    "testFailed": "Тизлек тикшерүе уңышсыз: {{message}}",
+    "adjusting": "Көйләнә, зинһар көтегез…",
+    "updated": "Яңартылды",
+    "portSaved": "Прокси порты сакланды һәм яңадан йөкләнде",
     "profilesTitle": "Profiles & Subscriptions",
     "importConfig": "Import Config",
     "importPlaceholder": "Enter subscription link or node configuration...",

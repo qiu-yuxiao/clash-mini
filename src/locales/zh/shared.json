@@ -23,7 +23,12 @@
     "closeAll": "关闭全部",
     "clear": "清除",
     "previous": "上一页",
-    "next": "下一页"
+    "next": "下一页",
+    "cut": "剪切",
+    "copy": "复制",
+    "paste": "粘贴",
+    "selectAll": "全选",
+    "clearInput": "清空"
   },
   "labels": {
     "updateAt": "更新于",
@@ -88,8 +93,10 @@
         "copySuccess": "复制成功",
         "saveSuccess": "配置保存成功",
         "saveFailed": "配置保存失败",
-        "refreshFailed": "刷新失败"
-      }
+        "refreshFailed": "刷新失败",
+        "deleteSuccess": "删除成功"
+      },
+      "clashNotReady": "Clash 内核加载超时，自动选点可能不准确"
     },
     "validation": {
       "config": {
@@ -117,6 +124,11 @@
         "keyError": "覆写文件键错误，变更已撤销",
         "generalError": "覆写文件错误，变更已撤销"
       }
+    },
+    "errorBoundary": {
+      "pageTitle": "页面发生错误",
+      "areaTitle": "该区域发生错误",
+      "details": "错误详情"
     }
   },
   "filters": {

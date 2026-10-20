@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (değiştirilmiş bölümler)",
         "title": "Tema Ayarı",
         "fields": {
           "primaryColor": "Ana Renk",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "Sonraki düğüme geçmek için tıklayın",
+    "testingInProgress": "Hız testi sürüyor, lütfen daha sonra tekrar deneyin",
+    "testNotExecuted": "Test yürütülmedi: çekirdek hazır değil veya test edilebilir düğüm yok",
+    "testFailed": "Hız testi başarısız: {{message}}",
+    "adjusting": "Ayarlanıyor, lütfen bekleyin…",
+    "updated": "Güncellendi",
+    "portSaved": "Proxy bağlantı noktası kaydedildi ve yeniden yüklendi",
     "profilesTitle": "Profiller ve Abonelikler",
     "importConfig": "Yapılandırmayı İçe Aktar",
     "importPlaceholder": "Abonelik bağlantısını veya düğüm yapılandırmasını girin...",

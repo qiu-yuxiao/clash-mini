@@ -2,6 +2,9 @@
   "page": {
     "title": "اتصالات"
   },
+  "notices": {
+    "copied": "کپی شد: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "میزبان",
@@ -26,6 +29,21 @@
       "active": "Active",
       "closed": "Closed",
       "closeConnection": "بستن اتصال"
+    },
+    "miniTable": {
+      "hostColumn": "مقصد",
+      "chainsColumn": "مسیر",
+      "chainsDirect": "مستقیم",
+      "chainsReject": "مسدود",
+      "chainsProxy": "پروکسی"
+    },
+    "contextMenu": {
+      "setDirect": "تنظیم به‌عنوان اتصال مستقیم سراسری",
+      "setProxy": "تنظیم به‌عنوان مسیریابی پروکسی",
+      "setReject": "مسدودسازی (REJECT)",
+      "disconnect": "قطع این اتصال",
+      "copyAddress": "کپی نشانی اتصال",
+      "viewDetail": "مشاهده جزئیات"
     },
     "columnManager": {
       "title": "ستون‌ها",

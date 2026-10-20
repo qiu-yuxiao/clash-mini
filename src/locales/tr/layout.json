@@ -30,6 +30,42 @@
       "checkAppUpdate": "Uygulama Güncellemelerini Denetle",
       "checkCoreUpdate": "Çekirdek Güncellemelerini Denetle"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "Profili Düzenle",
+        "nameLabel": "Profil Adı",
+        "urlLabel": "Abonelik Adresi",
+        "intervalLabel": "Güncelleme aralığı (saat cinsinden, devre dışı bırakmak için 0)"
+      },
+      "update": {
+        "currentVersion": "Mevcut sürüm: {{version}}",
+        "latestVersion": "En son sürüm: {{version}}",
+        "unknown": "Bilinmiyor",
+        "updating": "Güncelleniyor...",
+        "upToDate": "Zaten güncel",
+        "updateNow": "Şimdi güncelle"
+      },
+      "client": {
+        "title": "Uygulama Güncellemesi",
+        "changelog": "Değişiklik günlüğü:",
+        "changelogEmpty": "Henüz ayrıntılı değişiklik günlüğü yok",
+        "prepareRestart": "Yeniden başlatmaya hazırlanıyor"
+      },
+      "core": {
+        "title": "Mihomo Çekirdeği Güncellemesi",
+        "fetching": "Alınıyor...",
+        "updateDone": "Güncelleme tamamlandı"
+      },
+      "progress": {
+        "coreStarting": "Çekirdek yükseltme görevi başlatılıyor...",
+        "coreStartFailed": "Başlatma başarısız: {{message}}",
+        "clientDownloading": "Güncelleme indiriliyor...",
+        "clientDownloadStarted": "Uygulama güncelleme paketi indirmesi başlıyor...",
+        "clientDownloadProgress": "İndirildi: %{{percent}} ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "İndirildi: {{downloaded}} MB",
+        "clientDownloadFinished": "İndirme tamamlandı, kurulum ve yeniden başlatma hazırlanıyor..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Ana Sayfa",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "Proxy modu ayarlanıyor, lütfen bekleyin…",
+    "adjusting": "Ayarlanıyor, lütfen bekleyin…",
+    "updatingSubscription": "Abonelik güncelleniyor...",
+    "subscriptionUpdated": "Abonelik başarıyla güncellendi",
+    "profileLinkCopied": "Bağlantı panoya kopyalandı",
+    "copyFailed": "Kopyalama başarısız",
+    "profileSaved": "Yapılandırma başarıyla değiştirildi",
+    "switchedToManualMode": "Manuel moda geçildi",
+    "systemProxyEnabled": "Sistem proxy'si etkinleştirildi",
+    "tunServiceConfigFailed": "TUN modu hizmet yapılandırması başarısız oldu. Yönetici olarak çalıştırmayı deneyin.",
+    "tunModeEnabled": "TUN modu etkinleştirildi",
+    "coreUpdateSuccess": "Mihomo çekirdeği başarıyla güncellendi",
+    "coreUpdateFailed": "Çekirdek güncellemesi başarısız: {{message}}",
+    "coreUpToDate": "Çekirdek zaten en son sürümde",
+    "coreCheckFailed": "Çekirdek güncellemesi kontrol edilemedi: {{message}}",
+    "coreUpgradeStartFailed": "Çekirdek yükseltmesi başlatılamadı: {{message}}",
+    "clientUpToDate": "Zaten en son sürümdesiniz",
+    "clientCheckFailed": "Güncellemeler kontrol edilemedi: {{message}}",
+    "clientInstallCompleted": "Güncelleme kuruldu. Değişiklikleri uygulamak için uygulamayı yeniden başlatın.",
+    "clientUpdateFailed": "Güncelleme başarısız: {{message}}"
   },
   "a11y": {
     "pinWindow": "Pencereyi üstte sabitle",

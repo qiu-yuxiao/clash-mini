@@ -399,7 +399,7 @@ const Layout = () => {
   const handleRuleFallbackChange = async (
     fallback: 'direct' | 'proxy' | 'addurl',
   ) => {
-    const waitId = showNotice.info('正在调整代理模式，请稍候…', 0)
+    const waitId = showNotice.info('layout.notices.adjustingProxyMode', 0)
 
     // 标记长操作开始：patchVerge({rule_fallback}) 后端会 update_config_checked
     // 重新生成运行时配置并 reload mihomo，期间 IPC 通道阻塞。
@@ -935,14 +935,14 @@ const Layout = () => {
   const handleUpdateProfile = async (uid: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
-      showNotice.info('正在更新订阅...')
+      showNotice.info('layout.notices.updatingSubscription')
       await updateProfile(uid)
       if (uid === currentProfileUid) {
         lastProcessedRef.current.uid = null
         setProfileRefreshCounter((c) => c + 1)
       }
       await mutateProfiles()
-      showNotice.success('订阅更新成功')
+      showNotice.success('layout.notices.subscriptionUpdated')
     } catch (err) {
       showNotice.error(err)
     }
@@ -988,9 +988,9 @@ const Layout = () => {
     if (!targetItem?.url) return
     try {
       await navigator.clipboard.writeText(targetItem.url)
-      showNotice.success('链接已复制到剪贴板')
+      showNotice.success('layout.notices.profileLinkCopied')
     } catch {
-      showNotice.error('复制失败')
+      showNotice.error('layout.notices.copyFailed')
     }
   }
 
@@ -1023,7 +1023,7 @@ const Layout = () => {
           update_interval: Number(editProfileInterval) || 0,
         },
       })
-      showNotice.success('配置修改成功')
+      showNotice.success('layout.notices.profileSaved')
       setEditProfileOpen(false)
       await mutateProfiles()
       if (editProfileUid === currentProfileUid) {
@@ -1041,7 +1041,7 @@ const Layout = () => {
   ) => {
     if (targetMode === currentMode) return
 
-    const waitId = showNotice.info('正在调整，请稍候…', 0)
+    const waitId = showNotice.info('layout.notices.adjusting', 0)
 
     // 标记长操作开始：patchVerge / restartCore 期间 mihomo reload 或内核重启
     // 会阻塞 IPC 通道，此时所有 IPC timeout 静默（已有持久 Notice 提示用户），
@@ -1060,7 +1060,7 @@ const Layout = () => {
             )
           }
           hideNotice(waitId)
-          showNotice.success('已切换至手动模式')
+          showNotice.success('layout.notices.switchedToManualMode')
         } catch (err) {
           hideNotice(waitId)
           showNotice.error(err)
@@ -1072,7 +1072,7 @@ const Layout = () => {
             enable_tun_mode: false,
           })
           hideNotice(waitId)
-          showNotice.success('已开启系统代理')
+          showNotice.success('layout.notices.systemProxyEnabled')
         } catch (err) {
           hideNotice(waitId)
           showNotice.error(err)
@@ -1084,7 +1084,7 @@ const Layout = () => {
             await mutateSystemState()
           } catch {
             hideNotice(waitId)
-            showNotice.error('TUN 模式服务配置失败，请尝试以管理员身份运行。')
+            showNotice.error('layout.notices.tunServiceConfigFailed')
             return
           }
         }
@@ -1100,7 +1100,7 @@ const Layout = () => {
           await mutateSystemState()
           await restartCore()
           hideNotice(waitId)
-          showNotice.success('已开启 TUN 模式')
+          showNotice.success('layout.notices.tunModeEnabled')
         } catch (err) {
           hideNotice(waitId)
           showNotice.error(err)
@@ -1822,13 +1822,13 @@ const Layout = () => {
           onClick={handleEditProfileClick}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          📝 编辑
+          📝 {t('shared.actions.edit')}
         </MenuItem>
         <MenuItem
           onClick={handleEditProfileFileClick}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          📄 编辑文件
+          📄 {t('profiles.components.menu.editFile')}
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
@@ -1836,14 +1836,14 @@ const Layout = () => {
           disabled={isContextMenuLocal || !contextMenuTargetItem?.url}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🔗 复制链接
+          🔗 {t('profiles.components.menu.copyLink')}
         </MenuItem>
         <MenuItem
           onClick={handleUpdateProfileClick}
           disabled={isContextMenuLocal}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🔄 更新
+          🔄 {t('profiles.components.menu.update')}
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
@@ -1853,7 +1853,7 @@ const Layout = () => {
             color: 'error.main',
           }}
         >
-          ❌ 删除
+          ❌ {t('shared.actions.delete')}
         </MenuItem>
       </Menu>
 
@@ -1893,7 +1893,7 @@ const Layout = () => {
           }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          ✂️ 剪切
+          ✂️ {t('shared.actions.cut')}
         </MenuItem>
         <MenuItem
           onClick={handleImportInputCopy}
@@ -1904,20 +1904,20 @@ const Layout = () => {
           }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          📋 复制
+          📋 {t('shared.actions.copy')}
         </MenuItem>
         <MenuItem
           onClick={handleImportInputPaste}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          📥 粘贴
+          📥 {t('shared.actions.paste')}
         </MenuItem>
         <MenuItem
           onClick={handleImportInputSelectAll}
           disabled={!url}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🔍 全选
+          🔍 {t('shared.actions.selectAll')}
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
@@ -1928,7 +1928,7 @@ const Layout = () => {
             color: 'error.main',
           }}
         >
-          🧹 清空
+          🧹 {t('shared.actions.clearInput')}
         </MenuItem>
       </Menu>
 

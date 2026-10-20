@@ -30,6 +30,24 @@
     "columnManager": {
       "title": "列设置",
       "dragHandle": "拖拽控件"
+    },
+    "miniTable": {
+      "hostColumn": "链接目标",
+      "chainsColumn": "路由",
+      "chainsDirect": "直连",
+      "chainsReject": "封锁",
+      "chainsProxy": "代理"
+    },
+    "contextMenu": {
+      "setDirect": "设为全局直连",
+      "setProxy": "设为代理分流",
+      "setReject": "封锁它 (REJECT)",
+      "disconnect": "断开此连接",
+      "copyAddress": "复制连接地址",
+      "viewDetail": "查看详细信息"
     }
+  },
+  "notices": {
+    "copied": "已复制: {{address}}"
   }
 }

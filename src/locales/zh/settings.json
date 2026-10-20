@@ -200,6 +200,7 @@
       },
       "theme": {
         "title": "主题设置",
+        "copyright": "© 2026 秋雨潇潇 (修改部分)",
         "fields": {
           "primaryColor": "主要颜色",
           "secondaryColor": "次要颜色",
@@ -569,6 +570,13 @@
     "addUrlPlaceholder": "请填入需要代理的网址（每行一个）",
     "addUrlButton": "添加",
     "addUrlSuccess": "已添加 {{count}} 条规则",
-    "addUrlNoChange": "没有新增规则（可能已存在或输入无效）"
+    "addUrlNoChange": "没有新增规则（可能已存在或输入无效）",
+    "rotateNodeTooltip": "点击轮换下一个节点",
+    "testingInProgress": "正在测速中，请稍候再试",
+    "testNotExecuted": "测速未执行：内核未就绪或暂无可测节点",
+    "testFailed": "测速失败：{{message}}",
+    "adjusting": "正在调整，请稍候…",
+    "updated": "已更新",
+    "portSaved": "代理端口已保存并重载"
   }
 }

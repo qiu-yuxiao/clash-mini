@@ -57,6 +57,7 @@
       "chooseFile": "選擇檔案"
     },
     "menu": {
+      "copyLink": "複製連結",
       "home": "首 頁",
       "select": "使用",
       "shareQrCode": "Share QR Code",

@@ -2,6 +2,9 @@
   "page": {
     "title": "Koneksi"
   },
+  "notices": {
+    "copied": "Tersalin: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "Host",
@@ -26,6 +29,21 @@
       "active": "Active",
       "closed": "Closed",
       "closeConnection": "Tutup Koneksi"
+    },
+    "miniTable": {
+      "hostColumn": "Tujuan",
+      "chainsColumn": "Rute",
+      "chainsDirect": "Langsung",
+      "chainsReject": "Diblokir",
+      "chainsProxy": "Proksi"
+    },
+    "contextMenu": {
+      "setDirect": "Jadikan koneksi langsung global",
+      "setProxy": "Jadikan perutean proksi",
+      "setReject": "Blokir (REJECT)",
+      "disconnect": "Putuskan koneksi ini",
+      "copyAddress": "Salin alamat koneksi",
+      "viewDetail": "Lihat detail"
     },
     "columnManager": {
       "title": "Kolom",

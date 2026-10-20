@@ -30,6 +30,42 @@
       "checkAppUpdate": "앱 업데이트 확인",
       "checkCoreUpdate": "코어 업데이트 확인"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "프로필 편집",
+        "nameLabel": "프로필 이름",
+        "urlLabel": "구독 주소",
+        "intervalLabel": "업데이트 주기 (단위: 시간, 0으로 설정 시 비활성화)"
+      },
+      "update": {
+        "currentVersion": "현재 버전: {{version}}",
+        "latestVersion": "최신 버전: {{version}}",
+        "unknown": "알 수 없음",
+        "updating": "업데이트 중...",
+        "upToDate": "최신 상태",
+        "updateNow": "지금 업데이트"
+      },
+      "client": {
+        "title": "앱 업데이트",
+        "changelog": "변경 로그:",
+        "changelogEmpty": "아직 자세한 변경 로그가 없습니다",
+        "prepareRestart": "재시작 준비 중"
+      },
+      "core": {
+        "title": "Mihomo 코어 업데이트",
+        "fetching": "가져오는 중...",
+        "updateDone": "업데이트 완료"
+      },
+      "progress": {
+        "coreStarting": "코어 업그레이드 작업을 시작하는 중...",
+        "coreStartFailed": "시작 실패: {{message}}",
+        "clientDownloading": "업데이트를 다운로드하는 중...",
+        "clientDownloadStarted": "앱 업데이트 패키지 다운로드를 시작합니다...",
+        "clientDownloadProgress": "{{percent}}% 다운로드됨 ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "{{downloaded}} MB 다운로드됨",
+        "clientDownloadFinished": "다운로드 완료, 설치 및 재시작을 준비하는 중..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "홈",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "프록시 모드를 조정하는 중입니다. 잠시만 기다려 주세요…",
+    "adjusting": "조정하는 중입니다. 잠시만 기다려 주세요…",
+    "updatingSubscription": "구독을 업데이트하는 중...",
+    "subscriptionUpdated": "구독 업데이트 성공",
+    "profileLinkCopied": "링크가 클립보드에 복사되었습니다",
+    "copyFailed": "복사 실패",
+    "profileSaved": "설정이 성공적으로 수정되었습니다",
+    "switchedToManualMode": "수동 모드로 전환되었습니다",
+    "systemProxyEnabled": "시스템 프록시가 활성화되었습니다",
+    "tunServiceConfigFailed": "TUN 모드 서비스 구성에 실패했습니다. 관리자 권한으로 실행해 보세요.",
+    "tunModeEnabled": "TUN 모드가 활성화되었습니다",
+    "coreUpdateSuccess": "Mihomo 코어가 성공적으로 업데이트되었습니다",
+    "coreUpdateFailed": "코어 업데이트 실패: {{message}}",
+    "coreUpToDate": "코어가 이미 최신 버전입니다",
+    "coreCheckFailed": "코어 업데이트 확인 실패: {{message}}",
+    "coreUpgradeStartFailed": "코어 업그레이드 시작 실패: {{message}}",
+    "clientUpToDate": "이미 최신 버전입니다",
+    "clientCheckFailed": "업데이트 확인 실패: {{message}}",
+    "clientInstallCompleted": "업데이트 설치가 완료되었습니다. 변경 사항을 적용하려면 앱을 재시작하세요.",
+    "clientUpdateFailed": "업데이트 실패: {{message}}"
   },
   "a11y": {
     "pinWindow": "창 최상단 고정",

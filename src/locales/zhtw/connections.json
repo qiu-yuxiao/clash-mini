@@ -2,6 +2,9 @@
   "page": {
     "title": "連線"
   },
+  "notices": {
+    "copied": "已複製: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "主機",
@@ -26,6 +29,21 @@
       "active": "活躍",
       "closed": "已關閉",
       "closeConnection": "關閉連線"
+    },
+    "miniTable": {
+      "hostColumn": "連線目標",
+      "chainsColumn": "路由",
+      "chainsDirect": "直連",
+      "chainsReject": "封鎖",
+      "chainsProxy": "代理"
+    },
+    "contextMenu": {
+      "setDirect": "設為全域直連",
+      "setProxy": "設為代理分流",
+      "setReject": "封鎖它 (REJECT)",
+      "disconnect": "中斷此連線",
+      "copyAddress": "複製連線地址",
+      "viewDetail": "檢視詳細資訊"
     },
     "columnManager": {
       "title": "欄位設定",

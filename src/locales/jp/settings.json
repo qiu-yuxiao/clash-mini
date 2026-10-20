@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇（改変部分）",
         "title": "テーマ設定",
         "fields": {
           "primaryColor": "主要色",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "クリックで次のノードに切り替え",
+    "testingInProgress": "スピードテスト中です。しばらくしてから再試行してください",
+    "testNotExecuted": "テスト未実行：コアが準備できていないか、テスト可能なノードがありません",
+    "testFailed": "スピードテストに失敗しました：{{message}}",
+    "adjusting": "調整しています。しばらくお待ちください…",
+    "updated": "更新しました",
+    "portSaved": "プロキシポートを保存し再読み込みしました",
     "profilesTitle": "購読とプロファイル",
     "importConfig": "設定をインポート",
     "importPlaceholder": "購読リンクまたはノード設定を入力します...",

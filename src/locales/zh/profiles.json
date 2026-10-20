@@ -62,6 +62,7 @@
       "shareQrCode": "分享二维码",
       "editInfo": "编辑信息",
       "editFile": "编辑文件",
+      "copyLink": "复制链接",
       "editRules": "编辑规则",
       "editProxies": "编辑节点",
       "extendConfig": "扩展覆写配置",

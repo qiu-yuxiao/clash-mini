@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (partes modificadas)",
         "title": "Configuración de tema",
         "fields": {
           "primaryColor": "Color principal",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "Haga clic para rotar al siguiente nodo",
+    "testingInProgress": "Prueba de velocidad en curso, inténtelo más tarde",
+    "testNotExecuted": "Prueba no ejecutada: el núcleo no está listo o no hay nodos disponibles",
+    "testFailed": "Error en la prueba de velocidad: {{message}}",
+    "adjusting": "Ajustando, espere…",
+    "updated": "Actualizado",
+    "portSaved": "Puerto proxy guardado y recargado",
     "profilesTitle": "Perfiles y Suscripciones",
     "importConfig": "Importar Configuración",
     "importPlaceholder": "Ingrese el enlace de suscripción o la configuración del nodo...",

@@ -67,12 +67,12 @@ export const useMinimalSettings = () => {
       )
     }
 
-    const waitId = showNotice.info('正在调整，请稍候…', 0)
+    const waitId = showNotice.info('settings.mini.adjusting', 0)
     beginLongOperation()
     try {
       await patchClashConfig({ [field]: checked })
       await mutateInfo()
-      showNotice.success('已更新')
+      showNotice.success('settings.mini.updated')
     } catch (err: unknown) {
       await mutateInfo()
       showNotice.error(err instanceof Error ? err.message : String(err))
@@ -99,7 +99,7 @@ export const useMinimalSettings = () => {
         patchInfo({ 'mixed-port': port }),
         patchVerge({ verge_mixed_port: port }),
       ])
-      showNotice.success('代理端口已保存并重载')
+      showNotice.success('settings.mini.portSaved')
     } catch (err) {
       showNotice.error(err)
       setMixedPortVal(currentPort())

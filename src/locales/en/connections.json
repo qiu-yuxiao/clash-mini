@@ -2,6 +2,9 @@
   "page": {
     "title": "Connections"
   },
+  "notices": {
+    "copied": "Copied: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "Host",
@@ -26,6 +29,21 @@
       "active": "Active",
       "closed": "Closed",
       "closeConnection": "Close Connection"
+    },
+    "miniTable": {
+      "hostColumn": "Destination",
+      "chainsColumn": "Route",
+      "chainsDirect": "Direct",
+      "chainsReject": "Blocked",
+      "chainsProxy": "Proxied"
+    },
+    "contextMenu": {
+      "setDirect": "Set as global direct",
+      "setProxy": "Set as proxied routing",
+      "setReject": "Block it (REJECT)",
+      "disconnect": "Disconnect",
+      "copyAddress": "Copy connection address",
+      "viewDetail": "View details"
     },
     "columnManager": {
       "title": "Columns",

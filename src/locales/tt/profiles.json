@@ -57,6 +57,7 @@
       "chooseFile": "Файл сайлау"
     },
     "menu": {
+      "copyLink": "Сылталамны күчерү",
       "home": "Home",
       "select": "Сайлау",
       "shareQrCode": "Share QR Code",

@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (modified portions)",
         "title": "Theme Setting",
         "fields": {
           "primaryColor": "Primary Color",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "Click to rotate to the next node",
+    "testingInProgress": "A speed test is in progress, please try again later",
+    "testNotExecuted": "Test not executed: core not ready or no testable nodes",
+    "testFailed": "Speed test failed: {{message}}",
+    "adjusting": "Adjusting, please wait…",
+    "updated": "Updated",
+    "portSaved": "Proxy port saved and reloaded",
     "profilesTitle": "Profiles & Subscriptions",
     "importConfig": "Import Config",
     "importPlaceholder": "Enter subscription link or node configuration...",

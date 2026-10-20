@@ -144,7 +144,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             fontFamily: 'var(--control-font-family)',
           }}
         >
-          ⚙️ 编辑配置文件
+          ⚙️ {t('layout.components.dialogs.editProfile.title')}
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
@@ -158,7 +158,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
                 fontFamily: 'var(--control-font-family)',
               }}
             >
-              配置名称
+              {t('layout.components.dialogs.editProfile.nameLabel')}
             </Typography>
             <TextField
               aria-labelledby="profile-name-label"
@@ -180,7 +180,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
                 fontFamily: 'var(--control-font-family)',
               }}
             >
-              订阅地址
+              {t('layout.components.dialogs.editProfile.urlLabel')}
             </Typography>
             <TextField
               aria-labelledby="profile-url-label"
@@ -203,7 +203,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
                 fontFamily: 'var(--control-font-family)',
               }}
             >
-              更新周期 (单位: 小时, 设为 0 禁用)
+              {t('layout.components.dialogs.editProfile.intervalLabel')}
             </Typography>
             <TextField
               aria-labelledby="profile-interval-label"
@@ -228,7 +228,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               ...defaultBtn3DStyle,
             }}
           >
-            取消
+            {t('shared.actions.cancel')}
           </Button>
           <Button
             onClick={handleSaveProfile}
@@ -239,7 +239,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               ...primaryBtn3DStyle,
             }}
           >
-            保存
+            {t('shared.actions.save')}
           </Button>
         </Box>
       </Dialog>
@@ -277,7 +277,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             fontFamily: 'var(--control-font-family)',
           }}
         >
-          🚀 软件本体更新
+          🚀 {t('layout.components.dialogs.client.title')}
         </Typography>
 
         <Box sx={{ mb: 2 }}>
@@ -285,7 +285,11 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             variant="body2"
             sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}
           >
-            当前版本: {appVersion ? `v${appVersion}` : '未知'}
+            {t('layout.components.dialogs.update.currentVersion', {
+              version: appVersion
+                ? `v${appVersion}`
+                : t('layout.components.dialogs.update.unknown'),
+            })}
           </Typography>
           <Typography
             variant="body2"
@@ -295,8 +299,11 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               fontWeight: 'bold',
             }}
           >
-            最新版本:{' '}
-            {clientUpdateObj?.version ? `v${clientUpdateObj.version}` : '未知'}
+            {t('layout.components.dialogs.update.latestVersion', {
+              version: clientUpdateObj?.version
+                ? `v${clientUpdateObj.version}`
+                : t('layout.components.dialogs.update.unknown'),
+            })}
           </Typography>
         </Box>
 
@@ -308,7 +315,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             fontFamily: 'var(--control-font-family)',
           }}
         >
-          更新日志:
+          {t('layout.components.dialogs.client.changelog')}
         </Typography>
         <Box
           sx={{
@@ -324,7 +331,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             ...get3DCardStyle(theme, 'default'),
           }}
         >
-          {clientUpdateObj?.body || '暂无详细更新日志'}
+          {clientUpdateObj?.body ||
+            t('layout.components.dialogs.client.changelogEmpty')}
         </Box>
 
         {clientStatus !== 'idle' && (
@@ -373,7 +381,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               mr: 1,
             }}
           >
-            关闭
+            {t('shared.actions.close')}
           </Button>
           <Button
             onClick={handleClientUpgrade}
@@ -390,13 +398,13 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             }}
           >
             {clientStatus === 'done'
-              ? '准备重启'
+              ? t('layout.components.dialogs.client.prepareRestart')
               : clientStatus === 'downloading'
-                ? '更新中...'
+                ? t('layout.components.dialogs.update.updating')
                 : clientUpdateObj &&
                     isSameVersion(appVersion, clientUpdateObj.version)
-                  ? '已是最新'
-                  : '立即更新'}
+                  ? t('layout.components.dialogs.update.upToDate')
+                  : t('layout.components.dialogs.update.updateNow')}
           </Button>
         </Box>
       </Dialog>
@@ -438,7 +446,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             fontFamily: 'var(--control-font-family)',
           }}
         >
-          ⚙️ Mihomo 内核更新
+          ⚙️ {t('layout.components.dialogs.core.title')}
         </Typography>
 
         <Box sx={{ mb: 2 }}>
@@ -446,7 +454,11 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             variant="body2"
             sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}
           >
-            当前版本: {coreVersion ? formatCoreVersion(coreVersion) : '未知'}
+            {t('layout.components.dialogs.update.currentVersion', {
+              version: coreVersion
+                ? formatCoreVersion(coreVersion)
+                : t('layout.components.dialogs.update.unknown'),
+            })}
           </Typography>
           <Typography
             variant="body2"
@@ -456,10 +468,11 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               fontWeight: 'bold',
             }}
           >
-            最新版本:{' '}
-            {coreUpdateRelease?.tag_name
-              ? formatCoreVersion(coreUpdateRelease.tag_name)
-              : '获取中...'}
+            {t('layout.components.dialogs.update.latestVersion', {
+              version: coreUpdateRelease?.tag_name
+                ? formatCoreVersion(coreUpdateRelease.tag_name)
+                : t('layout.components.dialogs.core.fetching'),
+            })}
           </Typography>
         </Box>
 
@@ -513,7 +526,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
               mr: 1,
             }}
           >
-            关闭
+            {t('shared.actions.close')}
           </Button>
           <Button
             onClick={handleCoreUpgrade}
@@ -529,12 +542,12 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             }}
           >
             {coreUpgradeStatus === 'done'
-              ? '更新完成'
+              ? t('layout.components.dialogs.core.updateDone')
               : coreUpgradeStatus !== 'idle'
-                ? '更新中...'
+                ? t('layout.components.dialogs.update.updating')
                 : isSameVersion(coreVersion, coreUpdateRelease?.tag_name)
-                  ? '已是最新'
-                  : '立即更新'}
+                  ? t('layout.components.dialogs.update.upToDate')
+                  : t('layout.components.dialogs.update.updateNow')}
           </Button>
         </Box>
       </Dialog>

@@ -1,5 +1,10 @@
 {
   "actions": {
+    "cut": "Вырезать",
+    "copy": "Копировать",
+    "paste": "Вставить",
+    "selectAll": "Выбрать всё",
+    "clearInput": "Очистить",
     "cancel": "Отмена",
     "close": "Закрыть",
     "confirm": "Подтвердить",
@@ -79,12 +84,14 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
+      "clashNotReady": "Ядро Clash загружается слишком долго, автоматический выбор узла может быть неточным",
       "importSuccess": "Профиль успешно импортирован",
       "importSubscriptionSuccess": "Подписка успешно импортирована",
       "importWithClashProxy": "Профиль импортирован через Clash proxy",
       "updateAvailable": "Доступно обновление",
       "saved": "Успешно сохранено",
       "common": {
+        "deleteSuccess": "Успешно удалено",
         "copySuccess": "Скопировано",
         "saveSuccess": "Конфигурация успешно сохранена",
         "saveFailed": "Не удалось сохранить конфигурацию",
@@ -117,6 +124,11 @@
         "keyError": "Ошибка ключа в Merge File, откат изменений",
         "generalError": "Ошибка Merge File, откат изменений"
       }
+    },
+    "errorBoundary": {
+      "pageTitle": "Ошибка страницы",
+      "areaTitle": "В этой области произошла ошибка",
+      "details": "Сведения об ошибке"
     }
   },
   "filters": {

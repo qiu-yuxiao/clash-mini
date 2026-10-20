@@ -37,8 +37,7 @@ export async function waitForClashReady(t: TFunc): Promise<boolean> {
   )
   try {
     showNotice.info(
-      t('shared.feedback.notifications.clashNotReady') ||
-        'Clash 内核加载超时，自动选点可能不准确',
+      t('shared.feedback.notifications.clashNotReady'),
     )
   } catch {
     // showNotice 不可用则静默失败

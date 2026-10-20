@@ -2,6 +2,9 @@
   "page": {
     "title": "Verbindungen"
   },
+  "notices": {
+    "copied": "Kopiert: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "Host",
@@ -26,6 +29,21 @@
       "active": "Active",
       "closed": "Closed",
       "closeConnection": "Verbindung schließen"
+    },
+    "miniTable": {
+      "hostColumn": "Ziel",
+      "chainsColumn": "Route",
+      "chainsDirect": "Direkt",
+      "chainsReject": "Blockiert",
+      "chainsProxy": "Über Proxy"
+    },
+    "contextMenu": {
+      "setDirect": "Als global direkt festlegen",
+      "setProxy": "Als Proxy-Weiterleitung festlegen",
+      "setReject": "Blockieren (REJECT)",
+      "disconnect": "Verbindung trennen",
+      "copyAddress": "Verbindungsadresse kopieren",
+      "viewDetail": "Details anzeigen"
     },
     "columnManager": {
       "title": "Spalten",

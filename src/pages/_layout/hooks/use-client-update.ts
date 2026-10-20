@@ -4,6 +4,7 @@ import {
   type DownloadEvent,
 } from '@tauri-apps/plugin-updater'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { isSameVersion } from '@/pages/_layout/utils/style-helpers'
 import { withIpcTimeout } from '@/services/cmds'
@@ -18,6 +19,7 @@ export function useClientUpdate({
   appVersion,
   setHelpAnchorEl,
 }: UseClientUpdateParams) {
+  const { t } = useTranslation()
   const [clientUpdateOpen, setClientUpdateOpen] = useState(false)
   const [clientUpdateObj, setClientUpdateObj] = useState<Update | null>(null)
   const [clientStatus, setClientStatus] = useState<
@@ -39,13 +41,13 @@ export function useClientUpdate({
         setClientProgress(0)
         setClientProgressMessage('')
       } else {
-        showNotice.info('当前已是最新版本')
+        showNotice.info('layout.notices.clientUpToDate')
       }
     } catch (err: unknown) {
       console.error('Failed to check for client update:', err)
-      showNotice.error(
-        `检查更新失败: ${err instanceof Error ? err.message : String(err)}`,
-      )
+      showNotice.error('layout.notices.clientCheckFailed', {
+        message: err instanceof Error ? err.message : String(err),
+      })
     } finally {
       setClientCheckLoading(false)
     }
@@ -53,14 +55,16 @@ export function useClientUpdate({
 
   const handleClientUpgrade = async () => {
     if (clientUpdateObj && isSameVersion(appVersion, clientUpdateObj.version)) {
-      showNotice.info('当前已是最新版本')
+      showNotice.info('layout.notices.clientUpToDate')
       setClientUpdateOpen(false)
       return
     }
     if (!clientUpdateObj) return
     setClientStatus('downloading')
     setClientProgress(0)
-    setClientProgressMessage('正在下载更新...')
+    setClientProgressMessage(
+      t('layout.components.dialogs.progress.clientDownloading'),
+    )
 
     try {
       let downloaded = 0
@@ -69,24 +73,38 @@ export function useClientUpdate({
         (progressEvent: DownloadEvent) => {
           if (progressEvent.event === 'Started') {
             total = progressEvent.data.contentLength || 0
-            setClientProgressMessage('开始下载软件更新包...')
+            setClientProgressMessage(
+              t('layout.components.dialogs.progress.clientDownloadStarted'),
+            )
           } else if (progressEvent.event === 'Progress') {
             downloaded += progressEvent.data.chunkLength
             if (total > 0) {
               const pct = Math.round((downloaded / total) * 100)
               setClientProgress(pct)
               setClientProgressMessage(
-                `已下载 ${pct}% (${(downloaded / 1024 / 1024).toFixed(2)} MB / ${(total / 1024 / 1024).toFixed(2)} MB)`,
+                t(
+                  'layout.components.dialogs.progress.clientDownloadProgress',
+                  {
+                    percent: pct,
+                    downloaded: (downloaded / 1024 / 1024).toFixed(2),
+                    total: (total / 1024 / 1024).toFixed(2),
+                  },
+                ),
               )
             } else {
               setClientProgressMessage(
-                `已下载 ${(downloaded / 1024 / 1024).toFixed(2)} MB`,
+                t(
+                  'layout.components.dialogs.progress.clientDownloadProgressNoTotal',
+                  { downloaded: (downloaded / 1024 / 1024).toFixed(2) },
+                ),
               )
             }
           } else if (progressEvent.event === 'Finished') {
             setClientProgress(100)
             setClientStatus('done')
-            setClientProgressMessage('下载完成，正在准备安装并重启...')
+            setClientProgressMessage(
+              t('layout.components.dialogs.progress.clientDownloadFinished'),
+            )
           }
         },
       )
@@ -95,13 +113,17 @@ export function useClientUpdate({
         10 * 60 * 1000,
         'downloadAndInstall',
       )
-      showNotice.success('更新安装完毕，请重启应用以应用更改')
+      showNotice.success('layout.notices.clientInstallCompleted')
     } catch (err: unknown) {
       console.error('Client update error:', err)
       setClientStatus('error')
       const errMsg = err instanceof Error ? err.message : String(err)
-      setClientProgressMessage(`更新失败: ${errMsg}`)
-      showNotice.error(`更新失败: ${errMsg}`)
+      setClientProgressMessage(
+        t('layout.notices.clientUpdateFailed', { message: errMsg }),
+      )
+      showNotice.error('layout.notices.clientUpdateFailed', {
+        message: errMsg,
+      })
     }
   }
 

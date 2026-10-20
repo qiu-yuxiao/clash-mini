@@ -1,5 +1,10 @@
 {
   "actions": {
+    "cut": "Cortar",
+    "copy": "Copiar",
+    "paste": "Pegar",
+    "selectAll": "Seleccionar todo",
+    "clearInput": "Vaciar",
     "cancel": "Cancelar",
     "close": "Cerrar",
     "confirm": "Confirmar",
@@ -79,12 +84,14 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
+      "clashNotReady": "El núcleo de Clash tarda en cargar, la selección automática de nodos puede ser imprecisa",
       "importSuccess": "Suscripción importada con éxito",
       "importSubscriptionSuccess": "Suscripción importada con éxito",
       "importWithClashProxy": "Suscripción importada con el proxy de Clash",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
+        "deleteSuccess": "Eliminado correctamente",
         "copySuccess": "Copia exitosa",
         "saveSuccess": "Configuración aleatoria guardada correctamente",
         "saveFailed": "Failed to save configuration",
@@ -117,6 +124,11 @@
         "keyError": "Error de clave en el archivo de sobrescritura. Los cambios se han deshecho",
         "generalError": "Error en el archivo de sobrescritura. Los cambios se han deshecho"
       }
+    },
+    "errorBoundary": {
+      "pageTitle": "Error en la página",
+      "areaTitle": "Se produjo un error en esta área",
+      "details": "Detalles del error"
     }
   },
   "filters": {

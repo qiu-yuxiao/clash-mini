@@ -57,6 +57,7 @@
       "chooseFile": "Выбрать файл"
     },
     "menu": {
+      "copyLink": "Копировать ссылку",
       "home": "Главная",
       "select": "Выбрать",
       "shareQrCode": "Share QR Code",

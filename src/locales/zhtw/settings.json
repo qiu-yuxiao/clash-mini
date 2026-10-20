@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (修改部分)",
         "title": "主題設定",
         "fields": {
           "primaryColor": "主要顏色",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "點擊輪換下一個節點",
+    "testingInProgress": "正在測速中，請稍候再試",
+    "testNotExecuted": "測速未執行：核心未就緒或暫無可測節點",
+    "testFailed": "測速失敗：{{message}}",
+    "adjusting": "正在調整，請稍候…",
+    "updated": "已更新",
+    "portSaved": "代理連接埠已儲存並重新載入",
     "profilesTitle": "訂閱与機場配置",
     "importConfig": "導入節點信息",
     "importPlaceholder": "填入訂閱鏈接/節點配置...",

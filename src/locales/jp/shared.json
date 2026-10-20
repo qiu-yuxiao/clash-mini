@@ -1,5 +1,10 @@
 {
   "actions": {
+    "cut": "切り取り",
+    "copy": "コピー",
+    "paste": "貼り付け",
+    "selectAll": "すべて選択",
+    "clearInput": "クリア",
     "cancel": "キャンセル",
     "close": "閉じる",
     "confirm": "確認",
@@ -79,12 +84,14 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
+      "clashNotReady": "Clash コアの読み込みがタイムアウトしました。自動ノード選択が不正確になる可能性があります",
       "importSuccess": "プロファイルのインポートに成功しました。",
       "importSubscriptionSuccess": "サブスクリプションのインポートに成功しました。",
       "importWithClashProxy": "Clashプロキシを使用してプロファイルのインポートに成功しました。",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
+        "deleteSuccess": "削除しました",
         "copySuccess": "コピー成功",
         "saveSuccess": "ランダム設定を保存完了",
         "saveFailed": "Failed to save configuration",
@@ -117,6 +124,11 @@
         "keyError": "上書きファイルのキーエラーがあります。変更は取り消されました。",
         "generalError": "上書きファイルにエラーがあります。変更は取り消されました。"
       }
+    },
+    "errorBoundary": {
+      "pageTitle": "ページでエラーが発生しました",
+      "areaTitle": "この領域でエラーが発生しました",
+      "details": "エラーの詳細"
     }
   },
   "filters": {

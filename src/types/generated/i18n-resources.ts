@@ -14,6 +14,14 @@ export interface TranslationResources {
           dragHandle: string
           title: string
         }
+        contextMenu: {
+          copyAddress: string
+          disconnect: string
+          setDirect: string
+          setProxy: string
+          setReject: string
+          viewDetail: string
+        }
         fields: {
           actions: string
           chains: string
@@ -28,11 +36,21 @@ export interface TranslationResources {
           type: string
           ulSpeed: string
         }
+        miniTable: {
+          chainsColumn: string
+          chainsDirect: string
+          chainsProxy: string
+          chainsReject: string
+          hostColumn: string
+        }
         order: {
           default: string
           downloadSpeed: string
           uploadSpeed: string
         }
+      }
+      notices: {
+        copied: string
       }
       page: {
         title: string
@@ -182,6 +200,42 @@ export interface TranslationResources {
         selectLanguage: string
       }
       components: {
+        dialogs: {
+          client: {
+            changelog: string
+            changelogEmpty: string
+            prepareRestart: string
+            title: string
+          }
+          core: {
+            fetching: string
+            title: string
+            updateDone: string
+          }
+          editProfile: {
+            intervalLabel: string
+            nameLabel: string
+            title: string
+            urlLabel: string
+          }
+          progress: {
+            clientDownloadFinished: string
+            clientDownloading: string
+            clientDownloadProgress: string
+            clientDownloadProgressNoTotal: string
+            clientDownloadStarted: string
+            coreStartFailed: string
+            coreStarting: string
+          }
+          update: {
+            currentVersion: string
+            latestVersion: string
+            unknown: string
+            updateNow: string
+            updating: string
+            upToDate: string
+          }
+        }
         firstRun: {
           checking: string
           enterHint: string
@@ -233,6 +287,28 @@ export interface TranslationResources {
           }
         }
       }
+      notices: {
+        adjusting: string
+        adjustingProxyMode: string
+        clientCheckFailed: string
+        clientInstallCompleted: string
+        clientUpdateFailed: string
+        clientUpToDate: string
+        copyFailed: string
+        coreCheckFailed: string
+        coreUpdateFailed: string
+        coreUpdateSuccess: string
+        coreUpgradeStartFailed: string
+        coreUpToDate: string
+        profileLinkCopied: string
+        profileSaved: string
+        subscriptionUpdated: string
+        switchedToManualMode: string
+        systemProxyEnabled: string
+        tunModeEnabled: string
+        tunServiceConfigFailed: string
+        updatingSubscription: string
+      }
     }
     logs: {
       actions: {
@@ -254,6 +330,7 @@ export interface TranslationResources {
           chooseFile: string
         }
         menu: {
+          copyLink: string
           editFile: string
           editInfo: string
           editProxies: string
@@ -651,6 +728,7 @@ export interface TranslationResources {
             }
           }
           theme: {
+            copyright: string
             fields: {
               errorColor: string
               fontFamily: string
@@ -694,6 +772,7 @@ export interface TranslationResources {
         addUrlPlaceholder: string
         addUrlSuccess: string
         addUrlTooltip: string
+        adjusting: string
         connectionsActive: string
         connectionsClearHistory: string
         connectionsDisconnectAll: string
@@ -709,8 +788,10 @@ export interface TranslationResources {
         manual: string
         nodeCount: string
         pathControl: string
+        portSaved: string
         profilesTitle: string
         proxyMethod: string
+        rotateNodeTooltip: string
         statusDelayExcellent: string
         statusDelayGood: string
         statusDelayHigh: string
@@ -724,9 +805,13 @@ export interface TranslationResources {
         takeoverTooltipManual: string
         takeoverTooltipSystem: string
         takeoverTooltipTun: string
+        testFailed: string
+        testingInProgress: string
+        testNotExecuted: string
         total: string
         tun: string
         unnamedConfig: string
+        updated: string
       }
       modals: {
         backup: {
@@ -1130,9 +1215,12 @@ export interface TranslationResources {
       actions: {
         cancel: string
         clear: string
+        clearInput: string
         close: string
         closeAll: string
         confirm: string
+        copy: string
+        cut: string
         delete: string
         edit: string
         enable: string
@@ -1140,6 +1228,7 @@ export interface TranslationResources {
         listView: string
         new: string
         next: string
+        paste: string
         pause: string
         previous: string
         refresh: string
@@ -1149,6 +1238,7 @@ export interface TranslationResources {
         resume: string
         retry: string
         save: string
+        selectAll: string
         showDetails: string
         tableView: string
         upgrade: string
@@ -1158,6 +1248,11 @@ export interface TranslationResources {
         visualization: string
       }
       feedback: {
+        errorBoundary: {
+          areaTitle: string
+          details: string
+          pageTitle: string
+        }
         errors: {
           trafficStats: string
           trafficStatsDescription: string
@@ -1167,8 +1262,10 @@ export interface TranslationResources {
           raw: string
         }
         notifications: {
+          clashNotReady: string
           common: {
             copySuccess: string
+            deleteSuccess: string
             refreshFailed: string
             saveFailed: string
             saveSuccess: string

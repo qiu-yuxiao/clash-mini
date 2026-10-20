@@ -30,6 +30,42 @@
       "checkAppUpdate": "检查软件更新",
       "checkCoreUpdate": "检查内核更新"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "编辑配置文件",
+        "nameLabel": "配置名称",
+        "urlLabel": "订阅地址",
+        "intervalLabel": "更新周期 (单位: 小时, 设为 0 禁用)"
+      },
+      "update": {
+        "currentVersion": "当前版本: {{version}}",
+        "latestVersion": "最新版本: {{version}}",
+        "unknown": "未知",
+        "updating": "更新中...",
+        "upToDate": "已是最新",
+        "updateNow": "立即更新"
+      },
+      "client": {
+        "title": "软件本体更新",
+        "changelog": "更新日志:",
+        "changelogEmpty": "暂无详细更新日志",
+        "prepareRestart": "准备重启"
+      },
+      "core": {
+        "title": "Mihomo 内核更新",
+        "fetching": "获取中...",
+        "updateDone": "更新完成"
+      },
+      "progress": {
+        "coreStarting": "正在启动内核升级任务...",
+        "coreStartFailed": "启动失败: {{message}}",
+        "clientDownloading": "正在下载更新...",
+        "clientDownloadStarted": "开始下载软件更新包...",
+        "clientDownloadProgress": "已下载 {{percent}}% ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "已下载 {{downloaded}} MB",
+        "clientDownloadFinished": "下载完成，正在准备安装并重启..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "首 页",
@@ -57,5 +93,27 @@
     "closeSettings": "关闭设置",
     "closeLogsDialog": "关闭日志对话框",
     "selectLanguage": "选择语言"
+  },
+  "notices": {
+    "adjustingProxyMode": "正在调整代理模式，请稍候…",
+    "adjusting": "正在调整，请稍候…",
+    "updatingSubscription": "正在更新订阅...",
+    "subscriptionUpdated": "订阅更新成功",
+    "profileLinkCopied": "链接已复制到剪贴板",
+    "copyFailed": "复制失败",
+    "profileSaved": "配置修改成功",
+    "switchedToManualMode": "已切换至手动模式",
+    "systemProxyEnabled": "已开启系统代理",
+    "tunServiceConfigFailed": "TUN 模式服务配置失败，请尝试以管理员身份运行。",
+    "tunModeEnabled": "已开启 TUN 模式",
+    "coreUpdateSuccess": "Mihomo 内核更新成功",
+    "coreUpdateFailed": "内核更新失败: {{message}}",
+    "coreUpToDate": "当前内核已是最新版本",
+    "coreCheckFailed": "检查内核更新失败: {{message}}",
+    "coreUpgradeStartFailed": "启动内核升级失败: {{message}}",
+    "clientUpToDate": "当前已是最新版本",
+    "clientCheckFailed": "检查更新失败: {{message}}",
+    "clientInstallCompleted": "更新安装完毕，请重启应用以应用更改",
+    "clientUpdateFailed": "更新失败: {{message}}"
   }
 }

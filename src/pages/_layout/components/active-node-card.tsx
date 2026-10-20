@@ -119,11 +119,11 @@ export const ActiveNodeStatusCard = () => {
       // 因此这些失败属控制面竞争/环境问题，必须给出可读提示，不能静默无响应。
       const msg = String(err instanceof Error ? err.message : err)
       if (msg.includes('AUTO_SELECT_BUSY')) {
-        showNotice.info('正在测速中，请稍候再试')
+        showNotice.info('settings.mini.testingInProgress')
       } else if (msg.includes('AUTO_SELECT_NO_RESULT')) {
-        showNotice.error('测速未执行：内核未就绪或暂无可测节点')
+        showNotice.error('settings.mini.testNotExecuted')
       } else {
-        showNotice.error(`测速失败：${msg}`)
+        showNotice.error('settings.mini.testFailed', { message: msg })
       }
       console.error('[ActiveNodeCard] 单点测速失败:', err)
     } finally {
@@ -255,7 +255,7 @@ export const ActiveNodeStatusCard = () => {
         {getFriendlyProtocolName(activeNodeRecord?.type) || 'Direct'}
       </Typography>
 
-      <Tooltip title="点击轮换下一个节点">
+      <Tooltip title={t('settings.mini.rotateNodeTooltip')}>
         <Typography
           variant="body2"
           onClick={handleCycleNode}

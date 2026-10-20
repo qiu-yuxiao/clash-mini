@@ -30,6 +30,42 @@
       "checkAppUpdate": "Cek Pembaruan Aplikasi",
       "checkCoreUpdate": "Cek Pembaruan Core"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "Edit Profil",
+        "nameLabel": "Nama Profil",
+        "urlLabel": "URL Langganan",
+        "intervalLabel": "Interval pembaruan (satuan jam, isi 0 untuk menonaktifkan)"
+      },
+      "update": {
+        "currentVersion": "Versi saat ini: {{version}}",
+        "latestVersion": "Versi terbaru: {{version}}",
+        "unknown": "Tidak diketahui",
+        "updating": "Memperbarui...",
+        "upToDate": "Sudah terbaru",
+        "updateNow": "Perbarui sekarang"
+      },
+      "client": {
+        "title": "Pembaruan Aplikasi",
+        "changelog": "Catatan perubahan:",
+        "changelogEmpty": "Belum ada catatan perubahan terperinci",
+        "prepareRestart": "Bersiap memulai ulang"
+      },
+      "core": {
+        "title": "Pembaruan Inti Mihomo",
+        "fetching": "Mengambil...",
+        "updateDone": "Pembaruan selesai"
+      },
+      "progress": {
+        "coreStarting": "Memulai tugas peningkatan inti...",
+        "coreStartFailed": "Gagal memulai: {{message}}",
+        "clientDownloading": "Mengunduh pembaruan...",
+        "clientDownloadStarted": "Mulai mengunduh paket pembaruan aplikasi...",
+        "clientDownloadProgress": "Terunduh {{percent}}% ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "Terunduh {{downloaded}} MB",
+        "clientDownloadFinished": "Unduhan selesai, menyiapkan pemasangan dan mulai ulang..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Home",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "Menyesuaikan mode proksi, mohon tunggu…",
+    "adjusting": "Menyesuaikan, mohon tunggu…",
+    "updatingSubscription": "Memperbarui langganan...",
+    "subscriptionUpdated": "Langganan berhasil diperbarui",
+    "profileLinkCopied": "Tautan disalin ke papan klip",
+    "copyFailed": "Gagal menyalin",
+    "profileSaved": "Konfigurasi berhasil diubah",
+    "switchedToManualMode": "Beralih ke mode manual",
+    "systemProxyEnabled": "Proksi sistem diaktifkan",
+    "tunServiceConfigFailed": "Konfigurasi layanan mode TUN gagal. Coba jalankan sebagai administrator.",
+    "tunModeEnabled": "Mode TUN diaktifkan",
+    "coreUpdateSuccess": "Inti Mihomo berhasil diperbarui",
+    "coreUpdateFailed": "Gagal memperbarui inti: {{message}}",
+    "coreUpToDate": "Inti sudah versi terbaru",
+    "coreCheckFailed": "Gagal memeriksa pembaruan inti: {{message}}",
+    "coreUpgradeStartFailed": "Gagal memulai peningkatan inti: {{message}}",
+    "clientUpToDate": "Sudah versi terbaru",
+    "clientCheckFailed": "Gagal memeriksa pembaruan: {{message}}",
+    "clientInstallCompleted": "Pembaruan terpasang. Silakan mulai ulang aplikasi untuk menerapkan perubahan.",
+    "clientUpdateFailed": "Gagal memperbarui: {{message}}"
   },
   "a11y": {
     "pinWindow": "Sematkan jendela di atas",

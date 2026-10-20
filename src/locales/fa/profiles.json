@@ -57,6 +57,7 @@
       "chooseFile": "انتخاب فایل"
     },
     "menu": {
+      "copyLink": "کپی پیوند",
       "home": "Home",
       "select": "انتخاب",
       "shareQrCode": "Share QR Code",

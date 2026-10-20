@@ -30,6 +30,42 @@
       "checkAppUpdate": "Check App Updates",
       "checkCoreUpdate": "Check Core Updates"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "Edit Profile",
+        "nameLabel": "Profile Name",
+        "urlLabel": "Subscription URL",
+        "intervalLabel": "Update interval (in hours, set 0 to disable)"
+      },
+      "update": {
+        "currentVersion": "Current version: {{version}}",
+        "latestVersion": "Latest version: {{version}}",
+        "unknown": "Unknown",
+        "updating": "Updating...",
+        "upToDate": "Up to date",
+        "updateNow": "Update now"
+      },
+      "client": {
+        "title": "App Update",
+        "changelog": "Changelog:",
+        "changelogEmpty": "No detailed changelog yet",
+        "prepareRestart": "Restarting soon"
+      },
+      "core": {
+        "title": "Mihomo Core Update",
+        "fetching": "Fetching...",
+        "updateDone": "Update completed"
+      },
+      "progress": {
+        "coreStarting": "Starting core upgrade task...",
+        "coreStartFailed": "Start failed: {{message}}",
+        "clientDownloading": "Downloading update...",
+        "clientDownloadStarted": "Starting app update package download...",
+        "clientDownloadProgress": "Downloaded {{percent}}% ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "Downloaded {{downloaded}} MB",
+        "clientDownloadFinished": "Download complete, preparing to install and restart..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Home",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "Adjusting proxy mode, please wait…",
+    "adjusting": "Adjusting, please wait…",
+    "updatingSubscription": "Updating subscription...",
+    "subscriptionUpdated": "Subscription updated successfully",
+    "profileLinkCopied": "Link copied to clipboard",
+    "copyFailed": "Copy failed",
+    "profileSaved": "Profile saved successfully",
+    "switchedToManualMode": "Switched to manual mode",
+    "systemProxyEnabled": "System proxy enabled",
+    "tunServiceConfigFailed": "TUN mode service configuration failed. Please try running as administrator.",
+    "tunModeEnabled": "TUN mode enabled",
+    "coreUpdateSuccess": "Mihomo core updated successfully",
+    "coreUpdateFailed": "Core update failed: {{message}}",
+    "coreUpToDate": "Core is already up to date",
+    "coreCheckFailed": "Failed to check for core updates: {{message}}",
+    "coreUpgradeStartFailed": "Failed to start core upgrade: {{message}}",
+    "clientUpToDate": "Already the latest version",
+    "clientCheckFailed": "Failed to check for updates: {{message}}",
+    "clientInstallCompleted": "Update installed. Please restart the app to apply changes.",
+    "clientUpdateFailed": "Update failed: {{message}}"
   },
   "a11y": {
     "pinWindow": "Pin window on top",

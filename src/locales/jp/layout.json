@@ -30,6 +30,42 @@
       "checkAppUpdate": "アプリの更新を確認",
       "checkCoreUpdate": "コアの更新を確認"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "プロファイルを編集",
+        "nameLabel": "プロファイル名",
+        "urlLabel": "購読URL",
+        "intervalLabel": "更新間隔（時間単位、0で無効）"
+      },
+      "update": {
+        "currentVersion": "現在のバージョン: {{version}}",
+        "latestVersion": "最新バージョン: {{version}}",
+        "unknown": "不明",
+        "updating": "更新中...",
+        "upToDate": "最新です",
+        "updateNow": "今すぐ更新"
+      },
+      "client": {
+        "title": "アプリの更新",
+        "changelog": "更新履歴:",
+        "changelogEmpty": "詳細な更新履歴はまだありません",
+        "prepareRestart": "再起動を準備中"
+      },
+      "core": {
+        "title": "Mihomo コアの更新",
+        "fetching": "取得中...",
+        "updateDone": "更新が完了しました"
+      },
+      "progress": {
+        "coreStarting": "コアのアップグレードタスクを開始しています...",
+        "coreStartFailed": "開始に失敗しました: {{message}}",
+        "clientDownloading": "更新をダウンロードしています...",
+        "clientDownloadStarted": "アプリ更新パッケージのダウンロードを開始しています...",
+        "clientDownloadProgress": "{{percent}}% ダウンロード済み ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "{{downloaded}} MB ダウンロード済み",
+        "clientDownloadFinished": "ダウンロード完了。インストールと再起動を準備しています..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "ホーム",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "プロキシモードを調整しています。しばらくお待ちください…",
+    "adjusting": "調整しています。しばらくお待ちください…",
+    "updatingSubscription": "購読を更新しています...",
+    "subscriptionUpdated": "購読の更新に成功しました",
+    "profileLinkCopied": "リンクをクリップボードにコピーしました",
+    "copyFailed": "コピーに失敗しました",
+    "profileSaved": "設定の変更を保存しました",
+    "switchedToManualMode": "手動モードに切り替えました",
+    "systemProxyEnabled": "システムプロキシを有効にしました",
+    "tunServiceConfigFailed": "TUN モードのサービス設定に失敗しました。管理者として実行してください。",
+    "tunModeEnabled": "TUN モードを有効にしました",
+    "coreUpdateSuccess": "Mihomo コアの更新に成功しました",
+    "coreUpdateFailed": "コアの更新に失敗しました: {{message}}",
+    "coreUpToDate": "コアは最新です",
+    "coreCheckFailed": "コアの更新確認に失敗しました: {{message}}",
+    "coreUpgradeStartFailed": "コアのアップグレード開始に失敗しました: {{message}}",
+    "clientUpToDate": "最新バージョンです",
+    "clientCheckFailed": "更新の確認に失敗しました: {{message}}",
+    "clientInstallCompleted": "更新のインストールが完了しました。変更を適用するにはアプリを再起動してください。",
+    "clientUpdateFailed": "更新に失敗しました: {{message}}"
   },
   "a11y": {
     "pinWindow": "ウィンドウを最前面に固定",

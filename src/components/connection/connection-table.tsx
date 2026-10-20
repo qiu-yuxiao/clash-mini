@@ -18,6 +18,7 @@ import {
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { closeConnectionWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
@@ -200,6 +201,7 @@ interface Props {
 }
 
 export const ConnectionTable = (props: Props) => {
+  const { t } = useTranslation()
   const { connections, onShowDetail: rawOnShowDetail } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
@@ -296,7 +298,7 @@ export const ConnectionTable = (props: Props) => {
     const address = (port ? `${host}:${port}` : host) || ''
     try {
       await navigator.clipboard.writeText(address)
-      showNotice.success('connections.copied', `已复制: ${address}`, 2000)
+      showNotice.success('connections.notices.copied', { address }, 2000)
     } catch (err) {
       console.error('Failed to copy connection address:', err)
     }
@@ -319,7 +321,7 @@ export const ConnectionTable = (props: Props) => {
             ? `${m.host}:${m.destinationPort}`
             : `${m.remoteDestination}:${m.destinationPort}`
         },
-        header: '链接目标',
+        header: () => t('connections.components.miniTable.hostColumn'),
         cell: (ctx) => {
           const row = ctx.row.original
           const m = row.metadata ?? {}
@@ -330,19 +332,22 @@ export const ConnectionTable = (props: Props) => {
       },
       {
         id: 'chains',
-        header: '路由',
+        header: () => t('connections.components.miniTable.chainsColumn'),
         cell: (ctx) => {
           const row = ctx.row.original
           const chains = row.chains || []
-          if (chains.length === 0) return '直连'
+          if (chains.length === 0)
+            return t('connections.components.miniTable.chainsDirect')
           const upperChains = chains.map((c) => c.toUpperCase())
-          if (upperChains.includes('REJECT')) return '封锁'
-          if (upperChains.includes('DIRECT')) return '直连'
-          return '代理'
+          if (upperChains.includes('REJECT'))
+            return t('connections.components.miniTable.chainsReject')
+          if (upperChains.includes('DIRECT'))
+            return t('connections.components.miniTable.chainsDirect')
+          return t('connections.components.miniTable.chainsProxy')
         },
       },
     ]
-  }, [])
+  }, [t])
 
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -488,42 +493,42 @@ export const ConnectionTable = (props: Props) => {
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
         >
           <FlashOnRounded sx={{ fontSize: 18, color: 'success.main' }} />
-          设为全局直连
+          {t('connections.components.contextMenu.setDirect')}
         </MenuItem>
         <MenuItem
           onClick={handleProxy}
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
         >
           <PublicRounded sx={{ fontSize: 18, color: 'primary.main' }} />
-          设为代理分流
+          {t('connections.components.contextMenu.setProxy')}
         </MenuItem>
         <MenuItem
           onClick={handleReject}
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
         >
           <BlockRounded sx={{ fontSize: 18, color: 'error.main' }} />
-          封锁它 (REJECT)
+          {t('connections.components.contextMenu.setReject')}
         </MenuItem>
         <MenuItem
           onClick={handleDisconnect}
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
         >
           <LinkOffRounded sx={{ fontSize: 18, color: 'error.main' }} />
-          断开此连接
+          {t('connections.components.contextMenu.disconnect')}
         </MenuItem>
         <MenuItem
           onClick={handleCopy}
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
         >
           <ContentCopyRounded sx={{ fontSize: 18, color: 'text.secondary' }} />
-          复制连接地址
+          {t('connections.components.contextMenu.copyAddress')}
         </MenuItem>
         <MenuItem
           onClick={handleDetail}
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
         >
           <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary' }} />
-          查看详细信息
+          {t('connections.components.contextMenu.viewDetail')}
         </MenuItem>
       </Menu>
     </>

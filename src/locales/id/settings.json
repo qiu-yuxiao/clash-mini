@@ -199,6 +199,7 @@
         }
       },
       "theme": {
+        "copyright": "© 2026 秋雨潇潇 (bagian yang dimodifikasi)",
         "title": "Pengaturan Tema",
         "fields": {
           "primaryColor": "Warna Utama",
@@ -530,6 +531,13 @@
     }
   },
   "mini": {
+    "rotateNodeTooltip": "Klik untuk beralih ke node berikutnya",
+    "testingInProgress": "Pengujian kecepatan sedang berlangsung, coba lagi nanti",
+    "testNotExecuted": "Pengujian tidak dijalankan: inti belum siap atau tidak ada node yang bisa diuji",
+    "testFailed": "Pengujian kecepatan gagal: {{message}}",
+    "adjusting": "Menyesuaikan, mohon tunggu…",
+    "updated": "Diperbarui",
+    "portSaved": "Port proksi disimpan dan dimuat ulang",
     "profilesTitle": "Profil & Langganan",
     "importConfig": "Impor Konfigurasi",
     "importPlaceholder": "Masukkan tautan langganan atau konfigurasi node...",

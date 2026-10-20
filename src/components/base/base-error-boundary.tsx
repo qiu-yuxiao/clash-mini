@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary'
+import { useTranslation } from 'react-i18next'
 
 // 错误边界分级策略（已按此落地，新增代码请遵循）：
 //
@@ -15,17 +16,18 @@ import { ErrorBoundary, type FallbackProps } from 'react-error-boundary'
 //   （异步错误请走 error-reporter / showNotice）
 // - 边界不宜过密：优先给高频出错、依赖第三方渲染的组件加
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
+  const { t } = useTranslation()
   const errorMessage = error instanceof Error ? error.message : String(error)
   const errorStack = error instanceof Error ? error.stack : undefined
 
   return (
     <div role="alert" style={{ padding: 16 }}>
-      <h4>⚠️ 页面发生错误</h4>
+      <h4>⚠️ {t('shared.feedback.errorBoundary.pageTitle')}</h4>
 
       <pre>{errorMessage}</pre>
 
-      <details title="错误详情">
-        <summary>错误详情</summary>
+      <details title={t('shared.feedback.errorBoundary.details')}>
+        <summary>{t('shared.feedback.errorBoundary.details')}</summary>
         <pre>{errorStack}</pre>
       </details>
 
@@ -38,13 +40,14 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
           cursor: 'pointer',
         }}
       >
-        重试
+        {t('shared.actions.retry')}
       </button>
     </div>
   )
 }
 
 export const AreaErrorFallback = ({ error }: FallbackProps) => {
+  const { t } = useTranslation()
   const errorMessage = error instanceof Error ? error.message : String(error)
   return (
     <div
@@ -60,7 +63,7 @@ export const AreaErrorFallback = ({ error }: FallbackProps) => {
         gap: 12,
       }}
     >
-      <span>⚠️ 该区域发生错误</span>
+      <span>⚠️ {t('shared.feedback.errorBoundary.areaTitle')}</span>
       <span style={{ fontSize: 12, opacity: 0.7 }}>{errorMessage}</span>
     </div>
   )

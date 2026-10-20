@@ -2,6 +2,9 @@
   "page": {
     "title": "Соединения"
   },
+  "notices": {
+    "copied": "Скопировано: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "Хост",
@@ -26,6 +29,21 @@
       "active": "Активные",
       "closed": "Закрытые",
       "closeConnection": "Закрыть соединение"
+    },
+    "miniTable": {
+      "hostColumn": "Цель",
+      "chainsColumn": "Маршрут",
+      "chainsDirect": "Напрямую",
+      "chainsReject": "Заблокировано",
+      "chainsProxy": "Через прокси"
+    },
+    "contextMenu": {
+      "setDirect": "Сделать глобальное прямое подключение",
+      "setProxy": "Направить через прокси",
+      "setReject": "Заблокировать (REJECT)",
+      "disconnect": "Разорвать соединение",
+      "copyAddress": "Копировать адрес соединения",
+      "viewDetail": "Подробная информация"
     },
     "columnManager": {
       "title": "Столбцы",

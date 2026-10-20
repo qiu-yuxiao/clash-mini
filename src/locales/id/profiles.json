@@ -57,6 +57,7 @@
       "chooseFile": "Pilih Berkas"
     },
     "menu": {
+      "copyLink": "Salin tautan",
       "home": "Home",
       "select": "Pilih",
       "shareQrCode": "Share QR Code",

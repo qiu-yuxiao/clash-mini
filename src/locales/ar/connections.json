@@ -2,6 +2,9 @@
   "page": {
     "title": "الاتصالات"
   },
+  "notices": {
+    "copied": "تم النسخ: {{address}}"
+  },
   "components": {
     "fields": {
       "host": "المضيف",
@@ -26,6 +29,21 @@
       "active": "Active",
       "closed": "Closed",
       "closeConnection": "إغلاق الاتصال"
+    },
+    "miniTable": {
+      "hostColumn": "الوجهة",
+      "chainsColumn": "المسار",
+      "chainsDirect": "مباشر",
+      "chainsReject": "محجوب",
+      "chainsProxy": "بروكسي"
+    },
+    "contextMenu": {
+      "setDirect": "تعيين كاتصال مباشر عام",
+      "setProxy": "تعيين كتوجيه عبر البروكسي",
+      "setReject": "حجبه (REJECT)",
+      "disconnect": "قطع هذا الاتصال",
+      "copyAddress": "نسخ عنوان الاتصال",
+      "viewDetail": "عرض التفاصيل"
     },
     "columnManager": {
       "title": "الأعمدة",

@@ -1,5 +1,10 @@
 {
   "actions": {
+    "cut": "Ausschneiden",
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "selectAll": "Alles auswählen",
+    "clearInput": "Leeren",
     "cancel": "Abbrechen",
     "close": "Schließen",
     "confirm": "Bestätigen",
@@ -79,12 +84,14 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
+      "clashNotReady": "Clash-Core lädt verzögert, die automatische Knotenauswahl ist möglicherweise ungenau",
       "importSuccess": "Abonnement erfolgreich importiert",
       "importSubscriptionSuccess": "Abonnement erfolgreich importiert",
       "importWithClashProxy": "Abonnement mit Clash-Proxy importiert",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
+        "deleteSuccess": "Erfolgreich gelöscht",
         "copySuccess": "Kopieren erfolgreich",
         "saveSuccess": "Zufalls-Konfiguration erfolgreich gespeichert",
         "saveFailed": "Failed to save configuration",
@@ -117,6 +124,11 @@
         "keyError": "Schlüsselfehler in der Überdeckungsdatei. Die Änderungen wurden rückgängig gemacht.",
         "generalError": "Fehler in der Überdeckungsdatei. Die Änderungen wurden rückgängig gemacht."
       }
+    },
+    "errorBoundary": {
+      "pageTitle": "Seitenfehler",
+      "areaTitle": "In diesem Bereich ist ein Fehler aufgetreten",
+      "details": "Fehlerdetails"
     }
   },
   "filters": {

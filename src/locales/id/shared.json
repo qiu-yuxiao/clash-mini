@@ -1,5 +1,10 @@
 {
   "actions": {
+    "cut": "Potong",
+    "copy": "Salin",
+    "paste": "Tempel",
+    "selectAll": "Pilih Semua",
+    "clearInput": "Kosongkan",
     "cancel": "Batal",
     "close": "Tutup",
     "confirm": "Konfirmasi",
@@ -79,12 +84,14 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
+      "clashNotReady": "Inti Clash lama dimuat, pemilihan node otomatis mungkin tidak akurat",
       "importSuccess": "Profil Berhasil Diimpor",
       "importSubscriptionSuccess": "Berlangganan Berhasil Diimpor",
       "importWithClashProxy": "Profile Imported with Clash proxy",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
+        "deleteSuccess": "Berhasil dihapus",
         "copySuccess": "Salin Berhasil",
         "saveSuccess": "Configuration saved successfully",
         "saveFailed": "Failed to save configuration",
@@ -117,6 +124,11 @@
         "keyError": "Merge file key error, changes reverted",
         "generalError": "Merge file error, changes reverted"
       }
+    },
+    "errorBoundary": {
+      "pageTitle": "Terjadi kesalahan pada halaman",
+      "areaTitle": "Terjadi kesalahan di area ini",
+      "details": "Detail kesalahan"
     }
   },
   "filters": {

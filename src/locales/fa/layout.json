@@ -30,6 +30,42 @@
       "checkAppUpdate": "بررسی به‌روزرسانی برنامه",
       "checkCoreUpdate": "بررسی به‌روزرسانی هسته"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "ویرایش پروفایل",
+        "nameLabel": "نام پروفایل",
+        "urlLabel": "نشانی اشتراک",
+        "intervalLabel": "فاصله به‌روزرسانی (بر حسب ساعت، 0 برای غیرفعال)"
+      },
+      "update": {
+        "currentVersion": "نسخه فعلی: {{version}}",
+        "latestVersion": "جدیدترین نسخه: {{version}}",
+        "unknown": "نامشخص",
+        "updating": "در حال به‌روزرسانی...",
+        "upToDate": "از قبل به‌روز است",
+        "updateNow": "به‌روزرسانی فوری"
+      },
+      "client": {
+        "title": "به‌روزرسانی برنامه",
+        "changelog": "گزارش تغییرات:",
+        "changelogEmpty": "هنوز گزارش تغییرات مفصلی وجود ندارد",
+        "prepareRestart": "آماده‌سازی برای راه‌اندازی مجدد"
+      },
+      "core": {
+        "title": "به‌روزرسانی هسته Mihomo",
+        "fetching": "در حال دریافت...",
+        "updateDone": "به‌روزرسانی کامل شد"
+      },
+      "progress": {
+        "coreStarting": "در حال شروع وظیفه ارتقای هسته...",
+        "coreStartFailed": "شروع ناموفق بود: {{message}}",
+        "clientDownloading": "در حال دانلود به‌روزرسانی...",
+        "clientDownloadStarted": "دانلود بسته به‌روزرسانی برنامه آغاز شد...",
+        "clientDownloadProgress": "{{percent}}٪ دانلود شد ({{downloaded}} MB از {{total}} MB)",
+        "clientDownloadProgressNoTotal": "{{downloaded}} MB دانلود شد",
+        "clientDownloadFinished": "دانلود کامل شد، در حال آماده‌سازی نصب و راه‌اندازی مجدد..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Home",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "در حال تنظیم حالت پروکسی، لطفاً منتظر بمانید…",
+    "adjusting": "در حال تنظیم، لطفاً منتظر بمانید…",
+    "updatingSubscription": "در حال به‌روزرسانی اشتراک...",
+    "subscriptionUpdated": "اشتراک با موفقیت به‌روزرسانی شد",
+    "profileLinkCopied": "پیوند در کلیپ‌بورد کپی شد",
+    "copyFailed": "کپی ناموفق بود",
+    "profileSaved": "پیکربندی با موفقیت ذخیره شد",
+    "switchedToManualMode": "به حالت دستی تغییر کرد",
+    "systemProxyEnabled": "پروکسی سیستم فعال شد",
+    "tunServiceConfigFailed": "پیکربندی سرویس حالت TUN ناموفق بود. اجرا با دسترسی مدیر را امتحان کنید.",
+    "tunModeEnabled": "حالت TUN فعال شد",
+    "coreUpdateSuccess": "هسته Mihomo با موفقیت به‌روزرسانی شد",
+    "coreUpdateFailed": "به‌روزرسانی هسته ناموفق بود: {{message}}",
+    "coreUpToDate": "هسته از قبل جدیدترین نسخه است",
+    "coreCheckFailed": "بررسی به‌روزرسانی هسته ناموفق بود: {{message}}",
+    "coreUpgradeStartFailed": "شروع ارتقای هسته ناموفق بود: {{message}}",
+    "clientUpToDate": "از قبل جدیدترین نسخه است",
+    "clientCheckFailed": "بررسی به‌روزرسانی ناموفق بود: {{message}}",
+    "clientInstallCompleted": "به‌روزرسانی نصب شد. برای اعمال تغییرات، برنامه را راه‌اندازی مجدد کنید.",
+    "clientUpdateFailed": "به‌روزرسانی ناموفق بود: {{message}}"
   },
   "a11y": {
     "pinWindow": "پین کردن پنجره در بالا",

@@ -474,7 +474,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             userSelect: 'none',
           }}
         >
-          © 2026 秋雨潇潇 (修改部分)
+          {t('settings.components.verge.theme.copyright')}
         </Typography>
         <Typography
           variant="caption"

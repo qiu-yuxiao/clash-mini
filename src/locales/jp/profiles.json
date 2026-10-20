@@ -57,6 +57,7 @@
       "chooseFile": "ファイルを選択"
     },
     "menu": {
+      "copyLink": "リンクをコピー",
       "home": "ホーム",
       "select": "使用する",
       "shareQrCode": "Share QR Code",

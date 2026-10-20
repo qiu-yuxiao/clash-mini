@@ -30,6 +30,42 @@
       "checkAppUpdate": "App-Updates prüfen",
       "checkCoreUpdate": "Core-Updates prüfen"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "Profil bearbeiten",
+        "nameLabel": "Profilname",
+        "urlLabel": "Abo-URL",
+        "intervalLabel": "Aktualisierungsintervall (in Stunden, 0 = deaktiviert)"
+      },
+      "update": {
+        "currentVersion": "Aktuelle Version: {{version}}",
+        "latestVersion": "Neueste Version: {{version}}",
+        "unknown": "Unbekannt",
+        "updating": "Aktualisierung...",
+        "upToDate": "Bereits aktuell",
+        "updateNow": "Jetzt aktualisieren"
+      },
+      "client": {
+        "title": "App-Update",
+        "changelog": "Änderungsprotokoll:",
+        "changelogEmpty": "Kein detailliertes Änderungsprotokoll vorhanden",
+        "prepareRestart": "Neustart wird vorbereitet"
+      },
+      "core": {
+        "title": "Mihomo-Core-Update",
+        "fetching": "Wird abgerufen...",
+        "updateDone": "Update abgeschlossen"
+      },
+      "progress": {
+        "coreStarting": "Core-Aktualisierung wird gestartet...",
+        "coreStartFailed": "Start fehlgeschlagen: {{message}}",
+        "clientDownloading": "Update wird heruntergeladen...",
+        "clientDownloadStarted": "Download des App-Update-Pakets gestartet...",
+        "clientDownloadProgress": "{{percent}} % heruntergeladen ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "{{downloaded}} MB heruntergeladen",
+        "clientDownloadFinished": "Download abgeschlossen, Installation und Neustart werden vorbereitet..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Startseite",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "Proxy-Modus wird angepasst, bitte warten…",
+    "adjusting": "Anpassung läuft, bitte warten…",
+    "updatingSubscription": "Abo wird aktualisiert...",
+    "subscriptionUpdated": "Abo erfolgreich aktualisiert",
+    "profileLinkCopied": "Link in die Zwischenablage kopiert",
+    "copyFailed": "Kopieren fehlgeschlagen",
+    "profileSaved": "Konfiguration erfolgreich gespeichert",
+    "switchedToManualMode": "Zu manuellem Modus gewechselt",
+    "systemProxyEnabled": "Systemproxy aktiviert",
+    "tunServiceConfigFailed": "Konfiguration des TUN-Modus-Dienstes fehlgeschlagen. Bitte als Administrator ausführen.",
+    "tunModeEnabled": "TUN-Modus aktiviert",
+    "coreUpdateSuccess": "Mihomo-Core erfolgreich aktualisiert",
+    "coreUpdateFailed": "Core-Update fehlgeschlagen: {{message}}",
+    "coreUpToDate": "Der Core ist bereits aktuell",
+    "coreCheckFailed": "Core-Update-Prüfung fehlgeschlagen: {{message}}",
+    "coreUpgradeStartFailed": "Core-Update konnte nicht gestartet werden: {{message}}",
+    "clientUpToDate": "Bereits die neueste Version",
+    "clientCheckFailed": "Update-Prüfung fehlgeschlagen: {{message}}",
+    "clientInstallCompleted": "Update installiert. Bitte App neu starten, um die Änderungen zu übernehmen.",
+    "clientUpdateFailed": "Update fehlgeschlagen: {{message}}"
   },
   "a11y": {
     "pinWindow": "Fenster oben anheften",

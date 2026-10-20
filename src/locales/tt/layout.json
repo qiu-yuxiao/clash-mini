@@ -30,6 +30,42 @@
       "checkAppUpdate": "Кушымта яңартуларын тикшерү",
       "checkCoreUpdate": "Төш яңартуларын тикшерү"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "Профильне үзгәртү",
+        "nameLabel": "Профиль исеме",
+        "urlLabel": "Язылу адресы",
+        "intervalLabel": "Яңарту периоды (сәгатьләрдә, 0 = сүндерү)"
+      },
+      "update": {
+        "currentVersion": "Хәзерге версия: {{version}}",
+        "latestVersion": "Соңгы версия: {{version}}",
+        "unknown": "Билгесез",
+        "updating": "Яңартылда...",
+        "upToDate": "Инде соңгы версия",
+        "updateNow": "Хәзер яңарту"
+      },
+      "client": {
+        "title": "Кушымта яңартуы",
+        "changelog": "Үзгәрешләр көндәлеге:",
+        "changelogEmpty": "Җентекле үзгәрешләр көндәлеге әлегә юк",
+        "prepareRestart": "Кабаттан башлауга әзерләнә"
+      },
+      "core": {
+        "title": "Mihomo төп программасын яңарту",
+        "fetching": "Алына...",
+        "updateDone": "Яңарту тәмамланды"
+      },
+      "progress": {
+        "coreStarting": "Төп программаны яңарту бурычы башлана...",
+        "coreStartFailed": "Башлау уңышсыз: {{message}}",
+        "clientDownloading": "Яңарту йөкләнә...",
+        "clientDownloadStarted": "Кушымта яңарту пакетын йөкләү башланды...",
+        "clientDownloadProgress": "Йөкләнде {{percent}}% ({{downloaded}} MB / {{total}} MB)",
+        "clientDownloadProgressNoTotal": "Йөкләнде {{downloaded}} MB",
+        "clientDownloadFinished": "Йөкләү тәмамланды, урнаштыру һәм кабаттан башлау әзерләнә..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Home",
@@ -50,6 +86,28 @@
         "expandNavBar": "Expand navigation bar"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "Прокси режимы көйләнә, зинһар көтегез…",
+    "adjusting": "Көйләнә, зинһар көтегез…",
+    "updatingSubscription": "Язылу яңартылда...",
+    "subscriptionUpdated": "Язылу уңышлы яңартылды",
+    "profileLinkCopied": "Сылталам алмаш буфергә күчерелде",
+    "copyFailed": "Күчерү уңышсыз булды",
+    "profileSaved": "Көйләүләр уңышлы сакланды",
+    "switchedToManualMode": "Кул белән идарә режимына күчте",
+    "systemProxyEnabled": "Система проксиы кабызды",
+    "tunServiceConfigFailed": "TUN режимы хезмәтне көйләү уңышсыз булды. Администратор буларак эшләп карагыз.",
+    "tunModeEnabled": "TUN режимы кабызды",
+    "coreUpdateSuccess": "Mihomo төп программасы уңышлы яңартылды",
+    "coreUpdateFailed": "Төп программаны яңарту уңышсыз: {{message}}",
+    "coreUpToDate": "Төп программа инде соңгы версиядә",
+    "coreCheckFailed": "Төп программа яңартуларын тикшерү уңышсыз: {{message}}",
+    "coreUpgradeStartFailed": "Төп программаны яңартуны башлау уңышсыз: {{message}}",
+    "clientUpToDate": "Инде соңгы версия",
+    "clientCheckFailed": "Яңартуларны тикшерү уңышсыз: {{message}}",
+    "clientInstallCompleted": "Яңарту урнаштырылды. Үзгәрешләрне куллану өчен кушымтаны кабаттан башлагыз.",
+    "clientUpdateFailed": "Яңарту уңышсыз: {{message}}"
   },
   "a11y": {
     "pinWindow": "Тәрәзәне өскә беркетеп куярға",

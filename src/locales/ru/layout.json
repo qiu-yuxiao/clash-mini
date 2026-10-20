@@ -30,6 +30,42 @@
       "checkAppUpdate": "Проверить обновления приложения",
       "checkCoreUpdate": "Проверить обновления ядра"
     },
+    "dialogs": {
+      "editProfile": {
+        "title": "Редактировать профиль",
+        "nameLabel": "Название профиля",
+        "urlLabel": "Адрес подписки",
+        "intervalLabel": "Интервал обновления (в часах, 0 — отключить)"
+      },
+      "update": {
+        "currentVersion": "Текущая версия: {{version}}",
+        "latestVersion": "Последняя версия: {{version}}",
+        "unknown": "Неизвестно",
+        "updating": "Обновление...",
+        "upToDate": "Актуальная версия",
+        "updateNow": "Обновить сейчас"
+      },
+      "client": {
+        "title": "Обновление приложения",
+        "changelog": "Список изменений:",
+        "changelogEmpty": "Подробный список изменений отсутствует",
+        "prepareRestart": "Подготовка к перезапуску"
+      },
+      "core": {
+        "title": "Обновление ядра Mihomo",
+        "fetching": "Получение...",
+        "updateDone": "Обновление завершено"
+      },
+      "progress": {
+        "coreStarting": "Запуск задачи обновления ядра...",
+        "coreStartFailed": "Ошибка запуска: {{message}}",
+        "clientDownloading": "Загрузка обновления...",
+        "clientDownloadStarted": "Начата загрузка пакета обновления приложения...",
+        "clientDownloadProgress": "Загружено {{percent}}% ({{downloaded}} МБ / {{total}} МБ)",
+        "clientDownloadProgressNoTotal": "Загружено {{downloaded}} МБ",
+        "clientDownloadFinished": "Загрузка завершена, подготовка к установке и перезапуску..."
+      }
+    },
     "navigation": {
       "tabs": {
         "home": "Главная",
@@ -50,6 +86,28 @@
         "expandNavBar": "Развернуть панель навигации"
       }
     }
+  },
+  "notices": {
+    "adjustingProxyMode": "Переключение режима прокси, подождите…",
+    "adjusting": "Выполняется настройка, подождите…",
+    "updatingSubscription": "Обновление подписки...",
+    "subscriptionUpdated": "Подписка успешно обновлена",
+    "profileLinkCopied": "Ссылка скопирована в буфер обмена",
+    "copyFailed": "Не удалось скопировать",
+    "profileSaved": "Конфигурация успешно изменена",
+    "switchedToManualMode": "Переключено на ручной режим",
+    "systemProxyEnabled": "Системный прокси включён",
+    "tunServiceConfigFailed": "Не удалось настроить службу режима TUN. Попробуйте запустить от имени администратора.",
+    "tunModeEnabled": "Режим TUN включён",
+    "coreUpdateSuccess": "Ядро Mihomo успешно обновлено",
+    "coreUpdateFailed": "Ошибка обновления ядра: {{message}}",
+    "coreUpToDate": "Ядро уже последней версии",
+    "coreCheckFailed": "Не удалось проверить обновления ядра: {{message}}",
+    "coreUpgradeStartFailed": "Не удалось запустить обновление ядра: {{message}}",
+    "clientUpToDate": "У вас уже последняя версия",
+    "clientCheckFailed": "Не удалось проверить обновления: {{message}}",
+    "clientInstallCompleted": "Обновление установлено. Перезапустите приложение, чтобы применить изменения.",
+    "clientUpdateFailed": "Ошибка обновления: {{message}}"
   },
   "a11y": {
     "pinWindow": "Закрепить окно сверху",
