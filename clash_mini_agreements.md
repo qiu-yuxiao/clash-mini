@@ -280,6 +280,13 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - IPv4-mapped IPv6（`::ffff:a.b.c.d`）按 IPv4 私网段**逐一映射**直连（`::ffff:127.0.0.0/104`、`::ffff:10.0.0.0/104`、`::ffff:172.16.0.0/108`、`::ffff:192.168.0.0/112`、`::ffff:100.64.0.0/106`、`::ffff:169.254.0.0/112`）。**严禁**整体把 `::ffff:0:0/96` 设为 DIRECT —— 那会把国外目标一并直连、绕过代理。
 - **`dns.fake-ip-range6` 与 `fc00::/7` 的硬约束**：`fake-ip-range6` 必须落在 `fc00::/7` **之外**（当前 `2001:2::/64`，安全）。因 `fc00::/7` 已被设为直连，一旦改成社区常见的 ULA 取值（如 `fdfe:dcba:9877::/64`），fake IPv6 就会撞上该直连规则。改此值前必须先核对本约束。
 - **DNS 劫持必须显式覆盖 TCP**：mihomo 的 `dns-hijack` **不书写协议时默认按 `udp://` 处理**，故必须写为 `["any:53", "tcp://any:53"]`；否则 TCP 53 的 DNS 查询不被劫持、改按规则转发，形成 DNS 泄漏面。
+- **IPv6 兜底必须在 MATCH 之前，且不得带 `no-resolve`（2026-10-21 铁律）**：GFWList 是纯域名规则集，IPv6 目标无从按域名命中，会漏到 `MATCH` 兜底；若兜底为 DIRECT，境外/投毒 IPv6 直连即 `i/o timeout`，表现为 TUN 断流。故固定注入 `GEOIP6,CN,DIRECT` + `IP-CIDR6,::/0,PROXY`。
+  - **两条都必须放在本地网段直连规则之后、`MATCH` 之前**：放前面会抢走 IPv4-mapped 私网段与 TUN 自身 ULA 的直连判定。
+  - **`no-resolve` 必须去掉**：带 `no-resolve` 的 IP 类规则对**域名**目标直接跳过。v3.0.0 现场 375 条 `i/o timeout` 中仍有 85 条（22.7%）目标是域名（`icube-api*.tiktok-row.net` 等），正是因为域名目标绕过了这两条规则又漏回 `MATCH,DIRECT`。去掉后由内核先解析再判定：境内 IPv6 → 前一条直连；其余 IPv6 → 走代理；只有 A 记录的域名 → 两条都不匹配、行为不变。
+- **`dns.fallback` 的上游必须强制走代理（2026-10-21 铁律）**：`dns.respect-rules: true` 时，内核为解析域名发出的上游连接**同样要过规则匹配**；而默认 `rule_fallback = "direct"`，于是 fallback 里的境外 DoH（`1.1.1.1` / `8.8.8.8` / `8.8.4.4`）会一路漏到 `MATCH,DIRECT`。这三家在大陆直连被墙 → fallback 整链失效 → `fallback-filter.geoip` 防投毒能力等于关闭 → 投毒应答（如 Teredo 段的 `2001::1`）被采信 → 客户端反复连不存在的地址刷 `i/o timeout` → **TUN 断流**。
+  - **落地方式**：由 `enhance::dns_fallback_proxy_rules` 从**真实 `dns.fallback` 配置**推导，逐条生成 `IP-CIDR,<ip>/32,PROXY,no-resolve`（IPv6 则 `IP-CIDR6,<ip>/128`）。**严禁写死具体 IP**——订阅换上游时必须自动跟随。
+  - **插入位置**：`RULE-SET,gfwlist` 之后、用户 `append-rules` 之前。既不抢用户规则最终决定权，又早于全部私网与 `MATCH` 规则。
+  - 域名型上游（`https://dns.google/dns-query`）无法在规则层静态表达，不生成规则；其解析结果落回上面生成的 IP 规则时同样受益。
 
 ---
 
@@ -613,4 +620,7 @@ flowchart LR
 | **BUG-287** | 8.9 | 剩余硬编码文案 i18n 收口；修正节点列表 `aria-label` 错误 key（`proxies` → `proxies.page.a11y.nodelist`）并为帮助按钮补可读名称 |
 | **BUG-288** | 8.6 | `clash.yaml` 版本检测提到模板合并之前，修复 v1→v2 迁移（`tun.stack` 归一化）长期静默失效 |
 | **BUG-289** | 8.7 | 诊断包脱敏补齐 `authorization` 键，覆盖 `ws-opts.headers.Authorization` 节点级令牌泄露 |
+| **BUG-290** | 3.7 | IPv6 兜底去掉 `no-resolve`，修复域名目标绕过 IPv6 规则漏回 `MATCH,DIRECT` 造成的 i/o timeout |
+| **BUG-291** | 3.7 | `dns.fallback` 的境外 DoH 强制走代理，修复 `respect-rules` 下 fallback 直连被墙导致防投毒链路整体失效 |
+| **BUG-292** | 4.1 | 节点选择快照/还原跳过内置出站（DIRECT/REJECT），消除冷启动 `proxy not exist` 告警 |
 

@@ -523,6 +523,92 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     config
 }
 
+/// 从 DNS 上游字符串中取出主机名部分。
+///
+/// 支持 mihomo 的全部常见写法：`1.1.1.1`、`8.8.8.8:53`、
+/// `https://1.1.1.1/dns-query`、`tls://8.8.8.8`、
+/// `https://[2606:4700:4700::1111]/dns-query#h3=true`。
+fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
+    let s = raw.trim();
+    // 去掉 `#h3=true` 之类的策略参数
+    let s = s.split('#').next()?;
+    // 去掉 scheme
+    let s = match s.find("://") {
+        Some(idx) => s.get(idx + 3..)?,
+        None => s,
+    };
+    // 去掉 path
+    let host_port = s.split('/').next()?;
+
+    let host = if let Some(rest) = host_port.strip_prefix('[') {
+        // `[IPv6]:port`
+        rest.split(']').next()?
+    } else if host_port.matches(':').count() == 1 {
+        // `host:port`；单冒号一定不是 IPv6 字面量
+        host_port.split(':').next()?
+    } else {
+        // 裸 IPv6 或纯主机名
+        host_port
+    };
+
+    let host = host.trim();
+    (!host.is_empty()).then(|| std::string::String::from(host))
+}
+
+/// 由 `dns.fallback` 中的「IP 字面量」上游生成强制走代理的规则。
+///
+/// 【为什么必须有】`dns.respect-rules: true` 时，内核为解析域名而发出的上游连接同样要
+/// 过规则匹配；而本程序默认 `rule_fallback = "direct"`，于是 fallback 里的境外 DoH
+/// （1.1.1.1 / 8.8.8.8 / 8.8.4.4 …）会一路漏到 `MATCH,DIRECT`。这三家在大陆直连被墙，
+/// fallback 整链随之失效，`fallback-filter.geoip` 的防投毒能力等于关闭 —— 投毒应答
+/// （如 Teredo 段的 `2001::1`）被直接采信，客户端随后反复连接这些不存在的地址，
+/// 表现为 `i/o timeout` 刷屏 → TUN 断流。
+///
+/// v3.0.0 现场日志实证：`dial DIRECT (match Match/) mihomo --> 8.8.8.8:443 error ...`。
+///
+/// 只处理 IP 字面量：域名型上游（`https://dns.google/dns-query`）无法在规则层静态表达，
+/// 它依赖 `proxy-server-nameserver` 先解析、再按解析结果匹配，不在本函数职责内。
+fn dns_fallback_proxy_rules(dns: Option<&Value>) -> Vec<Value> {
+    let mut rules = Vec::new();
+    let mut seen = HashSet::new();
+
+    let Some(Value::Mapping(dns_map)) = dns else {
+        return rules;
+    };
+    // `fallback` 允许标量或列表两种写法，统一成迭代
+    let Some(fallback) = dns_map.get(Value::from("fallback")) else {
+        return rules;
+    };
+    let servers: Vec<&Value> = match fallback {
+        Value::Sequence(seq) => seq.iter().collect(),
+        other => vec![other],
+    };
+
+    for server in servers {
+        let Some(raw) = server.as_str() else {
+            continue;
+        };
+        let Some(host) = extract_upstream_host(raw) else {
+            continue;
+        };
+
+        let rule = if host.parse::<std::net::Ipv4Addr>().is_ok() {
+            format!("IP-CIDR,{host}/32,PROXY,no-resolve")
+        } else if host.parse::<std::net::Ipv6Addr>().is_ok() {
+            format!("IP-CIDR6,{host}/128,PROXY,no-resolve")
+        } else {
+            // 域名型上游：无法静态落成 IP 规则
+            continue;
+        };
+
+        if seen.insert(rule.clone()) {
+            rules.push(Value::from(rule.as_str()));
+        }
+    }
+
+    rules
+}
+
 async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
     //    过滤广告/假节点（"网址"、"官网"、"剩余流量" 等），避免它们进入 PROXY 组后
@@ -642,6 +728,23 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // Add GFWList rule: only explicitly blocked domains go through proxy
     final_rules.push(Value::from("RULE-SET,gfwlist,PROXY"));
 
+    // 【DNS 上游保通】让 fallback 里的境外 DoH 走代理，救活防投毒链路。
+    // 放在 gfwlist 之后、用户 append-rules 之前：既不抢用户自定义规则的最终决定权，
+    // 又早于所有私网/MATCH 规则，避免被 `MATCH,DIRECT` 兜走。
+    // 规则由真实 `dns.fallback` 推导（不写死 IP），订阅换上游时自动跟随。
+    let dns_rules = dns_fallback_proxy_rules(config.get(Value::from("dns")));
+    if !dns_rules.is_empty() {
+        for rule in &dns_rules {
+            final_rules.push(rule.clone());
+        }
+        logging!(
+            info,
+            Type::Core,
+            "DNS fallback 上游共 {} 个 IP 字面量已强制走代理（防投毒链路保通）",
+            dns_rules.len()
+        );
+    }
+
     // Add local LAN bypass rules (DIRECT) to avoid DNS loopback & LAN routing deadlock
     // 【IPv4 私网 / 环回 / 链路本地】防止「代理所有流量」（MATCH,PROXY）下本地流量被误转远端代理
     final_rules.push(Value::from("IP-CIDR,127.0.0.0/8,DIRECT,no-resolve"));
@@ -677,14 +780,21 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         }
     }
 
-    // 【IPv6 兜底】GFWList 是纯域名规则集（behavior: domain），对 sniffer
-    // parse-pure-ip 提取出的「纯 IPv6 真实地址」无从按域名匹配 → 会全部漏到
-    // MATCH 兜底。若兜底为 DIRECT，境外/投毒 IPv6 就直连超时（实测无 IPv6
-    // 出口时每条 i/o timeout，形成 TUN 断流刷屏）。故在 MATCH 之前为 IPv6 补
-    // 兜底：境内 GeoIP6 直连，其余 IPv6 统一走代理，确保境外 IPv6 经节点出口。
-    // no-resolve：仅对已解析为 IP 的连接生效，避免干扰域名解析过程。
-    final_rules.push(Value::from("GEOIP6,CN,DIRECT,no-resolve"));
-    final_rules.push(Value::from("IP-CIDR6,::/0,PROXY,no-resolve"));
+    // 【IPv6 兜底】GFWList 是纯域名规则集（behavior: domain），对「纯 IPv6 真实地址」
+    // 无从按域名匹配，会全部漏到 MATCH 兜底。若兜底为 DIRECT，境外/投毒 IPv6 就直连
+    // 超时（实测无 IPv6 出口时每条 i/o timeout，形成 TUN 断流刷屏）。故在 MATCH 之前
+    // 为 IPv6 补兜底：境内 GeoIP6 直连，其余 IPv6 统一走代理。
+    //
+    // 【刻意不加 no-resolve】v3.0.0 现场日志显示 375 条 i/o timeout 中仍有 85 条
+    // （22.7%）目标是**域名**（icube-api*.tiktok-row.net 等）：域名目标不会命中带
+    // no-resolve 的 IP 类规则，仍然漏到 MATCH,DIRECT。去掉 no-resolve 后，内核会先
+    // 解析再判定，于是「解析出任意 IPv6 的域名」也能落到这里：
+    //   - 解析结果是境内 IPv6 → 上一条 GEOIP6,CN,DIRECT 接住（故它同样不能带 no-resolve）
+    //   - 其余 IPv6 → 本规则走代理
+    //   - 只有 A 记录的域名 → 两条 IPv6 规则都不匹配，行为与之前一致
+    // 代价仅为规则匹配期多一次解析，结果走内核 DNS 缓存，可接受。
+    final_rules.push(Value::from("GEOIP6,CN,DIRECT"));
+    final_rules.push(Value::from("IP-CIDR6,::/0,PROXY"));
 
     // Read verge config to get the rule fallback type
     let verge = Config::verge().await.latest_arc();
@@ -976,12 +1086,86 @@ append-rules:
         );
         assert_eq!(rules[19].as_str(), Some("DOMAIN,custom-domain,REJECT"));
         // IPv6 兜底（在 MATCH 之前，确保境外/投毒 IPv6 不直连超时）
-        assert_eq!(rules[20].as_str(), Some("GEOIP6,CN,DIRECT,no-resolve"));
-        assert_eq!(rules[21].as_str(), Some("IP-CIDR6,::/0,PROXY,no-resolve"));
+        // 刻意不带 no-resolve：否则域名目标会跳过这两条规则、仍漏到 MATCH,DIRECT
+        assert_eq!(rules[20].as_str(), Some("GEOIP6,CN,DIRECT"));
+        assert_eq!(rules[21].as_str(), Some("IP-CIDR6,::/0,PROXY"));
         assert_eq!(rules[22].as_str(), Some("MATCH,DIRECT"));
 
         // Verify prepend-rules and append-rules keys are removed
         assert!(config.get("prepend-rules").is_none());
         assert!(config.get("append-rules").is_none());
+    }
+
+    /// 回归：`dns.respect-rules: true` + `rule_fallback = direct` 时，fallback 的
+    /// 境外 DoH 会被 `MATCH,DIRECT` 兜走并直连失败，导致防投毒链路整体失效
+    /// （v3.0.0 现场：`dial DIRECT (match Match/) mihomo --> 8.8.8.8:443 error`）。
+    /// 本用例锁定「按 fallback 里的 IP 字面量生成走代理规则」这一约定。
+    #[test]
+    fn dns_fallback_upstreams_are_forced_through_proxy() {
+        use super::dns_fallback_proxy_rules;
+        use serde_yaml_ng::{Mapping, Value};
+
+        // 标量与列表混用 + 各种 scheme / 端口 / h3 参数 / 去重
+        let dns: Mapping = serde_yaml_ng::from_str(
+            r"
+fallback:
+  - https://1.1.1.1/dns-query
+  - https://8.8.8.8/dns-query#h3=true
+  - tls://8.8.4.4:853
+  - https://dns.google/dns-query
+  - https://[2606:4700:4700::1111]/dns-query
+  - 1.1.1.1
+",
+        )
+        .unwrap();
+
+        let generated = dns_fallback_proxy_rules(Some(&Value::Mapping(dns)));
+        let rules: Vec<std::string::String> = generated
+            .iter()
+            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .collect();
+
+        assert_eq!(
+            rules,
+            vec![
+                std::string::String::from("IP-CIDR,1.1.1.1/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,8.8.8.8/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,8.8.4.4/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR6,2606:4700:4700::1111/128,PROXY,no-resolve"),
+            ],
+            "域名型上游应跳过，其余按出现顺序去重后各生成一条"
+        );
+
+        // 没有 dns 段 / 没有 fallback 时不得凭空造规则
+        assert!(dns_fallback_proxy_rules(None).is_empty());
+        let empty: Mapping = serde_yaml_ng::from_str("enable: true").unwrap();
+        assert!(dns_fallback_proxy_rules(Some(&Value::Mapping(empty))).is_empty());
+    }
+
+    #[test]
+    fn extract_upstream_host_handles_all_mihomo_forms() {
+        use super::extract_upstream_host;
+
+        assert_eq!(extract_upstream_host("1.1.1.1").as_deref(), Some("1.1.1.1"));
+        assert_eq!(extract_upstream_host("8.8.8.8:53").as_deref(), Some("8.8.8.8"));
+        assert_eq!(
+            extract_upstream_host("https://1.1.1.1/dns-query").as_deref(),
+            Some("1.1.1.1")
+        );
+        assert_eq!(extract_upstream_host("tls://8.8.4.4:853").as_deref(), Some("8.8.4.4"));
+        assert_eq!(
+            extract_upstream_host("https://dns.google/dns-query#h3=true").as_deref(),
+            Some("dns.google")
+        );
+        assert_eq!(
+            extract_upstream_host("https://[2606:4700:4700::1111]/dns-query").as_deref(),
+            Some("2606:4700:4700::1111")
+        );
+        // 裸 IPv6 不带方括号
+        assert_eq!(
+            extract_upstream_host("2606:4700:4700::1001").as_deref(),
+            Some("2606:4700:4700::1001")
+        );
+        assert_eq!(extract_upstream_host("   ").as_deref(), None);
     }
 }

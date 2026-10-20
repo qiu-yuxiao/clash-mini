@@ -8,6 +8,18 @@ use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 use tauri_plugin_mihomo::Mihomo;
 
+/// 内置出站（非真实代理节点）。
+///
+/// `PROXY` 组只有在「一个真实节点都没有」的冷启动窗口里才会用 `DIRECT` 临时兜底
+/// （见 `enhance::enforce_mini_agreements` 的空组兜底分支）。此时 `group.now` 会等于
+/// `DIRECT`，若照抄进快照、再在真实节点加载后还原，必然得到
+/// `Selector update error: proxy not exist` —— v3.0.0 现场日志实证：
+/// `WARN 恢复 PROXY 组节点选择失败 (DIRECT): ... proxy not exist`。
+/// 这类名字不属于「用户的选择」，快照与还原都应跳过，交给正常的自动选点流程。
+fn is_builtin_outbound(name: &str) -> bool {
+    matches!(name, "DIRECT" | "REJECT" | "REJECT-DROP" | "PASS" | "COMPATIBLE")
+}
+
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
         // 先在锁外等待服务就绪（可能阻塞很久，如UAC弹窗、服务启动等）
@@ -239,9 +251,19 @@ impl CoreManager {
         let mihomo = Handle::mihomo().await.clone();
         match mihomo.get_group_by_name("PROXY").await {
             Ok(group) => match group.now {
-                Some(node) if !node.is_empty() => {
+                Some(node) if !node.is_empty() && !is_builtin_outbound(&node) => {
                     logging!(info, Type::Core, "快照 PROXY 组当前节点: {}", node);
                     Some(node)
+                }
+                Some(node) if !node.is_empty() => {
+                    // 冷启动空组兜底出来的 DIRECT 之类，不是用户的选择，不参与恢复
+                    logging!(
+                        info,
+                        Type::Core,
+                        "PROXY 组当前为内置出站 {}（尚无真实节点），跳过快照",
+                        node
+                    );
+                    None
                 }
                 _ => None,
             },
@@ -294,6 +316,21 @@ impl CoreManager {
                 }
             }
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+
+        // 防御：内置出站（DIRECT/REJECT…）不是可选择的节点，拿它去 select 必然报
+        // `proxy not exist`。放到「API 就绪 + 组列表已填充」之后处理，跳过这次注定
+        // 失败的 IPC，直接走与「还原失败」相同的子集兜底，恢复语义不变。
+        if is_builtin_outbound(node) {
+            logging!(
+                info,
+                Type::Core,
+                "跳过 PROXY 组节点恢复：{} 属内置出站，直接按子集兜底",
+                node
+            );
+            let filter_lower = read_filter_text().await;
+            select_fallback_in_subset(&mihomo, &filter_lower).await;
+            return;
         }
 
         // 恢复节点选择：优先恢复 snapshot 保存的节点
