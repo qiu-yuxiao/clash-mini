@@ -61,7 +61,11 @@ pub async fn enhance_profiles() -> CmdResult<ValidationOutcome> {
             // 只记 info 日志，不走 "failed validation" warn 分支，避免日志措辞误导。
             // handle_validation_notice 内部对 Busy 也已静默（只记日志不弹 notice）。
             if matches!(outcome, ValidationOutcome::Busy) {
-                logging!(info, Type::Cmd, "Reactivate profiles skipped: validation already running");
+                logging!(
+                    info,
+                    Type::Cmd,
+                    "Reactivate profiles skipped: validation already running"
+                );
             } else {
                 logging!(
                     warn,

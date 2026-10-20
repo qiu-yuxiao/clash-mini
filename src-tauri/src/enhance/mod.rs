@@ -338,9 +338,9 @@ async fn merge_default_config(
             // dns / profile 是"订阅优先"的复合节点：仅补缺，不覆盖订阅已声明的字段。
             // 与 tun 不同，二者归订阅所有（Mini 无对应覆写入口），模板只提供兜底默认值。
             let section_name = key.as_str().unwrap_or_default().to_string();
-            let mut section = config
-                .get_mut(section_name.as_str())
-                .map_or_else(Mapping::new, |val| val.as_mapping().cloned().unwrap_or_else(Mapping::new));
+            let mut section = config.get_mut(section_name.as_str()).map_or_else(Mapping::new, |val| {
+                val.as_mapping().cloned().unwrap_or_else(Mapping::new)
+            });
             let defaults = value.as_mapping().cloned().unwrap_or_else(Mapping::new);
             for (default_key, default_value) in defaults.into_iter() {
                 let absent = match default_key.as_str() {
@@ -940,12 +940,30 @@ append-rules:
         assert_eq!(rules[10].as_str(), Some("IP-CIDR6,fc00::/7,DIRECT,no-resolve"));
         assert_eq!(rules[11].as_str(), Some("IP-CIDR6,fe80::/10,DIRECT,no-resolve"));
         assert_eq!(rules[12].as_str(), Some("IP-CIDR6,ff00::/8,DIRECT,no-resolve"));
-        assert_eq!(rules[13].as_str(), Some("IP-CIDR6,::ffff:127.0.0.0/104,DIRECT,no-resolve"));
-        assert_eq!(rules[14].as_str(), Some("IP-CIDR6,::ffff:10.0.0.0/104,DIRECT,no-resolve"));
-        assert_eq!(rules[15].as_str(), Some("IP-CIDR6,::ffff:172.16.0.0/108,DIRECT,no-resolve"));
-        assert_eq!(rules[16].as_str(), Some("IP-CIDR6,::ffff:192.168.0.0/112,DIRECT,no-resolve"));
-        assert_eq!(rules[17].as_str(), Some("IP-CIDR6,::ffff:100.64.0.0/106,DIRECT,no-resolve"));
-        assert_eq!(rules[18].as_str(), Some("IP-CIDR6,::ffff:169.254.0.0/112,DIRECT,no-resolve"));
+        assert_eq!(
+            rules[13].as_str(),
+            Some("IP-CIDR6,::ffff:127.0.0.0/104,DIRECT,no-resolve")
+        );
+        assert_eq!(
+            rules[14].as_str(),
+            Some("IP-CIDR6,::ffff:10.0.0.0/104,DIRECT,no-resolve")
+        );
+        assert_eq!(
+            rules[15].as_str(),
+            Some("IP-CIDR6,::ffff:172.16.0.0/108,DIRECT,no-resolve")
+        );
+        assert_eq!(
+            rules[16].as_str(),
+            Some("IP-CIDR6,::ffff:192.168.0.0/112,DIRECT,no-resolve")
+        );
+        assert_eq!(
+            rules[17].as_str(),
+            Some("IP-CIDR6,::ffff:100.64.0.0/106,DIRECT,no-resolve")
+        );
+        assert_eq!(
+            rules[18].as_str(),
+            Some("IP-CIDR6,::ffff:169.254.0.0/112,DIRECT,no-resolve")
+        );
         assert_eq!(rules[19].as_str(), Some("DOMAIN,custom-domain,REJECT"));
         assert_eq!(rules[20].as_str(), Some("MATCH,DIRECT"));
 

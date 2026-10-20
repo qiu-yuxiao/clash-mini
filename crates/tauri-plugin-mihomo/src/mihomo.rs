@@ -794,7 +794,9 @@ impl Mihomo {
     pub async fn dns_query_ready(&self, name: &str) -> Result<bool> {
         let name_encode = urlencoding::encode(name);
         let suffix_url = format!("/dns/query?name={name_encode}&type=A");
-        let client = self.build_request(Method::GET, &suffix_url)?.timeout(Duration::from_secs(3));
+        let client = self
+            .build_request(Method::GET, &suffix_url)?
+            .timeout(Duration::from_secs(3));
         let response = match self.send_by_protocol(client).await {
             Ok(resp) => resp,
             // 客户端 3 秒超时或连接尚未就绪：DNS 链挂起/未就绪，判定为未就绪并允许调用方继续重试

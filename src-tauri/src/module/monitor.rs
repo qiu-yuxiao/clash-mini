@@ -182,10 +182,7 @@ async fn load_node_server_map() -> HashMap<String, String> {
 ///
 /// 返回 `Some(map)` = 测速链路可用（map 内为本次测得的节点延迟，可能为空但链路正常）；
 /// `None` = 主/备地址都整体失败，属测速链路问题，**不可据此判定节点已死**。
-async fn probe_metrics_group(
-    mihomo: &tauri_plugin_mihomo::Mihomo,
-    label: &str,
-) -> Option<HashMap<String, u32>> {
+async fn probe_metrics_group(mihomo: &tauri_plugin_mihomo::Mihomo, label: &str) -> Option<HashMap<String, u32>> {
     let test_url = get_test_url().await;
     match mihomo
         .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
@@ -456,7 +453,11 @@ pub(crate) async fn wait_for_clash_ready() -> bool {
                         }
                     }
                     if !net_probe_ok {
-                        logging!(warn, Type::Lightweight, "[后台监测] 阶段 3 超时：物理网络探测未通过，继续进入阶段 4 兜底");
+                        logging!(
+                            warn,
+                            Type::Lightweight,
+                            "[后台监测] 阶段 3 超时：物理网络探测未通过，继续进入阶段 4 兜底"
+                        );
                     }
                     // 阶段 4：等待 mihomo DNS 解析链就绪（实测解析一个稳定域名，通后才放行测速）。
                     // 阶段 3 只反映系统侧探测结果，仍需内核侧确认解析链可用，
@@ -529,7 +530,11 @@ async fn wait_dns_resolver_ready(initial_uid: &Option<String>) -> bool {
             }
         }
     }
-    logging!(warn, Type::Lightweight, "[后台监测] 阶段 4 超时：DNS 解析链未就绪，放行测速（由下游兜底）");
+    logging!(
+        warn,
+        Type::Lightweight,
+        "[后台监测] 阶段 4 超时：DNS 解析链未就绪，放行测速（由下游兜底）"
+    );
     true
 }
 
@@ -927,9 +932,7 @@ async fn trigger_backend_auto_select_inner(
         //
         // 带「测速失真复核」：主测速地址整体失败时改用备用 HTTPS 地址复核一次，
         // 避免主地址被机场劫持/不兼容时误判「所有测速节点均不可达」。
-        delays = probe_metrics_group(&mihomo, "选点")
-            .await
-            .unwrap_or_default();
+        delays = probe_metrics_group(&mihomo, "选点").await.unwrap_or_default();
     }
 
     // 【单点测速语义：必须真实探测】valid_nodes.len() == 1 为用户显式单点测速（强即时意图）。
@@ -1228,17 +1231,17 @@ pub fn start_background_monitor() {
                 //   下一个周期也会重新读取当前 Profile，语义仍然正确（等待阶段则由
                 //   is_profile_switched 的状态对比兜底）。
                 tokio::select! {
-                                _ = sleep(Duration::from_secs(check_interval)) => {}
-                                _ = MONITOR_WAKEUP_NOTIFY.notified() => {
-                                    logging!(debug, Type::Lightweight, "[后台监测] 收到唤醒信号，立即唤醒监测");
-                                    // 唤醒即放行一次体检（探活+必要时自愈），不再等下一自然周期
-                                    last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
-                                }
-                                _ = PROFILE_SWITCH_NOTIFY.notified() => {
-                                    logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒监测");
-                                    last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
-                                }
-                            }
+                    _ = sleep(Duration::from_secs(check_interval)) => {}
+                    _ = MONITOR_WAKEUP_NOTIFY.notified() => {
+                        logging!(debug, Type::Lightweight, "[后台监测] 收到唤醒信号，立即唤醒监测");
+                        // 唤醒即放行一次体检（探活+必要时自愈），不再等下一自然周期
+                        last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
+                    }
+                    _ = PROFILE_SWITCH_NOTIFY.notified() => {
+                        logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒监测");
+                        last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
+                    }
+                }
             }
 
             let current_profile = match get_current_profile_uid().await {
@@ -1285,7 +1288,13 @@ pub fn start_background_monitor() {
                         "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点"
                     );
                     // 委托后端执行网络恢复自愈选点（统一走冷却/计数/警报记账，🟡6）
-                    self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
+                    self_heal_with_accounting(
+                        &current_profile,
+                        &mut auto_select_fail_count,
+                        &mut last_auto_select_time,
+                        &mut last_check_time,
+                    )
+                    .await;
                 }
             } else if was_online && !is_online {
                 logging!(
@@ -1325,7 +1334,13 @@ pub fn start_background_monitor() {
                             api_error_count = 0;
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
                             // 统一走冷却/计数/警报记账（与主路径、网络恢复、evaluate_failover Err 一致）
-                            self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
+                            self_heal_with_accounting(
+                                &current_profile,
+                                &mut auto_select_fail_count,
+                                &mut last_auto_select_time,
+                                &mut last_check_time,
+                            )
+                            .await;
                         }
                         continue;
                     }
@@ -1403,7 +1418,13 @@ pub fn start_background_monitor() {
                                         }
 
                                         // 统一走冷却/计数/警报记账（与网络恢复、API 异常路径一致，🟡6）
-                                        self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
+                                        self_heal_with_accounting(
+                                            &current_profile,
+                                            &mut auto_select_fail_count,
+                                            &mut last_auto_select_time,
+                                            &mut last_check_time,
+                                        )
+                                        .await;
                                     }
                                 }
                             }
@@ -1427,7 +1448,13 @@ pub fn start_background_monitor() {
                             api_error_count = 0;
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
                             // 统一走冷却/计数/警报记账（与网络恢复、主路径一致，🟡6）
-                            self_heal_with_accounting(&current_profile, &mut auto_select_fail_count, &mut last_auto_select_time, &mut last_check_time).await;
+                            self_heal_with_accounting(
+                                &current_profile,
+                                &mut auto_select_fail_count,
+                                &mut last_auto_select_time,
+                                &mut last_check_time,
+                            )
+                            .await;
                         }
                     }
                 }
@@ -1563,16 +1590,9 @@ async fn self_heal_with_accounting(
                 Type::Lightweight,
                 "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，重启内核以恢复 API 通道"
             );
-            match crate::core::manager::CoreManager::global()
-                .restart_core()
-                .await
-            {
+            match crate::core::manager::CoreManager::global().restart_core().await {
                 Ok(()) => {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 重启内核成功，API 通道应已恢复"
-                    );
+                    logging!(info, Type::Lightweight, "[后台监测] 重启内核成功，API 通道应已恢复");
                 }
                 Err(e) => {
                     logging!(

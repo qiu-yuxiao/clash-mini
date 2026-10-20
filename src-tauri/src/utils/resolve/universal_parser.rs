@@ -285,11 +285,7 @@ fn parse_trojan(link: &str) -> Option<serde_yaml_ng::Mapping> {
             if k == "sni" && !v.is_empty() {
                 map.insert(
                     serde_yaml_ng::Value::from("sni"),
-                    serde_yaml_ng::Value::from(
-                        percent_encoding::percent_decode_str(v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    ),
+                    serde_yaml_ng::Value::from(percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string()),
                 );
             } else if k == "allowinsecure" && (v == "1" || v.to_lowercase() == "true") {
                 map.insert(
@@ -358,11 +354,7 @@ fn parse_vless(link: &str) -> Option<serde_yaml_ng::Mapping> {
             } else if k == "sni" {
                 map.insert(
                     serde_yaml_ng::Value::from("servername"),
-                    serde_yaml_ng::Value::from(
-                        percent_encoding::percent_decode_str(v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    ),
+                    serde_yaml_ng::Value::from(percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string()),
                 );
             } else if k == "type" {
                 network_type = v.to_string();
@@ -506,29 +498,17 @@ fn parse_hysteria2(link: &str) -> Option<serde_yaml_ng::Mapping> {
             } else if k == "sni" {
                 map.insert(
                     serde_yaml_ng::Value::from("sni"),
-                    serde_yaml_ng::Value::from(
-                        percent_encoding::percent_decode_str(v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    ),
+                    serde_yaml_ng::Value::from(percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string()),
                 );
             } else if k == "obfs" {
                 map.insert(
                     serde_yaml_ng::Value::from("obfs"),
-                    serde_yaml_ng::Value::from(
-                        percent_encoding::percent_decode_str(v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    ),
+                    serde_yaml_ng::Value::from(percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string()),
                 );
             } else if k == "obfs-password" {
                 map.insert(
                     serde_yaml_ng::Value::from("obfs-password"),
-                    serde_yaml_ng::Value::from(
-                        percent_encoding::percent_decode_str(v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    ),
+                    serde_yaml_ng::Value::from(percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string()),
                 );
             }
         }
@@ -563,7 +543,10 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
     }
 
     let mut map = serde_yaml_ng::Mapping::new();
-    map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("hysteria"));
+    map.insert(
+        serde_yaml_ng::Value::from("type"),
+        serde_yaml_ng::Value::from("hysteria"),
+    );
     map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
     map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
     map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
@@ -585,27 +568,15 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
         for (k, v) in parse_query_pairs(q) {
             match k.as_str() {
                 "auth" | "auth_str" | "auth-str" => {
-                    auth_str = Some(
-                        percent_encoding::percent_decode_str(&v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    )
+                    auth_str = Some(percent_encoding::percent_decode_str(&v).decode_utf8_lossy().to_string())
                 }
                 // SNI：v1 链接里通常叫 peer，也兼容直接给 sni
-                "peer" | "sni" => {
-                    sni = Some(
-                        percent_encoding::percent_decode_str(&v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    )
-                }
+                "peer" | "sni" => sni = Some(percent_encoding::percent_decode_str(&v).decode_utf8_lossy().to_string()),
                 "up" | "upmbps" => up = Some(normalize_bandwidth(&v)),
                 "down" | "downmbps" => down = Some(normalize_bandwidth(&v)),
                 // 内核仅支持 udp / wechat-video / faketcp，其它取值忽略，避免写入非法配置
                 "protocol" => {
-                    let proto = percent_encoding::percent_decode_str(&v)
-                        .decode_utf8_lossy()
-                        .to_string();
+                    let proto = percent_encoding::percent_decode_str(&v).decode_utf8_lossy().to_string();
                     if matches!(proto.as_str(), "udp" | "wechat-video" | "faketcp") {
                         protocol = Some(proto);
                     }
@@ -619,19 +590,9 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
                 "alpn" => alpn = Some(v),
                 // 混淆密码：不同生成器写作 obfsParam 或 obfs，二者都对应内核的 obfs 字段
                 "obfsparam" | "obfs-password" | "obfs_password" => {
-                    obfs_param = Some(
-                        percent_encoding::percent_decode_str(&v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    )
+                    obfs_param = Some(percent_encoding::percent_decode_str(&v).decode_utf8_lossy().to_string())
                 }
-                "obfs" => {
-                    obfs_plain = Some(
-                        percent_encoding::percent_decode_str(&v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    )
-                }
+                "obfs" => obfs_plain = Some(percent_encoding::percent_decode_str(&v).decode_utf8_lossy().to_string()),
                 _ => {}
             }
         }
@@ -662,7 +623,10 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
             .filter(|s| !s.is_empty())
             .collect();
         if !alpn_list.is_empty() {
-            map.insert(serde_yaml_ng::Value::from("alpn"), serde_yaml_ng::Value::from(alpn_list));
+            map.insert(
+                serde_yaml_ng::Value::from("alpn"),
+                serde_yaml_ng::Value::from(alpn_list),
+            );
         }
     }
 
@@ -701,7 +665,10 @@ fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
     map.insert(serde_yaml_ng::Value::from("name"), serde_yaml_ng::Value::from(remarks));
     map.insert(serde_yaml_ng::Value::from("server"), serde_yaml_ng::Value::from(server));
     map.insert(serde_yaml_ng::Value::from("port"), serde_yaml_ng::Value::from(port));
-    map.insert(serde_yaml_ng::Value::from("password"), serde_yaml_ng::Value::from(password));
+    map.insert(
+        serde_yaml_ng::Value::from("password"),
+        serde_yaml_ng::Value::from(password),
+    );
     map.insert(serde_yaml_ng::Value::from("udp"), serde_yaml_ng::Value::from(true));
 
     if let Some(q) = query {
@@ -709,16 +676,8 @@ fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
         let mut alpn: Option<String> = None;
         for (k, v) in parse_query_pairs(q) {
             match k.as_str() {
-                "sni" | "peer" => {
-                    sni = Some(
-                        percent_encoding::percent_decode_str(&v)
-                            .decode_utf8_lossy()
-                            .to_string(),
-                    )
-                }
-                "insecure" | "allowinsecure" | "allow_insecure"
-                    if v == "1" || v.eq_ignore_ascii_case("true") =>
-                {
+                "sni" | "peer" => sni = Some(percent_encoding::percent_decode_str(&v).decode_utf8_lossy().to_string()),
+                "insecure" | "allowinsecure" | "allow_insecure" if v == "1" || v.eq_ignore_ascii_case("true") => {
                     map.insert(
                         serde_yaml_ng::Value::from("skip-cert-verify"),
                         serde_yaml_ng::Value::from(true),
@@ -831,9 +790,7 @@ fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
                     map.insert(
                         serde_yaml_ng::Value::from("sni"),
                         serde_yaml_ng::Value::from(
-                            percent_encoding::percent_decode_str(v)
-                                .decode_utf8_lossy()
-                                .to_string(),
+                            percent_encoding::percent_decode_str(v).decode_utf8_lossy().to_string(),
                         ),
                     );
                 }
@@ -1700,7 +1657,10 @@ mod tests {
             15823
         );
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("auth-str")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("auth-str"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "dongtaiwang.com"
         );
         assert_eq!(
@@ -1781,8 +1741,7 @@ mod tests {
 
     #[test]
     fn test_parse_anytls() {
-        let link =
-            "anytls://mypassword@example.com:8443?sni=example.com&insecure=1&alpn=h2,http/1.1#anytls-test";
+        let link = "anytls://mypassword@example.com:8443?sni=example.com&insecure=1&alpn=h2,http/1.1#anytls-test";
         let map = parse_anytls(link).unwrap();
 
         assert_eq!(
@@ -1867,8 +1826,7 @@ mod tests {
     #[test]
     fn test_parse_anytls_password_with_at() {
         // 密码里的 @ 经百分号编码：唯一的字面 @ 仍是分隔符，密码需解码
-        let map =
-            parse_anytls("anytls://user%40pass@example.com:8443?sni=example.com#anytls-enc").unwrap();
+        let map = parse_anytls("anytls://user%40pass@example.com:8443?sni=example.com#anytls-enc").unwrap();
         assert_eq!(
             map.get(serde_yaml_ng::Value::from("password"))
                 .unwrap()
@@ -1878,8 +1836,7 @@ mod tests {
         );
 
         // 密码里含未编码的字面 @：须按最后一个 @ 分割 host（覆盖 rsplit 分支）
-        let map =
-            parse_anytls("anytls://user@pass@example.com:8443?sni=example.com#anytls-at").unwrap();
+        let map = parse_anytls("anytls://user@pass@example.com:8443?sni=example.com#anytls-at").unwrap();
         assert_eq!(
             map.get(serde_yaml_ng::Value::from("password"))
                 .unwrap()
@@ -1902,7 +1859,10 @@ mod tests {
         let link = "hysteria://example.com:443?auth=pass%2Bword%26123&peer=sub.example.com&obfsParam=sec%20ret&protocol=wechat%2Dvideo#hy-decode";
         let map = parse_hysteria(link).unwrap();
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("auth-str")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("auth-str"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "pass+word&123"
         );
         assert_eq!(
@@ -1914,7 +1874,10 @@ mod tests {
             "sec ret"
         );
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("protocol")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("protocol"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "wechat-video"
         );
     }
@@ -1925,7 +1888,10 @@ mod tests {
         let link = "trojan://a@b@example.com:443?sni=cdn%20edge.example.com#t-at";
         let map = parse_trojan(link).unwrap();
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "a@b"
         );
         assert_eq!(
@@ -1941,10 +1907,14 @@ mod tests {
     #[test]
     fn test_parse_hysteria2_password_and_query_decode() {
         // 密码含未编码 @：按最后一个 @ 拆分；obfs-password 含编码空格
-        let link = "hysteria2://p@ss@example.com:8443?sni=example.com&obfs=salamander&obfs-password=my%20secret#h2-decode";
+        let link =
+            "hysteria2://p@ss@example.com:8443?sni=example.com&obfs=salamander&obfs-password=my%20secret#h2-decode";
         let map = parse_hysteria2(link).unwrap();
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "p@ss"
         );
         assert_eq!(
@@ -1984,7 +1954,10 @@ mod tests {
         let link = "hysteria://auth_str@example.com:443?peer=user@backend.example.com&insecure=1#hy-query-at";
         let map = parse_hysteria(link).unwrap();
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("auth-str")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("auth-str"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "auth_str"
         );
         assert_eq!(
@@ -1996,7 +1969,10 @@ mod tests {
             "user@backend.example.com"
         );
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("skip-cert-verify")).unwrap().as_bool().unwrap(),
+            map.get(serde_yaml_ng::Value::from("skip-cert-verify"))
+                .unwrap()
+                .as_bool()
+                .unwrap(),
             true
         );
     }
@@ -2007,7 +1983,10 @@ mod tests {
         let link = "anytls://mypass@example.com:443?sni=user@internal.example.com&insecure=true#anytls-query-at";
         let map = parse_anytls(link).unwrap();
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("password")).unwrap().as_str().unwrap(),
+            map.get(serde_yaml_ng::Value::from("password"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "mypass"
         );
         assert_eq!(
@@ -2019,7 +1998,10 @@ mod tests {
             "user@internal.example.com"
         );
         assert_eq!(
-            map.get(serde_yaml_ng::Value::from("skip-cert-verify")).unwrap().as_bool().unwrap(),
+            map.get(serde_yaml_ng::Value::from("skip-cert-verify"))
+                .unwrap()
+                .as_bool()
+                .unwrap(),
             true
         );
     }

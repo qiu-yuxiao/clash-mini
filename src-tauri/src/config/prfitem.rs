@@ -709,8 +709,7 @@ impl PrfItem {
         };
 
         if should_write {
-            std::fs::write(path, data.as_bytes())
-                .context("failed to save the file")
+            std::fs::write(path, data.as_bytes()).context("failed to save the file")
         } else {
             Ok(())
         }
@@ -980,8 +979,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // Save empty string again (should be skipped)
-        item.save_file("".into())
-            .expect("save empty string second time failed");
+        item.save_file("".into()).expect("save empty string second time failed");
         let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
         let mtime_second = metadata_second.modified().expect("modified time failed");
         assert_eq!(
@@ -1046,8 +1044,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // 2. Save CRLF equivalent content -> should skip write
-        item.save_file("line1\r\nline2\r\n".into())
-            .expect("save CRLF failed");
+        item.save_file("line1\r\nline2\r\n".into()).expect("save CRLF failed");
         let metadata_second = tokio::fs::metadata(&file_path).await.expect("metadata failed");
         let mtime_second = metadata_second.modified().expect("mtime failed");
         assert_eq!(mtime_first, mtime_second, "mtime changed for normalized CRLF content");
@@ -1055,8 +1052,7 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // 3. Save mixed content -> should skip write if normalized equivalent
-        item.save_file("line1\r\nline2\n".into())
-            .expect("save mixed failed");
+        item.save_file("line1\r\nline2\n".into()).expect("save mixed failed");
         let metadata_third = tokio::fs::metadata(&file_path).await.expect("mtime failed");
         let mtime_third = metadata_third.modified().expect("mtime failed");
         assert_eq!(mtime_first, mtime_third, "mtime changed for normalized mixed content");

@@ -1,6 +1,4 @@
-use crate::{
-    constants::files, core::handle, utils::resolve::window::build_new_window,
-};
+use crate::{constants::files, core::handle, utils::resolve::window::build_new_window};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
@@ -150,15 +148,8 @@ static LAST_GEOMETRY_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 /// tokio worker 被阻塞导致 runtime 调度停止。
 /// 改用 spawn_blocking 将 I/O 投递到阻塞线程池，主线程立即返回。
 /// 安全性：0×0 守卫已拒绝 destroy 触发的无效事件；写入内容幂等，乱序无害。
-pub fn save_window_state_on_geometry_change_sync(
-    width: f64,
-    height: f64,
-    x: Option<f64>,
-    y: Option<f64>,
-) {
-    if width < crate::utils::resolve::window::MINIMAL_WIDTH
-        || height < crate::utils::resolve::window::MINIMAL_HEIGHT
-    {
+pub fn save_window_state_on_geometry_change_sync(width: f64, height: f64, x: Option<f64>, y: Option<f64>) {
+    if width < crate::utils::resolve::window::MINIMAL_WIDTH || height < crate::utils::resolve::window::MINIMAL_HEIGHT {
         return;
     }
     let now = SystemTime::now()
@@ -559,12 +550,7 @@ impl WindowManager {
                         Some(p.x as f64 / scale),
                         Some(p.y as f64 / scale),
                     )),
-                    (Some(s), None) => Some((
-                        s.width as f64 / scale,
-                        s.height as f64 / scale,
-                        None,
-                        None,
-                    )),
+                    (Some(s), None) => Some((s.width as f64 / scale, s.height as f64 / scale, None, None)),
                     _ => None,
                 }
             } else {
@@ -613,7 +599,11 @@ impl WindowManager {
                     }
                     Ok(Err(_)) => {
                         // oneshot 发送端被丢弃（主线程闭包未回报），不再乐观宣称已摧毁
-                        logging!(warn, Type::Window, "接收窗口销毁结果失败（oneshot 发送端被丢弃），返回 Failed");
+                        logging!(
+                            warn,
+                            Type::Window,
+                            "接收窗口销毁结果失败（oneshot 发送端被丢弃），返回 Failed"
+                        );
                         WindowOperationResult::Failed
                     }
                     Err(_) => {

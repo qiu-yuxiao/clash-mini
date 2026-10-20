@@ -6,9 +6,7 @@ use tauri_plugin_notification::NotificationExt as _;
 
 pub enum NotificationEvent<'a> {
     DashboardToggled,
-    ClashModeChanged {
-        mode: &'a str,
-    },
+    ClashModeChanged { mode: &'a str },
     SystemProxyToggled(bool),
     TunModeToggled(bool),
     LightweightModeEntered,

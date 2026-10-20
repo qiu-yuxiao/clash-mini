@@ -63,22 +63,12 @@ pub fn backup_before_migration(path: &Path, from_version: u32) -> Option<PathBuf
     let backup = path.with_file_name(format!("{file_name}.bak.v{from_version}"));
     if backup.exists() {
         // 同一版本只备份一次，避免重复启动时反复覆盖（保留最早那份原始配置）
-        logging!(
-            info,
-            Type::Config,
-            "配置迁移备份已存在，跳过覆盖: {}",
-            backup.display()
-        );
+        logging!(info, Type::Config, "配置迁移备份已存在，跳过覆盖: {}", backup.display());
         return Some(backup);
     }
     match std::fs::copy(path, &backup) {
         Ok(_) => {
-            logging!(
-                info,
-                Type::Config,
-                "配置迁移前已备份: {}",
-                backup.display()
-            );
+            logging!(info, Type::Config, "配置迁移前已备份: {}", backup.display());
             Some(backup)
         }
         Err(e) => {
@@ -375,14 +365,8 @@ mod tests {
         // 模拟模板合并（注入 config_version = 当前版本）：合并后检测会被污染为最新版，
         // 这正是集成顺序颠倒时迁移失效的机理
         let mut merged = legacy.clone();
-        merged.insert(
-            "config_version".into(),
-            CURRENT_CLASH_CONFIG_VERSION.into(),
-        );
-        assert_eq!(
-            detect_config_version(&merged),
-            CURRENT_CLASH_CONFIG_VERSION
-        );
+        merged.insert("config_version".into(), CURRENT_CLASH_CONFIG_VERSION.into());
+        assert_eq!(detect_config_version(&merged), CURRENT_CLASH_CONFIG_VERSION);
 
         // 以合并前检测到的 v1 为起始版本，tun.stack "system" 才会被归一化
         let v = migrate_clash(&mut legacy, from_version);

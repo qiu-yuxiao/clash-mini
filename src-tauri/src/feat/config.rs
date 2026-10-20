@@ -210,8 +210,7 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     }
     // SYS_PROXY 已提前至 CLASH_CONFIG 之前执行（见上方注释），此处不再重复。
     if update_flags.contains(UpdateFlags::SYSTRAY_ICON) {
-        tray::Tray::global()
-            .update_icon(&Config::verge().await.latest_arc())?;
+        tray::Tray::global().update_icon(&Config::verge().await.latest_arc())?;
     }
     if update_flags.contains(UpdateFlags::LOG_LEVEL) {
         Logger::global().update_log_level(patch.get_log_level())?;

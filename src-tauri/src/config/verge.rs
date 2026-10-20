@@ -1,6 +1,5 @@
 use crate::config::{
-    Config, CURRENT_VERGE_CONFIG_VERSION, IMPLICIT_LEGACY_VERSION, backup_before_migration,
-    migrate_verge,
+    CURRENT_VERGE_CONFIG_VERSION, Config, IMPLICIT_LEGACY_VERSION, backup_before_migration, migrate_verge,
 };
 use crate::{
     config::DEFAULT_PAC,
@@ -296,9 +295,7 @@ impl IVerge {
                     // 已收编为正式迁移 `migrate_verge_v1_to_v2`，便于单测与后续扩展。
                     // 备份成功才迁移：备份失败则中止（配置保持旧版本原样，下次启动重试），
                     // 宁可不迁移也不在无备份的情况下改写用户配置。
-                    let from_version = config
-                        .config_version
-                        .unwrap_or(IMPLICIT_LEGACY_VERSION);
+                    let from_version = config.config_version.unwrap_or(IMPLICIT_LEGACY_VERSION);
                     if from_version < CURRENT_VERGE_CONFIG_VERSION
                         && backup_before_migration(&path, from_version).is_none()
                     {

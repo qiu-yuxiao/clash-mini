@@ -267,7 +267,8 @@ pub fn run() {
                             // 每次窗口尺寸或位置变化都同步持久化（带 250ms 节流），
                             // 确保进入轻量模式销毁窗口前 window_state.json 已是当前尺寸与位置。
                             let scale = webview_window.scale_factor().unwrap_or(1.0);
-                            if let (Ok(size), Ok(pos)) = (webview_window.outer_size(), webview_window.outer_position()) {
+                            if let (Ok(size), Ok(pos)) = (webview_window.outer_size(), webview_window.outer_position())
+                            {
                                 let w = size.width as f64 / scale;
                                 let h = size.height as f64 / scale;
                                 let x = pos.x as f64 / scale;

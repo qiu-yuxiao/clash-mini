@@ -1,7 +1,6 @@
 use super::{PrfOption, prfitem::PrfItem};
 use crate::config::{
-    CURRENT_PROFILES_CONFIG_VERSION, IMPLICIT_LEGACY_VERSION, backup_before_migration,
-    migrate_profiles,
+    CURRENT_PROFILES_CONFIG_VERSION, IMPLICIT_LEGACY_VERSION, backup_before_migration, migrate_profiles,
 };
 use crate::utils::{
     dirs::{self, PathBufExec as _},
@@ -72,9 +71,7 @@ impl IProfiles {
                 // 当前 profiles.yaml 尚无破坏性变更（v1），骨架先就位以便后续扩展。
                 // 与 verge.yaml 保持对称：备份成功才迁移，迁移后立即落盘；
                 // 备份失败则中止迁移（宁可不迁移也不在无备份时改写用户配置）。
-                let from_version = profiles
-                    .config_version
-                    .unwrap_or(IMPLICIT_LEGACY_VERSION);
+                let from_version = profiles.config_version.unwrap_or(IMPLICIT_LEGACY_VERSION);
                 if from_version < CURRENT_PROFILES_CONFIG_VERSION
                     && backup_before_migration(&path, from_version).is_none()
                 {

@@ -232,10 +232,7 @@ impl IClashTemp {
                 Value::Number(val_num) => Some(val_num.to_string()),
                 _ => None,
             }),
-            ipv6: config
-                .get("ipv6")
-                .and_then(|value| value.as_bool())
-                .unwrap_or(false),
+            ipv6: config.get("ipv6").and_then(|value| value.as_bool()).unwrap_or(false),
             allow_lan: config
                 .get("allow-lan")
                 .and_then(|value| value.as_bool())

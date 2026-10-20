@@ -77,25 +77,25 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
     }
 
     builder = builder.on_page_load(move |window, payload| {
-            if payload.event() != PageLoadEvent::Finished {
-                return;
-            }
+        if payload.event() != PageLoadEvent::Finished {
+            return;
+        }
 
-            logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
-            logging_error!(Type::Window, window.show());
-            logging_error!(Type::Window, window.set_focus());
-            let label = window.label().to_string();
-            let ah = app_handle_clone.clone();
-            let ah2 = ah.clone();
-            // 【注意】on_page_load 回调本身就在主线程执行，此处 run_on_main_thread 是冗余的
-            // 保留是为了安全起见，确保 set_always_on_top 在主线程调用，即使未来回调上下文变化
-            let _ = ah.run_on_main_thread(move || {
-                use tauri::Manager as _;
-                if let Some(w) = ah2.get_webview_window(&label) {
-                    let _ = w.set_always_on_top(always_on_top);
-                }
-            });
+        logging_error!(Type::Window, window.set_title(&get_bold_window_title()));
+        logging_error!(Type::Window, window.show());
+        logging_error!(Type::Window, window.set_focus());
+        let label = window.label().to_string();
+        let ah = app_handle_clone.clone();
+        let ah2 = ah.clone();
+        // 【注意】on_page_load 回调本身就在主线程执行，此处 run_on_main_thread 是冗余的
+        // 保留是为了安全起见，确保 set_always_on_top 在主线程调用，即使未来回调上下文变化
+        let _ = ah.run_on_main_thread(move || {
+            use tauri::Manager as _;
+            if let Some(w) = ah2.get_webview_window(&label) {
+                let _ = w.set_always_on_top(always_on_top);
+            }
         });
+    });
 
     // 窗口创建阶段即禁用 OS 级 maximize（Win+上 / 双击标题栏 / 任务栏右键），
     // 改由前端 toggleMaximize 自定义 640×860 大尺寸模式。

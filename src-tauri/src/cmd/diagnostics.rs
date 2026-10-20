@@ -101,14 +101,12 @@ async fn read_log_file_with_tail_cap(path: &std::path::Path, max_bytes: usize) -
 ///
 /// 单独成规则的原因：认证头的值常常不是 `key=value` 形态（如 `Bearer eyJ...`），
 /// 普通 KV 规则只吃掉第一个 token（`Bearer`），后面真正的令牌会漏出来。
-static LOG_AUTH_HEADER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(\bauthorization\s*[=:]\s*)[^\r\n]+").expect("log auth header regex")
-});
+static LOG_AUTH_HEADER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(\bauthorization\s*[=:]\s*)[^\r\n]+").expect("log auth header regex"));
 
 /// 日志正文脱敏规则 0b：裸 `Bearer <token>`（日志里没带 Authorization 前缀时兜底）。
-static LOG_BEARER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?i)(\bbearer\s+)[^\s"&,;]+"#).expect("log bearer regex")
-});
+static LOG_BEARER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?i)(\bbearer\s+)[^\s"&,;]+"#).expect("log bearer regex"));
 
 /// 日志正文脱敏（非结构化文本，无法按 YAML 键名递归，改为按敏感字段名匹配）。
 /// 测速地址、网站域名等无害内容原样保留，保证排查价值；覆盖不到的形态由
@@ -179,8 +177,7 @@ fn redact_yaml_text(text: &str) -> String {
     match serde_yaml_ng::from_str::<Value>(text) {
         Ok(mut value) => {
             redact_value(&mut value);
-            serde_yaml_ng::to_string(&value)
-                .unwrap_or_else(|e| format!("# 脱敏成功但序列化失败: {e}\n"))
+            serde_yaml_ng::to_string(&value).unwrap_or_else(|e| format!("# 脱敏成功但序列化失败: {e}\n"))
         }
         Err(e) => format!("# 配置解析失败，为避免泄露原始内容，本文件不含配置正文: {e}\n"),
     }
@@ -232,9 +229,7 @@ async fn collect_system_info() -> String {
          日志轮转        : {:?} KB × {:?} 个\n\
          节点总数        : {}\n",
         Local::now().format("%Y-%m-%d %H:%M:%S"),
-        crate::core::handle::Handle::app_handle()
-            .package_info()
-            .version,
+        crate::core::handle::Handle::app_handle().package_info().version,
         std::env::consts::OS,
         std::env::consts::ARCH,
         verge.config_version,
@@ -267,8 +262,7 @@ async fn export_bundle_inner() -> Result<String> {
         .with_context(|| format!("创建诊断目录失败: {}", out_dir.display()))?;
     let zip_path = out_dir.join(format!("clash-mini-diag-{stamp}.zip"));
 
-    let file = std::fs::File::create(&zip_path)
-        .with_context(|| format!("创建诊断包失败: {}", zip_path.display()))?;
+    let file = std::fs::File::create(&zip_path).with_context(|| format!("创建诊断包失败: {}", zip_path.display()))?;
     let mut zip = zip::ZipWriter::new(file);
 
     // 1) 日志：递归收集（主目录 + service / sidecar 子目录），全部脱敏后入包
@@ -283,12 +277,7 @@ async fn export_bundle_inner() -> Result<String> {
         while let Ok(Some(entry)) = rd.next_entry().await {
             // 符号链接一律跳过：latest.log 与最新轮转文件内容重复；
             // 更关键的是**链接目录**会形成遍历环，靠日志条数上限兜不住（会无限压栈）
-            if entry
-                .file_type()
-                .await
-                .map(|t| t.is_symlink())
-                .unwrap_or(false)
-            {
+            if entry.file_type().await.map(|t| t.is_symlink()).unwrap_or(false) {
                 continue;
             }
             let path = entry.path();
@@ -338,10 +327,7 @@ async fn export_bundle_inner() -> Result<String> {
 
     // 2) 配置：一律脱敏后再入包
     for (src_name, out_name) in [
-        (
-            crate::constants::files::RUNTIME_CONFIG,
-            "runtime-config.redacted.yaml",
-        ),
+        (crate::constants::files::RUNTIME_CONFIG, "runtime-config.redacted.yaml"),
         ("verge.yaml", "verge.yaml.redacted.yaml"),
         ("profiles.yaml", "profiles.yaml.redacted.yaml"),
     ] {
@@ -481,10 +467,7 @@ proxies:
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!(
-            "clash-mini-diag-test-{tag}-{}-{nanos}.log",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("clash-mini-diag-test-{tag}-{}-{nanos}.log", std::process::id()))
     }
 
     #[tokio::test]

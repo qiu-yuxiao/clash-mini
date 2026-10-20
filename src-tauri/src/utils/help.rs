@@ -16,8 +16,8 @@ pub fn read_yaml<T: DeserializeOwned>(path: &PathBuf) -> Result<T> {
         bail!("file not found \"{}\"", path.display());
     }
 
-    let yaml_str = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read the file \"{}\"", path.display()))?;
+    let yaml_str =
+        std::fs::read_to_string(path).with_context(|| format!("failed to read the file \"{}\"", path.display()))?;
 
     Ok(with_encryption(|| serde_yaml_ng::from_str::<T>(&yaml_str))?)
 }
@@ -28,8 +28,8 @@ pub fn read_mapping(path: &PathBuf) -> Result<Mapping> {
         bail!("file not found \"{}\"", path.display());
     }
 
-    let yaml_str = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read the file \"{}\"", path.display()))?;
+    let yaml_str =
+        std::fs::read_to_string(path).with_context(|| format!("failed to read the file \"{}\"", path.display()))?;
 
     // YAML语法检查
     match serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&yaml_str) {
@@ -93,8 +93,7 @@ pub fn save_yaml<T: Serialize>(path: &PathBuf, data: &T, prefix: Option<&str>) -
     let path_str = path.as_os_str().to_string_lossy().to_string();
     let tmp_path_str = tmp_path.as_os_str().to_string_lossy().to_string();
 
-    std::fs::write(&tmp_path, yaml_bytes)
-        .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
+    std::fs::write(&tmp_path, yaml_bytes).with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
     // 原子替换文件：使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
     let result = move_file_ex_replace(&tmp_path, path);
@@ -139,8 +138,7 @@ pub fn save_json<T: Serialize>(path: &PathBuf, data: &T) -> Result<()> {
     let path_str = path.as_os_str().to_string_lossy().to_string();
     let tmp_path_str = tmp_path.as_os_str().to_string_lossy().to_string();
 
-    std::fs::write(&tmp_path, json_bytes)
-        .with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
+    std::fs::write(&tmp_path, json_bytes).with_context(|| format!("failed to write temp file \"{tmp_path_str}\""))?;
 
     // 原子替换文件：使用 MoveFileExW + MOVEFILE_REPLACE_EXISTING，原子替换不产生竞态窗口
     let result = move_file_ex_replace(&tmp_path, path);
@@ -313,10 +311,7 @@ pub fn show_in_folder(path: &Path) -> Result<()> {
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
-        Command::new("open")
-            .arg("-R")
-            .arg(path)
-            .spawn()?;
+        Command::new("open").arg("-R").arg(path).spawn()?;
         Ok(())
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
