@@ -535,7 +535,6 @@
     "testingInProgress": "Geschwindigkeitstest läuft, bitte später erneut versuchen",
     "testNotExecuted": "Test nicht ausgeführt: Core nicht bereit oder keine testbaren Knoten",
     "testFailed": "Geschwindigkeitstest fehlgeschlagen: {{message}}",
-    "adjusting": "Anpassung läuft, bitte warten…",
     "updated": "Aktualisiert",
     "portSaved": "Proxy-Port gespeichert und neu geladen",
     "profilesTitle": "Profile & Abonnements",

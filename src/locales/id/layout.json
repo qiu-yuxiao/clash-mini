@@ -28,7 +28,8 @@
       "generatingDiagnostics": "Sedang membuat diagnostik, mohon tunggu…",
       "diagnosticsExported": "Diagnostik diekspor: {{path}}",
       "checkAppUpdate": "Cek Pembaruan Aplikasi",
-      "checkCoreUpdate": "Cek Pembaruan Core"
+      "checkCoreUpdate": "Cek Pembaruan Core",
+      "buttonAriaLabel": "Bantuan dan alat"
     },
     "dialogs": {
       "editProfile": {

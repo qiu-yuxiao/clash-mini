@@ -285,7 +285,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
           }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          ✂️ 剪切
+          ✂️ {t('shared.actions.cut')}
         </MenuItem>
         <MenuItem
           onClick={handleCopy}
@@ -295,20 +295,20 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
           }
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          📋 复制
+          📋 {t('shared.actions.copy')}
         </MenuItem>
         <MenuItem
           onClick={handlePaste}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          📥 粘贴
+          📥 {t('shared.actions.paste')}
         </MenuItem>
         <MenuItem
           onClick={handleSelectAll}
           disabled={!text}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🔍 全选
+          🔍 {t('shared.actions.selectAll')}
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
@@ -319,7 +319,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
             color: 'error.main',
           }}
         >
-          🧹 清空
+          🧹 {t('shared.actions.clearInput')}
         </MenuItem>
       </Menu>
     </>

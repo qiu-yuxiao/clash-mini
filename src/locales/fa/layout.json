@@ -28,7 +28,8 @@
       "generatingDiagnostics": "در حال تولید تشخیص، لطفاً صبر کنید…",
       "diagnosticsExported": "تشخیص برون‌بری شد: {{path}}",
       "checkAppUpdate": "بررسی به‌روزرسانی برنامه",
-      "checkCoreUpdate": "بررسی به‌روزرسانی هسته"
+      "checkCoreUpdate": "بررسی به‌روزرسانی هسته",
+      "buttonAriaLabel": "راهنما و ابزارها"
     },
     "dialogs": {
       "editProfile": {

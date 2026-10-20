@@ -28,7 +28,8 @@
       "generatingDiagnostics": "Diagnose wird erstellt, bitte warten…",
       "diagnosticsExported": "Diagnose exportiert: {{path}}",
       "checkAppUpdate": "App-Updates prüfen",
-      "checkCoreUpdate": "Core-Updates prüfen"
+      "checkCoreUpdate": "Core-Updates prüfen",
+      "buttonAriaLabel": "Hilfe und Werkzeuge"
     },
     "dialogs": {
       "editProfile": {

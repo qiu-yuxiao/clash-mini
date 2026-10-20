@@ -28,7 +28,8 @@
       "generatingDiagnostics": "Generating diagnostics, please wait…",
       "diagnosticsExported": "Diagnostics exported: {{path}}",
       "checkAppUpdate": "Check App Updates",
-      "checkCoreUpdate": "Check Core Updates"
+      "checkCoreUpdate": "Check Core Updates",
+      "buttonAriaLabel": "Help and tools"
     },
     "dialogs": {
       "editProfile": {

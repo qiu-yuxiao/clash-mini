@@ -28,7 +28,8 @@
       "generatingDiagnostics": "Tanılama oluşturuluyor, lütfen bekleyin…",
       "diagnosticsExported": "Tanılama dışa aktarıldı: {{path}}",
       "checkAppUpdate": "Uygulama Güncellemelerini Denetle",
-      "checkCoreUpdate": "Çekirdek Güncellemelerini Denetle"
+      "checkCoreUpdate": "Çekirdek Güncellemelerini Denetle",
+      "buttonAriaLabel": "Yardım ve araçlar"
     },
     "dialogs": {
       "editProfile": {

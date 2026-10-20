@@ -28,7 +28,8 @@
       "generatingDiagnostics": "Generando diagnóstico, espere…",
       "diagnosticsExported": "Diagnóstico exportado: {{path}}",
       "checkAppUpdate": "Buscar actualizaciones de la app",
-      "checkCoreUpdate": "Buscar actualizaciones del núcleo"
+      "checkCoreUpdate": "Buscar actualizaciones del núcleo",
+      "buttonAriaLabel": "Ayuda y herramientas"
     },
     "dialogs": {
       "editProfile": {

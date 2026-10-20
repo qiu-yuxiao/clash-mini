@@ -28,7 +28,8 @@
       "generatingDiagnostics": "진단 패키지 생성 중…",
       "diagnosticsExported": "진단 패키지 내보내기 완료: {{path}}",
       "checkAppUpdate": "앱 업데이트 확인",
-      "checkCoreUpdate": "코어 업데이트 확인"
+      "checkCoreUpdate": "코어 업데이트 확인",
+      "buttonAriaLabel": "도움말 및 도구"
     },
     "dialogs": {
       "editProfile": {

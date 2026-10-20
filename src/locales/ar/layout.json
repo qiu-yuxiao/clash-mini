@@ -28,7 +28,8 @@
       "generatingDiagnostics": "جارٍ إنشاء التشخيص، انتظر…",
       "diagnosticsExported": "تم تصدير التشخيص: {{path}}",
       "checkAppUpdate": "التحقق من تحديثات التطبيق",
-      "checkCoreUpdate": "التحقق من تحديثات النواة"
+      "checkCoreUpdate": "التحقق من تحديثات النواة",
+      "buttonAriaLabel": "المساعدة والأدوات"
     },
     "dialogs": {
       "editProfile": {

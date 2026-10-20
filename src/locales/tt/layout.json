@@ -28,7 +28,8 @@
       "generatingDiagnostics": "Диагностика ясала, көтегез…",
       "diagnosticsExported": "Диагностика тышка алынды: {{path}}",
       "checkAppUpdate": "Кушымта яңартуларын тикшерү",
-      "checkCoreUpdate": "Төш яңартуларын тикшерү"
+      "checkCoreUpdate": "Төш яңартуларын тикшерү",
+      "buttonAriaLabel": "Ярдәм һәм кораллар"
     },
     "dialogs": {
       "editProfile": {

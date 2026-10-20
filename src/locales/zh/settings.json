@@ -575,7 +575,6 @@
     "testingInProgress": "正在测速中，请稍候再试",
     "testNotExecuted": "测速未执行：内核未就绪或暂无可测节点",
     "testFailed": "测速失败：{{message}}",
-    "adjusting": "正在调整，请稍候…",
     "updated": "已更新",
     "portSaved": "代理端口已保存并重载"
   }

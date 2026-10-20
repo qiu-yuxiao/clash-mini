@@ -535,7 +535,6 @@
     "testingInProgress": "スピードテスト中です。しばらくしてから再試行してください",
     "testNotExecuted": "テスト未実行：コアが準備できていないか、テスト可能なノードがありません",
     "testFailed": "スピードテストに失敗しました：{{message}}",
-    "adjusting": "調整しています。しばらくお待ちください…",
     "updated": "更新しました",
     "portSaved": "プロキシポートを保存し再読み込みしました",
     "profilesTitle": "購読とプロファイル",

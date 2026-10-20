@@ -21,6 +21,9 @@
       "title": "Proxy Rules",
       "select": "Select Rules"
     },
+    "a11y": {
+      "nodelist": "قائمة عقد الوكيل"
+    },
     "labels": {
       "proxyCount": "Proxy Count",
       "delayCheckReset": "فحص التأخير لإلغاء الثابت"

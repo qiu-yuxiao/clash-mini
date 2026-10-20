@@ -535,7 +535,6 @@
     "testingInProgress": "Hız testi sürüyor, lütfen daha sonra tekrar deneyin",
     "testNotExecuted": "Test yürütülmedi: çekirdek hazır değil veya test edilebilir düğüm yok",
     "testFailed": "Hız testi başarısız: {{message}}",
-    "adjusting": "Ayarlanıyor, lütfen bekleyin…",
     "updated": "Güncellendi",
     "portSaved": "Proxy bağlantı noktası kaydedildi ve yeniden yüklendi",
     "profilesTitle": "Profiller ve Abonelikler",

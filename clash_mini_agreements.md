@@ -551,6 +551,15 @@ flowchart LR
 - **只测纯逻辑**：当前覆盖「节点子集过滤」（`compileStringMatcher`）、「流量单位换算」（`parseTraffic`）、「假节点判定与真实协议节点防误伤」（`isDummyNode`）以及「节点延迟格式化与主题色映射」（`formatDelay` / `formatDelayColor`）—— 选点范围、界面数值与视觉状态呈现的正确性来源，最容易被后续改动悄悄改坏。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
+### 8.9 用户可见文案 i18n 硬约束
+
+- **一切用户可见文案必须走 `t()`**：按钮、标签、菜单项、`Tooltip`、`aria-label`、`placeholder`、`showNotice` 提示、错误边界兜底文案都算。只有两类例外：① 参与数据比较的哨兵字符串（`profile-import-card` 的「本地手动导入的代理节点」、`utils/node.ts` 的假节点关键词）；② 语言选择器里的语言自身名称（简体中文 / 日本語 …）。`console.*` 与 `debugLog` 的排障日志不在此列。
+- **key 路径必须与资源层级一致**：`src/locales/<module>/<file>.json` 的根节点会拼进 key。例如 `proxies.json` 根为 `page`，资源里的 `page.a11y.nodelist` 对应的真实 key 是 `proxies.page.a11y.nodelist`。**严禁凭印象猜 key**，拿不准就看 JSON 层级或 `src/types/generated/i18n-keys.ts` 的联合类型。
+- **严禁用 `@ts-expect-error` 掩盖 i18n 类型错误**：生成类型是字面量联合，key 写错会立刻报错；一旦用 `@ts-expect-error` 压掉，错误 key 会静默上线，界面直接显示 `proxies.a11y.nodelist` 这种原始 key 串（2026-10-20 实测案例：`proxy-groups.tsx` 的 `aria-label` 同时踩了「key 少一层 `page.`」和「`@ts-expect-error` 压掉类型报错」两个坑）。确属第三方类型缺陷时才允许压制，且注释必须写明「报的是哪一条、为什么不是 key 的问题」。
+- **新增 key 必须 13 语种同时落地**：zh/zhtw/en/ru/fa/tt/id/ar/ko/tr/de/es/jp 一个不能少，`{{placeholder}}` 集合必须与基准语种完全一致（单位可本地化，如 ru 用 `МБ`，但占位符名不得改）。改完依次执行 `pnpm i18n:check`（missing / extra / missingSource 必须全 0）与 `pnpm i18n:types`。
+- **同一句话只留一个 key**：功能与语境相同的文案不得在多模块各写一份（反例：`layout.notices.adjusting` 与已删除的 `settings.mini.adjusting` 曾同值并存）。跨模块复用的通用动作词统一收敛到 `shared.actions.*`。
+- **同款 UI 必须整体覆盖**：项目里存在三处结构完全相同的「剪切/复制/粘贴/全选/清空」输入框右键菜单（`_layout.tsx`、`add-url-dialog.tsx`、`first-run-guide-dialog.tsx`），改一处必须同步改全部，禁止只改当前正在动的那一个。
+
 ---
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
@@ -599,4 +608,5 @@ flowchart LR
 | **BUG-284** | 8.6 | `clash.yaml` 纳入版本迁移框架（v1 → v2 自动归一化 tun.stack 为 gvisor） |
 | **BUG-285** | 8.8 | 前端 Vitest 纯逻辑单测基线扩充（`node.test.ts` 与 `delay.test.ts`） |
 | **BUG-286** | 2.12 | 首次安装引导向导弹窗（直接填入订阅）与就绪打开项目 Wiki 测试验证通道 |
+| **BUG-287** | 8.9 | 剩余硬编码文案 i18n 收口；修正节点列表 `aria-label` 错误 key（`proxies` → `proxies.page.a11y.nodelist`）并为帮助按钮补可读名称 |
 

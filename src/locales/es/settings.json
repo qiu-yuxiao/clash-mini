@@ -535,7 +535,6 @@
     "testingInProgress": "Prueba de velocidad en curso, inténtelo más tarde",
     "testNotExecuted": "Prueba no ejecutada: el núcleo no está listo o no hay nodos disponibles",
     "testFailed": "Error en la prueba de velocidad: {{message}}",
-    "adjusting": "Ajustando, espere…",
     "updated": "Actualizado",
     "portSaved": "Puerto proxy guardado y recargado",
     "profilesTitle": "Perfiles y Suscripciones",

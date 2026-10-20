@@ -257,6 +257,7 @@ export interface TranslationResources {
           wikiHint: string
         }
         helpMenu: {
+          buttonAriaLabel: string
           checkAppUpdate: string
           checkCoreUpdate: string
           diagnosticsExported: string
@@ -500,6 +501,9 @@ export interface TranslationResources {
         }
       }
       page: {
+        a11y: {
+          nodelist: string
+        }
         actions: {
           connect: string
           connecting: string
@@ -772,7 +776,6 @@ export interface TranslationResources {
         addUrlPlaceholder: string
         addUrlSuccess: string
         addUrlTooltip: string
-        adjusting: string
         connectionsActive: string
         connectionsClearHistory: string
         connectionsDisconnectAll: string

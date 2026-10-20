@@ -21,6 +21,9 @@
       "title": "Proxy Rules",
       "select": "Select Rules"
     },
+    "a11y": {
+      "nodelist": "Lista de nodos proxy"
+    },
     "labels": {
       "proxyCount": "Número de nodos",
       "delayCheckReset": "Realizar prueba de latencia para cancelar la fijación"

@@ -36,9 +36,7 @@ export async function waitForClashReady(t: TFunc): Promise<boolean> {
     `[waitForClashReady] 等待 Clash 内核就绪超时（${MAX_WAIT_MS}ms），继续触发自动选点`,
   )
   try {
-    showNotice.info(
-      t('shared.feedback.notifications.clashNotReady'),
-    )
+    showNotice.info(t('shared.feedback.notifications.clashNotReady'))
   } catch {
     // showNotice 不可用则静默失败
   }

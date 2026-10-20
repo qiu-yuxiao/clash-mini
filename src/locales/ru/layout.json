@@ -28,7 +28,8 @@
       "generatingDiagnostics": "Создание диагностики, подождите…",
       "diagnosticsExported": "Диагностика экспортирована: {{path}}",
       "checkAppUpdate": "Проверить обновления приложения",
-      "checkCoreUpdate": "Проверить обновления ядра"
+      "checkCoreUpdate": "Проверить обновления ядра",
+      "buttonAriaLabel": "Справка и инструменты"
     },
     "dialogs": {
       "editProfile": {

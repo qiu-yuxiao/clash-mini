@@ -535,7 +535,6 @@
     "testingInProgress": "A speed test is in progress, please try again later",
     "testNotExecuted": "Test not executed: core not ready or no testable nodes",
     "testFailed": "Speed test failed: {{message}}",
-    "adjusting": "Adjusting, please wait…",
     "updated": "Updated",
     "portSaved": "Proxy port saved and reloaded",
     "profilesTitle": "Profiles & Subscriptions",

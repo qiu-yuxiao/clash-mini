@@ -57,6 +57,9 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
       <Button
         variant="contained"
         onClick={handleHelpClick}
+        aria-label={t('layout.components.helpMenu.buttonAriaLabel')}
+        aria-haspopup="menu"
+        aria-expanded={Boolean(helpAnchorEl)}
         sx={{
           position: 'absolute',
           bottom: '0',
@@ -147,11 +150,18 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
         <MenuItem
           onClick={async () => {
             handleHelpClose()
-            const waitId = showNotice.info(t('layout.components.helpMenu.generatingDiagnostics'), 0)
+            const waitId = showNotice.info(
+              t('layout.components.helpMenu.generatingDiagnostics'),
+              0,
+            )
             try {
               const zipPath = await exportDiagnosticBundle()
               if (!zipPath) return
-              showNotice.success(t('layout.components.helpMenu.diagnosticsExported', { path: zipPath }))
+              showNotice.success(
+                t('layout.components.helpMenu.diagnosticsExported', {
+                  path: zipPath,
+                }),
+              )
               // 优先使用文件管理器高亮选中该 zip 文件，失败则兜底打开所在目录
               await showInFolder(zipPath).catch(async (err) => {
                 console.warn(
@@ -179,7 +189,8 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           disabled={clientCheckLoading}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🚀 {t('layout.components.helpMenu.checkAppUpdate')} {appVersion ? `(v${appVersion})` : ''}
+          🚀 {t('layout.components.helpMenu.checkAppUpdate')}{' '}
+          {appVersion ? `(v${appVersion})` : ''}
         </MenuItem>
         <MenuItem
           onClick={handleCoreCheck}

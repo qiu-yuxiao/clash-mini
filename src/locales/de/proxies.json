@@ -21,6 +21,9 @@
       "title": "Proxy Rules",
       "select": "Select Rules"
     },
+    "a11y": {
+      "nodelist": "Proxy-Knotenliste"
+    },
     "labels": {
       "proxyCount": "Anzahl der Knoten",
       "delayCheckReset": "Latenztest durchführen, um Fixierung aufzuheben"

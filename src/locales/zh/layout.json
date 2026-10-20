@@ -28,7 +28,8 @@
       "generatingDiagnostics": "正在生成诊断包，请稍候…",
       "diagnosticsExported": "诊断包已导出：{{path}}",
       "checkAppUpdate": "检查软件更新",
-      "checkCoreUpdate": "检查内核更新"
+      "checkCoreUpdate": "检查内核更新",
+      "buttonAriaLabel": "帮助与工具"
     },
     "dialogs": {
       "editProfile": {

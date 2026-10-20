@@ -535,7 +535,6 @@
     "testingInProgress": "Pengujian kecepatan sedang berlangsung, coba lagi nanti",
     "testNotExecuted": "Pengujian tidak dijalankan: inti belum siap atau tidak ada node yang bisa diuji",
     "testFailed": "Pengujian kecepatan gagal: {{message}}",
-    "adjusting": "Menyesuaikan, mohon tunggu…",
     "updated": "Diperbarui",
     "portSaved": "Port proksi disimpan dan dimuat ulang",
     "profilesTitle": "Profil & Langganan",

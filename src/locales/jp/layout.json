@@ -28,7 +28,8 @@
       "generatingDiagnostics": "診断パッケージを生成中です…",
       "diagnosticsExported": "診断パッケージをエクスポートしました：{{path}}",
       "checkAppUpdate": "アプリの更新を確認",
-      "checkCoreUpdate": "コアの更新を確認"
+      "checkCoreUpdate": "コアの更新を確認",
+      "buttonAriaLabel": "ヘルプとツール"
     },
     "dialogs": {
       "editProfile": {

@@ -67,7 +67,8 @@ export const useMinimalSettings = () => {
       )
     }
 
-    const waitId = showNotice.info('settings.mini.adjusting', 0)
+    // 与 _layout 的代理方式切换共用同一条「正在调整」提示，避免同一句话维护两份词条
+    const waitId = showNotice.info('layout.notices.adjusting', 0)
     beginLongOperation()
     try {
       await patchClashConfig({ [field]: checked })

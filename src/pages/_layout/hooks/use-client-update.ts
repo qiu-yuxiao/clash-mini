@@ -82,14 +82,11 @@ export function useClientUpdate({
               const pct = Math.round((downloaded / total) * 100)
               setClientProgress(pct)
               setClientProgressMessage(
-                t(
-                  'layout.components.dialogs.progress.clientDownloadProgress',
-                  {
-                    percent: pct,
-                    downloaded: (downloaded / 1024 / 1024).toFixed(2),
-                    total: (total / 1024 / 1024).toFixed(2),
-                  },
-                ),
+                t('layout.components.dialogs.progress.clientDownloadProgress', {
+                  percent: pct,
+                  downloaded: (downloaded / 1024 / 1024).toFixed(2),
+                  total: (total / 1024 / 1024).toFixed(2),
+                }),
               )
             } else {
               setClientProgressMessage(

@@ -421,8 +421,7 @@ function ProxyVirtualList({
       >
         <div
           role="list"
-          // @ts-expect-error MUI v9 aria-label type issue
-          aria-label={t('proxies.a11y.nodelist')}
+          aria-label={t('proxies.page.a11y.nodelist')}
           style={{ height: totalSize, position: 'relative' }}
         >
           {virtualItems.map((virtualItem) => (

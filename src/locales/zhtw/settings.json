@@ -535,7 +535,6 @@
     "testingInProgress": "正在測速中，請稍候再試",
     "testNotExecuted": "測速未執行：核心未就緒或暫無可測節點",
     "testFailed": "測速失敗：{{message}}",
-    "adjusting": "正在調整，請稍候…",
     "updated": "已更新",
     "portSaved": "代理連接埠已儲存並重新載入",
     "profilesTitle": "訂閱与機場配置",
