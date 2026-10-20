@@ -49,7 +49,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
   controlSkin,
   primaryBtn3DStyle,
 }) => {
-  const { t: _t } = useTranslation()
+  const { t } = useTranslation()
   const theme = useTheme()
 
   return (
@@ -119,7 +119,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           }}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🐱 GitHub 主页
+          🐱 {t('layout.components.helpMenu.github')}
         </MenuItem>
         <MenuItem
           onClick={async () => {
@@ -132,7 +132,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           }}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          💡 帮助指南 (Wiki)
+          💡 {t('layout.components.helpMenu.wiki')}
         </MenuItem>
         <MenuItem
           onClick={() => {
@@ -141,17 +141,17 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           }}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🧭 新手引导
+          🧭 {t('layout.components.helpMenu.firstRunGuide')}
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
           onClick={async () => {
             handleHelpClose()
-            const waitId = showNotice.info('正在生成诊断包，请稍候…', 0)
+            const waitId = showNotice.info(t('layout.components.helpMenu.generatingDiagnostics'), 0)
             try {
               const zipPath = await exportDiagnosticBundle()
               if (!zipPath) return
-              showNotice.success(`诊断包已导出：${zipPath}`)
+              showNotice.success(t('layout.components.helpMenu.diagnosticsExported', { path: zipPath }))
               // 优先使用文件管理器高亮选中该 zip 文件，失败则兜底打开所在目录
               await showInFolder(zipPath).catch(async (err) => {
                 console.warn(
@@ -171,7 +171,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           }}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          📦 导出诊断包
+          📦 {t('layout.components.helpMenu.exportDiagnostics')}
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem
@@ -179,14 +179,14 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           disabled={clientCheckLoading}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          🚀 检查软件更新 {appVersion ? `(v${appVersion})` : ''}
+          🚀 {t('layout.components.helpMenu.checkAppUpdate')} {appVersion ? `(v${appVersion})` : ''}
         </MenuItem>
         <MenuItem
           onClick={handleCoreCheck}
           disabled={coreCheckLoading}
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
-          ⚙️ 检查内核更新{' '}
+          ⚙️ {t('layout.components.helpMenu.checkCoreUpdate')}{' '}
           {coreVersion ? `(${formatCoreVersion(coreVersion)})` : ''}
         </MenuItem>
       </Menu>

@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "Home",
-        "proxies": "پراکسی‌ها",
-        "profiles": "پروفایل‌ها",
-        "connections": "اتصالات",
-        "rules": "قوانین",
-        "logs": "لاگ‌ها",
-        "unlock": "Test",
-        "settings": "تنظیمات"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "به Clash Mini خوش آمدید",
       "intro": "به نظر می‌رسد اولین اجراست و هنوز اشتراکی اضافه نشده است. لینک اشتراک را در پایین وارد کنید؛ تجزیه نود، تست سرعت و تصاحب شبکه به‌صورت خودکار انجام می‌شود.",
@@ -39,6 +19,36 @@
       "wikiHint": "برای بررسی اتصال و دیدن امکانات بیشتر، Wiki را باز کنید.",
       "openWiki": "باز کردن Wiki برای تست",
       "finish": "پایان"
+    },
+    "helpMenu": {
+      "github": "صفحه گیت‌هاب",
+      "wiki": "راهنما (Wiki)",
+      "firstRunGuide": "راهنمای شروع",
+      "exportDiagnostics": "برون‌بری تشخیص",
+      "generatingDiagnostics": "در حال تولید تشخیص، لطفاً صبر کنید…",
+      "diagnosticsExported": "تشخیص برون‌بری شد: {{path}}",
+      "checkAppUpdate": "بررسی به‌روزرسانی برنامه",
+      "checkCoreUpdate": "بررسی به‌روزرسانی هسته"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "Home",
+        "proxies": "پراکسی‌ها",
+        "profiles": "پروفایل‌ها",
+        "connections": "اتصالات",
+        "rules": "قوانین",
+        "logs": "لاگ‌ها",
+        "unlock": "Test",
+        "settings": "تنظیمات"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

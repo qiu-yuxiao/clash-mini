@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "Home",
-        "proxies": "الوكلاء",
-        "profiles": "الملفات الشخصية",
-        "connections": "الاتصالات",
-        "rules": "القواعد",
-        "logs": "السجلات",
-        "unlock": "Test",
-        "settings": "الإعدادات"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "مرحبًا بك في Clash Mini",
       "intro": "يبدو أن هذه أول مرة ولا توجد اشتراكات بعد. الصق رابط الاشتراك أدناه — سيتم تحليل العقد وقياس السرعة والتحكم بالشبكة تلقائيًا.",
@@ -39,6 +19,36 @@
       "wikiHint": "افتح Wiki للتحقق من الاتصال ومعرفة المزيد.",
       "openWiki": "فتح Wiki للاختبار",
       "finish": "تم"
+    },
+    "helpMenu": {
+      "github": "صفحة GitHub",
+      "wiki": "دليل المساعدة (Wiki)",
+      "firstRunGuide": "دليل البدء",
+      "exportDiagnostics": "تصدير التشخيص",
+      "generatingDiagnostics": "جارٍ إنشاء التشخيص، انتظر…",
+      "diagnosticsExported": "تم تصدير التشخيص: {{path}}",
+      "checkAppUpdate": "التحقق من تحديثات التطبيق",
+      "checkCoreUpdate": "التحقق من تحديثات النواة"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "Home",
+        "proxies": "الوكلاء",
+        "profiles": "الملفات الشخصية",
+        "connections": "الاتصالات",
+        "rules": "القواعد",
+        "logs": "السجلات",
+        "unlock": "Test",
+        "settings": "الإعدادات"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

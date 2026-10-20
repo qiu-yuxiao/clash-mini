@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "홈",
-        "proxies": "프록시",
-        "profiles": "프로필",
-        "connections": "연결",
-        "rules": "규칙",
-        "logs": "로그",
-        "unlock": "테스트",
-        "settings": "설정"
-      },
-      "menu": {
-        "reorderMode": "메뉴 재정렬 모드",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "메뉴 순서 잠금 해제",
-        "lock": "메뉴 순서 잠금",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "Clash Mini에 오신 것을 환영합니다",
       "intro": "처음 실행하신 것 같습니다. 아직 구독이 없습니다. 아래에 구독 링크를 입력하면 노드 분석, 속도 측정, 네트워크 인수가 자동으로 처리됩니다.",
@@ -39,6 +19,36 @@
       "wikiHint": "Wiki를 열어 연결을 확인하고 고급 사용법을 알아보세요.",
       "openWiki": "Wiki 열어 테스트",
       "finish": "완료"
+    },
+    "helpMenu": {
+      "github": "GitHub 홈",
+      "wiki": "도움말 가이드 (Wiki)",
+      "firstRunGuide": "시작 가이드",
+      "exportDiagnostics": "진단 패키지 내보내기",
+      "generatingDiagnostics": "진단 패키지 생성 중…",
+      "diagnosticsExported": "진단 패키지 내보내기 완료: {{path}}",
+      "checkAppUpdate": "앱 업데이트 확인",
+      "checkCoreUpdate": "코어 업데이트 확인"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "홈",
+        "proxies": "프록시",
+        "profiles": "프로필",
+        "connections": "연결",
+        "rules": "규칙",
+        "logs": "로그",
+        "unlock": "테스트",
+        "settings": "설정"
+      },
+      "menu": {
+        "reorderMode": "메뉴 재정렬 모드",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "메뉴 순서 잠금 해제",
+        "lock": "메뉴 순서 잠금",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

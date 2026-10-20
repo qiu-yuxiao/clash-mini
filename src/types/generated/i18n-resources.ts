@@ -202,6 +202,16 @@ export interface TranslationResources {
           title: string
           wikiHint: string
         }
+        helpMenu: {
+          checkAppUpdate: string
+          checkCoreUpdate: string
+          diagnosticsExported: string
+          exportDiagnostics: string
+          firstRunGuide: string
+          generatingDiagnostics: string
+          github: string
+          wiki: string
+        }
         navigation: {
           menu: {
             collapseNavBar: string

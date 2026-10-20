@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "Startseite",
-        "proxies": "Proxy",
-        "profiles": "Abonnement",
-        "connections": "Verbindungen",
-        "rules": "Regeln",
-        "logs": "Protokolle",
-        "unlock": "Testen",
-        "settings": "Einstellungen"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "Willkommen bei Clash Mini",
       "intro": "Sieht aus, als wäre dies der erste Start und es ist noch kein Abonnement vorhanden. Füge unten deinen Abo-Link ein – Knotenanalyse, Geschwindigkeitstest und Netzwerkübernahme laufen automatisch.",
@@ -39,6 +19,36 @@
       "wikiHint": "Öffne das Wiki, um die Verbindung zu prüfen und mehr zu erfahren.",
       "openWiki": "Wiki zum Testen öffnen",
       "finish": "Fertig"
+    },
+    "helpMenu": {
+      "github": "GitHub-Seite",
+      "wiki": "Hilfe (Wiki)",
+      "firstRunGuide": "Erste-Schritte-Guide",
+      "exportDiagnostics": "Diagnose exportieren",
+      "generatingDiagnostics": "Diagnose wird erstellt, bitte warten…",
+      "diagnosticsExported": "Diagnose exportiert: {{path}}",
+      "checkAppUpdate": "App-Updates prüfen",
+      "checkCoreUpdate": "Core-Updates prüfen"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "Startseite",
+        "proxies": "Proxy",
+        "profiles": "Abonnement",
+        "connections": "Verbindungen",
+        "rules": "Regeln",
+        "logs": "Protokolle",
+        "unlock": "Testen",
+        "settings": "Einstellungen"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

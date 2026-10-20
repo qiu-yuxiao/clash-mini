@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "Home",
-        "proxies": "Прокси",
-        "profiles": "Профильләр",
-        "connections": "Тоташулар",
-        "rules": "Кагыйдәләр",
-        "logs": "Логлар",
-        "unlock": "Test",
-        "settings": "Көйләүләр"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "Clash Mini'га рәхим итегез",
       "intro": "Күрәсең, бу беренче эшләтү һәм әле язылу юк. Язылу сылтамасын түбәндә кертегез — төеннәрне анализлау, тизлекне үлчәү һәм челтәрне үзләштерү автоматик башкарыла.",
@@ -39,6 +19,36 @@
       "wikiHint": "Тоташуны тикшерү һәм күбрәк белү өчен Wiki ачыгыз.",
       "openWiki": "Сынау өчен Wiki ачу",
       "finish": "Әзер"
+    },
+    "helpMenu": {
+      "github": "GitHub бите",
+      "wiki": "Ярдәм кулланмасы (Wiki)",
+      "firstRunGuide": "Башлангыч кулланма",
+      "exportDiagnostics": "Диагностиканы тышка алу",
+      "generatingDiagnostics": "Диагностика ясала, көтегез…",
+      "diagnosticsExported": "Диагностика тышка алынды: {{path}}",
+      "checkAppUpdate": "Кушымта яңартуларын тикшерү",
+      "checkCoreUpdate": "Төш яңартуларын тикшерү"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "Home",
+        "proxies": "Прокси",
+        "profiles": "Профильләр",
+        "connections": "Тоташулар",
+        "rules": "Кагыйдәләр",
+        "logs": "Логлар",
+        "unlock": "Test",
+        "settings": "Көйләүләр"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

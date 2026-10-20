@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "ホーム",
-        "proxies": "プロキシ",
-        "profiles": "プロファイル",
-        "connections": "接続",
-        "rules": "ルール",
-        "logs": "ログ",
-        "unlock": "テスト",
-        "settings": "設定"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "Clash Mini へようこそ",
       "intro": "初回起動のようで、まだサブスクリプションがありません。以下にリンクを入力してください。ノード解析・速度測定・ネットワーク接管は自動で行われます。",
@@ -39,6 +19,36 @@
       "wikiHint": "Wiki を開いて接続を確認し、詳細な使い方をご覧ください。",
       "openWiki": "Wiki を開いてテスト",
       "finish": "完了"
+    },
+    "helpMenu": {
+      "github": "GitHub ホーム",
+      "wiki": "ヘルプガイド (Wiki)",
+      "firstRunGuide": "初期設定ガイド",
+      "exportDiagnostics": "診断パッケージをエクスポート",
+      "generatingDiagnostics": "診断パッケージを生成中です…",
+      "diagnosticsExported": "診断パッケージをエクスポートしました：{{path}}",
+      "checkAppUpdate": "アプリの更新を確認",
+      "checkCoreUpdate": "コアの更新を確認"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "ホーム",
+        "proxies": "プロキシ",
+        "profiles": "プロファイル",
+        "connections": "接続",
+        "rules": "ルール",
+        "logs": "ログ",
+        "unlock": "テスト",
+        "settings": "設定"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

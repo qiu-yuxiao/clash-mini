@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "Home",
-        "proxies": "Proksi",
-        "profiles": "Profil",
-        "connections": "Koneksi",
-        "rules": "Aturan",
-        "logs": "Log",
-        "unlock": "Test",
-        "settings": "Pengaturan"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "Selamat datang di Clash Mini",
       "intro": "Sepertinya ini peluncuran pertama dan belum ada langganan. Tempel tautan di bawah — penguraian node, uji kecepatan, dan pengambilalihan jaringan dilakukan otomatis.",
@@ -39,6 +19,36 @@
       "wikiHint": "Buka Wiki untuk memeriksa koneksi dan melihat fitur lanjutan.",
       "openWiki": "Buka Wiki untuk menguji",
       "finish": "Selesai"
+    },
+    "helpMenu": {
+      "github": "Beranda GitHub",
+      "wiki": "Panduan Bantuan (Wiki)",
+      "firstRunGuide": "Panduan Awal",
+      "exportDiagnostics": "Ekspor Diagnostik",
+      "generatingDiagnostics": "Sedang membuat diagnostik, mohon tunggu…",
+      "diagnosticsExported": "Diagnostik diekspor: {{path}}",
+      "checkAppUpdate": "Cek Pembaruan Aplikasi",
+      "checkCoreUpdate": "Cek Pembaruan Core"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "Home",
+        "proxies": "Proksi",
+        "profiles": "Profil",
+        "connections": "Koneksi",
+        "rules": "Aturan",
+        "logs": "Log",
+        "unlock": "Test",
+        "settings": "Pengaturan"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

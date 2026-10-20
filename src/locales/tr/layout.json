@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "Ana Sayfa",
-        "proxies": "Vekil'ler",
-        "profiles": "Profiller",
-        "connections": "Bağlantılar",
-        "rules": "Kurallar",
-        "logs": "Günlükler",
-        "unlock": "Test",
-        "settings": "Ayarlar"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "Clash Mini'ye hoş geldiniz",
       "intro": "İlk açılış gibi görünüyor ve henüz abonelik yok. Abonelik bağlantını aşağıya yapıştır — düğüm ayrıştırma, hız testi ve ağ devralma otomatik yapılır.",
@@ -39,6 +19,36 @@
       "wikiHint": "Bağlantıyı doğrulamak ve daha fazlasını görmek için Wiki'yi aç.",
       "openWiki": "Test için Wiki'yi aç",
       "finish": "Bitti"
+    },
+    "helpMenu": {
+      "github": "GitHub Sayfası",
+      "wiki": "Yardım Rehberi (Wiki)",
+      "firstRunGuide": "Başlangıç Rehberi",
+      "exportDiagnostics": "Tanılama Dışa Aktar",
+      "generatingDiagnostics": "Tanılama oluşturuluyor, lütfen bekleyin…",
+      "diagnosticsExported": "Tanılama dışa aktarıldı: {{path}}",
+      "checkAppUpdate": "Uygulama Güncellemelerini Denetle",
+      "checkCoreUpdate": "Çekirdek Güncellemelerini Denetle"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "Ana Sayfa",
+        "proxies": "Vekil'ler",
+        "profiles": "Profiller",
+        "connections": "Bağlantılar",
+        "rules": "Kurallar",
+        "logs": "Günlükler",
+        "unlock": "Test",
+        "settings": "Ayarlar"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {

@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "首 页",
-        "proxies": "代 理",
-        "profiles": "订 阅",
-        "connections": "连 接",
-        "rules": "规 则",
-        "logs": "日 志",
-        "unlock": "测 试",
-        "settings": "设 置"
-      },
-      "menu": {
-        "reorderMode": "菜单排序模式",
-        "restoreDefaultOrder": "恢复默认排序",
-        "unlock": "解锁菜单排序",
-        "lock": "锁定菜单排序",
-        "collapseNavBar": "收起导航栏",
-        "expandNavBar": "展开导航栏"
-      }
-    },
     "firstRun": {
       "title": "欢迎使用 Clash Mini",
       "intro": "检测到您是首次使用，尚未添加订阅。请在下方填入代理订阅链接，我们将自动完成节点解析、测速与网络接管：",
@@ -39,6 +19,36 @@
       "wikiHint": "你可以打开 Wiki 首页验证连通性，也顺便了解进阶玩法。",
       "openWiki": "打开 Wiki 首页测试",
       "finish": "完成并进入主界面"
+    },
+    "helpMenu": {
+      "github": "GitHub 主页",
+      "wiki": "帮助指南 (Wiki)",
+      "firstRunGuide": "新手引导",
+      "exportDiagnostics": "导出诊断包",
+      "generatingDiagnostics": "正在生成诊断包，请稍候…",
+      "diagnosticsExported": "诊断包已导出：{{path}}",
+      "checkAppUpdate": "检查软件更新",
+      "checkCoreUpdate": "检查内核更新"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "首 页",
+        "proxies": "代 理",
+        "profiles": "订 阅",
+        "connections": "连 接",
+        "rules": "规 则",
+        "logs": "日 志",
+        "unlock": "测 试",
+        "settings": "设 置"
+      },
+      "menu": {
+        "reorderMode": "菜单排序模式",
+        "restoreDefaultOrder": "恢复默认排序",
+        "unlock": "解锁菜单排序",
+        "lock": "锁定菜单排序",
+        "collapseNavBar": "收起导航栏",
+        "expandNavBar": "展开导航栏"
+      }
     }
   },
   "a11y": {

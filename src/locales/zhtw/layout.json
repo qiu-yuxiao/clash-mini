@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "首 頁",
-        "proxies": "代 理",
-        "profiles": "訂 閱",
-        "connections": "連 線",
-        "rules": "規 則",
-        "logs": "日 誌",
-        "unlock": "解 鎖",
-        "settings": "設 定"
-      },
-      "menu": {
-        "reorderMode": "選單排序模式",
-        "restoreDefaultOrder": "恢復預設排序",
-        "unlock": "解鎖選單排序",
-        "lock": "鎖定選單排序",
-        "collapseNavBar": "收起導覽列",
-        "expandNavBar": "展開導覽列"
-      }
-    },
     "firstRun": {
       "title": "歡迎使用 Clash Mini",
       "intro": "偵測到您是首次使用，尚未新增訂閱。請在下方填入代理訂閱連結，我們將自動完成節點解析、測速與網路接管：",
@@ -39,6 +19,36 @@
       "wikiHint": "你可以開啟 Wiki 首頁驗證連線，也順便了解進階玩法。",
       "openWiki": "開啟 Wiki 首頁測試",
       "finish": "完成並進入主介面"
+    },
+    "helpMenu": {
+      "github": "GitHub 主頁",
+      "wiki": "幫助指南 (Wiki)",
+      "firstRunGuide": "新手引導",
+      "exportDiagnostics": "匯出診斷包",
+      "generatingDiagnostics": "正在產生診斷包，請稍候…",
+      "diagnosticsExported": "診斷包已匯出：{{path}}",
+      "checkAppUpdate": "檢查軟體更新",
+      "checkCoreUpdate": "檢查核心更新"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "首 頁",
+        "proxies": "代 理",
+        "profiles": "訂 閱",
+        "connections": "連 線",
+        "rules": "規 則",
+        "logs": "日 誌",
+        "unlock": "解 鎖",
+        "settings": "設 定"
+      },
+      "menu": {
+        "reorderMode": "選單排序模式",
+        "restoreDefaultOrder": "恢復預設排序",
+        "unlock": "解鎖選單排序",
+        "lock": "鎖定選單排序",
+        "collapseNavBar": "收起導覽列",
+        "expandNavBar": "展開導覽列"
+      }
     }
   },
   "a11y": {

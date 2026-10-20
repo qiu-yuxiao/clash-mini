@@ -1,25 +1,5 @@
 {
   "components": {
-    "navigation": {
-      "tabs": {
-        "home": "Home",
-        "proxies": "Proxies",
-        "profiles": "Profiles",
-        "connections": "Connections",
-        "rules": "Rules",
-        "logs": "Logs",
-        "unlock": "Test",
-        "settings": "Settings"
-      },
-      "menu": {
-        "reorderMode": "Menu reorder mode",
-        "restoreDefaultOrder": "Restore default order",
-        "unlock": "Unlock menu order",
-        "lock": "Lock menu order",
-        "collapseNavBar": "Collapse navigation bar",
-        "expandNavBar": "Expand navigation bar"
-      }
-    },
     "firstRun": {
       "title": "Welcome to Clash Mini",
       "intro": "Looks like this is your first launch and no subscription has been added yet. Paste your subscription link below — node parsing, speed testing and network takeover are handled automatically.",
@@ -39,6 +19,36 @@
       "wikiHint": "Open the Wiki to verify connectivity and learn more.",
       "openWiki": "Open Wiki to test",
       "finish": "Done"
+    },
+    "helpMenu": {
+      "github": "GitHub Home",
+      "wiki": "Help Guide (Wiki)",
+      "firstRunGuide": "Getting Started",
+      "exportDiagnostics": "Export Diagnostics",
+      "generatingDiagnostics": "Generating diagnostics, please wait…",
+      "diagnosticsExported": "Diagnostics exported: {{path}}",
+      "checkAppUpdate": "Check App Updates",
+      "checkCoreUpdate": "Check Core Updates"
+    },
+    "navigation": {
+      "tabs": {
+        "home": "Home",
+        "proxies": "Proxies",
+        "profiles": "Profiles",
+        "connections": "Connections",
+        "rules": "Rules",
+        "logs": "Logs",
+        "unlock": "Test",
+        "settings": "Settings"
+      },
+      "menu": {
+        "reorderMode": "Menu reorder mode",
+        "restoreDefaultOrder": "Restore default order",
+        "unlock": "Unlock menu order",
+        "lock": "Lock menu order",
+        "collapseNavBar": "Collapse navigation bar",
+        "expandNavBar": "Expand navigation bar"
+      }
     }
   },
   "a11y": {
