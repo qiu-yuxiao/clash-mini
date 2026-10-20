@@ -1,3 +1,37 @@
+## v2.9.9
+
+### 🚀 New Features & Engineering Enhancements
+- **一键导出诊断包（Diagnostics Bundle）与交互体验升级**：
+  - 「帮助」菜单新增「导出诊断包」功能，一键收集全量轮转日志（应用主日志 + `service`/`sidecar` 内核日志）、脱敏后的配置文件（`verge.yaml`、`profiles.yaml`、运行时 `clash-mini.yaml`）及系统与运行时状态摘要，自动打包至 `<app_home>/diagnostics/` 目录；
+  - 导出成功后通过 `show_in_folder`（Windows 原生执行 `explorer /select,"<zipPath>"`，macOS `open -R`）在文件管理器中直接高亮定位选定生成的 zip 压缩包，免去翻找；前端导出过程提供 loading 交互通知反馈，防止重复触发。
+- **配置格式版本迁移框架（`migrate.rs`）**：
+  - `verge.yaml`、`profiles.yaml`、`clash.yaml` 统一纳入版本迁移框架，顶层维护独立于应用版本的 `config_version: u32`（缺失视为 v1）；
+  - 启动时自动逐级纯函数迁移；迁移前自动备份为 `<文件名>.bak.v<from>`（备份失败则中止本次迁移，绝不在无备份时改写配置）；
+  - `clash.yaml` 升级至 v2：自动将破坏性的 `tun.stack: "system"` 归一化为稳定可靠的 `"gvisor"`；
+  - `enhance::merge_default_config` 在配置增强阶段显式跳过 `config_version`，保证生成的运行时配置 `clash-mini.yaml` 不混入非内核字段，杜绝潜在的配置校验失败隐患。
+- **日志保留时长由 4.5 小时提升至 26 小时**：
+  - 应用主日志 `app_log_max_count` 默认轮转数量从 8 个提升至 40 个（128KB × 40 ≈ 5MB），充分支撑过夜后反馈排查；存量用户旧默认值通过配置迁移 v2→v3 平滑升级，用户自定义值一律严格保留。
+- **前端架构解耦与错误边界分级**：
+  - 弹窗模块（`LayoutDialogs` / `ConnectionDetail`）补齐区域级错误边界，避免局部渲染异常导致全屏崩溃；
+  - 将端口编辑态、allow-lan 与 ipv6 切换逻辑从 `_layout.tsx` 单体组件中抽离为独立的 `use-minimal-settings` hook。
+
+### 🐞 Fixed Bugs & Reliability
+- **前后端伪节点判定严格对齐，根除真节点误隐藏**：
+  - **根因**：后端 `utils/node.rs` 采用「归一化 + 完全/前缀匹配」，而前端 `isDummyNode` 此前使用粗粒度 `includes` 子串匹配，导致 `日本群组-A`、`美国-网址专线`、`上海-群节点-01`、`HK-流量优化` 等真实节点被误判为伪节点从前端隐藏，引发「后端能选中、前端看不到」的高危不一致；
+  - **修复**：前端逐条对齐后端逻辑，中文广告短语必须经归一化（多层剥外层包裹括号与通用前缀）后按完全或前缀匹配判定；英文广告词与 URL 协议头保留高置信度子串匹配；单测补充 31 项断言（含防误伤基线与有意漏判对齐）。
+- **诊断包采集全方位安全与健壮性防护**：
+  - **大日志尾部截断保护**：单文件设置 2MB 上限（`MAX_LOG_FILE_READ_BYTES`）与 60 个文件总数上限，日志超大时从尾部 seek 读取最新内容并扫描首个换行对齐完整日志行，防止内存或 zip 膨胀；
+  - **修改时间优先级排序**：采集按 `mtime` 倒序截取，确保最新的应用日志与 service/sidecar 内核日志优先入包，不被老旧主日志占满上限；
+  - **遍历安全与 ZIP 规范**：跳过目录符号链接以杜绝循环遍历环（并天然跳过 latest.log 软链去重），Windows 反斜杠统一转换为 ZIP 标准正斜杠；
+  - **多层深度脱敏**：优先整行抹除 `Authorization: ...` 头与裸 `Bearer <token>`，再进行 URL userinfo 与通用敏感 KV 替换，杜绝 Token 泄漏；并将 CPU 密集正则任务放至 `spawn_blocking` 保护 tokio worker。
+
+### 🧪 Tests & Engineering Standards
+- **前端纯逻辑 Vitest 单测基线**：
+  - 新建并扩充 Vitest 单测体系，涵盖「节点子集过滤」（`search-matcher.test.ts`）、「流量单位换算」（`parseTraffic.test.ts`）、「伪节点判定与防误伤」（`node.test.ts`）以及「延迟格式化与色值映射」（`delay.test.ts`），建立 31 项核心纯逻辑单测基线；
+  - 清理后台监测模块中排障期的 18 处 `[探针]` INFO 打点，保持生产日志规范整洁。
+
+---
+
 ## v2.9.8
 
 ### 🐞 Fixed Bugs & Reliability Enhancements
