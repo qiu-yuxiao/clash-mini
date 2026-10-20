@@ -18,7 +18,7 @@
 - **新手引导弹窗文字反差修复**：retro-3d 皮肤下引导弹窗为金黄渐变底，原先的主题灰白次级文字几乎无法辨认；现按皮肤配套深棕系文字及深绿/深琥珀状态色，其他皮肤沿用主题色。
 - **TUN 模式 IPv6 兜底断流修复（全新安装长时断流根因）**：
   - TUN 接管 IPv6 路由后，GFWList（纯域名规则集）无法匹配「纯 IPv6 真实地址」，此类流量全部漏到 `MATCH` 兜底；默认兜底为 DIRECT，境外/被投毒的 IPv6 目标直连即 `i/o timeout`，现场实测 375 条超时刷屏、表现为 TUN 长时间断流；
-  - 现于 `MATCH` 之前固定注入 IPv6 兜底：`GEOIP6,CN,DIRECT`（境内 IPv6 走随包携带、离线可用的 `Country.mmdb` 直连）+ `IP-CIDR6,::/0,PROXY`（其余 IPv6 经节点 IPv6 出站，实测可用）；
+  - 现于 `MATCH` 之前固定注入 IPv6 兜底：`GEOIP,CN,DIRECT`（境内 IPv6 走随包携带、离线可用的 `Country.mmdb` 直连；mihomo 的 `GEOIP` 自动覆盖 IPv4/IPv6）+ `IP-CIDR6,::/0,PROXY`（其余 IPv6 经节点 IPv6 出站，实测可用）；
   - **两条兜底均不带 `no-resolve`**：带 `no-resolve` 的 IP 类规则对域名目标直接跳过（现场 85/375=22.7% 超时目标是域名），去掉后由内核先解析再判定，解析出 IPv6 的域名同样被接住；仅含 A 记录的域名行为不变。
 - **DNS fallback 防投毒链路救活**：
   - `dns.respect-rules: true` 时，内核为解析域名发出的上游连接同样要过规则匹配；fallback 里的境外 DoH（1.1.1.1 / 8.8.8.8 / 8.8.4.4）会一路漏到 `MATCH,DIRECT`，在大陆直连被墙 → fallback 整链失效 → `fallback-filter.geoip` 防投毒能力等于关闭 → 投毒应答被采信后客户端反复连接不存在的地址，正是断流的深层根因（现场日志实证 `dial DIRECT --> 8.8.8.8:443 error`）；

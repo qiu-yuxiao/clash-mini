@@ -783,17 +783,22 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 【IPv6 兜底】GFWList 是纯域名规则集（behavior: domain），对「纯 IPv6 真实地址」
     // 无从按域名匹配，会全部漏到 MATCH 兜底。若兜底为 DIRECT，境外/投毒 IPv6 就直连
     // 超时（实测无 IPv6 出口时每条 i/o timeout，形成 TUN 断流刷屏）。故在 MATCH 之前
-    // 为 IPv6 补兜底：境内 GeoIP6 直连，其余 IPv6 统一走代理。
+    // 为 IPv6 补兜底：境内 GEOIP 直连，其余 IPv6 统一走代理。
+    //
+    // 【必须用 GEOIP 而非 GEOIP6】mihomo（Clash Meta）不支持 `GEOIP6` 规则类型
+    // （那是老 Clash Premium 的语法），写入即 `unsupported rule type: GEOIP6`，
+    // 配置校验失败、内核拒绝启动、全部流量回落直连（v3.0.0 现场实证）。
+    // mihomo 的 `GEOIP` 自动覆盖 IPv4/IPv6（查 mmdb 对应段），语义等价且合法。
     //
     // 【刻意不加 no-resolve】v3.0.0 现场日志显示 375 条 i/o timeout 中仍有 85 条
     // （22.7%）目标是**域名**（icube-api*.tiktok-row.net 等）：域名目标不会命中带
     // no-resolve 的 IP 类规则，仍然漏到 MATCH,DIRECT。去掉 no-resolve 后，内核会先
     // 解析再判定，于是「解析出任意 IPv6 的域名」也能落到这里：
-    //   - 解析结果是境内 IPv6 → 上一条 GEOIP6,CN,DIRECT 接住（故它同样不能带 no-resolve）
+    //   - 解析结果是境内 IPv6 → 上一条 GEOIP,CN,DIRECT 接住（故它同样不能带 no-resolve）
     //   - 其余 IPv6 → 本规则走代理
     //   - 只有 A 记录的域名 → 两条 IPv6 规则都不匹配，行为与之前一致
     // 代价仅为规则匹配期多一次解析，结果走内核 DNS 缓存，可接受。
-    final_rules.push(Value::from("GEOIP6,CN,DIRECT"));
+    final_rules.push(Value::from("GEOIP,CN,DIRECT"));
     final_rules.push(Value::from("IP-CIDR6,::/0,PROXY"));
 
     // Read verge config to get the rule fallback type
@@ -1044,7 +1049,7 @@ append-rules:
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
         // prepend(1) + GFWList(1) + IP-CIDR(6) + IP-CIDR6(5) + IPv4-mapped(6) + append(1)
-        // + IPv6 兜底(2: GEOIP6,CN + IP-CIDR6,::/0) + MATCH(1) = 23
+        // + IPv6 兜底(2: GEOIP,CN + IP-CIDR6,::/0) + MATCH(1) = 23
         // MATCH=DIRECT because default rule_fallback is "direct" (GFWList mode)
         assert_eq!(rules.len(), 23);
         assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));
@@ -1087,7 +1092,8 @@ append-rules:
         assert_eq!(rules[19].as_str(), Some("DOMAIN,custom-domain,REJECT"));
         // IPv6 兜底（在 MATCH 之前，确保境外/投毒 IPv6 不直连超时）
         // 刻意不带 no-resolve：否则域名目标会跳过这两条规则、仍漏到 MATCH,DIRECT
-        assert_eq!(rules[20].as_str(), Some("GEOIP6,CN,DIRECT"));
+        // GEOIP 而非 GEOIP6：mihomo 不支持 GEOIP6 规则类型（配置校验直接失败）
+        assert_eq!(rules[20].as_str(), Some("GEOIP,CN,DIRECT"));
         assert_eq!(rules[21].as_str(), Some("IP-CIDR6,::/0,PROXY"));
         assert_eq!(rules[22].as_str(), Some("MATCH,DIRECT"));
 
