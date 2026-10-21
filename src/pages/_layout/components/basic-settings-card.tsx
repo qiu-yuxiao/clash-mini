@@ -130,7 +130,14 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
             checked={realAutoLaunch ?? verge?.enable_auto_launch ?? false}
             onChange={(_, checked: boolean) => {
               setRealAutoLaunch(checked)
-              patchVerge({ enable_auto_launch: checked })
+              patchVerge({ enable_auto_launch: checked }).catch(() => {
+                // patch 失败：verge 缓存已由 patchVerge 内部 refetch 回滚，但
+                // enable_auto_launch 值未变、useEffect 不会重跑 —— 若不处理，
+                // 乐观值会停留成与事实不符的状态。这里重置为 null 先落回配置值，
+                // 再重拉注册表真实状态纠偏（getAutoLaunchStatus 内部已兜底返回 null）。
+                setRealAutoLaunch(null)
+                void getAutoLaunchStatus().then(setRealAutoLaunch)
+              })
             }}
             sx={{
               transform: 'scale(0.85)',
