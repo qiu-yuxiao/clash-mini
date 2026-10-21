@@ -1,3 +1,21 @@
+## v3.0.1
+
+### 🐞 Fixed Bugs & Reliability
+- **开机自启改为注册表实现，并补上启动对账**（修复「开关显示关，开机却照样启动」）：
+  - 自启介质由 Windows 计划任务改为注册表 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`。旧方案的三处缺陷叠加导致该问题：卸载脚本从不清理计划任务（`installer.nsi` 全文无 `schtasks`），老版本建的「Clash Mini」任务会残留到新安装上；自启状态只在用户拨开关时才写入，启动流程没有任何对账；开关只绑配置值，真实状态是盲区；
+  - 现在每次启动都以配置为准重写一次真实状态；新版首次启动会清理历史计划任务（不提权、不弹 UAC）；
+  - 设置里的开关改为显示系统真实状态（读注册表），配置值仅作回退；写入失败时回滚乐观状态并重拉真实值，不会停在自相矛盾的状态上。
+- **修复开启「静默启动」后手动启动被误判**：此前只判断配置项、不看启动参数，导致手动双击桌面快捷方式也被当成静默启动，直接进入轻量模式、主窗口不显示。现统一补上 `--silent` 参数判定，与开机自启通道口径一致。
+- **DNS 防投毒规则排除内网地址**：为 `dns.fallback` 上游生成的「强制走代理」规则现在会跳过私网、环回、链路本地与 ULA 地址，避免误伤局域网网关和本地 DNS 服务。
+- **全局代理模式不再插入 IPv6 直连分流**：IPv6 兜底规则（`GEOIP,CN,DIRECT` + `IP-CIDR6,::/0,PROXY`）仅在 GFWList 模式下生效；当用户选择「代理全部流量」时直接走 `MATCH,PROXY`，保持全局代理语义完整。
+
+### 🧪 Tests & Engineering Standards
+- **删除计划任务实现**：`utils/schtasks.rs`（497 行）整体移除，连带删掉仅为解析 `schtasks.exe` 中文输出而存在的 OEM/ANSI 代码页解码逻辑；自启改由已注册的 `tauri-plugin-autostart` 提供。
+- 新增纯函数单测 `dns_fallback_upstreams_are_forced_through_proxy` 与 `extract_upstream_host_handles_all_mihomo_forms`（覆盖标量/列表、六种上游写法、内网过滤与去重）。
+- 自启状态读取改用 `try_state`，避免插件注册失败时 `autolaunch()` 直接 panic。
+
+---
+
 ## v3.0.0
 
 ### 🚀 New Features & User Experience
