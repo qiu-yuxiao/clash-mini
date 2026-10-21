@@ -87,6 +87,13 @@ pub fn resolve_setup_async() {
         init_verge_config().await;
         Config::verify_config_initialization().await;
 
+        // 【自启对账】以配置为准重写真实的开机自启状态，并顺带清掉历史计划任务残留。
+        // 旧实现只在用户拨开关时才写自启状态，启动流程没有对账，导致「开关显示关、
+        // 残留任务/残留注册表值却仍在拉起」。失败不阻断启动，仅记日志、下一轮再对齐。
+        if let Err(err) = crate::core::autostart::reconcile_on_startup().await {
+            logging!(warn, Type::Setup, "开机自启对账失败（下一轮启动重试）: {}", err);
+        }
+
         // 优化启动顺序：先判断是否需要进入轻量模式，避免"创建窗口再销毁"的资源浪费
         // - 静默启动且启用了自动轻量模式：直接进入轻量模式，不创建窗口
         // - 其他情况：正常创建窗口

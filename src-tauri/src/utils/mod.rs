@@ -5,7 +5,6 @@ pub mod network;
 pub mod node;
 pub mod notification;
 pub mod resolve;
-pub mod schtasks;
 pub mod server;
 pub mod singleton;
 pub mod speed;

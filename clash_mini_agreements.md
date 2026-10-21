@@ -202,6 +202,19 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **queryClient 必须同源**：全应用**只能存在一个** `QueryClient` 实例（`main.tsx` 的 `QueryClientProvider` 与各处 `import { queryClient }` 必须指向同一 `@/services/query-client` 单例）；`useQueryClient()` 与直接 import 不可各自持有不同实例，否则乐观更新会写进另一个缓存、UI 不刷新。
 - **并发点击语义**：`patchVerge` 使用 `useLockFn`，其语义是**丢弃**并发调用（而非排队）——这是**有意为之**，用于防止并发 patch 引发内核反复 reload 与 IPC 风暴。因乐观更新写在锁内，被丢弃的调用不会改 UI，故缓存与「未执行」的事实保持一致。
 
+### 2.10.1 开机自启：注册表方案与启动对账（2026-10-22 定）
+
+- **实现介质：注册表 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`**，由已注册的 `tauri-plugin-autostart`（底层 `auto-launch`）写入；**不再使用计划任务**（`utils/schtasks.rs` 已整体删除）。
+  - **为什么不用计划任务**：它唯一的独有能力是 `RunLevel=HighestAvailable` 可「免 UAC 提权自启」，而本项目**用不上** —— TUN 走独立安装的 Windows 服务（`clash_verge_service`，`StartMode=Auto`，开机自启），app 本身不需提权；是否建 Admin 任务原本也只取决于「进程当前已提权」，实测现网任务都是 `RunLevel: Limited`。
+  - 换回注册表的收益：删掉约 400 行 `schtasks` 逻辑（含仅为解析 `schtasks.exe` 中文输出而存在的 OEM/ANSI 代码页解码）、无子进程、无 XML 落盘，用户在任务管理器「启动」页可直接看到并禁用。
+  - 插件构建时固定注入 `--silent` 参数；是否真的静默由运行时判定（`should_silent = enable_silent_start && has_silent_arg`），与旧方案语义一致。
+- **启动必须对账（铁律）**：`resolve_setup_async` 在 `init_verge_config` 之后无条件调用 `autostart::reconcile_on_startup()`，以**配置为准**重写真实自启状态。
+  - 旧实现只在用户拨开关时才写状态（`UpdateFlags::LAUNCH`），启动流程没有任何对账步骤；叠加「卸载脚本从不清理计划任务（installer.nsi 全文无 schtasks）」，老用户升级后残留任务继续拉起 —— 即 v3.0.0 实测的「开关显示关、开机却照样启动」。
+  - **配置胜出，包括用户在任务管理器里手动禁用的情形**：`enable()` 会同时把 `StartupApproved\Run` 覆盖写回「启用」，所以只要配置是开，下次启动就会重新启用。这是刻意的单一真源设计（避免又一种「配置与事实不一致」），但要在文档里说清楚。
+  - **禁用前必须先 `is_enabled()`**：底层 `disable()` 是 `delete_value`，值不存在会报错；对账每次启动都跑，不加判断就会每次刷一条错误日志。
+- **开关必须显示真实状态**：自启开关优先显示 `get_auto_launch_status`（读注册表）的结果，配置值仅作回退。否则用户在任务管理器禁用、或注册表被改写后，UI 仍显示错误状态。
+- **迁移遗留一次**：`cleanup_legacy_scheduled_tasks()` 在新版首次启动时删除历史任务 `Clash Mini` / `Clash Mini (Admin)`，并落标记文件 `.autostart_task_migrated` 保证只做一次。**不提权、不弹 UAC**：用户级任务普通权限即可删，Admin 级删不掉只记日志，绝不为清理打断启动流程。
+
 ### 2.11 错误边界分级与局部降级
 
 - **分级策略**：全局（`main.tsx`）只作最后兜底；页面级（`BasePage`、`/unlock` 的 Outlet）单页崩溃不影响其他页；区域级（活跃节点栏、节点列表、连接表、流量图、弹窗组）用 `AreaErrorFallback` 局部降级为一行提示，**严禁因单组件异常整页白屏**。
@@ -624,5 +637,6 @@ flowchart LR
 | **BUG-290** | 3.7 | IPv6 兜底去掉 `no-resolve`，修复域名目标绕过 IPv6 规则漏回 `MATCH,DIRECT` 造成的 i/o timeout |
 | **BUG-291** | 3.7 | `dns.fallback` 的境外 DoH 强制走代理，修复 `respect-rules` 下 fallback 直连被墙导致防投毒链路整体失效 |
 | **BUG-292** | 4.1 | 节点选择快照/还原跳过内置出站（DIRECT/REJECT），消除冷启动 `proxy not exist` 告警 |
+| **BUG-293** | 2.10.1 | 开机自启改注册表方案并加启动对账/真实状态回读，修复「开关显示关却仍随系统启动」 |
 | **BUG-293** | 3.7 | IPv6 兜底误用 mihomo 不支持的 `GEOIP6` 规则类型导致配置校验失败、内核拒绝启动、全部流量回落直连；改用 `GEOIP`（自动覆盖 IPv4/IPv6） |
 

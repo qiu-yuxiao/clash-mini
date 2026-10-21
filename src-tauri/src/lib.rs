@@ -109,8 +109,16 @@ mod app_init {
     }
 
     /// Setup autostart plugin
+    ///
+    /// 自启实现走注册表 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
+    /// （Windows 下由插件底层 `auto-launch` 写入；macOS 为 LaunchAgent，Linux 为 desktop 文件）。
+    /// - 固定带 `--silent` 参数：是否真的静默由运行时按 `enable_silent_start` 判定
+    ///   （`resolve::init_window`：`should_silent = is_silent_start && has_silent_arg`）。
+    /// - 注册表项名显式设为 `Clash Mini`，与任务管理器「启动」页展示一致（默认会取 crate 名）。
     pub fn setup_autostart(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-        let auto_start_plugin_builder = tauri_plugin_autostart::Builder::new();
+        let auto_start_plugin_builder = tauri_plugin_autostart::Builder::new()
+            .app_name("Clash Mini")
+            .args(["--silent"]);
         app.handle().plugin(auto_start_plugin_builder.build())?;
         Ok(())
     }
@@ -143,6 +151,8 @@ mod app_init {
             cmd::close_all_connections,
             cmd::get_verge_config,
             cmd::patch_verge_config,
+            // 供前端读取「真实的自启状态」（注册表），而不是只看配置值
+            cmd::get_auto_launch_status,
             cmd::trigger_auto_select,
             cmd::download_icon_cache,
             cmd::get_profiles,

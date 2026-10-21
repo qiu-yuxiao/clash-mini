@@ -3,6 +3,7 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Switch } from '@/components/base'
+import { getAutoLaunchStatus } from '@/services/cmds'
 import type { IClashInfo } from '@/types/clash'
 import type { IVergeConfig } from '@/types/verge'
 import { get3DCardStyle, get3DInputStyle } from '@/utils/button-styles'
@@ -57,6 +58,23 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   const [localPort, setLocalPort] = React.useState(mixedPortVal)
   const inputRef = React.useRef<HTMLInputElement | null>(null)
 
+  // 自启开关以「系统真实状态」为准，配置值仅作为回退：
+  // 用户在任务管理器禁用、或注册表被改写时，配置值不会变，只看配置会显示错误状态。
+  // 后端启动时已按配置对账过一次（autostart::reconcile_on_startup），这里负责把
+  // 运行期间的外部改动反映回 UI。
+  const [realAutoLaunch, setRealAutoLaunch] = React.useState<boolean | null>(
+    null,
+  )
+  React.useEffect(() => {
+    let alive = true
+    getAutoLaunchStatus().then((status) => {
+      if (alive) setRealAutoLaunch(status)
+    })
+    return () => {
+      alive = false
+    }
+  }, [verge?.enable_auto_launch])
+
   React.useEffect(() => {
     if (document.activeElement !== inputRef.current) {
       setLocalPort(mixedPortVal)
@@ -109,7 +127,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           </Typography>
           <Switch
             size="small"
-            checked={verge?.enable_auto_launch ?? false}
+            checked={realAutoLaunch ?? verge?.enable_auto_launch ?? false}
             onChange={(_, checked: boolean) =>
               patchVerge({ enable_auto_launch: checked })
             }

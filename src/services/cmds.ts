@@ -621,3 +621,23 @@ export async function openWebUrl(url: string) {
     'openWebUrl',
   )
 }
+
+/**
+ * 读取「真实的」开机自启状态（Windows 下即注册表 Run 项）。
+ *
+ * 与 `verge.enable_auto_launch`（配置值）区分开：用户在任务管理器里禁用、或注册表
+ * 被其它程序改写时，配置值并不会变。开关应优先显示这里读到的真实状态，
+ * 否则会重现「开关显示关、开机却照样启动」的错觉。读取失败返回 null，由调用方回退到配置值。
+ */
+export async function getAutoLaunchStatus(): Promise<boolean | null> {
+  try {
+    return await withIpcTimeout(
+      invoke<boolean>('get_auto_launch_status'),
+      10_000,
+      'getAutoLaunchStatus',
+    )
+  } catch (err) {
+    console.warn('[getAutoLaunchStatus] 读取自启状态失败，回退到配置值:', err)
+    return null
+  }
+}
