@@ -79,7 +79,9 @@ pub fn is_in_lightweight_mode() -> bool {
 pub async fn auto_lightweight_boot() -> Result<()> {
     let verge_config = Config::verge().await;
     let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
-    if is_silent_start {
+    let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
+    let should_silent = is_silent_start && has_silent_arg;
+    if should_silent {
         entry_lightweight_mode().await;
     }
     Ok(())

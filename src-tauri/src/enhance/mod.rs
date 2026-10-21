@@ -592,9 +592,18 @@ fn dns_fallback_proxy_rules(dns: Option<&Value>) -> Vec<Value> {
             continue;
         };
 
-        let rule = if host.parse::<std::net::Ipv4Addr>().is_ok() {
+        let rule = if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
+            // 私网、环回与链路本地地址不走代理，避免误伤局域网网关与本地服务
+            if ip.is_private() || ip.is_loopback() || ip.is_link_local() {
+                continue;
+            }
             format!("IP-CIDR,{host}/32,PROXY,no-resolve")
-        } else if host.parse::<std::net::Ipv6Addr>().is_ok() {
+        } else if let Ok(ip) = host.parse::<std::net::Ipv6Addr>() {
+            // 环回、未指定、ULA 与链路本地地址不走代理
+            let seg0 = ip.segments()[0];
+            if ip.is_loopback() || ip.is_unspecified() || (seg0 & 0xfe00) == 0xfc00 || (seg0 & 0xffc0) == 0xfe80 {
+                continue;
+            }
             format!("IP-CIDR6,{host}/128,PROXY,no-resolve")
         } else {
             // 域名型上游：无法静态落成 IP 规则
@@ -798,17 +807,19 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     //   - 其余 IPv6 → 本规则走代理
     //   - 只有 A 记录的域名 → 两条 IPv6 规则都不匹配，行为与之前一致
     // 代价仅为规则匹配期多一次解析，结果走内核 DNS 缓存，可接受。
-    final_rules.push(Value::from("GEOIP,CN,DIRECT"));
-    final_rules.push(Value::from("IP-CIDR6,::/0,PROXY"));
-
     // Read verge config to get the rule fallback type
     let verge = Config::verge().await.latest_arc();
     let rule_fallback = verge.rule_fallback.as_deref().unwrap_or("direct");
 
     // Add MATCH final rule according to the fallback type
+    // 注意：IPv6 兜底（GEOIP,CN,DIRECT + IP-CIDR6,::/0,PROXY）仅在 GFWList 模式（rule_fallback != "proxy"）下生效；
+    // 当用户选择「代理全部流量」（rule_fallback == "proxy"）时，直接落入 MATCH,PROXY，
+    // 避免 GEOIP,CN,DIRECT 把国内流量强制直连、破坏「代理全部流量」的全局代理语义。
     if rule_fallback == "proxy" {
         final_rules.push(Value::from("MATCH,PROXY"));
     } else {
+        final_rules.push(Value::from("GEOIP,CN,DIRECT"));
+        final_rules.push(Value::from("IP-CIDR6,::/0,PROXY"));
         final_rules.push(Value::from("MATCH,DIRECT"));
     }
 
@@ -1121,6 +1132,11 @@ fallback:
   - https://dns.google/dns-query
   - https://[2606:4700:4700::1111]/dns-query
   - 1.1.1.1
+  - https://192.168.1.1/dns-query
+  - 127.0.0.1
+  - 10.0.0.1
+  - https://[::1]/dns-query
+  - https://[fe80::1]/dns-query
 ",
         )
         .unwrap();

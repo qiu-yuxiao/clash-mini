@@ -95,8 +95,8 @@ pub fn resolve_setup_async() {
         }
 
         // 优化启动顺序：先判断是否需要进入轻量模式，避免"创建窗口再销毁"的资源浪费
-        // - 静默启动且启用了自动轻量模式：直接进入轻量模式，不创建窗口
-        // - 其他情况：正常创建窗口
+        // - 静默启动（带 --silent 参数且配置了静默）且启用了自动轻量模式：直接进入轻量模式，不创建窗口
+        // - 其他情况（含手动双击启动）：正常创建窗口
         let is_silent_start = Config::verge().await.data_arc().enable_silent_start.unwrap_or(false);
         let enable_auto_lightweight = Config::verge()
             .await
@@ -104,7 +104,10 @@ pub fn resolve_setup_async() {
             .enable_auto_light_weight_mode
             .unwrap_or(false);
 
-        if is_silent_start && enable_auto_lightweight {
+        let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
+        let should_silent = is_silent_start && has_silent_arg;
+
+        if should_silent && enable_auto_lightweight {
             // 静默启动 + 自动轻量模式：直接进入轻量模式，跳过窗口创建
         } else {
             // 正常启动：先创建窗口

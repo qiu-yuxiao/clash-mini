@@ -251,19 +251,9 @@ impl CoreManager {
         let mihomo = Handle::mihomo().await.clone();
         match mihomo.get_group_by_name("PROXY").await {
             Ok(group) => match group.now {
-                Some(node) if !node.is_empty() && !is_builtin_outbound(&node) => {
+                Some(node) if !node.is_empty() => {
                     logging!(info, Type::Core, "快照 PROXY 组当前节点: {}", node);
                     Some(node)
-                }
-                Some(node) if !node.is_empty() => {
-                    // 冷启动空组兜底出来的 DIRECT 之类，不是用户的选择，不参与恢复
-                    logging!(
-                        info,
-                        Type::Core,
-                        "PROXY 组当前为内置出站 {}（尚无真实节点），跳过快照",
-                        node
-                    );
-                    None
                 }
                 _ => None,
             },

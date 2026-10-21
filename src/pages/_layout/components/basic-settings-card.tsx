@@ -128,9 +128,10 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           <Switch
             size="small"
             checked={realAutoLaunch ?? verge?.enable_auto_launch ?? false}
-            onChange={(_, checked: boolean) =>
+            onChange={(_, checked: boolean) => {
+              setRealAutoLaunch(checked)
               patchVerge({ enable_auto_launch: checked })
-            }
+            }}
             sx={{
               transform: 'scale(0.85)',
               transformOrigin: 'right center',
