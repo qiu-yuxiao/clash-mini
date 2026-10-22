@@ -115,8 +115,8 @@ import 'dayjs/locale/zh-cn'
 dayjs.extend(relativeTime)
 
 // 底部常驻流量条(MiniTrafficPanel)的固定高度(px)。
-// 这是面板自身的显示尺寸，与窗口极小高度开关阈值(MINI_HEIGHT_THRESHOLD=121)无关，
-// 不应耦合（历史上曾与旧阈值 135 同值纯属巧合，窗口侧修正为 121 后两值已分离）。
+// 这是面板自身的显示尺寸，与窗口极小高度开关阈值(MINI_HEIGHT_THRESHOLD=126)无关，
+// 不应耦合（历史上曾与旧阈值 135 同值纯属巧合，窗口侧先后修正为 121、126 后两值已分离）。
 const TRAFFIC_PANE_HEIGHT_WIDE = 135
 const TRAFFIC_PANE_HEIGHT_MINIMAL = 100
 

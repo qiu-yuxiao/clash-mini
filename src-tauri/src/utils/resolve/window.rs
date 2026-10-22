@@ -22,9 +22,11 @@ pub const MAX_HEIGHT: f64 = 860.0;
 // 极简窗口最小尺寸；必须与前端 src/constants.ts 的 MIN_WINDOW_WIDTH 保持一致
 // （注意：不是排版断点 MINI_WIDTH_THRESHOLD=285，断点只属于前端布局层）
 pub const MINIMAL_WIDTH: f64 = 271.0;
-// 极简窗口最小高度；对应前端 MIN_WINDOW_HEIGHT（与极小窗口判定门槛 121 同值）。
-// 旧值 135 是带系统阴影时代的余量，关闭阴影（shadow(false)）后按 −14 对称修正（BUG-300）
-pub const MINIMAL_HEIGHT: f64 = 121.0;
+// 极简窗口最小高度；对应前端 MIN_WINDOW_HEIGHT（与极小窗口判定门槛 126 同值）。
+// 旧值 135 是带系统阴影时代的余量，关闭阴影（shadow(false)）后按 −14 对称修正到 121
+// （BUG-300）；3.0.5 再 +5 到 126，使 150% 档物理落点（126×1.5=189）恰为整数，
+// 消除极窄判定的取整歧义（BUG-301 时期一并调整）
+pub const MINIMAL_HEIGHT: f64 = 126.0;
 const DEFAULT_DECORATIONS: bool = false;
 
 pub async fn build_new_window() -> Result<WebviewWindow, String> {

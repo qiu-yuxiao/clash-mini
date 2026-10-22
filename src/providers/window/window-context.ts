@@ -9,7 +9,7 @@ export interface WindowContextType {
   isDecorationsHidden: boolean
   /** 内容宽度 ≤ 285px（窄窗口）：控制路由表格、流量面板布局 */
   isMinimalWidth: boolean
-  /** 内容宽 ≤ 285 且 高 ≤ 121（最小窗口）：触发数据精简 + DOM卸载 */
+  /** 内容宽 ≤ 285 且 高 ≤ 126（最小窗口）：触发数据精简 + DOM卸载 */
   isMiniStatus: boolean
   minimize: () => Promise<void>
   close: () => Promise<void>

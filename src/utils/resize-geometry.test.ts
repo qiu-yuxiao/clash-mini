@@ -92,12 +92,12 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       expect(geo.physY).toBeNull()
     })
 
-    it('向上收缩受 MIN_WINDOW_HEIGHT (121) 钳制', () => {
+    it('向上收缩受 MIN_WINDOW_HEIGHT (126) 钳制', () => {
       const geo = computeResizeGeometry({
         ...defaultBase,
         direction: 's',
         dx: 0,
-        dy: -100, // 200 - 100 = 100 < 121
+        dy: -100, // 200 - 100 = 100 < 126
       })
 
       expect(geo.height).toBe(MIN_WINDOW_HEIGHT)
@@ -178,12 +178,12 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       )
     })
 
-    it('向下挤压达到 MIN_WINDOW_HEIGHT (121) 时，底边缘依然保持锁定不动', () => {
+    it('向下挤压达到 MIN_WINDOW_HEIGHT (126) 时，底边缘依然保持锁定不动', () => {
       const geo = computeResizeGeometry({
         ...defaultBase,
         direction: 'n',
         dx: 0,
-        dy: 90, // 200 - 90 = 110 < 121
+        dy: 90, // 200 - 90 = 110 < 126
       })
 
       expect(geo.height).toBe(MIN_WINDOW_HEIGHT)
@@ -315,8 +315,13 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
     it('非拖拽维度原样透传：最小高度下拖左右边，高度不得被顶大 1px', () => {
       const scaleFactor = 1.25
-      const startInnerH = 151 // 121 * 1.25 = 151.25 → 实际 151，回算 120.8 < 121
-      expect(startInnerH / scaleFactor).toBeLessThan(MIN_WINDOW_HEIGHT)
+      // 126 × 1.25 = 157.5 → Windows 半进位落 158，回算 126.4 ≥ 126
+      //（MulDiv 半进位特性下 126 的各档落点回算恒 ≥ 阈值，121 时代的下偏场景已消除，
+      //  本用例验证的透传语义不变：物理像素原样回传，不做任何 clamp）
+      const startInnerH = 158
+      expect(startInnerH / scaleFactor).toBeGreaterThanOrEqual(
+        MIN_WINDOW_HEIGHT,
+      )
 
       const geo = computeResizeGeometry({
         startInnerW: 400,

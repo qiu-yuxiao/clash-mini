@@ -12,17 +12,19 @@
 //   即外框 285 时内容实际只有约 270.67 CSS px。关闭阴影后 outer == inner，
 //   若沿用 285 会让窄窗内容凭空变宽约 14px、既有排版变松，故取 271（= 285 − 14）。
 //
-// · MIN_WINDOW_HEIGHT = 121：窗口能达到的最小高度。
+// · MIN_WINDOW_HEIGHT = 126：窗口能达到的最小高度。
 //   旧值 135 是带系统阴影时代的余量（与宽度同理：阴影占位 14px）。关闭阴影后
-//   outer == inner，高度侧同样按 −14 对称修正（135 − 14 = 121），否则最小高度下
-//   底部凭空多出一段没有归属的空白，外观怪异（BUG-300）。
+//   outer == inner，高度侧先按 −14 对称修正到 121（BUG-300）。3.0.5 再 +5 到 126：
+//   121×1.5=181.5 的物理落点有取整歧义，而 126×1.5=189 恰为整数，主流 150% 档的
+//   极窄判定不再依赖 1 物理像素容差兜底；125%/175% 档落点（158/221，MulDiv 半进位）
+//   回算也恒 ≥ 126，消除了「回算略小于阈值」的边缘场景（BUG-301 时期一并调整）。
 //
 // · MINI_WIDTH_THRESHOLD = 285：窄窗/宽窗的**排版断点**，比较对象是内容宽度。
 //   旧版就是这个值，必须保持不变 —— 否则内容宽度 272–285 这一段会从「1 列窄窗」
 //   变成「3 列宽窗」，把三列卡片硬挤进 272px，属于可见的排版事故。
 //   它比最小宽度大，是有意为之：窗口最小时必然落在窄窗模式，且 272–285 区间行为与历史一致。
 export const MIN_WINDOW_WIDTH = 271
-export const MIN_WINDOW_HEIGHT = 121
+export const MIN_WINDOW_HEIGHT = 126
 export const MAX_WINDOW_WIDTH = 640
 export const MAX_WINDOW_HEIGHT = 860
 
@@ -30,7 +32,7 @@ export const MAX_WINDOW_HEIGHT = 860
 export const MINI_WIDTH_THRESHOLD = 285
 /**
  * 极小窗口判定断点：内容宽 ≤ MINI_WIDTH_THRESHOLD 且 高 ≤ 该值，触发数据精简 + DOM 卸载。
- * 当前与 MIN_WINDOW_HEIGHT 同值 121，但语义不同（高度下限 vs 极小窗口门槛），故不合并；
+ * 当前与 MIN_WINDOW_HEIGHT 同值 126，但语义不同（高度下限 vs 极小窗口门槛），故不合并；
  * 改动其一必须核对另一处是否也要跟着改。
  */
-export const MINI_HEIGHT_THRESHOLD = 121
+export const MINI_HEIGHT_THRESHOLD = 126
