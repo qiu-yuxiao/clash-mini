@@ -249,7 +249,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         // 关键补强——拖窗口边缘走的是 Tauri 缩放边框子窗口，页面收不到 mousemove；
         // 拖页面内手柄又被 pointerdown 的 preventDefault 抑制了兼容鼠标事件。
         // 没有这一句，上述两条路径都无法给空闲计时器续命。
-        resetIdleTimer()
+        // （续期在监听器入口每帧做，见下方 onResized 包装；这里不重复续期。）
 
         // 大尺寸模式逻辑：转换为 logical 比较
         const logicalW = width / factor
@@ -273,7 +273,14 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       300,
     )
 
-    const unlistenPromise = currentWindow.onResized(checkMaximized)
+    // 续期放在防抖之外、监听器入口处：onResized 每帧都续。
+    // 若只在 300ms 防抖回调里续期，持续超过 10 秒的长拖期间防抖被反复推迟、
+    // 回调一次都不执行，空闲计时器会在拖拽中途触发（用拖拽前的旧状态判定），
+    // 造成标题栏瞬隐瞬显。入口处每帧续期后，拖拽全程计时器不会走到期。
+    const unlistenPromise = currentWindow.onResized((event) => {
+      resetIdleTimer()
+      checkMaximized(event)
+    })
 
     return () => {
       isUnmounted = true
