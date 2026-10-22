@@ -266,6 +266,12 @@ impl CoreManager {
             logging!(error, Type::Service, "回退应用系统代理失败: {}", e);
         }
         crate::core::sysopt::Sysopt::global().refresh_guard().await;
+        // 【必须通知前端】配置是被后端「背着前端」改掉的（绕过了 patch_verge），
+        // 而 verge://refresh-verge-config 这个事件原本由 patch_verge 的
+        // process_terminated_flags 发出，此路径不补发的话前端 TUN / 系统代理开关
+        // 会一直停在旧状态（显示「TUN 开、代理关」，实际正好相反）。
+        // 这属于 BUG-298 那类「界面与现实不一致」问题的镜像，不能只靠 warning 提示兜住。
+        Handle::refresh_verge();
     }
 
     /// 快照当前 PROXY 组的 now 字段（用于内核重启后恢复）

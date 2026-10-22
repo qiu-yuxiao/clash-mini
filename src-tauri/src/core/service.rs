@@ -1,5 +1,6 @@
 use crate::{
     config::{Config, IClashTemp},
+    constants::timing,
     core::logger::Logger,
     utils::dirs,
 };
@@ -332,11 +333,18 @@ pub async fn is_service_available() -> Result<()> {
 }
 
 async fn wait_for_service_ipc(manager: &ServiceManager) -> Result<()> {
-    let config = ServiceManager::config();
+    // 【预算口径】「等服务就绪愿意等多久」与「单次 IPC 请求失败重试几次」是两个语义，
+    // 不能共用一个数字：
+    //  · 这里 = 就绪预算，取 timing::SERVICE_WAIT_MAX（30s），覆盖「安装器收尾 → SCM
+    //    拉起服务 → 建 IPC 管道」全链路（BUG-298 ①）。
+    //  · ServiceManager::config().max_retries = 客户端每请求重试次数，必须保持短，
+    //    否则服务挂掉时任何一次普通服务调用都要阻塞 30s（UI 假死感）。
+    // 两者此前被绑成同一个常量，放宽就绪窗口会把运行时请求一起拖慢，故此处独立取预算。
+    let budget_times = (timing::SERVICE_WAIT_MAX.as_millis() / timing::SERVICE_WAIT_INTERVAL.as_millis()) as usize;
 
     let backoff = ConstantBuilder::default()
-        .with_delay(config.retry_delay)
-        .with_max_times(config.max_retries);
+        .with_delay(timing::SERVICE_WAIT_INTERVAL)
+        .with_max_times(budget_times);
 
     let result = (|| async {
         if !is_service_ipc_path_exists() {
@@ -365,11 +373,13 @@ impl ServiceManager {
         clash_verge_service_ipc::IpcConfig {
             default_timeout: Duration::from_millis(150),
             retry_delay: Duration::from_millis(250),
-            // 120 × 250ms = 30s，与 timing::SERVICE_WAIT_MAX 对齐：
-            // 全新安装后服务经 SCM 首次启动 + 初始化常超过旧值 20 次（5s）的窗口，
-            // 曾导致安装流程整体误报失败而服务随后才就绪（BUG-298）。
-            // 就绪时 connect 立即返回，放宽上限无副作用。
-            max_retries: 120,
+            // 【不要为了放宽「等服务就绪」而调大这个值】它是客户端**每一次请求**的
+            // 失败重试次数（kode-bridge 用它构建 RetryExecutor，连接失败时按
+            // 0..max_retries 循环 × retry_delay），服务挂掉/未安装时会把每次普通服务
+            // 调用都拖到 max_retries × retry_delay。就绪预算请改
+            // timing::SERVICE_WAIT_MAX（wait_for_service_ipc / wait_for_service_ready
+            // 都按它算次数），两者语义不同、互相独立（BUG-298 ① 的正确落点）。
+            max_retries: 20,
         }
     }
 
