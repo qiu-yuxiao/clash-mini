@@ -139,7 +139,7 @@ pub fn save_window_state_sync(width: f64, height: f64, x: Option<f64>, y: Option
     }
 }
 
-/// 窗口尺寸或位置变化时的持久化（带 250ms 节流，避免拖拽期间频繁写盘）
+/// 窗口尺寸或位置变化时的持久化（带 1000ms 节流，避免拖拽期间频繁写盘）
 static LAST_GEOMETRY_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 
 /// 同步版本：在 Resized / Moved 事件中直接调用，不 spawn 异步任务。
@@ -147,8 +147,7 @@ static LAST_GEOMETRY_SAVE_MS: AtomicI64 = AtomicI64::new(0);
 ///
 /// 【I/O 隔离】on_window_event 回调在 Tauri 主线程执行，若在此处同步执行
 /// std::fs::write，开机自启时磁盘忙（杀软扫描/系统启动）会导致单次写入耗时
-/// 超过 250ms 节流间隔，主线程被持续阻塞，最终引发 UI 卡死、心跳探针超时、
-/// tokio worker 被阻塞导致 runtime 调度停止。
+/// 阻塞主线程，最终引发 UI 卡死、心跳探针超时、tokio worker 被阻塞导致 runtime 调度停止。
 /// 改用 spawn_blocking 将 I/O 投递到阻塞线程池，主线程立即返回。
 /// 安全性：0×0 守卫已拒绝 destroy 触发的无效事件；写入内容幂等，乱序无害。
 pub fn save_window_state_on_geometry_change_sync(width: f64, height: f64, x: Option<f64>, y: Option<f64>) {
@@ -160,7 +159,7 @@ pub fn save_window_state_on_geometry_change_sync(width: f64, height: f64, x: Opt
         .unwrap_or_default()
         .as_millis() as i64;
     let last = LAST_GEOMETRY_SAVE_MS.load(Ordering::Relaxed);
-    if now - last < 250 {
+    if now - last < 1000 {
         return;
     }
     LAST_GEOMETRY_SAVE_MS.store(now, Ordering::Relaxed);
@@ -428,6 +427,24 @@ impl WindowManager {
                 if let Err(e) = w.unminimize() {
                     logging!(warn, Type::Window, "取消最小化失败: {}", e);
                     success = false;
+                }
+            }
+
+            // 拔插显示器保护：若窗口位置已脱离所有当前显示器的可视范围，自动居中重置
+            if let (Ok(pos), Ok(scale)) = (w.outer_position(), w.scale_factor()) {
+                let logical_x = pos.x as f64 / scale;
+                let logical_y = pos.y as f64 / scale;
+                if !is_position_on_screen(logical_x, logical_y) {
+                    logging!(
+                        warn,
+                        Type::Window,
+                        "窗口当前位置 ({}, {}) 脱离当前显示器可视范围，安全重置为居中",
+                        logical_x,
+                        logical_y
+                    );
+                    if let Err(e) = w.center() {
+                        logging!(warn, Type::Window, "居中窗口失败: {}", e);
+                    }
                 }
             }
 

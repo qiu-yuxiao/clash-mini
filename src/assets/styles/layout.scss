@@ -6,6 +6,7 @@
   overflow: hidden;
   position: relative;
   background: var(--theme-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--theme-border);
   z-index: 1;
 
   &::before {

@@ -34,7 +34,14 @@ export function computeResizeGeometry(input: {
   dx: number
   dy: number
   scaleFactor: number
-}): { width: number; height: number; x: number | null; y: number | null } {
+}): {
+  width: number
+  height: number
+  x: number | null
+  y: number | null
+  physX: number | null
+  physY: number | null
+} {
   const {
     direction,
     startInnerW,
@@ -90,10 +97,15 @@ export function computeResizeGeometry(input: {
   }
 
   const hasWestOrNorth = direction.includes('w') || direction.includes('n')
+  const physX = hasWestOrNorth ? Math.round(newX) : null
+  const physY = hasWestOrNorth ? Math.round(newY) : null
+
   return {
     width: clampedW,
     height: clampedH,
     x: hasWestOrNorth ? Math.round(newX / sf) : null,
     y: hasWestOrNorth ? Math.round(newY / sf) : null,
+    physX,
+    physY,
   }
 }

@@ -125,11 +125,16 @@ interface ResizeSession {
   pendingH: number | null
   pendingX: number | null
   pendingY: number | null
-  // 🛡️ [FM-03 防 IPC 洪水] 缓存上一次实际发出的几何值 (logical px)，比对去重
+  // 待应用的 physical 坐标（避免 physical -> logical -> physical 双重取整抖动）
+  pendingPhysX: number | null
+  pendingPhysY: number | null
+  // 🛡️ [FM-03 防 IPC 洪水] 缓存上一次实际发出的几何值 (logical px 与 physical px)，比对去重
   lastAppliedW?: number
   lastAppliedH?: number
   lastAppliedX?: number
   lastAppliedY?: number
+  lastAppliedPhysX?: number
+  lastAppliedPhysY?: number
   // rAF 调度句柄；非 null 表示已有帧排队或正在执行
   rafId: number | null
   // applyPending 是否在飞行中（IPC 未完成），防止下一帧 rAF 触发并发 IPC 调用堆积
@@ -167,10 +172,14 @@ export const ResizeHandles: React.FC = () => {
       const h = session.pendingH
       const x = session.pendingX
       const y = session.pendingY
+      const physX = session.pendingPhysX
+      const physY = session.pendingPhysY
       session.pendingW = null
       session.pendingH = null
       session.pendingX = null
       session.pendingY = null
+      session.pendingPhysX = null
+      session.pendingPhysY = null
       session.rafId = null
       session.inFlight = true
       try {
@@ -185,6 +194,10 @@ export const ResizeHandles: React.FC = () => {
           x ?? session.lastAppliedX ?? session.startPhysX / session.scaleFactor
         const targetY =
           y ?? session.lastAppliedY ?? session.startPhysY / session.scaleFactor
+        const targetPhysX =
+          physX ?? session.lastAppliedPhysX ?? session.startPhysX
+        const targetPhysY =
+          physY ?? session.lastAppliedPhysY ?? session.startPhysY
 
         // 🛡️ [FM-03 防 IPC 洪水] 尺寸/位置变动与上一次已发出的值对比去重
         // 拖拽推到最小尺寸 271x135 边界时，高频 pointermove 计算出的目标值均为 271x135，
@@ -193,8 +206,8 @@ export const ResizeHandles: React.FC = () => {
           (w !== null && targetW !== session.lastAppliedW) ||
           (h !== null && targetH !== session.lastAppliedH)
         const needsPos =
-          (x !== null && targetX !== session.lastAppliedX) ||
-          (y !== null && targetY !== session.lastAppliedY)
+          (physX !== null && targetPhysX !== session.lastAppliedPhysX) ||
+          (physY !== null && targetPhysY !== session.lastAppliedPhysY)
 
         if (!needsSize && !needsPos) return
 
@@ -203,11 +216,12 @@ export const ResizeHandles: React.FC = () => {
         session.lastAppliedH = targetH
         session.lastAppliedX = targetX
         session.lastAppliedY = targetY
+        session.lastAppliedPhysX = targetPhysX
+        session.lastAppliedPhysY = targetPhysY
 
         // 并行发 IPC：setSize 和 setPosition 之间合并调用。
-        // 【物理像素下发】几何量在 physical 空间里计算，落地也直接用 Physical*：
-        // 若用 Logical*，tao 的 logical→physical 是截断转换（×1.5 后 `as u32`），
-        // 未变动的那一维每帧可能被截掉 1px，长拖拽会出现缓慢漂移。
+        // 【物理像素下发】位置直接使用 PhysicalPosition(targetPhysX, targetPhysY)，
+        // 彻底消除 targetX * scaleFactor 浮点数取整带来的 1px 漂移/抖动。
         await Promise.all([
           needsSize
             ? currentWindow.setSize(
@@ -219,10 +233,7 @@ export const ResizeHandles: React.FC = () => {
             : Promise.resolve(),
           needsPos
             ? currentWindow.setPosition(
-                new PhysicalPosition(
-                  Math.round(targetX * session.scaleFactor),
-                  Math.round(targetY * session.scaleFactor),
-                ),
+                new PhysicalPosition(targetPhysX, targetPhysY),
               )
             : Promise.resolve(),
         ])
@@ -237,8 +248,8 @@ export const ResizeHandles: React.FC = () => {
         if (
           session.pendingW !== null ||
           session.pendingH !== null ||
-          session.pendingX !== null ||
-          session.pendingY !== null
+          session.pendingPhysX !== null ||
+          session.pendingPhysY !== null
         ) {
           scheduleApply(session)
         }
@@ -350,6 +361,8 @@ export const ResizeHandles: React.FC = () => {
         pendingH: null,
         pendingX: null,
         pendingY: null,
+        pendingPhysX: null,
+        pendingPhysY: null,
         rafId: null,
         inFlight: false,
       }
@@ -499,6 +512,8 @@ export const ResizeHandles: React.FC = () => {
       session.pendingH = geo.height
       session.pendingX = geo.x
       session.pendingY = geo.y
+      session.pendingPhysX = geo.physX
+      session.pendingPhysY = geo.physY
 
       scheduleApply(session)
     },
