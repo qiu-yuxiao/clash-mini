@@ -115,21 +115,21 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isMinimalWidth, setIsMinimalWidth] = useState(
     () =>
       typeof window !== 'undefined' &&
-      window.innerWidth <= MINI_WIDTH_THRESHOLD,
+      Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD,
   )
   /** 内容宽 ≤ 285 且 高 ≤ 135（最小窗口）：触发数据精简 + DOM卸载 */
   const [isMiniStatus, setIsMiniStatus] = useState(
     () =>
       typeof window !== 'undefined' &&
-      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
-      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
+      Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD &&
+      Math.round(window.innerHeight) <= MINI_HEIGHT_THRESHOLD,
   )
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDecorationsHiddenRef = useRef(false)
   const isMinimalWidthRef = useRef(
     typeof window !== 'undefined'
-      ? window.innerWidth <= MINI_WIDTH_THRESHOLD
+      ? Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
       : false,
   )
   // ── Drag-vs-click detection (for stealth mode) ────────────────────────────
@@ -159,12 +159,45 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     await currentWindow.minimize()
   }, [currentWindow])
 
+  // ── Reset idle timer ────────────────────────────────────────────────────────
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)
+
+    if (typeof window !== 'undefined') {
+      isMinimalWidthRef.current =
+        Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
+    }
+
+    idleTimerRef.current = setTimeout(() => {
+      // DPI 取整容差：在 125%/150% 等非整数缩放下，物理像素取整后换算回逻辑像素会带浮点微量（如 150% 下 203/1.5 = 135.33px），
+      // 使用 Math.round 消除浮点误差，确保极小窗口判定准确触发极窄隐藏标题栏模式（契约 2.6）。
+      const currentIsMinimal =
+        typeof window !== 'undefined'
+          ? Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
+          : false
+      const currentIsMinimalHeight =
+        typeof window !== 'undefined'
+          ? Math.round(window.innerHeight) <= MINI_HEIGHT_THRESHOLD
+          : false
+      if (
+        !currentIsMinimal ||
+        !currentIsMinimalHeight ||
+        isDecorationsHiddenRef.current
+      )
+        return
+      isDecorationsHiddenRef.current = true
+      // eslint-disable-next-line @eslint-react/set-state-in-effect
+      setIsDecorationsHidden(true)
+    }, IDLE_HIDE_DELAY_MS)
+  }, [])
+
   // ── Restore chrome (show custom titlebar) ─────────────────────────────────
   const restoreChrome = useCallback(() => {
     if (!isDecorationsHiddenRef.current) return
     isDecorationsHiddenRef.current = false
     setIsDecorationsHidden(false)
-  }, [])
+    resetIdleTimer()
+  }, [resetIdleTimer])
 
   // ── Resize listener: track large-mode + minimal width ────────────────────────
   useEffect(() => {
@@ -185,13 +218,14 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         lastWidth = width
         lastHeight = height
 
-        const wasMinimal = isMinimalWidthRef.current
-        isMinimalWidthRef.current = window.innerWidth <= MINI_WIDTH_THRESHOLD
+        isMinimalWidthRef.current =
+          Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
 
         // 同步窄窗口 / 最小窗口状态到 React state（供消费方订阅）
         const nextIsMinimalWidth = isMinimalWidthRef.current
         const nextIsMiniStatus =
-          nextIsMinimalWidth && window.innerHeight <= MINI_HEIGHT_THRESHOLD
+          nextIsMinimalWidth &&
+          Math.round(window.innerHeight) <= MINI_HEIGHT_THRESHOLD
         setIsMinimalWidth((prev) =>
           prev !== nextIsMinimalWidth ? nextIsMinimalWidth : prev,
         )
@@ -199,11 +233,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           prev !== nextIsMiniStatus ? nextIsMiniStatus : prev,
         )
 
-        if (
-          wasMinimal &&
-          !isMinimalWidthRef.current &&
-          isDecorationsHiddenRef.current
-        ) {
+        // 若窗口离开极小/窄窗尺寸（宽度扩大或高度拉高），立即退出极窄模式恢复标题栏
+        if (!nextIsMiniStatus && isDecorationsHiddenRef.current) {
           restoreChrome()
         }
 
@@ -239,35 +270,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         .catch((err) => console.warn('[WindowProvider] 清理监听器失败:', err))
     }
   }, [currentWindow, restoreChrome])
-
-  // ── Reset idle timer ────────────────────────────────────────────────────────
-  const resetIdleTimer = useCallback(() => {
-    if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)
-
-    if (typeof window !== 'undefined') {
-      isMinimalWidthRef.current = window.innerWidth <= MINI_WIDTH_THRESHOLD
-    }
-
-    idleTimerRef.current = setTimeout(() => {
-      const currentIsMinimal =
-        typeof window !== 'undefined'
-          ? window.innerWidth <= MINI_WIDTH_THRESHOLD
-          : false
-      const currentIsMinimalHeight =
-        typeof window !== 'undefined'
-          ? window.innerHeight <= MINI_HEIGHT_THRESHOLD
-          : false
-      if (
-        !currentIsMinimal ||
-        !currentIsMinimalHeight ||
-        isDecorationsHiddenRef.current
-      )
-        return
-      isDecorationsHiddenRef.current = true
-      // eslint-disable-next-line @eslint-react/set-state-in-effect
-      setIsDecorationsHidden(true)
-    }, IDLE_HIDE_DELAY_MS)
-  }, [])
 
   // ── Activity listeners: reset timer on any user input ──────────────────────
   useEffect(() => {

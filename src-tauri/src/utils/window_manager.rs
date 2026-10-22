@@ -273,12 +273,16 @@ pub fn restore_window_state() -> Option<SavedWindowState> {
     let content = std::fs::read_to_string(&path).ok()?;
     let mut state: SavedWindowState = serde_json::from_str(&content).ok()?;
 
-    // 兜底：保存值必须大于等于极简窗口最小值，且限制上限在 MAX_WIDTH 和 MAX_HEIGHT 范围内
-    if state.width >= crate::utils::resolve::window::MINIMAL_WIDTH
-        && state.height >= crate::utils::resolve::window::MINIMAL_HEIGHT
-    {
-        state.width = state.width.min(crate::utils::resolve::window::MAX_WIDTH);
-        state.height = state.height.min(crate::utils::resolve::window::MAX_HEIGHT);
+    // 兜底：保存值必须大于等于极简窗口最小值（带 DPI 取整容差），且限制在 [MIN, MAX] 范围内
+    if is_geometry_valid(state.width, state.height) {
+        state.width = state.width.clamp(
+            crate::utils::resolve::window::MINIMAL_WIDTH,
+            crate::utils::resolve::window::MAX_WIDTH,
+        );
+        state.height = state.height.clamp(
+            crate::utils::resolve::window::MINIMAL_HEIGHT,
+            crate::utils::resolve::window::MAX_HEIGHT,
+        );
 
         // 如果包含位置，校验位置是否依然落在可视屏幕范围内（防止拔插显示器导致丢到外星域）
         if let (Some(x), Some(y)) = (state.x, state.y) {
