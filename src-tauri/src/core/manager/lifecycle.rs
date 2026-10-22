@@ -106,6 +106,13 @@ impl CoreManager {
     }
 
     pub async fn restart_core(&self) -> Result<()> {
+        // 【锁外等服务，与 start_core 同源】restart 路径此前不经过
+        // await_service_ready_if_needed，TUN 开启时 prepare_startup_mode 只能读到
+        // SERVICE_MANAGER 的缓存状态——若缓存陈旧（如安装命令超时后停在 Unavailable，
+        // 而服务实际随后已就绪），内核会被静默降级成 Sidecar，TUN 完全不生效
+        // 且没有任何提示（BUG-298 现场：TUN 开关显示成功但流量不被接管）。
+        self.await_service_ready_if_needed().await;
+
         let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
 
@@ -148,7 +155,17 @@ impl CoreManager {
             let value = SERVICE_MANAGER.current().await;
             match value {
                 ServiceStatus::Ready => RunningMode::Service,
-                _ => RunningMode::Sidecar,
+                // 锁内只能接受现状不能等待（UAC 可能很久）。走到这里说明
+                // await_service_ready_if_needed 未能把服务带到 Ready——
+                // 必须留痕，禁止静默降级（BUG-298 教训）。
+                other => {
+                    logging!(
+                        warn,
+                        Type::Service,
+                        "TUN 已开启但服务状态为 {other:?}，内核将以 Sidecar 模式启动（TUN 不会生效）"
+                    );
+                    RunningMode::Sidecar
+                }
             }
         } else {
             RunningMode::Sidecar
@@ -215,6 +232,9 @@ impl CoreManager {
 
         if res.is_err() {
             logging!(error, Type::Service, "系统服务启动或安装失败，执行回退至系统代理");
+            // 【前端通知】静默回退曾让用户误以为 TUN 已生效（BUG-298：开关显示成功
+            // 但内核实为 Sidecar，流量不被接管）。回退必须明确告知。
+            Handle::notice_message("warning", "系统服务未就绪，TUN 模式无法生效，已自动回退为系统代理模式");
             self.fallback_to_system_proxy().await;
         }
     }
@@ -225,16 +245,27 @@ impl CoreManager {
             Type::Service,
             "检测到系统服务未就绪，执行配置回退：关闭 TUN 模式，开启系统代理"
         );
-        let patch = crate::config::IVerge {
-            enable_tun_mode: Some(false),
-            enable_system_proxy: Some(true),
-            ..Default::default()
-        };
-        if let Err(e) = crate::feat::patch_verge(&patch, false).await {
-            logging!(error, Type::Service, "应用回退配置失败: {}", e);
-            // 兜底设置运行模式，防止状态卡在 Service 导致后续无法启动
-            self.set_running_mode(RunningMode::Sidecar);
+        // 【禁止走 feat::patch_verge】enable_tun_mode 变更会联动 RESTART_CORE 分支，
+        // 与本函数的调用方（start_core / restart_core 的锁外前奏）构成 async fn
+        // 静态递归（E0733），运行期还会经 VERGE_PATCH_LOCK 互相等待造成死锁。
+        // 这里只落定配置并应用系统代理：随后的启动/重启流程读到 enable_tun_mode=false
+        // 自行走 Sidecar，系统代理由 update_sysproxy 立即接管。
+        {
+            let verge = Config::verge().await;
+            verge.edit_draft(|d| {
+                d.enable_tun_mode = Some(false);
+                d.enable_system_proxy = Some(true);
+            });
+            verge.apply();
+            let data = verge.data_arc();
+            if let Err(e) = data.save_file() {
+                logging!(error, Type::Service, "应用回退配置失败: {}", e);
+            }
         }
+        if let Err(e) = crate::core::sysopt::Sysopt::global().update_sysproxy().await {
+            logging!(error, Type::Service, "回退应用系统代理失败: {}", e);
+        }
+        crate::core::sysopt::Sysopt::global().refresh_guard().await;
     }
 
     /// 快照当前 PROXY 组的 now 字段（用于内核重启后恢复）

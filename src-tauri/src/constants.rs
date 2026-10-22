@@ -21,7 +21,10 @@ pub mod timing {
     pub const CONFIG_UPDATE_DEBOUNCE: Duration = Duration::from_millis(300);
     pub const STARTUP_ERROR_DELAY: Duration = Duration::from_secs(2);
 
-    pub const SERVICE_WAIT_MAX: Duration = Duration::from_millis(3000);
+    /// 服务就绪等待上限。全新安装场景下「安装器收尾 → SCM 拉起服务 → 服务初始化建 IPC 管道」
+    /// 全链路实测可超过 10 秒（Windows 服务启动经 SCM 调度 + 杀软扫描新注册的服务二进制），
+    /// 旧的 3 秒窗口会导致首次安装后误判失败（BUG-298）。就绪时 connect 立即返回，多等无副作用。
+    pub const SERVICE_WAIT_MAX: Duration = Duration::from_millis(30000);
     pub const SERVICE_WAIT_INTERVAL: Duration = Duration::from_millis(200);
 
     /// 代理节点判死与探针超时最大延迟限值

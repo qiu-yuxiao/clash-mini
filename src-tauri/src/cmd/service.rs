@@ -1,11 +1,17 @@
 use super::{CmdResult, StringifyErr as _};
 use crate::core::service::{self, SERVICE_MANAGER, ServiceStatus};
+use clash_verge_logging::{Type, logging};
 
 async fn execute_service_operation_sync(status: ServiceStatus, op_type: &str) -> CmdResult {
     SERVICE_MANAGER
         .handle_service_status(status)
         .await
-        .map_err(|e| format!("{op_type} Service failed: {e}").into())
+        // 【诊断留痕】服务操作失败此前只把错误返回前端、后端零日志，
+        // 排查时 latest.log 在「需要安装服务」之后一片空白（BUG-298 现场即如此）。
+        .map_err(|e| {
+            logging!(error, Type::Service, "{op_type} service 操作失败: {e}");
+            format!("{op_type} Service failed: {e}").into()
+        })
 }
 
 #[tauri::command]

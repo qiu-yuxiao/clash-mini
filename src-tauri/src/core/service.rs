@@ -365,7 +365,11 @@ impl ServiceManager {
         clash_verge_service_ipc::IpcConfig {
             default_timeout: Duration::from_millis(150),
             retry_delay: Duration::from_millis(250),
-            max_retries: 20,
+            // 120 × 250ms = 30s，与 timing::SERVICE_WAIT_MAX 对齐：
+            // 全新安装后服务经 SCM 首次启动 + 初始化常超过旧值 20 次（5s）的窗口，
+            // 曾导致安装流程整体误报失败而服务随后才就绪（BUG-298）。
+            // 就绪时 connect 立即返回，放宽上限无副作用。
+            max_retries: 120,
         }
     }
 

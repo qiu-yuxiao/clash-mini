@@ -658,4 +658,5 @@ flowchart LR
 | **BUG-295** | 2.10.1 | `enable_silent_start` 补齐 `--silent` 命令行校验，修复手动双击桌面启动被误判静默跳过创建主窗口；自启开关补齐立即乐观更新 |
 | **BUG-296** | 3.7 / 4.1 | 节点快照保留内置出站传递以激活还原期子集兜底；`dns.fallback` 代理规则排除私网/环回 IP；全局代理模式下跳过 GEOIP 直连拦截保持 `MATCH,PROXY` 语义 |
 | **BUG-297** | 2.3 / 2.5 | 缩放拖拽基准用 `outerSize()` 而落地用 `setSize()`（内尺寸），每帧多出外框内缩量（实测 150% DPI 为 22×13 物理像素），最小宽度下按一下左键窗口即跳宽；`setPointerCapture` 在 `await` 后取 `e.currentTarget` 得 `null` 导致捕获从未建立、拖拽一帧即失效。修复：尺寸统一内尺寸口径 + 关闭无框阴影（`shadow(false)`）+ 捕获前置同步建立 + 手势提前结束可收尾 |
+| **BUG-298** | 2.10.1 | TUN 全新安装三层失效：① 安装服务后 IPC 等待窗口仅 5s（安装器收尾 + SCM 首次启动常超窗）导致首次误报失败；② 失败后 `SERVICE_MANAGER` 缓存停在 Unavailable 且 `restart_core` 不经过等服务流程，`prepare_startup_mode` 读陈旧缓存把内核静默降级 Sidecar——TUN 开关显示成功但流量不被接管；③ 降级与回退全程无日志无通知。修复：等待窗口放宽至 30s + restart 路径补锁外等服务 + 降级 WARN 留痕 + 回退前端通知 + 服务操作失败补 error 日志 |
 
