@@ -300,7 +300,7 @@ async fn export_bundle_inner() -> Result<String> {
     // 【优先级】按修改时间倒序：条数上限必须优先保住最新日志。
     // 此前按 read_dir 的任意顺序取，主日志先塞满上限后就轮不到 service 内核日志，
     // 而被挤掉的恰恰是断流排查最需要的证据。
-    collected.sort_by(|a, b| b.1.cmp(&a.1));
+    collected.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     let mut log_files = 0usize;
     for (path, _) in collected {

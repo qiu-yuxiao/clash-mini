@@ -126,7 +126,7 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
         let mut dns_val = config
             .get(&dns_key)
             .and_then(|v| v.as_mapping().cloned())
-            .unwrap_or_else(Mapping::new);
+            .unwrap_or_default();
         revise!(dns_val, "ipv6", user_ipv6);
         revise!(config, "dns", dns_val);
     }

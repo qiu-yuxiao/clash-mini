@@ -22,12 +22,12 @@ fn main() {
         println!("cargo:rerun-if-env-changed=CLASH_MINI_TEST_LINK");
 
         #[cfg(windows)]
-        if std::env::var_os("CLASH_MINI_TEST_LINK").is_some() {
-            if let Ok(out_dir) = std::env::var("OUT_DIR") {
-                let resource_lib = std::path::Path::new(&out_dir).join("resource.lib");
-                if resource_lib.exists() {
-                    println!("cargo:rustc-link-arg={}", resource_lib.display());
-                }
+        if std::env::var_os("CLASH_MINI_TEST_LINK").is_some()
+            && let Ok(out_dir) = std::env::var("OUT_DIR")
+        {
+            let resource_lib = std::path::Path::new(&out_dir).join("resource.lib");
+            if resource_lib.exists() {
+                println!("cargo:rustc-link-arg={}", resource_lib.display());
             }
         }
     }

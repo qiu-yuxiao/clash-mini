@@ -337,10 +337,9 @@ pub async fn startup_script() -> Result<()> {
         loop {
             tokio::select! {
                 event = rx.recv() => {
-                    match event {
-                        // 通道关闭 = 进程结束且输出读完
-                        None => break,
-                        Some(_) => {}
+                    // 通道关闭 = 进程结束且输出读完
+                    if event.is_none() {
+                        break;
                     }
                 }
                 _ = &mut timeout => {

@@ -118,17 +118,16 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
   /** 内容宽 ≤ 285 且 高 ≤ 126（最小窗口）：触发数据精简 + DOM卸载（同上，仅首帧粗估） */
-  const [isMiniStatus, setIsMiniStatus] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
-      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
-  )
+  const initialIsMini =
+    typeof window !== 'undefined' &&
+    window.innerWidth <= MINI_WIDTH_THRESHOLD &&
+    window.innerHeight <= MINI_HEIGHT_THRESHOLD
+  const [isMiniStatus, setIsMiniStatus] = useState(initialIsMini)
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDecorationsHiddenRef = useRef(false)
-  /** 极小窗状态镜像。权威来源是窗口内尺寸（物理像素），由 applyGeometry 唯一写入 */
-  const isMiniStatusRef = useRef(false)
+  /** 极小窗状态镜像。首帧与 state 对齐，挂载后由 applyGeometry 按窗口内尺寸物理像素权威维护 */
+  const isMiniStatusRef = useRef(initialIsMini)
   // ── Drag-vs-click detection (for stealth mode) ────────────────────────────
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null)
   const dragStartedRef = useRef(false)
