@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { listen } from '@tauri-apps/api/event'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type React from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useVerge } from '@/hooks/use-verge'
 import { useWindowDecorations } from '@/hooks/use-window'
@@ -21,7 +22,7 @@ import {
 import { queryClient } from '@/services/query-client'
 import type { IProxyGroupItem } from '@/types/clash'
 import { isDummyNode } from '@/utils/node'
-import type { Proxy, ProxyProvider } from 'tauri-plugin-mihomo-api'
+import type { Proxy as ProxyNode, ProxyProvider } from 'tauri-plugin-mihomo-api'
 
 import {
   ClashConfigContext,
@@ -84,7 +85,7 @@ export const AppDataProvider = ({
         const groupProxy = await getProxyByNameWithTimeout('PROXY')
         if (groupProxy) {
           const activeNodeName = groupProxy.now || ''
-          let activeNode: (Proxy & { provider?: string }) | null = null
+          let activeNode: (ProxyNode & { provider?: string }) | null = null
           if (activeNodeName) {
             try {
               activeNode = await getProxyByNameWithTimeout(activeNodeName)
@@ -165,6 +166,7 @@ export const AppDataProvider = ({
   // 之前 queryKey 含 isMiniStatus 会把缓存分裂成两份并行 query、翻转即全量重拉；
   // 现 queryKey 稳定为 ['getProxies']，翻转时仅作废缓存并重新拉取（单一入口，复用缓存机制）。
   const isFirstMiniRef = useRef(true)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: isMiniStatus 是有意作为触发依赖：翻转时作废代理缓存（挂载首跑由 isFirstMiniRef 跳过），故意不在回调体内引用
   useEffect(() => {
     if (isFirstMiniRef.current) {
       isFirstMiniRef.current = false

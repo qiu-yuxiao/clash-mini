@@ -4,7 +4,8 @@ import {
   PhysicalPosition,
   currentMonitor,
 } from '@tauri-apps/api/window'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type React from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   MAX_WINDOW_HEIGHT,
@@ -102,12 +103,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     () => (isTauri ? getCurrentWindow() : null),
     [isTauri],
   )
-
-  /**
-   * Whether the window has native decorations (title bar + borders).
-   * Windows：始终 frameless（自定义标题栏）。
-   */
-  const decorated: boolean = false
 
   const [isLargeMode, setIsLargeMode] = useState(false)
   /** FEAT-003: true when custom titlebar is hidden by idle auto-hide timer (stealth mode) */
@@ -495,7 +490,9 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const contextValue = useMemo(
     () => ({
-      decorated,
+      // Whether the window has native decorations (title bar + borders).
+      // Windows：始终 frameless（自定义标题栏），故恒为 false（平台不变量，无需进依赖）。
+      decorated: false,
       isLargeMode,
       isDecorationsHidden,
       isMinimalWidth,
@@ -506,7 +503,6 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       currentWindow,
     }),
     [
-      decorated,
       isLargeMode,
       isDecorationsHidden,
       isMinimalWidth,

@@ -9,6 +9,22 @@ import {
 
 import { computeResizeGeometry } from './resize-geometry'
 
+// 西/北向拖拽由锚定边反推保证 physX/physY 非空；测试里显式判空收窄而非 `!` 断言，
+// 失败时给出可读信息（同时规避 noNonNullAssertion）。
+function rightEdgeOf(geo: ReturnType<typeof computeResizeGeometry>): number {
+  if (geo.physX === null) {
+    throw new Error('physX 应非空：w/nw/sw 向拖拽必有锚定边反推')
+  }
+  return geo.physX + geo.physW
+}
+
+function bottomEdgeOf(geo: ReturnType<typeof computeResizeGeometry>): number {
+  if (geo.physY === null) {
+    throw new Error('physY 应非空：n/ne/nw 向拖拽必有锚定边反推')
+  }
+  return geo.physY + geo.physH
+}
+
 describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
   const defaultBase = {
     startInnerW: 300,
@@ -112,7 +128,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       expect(geo.width).toBe(350)
       expect(geo.physW).toBe(350)
       expect(geo.physX).toBe(450)
-      expect(geo.physX! + geo.physW).toBe(
+      expect(rightEdgeOf(geo)).toBe(
         defaultBase.startPhysX + defaultBase.startInnerW,
       )
     })
@@ -126,7 +142,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(MIN_WINDOW_WIDTH)
-      expect(geo.physX! + geo.physW).toBe(
+      expect(rightEdgeOf(geo)).toBe(
         defaultBase.startPhysX + defaultBase.startInnerW,
       )
     })
@@ -140,7 +156,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(MAX_WINDOW_WIDTH)
-      expect(geo.physX! + geo.physW).toBe(
+      expect(rightEdgeOf(geo)).toBe(
         defaultBase.startPhysX + defaultBase.startInnerW,
       )
     })
@@ -157,7 +173,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.height).toBe(240)
       expect(geo.physY).toBe(260)
-      expect(geo.physY! + geo.physH).toBe(
+      expect(bottomEdgeOf(geo)).toBe(
         defaultBase.startPhysY + defaultBase.startInnerH,
       )
     })
@@ -171,7 +187,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.height).toBe(MIN_WINDOW_HEIGHT)
-      expect(geo.physY! + geo.physH).toBe(
+      expect(bottomEdgeOf(geo)).toBe(
         defaultBase.startPhysY + defaultBase.startInnerH,
       )
     })
@@ -185,7 +201,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.height).toBe(MAX_WINDOW_HEIGHT)
-      expect(geo.physY! + geo.physH).toBe(
+      expect(bottomEdgeOf(geo)).toBe(
         defaultBase.startPhysY + defaultBase.startInnerH,
       )
     })
@@ -202,10 +218,10 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.width).toBe(330)
       expect(geo.height).toBe(220)
-      expect(geo.physX! + geo.physW).toBe(
+      expect(rightEdgeOf(geo)).toBe(
         defaultBase.startPhysX + defaultBase.startInnerW,
       )
-      expect(geo.physY! + geo.physH).toBe(
+      expect(bottomEdgeOf(geo)).toBe(
         defaultBase.startPhysY + defaultBase.startInnerH,
       )
     })
@@ -230,8 +246,8 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       expect(geo.physX).toBe(120) // 103 + 450 - 433
       expect(geo.physY).toBe(218) // 207 + 300 - 289
       // 精确锁定：不经 logical 往返，右边与底边一像素都不许动
-      expect(geo.physX! + geo.physW).toBe(103 + 450)
-      expect(geo.physY! + geo.physH).toBe(207 + 300)
+      expect(rightEdgeOf(geo)).toBe(103 + 450)
+      expect(bottomEdgeOf(geo)).toBe(207 + 300)
     })
 
     it('125% DPI 下西侧 clamp 到最小宽度后，右边缘仍然精确锁定（0 误差）', () => {
@@ -251,7 +267,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.width).toBe(MIN_WINDOW_WIDTH)
       expect(geo.physW).toBe(Math.round(MIN_WINDOW_WIDTH * scaleFactor)) // 339
-      expect(geo.physX! + geo.physW).toBe(startPhysX + startInnerW)
+      expect(rightEdgeOf(geo)).toBe(startPhysX + startInnerW)
     })
 
     it('150% DPI 下连续 100 帧小步拖拽，右边缘累积误差为 0（无漂移）', () => {
@@ -271,7 +287,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
           dy: 0,
           scaleFactor,
         })
-        expect(geo.physX! + geo.physW).toBe(rightEdge)
+        expect(rightEdgeOf(geo)).toBe(rightEdge)
       }
     })
 
@@ -294,7 +310,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.physW).toBe(startInnerW) // 不被 clamp 顶成 407
       expect(geo.physH).toBe(350) // 300 - (-50)
-      expect(geo.physY! + geo.physH).toBe(200 + 300)
+      expect(bottomEdgeOf(geo)).toBe(200 + 300)
     })
 
     it('非拖拽维度原样透传：最小高度下拖左右边，高度不得被顶大 1px', () => {
