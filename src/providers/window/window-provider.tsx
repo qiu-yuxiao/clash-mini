@@ -14,6 +14,7 @@ import {
 } from '@/constants'
 import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
+import { isMiniByPhysical, isMinimalWidthByPhysical } from '@/utils/mini-window'
 import { isWindowResizing } from '@/utils/window-resizing'
 
 import { WindowContext, type WindowContextType } from './window-context'
@@ -111,27 +112,28 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLargeMode, setIsLargeMode] = useState(false)
   /** FEAT-003: true when custom titlebar is hidden by idle auto-hide timer (stealth mode) */
   const [isDecorationsHidden, setIsDecorationsHidden] = useState(false)
-  /** 内容宽度 ≤ 285px（窄窗口）：控制路由表格、流量面板布局 */
+  /**
+   * 内容宽度 ≤ 285px（窄窗口）：控制路由表格、流量面板布局。
+   * 【仅供首帧布局】用的是页面视口（整数 CSS 像素）的粗估；
+   * 权威判定见 applyGeometry（窗口内尺寸物理像素 + 1 物理像素容差），挂载后立即校正。
+   */
   const [isMinimalWidth, setIsMinimalWidth] = useState(
     () =>
       typeof window !== 'undefined' &&
-      Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD,
+      window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
-  /** 内容宽 ≤ 285 且 高 ≤ 135（最小窗口）：触发数据精简 + DOM卸载 */
+  /** 内容宽 ≤ 285 且 高 ≤ 135（最小窗口）：触发数据精简 + DOM卸载（同上，仅首帧粗估） */
   const [isMiniStatus, setIsMiniStatus] = useState(
     () =>
       typeof window !== 'undefined' &&
-      Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD &&
-      Math.round(window.innerHeight) <= MINI_HEIGHT_THRESHOLD,
+      window.innerWidth <= MINI_WIDTH_THRESHOLD &&
+      window.innerHeight <= MINI_HEIGHT_THRESHOLD,
   )
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDecorationsHiddenRef = useRef(false)
-  const isMinimalWidthRef = useRef(
-    typeof window !== 'undefined'
-      ? Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
-      : false,
-  )
+  /** 极小窗状态镜像。权威来源是窗口内尺寸（物理像素），由 applyGeometry 唯一写入 */
+  const isMiniStatusRef = useRef(false)
   // ── Drag-vs-click detection (for stealth mode) ────────────────────────────
   const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null)
   const dragStartedRef = useRef(false)
@@ -159,45 +161,64 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     await currentWindow.minimize()
   }, [currentWindow])
 
-  // ── Reset idle timer ────────────────────────────────────────────────────────
+  // ── Idle timer（FEAT-003）：必须自续期，禁止自杀式退出 ──────────────────────
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)
 
-    if (typeof window !== 'undefined') {
-      isMinimalWidthRef.current =
-        Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
+    // 用局部递归函数排程，保证每次触发后**无条件**重新武装。
+    // 旧实现在条件不满足时直接 return，导致「启动 10 秒后窗口还不是极小窗」就把
+    // 计时器永久注销，整场会话再也不会有下一次判定（v3.0.0~v3.0.3 失效主因之一）。
+    const arm = () => {
+      idleTimerRef.current = setTimeout(() => {
+        idleTimerRef.current = null
+        if (!isDecorationsHiddenRef.current && isMiniStatusRef.current) {
+          isDecorationsHiddenRef.current = true
+          setIsDecorationsHidden(true)
+        }
+        arm()
+      }, IDLE_HIDE_DELAY_MS)
     }
 
-    idleTimerRef.current = setTimeout(() => {
-      // DPI 取整容差：在 125%/150% 等非整数缩放下，物理像素取整后换算回逻辑像素会带浮点微量（如 150% 下 203/1.5 = 135.33px），
-      // 使用 Math.round 消除浮点误差，确保极小窗口判定准确触发极窄隐藏标题栏模式（契约 2.6）。
-      const currentIsMinimal =
-        typeof window !== 'undefined'
-          ? Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
-          : false
-      const currentIsMinimalHeight =
-        typeof window !== 'undefined'
-          ? Math.round(window.innerHeight) <= MINI_HEIGHT_THRESHOLD
-          : false
-      if (
-        !currentIsMinimal ||
-        !currentIsMinimalHeight ||
-        isDecorationsHiddenRef.current
-      )
-        return
-      isDecorationsHiddenRef.current = true
-      // eslint-disable-next-line @eslint-react/set-state-in-effect
-      setIsDecorationsHidden(true)
-    }, IDLE_HIDE_DELAY_MS)
+    arm()
   }, [])
 
   // ── Restore chrome (show custom titlebar) ─────────────────────────────────
   const restoreChrome = useCallback(() => {
-    if (!isDecorationsHiddenRef.current) return
-    isDecorationsHiddenRef.current = false
-    setIsDecorationsHidden(false)
+    // 旧实现在未隐藏时提前 return 且不续期，调用点（窗口变大）等于白调。
+    // 这里无条件续期：恢复本身是一次交互，且让调用方不必依赖「已隐藏」这个前置条件。
+    if (isDecorationsHiddenRef.current) {
+      isDecorationsHiddenRef.current = false
+      setIsDecorationsHidden(false)
+    }
     resetIdleTimer()
   }, [resetIdleTimer])
+
+  /**
+   * 同步窄窗 / 极小窗状态（FEAT-003 唯一判定入口）。
+   *
+   * 入参必须是**窗口内尺寸的物理像素**（onResized payload / innerSize()），
+   * 禁止传页面视口数值——视口是整数 CSS 像素，150% 下会 135.33 → 136，判定永远不成立。
+   */
+  const applyGeometry = useCallback(
+    (physW: number, physH: number, sf: number) => {
+      const nextIsMiniStatus = isMiniByPhysical(physW, physH, sf)
+      const nextIsMinimalWidth = isMinimalWidthByPhysical(physW, sf)
+
+      isMiniStatusRef.current = nextIsMiniStatus
+      setIsMinimalWidth((prev) =>
+        prev !== nextIsMinimalWidth ? nextIsMinimalWidth : prev,
+      )
+      setIsMiniStatus((prev) =>
+        prev !== nextIsMiniStatus ? nextIsMiniStatus : prev,
+      )
+
+      // 离开极小窗尺寸（变宽或拉高）：立即退出隐匿、恢复标题栏
+      if (!nextIsMiniStatus && isDecorationsHiddenRef.current) {
+        restoreChrome()
+      }
+    },
+    [restoreChrome],
+  )
 
   // ── Resize listener: track large-mode + minimal width ────────────────────────
   useEffect(() => {
@@ -218,28 +239,19 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         lastWidth = width
         lastHeight = height
 
-        isMinimalWidthRef.current =
-          Math.round(window.innerWidth) <= MINI_WIDTH_THRESHOLD
-
-        // 同步窄窗口 / 最小窗口状态到 React state（供消费方订阅）
-        const nextIsMinimalWidth = isMinimalWidthRef.current
-        const nextIsMiniStatus =
-          nextIsMinimalWidth &&
-          Math.round(window.innerHeight) <= MINI_HEIGHT_THRESHOLD
-        setIsMinimalWidth((prev) =>
-          prev !== nextIsMinimalWidth ? nextIsMinimalWidth : prev,
-        )
-        setIsMiniStatus((prev) =>
-          prev !== nextIsMiniStatus ? nextIsMiniStatus : prev,
-        )
-
-        // 若窗口离开极小/窄窗尺寸（宽度扩大或高度拉高），立即退出极窄模式恢复标题栏
-        if (!nextIsMiniStatus && isDecorationsHiddenRef.current) {
-          restoreChrome()
-        }
-
-        // 大尺寸模式逻辑：event.payload 是 PhysicalSize，转换为 logical 比较
+        // event.payload 是窗口内尺寸的物理像素——这是权威一手数据。
+        // 窄窗/极小窗判定统一走 applyGeometry（物理像素域 + 1 物理像素容差），
+        // 不再读 window.innerWidth/innerHeight（整数 CSS 像素会吃掉那 1 个物理像素）。
         const factor = window.devicePixelRatio || 1
+        applyGeometry(width, height, factor)
+
+        // 窗口几何变化也是一次交互：从这里起重新计时 10 秒。
+        // 关键补强——拖窗口边缘走的是 Tauri 缩放边框子窗口，页面收不到 mousemove；
+        // 拖页面内手柄又被 pointerdown 的 preventDefault 抑制了兼容鼠标事件。
+        // 没有这一句，上述两条路径都无法给空闲计时器续命。
+        resetIdleTimer()
+
+        // 大尺寸模式逻辑：转换为 logical 比较
         const logicalW = width / factor
         const logicalH = height / factor
         const isLargeSize =
@@ -269,7 +281,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         .then((unlisten) => unlisten())
         .catch((err) => console.warn('[WindowProvider] 清理监听器失败:', err))
     }
-  }, [currentWindow, restoreChrome])
+  }, [currentWindow, applyGeometry, resetIdleTimer])
 
   // ── Activity listeners: reset timer on any user input ──────────────────────
   useEffect(() => {
@@ -431,6 +443,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
         const logicalW = size.width / factor
         const logicalH = size.height / factor
 
+        // 首帧校正：以窗口内尺寸（物理像素）作为窄窗/极小窗判定的权威初值，
+        // 覆盖 useState 里基于页面视口的粗估（视口是整数 CSS 像素，边界上差 1 像素）。
+        applyGeometry(size.width, size.height, factor)
+
         // 若窗口状态恢复插件恢复了 640×860（大尺寸模式下关闭程序），
         // 标记为大尺寸模式，lastNonLargeSizeRef 恢复为持久化的「进入大尺寸前的尺寸」
         const isLargeSize =
@@ -468,7 +484,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       .catch((err) => {
         console.warn('[WindowProvider] 初始化 innerSize 失败:', err)
       })
-  }, [currentWindow])
+  }, [currentWindow, applyGeometry])
 
   const contextValue = useMemo(
     () => ({
