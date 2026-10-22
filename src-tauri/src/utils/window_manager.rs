@@ -1,7 +1,8 @@
 use crate::{constants::files, core::handle, utils::resolve::window::build_new_window};
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Manager as _, WebviewWindow, Wry};
 
@@ -139,34 +140,107 @@ pub fn save_window_state_sync(width: f64, height: f64, x: Option<f64>, y: Option
     }
 }
 
-/// 窗口尺寸或位置变化时的持久化（带 1000ms 节流，避免拖拽期间频繁写盘）
-static LAST_GEOMETRY_SAVE_MS: AtomicI64 = AtomicI64::new(0);
+/// 窗口几何持久化的节流间隔（毫秒）：拖拽期间几何事件每帧都来，间隔内只落盘一次。
+const GEOMETRY_SAVE_INTERVAL_MS: i64 = 1000;
 
-/// 同步版本：在 Resized / Moved 事件中直接调用，不 spawn 异步任务。
-/// 0×0 守卫：w.destroy() 会触发 Resized(0,0)，必须拒绝此无效值。
-///
-/// 【I/O 隔离】on_window_event 回调在 Tauri 主线程执行，若在此处同步执行
-/// std::fs::write，开机自启时磁盘忙（杀软扫描/系统启动）会导致单次写入耗时
-/// 阻塞主线程，最终引发 UI 卡死、心跳探针超时、tokio worker 被阻塞导致 runtime 调度停止。
-/// 改用 spawn_blocking 将 I/O 投递到阻塞线程池，主线程立即返回。
-/// 安全性：0×0 守卫已拒绝 destroy 触发的无效事件；写入内容幂等，乱序无害。
-pub fn save_window_state_on_geometry_change_sync(width: f64, height: f64, x: Option<f64>, y: Option<f64>) {
-    if width < crate::utils::resolve::window::MINIMAL_WIDTH || height < crate::utils::resolve::window::MINIMAL_HEIGHT {
-        return;
-    }
-    let now = SystemTime::now()
+/// 尺寸守卫容差（logical px）。
+/// 必须留出 DPI 换算的取整余量：150% 下最小宽度 271 对应物理 406，回算得 270.67 < 271；
+/// 若用严格 `<` 判定，最小宽度这个状态会被永远判为无效而无法持久化。
+const GEOMETRY_MIN_EPS: f64 = 1.0;
+
+/// 上次落盘时刻（毫秒时间戳）
+static LAST_GEOMETRY_SAVE_MS: AtomicI64 = AtomicI64::new(0);
+/// 几何版本号：每次收到几何变化领一个递增号
+static GEOMETRY_SEQ: AtomicU64 = AtomicU64::new(0);
+/// 已落盘的最大版本号：写入方据此丢弃「迟到的旧值」
+static WRITTEN_SEQ: AtomicU64 = AtomicU64::new(0);
+/// 待写几何：(版本号, 宽, 高, x, y)
+type PendingGeometry = (u64, f64, f64, Option<f64>, Option<f64>);
+
+/// 待写几何槽：只保留最新一版，节流丢弃的只是中间帧
+static PENDING_GEOMETRY: Mutex<Option<PendingGeometry>> = Mutex::new(None);
+/// 是否已排入「尾随补写」任务，避免重复排程
+static TRAILING_WRITE_ARMED: AtomicBool = AtomicBool::new(false);
+/// 串行化文件写入，配合版本号保证「后发生的一定最后落盘」
+static WRITE_LOCK: Mutex<()> = Mutex::new(());
+
+fn now_ms() -> i64 {
+    SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_millis() as i64;
-    let last = LAST_GEOMETRY_SAVE_MS.load(Ordering::Relaxed);
-    if now - last < 1000 {
+        .as_millis() as i64
+}
+
+/// 几何是否可信：0×0 守卫（w.destroy() 会触发 Resized(0,0)）＋ DPI 取整容差
+fn is_geometry_valid(w: f64, h: f64) -> bool {
+    w >= crate::utils::resolve::window::MINIMAL_WIDTH - GEOMETRY_MIN_EPS
+        && h >= crate::utils::resolve::window::MINIMAL_HEIGHT - GEOMETRY_MIN_EPS
+}
+
+/// 按版本号顺序落盘：比已写版本更旧的直接丢弃。
+fn write_geometry_ordered(seq: u64, w: f64, h: f64, x: Option<f64>, y: Option<f64>) {
+    let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    if seq <= WRITTEN_SEQ.load(Ordering::SeqCst) {
+        // 已经有更新的几何落盘了，这版是迟到的旧值
         return;
     }
-    LAST_GEOMETRY_SAVE_MS.store(now, Ordering::Relaxed);
-    // 投递到阻塞线程池，避免主线程被磁盘 I/O 阻塞
-    let _handle = tauri::async_runtime::spawn_blocking(move || {
-        save_window_state_sync(width, height, x, y);
-    });
+    save_window_state_sync(w, h, x, y);
+    WRITTEN_SEQ.store(seq, Ordering::SeqCst);
+}
+
+/// 取出待写槽里最新的一版，投递到阻塞线程池落盘
+fn flush_pending_geometry() {
+    let pending = PENDING_GEOMETRY.lock().unwrap_or_else(|e| e.into_inner()).take();
+    if let Some((seq, w, h, x, y)) = pending {
+        LAST_GEOMETRY_SAVE_MS.store(now_ms(), Ordering::Relaxed);
+        let _handle = tauri::async_runtime::spawn_blocking(move || write_geometry_ordered(seq, w, h, x, y));
+    }
+}
+
+/// 窗口尺寸或位置变化时的持久化入口（Resized / Moved 事件）。
+///
+/// 【节流 + 尾随补写】间隔内的连续变化不逐帧写盘，但**最后一版一定会落盘**：
+/// 间隔已到则立即写；没到则排一个到点执行的补写任务，只丢中间帧、不丢终值。
+/// 纯前沿节流（到点写、未到点直接丢）会把「拖拽停止前那一段」的几何丢掉，
+/// 拖完窗口马上退出程序时，重启后会回退到拖拽中途的尺寸。
+///
+/// 【I/O 隔离】事件回调在 Tauri 主线程执行，磁盘忙时同步写会阻塞主线程，
+/// 因此实际写入投递到阻塞线程池，主线程立即返回。
+///
+/// 【顺序保证】每次变化领一个递增版本号，写入方在互斥锁内比对版本号，
+/// 迟到的旧值直接丢弃 —— 避免「销毁前立即写」与「节流后台写」乱序时旧值覆盖新值。
+pub fn save_window_state_on_geometry_change(w: f64, h: f64, x: Option<f64>, y: Option<f64>) {
+    if !is_geometry_valid(w, h) {
+        return;
+    }
+    let seq = GEOMETRY_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    *PENDING_GEOMETRY.lock().unwrap_or_else(|e| e.into_inner()) = Some((seq, w, h, x, y));
+
+    let elapsed = now_ms() - LAST_GEOMETRY_SAVE_MS.load(Ordering::Relaxed);
+    if elapsed >= GEOMETRY_SAVE_INTERVAL_MS {
+        flush_pending_geometry();
+        return;
+    }
+    if !TRAILING_WRITE_ARMED.swap(true, Ordering::SeqCst) {
+        let wait = (GEOMETRY_SAVE_INTERVAL_MS - elapsed).max(0) as u64;
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+            TRAILING_WRITE_ARMED.store(false, Ordering::SeqCst);
+            flush_pending_geometry();
+        });
+    }
+}
+
+/// 立即持久化（跳过节流）：窗口销毁前调用，保证最新几何先落盘。
+/// 同时清空待写槽，避免节流任务稍后用旧值把刚写的覆盖回去。
+pub fn save_window_state_immediately(w: f64, h: f64, x: Option<f64>, y: Option<f64>) {
+    if !is_geometry_valid(w, h) {
+        return;
+    }
+    let seq = GEOMETRY_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    *PENDING_GEOMETRY.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    LAST_GEOMETRY_SAVE_MS.store(now_ms(), Ordering::Relaxed);
+    write_geometry_ordered(seq, w, h, x, y);
 }
 
 /// 检查给定的坐标 (x, y) 是否落在当前已连接显示器的可视范围内
@@ -422,7 +496,13 @@ impl WindowManager {
 
             let mut success = true;
 
-            if w.is_minimized().unwrap_or(false) {
+            // 必须在 unminimize() 之前取样：Windows 上最小化窗口的窗口矩形被系统挪到
+            // (-32000, -32000)，而 unminimize 的还原未必在同一轮消息处理里生效。
+            // 此时若拿 outer_position() 去判「是否在屏内」，必然判负，
+            // 接着 center() 会把用户刚从任务栏恢复出来的窗口弹到屏幕正中央、丢掉原位置。
+            let was_minimized = w.is_minimized().unwrap_or(false);
+
+            if was_minimized {
                 logging!(info, Type::Window, "窗口已最小化，正在取消最小化");
                 if let Err(e) = w.unminimize() {
                     logging!(warn, Type::Window, "取消最小化失败: {}", e);
@@ -430,20 +510,23 @@ impl WindowManager {
                 }
             }
 
-            // 拔插显示器保护：若窗口位置已脱离所有当前显示器的可视范围，自动居中重置
-            if let (Ok(pos), Ok(scale)) = (w.outer_position(), w.scale_factor()) {
-                let logical_x = pos.x as f64 / scale;
-                let logical_y = pos.y as f64 / scale;
-                if !is_position_on_screen(logical_x, logical_y) {
-                    logging!(
-                        warn,
-                        Type::Window,
-                        "窗口当前位置 ({}, {}) 脱离当前显示器可视范围，安全重置为居中",
-                        logical_x,
-                        logical_y
-                    );
-                    if let Err(e) = w.center() {
-                        logging!(warn, Type::Window, "居中窗口失败: {}", e);
+            // 拔插显示器保护：仅对「本来就处于显示状态」的窗口校验位置。
+            // 最小化窗口的坐标不可信（见上），交给下一次正常激活时再校验即可。
+            if !was_minimized {
+                if let (Ok(pos), Ok(scale)) = (w.outer_position(), w.scale_factor()) {
+                    let logical_x = pos.x as f64 / scale;
+                    let logical_y = pos.y as f64 / scale;
+                    if !is_position_on_screen(logical_x, logical_y) {
+                        logging!(
+                            warn,
+                            Type::Window,
+                            "窗口当前位置 ({}, {}) 脱离当前显示器可视范围，安全重置为居中",
+                            logical_x,
+                            logical_y
+                        );
+                        if let Err(e) = w.center() {
+                            logging!(warn, Type::Window, "居中窗口失败: {}", e);
+                        }
                     }
                 }
             }
@@ -589,10 +672,8 @@ impl WindowManager {
                 // 加 5 秒超时保护：主线程被模态循环/COM 调用占用时不会永久阻塞（与 activate_window 一致）
                 match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
                     Ok(Ok(Some((w, h, x, y)))) => {
-                        if w >= crate::utils::resolve::window::MINIMAL_WIDTH
-                            && h >= crate::utils::resolve::window::MINIMAL_HEIGHT
-                        {
-                            save_window_state_sync(w, h, x, y);
+                        if is_geometry_valid(w, h) {
+                            save_window_state_immediately(w, h, x, y);
                             logging!(
                                 info,
                                 Type::Window,

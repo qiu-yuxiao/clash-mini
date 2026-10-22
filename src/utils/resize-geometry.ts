@@ -11,19 +11,25 @@ import {
 type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
 /**
- * 纯函数：根据拖拽起始几何与鼠标位移，算出窗口的新几何（logical px）。
+ * 纯函数：根据拖拽起始几何与鼠标位移，算出窗口的新几何。
  *
- * 【口径铁律】`startInnerW` / `startInnerH` 必须是**内尺寸（客户区）**物理像素（来自 `innerSize()`），
- * `startPhysX` / `startPhysY` 必须是**外位置**物理像素（来自 `outerPosition()`）。
+ * 【入参口径】`startInnerW/H` 必须是**内尺寸（客户区）**物理像素（来自 `innerSize()`），
+ * `startPhysX/Y` 必须是**外位置**物理像素（来自 `outerPosition()`）。
  * 因为落地分别是 `setSize()`（Tauri 语义 = 内尺寸）与 `setPosition()`（Tauri 语义 = 外位置）。
- *
  * 两者混用会让每帧尺寸多出一个「外框内缩量」：历史上曾用 outerSize 作基准 + setSize 落地，
  * 在 150% DPI 下每帧凭空放大 22×13 物理像素，最小宽度时表现为「按下左键窗口就跳宽」。
  *
- * 位置换算（保持对边不动）：newOuterX = startOuterX + (startInnerW - newInnerW)。
- * 外框左右/上下内缩量在这条式子中精确抵消，所以即使将来外框重新出现内缩也不会漂移。
+ * 【出参口径】除 `width` / `height` 是 clamp 后的 logical 尺寸外，
+ * `physW` / `physH` / `physX` / `physY` 全是**整数物理像素**，可直接构造函数下发。
+ * 落地时不再做 logical → physical 换算 —— 那一趟往返每帧要取整两次，正是 1px 抖动来源之一。
  *
- * 尺寸 clamp 到 [MIN, MAX]；被 clamp 时回退对边位置以保持不动。
+ * 【锚定边反推】西/北方向拖拽时，位置不由「起点 + 位移」推导，而由**固定的对边**反推：
+ *   physX = startPhysX + startInnerW - physW
+ * 这样即使尺寸被 min/max clamp，右边（下边）也绝对不动，不会出现
+ * 「尺寸取整一次、位置取整一次，两边各差半像素」的 ±1px 边缘抖动。
+ * （`startPhysX + startInnerW` 即窗口右边：本项目 shadow(false)，外尺寸恒等于内尺寸。）
+ *
+ * 尺寸 clamp 到 [MIN, MAX]（logical 口径，与后端 min/max_inner_size 一致）。
  */
 export function computeResizeGeometry(input: {
   direction: ResizeDirection
@@ -37,8 +43,8 @@ export function computeResizeGeometry(input: {
 }): {
   width: number
   height: number
-  x: number | null
-  y: number | null
+  physW: number
+  physH: number
   physX: number | null
   physY: number | null
 } {
@@ -55,57 +61,36 @@ export function computeResizeGeometry(input: {
 
   let newW = startInnerW
   let newH = startInnerH
-  let newX = startPhysX
-  let newY = startPhysY
 
   if (direction.includes('e')) newW = startInnerW + dx
   if (direction.includes('s')) newH = startInnerH + dy
-  if (direction.includes('w')) {
-    newW = startInnerW - dx
-    newX = startPhysX + dx
-  }
-  if (direction.includes('n')) {
-    newH = startInnerH - dy
-    newY = startPhysY + dy
-  }
+  if (direction.includes('w')) newW = startInnerW - dx
+  if (direction.includes('n')) newH = startInnerH - dy
 
-  // physical → logical 用于 clamp 比较（后端 min/max_inner_size 也是 logical）
-  const logicalW = newW / sf
-  const logicalH = newH / sf
+  // 只对「本次被拖拽的维度」做 clamp，另一维原样透传（不重新 clamp）。
+  // 否则会出现：窗口停在最小宽度（150% 下物理 406 = 270.67 logical）时拖上下边，
+  // 宽度被重新 clamp 到 271 → 物理 407，凭空宽出 1 像素。
+  const horiz = direction.includes('e') || direction.includes('w')
+  const vert = direction.includes('n') || direction.includes('s')
 
-  // clamp 尺寸到 [MIN, MAX]
-  const clampedW = Math.max(
-    MIN_WINDOW_WIDTH,
-    Math.min(MAX_WINDOW_WIDTH, logicalW),
-  )
-  const clampedH = Math.max(
-    MIN_WINDOW_HEIGHT,
-    Math.min(MAX_WINDOW_HEIGHT, logicalH),
-  )
+  const clampedW = horiz
+    ? Math.max(MIN_WINDOW_WIDTH, Math.min(MAX_WINDOW_WIDTH, newW / sf))
+    : startInnerW / sf
+  const clampedH = vert
+    ? Math.max(MIN_WINDOW_HEIGHT, Math.min(MAX_WINDOW_HEIGHT, newH / sf))
+    : startInnerH / sf
 
-  // 若尺寸被 clamp（例如达到最小宽度），需要相应回退位置以保持对边不动
-  // 推导：右边缘 = newX + newW，clamp 后 newW 变成 clampedW*sf，
-  //   为保持右边缘不动，newX 需减去 (newW - clampedW*sf) = -dwLogical*sf
-  //   即 newX += dwLogical*sf（dwLogical 为负时往左推，正时往右推）
-  const dwLogical = clampedW - logicalW
-  const dhLogical = clampedH - logicalH
-  if (dwLogical !== 0 && direction.includes('w')) {
-    newX -= dwLogical * sf
-  }
-  if (dhLogical !== 0 && direction.includes('n')) {
-    newY -= dhLogical * sf
-  }
+  // 全程唯一一次取整：logical → physical
+  const physW = Math.round(clampedW * sf)
+  const physH = Math.round(clampedH * sf)
 
-  const hasWestOrNorth = direction.includes('w') || direction.includes('n')
-  const physX = hasWestOrNorth ? Math.round(newX) : null
-  const physY = hasWestOrNorth ? Math.round(newY) : null
+  // 锚定边反推（东/南方向位置不变，故为 null）
+  const physX = direction.includes('w')
+    ? startPhysX + startInnerW - physW
+    : null
+  const physY = direction.includes('n')
+    ? startPhysY + startInnerH - physH
+    : null
 
-  return {
-    width: clampedW,
-    height: clampedH,
-    x: hasWestOrNorth ? Math.round(newX / sf) : null,
-    y: hasWestOrNorth ? Math.round(newY / sf) : null,
-    physX,
-    physY,
-  }
+  return { width: clampedW, height: clampedH, physW, physH, physX, physY }
 }

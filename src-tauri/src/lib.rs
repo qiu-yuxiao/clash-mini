@@ -274,8 +274,8 @@ pub fn run() {
                             event_handlers::handle_window_close(&webview_window, event);
                         }
                         tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
-                            // 每次窗口尺寸或位置变化都同步持久化（带 250ms 节流），
-                            // 确保进入轻量模式销毁窗口前 window_state.json 已是当前尺寸与位置。
+                            // 窗口几何变化 → 节流 + 尾随补写持久化（拖拽期间不逐帧写盘，
+                            // 但最后一帧一定会落盘，见 window_manager 的几何持久化说明）。
                             //
                             // 【口径说明】宽高存「内尺寸」（客户区），位置存「外位置」：
                             // MINIMAL_WIDTH/MINIMAL_HEIGHT、max_inner_size、前端 setSize 与 MIN/MAX 常量
@@ -288,7 +288,7 @@ pub fn run() {
                                 let h = size.height as f64 / scale;
                                 let x = pos.x as f64 / scale;
                                 let y = pos.y as f64 / scale;
-                                crate::utils::window_manager::save_window_state_on_geometry_change_sync(
+                                crate::utils::window_manager::save_window_state_on_geometry_change(
                                     w,
                                     h,
                                     Some(x),

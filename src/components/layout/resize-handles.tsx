@@ -120,21 +120,17 @@ interface ResizeSession {
   scaleFactor: number
   // 拖拽期间使用的 pointerId，用于 setPointerCapture/releasePointerCapture
   pointerId: number
-  // 当前帧待应用的 logical 尺寸/位置（rAF 节流）
-  pendingW: number | null
-  pendingH: number | null
-  pendingX: number | null
-  pendingY: number | null
-  // 待应用的 physical 坐标（避免 physical -> logical -> physical 双重取整抖动）
+  // 当前帧待应用的**物理像素**几何（rAF 节流）。
+  // 全程只在物理像素空间里待命与下发，不做 logical 往返 —— 少一次取整就少一次 1px 抖动。
+  pendingPhysW: number | null
+  pendingPhysH: number | null
   pendingPhysX: number | null
   pendingPhysY: number | null
-  // 🛡️ [FM-03 防 IPC 洪水] 缓存上一次实际发出的几何值 (logical px 与 physical px)，比对去重
-  lastAppliedW?: number
-  lastAppliedH?: number
-  lastAppliedX?: number
-  lastAppliedY?: number
-  lastAppliedPhysX?: number
-  lastAppliedPhysY?: number
+  // 🛡️ [FM-03 防 IPC 洪水] 缓存上一次实际发出的物理几何值，比对去重
+  lastAppliedPhysW: number
+  lastAppliedPhysH: number
+  lastAppliedPhysX: number
+  lastAppliedPhysY: number
   // rAF 调度句柄；非 null 表示已有帧排队或正在执行
   rafId: number | null
   // applyPending 是否在飞行中（IPC 未完成），防止下一帧 rAF 触发并发 IPC 调用堆积
@@ -168,16 +164,12 @@ export const ResizeHandles: React.FC = () => {
   const applyPending = useCallback(
     async (session: ResizeSession) => {
       // 取出本帧的待应用值，立即清空，避免下一帧重复应用
-      const w = session.pendingW
-      const h = session.pendingH
-      const x = session.pendingX
-      const y = session.pendingY
+      const physW = session.pendingPhysW
+      const physH = session.pendingPhysH
       const physX = session.pendingPhysX
       const physY = session.pendingPhysY
-      session.pendingW = null
-      session.pendingH = null
-      session.pendingX = null
-      session.pendingY = null
+      session.pendingPhysW = null
+      session.pendingPhysH = null
       session.pendingPhysX = null
       session.pendingPhysY = null
       session.rafId = null
@@ -185,56 +177,39 @@ export const ResizeHandles: React.FC = () => {
       try {
         if (!currentWindow) return
 
-        // 计算目标几何（如某维度无需调整则维持上次应用值或初始值）
-        const targetW =
-          w ?? session.lastAppliedW ?? session.startInnerW / session.scaleFactor
-        const targetH =
-          h ?? session.lastAppliedH ?? session.startInnerH / session.scaleFactor
-        const targetX =
-          x ?? session.lastAppliedX ?? session.startPhysX / session.scaleFactor
-        const targetY =
-          y ?? session.lastAppliedY ?? session.startPhysY / session.scaleFactor
-        const targetPhysX =
-          physX ?? session.lastAppliedPhysX ?? session.startPhysX
-        const targetPhysY =
-          physY ?? session.lastAppliedPhysY ?? session.startPhysY
+        // 未发生变化的维度沿用上一次已发出的值；仍在原点则回落到拖拽起始值
+        const targetW = physW ?? session.lastAppliedPhysW
+        const targetH = physH ?? session.lastAppliedPhysH
+        const targetX = physX ?? session.lastAppliedPhysX
+        const targetY = physY ?? session.lastAppliedPhysY
 
-        // 🛡️ [FM-03 防 IPC 洪水] 尺寸/位置变动与上一次已发出的值对比去重
-        // 拖拽推到最小尺寸 271x135 边界时，高频 pointermove 计算出的目标值均为 271x135，
-        // 经过此判断判定未变动，从而直接跳过发 IPC，彻底消除最小尺寸边界处的 IPC 堆积现象。
+        // 🛡️ [FM-03 防 IPC 洪水] 与上一次已发出的物理值对比去重。
+        // 拖拽推到最小尺寸 271x135 边界时，高频 pointermove 算出的目标值恒为同一组，
+        // 此判据直接跳过发 IPC，消除最小尺寸边界处的 IPC 堆积。
         const needsSize =
-          (w !== null && targetW !== session.lastAppliedW) ||
-          (h !== null && targetH !== session.lastAppliedH)
+          targetW !== session.lastAppliedPhysW ||
+          targetH !== session.lastAppliedPhysH
         const needsPos =
-          (physX !== null && targetPhysX !== session.lastAppliedPhysX) ||
-          (physY !== null && targetPhysY !== session.lastAppliedPhysY)
+          (physX !== null && targetX !== session.lastAppliedPhysX) ||
+          (physY !== null && targetY !== session.lastAppliedPhysY)
 
         if (!needsSize && !needsPos) return
 
         // 更新上次发出的实际几何记录
-        session.lastAppliedW = targetW
-        session.lastAppliedH = targetH
-        session.lastAppliedX = targetX
-        session.lastAppliedY = targetY
-        session.lastAppliedPhysX = targetPhysX
-        session.lastAppliedPhysY = targetPhysY
+        session.lastAppliedPhysW = targetW
+        session.lastAppliedPhysH = targetH
+        session.lastAppliedPhysX = targetX
+        session.lastAppliedPhysY = targetY
 
         // 并行发 IPC：setSize 和 setPosition 之间合并调用。
-        // 【物理像素下发】位置直接使用 PhysicalPosition(targetPhysX, targetPhysY)，
-        // 彻底消除 targetX * scaleFactor 浮点数取整带来的 1px 漂移/抖动。
+        // 【物理像素直发】几何量本来就是物理像素整数，不再乘以 scaleFactor 二次换算，
+        // 从根上消灭「×1.5 再取整」造成的 ±1px 漂移。
         await Promise.all([
           needsSize
-            ? currentWindow.setSize(
-                new PhysicalSize(
-                  Math.round(targetW * session.scaleFactor),
-                  Math.round(targetH * session.scaleFactor),
-                ),
-              )
+            ? currentWindow.setSize(new PhysicalSize(targetW, targetH))
             : Promise.resolve(),
           needsPos
-            ? currentWindow.setPosition(
-                new PhysicalPosition(targetPhysX, targetPhysY),
-              )
+            ? currentWindow.setPosition(new PhysicalPosition(targetX, targetY))
             : Promise.resolve(),
         ])
       } catch (err) {
@@ -246,8 +221,8 @@ export const ResizeHandles: React.FC = () => {
         session.inFlight = false
         // IPC 期间若又有新的 pending，立即再调度一帧应用，避免遗漏最后一帧
         if (
-          session.pendingW !== null ||
-          session.pendingH !== null ||
+          session.pendingPhysW !== null ||
+          session.pendingPhysH !== null ||
           session.pendingPhysX !== null ||
           session.pendingPhysY !== null
         ) {
@@ -357,12 +332,16 @@ export const ResizeHandles: React.FC = () => {
         startPointerY: downClientY * scaleFactor,
         scaleFactor,
         pointerId: e.pointerId,
-        pendingW: null,
-        pendingH: null,
-        pendingX: null,
-        pendingY: null,
+        pendingPhysW: null,
+        pendingPhysH: null,
         pendingPhysX: null,
         pendingPhysY: null,
+        // 上一帧已发出值以「当前窗口几何」为初值：
+        // 这样首帧只有真正变化的维度才会发 IPC，不会白打一次同值的 setSize/setPosition。
+        lastAppliedPhysW: size.width,
+        lastAppliedPhysH: size.height,
+        lastAppliedPhysX: pos.x,
+        lastAppliedPhysY: pos.y,
         rafId: null,
         inFlight: false,
       }
@@ -508,10 +487,8 @@ export const ResizeHandles: React.FC = () => {
         dy,
         scaleFactor: session.scaleFactor,
       })
-      session.pendingW = geo.width
-      session.pendingH = geo.height
-      session.pendingX = geo.x
-      session.pendingY = geo.y
+      session.pendingPhysW = geo.physW
+      session.pendingPhysH = geo.physH
       session.pendingPhysX = geo.physX
       session.pendingPhysY = geo.physY
 

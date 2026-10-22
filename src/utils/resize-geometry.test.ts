@@ -19,7 +19,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
   }
 
   describe('东侧拖拽 (direction: e)', () => {
-    it('向右拉伸增加宽度，高度与原点位置保持不变 (x/y 为 null)', () => {
+    it('向右拉伸增加宽度，高度与原点位置保持不变 (physX/physY 为 null)', () => {
       const geo = computeResizeGeometry({
         ...defaultBase,
         direction: 'e',
@@ -29,8 +29,8 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.width).toBe(350)
       expect(geo.height).toBe(200)
-      expect(geo.x).toBeNull()
-      expect(geo.y).toBeNull()
+      expect(geo.physW).toBe(350)
+      expect(geo.physH).toBe(200)
       expect(geo.physX).toBeNull()
       expect(geo.physY).toBeNull()
     })
@@ -44,7 +44,8 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(MIN_WINDOW_WIDTH)
-      expect(geo.x).toBeNull()
+      expect(geo.physW).toBe(MIN_WINDOW_WIDTH)
+      expect(geo.physX).toBeNull()
     })
 
     it('向右拉伸受 MAX_WINDOW_WIDTH (640) 钳制', () => {
@@ -56,6 +57,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(MAX_WINDOW_WIDTH)
+      expect(geo.physW).toBe(MAX_WINDOW_WIDTH)
     })
   })
 
@@ -70,8 +72,6 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.width).toBe(300)
       expect(geo.height).toBe(260)
-      expect(geo.x).toBeNull()
-      expect(geo.y).toBeNull()
       expect(geo.physX).toBeNull()
       expect(geo.physY).toBeNull()
     })
@@ -85,7 +85,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.height).toBe(MIN_WINDOW_HEIGHT)
-      expect(geo.y).toBeNull()
+      expect(geo.physY).toBeNull()
     })
 
     it('向下拉伸受 MAX_WINDOW_HEIGHT (860) 钳制', () => {
@@ -100,7 +100,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
     })
   })
 
-  describe('西侧拖拽 (direction: w) - 保持右边缘不动', () => {
+  describe('西侧拖拽 (direction: w) - 右边缘绝对锁定', () => {
     it('向左拉伸增加宽度并向左平移，右边缘坐标恒定', () => {
       const geo = computeResizeGeometry({
         ...defaultBase,
@@ -110,9 +110,9 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(350)
+      expect(geo.physW).toBe(350)
       expect(geo.physX).toBe(450)
-      // 右边缘：physX + width * sf 必须等于 startPhysX + startInnerW
-      expect(geo.physX! + geo.width * defaultBase.scaleFactor).toBe(
+      expect(geo.physX! + geo.physW).toBe(
         defaultBase.startPhysX + defaultBase.startInnerW,
       )
     })
@@ -126,9 +126,9 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(MIN_WINDOW_WIDTH)
-      // 验证右边缘锁定
-      const rightEdge = geo.physX! + geo.width * defaultBase.scaleFactor
-      expect(rightEdge).toBe(defaultBase.startPhysX + defaultBase.startInnerW)
+      expect(geo.physX! + geo.physW).toBe(
+        defaultBase.startPhysX + defaultBase.startInnerW,
+      )
     })
 
     it('向左拉伸达到 MAX_WINDOW_WIDTH (640) 时，右边缘依然保持锁定不动', () => {
@@ -140,12 +140,13 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(MAX_WINDOW_WIDTH)
-      const rightEdge = geo.physX! + geo.width * defaultBase.scaleFactor
-      expect(rightEdge).toBe(defaultBase.startPhysX + defaultBase.startInnerW)
+      expect(geo.physX! + geo.physW).toBe(
+        defaultBase.startPhysX + defaultBase.startInnerW,
+      )
     })
   })
 
-  describe('北侧拖拽 (direction: n) - 保持底边缘不动', () => {
+  describe('北侧拖拽 (direction: n) - 底边缘绝对锁定', () => {
     it('向上拉伸增加高度并向上平移，底边缘坐标恒定', () => {
       const geo = computeResizeGeometry({
         ...defaultBase,
@@ -156,8 +157,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.height).toBe(240)
       expect(geo.physY).toBe(260)
-      // 底边缘：physY + height * sf 必须等于 startPhysY + startInnerH
-      expect(geo.physY! + geo.height * defaultBase.scaleFactor).toBe(
+      expect(geo.physY! + geo.physH).toBe(
         defaultBase.startPhysY + defaultBase.startInnerH,
       )
     })
@@ -171,8 +171,9 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.height).toBe(MIN_WINDOW_HEIGHT)
-      const bottomEdge = geo.physY! + geo.height * defaultBase.scaleFactor
-      expect(bottomEdge).toBe(defaultBase.startPhysY + defaultBase.startInnerH)
+      expect(geo.physY! + geo.physH).toBe(
+        defaultBase.startPhysY + defaultBase.startInnerH,
+      )
     })
 
     it('向上拉伸达到 MAX_WINDOW_HEIGHT (860) 时，底边缘依然保持锁定不动', () => {
@@ -184,8 +185,9 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.height).toBe(MAX_WINDOW_HEIGHT)
-      const bottomEdge = geo.physY! + geo.height * defaultBase.scaleFactor
-      expect(bottomEdge).toBe(defaultBase.startPhysY + defaultBase.startInnerH)
+      expect(geo.physY! + geo.physH).toBe(
+        defaultBase.startPhysY + defaultBase.startInnerH,
+      )
     })
   })
 
@@ -200,34 +202,39 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
       expect(geo.width).toBe(330)
       expect(geo.height).toBe(220)
-      expect(geo.physX! + geo.width * defaultBase.scaleFactor).toBe(
+      expect(geo.physX! + geo.physW).toBe(
         defaultBase.startPhysX + defaultBase.startInnerW,
       )
-      expect(geo.physY! + geo.height * defaultBase.scaleFactor).toBe(
+      expect(geo.physY! + geo.physH).toBe(
         defaultBase.startPhysY + defaultBase.startInnerH,
       )
     })
 
-    it('150% DPI 缩放下，physX 和 physY 始终为规整的物理像素整数，杜绝浮点抖动', () => {
+    it('150% DPI 下 physW/physH/physX/physY 全为整数物理像素，可直接下发', () => {
       const scaleFactor = 1.5
-      // 模拟物理像素初值与位移
       const geo = computeResizeGeometry({
         startInnerW: Math.round(300 * scaleFactor), // 450
         startInnerH: Math.round(200 * scaleFactor), // 300
-        startPhysX: 103, // 任意非 1.5 整数倍的坐标
+        startPhysX: 103, // 故意取非 1.5 整数倍的坐标
         startPhysY: 207,
-        direction: 'w',
+        direction: 'nw',
         dx: 17, // 奇数像素移动
-        dy: 0,
+        dy: 11,
         scaleFactor,
       })
 
+      expect(Number.isInteger(geo.physW)).toBe(true)
+      expect(Number.isInteger(geo.physH)).toBe(true)
       expect(Number.isInteger(geo.physX)).toBe(true)
       expect(Number.isInteger(geo.physY)).toBe(true)
-      expect(geo.physX).toBe(120) // 103 + 17 = 120
+      expect(geo.physX).toBe(120) // 103 + 450 - 433
+      expect(geo.physY).toBe(218) // 207 + 300 - 289
+      // 精确锁定：不经 logical 往返，右边与底边一像素都不许动
+      expect(geo.physX! + geo.physW).toBe(103 + 450)
+      expect(geo.physY! + geo.physH).toBe(207 + 300)
     })
 
-    it('125% DPI 缩放下，西侧 clamp 到最小宽度后右边缘无跳动', () => {
+    it('125% DPI 下西侧 clamp 到最小宽度后，右边缘仍然精确锁定（0 误差）', () => {
       const scaleFactor = 1.25
       const startInnerW = Math.round(300 * scaleFactor) // 375
       const startPhysX = 250
@@ -243,10 +250,72 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       })
 
       expect(geo.width).toBe(MIN_WINDOW_WIDTH)
-      // 物理右边缘：physX + Math.round(clampedW * sf) 与 startPhysX + startInnerW 误差不超过 1px (四舍五入规整)
-      const expectedRight = startPhysX + startInnerW
-      const actualRight = geo.physX! + Math.round(geo.width * scaleFactor)
-      expect(Math.abs(actualRight - expectedRight)).toBeLessThanOrEqual(1)
+      expect(geo.physW).toBe(Math.round(MIN_WINDOW_WIDTH * scaleFactor)) // 339
+      expect(geo.physX! + geo.physW).toBe(startPhysX + startInnerW)
+    })
+
+    it('150% DPI 下连续 100 帧小步拖拽，右边缘累积误差为 0（无漂移）', () => {
+      const scaleFactor = 1.5
+      const startInnerW = 450
+      const startPhysX = 103
+      const rightEdge = startPhysX + startInnerW
+
+      for (let i = 1; i <= 100; i += 1) {
+        const geo = computeResizeGeometry({
+          startInnerW,
+          startInnerH: 300,
+          startPhysX,
+          startPhysY: 207,
+          direction: 'w',
+          dx: i, // 每帧挪 1 物理像素
+          dy: 0,
+          scaleFactor,
+        })
+        expect(geo.physX! + geo.physW).toBe(rightEdge)
+      }
+    })
+
+    it('非拖拽维度原样透传：最小宽度下拖上下边，宽度不得被重新 clamp 顶大 1px', () => {
+      const scaleFactor = 1.5
+      // 窗口停在最小宽度：OS 的最小跟踪尺寸 271 * 1.5 = 406.5，实际截断为 406 物理像素
+      const startInnerW = 406
+      expect(startInnerW / scaleFactor).toBeLessThan(MIN_WINDOW_WIDTH) // 270.67
+
+      const geo = computeResizeGeometry({
+        startInnerW,
+        startInnerH: 300,
+        startPhysX: 100,
+        startPhysY: 200,
+        direction: 'n',
+        dx: 0,
+        dy: -50,
+        scaleFactor,
+      })
+
+      expect(geo.physW).toBe(startInnerW) // 不被 clamp 顶成 407
+      expect(geo.physH).toBe(350) // 300 - (-50)
+      expect(geo.physY! + geo.physH).toBe(200 + 300)
+    })
+
+    it('非拖拽维度原样透传：最小高度下拖左右边，高度不得被顶大 1px', () => {
+      const scaleFactor = 1.25
+      const startInnerH = 168 // 135 * 1.25 = 168.75 → 实际 168，回算 134.4 < 135
+      expect(startInnerH / scaleFactor).toBeLessThan(MIN_WINDOW_HEIGHT)
+
+      const geo = computeResizeGeometry({
+        startInnerW: 400,
+        startInnerH,
+        startPhysX: 100,
+        startPhysY: 200,
+        direction: 'e',
+        dx: 30,
+        dy: 0,
+        scaleFactor,
+      })
+
+      expect(geo.physH).toBe(startInnerH)
+      expect(geo.physW).toBe(430)
+      expect(geo.physX).toBeNull()
     })
   })
 })
