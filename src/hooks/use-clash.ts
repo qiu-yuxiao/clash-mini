@@ -75,20 +75,23 @@ export const useClash = () => {
     queryFn: getVersionWithTimeout,
   })
 
-  const mutateClash = useCallback((updater?: MutateClashUpdater, revalidate?: boolean) => {
-    if (updater === undefined) {
-      return refetch()
-    }
-    const next =
-      typeof updater === 'function'
-        ? updater(queryClient.getQueryData<IConfigData>(['getRuntimeConfig']))
-        : updater
-    queryClient.setQueryData(['getRuntimeConfig'], next)
-    if (revalidate !== false) {
-      return refetch()
-    }
-    return Promise.resolve()
-  }, [refetch])
+  const mutateClash = useCallback(
+    (updater?: MutateClashUpdater, revalidate?: boolean) => {
+      if (updater === undefined) {
+        return refetch()
+      }
+      const next =
+        typeof updater === 'function'
+          ? updater(queryClient.getQueryData<IConfigData>(['getRuntimeConfig']))
+          : updater
+      queryClient.setQueryData(['getRuntimeConfig'], next)
+      if (revalidate !== false) {
+        return refetch()
+      }
+      return Promise.resolve()
+    },
+    [refetch],
+  )
 
   const patchClash = useLockFn(async (patch: Partial<IConfigData>) => {
     await patchClashConfig(patch)

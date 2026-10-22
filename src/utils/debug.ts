@@ -45,8 +45,7 @@ const computeDebugEnabled = (): boolean => {
 }
 
 export const isDebugLoggingEnabled = () =>
-  cachedDebugEnabled ??
-  (cachedDebugEnabled = computeDebugEnabled())
+  cachedDebugEnabled ?? (cachedDebugEnabled = computeDebugEnabled())
 
 /**
  * Logs to the console only when debug logging is enabled.

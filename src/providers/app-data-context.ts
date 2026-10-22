@@ -53,11 +53,13 @@ export interface ConnectionSpeedData {
 }
 
 export interface ProxiesContextType {
-  proxies: {
-    groups: IProxyGroupItem[]
-    records: Record<string, IProxyItem>
-    proxies: IProxyItem[]
-  } | undefined
+  proxies:
+    | {
+        groups: IProxyGroupItem[]
+        records: Record<string, IProxyItem>
+        proxies: IProxyItem[]
+      }
+    | undefined
   proxyProviders: Record<string, ProxyProvider | undefined>
   isProxiesPending: boolean
 }

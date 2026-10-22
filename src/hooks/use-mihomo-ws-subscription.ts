@@ -112,7 +112,10 @@ const createSharedSubscriptionEntry = (
         activeOwner.handleMessage(msg.data)
       })
     } catch (err) {
-      console.warn('[WS] 连接失败，将在重连间隔后重试:', err instanceof Error ? err.message : String(err))
+      console.warn(
+        '[WS] 连接失败，将在重连间隔后重试:',
+        err instanceof Error ? err.message : String(err),
+      )
       if (!entry.closed && !entry.ws) {
         clearReconnectTimer()
         entry.reconnectTimer = setTimeout(entry.connectWs, RECONNECT_DELAY_MS)

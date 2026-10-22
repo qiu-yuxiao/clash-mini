@@ -26,7 +26,9 @@ async function sendTelegramNotification() {
   const isAutobuild =
     process.env.BUILD_TYPE === 'autobuild' || version.includes('autobuild')
   const chatId = isAutobuild ? CHAT_ID_TEST : CHAT_ID_RELEASE
-  const buildType = isAutobuild ? '\u6eda\u52a8\u66f4\u65b0\u7248' : '\u6b63\u5f0f\u7248'
+  const buildType = isAutobuild
+    ? '\u6eda\u52a8\u66f4\u65b0\u7248'
+    : '\u6b63\u5f0f\u7248'
 
   log_info(`Preparing Telegram notification for ${buildType} ${version}`)
   log_info(`Target channel: ${chatId}`)
@@ -38,8 +40,12 @@ async function sendTelegramNotification() {
     releaseContent = readFileSync('release.txt', 'utf-8')
     log_info('[OK]: Successfully read release.txt file')
   } catch (error) {
-    log_error('[WARN]: Failed to read release.txt, using default release notes', error)
-    releaseContent = '\u66f4\u591a\u65b0\u529f\u80fd\u73b0\u5df2\u652f\u6301\uff0c\u8be6\u7ec6\u66f4\u65b0\u65e5\u5fd7\u8bf7\u67e5\u770b\u53d1\u5e03\u9875\u9762\u3002'
+    log_error(
+      '[WARN]: Failed to read release.txt, using default release notes',
+      error,
+    )
+    releaseContent =
+      '\u66f4\u591a\u65b0\u529f\u80fd\u73b0\u5df2\u652f\u6301\uff0c\u8be6\u7ec6\u66f4\u65b0\u65e5\u5fd7\u8bf7\u67e5\u770b\u53d1\u5e03\u9875\u9762\u3002'
   }
 
   // Convert Markdown to HTML
@@ -109,7 +115,9 @@ async function sendTelegramNotification() {
     convertMarkdownToTelegramHTML(releaseContent),
   )
 
-  const releaseTitle = isAutobuild ? '\u6eda\u52a8\u66f4\u65b0\u7248\u53d1\u5e03' : '\u6b63\u5f0f\u53d1\u5e03'
+  const releaseTitle = isAutobuild
+    ? '\u6eda\u52a8\u66f4\u65b0\u7248\u53d1\u5e03'
+    : '\u6b63\u5f0f\u53d1\u5e03'
   const encodedVersion = encodeURIComponent(version)
   const releaseTag = isAutobuild ? 'autobuild' : `v${version}`
   const content = `<b>🎉 <a href="https://github.com/qiu-yuxiao/clash-mini/releases/tag/${releaseTag}">Clash Mini v${version}</a> ${releaseTitle}</b>\n\n${formattedContent}`

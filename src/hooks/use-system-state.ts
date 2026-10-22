@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
-
 import { useVisibility } from '@/hooks/use-visibility'
 import {
   getRunningMode,
@@ -106,7 +105,8 @@ export function useSystemState() {
       !isLongOperationRunning()
     ) {
       disablingTunRef.current = true
-      patchVergeRef.current({ enable_tun_mode: false, enable_system_proxy: true })
+      patchVergeRef
+        .current({ enable_tun_mode: false, enable_system_proxy: true })
         .then(() => {
           showNotice.info(
             'settings.sections.system.notifications.tunMode.autoDisabled',

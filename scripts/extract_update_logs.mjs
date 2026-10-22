@@ -46,7 +46,8 @@ async function run() {
         if (isCapturing) {
           if (
             nextTitleRegex.test(line) ||
-            line.trim() === '## \u539f\u59cb\u7248\u672c\u5386\u53f2 (Clash Verge History)'
+            line.trim() ===
+              '## \u539f\u59cb\u7248\u672c\u5386\u53f2 (Clash Verge History)'
           ) {
             break
           }

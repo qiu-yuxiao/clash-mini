@@ -1,4 +1,8 @@
-import type { ITrafficDataPoint, ISamplingConfig, ISamplerStats } from '@/types/traffic'
+import type {
+  ITrafficDataPoint,
+  ISamplingConfig,
+  ISamplerStats,
+} from '@/types/traffic'
 interface ICompressedDataPoint {
   up: number
   down: number

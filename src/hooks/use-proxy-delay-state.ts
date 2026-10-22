@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useReducer } from 'react'
 
-import { getDelayManager, NODE_DELAY_MAX_MS, type DelayUpdate } from '@/services/delay'
+import {
+  getDelayManager,
+  NODE_DELAY_MAX_MS,
+  type DelayUpdate,
+} from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
 
 const PRESET_PROXY_NAMES = [

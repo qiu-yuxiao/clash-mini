@@ -1,30 +1,34 @@
 #!/usr/bin/env node
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, '..');
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const rootDir = path.resolve(__dirname, '..')
 
 // Read parameters from environment variables
-const version = process.env.VERSION;
-const setupExe = process.env.SETUP_EXE;
-const setupFilename = process.env.SETUP_FILENAME;
-const setupSize = parseInt(process.env.SETUP_SIZE || '0', 10);
-const sigFile = process.env.SIG_FILE;
+const version = process.env.VERSION
+const setupExe = process.env.SETUP_EXE
+const setupFilename = process.env.SETUP_FILENAME
+const setupSize = parseInt(process.env.SETUP_SIZE || '0', 10)
+const sigFile = process.env.SIG_FILE
 
 if (!version || !setupExe || !setupFilename || !setupSize || !sigFile) {
-  console.error('❌ Missing required environment variables');
-  console.error('   VERSION:', version);
-  console.error('   SETUP_EXE:', setupExe);
-  console.error('   SETUP_FILENAME:', setupFilename);
-  console.error('   SETUP_SIZE:', setupSize);
-  console.error('   SIG_FILE:', sigFile);
-  process.exit(1);
+  console.error('❌ Missing required environment variables')
+  console.error('   VERSION:', version)
+  console.error('   SETUP_EXE:', setupExe)
+  console.error('   SETUP_FILENAME:', setupFilename)
+  console.error('   SETUP_SIZE:', setupSize)
+  console.error('   SIG_FILE:', sigFile)
+  process.exit(1)
 }
 
 // Read .sig content directly from file (avoids shell variable interpolation issues)
-const sigContent = fs.readFileSync(sigFile, 'utf8').trim().replace(/\n/g, '').replace(/\r/g, '');
+const sigContent = fs
+  .readFileSync(sigFile, 'utf8')
+  .trim()
+  .replace(/\n/g, '')
+  .replace(/\r/g, '')
 
 const data = {
   version: version,
@@ -34,15 +38,17 @@ const data = {
     'windows-x86_64': {
       signature: sigContent,
       url: `https://github.com/qiu-yuxiao/clash-mini/releases/download/v${version}/${encodeURIComponent(setupFilename)}`,
-      size: setupSize
-    }
-  }
-};
+      size: setupSize,
+    },
+  },
+}
 
-const outputPath = path.join(rootDir, 'updater', 'app-update.json');
-fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-fs.writeFileSync(outputPath, JSON.stringify(data, null, 2) + '\n', 'utf8');
+const outputPath = path.join(rootDir, 'updater', 'app-update.json')
+fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+fs.writeFileSync(outputPath, JSON.stringify(data, null, 2) + '\n', 'utf8')
 
-console.log(`✅ app-update.json updated: ${outputPath}`);
-console.log(`   Version: ${version}`);
-console.log(`   URL: https://github.com/qiu-yuxiao/clash-mini/releases/download/v${version}/${encodeURIComponent(setupFilename)}`);
+console.log(`✅ app-update.json updated: ${outputPath}`)
+console.log(`   Version: ${version}`)
+console.log(
+  `   URL: https://github.com/qiu-yuxiao/clash-mini/releases/download/v${version}/${encodeURIComponent(setupFilename)}`,
+)

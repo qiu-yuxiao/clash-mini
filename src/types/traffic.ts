@@ -62,7 +62,6 @@ export interface ISystemMonitorOverviewValidator {
   sanitize(data: unknown): ISystemMonitorOverview
 }
 
-
 export interface ITrafficDataPoint {
   up: number
   down: number

@@ -4,18 +4,14 @@ export interface ErrorContext {
   extra?: Record<string, unknown>
 }
 
-export function reportError(
-  error: unknown,
-  context: ErrorContext = {},
-): void {
+export function reportError(error: unknown, context: ErrorContext = {}): void {
   const { component, action, extra } = context
 
   if (typeof window === 'undefined') {
     return
   }
 
-  const errorMessage =
-    error instanceof Error ? error.message : String(error)
+  const errorMessage = error instanceof Error ? error.message : String(error)
   const errorStack = error instanceof Error ? error.stack : undefined
 
   console.error(

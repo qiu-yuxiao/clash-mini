@@ -44,33 +44,31 @@ export const useVerge = () => {
     }
   }
 
-  const patchVerge = useLockFn(
-    async (value: Partial<IVergeConfig>) => {
-      // 乐观更新 UI：立即将补丁合并到 queryClient 缓存中，提供 0ms 原生切换手感
-      qc.setQueryData<IVergeConfig>(['getVergeConfig'], (prev) =>
-        prev ? { ...prev, ...value } : prev,
-      )
+  const patchVerge = useLockFn(async (value: Partial<IVergeConfig>) => {
+    // 乐观更新 UI：立即将补丁合并到 queryClient 缓存中，提供 0ms 原生切换手感
+    qc.setQueryData<IVergeConfig>(['getVergeConfig'], (prev) =>
+      prev ? { ...prev, ...value } : prev,
+    )
 
-      try {
-        await patchVergeConfig(value)
-      } catch (err) {
-        // 失败时回滚缓存
-        await refetch().catch(() => {})
-        showNotice.error(err)
-        throw err
-      }
+    try {
+      await patchVergeConfig(value)
+    } catch (err) {
+      // 失败时回滚缓存
+      await refetch().catch(() => {})
+      showNotice.error(err)
+      throw err
+    }
 
-      // patchVergeConfig 成功即说明后端已生效，refetch 只为同步前端状态。
-      // mihomo reload 期间 IPC 通道阻塞必然 timeout，重试会反复弹 notice
-      // 并加剧 IPC 风暴（TUN/系统代理切换时的卡死根因）。改为失败 1 次静默放弃，
-      // 依赖后端 verge://refresh-verge-config 事件或下次用户操作自然同步状态。
-      try {
-        await mutateVerge()
-      } catch (refetchErr) {
-        console.error('[useVerge] refetch 失败，等待后端事件同步:', refetchErr)
-      }
-    },
-  )
+    // patchVergeConfig 成功即说明后端已生效，refetch 只为同步前端状态。
+    // mihomo reload 期间 IPC 通道阻塞必然 timeout，重试会反复弹 notice
+    // 并加剧 IPC 风暴（TUN/系统代理切换时的卡死根因）。改为失败 1 次静默放弃，
+    // 依赖后端 verge://refresh-verge-config 事件或下次用户操作自然同步状态。
+    try {
+      await mutateVerge()
+    } catch (refetchErr) {
+      console.error('[useVerge] refetch 失败，等待后端事件同步:', refetchErr)
+    }
+  })
 
   return {
     verge,

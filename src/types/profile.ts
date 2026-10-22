@@ -70,4 +70,3 @@ export interface ISeqProfileConfig {
   append: []
   delete: []
 }
-

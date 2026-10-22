@@ -44,14 +44,14 @@ const getSystemAccentColor = (): string | null => {
 
 /**
  * custom theme
- * 
+ *
  * Known issue: Theme switching may cause brief white screen/flicker.
- * 
+ *
  * Root cause:
  * - Theme changes trigger MUI theme recreation and CSS variable updates
  * - Some browsers may repaint before all CSS variables are applied
  * - Background image and transparency settings add complexity
- * 
+ *
  * Future improvement directions:
  * 1. Use CSS variable transitions: Add transition property to CSS variables
  *    for smooth color changes (e.g., `transition: background-color 0.2s ease`)
@@ -172,7 +172,10 @@ export const useCustomTheme = () => {
       resolvedPrimary = getSystemAccentColor() || dt.primary_color
     }
     if (controlSkin === 'original') {
-      const val2Str = typeof window !== 'undefined' ? localStorage.getItem('clash-mini-original-val2') : null
+      const val2Str =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('clash-mini-original-val2')
+          : null
       const val2 = val2Str ? parseFloat(val2Str) : 1.0
       resolvedPrimary = `hsl(${239 * val2}, 26%, 49%)`
     }

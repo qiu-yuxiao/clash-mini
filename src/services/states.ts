@@ -4,8 +4,4 @@ const [ThemeModeProvider, useThemeMode, useSetThemeMode] = createContextState<
   'light' | 'dark'
 >()
 
-export {
-  ThemeModeProvider,
-  useThemeMode,
-  useSetThemeMode,
-}
+export { ThemeModeProvider, useThemeMode, useSetThemeMode }

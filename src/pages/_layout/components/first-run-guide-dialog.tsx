@@ -479,10 +479,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   }}
                 >
                   {!proxyReady && !gaveUp && (
-                    <CircularProgress
-                      size={12}
-                      sx={{ color: secondaryText }}
-                    />
+                    <CircularProgress size={12} sx={{ color: secondaryText }} />
                   )}
                   <Typography
                     variant="body2"

@@ -26,8 +26,6 @@ interface Props {
   onClose?: () => void
 }
 
-
-
 export const BaseDialog: React.FC<Props> = ({
   open,
   title,

@@ -31,4 +31,3 @@ export interface IConnections {
 export interface IConnectionSetting {
   layout: 'table' | 'list'
 }
-

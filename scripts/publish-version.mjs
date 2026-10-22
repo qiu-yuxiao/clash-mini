@@ -47,8 +47,12 @@ async function run() {
   try {
     await runVerify()
   } catch (err) {
-    console.error('[ERROR]: verify.py verification failed! Release tag will not be created.')
-    console.error('[INFO]: Please fix the Changelog/Bug List alignment issues and run the command again.')
+    console.error(
+      '[ERROR]: verify.py verification failed! Release tag will not be created.',
+    )
+    console.error(
+      '[INFO]: Please fix the Changelog/Bug List alignment issues and run the command again.',
+    )
     process.exit(1)
   }
 
@@ -68,12 +72,21 @@ async function run() {
     const { execSync } = await import('child_process')
     console.log('[INFO]: Committing version configurations and docs...')
     try {
-      execSync('git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json updater/app-update.json bug_list.md Changelog.md Cargo.lock', { stdio: 'inherit' })
-      execSync(`git commit -m "release: bump version to ${versionArg}" --no-verify`, { stdio: 'inherit' })
+      execSync(
+        'git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json updater/app-update.json bug_list.md Changelog.md Cargo.lock',
+        { stdio: 'inherit' },
+      )
+      execSync(
+        `git commit -m "release: bump version to ${versionArg}" --no-verify`,
+        { stdio: 'inherit' },
+      )
       console.log('[INFO]: Pushing dev branch to origin...')
       execSync('git push origin dev --no-verify', { stdio: 'inherit' })
     } catch (gitErr) {
-      console.warn('[WARNING]: Git commit or push failed, but proceeding to tag anyway:', gitErr.message)
+      console.warn(
+        '[WARNING]: Git commit or push failed, but proceeding to tag anyway:',
+        gitErr.message,
+      )
     }
 
     try {
@@ -88,13 +101,20 @@ async function run() {
       const err = fs.openSync(logFile, 'a')
       const monitorProcess = spawn('node', ['scratch/monitor_build.mjs'], {
         detached: true,
-        stdio: ['ignore', out, err]
+        stdio: ['ignore', out, err],
       })
       monitorProcess.unref()
-      console.log(`[INFO]: Build monitor spawned in background. Log file: ${logFile}`)
-      console.log('[INFO]: It will automatically wait for CI and download the portable release.')
+      console.log(
+        `[INFO]: Build monitor spawned in background. Log file: ${logFile}`,
+      )
+      console.log(
+        '[INFO]: It will automatically wait for CI and download the portable release.',
+      )
     } catch (err) {
-      console.error(`[ERROR]: Failed to create or push git tag: ${tag}`, err.message)
+      console.error(
+        `[ERROR]: Failed to create or push git tag: ${tag}`,
+        err.message,
+      )
       process.exit(1)
     }
   } else {

@@ -166,7 +166,11 @@ const displayDataReducer = (
   current: ITrafficDataPoint[],
   payload: ITrafficDataPoint[],
 ): ITrafficDataPoint[] =>
-  Array.isArray(payload) ? (isSameTrafficData(current, payload) ? current : payload) : current
+  Array.isArray(payload)
+    ? isSameTrafficData(current, payload)
+      ? current
+      : payload
+    : current
 
 /**
  * 稳定版Canvas流量图表组件
@@ -351,7 +355,8 @@ export const EnhancedCanvasTrafficGraph = memo(
       (
         data: ITrafficDataPoint[],
       ): { topValue: number; bottomValue: number } => {
-        if (!Array.isArray(data) || data.length === 0) return { topValue: 1024, bottomValue: 0 }
+        if (!Array.isArray(data) || data.length === 0)
+          return { topValue: 1024, bottomValue: 0 }
 
         let maxValue = 0
         let minValue = Infinity

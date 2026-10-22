@@ -264,9 +264,13 @@ async function updateAppUpdateVersion(newVersion) {
       for (const platform of Object.keys(appUpdate.platforms)) {
         const pInfo = appUpdate.platforms[platform]
         if (pInfo && pInfo.url) {
-          const oldVWithV = oldVersion.startsWith('v') ? oldVersion : `v${oldVersion}`
-          const oldVWithoutV = oldVersion.startsWith('v') ? oldVersion.slice(1) : oldVersion
-          
+          const oldVWithV = oldVersion.startsWith('v')
+            ? oldVersion
+            : `v${oldVersion}`
+          const oldVWithoutV = oldVersion.startsWith('v')
+            ? oldVersion.slice(1)
+            : oldVersion
+
           pInfo.url = pInfo.url
             .replace(new RegExp(oldVWithV, 'g'), versionWithV)
             .replace(new RegExp(oldVWithoutV, 'g'), versionWithoutV)
