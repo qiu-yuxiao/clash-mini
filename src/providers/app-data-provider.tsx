@@ -161,7 +161,7 @@ export const AppDataProvider = ({
     ...TQ_MIHOMO,
   })
 
-  // isMiniStatus 翻转（窗口跨 285×135）时精简/全量路径切换。
+  // isMiniStatus 翻转（窗口跨 285×121）时精简/全量路径切换。
   // 之前 queryKey 含 isMiniStatus 会把缓存分裂成两份并行 query、翻转即全量重拉；
   // 现 queryKey 稳定为 ['getProxies']，翻转时仅作废缓存并重新拉取（单一入口，复用缓存机制）。
   const isFirstMiniRef = useRef(true)

@@ -122,7 +122,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       typeof window !== 'undefined' &&
       window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
-  /** 内容宽 ≤ 285 且 高 ≤ 135（最小窗口）：触发数据精简 + DOM卸载（同上，仅首帧粗估） */
+  /** 内容宽 ≤ 285 且 高 ≤ 121（最小窗口）：触发数据精简 + DOM卸载（同上，仅首帧粗估） */
   const [isMiniStatus, setIsMiniStatus] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -197,7 +197,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
    * 同步窄窗 / 极小窗状态（FEAT-003 唯一判定入口）。
    *
    * 入参必须是**窗口内尺寸的物理像素**（onResized payload / innerSize()），
-   * 禁止传页面视口数值——视口是整数 CSS 像素，150% 下会 135.33 → 136，判定永远不成立。
+   * 禁止传页面视口数值——视口是整数 CSS 像素，150% 下会 121.33 → 122，判定永远不成立。
    */
   const applyGeometry = useCallback(
     (physW: number, physH: number, sf: number) => {

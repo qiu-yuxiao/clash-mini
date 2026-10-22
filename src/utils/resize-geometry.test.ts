@@ -76,12 +76,12 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       expect(geo.physY).toBeNull()
     })
 
-    it('向上收缩受 MIN_WINDOW_HEIGHT (135) 钳制', () => {
+    it('向上收缩受 MIN_WINDOW_HEIGHT (121) 钳制', () => {
       const geo = computeResizeGeometry({
         ...defaultBase,
         direction: 's',
         dx: 0,
-        dy: -100, // 200 - 100 = 100 < 135
+        dy: -100, // 200 - 100 = 100 < 121
       })
 
       expect(geo.height).toBe(MIN_WINDOW_HEIGHT)
@@ -162,12 +162,12 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       )
     })
 
-    it('向下挤压达到 MIN_WINDOW_HEIGHT (135) 时，底边缘依然保持锁定不动', () => {
+    it('向下挤压达到 MIN_WINDOW_HEIGHT (121) 时，底边缘依然保持锁定不动', () => {
       const geo = computeResizeGeometry({
         ...defaultBase,
         direction: 'n',
         dx: 0,
-        dy: 90, // 200 - 90 = 110 < 135
+        dy: 90, // 200 - 90 = 110 < 121
       })
 
       expect(geo.height).toBe(MIN_WINDOW_HEIGHT)
@@ -299,7 +299,7 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
 
     it('非拖拽维度原样透传：最小高度下拖左右边，高度不得被顶大 1px', () => {
       const scaleFactor = 1.25
-      const startInnerH = 168 // 135 * 1.25 = 168.75 → 实际 168，回算 134.4 < 135
+      const startInnerH = 151 // 121 * 1.25 = 151.25 → 实际 151，回算 120.8 < 121
       expect(startInnerH / scaleFactor).toBeLessThan(MIN_WINDOW_HEIGHT)
 
       const geo = computeResizeGeometry({
