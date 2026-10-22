@@ -625,16 +625,37 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     let mut proxy_names = Vec::new();
     if let Some(Value::Sequence(proxies)) = config.get("proxies") {
         for p in proxies {
-            let name_opt = p
-                .as_mapping()
-                .and_then(|m| m.get("name"))
-                .and_then(Value::as_str)
-                .or_else(|| p.as_str());
-            if let Some(name) = name_opt {
-                if !crate::utils::node::is_dummy_node(name) {
-                    proxy_names.push(Value::from(name.to_owned()));
+            let Some(m) = p.as_mapping() else {
+                // 纯字符串形式（"- 节点名"）没有 server 字段，沿用名字过滤
+                if let Some(name) = p.as_str() {
+                    if !crate::utils::node::is_dummy_node(name) {
+                        proxy_names.push(Value::from(name.to_owned()));
+                    }
+                }
+                continue;
+            };
+            let Some(name) = m.get("name").and_then(Value::as_str) else {
+                continue;
+            };
+            if crate::utils::node::is_dummy_node(name) {
+                continue;
+            }
+            // 【BUG-301】占位假节点的名字可伪装成 URL 绕过名字过滤（现场：
+            // "v0-网址:xxx" + server='1'），但 server 字段藏不住。按 server 有效性
+            // 拦截入组；节点定义保留在 proxies: 中（与 dummy 过滤同策略），只是
+            // 不允许它成为 PROXY 组成员——否则内核重启后 Selector 落回首位死节点，
+            // TUN 下全系统流量打进死地址触发 connect error 风暴。
+            if let Some(server) = m.get("server").and_then(Value::as_str) {
+                if !crate::utils::node::is_valid_node_server(server) {
+                    logging!(
+                        warn,
+                        Type::Config,
+                        "跳过 server 字段无效的节点: {name} (server={server:?})"
+                    );
+                    continue;
                 }
             }
+            proxy_names.push(Value::from(name.to_owned()));
         }
     }
 

@@ -329,8 +329,10 @@ impl CoreManager {
             return;
         }
 
-        // 等待 PROXY 组节点列表填充（最多 20 秒）
+        // 等待 PROXY 组节点列表填充（最多 20 秒），顺带确认目标节点是否已入组
+        // （决定后续 select 是否值得重试：不在组内属持久性错误，重试无意义）
         let start2 = std::time::Instant::now();
+        let mut node_in_group = false;
         while start2.elapsed().as_secs() < 20 {
             if Handle::global().is_exiting() {
                 return;
@@ -338,6 +340,7 @@ impl CoreManager {
             if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
                 if let Some(all) = group_info.all {
                     if !all.is_empty() {
+                        node_in_group = all.iter().any(|n| n == node);
                         break;
                     }
                 }
@@ -360,21 +363,54 @@ impl CoreManager {
             return;
         }
 
-        // 恢复节点选择：优先恢复 snapshot 保存的节点
-        // 若该节点已不存在（订阅更新导致），回退到 PROXY 组子集中首个可用节点
-        match mihomo.select_node_for_group("PROXY", node).await {
-            Ok(()) => logging!(info, Type::Core, "已恢复 PROXY 组节点选择: {}", node),
-            Err(e) => {
-                logging!(
-                    warn,
-                    Type::Core,
-                    "恢复 PROXY 组节点选择失败 ({}): {}，尝试回退到子集首个可用节点",
-                    node,
-                    e
-                );
-                // 读取用户保存的 filterText，在子集范围内选点兜底
-                let filter_lower = read_filter_text().await;
-                select_fallback_in_subset(&mihomo, &filter_lower).await;
+        // 【BUG-301】目标节点不在组成员里（订阅更新移除、或空组兜底成 DIRECT），
+        // select 是持久性错误，重试没有意义——直接走与「还原失败」相同的子集兜底。
+        if !node_in_group {
+            logging!(
+                info,
+                Type::Core,
+                "跳过 PROXY 组节点恢复：目标节点 {node} 不在组成员中，直接按子集兜底"
+            );
+            let filter_lower = read_filter_text().await;
+            select_fallback_in_subset(&mihomo, &filter_lower).await;
+            return;
+        }
+
+        // 恢复节点选择：优先恢复 snapshot 保存的节点。
+        // 【BUG-301】服务核心冷启动的头几十秒，TUN 风暴/流量洪峰会把核心 CPU 打满，
+        // IPC 请求可能接连 4 秒超时（现场实证：恢复一次超时即放弃，节点留在死节点上，
+        // 全系统断网 80 秒直到自愈监控救场）。节点已前置校验在组内，不存在持久性
+        // 错误，任何失败都值得重试——给 90 秒总预算，预算耗尽再走兜底。
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+        loop {
+            match mihomo.select_node_for_group("PROXY", node).await {
+                Ok(()) => {
+                    logging!(info, Type::Core, "已恢复 PROXY 组节点选择: {}", node);
+                    break;
+                }
+                Err(e) => {
+                    if Handle::global().is_exiting() || std::time::Instant::now() >= deadline {
+                        logging!(
+                            warn,
+                            Type::Core,
+                            "恢复 PROXY 组节点选择失败 ({}): {}，重试预算耗尽，回退到子集首个可用节点",
+                            node,
+                            e
+                        );
+                        // 读取用户保存的 filterText，在子集范围内选点兜底
+                        let filter_lower = read_filter_text().await;
+                        select_fallback_in_subset(&mihomo, &filter_lower).await;
+                        break;
+                    }
+                    logging!(
+                        warn,
+                        Type::Core,
+                        "恢复 PROXY 组节点选择失败 ({}): {}，3 秒后重试（总预算 90 秒）",
+                        node,
+                        e
+                    );
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                }
             }
         }
     }

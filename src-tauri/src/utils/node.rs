@@ -51,6 +51,24 @@ pub fn is_dummy_node(name: &str) -> bool {
     false
 }
 
+/// 节点 server 字段有效性：IP 字面量，或至少含一个点的域名。
+///
+/// 订阅常塞入 `server: '1'` 之类的占位假节点，名字伪装成 URL（如 "v0-网址:xxx"）
+/// 绕过 is_dummy_node 的名字过滤。它一旦入选 PROXY 组成员（尤其是首位），内核重启
+/// 后 Selector 落回该节点，TUN 下全系统流量打进死地址，触发秒级 connect error
+/// 风暴打满核心 CPU，连带 API 全部超时——3.0.5 现场 80 秒全系统断网（BUG-301）。
+/// 名字可以任意伪装，server 字段藏不住，按它拦截最可靠。
+pub fn is_valid_node_server(server: &str) -> bool {
+    let s = server.trim();
+    if s.is_empty() {
+        return false;
+    }
+    if s.parse::<std::net::IpAddr>().is_ok() {
+        return true;
+    }
+    s.contains('.')
+}
+
 /// 把节点名归一化，便于检测「广告短语不在最开头」的伪节点。
 /// 1. 剥掉两端的空白与包裹符号（【】()（）[]「」），可多层；
 /// 2. 剥掉通用前缀「节点-」「节点：」等（"节点-购买入口" 这类纯伪节点）。
@@ -87,7 +105,20 @@ fn normalize_dummy_name(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::is_dummy_node;
+    use super::{is_dummy_node, is_valid_node_server};
+
+    #[test]
+    fn test_valid_node_server() {
+        // 有效：IP 字面量与正常域名
+        assert!(is_valid_node_server("1.2.3.4"));
+        assert!(is_valid_node_server("::1"));
+        assert!(is_valid_node_server("a03.jiffdl.net"));
+        assert!(is_valid_node_server(" jp.example.com "));
+        // 无效：占位假节点（BUG-301 现场 server='1'）与空值
+        assert!(!is_valid_node_server("1"));
+        assert!(!is_valid_node_server(""));
+        assert!(!is_valid_node_server("   "));
+    }
 
     #[test]
     fn test_dummy_node_detection() {
