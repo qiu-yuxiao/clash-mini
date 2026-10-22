@@ -659,4 +659,5 @@ flowchart LR
 | **BUG-296** | 3.7 / 4.1 | 节点快照保留内置出站传递以激活还原期子集兜底；`dns.fallback` 代理规则排除私网/环回 IP；全局代理模式下跳过 GEOIP 直连拦截保持 `MATCH,PROXY` 语义 |
 | **BUG-297** | 2.3 / 2.5 | 缩放拖拽基准用 `outerSize()` 而落地用 `setSize()`（内尺寸），每帧多出外框内缩量（实测 150% DPI 为 22×13 物理像素），最小宽度下按一下左键窗口即跳宽；`setPointerCapture` 在 `await` 后取 `e.currentTarget` 得 `null` 导致捕获从未建立、拖拽一帧即失效。修复：尺寸统一内尺寸口径 + 关闭无框阴影（`shadow(false)`）+ 捕获前置同步建立 + 手势提前结束可收尾 |
 | **BUG-298** | 2.10.1 | TUN 全新安装三层失效：① 安装服务后 IPC 等待窗口仅 5s（安装器收尾 + SCM 首次启动常超窗）导致首次误报失败；② 失败后 `SERVICE_MANAGER` 缓存停在 Unavailable 且 `restart_core` 不经过等服务流程，`prepare_startup_mode` 读陈旧缓存把内核静默降级 Sidecar——TUN 开关显示成功但流量不被接管；③ 降级与回退全程无日志无通知。修复：等待窗口放宽至 30s + restart 路径补锁外等服务 + 降级 WARN 留痕 + 回退前端通知 + 服务操作失败补 error 日志 |
+| **BUG-299** | 2.12 | 首次引导「按回车键立即导入」仅监听输入框 `onKeyDown`，焦点一旦离开输入框（如点击提示文字）Enter 事件无人接听，表现为按了没反应。修复：Enter 监听提升到 Dialog Paper（弹窗内任意位置生效），排除 `isComposing`（IME 组词确认）与按钮焦点（放行按钮自身行为），输入框尾部补装饰性回车图标，提示文案改说明语气 |
 

@@ -4,7 +4,7 @@
       "title": "Welcome to Clash Mini",
       "intro": "Looks like this is your first launch and no subscription has been added yet. Paste your subscription link below — node parsing, speed testing and network takeover are handled automatically.",
       "paste": "Paste from clipboard",
-      "enterHint": "Press Enter to import",
+      "enterHint": "Tip: press Enter to import",
       "importAndStart": "Import and enable",
       "later": "Configure manually later",
       "errEmpty": "Please enter or paste a subscription link",

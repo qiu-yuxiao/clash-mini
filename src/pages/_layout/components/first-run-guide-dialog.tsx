@@ -1,3 +1,4 @@
+import { KeyboardReturn as KeyboardReturnIcon } from '@mui/icons-material'
 import {
   Box,
   Button,
@@ -6,6 +7,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  InputAdornment,
   TextField,
   Typography,
   useTheme,
@@ -228,11 +230,18 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !submitting && step === 'input') {
-      e.preventDefault()
-      handleSubmitImport()
-    }
+  // 【Enter 全局化】监听挂在 Dialog Paper 上：弹窗内任意位置按 Enter 都能导入。
+  // 旧实现只挂在输入框上——焦点一旦离开输入框（例如点了下方的提示文字），键盘事件
+  // 根本到不了监听器，表现为「按了回车毫无反应」（BUG-299）。
+  // 排除规则：
+  //  · isComposing——中文输入法组词确认的 Enter 不算提交指令；
+  //  · 焦点落在按钮上——放行按钮自身行为（「稍后」「粘贴」「导入」各自的 Enter 语义）。
+  const handleDialogKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+    if (submitting || step !== 'input') return
+    if ((e.target as HTMLElement).closest('button')) return
+    e.preventDefault()
+    void handleSubmitImport()
   }
 
   const handleFinish = () => {
@@ -287,6 +296,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
         maxWidth={false}
         slotProps={{
           paper: {
+            onKeyDown: handleDialogKeyDown,
             sx: {
               ...get3DCardStyle(theme, 'default'),
               p: 0,
@@ -341,11 +351,22 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     setUrl(e.target.value)
                     if (errorMessage) setErrorMessage('')
                   }}
-                  onKeyDown={handleKeyDown}
                   placeholder="https://example.com/api/v1/client/subscribe?token=..."
                   sx={get3DInputStyle(theme)}
                   inputRef={inputRef}
                   onContextMenu={handleContextMenu}
+                  // 装饰性回车图标：呼应右侧的 Enter 提示文字，同时弱化「提示文字像按钮」的观感
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <KeyboardReturnIcon
+                            sx={{ fontSize: 16, color: 'text.disabled' }}
+                          />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
                 />
               </Box>
 

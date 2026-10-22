@@ -4,7 +4,7 @@
       "title": "欢迎使用 Clash Mini",
       "intro": "检测到您是首次使用，尚未添加订阅。请在下方填入代理订阅链接，我们将自动完成节点解析、测速与网络接管：",
       "paste": "一键粘贴剪贴板链接",
-      "enterHint": "按回车键立即导入",
+      "enterHint": "提示：按 Enter 键即可导入",
       "importAndStart": "立即导入并开启",
       "later": "稍后手动配置",
       "errEmpty": "请输入或粘贴订阅链接",
