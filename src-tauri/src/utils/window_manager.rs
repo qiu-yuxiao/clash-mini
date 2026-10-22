@@ -112,9 +112,12 @@ pub struct SavedWindowState {
     pub y: Option<f64>,
 }
 
-/// 保存当前窗口 outer 尺寸与位置到 app 数据目录的 `window_state.json`
+/// 保存当前窗口几何到 app 数据目录的 `window_state.json`
 ///
 /// 写入干净的 `{width, height, x, y}` 对象。
+/// 【口径】width/height 为**内尺寸（客户区）**逻辑像素，x/y 为**外位置**逻辑像素 ——
+/// 与 MINIMAL_WIDTH/MINIMAL_HEIGHT、`min_inner_size`/`max_inner_size`、前端 `setSize` 一致。
+/// 窗口以 `shadow(false)` 创建，outer == inner，因此数值上两者相同。
 /// 必须用同步而非异步：`w.destroy()` 会同步触发 `Resized(0,0)` 事件，
 /// 若 resize 保存是异步 spawn，0×0 与 destroy 后的正确值写入顺序由调度器决定（竞态）。
 pub fn save_window_state_sync(width: f64, height: f64, x: Option<f64>, y: Option<f64>) {
@@ -534,7 +537,8 @@ impl WindowManager {
 
         match app_handle.run_on_main_thread(move || {
             let saved = if let Some(w) = app_handle_clone.get_webview_window(&label) {
-                let size = w.outer_size().ok();
+                // 内尺寸（客户区）+ 外位置，口径与 window_state.json 约定一致
+                let size = w.inner_size().ok();
                 let pos = w.outer_position().ok();
                 let scale = w
                     .current_monitor()

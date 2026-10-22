@@ -6,7 +6,12 @@ import {
 } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { MINI_WIDTH_THRESHOLD, MINI_HEIGHT_THRESHOLD } from '@/constants'
+import {
+  MAX_WINDOW_HEIGHT,
+  MAX_WINDOW_WIDTH,
+  MINI_HEIGHT_THRESHOLD,
+  MINI_WIDTH_THRESHOLD,
+} from '@/constants'
 import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
 import { isWindowResizing } from '@/utils/window-resizing'
@@ -16,9 +21,9 @@ import { WindowContext, type WindowContextType } from './window-context'
 /** FEAT-003: Idle duration (ms) before chrome auto-hides */
 const IDLE_HIDE_DELAY_MS = 10_000
 
-/** 大尺寸模式窗口尺寸（logical px），与后端 resolve/window.rs 的 MAX_WIDTH/MAX_HEIGHT 对齐 */
-const LARGE_MODE_WIDTH = 640
-const LARGE_MODE_HEIGHT = 860
+/** 大尺寸模式窗口尺寸（logical px），取自 @/constants（与后端 MAX_WIDTH/MAX_HEIGHT 同源） */
+const LARGE_MODE_WIDTH = MAX_WINDOW_WIDTH
+const LARGE_MODE_HEIGHT = MAX_WINDOW_HEIGHT
 
 /** 进入大尺寸模式前的窗口尺寸持久化 key（跨会话恢复用） */
 const LAST_NON_LARGE_SIZE_KEY = 'last-non-large-size'
@@ -106,13 +111,13 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLargeMode, setIsLargeMode] = useState(false)
   /** FEAT-003: true when custom titlebar is hidden by idle auto-hide timer (stealth mode) */
   const [isDecorationsHidden, setIsDecorationsHidden] = useState(false)
-  /** 窗口宽度 ≤ 285px（窄窗口）：控制路由表格、流量面板布局 */
+  /** 内容宽度 ≤ 285px（窄窗口）：控制路由表格、流量面板布局 */
   const [isMinimalWidth, setIsMinimalWidth] = useState(
     () =>
       typeof window !== 'undefined' &&
       window.innerWidth <= MINI_WIDTH_THRESHOLD,
   )
-  /** 窗口宽 ≤ 285 且 高 ≤ 135（最小窗口）：触发数据精简 + DOM卸载 */
+  /** 内容宽 ≤ 285 且 高 ≤ 135（最小窗口）：触发数据精简 + DOM卸载 */
   const [isMiniStatus, setIsMiniStatus] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -137,10 +142,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   /**
    * 最近一次非大尺寸模式的窗口尺寸（logical px）。
    * 进入大尺寸模式时保存当前尺寸，退出时恢复。
-   * 初始值 {width:285, height:680} 与后端 DEFAULT_WIDTH/DEFAULT_HEIGHT 对齐，
+   * 初始值 {width:271, height:680} 与后端 DEFAULT_WIDTH/DEFAULT_HEIGHT 对齐，
    * 挂载后通过 innerSize() IPC 校正为实际值（兼容窗口状态恢复插件）。
    */
-  const lastNonLargeSizeRef = useRef({ width: 285, height: 680 })
+  const lastNonLargeSizeRef = useRef({ width: 271, height: 680 })
 
   const close = useCallback(async () => {
     if (!currentWindow) return
@@ -433,7 +438,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
           isLargeModeRef.current = true
           setIsLargeMode(true)
           // 读取持久化的「进入大尺寸前的尺寸」；无记录或数据损坏则回退默认
-          let restored = { width: 285, height: 680 }
+          // （默认值 = 后端 DEFAULT_WIDTH / DEFAULT_HEIGHT，见 resolve/window.rs）
+          let restored = { width: 271, height: 680 }
           try {
             const raw = localStorage.getItem(LAST_NON_LARGE_SIZE_KEY)
             if (raw) {

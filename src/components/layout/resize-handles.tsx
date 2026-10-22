@@ -1,10 +1,16 @@
 import {
   currentMonitor,
-  LogicalPosition,
-  LogicalSize,
+  PhysicalPosition,
+  PhysicalSize,
 } from '@tauri-apps/api/window'
 import React, { useCallback, useEffect, useRef } from 'react'
 
+import {
+  MAX_WINDOW_HEIGHT,
+  MAX_WINDOW_WIDTH,
+  MIN_WINDOW_HEIGHT,
+  MIN_WINDOW_WIDTH,
+} from '@/constants'
 import { useWindow } from '@/hooks/use-window'
 import { frontendLog } from '@/services/cmds'
 import { computeResizeGeometry } from '@/utils/resize-geometry'
@@ -99,11 +105,14 @@ const handles: { direction: Direction; style: React.CSSProperties }[] = [
 
 interface ResizeSession {
   direction: Direction
-  // 拖拽起始时窗口的 outer 位置与尺寸（physical px）
+  // 拖拽起始时的「外位置」（physical px，与 pointermove 换算出的屏幕位移同坐标系）
   startPhysX: number
   startPhysY: number
-  startPhysW: number
-  startPhysH: number
+  // 拖拽起始时的「内尺寸」（客户区，physical px）
+  // 【口径铁律】必须用 innerSize()，不可用 outerSize()：落地走 setSize()（Tauri 语义 = 内尺寸），
+  // 且 MIN/MAX 边界也是内尺寸。混用会让每帧多出一个外框内缩量。
+  startInnerW: number
+  startInnerH: number
   // 拖拽起始鼠标屏幕坐标（physical px，与 outerPosition 同坐标系）
   startPointerX: number
   startPointerY: number
@@ -131,6 +140,13 @@ export const ResizeHandles: React.FC = () => {
   const { isLargeMode, currentWindow } = useWindow()
   // session ref 持有整个拖拽期间的不可变快照，pointermove/up 通过闭包读取
   const sessionRef = useRef<ResizeSession | null>(null)
+  // 已在 pointerdown 登记、但「窗口几何量」尚未读回来的手势。
+  // 用于：几何量回来之前用户就松手 / 丢失指针捕获时，仍能正确收尾（释放捕获、复位全局标志），
+  // 避免指针捕获与 __isResizing 标志永久残留。
+  const pendingDownRef = useRef<{
+    pointerId: number
+    cancelled: boolean
+  } | null>(null)
   // applyPending ref：用于打破 scheduleApply ↔ applyPending 循环依赖
   const applyPendingRef = useRef<
     ((session: ResizeSession) => Promise<void>) | null
@@ -161,13 +177,17 @@ export const ResizeHandles: React.FC = () => {
         if (!currentWindow) return
 
         // 计算目标几何（如某维度无需调整则维持上次应用值或初始值）
-        const targetW = w ?? (session.lastAppliedW ?? session.startPhysW / session.scaleFactor)
-        const targetH = h ?? (session.lastAppliedH ?? session.startPhysH / session.scaleFactor)
-        const targetX = x ?? (session.lastAppliedX ?? session.startPhysX / session.scaleFactor)
-        const targetY = y ?? (session.lastAppliedY ?? session.startPhysY / session.scaleFactor)
+        const targetW =
+          w ?? session.lastAppliedW ?? session.startInnerW / session.scaleFactor
+        const targetH =
+          h ?? session.lastAppliedH ?? session.startInnerH / session.scaleFactor
+        const targetX =
+          x ?? session.lastAppliedX ?? session.startPhysX / session.scaleFactor
+        const targetY =
+          y ?? session.lastAppliedY ?? session.startPhysY / session.scaleFactor
 
         // 🛡️ [FM-03 防 IPC 洪水] 尺寸/位置变动与上一次已发出的值对比去重
-        // 拖拽推到最小尺寸 285x135 边界时，高频 pointermove 计算出的目标值均为 285x135，
+        // 拖拽推到最小尺寸 271x135 边界时，高频 pointermove 计算出的目标值均为 271x135，
         // 经过此判断判定未变动，从而直接跳过发 IPC，彻底消除最小尺寸边界处的 IPC 堆积现象。
         const needsSize =
           (w !== null && targetW !== session.lastAppliedW) ||
@@ -184,13 +204,26 @@ export const ResizeHandles: React.FC = () => {
         session.lastAppliedX = targetX
         session.lastAppliedY = targetY
 
-        // 并行发 IPC：setSize 和 setPosition 之间合并调用
+        // 并行发 IPC：setSize 和 setPosition 之间合并调用。
+        // 【物理像素下发】几何量在 physical 空间里计算，落地也直接用 Physical*：
+        // 若用 Logical*，tao 的 logical→physical 是截断转换（×1.5 后 `as u32`），
+        // 未变动的那一维每帧可能被截掉 1px，长拖拽会出现缓慢漂移。
         await Promise.all([
           needsSize
-            ? currentWindow.setSize(new LogicalSize(targetW, targetH))
+            ? currentWindow.setSize(
+                new PhysicalSize(
+                  Math.round(targetW * session.scaleFactor),
+                  Math.round(targetH * session.scaleFactor),
+                ),
+              )
             : Promise.resolve(),
           needsPos
-            ? currentWindow.setPosition(new LogicalPosition(targetX, targetY))
+            ? currentWindow.setPosition(
+                new PhysicalPosition(
+                  Math.round(targetX * session.scaleFactor),
+                  Math.round(targetY * session.scaleFactor),
+                ),
+              )
             : Promise.resolve(),
         ])
       } catch (err) {
@@ -229,7 +262,11 @@ export const ResizeHandles: React.FC = () => {
         cooldownTimerRef.current = null
       }
       setWindowResizing(false)
-      if (sessionRef.current?.rafId !== null && sessionRef.current?.rafId !== undefined) {
+      pendingDownRef.current = null
+      if (
+        sessionRef.current?.rafId !== null &&
+        sessionRef.current?.rafId !== undefined
+      ) {
         cancelAnimationFrame(sessionRef.current.rafId)
       }
     },
@@ -248,41 +285,65 @@ export const ResizeHandles: React.FC = () => {
         cooldownTimerRef.current = null
       }
 
-      // 读取窗口当前 outer 位置/尺寸（physical px），所有读取并行发 IPC 减少往返
-      const [pos, size, monitor] = await Promise.all([
-        currentWindow.outerPosition(),
-        currentWindow.outerSize(),
-        currentMonitor(),
-      ]).catch((err) => {
-        frontendLog('error', `[ResizeHandle] read window state failed: ${err}`)
-        return [null, null, null]
-      })
-      if (!pos || !size) return
-      const scaleFactor = monitor?.scaleFactor || window.devicePixelRatio || 1
-
-      // 锁定指针，确保 pointermove/up 即使移出 handle 也能收到
+      // ── 以下三步必须在 await 之前同步完成 ────────────────────────────────
+      // ① 锁指针：React 在事件派发结束后会把 SyntheticEvent.currentTarget 置空，
+      //    await 之后再读 e.currentTarget 只能拿到 null，setPointerCapture 抛出的
+      //    TypeError 又被 catch 吞掉 —— 指针捕获从未建立。后果是窗口一边随拖拽变形、
+      //    手柄一边从鼠标底下溜走，pointermove 立刻收不到，表现为「动一下就拖不动」。
+      // ② 置位全局拖拽标志，尽早短路 window-provider / use-visibility 的 IPC。
+      // ③ 记录按下时的指针坐标（位移一律按按下点绝对计算，await 期间丢失的 move 不会累积误差）。
       const target = e.currentTarget as HTMLElement
       try {
         target.setPointerCapture(e.pointerId)
       } catch (err) {
         frontendLog('warn', `[ResizeHandle] setPointerCapture failed: ${err}`)
       }
-
-      // 设置全局 resizing 标志：window-provider (onResized) 与 use-visibility
-      // (updateWindowState) 在发起 IPC 前读取此标志，拖拽期间跳过 IPC，
-      // 避免与拖拽自身的 setSize/setPosition 抢占连接。
       setWindowResizing(true)
+      pendingDownRef.current = { pointerId: e.pointerId, cancelled: false }
+      const downClientX = e.clientX
+      const downClientY = e.clientY
+
+      // 读取窗口当前几何，所有读取并行发 IPC 减少往返。
+      // 【口径】位置取 outerPosition（与 setPosition 对齐），尺寸取 innerSize（与 setSize 对齐）。
+      const [pos, size, monitor] = await Promise.all([
+        currentWindow.outerPosition(),
+        currentWindow.innerSize(),
+        currentMonitor(),
+      ]).catch((err) => {
+        frontendLog('error', `[ResizeHandle] read window state failed: ${err}`)
+        return [null, null, null]
+      })
+
+      const pending = pendingDownRef.current
+      pendingDownRef.current = null
+      const gestureAlive =
+        pending !== null &&
+        !pending.cancelled &&
+        pending.pointerId === e.pointerId
+
+      if (!gestureAlive || !pos || !size) {
+        // 几何量回来之前手势已结束，或读取失败：释放捕获并复位标志，不留残余拖拽态
+        try {
+          target.releasePointerCapture(e.pointerId)
+        } catch {
+          // 捕获可能已被系统自动释放，忽略
+        }
+        setWindowResizing(false)
+        return
+      }
+
+      const scaleFactor = monitor?.scaleFactor || window.devicePixelRatio || 1
 
       sessionRef.current = {
         direction,
         startPhysX: pos.x,
         startPhysY: pos.y,
-        startPhysW: size.width,
-        startPhysH: size.height,
+        startInnerW: size.width,
+        startInnerH: size.height,
         // pointer events 的 clientX/Y 是 CSS 像素（logical），
-        // 转换为 physical 以与 outerPosition 同坐标系
-        startPointerX: e.clientX * scaleFactor,
-        startPointerY: e.clientY * scaleFactor,
+        // 乘以缩放因子后与 outerPosition/innerSize 同为 physical 坐标系
+        startPointerX: downClientX * scaleFactor,
+        startPointerY: downClientY * scaleFactor,
         scaleFactor,
         pointerId: e.pointerId,
         pendingW: null,
@@ -298,6 +359,14 @@ export const ResizeHandles: React.FC = () => {
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      // 手势在「窗口几何量还没读回来」阶段就结束（快速点击 / 捕获丢失）：
+      // 只做取消登记，捕获与全局标志由 handlePointerDown 的续体统一收尾，避免早退留下残留状态。
+      const pending = pendingDownRef.current
+      if (pending && pending.pointerId === e.pointerId) {
+        pending.cancelled = true
+        return
+      }
+
       const session = sessionRef.current
       if (!session || e.pointerId !== session.pointerId) return
 
@@ -363,15 +432,17 @@ export const ResizeHandles: React.FC = () => {
       // 🛡️ [FM-05 消除反向拖拽死区] 动态锚点滑动 Clamping：
       // 当鼠标推过最小/最大尺寸边界时，动态滑动 session.startPointerX/Y 锚点，
       // 使得 dx/dy 紧贴临界边界。一旦鼠标反向移动，可实现 0 延迟即刻拉大/缩小，消除死区粘滞感。
+      // 注意：这里的 MIN/MAX 与 computeResizeGeometry 同为「内尺寸」口径，基准值也用 startInnerW/H，
+      // 且边界值统一引用 @/constants 的导出常量，避免两处魔数漂移（曾经就是这类重复埋的坑）。
       const sf = session.scaleFactor
-      const MIN_W_PHYS = 285 * sf
-      const MAX_W_PHYS = 640 * sf
-      const MIN_H_PHYS = 135 * sf
-      const MAX_H_PHYS = 860 * sf
+      const MIN_W_PHYS = MIN_WINDOW_WIDTH * sf
+      const MAX_W_PHYS = MAX_WINDOW_WIDTH * sf
+      const MIN_H_PHYS = MIN_WINDOW_HEIGHT * sf
+      const MAX_H_PHYS = MAX_WINDOW_HEIGHT * sf
 
       if (session.direction.includes('e')) {
-        const minDx = MIN_W_PHYS - session.startPhysW
-        const maxDx = MAX_W_PHYS - session.startPhysW
+        const minDx = MIN_W_PHYS - session.startInnerW
+        const maxDx = MAX_W_PHYS - session.startInnerW
         if (dx < minDx) {
           session.startPointerX = currentPointerX - minDx
           dx = minDx
@@ -380,8 +451,8 @@ export const ResizeHandles: React.FC = () => {
           dx = maxDx
         }
       } else if (session.direction.includes('w')) {
-        const minDx = session.startPhysW - MAX_W_PHYS
-        const maxDx = session.startPhysW - MIN_W_PHYS
+        const minDx = session.startInnerW - MAX_W_PHYS
+        const maxDx = session.startInnerW - MIN_W_PHYS
         if (dx < minDx) {
           session.startPointerX = currentPointerX - minDx
           dx = minDx
@@ -392,8 +463,8 @@ export const ResizeHandles: React.FC = () => {
       }
 
       if (session.direction.includes('s')) {
-        const minDy = MIN_H_PHYS - session.startPhysH
-        const maxDy = MAX_H_PHYS - session.startPhysH
+        const minDy = MIN_H_PHYS - session.startInnerH
+        const maxDy = MAX_H_PHYS - session.startInnerH
         if (dy < minDy) {
           session.startPointerY = currentPointerY - minDy
           dy = minDy
@@ -402,8 +473,8 @@ export const ResizeHandles: React.FC = () => {
           dy = maxDy
         }
       } else if (session.direction.includes('n')) {
-        const minDy = session.startPhysH - MAX_H_PHYS
-        const maxDy = session.startPhysH - MIN_H_PHYS
+        const minDy = session.startInnerH - MAX_H_PHYS
+        const maxDy = session.startInnerH - MIN_H_PHYS
         if (dy < minDy) {
           session.startPointerY = currentPointerY - minDy
           dy = minDy
@@ -416,8 +487,8 @@ export const ResizeHandles: React.FC = () => {
       // 计算 clamp 后的新几何（logical），写入 pending（rAF 节流后统一应用）
       const geo = computeResizeGeometry({
         direction: session.direction,
-        startPhysW: session.startPhysW,
-        startPhysH: session.startPhysH,
+        startInnerW: session.startInnerW,
+        startInnerH: session.startInnerH,
         startPhysX: session.startPhysX,
         startPhysY: session.startPhysY,
         dx,

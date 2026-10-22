@@ -276,8 +276,13 @@ pub fn run() {
                         tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
                             // 每次窗口尺寸或位置变化都同步持久化（带 250ms 节流），
                             // 确保进入轻量模式销毁窗口前 window_state.json 已是当前尺寸与位置。
+                            //
+                            // 【口径说明】宽高存「内尺寸」（客户区），位置存「外位置」：
+                            // MINIMAL_WIDTH/MINIMAL_HEIGHT、max_inner_size、前端 setSize 与 MIN/MAX 常量
+                            // 全部是内尺寸口径；`shadow(false)` 下 outer == inner，两者数值一致，
+                            // 但取内尺寸可保证即使将来重新开阴影也不会把内缩量写进持久化。
                             let scale = webview_window.scale_factor().unwrap_or(1.0);
-                            if let (Ok(size), Ok(pos)) = (webview_window.outer_size(), webview_window.outer_position())
+                            if let (Ok(size), Ok(pos)) = (webview_window.inner_size(), webview_window.outer_position())
                             {
                                 let w = size.width as f64 / scale;
                                 let h = size.height as f64 / scale;
