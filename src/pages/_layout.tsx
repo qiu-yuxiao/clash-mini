@@ -31,7 +31,6 @@ import AppIcon from '@/assets/image/app-icon.png'
 import { AreaErrorFallback } from '@/components/base/base-error-boundary'
 import { ConnectionDetail } from '@/components/connection/connection-detail'
 import type { ConnectionDetailRef } from '@/components/connection/connection-detail'
-import { GlowBorder } from '@/components/glow-border'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { ResizeHandles } from '@/components/layout/resize-handles'
 import { WindowControls } from '@/components/layout/window-controller'
@@ -1248,9 +1247,6 @@ const Layout = () => {
       >
         <ResizeHandles />
         {customTitlebar}
-
-        {/* FEAT-003: GlowBorder — only visible in stealth mode, replaces native chrome */}
-        {isDecorationsHidden && <GlowBorder />}
 
         <div
           className="layout-content"

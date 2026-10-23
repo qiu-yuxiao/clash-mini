@@ -77,7 +77,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
         // 会导致拖拽每帧都被放大一圈（最小宽度下表现为「点一下左键窗口就跳宽 22×13 物理像素」）。
         // 关掉阴影后内缩归零，outer == inner，全工程（后端 min/max_inner_size、前端 MIN/MAX 常量、
         // window_state.json 持久化）统一按内尺寸口径，不再需要到处补偿内缩量。
-        // 代价：失去系统投影与 Win11 圆角/1px 描边 —— 本程序外框自绘（皮肤 / GlowBorder），可接受。
+        // 代价：失去系统投影与 Win11 圆角/1px 描边 —— 本程序外框自绘（皮肤背景），可接受。
         .shadow(false)
         .fullscreen(false)
         .inner_size(win_w, win_h)
