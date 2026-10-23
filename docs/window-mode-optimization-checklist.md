@@ -92,9 +92,10 @@
   - 原提议：收标题栏 30px 让流量条完整可见。
   - 裁定理由：**已有 FEAT-003 空闲自动隐藏标题栏机制** —— `window-provider.tsx` 的
     `idleTimerRef`（`IDLE_HIDE_DELAY_MS = 10_000`）：当窗口满足
-    `宽≤285 且 高≤135`（即小窗口）且用户无操作 **10 秒后**，`setIsDecorationsHidden(true)`，
-    `_layout.tsx:1522` 据此隐藏整个自定义标题栏、改由 `GlowBorder` 替代；活跃节点栏随即
-    获得空位完整显示。**所以"小窗标题栏腾位"已由现有 stealth 机制实现，无需再改。**
+    `宽≤285 且 高≤126`（即小窗口）且用户无操作 **10 秒后**，`setIsDecorationsHidden(true)`，
+    `_layout.tsx` 据此隐藏整个自定义标题栏、内容区改按 `100vh` 铺满（GlowBorder 已移除，
+    边缘不再有自绘外发光装饰）；活跃节点栏随即获得空位完整显示。**所以"小窗标题栏腾位"
+    已由现有 stealth 机制实现，无需再改。**
   - 教训：这是我没掌握既有机制时提出的误判，印证了"先核对再动手"的必要性。
 - [ ] **TODO-C 流量 WS 采样率在小窗可减半 — ❌ REJECTED（你裁定：伤 UX）**
   - 现状：`useTrafficData` 节流 `throttleMs: 1000`。
