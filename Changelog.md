@@ -1,3 +1,20 @@
+## v3.0.9
+
+### 🎨 UI & Minimalist Design
+- **极窄隐匿模式窗框发光装饰移除（回归极简纯净边缘）**：
+  - 用户在极窄且极小高度（≤126px）静置 10 秒后，标题栏依然自动平滑隐藏、内容区撑满 100vh 且全区域可按住无缝拖拽；
+  - 彻底删除 `GlowBorder` 边框组件及关联的 6 套皮肤渐变分支、LocalStorage 读取与全局事件监听器，避免任何潜在渲染与计算开销，呈现无多余修饰的极简纯净边缘。
+
+### 📖 Architecture & Standards
+- **窗口模式设计契约与架构清单同步定型**：
+  - 《设计契约 2.6》正式更名为「极窄隐匿模式（自动隐藏标题栏规范）」，同步更新为纯净无装饰定型说明；
+  - 修正 `docs/window-mode-optimization-checklist.md` 中过期的 135px 阈值与 `GlowBorder` 行号引用；后端 `window.rs` 相应更新自绘注释。
+- **新增附录 B《已知非缺陷（NOT A BUG）》日志判据规范**：
+  - 基于现场日志实证，系统性归档境内直连抖动（`GeoIp/cn` i/o timeout）、核心退出批处理取消（`operation was canceled`）以及节点侧拨号超时（node-health）三大类常规日志现象；
+  - 确立两点可复现通用判据，杜绝将正常生命周期与网络抖动误判为配置/规则缺陷而反复立项排查。
+
+---
+
 ## v3.0.8
 
 ### 🐞 Fixed Bugs & DNS Reliability
