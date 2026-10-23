@@ -312,10 +312,9 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - **必须用 `GEOIP` 而非 `GEOIP6`**：mihomo（Clash Meta）**不支持 `GEOIP6` 规则类型**（老 Clash Premium 语法），写入即 `unsupported rule type: GEOIP6`，配置校验失败、内核拒绝启动、全部流量回落直连（v3.0.0 现场实证）。mihomo 的 `GEOIP` 自动覆盖 IPv4/IPv6（查 mmdb 对应段），语义等价且合法。
   - **两条都必须放在本地网段直连规则之后、`MATCH` 之前**：放前面会抢走 IPv4-mapped 私网段与 TUN 自身 ULA 的直连判定。
   - **`no-resolve` 必须去掉**：带 `no-resolve` 的 IP 类规则对**域名**目标直接跳过。v3.0.0 现场 375 条 `i/o timeout` 中仍有 85 条（22.7%）目标是域名（`icube-api*.tiktok-row.net` 等），正是因为域名目标绕过了这两条规则又漏回 `MATCH,DIRECT`。去掉后由内核先解析再判定：境内 IPv6 → 前一条直连；其余 IPv6 → 走代理；只有 A 记录的域名 → 两条都不匹配、行为不变。
-- **`dns.fallback` 的上游必须强制走代理（2026-10-21 铁律）**：`dns.respect-rules: true` 时，内核为解析域名发出的上游连接**同样要过规则匹配**；而默认 `rule_fallback = "direct"`，于是 fallback 里的境外 DoH（`1.1.1.1` / `8.8.8.8` / `8.8.4.4`）会一路漏到 `MATCH,DIRECT`。这三家在大陆直连被墙 → fallback 整链失效 → `fallback-filter.geoip` 防投毒能力等于关闭 → 投毒应答（如 Teredo 段的 `2001::1`）被采信 → 客户端反复连不存在的地址刷 `i/o timeout` → **TUN 断流**。
-  - **落地方式**：由 `enhance::dns_fallback_proxy_rules` 从**真实 `dns.fallback` 配置**推导，逐条生成 `IP-CIDR,<ip>/32,PROXY,no-resolve`（IPv6 则 `IP-CIDR6,<ip>/128`）。**严禁写死具体 IP**——订阅换上游时必须自动跟随。
+- **`dns.fallback` 的上游必须强制走代理（2026-10-21 铁律，2026-10-23 辅 IP 对偶补齐）**：`dns.respect-rules: true` 时，内核为解析域名发出的上游连接**同样要过规则匹配**；而默认 `rule_fallback = "direct"`，于是 fallback 里的境外 DoH（`1.1.1.1` / `8.8.8.8` / `8.8.4.4`）会一路漏到 `MATCH,DIRECT`。这三家在大陆直连被墙 → fallback 整链失效 → `fallback-filter.geoip` 防投毒能力等于关闭 → 投毒应答（如 Teredo 段的 `2001::1`）被采信 → 客户端反复连不存在的地址刷 `i/o timeout` → **TUN 断流**。
+  - **落地方式**：由 `enhance::dns_fallback_proxy_rules` 从**真实 `dns.fallback` 配置**推导，生成 `IP-CIDR,<ip>/32,PROXY,no-resolve`（IPv6 则 `IP-CIDR6,<ip>/128`），公共 DNS（Google `8.8.8.8` ↔ `8.8.4.4`，Cloudflare `1.1.1.1` ↔ `1.0.0.1`）自动补齐对偶辅 IP 规则，域名型上游（如 `dns.google`）同步补齐 `DOMAIN,dns.google,PROXY` 及其落地 IP（`8.8.8.8`、`8.8.4.4`）。**严禁写死具体 IP**——订阅换上游时必须自动跟随。
   - **插入位置**：`RULE-SET,gfwlist` 之后、用户 `append-rules` 之前。既不抢用户规则最终决定权，又早于全部私网与 `MATCH` 规则。
-  - 域名型上游（`https://dns.google/dns-query`）无法在规则层静态表达，不生成规则；其解析结果落回上面生成的 IP 规则时同样受益。
 
 ---
 
@@ -662,5 +661,6 @@ flowchart LR
 | **BUG-299** | 2.12 | 首次引导「按回车键立即导入」仅监听输入框 `onKeyDown`，焦点一旦离开输入框（如点击提示文字）Enter 事件无人接听，表现为按了没反应。修复：Enter 监听提升到 Dialog Paper（弹窗内任意位置生效），排除 `isComposing`（IME 组词确认）与按钮焦点（放行按钮自身行为），输入框尾部补装饰性回车图标，提示文案改说明语气 |
 | **BUG-300** | 2.3 | 最小高度 135 沿用带系统阴影时代的余量，关闭阴影（`shadow(false)`）后未像宽度（285→271）那样做 −14 对称修正，最小高度下底部凭空多一段空白。修复：`MIN_WINDOW_HEIGHT` / `MINIMAL_HEIGHT` / `MINI_HEIGHT_THRESHOLD` 统一 135→121。3.0.5 再 121→126：121×1.5=181.5 物理落点有取整歧义，126×1.5=189 恰为整数（主流 150% 档不再依赖容差兜底），且 125%/175% 档 MulDiv 半进位落点（158/221）回算恒 ≥ 阈值，消除「回算略小于阈值」的边缘场景 |
 | **BUG-301** | 2.10.1 / 3.7 | TUN 开关显示安装成功但实际不可用（现场 80 秒全系统断网）：订阅占位假节点 `server: '1'` 名字伪装成 URL（"v0-网址:xxx"）绕过 `is_dummy_node` 纯名字过滤 → 入选 PROXY 组成员（订阅排序在首位）→ 内核重启后 Selector 落回该死节点 → TUN 下全系统流量打进死地址触发 `1:443 connect error` 风暴打满核心 CPU → 节点恢复一次性 4s IPC 超时即放弃 + 自愈监控 87s 后才救场。修复：① `enhance` 收集组成员时按 `is_valid_node_server` 校验 server 字段（IP 字面量或含点域名），无效节点不入组（定义保留在 `proxies:`，与 dummy 过滤同策略）；② `restore_proxy_group_now` 组填充等待期顺带校验目标节点在组内（不在组内属持久性错误直接兜底），select 失败改 90 秒预算重试（3s 间隔），预算耗尽再走子集兜底。**铁律**：节点名字可任意伪装，server 字段藏不住——拦占位节点必须看 server，不能只看名字 |
+| **BUG-302** | 3.7 | `dns.fallback` 配置 `8.8.8.8` 或 `dns.google` 时，内核 DoH 解析并发轮询至其对偶辅 IP `8.8.4.4:443`，因缺少规则漏入 `MATCH,DIRECT` 触发直连 i/o timeout 告警。修复：`dns_fallback_proxy_rules` 针对知名公共 DNS（Google 8.8.8.8 ↔ 8.8.4.4、Cloudflare 1.1.1.1 ↔ 1.0.0.1）自动对偶注入辅 IP 规则，域名型上游同步注入 `DOMAIN,<host>,PROXY` 与已知固定落地 IP，彻底消灭 DoH 上游漏入直连超时 |
 
 

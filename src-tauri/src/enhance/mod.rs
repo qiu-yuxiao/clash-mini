@@ -555,7 +555,7 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
     (!host.is_empty()).then(|| std::string::String::from(host))
 }
 
-/// 由 `dns.fallback` 中的「IP 字面量」上游生成强制走代理的规则。
+/// 由 `dns.fallback` 中的境外上游生成强制走代理的规则。
 ///
 /// 【为什么必须有】`dns.respect-rules: true` 时，内核为解析域名而发出的上游连接同样要
 /// 过规则匹配；而本程序默认 `rule_fallback = "direct"`，于是 fallback 里的境外 DoH
@@ -565,9 +565,13 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
 /// 表现为 `i/o timeout` 刷屏 → TUN 断流。
 ///
 /// v3.0.0 现场日志实证：`dial DIRECT (match Match/) mihomo --> 8.8.8.8:443 error ...`。
+/// 3.0.7 现场日志实证：`dial DIRECT (match Match/) mihomo --> 8.8.4.4:443 error ...`。
 ///
-/// 只处理 IP 字面量：域名型上游（`https://dns.google/dns-query`）无法在规则层静态表达，
-/// 它依赖 `proxy-server-nameserver` 先解析、再按解析结果匹配，不在本函数职责内。
+/// 处理规则：
+/// 1. IP 字面量：生成 `IP-CIDR,<ip>/32,PROXY,no-resolve`（IPv6 为 /128）；
+/// 2. 公共 DNS 对偶补齐：Google DNS（8.8.8.8 ↔ 8.8.4.4）、Cloudflare DNS（1.1.1.1 ↔ 1.0.0.1）
+///    自动注入辅 IP 规则，消除仅配置主 IP 时内核或系统轮询辅 IP 漏入 MATCH,DIRECT 造成的超时；
+/// 3. 域名型上游：生成 `DOMAIN,<host>,PROXY`；对已知域名（如 `dns.google`）自动补齐其固定落地 IP（8.8.8.8 与 8.8.4.4）。
 fn dns_fallback_proxy_rules(dns: Option<&Value>) -> Vec<Value> {
     let mut rules = Vec::new();
     let mut seen = HashSet::new();
@@ -592,26 +596,50 @@ fn dns_fallback_proxy_rules(dns: Option<&Value>) -> Vec<Value> {
             continue;
         };
 
-        let rule = if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
+        let mut candidate_rules: Vec<std::string::String> = Vec::new();
+
+        if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
             // 私网、环回与链路本地地址不走代理，避免误伤局域网网关与本地服务
             if ip.is_private() || ip.is_loopback() || ip.is_link_local() {
                 continue;
             }
-            format!("IP-CIDR,{host}/32,PROXY,no-resolve")
+            candidate_rules.push(format!("IP-CIDR,{host}/32,PROXY,no-resolve"));
+            // 对偶补齐知名公共 DNS 的辅 IP：
+            // Google: 8.8.8.8 <-> 8.8.4.4
+            // Cloudflare: 1.1.1.1 <-> 1.0.0.1
+            // 客户端与内核在 fallback 时若轮询到对偶 IP，未补齐会漏到 MATCH,DIRECT 导致超时
+            if host == "8.8.8.8" {
+                candidate_rules.push("IP-CIDR,8.8.4.4/32,PROXY,no-resolve".to_string());
+            } else if host == "8.8.4.4" {
+                candidate_rules.push("IP-CIDR,8.8.8.8/32,PROXY,no-resolve".to_string());
+            } else if host == "1.1.1.1" {
+                candidate_rules.push("IP-CIDR,1.0.0.1/32,PROXY,no-resolve".to_string());
+            } else if host == "1.0.0.1" {
+                candidate_rules.push("IP-CIDR,1.1.1.1/32,PROXY,no-resolve".to_string());
+            }
         } else if let Ok(ip) = host.parse::<std::net::Ipv6Addr>() {
             // 环回、未指定、ULA 与链路本地地址不走代理
             let seg0 = ip.segments()[0];
             if ip.is_loopback() || ip.is_unspecified() || (seg0 & 0xfe00) == 0xfc00 || (seg0 & 0xffc0) == 0xfe80 {
                 continue;
             }
-            format!("IP-CIDR6,{host}/128,PROXY,no-resolve")
+            candidate_rules.push(format!("IP-CIDR6,{host}/128,PROXY,no-resolve"));
         } else {
-            // 域名型上游：无法静态落成 IP 规则
-            continue;
-        };
+            // 域名型境外上游（如 dns.google）：
+            // 1. 生成 DOMAIN,{host},PROXY 规则，确保内核建立连接时直接匹配走代理；
+            // 2. 针对已知域名（如 dns.google），其固定解析落地为 8.8.8.8 / 8.8.4.4，
+            //    补充 IP-CIDR 规则，杜绝内核解析后直连其辅 IP 导致 i/o timeout。
+            candidate_rules.push(format!("DOMAIN,{host},PROXY"));
+            if host == "dns.google" {
+                candidate_rules.push("IP-CIDR,8.8.8.8/32,PROXY,no-resolve".to_string());
+                candidate_rules.push("IP-CIDR,8.8.4.4/32,PROXY,no-resolve".to_string());
+            }
+        }
 
-        if seen.insert(rule.clone()) {
-            rules.push(Value::from(rule.as_str()));
+        for rule in candidate_rules {
+            if seen.insert(rule.clone()) {
+                rules.push(Value::from(rule.as_str()));
+            }
         }
     }
 
@@ -770,7 +798,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         logging!(
             info,
             Type::Core,
-            "DNS fallback 上游共 {} 个 IP 字面量已强制走代理（防投毒链路保通）",
+            "DNS fallback 上游共 {} 条规则已强制走代理（防投毒链路保通）",
             dns_rules.len()
         );
     }
@@ -1172,11 +1200,42 @@ fallback:
             rules,
             vec![
                 std::string::String::from("IP-CIDR,1.1.1.1/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,1.0.0.1/32,PROXY,no-resolve"),
                 std::string::String::from("IP-CIDR,8.8.8.8/32,PROXY,no-resolve"),
                 std::string::String::from("IP-CIDR,8.8.4.4/32,PROXY,no-resolve"),
+                std::string::String::from("DOMAIN,dns.google,PROXY"),
                 std::string::String::from("IP-CIDR6,2606:4700:4700::1111/128,PROXY,no-resolve"),
             ],
-            "域名型上游应跳过，其余按出现顺序去重后各生成一条"
+            "域名型上游与对偶辅IP生成走代理规则，按出现顺序去重"
+        );
+
+        // 单独配置 8.8.8.8 时，应自动补齐对偶辅 IP 8.8.4.4
+        let single_google: Mapping = serde_yaml_ng::from_str("fallback: ['https://8.8.8.8/dns-query']").unwrap();
+        let single_rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(single_google)))
+            .iter()
+            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .collect();
+        assert_eq!(
+            single_rules,
+            vec![
+                std::string::String::from("IP-CIDR,8.8.8.8/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,8.8.4.4/32,PROXY,no-resolve"),
+            ]
+        );
+
+        // 单独配置 dns.google 时，应同时生成 DOMAIN 与 8.8.8.8/8.8.4.4 落地规则
+        let domain_google: Mapping = serde_yaml_ng::from_str("fallback: ['https://dns.google/dns-query']").unwrap();
+        let domain_rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(domain_google)))
+            .iter()
+            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .collect();
+        assert_eq!(
+            domain_rules,
+            vec![
+                std::string::String::from("DOMAIN,dns.google,PROXY"),
+                std::string::String::from("IP-CIDR,8.8.8.8/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,8.8.4.4/32,PROXY,no-resolve"),
+            ]
         );
 
         // 没有 dns 段 / 没有 fallback 时不得凭空造规则
