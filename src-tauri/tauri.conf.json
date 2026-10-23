@@ -1,5 +1,5 @@
 {
-  "version": "3.0.8",
+  "version": "3.0.9",
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "bundle": {
     "active": true,
@@ -10,9 +10,13 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "resources": ["resources"],
+    "resources": [
+      "resources"
+    ],
     "publisher": "Clash Mini",
-    "externalBin": ["sidecar/mini-mihomo"],
+    "externalBin": [
+      "sidecar/mini-mihomo"
+    ],
     "copyright": "GNU General Public License v3.0",
     "category": "DeveloperTool",
     "shortDescription": "Clash Mini",
@@ -39,17 +43,26 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["clash", "clash-mini"]
+        "schemes": [
+          "clash",
+          "clash-mini"
+        ]
       }
     }
   },
   "app": {
     "security": {
-      "capabilities": ["desktop-capability", "migrated"],
+      "capabilities": [
+        "desktop-capability",
+        "migrated"
+      ],
       "assetProtocol": {
         "enable": true,
         "scope": {
-          "allow": ["$APPDATA/**", "$APPLOCALDATA/**"],
+          "allow": [
+            "$APPDATA/**",
+            "$APPLOCALDATA/**"
+          ],
           "requireLiteralLeadingDot": false
         }
       },
