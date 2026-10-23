@@ -1,3 +1,16 @@
+## v3.0.8
+
+### 🐞 Fixed Bugs & DNS Reliability
+- **DoH 上游辅 IP 漏入直连，`8.8.4.4:443` 超时刷屏（BUG-302，3.0.7 现场实证）**：
+  - **主辅 IP 对偶补齐**：`dns.fallback` 里只写 `8.8.8.8` 时，内核解析 `dns.google` 得到的辅 IP `8.8.4.4` 此前没有任何规则接住，一路漏到 `MATCH,DIRECT` 直连失败（3.0.7 日志实证 29 条 `dial DIRECT (match Match/) mihomo --> 8.8.4.4:443 error: i/o timeout`）。现在 Google DNS（`8.8.8.8` ↔ `8.8.4.4`）与 Cloudflare DNS（`1.1.1.1` ↔ `1.0.0.1`）的主辅对偶会自动补齐走代理规则，只配了主 IP 也能覆盖辅 IP。
+  - **域名型上游改为按域名直连代理**：`https://dns.google/dns-query` 这类域名上游过去不生成任何规则，只能靠解析后的 IP 碰运气命中；现在生成 `DOMAIN,dns.google,PROXY`，内核建连时按域名直接走代理，并同步补齐其固定落地 IP（`8.8.8.8` / `8.8.4.4`）。
+  - **规则仍全部从真实 `dns.fallback` 推导**：订阅换上游自动跟随，没有配置这些 DNS 的用户不会凭空多出规则；插入位置保持在 `RULE-SET,gfwlist` 之后、用户 `append-rules` 之前，不抢用户自定义规则的最终决定权。
+
+### 🧪 Tests & Engineering Standards
+- 新增 DoH 上游规则回归用例：覆盖「只配 `8.8.8.8` 时自动补齐 `8.8.4.4`」「只配 `dns.google` 时同时生成 `DOMAIN` 与落地 IP 规则」两种现场形态，并锁定主辅对偶与去重顺序。
+
+---
+
 ## v3.0.3
 
 ### 🐞 Fixed Bugs & Window Mechanics
