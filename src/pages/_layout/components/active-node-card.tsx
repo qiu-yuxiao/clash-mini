@@ -68,7 +68,12 @@ export const ActiveNodeStatusCard = () => {
     }
     getDelayManager().setListener(activeNodeName, primaryGroup.name, handler)
     return () => {
-      getDelayManager().removeListener(activeNodeName, primaryGroup.name)
+      // 带上具体 handler：列表项同样在监听该节点，无参调用会连它一起摘除
+      getDelayManager().removeListener(
+        activeNodeName,
+        primaryGroup.name,
+        handler,
+      )
     }
   }, [activeNodeName, primaryGroup?.name, hasRecord])
 

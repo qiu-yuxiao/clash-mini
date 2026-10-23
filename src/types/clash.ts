@@ -75,6 +75,11 @@ export interface IProxyItem {
   }[]
   all?: string[]
   now?: string
+  /**
+   * 内核最近一次拨测判定的存活状态（mihomo `/proxies` 原生字段）。
+   * 拨测失败只置 false、不追加 history，故必须用它来兜住 history 里的陈旧成功值。
+   */
+  alive?: boolean
   hidden?: boolean
   icon?: string
   provider?: string // 记录是否来自provider

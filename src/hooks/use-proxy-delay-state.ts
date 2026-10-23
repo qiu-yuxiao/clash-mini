@@ -40,7 +40,9 @@ export function useProxyDelayState(
     if (isPreset || !proxy) return
     getDelayManager().setListener(proxy.name, groupName, setDelayState)
     return () => {
-      getDelayManager().removeListener(proxy.name, groupName)
+      // 必须带上具体 listener：同节点可能有多个订阅者（活跃节点栏也在监听），
+      // 无参调用会把它一并摘掉，导致那边永久收不到延迟更新。
+      getDelayManager().removeListener(proxy.name, groupName, setDelayState)
     }
   }, [proxy, groupName, isPreset])
 

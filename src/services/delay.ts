@@ -12,6 +12,15 @@ export interface DelayUpdate {
 
 const CACHE_TTL = 30 * 60 * 1000
 
+/**
+ * history 回落的最大容忍时长。
+ *
+ * 内核测量组的 `interval` 为 300s（`PROXY__METRICS`，见 enhance/mod.rs），
+ * 取 2 个周期即 10 分钟：再旧的 history 记录已不代表「当前延迟」，不得冒充展示。
+ * 下限必须大于 300s，否则会把「健康但本轮尚未拨测」的节点误判成 Timeout。
+ */
+export const HISTORY_FALLBACK_MAX_AGE_MS = 10 * 60 * 1000
+
 // 节点延迟判定阈值：与后端 src-tauri/src/module/monitor.rs 的
 // NODE_DELAY_MIN_MS / NODE_DELAY_MAX_MS 保持一致，作为单一真源，严禁各自漂移。
 // - 下限 30ms：过滤机场伪造的超低延迟广告/假节点
@@ -31,8 +40,12 @@ export const STARTUP_GRACE_MS = 10000
 class DelayManager {
   private cache = new Map<string, DelayUpdate>()
 
-  // 每个节点的监听
-  private listenerMap = new Map<string, (update: DelayUpdate) => void>()
+  // 每个节点的监听。必须是「一对多」：
+  // 活跃节点栏（active-node-card）与节点列表项（use-proxy-delay-state）会同时监听
+  // 同一个 `PROXY::节点名`，若用单值 Map 后注册的会顶掉先注册的，被顶掉者从此
+  // 收不到任何延迟更新，永久停留在挂载时读到的旧值（实测表现为「上面已 Timeout、
+  // 列表里还是绿色的旧延迟」）。故与 groupListenerMap 对齐，改用 Set 承载多订阅者。
+  private listenerMap = new Map<string, Set<(update: DelayUpdate) => void>>()
 
   // 每个分组的监听
   private groupListenerMap = new Map<string, Array<() => void>>()
@@ -86,18 +99,20 @@ class DelayManager {
       this.pendingItemUpdates = new Map()
 
       updates.forEach((queue, key) => {
-        const listener = this.listenerMap.get(key)
-        if (!listener) return
+        const listeners = this.listenerMap.get(key)
+        if (!listeners || listeners.size === 0) return
 
-        queue.forEach((update) => {
-          try {
-            listener(update)
-          } catch (error) {
-            console.error(
-              `[DelayManager] 通知节点延迟监听器失败: ${key}`,
-              error,
-            )
-          }
+        listeners.forEach((listener) => {
+          queue.forEach((update) => {
+            try {
+              listener(update)
+            } catch (error) {
+              console.error(
+                `[DelayManager] 通知节点延迟监听器失败: ${key}`,
+                error,
+              )
+            }
+          })
         })
       })
 
@@ -157,12 +172,31 @@ class DelayManager {
     listener: (update: DelayUpdate) => void,
   ) {
     const key = hashKey(name, group)
-    this.listenerMap.set(key, listener)
+    const listeners = this.listenerMap.get(key)
+    if (listeners) {
+      listeners.add(listener)
+      return
+    }
+    this.listenerMap.set(key, new Set([listener]))
   }
 
-  removeListener(name: string, group = 'PROXY') {
+  removeListener(
+    name: string,
+    group = 'PROXY',
+    listener?: (update: DelayUpdate) => void,
+  ) {
     const key = hashKey(name, group)
-    this.listenerMap.delete(key)
+    // 未指定 listener 时退化为整组移除（仅用于确实要清空该节点全部订阅者的场景）
+    if (!listener) {
+      this.listenerMap.delete(key)
+      return
+    }
+    const listeners = this.listenerMap.get(key)
+    if (!listeners) return
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      this.listenerMap.delete(key)
+    }
   }
 
   setGroupListener(group = 'PROXY', listener: () => void) {
@@ -237,9 +271,27 @@ class DelayManager {
       return update.delay
     }
 
+    // 【禁止陈旧成功值冒充当前延迟】内核拨测失败时只把节点标记为 alive=false，
+    // 并不追加 history —— history 会永久停在最后一次成功的那个值。此前这里无条件回落
+    // history，导致「已断流的节点在列表里仍是绿色 106ms」，与活跃节点栏的 Timeout 自相矛盾。
+    // 内核已判死 → 一律按 Timeout（0）呈现。
+    if (proxy.alive === false) {
+      return 0
+    }
+
     // 添加 history 属性的安全检查
     if (proxy.history && proxy.history.length > 0) {
-      return proxy.history[proxy.history.length - 1].delay ?? -1
+      const lastRecord = proxy.history[proxy.history.length - 1]
+      // 记录过旧（超过测量组 2 个 interval）同样不再冒充当前延迟。
+      // 时间无法解析时保持原值回落，避免把「格式异常」误判成「节点已死」。
+      const recordedAt = Date.parse(lastRecord.time)
+      if (
+        !Number.isNaN(recordedAt) &&
+        Date.now() - recordedAt > HISTORY_FALLBACK_MAX_AGE_MS
+      ) {
+        return 0
+      }
+      return lastRecord.delay ?? -1
     }
     return -1
   }

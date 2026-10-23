@@ -1126,6 +1126,14 @@ async fn trigger_backend_auto_select_inner(
             }
         } else {
             logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: 所有测速节点均不可达");
+            // 【治本】失败路径同样刷新前端代理缓存。
+            // 此前只有选点成功才 refresh_proxies()，失败时前端 proxies 数据长期不更新：
+            // 节点已被内核判死（alive=false），前端却仍握着旧的 alive=true + history 里
+            // 最后一次成功的延迟，列表于是把断流节点渲染成绿色延迟，与活跃节点栏的
+            // Timeout 自相矛盾（2026-10-24 实测现象）。补上这条，前端数据才始终权威。
+            if !crate::module::lightweight::is_in_lightweight_mode() {
+                crate::core::handle::Handle::refresh_proxies();
+            }
         }
     }
 

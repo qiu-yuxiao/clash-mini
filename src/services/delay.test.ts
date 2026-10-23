@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDelay, formatDelayColor, NODE_DELAY_MAX_MS } from './delay'
+import type { IProxyItem } from '@/types/clash'
+
+import {
+  formatDelay,
+  formatDelayColor,
+  getDelayManager,
+  HISTORY_FALLBACK_MAX_AGE_MS,
+  NODE_DELAY_MAX_MS,
+} from './delay'
 
 describe('formatDelay 延迟文本格式化', () => {
   it('未测速 (-1) 返回占位横线', () => {
@@ -63,5 +71,124 @@ describe('formatDelayColor 延迟颜色映射', () => {
     expect(formatDelayColor(30)).toBe('success.main')
     expect(formatDelayColor(120)).toBe('success.main')
     expect(formatDelayColor(249)).toBe('success.main')
+  })
+})
+
+/**
+ * 2026-10-24 实测事故回归：节点已断流（活跃节点栏 Timeout），
+ * 节点列表却仍显示绿色 106ms（history 里最后一次成功值）。
+ */
+describe('getDelayFix 回落规则：禁止陈旧成功值冒充当前延迟', () => {
+  const NODE = '回归-日本aw6'
+  const makeProxy = (over: Partial<IProxyItem> = {}) =>
+    ({
+      name: NODE,
+      type: 'AnyTLS',
+      udp: true,
+      history: [],
+      ...over,
+    }) as unknown as IProxyItem
+  const freshHistory = () => [
+    { time: new Date(Date.now() - 30_000).toISOString(), delay: 106 },
+  ]
+
+  it('内核已判死 (alive=false) 时按 Timeout(0) 呈现，不回落 history', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    const proxy = makeProxy({ alive: false, history: freshHistory() })
+    expect(dm.getDelayFix(proxy)).toBe(0)
+    expect(dm.formatDelay(dm.getDelayFix(proxy))).toBe('Timeout')
+  })
+
+  it('存活且 history 新鲜时正常回落真实延迟', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    const proxy = makeProxy({ alive: true, history: freshHistory() })
+    expect(dm.getDelayFix(proxy)).toBe(106)
+  })
+
+  it('history 记录超过容忍时长后不再冒充当前延迟', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    const stale = [
+      {
+        time: new Date(
+          Date.now() - HISTORY_FALLBACK_MAX_AGE_MS - 60_000,
+        ).toISOString(),
+        delay: 88,
+      },
+    ]
+    expect(dm.getDelayFix(makeProxy({ alive: true, history: stale }))).toBe(0)
+  })
+
+  it('时间无法解析时保守回落原值，不误判为 Timeout', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    const proxy = makeProxy({
+      alive: true,
+      history: [{ time: 'not-a-time', delay: 77 }],
+    })
+    expect(dm.getDelayFix(proxy)).toBe(77)
+  })
+
+  it('完全无 history 且无缓存时返回 -1（未测速占位）', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    expect(dm.getDelayFix(makeProxy({ alive: true }))).toBe(-1)
+  })
+
+  it('有本次测速结论时以缓存为准（不被内核 alive 标记覆盖）', () => {
+    // 依据 agreements 5.8：测速链路失真时内核会把全组 alive 置 false，
+    // 此时前端已有的真实测量结论必须优先，否则会把所有节点误显示为 Timeout。
+    const dm = getDelayManager()
+    dm.clearCache()
+    dm.setDelay(NODE, 'PROXY', 132)
+    expect(dm.getDelayFix(makeProxy({ alive: false }))).toBe(132)
+  })
+})
+
+describe('节点延迟监听：同一节点支持多订阅者', () => {
+  const NODE = '回归-多订阅节点'
+
+  it('活跃节点栏与列表项同时监听同一节点时都能收到更新', async () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    dm.removeListener(NODE, 'PROXY')
+
+    const upper: number[] = []
+    const lower: number[] = []
+    dm.setListener(NODE, 'PROXY', (u) => upper.push(u.delay))
+    dm.setListener(NODE, 'PROXY', (u) => lower.push(u.delay))
+
+    dm.injectBatchResults('PROXY', [[NODE, 0]])
+    await new Promise((r) => setTimeout(r, 50))
+
+    expect(upper).toEqual([0])
+    expect(lower).toEqual([0])
+
+    dm.removeListener(NODE, 'PROXY')
+  })
+
+  it('移除指定 listener 不会带走同节点的其它订阅者', async () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    dm.removeListener(NODE, 'PROXY')
+
+    const kept: number[] = []
+    const removed: number[] = []
+    const keptFn = (u: { delay: number }) => kept.push(u.delay)
+    const removedFn = (u: { delay: number }) => removed.push(u.delay)
+
+    dm.setListener(NODE, 'PROXY', keptFn)
+    dm.setListener(NODE, 'PROXY', removedFn)
+    dm.removeListener(NODE, 'PROXY', removedFn)
+
+    dm.injectBatchResults('PROXY', [[NODE, 42]])
+    await new Promise((r) => setTimeout(r, 50))
+
+    expect(kept).toEqual([42])
+    expect(removed).toEqual([])
+
+    dm.removeListener(NODE, 'PROXY')
   })
 })
