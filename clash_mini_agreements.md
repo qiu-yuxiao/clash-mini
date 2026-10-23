@@ -654,7 +654,6 @@ flowchart LR
 | **BUG-285** | 8.8 | 前端 Vitest 纯逻辑单测基线扩充（`node.test.ts` 与 `delay.test.ts`） |
 | **BUG-286** | 2.12 | 首次安装引导向导弹窗（直接填入订阅）与就绪打开项目 Wiki 测试验证通道 |
 | **BUG-287** | 8.9 | 剩余硬编码文案 i18n 收口；修正节点列表 `aria-label` 错误 key（`proxies` → `proxies.page.a11y.nodelist`）并为帮助按钮补可读名称 |
-| **BUG-288** | 5.6 | 延迟呈现三级真源与节点延迟多订阅：根除「已断流节点仍显示绿色历史延迟」与「列表收不到更新永久卡旧值」 |
 | **BUG-288** | 8.6 | `clash.yaml` 版本检测提到模板合并之前，修复 v1→v2 迁移（`tun.stack` 归一化）长期静默失效 |
 | **BUG-289** | 8.7 | 诊断包脱敏补齐 `authorization` 键，覆盖 `ws-opts.headers.Authorization` 节点级令牌泄露 |
 | **BUG-290** | 3.7 | IPv6 兜底去掉 `no-resolve`，修复域名目标绕过 IPv6 规则漏回 `MATCH,DIRECT` 造成的 i/o timeout |
@@ -670,6 +669,7 @@ flowchart LR
 | **BUG-300** | 2.3 | 最小高度 135 沿用带系统阴影时代的余量，关闭阴影（`shadow(false)`）后未像宽度（285→271）那样做 −14 对称修正，最小高度下底部凭空多一段空白。修复：`MIN_WINDOW_HEIGHT` / `MINIMAL_HEIGHT` / `MINI_HEIGHT_THRESHOLD` 统一 135→121。3.0.5 再 121→126：121×1.5=181.5 物理落点有取整歧义，126×1.5=189 恰为整数（主流 150% 档不再依赖容差兜底），且 125%/175% 档 MulDiv 半进位落点（158/221）回算恒 ≥ 阈值，消除「回算略小于阈值」的边缘场景 |
 | **BUG-301** | 2.10.1 / 3.7 | TUN 开关显示安装成功但实际不可用（现场 80 秒全系统断网）：订阅占位假节点 `server: '1'` 名字伪装成 URL（"v0-网址:xxx"）绕过 `is_dummy_node` 纯名字过滤 → 入选 PROXY 组成员（订阅排序在首位）→ 内核重启后 Selector 落回该死节点 → TUN 下全系统流量打进死地址触发 `1:443 connect error` 风暴打满核心 CPU → 节点恢复一次性 4s IPC 超时即放弃 + 自愈监控 87s 后才救场。修复：① `enhance` 收集组成员时按 `is_valid_node_server` 校验 server 字段（IP 字面量或含点域名），无效节点不入组（定义保留在 `proxies:`，与 dummy 过滤同策略）；② `restore_proxy_group_now` 组填充等待期顺带校验目标节点在组内（不在组内属持久性错误直接兜底），select 失败改 90 秒预算重试（3s 间隔），预算耗尽再走子集兜底。**铁律**：节点名字可任意伪装，server 字段藏不住——拦占位节点必须看 server，不能只看名字 |
 | **BUG-302** | 3.7 | `dns.fallback` 配置 `8.8.8.8` 或 `dns.google` 时，内核 DoH 解析并发轮询至其对偶辅 IP `8.8.4.4:443`，因缺少规则漏入 `MATCH,DIRECT` 触发直连 i/o timeout 告警。修复：`dns_fallback_proxy_rules` 针对知名公共 DNS（Google 8.8.8.8 ↔ 8.8.4.4、Cloudflare 1.1.1.1 ↔ 1.0.0.1）自动对偶注入辅 IP 规则，域名型上游同步注入 `DOMAIN,<host>,PROXY` 与已知固定落地 IP，彻底消灭 DoH 上游漏入直连超时 |
+| **BUG-303** | 5.6 | 延迟呈现三级真源与节点延迟多订阅：根除「已断流节点仍显示绿色历史延迟」与「列表收不到更新永久卡旧值」 |
 
 ---
 
