@@ -1,3 +1,14 @@
+## v3.1.2
+
+### 🐞 Fixed Bugs & Threshold Consistency
+
+- **前后端判死阈值分裂修复：前端单一真源补齐 2000 → 5000 同步（BUG-304 收尾）**：
+  - **现象**：v3.1.1 中后端 monitor.rs 判死阈值已放宽至 5000ms，但前端 `NODE_DELAY_MAX_MS` 仍停留在 2000ms——实测延迟 2000~5000ms 的「拥塞期慢而可用」节点，后端判定存活，UI 却照样红字 Time out 并沉底排序，BUG-304 的现象在显示层复发。
+  - **修复**：前端延迟单一真源（`src/services/delay.ts`）、后端 timing 模块的第二处同语义常量（`src-tauri/src/constants.rs`）与两处注释口径统一同步为 5000ms，与 monitor.rs 单一真源完全一致。
+  - **回归锁定**：新增 BUG-304 阈值同步用例——前端真源必须恒等于 5000、3000ms/4999ms 按有效延迟呈现、恰 5000ms 才判 Timeout，防止后续再漂移。
+
+---
+
 ## v3.1.1
 
 ### 🐞 Fixed Bugs & Congestion-Tolerant Speed Test
