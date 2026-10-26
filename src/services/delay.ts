@@ -24,12 +24,13 @@ export const HISTORY_FALLBACK_MAX_AGE_MS = 10 * 60 * 1000
 // 节点延迟判定阈值：与后端 src-tauri/src/module/monitor.rs 的
 // NODE_DELAY_MIN_MS / NODE_DELAY_MAX_MS 保持一致，作为单一真源，严禁各自漂移。
 // - 下限 30ms：过滤机场伪造的超低延迟广告/假节点
-// - 上限 2000ms：超过即视为死节点，不参与自动选点
-//   探针超时现已与死节点阈值统一为 2000ms（checkListDelay 的 timeout 与后端 NODE_TEST_TIMEOUT_MS
-//   均取 NODE_DELAY_MAX_MS），超过即按不可用处理，UI 显示 Error/Timeout，不再展示真实延迟。
+// - 上限 5000ms：超过即视为死节点，不参与自动选点（BUG-304：2000→5000，
+//   链路拥塞簇内活节点总耗时可达 2~5s，2000ms 会把「慢而可用」误判为断流）
+//   探针超时现已与死节点阈值统一为 5000ms（后端 NODE_TEST_TIMEOUT_MS
+//   取 NODE_DELAY_MAX_MS），超过即按不可用处理，UI 显示 Error/Timeout，不再展示真实延迟。
 //   此处阈值同时决定「探针超时」与「候选/选点」资格，前后端语义完全一致。
 export const NODE_DELAY_MIN_MS = 30
-export const NODE_DELAY_MAX_MS = 2000
+export const NODE_DELAY_MAX_MS = 5000
 
 // 解锁流媒体 region 探测超时：HTTP 经代理访问外网，可能较慢，需较长超时（还原 15s）
 export const UNLOCK_TIMEOUT_MS = 15000
@@ -303,7 +304,7 @@ class DelayManager {
    * 为什么不走 /proxies/{name}/delay：TUN 下对（活跃）节点自测会发生回环并返回 timeout，
    * 这是后端已定位并废弃的路径（见 src-tauri/src/module/monitor.rs 的「测量层根因修复」）。
    *
-   * 探针超时由后端 NODE_TEST_TIMEOUT_MS 决定（= NODE_DELAY_MAX_MS 2000ms，与判死阈值统一）；
+   * 探针超时由后端 NODE_TEST_TIMEOUT_MS 决定（= NODE_DELAY_MAX_MS 5000ms，与判死阈值统一）；
    * 前端不再设置更短的本地竞速超时，避免把「尚未返回」误判为 Timeout。
    */
   async checkDelay(

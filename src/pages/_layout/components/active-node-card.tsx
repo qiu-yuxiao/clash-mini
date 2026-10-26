@@ -30,7 +30,7 @@ export const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
   const { profiles } = useProfiles()
   const currentProfileUid = profiles?.current || ''
-  // 判死/显示/轮换/探针阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定、
+  // 判死/显示/轮换/探针阈值统一为 NODE_DELAY_MAX_MS(5000)，与后端死节点判定、
   // 探针超时（NODE_TEST_TIMEOUT_MS）一致；单点测速同样委托后端测量组，不再有独立的短超时。
   const latencyTimeout = NODE_DELAY_MAX_MS
 

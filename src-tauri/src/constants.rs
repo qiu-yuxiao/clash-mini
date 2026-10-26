@@ -27,8 +27,10 @@ pub mod timing {
     pub const SERVICE_WAIT_MAX: Duration = Duration::from_millis(30000);
     pub const SERVICE_WAIT_INTERVAL: Duration = Duration::from_millis(200);
 
-    /// 代理节点判死与探针超时最大延迟限值
-    pub const NODE_DELAY_MAX_MS: u32 = 2000;
+    /// 代理节点判死与探针超时最大延迟限值。
+    /// 与 src-tauri/src/module/monitor.rs 的 NODE_DELAY_MAX_MS 同语义，必须保持一致
+    /// （BUG-304：2000 → 5000，覆盖拥塞期「慢而可用」节点）。
+    pub const NODE_DELAY_MAX_MS: u32 = 5000;
 
     /// 内部控制、Local Socket 通信与 JS 合并脚本执行的最大熔断时间 (ms)
     pub const INTERNAL_CONTROL_TIMEOUT_MS: u64 = 3000;

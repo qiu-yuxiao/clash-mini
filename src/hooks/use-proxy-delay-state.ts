@@ -33,7 +33,7 @@ export function useProxyDelayState(
   const isPreset = proxy ? PRESET_PROXY_NAMES.includes(proxy.name) : false
   const [delayState, setDelayState] = useReducer(identity, INITIAL_DELAY)
 
-  // 死活着色阈值统一为 NODE_DELAY_MAX_MS(2000)，与后端死节点判定一致
+  // 死活着色阈值统一为 NODE_DELAY_MAX_MS(5000)，与后端死节点判定一致
   const timeout = NODE_DELAY_MAX_MS
 
   useEffect(() => {

@@ -22,7 +22,7 @@ describe('formatDelay 延迟文本格式化', () => {
   it('超时 (0 或 >= timeout 且 <= 1e5) 返回 Timeout', () => {
     expect(formatDelay(0)).toBe('Timeout')
     expect(formatDelay(NODE_DELAY_MAX_MS)).toBe('Timeout')
-    expect(formatDelay(2500)).toBe('Timeout')
+    expect(formatDelay(6000)).toBe('Timeout')
     expect(formatDelay(1e5)).toBe('Timeout')
   })
 
@@ -44,6 +44,28 @@ describe('formatDelay 延迟文本格式化', () => {
 })
 
 describe('formatDelayColor 延迟颜色映射', () => {
+  /**
+   * BUG-304 回归（2026-10-26）：后端 monitor.rs 判死阈值已 2000→5000，
+   * 前端单一真源若不同步，2000~5000ms 的「拥塞期慢而可用」节点会被
+   * formatDelay/formatDelayColor/排序/联动逻辑误判为 Timeout（红字 + 沉底），
+   * 重现 BUG-304 要根除的「活节点全员 Time out」。
+   */
+  describe('BUG-304 阈值同步：2000~5000ms 是有效延迟而非 Timeout', () => {
+    it('NODE_DELAY_MAX_MS 必须为 5000（与后端 monitor.rs 单一真源一致）', () => {
+      expect(NODE_DELAY_MAX_MS).toBe(5000)
+    })
+
+    it('拥塞期实测延迟 (3000ms) 按有效值呈现，不得显示 Timeout', () => {
+      expect(formatDelay(3000)).toBe('3000')
+      expect(formatDelayColor(3000)).not.toBe('error.main')
+    })
+
+    it('拥塞期实测延迟 (4999ms) 仍为有效值，恰好 5000ms 才判 Timeout', () => {
+      expect(formatDelay(4999)).toBe('4999')
+      expect(formatDelay(5000)).toBe('Timeout')
+    })
+  })
+
   it('未测速与测试中 (< 0) 返回空样式', () => {
     expect(formatDelayColor(-1)).toBe('')
     expect(formatDelayColor(-2)).toBe('')
@@ -51,8 +73,8 @@ describe('formatDelayColor 延迟颜色映射', () => {
 
   it('超时与失败 (0 或 >= timeout) 返回 error.main', () => {
     expect(formatDelayColor(0)).toBe('error.main')
-    expect(formatDelayColor(2000)).toBe('error.main')
-    expect(formatDelayColor(3500)).toBe('error.main')
+    expect(formatDelayColor(NODE_DELAY_MAX_MS)).toBe('error.main')
+    expect(formatDelayColor(6500)).toBe('error.main')
   })
 
   it('较慢延迟 (>= 400 且 < timeout) 在浅色与深色主题下返回对应 warning 色', () => {
