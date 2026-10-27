@@ -59,6 +59,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
         height: '100%',
         minHeight: 0,
         overflow: 'hidden',
+        pb: { xs: 0, '@media (min-height: 831px)': '24px' },
       }}
     >
       <Box
@@ -217,7 +218,17 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
       </Box>
 
       {/* Connection Table Container */}
-      <Box sx={{ flex: 1, minHeight: 0, mt: 0.5 }}>
+      <Box
+        sx={{
+          flex: 1,
+          height: '100%',
+          minHeight: 0,
+          mt: 0.5,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
         {filterConn.length === 0 ? (
           <BaseEmpty />
         ) : (

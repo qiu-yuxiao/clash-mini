@@ -16,7 +16,7 @@ import {
 import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
 import { isMiniByPhysical, isMinimalWidthByPhysical } from '@/utils/mini-window'
-import { isWindowResizing } from '@/utils/window-resizing'
+import { RESIZE_ENDED_EVENT } from '@/utils/window-resizing'
 
 import { WindowContext, type WindowContextType } from './window-context'
 
@@ -222,54 +222,70 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     let lastWidth = -1
     let lastHeight = -1
 
+    const syncGeometryAndLargeState = (width: number, height: number) => {
+      if (isUnmounted) return
+      if (width === lastWidth && height === lastHeight) return
+      lastWidth = width
+      lastHeight = height
+
+      // event.payload 是窗口内尺寸的物理像素——这是权威一手数据。
+      // 窄窗/极小窗判定统一走 applyGeometry（物理像素域 + 1 物理像素容差），
+      // 不再读 window.innerWidth/innerHeight（整数 CSS 像素会吃掉那 1 个物理像素）。
+      const factor = window.devicePixelRatio || 1
+      applyGeometry(width, height, factor)
+
+      // 大尺寸模式逻辑：转换为 logical 比较
+      const logicalW = width / factor
+      const logicalH = height / factor
+      const isLargeSize =
+        Math.abs(logicalW - LARGE_MODE_WIDTH) < 1 &&
+        Math.abs(logicalH - LARGE_MODE_HEIGHT) < 1
+
+      if (isLargeModeRef.current && !isLargeSize) {
+        // 从大尺寸模式拖动变小 → 自动退出大尺寸模式
+        isLargeModeRef.current = false
+        setIsLargeMode(false)
+        // 更新 lastNonLargeSizeRef 为当前拖动后的尺寸
+        lastNonLargeSizeRef.current = { width: logicalW, height: logicalH }
+      } else if (!isLargeModeRef.current && !isLargeSize) {
+        // 非大尺寸模式下拖动 → 更新 lastNonLargeSizeRef
+        lastNonLargeSizeRef.current = { width: logicalW, height: logicalH }
+      }
+      // isLargeSize=true 且 isLargeModeRef.current=true：toggleMaximize 触发的 setSize，无需处理
+    }
+
     const checkMaximized = debounce(
-      async (event: { payload: { width: number; height: number } }) => {
-        if (isUnmounted) return
-        // 拖拽调整窗口大小期间（resize-handles 设置 __isResizing）跳过处理，
-        // 避免每像素 churn，也让位给拖拽自身的 setSize/setPosition。
-        // 收尾的 onResized 在 __isResizing 清除后触发，会用最终尺寸正常刷新。
-        if (isWindowResizing()) return
-        const { width, height } = event.payload
-        if (width === lastWidth && height === lastHeight) return
-        lastWidth = width
-        lastHeight = height
-
-        // event.payload 是窗口内尺寸的物理像素——这是权威一手数据。
-        // 窄窗/极小窗判定统一走 applyGeometry（物理像素域 + 1 物理像素容差），
-        // 不再读 window.innerWidth/innerHeight（整数 CSS 像素会吃掉那 1 个物理像素）。
-        const factor = window.devicePixelRatio || 1
-        applyGeometry(width, height, factor)
-
-        // 窗口几何变化也是一次交互：从这里起重新计时 10 秒。
-        // 关键补强——拖窗口边缘走的是 Tauri 缩放边框子窗口，页面收不到 mousemove；
-        // 拖页面内手柄又被 pointerdown 的 preventDefault 抑制了兼容鼠标事件。
-        // 没有这一句，上述两条路径都无法给空闲计时器续命。
-        // （续期在监听器入口每帧做，见下方 onResized 包装；这里不重复续期。）
-
-        // 大尺寸模式逻辑：转换为 logical 比较
-        const logicalW = width / factor
-        const logicalH = height / factor
-        const isLargeSize =
-          Math.abs(logicalW - LARGE_MODE_WIDTH) < 1 &&
-          Math.abs(logicalH - LARGE_MODE_HEIGHT) < 1
-
-        if (isLargeModeRef.current && !isLargeSize) {
-          // 从大尺寸模式拖动变小 → 自动退出大尺寸模式
-          isLargeModeRef.current = false
-          setIsLargeMode(false)
-          // 更新 lastNonLargeSizeRef 为当前拖动后的尺寸
-          lastNonLargeSizeRef.current = { width: logicalW, height: logicalH }
-        } else if (!isLargeModeRef.current && !isLargeSize) {
-          // 非大尺寸模式下拖动 → 更新 lastNonLargeSizeRef
-          lastNonLargeSizeRef.current = { width: logicalW, height: logicalH }
-        }
-        // isLargeSize=true 且 isLargeModeRef.current=true：toggleMaximize 触发的 setSize，无需处理
+      (event: { payload: { width: number; height: number } }) => {
+        // 注意：此处严禁因 isWindowResizing() 提前 return！
+        // syncGeometryAndLargeState 纯内存计算（0 次 IPC），而拖拽到最大宽度（640px）时，
+        // 最后一次 onResized 往往发生在 pointerup 200ms 冷却期结束之前；
+        // 若在 __isResizing 期间丢弃事件，冷却结束后不会再有新 onResized，
+        // 会导致 isMinimalWidth 卡在 true，右侧 ConnectionsPanel 无法挂载。
+        syncGeometryAndLargeState(event.payload.width, event.payload.height)
       },
-      300,
+      150,
     )
 
+    // 拖拽收尾兜底：当 resize-handles 释放 __isResizing 时，主动读取一次最新 innerSize 校正，
+    // 确保任何极端竞态下窄窗/宽窗布局状态与真实窗口物理尺寸完全一致。
+    const handleResizeEnded = () => {
+      if (isUnmounted) return
+      currentWindow
+        .innerSize()
+        .then((size) => {
+          if (isUnmounted) return
+          lastWidth = -1
+          lastHeight = -1
+          syncGeometryAndLargeState(size.width, size.height)
+        })
+        .catch(() => {
+          // 忽略偶发超时
+        })
+    }
+    window.addEventListener(RESIZE_ENDED_EVENT, handleResizeEnded)
+
     // 续期放在防抖之外、监听器入口处：onResized 每帧都续。
-    // 若只在 300ms 防抖回调里续期，持续超过 10 秒的长拖期间防抖被反复推迟、
+    // 若只在防抖回调里续期，持续超过 10 秒的长拖期间防抖被反复推迟、
     // 回调一次都不执行，空闲计时器会在拖拽中途触发（用拖拽前的旧状态判定），
     // 造成标题栏瞬隐瞬显。入口处每帧续期后，拖拽全程计时器不会走到期。
     const unlistenPromise = currentWindow.onResized((event) => {
@@ -279,6 +295,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
     return () => {
       isUnmounted = true
+      window.removeEventListener(RESIZE_ENDED_EVENT, handleResizeEnded)
       unlistenPromise
         .then((unlisten) => unlisten())
         .catch((err) => console.warn('[WindowProvider] 清理监听器失败:', err))
@@ -412,9 +429,15 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
         isLargeModeRef.current = true
         setIsLargeMode(true)
+        applyGeometry(
+          Math.round(LARGE_MODE_WIDTH * factor),
+          Math.round(LARGE_MODE_HEIGHT * factor),
+          factor,
+        )
       } else {
         // 退出大尺寸模式：恢复保存的尺寸
         const saved = lastNonLargeSizeRef.current
+        const factor = await getScaleFactor()
         await withIpcTimeout(
           currentWindow.setSize(new LogicalSize(saved.width, saved.height)),
           5000,
@@ -425,11 +448,16 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
         isLargeModeRef.current = false
         setIsLargeMode(false)
+        applyGeometry(
+          Math.round(saved.width * factor),
+          Math.round(saved.height * factor),
+          factor,
+        )
       }
     } catch (err) {
       console.warn('[WindowProvider] toggleMaximize failed:', err)
     }
-  }, [currentWindow])
+  }, [currentWindow, applyGeometry])
 
   useEffect(() => {
     if (!currentWindow) return

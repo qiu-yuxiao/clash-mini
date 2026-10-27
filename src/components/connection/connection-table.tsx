@@ -31,6 +31,7 @@ const SX_OUTER: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
   flexDirection: 'column',
   flex: 1,
+  height: '100%',
   minHeight: 0,
   position: 'relative',
   fontFamily: (theme) => theme.typography.fontFamily,
@@ -38,20 +39,18 @@ const SX_OUTER: React.ComponentProps<typeof Box>['sx'] = {
 
 const SX_SCROLL_CONTAINER: React.ComponentProps<typeof Box>['sx'] = {
   flex: 1,
+  height: '100%',
   minHeight: 0,
   overflowY: 'auto',
   overflowX: 'hidden',
   WebkitOverflowScrolling: 'touch',
   overscrollBehavior: 'contain',
-  scrollbarWidth: 'none',
-  msOverflowStyle: 'none !important',
-  '&::-webkit-scrollbar': {
-    display: 'none !important',
-    width: '0 !important',
-    height: '0 !important',
-  },
   border: '5px double var(--theme-border)',
   borderRadius: '4px',
+  scrollbarWidth: 'none',
+  '&::-webkit-scrollbar': {
+    display: 'none !important',
+  },
 }
 
 const SX_HEADER_STICKY: React.ComponentProps<typeof Box>['sx'] = {
@@ -168,9 +167,10 @@ const RowComponent = memo(
               sx={[
                 SX_DATA_CELL_BASE,
                 {
-                  flex: isChains ? '0 0 50px' : '1 1 0%',
+                  flex: isChains ? '0 0 64px' : '1 1 0%',
                   minWidth: 0,
-                  width: isChains ? '50px' : 'auto',
+                  width: isChains ? '64px' : 'auto',
+                  px: isChains ? 0.5 : 1.5,
                   justifyContent: isChains ? 'center' : 'flex-start',
                   borderRight: (theme) =>
                     !isChains ? `2px solid ${theme.palette.divider}` : 'none',
@@ -332,9 +332,7 @@ export const ConnectionTable = (props: Props) => {
       },
       {
         id: 'chains',
-        header: () => t('connections.components.miniTable.chainsColumn'),
-        cell: (ctx) => {
-          const row = ctx.row.original
+        accessorFn: (row) => {
           const chains = row.chains || []
           if (chains.length === 0)
             return t('connections.components.miniTable.chainsDirect')
@@ -345,6 +343,8 @@ export const ConnectionTable = (props: Props) => {
             return t('connections.components.miniTable.chainsDirect')
           return t('connections.components.miniTable.chainsProxy')
         },
+        header: () => t('connections.components.miniTable.chainsColumn'),
+        cell: (ctx) => ctx.getValue<string>(),
       },
     ]
   }, [t])
@@ -395,9 +395,10 @@ export const ConnectionTable = (props: Props) => {
                         sx={[
                           SX_HEADER_CELL_BASE,
                           {
-                            flex: isChains ? '0 0 50px' : '1 1 0%',
+                            flex: isChains ? '0 0 64px' : '1 1 0%',
                             minWidth: 0,
-                            width: isChains ? '50px' : 'auto',
+                            width: isChains ? '64px' : 'auto',
+                            px: isChains ? 0.5 : 1.5,
                             borderRight: (theme) =>
                               !isChains
                                 ? `2px solid ${theme.palette.divider}`
@@ -421,6 +422,7 @@ export const ConnectionTable = (props: Props) => {
                               cursor: header.column.getCanSort()
                                 ? 'pointer'
                                 : 'default',
+                              whiteSpace: 'nowrap',
                             },
                           ]}
                         >

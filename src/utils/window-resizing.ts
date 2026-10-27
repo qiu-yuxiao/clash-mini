@@ -12,6 +12,8 @@ interface ResizingFlag {
   __isResizing?: boolean
 }
 
+export const RESIZE_ENDED_EVENT = 'clash-mini-resize-ended'
+
 export function isWindowResizing(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -21,6 +23,11 @@ export function isWindowResizing(): boolean {
 
 export function setWindowResizing(value: boolean): void {
   if (typeof window !== 'undefined') {
-    ;(window as unknown as ResizingFlag).__isResizing = value
+    const win = window as unknown as ResizingFlag
+    const wasResizing = win.__isResizing === true
+    win.__isResizing = value
+    if (wasResizing && !value) {
+      window.dispatchEvent(new Event(RESIZE_ENDED_EVENT))
+    }
   }
 }
