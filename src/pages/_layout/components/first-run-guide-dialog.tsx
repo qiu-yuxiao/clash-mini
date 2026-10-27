@@ -112,16 +112,18 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   const proxyReady =
     activeDelay !== null && activeDelay > 0 && activeDelay < NODE_DELAY_MAX_MS
 
-  // 进入第二步开始计时：超时仍无有效延迟则放弃「已就绪」的表述
+  // 进入 ready 步骤开始计时，超时后停止等待，如实告知「未确认」
   useEffect(() => {
     if (!open || step !== 'ready') return
     const timer = setTimeout(() => setGaveUp(true), READY_TIMEOUT_MS)
     return () => clearTimeout(timer)
   }, [open, step])
 
-  // 未就绪且未超时：周期刷新代理数据，等节点测出延迟
+  // 进入 ready 步骤时立即主动刷新一次，随后在未就绪且未超时期间按 1.5s 周期轮询
+  // ── 解决内核 reload 后首次 url-test 尚未完成时 proxies 上下文停留旧值的问题
   useEffect(() => {
     if (!open || step !== 'ready' || proxyReady || gaveUp) return
+    void refreshProxyRef.current?.()
     const timer = setInterval(() => {
       void refreshProxyRef.current?.()
     }, READY_POLL_INTERVAL_MS)
@@ -410,7 +412,8 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 py: 1.5,
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'flex-start',
+                alignItems: 'center',
+                textAlign: 'center',
                 gap: 0.6,
                 borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
@@ -419,6 +422,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 0.75,
                   fontWeight: 'bold',
                   fontSize: '15.5px',
@@ -670,7 +674,8 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 py: 1.5,
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'flex-start',
+                alignItems: 'center',
+                textAlign: 'center',
                 gap: 0.6,
                 borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
@@ -679,6 +684,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 0.75,
                   fontWeight: 'bold',
                   fontSize: '15.5px',

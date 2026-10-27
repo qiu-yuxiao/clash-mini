@@ -210,18 +210,27 @@ pub async fn init_resources() -> Result<()> {
         std::mem::drop(fs::create_dir_all(&res_dir).await);
     }
 
-    // 需要复制到运行目录的资源文件（保证离线可用，避免内核联网下载被墙而卡住校验）。
+    // 需要复制到运行目录的资源文件（保证离线可用，避免内核联网下载被墙或冷启动空窗）：
     // - Country.mmdb：GeoIP 库，fallback-filter.geoip 与 GEOIP 规则默认走它；
     //   缺失时内核会联网下载 geoip.metadb（默认源 github 大陆不可达）→ 校验超时、订阅被判无效。
     // - geosite.dat：GEOSITE 规则必需，机场订阅常见写法，缺失时同样联网下载被墙。
+    // - gfwlist.yaml -> ruleset/gfwlist.yaml（BUG-309）：GFWList 境外域名分流规则集随包预置；
+    //   全新安装第 0 毫秒直接命中本地缓存，无需首次启动联网等待拉取（杜绝拉取完成前
+    //   GitHub/YouTube 落 MATCH,DIRECT 直连被墙的冷启动空窗），运行期仍由内核按
+    //   interval: 86400 定时自动更新；若运行期已拉取到更新版本，dest_modified > src_modified
+    //   自动保留更新版本不被覆盖。
     // geoip.dat 不再随包：仅 geodata-mode: true 的罕见订阅才用，普通 GEOIP 规则走 mmdb。
-    let file_list: [&str; 2] = ["Country.mmdb", "geosite.dat"];
+    let file_list: [(&str, &str); 3] = [
+        ("Country.mmdb", "Country.mmdb"),
+        ("geosite.dat", "geosite.dat"),
+        ("gfwlist.yaml", "ruleset/gfwlist.yaml"),
+    ];
 
     // copy the resource file
     // if the source file is newer than the destination file, copy it over
-    for file in file_list.iter() {
-        let src_path = res_dir.join(file);
-        let dest_path = app_dir.join(file);
+    for (src_rel, dest_rel) in file_list.iter() {
+        let src_path = res_dir.join(src_rel);
+        let dest_path = app_dir.join(dest_rel);
 
         // 源文件不存在或为空（如开发环境未随包携带）时跳过，避免误报复制失败
         let src_len = fs::metadata(&src_path).await.map(|m| m.len()).unwrap_or(0);
@@ -232,7 +241,7 @@ pub async fn init_resources() -> Result<()> {
         // 目标文件不存在或大小为0（如此前因网络超时下载失败残留的空文件）时直接覆盖复制
         let dest_len = fs::metadata(&dest_path).await.map(|m| m.len()).unwrap_or(0);
         if !dest_path.exists() || dest_len == 0 {
-            handle_copy(&src_path, &dest_path, file).await;
+            handle_copy(&src_path, &dest_path, dest_rel).await;
             continue;
         }
 
@@ -242,12 +251,12 @@ pub async fn init_resources() -> Result<()> {
         match (src_modified, dest_modified) {
             (Ok(src_modified), Ok(dest_modified)) => {
                 if src_modified > dest_modified {
-                    handle_copy(&src_path, &dest_path, file).await;
+                    handle_copy(&src_path, &dest_path, dest_rel).await;
                 }
             }
             _ => {
-                logging!(debug, Type::Setup, "failed to get modified '{}'", file);
-                handle_copy(&src_path, &dest_path, file).await;
+                logging!(debug, Type::Setup, "failed to get modified '{}'", dest_rel);
+                handle_copy(&src_path, &dest_path, dest_rel).await;
             }
         };
     }
@@ -370,6 +379,11 @@ pub async fn startup_script() -> Result<()> {
 }
 
 async fn handle_copy(src: &PathBuf, dest: &PathBuf, file: &str) {
+    if let Some(parent) = dest.parent()
+        && !parent.exists()
+    {
+        std::mem::drop(fs::create_dir_all(parent).await);
+    }
     match fs::copy(src, dest).await {
         Ok(_) => {
             logging!(debug, Type::Setup, "resources copied '{}'", file);

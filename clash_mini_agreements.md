@@ -30,7 +30,7 @@
   - [3.1 内核选择与安装包体积极致精简](#31-内核选择与安装包体积极致精简)
   - [3.2 Windows 命名管道与高并发退避重试](#32-windows-命名管道与高并发退避重试)
   - [3.3 端口冲突自适应探测与私有密钥保障](#33-端口冲突自适应探测与私有密钥保障)
-  - [3.4 Geodata 资源随包策略与按需加载](#34-geodata-资源随包策略与按需加载)
+  - [3.4 Geodata 与 GFWList 资源随包策略与按需加载](#34-geodata-与-gfwlist-资源随包策略与按需加载)
   - [3.5 Go Runtime 运行参数深度压制](#35-go-runtime-运行参数深度压制)
   - [3.6 内核在线平滑升级与多层代理降级链](#36-内核在线平滑升级与多层代理降级链)
 - [💤 四、轻量级模式与窗口生命周期](#四轻量级模式与窗口生命周期)
@@ -275,10 +275,11 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **动态端口避让与自愈**：内核 Controller 默认监听 `127.0.0.1:9098`。在启动初始化阶段，若探测到端口被占用，先向该端口发送鉴权探测；若带私有密钥校验成功，则判定为异常退出的前代残留进程予以平滑复用；若鉴权失败（被第三方程序占用），自动向上逐个扫描空闲端口，并动态重写内核启动配置完成无感迁移绑定。
 - **控制密钥私有化**：废弃所有硬编码公共密钥，外部控制密钥采用全局强随机散列固定值保护，阻断本地恶意软件利用内核 API 篡改网络路由。
 
-### 3.4 Geodata 资源随包策略与按需加载
+### 3.4 Geodata 与 GFWList 资源随包策略与按需加载
 
 - **精简随包清单**：
-  - **随包并释放至运行目录**：`Country.mmdb`（GEOIP 与 fallback-filter 规则必备基础库）与 `geosite.dat`（GEOSITE 分流规则库）。
+  - **随包并释放至运行目录**：`Country.mmdb`（GEOIP 与 fallback-filter 规则必备基础库）、`geosite.dat`（GEOSITE 分流规则库）以及 `gfwlist.yaml -> ruleset/gfwlist.yaml`（GFWList 境外域名分流规则集，约 95KB）。
+  - **GFWList 发版拉取 + 随包预置 + 定时更新闭环（BUG-309）**：每次构建/发版阶段（`scripts/prebuild.mjs::resolveGfwlist`）主动从多镜像源拉取最新 `Loyalsoldier/clash-rules` 的 `gfw.txt` 并校验打入 `resources/gfwlist.yaml`；应用启动早期（`init_resources`）若运行目录 `ruleset/gfwlist.yaml` 缺失、为空或旧于随包版本则立即释放到位，使全新安装第 0 毫秒即具备完整境外域名分流能力，彻底省去首次启动联网等待拉取规则的逻辑；运行期仍由内核 `rule-providers.gfwlist` 按 `interval: 86400`（24 小时）经 `PROXY` 通道自动定时更新，且更新后的文件因 `dest_modified > src_modified` 在后续日常重启时自动保留不被旧随包文件覆盖。
   - **移除随包**：移除体积庞大的 `geoip.dat`（节省约 17MB 磁盘与包体积），满足 99.9% 订阅规则之需。
 - **按需保守内存加载**：启动配置默认注入 `geodata-loader: memconservative`，规则库仅在首次路由命中时按需索取并载入内存，降低约 5MB ~ 10MB 物理常驻内存。
 
@@ -680,6 +681,7 @@ flowchart LR
 | **BUG-306** | 2.2 / 5.7 | 宽窗口路径控制表格改良与首次拉宽不显示竞态修复（v3.1.6）：① `ConnectionTable` 的 `chains`（路由）列补齐 `accessorFn` 以启用 `@tanstack/react-table` 升序/降序/取消循环点击排序（活跃与历史连接通用），列宽由 50px 扩至 64px 容纳排序箭头；② 修复 `ConnectionsPanel` 外层容器 `display: block` 导致内部 `flex: 1` 失效、虚拟列表被撑高至全量高度而无法纵向滚动的布局断裂，补齐 `display: 'flex', flexDirection: 'column', height: '100%'` 滚动链路（保持隐藏滚动条、仅通过鼠标滚轮上下滚动）；③ 移除 `WindowProvider.checkMaximized` 中误丢弃末帧 `onResized` 事件的 `isWindowResizing()` 拦截（`syncGeometryAndLargeState` 纯内存计算无 IPC），并新增 `clash-mini-resize-ended` 收尾对账与 `toggleMaximize` 即时 `applyGeometry`，根治首次在设置页将窗口拉至最宽时 `isMinimalWidth` 卡在 `true` 导致右侧 `ConnectionsPanel` 不挂载的竞态 |
 | **BUG-307** | 2.12 | 首次使用向导弹窗（`FirstRunGuideDialog`）针对 `271px` 极窄竖屏窗口实施主从纵向层级重构（v3.1.7）：① 弹窗标题（「欢迎使用 Clash Mini」/「订阅已就绪」）与步骤胶囊（`STEP 1 / 2` / `STEP 2 / 2`）由左右并列改为上下主从两行，消除标题被挤折行；② 输入框下方的「一键粘贴剪贴板链接」与「按 Enter 键即可导入」改为上下两行居中排布，剪贴板智能探测横幅取消单行省略截断，三大特性胶囊自适应均分撑满；③ 第二步「当前最优节点」标签（含延迟胶囊）与节点全称改为上下分行展示，彻底释放长节点名称显示空间；④ 第一步与第二步底部操作栏（`DialogActions`）统一改为 `disableSpacing` 纵向双行居中满宽排布（主操作按钮在上、次操作「稍后手动配置」/「进入主界面」在最下方一行），根除窄窗下双按钮横向挤压 |
 | **BUG-308** | 5.2 | 订阅自带 DNS 境外明文 UDP 上游的 DoH 卫生改写（3.1.7 现场实证，v3.1.8 发布）：机场订阅在 `dns.nameserver` 自带明文 `8.8.8.8`，`respect-rules: true` 下内核自身 DNS 查询命中 `IP-CIDR,8.8.8.8/32,PROXY` 穿代理；节点为 anytls 等 TCP 承载协议时 UDP 需 UDP-over-TCP（每个查询先向节点新建 TCP 会话），该会话建立慢于境内 DoH，在内核 DNS 并发赛跑中必被取消，刷出 `failed to create session: dial tcp <node>: operation was canceled` 警告（7 条全部落在 anytls 被选中窗口内，切 ss 节点后零新增；实测确认该节点本身可翻墙，节点无责）。修复：enhance 流水线新增 `sanitize_foreign_plain_dns_upstreams`，仅将 `nameserver` 中四家境外公共 DNS（Google 8.8.8.8/8.8.4.4、Cloudflare 1.1.1.1/1.0.0.1）的明文形式（裸 IP / `IP:53`）改写为 `https://<ip>/dns-query`；`default-nameserver` 按协议定义必须明文不动、境内明文上游直连可达不动、已加密上游不动。诊断期间新增管道 API 调试脚本约定：命名管道返回 chunked 编码，需按 chunk 长度行重组后再 JSON 解析 |
+| **BUG-309** | 2.12 / 3.4 | GFWList 规则集随包预置与 24h 定时更新闭环 + 新手向导步骤胶囊居中对齐（3.1.8 现场实证）：全新安装时本地 `ruleset/gfwlist.yaml` 尚未生成，需等待后台 29 节点并发测速完成切换后才拉取成功，期间用户提前点击打开 GitHub / YouTube 会因 `gfwlist` 规则数为 0 而全部漏入 `MATCH,DIRECT` 直连超时（日志实证 `dial DIRECT (match Match/) --> 20.205.243.166:443 / 172.217.112.4:443 i/o timeout`）。修复：① `scripts/prebuild.mjs` 新增 `resolveGfwlist` 任务，每次构建/发版时主动从多镜像源拉取最新 `Loyalsoldier/clash-rules` 的 `gfw.txt`（~95KB）并校验 `payload:` 后写入 `src-tauri/resources/gfwlist.yaml`；② `init_resources()` 在启动早期（内核启动前）将 `resources/gfwlist.yaml` 释放至 `<app_home_dir>/ruleset/gfwlist.yaml`（缺失/空文件或 `src_modified > dest_modified` 时复制），使全新安装第 0 毫秒即具备 6,500+ 条境外域名分流规则，彻底省去首次启动拉取等待与锁按钮交互；③ 保留 `enforce_mini_agreements` 中 `rule-providers.gfwlist` 的 `interval: 86400`（24h）+ `proxy: PROXY` 后台定时自动更新机制，且更新后的文件因 `dest_modified > src_modified` 在后续重启时自动保留；④ `FirstRunGuideDialog` 弹窗标题与 `STEP 1 / 2`、`STEP 2 / 2` 胶囊统一居中对齐 |
 
 ---
 

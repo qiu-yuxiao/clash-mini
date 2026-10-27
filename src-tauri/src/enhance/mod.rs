@@ -811,7 +811,15 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         Value::from(vec![Value::from(single_group), Value::from(metrics_group)]),
     );
 
-    // 4. Inject rule-provider for "gfwlist"
+    // 4. Inject rule-providers for GFWList
+    //
+    // 【随包预置 + 定时更新（BUG-309）】GFWList 规则集是境外域名走代理的唯一判定源。
+    // 构建/发版阶段（scripts/prebuild.mjs）主动拉取最新 Loyalsoldier/clash-rules gfw.txt
+    // 随包打入 resources/gfwlist.yaml，启动早期由 init_resources 释放至
+    // <app_home_dir>/ruleset/gfwlist.yaml。因此全新安装第 0 毫秒本地缓存即已就绪，
+    // 无需首次启动时联网等待拉取（彻底消除拉取完成前 GitHub/YouTube 落 MATCH,DIRECT
+    // 直连被墙的冷启动空窗）；运行期仍由内核按 interval: 86400（24h）经 PROXY 通道
+    // 后台定时拉取更新。
     let mut gfwlist_provider = Mapping::new();
     gfwlist_provider.insert(Value::from("type"), Value::from("http"));
     gfwlist_provider.insert(Value::from("behavior"), Value::from("domain"));
@@ -841,11 +849,12 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     }
 
     // 注：境外域名走代理由 GFWList 规则集判断（规则集从 GEOIP/GEOSITE 更换而来，
-    // 省去 geosite.dat 的常驻内存开销；GEOIP 数据仍随包携带见下）。
+    // 省去 geosite.dat 的常驻内存开销；GEOIP 数据与 gfwlist.yaml 均随包携带，
+    // 见 utils::init::init_resources）。
     // MATCH 兜底策略由 rule_fallback 控制；IPv6 境内外分流依赖 Country.mmdb
-    // （随包携带、离线可用，见 utils::init::init_resources），见下方 IPv6 兜底规则。
+    // （随包携带、离线可用），见下方 IPv6 兜底规则。
 
-    // Add GFWList rule: only explicitly blocked domains go through proxy
+    // Add GFWList rule:
     final_rules.push(Value::from("RULE-SET,gfwlist,PROXY"));
 
     // 【DNS 上游保通】让 fallback 里的境外 DoH 走代理，救活防投毒链路。
@@ -1159,7 +1168,7 @@ append-rules:
         assert_eq!(group_uses.len(), 1);
         assert_eq!(group_uses[0].as_str(), Some("providerA"));
 
-        // 2. Verify gfwlist provider
+        // 2. Verify gfwlist provider & rules (pre-bundled + 24h periodic update via PROXY)
         let providers = config.get("rule-providers").and_then(Value::as_mapping).unwrap();
         let gfwlist = providers.get("gfwlist").and_then(Value::as_mapping).unwrap();
         assert_eq!(gfwlist.get("type").unwrap().as_str(), Some("http"));
@@ -1168,11 +1177,13 @@ append-rules:
             gfwlist.get("url").unwrap().as_str(),
             Some("https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt")
         );
+        assert_eq!(gfwlist.get("path").unwrap().as_str(), Some("./ruleset/gfwlist.yaml"));
+        assert_eq!(gfwlist.get("interval").unwrap().as_u64(), Some(86400));
         assert_eq!(gfwlist.get("proxy").unwrap().as_str(), Some("PROXY"));
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
-        // prepend(1) + GFWList(1) + IP-CIDR(6) + IP-CIDR6(5) + IPv4-mapped(6) + append(1)
-        // + IPv6 兜底(2: GEOIP,CN + IP-CIDR6,::/0) + MATCH(1) = 23
+        // prepend(1) + GFWList(1) + IP-CIDR(6) + IP-CIDR6(5) + IPv4-mapped(6)
+        // + append(1) + IPv6 兜底(2: GEOIP,CN + IP-CIDR6,::/0) + MATCH(1) = 23
         // MATCH=DIRECT because default rule_fallback is "direct" (GFWList mode)
         assert_eq!(rules.len(), 23);
         assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));

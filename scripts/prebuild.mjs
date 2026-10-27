@@ -605,6 +605,63 @@ const resolveEnableLoopback = () =>
     downloadURL: `https://github.com/Kuingsmile/uwp-tool/releases/download/latest/enableLoopback.exe`,
   })
 
+// GFWList 规则集随包预置（BUG-309）：
+// 每次构建/发版时主动拉取最新 Loyalsoldier/clash-rules gfw.txt（~95KB）写入
+// src-tauri/resources/gfwlist.yaml，运行期由 init_resources 释放到
+// <app_home_dir>/ruleset/gfwlist.yaml，使全新安装第 0 毫秒即具备完整境外域名分流，
+// 无需首次启动时联网等待拉取；后续运行期仍由内核按 interval: 86400 定时自动更新。
+const GFWLIST_URLS = [
+  'https://github.com/Loyalsoldier/clash-rules/releases/latest/download/gfw.txt',
+  'https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt',
+  'https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/gfw.txt',
+  'https://cdn.jsdmirror.com/gh/Loyalsoldier/clash-rules@release/gfw.txt',
+]
+
+const resolveGfwlist = async () => {
+  const file = 'gfwlist.yaml'
+  const targetPath = path.join(RESOURCES_DIR, file)
+  const tempPath = path.join(TEMP_DIR, `${file}.tmp`)
+
+  await fsp.mkdir(RESOURCES_DIR, { recursive: true })
+  await fsp.mkdir(TEMP_DIR, { recursive: true })
+
+  let lastErr = null
+  for (const url of GFWLIST_URLS) {
+    try {
+      await downloadFile(url, tempPath)
+      const content = await fsp.readFile(tempPath, 'utf8')
+      if (!content.includes('payload:') || content.length < 1024) {
+        throw new Error(`Invalid gfwlist payload downloaded from ${url}`)
+      }
+      await fsp.copyFile(tempPath, targetPath)
+      await fsp.rm(tempPath, { force: true })
+      await updateHashCache(targetPath)
+      log_success(
+        `"${file}" fetched latest from ${url} (${content.length} bytes)`,
+      )
+      return
+    } catch (err) {
+      lastErr = err
+      log_info(`Failed to fetch ${file} from ${url}: ${err.message}`)
+    }
+  }
+
+  // 离线开发兜底：若全部镜像均不可达但本地已有合法缓存，则保留现有文件不中断本地构建
+  if (fs.existsSync(targetPath)) {
+    try {
+      const stat = fs.statSync(targetPath)
+      if (stat.size > 1024) {
+        log_info(
+          `All GFWList mirrors unreachable, reusing existing "${file}" (${stat.size} bytes)`,
+        )
+        return
+      }
+    } catch {}
+  }
+
+  throw lastErr ?? new Error(`Failed to resolve ${file}`)
+}
+
 // =======================
 // Tasks
 // =======================
@@ -619,6 +676,7 @@ const tasks = [
   { name: 'service', func: resolveServiceBundle, retry: 5 },
   { name: 'mmdb', func: resolveMmdb, retry: 5 },
   { name: 'geosite', func: resolveGeosite, retry: 5 },
+  { name: 'gfwlist', func: resolveGfwlist, retry: 3 },
   {
     name: 'enableLoopback',
     func: resolveEnableLoopback,
