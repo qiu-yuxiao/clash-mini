@@ -339,16 +339,15 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   const stepBadge = (currentStep: 1 | 2) => (
     <Box
       sx={{
-        ml: 'auto',
         display: 'inline-flex',
         alignItems: 'center',
         gap: 0.75,
         px: 1,
-        py: 0.25,
+        py: 0.2,
         borderRadius: '999px',
-        fontSize: '11px',
+        fontSize: '10.5px',
         fontWeight: 700,
-        letterSpacing: '0.5px',
+        letterSpacing: '0.6px',
         bgcolor: isRetro3D
           ? 'rgba(44, 31, 3, 0.12)'
           : 'rgba(128, 128, 128, 0.14)',
@@ -407,22 +406,32 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             <DialogTitle
               sx={{
                 color: 'inherit',
-                fontWeight: 'bold',
-                fontSize: '15px',
-                px: 1.5,
+                px: 1.75,
                 py: 1.5,
                 display: 'flex',
-                alignItems: 'center',
-                gap: 0.75,
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 0.6,
                 borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
-              <span>🎉</span>
-              <span>{t('layout.components.firstRun.title')}</span>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  fontWeight: 'bold',
+                  fontSize: '15.5px',
+                  lineHeight: 1.35,
+                }}
+              >
+                <span>🎉</span>
+                <span>{t('layout.components.firstRun.title')}</span>
+              </Box>
               {stepBadge(1)}
             </DialogTitle>
 
-            <DialogContent sx={{ px: 1.5, py: 1.75 }}>
+            <DialogContent sx={{ px: 1.75, py: 1.75 }}>
               <Typography
                 variant="body2"
                 sx={{
@@ -435,7 +444,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 {t('layout.components.firstRun.intro')}
               </Typography>
 
-              {/* 三大核心价值亮点胶囊 */}
+              {/* 三大核心价值亮点胶囊：自适应均分撑满行宽，避免窄窗折行后右侧留白失衡 */}
               <Box
                 sx={{
                   display: 'flex',
@@ -454,8 +463,10 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   <Box
                     key={featureKey}
                     sx={{
+                      flex: '1 1 auto',
+                      textAlign: 'center',
                       px: 1,
-                      py: 0.35,
+                      py: 0.4,
                       borderRadius: '6px',
                       fontSize: '11.5px',
                       fontWeight: 600,
@@ -494,7 +505,6 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     cursor: submitting ? 'default' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
                     gap: 1,
                     bgcolor: isRetro3D
                       ? 'rgba(27, 94, 32, 0.12)'
@@ -518,9 +528,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                       color: readyColor,
                       fontWeight: 700,
                       fontSize: '12px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      lineHeight: 1.45,
                     }}
                   >
                     ✨ {t('layout.components.firstRun.clipboardDetected')}
@@ -543,7 +551,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   sx={get3DInputStyle(theme)}
                   inputRef={inputRef}
                   onContextMenu={handleContextMenu}
-                  // 装饰性回车图标：呼应右侧的 Enter 提示文字，同时弱化「提示文字像按钮」的观感
+                  // 装饰性回车图标：呼应下方的 Enter 提示文字，同时弱化「提示文字像按钮」的观感
                   slotProps={{
                     input: {
                       endAdornment: (
@@ -573,12 +581,14 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 </Typography>
               )}
 
+              {/* 粘贴操作与回车提示：主从上下两行居中排布，避免窄窗内横向拥挤 */}
               <Box
                 sx={{
                   display: 'flex',
-                  justifyContent: 'space-between',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  mt: 1.25,
+                  gap: 0.5,
+                  mt: 1,
                 }}
               >
                 <Button
@@ -591,7 +601,9 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     fontWeight: 600,
                     textTransform: 'none',
                     color: 'primary.main',
-                    px: 0.5,
+                    px: 1,
+                    py: 0.25,
+                    minHeight: 'auto',
                   }}
                 >
                   📋 {t('layout.components.firstRun.paste')}
@@ -599,7 +611,12 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 
                 <Typography
                   variant="caption"
-                  sx={{ color: disabledText, fontSize: '11px' }}
+                  sx={{
+                    color: disabledText,
+                    fontSize: '11.5px',
+                    lineHeight: 1.4,
+                    textAlign: 'center',
+                  }}
                 >
                   {t('layout.components.firstRun.enterHint')}
                 </Typography>
@@ -607,34 +624,40 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             </DialogContent>
 
             <DialogActions
+              disableSpacing
               sx={{
-                px: 1.5,
+                flexDirection: 'column',
+                alignItems: 'center',
+                px: 1.75,
                 py: 1.5,
                 gap: 1,
                 borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <Button
-                sx={{
-                  ...get3DButtonStyle(theme, 'outlined', 'default'),
-                  whiteSpace: 'nowrap',
-                }}
-                onClick={handleDismissLater}
-                disabled={submitting}
-              >
-                {t('layout.components.firstRun.later')}
-              </Button>
-              <Button
+                fullWidth
                 sx={{
                   ...get3DButtonStyle(theme, 'contained', 'primary'),
-                  flex: 1,
-                  whiteSpace: 'nowrap',
+                  py: 0.85,
+                  fontSize: '13px',
                 }}
                 onClick={handleSubmitImport}
                 loading={submitting}
                 disabled={submitting}
               >
                 {t('layout.components.firstRun.importAndStart')}
+              </Button>
+              <Button
+                fullWidth
+                sx={{
+                  ...get3DButtonStyle(theme, 'outlined', 'default'),
+                  py: 0.7,
+                  fontSize: '12.5px',
+                }}
+                onClick={handleDismissLater}
+                disabled={submitting}
+              >
+                {t('layout.components.firstRun.later')}
               </Button>
             </DialogActions>
           </>
@@ -643,22 +666,32 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             <DialogTitle
               sx={{
                 color: readyColor,
-                fontWeight: 'bold',
-                fontSize: '15px',
-                px: 1.5,
+                px: 1.75,
                 py: 1.5,
                 display: 'flex',
-                alignItems: 'center',
-                gap: 0.75,
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                gap: 0.6,
                 borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
-              <span>🚀</span>
-              <span>{t('layout.components.firstRun.readyTitle')}</span>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  fontWeight: 'bold',
+                  fontSize: '15.5px',
+                  lineHeight: 1.35,
+                }}
+              >
+                <span>🚀</span>
+                <span>{t('layout.components.firstRun.readyTitle')}</span>
+              </Box>
               {stepBadge(2)}
             </DialogTitle>
 
-            <DialogContent sx={{ px: 1.5, py: 1.75 }}>
+            <DialogContent sx={{ px: 1.75, py: 1.75 }}>
               {/* 卡片 1：实时节点连通仪表盘 */}
               <Box
                 sx={{
@@ -717,7 +750,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   </Typography>
                 </Box>
 
-                {/* 当前活跃出口节点与实测毫秒级延迟胶囊 */}
+                {/* 当前活跃出口节点与实测毫秒级延迟：标签与节点全称上下分行，避免长节点名被截断 */}
                 {activeNodeName && (
                   <Box
                     sx={{
@@ -725,46 +758,57 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                       pt: 0.85,
                       borderTop: '1px dashed rgba(128, 128, 128, 0.25)',
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 1,
+                      flexDirection: 'column',
+                      gap: 0.4,
                     }}
                   >
-                    <Typography
-                      variant="caption"
+                    <Box
                       sx={{
-                        color: secondaryText,
-                        fontWeight: 600,
-                        fontSize: '12px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 1,
                       }}
                     >
-                      🌐 {t('layout.components.firstRun.activeNodeLabel')}:{' '}
-                      <Box
-                        component="span"
-                        sx={{ color: 'text.primary', fontWeight: 700 }}
-                      >
-                        {activeNodeName}
-                      </Box>
-                    </Typography>
-                    {proxyReady && activeDelay !== null && (
-                      <Box
+                      <Typography
+                        variant="caption"
                         sx={{
-                          px: 0.85,
-                          py: 0.15,
-                          borderRadius: '999px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          color: readyColor,
-                          bgcolor: 'rgba(76, 175, 80, 0.18)',
-                          flexShrink: 0,
+                          color: secondaryText,
+                          fontWeight: 600,
+                          fontSize: '11.5px',
                         }}
                       >
-                        ⚡ {activeDelay} ms
-                      </Box>
-                    )}
+                        🌐 {t('layout.components.firstRun.activeNodeLabel')}
+                      </Typography>
+                      {proxyReady && activeDelay !== null && (
+                        <Box
+                          sx={{
+                            px: 0.85,
+                            py: 0.15,
+                            borderRadius: '999px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: readyColor,
+                            bgcolor: 'rgba(76, 175, 80, 0.18)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          ⚡ {activeDelay} ms
+                        </Box>
+                      )}
+                    </Box>
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: 'text.primary',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        lineHeight: 1.4,
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {activeNodeName}
+                    </Typography>
                   </Box>
                 )}
 
@@ -808,6 +852,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     color: starAccentColor,
                     mb: 0.5,
                     fontSize: '13.5px',
+                    lineHeight: 1.45,
                   }}
                 >
                   ⭐ {t('layout.components.firstRun.starTitle')}
@@ -852,31 +897,37 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             </DialogContent>
 
             <DialogActions
+              disableSpacing
               sx={{
-                px: 1.5,
+                flexDirection: 'column',
+                alignItems: 'center',
+                px: 1.75,
                 py: 1.5,
                 gap: 1,
                 borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <Button
-                sx={{
-                  ...get3DButtonStyle(theme, 'outlined', 'default'),
-                  whiteSpace: 'nowrap',
-                }}
-                onClick={handleFinish}
-              >
-                {t('layout.components.firstRun.finish')}
-              </Button>
-              <Button
+                fullWidth
                 sx={{
                   ...get3DButtonStyle(theme, 'contained', 'primary'),
-                  flex: 1,
-                  whiteSpace: 'nowrap',
+                  py: 0.85,
+                  fontSize: '13px',
                 }}
                 onClick={handleOpenGithubStarAndFinish}
               >
                 ⭐ {t('layout.components.firstRun.openGithubStar')}
+              </Button>
+              <Button
+                fullWidth
+                sx={{
+                  ...get3DButtonStyle(theme, 'outlined', 'default'),
+                  py: 0.7,
+                  fontSize: '12.5px',
+                }}
+                onClick={handleFinish}
+              >
+                {t('layout.components.firstRun.finish')}
               </Button>
             </DialogActions>
           </>
