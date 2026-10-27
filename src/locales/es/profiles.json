@@ -57,12 +57,12 @@
       "chooseFile": "Elegir archivo"
     },
     "menu": {
-      "copyLink": "Copiar enlace",
       "home": "Hogar",
       "select": "Usar",
       "shareQrCode": "Share QR Code",
       "editInfo": "Editar información",
       "editFile": "Editar archivo",
+      "copyLink": "Copiar enlace",
       "editRules": "Editar reglas",
       "editProxies": "Editar nodos",
       "extendConfig": "Configurar sobrescritura extendida",

@@ -1,10 +1,5 @@
 {
   "actions": {
-    "cut": "Cut",
-    "copy": "Copy",
-    "paste": "Paste",
-    "selectAll": "Select All",
-    "clearInput": "Clear",
     "cancel": "Cancel",
     "close": "Close",
     "confirm": "Confirm",
@@ -28,7 +23,12 @@
     "closeAll": "Close All",
     "clear": "Clear",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "clearInput": "Clear"
   },
   "labels": {
     "updateAt": "Update At",
@@ -84,19 +84,19 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
-      "clashNotReady": "Clash core is taking too long to load; auto node selection may be inaccurate",
       "importSuccess": "Profile Imported Successfully",
       "importSubscriptionSuccess": "Import subscription successful",
       "importWithClashProxy": "Profile Imported with Clash proxy",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
-        "deleteSuccess": "Deleted successfully",
         "copySuccess": "Copy Success",
         "saveSuccess": "Configuration saved successfully",
         "saveFailed": "Failed to save configuration",
-        "refreshFailed": "Refresh failed; showing last loaded value"
-      }
+        "refreshFailed": "Refresh failed; showing last loaded value",
+        "deleteSuccess": "Deleted successfully"
+      },
+      "clashNotReady": "Clash core is taking too long to load; auto node selection may be inaccurate"
     },
     "validation": {
       "config": {

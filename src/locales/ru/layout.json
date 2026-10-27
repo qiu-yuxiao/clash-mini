@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "Закрепить окно сверху",
+    "openSettings": "Открыть настройки",
+    "closeSettings": "Закрыть настройки",
+    "closeLogsDialog": "Закрыть диалог логов",
+    "selectLanguage": "Выбрать язык"
+  },
   "notices": {
     "adjustingProxyMode": "Переключение режима прокси, подождите…",
     "adjusting": "Выполняется настройка, подождите…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "Не удалось проверить обновления: {{message}}",
     "clientInstallCompleted": "Обновление установлено. Перезапустите приложение, чтобы применить изменения.",
     "clientUpdateFailed": "Ошибка обновления: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "Закрепить окно сверху",
-    "openSettings": "Открыть настройки",
-    "closeSettings": "Закрыть настройки",
-    "closeLogsDialog": "Закрыть диалог логов",
-    "selectLanguage": "Выбрать язык"
   }
 }

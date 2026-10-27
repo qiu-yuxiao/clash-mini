@@ -2,9 +2,6 @@
   "page": {
     "title": "Conexiones"
   },
-  "notices": {
-    "copied": "Copiado: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "Host",
@@ -30,6 +27,10 @@
       "closed": "Closed",
       "closeConnection": "Cerrar conexión"
     },
+    "columnManager": {
+      "title": "Columnas",
+      "dragHandle": "Drag handle"
+    },
     "miniTable": {
       "hostColumn": "Destino",
       "chainsColumn": "Ruta",
@@ -44,10 +45,9 @@
       "disconnect": "Desconectar esta conexión",
       "copyAddress": "Copiar dirección de conexión",
       "viewDetail": "Ver detalles"
-    },
-    "columnManager": {
-      "title": "Columnas",
-      "dragHandle": "Drag handle"
     }
+  },
+  "notices": {
+    "copied": "Copiado: {{address}}"
   }
 }

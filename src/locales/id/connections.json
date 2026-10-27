@@ -2,9 +2,6 @@
   "page": {
     "title": "Koneksi"
   },
-  "notices": {
-    "copied": "Tersalin: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "Host",
@@ -30,6 +27,10 @@
       "closed": "Closed",
       "closeConnection": "Tutup Koneksi"
     },
+    "columnManager": {
+      "title": "Kolom",
+      "dragHandle": "Drag handle"
+    },
     "miniTable": {
       "hostColumn": "Tujuan",
       "chainsColumn": "Rute",
@@ -44,10 +45,9 @@
       "disconnect": "Putuskan koneksi ini",
       "copyAddress": "Salin alamat koneksi",
       "viewDetail": "Lihat detail"
-    },
-    "columnManager": {
-      "title": "Kolom",
-      "dragHandle": "Drag handle"
     }
+  },
+  "notices": {
+    "copied": "Tersalin: {{address}}"
   }
 }

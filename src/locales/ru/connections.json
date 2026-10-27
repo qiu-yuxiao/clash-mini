@@ -2,9 +2,6 @@
   "page": {
     "title": "Соединения"
   },
-  "notices": {
-    "copied": "Скопировано: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "Хост",
@@ -30,6 +27,10 @@
       "closed": "Закрытые",
       "closeConnection": "Закрыть соединение"
     },
+    "columnManager": {
+      "title": "Столбцы",
+      "dragHandle": "Маркер перетаскивания"
+    },
     "miniTable": {
       "hostColumn": "Цель",
       "chainsColumn": "Маршрут",
@@ -44,10 +45,9 @@
       "disconnect": "Разорвать соединение",
       "copyAddress": "Копировать адрес соединения",
       "viewDetail": "Подробная информация"
-    },
-    "columnManager": {
-      "title": "Столбцы",
-      "dragHandle": "Маркер перетаскивания"
     }
+  },
+  "notices": {
+    "copied": "Скопировано: {{address}}"
   }
 }

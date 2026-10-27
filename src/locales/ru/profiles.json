@@ -57,12 +57,12 @@
       "chooseFile": "Выбрать файл"
     },
     "menu": {
-      "copyLink": "Копировать ссылку",
       "home": "Главная",
       "select": "Выбрать",
       "shareQrCode": "Share QR Code",
       "editInfo": "Изменить информацию",
       "editFile": "Изменить файл",
+      "copyLink": "Копировать ссылку",
       "editRules": "Редактировать правила",
       "editProxies": "Редактировать прокси",
       "extendConfig": "Изменить Merge-конфигурацию",

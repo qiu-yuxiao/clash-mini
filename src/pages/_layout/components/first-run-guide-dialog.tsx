@@ -20,7 +20,11 @@ import type React from 'react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { useAppData } from '@/providers/app-data-context'
+import {
+  useAppRefreshers,
+  useProxiesData,
+  useSystemData,
+} from '@/providers/app-data-context'
 import { NODE_DELAY_MAX_MS } from '@/services/delay'
 import {
   get3DCardStyle,
@@ -72,8 +76,10 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // ── 就绪判定：复用既有代理上下文，不新建测量链路 ──
-  const { proxies, sysproxy, refreshProxy } = useAppData()
+  // ── 就绪判定：复用细粒度代理与系统上下文，避免订阅全量 AppData 触发无关重绘 ──
+  const { proxies } = useProxiesData()
+  const { sysproxy } = useSystemData()
+  const { refreshProxy } = useAppRefreshers()
   // refreshProxy 的引用不保证稳定，用 ref 持有，避免写进轮询副作用依赖后反复重排
   const refreshProxyRef = useRef(refreshProxy)
   useEffect(() => {
@@ -82,12 +88,12 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 
   /** 活跃出口节点最近一次延迟（ms）；无数据返回 null */
   const activeDelay = useMemo(() => {
-    const group = proxies.groups.find((g) => g.name === 'PROXY')
+    const group = proxies?.groups.find((g) => g.name === 'PROXY')
     const activeName = group?.now
     if (!activeName) return null
     const node =
-      proxies.records[activeName] ??
-      proxies.proxies.find((p) => p.name === activeName)
+      proxies?.records[activeName] ??
+      proxies?.proxies.find((p) => p.name === activeName)
     const history = node?.history
     if (!history || history.length === 0) return null
     const delay = history[history.length - 1]?.delay
@@ -519,7 +525,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   </Typography>
                 </Box>
 
-                {!sysproxy.enable && (
+                {!sysproxy?.enable && (
                   <Typography
                     variant="body2"
                     sx={{

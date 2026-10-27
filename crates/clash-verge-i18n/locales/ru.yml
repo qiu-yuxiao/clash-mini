@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: Скорый выход
     body: Clash Mini скоро завершит работу.
-  appHidden:
-    title: Приложение скрыто
-    body: Clash Mini работает в фоновом режиме.
-service:
-  adminInstallPrompt: Для установки службы Clash Mini требуются права администратора.
-  adminUninstallPrompt: Для удаления службы Clash Mini требуются права администратора.

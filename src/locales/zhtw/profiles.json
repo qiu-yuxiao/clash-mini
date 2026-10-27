@@ -57,12 +57,12 @@
       "chooseFile": "選擇檔案"
     },
     "menu": {
-      "copyLink": "複製連結",
       "home": "首 頁",
       "select": "使用",
       "shareQrCode": "Share QR Code",
       "editInfo": "編輯資訊",
       "editFile": "編輯檔案",
+      "copyLink": "複製連結",
       "editRules": "編輯規則",
       "editProxies": "編輯節點",
       "extendConfig": "擴充覆寫設定",

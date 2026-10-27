@@ -2,9 +2,6 @@
   "page": {
     "title": "接続"
   },
-  "notices": {
-    "copied": "コピーしました: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "ホスト",
@@ -30,6 +27,10 @@
       "closed": "Closed",
       "closeConnection": "接続を閉じる"
     },
+    "columnManager": {
+      "title": "列",
+      "dragHandle": "Drag handle"
+    },
     "miniTable": {
       "hostColumn": "接続先",
       "chainsColumn": "経路",
@@ -44,10 +45,9 @@
       "disconnect": "この接続を切断",
       "copyAddress": "接続アドレスをコピー",
       "viewDetail": "詳細を表示"
-    },
-    "columnManager": {
-      "title": "列",
-      "dragHandle": "Drag handle"
     }
+  },
+  "notices": {
+    "copied": "コピーしました: {{address}}"
   }
 }

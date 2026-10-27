@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: 곧 종료
     body: Clash Mini가 곧 종료됩니다.
-  appHidden:
-    title: 앱이 숨겨짐
-    body: Clash Mini가 백그라운드에서 실행 중입니다.
-service:
-  adminInstallPrompt: Clash Mini 서비스 설치에는 관리자 권한이 필요합니다.
-  adminUninstallPrompt: Clash Mini 서비스 제거에는 관리자 권한이 필요합니다.

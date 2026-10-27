@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇 (partes modificadas)",
         "title": "Configuración de tema",
+        "copyright": "© 2026 秋雨潇潇 (partes modificadas)",
         "fields": {
           "primaryColor": "Color principal",
           "secondaryColor": "Color secundario",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "Haga clic para rotar al siguiente nodo",
-    "testingInProgress": "Prueba de velocidad en curso, inténtelo más tarde",
-    "testNotExecuted": "Prueba no ejecutada: el núcleo no está listo o no hay nodos disponibles",
-    "testFailed": "Error en la prueba de velocidad: {{message}}",
-    "updated": "Actualizado",
-    "portSaved": "Puerto proxy guardado y recargado",
     "profilesTitle": "Perfiles y Suscripciones",
     "importConfig": "Importar Configuración",
     "importPlaceholder": "Ingrese el enlace de suscripción o la configuración del nodo...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "Introduce las URL a proxy (una por línea)",
     "addUrlButton": "Añadir",
     "addUrlSuccess": "Se añadieron {{count}} reglas",
-    "addUrlNoChange": "No se añadieron reglas (ya existen o entrada no válida)"
+    "addUrlNoChange": "No se añadieron reglas (ya existen o entrada no válida)",
+    "rotateNodeTooltip": "Haga clic para rotar al siguiente nodo",
+    "testingInProgress": "Prueba de velocidad en curso, inténtelo más tarde",
+    "testNotExecuted": "Prueba no ejecutada: el núcleo no está listo o no hay nodos disponibles",
+    "testFailed": "Error en la prueba de velocidad: {{message}}",
+    "updated": "Actualizado",
+    "portSaved": "Puerto proxy guardado y recargado"
   }
 }

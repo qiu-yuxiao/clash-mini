@@ -1,10 +1,5 @@
 {
   "actions": {
-    "cut": "قص",
-    "copy": "نسخ",
-    "paste": "لصق",
-    "selectAll": "تحديد الكل",
-    "clearInput": "تفريغ",
     "cancel": "إلغاء",
     "close": "إغلاق",
     "confirm": "تأكيد",
@@ -28,7 +23,12 @@
     "closeAll": "إغلاق الكل",
     "clear": "مسح",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "cut": "قص",
+    "copy": "نسخ",
+    "paste": "لصق",
+    "selectAll": "تحديد الكل",
+    "clearInput": "تفريغ"
   },
   "labels": {
     "updateAt": "التحديث عند",
@@ -84,19 +84,19 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
-      "clashNotReady": "استغرقت نواة Clash وقتًا طويلًا في التحميل، قد يكون اختيار العقدة التلقائي غير دقيق",
       "importSuccess": "تم استيراد الملف الشخصي بنجاح",
       "importSubscriptionSuccess": "تم استيراد الاشتراك بنجاح",
       "importWithClashProxy": "Profile Imported with Clash proxy",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
-        "deleteSuccess": "تم الحذف بنجاح",
         "copySuccess": "تم النسخ بنجاح",
         "saveSuccess": "Configuration saved successfully",
         "saveFailed": "Failed to save configuration",
-        "refreshFailed": "فشل التحديث"
-      }
+        "refreshFailed": "فشل التحديث",
+        "deleteSuccess": "تم الحذف بنجاح"
+      },
+      "clashNotReady": "استغرقت نواة Clash وقتًا طويلًا في التحميل، قد يكون اختيار العقدة التلقائي غير دقيق"
     },
     "validation": {
       "config": {

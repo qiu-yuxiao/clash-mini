@@ -1,10 +1,5 @@
 {
   "actions": {
-    "cut": "Ausschneiden",
-    "copy": "Kopieren",
-    "paste": "Einfügen",
-    "selectAll": "Alles auswählen",
-    "clearInput": "Leeren",
     "cancel": "Abbrechen",
     "close": "Schließen",
     "confirm": "Bestätigen",
@@ -28,7 +23,12 @@
     "closeAll": "Alle schließen",
     "clear": "Löschen",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "cut": "Ausschneiden",
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "selectAll": "Alles auswählen",
+    "clearInput": "Leeren"
   },
   "labels": {
     "updateAt": "Aktualisiert am",
@@ -84,19 +84,19 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
-      "clashNotReady": "Clash-Core lädt verzögert, die automatische Knotenauswahl ist möglicherweise ungenau",
       "importSuccess": "Abonnement erfolgreich importiert",
       "importSubscriptionSuccess": "Abonnement erfolgreich importiert",
       "importWithClashProxy": "Abonnement mit Clash-Proxy importiert",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
-        "deleteSuccess": "Erfolgreich gelöscht",
         "copySuccess": "Kopieren erfolgreich",
         "saveSuccess": "Zufalls-Konfiguration erfolgreich gespeichert",
         "saveFailed": "Failed to save configuration",
-        "refreshFailed": "Aktualisierung fehlgeschlagen"
-      }
+        "refreshFailed": "Aktualisierung fehlgeschlagen",
+        "deleteSuccess": "Erfolgreich gelöscht"
+      },
+      "clashNotReady": "Clash-Core lädt verzögert, die automatische Knotenauswahl ist möglicherweise ungenau"
     },
     "validation": {
       "config": {

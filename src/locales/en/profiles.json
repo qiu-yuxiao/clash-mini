@@ -57,12 +57,12 @@
       "chooseFile": "Choose File"
     },
     "menu": {
-      "copyLink": "Copy Link",
       "home": "Home",
       "select": "Select",
       "shareQrCode": "Share QR Code",
       "editInfo": "Edit Info",
       "editFile": "Edit File",
+      "copyLink": "Copy Link",
       "editRules": "Edit Rules",
       "editProxies": "Edit Proxies",
       "extendConfig": "Extend Config",

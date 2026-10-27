@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: About to Exit
     body: Clash Mini is about to exit.
-  appHidden:
-    title: Application Hidden
-    body: Clash Mini is running in the background.
-service:
-  adminInstallPrompt: Installing the Clash Mini service requires administrator privileges.
-  adminUninstallPrompt: Uninstalling the Clash Mini service requires administrator privileges.

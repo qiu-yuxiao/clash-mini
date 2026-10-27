@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇 (değiştirilmiş bölümler)",
         "title": "Tema Ayarı",
+        "copyright": "© 2026 秋雨潇潇 (değiştirilmiş bölümler)",
         "fields": {
           "primaryColor": "Ana Renk",
           "secondaryColor": "İkincil Renk",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "Sonraki düğüme geçmek için tıklayın",
-    "testingInProgress": "Hız testi sürüyor, lütfen daha sonra tekrar deneyin",
-    "testNotExecuted": "Test yürütülmedi: çekirdek hazır değil veya test edilebilir düğüm yok",
-    "testFailed": "Hız testi başarısız: {{message}}",
-    "updated": "Güncellendi",
-    "portSaved": "Proxy bağlantı noktası kaydedildi ve yeniden yüklendi",
     "profilesTitle": "Profiller ve Abonelikler",
     "importConfig": "Yapılandırmayı İçe Aktar",
     "importPlaceholder": "Abonelik bağlantısını veya düğüm yapılandırmasını girin...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "Proxy'den geçirilecek URL'leri girin (satır başına bir tane)",
     "addUrlButton": "Ekle",
     "addUrlSuccess": "{{count}} kural eklendi",
-    "addUrlNoChange": "Kural eklenmedi (zaten var veya geçersiz giriş)"
+    "addUrlNoChange": "Kural eklenmedi (zaten var veya geçersiz giriş)",
+    "rotateNodeTooltip": "Sonraki düğüme geçmek için tıklayın",
+    "testingInProgress": "Hız testi sürüyor, lütfen daha sonra tekrar deneyin",
+    "testNotExecuted": "Test yürütülmedi: çekirdek hazır değil veya test edilebilir düğüm yok",
+    "testFailed": "Hız testi başarısız: {{message}}",
+    "updated": "Güncellendi",
+    "portSaved": "Proxy bağlantı noktası kaydedildi ve yeniden yüklendi"
   }
 }

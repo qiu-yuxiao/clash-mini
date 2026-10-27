@@ -57,12 +57,12 @@
       "chooseFile": "Datei auswählen"
     },
     "menu": {
-      "copyLink": "Link kopieren",
       "home": "Startseite",
       "select": "Verwenden",
       "shareQrCode": "Share QR Code",
       "editInfo": "Informationen bearbeiten",
       "editFile": "Datei bearbeiten",
+      "copyLink": "Link kopieren",
       "editRules": "Regeln bearbeiten",
       "editProxies": "Knoten bearbeiten",
       "extendConfig": "Erweiterte Überdeckungskonfiguration",

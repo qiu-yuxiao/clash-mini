@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇 (bagian yang dimodifikasi)",
         "title": "Pengaturan Tema",
+        "copyright": "© 2026 秋雨潇潇 (bagian yang dimodifikasi)",
         "fields": {
           "primaryColor": "Warna Utama",
           "secondaryColor": "Warna Sekunder",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "Klik untuk beralih ke node berikutnya",
-    "testingInProgress": "Pengujian kecepatan sedang berlangsung, coba lagi nanti",
-    "testNotExecuted": "Pengujian tidak dijalankan: inti belum siap atau tidak ada node yang bisa diuji",
-    "testFailed": "Pengujian kecepatan gagal: {{message}}",
-    "updated": "Diperbarui",
-    "portSaved": "Port proksi disimpan dan dimuat ulang",
     "profilesTitle": "Profil & Langganan",
     "importConfig": "Impor Konfigurasi",
     "importPlaceholder": "Masukkan tautan langganan atau konfigurasi node...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "Masukkan URL untuk proxy (satu per baris)",
     "addUrlButton": "Tambah",
     "addUrlSuccess": "{{count}} aturan ditambahkan",
-    "addUrlNoChange": "Tidak ada aturan yang ditambahkan (sudah ada atau input tidak valid)"
+    "addUrlNoChange": "Tidak ada aturan yang ditambahkan (sudah ada atau input tidak valid)",
+    "rotateNodeTooltip": "Klik untuk beralih ke node berikutnya",
+    "testingInProgress": "Pengujian kecepatan sedang berlangsung, coba lagi nanti",
+    "testNotExecuted": "Pengujian tidak dijalankan: inti belum siap atau tidak ada node yang bisa diuji",
+    "testFailed": "Pengujian kecepatan gagal: {{message}}",
+    "updated": "Diperbarui",
+    "portSaved": "Port proksi disimpan dan dimuat ulang"
   }
 }

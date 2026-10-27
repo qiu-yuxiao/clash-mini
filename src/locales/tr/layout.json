@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "Pencereyi üstte sabitle",
+    "openSettings": "Ayarları aç",
+    "closeSettings": "Ayarları kapat",
+    "closeLogsDialog": "Günlük iletişim kutusunu kapat",
+    "selectLanguage": "Dil seç"
+  },
   "notices": {
     "adjustingProxyMode": "Proxy modu ayarlanıyor, lütfen bekleyin…",
     "adjusting": "Ayarlanıyor, lütfen bekleyin…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "Güncellemeler kontrol edilemedi: {{message}}",
     "clientInstallCompleted": "Güncelleme kuruldu. Değişiklikleri uygulamak için uygulamayı yeniden başlatın.",
     "clientUpdateFailed": "Güncelleme başarısız: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "Pencereyi üstte sabitle",
-    "openSettings": "Ayarları aç",
-    "closeSettings": "Ayarları kapat",
-    "closeLogsDialog": "Günlük iletişim kutusunu kapat",
-    "selectLanguage": "Dil seç"
   }
 }

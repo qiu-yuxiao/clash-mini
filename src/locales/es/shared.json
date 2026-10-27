@@ -1,10 +1,5 @@
 {
   "actions": {
-    "cut": "Cortar",
-    "copy": "Copiar",
-    "paste": "Pegar",
-    "selectAll": "Seleccionar todo",
-    "clearInput": "Vaciar",
     "cancel": "Cancelar",
     "close": "Cerrar",
     "confirm": "Confirmar",
@@ -28,7 +23,12 @@
     "closeAll": "Cerrar todas",
     "clear": "Limpiar",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "cut": "Cortar",
+    "copy": "Copiar",
+    "paste": "Pegar",
+    "selectAll": "Seleccionar todo",
+    "clearInput": "Vaciar"
   },
   "labels": {
     "updateAt": "Actualizado el",
@@ -84,19 +84,19 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
-      "clashNotReady": "El núcleo de Clash tarda en cargar, la selección automática de nodos puede ser imprecisa",
       "importSuccess": "Suscripción importada con éxito",
       "importSubscriptionSuccess": "Suscripción importada con éxito",
       "importWithClashProxy": "Suscripción importada con el proxy de Clash",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
-        "deleteSuccess": "Eliminado correctamente",
         "copySuccess": "Copia exitosa",
         "saveSuccess": "Configuración aleatoria guardada correctamente",
         "saveFailed": "Failed to save configuration",
-        "refreshFailed": "Error al actualizar"
-      }
+        "refreshFailed": "Error al actualizar",
+        "deleteSuccess": "Eliminado correctamente"
+      },
+      "clashNotReady": "El núcleo de Clash tarda en cargar, la selección automática de nodos puede ser imprecisa"
     },
     "validation": {
       "config": {

@@ -671,6 +671,7 @@ flowchart LR
 | **BUG-302** | 3.7 | `dns.fallback` 配置 `8.8.8.8` 或 `dns.google` 时，内核 DoH 解析并发轮询至其对偶辅 IP `8.8.4.4:443`，因缺少规则漏入 `MATCH,DIRECT` 触发直连 i/o timeout 告警。修复：`dns_fallback_proxy_rules` 针对知名公共 DNS（Google 8.8.8.8 ↔ 8.8.4.4、Cloudflare 1.1.1.1 ↔ 1.0.0.1）自动对偶注入辅 IP 规则，域名型上游同步注入 `DOMAIN,<host>,PROXY` 与已知固定落地 IP，彻底消灭 DoH 上游漏入直连超时 |
 | **BUG-303** | 5.6 | 延迟呈现三级真源与节点延迟多订阅：根除「已断流节点仍显示绿色历史延迟」与「列表收不到更新永久卡旧值」 |
 | **BUG-304** | 5.6 | 节点判死阈值与批量测速超时 2000ms → 5000ms：链路拥塞簇内 TCP 握手即需 1.1~2.1s（现场双路对照实证），叠加 TLS 与 204 往返后活节点总耗时超 2s 被整组误判断流；5s 预算覆盖拥塞期「慢而可用」节点，真死节点 5s 内同样超时。单一真源 `NODE_DELAY_MAX_MS` 同步驱动测速超时、判死阈值与有效延迟区间 |
+| **BUG-305** | 1.3 / 2.4 / 3.1 / 5.1 | 全栈收尾审计治理（F-01~F-07, FE-01~FE-10）：① 关闭 TUN 时附加 `UpdateFlags::RESTART_CORE` 彻底释放系统服务切回 Sidecar（消除前端开启 TUN 时重复 `restartCore`）；② `setup_wm_sizing_hook` 迁入 `build_new_window` 并按 `HOOKED_HWND` 判重，根治冷启动时序竞态与轻量模式重建窗口失灵；③ 单例唤醒补齐 `clash-mini:`/`clash-verge:` 匹配与 `.query()` 百分比编码；④ `get_proxy_addr` 改用强类型派生结构体单次反序列化；⑤ 剥离零引用的 Monaco 编辑器子系统（前端 `dist` 缩减 >4.4MB）及 16 个无用 npm 依赖，延迟 Hook 惰性初始化消除卡片首帧双重重绘，清理 52 处孤立后端 i18n 键 |
 
 ---
 

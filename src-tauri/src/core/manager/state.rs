@@ -160,10 +160,10 @@ impl CoreManager {
                 Type::Core,
                 "Scanning and killing leftover mini-mihomo processes..."
             );
-            // 注意：每次调用都重新创建 System 实例，虽然有一定开销，
-            // 但此函数为低频调用（仅在启动/停止核心时触发），
-            // 且准确性优先于性能——每次重新扫描确保能捕获到最新的进程状态。
-            let system = sysinfo::System::new_all();
+            // 仅扫描进程列表，避免 System::new_all() 额外枚举磁盘、网卡、传感器与全量硬件信息带来的 50~150ms 阻塞
+            let system = sysinfo::System::new_with_specifics(
+                sysinfo::RefreshKind::nothing().with_processes(sysinfo::ProcessRefreshKind::nothing()),
+            );
             for (pid, process) in system.processes() {
                 let name = process.name();
                 let name_str = name.to_string_lossy();

@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: در آستانه خروج
     body: Clash Mini در آستانه خروج است.
-  appHidden:
-    title: برنامه پنهان شد
-    body: Clash Mini در پس‌زمینه در حال اجراست.
-service:
-  adminInstallPrompt: نصب سرویس Clash Mini به دسترسی مدیر نیاز دارد.
-  adminUninstallPrompt: حذف سرویس Clash Mini به دسترسی مدیر نیاز دارد.

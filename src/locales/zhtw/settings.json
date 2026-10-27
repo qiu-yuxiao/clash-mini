@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇 (修改部分)",
         "title": "主題設定",
+        "copyright": "© 2026 秋雨潇潇 (修改部分)",
         "fields": {
           "primaryColor": "主要顏色",
           "secondaryColor": "次要顏色",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "點擊輪換下一個節點",
-    "testingInProgress": "正在測速中，請稍候再試",
-    "testNotExecuted": "測速未執行：核心未就緒或暫無可測節點",
-    "testFailed": "測速失敗：{{message}}",
-    "updated": "已更新",
-    "portSaved": "代理連接埠已儲存並重新載入",
     "profilesTitle": "訂閱与機場配置",
     "importConfig": "導入節點信息",
     "importPlaceholder": "填入訂閱鏈接/節點配置...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "請填入需要代理的網址（每行一個）",
     "addUrlButton": "新增",
     "addUrlSuccess": "已新增 {{count}} 條規則",
-    "addUrlNoChange": "沒有新增規則（可能已存在或輸入無效）"
+    "addUrlNoChange": "沒有新增規則（可能已存在或輸入無效）",
+    "rotateNodeTooltip": "點擊輪換下一個節點",
+    "testingInProgress": "正在測速中，請稍候再試",
+    "testNotExecuted": "測速未執行：核心未就緒或暫無可測節點",
+    "testFailed": "測速失敗：{{message}}",
+    "updated": "已更新",
+    "portSaved": "代理連接埠已儲存並重新載入"
   }
 }

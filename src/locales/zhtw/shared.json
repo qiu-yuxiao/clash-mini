@@ -1,10 +1,5 @@
 {
   "actions": {
-    "cut": "剪下",
-    "copy": "複製",
-    "paste": "貼上",
-    "selectAll": "全選",
-    "clearInput": "清空",
     "cancel": "取消",
     "close": "關閉",
     "confirm": "確認",
@@ -28,7 +23,12 @@
     "closeAll": "關閉全部",
     "clear": "清除",
     "previous": "上一頁",
-    "next": "下一頁"
+    "next": "下一頁",
+    "cut": "剪下",
+    "copy": "複製",
+    "paste": "貼上",
+    "selectAll": "全選",
+    "clearInput": "清空"
   },
   "labels": {
     "updateAt": "更新於",
@@ -84,19 +84,19 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
-      "clashNotReady": "Clash 核心載入逾時，自動選點可能不準確",
       "importSuccess": "匯入設定檔成功",
       "importSubscriptionSuccess": "匯入訂閱成功",
       "importWithClashProxy": "使用 Clash 代理匯入訂閱成功",
       "updateAvailable": "有可用更新",
       "saved": "儲存成功",
       "common": {
-        "deleteSuccess": "刪除成功",
         "copySuccess": "複製成功",
         "saveSuccess": "設定儲存完成",
         "saveFailed": "設定儲存失敗",
-        "refreshFailed": "重整失敗"
-      }
+        "refreshFailed": "重整失敗",
+        "deleteSuccess": "刪除成功"
+      },
+      "clashNotReady": "Clash 核心載入逾時，自動選點可能不準確"
     },
     "validation": {
       "config": {

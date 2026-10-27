@@ -2,9 +2,6 @@
   "page": {
     "title": "اتصالات"
   },
-  "notices": {
-    "copied": "کپی شد: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "میزبان",
@@ -30,6 +27,10 @@
       "closed": "Closed",
       "closeConnection": "بستن اتصال"
     },
+    "columnManager": {
+      "title": "ستون‌ها",
+      "dragHandle": "Drag handle"
+    },
     "miniTable": {
       "hostColumn": "مقصد",
       "chainsColumn": "مسیر",
@@ -44,10 +45,9 @@
       "disconnect": "قطع این اتصال",
       "copyAddress": "کپی نشانی اتصال",
       "viewDetail": "مشاهده جزئیات"
-    },
-    "columnManager": {
-      "title": "ستون‌ها",
-      "dragHandle": "Drag handle"
     }
+  },
+  "notices": {
+    "copied": "کپی شد: {{address}}"
   }
 }

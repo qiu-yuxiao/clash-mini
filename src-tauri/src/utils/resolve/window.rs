@@ -139,6 +139,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
             // 生效的前提；可见边框由 tao 的 WM_NCCALCSIZE 子类化消除（decorations=false 时 insets=0）。
             strip_caption_style(&window);
             force_set_window_outer_size(&window, win_w, win_h);
+            setup_wm_sizing_hook(&window);
 
             // 超时兜底：如果页面加载超时（默认 10 秒），强制显示窗口
             // 避免页面加载卡住导致用户看不到窗口
@@ -286,5 +287,119 @@ fn force_set_window_outer_size(window: &WebviewWindow, width: f64, height: f64) 
             dpi,
             scale
         );
+    }
+}
+
+static OLD_WNDPROC: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
+    std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
+static HOOKED_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
+/// 安装 WM_SIZING 消息处理器，防止上边缘缩放到最小高度后窗口 Y 坐标继续下移。
+///
+/// 标准 WM_GETMINMAXINFO 只钳制尺寸不钳制位置，而上边缘缩放时 Windows 会持续增加 Y 坐标，
+/// 导致窗口缩到最小时整体向下平移。WM_SIZING 在系统应用矩形之前给出提议矩形，在此处
+/// 同时钳制尺寸和 Y 位置可根除该问题。
+pub(crate) fn setup_wm_sizing_hook(window: &WebviewWindow) {
+    use raw_window_handle::HasWindowHandle as _;
+    use std::sync::atomic::Ordering;
+    use windows::Win32::UI::WindowsAndMessaging::{GWLP_WNDPROC, SetWindowLongPtrW};
+
+    let handle = match window.window_handle() {
+        Ok(h) => h,
+        Err(_) => return,
+    };
+
+    let hwnd = match handle.as_raw() {
+        raw_window_handle::RawWindowHandle::Win32(h) => {
+            windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
+        }
+        _ => return,
+    };
+
+    // 按 HWND 重入保护：
+    // 1. 同一窗口在 RunEvent::Resumed（系统睡眠恢复）重复调用时跳过，防止 OLD_WNDPROC
+    //    被覆盖为 sizing_wndproc 自身地址导致无限递归；
+    // 2. 轻量模式销毁旧窗口并重建新窗口时，新 HWND 与旧 HWND 不同，允许为新窗口重新安装钩子。
+    let hwnd_val = hwnd.0 as isize;
+    if hwnd_val == 0 || HOOKED_HWND.load(Ordering::Acquire) == hwnd_val {
+        return;
+    }
+
+    unsafe {
+        let new_proc = Some(sizing_wndproc as unsafe extern "system" fn(_, _, _, _) -> _);
+        let old_proc_val = SetWindowLongPtrW(
+            hwnd,
+            GWLP_WNDPROC,
+            std::mem::transmute::<
+                Option<
+                    unsafe extern "system" fn(
+                        windows::Win32::Foundation::HWND,
+                        u32,
+                        windows::Win32::Foundation::WPARAM,
+                        windows::Win32::Foundation::LPARAM,
+                    ) -> windows::Win32::Foundation::LRESULT,
+                >,
+                isize,
+            >(new_proc),
+        );
+        if old_proc_val != 0 {
+            OLD_WNDPROC.store(old_proc_val as *mut _, Ordering::Release);
+            HOOKED_HWND.store(hwnd_val, Ordering::Release);
+        }
+    }
+}
+
+/// WM_SIZING 子类化窗口过程。
+/// 拦截上边缘缩放（WMSZ_TOP / WMSZ_TOPLEFT / WMSZ_TOPRIGHT），
+/// 当提议高度小于最小尺寸时，修正 rect.top，使窗口位置和高度同时被钳制。
+unsafe extern "system" fn sizing_wndproc(
+    hwnd: windows::Win32::Foundation::HWND,
+    msg: u32,
+    wparam: windows::Win32::Foundation::WPARAM,
+    lparam: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::LRESULT {
+    use std::sync::atomic::Ordering;
+    use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+    use windows::Win32::UI::HiDpi::GetDpiForWindow;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallWindowProcW, DefWindowProcW, WM_SIZING, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT,
+    };
+
+    if msg == WM_SIZING {
+        let side = wparam.0 as u32;
+        if side == WMSZ_TOP || side == WMSZ_TOPLEFT || side == WMSZ_TOPRIGHT {
+            // SAFETY: lparam 在 WM_SIZING 消息中指向有效的 RECT 结构
+            unsafe {
+                let rect = &mut *(lparam.0 as *mut windows::Win32::Foundation::RECT);
+                let dpi = GetDpiForWindow(hwnd);
+                let scale = (dpi as f64) / 96.0;
+                let min_height_px = (MINIMAL_HEIGHT * scale).round() as i32;
+                let height = rect.bottom - rect.top;
+                if height < min_height_px {
+                    rect.top = rect.bottom - min_height_px;
+                    return windows::Win32::Foundation::LRESULT(1);
+                }
+            }
+        }
+    }
+
+    let old_proc = OLD_WNDPROC.load(Ordering::Acquire);
+    if !old_proc.is_null() {
+        // SAFETY: old_proc 是之前 SetWindowLongPtrW 返回的有效窗口过程
+        unsafe {
+            CallWindowProcW(
+                Some(std::mem::transmute::<
+                    *mut std::ffi::c_void,
+                    unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> windows::Win32::Foundation::LRESULT,
+                >(old_proc)),
+                hwnd,
+                msg,
+                wparam,
+                lparam,
+            )
+        }
+    } else {
+        // SAFETY: DefWindowProcW 是默认窗口过程，对所有参数安全
+        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 }

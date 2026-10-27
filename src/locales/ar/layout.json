@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "تثبيت النافذة في الأعلى",
+    "openSettings": "فتح الإعدادات",
+    "closeSettings": "إغلاق الإعدادات",
+    "closeLogsDialog": "إغلاق مربع حوار السجلات",
+    "selectLanguage": "اختر اللغة"
+  },
   "notices": {
     "adjustingProxyMode": "جارٍ تعديل وضع البروكسي، يرجى الانتظار…",
     "adjusting": "جارٍ التعديل، يرجى الانتظار…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "فشل التحقق من التحديثات: {{message}}",
     "clientInstallCompleted": "تم تثبيت التحديث. أعد تشغيل التطبيق لتطبيق التغييرات.",
     "clientUpdateFailed": "فشل التحديث: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "تثبيت النافذة في الأعلى",
-    "openSettings": "فتح الإعدادات",
-    "closeSettings": "إغلاق الإعدادات",
-    "closeLogsDialog": "إغلاق مربع حوار السجلات",
-    "selectLanguage": "اختر اللغة"
   }
 }

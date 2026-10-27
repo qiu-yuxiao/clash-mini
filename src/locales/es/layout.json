@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "Fijar ventana arriba",
+    "openSettings": "Abrir configuración",
+    "closeSettings": "Cerrar configuración",
+    "closeLogsDialog": "Cerrar diálogo de registros",
+    "selectLanguage": "Seleccionar idioma"
+  },
   "notices": {
     "adjustingProxyMode": "Ajustando el modo proxy, espere…",
     "adjusting": "Ajustando, espere…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "Error al buscar actualizaciones: {{message}}",
     "clientInstallCompleted": "Actualización instalada. Reinicie la aplicación para aplicar los cambios.",
     "clientUpdateFailed": "Error al actualizar: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "Fijar ventana arriba",
-    "openSettings": "Abrir configuración",
-    "closeSettings": "Cerrar configuración",
-    "closeLogsDialog": "Cerrar diálogo de registros",
-    "selectLanguage": "Seleccionar idioma"
   }
 }

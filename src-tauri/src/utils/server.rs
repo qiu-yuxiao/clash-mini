@@ -55,9 +55,16 @@ pub async fn check_singleton() -> Result<()> {
             let argvs: Vec<std::string::String> = std::env::args().collect();
             if argvs.len() > 1 {
                 let param = argvs[1].as_str();
-                if param.starts_with("clash:") {
+                if param.starts_with("clash:") || param.starts_with("clash-mini:") || param.starts_with("clash-verge:")
+                {
                     client
-                        .get(format!("http://127.0.0.1:{port}/commands/scheme?param={param}"))
+                        .get(format!("http://127.0.0.1:{port}/commands/scheme"))
+                        .query(&[("param", param)])
+                        .send()
+                        .await?;
+                } else if param != "--silent" {
+                    client
+                        .get(format!("http://127.0.0.1:{port}/commands/visible"))
                         .send()
                         .await?;
                 }

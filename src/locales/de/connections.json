@@ -2,9 +2,6 @@
   "page": {
     "title": "Verbindungen"
   },
-  "notices": {
-    "copied": "Kopiert: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "Host",
@@ -30,6 +27,10 @@
       "closed": "Closed",
       "closeConnection": "Verbindung schließen"
     },
+    "columnManager": {
+      "title": "Spalten",
+      "dragHandle": "Drag handle"
+    },
     "miniTable": {
       "hostColumn": "Ziel",
       "chainsColumn": "Route",
@@ -44,10 +45,9 @@
       "disconnect": "Verbindung trennen",
       "copyAddress": "Verbindungsadresse kopieren",
       "viewDetail": "Details anzeigen"
-    },
-    "columnManager": {
-      "title": "Spalten",
-      "dragHandle": "Drag handle"
     }
+  },
+  "notices": {
+    "copied": "Kopiert: {{address}}"
   }
 }

@@ -99,7 +99,7 @@ bitflags! {
      }
 }
 
-fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
+fn determine_update_flags(old_config: &IVerge, patch: &IVerge) -> UpdateFlags {
     let tun_mode = patch.enable_tun_mode;
     let auto_launch = patch.enable_auto_launch;
     let system_proxy = patch.enable_system_proxy;
@@ -126,12 +126,34 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     let rule_fallback = &patch.rule_fallback;
     let enable_builtin_enhanced = patch.enable_builtin_enhanced;
 
+    // 契约 1.3：TUN 模式与系统服务生命周期严格绑定。
+    // 开启 TUN 时需切入 Service 模式，关闭 TUN 时必须停止系统服务中的内核并切回用户态 Sidecar。
+    let current_tun = old_config.enable_tun_mode.unwrap_or(false);
+    let tun_changed = match tun_mode {
+        Some(true) => {
+            !current_tun
+                || !matches!(
+                    *CoreManager::global().get_running_mode(),
+                    crate::core::manager::RunningMode::Service
+                )
+        }
+        Some(false) => {
+            current_tun
+                || matches!(
+                    *CoreManager::global().get_running_mode(),
+                    crate::core::manager::RunningMode::Service
+                )
+        }
+        None => false,
+    };
+
     let restart_core_needed = socks_enabled.is_some()
         || http_enabled.is_some()
         || socks_port.is_some()
         || http_port.is_some()
         || mixed_port.is_some()
-        || enable_external_controller.is_some();
+        || enable_external_controller.is_some()
+        || tun_changed;
 
     let mut update_flags = UpdateFlags::empty();
     if restart_core_needed {
@@ -174,24 +196,29 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
 
 #[allow(clippy::cognitive_complexity)]
 async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> Result<()> {
-    // Process updates based on flags
-    if update_flags.contains(UpdateFlags::RESTART_CORE) {
-        Config::generate().await?;
-        CoreManager::global().restart_core().await?;
-    }
-    // SYS_PROXY 必须在 CLASH_CONFIG（TUN 重载）之前执行，原因：
-    // 1. 退场顺序：切换到 TUN 模式时，必须先清除 OS 系统代理，再启动 TUN 网卡，
-    //    否则存在双重流量接管的冲突时间窗口。
-    // 2. 异常隔离：若 CLASH_CONFIG（内核重载/TUN 适配器提权）报错并经 `?` 向上传播，
-    //    将导致此处之后的所有步骤被跳过。将 SYS_PROXY 提前可确保代理清理在任何
-    //    内核错误之前完成，不会因其他步骤失败而被遗漏残留在 OS 注册表中。
-    // 注：对于端口变更场景（RESTART_CORE + SYS_PROXY），RESTART_CORE 仍在本块之前，
-    //    顺序依然正确（先重启内核监听新端口，再更新 OS 代理指向新端口）。
-    if update_flags.contains(UpdateFlags::SYS_PROXY) {
+    // 1. 退场顺序：当关闭 OS 系统代理（如切换至 TUN 或手动模式）时，必须先清除 OS 系统代理，
+    //    再执行内核重启/TUN 网卡拉起，消除双重流量接管冲突窗口；且若后续内核启动报错，
+    //    OS 代理也已先行清理完毕，不会残留在注册表中。
+    // 2. 入场顺序：当开启 OS 系统代理（如从 TUN 切回系统代理）或变更混合端口时，
+    //    先执行 RESTART_CORE 让 Sidecar 内核就绪监听端口，再将 OS 系统代理指向该端口。
+    let disable_sys_proxy_first =
+        update_flags.contains(UpdateFlags::SYS_PROXY) && patch.enable_system_proxy == Some(false);
+    if disable_sys_proxy_first {
         sysopt::Sysopt::global().update_sysproxy().await?;
         sysopt::Sysopt::global().refresh_guard().await;
     }
-    if update_flags.contains(UpdateFlags::CLASH_CONFIG) {
+
+    if update_flags.contains(UpdateFlags::RESTART_CORE) {
+        Config::generate().await?;
+        CoreManager::global().restart_core().await?;
+        Config::runtime().await.apply();
+    }
+
+    if update_flags.contains(UpdateFlags::SYS_PROXY) && !disable_sys_proxy_first {
+        sysopt::Sysopt::global().update_sysproxy().await?;
+        sysopt::Sysopt::global().refresh_guard().await;
+    }
+    if update_flags.contains(UpdateFlags::CLASH_CONFIG) && !update_flags.contains(UpdateFlags::RESTART_CORE) {
         CoreManager::global().update_config_checked().await?;
         handle::Handle::refresh_clash();
     }
@@ -244,7 +271,7 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
 
     Config::verge().await.edit_draft(|d| d.patch_config(patch));
 
-    let update_flags = determine_update_flags(patch);
+    let update_flags = determine_update_flags(&old_config, patch);
     logging!(debug, Type::Setup, "Determined update flags: {:?}", update_flags);
     let process_flag_result = process_terminated_flags(update_flags, patch).await;
 

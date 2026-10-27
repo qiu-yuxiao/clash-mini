@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "Fenster oben anheften",
+    "openSettings": "Einstellungen öffnen",
+    "closeSettings": "Einstellungen schließen",
+    "closeLogsDialog": "Protokolldialog schließen",
+    "selectLanguage": "Sprache auswählen"
+  },
   "notices": {
     "adjustingProxyMode": "Proxy-Modus wird angepasst, bitte warten…",
     "adjusting": "Anpassung läuft, bitte warten…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "Update-Prüfung fehlgeschlagen: {{message}}",
     "clientInstallCompleted": "Update installiert. Bitte App neu starten, um die Änderungen zu übernehmen.",
     "clientUpdateFailed": "Update fehlgeschlagen: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "Fenster oben anheften",
-    "openSettings": "Einstellungen öffnen",
-    "closeSettings": "Einstellungen schließen",
-    "closeLogsDialog": "Protokolldialog schließen",
-    "selectLanguage": "Sprache auswählen"
   }
 }

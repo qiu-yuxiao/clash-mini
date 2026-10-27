@@ -2,9 +2,6 @@
   "page": {
     "title": "Bağlantılar"
   },
-  "notices": {
-    "copied": "Kopyalandı: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "Ana Bilgisayar",
@@ -30,6 +27,10 @@
       "closed": "Closed",
       "closeConnection": "Bağlantıyı Kapat"
     },
+    "columnManager": {
+      "title": "Sütunlar",
+      "dragHandle": "Drag handle"
+    },
     "miniTable": {
       "hostColumn": "Hedef",
       "chainsColumn": "Rota",
@@ -44,10 +45,9 @@
       "disconnect": "Bu bağlantıyı kes",
       "copyAddress": "Bağlantı adresini kopyala",
       "viewDetail": "Ayrıntıları görüntüle"
-    },
-    "columnManager": {
-      "title": "Sütunlar",
-      "dragHandle": "Drag handle"
     }
+  },
+  "notices": {
+    "copied": "Kopyalandı: {{address}}"
   }
 }

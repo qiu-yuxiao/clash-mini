@@ -13,7 +13,7 @@ export default defineConfig({
     svgr(),
     react(),
     legacy({
-      modernTargets: ['edge>=109', 'safari>=14'],
+      modernTargets: ['edge>=109'],
       renderLegacyChunks: false,
       modernPolyfills: ['es.object.has-own', 'web.structured-clone'],
       additionalModernPolyfills: [

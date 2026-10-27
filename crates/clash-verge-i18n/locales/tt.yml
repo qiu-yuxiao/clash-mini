@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: Чыгар алдыннан
     body: Clash Mini чыгарга җыена.
-  appHidden:
-    title: Кушымта яшерелде
-    body: Clash Mini фон режимында эшли.
-service:
-  adminInstallPrompt: Clash Mini хезмәтен урнаштыру өчен администратор хокуклары кирәк.
-  adminUninstallPrompt: Clash Mini хезмәтен бетерү өчен администратор хокуклары кирәк.

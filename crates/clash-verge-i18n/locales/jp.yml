@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: 終了間近
     body: Clash Mini はまもなく終了します。
-  appHidden:
-    title: アプリが非表示
-    body: Clash Mini はバックグラウンドで実行中です。
-service:
-  adminInstallPrompt: Clash Mini サービスのインストールには管理者権限が必要です。
-  adminUninstallPrompt: Clash Mini サービスのアンインストールには管理者権限が必要です。

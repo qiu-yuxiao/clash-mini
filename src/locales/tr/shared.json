@@ -1,10 +1,5 @@
 {
   "actions": {
-    "cut": "Kes",
-    "copy": "Kopyala",
-    "paste": "Yapıştır",
-    "selectAll": "Tümünü Seç",
-    "clearInput": "Temizle",
     "cancel": "İptal",
     "close": "Kapat",
     "confirm": "Onayla",
@@ -28,7 +23,12 @@
     "closeAll": "Tümünü Kapat",
     "clear": "Temizle",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "cut": "Kes",
+    "copy": "Kopyala",
+    "paste": "Yapıştır",
+    "selectAll": "Tümünü Seç",
+    "clearInput": "Temizle"
   },
   "labels": {
     "updateAt": "Güncelleme Zamanı",
@@ -84,19 +84,19 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
-      "clashNotReady": "Clash çekirdeği yavaş yükleniyor, otomatik düğüm seçimi yanlış olabilir",
       "importSuccess": "Profil Başarıyla İçe Aktarıldı",
       "importSubscriptionSuccess": "Abonelik içe aktarımı başarılı",
       "importWithClashProxy": "Profil Clash vekil ile içe aktarıldı",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
-        "deleteSuccess": "Silme başarılı",
         "copySuccess": "Kopyalama Başarılı",
         "saveSuccess": "Configuration saved successfully",
         "saveFailed": "Failed to save configuration",
-        "refreshFailed": "Yenileme başarısız"
-      }
+        "refreshFailed": "Yenileme başarısız",
+        "deleteSuccess": "Silme başarılı"
+      },
+      "clashNotReady": "Clash çekirdeği yavaş yükleniyor, otomatik düğüm seçimi yanlış olabilir"
     },
     "validation": {
       "config": {

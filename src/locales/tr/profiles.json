@@ -57,12 +57,12 @@
       "chooseFile": "Dosya Seç"
     },
     "menu": {
-      "copyLink": "Bağlantıyı kopyala",
       "home": "Ana Sayfa",
       "select": "Seç",
       "shareQrCode": "Share QR Code",
       "editInfo": "Bilgileri Düzenle",
       "editFile": "Dosyayı Düzenle",
+      "copyLink": "Bağlantıyı kopyala",
       "editRules": "Kuralları Düzenle",
       "editProxies": "Vekil'leri Düzenle",
       "extendConfig": "Yapılandırma Genişletme",

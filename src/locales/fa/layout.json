@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "پین کردن پنجره در بالا",
+    "openSettings": "باز کردن تنظیمات",
+    "closeSettings": "بستن تنظیمات",
+    "closeLogsDialog": "بستن گفتگوی گزارش‌ها",
+    "selectLanguage": "انتخاب زبان"
+  },
   "notices": {
     "adjustingProxyMode": "در حال تنظیم حالت پروکسی، لطفاً منتظر بمانید…",
     "adjusting": "در حال تنظیم، لطفاً منتظر بمانید…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "بررسی به‌روزرسانی ناموفق بود: {{message}}",
     "clientInstallCompleted": "به‌روزرسانی نصب شد. برای اعمال تغییرات، برنامه را راه‌اندازی مجدد کنید.",
     "clientUpdateFailed": "به‌روزرسانی ناموفق بود: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "پین کردن پنجره در بالا",
-    "openSettings": "باز کردن تنظیمات",
-    "closeSettings": "بستن تنظیمات",
-    "closeLogsDialog": "بستن گفتگوی گزارش‌ها",
-    "selectLanguage": "انتخاب زبان"
   }
 }

@@ -58,7 +58,6 @@ import {
   getProfiles,
   patchProfile,
   viewProfile,
-  restartCore,
   triggerAutoSelect,
   beginLongOperation,
   endLongOperation,
@@ -201,7 +200,7 @@ const Layout = () => {
 
   const mode = useThemeMode()
   const { t } = useTranslation()
-  const { theme } = useCustomTheme()
+  const { theme } = useCustomTheme(controlSkin)
   const { verge, patchVerge } = useVerge()
   const { language } = verge ?? {}
   const { switchLanguage, currentLanguage } = useI18n()
@@ -1053,6 +1052,7 @@ const Layout = () => {
             enable_system_proxy: false,
             enable_tun_mode: false,
           })
+          await mutateSystemState()
           if (verge?.auto_close_connection) {
             await closeAllConnectionsWithTimeout().catch(() =>
               console.warn('[layout] closeAllConnectionsWithTimeout failed'),
@@ -1070,6 +1070,7 @@ const Layout = () => {
             enable_system_proxy: true,
             enable_tun_mode: false,
           })
+          await mutateSystemState()
           hideNotice(waitId)
           showNotice.success('layout.notices.systemProxyEnabled')
         } catch (err) {
@@ -1089,15 +1090,12 @@ const Layout = () => {
         }
 
         try {
+          // patchVerge 检测 enable_tun_mode 变更后自动在后端执行 RESTART_CORE 切换运行模式
           await patchVerge({
             enable_system_proxy: false,
             enable_tun_mode: true,
           })
-          // restartCore 前先刷新 systemState，确保 isTunModeAvailable 已为 true。
-          // 否则长操作结束时 use-system-state 的自动关闭 TUN useEffect 可能误判
-          // （依赖 isTunModeAvailableRef，需在 endLongOperation 前更新到位）。
           await mutateSystemState()
-          await restartCore()
           hideNotice(waitId)
           showNotice.success('layout.notices.tunModeEnabled')
         } catch (err) {

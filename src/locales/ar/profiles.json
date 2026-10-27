@@ -57,12 +57,12 @@
       "chooseFile": "اختر ملف"
     },
     "menu": {
-      "copyLink": "نسخ الرابط",
       "home": "Home",
       "select": "اختيار",
       "shareQrCode": "Share QR Code",
       "editInfo": "تعديل المعلومات",
       "editFile": "تعديل الملف",
+      "copyLink": "نسخ الرابط",
       "editRules": "تعديل القواعد",
       "editProxies": "تعديل الوكلاء",
       "extendConfig": "توسيع الإعدادات",

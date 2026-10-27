@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: Akan Keluar
     body: Clash Mini akan keluar.
-  appHidden:
-    title: Aplikasi Disembunyikan
-    body: Clash Mini berjalan di latar belakang.
-service:
-  adminInstallPrompt: Menginstal layanan Clash Mini memerlukan hak administrator.
-  adminUninstallPrompt: Menghapus instalasi layanan Clash Mini memerlukan hak administrator.

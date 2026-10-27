@@ -2,9 +2,6 @@
   "page": {
     "title": "連線"
   },
-  "notices": {
-    "copied": "已複製: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "主機",
@@ -30,6 +27,10 @@
       "closed": "已關閉",
       "closeConnection": "關閉連線"
     },
+    "columnManager": {
+      "title": "欄位設定",
+      "dragHandle": "拖曳以移動"
+    },
     "miniTable": {
       "hostColumn": "連線目標",
       "chainsColumn": "路由",
@@ -44,10 +45,9 @@
       "disconnect": "中斷此連線",
       "copyAddress": "複製連線地址",
       "viewDetail": "檢視詳細資訊"
-    },
-    "columnManager": {
-      "title": "欄位設定",
-      "dragHandle": "拖曳以移動"
     }
+  },
+  "notices": {
+    "copied": "已複製: {{address}}"
   }
 }

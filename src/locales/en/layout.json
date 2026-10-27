@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "Pin window on top",
+    "openSettings": "Open settings",
+    "closeSettings": "Close settings",
+    "closeLogsDialog": "Close logs dialog",
+    "selectLanguage": "Select language"
+  },
   "notices": {
     "adjustingProxyMode": "Adjusting proxy mode, please wait…",
     "adjusting": "Adjusting, please wait…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "Failed to check for updates: {{message}}",
     "clientInstallCompleted": "Update installed. Please restart the app to apply changes.",
     "clientUpdateFailed": "Update failed: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "Pin window on top",
-    "openSettings": "Open settings",
-    "closeSettings": "Close settings",
-    "closeLogsDialog": "Close logs dialog",
-    "selectLanguage": "Select language"
   }
 }

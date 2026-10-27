@@ -2,9 +2,6 @@
   "page": {
     "title": "Тоташулар"
   },
-  "notices": {
-    "copied": "Күчерелде: {{address}}"
-  },
   "components": {
     "fields": {
       "host": "Хост",
@@ -30,6 +27,10 @@
       "closed": "Closed",
       "closeConnection": "Тоташуны ябу"
     },
+    "columnManager": {
+      "title": "Баганалар",
+      "dragHandle": "Drag handle"
+    },
     "miniTable": {
       "hostColumn": "Максат",
       "chainsColumn": "Юнәлеш",
@@ -44,10 +45,9 @@
       "disconnect": "Бу тоташуны өзү",
       "copyAddress": "Тоташу адресын күчерү",
       "viewDetail": "Детальләрне карау"
-    },
-    "columnManager": {
-      "title": "Баганалар",
-      "dragHandle": "Drag handle"
     }
+  },
+  "notices": {
+    "copied": "Күчерелде: {{address}}"
   }
 }

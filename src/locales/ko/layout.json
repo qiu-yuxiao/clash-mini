@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "창 최상단 고정",
+    "openSettings": "설정 열기",
+    "closeSettings": "설정 닫기",
+    "closeLogsDialog": "로그 대화상자 닫기",
+    "selectLanguage": "언어 선택"
+  },
   "notices": {
     "adjustingProxyMode": "프록시 모드를 조정하는 중입니다. 잠시만 기다려 주세요…",
     "adjusting": "조정하는 중입니다. 잠시만 기다려 주세요…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "업데이트 확인 실패: {{message}}",
     "clientInstallCompleted": "업데이트 설치가 완료되었습니다. 변경 사항을 적용하려면 앱을 재시작하세요.",
     "clientUpdateFailed": "업데이트 실패: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "창 최상단 고정",
-    "openSettings": "설정 열기",
-    "closeSettings": "설정 닫기",
-    "closeLogsDialog": "로그 대화상자 닫기",
-    "selectLanguage": "언어 선택"
   }
 }

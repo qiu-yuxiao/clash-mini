@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: Çıkış Yapılmak Üzere
     body: Clash Mini kapanmak üzere.
-  appHidden:
-    title: Uygulama Gizlendi
-    body: Clash Mini arka planda çalışıyor.
-service:
-  adminInstallPrompt: Clash Mini hizmetini kurmak için yönetici ayrıcalıkları gerekir.
-  adminUninstallPrompt: Clash Mini hizmetini kaldırmak için yönetici ayrıcalıkları gerekir.

@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "Sematkan jendela di atas",
+    "openSettings": "Buka pengaturan",
+    "closeSettings": "Tutup pengaturan",
+    "closeLogsDialog": "Tutup dialog log",
+    "selectLanguage": "Pilih bahasa"
+  },
   "notices": {
     "adjustingProxyMode": "Menyesuaikan mode proksi, mohon tunggu…",
     "adjusting": "Menyesuaikan, mohon tunggu…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "Gagal memeriksa pembaruan: {{message}}",
     "clientInstallCompleted": "Pembaruan terpasang. Silakan mulai ulang aplikasi untuk menerapkan perubahan.",
     "clientUpdateFailed": "Gagal memperbarui: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "Sematkan jendela di atas",
-    "openSettings": "Buka pengaturan",
-    "closeSettings": "Tutup pengaturan",
-    "closeLogsDialog": "Tutup dialog log",
-    "selectLanguage": "Pilih bahasa"
   }
 }

@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "Тәрәзәне өскә беркетеп куярға",
+    "openSettings": "Көйләүләрне ачарға",
+    "closeSettings": "Көйләүләрне япарға",
+    "closeLogsDialog": "Логлар диалогын япарға",
+    "selectLanguage": "Телне сайларға"
+  },
   "notices": {
     "adjustingProxyMode": "Прокси режимы көйләнә, зинһар көтегез…",
     "adjusting": "Көйләнә, зинһар көтегез…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "Яңартуларны тикшерү уңышсыз: {{message}}",
     "clientInstallCompleted": "Яңарту урнаштырылды. Үзгәрешләрне куллану өчен кушымтаны кабаттан башлагыз.",
     "clientUpdateFailed": "Яңарту уңышсыз: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "Тәрәзәне өскә беркетеп куярға",
-    "openSettings": "Көйләүләрне ачарға",
-    "closeSettings": "Көйләүләрне япарға",
-    "closeLogsDialog": "Логлар диалогын япарға",
-    "selectLanguage": "Телне сайларға"
   }
 }

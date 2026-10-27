@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇（改変部分）",
         "title": "テーマ設定",
+        "copyright": "© 2026 秋雨潇潇（改変部分）",
         "fields": {
           "primaryColor": "主要色",
           "secondaryColor": "次要色",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "クリックで次のノードに切り替え",
-    "testingInProgress": "スピードテスト中です。しばらくしてから再試行してください",
-    "testNotExecuted": "テスト未実行：コアが準備できていないか、テスト可能なノードがありません",
-    "testFailed": "スピードテストに失敗しました：{{message}}",
-    "updated": "更新しました",
-    "portSaved": "プロキシポートを保存し再読み込みしました",
     "profilesTitle": "購読とプロファイル",
     "importConfig": "設定をインポート",
     "importPlaceholder": "購読リンクまたはノード設定を入力します...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "プロキシを通す URL を入力（1行に1つ）",
     "addUrlButton": "追加",
     "addUrlSuccess": "{{count}} 件のルールを追加しました",
-    "addUrlNoChange": "追加されたルールはありません（すでに存在するか、入力が無効です）"
+    "addUrlNoChange": "追加されたルールはありません（すでに存在するか、入力が無効です）",
+    "rotateNodeTooltip": "クリックで次のノードに切り替え",
+    "testingInProgress": "スピードテスト中です。しばらくしてから再試行してください",
+    "testNotExecuted": "テスト未実行：コアが準備できていないか、テスト可能なノードがありません",
+    "testFailed": "スピードテストに失敗しました：{{message}}",
+    "updated": "更新しました",
+    "portSaved": "プロキシポートを保存し再読み込みしました"
   }
 }

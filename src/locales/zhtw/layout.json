@@ -88,6 +88,13 @@
       }
     }
   },
+  "a11y": {
+    "pinWindow": "置頂窗口",
+    "openSettings": "打開設置",
+    "closeSettings": "關閉設置",
+    "closeLogsDialog": "關閉日誌對話框",
+    "selectLanguage": "選擇語言"
+  },
   "notices": {
     "adjustingProxyMode": "正在調整代理模式，請稍候…",
     "adjusting": "正在調整，請稍候…",
@@ -109,12 +116,5 @@
     "clientCheckFailed": "檢查更新失敗: {{message}}",
     "clientInstallCompleted": "更新安裝完成，請重新啟動應用程式以套用變更",
     "clientUpdateFailed": "更新失敗: {{message}}"
-  },
-  "a11y": {
-    "pinWindow": "置頂窗口",
-    "openSettings": "打開設置",
-    "closeSettings": "關閉設置",
-    "closeLogsDialog": "關閉日誌對話框",
-    "selectLanguage": "選擇語言"
   }
 }

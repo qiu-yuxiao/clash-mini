@@ -2,9 +2,6 @@ import { InboxRounded } from '@mui/icons-material'
 import { Box, Typography } from '@mui/material'
 import { memo, useMemo } from 'react'
 
-import { useIconCache } from '@/hooks/use-icon-cache'
-import { useVerge } from '@/hooks/use-verge'
-
 import { ProxyItem } from './proxy-item'
 import type { HeadState } from './use-head-state'
 import type { IRenderItem } from './use-render-list'
@@ -25,13 +22,6 @@ interface RenderProps {
 const ProxyRenderComponent = (props: RenderProps) => {
   const { item, onChangeProxy } = props
   const { type, group, headState, proxyCol, col } = item
-  const { verge } = useVerge()
-  const enable_group_icon = verge?.enable_group_icon ?? true
-  useIconCache({
-    icon: group?.icon,
-    cacheKey: (group?.name ?? '').replaceAll(' ', ''),
-    enabled: enable_group_icon,
-  })
 
   const showType = headState?.showType
   const proxyColItemsMemo = useMemo(() => {

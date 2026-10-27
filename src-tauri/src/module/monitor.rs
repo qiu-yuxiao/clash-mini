@@ -1473,14 +1473,18 @@ pub fn start_background_monitor() {
         }
     });
 
-    *MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| {
+    let mut guard = MONITOR_TASK_HANDLE.lock().unwrap_or_else(|e| {
         logging!(
             warn,
             Type::Lightweight,
             "MONITOR_TASK_HANDLE 锁被中毒线程污染，恢复继续"
         );
         e.into_inner()
-    }) = Some(handle);
+    });
+    if let Some(old) = guard.take() {
+        old.abort();
+    }
+    *guard = Some(handle);
 }
 
 /// 连续 5 次自愈失败 / 内核 API 不可达后，弹出 Windows 系统警报框。

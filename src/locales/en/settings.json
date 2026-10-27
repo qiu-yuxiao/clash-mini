@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇 (modified portions)",
         "title": "Theme Setting",
+        "copyright": "© 2026 秋雨潇潇 (modified portions)",
         "fields": {
           "primaryColor": "Primary Color",
           "secondaryColor": "Secondary Color",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "Click to rotate to the next node",
-    "testingInProgress": "A speed test is in progress, please try again later",
-    "testNotExecuted": "Test not executed: core not ready or no testable nodes",
-    "testFailed": "Speed test failed: {{message}}",
-    "updated": "Updated",
-    "portSaved": "Proxy port saved and reloaded",
     "profilesTitle": "Profiles & Subscriptions",
     "importConfig": "Import Config",
     "importPlaceholder": "Enter subscription link or node configuration...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "Enter URLs to proxy (one per line)",
     "addUrlButton": "Add",
     "addUrlSuccess": "Added {{count}} rules",
-    "addUrlNoChange": "No rules added (already exist or invalid input)"
+    "addUrlNoChange": "No rules added (already exist or invalid input)",
+    "rotateNodeTooltip": "Click to rotate to the next node",
+    "testingInProgress": "A speed test is in progress, please try again later",
+    "testNotExecuted": "Test not executed: core not ready or no testable nodes",
+    "testFailed": "Speed test failed: {{message}}",
+    "updated": "Updated",
+    "portSaved": "Proxy port saved and reloaded"
   }
 }

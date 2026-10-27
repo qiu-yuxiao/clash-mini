@@ -57,12 +57,12 @@
       "chooseFile": "انتخاب فایل"
     },
     "menu": {
-      "copyLink": "کپی پیوند",
       "home": "Home",
       "select": "انتخاب",
       "shareQrCode": "Share QR Code",
       "editInfo": "ویرایش اطلاعات",
       "editFile": "ویرایش فایل",
+      "copyLink": "کپی پیوند",
       "editRules": "ویرایش قوانین",
       "editProxies": "ویرایش پروکسی‌ها",
       "extendConfig": "توسعه پیکربندی",

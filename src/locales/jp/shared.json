@@ -1,10 +1,5 @@
 {
   "actions": {
-    "cut": "切り取り",
-    "copy": "コピー",
-    "paste": "貼り付け",
-    "selectAll": "すべて選択",
-    "clearInput": "クリア",
     "cancel": "キャンセル",
     "close": "閉じる",
     "confirm": "確認",
@@ -28,7 +23,12 @@
     "closeAll": "すべて閉じる",
     "clear": "クリア",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "cut": "切り取り",
+    "copy": "コピー",
+    "paste": "貼り付け",
+    "selectAll": "すべて選択",
+    "clearInput": "クリア"
   },
   "labels": {
     "updateAt": "更新日時",
@@ -84,19 +84,19 @@
       "prefixedRaw": "{{prefix}} {{message}}"
     },
     "notifications": {
-      "clashNotReady": "Clash コアの読み込みがタイムアウトしました。自動ノード選択が不正確になる可能性があります",
       "importSuccess": "プロファイルのインポートに成功しました。",
       "importSubscriptionSuccess": "サブスクリプションのインポートに成功しました。",
       "importWithClashProxy": "Clashプロキシを使用してプロファイルのインポートに成功しました。",
       "updateAvailable": "Update Available",
       "saved": "Saved successfully",
       "common": {
-        "deleteSuccess": "削除しました",
         "copySuccess": "コピー成功",
         "saveSuccess": "ランダム設定を保存完了",
         "saveFailed": "Failed to save configuration",
-        "refreshFailed": "更新に失敗しました"
-      }
+        "refreshFailed": "更新に失敗しました",
+        "deleteSuccess": "削除しました"
+      },
+      "clashNotReady": "Clash コアの読み込みがタイムアウトしました。自動ノード選択が不正確になる可能性があります"
     },
     "validation": {
       "config": {

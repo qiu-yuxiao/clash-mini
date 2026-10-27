@@ -87,27 +87,3 @@ export interface IVergeConfig {
   enable_external_controller?: boolean
   rule_fallback?: 'direct' | 'proxy' | 'addurl'
 }
-
-export interface IWebDavFile {
-  filename: string
-  href: string
-  last_modified: string
-  content_length: number
-  content_type: string
-  tag: string
-}
-
-export interface ILocalBackupFile {
-  filename: string
-  path: string
-  last_modified: string
-  content_length: number
-}
-
-export interface IWebDavConfig {
-  url: string
-  username: string
-  password: string
-}
-
-// Traffic monitor types

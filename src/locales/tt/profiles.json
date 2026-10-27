@@ -57,12 +57,12 @@
       "chooseFile": "Файл сайлау"
     },
     "menu": {
-      "copyLink": "Сылталамны күчерү",
       "home": "Home",
       "select": "Сайлау",
       "shareQrCode": "Share QR Code",
       "editInfo": "Мәгълүматны үзгәртү",
       "editFile": "Файлны үзгәртү",
+      "copyLink": "Сылталамны күчерү",
       "editRules": "Кагыйдәләрне үзгәртү",
       "editProxies": "Проксины үзгәртү",
       "extendConfig": "Merge-ны үзгәртергә",

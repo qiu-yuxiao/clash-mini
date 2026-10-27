@@ -23,9 +23,3 @@ notifications:
   appQuit:
     title: 即将退出
     body: Clash Mini 即将退出。
-  appHidden:
-    title: 应用已隐藏
-    body: Clash Mini 正在后台运行。
-service:
-  adminInstallPrompt: 安装 Clash Mini 服务需要管理员权限
-  adminUninstallPrompt: 卸载 Clash Mini 服务需要管理员权限

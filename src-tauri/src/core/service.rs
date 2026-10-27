@@ -54,6 +54,7 @@ fn uninstall_service() -> Result<()> {
     if !uninstall_path.exists() {
         bail!(format!("uninstaller not found: {uninstall_path:?}"));
     }
+    let uninstall_path = dunce::canonicalize(&uninstall_path).unwrap_or(uninstall_path);
 
     let token = Token::with_current_process()?;
     let level = token.privilege_level()?;
@@ -86,6 +87,7 @@ fn install_service() -> Result<()> {
     if !install_path.exists() {
         bail!(format!("installer not found: {install_path:?}"));
     }
+    let install_path = dunce::canonicalize(&install_path).unwrap_or(install_path);
 
     let token = Token::with_current_process()?;
     let level = token.privilege_level()?;
@@ -134,9 +136,18 @@ fn check_output_error(output: &std::process::Output) -> Option<(i32, Cow<'_, str
     Some((code, Cow::Borrowed("Unknown error")))
 }
 
+fn system32_sc_exe() -> PathBuf {
+    std::env::var_os("SystemRoot")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
+        .join("System32")
+        .join("sc.exe")
+}
+
 pub fn is_service_installed() -> bool {
     use std::os::windows::process::CommandExt as _;
-    let output = std::process::Command::new("sc.exe")
+    let sc_path = system32_sc_exe();
+    let output = std::process::Command::new(&sc_path)
         .arg("query")
         .arg("clash_verge_service")
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
@@ -157,15 +168,16 @@ fn start_service() -> Result<()> {
     use runas::Command as RunasCommand;
     use std::os::windows::process::CommandExt as _;
 
+    let sc_path = system32_sc_exe();
     let token = Token::with_current_process()?;
     let level = token.privilege_level()?;
     let status = match level {
-        PrivilegeLevel::NotPrivileged => RunasCommand::new("sc.exe")
+        PrivilegeLevel::NotPrivileged => RunasCommand::new(&sc_path)
             .arg("start")
             .arg("clash_verge_service")
             .show(false)
             .status()?,
-        _ => std::process::Command::new("sc.exe")
+        _ => std::process::Command::new(&sc_path)
             .arg("start")
             .arg("clash_verge_service")
             .creation_flags(0x08000000)

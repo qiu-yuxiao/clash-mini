@@ -156,6 +156,10 @@ export const useAppRefreshers = (): RefreshersContextType =>
 export const useCoreDataStatus = (): CoreDataStatusContextType =>
   useCtx(CoreDataStatusContext, 'useCoreDataStatus')
 
+/**
+ * @deprecated 请优先使用细粒度 Hook（如 `useProxiesData`、`useSystemData`、`useAppRefreshers` 等），
+ * 避免订阅全量上下文导致无关数据变更触发组件重渲染。
+ */
 export const useAppData = (): AppDataContextType => {
   const { proxies, proxyProviders } = useProxiesData()
   const { rules, ruleProviders } = useRulesData()

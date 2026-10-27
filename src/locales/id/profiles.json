@@ -57,12 +57,12 @@
       "chooseFile": "Pilih Berkas"
     },
     "menu": {
-      "copyLink": "Salin tautan",
       "home": "Home",
       "select": "Pilih",
       "shareQrCode": "Share QR Code",
       "editInfo": "Ubah Info",
       "editFile": "Ubah Berkas",
+      "copyLink": "Salin tautan",
       "editRules": "Ubah Aturan",
       "editProxies": "Ubah Proksi",
       "extendConfig": "Perluas Konfigurasi",

@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇 (modifizierte Teile)",
         "title": "Thema-Einstellungen",
+        "copyright": "© 2026 秋雨潇潇 (modifizierte Teile)",
         "fields": {
           "primaryColor": "Hauptfarbe",
           "secondaryColor": "Sekundärfarbe",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "Klicken, um zum nächsten Knoten zu wechseln",
-    "testingInProgress": "Geschwindigkeitstest läuft, bitte später erneut versuchen",
-    "testNotExecuted": "Test nicht ausgeführt: Core nicht bereit oder keine testbaren Knoten",
-    "testFailed": "Geschwindigkeitstest fehlgeschlagen: {{message}}",
-    "updated": "Aktualisiert",
-    "portSaved": "Proxy-Port gespeichert und neu geladen",
     "profilesTitle": "Profile & Abonnements",
     "importConfig": "Konfiguration importieren",
     "importPlaceholder": "Abonnement-Link oder Knotenkonfiguration eingeben...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "URL(s) für den Proxy eingeben (eine pro Zeile)",
     "addUrlButton": "Hinzufügen",
     "addUrlSuccess": "{{count}} Regeln hinzugefügt",
-    "addUrlNoChange": "Keine Regeln hinzugefügt (bereits vorhanden oder ungültige Eingabe)"
+    "addUrlNoChange": "Keine Regeln hinzugefügt (bereits vorhanden oder ungültige Eingabe)",
+    "rotateNodeTooltip": "Klicken, um zum nächsten Knoten zu wechseln",
+    "testingInProgress": "Geschwindigkeitstest läuft, bitte später erneut versuchen",
+    "testNotExecuted": "Test nicht ausgeführt: Core nicht bereit oder keine testbaren Knoten",
+    "testFailed": "Geschwindigkeitstest fehlgeschlagen: {{message}}",
+    "updated": "Aktualisiert",
+    "portSaved": "Proxy-Port gespeichert und neu geladen"
   }
 }

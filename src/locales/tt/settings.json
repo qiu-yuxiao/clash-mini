@@ -199,8 +199,8 @@
         }
       },
       "theme": {
-        "copyright": "© 2026 秋雨潇潇 (үзгәртелгән өлешләр)",
         "title": "Тема көйләүләре",
+        "copyright": "© 2026 秋雨潇潇 (үзгәртелгән өлешләр)",
         "fields": {
           "primaryColor": "Төп төс",
           "secondaryColor": "Икенче төс",
@@ -531,12 +531,6 @@
     }
   },
   "mini": {
-    "rotateNodeTooltip": "Киләсе төенгә күчү өчен басыгыз",
-    "testingInProgress": "Тизлек тикшерүе бара, соңрак кабат карагыз",
-    "testNotExecuted": "Тикшерү үтәлмәде: төп программа әзер түгел яки тикшерергә мөмкин төен юк",
-    "testFailed": "Тизлек тикшерүе уңышсыз: {{message}}",
-    "updated": "Яңартылды",
-    "portSaved": "Прокси порты сакланды һәм яңадан йөкләнде",
     "profilesTitle": "Profiles & Subscriptions",
     "importConfig": "Import Config",
     "importPlaceholder": "Enter subscription link or node configuration...",
@@ -576,6 +570,12 @@
     "addUrlPlaceholder": "Прокси аша үткәрүче URL-ларны кертегез (бер юлга берәү)",
     "addUrlButton": "Өстәү",
     "addUrlSuccess": "{{count}} кагыйдә өстәлде",
-    "addUrlNoChange": "Кагыйдәләр өстәлмәде (бар инде яки дөрес түгел кертелгән)"
+    "addUrlNoChange": "Кагыйдәләр өстәлмәде (бар инде яки дөрес түгел кертелгән)",
+    "rotateNodeTooltip": "Киләсе төенгә күчү өчен басыгыз",
+    "testingInProgress": "Тизлек тикшерүе бара, соңрак кабат карагыз",
+    "testNotExecuted": "Тикшерү үтәлмәде: төп программа әзер түгел яки тикшерергә мөмкин төен юк",
+    "testFailed": "Тизлек тикшерүе уңышсыз: {{message}}",
+    "updated": "Яңартылды",
+    "portSaved": "Прокси порты сакланды һәм яңадан йөкләнде"
   }
 }

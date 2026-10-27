@@ -60,21 +60,23 @@ const getSystemAccentColor = (): string | null => {
  * 4. Ensure all theme-dependent styles use CSS variables instead of inline styles
  * 5. Consider using `color-scheme` CSS property for native OS theme support
  */
-export const useCustomTheme = () => {
+export const useCustomTheme = (externalControlSkin?: string) => {
   const appWindow: WebviewWindow = useMemo(() => getCurrentWebviewWindow(), [])
   const { verge } = useVerge()
   const { theme_mode, theme_setting } = verge ?? {}
   const mode = useThemeMode()
   const setMode = useSetThemeMode()
-  const [controlSkin, setControlSkin] = useState(() => {
+  const [internalControlSkin, setInternalControlSkin] = useState(() => {
     return typeof window !== 'undefined'
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
       : 'retro-3d'
   })
+  const controlSkin = externalControlSkin ?? internalControlSkin
 
   useEffect(() => {
+    if (externalControlSkin !== undefined) return
     const handleSkinChanged = () => {
-      setControlSkin(
+      setInternalControlSkin(
         localStorage.getItem('clash-mini-control-skin') || 'retro-3d',
       )
     }
@@ -82,7 +84,7 @@ export const useCustomTheme = () => {
     return () => {
       window.removeEventListener('clash-mini-skin-changed', handleSkinChanged)
     }
-  }, [])
+  }, [externalControlSkin])
 
   useEffect(() => {
     if (typeof document !== 'undefined') {

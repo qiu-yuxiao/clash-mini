@@ -57,12 +57,12 @@
       "chooseFile": "ファイルを選択"
     },
     "menu": {
-      "copyLink": "リンクをコピー",
       "home": "ホーム",
       "select": "使用する",
       "shareQrCode": "Share QR Code",
       "editInfo": "情報を編集",
       "editFile": "ファイルを編集",
+      "copyLink": "リンクをコピー",
       "editRules": "ルールを編集",
       "editProxies": "ノードを編集",
       "extendConfig": "拡張上書き設定",

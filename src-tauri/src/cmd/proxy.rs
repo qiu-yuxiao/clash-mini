@@ -1,8 +1,33 @@
 use super::CmdResult;
 use super::StringifyErr as _;
 use crate::utils::dirs;
-use serde_yaml_ng::Value;
+use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
+
+#[derive(Deserialize)]
+struct ProxyAddrEntry {
+    name: Option<String>,
+    server: Option<String>,
+    port: Option<u16>,
+}
+
+#[derive(Deserialize)]
+struct ProviderEntry {
+    path: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct QuickConfigLookup {
+    #[serde(rename = "proxy-providers")]
+    providers: Option<HashMap<String, ProviderEntry>>,
+    proxies: Option<Vec<ProxyAddrEntry>>,
+}
+
+#[derive(Deserialize)]
+struct ProviderFileLookup {
+    proxies: Option<Vec<ProxyAddrEntry>>,
+}
 
 /// 前端委托后端执行群发测速与择优（根治前后端重复测速/选点冲突）
 /// - `profile_uid`: 当前活动配置 UID
@@ -31,62 +56,45 @@ pub async fn get_proxy_addr(
     provider: Option<std::string::String>,
 ) -> CmdResult<Option<(std::string::String, u16)>> {
     let app_dir = dirs::app_home_dir().stringify_err()?;
+    let config_path = app_dir.join("clash-mini.yaml");
+
+    let Ok(config_content) = tokio::fs::read_to_string(&config_path).await else {
+        return Ok(None);
+    };
+    let Ok(parsed_config) = serde_yaml_ng::from_str::<QuickConfigLookup>(&config_content) else {
+        return Ok(None);
+    };
 
     // 1. 如果指定了 provider，优先从 provider 的配置文件中查询
-    if let Some(provider_name) = provider {
-        let config_path = app_dir.join("clash-mini.yaml");
-        if config_path.exists()
-            && let Ok(config_content) = tokio::fs::read_to_string(&config_path).await
-            && let Ok(Value::Mapping(config_map)) = serde_yaml_ng::from_str::<Value>(&config_content)
-            && let Some(Value::Mapping(providers)) = config_map.get("proxy-providers")
-            && let Some(Value::Mapping(provider_info)) = providers.get(provider_name.as_str())
-            && let Some(Value::String(path)) = provider_info.get("path")
+    if let Some(provider_name) = provider
+        && let Some(providers) = &parsed_config.providers
+        && let Some(provider_info) = providers.get(provider_name.as_str())
+        && let Some(path) = &provider_info.path
+    {
+        let mut provider_path = PathBuf::from(path.as_str());
+        if provider_path.is_relative() {
+            provider_path = app_dir.join(provider_path);
+        }
+        if let Ok(provider_content) = tokio::fs::read_to_string(&provider_path).await
+            && let Ok(provider_parsed) = serde_yaml_ng::from_str::<ProviderFileLookup>(&provider_content)
+            && let Some(proxies) = provider_parsed.proxies
         {
-            let mut provider_path = PathBuf::from(path.as_str());
-            if provider_path.is_relative() {
-                provider_path = app_dir.join(provider_path);
-            }
-            if provider_path.exists()
-                && let Ok(provider_content) = tokio::fs::read_to_string(&provider_path).await
-                && let Ok(Value::Mapping(provider_map)) = serde_yaml_ng::from_str::<Value>(&provider_content)
-                && let Some(Value::Sequence(proxies)) = provider_map.get("proxies")
-            {
-                for proxy in proxies {
-                    if let Some(proxy_map) = proxy.as_mapping()
-                        && let Some(Value::String(proxy_name)) = proxy_map.get("name")
-                        && proxy_name.as_str() == name
-                    {
-                        let server = proxy_map
-                            .get("server")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        let port = proxy_map.get("port").and_then(|v| v.as_i64()).unwrap_or(0) as u16;
-                        return Ok(Some((server, port)));
-                    }
+            for proxy in proxies {
+                if proxy.name.as_deref() == Some(name.as_str()) {
+                    let server = proxy.server.unwrap_or_default();
+                    let port = proxy.port.unwrap_or(0);
+                    return Ok(Some((server, port)));
                 }
             }
         }
     }
 
-    // 2. 默认 fallback: 从 clash-mini.yaml 的 proxies 列表中查询
-    let config_path = app_dir.join("clash-mini.yaml");
-    if config_path.exists()
-        && let Ok(config_content) = tokio::fs::read_to_string(&config_path).await
-        && let Ok(Value::Mapping(config_map)) = serde_yaml_ng::from_str::<Value>(&config_content)
-        && let Some(Value::Sequence(proxies)) = config_map.get("proxies")
-    {
+    // 2. 默认 fallback: 复用已解析的 clash-mini.yaml 的 proxies 列表查询（避免二次磁盘读取与反序列化）
+    if let Some(proxies) = parsed_config.proxies {
         for proxy in proxies {
-            if let Some(proxy_map) = proxy.as_mapping()
-                && let Some(Value::String(proxy_name)) = proxy_map.get("name")
-                && proxy_name.as_str() == name
-            {
-                let server = proxy_map
-                    .get("server")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let port = proxy_map.get("port").and_then(|v| v.as_i64()).unwrap_or(0) as u16;
+            if proxy.name.as_deref() == Some(name.as_str()) {
+                let server = proxy.server.unwrap_or_default();
+                let port = proxy.port.unwrap_or(0);
                 return Ok(Some((server, port)));
             }
         }
