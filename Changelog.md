@@ -1,3 +1,15 @@
+## v3.1.8
+
+### 🐞 DNS Hygiene & Code Quality
+
+- **订阅 `dns.nameserver` 境外明文 UDP 上游自动改写为 DoH（BUG-308）**：
+  - **现象**：部分机场订阅在 `dns.nameserver` 中自带明文 `8.8.8.8` 等境外公共 DNS，在 `respect-rules: true` 下内核自身 DNS 查询命中代理规则穿代理；当活跃节点为 `anytls` 等 TCP 承载协议时，UDP 查询需走 UDP-over-TCP 新建会话，建连速度慢于境内 DoH，在内核 DNS 并发竞速中必被取消并刷出 `failed to create session: dial tcp <node>: operation was canceled` 告警；
+  - **修复**：`enhance` 管线新增 `sanitize_foreign_plain_dns_upstreams`，将 `dns.nameserver` 中 Google（`8.8.8.8` / `8.8.4.4`）与 Cloudflare（`1.1.1.1` / `1.0.0.1`）的明文 UDP 形式（裸 IP 或 `:53` 端口）自动改写为 `https://<ip>/dns-query` DoH，同时严格保留 `default-nameserver` 明文引导项、境内明文 DNS 及已加密上游不变。
+- **清零 `clippy --all-targets` 测试与诊断模块存量告警**：
+  - 清理 `diagnostics.rs`、`migrate.rs` 与 `enhance/mod.rs` 中的 `field_reassign_with_default` 及测试断言告警，确保 `pre-push` 静态检查门禁零告警全绿通过。
+
+---
+
 ## v3.1.7
 
 ### ✨ Onboarding Vertical Hierarchy & Narrow-Window Aesthetics
