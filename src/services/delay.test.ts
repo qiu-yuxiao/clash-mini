@@ -8,6 +8,7 @@ import {
   getDelayManager,
   HISTORY_FALLBACK_MAX_AGE_MS,
   NODE_DELAY_MAX_MS,
+  resolveSignalDelayColor,
 } from './delay'
 
 describe('formatDelay 延迟文本格式化', () => {
@@ -212,5 +213,27 @@ describe('节点延迟监听：同一节点支持多订阅者', () => {
     expect(removed).toEqual([])
 
     dm.removeListener(NODE, 'PROXY')
+  })
+})
+
+describe('resolveSignalDelayColor 与 formatDelayColor 延迟颜色标准完全一致', () => {
+  const samples = [
+    0, 35, 180, 220, 249, 250, 280, 350, 399, 400, 450, 600, 3000, 5000, 120000,
+  ]
+
+  it('在浅色与深色主题下，顶部活跃节点栏颜色均与节点表格保持 100% 一致', () => {
+    for (const isDark of [false, true]) {
+      for (const delay of samples) {
+        const expected = formatDelayColor(delay, NODE_DELAY_MAX_MS, isDark)
+        expect(resolveSignalDelayColor(delay, NODE_DELAY_MAX_MS, isDark)).toBe(
+          expected,
+        )
+      }
+    }
+  })
+
+  it('未测速 (-1) 与测试中 (-2) 返回 text.secondary', () => {
+    expect(resolveSignalDelayColor(-1)).toBe('text.secondary')
+    expect(resolveSignalDelayColor(-2)).toBe('text.secondary')
   })
 })

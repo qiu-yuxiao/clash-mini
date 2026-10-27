@@ -9,7 +9,11 @@ import {
 } from '@mui/icons-material'
 import { alpha, type Theme } from '@mui/material'
 
-import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
+import {
+  getDelayManager,
+  NODE_DELAY_MAX_MS,
+  resolveSignalDelayColor,
+} from '@/services/delay'
 import getSystem from '@/utils/get-system'
 
 const OS = getSystem()
@@ -18,7 +22,12 @@ export const portableFlag = false
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string
 
-export function getSignalIcon(delay: number, t: TFunc) {
+export function getSignalIcon(
+  delay: number,
+  t: TFunc,
+  timeout = NODE_DELAY_MAX_MS,
+  isDarkMode = false,
+) {
   const iconStyle = { fontSize: '12px', width: '12px', height: '12px' }
   if (delay === -2)
     return {
@@ -26,54 +35,67 @@ export function getSignalIcon(delay: number, t: TFunc) {
       text: t('settings.mini.statusTesting', { defaultValue: '测试中' }),
       color: 'text.secondary',
     }
-  if (delay === -1)
+  if (delay < 0)
     return {
       icon: <SignalNone sx={iconStyle} />,
       text: t('settings.mini.statusUntested', { defaultValue: '未测试' }),
       color: 'text.secondary',
     }
+
+  // 延迟颜色统一委托单一真源 formatDelayColor（<250 success.main / 250..399 primary.main /
+  // 400..timeout-1 warning.dark|warning.main / 0 或 >=timeout error.main），
+  // 确保顶部活跃节点栏与下方节点表格在任何延迟区间、深浅色主题下 100% 同色同标准。
+  const unifiedColor = resolveSignalDelayColor(delay, timeout, isDarkMode)
+
   if (delay > 1e5)
     return {
       icon: <SignalError sx={iconStyle} />,
       text: t('settings.mini.statusError', { defaultValue: '错误' }),
-      color: 'error.main',
+      color: unifiedColor,
     }
-  if (delay === 0 || delay >= NODE_DELAY_MAX_MS)
+  if (delay === 0 || delay >= timeout)
     return {
       icon: <SignalError sx={iconStyle} />,
       text: t('settings.mini.statusTimeout', { defaultValue: '超时' }),
-      color: 'error.main',
+      color: unifiedColor,
     }
-  if (delay >= 500)
+  if (delay >= 400)
     return {
-      icon: <SignalWeak sx={iconStyle} />,
-      text: t('settings.mini.statusDelayHigh', { defaultValue: '延迟较高' }),
-      color: 'error.main',
+      icon:
+        delay >= 800 ? (
+          <SignalWeak sx={iconStyle} />
+        ) : (
+          <SignalMedium sx={iconStyle} />
+        ),
+      text:
+        delay >= 800
+          ? t('settings.mini.statusDelayHigh', { defaultValue: '延迟较高' })
+          : t('settings.mini.statusDelayMedium', { defaultValue: '延迟中等' }),
+      color: unifiedColor,
     }
-  if (delay >= 300)
-    return {
-      icon: <SignalMedium sx={iconStyle} />,
-      text: t('settings.mini.statusDelayMedium', { defaultValue: '延迟中等' }),
-      color: 'warning.main',
-    }
-  if (delay >= 200)
+  if (delay >= 250)
     return {
       icon: <SignalGood sx={iconStyle} />,
       text: t('settings.mini.statusDelayGood', { defaultValue: '延迟良好' }),
-      color: 'info.main',
+      color: unifiedColor,
     }
   return {
     icon: <SignalStrong sx={iconStyle} />,
     text: t('settings.mini.statusDelayExcellent', { defaultValue: '延迟极佳' }),
-    color: 'success.main',
+    color: unifiedColor,
   }
 }
 
 export function convertDelayColor(
   delayValue: number,
   timeout = NODE_DELAY_MAX_MS,
+  isDarkMode = false,
 ) {
-  const colorStr = getDelayManager().formatDelayColor(delayValue, timeout)
+  const colorStr = getDelayManager().formatDelayColor(
+    delayValue,
+    timeout,
+    isDarkMode,
+  )
   if (!colorStr) return 'default'
   const mainColor = colorStr.split('.')[0]
   switch (mainColor) {

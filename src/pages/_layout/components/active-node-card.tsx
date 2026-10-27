@@ -200,16 +200,34 @@ export const ActiveNodeStatusCard = () => {
   }
 
   const { t } = useTranslation()
-  const signalInfo = getSignalIcon(delay, t)
-  const delayColor = convertDelayColor(delay, latencyTimeout)
   const theme = useTheme()
+  const isDark = theme.palette.mode === 'dark'
+  const signalInfo = getSignalIcon(delay, t, latencyTimeout, isDark)
+  const delayColor = convertDelayColor(delay, latencyTimeout, isDark)
   const skinFallback = useMemo(() => {
     return typeof window !== 'undefined'
       ? localStorage.getItem('clash-mini-control-skin') || 'retro-3d'
       : 'retro-3d'
   }, [])
   const skin = theme.controlSkin || skinFallback
-  const isRetro3DDark = skin === 'retro-3d' && theme.palette.mode === 'dark'
+  const isRetro3DDark = skin === 'retro-3d' && isDark
+
+  const chipTintBase = useMemo(() => {
+    switch (signalInfo.color) {
+      case 'success.main':
+        return theme.palette.success.main
+      case 'primary.main':
+        return theme.palette.primary.main
+      case 'warning.dark':
+        return theme.palette.warning.dark
+      case 'warning.main':
+        return theme.palette.warning.main
+      case 'error.main':
+        return theme.palette.error.main
+      default:
+        return theme.palette.text.secondary
+    }
+  }, [signalInfo.color, theme.palette])
 
   return (
     <Paper
@@ -317,22 +335,16 @@ export const ActiveNodeStatusCard = () => {
             height: '20px',
             fontWeight: 600,
             cursor: 'pointer',
-            bgcolor: testing
-              ? undefined
-              : alpha(
-                  signalInfo.color === 'success.main'
-                    ? '#4caf50'
-                    : signalInfo.color === 'warning.main'
-                      ? '#ff9800'
-                      : '#f44336',
-                  0.12,
-                ),
+            bgcolor: testing ? undefined : alpha(chipTintBase, 0.12),
             color:
               signalInfo.color === 'text.secondary'
                 ? isRetro3DDark
                   ? '#2C1F03'
                   : 'text.secondary'
                 : signalInfo.color,
+            '& .MuiChip-label': {
+              color: 'inherit',
+            },
             '& .MuiChip-icon': {
               color: 'inherit',
               fontSize: '12px',

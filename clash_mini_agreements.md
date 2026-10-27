@@ -597,7 +597,7 @@ flowchart LR
 ### 8.8 前端单测基线与最小覆盖
 
 - **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前覆盖「节点子集过滤」（`compileStringMatcher`）、「流量单位换算」（`parseTraffic`）、「假节点判定与真实协议节点防误伤」（`isDummyNode`）以及「节点延迟格式化与主题色映射」（`formatDelay` / `formatDelayColor`）—— 选点范围、界面数值与视觉状态呈现的正确性来源，最容易被后续改动悄悄改坏。
+- **只测纯逻辑**：当前覆盖「节点子集过滤」（`compileStringMatcher`）、「流量单位换算」（`parseTraffic`）、「假节点判定与真实协议节点防误伤」（`isDummyNode`）以及「节点延迟格式化与主题色单一真源映射」（`formatDelay` / `formatDelayColor` / `getSignalIcon` 顶部活跃节点栏与下方节点表格 100% 同色同阈值）—— 选点范围、界面数值与视觉状态呈现的正确性来源，最容易被后续改动悄悄改坏。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ### 8.9 用户可见文案 i18n 硬约束

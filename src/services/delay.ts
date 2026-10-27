@@ -412,6 +412,21 @@ export function formatDelayColor(
   return 'success.main'
 }
 
+/**
+ * 顶部活跃节点栏（ActiveNodeStatusCard / getSignalIcon）与下方节点表格（ProxyItem）
+ * 共用的延迟颜色解析函数：
+ * - 未测速 (-1) / 测试中 (-2) 返回 'text.secondary'
+ * - 其余有效/超时延迟 100% 委托 formatDelayColor，确保上下两处同值同色
+ */
+export function resolveSignalDelayColor(
+  delay: number,
+  timeout = NODE_DELAY_MAX_MS,
+  isDarkMode = false,
+) {
+  if (delay < 0) return 'text.secondary'
+  return formatDelayColor(delay, timeout, isDarkMode) || 'text.secondary'
+}
+
 let _instance: DelayManager | null = null
 
 /** 获取 DelayManager 惰性单例（避免模块加载时即创建实例等副作用） */
