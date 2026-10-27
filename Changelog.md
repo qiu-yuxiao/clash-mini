@@ -1,3 +1,13 @@
+## v3.1.5
+
+### ✨ UI & Onboarding Layout Refinement
+
+- **首次使用引导弹窗横向 100% 铺满默认窗口宽度（Full-Width Onboarding Dialog）**：
+  - **现象**：初次启动默认窗口为 `330px` 窄竖条，此前 `FirstRunGuideDialog` 受 MUI `Dialog` 默认左右各 `32px` 外边距（共 `64px`）与内部 `px: 2.5`（共 `40px`）双重挤压，实际内容可用宽度仅剩 `226px`，在窄窗口中形成「窄条套窄条」的局促观感；
+  - **优化**：显式声明 `m: 0, width: '100%'` 破除默认外边距挤压，并将内部横向内边距收紧为 `px: 1.5`，使可用内容宽度由 `226px` 拓宽至 `306px`（提升 +35%）；同时将底部主操作按钮设为 `flex: 1` 自适应撑满，大幅减少文本折行，视觉比例更加饱满舒展。
+
+---
+
 ## v3.1.4
 
 ### ✨ Onboarding Experience & UI Consistency
