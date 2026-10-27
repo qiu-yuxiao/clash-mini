@@ -237,21 +237,28 @@ export interface TranslationResources {
           }
         }
         firstRun: {
+          activeNodeLabel: string
           checking: string
+          clipboardDetected: string
           enterHint: string
           errEmpty: string
           errImport: string
           errScheme: string
+          featureAutoSelect: string
+          featureDnsGuard: string
+          featureStealth: string
           finish: string
           importAndStart: string
           imported: string
           intro: string
           later: string
+          openGithubStar: string
           openWiki: string
           paste: string
           readyOk: string
           readyTitle: string
           readyUnconfirmed: string
+          starTitle: string
           sysProxyOff: string
           title: string
           wikiHint: string

@@ -238,17 +238,21 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **边界只捕获渲染期异常**：事件处理与异步代码中的错误不走边界，必须用 `error-reporter` / `showNotice` 自行处理。
 - **边界不宜过密**：优先高频出错、依赖第三方渲染的组件；过度拆分只增加复杂度与开销。
 
-### 2.12 首次使用引导与网络就绪反馈
+### 2.12 首次使用引导与网络就绪反馈（含 GitHub Star 转化设计）
 
 - **触发条件（判定语义，错不得）**：`localStorage.getItem('clash-mini-first-run-completed') !== 'true'` **且列表中没有任何真实订阅**（`type === 'remote' || type === 'local'`）时，启动 500ms 后自动居中弹出引导弹窗（`FirstRunGuideDialog`）。
   - **严禁用 `profiles.items.length === 0` 判断**：后端 `Config::init_config()` 每次启动都会调用 `ensure_default_profile_items()`，**无条件**追加 `Merge`（`type: merge`）与 `Script`（`type: script`）两个内置项，故 `items.length` **恒 ≥ 2**、该判定永不成立（v2.9.9 曾因此让弹窗完全变成死代码）。
   - 判定逻辑固定在 `src/utils/profile-items.ts`（`hasRealProfileItem`），并有回归单测；存量老用户绝不被打扰。
-- **一体化向导体验**：弹窗内直接提供订阅链接输入框与「立即导入并开启」按钮，支持剪贴板一键读取与右键菜单，免去小白用户翻找左侧抽屉的困惑；导入成功后原地切换至第二步。
+- **两步式价值感知与转化向导（`STEP 1 / 2` → `STEP 2 / 2`）**：
+  - **Step 1（一键导入订阅）**：顶部配有步骤胶囊（`STEP 1 / 2`）与三枚核心特性徽章（智能优选低延迟节点 / 防 DNS 泄漏保护 / 轻量静默驻留）；弹窗打开时自动静默嗅探系统剪贴板，若检测到单行 `http(s)://` 链接且输入框为空，展示可一键填入的智能横幅（`clipboardDetected`），同时保留剪贴板按钮与右键菜单；导入成功后原地切换至第二步。
+  - **Step 2（实时连通性仪表盘 + GitHub Star 激励卡）**：
+    - **卡片 1（实时连通性面板）**：展示订阅导入成功状态、代理就绪探测结果，并在就绪时实时展示**当前最优出口节点名称**（`activeNodeName`）与**绿色发光延迟徽章**（`⚡ XX ms`）。
+    - **卡片 2（金色 GitHub Star 转化卡 + Wiki 入口）**：采用暖金渐变卡片展示开源支持文案（`starTitle` + `wikiHint`），附带「📖 查看 Wiki 进阶指南 ↗」次级链接，底部主 3D 按钮升级为「⭐ 打开 GitHub 测速并点 ⭐ Star」（`CLASH_MINI_GITHUB_URL`），在用户刚体验到导入成功与节点低延迟的愉悦时刻自然引导浏览器打开仓库主页测试国际网络并顺手点亮 Star。
 - **就绪判定必须是「测出来」而不是「假定」**：第二步只有在**活跃出口节点存在有效延迟**（`0 < delay < NODE_DELAY_MAX_MS`，数据取自既有代理上下文，不另造测量链路）时才显示「代理已就绪」。未测出则显示「正在确认节点连通性…」并每 1.5s 刷新一次；超过 20s 仍无有效延迟则改成如实提示「暂未测出节点延迟」，**不得宣称网络畅通**。
   - 同时按 `sysproxy.enable` 的真实状态提示「系统代理未开启」。**严禁再写「TUN 已全量就绪」**——`init_config` 在非管理员且未装服务时会把 `enable_tun_mode` 强制置为 `false`，首次安装用户绝大多数属于这种情形。
-- **验证通道（打开 Wiki 测试）**：第二步提供「打开 Wiki 首页测试」按钮，安全调用后端 `open_web_url`（仅允许 http/https 协议）打开系统默认浏览器访问项目 Wiki，由用户自行确认国际网络连通性。
+- **帮助菜单常驻 Star 入口**：顶栏 `?` 帮助菜单（`HelpMenuButton`）首项固定为加粗的 `⭐ 去 GitHub 点亮 Star`（`layout.components.helpMenu.github`），为错失首次引导的老用户提供常驻支持通道。
 - **导入不可被误中断**：导入进行中（`submitting`），点击遮罩与按 **Esc**（`reason === 'escapeKeyDown'`）都必须被拦截，不允许关闭弹窗。
-- **优雅稍后配置**：三个出口（完成 / 打开 Wiki / 稍后手动配置）统一记录 `clash-mini-first-run-completed: true`；「稍后手动配置」还会自动滑开左侧抽屉指引订阅管理卡片位置。
+- **优雅稍后配置**：所有出口（完成 / 打开 GitHub Star / 打开 Wiki / 稍后手动配置）统一记录 `clash-mini-first-run-completed: true`；「稍后手动配置」还会自动滑开左侧抽屉指引订阅管理卡片位置。
 - **多语言必须齐全**：本弹窗文案走 i18n（`layout.components.firstRun.*`），**13 个语种资源全部提供**。理由：应用已按系统语言自动初始化（`system_language()` + `clash_verge_i18n`），支持 zh/zhtw/en/ru/fa/tt/id/ar/ko/tr/de/es/jp；首次引导是用户看到的第一屏，单独硬编码中文等于给非中文用户「一上来就是外语」的糟糕第一印象。新增 key 后须执行 `pnpm i18n:types` 重新生成类型。
 
 ---

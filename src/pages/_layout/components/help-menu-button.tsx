@@ -120,9 +120,12 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
               console.error('Failed to open help link:', err)
             }
           }}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
+          sx={{
+            ...getMenuItemHoverStyle(theme, controlSkin),
+            fontWeight: 700,
+          }}
         >
-          🐱 {t('layout.components.helpMenu.github')}
+          ⭐ {t('layout.components.helpMenu.github')}
         </MenuItem>
         <MenuItem
           onClick={async () => {

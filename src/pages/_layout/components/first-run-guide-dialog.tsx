@@ -35,6 +35,7 @@ import {
 
 import { getMenuItemHoverStyle } from '../utils/style-helpers'
 
+export const CLASH_MINI_GITHUB_URL = 'https://github.com/qiu-yuxiao/clash-mini'
 export const CLASH_MINI_WIKI_URL =
   'https://github.com/qiu-yuxiao/clash-mini/wiki'
 export const FIRST_RUN_GUIDE_STORAGE_KEY = 'clash-mini-first-run-completed'
@@ -49,6 +50,7 @@ interface FirstRunGuideDialogProps {
   onClose: () => void
   onImport: (url: string) => Promise<boolean>
   onOpenWiki: () => void
+  onOpenGithub?: () => void
   onLater: () => void
 }
 
@@ -57,6 +59,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   onClose,
   onImport,
   onOpenWiki,
+  onOpenGithub,
   onLater,
 }) => {
   const { t } = useTranslation()
@@ -65,6 +68,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 
   const [step, setStep] = useState<'input' | 'ready'>('input')
   const [url, setUrl] = useState('')
+  const [detectedClipboardUrl, setDetectedClipboardUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [gaveUp, setGaveUp] = useState(false)
@@ -86,19 +90,23 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     refreshProxyRef.current = refreshProxy
   }, [refreshProxy])
 
+  /** 当前选中的活跃出口节点名称 */
+  const activeNodeName = useMemo(() => {
+    const group = proxies?.groups.find((g) => g.name === 'PROXY')
+    return group?.now || null
+  }, [proxies])
+
   /** 活跃出口节点最近一次延迟（ms）；无数据返回 null */
   const activeDelay = useMemo(() => {
-    const group = proxies?.groups.find((g) => g.name === 'PROXY')
-    const activeName = group?.now
-    if (!activeName) return null
+    if (!activeNodeName) return null
     const node =
-      proxies?.records[activeName] ??
-      proxies?.proxies.find((p) => p.name === activeName)
+      proxies?.records[activeNodeName] ??
+      proxies?.proxies.find((p) => p.name === activeNodeName)
     const history = node?.history
     if (!history || history.length === 0) return null
     const delay = history[history.length - 1]?.delay
     return typeof delay === 'number' ? delay : null
-  }, [proxies])
+  }, [proxies, activeNodeName])
 
   /** 有效延迟（排除 0/超时与假节点阈值）才算真的连通 */
   const proxyReady =
@@ -120,19 +128,50 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     return () => clearInterval(timer)
   }, [open, step, proxyReady, gaveUp])
 
-  // 弹窗打开时尝试自动聚焦输入框
+  // 弹窗打开时尝试自动聚焦输入框，并静默探测剪贴板中是否已有待导入的 http(s) 订阅链接
   useEffect(() => {
     if (!open) return
     const timer = setTimeout(() => {
       inputRef.current?.focus()
     }, 100)
-    return () => clearTimeout(timer)
+
+    let cancelled = false
+    const detectClipboard = async () => {
+      let clip = ''
+      try {
+        clip = await readText()
+      } catch {
+        try {
+          clip = await navigator.clipboard.readText()
+        } catch {
+          // ignore permission errors
+        }
+      }
+      if (cancelled || !clip) return
+      const trimmed = clip.trim()
+      if (
+        !trimmed.includes('\n') &&
+        !trimmed.includes(' ') &&
+        (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
+      ) {
+        setDetectedClipboardUrl(trimmed)
+      } else {
+        setDetectedClipboardUrl('')
+      }
+    }
+    void detectClipboard()
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [open])
 
   const resetForm = () => {
     // 重置回第一步：支持「帮助菜单 → 新手引导」重新打开时从导入步开始
     setStep('input')
     setUrl('')
+    setDetectedClipboardUrl('')
     setSubmitting(false)
     setErrorMessage('')
     setGaveUp(false)
@@ -256,11 +295,19 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     onClose()
   }
 
-  const handleOpenWikiAndFinish = () => {
+  const handleOpenGithubStarAndFinish = () => {
     markGuided()
     resetForm()
-    onOpenWiki()
+    if (onOpenGithub) {
+      onOpenGithub()
+    } else {
+      onOpenWiki()
+    }
     onClose()
+  }
+
+  const handleOpenWikiOnly = () => {
+    onOpenWiki()
   }
 
   const handleDismissLater = () => {
@@ -277,12 +324,52 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   const disabledText = isRetro3D ? 'rgba(44, 31, 3, 0.55)' : 'text.disabled'
   const readyColor = isRetro3D ? '#1B5E20' : 'success.main'
   const warningColor = isRetro3D ? '#8C4A03' : 'warning.main'
+  const starAccentColor = isRetro3D
+    ? '#7A3E00'
+    : theme.palette.mode === 'dark'
+      ? '#FFD54F'
+      : '#B26A00'
 
   const statusColor = proxyReady
     ? readyColor
     : gaveUp
       ? warningColor
       : secondaryText
+
+  const stepBadge = (currentStep: 1 | 2) => (
+    <Box
+      sx={{
+        ml: 'auto',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.75,
+        px: 1,
+        py: 0.25,
+        borderRadius: '999px',
+        fontSize: '11px',
+        fontWeight: 700,
+        letterSpacing: '0.5px',
+        bgcolor: isRetro3D
+          ? 'rgba(44, 31, 3, 0.12)'
+          : 'rgba(128, 128, 128, 0.14)',
+        color: secondaryText,
+        border: '1px solid',
+        borderColor: isRetro3D
+          ? 'rgba(44, 31, 3, 0.22)'
+          : 'rgba(128, 128, 128, 0.24)',
+      }}
+    >
+      <Box
+        sx={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          bgcolor: currentStep === 1 ? 'primary.main' : readyColor,
+        }}
+      />
+      <span>STEP {currentStep} / 2</span>
+    </Box>
+  )
 
   return (
     <>
@@ -307,8 +394,8 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               ...get3DCardStyle(theme, 'default'),
               p: 0,
               overflow: 'hidden',
-              width: 'calc(100% - 32px)',
-              maxWidth: '430px',
+              width: 'calc(100% - 28px)',
+              maxWidth: '440px',
               borderRadius: '10px',
             },
           },
@@ -320,9 +407,9 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               sx={{
                 color: 'inherit',
                 fontWeight: 'bold',
-                fontSize: '16px',
+                fontSize: '15.5px',
                 px: 2.5,
-                py: 2,
+                py: 1.75,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
@@ -331,6 +418,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             >
               <span>🎉</span>
               <span>{t('layout.components.firstRun.title')}</span>
+              {stepBadge(1)}
             </DialogTitle>
 
             <DialogContent sx={{ px: 2.5, py: 2 }}>
@@ -339,12 +427,105 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 sx={{
                   color: secondaryText,
                   lineHeight: 1.6,
-                  mb: 2,
-                  fontSize: '13.5px',
+                  mb: 1.5,
+                  fontSize: '13px',
                 }}
               >
                 {t('layout.components.firstRun.intro')}
               </Typography>
+
+              {/* 三大核心价值亮点胶囊 */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 0.75,
+                  mb: 1.75,
+                }}
+              >
+                {(
+                  [
+                    'layout.components.firstRun.featureAutoSelect',
+                    'layout.components.firstRun.featureDnsGuard',
+                    'layout.components.firstRun.featureStealth',
+                  ] as const
+                ).map((featureKey) => (
+                  <Box
+                    key={featureKey}
+                    sx={{
+                      px: 1,
+                      py: 0.35,
+                      borderRadius: '6px',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      color: 'inherit',
+                      bgcolor: isRetro3D
+                        ? 'rgba(44, 31, 3, 0.1)'
+                        : (t2) =>
+                            t2.palette.mode === 'dark'
+                              ? 'rgba(255, 255, 255, 0.06)'
+                              : 'rgba(0, 0, 0, 0.04)',
+                      border: '1px solid',
+                      borderColor: isRetro3D
+                        ? 'rgba(44, 31, 3, 0.2)'
+                        : (t2) => t2.palette.divider,
+                    }}
+                  >
+                    {t(featureKey)}
+                  </Box>
+                ))}
+              </Box>
+
+              {/* 剪贴板智能探测横幅：若剪贴板已是 http(s) 订阅链接且输入框为空，提供一键点击填入 */}
+              {detectedClipboardUrl && !url && (
+                <Box
+                  onClick={() => {
+                    if (submitting) return
+                    setUrl(detectedClipboardUrl)
+                    setErrorMessage('')
+                    inputRef.current?.focus()
+                  }}
+                  sx={{
+                    mb: 1.25,
+                    px: 1.25,
+                    py: 0.75,
+                    borderRadius: '6px',
+                    cursor: submitting ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 1,
+                    bgcolor: isRetro3D
+                      ? 'rgba(27, 94, 32, 0.12)'
+                      : (t2) =>
+                          t2.palette.mode === 'dark'
+                            ? 'rgba(46, 125, 50, 0.18)'
+                            : 'rgba(46, 125, 50, 0.1)',
+                    border: '1px dashed',
+                    borderColor: isRetro3D
+                      ? 'rgba(27, 94, 32, 0.45)'
+                      : 'success.main',
+                    transition: 'transform 0.12s ease',
+                    '&:hover': {
+                      transform: 'translateY(-1px)',
+                    },
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: readyColor,
+                      fontWeight: 700,
+                      fontSize: '12px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ✨ {t('layout.components.firstRun.clipboardDetected')}
+                  </Typography>
+                </Box>
+              )}
 
               <Box sx={{ mb: 1 }}>
                 <TextField
@@ -396,7 +577,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  mt: 1.5,
+                  mt: 1.25,
                 }}
               >
                 <Button
@@ -406,6 +587,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   disabled={submitting}
                   sx={{
                     fontSize: '12px',
+                    fontWeight: 600,
                     textTransform: 'none',
                     color: 'primary.main',
                     px: 0.5,
@@ -426,7 +608,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             <DialogActions
               sx={{
                 px: 2.5,
-                py: 1.8,
+                py: 1.75,
                 gap: 1,
                 borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
@@ -454,9 +636,9 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               sx={{
                 color: readyColor,
                 fontWeight: 'bold',
-                fontSize: '16px',
+                fontSize: '15.5px',
                 px: 2.5,
-                py: 2,
+                py: 1.75,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
@@ -465,13 +647,15 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             >
               <span>🚀</span>
               <span>{t('layout.components.firstRun.readyTitle')}</span>
+              {stepBadge(2)}
             </DialogTitle>
 
             <DialogContent sx={{ px: 2.5, py: 2 }}>
+              {/* 卡片 1：实时节点连通仪表盘 */}
               <Box
                 sx={{
                   p: 1.5,
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   bgcolor: (t2) =>
                     t2.palette.mode === 'dark'
                       ? 'rgba(76, 175, 80, 0.12)'
@@ -479,18 +663,18 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   border: '1px solid',
                   borderColor: (t2) =>
                     t2.palette.mode === 'dark'
-                      ? 'rgba(76, 175, 80, 0.3)'
-                      : 'rgba(76, 175, 80, 0.25)',
-                  mb: 2,
+                      ? 'rgba(76, 175, 80, 0.32)'
+                      : 'rgba(76, 175, 80, 0.28)',
+                  mb: 1.5,
                 }}
               >
                 <Typography
                   variant="body2"
                   sx={{
-                    fontWeight: 600,
+                    fontWeight: 700,
                     color: readyColor,
                     mb: 0.5,
-                    fontSize: '14px',
+                    fontSize: '13.5px',
                   }}
                 >
                   ✅ {t('layout.components.firstRun.imported')}
@@ -514,7 +698,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                       color: statusColor,
                       fontWeight: 600,
                       lineHeight: 1.5,
-                      fontSize: '13px',
+                      fontSize: '12.5px',
                     }}
                   >
                     {proxyReady
@@ -525,6 +709,57 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   </Typography>
                 </Box>
 
+                {/* 当前活跃出口节点与实测毫秒级延迟胶囊 */}
+                {activeNodeName && (
+                  <Box
+                    sx={{
+                      mt: 1,
+                      pt: 0.85,
+                      borderTop: '1px dashed rgba(128, 128, 128, 0.25)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: secondaryText,
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      🌐 {t('layout.components.firstRun.activeNodeLabel')}:{' '}
+                      <Box
+                        component="span"
+                        sx={{ color: 'text.primary', fontWeight: 700 }}
+                      >
+                        {activeNodeName}
+                      </Box>
+                    </Typography>
+                    {proxyReady && activeDelay !== null && (
+                      <Box
+                        sx={{
+                          px: 0.85,
+                          py: 0.15,
+                          borderRadius: '999px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          color: readyColor,
+                          bgcolor: 'rgba(76, 175, 80, 0.18)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        ⚡ {activeDelay} ms
+                      </Box>
+                    )}
+                  </Box>
+                )}
+
                 {!sysproxy?.enable && (
                   <Typography
                     variant="body2"
@@ -532,7 +767,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                       color: warningColor,
                       fontWeight: 600,
                       mt: 0.75,
-                      fontSize: '12.5px',
+                      fontSize: '12px',
                       lineHeight: 1.5,
                     }}
                   >
@@ -541,22 +776,77 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 )}
               </Box>
 
-              <Typography
-                variant="body2"
+              {/* 卡片 2：金色星标 GitHub Star 开源应援卡片 */}
+              <Box
                 sx={{
-                  color: secondaryText,
-                  lineHeight: 1.6,
-                  fontSize: '13px',
+                  p: 1.5,
+                  borderRadius: '8px',
+                  bgcolor: isRetro3D
+                    ? 'rgba(255, 255, 255, 0.22)'
+                    : (t2) =>
+                        t2.palette.mode === 'dark'
+                          ? 'rgba(255, 193, 7, 0.09)'
+                          : 'rgba(255, 193, 7, 0.1)',
+                  border: '1px solid',
+                  borderColor: isRetro3D
+                    ? 'rgba(122, 62, 0, 0.35)'
+                    : 'rgba(255, 193, 7, 0.45)',
                 }}
               >
-                {t('layout.components.firstRun.wikiHint')}
-              </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
+                    color: starAccentColor,
+                    mb: 0.5,
+                    fontSize: '13.5px',
+                  }}
+                >
+                  ⭐ {t('layout.components.firstRun.starTitle')}
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: secondaryText,
+                    lineHeight: 1.55,
+                    fontSize: '12.5px',
+                  }}
+                >
+                  {t('layout.components.firstRun.wikiHint')}
+                </Typography>
+
+                <Box
+                  sx={{
+                    mt: 0.75,
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={handleOpenWikiOnly}
+                    sx={{
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      color: 'primary.main',
+                      py: 0.2,
+                      px: 0.75,
+                      minHeight: 'auto',
+                    }}
+                  >
+                    📖 {t('layout.components.firstRun.openWiki')} ↗
+                  </Button>
+                </Box>
+              </Box>
             </DialogContent>
 
             <DialogActions
               sx={{
                 px: 2.5,
-                py: 1.8,
+                py: 1.75,
                 gap: 1,
                 borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
@@ -569,9 +859,9 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               </Button>
               <Button
                 sx={get3DButtonStyle(theme, 'contained', 'primary')}
-                onClick={handleOpenWikiAndFinish}
+                onClick={handleOpenGithubStarAndFinish}
               >
-                🌐 {t('layout.components.firstRun.openWiki')}
+                ⭐ {t('layout.components.firstRun.openGithubStar')}
               </Button>
             </DialogActions>
           </>

@@ -79,6 +79,7 @@ import { BasicSettingsCard } from './_layout/components/basic-settings-card'
 import { ConnectionsPanel } from './_layout/components/connections-panel'
 import {
   FirstRunGuideDialog,
+  CLASH_MINI_GITHUB_URL,
   CLASH_MINI_WIKI_URL,
   FIRST_RUN_GUIDE_STORAGE_KEY,
 } from './_layout/components/first-run-guide-dialog'
@@ -1964,6 +1965,11 @@ const Layout = () => {
           open={firstRunGuideOpen}
           onClose={() => setFirstRunGuideOpen(false)}
           onImport={handleImportProfile}
+          onOpenGithub={() => {
+            openWebUrl(CLASH_MINI_GITHUB_URL).catch((e) => {
+              console.error('[FirstRunGuide] 打开 GitHub 失败:', e)
+            })
+          }}
           onOpenWiki={() => {
             openWebUrl(CLASH_MINI_WIKI_URL).catch((e) => {
               console.error('[FirstRunGuide] 打开 Wiki 失败:', e)
