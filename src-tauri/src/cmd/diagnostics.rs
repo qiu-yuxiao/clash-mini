@@ -458,6 +458,8 @@ proxies:
     }
 
     #[tokio::test]
+    // 测试断言前置条件用 unwrap 简洁明了，失败即测试失败，属预期用法
+    #[allow(clippy::unwrap_used)]
     async fn tail_cap_keeps_small_log_intact() {
         let path = unique_temp("small");
         let content = "line 1\nline 2\nline 3\n";
@@ -478,6 +480,8 @@ proxies:
     }
 
     #[tokio::test]
+    // 测试断言前置条件用 unwrap 简洁明了，失败即测试失败，属预期用法
+    #[allow(clippy::unwrap_used)]
     async fn tail_cap_truncates_large_log_from_end() {
         let path = unique_temp("large");
         let content = "line 1: ancient\nline 2: middle\nline 3: recent\nline 4: newest\n";

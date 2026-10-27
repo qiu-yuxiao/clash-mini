@@ -1315,7 +1315,7 @@ fallback:
     #[test]
     fn foreign_plain_dns_upstreams_in_nameserver_are_sanitized_to_doh() {
         use super::sanitize_foreign_plain_dns_upstreams;
-        use serde_yaml_ng::{Mapping, Value};
+        use serde_yaml_ng::Mapping;
 
         let config: Mapping = serde_yaml_ng::from_str(
             r"

@@ -226,8 +226,10 @@ mod tests {
 
     #[test]
     fn legacy_config_without_version_is_treated_as_v1() {
-        let mut cfg = IVerge::default();
-        cfg.config_version = None;
+        let mut cfg = IVerge {
+            config_version: None,
+            ..Default::default()
+        };
         // 缺失版本 = v1，应迁移到当前版本
         let v = migrate_verge(&mut cfg, IMPLICIT_LEGACY_VERSION);
         assert_eq!(v, CURRENT_VERGE_CONFIG_VERSION);
@@ -235,24 +237,30 @@ mod tests {
 
     #[test]
     fn v1_to_v2_normalizes_legacy_start_page() {
-        let mut cfg = IVerge::default();
-        cfg.start_page = Some("/home".into());
+        let mut cfg = IVerge {
+            start_page: Some("/home".into()),
+            ..Default::default()
+        };
         migrate_verge(&mut cfg, 1);
         assert_eq!(cfg.start_page.as_deref(), Some("/"));
     }
 
     #[test]
     fn v1_to_v2_keeps_other_start_pages() {
-        let mut cfg = IVerge::default();
-        cfg.start_page = Some("/proxy".into());
+        let mut cfg = IVerge {
+            start_page: Some("/proxy".into()),
+            ..Default::default()
+        };
         migrate_verge(&mut cfg, 1);
         assert_eq!(cfg.start_page.as_deref(), Some("/proxy"));
     }
 
     #[test]
     fn migration_is_idempotent() {
-        let mut cfg = IVerge::default();
-        cfg.start_page = Some("/home".into());
+        let mut cfg = IVerge {
+            start_page: Some("/home".into()),
+            ..Default::default()
+        };
         migrate_verge(&mut cfg, 1);
         let after_first = cfg.start_page.clone();
         // 再跑一次（已是最新版本）不应改变任何东西
@@ -262,8 +270,10 @@ mod tests {
 
     #[test]
     fn future_version_is_not_downgraded() {
-        let mut cfg = IVerge::default();
-        cfg.start_page = Some("/home".into());
+        let mut cfg = IVerge {
+            start_page: Some("/home".into()),
+            ..Default::default()
+        };
         // 高于当前程序支持的版本 → 不迁移、不降级，原样返回
         let v = migrate_verge(&mut cfg, CURRENT_VERGE_CONFIG_VERSION + 5);
         assert_eq!(v, CURRENT_VERGE_CONFIG_VERSION + 5);
@@ -273,21 +283,27 @@ mod tests {
 
     #[test]
     fn v2_to_v3_raises_legacy_log_count() {
-        let mut cfg = IVerge::default();
-        cfg.app_log_max_count = Some(8);
+        let mut cfg = IVerge {
+            app_log_max_count: Some(8),
+            ..Default::default()
+        };
         migrate_verge(&mut cfg, 2);
         assert_eq!(cfg.app_log_max_count, Some(40));
     }
 
     #[test]
     fn v2_to_v3_keeps_custom_log_count() {
-        let mut cfg = IVerge::default();
-        cfg.app_log_max_count = Some(12);
+        let mut cfg = IVerge {
+            app_log_max_count: Some(12),
+            ..Default::default()
+        };
         migrate_verge(&mut cfg, 2);
         assert_eq!(cfg.app_log_max_count, Some(12));
     }
 
     #[test]
+    // 测试断言前置条件用 unwrap 简洁明了，失败即测试失败，属预期用法
+    #[allow(clippy::unwrap_used)]
     fn legacy_clash_config_without_version_is_treated_as_v1() {
         let mut map = serde_yaml_ng::Mapping::new();
         let mut tun = serde_yaml_ng::Mapping::new();
@@ -305,6 +321,8 @@ mod tests {
     }
 
     #[test]
+    // 测试断言前置条件用 unwrap 简洁明了，失败即测试失败，属预期用法
+    #[allow(clippy::unwrap_used)]
     fn clash_migration_is_idempotent() {
         let mut map = serde_yaml_ng::Mapping::new();
         let mut tun = serde_yaml_ng::Mapping::new();
@@ -319,6 +337,8 @@ mod tests {
     }
 
     #[test]
+    // 测试断言前置条件用 unwrap 简洁明了，失败即测试失败，属预期用法
+    #[allow(clippy::unwrap_used)]
     fn future_clash_version_is_not_downgraded() {
         let mut map = serde_yaml_ng::Mapping::new();
         let mut tun = serde_yaml_ng::Mapping::new();
@@ -351,6 +371,8 @@ mod tests {
     /// 存量配置会被误判为最新版、v1→v2 迁移（tun.stack "system" 归一化）整体失效。
     /// 检测必须先于模板合并 —— 本用例锁定该顺序契约。
     #[test]
+    // 测试断言前置条件用 unwrap 简洁明了，失败即测试失败，属预期用法
+    #[allow(clippy::unwrap_used)]
     fn detection_must_precede_template_merge() {
         // 存量配置：无 config_version，tun.stack 为旧默认 "system"
         let mut legacy = serde_yaml_ng::Mapping::new();
