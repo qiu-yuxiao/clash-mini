@@ -1,3 +1,18 @@
+## v3.1.4
+
+### ✨ Onboarding Experience & UI Consistency
+
+- **首次使用向导全链路重设计与 GitHub Star 激励转化（First-Run Onboarding Redesign）**：
+  - **两步式价值感知向导（`STEP 1 / 2` → `STEP 2 / 2`）**：新增顶部步骤胶囊徽章与三枚核心特性标识（智能优选低延迟节点 / 防 DNS 泄漏保护 / 轻量静默驻留）；
+  - **剪贴板智能嗅探一键填入**：弹窗打开时自动静默检测系统剪贴板，若包含单行 `http(s)://` 订阅链接且输入框为空，展示可一键填入的横幅提示，实现零键盘输入导入；
+  - **实时连通性仪表盘与开源支持卡**：导入成功后原地切换至第二步，实时展示当前最优出口节点名称与毫秒级延迟徽章，并新增暖金渐变 GitHub ⭐ Star 激励卡（含主按钮直达仓库测速点 Star 及次级 Wiki 指南入口）；
+  - **顶栏帮助菜单常驻 Star 入口**：`?` 帮助下拉菜单首项升级为醒目的 **`⭐ 去 GitHub 点亮 Star`**（13 个语种资源全量同步对齐）。
+- **顶部活跃节点栏与下方节点表格延迟颜色标准 100% 统一**：
+  - **现象**：此前顶部活跃节点栏（`ActiveNodeStatusCard` / `getSignalIcon`）沿用了独立硬编码的旧分段阈值（`200 / 300 / 500ms` 及 `info.main`）与三分支胶囊底色，导致同一延迟数值在 `200 ~ 4999ms` 区间内顶部栏与下方节点表格（`ProxyItem`）呈现出截然不同的颜色；
+  - **修复**：在 `src/services/delay.ts` 中收敛出共用颜色解析函数 `resolveSignalDelayColor`，使顶部活跃节点栏与下方节点表格 100% 共享 `formatDelayColor` 单一真源（`< 250ms` 绿色 `success.main`、`250 ~ 399ms` 主题色 `primary.main`、`400 ~ 4999ms` 橙色 `warning.dark`/`warning.main`、`0` 或 `>= 5000ms` 红色 `error.main`），同步修复胶囊背景色映射并补充深浅色主题全区间单测。
+
+---
+
 ## v3.1.3
 
 ### 🐞 Fixed Bugs & Core Lifecycle
