@@ -1,3 +1,28 @@
+## v3.1.3
+
+### 🐞 Fixed Bugs & Core Lifecycle
+
+- **关闭 TUN 模式后彻底释放系统服务并切回用户态 Sidecar（BUG-305 / F-01）**：
+  - **现象**：此前从 TUN 模式切回「系统代理」或「手动模式」时，仅执行 `UpdateFlags::CLASH_CONFIG` 热重载，Mihomo 内核仍继续驻留在高权限 Windows 服务（`RunningMode::Service`）中运行，未释放服务句柄也未切回普通用户态 `Sidecar`。同时前端开启 TUN 时在 `patchVerge` 之后又重复调用了一次 `restartCore()`，造成双重重启延迟。
+  - **修复**：后端 `determine_update_flags` 对比修改前后的 `enable_tun_mode` 与当前 `RunningMode`，开启或关闭 TUN 时均自动附加 `UpdateFlags::RESTART_CORE`，在关闭系统代理时先清理注册表再重启切换运行模式，并在 `RESTART_CORE` 已执行时跳过冗余热重载；前端移除重复的 `restartCore()` 调用并统一刷新系统运行态。
+- **Win32 `WM_SIZING` 防上边缘缩放下移钩子 100% 挂载生效（BUG-305 / F-02）**：
+  - **现象**：`setup_wm_sizing_hook` 原先仅在 `RunEvent::Ready` 中调用，比异步创建主窗口早约 0.5 秒触发，导致首次冷启动时 `get_webview_window("main")` 返回 `None` 跳过安装；且旧的全局重入锁在轻量模式销毁并重建主窗口后阻止为新 HWND 重新挂载钩子。
+  - **修复**：将 `setup_wm_sizing_hook` 迁入 `build_new_window` 窗口创建后立即执行，并改用 `HOOKED_HWND` 按窗口句柄原子判重，确保初次启动与轻量模式唤醒重建窗口后均 100% 生效。
+- **单例唤醒补齐 `clash-mini://` 协议匹配并修复 Deep Link 参数截断（BUG-305 / F-03）**：
+  - **修复**：`check_singleton` 新增 `clash-mini:` 与 `clash-verge:` 协议前缀识别，改用 `.query(&[("param", param)])` 自动对含 `&` 的订阅 URL 进行百分比编码，防止服务端查询参数截断；非 `--silent` 普通二次启动时正确唤醒已有实例主窗口。
+
+### ⚡ Performance & Bundle Size Optimization
+
+- **剥离未使用的 Monaco Editor 子系统与 16 个冗余依赖（BUG-305 / FE-01, FE-02, FE-04, FE-08, FE-09, FE-10）**：
+  - 移除零引用的 Monaco 编辑器组件、YAML Worker 及 16 个未使用的 npm 依赖包（`node_modules` 净减 122 个包），前端 `dist/` 构建产物直降 **>4.4MB (>60%)**；
+  - 清理 4 个无引用历史基础组件、约 560 行未使用的手动出站代理配置与 WebDAV 类型定义、以及后端 13 语种共 52 处孤立 i18n 键；`vite.config.mts` 移除遗留的 `safari>=14` 目标，进一步缩减 polyfill 体积。
+- **前后端热路径与渲染生命周期优化（BUG-305 / F-04, F-05, F-06, F-07, FE-03, FE-05, FE-06, FE-07）**：
+  - `get_proxy_addr` 改用强类型轻量结构体单次读取并反序列化 `clash-mini.yaml`，消除 fallback 阶段的二次磁盘读取与全量动态 AST 构建；
+  - 残留核心清理改用 `System::new_with_specifics` 仅扫描进程列表，避免枚举磁盘/网卡/传感器带来的 50~150ms 阻塞；后台监控任务覆盖前显式 `abort` 旧句柄；系统服务管理命令统一解析 `%SystemRoot%\System32\sc.exe` 绝对路径并规范化安装器路径；
+  - `useProxyDelayState` 改用 `useReducer` 惰性初始化消除节点卡片挂载时的首帧双重渲染；`FirstRunGuideDialog` 解耦为细粒度 Context 订阅；`ProxyRenderComponent` 移除无效的 `useVerge` / `useIconCache` 行级订阅；收敛 `useSkinControls` 与 `useCustomTheme` 的 `controlSkin` 状态为单一真源。
+
+---
+
 ## v3.1.2
 
 ### 🐞 Fixed Bugs & Threshold Consistency
