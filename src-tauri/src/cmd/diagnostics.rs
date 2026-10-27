@@ -49,6 +49,9 @@ const REDACTED: &str = "***REDACTED***";
 /// 日志正文脱敏规则 1：敏感键值对（`token=xxx` / `password: xxx` / `"secret":"xxx"` 等）。
 /// 长词在前避免 alternation 短路（auth-str 必须排在 auth 之前）。
 /// 兼容键带引号（JSON 形态 `"password":"xxx"`）及值带引号的情况。
+// 正则字面量为编译期常量，模式合法性与代码同生命周期，expect 失败属程序性错误，
+// 静态项上 panic 是预期行为（clippy::expect_used 豁免）。
+#[allow(clippy::expect_used)]
 static LOG_SENSITIVE_KV: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r#"(?i)(["']?\b(?:obfs-password|auth-str|password|passwd|secret|token|uuid|auth|sign)\b["']?)"#,
@@ -58,6 +61,7 @@ static LOG_SENSITIVE_KV: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// 日志正文脱敏规则 2：URL / 连接中的 userinfo（`user:pass@host`，订阅链接或代理带认证的形态）。
+#[allow(clippy::expect_used)]
 static LOG_URL_USERINFO: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)((?:[a-z][a-z0-9+.-]*://)?)[^\s@/:]+:[^\s@/:]+@").expect("log url userinfo regex")
 });
@@ -101,10 +105,13 @@ async fn read_log_file_with_tail_cap(path: &std::path::Path, max_bytes: usize) -
 ///
 /// 单独成规则的原因：认证头的值常常不是 `key=value` 形态（如 `Bearer eyJ...`），
 /// 普通 KV 规则只吃掉第一个 token（`Bearer`），后面真正的令牌会漏出来。
+// 正则字面量为编译期常量，模式合法性同上，expect 失败属程序性错误（clippy::expect_used 豁免）。
+#[allow(clippy::expect_used)]
 static LOG_AUTH_HEADER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)(\bauthorization\s*[=:]\s*)[^\r\n]+").expect("log auth header regex"));
 
 /// 日志正文脱敏规则 0b：裸 `Bearer <token>`（日志里没带 Authorization 前缀时兜底）。
+#[allow(clippy::expect_used)]
 static LOG_BEARER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?i)(\bbearer\s+)[^\s"&,;]+"#).expect("log bearer regex"));
 

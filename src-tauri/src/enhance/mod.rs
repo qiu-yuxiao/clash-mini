@@ -523,6 +523,68 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     config
 }
 
+/// 【订阅 DNS 卫生改写】境外公共 DNS 的明文 UDP 上游改写为 DoH 形态。
+///
+/// 机场订阅常在 `dns.nameserver` 里自带明文 UDP 上游（如 `8.8.8.8`）。在
+/// `respect-rules: true` 下，内核自身发起的这类 DNS 查询会命中
+/// `IP-CIDR,8.8.8.8/32,PROXY` 被塞进代理节点；当节点为 anytls 等 TCP 承载协议时
+/// （UDP-over-TCP），每个 UDP 查询都要先向节点新建一条 TCP 会话——该会话建立
+/// 慢于境内 DoH 上游，在内核 DNS 并发赛跑中必被取消，刷出大量
+/// `failed to create session: dial tcp <node>: operation was canceled` 警告
+/// （3.1.7 现场实证：7 条全部落在 anytls 被选中窗口内，切 ss 节点后零新增）。
+///
+/// 改写为 DoH（TCP 承载，走代理稳定）后该竞速取消彻底消失。范围界定：
+/// - 仅处理 `nameserver`：`default-nameserver` 按协议定义必须为明文 IP
+///   （用于解析 DoH 域名本身），不可改写；境内明文上游（223.5.5.5 /
+///   114.114.114.114 等）直连可达且稳定赢得赛跑，无需处理。
+/// - 已带 scheme（`tls://`、`https://`、`quic://` 等）的加密上游原样保留。
+/// - 仅覆盖四家境外公共 DNS 的已知 IP（Google 8.8.8.8/8.8.4.4、
+///   Cloudflare 1.1.1.1/1.0.0.1），与 `dns_fallback_proxy_rules` 的对偶口径一致。
+fn sanitize_foreign_plain_dns_upstreams(mut config: Mapping) -> Mapping {
+    use serde_yaml_ng::Value;
+
+    const FOREIGN_PUBLIC_DNS_DOH: [(&str, &str); 4] = [
+        ("8.8.8.8", "https://8.8.8.8/dns-query"),
+        ("8.8.4.4", "https://8.8.4.4/dns-query"),
+        ("1.1.1.1", "https://1.1.1.1/dns-query"),
+        ("1.0.0.1", "https://1.0.0.1/dns-query"),
+    ];
+
+    let Some(Value::Mapping(dns)) = config.get_mut("dns") else {
+        return config;
+    };
+    let Some(Value::Sequence(nameservers)) = dns.get_mut("nameserver") else {
+        return config;
+    };
+
+    let mut rewritten: Vec<std::string::String> = Vec::new();
+    for entry in nameservers.iter_mut() {
+        let Value::String(raw) = entry else { continue };
+        let trimmed = raw.trim();
+        // 已是加密上游（带 scheme）不动
+        if trimmed.contains("://") {
+            continue;
+        }
+        // 明文形式：裸 IP 或 `IP:53` 端口写法，取主机部分比对
+        let Some(host) = extract_upstream_host(trimmed) else {
+            continue;
+        };
+        if let Some((ip, doh)) = FOREIGN_PUBLIC_DNS_DOH.iter().find(|(ip, _)| *ip == host) {
+            *entry = Value::String(doh.to_string());
+            rewritten.push((*ip).to_string());
+        }
+    }
+    if !rewritten.is_empty() {
+        logging!(
+            info,
+            Type::Core,
+            "DNS nameserver 境外明文 UDP 上游已改写为 DoH（消除穿代理 UDP 竞速取消）：{}",
+            rewritten.join(", ")
+        );
+    }
+    config
+}
+
 /// 从 DNS 上游字符串中取出主机名部分。
 ///
 /// 支持 mihomo 的全部常见写法：`1.1.1.1`、`8.8.8.8:53`、
@@ -1014,6 +1076,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
 
     // dns settings
     config = apply_mandatory_dns_settings(config);
+    config = sanitize_foreign_plain_dns_upstreams(config);
 
     let mut exists_keys_set = HashSet::new();
     exists_keys_set.extend(exists_keys);
@@ -1242,6 +1305,93 @@ fallback:
         assert!(dns_fallback_proxy_rules(None).is_empty());
         let empty: Mapping = serde_yaml_ng::from_str("enable: true").unwrap();
         assert!(dns_fallback_proxy_rules(Some(&Value::Mapping(empty))).is_empty());
+    }
+
+    /// 回归（BUG-308）：订阅自带 `dns.nameserver` 含境外明文 UDP 上游（如 8.8.8.8）时，
+    /// `respect-rules: true` 下该查询穿代理，TCP 承载节点（anytls）上 UDP-over-TCP 会话
+    /// 建立慢于境内 DoH、在 DNS 并发赛跑中必被取消（3.1.7 现场实证 7 条
+    /// `failed to create session` 全落在 anytls 窗口内）。锁定「明文境外公共 DNS → DoH
+    /// 改写、境内明文与加密上游保留、default-nameserver 不动」的卫生改写约定。
+    #[test]
+    fn foreign_plain_dns_upstreams_in_nameserver_are_sanitized_to_doh() {
+        use super::sanitize_foreign_plain_dns_upstreams;
+        use serde_yaml_ng::{Mapping, Value};
+
+        let config: Mapping = serde_yaml_ng::from_str(
+            r"
+dns:
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+    - 8.8.8.8
+    - 8.8.8.8:53
+    - 1.1.1.1
+    - 223.5.5.5
+    - 114.114.114.114
+    - tls://8.8.4.4:853
+    - https://8.8.4.4/dns-query
+  default-nameserver:
+    - 223.6.6.6
+    - 8.8.8.8
+",
+        )
+        .unwrap();
+
+        let sanitized = sanitize_foreign_plain_dns_upstreams(config);
+        let dns = sanitized.get("dns").unwrap();
+        let nameservers: Vec<std::string::String> = dns
+            .get("nameserver")
+            .unwrap()
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap_or_default().to_string())
+            .collect();
+
+        assert_eq!(
+            nameservers,
+            vec![
+                std::string::String::from("https://doh.pub/dns-query"),
+                std::string::String::from("https://dns.alidns.com/dns-query"),
+                // 境外明文 UDP → DoH 改写（裸 IP 与 :53 端口两种写法）
+                std::string::String::from("https://8.8.8.8/dns-query"),
+                std::string::String::from("https://8.8.8.8/dns-query"),
+                std::string::String::from("https://1.1.1.1/dns-query"),
+                // 境内明文上游直连可达，保留
+                std::string::String::from("223.5.5.5"),
+                std::string::String::from("114.114.114.114"),
+                // 已加密上游原样保留
+                std::string::String::from("tls://8.8.4.4:853"),
+                std::string::String::from("https://8.8.4.4/dns-query"),
+            ],
+            "仅境外公共 DNS 明文形式被改写为 DoH"
+        );
+
+        // default-nameserver 按协议定义必须为明文 IP，不得改写
+        let defaults: Vec<std::string::String> = dns
+            .get("default-nameserver")
+            .unwrap()
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap_or_default().to_string())
+            .collect();
+        assert_eq!(
+            defaults,
+            vec![
+                std::string::String::from("223.6.6.6"),
+                std::string::String::from("8.8.8.8"),
+            ],
+            "default-nameserver 保持明文不动"
+        );
+
+        // 无 dns 段 / 无 nameserver 时安全跳过
+        let no_dns: Mapping = serde_yaml_ng::from_str("mixed-port: 7890").unwrap();
+        let untouched = sanitize_foreign_plain_dns_upstreams(no_dns);
+        assert!(untouched.get("dns").is_none());
+        let no_nameserver: Mapping = serde_yaml_ng::from_str("dns:\n  enable: true").unwrap();
+        let untouched = sanitize_foreign_plain_dns_upstreams(no_nameserver);
+        assert!(untouched.get("dns").unwrap().get("nameserver").is_none());
     }
 
     #[test]
