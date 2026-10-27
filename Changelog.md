@@ -1,3 +1,17 @@
+## v3.1.9
+
+### 🚀 Zero-Wait First-Run Routing & Onboarding Polish
+
+- **GFWList 规则集随安装包预置 + 运行期 24 小时定时更新闭环（BUG-309）**：
+  - **现象**：全新安装首次启动时，本地 `ruleset/gfwlist.yaml` 尚未存在，内核需等待后台节点并发测速完成并拉回规则文件后 `RULE-SET,gfwlist,PROXY` 才生效；在此之前用户若根据引导立即打开 GitHub 或 YouTube，会因规则集为空全部漏入 `MATCH,DIRECT` 直连超时（需等数分钟才通）；
+  - **发版自动拉取最新打包**：`scripts/prebuild.mjs` 新增 `resolveGfwlist` 任务，每次构建/发版时主动从多镜像源拉取最新 `Loyalsoldier/clash-rules` 的 `gfw.txt`（约 `95 KB`，6,500+ 条境外域名规则）并校验打包进 `resources/gfwlist.yaml`；
+  - **启动早期 0ms 释放到位**：`init_resources()` 在启动早期（内核拉起前）将随包 `gfwlist.yaml` 释放至运行目录 `ruleset/gfwlist.yaml`，使全新安装第 0 毫秒即具备完整境外域名分流能力，彻底省去首次启动拉取等待；
+  - **保留 24 小时定时更新且不回退**：继续保留 `rule-providers.gfwlist` 的 `interval: 86400`（24 小时）经 `PROXY` 自动定时更新；日常重启时若运行目录规则已被内核更新（`dest_modified > src_modified`），自动保留最新规则不被旧随包文件覆盖。
+- **首次使用向导弹窗（`FirstRunGuideDialog`）标题与步骤胶囊居中对齐**：
+  - 将弹窗标题与 `STEP 1 / 2`、`STEP 2 / 2` 胶囊统一调整为水平居中排布，视觉重心更稳重协调。
+
+---
+
 ## v3.1.8
 
 ### 🐞 DNS Hygiene & Code Quality
