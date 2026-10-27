@@ -392,11 +392,12 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             onKeyDown: handleDialogKeyDown,
             sx: {
               ...get3DCardStyle(theme, 'default'),
+              m: 0,
               p: 0,
               overflow: 'hidden',
-              width: 'calc(100% - 28px)',
-              maxWidth: '440px',
-              borderRadius: '10px',
+              width: '100%',
+              maxWidth: '520px',
+              borderRadius: '8px',
             },
           },
         }}
@@ -407,12 +408,12 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               sx={{
                 color: 'inherit',
                 fontWeight: 'bold',
-                fontSize: '15.5px',
-                px: 2.5,
-                py: 1.75,
+                fontSize: '15px',
+                px: 1.5,
+                py: 1.5,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1,
+                gap: 0.75,
                 borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
@@ -421,7 +422,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               {stepBadge(1)}
             </DialogTitle>
 
-            <DialogContent sx={{ px: 2.5, py: 2 }}>
+            <DialogContent sx={{ px: 1.5, py: 1.75 }}>
               <Typography
                 variant="body2"
                 sx={{
@@ -607,21 +608,28 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 
             <DialogActions
               sx={{
-                px: 2.5,
-                py: 1.75,
+                px: 1.5,
+                py: 1.5,
                 gap: 1,
                 borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <Button
-                sx={get3DButtonStyle(theme, 'outlined', 'default')}
+                sx={{
+                  ...get3DButtonStyle(theme, 'outlined', 'default'),
+                  whiteSpace: 'nowrap',
+                }}
                 onClick={handleDismissLater}
                 disabled={submitting}
               >
                 {t('layout.components.firstRun.later')}
               </Button>
               <Button
-                sx={get3DButtonStyle(theme, 'contained', 'primary')}
+                sx={{
+                  ...get3DButtonStyle(theme, 'contained', 'primary'),
+                  flex: 1,
+                  whiteSpace: 'nowrap',
+                }}
                 onClick={handleSubmitImport}
                 loading={submitting}
                 disabled={submitting}
@@ -636,12 +644,12 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               sx={{
                 color: readyColor,
                 fontWeight: 'bold',
-                fontSize: '15.5px',
-                px: 2.5,
-                py: 1.75,
+                fontSize: '15px',
+                px: 1.5,
+                py: 1.5,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1,
+                gap: 0.75,
                 borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
@@ -650,7 +658,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               {stepBadge(2)}
             </DialogTitle>
 
-            <DialogContent sx={{ px: 2.5, py: 2 }}>
+            <DialogContent sx={{ px: 1.5, py: 1.75 }}>
               {/* 卡片 1：实时节点连通仪表盘 */}
               <Box
                 sx={{
@@ -845,20 +853,27 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 
             <DialogActions
               sx={{
-                px: 2.5,
-                py: 1.75,
+                px: 1.5,
+                py: 1.5,
                 gap: 1,
                 borderTop: (t2) => `1px solid ${t2.palette.divider}`,
               }}
             >
               <Button
-                sx={get3DButtonStyle(theme, 'outlined', 'default')}
+                sx={{
+                  ...get3DButtonStyle(theme, 'outlined', 'default'),
+                  whiteSpace: 'nowrap',
+                }}
                 onClick={handleFinish}
               >
                 {t('layout.components.firstRun.finish')}
               </Button>
               <Button
-                sx={get3DButtonStyle(theme, 'contained', 'primary')}
+                sx={{
+                  ...get3DButtonStyle(theme, 'contained', 'primary'),
+                  flex: 1,
+                  whiteSpace: 'nowrap',
+                }}
                 onClick={handleOpenGithubStarAndFinish}
               >
                 ⭐ {t('layout.components.firstRun.openGithubStar')}
