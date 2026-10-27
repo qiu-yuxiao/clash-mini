@@ -1,3 +1,17 @@
+## v3.1.6
+
+### ✨ Connections Table & Wide-Window Layout Improvements
+
+- **宽窗口路径控制表格「路由」列支持点击循环排序（活跃 & 历史连接通用）**：
+  - 为 `ConnectionTable` 的 `chains`（路由）列补齐 `accessorFn`（按实际展示的「代理 / 直连 / 阻断 / 其它」路由类别提取排序键），支持与「链接目标」列一致的点击切换 **升序（`▲`）→ 降序（`▼`）→ 取消排序**，并将列宽由 `50px` 拓宽至 `64px` 防止排序箭头折行截断。
+- **修复连接表格无法上下滚动的问题（保持隐藏滚动条、鼠标滚轮丝滑滚动）**：
+  - 修复 `ConnectionsPanel` 表格外层容器默认 `display: block` 导致内部 `flex: 1, minHeight: 0` 失效、虚拟列表被撑高至全量高度而被裁切的问题；补齐 `display: 'flex', flexDirection: 'column', height: '100%'` 纵向滚动链路，同时保持无滚动条的简洁视觉（`scrollbarWidth: 'none'`），活跃与历史连接均可通过鼠标滚轮顺畅上下滚动。
+- **修复首次在设置界面将窗口拉至最宽时右侧路径控制面板偶发不出现的竞态（BUG-306）**：
+  - **现象**：拖拽窗口边缘至最大宽度（`640px`）时，末帧 `onResized` 事件常在 `pointerup` 后的 200ms 冷却期结束前触发；旧逻辑在 `WindowProvider.checkMaximized` 中因 `isWindowResizing()` 直接丢弃该事件，冷却结束后又无新 `onResized` 触发，导致 `isMinimalWidth` 卡在 `true`，需来回调整窗口才显示右侧面板；
+  - **修复**：移除纯内存计算函数 `syncGeometryAndLargeState` 前的 `isWindowResizing()` 拦截（0 次 IPC 调用），新增 `clash-mini-resize-ended` 收尾对账事件与 `toggleMaximize` 即时 `applyGeometry` 同步，确保首次拉宽或点击放大时右侧路径控制组件立即挂载显示。
+
+---
+
 ## v3.1.5
 
 ### ✨ UI & Onboarding Layout Refinement
