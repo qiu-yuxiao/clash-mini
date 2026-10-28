@@ -12,7 +12,7 @@
       "errImport": "Import fehlgeschlagen. Link prüfen und erneut versuchen",
       "readyTitle": "Einsatzbereit",
       "imported": "Abonnement importiert und aktiviert",
-      "checking": "Knotenverbindung wird geprüft…",
+      "checking": "Alle Knoten werden gemessen und der schnellste gewählt…",
       "readyOk": "Proxy ist bereit, Verbindung steht",
       "readyUnconfirmed": "Noch keine Knotenlatenz gemessen – evtl. läuft der Test noch oder der Knoten ist nicht verfügbar",
       "sysProxyOff": "Systemproxy ist aus. In den Einstellungen aktivieren und erneut versuchen",

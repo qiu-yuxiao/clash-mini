@@ -12,7 +12,7 @@
       "errImport": "Import failed. Check the link and try again",
       "readyTitle": "Ready to Go",
       "imported": "Subscription imported and activated",
-      "checking": "Checking node connectivity…",
+      "checking": "Benchmarking all nodes and selecting the fastest…",
       "readyOk": "Proxy is active and connected",
       "readyUnconfirmed": "Current node timed out. Click below to re-test and automatically switch to the fastest node, or enter the app to choose manually",
       "sysProxyOff": "System proxy is off. Enable it in Settings and try again",

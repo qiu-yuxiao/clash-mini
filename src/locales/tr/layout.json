@@ -12,7 +12,7 @@
       "errImport": "İçe aktarma başarısız. Bağlantıyı kontrol edip tekrar dene",
       "readyTitle": "Kullanıma Hazır",
       "imported": "Abonelik içe aktarıldı ve etkinleştirildi",
-      "checking": "Düğüm bağlantısı kontrol ediliyor…",
+      "checking": "Tüm düğümler test ediliyor ve en hızlısı otomatik seçiliyor…",
       "readyOk": "Proxy hazır, bağlantı kuruldu",
       "readyUnconfirmed": "Düğüm gecikmesi henüz ölçülmedi — test sürüyor olabilir ya da düğüm kullanılamıyor",
       "sysProxyOff": "Sistem proxy'si kapalı. Ayarlardan açıp tekrar dene",

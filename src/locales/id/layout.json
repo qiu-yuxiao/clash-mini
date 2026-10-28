@@ -12,7 +12,7 @@
       "errImport": "Gagal mengimpor. Periksa tautan lalu coba lagi",
       "readyTitle": "Siap Digunakan",
       "imported": "Langganan berhasil diimpor dan diaktifkan",
-      "checking": "Memeriksa konektivitas node…",
+      "checking": "Menguji kecepatan semua node dan memilih yang tercepat…",
       "readyOk": "Proxy siap, jaringan terhubung",
       "readyUnconfirmed": "Latensi node belum terukur — mungkin masih diuji atau node tidak tersedia",
       "sysProxyOff": "Proksi sistem mati. Aktifkan di Pengaturan lalu coba lagi",

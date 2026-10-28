@@ -46,8 +46,6 @@ export const FIRST_RUN_GUIDE_STORAGE_KEY = 'clash-mini-first-run-completed'
 const READY_TIMEOUT_MS = 20_000
 /** 就绪判定轮询间隔：借用既有代理上下文刷新，不另造测量链路 */
 const READY_POLL_INTERVAL_MS = 1_500
-/** 进入 Step 2/2 后若短时间内仍未拿到有效延迟，自动后台触发一次全节点并发测速优选 */
-const AUTO_SELECT_FALLBACK_DELAY_MS = 2_500
 
 interface FirstRunGuideDialogProps {
   open: boolean
@@ -206,29 +204,24 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     }
   }, [retesting])
 
-  // 进入 ready 步骤后若 2.5s 仍未测出有效延迟，自动后台触发一次全节点并发测速优选，
-  // 防止默认首节点不通而让用户干等 20 秒
+  // 进入 ready 步骤时立即在后台触发全节点并发测速优选，从订阅全部节点中选出最快节点
   useEffect(() => {
     if (!open || step !== 'ready' || proxyReady || autoRetestedRef.current) {
       return
     }
-    const timer = setTimeout(() => {
-      if (autoRetestedRef.current) return
-      autoRetestedRef.current = true
-      void (async () => {
-        try {
-          const profiles = await getProfiles()
-          const currentUid = profiles?.current || ''
-          if (currentUid) {
-            await triggerAutoSelect(currentUid, undefined, 0, true)
-          }
-          await refreshProxyRef.current?.({ forceFull: true })
-        } catch {
-          // ignore background fallback errors
+    autoRetestedRef.current = true
+    void (async () => {
+      try {
+        const profiles = await getProfiles()
+        const currentUid = profiles?.current || ''
+        if (currentUid) {
+          await triggerAutoSelect(currentUid, undefined, 0, true)
         }
-      })()
-    }, AUTO_SELECT_FALLBACK_DELAY_MS)
-    return () => clearTimeout(timer)
+        await refreshProxyRef.current?.({ forceFull: true })
+      } catch {
+        // ignore background auto-select errors
+      }
+    })()
   }, [open, step, proxyReady])
 
   // 进入 ready 步骤（或用户点击重测结束）开始计时，超时后停止等待，如实告知「未确认」并展示重测按钮
@@ -925,8 +918,8 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   </Typography>
                 </Box>
 
-                {/* 当前活跃出口节点与实测毫秒级延迟：标签与节点全称上下分行，避免长节点名被截断 */}
-                {activeNodeName && (
+                {/* 当前最优节点：仅在测速优选完成（proxyReady）或超时确认（isUnconfirmed）后才展示，避免一开始把未测速的默认首节点当作「最优节点」误导用户 */}
+                {activeNodeName && (proxyReady || isUnconfirmed) && (
                   <Box
                     sx={{
                       mt: 1,

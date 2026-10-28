@@ -12,7 +12,7 @@
       "errImport": "Error al importar. Revisa el enlace e inténtalo de nuevo",
       "readyTitle": "Listo para usar",
       "imported": "Suscripción importada y activada",
-      "checking": "Comprobando la conectividad del nodo…",
+      "checking": "Midiendo todos los nodos y seleccionando el más rápido…",
       "readyOk": "Proxy listo y conectado",
       "readyUnconfirmed": "Aún no se ha medido la latencia del nodo; puede que el test siga en curso o que el nodo no esté disponible",
       "sysProxyOff": "El proxy del sistema está desactivado. Actívalo en Ajustes e inténtalo de nuevo",

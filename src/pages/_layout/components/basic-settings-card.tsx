@@ -62,18 +62,19 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   // 用户在任务管理器禁用、或注册表被改写时，配置值不会变，只看配置会显示错误状态。
   // 后端启动时已按配置对账过一次（autostart::reconcile_on_startup），这里负责把
   // 运行期间的外部改动反映回 UI。
+  const isTogglingAutoLaunchRef = React.useRef(false)
   const [realAutoLaunch, setRealAutoLaunch] = React.useState<boolean | null>(
     null,
   )
   React.useEffect(() => {
     let alive = true
     getAutoLaunchStatus().then((status) => {
-      if (alive) setRealAutoLaunch(status)
+      if (alive && !isTogglingAutoLaunchRef.current) setRealAutoLaunch(status)
     })
     return () => {
       alive = false
     }
-  }, [verge?.enable_auto_launch])
+  }, [])
 
   React.useEffect(() => {
     if (document.activeElement !== inputRef.current) {
@@ -128,16 +129,20 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           <Switch
             size="small"
             checked={realAutoLaunch ?? verge?.enable_auto_launch ?? false}
-            onChange={(_, checked: boolean) => {
+            onChange={async (_, checked: boolean) => {
+              isTogglingAutoLaunchRef.current = true
               setRealAutoLaunch(checked)
-              patchVerge({ enable_auto_launch: checked }).catch(() => {
-                // patch 失败：verge 缓存已由 patchVerge 内部 refetch 回滚，但
-                // enable_auto_launch 值未变、useEffect 不会重跑 —— 若不处理，
-                // 乐观值会停留成与事实不符的状态。这里重置为 null 先落回配置值，
-                // 再重拉注册表真实状态纠偏（getAutoLaunchStatus 内部已兜底返回 null）。
+              try {
+                await patchVerge({ enable_auto_launch: checked })
+                // 后端写入注册表成功后，再对账确认真实状态
+                const status = await getAutoLaunchStatus()
+                setRealAutoLaunch(status)
+              } catch {
                 setRealAutoLaunch(null)
                 void getAutoLaunchStatus().then(setRealAutoLaunch)
-              })
+              } finally {
+                isTogglingAutoLaunchRef.current = false
+              }
             }}
             sx={{
               transform: 'scale(0.85)',
