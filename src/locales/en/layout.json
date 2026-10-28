@@ -22,7 +22,7 @@
       "featureAutoSelect": "⚡ Auto Best Node",
       "featureDnsGuard": "🛡️ DNS Leak Guard",
       "featureStealth": "🪶 Ultra-Light Mode",
-      "clipboardDetected": "Subscription URL detected in clipboard — click to fill",
+      "clipboardDetected": "Subscription URL detected in clipboard — click to fill or press Enter to import",
       "activeNodeLabel": "Active Node",
       "starTitle": "Enjoying Clash Mini? Give us a ⭐ Star on GitHub!",
       "openGithubStar": "Test & ⭐ Star on GitHub"

@@ -22,7 +22,7 @@
       "featureAutoSelect": "⚡ 自动测速择优",
       "featureDnsGuard": "🛡️ 零配置防泄漏",
       "featureStealth": "🪶 极窄隐匿轻量",
-      "clipboardDetected": "检测到剪贴板中有订阅链接，点击一键填入",
+      "clipboardDetected": "检测到剪贴板中有订阅链接，点击填入或按 Enter 直接导入",
       "activeNodeLabel": "当前最优节点",
       "starTitle": "喜欢 Clash Mini 吗？送我们一颗 ⭐ Star 吧！",
       "openGithubStar": "打开 GitHub 测速并点 ⭐ Star"

@@ -1,3 +1,20 @@
+## v3.2.0
+
+### ✨ Zero-Download Rule Pruning & First-Run Guide Experience Perfection
+
+- **剥离机场订阅未引用的残留 `rule-providers`，实现首次启动 100% 零外部规则下载（BUG-310）**：
+  - **现象**：部分机场原始订阅 YAML 自带了额外的 `rule-providers`（如 `China-Site.mrs`、`China-IP.mrs`、`Local-IP.mrs`）；虽然 Clash Mini 在 `enforce_mini_agreements` 中已用内置精简规则覆写了 `rules:`（未引用那些规则集），但保留在 `rule-providers:` 中的残留定义仍会触发 Mihomo 内核在首次启动时联网下载数百 KB 无用规则文件；
+  - **修复**：按最终生效的 `final_rules` 中 `RULE-SET,<name>` 实际引用的名称集合（默认仅有随包预置的 `gfwlist`）自动剔除未引用的 `rule-providers`，确保 Clash Mini 分流所需的 `gfwlist.yaml`、`Country.mmdb`、`geosite.dat` 100% 随安装包预置，首次启动零外部规则拉取。
+- **首次使用向导弹窗（`FirstRunGuideDialog`）Step 1/2 回车直通导入与剪贴板联动（BUG-310）**：
+  - **全窗口 `Enter` 监听兜底**：在弹窗 `Paper` 监听基础上新增 `window` 级 `keydown` 兜底监听（配合 `submittingRef` 防重入锁），解决首次启动延迟弹窗或异步剪贴板探测后焦点停留在 `document.body` 时按回车无响应的问题；
+  - **剪贴板订阅一键回车直导**：当输入框为空且剪贴板中已存在订阅链接时，无需先点击横幅或手动粘贴，直接按 `Enter` 键（或点击「立即导入并开启」、点击输入框右侧 `↵` 图标）即可自动填入剪贴板订阅链接并立即开始导入；
+  - **切回窗口自动重探测剪贴板**：监听窗口 `focus` 与 `visibilitychange` 事件，用户在打开软件后切去浏览器复制订阅链接再切回软件，即刻自动识别并支持直接按 `Enter` 导入。
+- **修复首次使用向导弹窗（`FirstRunGuideDialog`）Step 2/2 误报「系统代理未开启」的问题（BUG-310）**：
+  - **现象**：`getSystemProxy` 查询仅在打开设置抽屉时才启用，引导弹窗期间 `sysproxy` 恒为 `undefined`，且在 TUN 模式下 `sysproxy.enable` 本就为 `false`，导致旧逻辑 `!sysproxy?.enable` 在代理和节点已经正常工作时仍 100% 误报「⚠️ 系统代理未开启，请在设置中开启后再试」；
+  - **修复**：改用 `verge.enable_system_proxy || verge.enable_tun_mode || sysproxy?.enable` 判定真实流量接管状态，并在 Step 1/2 导入成功时若检测到系统代理与 TUN 均未开启则自动开启系统代理，彻底消除误导提示。
+
+---
+
 ## v3.1.9
 
 ### 🚀 Zero-Wait First-Run Routing & Onboarding Polish

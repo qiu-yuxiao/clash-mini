@@ -17,9 +17,10 @@ import {
 } from '@mui/material'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import type React from 'react'
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useVerge } from '@/hooks/use-verge'
 import {
   useAppRefreshers,
   useProxiesData,
@@ -79,16 +80,42 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     mouseY: number
   } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const submittingRef = useRef(false)
 
   // ── 就绪判定：复用细粒度代理与系统上下文，避免订阅全量 AppData 触发无关重绘 ──
   const { proxies } = useProxiesData()
   const { sysproxy } = useSystemData()
+  const { verge, patchVerge } = useVerge()
   const { refreshProxy } = useAppRefreshers()
   // refreshProxy 的引用不保证稳定，用 ref 持有，避免写进轮询副作用依赖后反复重排
   const refreshProxyRef = useRef(refreshProxy)
   useEffect(() => {
     refreshProxyRef.current = refreshProxy
   }, [refreshProxy])
+
+  const readClipboardSubscriptionUrl =
+    useCallback(async (): Promise<string> => {
+      let clip = ''
+      try {
+        clip = await readText()
+      } catch {
+        try {
+          clip = await navigator.clipboard.readText()
+        } catch {
+          // ignore permission errors
+        }
+      }
+      const trimmed = clip.trim()
+      if (
+        trimmed &&
+        !trimmed.includes('\n') &&
+        !trimmed.includes(' ') &&
+        (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
+      ) {
+        return trimmed
+      }
+      return ''
+    }, [])
 
   /** 当前选中的活跃出口节点名称 */
   const activeNodeName = useMemo(() => {
@@ -112,6 +139,18 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   const proxyReady =
     activeDelay !== null && activeDelay > 0 && activeDelay < NODE_DELAY_MAX_MS
 
+  /**
+   * 代理流量接管是否确实处于关闭状态：
+   * 1. sysproxy 在设置抽屉未打开时不查询（恒为 undefined），且 TUN 模式下 sysproxy.enable 本就为 false；
+   * 2. 因此必须以 verge.enable_system_proxy 或 verge.enable_tun_mode 为准，仅当 verge 已加载且所有接管方式均未开启时才提示。
+   */
+  const isTakeoverOff = Boolean(
+    verge &&
+      !verge.enable_system_proxy &&
+      !verge.enable_tun_mode &&
+      !sysproxy?.enable,
+  )
+
   // 进入 ready 步骤开始计时，超时后停止等待，如实告知「未确认」
   useEffect(() => {
     if (!open || step !== 'ready') return
@@ -130,50 +169,51 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     return () => clearInterval(timer)
   }, [open, step, proxyReady, gaveUp])
 
-  // 弹窗打开时尝试自动聚焦输入框，并静默探测剪贴板中是否已有待导入的 http(s) 订阅链接
+  // 弹窗打开或窗口切回前台时自动聚焦输入框，并静默探测剪贴板中是否已有待导入的 http(s) 订阅链接
   useEffect(() => {
-    if (!open) return
-    const timer = setTimeout(() => {
+    if (!open || step !== 'input') return
+    const timer1 = setTimeout(() => {
       inputRef.current?.focus()
     }, 100)
+    const timer2 = setTimeout(() => {
+      if (!document.activeElement || document.activeElement === document.body) {
+        inputRef.current?.focus()
+      }
+    }, 320)
 
     let cancelled = false
     const detectClipboard = async () => {
-      let clip = ''
-      try {
-        clip = await readText()
-      } catch {
-        try {
-          clip = await navigator.clipboard.readText()
-        } catch {
-          // ignore permission errors
-        }
-      }
-      if (cancelled || !clip) return
-      const trimmed = clip.trim()
-      if (
-        !trimmed.includes('\n') &&
-        !trimmed.includes(' ') &&
-        (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
-      ) {
-        setDetectedClipboardUrl(trimmed)
-      } else {
-        setDetectedClipboardUrl('')
-      }
+      const clipUrl = await readClipboardSubscriptionUrl()
+      if (cancelled) return
+      setDetectedClipboardUrl(clipUrl)
     }
     void detectClipboard()
 
+    const handleWindowFocusOrVisible = () => {
+      if (document.visibilityState === 'hidden') return
+      void detectClipboard()
+    }
+    window.addEventListener('focus', handleWindowFocusOrVisible)
+    document.addEventListener('visibilitychange', handleWindowFocusOrVisible)
+
     return () => {
       cancelled = true
-      clearTimeout(timer)
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      window.removeEventListener('focus', handleWindowFocusOrVisible)
+      document.removeEventListener(
+        'visibilitychange',
+        handleWindowFocusOrVisible,
+      )
     }
-  }, [open])
+  }, [open, step, readClipboardSubscriptionUrl])
 
   const resetForm = () => {
     // 重置回第一步：支持「帮助菜单 → 新手引导」重新打开时从导入步开始
     setStep('input')
     setUrl('')
     setDetectedClipboardUrl('')
+    submittingRef.current = false
     setSubmitting(false)
     setErrorMessage('')
     setGaveUp(false)
@@ -245,12 +285,22 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   }
 
   const handleSubmitImport = async () => {
-    if (submitting) return
-    const trimmed = url.trim()
+    if (submitting || submittingRef.current) return
+    let trimmed = url.trim() || detectedClipboardUrl.trim()
+    if (!trimmed) {
+      const clipUrl = await readClipboardSubscriptionUrl()
+      if (clipUrl) {
+        trimmed = clipUrl
+        setDetectedClipboardUrl(clipUrl)
+      }
+    }
     if (!trimmed) {
       setErrorMessage(t('layout.components.firstRun.errEmpty'))
       inputRef.current?.focus()
       return
+    }
+    if (url.trim() !== trimmed) {
+      setUrl(trimmed)
     }
 
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
@@ -258,6 +308,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
       return
     }
 
+    submittingRef.current = true
     setSubmitting(true)
     setErrorMessage('')
     setGaveUp(false)
@@ -265,6 +316,11 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     try {
       const success = await onImport(trimmed)
       if (success) {
+        // 若当前既未开启系统代理也未开启 TUN 模式，导入成功后自动开启系统代理，
+        // 兑现按钮「立即导入并开启」的语义并避免用户还要手动去设置开启
+        if (verge && !verge.enable_system_proxy && !verge.enable_tun_mode) {
+          void patchVerge({ enable_system_proxy: true }).catch(() => {})
+        }
         setStep('ready')
       } else {
         setErrorMessage(t('layout.components.firstRun.errImport'))
@@ -273,19 +329,40 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
       console.error('[FirstRunGuide] 导入异常:', err)
       setErrorMessage(t('layout.components.firstRun.errImport'))
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
 
-  // 【Enter 全局化】监听挂在 Dialog Paper 上：弹窗内任意位置按 Enter 都能导入。
-  // 旧实现只挂在输入框上——焦点一旦离开输入框（例如点了下方的提示文字），键盘事件
-  // 根本到不了监听器，表现为「按了回车毫无反应」（BUG-299）。
+  const handleSubmitImportRef = useRef(handleSubmitImport)
+  handleSubmitImportRef.current = handleSubmitImport
+
+  // 【Enter 全窗口监听】除了挂在 Dialog Paper 上，还在 window 级别兜底监听：
+  // 首次启动延迟弹窗或异步剪贴板探测后，activeElement 可能停留在 document.body（Paper 之外），
+  // 此时仅靠 Paper.onKeyDown 无法收到键盘冒泡事件。双保险 + submittingRef 防重入确保任意焦点位置按 Enter 均生效。
+  useEffect(() => {
+    if (!open || step !== 'input' || contextMenu !== null) return
+    const onWindowKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.isComposing || e.defaultPrevented) return
+      if (submittingRef.current) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest?.('button, [role="menuitem"]')) return
+      e.preventDefault()
+      void handleSubmitImportRef.current()
+    }
+    window.addEventListener('keydown', onWindowKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onWindowKeyDown)
+    }
+  }, [open, step, contextMenu])
+
+  // 【Enter 弹窗内监听】监听挂在 Dialog Paper 上：弹窗内任意位置按 Enter 都能导入。
   // 排除规则：
   //  · isComposing——中文输入法组词确认的 Enter 不算提交指令；
   //  · 焦点落在按钮上——放行按钮自身行为（「稍后」「粘贴」「导入」各自的 Enter 语义）。
   const handleDialogKeyDown = (e: React.KeyboardEvent) => {
     if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
-    if (submitting || step !== 'input') return
+    if (submitting || submittingRef.current || step !== 'input') return
     if ((e.target as HTMLElement).closest('button')) return
     e.preventDefault()
     void handleSubmitImport()
@@ -555,11 +632,19 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   sx={get3DInputStyle(theme)}
                   inputRef={inputRef}
                   onContextMenu={handleContextMenu}
-                  // 装饰性回车图标：呼应下方的 Enter 提示文字，同时弱化「提示文字像按钮」的观感
+                  // 回车图标：既呼应下方的 Enter 提示文字，也支持直接点击触发导入
                   slotProps={{
                     input: {
                       endAdornment: (
-                        <InputAdornment position="end">
+                        <InputAdornment
+                          position="end"
+                          onClick={() => {
+                            if (!submitting) void handleSubmitImport()
+                          }}
+                          sx={{
+                            cursor: submitting ? 'default' : 'pointer',
+                          }}
+                        >
                           <KeyboardReturnIcon
                             sx={{ fontSize: 16, color: 'text.disabled' }}
                           />
@@ -818,7 +903,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   </Box>
                 )}
 
-                {!sysproxy?.enable && (
+                {isTakeoverOff && (
                   <Typography
                     variant="body2"
                     sx={{

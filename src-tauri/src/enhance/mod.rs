@@ -831,12 +831,10 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     gfwlist_provider.insert(Value::from("interval"), Value::from(86400));
     gfwlist_provider.insert(Value::from("proxy"), Value::from("PROXY"));
 
-    let mut rule_providers = match config.remove("rule-providers") {
+    let raw_rule_providers = match config.remove("rule-providers") {
         Some(Value::Mapping(m)) => m,
         _ => Mapping::new(),
     };
-    rule_providers.insert(Value::from("gfwlist"), Value::from(gfwlist_provider));
-    config.insert(Value::from("rule-providers"), Value::from(rule_providers));
 
     // 5. Construct the rules list
     let mut final_rules = Vec::new();
@@ -942,6 +940,38 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         final_rules.push(Value::from("IP-CIDR6,::/0,PROXY"));
         final_rules.push(Value::from("MATCH,DIRECT"));
     }
+
+    // 仅保留被最终 rules（含用户 prepend-rules / append-rules）实际引用的 rule-providers。
+    // 机场订阅常自带 China-Site / China-IP / Local-IP 等未被 Clash Mini 规则链使用的
+    // rule-providers（3.1.9 现场实证：订阅自带 3 个 .mrs 规则集共 ~700KB，虽未被 rules
+    // 引用却仍触发内核首次启动联网拉取并常驻内存；若机场规则源被墙更会拖慢甚至卡死首次校验）。
+    // 按引用关系裁剪后，默认仅保留已随包预置的 gfwlist，实现首次启动路由规则 100% 离线零拉取。
+    let mut referenced_providers: HashSet<std::string::String> = HashSet::new();
+    referenced_providers.insert("gfwlist".to_string());
+    for rule in &final_rules {
+        if let Some(s) = rule.as_str() {
+            let mut parts = s.split(',');
+            if let (Some(kind), Some(name)) = (parts.next(), parts.next())
+                && kind.trim().eq_ignore_ascii_case("RULE-SET")
+            {
+                let trimmed = name.trim();
+                if !trimmed.is_empty() {
+                    referenced_providers.insert(trimmed.to_string());
+                }
+            }
+        }
+    }
+
+    let mut rule_providers = Mapping::new();
+    for (k, v) in raw_rule_providers {
+        if let Some(name) = k.as_str()
+            && referenced_providers.contains(name)
+        {
+            rule_providers.insert(k, v);
+        }
+    }
+    rule_providers.insert(Value::from("gfwlist"), Value::from(gfwlist_provider));
+    config.insert(Value::from("rule-providers"), Value::from(rule_providers));
 
     config.insert(Value::from("rules"), Value::from(final_rules));
 
@@ -1130,6 +1160,18 @@ proxy-groups:
     type: select
     proxies:
       - "node-B"
+rule-providers:
+  China-Site:
+    type: http
+    behavior: domain
+    format: mrs
+    url: https://example.com/China-Site.mrs
+    path: ./ruleset/China-Site.mrs
+  Custom-RuleSet:
+    type: http
+    behavior: domain
+    url: https://example.com/custom.yaml
+    path: ./ruleset/custom.yaml
 prepend-rules:
   - PROCESS-NAME,custom-process,DIRECT
 append-rules:
@@ -1168,8 +1210,12 @@ append-rules:
         assert_eq!(group_uses.len(), 1);
         assert_eq!(group_uses[0].as_str(), Some("providerA"));
 
-        // 2. Verify gfwlist provider & rules (pre-bundled + 24h periodic update via PROXY)
+        // 2. Verify gfwlist provider & rules (pre-bundled + 24h periodic update via PROXY),
+        //    and verify unreferenced airport rule-providers (China-Site, Custom-RuleSet) are stripped
         let providers = config.get("rule-providers").and_then(Value::as_mapping).unwrap();
+        assert_eq!(providers.len(), 1);
+        assert!(providers.get("China-Site").is_none());
+        assert!(providers.get("Custom-RuleSet").is_none());
         let gfwlist = providers.get("gfwlist").and_then(Value::as_mapping).unwrap();
         assert_eq!(gfwlist.get("type").unwrap().as_str(), Some("http"));
         assert_eq!(gfwlist.get("behavior").unwrap().as_str(), Some("domain"));

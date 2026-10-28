@@ -22,7 +22,7 @@
       "featureAutoSelect": "⚡ 自動測速擇優",
       "featureDnsGuard": "🛡️ 零配置防洩漏",
       "featureStealth": "🪶 極窄隱匿輕量",
-      "clipboardDetected": "偵測到剪貼簿中有訂閱連結，點擊一鍵填入",
+      "clipboardDetected": "偵測到剪貼簿中有訂閱連結，點擊填入或按 Enter 直接匯入",
       "activeNodeLabel": "目前最優節點",
       "starTitle": "喜歡 Clash Mini 嗎？送我們一顆 ⭐ Star 吧！",
       "openGithubStar": "打開 GitHub 測速並點 ⭐ Star"
