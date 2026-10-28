@@ -25,7 +25,8 @@
       "clipboardDetected": "Tautan terdeteksi di clipboard — klik untuk mengisi",
       "activeNodeLabel": "Node Aktif",
       "starTitle": "Suka Clash Mini? Beri kami ⭐ Star di GitHub!",
-      "openGithubStar": "Uji Koneksi & Beri ⭐ Star"
+      "openGithubStar": "Uji Koneksi & Beri ⭐ Star",
+      "retestNodes": "Uji Ulang & Pilih Node Terbaik"
     },
     "helpMenu": {
       "github": "Beri ⭐ Star di GitHub",

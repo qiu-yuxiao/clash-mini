@@ -26,7 +26,8 @@ import {
   useProxiesData,
   useSystemData,
 } from '@/providers/app-data-context'
-import { NODE_DELAY_MAX_MS } from '@/services/delay'
+import { getProfiles, triggerAutoSelect } from '@/services/cmds'
+import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import {
   get3DCardStyle,
   get3DButtonStyle,
@@ -41,10 +42,12 @@ export const CLASH_MINI_WIKI_URL =
   'https://github.com/qiu-yuxiao/clash-mini/wiki'
 export const FIRST_RUN_GUIDE_STORAGE_KEY = 'clash-mini-first-run-completed'
 
-/** 就绪判定超时：超时仍未测出有效延迟，就不再宣称「已就绪」，改为如实提示 */
+/** 就绪判定超时：超时仍未测出有效延迟，就不再宣称「已就绪」，改为如实提示并提供一键重测优选 */
 const READY_TIMEOUT_MS = 20_000
 /** 就绪判定轮询间隔：借用既有代理上下文刷新，不另造测量链路 */
 const READY_POLL_INTERVAL_MS = 1_500
+/** 进入 Step 2/2 后若短时间内仍未拿到有效延迟，自动后台触发一次全节点并发测速优选 */
+const AUTO_SELECT_FALLBACK_DELAY_MS = 2_500
 
 interface FirstRunGuideDialogProps {
   open: boolean
@@ -73,6 +76,8 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [gaveUp, setGaveUp] = useState(false)
+  const [retesting, setRetesting] = useState(false)
+  const [delayVersion, setDelayVersion] = useState(0)
 
   // Context menu for input
   const [contextMenu, setContextMenu] = useState<{
@@ -81,6 +86,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const submittingRef = useRef(false)
+  const autoRetestedRef = useRef(false)
 
   // ── 就绪判定：复用细粒度代理与系统上下文，避免订阅全量 AppData 触发无关重绘 ──
   const { proxies } = useProxiesData()
@@ -92,6 +98,18 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   useEffect(() => {
     refreshProxyRef.current = refreshProxy
   }, [refreshProxy])
+
+  // 订阅 DelayManager 的 PROXY 组通知：后端 triggerAutoSelect 注入批量测速结果时立即重算延迟
+  useEffect(() => {
+    if (!open || step !== 'ready') return
+    const onGroupUpdate = () => {
+      setDelayVersion((v) => v + 1)
+    }
+    getDelayManager().setGroupListener('PROXY', onGroupUpdate)
+    return () => {
+      getDelayManager().removeGroupListener('PROXY', onGroupUpdate)
+    }
+  }, [open, step])
 
   const readClipboardSubscriptionUrl =
     useCallback(async (): Promise<string> => {
@@ -123,21 +141,39 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     return group?.now || null
   }, [proxies])
 
-  /** 活跃出口节点最近一次延迟（ms）；无数据返回 null */
+  /** 活跃出口节点最近一次延迟（ms）；优先读取 DelayManager 本次测速缓存，其次回落内核 history */
   const activeDelay = useMemo(() => {
+    void delayVersion
     if (!activeNodeName) return null
+    const cached = getDelayManager().getDelayUpdate(
+      activeNodeName,
+      'PROXY',
+    )?.delay
+    if (
+      typeof cached === 'number' &&
+      cached > 0 &&
+      cached < NODE_DELAY_MAX_MS
+    ) {
+      return cached
+    }
     const node =
       proxies?.records[activeNodeName] ??
       proxies?.proxies.find((p) => p.name === activeNodeName)
     const history = node?.history
-    if (!history || history.length === 0) return null
-    const delay = history[history.length - 1]?.delay
-    return typeof delay === 'number' ? delay : null
-  }, [proxies, activeNodeName])
+    if (history && history.length > 0) {
+      const delay = history[history.length - 1]?.delay
+      if (typeof delay === 'number') return delay
+    }
+    return typeof cached === 'number' && cached >= 0 ? cached : null
+  }, [proxies, activeNodeName, delayVersion])
 
   /** 有效延迟（排除 0/超时与假节点阈值）才算真的连通 */
   const proxyReady =
     activeDelay !== null && activeDelay > 0 && activeDelay < NODE_DELAY_MAX_MS
+
+  /** 是否处于需要向用户展示「未确认提示 + 重新测速并优选按钮」的状态 */
+  const isUnconfirmed =
+    !proxyReady && (gaveUp || (!retesting && activeDelay === 0))
 
   /**
    * 代理流量接管是否确实处于关闭状态：
@@ -151,23 +187,69 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
       !sysproxy?.enable,
   )
 
-  // 进入 ready 步骤开始计时，超时后停止等待，如实告知「未确认」
+  /** 主动调用后端全节点并发测速并自动切换至最快节点 */
+  const handleRetestNodes = useCallback(async () => {
+    if (retesting) return
+    setRetesting(true)
+    setGaveUp(false)
+    try {
+      const profiles = await getProfiles()
+      const currentUid = profiles?.current || ''
+      if (currentUid) {
+        await triggerAutoSelect(currentUid, undefined, 0, true)
+      }
+      await refreshProxyRef.current?.({ forceFull: true })
+    } catch (err) {
+      console.warn('[FirstRunGuide] 重新测速并优选节点失败:', err)
+    } finally {
+      setRetesting(false)
+    }
+  }, [retesting])
+
+  // 进入 ready 步骤后若 2.5s 仍未测出有效延迟，自动后台触发一次全节点并发测速优选，
+  // 防止默认首节点不通而让用户干等 20 秒
   useEffect(() => {
-    if (!open || step !== 'ready') return
+    if (!open || step !== 'ready' || proxyReady || autoRetestedRef.current) {
+      return
+    }
+    const timer = setTimeout(() => {
+      if (autoRetestedRef.current) return
+      autoRetestedRef.current = true
+      void (async () => {
+        try {
+          const profiles = await getProfiles()
+          const currentUid = profiles?.current || ''
+          if (currentUid) {
+            await triggerAutoSelect(currentUid, undefined, 0, true)
+          }
+          await refreshProxyRef.current?.({ forceFull: true })
+        } catch {
+          // ignore background fallback errors
+        }
+      })()
+    }, AUTO_SELECT_FALLBACK_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [open, step, proxyReady])
+
+  // 进入 ready 步骤（或用户点击重测结束）开始计时，超时后停止等待，如实告知「未确认」并展示重测按钮
+  useEffect(() => {
+    if (!open || step !== 'ready' || proxyReady || retesting) return
     const timer = setTimeout(() => setGaveUp(true), READY_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [open, step])
+  }, [open, step, proxyReady, retesting])
 
   // 进入 ready 步骤时立即主动刷新一次，随后在未就绪且未超时期间按 1.5s 周期轮询
   // ── 解决内核 reload 后首次 url-test 尚未完成时 proxies 上下文停留旧值的问题
   useEffect(() => {
-    if (!open || step !== 'ready' || proxyReady || gaveUp) return
+    if (!open || step !== 'ready' || proxyReady || (gaveUp && !retesting)) {
+      return
+    }
     void refreshProxyRef.current?.()
     const timer = setInterval(() => {
       void refreshProxyRef.current?.()
     }, READY_POLL_INTERVAL_MS)
     return () => clearInterval(timer)
-  }, [open, step, proxyReady, gaveUp])
+  }, [open, step, proxyReady, gaveUp, retesting])
 
   // 弹窗打开或窗口切回前台时自动聚焦输入框，并静默探测剪贴板中是否已有待导入的 http(s) 订阅链接
   useEffect(() => {
@@ -214,9 +296,11 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     setUrl('')
     setDetectedClipboardUrl('')
     submittingRef.current = false
+    autoRetestedRef.current = false
     setSubmitting(false)
     setErrorMessage('')
     setGaveUp(false)
+    setRetesting(false)
     setContextMenu(null)
   }
 
@@ -411,7 +495,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 
   const statusColor = proxyReady
     ? readyColor
-    : gaveUp
+    : isUnconfirmed
       ? warningColor
       : secondaryText
 
@@ -821,7 +905,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     mt: 0.5,
                   }}
                 >
-                  {!proxyReady && !gaveUp && (
+                  {!proxyReady && !isUnconfirmed && (
                     <CircularProgress size={12} sx={{ color: secondaryText }} />
                   )}
                   <Typography
@@ -835,7 +919,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   >
                     {proxyReady
                       ? t('layout.components.firstRun.readyOk')
-                      : gaveUp
+                      : isUnconfirmed
                         ? t('layout.components.firstRun.readyUnconfirmed')
                         : t('layout.components.firstRun.checking')}
                   </Typography>
@@ -901,6 +985,25 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                       {activeNodeName}
                     </Typography>
                   </Box>
+                )}
+
+                {!proxyReady && (isUnconfirmed || retesting) && (
+                  <Button
+                    fullWidth
+                    size="small"
+                    sx={{
+                      ...get3DButtonStyle(theme, 'outlined', 'primary'),
+                      mt: 1.1,
+                      py: 0.65,
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                    }}
+                    onClick={handleRetestNodes}
+                    loading={retesting}
+                    disabled={retesting}
+                  >
+                    🔄 {t('layout.components.firstRun.retestNodes')}
+                  </Button>
                 )}
 
                 {isTakeoverOff && (

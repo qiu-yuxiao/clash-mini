@@ -14,7 +14,7 @@
       "imported": "Subscription imported and activated",
       "checking": "Checking node connectivity…",
       "readyOk": "Proxy is active and connected",
-      "readyUnconfirmed": "No node latency measured yet — testing may still be running, or the node is unavailable",
+      "readyUnconfirmed": "Current node timed out. Click below to re-test and automatically switch to the fastest node, or enter the app to choose manually",
       "sysProxyOff": "System proxy is off. Enable it in Settings and try again",
       "wikiHint": "Click the button below to open Clash Mini on GitHub — verify your connection and please click ⭐ Star in the top-right corner to support this open-source project!",
       "openWiki": "View Wiki Guide",
@@ -25,7 +25,8 @@
       "clipboardDetected": "Subscription URL detected in clipboard — click to fill or press Enter to import",
       "activeNodeLabel": "Active Node",
       "starTitle": "Enjoying Clash Mini? Give us a ⭐ Star on GitHub!",
-      "openGithubStar": "Test & ⭐ Star on GitHub"
+      "openGithubStar": "Test & ⭐ Star on GitHub",
+      "retestNodes": "Re-test & Select Best Node"
     },
     "helpMenu": {
       "github": "⭐ Star on GitHub",

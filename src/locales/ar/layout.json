@@ -25,7 +25,8 @@
       "clipboardDetected": "تم اكتشاف رابط في الحافظة — انقر للملء التلقائي",
       "activeNodeLabel": "العقدة النشطة",
       "starTitle": "هل أعجبك Clash Mini؟ ادعمنا بنجمة ⭐ Star على GitHub!",
-      "openGithubStar": "اختبار الاتصال ومنح ⭐ Star"
+      "openGithubStar": "اختبار الاتصال ومنح ⭐ Star",
+      "retestNodes": "إعادة الاختبار واختيار أفضل عقدة"
     },
     "helpMenu": {
       "github": "امنحنا ⭐ Star على GitHub",

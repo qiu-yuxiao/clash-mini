@@ -25,7 +25,8 @@
       "clipboardDetected": "Алмашу буферында сылтама табылды — тутыру өчен басыгыз",
       "activeNodeLabel": "Актив төен",
       "starTitle": "Clash Mini ошадымы? GitHubта ⭐ Star бүләк итегез!",
-      "openGithubStar": "GitHub ачу һәм ⭐ Star кую"
+      "openGithubStar": "GitHub ачу һәм ⭐ Star кую",
+      "retestNodes": "Яңадан тикшерү һәм иң яхшы төенне сайлау"
     },
     "helpMenu": {
       "github": "GitHubта ⭐ Star кую",

@@ -832,6 +832,9 @@ const Layout = () => {
         targetUid = newProfile.uid
       }
 
+      // 导入与切换动作已落盘，必须在 mutateProfiles 触发 currentProfileUid 变更前释放 isImportingRef 门闩，
+      // 否则新 profile 对应的 useEffect 会在首行被 isImportingRef.current === true 误杀，跳过首次自动测速优选。
+      isImportingRef.current = false
       await mutateProfiles()
 
       if (targetUid) {
@@ -881,6 +884,7 @@ const Layout = () => {
           }
           targetUid = newProfile.uid
         }
+        isImportingRef.current = false
         await mutateProfiles()
 
         if (targetUid) {

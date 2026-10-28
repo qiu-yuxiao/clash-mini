@@ -25,7 +25,8 @@
       "clipboardDetected": "Panoda bağlantı algılandı — doldurmak için tıklayın",
       "activeNodeLabel": "Aktif Düğüm",
       "starTitle": "Clash Mini hoşunuza gitti mi? GitHub üzerinde ⭐ Star verin!",
-      "openGithubStar": "Bağlantıyı Test Et ve ⭐ Star Ver"
+      "openGithubStar": "Bağlantıyı Test Et ve ⭐ Star Ver",
+      "retestNodes": "Yeniden Test Et ve En İyi Düğümü Seç"
     },
     "helpMenu": {
       "github": "GitHub üzerinde ⭐ Star Ver",

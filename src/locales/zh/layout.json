@@ -14,7 +14,7 @@
       "imported": "订阅配置已成功导入并激活",
       "checking": "正在确认节点连通性…",
       "readyOk": "代理已就绪，国际网络已连通",
-      "readyUnconfirmed": "暂未测出节点延迟，可能仍在测速或该节点暂不可用",
+      "readyUnconfirmed": "当前节点响应超时，可点击下方按钮自动重新测速并切换至最快节点；您也可以直接进入主界面手动选择其他节点",
       "sysProxyOff": "系统代理未开启，请在设置中开启后再试",
       "wikiHint": "点击下方主按钮将打开 Clash Mini 的 GitHub 仓库——既能实测外网秒开，也恳请在打开的页面右上角点亮一颗 ⭐ Star，您的支持是我们持续维护的最大动力！",
       "openWiki": "查看 Wiki 进阶指南",
@@ -25,7 +25,8 @@
       "clipboardDetected": "检测到剪贴板中有订阅链接，点击填入或按 Enter 直接导入",
       "activeNodeLabel": "当前最优节点",
       "starTitle": "喜欢 Clash Mini 吗？送我们一颗 ⭐ Star 吧！",
-      "openGithubStar": "打开 GitHub 测速并点 ⭐ Star"
+      "openGithubStar": "打开 GitHub 测速并点 ⭐ Star",
+      "retestNodes": "重新测速并优选节点"
     },
     "helpMenu": {
       "github": "去 GitHub 点亮 ⭐ Star",

@@ -25,7 +25,8 @@
       "clipboardDetected": "클립보드에서 구독 링크 감지됨 — 클릭하여 자동 입력",
       "activeNodeLabel": "현재 활성 노드",
       "starTitle": "Clash Mini가 마음에 드시나요? GitHub ⭐ Star를 눌러주세요!",
-      "openGithubStar": "GitHub 열기 및 ⭐ Star 응원"
+      "openGithubStar": "GitHub 열기 및 ⭐ Star 응원",
+      "retestNodes": "다시 테스트 및 최적 노드 선택"
     },
     "helpMenu": {
       "github": "GitHub에서 ⭐ Star 누르기",

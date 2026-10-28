@@ -1,3 +1,17 @@
+## v3.2.1
+
+### ✨ Proactive Node Benchmarking & One-Click Re-test in Onboarding
+
+- **首次使用向导弹窗（`FirstRunGuideDialog`）Step 2/2 新增「🔄 重新测速并优选节点」主动引导闭环（BUG-311）**：
+  - **一键重测并自动择优按钮**：当节点测速超时（`0 ms`）或等待超时未确认时，不再仅展示静态文字提示，而是在状态卡片内直接提供醒目的 **「🔄 重新测速并优选节点」** 按钮；点击后立即触发后端全节点并发测速（`triggerAutoSelect` `select=true`），从订阅全部节点中重新挑出延迟最低的可用节点并自动切换；
+  - **建设性行动指引文案**：将超时提示升级为清晰的行动引导（「当前节点响应超时，可点击下方按钮自动重新测速并切换至最快节点；您也可以直接进入主界面手动选择其他节点」），彻底消除新手用户的困惑；
+  - **进入 Step 2/2 自动兜底测速与 `DelayManager` 实时联动**：打通 `DelayManager` 测速缓存监听（无需等轮询即可毫秒级响应后端并发测速结果），并在进入 Step 2/2 后若 2.5 秒内尚无有效延迟自动后台触发一次全量并发测速优选。
+- **修复首次导入订阅时 `isImportingRef` 门闩误拦截自动测速优选的时序竞态（BUG-311）**：
+  - **现象**：`handleImportProfile` 在调用 `await mutateProfiles()` 更新 `currentProfileUid` 时，`isImportingRef.current` 仍处于 `true`（直到 `finally` 块才释放），导致新订阅触发的 `useEffect` 在首行检查 `if (isImportingRef.current) return` 时直接提前返回，跳过了首次导入后的自动并发测速优选；
+  - **修复**：在导入与配置落盘完成、`await mutateProfiles()` 触发状态变更前即释放 `isImportingRef.current = false`，确保首次导入后自动测速优选 100% 正常执行。
+
+---
+
 ## v3.2.0
 
 ### ✨ Zero-Download Rule Pruning & First-Run Guide Experience Perfection

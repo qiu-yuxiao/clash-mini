@@ -25,7 +25,8 @@
       "clipboardDetected": "Enlace detectado en el portapapeles — clic para rellenar",
       "activeNodeLabel": "Nodo activo",
       "starTitle": "¿Te gusta Clash Mini? ¡Danos una ⭐ Star en GitHub!",
-      "openGithubStar": "Probar red y dar ⭐ Star en GitHub"
+      "openGithubStar": "Probar red y dar ⭐ Star en GitHub",
+      "retestNodes": "Reintentar y elegir mejor nodo"
     },
     "helpMenu": {
       "github": "Dar ⭐ Star en GitHub",

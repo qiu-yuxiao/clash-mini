@@ -25,7 +25,8 @@
       "clipboardDetected": "クリップボードのURLを検出しました（クリックで自動入力）",
       "activeNodeLabel": "現在の最適ノード",
       "starTitle": "Clash Mini を気に入りましたか？⭐ Star で応援お願いします！",
-      "openGithubStar": "GitHub を開いて接続確認 & ⭐ Star"
+      "openGithubStar": "GitHub を開いて接続確認 & ⭐ Star",
+      "retestNodes": "再テストして最適ノードを選択"
     },
     "helpMenu": {
       "github": "GitHub で ⭐ Star を付ける",

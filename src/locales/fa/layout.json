@@ -25,7 +25,8 @@
       "clipboardDetected": "لینک در کلیپ‌بورد شناسایی شد — برای درج کلیک کنید",
       "activeNodeLabel": "گره فعال",
       "starTitle": "از Clash Mini راضی هستید؟ با یک ⭐ Star از ما حمایت کنید!",
-      "openGithubStar": "تست اتصال و ثبت ⭐ Star در GitHub"
+      "openGithubStar": "تست اتصال و ثبت ⭐ Star در GitHub",
+      "retestNodes": "تست مجدد و انتخاب بهترین نود"
     },
     "helpMenu": {
       "github": "ثبت ⭐ Star در GitHub",

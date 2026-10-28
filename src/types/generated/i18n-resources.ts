@@ -258,6 +258,7 @@ export interface TranslationResources {
           readyOk: string
           readyTitle: string
           readyUnconfirmed: string
+          retestNodes: string
           starTitle: string
           sysProxyOff: string
           title: string

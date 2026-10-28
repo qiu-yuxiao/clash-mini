@@ -25,7 +25,8 @@
       "clipboardDetected": "Link in Zwischenablage erkannt – zum Einfügen klicken",
       "activeNodeLabel": "Aktiver Knoten",
       "starTitle": "Gefällt Ihnen Clash Mini? Schenken Sie uns einen ⭐ Star!",
-      "openGithubStar": "GitHub testen & ⭐ Star geben"
+      "openGithubStar": "GitHub testen & ⭐ Star geben",
+      "retestNodes": "Erneut testen & besten Knoten wählen"
     },
     "helpMenu": {
       "github": "⭐ Star auf GitHub geben",

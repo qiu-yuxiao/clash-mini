@@ -133,6 +133,7 @@ export const translationKeys = [
   'layout.components.firstRun.activeNodeLabel',
   'layout.components.firstRun.starTitle',
   'layout.components.firstRun.openGithubStar',
+  'layout.components.firstRun.retestNodes',
   'layout.components.helpMenu.github',
   'layout.components.helpMenu.wiki',
   'layout.components.helpMenu.firstRunGuide',

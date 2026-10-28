@@ -25,7 +25,8 @@
       "clipboardDetected": "В буфере обмена найдена ссылка — нажмите для вставки",
       "activeNodeLabel": "Активный узел",
       "starTitle": "Нравится Clash Mini? Поддержите нас ⭐ Star на GitHub!",
-      "openGithubStar": "Проверить связь и поставить ⭐ Star"
+      "openGithubStar": "Проверить связь и поставить ⭐ Star",
+      "retestNodes": "Повторить тест и выбрать лучший узел"
     },
     "helpMenu": {
       "github": "Поставить ⭐ Star на GitHub",
