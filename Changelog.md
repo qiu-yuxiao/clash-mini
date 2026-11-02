@@ -1,5 +1,7 @@
 ## v3.2.2
 
+- **Mihomo(Meta) 内核升级至 v1.19.33**
+
 ### ⚡ Instant Full-Node Auto-Select in Onboarding & Auto-Launch Switch Polish
 
 - **修复基础设置「开机自动启动」开关首次点击必然没反应的问题（BUG-312）**：
