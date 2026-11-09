@@ -1,3 +1,20 @@
+## v3.2.3
+
+### ⚡ Auto Speed-Test & Node Activation on Filter + 271px Logs Dialog + Topmost Installer
+
+- **节点列表输入过滤条件完成后自动多路测速与择优切换（BUG-314）**：
+  - **停止输入 700ms 自动触发**：在主界面节点列表顶部的搜索/过滤框中输入条件（如 `HK`、`专线`、`01`）停止 700ms 后，自动对当前匹配到的可见节点子集发起多路并发测速与择优选择（`triggerAutoSelect`，`select: true`）；
+  - **回车键即时生效与输入法保护**：支持按下 `Enter` 键立即跳过防抖等待、当场触发并发测速择优；内置对中文输入法（IME）组词的严格过滤（`!isComposing && keyCode !== 229`），避免选拼音候选词时的回车被误触发；
+  - **最优节点自动成为当前活跃节点**：后端统一通过测量组高并发探测后挑出延迟最低节点，并调用 `select_node_for_group("PROXY", fastest_node)` 自动将其切换为当前活动出口节点，前端状态实时同步；
+  - **边界防护**：清空过滤条件时仅重置列表，不误触发全节点测速；过滤结果为空时安全短路返回，杜绝无效网络请求。
+- **系统调试运行日志弹窗宽度严格对齐最窄视口（271px）（BUG-314）**：
+  - **尺寸锁定 271px**：移除原 800px 宽幅样式，直接绑定全局最小窗口常数 `MIN_WINDOW_WIDTH`（`271px`），在任何视口宽度下弹窗均锁定为 271px 居中展示；
+  - **极窄排版美化**：优化日志窗口头部控件间距（`gap: 0.5`，紧凑型清空按钮与小图标），日志级别下拉框调整为 `95px`，为过滤框留出合理输入空间；日志条目保持 `overflowWrap: 'anywhere'`，在 271px 下无横向滚动条、自动折行整洁呈现。
+- **安装程序全周期保持窗口最上层铁律（BUG-314）**：
+  - **安装/卸载全程全局置顶**：在 `installer.nsi` 中全链路强化 `SetWindowPos(HWND_TOPMOST)` 与 `BringToFront`，覆盖 GUI 初始化（`myGuiInit` 与 `un.myGuiInit`）、安装前环境检查（`Section EarlyChecks`）、文件解压与部署（`Section Install`）以及卸载流程（`Section Uninstall`），确保安装程序在整个运行过程中始终位于最上层，绝不被任何杀毒软件提示或第三方窗口遮挡。
+
+---
+
 ## v3.2.2
 
 ### ⚡ Instant Full-Node Auto-Select in Onboarding & Auto-Launch Switch Polish

@@ -250,6 +250,13 @@ export const ProxyGroups = (props: Props) => {
 
       debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
 
+      if (visibleNames.length === 0) {
+        debugLog(
+          `[ProxyGroups] 当前组无可见匹配节点，跳过批量测速与择优: ${groupName}`,
+        )
+        return
+      }
+
       const currentUid = (await getProfiles())?.current || ''
       if (!currentUid) return
 

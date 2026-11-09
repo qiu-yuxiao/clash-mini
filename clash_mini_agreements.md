@@ -16,6 +16,7 @@
   - [1.5 多语言支持与「英文保留原则」](#15-多语言支持与英文保留原则)
   - [1.6 运行内存基准与资源配额](#16-运行内存基准与资源配额)
   - [1.7 版权规范与合规署名](#17-版权规范与合规署名)
+  - [1.8 移植完整性：服务自举与独立可用性](#18-移植完整性服务自举与独立可用性)
 - [🎨 二、界面美学与交互体系](#二界面美学与交互体系)
   - [2.1 3D 实体拟物美学准则](#21-3d-实体拟物美学准则)
   - [2.2 遮挡式布局与响应式视口框架](#22-遮挡式布局与响应式视口框架)
@@ -65,6 +66,11 @@
   - [8.3 令牌安全与代理环境防护红线](#83-令牌安全与代理环境防护红线)
   - [8.4 CI 四阶段死锁无关流水线架构](#84-ci-四阶段死锁无关流水线架构)
   - [8.5 本地制品验收与自动更新同步闭环](#85-本地制品验收与自动更新同步闭环)
+  - [8.6 配置文件版本号与迁移框架](#86-配置文件版本号与迁移框架)
+  - [8.7 可诊断性：日志保留与诊断包](#87-可诊断性日志保留与诊断包)
+  - [8.8 前端单测基线与最小覆盖](#88-前端单测基线与最小覆盖)
+  - [8.9 用户可见文案 i18n 硬约束](#89-用户可见文案-i18n-硬约束)
+  - [8.10 安装程序全周期全局置顶铁律](#810-安装程序全周期全局置顶铁律)
 - [附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表](#附录-a-历史缺陷与工程修复bug-id追溯映射表)
 - [附录 B: 已知非缺陷（NOT A BUG，勿重复排查）](#附录-b-已知非缺陷not-a-bug勿重复排查)
 
@@ -83,6 +89,8 @@ Clash Mini 是一款高度聚焦于极致轻量、超低内存占用、高稳定
    - 内核 Controller API 默认端口固定为 **`9098`**（避开原版默认的 9090/9097）。
    - 单实例检测通信端口在 Release 模式锁定为 **`33335`**，Dev 模式锁定为 **`33336`**。
 4. **单实例静默唤醒规范**：第二实例启动时若检测到单实例端口已被占用，通过本地 HTTP/IPC 向既有实例发送唤醒通知后**静默退出**，禁止弹出错误弹窗；仅当端口占用但请求彻底失败（超时/连接拒绝）时才提示单实例错误。
+
+> **Clash Win 端口与安装清洁规范（BUG-313 架构修正）**：原开发阶段为方便调试设定的 Clash Win 与 Clash Mini 并存端口错开特例现已正式废止。Clash Win 全面恢复 1:1 移植准则，使用与 Clash Mini 完全一致的全部端口（Mixed 10801, SOCKS 10802, HTTP 10803, Guard 7899, Controller 9098, 单实例 33335）及密钥（`adapted-by-qiu-yuxiao`）。Clash Win 安装包负责在安装时清除宿主机所有 Clash Mini 历史进程、服务与孤儿程序，营造绝对清洁环境。
 
 ### 1.2 Windows x64 单一平台架构收敛
 
@@ -125,6 +133,45 @@ Clash Mini 是一款高度聚焦于极致轻量、超低内存占用、高稳定
 - 保留原开源项目之署名与贡献者列表。
 - 开发者对 2026 年以来的二次开发与架构重构享有著作权，界面版权页脚统一展示：`© 2026 秋雨潇潇 (修改部分)`。
 
+### 1.8 移植完整性：服务自举与独立可用性
+
+> **口径**：本节不是新增需求，而是记录 Clash Mini **本来就具备**的行为。Clash Win 之前漏掉了它，属于**移植完整性缺陷（漏搬）**，不属于需求变更。写明依据是为了让以后审计能按「Mini 有 → 我们有没有」逐条比对，而不是靠记忆。**此前遗漏，2026-11-05 补记。**
+
+**Mini 的既有行为（源码证据）**
+
+1. **TUN 切换前的可用性门控与自举**
+   - 前端在切到 TUN 前判断 `isTunModeAvailable`；为假时**先安装服务并重启内核，再写 `enable_tun_mode`**：`src/pages/_layout.tsx:1085-1095` → `installServiceAndRestartCore()`。
+   - 该 hook 的动作顺序是 `installService()`（UAC 安装）→ `restartCore()`：`src/hooks/use-service-installer.ts:28-43`。
+   - `isTunModeAvailable = isAdminMode || isServiceOk`，`isServiceOk` 来自 `is_service_available`：`src/hooks/use-system-state.ts:50-65`。
+2. **后端安装/重装/修复服务命令**
+   - `install_service` 命令：`src-tauri/src/cmd/service.rs:18`；`is_service_available`：`:38`；`reinstall_service`：`:28`；`repair_service`：`:32`。
+   - 安装本体：`src-tauri/src/core/service.rs:76-121`——非管理员时用 `RunasCommand` 提权（UAC），管理员时直接执行。
+   - 重装 / 强制修复：`src-tauri/src/core/service.rs:193-215`。
+3. **服务状态机（区分"未安装 / 已装未运行 / 就绪"）**
+   - 就绪判定 `is_service_available()`：IPC 路径可访问即可用（`src-tauri/src/core/service.rs:333-...`）。
+   - `refresh()`：管理员 → 可用即 Ready；普通用户 → 可用即 Ready，**已安装但未运行 → `StartRequired` 并自动启动 + 等待**，未安装 → `Unavailable`（`:429-455`）。
+   - `apply_service_status()`：`StartRequired` 启动、`ReinstallRequired` 重装、`ForceReinstallRequired` 强制重装、`Unavailable` 安装（`:457-495`）。
+4. **起内核前置服务就绪**
+   - `prepare_startup_mode()`：服务 Ready → `Service`，否则 Sidecar 并告警（`src-tauri/src/core/manager/lifecycle.rs:151-176`）。
+   - `wait_for_service_ready()` 内含 installer UAC 路径：`src-tauri/src/core/manager/lifecycle.rs:183-235`。
+
+**因此 Clash Win 必须 1:1 照搬（硬约束）**
+
+- **干净机可用**：在从未安装过 Clash Mini 的机器上，Clash Win 必须能自行安装、启动、修复 `clash_verge_service`，TUN 与系统代理全功能可用；不得依赖 Mini 的任何文件、配置或安装残留。
+- **完整链路**：`检测（未安装 / STOPPED / 未就绪）→ 提权安装（UAC）→ 启动服务 → 等待 IPC 就绪 → 以 SYSTEM 身份起内核`。每一步失败都要有可见提示与回退，不得静默失败。
+- **禁止项**：
+  - 禁止假设服务存在；
+  - 禁止只发 IPC 请求就宣称"服务可用"（必须区分未安装 / STOPPED / RUNNING / 就绪）；
+  - 禁止在服务缺失时假装成功或跳过安装。
+- **共存规则**：服务名唯一 `clash_verge_service`；已存在则复用、不覆盖；卸载仅在 `ImagePath` 指向本安装目录时移除（避免破坏 Mini 安装的服务）。
+- **验收用例（缺一不可）**：
+  1. 干净机（无服务）启动 Clash Win → 切 TUN；
+  2. 弹出一次 UAC → 服务安装成功；
+  3. `sc query clash_verge_service` = `RUNNING`；
+  4. 内核进程 Session# = 0（SYSTEM）；
+  5. 境外三条 URL（google / youtube / github）在 TUN 下通，且默认路由指向 `198.18.0.2`。
+- **结论口径**：任何"TUN 可用"结论都必须附带"服务从缺失到就位"的完整链路证据；仅在"Mini 已装服务"的机器上通过，不得宣布可用。
+
 ---
 
 ## 🎨 二、界面美学与交互体系
@@ -144,6 +191,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - 窄窗（≤285px）：节点列表自动切换为 1 列纵向信息行；顶部活跃节点栏紧凑展示 2 项核心指标。
   - 右侧连接与路由监控表遵循大窗（>285px）挂载观测、窄窗（≤285px）彻底卸载不渲染、不订阅的统一信号门控。
   - **该断点与窗口最小宽度（271px）不是同一个数**：断点是排版门槛（比较内容宽度），最小宽度是几何下限。最小宽度必须小于断点，保证窗口缩到最小时必然进入窄窗模式，且内容宽度 272–285 区间行为与历史版本一致（否则三列卡片会被挤进 272px）。
+- **系统调试运行日志弹窗尺寸与布局规范**：为契合极窄竖屏与单手微型窗口体验，「系统调试运行日志」弹窗（`LayoutDialogs` 中的 `Logs View Dialog`）宽度强制锁定与全局最小窗口常数 `MIN_WINDOW_WIDTH`（`271px`）完全等宽（`width: 271px, maxWidth: 100%, m: '0 auto'`），居中展示。同时其内部工具栏（日志暂停/播放、升降序、一键清空）与日志级别选择下拉框（固定 `95px`）采用紧凑排版，确保标题栏与右上方关闭图标无缝排布，日志数据内容配合 `overflowWrap: 'anywhere'` 自动换行，彻底消除 271px 视口下的任何横向滚动条。
 
 ### 2.3 窗口尺寸常量与边界约束
 
@@ -204,11 +252,12 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **三列网格布局**：默认模式下每行 3 个节点卡片，单节点高度固定 20px；窄窗模式平滑退化为单列。
 - **整行响应式点击**：节点卡片整行均为点击触发热区，点击立即将该节点激活为当前活跃出口节点。
 - **活跃节点快速轮换（FEAT-006）**：点击顶部导航栏活跃节点卡片，基于用户当前搜索/过滤/排序状态实时计算可用子集，直接轮换至下一顺位可用节点，并弹出轻量操作气泡。
+- **节点过滤与自动并发测速择优接管**：在节点列表顶部过滤输入框中，当用户完成过滤词输入（实体输入停止 700ms 防抖，或按 `Enter` 键即时生效，同时排除中文 IME 组词期间的按键事件）时，系统自动对当前过滤子集触发一次多路并发测速与择优切换（`triggerAutoSelect`，`select: true`）。满足条件且延迟最低的节点自动被激活为当前活跃出口节点，所见即所选。若过滤词未匹配到任何可见节点则安全短路跳过，清空过滤框时仅重置列表而不触发全量测速。
 
 ### 2.9 静态极简系统托盘规范
 
 为避开 Windows 高权限与 UAC 提权环境下 Win32 托盘 Shell API 频繁更新导致的严重系统级 `E_FAIL` (0x80004005) 错误，托盘实施**绝对静态化规范**：
-- **静态双功能交互**：左键单击激活并恢复主窗口；右键单击弹出仅包含「退出」选项的极简静态右键菜单。
+- **静态双功能交互**：左键单击激活并恢复主窗口；右键单击弹出极简静态右键菜单，包含两项：「轻量模式 / Lite mode」（带勾选态，点击切换进入/退出轻量模式）与「退出 (Exit)」。
 - **严禁动态更新**：运行期间**严禁调用任何动态更新托盘图标、ToolTip 提示文本或动态生成托盘菜单的 API**，图标常驻固定资产，生命周期与应用管理器严格绑定。
 
 ### 2.10 设置开关的乐观更新与权威数据源
@@ -611,6 +660,18 @@ flowchart LR
 - **同一句话只留一个 key**：功能与语境相同的文案不得在多模块各写一份（反例：`layout.notices.adjusting` 与已删除的 `settings.mini.adjusting` 曾同值并存）。跨模块复用的通用动作词统一收敛到 `shared.actions.*`。
 - **同款 UI 必须整体覆盖**：项目里存在三处结构完全相同的「剪切/复制/粘贴/全选/清空」输入框右键菜单（`_layout.tsx`、`add-url-dialog.tsx`、`first-run-guide-dialog.tsx`），改一处必须同步改全部，禁止只改当前正在动的那一个。
 
+### 8.10 安装程序全周期全局置顶铁律
+
+- **置顶背景与安全目标**：在 Windows 宿主机安装或升级 Clash Mini 时，杀毒软件弹出的拦截确认窗口、系统级通知或用户其他处于激活态的前台窗口极易将安装器遮挡至后台。外行用户常因「窗口消失」误以为安装卡死而反复双击，或错过安全软件的放行确认。因此，**保证安装程序在所有过程中一直保持在窗口最上层，不得被其他窗口遮挡**，作为系统级绝对铁律。
+- **全生命周期置顶防护链路**：
+  1. **GUI 初始展现（`myGuiInit` / `un.myGuiInit`）**：在 Modern UI 2 界面构造第一时间，调用 `BringToFront` 并执行 Win32 API：
+     ```nsis
+     System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"
+     ```
+     赋予 `$HWNDPARENT` 顶层窗口扩展样式（`WS_EX_TOPMOST`，`-1` = `HWND_TOPMOST`，`3` = `SWP_NOSIZE | SWP_NOMOVE`）。
+  2. **卸载器对等置顶（`MUI_CUSTOMFUNCTION_UNGUIINIT`）**：卸载程序运行同样全量绑定 `un.myGuiInit`，保证反安装交互一致性。
+  3. **分阶段持续强化防抢焦**：在预检（`Section EarlyChecks`）、文件解压写入（`Section Install`）以及卸载执行（`Section Uninstall`）核心代码段前置插入 `BringToFront` 与 `SetWindowPos` 重申命令，即便子进程调用（如驱动安装、VC 运行库检测等）或用户点击其他屏幕区域，安装器与卸载器始终居于最前排可见。
+
 ---
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
@@ -685,6 +746,8 @@ flowchart LR
 | **BUG-310** | 2.12 / 3.4 | 机场未引用 `rule-providers` 剥离 + 新手引导回车即导入与系统代理误报修复（3.1.9 现场实证）：① 机场原始订阅自带 `rule-providers`（如 `Local-IP.mrs`、`China-Site.mrs`、`China-IP.mrs`），虽已被 `enforce_mini_agreements` 覆写 `rules` 而零引用，但保留在 `rule-providers` 映射中仍会触发 Mihomo 首次启动联网下载 ~700KB 无用规则集；现按 `final_rules` 中 `RULE-SET,<name>` 实际引用集合自动剔除未引用的 `rule-providers`，确保 Clash Mini 自身分流所需的 `gfwlist.yaml`、`Country.mmdb`、`geosite.dat` 100% 随包预置、首次启动零外部规则拉取；② `FirstRunGuideDialog` 第一步新增 `window` 级 `Enter` 兜底监听（解决焦点落在 `document.body` 时 `Paper.onKeyDown` 收不到回车事件）与剪贴板订阅自动回填（输入框为空时按 `Enter` 或点击「立即导入并开启」自动采用已探测或实时剪贴板中的订阅 URL 并填入输入框），且输入框右侧回车图标支持点击触发导入；③ 修复 `FirstRunGuideDialog` 第二步因 `sysproxy` 仅在设置抽屉打开时才查询（引导期恒为 `undefined`）以及 TUN 模式下 `sysproxy.enable` 为 `false` 导致 100% 误报「⚠️ 系统代理未开启，请在设置中开启后再试」的缺陷，改以 `verge.enable_system_proxy || verge.enable_tun_mode || sysproxy?.enable` 判定流量接管状态，并在导入成功时若二者均未开启自动开启系统代理 |
 | **BUG-311** | 2.12 / 4.2 | 新手引导（Step 2/2）主动测速择优与超时交互「🔄 重新测速并优选节点」闭环（v3.2.1）：① 修复 `handleImportProfile` 在调用 `await mutateProfiles()` 时 `isImportingRef.current` 仍为 `true`（直到 `finally` 才释放），导致新订阅 `currentProfileUid` 触发的 `useEffect` 在首行被 `if (isImportingRef.current) return` 误拦截、首次导入后跳过全节点并发测速优选的时序竞态；② `FirstRunGuideDialog` 第二步打通 `DelayManager` 的 `PROXY` 组监听与缓存直读（`getDelayUpdate` + `node.history` 双源），并在进入 Step 2/2 后若 2.5s 仍无有效延迟自动后台触发一次 `triggerAutoSelect(..., select=true)` 全节点并发测速优选；③ 当检测超时或当前节点测出超时（`0 ms`）时，将消极提示升级为建设性引导文案，并在状态卡片内展示满宽「🔄 重新测速并优选节点」按钮，点击即可当场触发全量节点并发测速并自动切换至最快节点 |
 | **BUG-312** | 2.10.1 / 2.12 | 开机自启开关首点回弹竞态修复 + 新手引导 0ms 全节点选优与未测速不显节点占位（v3.2.2）：① 修复基础设置「开机自启」开关在用户首次点击时必然回弹关闭的问题：`useEffect` 监听了 `[verge?.enable_auto_launch]`，在 `patchVerge` 乐观更新瞬时触发副作用，早于异步 IPC 写入 Windows 注册表，导致 `getAutoLaunchStatus()` 读到旧注册表值 `false` 将乐观状态回滚；现增加操作互斥锁并在副作用中剥离配置依赖、仅在写入完成对账确认；② 修复新手引导 Step 2/2 一开始显示未测速首节点并报超时的问题：进入 Step 2/2 零延迟立即触发全量节点并发测速与择优（`triggerAutoSelect` `select=true`），在测速择优完成前不展示未测速的默认首节点（卡片位置保持空置，提示「正在并发测速并自动选优最快节点…」），待真实测通跑赢后才挂载「当前最优节点」与毫秒延迟胶囊 |
+| **BUG-313** | 1.1 / 3.3 / 8.5 | 终止双实例共存特例，全面回归 1:1 端口与初次安装清洁净化规范（最高优先级架构更正）：① 取消开发调试期设立的 Clash Win 与 Clash Mini 端口错开特例，Clash Win 端口与凭据全面回归与 Clash Mini 1:1 绝对一致：Mixed 端口 `10801`、SOCKS `10802`、HTTP `10803`、HTTP Guard 兜底 `7899`、Controller API `9098`（`127.0.0.1:9098`）、单实例端口 `33335`（dev 33336）、控制器密钥 `adapted-by-qiu-yuxiao`；② 安装程序规范变动：Clash Win 初次安装时强制探测并彻底清理宿主机上所有与 Clash Mini 相关的残留进程（`clash-mini.exe`、`mini-mihomo.exe`、`clash-verge.exe` 等）、自启注册表项及 Windows 服务（`clash_verge_service`），在充分清洁的环境下安装部署 Clash Win |
+| **BUG-314** | 2.2 / 2.8 / 8.10 | 节点过滤自动并发测速择优与活跃接管 + 调试日志弹窗对齐极窄窗口（271px）+ 安装程序全周期全局置顶铁律（v3.2.3）：① 节点列表过滤输入框输入完成（物理按键停止输入 700ms 防抖或 Enter 即时确认，排除 IME 组词回车与清空动作）自动触发当前过滤子集的多路并发测速与择优选择（`triggerAutoSelect` `select=true`），测速完成后最优节点自动成为当前活跃节点，且匹配结果为 0 时安全短路不触发请求；② 系统调试运行日志弹窗宽度由 800px 响应式重构为严格对齐最窄视口常数 `MIN_WINDOW_WIDTH`（271px），并在 271px 下重构标题栏、日志级别选择与清空按钮排版，实现全场景无横向滚动条自适应换行；③ 安装程序全局置顶铁律：在 `installer.nsi` 中全链路强化 `SetWindowPos(HWND_TOPMOST)` 与 `BringToFront`，覆盖 GUI 初始化（`myGuiInit` 与 `un.myGuiInit`）、安装前环境检查（`Section EarlyChecks`）、文件部署（`Section Install`）与卸载（`Section Uninstall`），确保安装/卸载全程始终保持在所有窗口最上层，绝不被任何第三方窗口遮挡 |
 
 ---
 

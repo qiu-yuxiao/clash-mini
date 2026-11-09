@@ -7,7 +7,7 @@ import {
 import type { SxProps, Theme } from '@mui/material'
 import { Box, IconButton } from '@mui/material'
 import { keyframes } from '@mui/material'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox } from '@/components/base'
@@ -59,6 +59,67 @@ export const ProxyHead = ({
 
   const { t } = useTranslation()
   const [autoFocus, setAutoFocus] = useState(false)
+  const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTriggeredFilterRef = useRef<string>(filterText || '')
+
+  const onCheckDelayRef = useRef(onCheckDelay)
+  useEffect(() => {
+    onCheckDelayRef.current = onCheckDelay
+  }, [onCheckDelay])
+
+  useEffect(() => {
+    return () => {
+      if (filterTimerRef.current) {
+        clearTimeout(filterTimerRef.current)
+      }
+    }
+  }, [])
+
+  const triggerAutoDelayTest = useCallback(() => {
+    // 延迟 60ms 确保 React 状态更新并完成过滤计算
+    setTimeout(() => {
+      onCheckDelayRef.current()
+    }, 60)
+  }, [])
+
+  const handleFilterChangeText = useCallback(
+    (newText: string) => {
+      if (filterTimerRef.current) {
+        clearTimeout(filterTimerRef.current)
+        filterTimerRef.current = null
+      }
+      const trimmed = newText.trim()
+      // 清空过滤时不自动触发全量测速择优
+      if (!trimmed) {
+        lastTriggeredFilterRef.current = ''
+        return
+      }
+      // 防抖 700ms 自动触发一次多路测速择优
+      filterTimerRef.current = setTimeout(() => {
+        if (lastTriggeredFilterRef.current !== trimmed) {
+          lastTriggeredFilterRef.current = trimmed
+          debugLog(`[ProxyHead] 过滤输入完成，自动触发测速择优: "${trimmed}"`)
+          triggerAutoDelayTest()
+        }
+      }, 700)
+    },
+    [triggerAutoDelayTest],
+  )
+
+  const handleFilterEnter = useCallback(
+    (currentText: string) => {
+      if (filterTimerRef.current) {
+        clearTimeout(filterTimerRef.current)
+        filterTimerRef.current = null
+      }
+      const trimmed = currentText.trim()
+      if (!trimmed) return
+      lastTriggeredFilterRef.current = trimmed
+      debugLog(`[ProxyHead] 回车立即触发测速择优: "${trimmed}"`)
+      triggerAutoDelayTest()
+    },
+    [triggerAutoDelayTest],
+  )
 
   useEffect(() => {
     // fix the focus conflict
@@ -149,6 +210,8 @@ export const ProxyHead = ({
         <BaseSearchBox
           autoFocus={autoFocus}
           value={filterText}
+          onChangeText={handleFilterChangeText}
+          onEnter={handleFilterEnter}
           onSearch={(_, state) =>
             onHeadState({
               filterText: state.text,

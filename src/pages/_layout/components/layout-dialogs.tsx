@@ -14,6 +14,7 @@ import { type Update } from '@tauri-apps/plugin-updater'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { MIN_WINDOW_WIDTH } from '@/constants'
 import {
   get3DInputStyle,
   get3DCardStyle,
@@ -556,7 +557,7 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
       <Dialog
         open={logsOpen}
         onClose={() => setLogsOpen(false)}
-        fullWidth
+        fullWidth={false}
         maxWidth={false}
         slotProps={{
           paper: {
@@ -564,15 +565,22 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             sx: {
               background: 'var(--theme-bg, var(--background-color))',
               height: '480px',
-              width: 'calc(100% - 32px)',
-              maxWidth: '800px',
+              width: `${MIN_WINDOW_WIDTH}px`,
+              maxWidth: '100%',
+              m: '0 auto',
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
               boxSizing: 'border-box',
               '& .base-page > header': {
-                pr: 6,
+                pr: 5,
+                pl: 1.5,
+                flex: '0 0 44px',
+              },
+              '& .base-page > header .MuiTypography-root': {
+                fontSize: '15px',
+                fontWeight: 600,
               },
             },
           },
@@ -584,8 +592,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
           onClick={() => setLogsOpen(false)}
           sx={{
             position: 'absolute',
-            top: 14,
-            right: 14,
+            top: 10,
+            right: 10,
             zIndex: 10,
             color: 'text.secondary',
           }}

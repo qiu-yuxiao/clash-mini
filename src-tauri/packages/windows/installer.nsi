@@ -153,6 +153,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 
 ; Installer pages, must be ordered as they appear
 !define MUI_CUSTOMFUNCTION_GUIINIT myGuiInit
+!define MUI_CUSTOMFUNCTION_UNGUIINIT un.myGuiInit
 ; 1. Welcome Page
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
 !insertmacro MUI_PAGE_WELCOME
@@ -464,6 +465,13 @@ FunctionEnd
 
 Function myGuiInit
   ; 强制将安装程序窗口置顶最上层，防止被其他窗口遮挡导致防毒软件拦截提示被忽略
+  BringToFront
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"
+FunctionEnd
+
+Function un.myGuiInit
+  ; 强制将卸载程序窗口置顶最上层，防止被其他窗口遮挡
+  BringToFront
   System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"
 FunctionEnd
 
@@ -688,6 +696,9 @@ FunctionEnd
 !macroend
 
 Section EarlyChecks
+  ; 强制在安装各环节全程保持窗口置顶，不得被其他窗口遮挡
+  BringToFront
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"
   ; Abort silent installer if downgrades is disabled
   !if "${ALLOWDOWNGRADES}" == "false"
   ${If} ${Silent}
@@ -884,6 +895,9 @@ Section WebView2
 SectionEnd
 
 Section Install
+  ; 强制在文件解压与部署全过程保持窗口置顶
+  BringToFront
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"
   SetOutPath $INSTDIR
 
   !ifmacrodef NSIS_HOOK_PREINSTALL
@@ -1071,6 +1085,9 @@ Function un.onInit
 FunctionEnd
 
 Section Uninstall
+  ; 强制在卸载执行全过程中窗口持续锁定在最顶层
+  BringToFront
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"
 
   !ifmacrodef NSIS_HOOK_PREUNINSTALL
     !insertmacro NSIS_HOOK_PREUNINSTALL

@@ -111,7 +111,7 @@ const LogPage = () => {
         overflow: 'auto',
       }}
       header={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <IconButton
             title={t(
               enableLog ? 'shared.actions.pause' : 'shared.actions.resume',
@@ -122,11 +122,12 @@ const LogPage = () => {
             size="small"
             color="inherit"
             onClick={handleToggleLog}
+            sx={{ p: 0.5 }}
           >
             {enableLog ? (
-              <PauseCircleOutlineRounded />
+              <PauseCircleOutlineRounded sx={{ fontSize: 18 }} />
             ) : (
-              <PlayCircleOutlineRounded />
+              <PlayCircleOutlineRounded sx={{ fontSize: 18 }} />
             )}
           </IconButton>
           <IconButton
@@ -143,9 +144,11 @@ const LogPage = () => {
             size="small"
             color="inherit"
             onClick={handleToggleOrder}
+            sx={{ p: 0.5 }}
           >
             <SwapVertRounded
               sx={{
+                fontSize: 18,
                 transform: isDescending ? 'scaleY(-1)' : 'none',
                 transition: 'transform 0.2s ease',
               }}
@@ -159,6 +162,11 @@ const LogPage = () => {
             }}
             sx={(theme) => ({
               ...get3DButtonStyle(theme, 'contained', 'primary'),
+              minWidth: 'auto',
+              px: 1,
+              py: 0.2,
+              fontSize: '11px',
+              height: '24px',
             })}
           >
             {t('shared.actions.clear')}
@@ -179,6 +187,7 @@ const LogPage = () => {
         <BaseStyledSelect
           aria-label={t('shared.filters.logLevels.label')}
           value={logState}
+          sx={{ width: 95, minWidth: 90 }}
           onChange={(e) => handleLogLevelChange(e.target.value as LogFilter)}
         >
           <MenuItem value="all">{t('shared.filters.logLevels.all')}</MenuItem>

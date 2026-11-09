@@ -16,6 +16,8 @@ type SearchProps = {
   defaultValue?: string
   autoFocus?: boolean
   placeholder?: string
+  onChangeText?: (text: string) => void
+  onEnter?: (text: string) => void
   onSearch: (match: (content: string) => boolean, state: SearchState) => void
 }
 
@@ -58,6 +60,8 @@ export const BaseSearchBox = ({
   defaultValue,
   autoFocus,
   placeholder,
+  onChangeText,
+  onEnter,
   onSearch,
 }: SearchProps) => {
   const { t } = useTranslation()
@@ -98,11 +102,13 @@ export const BaseSearchBox = ({
     const nextText = e.target?.value ?? ''
     setText(nextText)
     emitSearch(nextText)
+    onChangeText?.(nextText)
   }
 
   const handleClearInput = () => {
     setText('')
     emitSearch('')
+    onChangeText?.('')
   }
 
   return (
@@ -118,6 +124,15 @@ export const BaseSearchBox = ({
       sx={{ input: { py: 0.65, px: 1.25 } }}
       value={text}
       onChange={handleChangeText}
+      onKeyDown={(e) => {
+        if (
+          e.key === 'Enter' &&
+          !e.nativeEvent.isComposing &&
+          e.keyCode !== 229
+        ) {
+          onEnter?.(text)
+        }
+      }}
       slotProps={{
         input: {
           sx: { pr: 4 },
