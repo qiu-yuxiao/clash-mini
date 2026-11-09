@@ -1,5 +1,7 @@
 ## v3.2.3
 
+- **Mihomo(Meta) 内核升级至 v1.19.33**
+
 ### ⚡ Auto Speed-Test & Node Activation on Filter + 271px Logs Dialog + Topmost Installer
 
 - **节点列表输入过滤条件完成后自动多路测速与择优切换（BUG-314）**：
