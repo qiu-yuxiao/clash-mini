@@ -1,3 +1,20 @@
+## v3.2.4
+
+### 🛡️ Stealth Mode Lifetime Protection & Flow-Guard Failover Acceleration
+
+- **根除隐身轻量模式下进程异常自杀与托盘图标消失（BUG-315）**：
+  - **Tauri 事件循环退出拦截铁律**：在 `src-tauri/src/lib.rs` 的 `RunEvent::ExitRequested` 建立无条件阻止退出防护机制，除非用户在托盘菜单明确点击「退出」（`Handle::global().is_exiting()`），否则一律执行 `api.prevent_exit()`；
+  - **杜绝误退与守护失效**：彻底移除此前在隐身轻量模式下容易被系统 session/窗口销毁事件绕过的有条件拦截代码，确保窗口关闭并销毁 WebView2 后，后台 Rust 主线程与防断流葛优守护常驻不灭，托盘图标稳定可见。
+- **物理网络连通性探测重构，打破断流死锁（BUG-315）**：
+  - **直连公网高可用 DNS IP（TCP:53）**：将 `is_physical_network_online` 从域名解析（`lookup_host`）重构为毫秒级直连公网高可用 DNS IP（`223.5.5.5:53`、`119.29.29.29:53`、`1.1.1.1:53`），避开 TUN 模式下的代理回环与 DNS 投毒/解析死锁；
+  - **彻底解除自愈死锁**：彻底根除在当前代理节点断流时，因操作系统域名解析失败导致应用误判「物理网络已断开，暂停健康检测与自愈」而永远无法自动切点的死锁 Bug。
+- **大幅缩短断流自愈感知与响应延迟（BUG-315）**：
+  - **健康数据新鲜度阈值加速**：`HEALTH_DATA_FRESH_SECS` 从 60 秒缩短至 20 秒，对突发断流在 15~20 秒内即可迅速捕获并介入；
+  - **节点切换宽限期加速**：`SWITCH_GRACE_PERIOD_SECS` 从 60 秒缩短至 20 秒，在兼顾新节点状态稳定的同时，大幅缩短切到异常节点时的二次自愈等待；
+  - **自愈失败冷却保护提速**：`self_heal_with_accounting` 冷却保护从 60 秒缩短至 25 秒，既防止测速风暴，又极大提升了连续异常时的网络自愈恢复时效。
+
+---
+
 ## v3.2.3
 
 ### ⚡ Auto Speed-Test & Node Activation on Filter + 271px Logs Dialog + Topmost Installer

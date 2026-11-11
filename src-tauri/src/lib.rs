@@ -374,21 +374,13 @@ pub fn run() {
         tauri::RunEvent::Exit => {
             logging!(info, Type::System, "Application exited");
         }
-        #[allow(unused_variables)]
-        tauri::RunEvent::ExitRequested { api, code, .. } => {
-            // 处于轻量模式且未在退出流程中时阻止退出，以便先退出轻量模式；
-            // 但仅当无退出码（code.is_none()）时才阻止——若带退出码（如系统关机/注销），
-            // 应允许退出，避免"阻止退出但无动作"的死锁路径。
-            if module::lightweight::is_in_lightweight_mode() && !handle::Handle::global().is_exiting() && code.is_none()
-            {
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            // Clash Mini 是托盘驻留应用，关闭或销毁窗口绝不可退出主进程；
+            // 只有当用户显式点击托盘菜单「退出 (Exit)」时，Handle::is_exiting 才为 true。
+            // 无论系统消息是否有退出码（code 是否为 None）、无论是否在轻量模式，
+            // 只要未进入明确退出流程，一律阻止退出，确保托盘和后台守护永驻。
+            if !handle::Handle::global().is_exiting() {
                 api.prevent_exit();
-            } else if code.is_none() {
-                api.prevent_exit();
-                if !handle::Handle::global().is_exiting() {
-                    AsyncHandler::spawn(|| async {
-                        feat::quit().await;
-                    });
-                }
             }
         }
         _ => {}

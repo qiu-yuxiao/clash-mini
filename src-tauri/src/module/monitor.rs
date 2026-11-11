@@ -59,9 +59,8 @@ const NODE_TEST_TIMEOUT_MS: u32 = NODE_DELAY_MAX_MS;
 
 /// 节点健康数据新鲜度阈值（秒）。
 /// 活跃节点 history 在此时间内视为可信，直接采用缓存判定，不再对测量组发起即时拨测。
-/// 【探测风暴防护】此前每次体检（正常 15s/重试 3s）都全组拨测 70+ 节点，
-/// 稳态约 280 次/分钟探测会自激误报（刚实测 81ms 的节点 17 秒后被判死）。
-const HEALTH_DATA_FRESH_SECS: u64 = 60;
+/// 缩短至 20 秒以加快对突发断流的感知与响应速度，同时避免过度频繁拨测。
+const HEALTH_DATA_FRESH_SECS: u64 = 20;
 
 /// 死节点确认拨测的最小间隔（秒）。
 /// 活跃节点被判死后，若其 history 在此时间内（说明刚拨测过），直接信缓存判定，
@@ -71,7 +70,8 @@ const DEAD_CONFIRM_MIN_INTERVAL_SECS: u64 = 10;
 /// 节点切换宽限期（秒）。
 /// 切换后测量组对新节点的缓存数据必然陈旧（可能是 300 秒自然周期前的死数据），
 /// 宽限期内的失败判定只记日志、不计入连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
-const SWITCH_GRACE_PERIOD_SECS: u64 = 60;
+/// 缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
+const SWITCH_GRACE_PERIOD_SECS: u64 = 20;
 
 /// 选点兜底 history 的最大可接受年龄（秒）。
 /// 超过此年龄的缓存延迟视为陈旧数据，不参与候选，防止把死节点的旧延迟选为最优。
@@ -283,18 +283,28 @@ fn resolve_probe_target(test_url: &str) -> String {
     }
 }
 
-/// 物理网络连通性探测：对当前测速 URL 解析出的 host:port 发起 DNS 查询，
-/// 成功即认为物理网络已就绪。超时上限由调用方指定。
-///
-/// 复用主循环 [后台监测] 已有的探测方式（tokio::net::lookup_host），
-/// 避免引入第三方依赖或硬编码探测目标。
+/// 物理网络连通性探测。
+/// 优先直连公网高可用 DNS IP (TCP:53)，避开域名解析和代理环路，10~30ms 内完成物理网卡探测；
+/// 若均不可通，最后使用当前测速 URL 进行 DNS 查询兜底。超时上限由调用方指定。
 async fn is_physical_network_online(timeout_secs: u64) -> bool {
-    let test_url = get_test_url().await;
-    let host_port = resolve_probe_target(&test_url);
-    tokio::time::timeout(Duration::from_secs(timeout_secs), tokio::net::lookup_host(host_port))
-        .await
-        .map(|res| res.is_ok())
-        .unwrap_or(false)
+    let dur = Duration::from_secs(timeout_secs.max(1));
+    let check = async {
+        // 优先直连公网高可用 DNS IP (TCP:53)，避开域名解析和代理环路，毫秒级快速确认物理网卡状态
+        if tokio::net::TcpStream::connect("223.5.5.5:53").await.is_ok() {
+            return true;
+        }
+        if tokio::net::TcpStream::connect("119.29.29.29:53").await.is_ok() {
+            return true;
+        }
+        if tokio::net::TcpStream::connect("1.1.1.1:53").await.is_ok() {
+            return true;
+        }
+        // 兜底：若特定局域网封禁出站 53 端口，回退至域名 DNS 查询
+        let test_url = get_test_url().await;
+        let host_port = resolve_probe_target(&test_url);
+        tokio::net::lookup_host(host_port).await.is_ok()
+    };
+    tokio::time::timeout(dur, check).await.unwrap_or(false)
 }
 
 /// 快速探测 mihomo 内核 API 是否可达。
@@ -1507,13 +1517,13 @@ fn fire_self_heal_alert() {
     });
 }
 
-/// 执行一次自愈选点并统一记账：60 秒冷却保护 + auto_select_fail_count 累计 +
+/// 执行一次自愈选点并统一记账：25 秒冷却保护 + auto_select_fail_count 累计 +
 /// 连续 5 次弹 Windows 警报。
 ///
 /// 后台监测的三处自愈触发路径（主路径 / 网络恢复 / API 异常）共用本函数，
 /// 避免冷却与计数逻辑各写一份导致行为不一致（🟡6）。
 ///
-/// - 冷却：auto_select 失败后至少等 60 秒再重试；处于冷却中直接返回 false 跳过。
+/// - 冷却：auto_select 失败后至少等 25 秒再重试；处于冷却中直接返回 false 跳过。
 /// - 计数：选点成功归零；失败或非 BUSY 报错加 1；AUTO_SELECT_BUSY 冲突不计失败、
 ///   回退冷却时间戳允许下次重试。
 /// - 警报：连续 5 次失败弹 Windows 提示框（fire_self_heal_alert，内部 spawn_blocking）。
@@ -1525,16 +1535,16 @@ async fn self_heal_with_accounting(
     last_auto_select_time: &mut Option<Instant>,
     last_check_time: &mut Instant,
 ) -> bool {
-    // 60 秒冷却保护：auto_select 失败后至少等 60 秒再重试
+    // 25 秒冷却保护：auto_select 失败后至少等 25 秒再重试
     let now = Instant::now();
     if let Some(last_time) = *last_auto_select_time {
         let elapsed = now.duration_since(last_time).as_secs();
-        if elapsed < 60 {
+        if elapsed < 25 {
             // info 级别：自愈被冷却跳过是关键状态变化，正常日志级别应可见（此前 debug 级导致排障时不可见）
             logging!(
                 info,
                 Type::Lightweight,
-                "[后台监测] 自愈选点在 60 秒冷却中（已过 {} 秒），跳过本次",
+                "[后台监测] 自愈选点在 25 秒冷却中（已过 {} 秒），跳过本次",
                 elapsed
             );
             return false;
