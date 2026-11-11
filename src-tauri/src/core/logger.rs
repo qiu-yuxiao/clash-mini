@@ -110,10 +110,13 @@ impl Logger {
         *self.sidecar_file_writer.write() = Some(sidecar_file_writer);
 
         std::panic::set_hook(Box::new(move |info| {
-            let payload = info
-                .payload()
-                .downcast_ref::<&str>()
-                .unwrap_or(&"Unknown panic payload");
+            let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+                (*s).to_string()
+            } else if let Some(s) = info.payload().downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic payload".to_string()
+            };
             let location = info
                 .location()
                 .map(|loc| format!("{}:{}", loc.file(), loc.line()))

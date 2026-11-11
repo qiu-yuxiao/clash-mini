@@ -105,10 +105,11 @@ pub fn resolve_setup_async() {
             .unwrap_or(false);
 
         let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
+        let is_respawn = crate::process::guardian::is_guardian_respawn();
         let should_silent = is_silent_start && has_silent_arg;
 
-        if should_silent && enable_auto_lightweight {
-            // 静默启动 + 自动轻量模式：直接进入轻量模式，跳过窗口创建
+        if is_respawn || (should_silent && enable_auto_lightweight) {
+            // 伴生看门狗静默拉起 或 静默启动+自动轻量模式：直接进入轻量模式，跳过窗口与 WebView2 创建
         } else {
             // 正常启动：先创建窗口
             init_window().await;
@@ -175,7 +176,10 @@ pub(super) async fn init_auto_lightweight_boot() {
 
 pub fn init_signal() {
     logging!(info, Type::Setup, "Initializing signal handlers...");
-    clash_verge_signal::register(feat::quit);
+    clash_verge_signal::register(|| async {
+        crate::process::guardian::notify_intentional_exit();
+        feat::quit().await;
+    });
 }
 
 pub async fn init_work_config() {

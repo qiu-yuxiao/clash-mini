@@ -1233,12 +1233,22 @@ pub fn start_background_monitor() {
                 // 窗口不可见（轻量/纯托盘启动）时，由后端在启动时执行一次初始化自动选点；
                 // 窗口存在则交给前端，此处不动作。进入轻量模式（lightweight.rs B4）也会选点，
                 // 二者由 trigger_backend_auto_select 内部的 AUTO_SELECT_RUNNING 互斥，不会重复执行。
-                let window_state = crate::utils::window_manager::WindowManager::get_main_window_state();
-                if matches!(window_state, crate::utils::window_manager::WindowState::NotExist) {
-                    if let Some(uid) = get_current_profile_uid().await {
-                        let _ = restore_profile_selected_nodes(&uid).await;
-                        // 委托后端执行初始化自动选点（前序 wait_for_clash_ready 已通过，跳过冗余等待）；结果经事件回写前端 UI
-                        let _ = trigger_backend_auto_select(&uid, None, 0, true, true).await;
+                // 若由伴生看门狗静默拉起并无感挂载了已在运行的内核（BUG-316），跳过节点重置与全量重选，
+                // 直接延续当前已选节点的健康监测，保证长连接零扰动。
+                if crate::core::CoreManager::take_reattached_existing_core() {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 伴生看门狗已无感挂载运行中内核，延续现有出口节点健康守护"
+                    );
+                } else {
+                    let window_state = crate::utils::window_manager::WindowManager::get_main_window_state();
+                    if matches!(window_state, crate::utils::window_manager::WindowState::NotExist) {
+                        if let Some(uid) = get_current_profile_uid().await {
+                            let _ = restore_profile_selected_nodes(&uid).await;
+                            // 委托后端执行初始化自动选点（前序 wait_for_clash_ready 已通过，跳过冗余等待）；结果经事件回写前端 UI
+                            let _ = trigger_backend_auto_select(&uid, None, 0, true, true).await;
+                        }
                     }
                 }
             } else {
@@ -1386,6 +1396,14 @@ pub fn start_background_monitor() {
                         api_error_count = 0;
                         match verdict {
                             FailoverVerdict::NoAction => {
+                                if consecutive_fails > 0 {
+                                    logging!(
+                                        info,
+                                        Type::Lightweight,
+                                        "[后台监测] 活跃节点复检恢复正常（此前连续失败 {} 次），解除重试状态",
+                                        consecutive_fails
+                                    );
+                                }
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
                             }

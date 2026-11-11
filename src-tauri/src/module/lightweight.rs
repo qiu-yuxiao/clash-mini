@@ -61,8 +61,14 @@ fn transition_and_log(from: LightweightState, to: LightweightState) -> bool {
         .is_ok()
     {
         match to {
-            LightweightState::Normal => logging!(info, Type::Lightweight, "轻量模式已关闭"),
-            LightweightState::In => logging!(info, Type::Lightweight, "轻量模式已开启"),
+            LightweightState::Normal => {
+                crate::process::guardian::set_lightweight_mode_signal(false);
+                logging!(info, Type::Lightweight, "轻量模式已关闭");
+            }
+            LightweightState::In => {
+                crate::process::guardian::set_lightweight_mode_signal(true);
+                logging!(info, Type::Lightweight, "轻量模式已开启");
+            }
             LightweightState::Exiting => logging!(info, Type::Lightweight, "正在退出轻量模式"),
         }
         true
@@ -81,7 +87,7 @@ pub async fn auto_lightweight_boot() -> Result<()> {
     let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
     let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
     let should_silent = is_silent_start && has_silent_arg;
-    if should_silent {
+    if should_silent || crate::process::guardian::is_guardian_respawn() {
         entry_lightweight_mode().await;
     }
     Ok(())
@@ -90,7 +96,9 @@ pub async fn auto_lightweight_boot() -> Result<()> {
 pub async fn entry_lightweight_mode() -> bool {
     let _guard = LIGHTWEIGHT_LOCK.lock().await;
     let verge = Config::verge().await;
-    if !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false) {
+    if !crate::process::guardian::is_guardian_respawn()
+        && !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false)
+    {
         let _ = WindowManager::hide_main_window();
         crate::core::tray::update_lite_mode_menu(false);
         return true;

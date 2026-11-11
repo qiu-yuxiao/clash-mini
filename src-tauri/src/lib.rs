@@ -192,6 +192,10 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
     }
 }
 
+pub fn maybe_run_guardian_mode() -> Option<i32> {
+    process::guardian::maybe_run_guardian_mode()
+}
+
 pub fn run() {
     if let Err(err) = app_init::init_singleton_check() {
         let msg = format!(
@@ -217,6 +221,10 @@ pub fn run() {
             resolve::init_work_dir_and_logger()?;
 
             logging!(info, Type::Setup, "开始应用初始化...");
+            // 挂载防第三方内存优化软件误杀的常驻零渲染哨兵窗口（UI 主线程）与超轻量伴生看门狗（BUG-316）
+            crate::process::guardian::init_resident_sentinel_window();
+            crate::process::guardian::start_guardian_companion();
+
             if let Err(e) = app_init::setup_autostart(app) {
                 logging!(error, Type::Setup, "Failed to setup autostart: {}", e);
             }
@@ -372,6 +380,7 @@ pub fn run() {
             event_handlers::handle_ready_resumed(app_handle);
         }
         tauri::RunEvent::Exit => {
+            crate::process::guardian::notify_intentional_exit();
             logging!(info, Type::System, "Application exited");
         }
         // Clash Mini 是托盘驻留应用，关闭或销毁窗口绝不可退出主进程；

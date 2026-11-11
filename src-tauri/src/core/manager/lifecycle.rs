@@ -58,7 +58,24 @@ impl CoreManager {
         }
 
         let result = match *self.get_running_mode() {
-            RunningMode::Service => self.start_core_by_service().await,
+            RunningMode::Service => {
+                // 【BUG-316 零断流自愈挂载】若当前为伴生看门狗静默拉起（--guardian-respawn），
+                // 且 Session 0 系统服务下的 mini-mihomo 内核仍在健康响应命名管道，
+                // 直接挂载现有内核状态而不重发 run_core_by_service，100% 保持活跃下载/通话不断流。
+                if crate::process::guardian::is_guardian_respawn()
+                    && Handle::mihomo().await.get_base_config().await.is_ok()
+                {
+                    Self::mark_reattached_existing_core();
+                    logging!(
+                        info,
+                        Type::Core,
+                        "[Guardian] 检测到系统服务内核仍在健康运行，已无感挂载现有内核（零断流恢复）"
+                    );
+                    Ok(())
+                } else {
+                    self.start_core_by_service().await
+                }
+            }
             RunningMode::NotRunning | RunningMode::Sidecar => self.start_core_by_sidecar().await,
         };
 

@@ -62,7 +62,7 @@ pub async fn check_singleton() -> Result<()> {
                         .query(&[("param", param)])
                         .send()
                         .await?;
-                } else if param != "--silent" {
+                } else if param != "--silent" && param != "--guardian-respawn" && param != "--guardian" {
                     client
                         .get(format!("http://127.0.0.1:{port}/commands/visible"))
                         .send()

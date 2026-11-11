@@ -129,6 +129,16 @@ impl CoreManager {
         self.start_core().await?;
         Ok(())
     }
+
+    pub fn mark_reattached_existing_core() {
+        REATTACHED_EXISTING_CORE.store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    pub fn take_reattached_existing_core() -> bool {
+        REATTACHED_EXISTING_CORE.swap(false, std::sync::atomic::Ordering::AcqRel)
+    }
 }
+
+static REATTACHED_EXISTING_CORE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 singleton!(CoreManager, CORE_MANAGER);

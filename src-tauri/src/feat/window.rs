@@ -9,6 +9,8 @@ use tokio::time::{Duration, timeout};
 /// 退出前统一准备工作：设置退出标志、中止后台任务、停止定时器等
 pub async fn prepare_exit() {
     logging!(debug, Type::System, "准备退出，中止所有后台任务");
+    // 第一时间置位正常退出内核事件，让伴生看门狗 0ms 同步退场（BUG-316）
+    crate::process::guardian::notify_intentional_exit();
     // 设置退出标志
     handle::Handle::global().set_is_exiting();
 
