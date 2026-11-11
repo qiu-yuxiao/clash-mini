@@ -1,3 +1,20 @@
+## v3.2.5
+
+### 🛡️ Anti-360 External Kill Immunity & Zero-Drop Guardian Self-Healing
+
+- **根治 360 加速球等第三方清理软件在轻量模式下误杀 `clash-mini.exe` 导致托盘与防断流守护消失（BUG-316）**：
+  - **真凶实证**：定位 `v3.2.3` / `v3.2.4` 进入轻量模式十余分钟后零日志猝死的根因——本机开启 360 加速球「智能自动加速」（`switch_smart_mode=1`、`cpu_exception=80`）后，其 `360perfoptm2.dll`（`DoOptmGroupResidual` / `FastOptm`）仅通过 `EnumWindows` 检查 `IsWindowVisible` 且非 `WS_EX_TOOLWINDOW` 的顶层窗口而不识别系统托盘图标；当轻量模式销毁 `Tauri Window` 主窗口且整机高负载触发自动清理时，进程被判定为「关窗残留进程」并遭 `TerminateProcess(hProcess, 99)` 内核级强杀；
+  - **常驻零渲染哨兵宿主窗口（源头免杀）**：主线程常驻创建纯 Win32 原生零 WebView 哨兵窗口对（隐藏 Owner + 屏外 `1×1` 全透明鼠标穿透 `WS_POPUP | WS_VISIBLE` 归属窗口，开销 `< 4 KB`，不显示在任务栏与 Alt+Tab，严守 `BUG-082` 不触碰工作集修剪），轻量模式销毁 WebView2 后依然满足第三方清理引擎的合法运行期应用窗口判据，从源头杜绝误杀。
+- **超轻量 `--guardian` 伴生看门狗：外部强杀必留遗言 + 轻量态零断流秒级自愈（BUG-316）**：
+  - **内核事件阻塞零开销**：在 `main.rs` 入口初始化 Tokio / Tauri / WebView2 之前分流纯 Win32 事件阻塞的 `--guardian` 伴生进程（内存 `< 1.5 MB`，CPU `0%`）；点击托盘「退出」或系统关机信号时 `0ms` 同步退场，绝无残留；
+  - **外部强杀同步取证留痕**：一旦主进程被任何外部程序暴力 `TerminateProcess`（如手动一键深度清理或 `taskkill /F`），看门狗立即向 `logs/latest.log` 同步补写精确的 `ERROR [System] [Guardian]` 死因日志（记录 `PID`、`ExitCode` 强杀特征码与轻量态标记），彻底告别“死无对证”；
+  - **纯静默托盘自愈与内核无感重挂**：若主进程在轻量模式下遭强杀，看门狗经 `1.5s` 安全避让窗口（自动避让系统关机、覆盖安装与卸载流程）后，以 `--guardian-respawn` 纯静默托盘轻量态拉起主进程——跳过主窗口与 WebView2 创建（零弹窗闪烁），自动检测并无缝挂载已在运行中的系统服务内核（`mini-mihomo`），不断网、不断流即刻恢复系统托盘与后台防断流守护。
+- **后台监测异常恢复日志闭环与 Panic 捕获增强（BUG-316）**：
+  - **异常复检恢复闭环**：`monitor.rs` 在 `consecutive_fails > 0` 经快速复检恢复正常时补齐一行事件闭环日志（正常稳态零额外输出）；
+  - **Panic 载荷完整解析**：修复 `logger.rs` 中 `std::panic::set_hook` 仅解析 `&str` 而遗漏 `format!` 动态 `String` 载荷的问题。
+
+---
+
 ## v3.2.4
 
 ### 🛡️ Stealth Mode Lifetime Protection & Flow-Guard Failover Acceleration
