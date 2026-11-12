@@ -813,6 +813,7 @@ flowchart LR
 | **BUG-361** | 2.9 | 系统托盘图标左键单击唤醒与隐藏双向切换：在不触碰任何托盘动态图标/菜单更新 API（严守 BUG-073 静态托盘红线）的前提下，左键单击回调先判断主窗口状态：若不处于轻量模式且主窗口当前可见、未最小化且已获焦点，则平稳隐藏主窗口；否则执行唤醒恢复并置顶聚焦。 |
 | **BUG-362** | 7.6 / 8.2 | 远程订阅默认 `User-Agent` 版本解耦与单订阅自定义逃生阀闭环：在 `constants::network` 定义单一事实源 `SUBSCRIPTION_COMPAT_USER_AGENT = "clash-verge/v2.5.10"` 与 `CARGO_PKG_VERSION` 彻底解耦，空串自动回退，并在 `PrfItem::from_url` 中完整持久化保留 `option.user_agent`。 |
 | **BUG-363** | 4.1 / 4.2 / 5.1 | 轻量模式防强杀四重闭环加固：伴生看门狗异名异目录物理隔离（`%LOCALAPPDATA%\<APP_ID>\guard\clash-mini-guard.exe` + `--target-exe` + NSIS 安装卸载联动）、主进程与看门狗双向互锁监督重建、双端挂载主屏工作区 `1×1` `LWA_ALPHA = 1` 穿透哨兵窗口（看门狗 `MsgWaitForMultipleObjects` 即时响应消息）及 `120s` 稳态代数自动复位。 |
+| **BUG-364** | 5.2 | TUN 模式默认启用并补全 `sniffer` 域名嗅探（含 `override-destination: true`、`HTTP`/`TLS`/`QUIC`、`skip-domain` 与私网 `skip-dst-address` 免误伤）以解决后台常驻浏览器持有缓存/投毒裸 IP 绕过 Fake-IP 失败；新增 `sanitize_nameserver_policy` 对订阅 `dns.nameserver-policy` 不可达海外公共 DNS 执行卫生剔除（未开 `respect-rules` 时）或 DoH 改写与前置 `PROXY` 规则补齐（`respect-rules: true` 时）。 |
 
 ---
 

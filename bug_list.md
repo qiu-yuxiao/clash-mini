@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-363)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-364)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -337,6 +337,13 @@
 - **涉及物理路径与行号**：`src-tauri/src/process/guardian.rs:1-1436`, `src-tauri/src/module/lightweight.rs:99-107, 170-177`, `src-tauri/src/utils/window_manager.rs:447-460, 568-573, 617-624`, `src-tauri/packages/windows/installer.nsi:551-586, 944-947, 1132-1143`
 - **根因与背景实证**：`v3.2.6` 现场运行 2 小时 30 分钟后（`21:05:24` ~ `23:34:59`），用户唤醒后再次关闭窗口进入轻量模式，叠加整机负载飙升至 `CPU 100% / 内存 94%` 触发 `360tray.exe`（`360perfoptm2.dll` `switch_smart_mode=1`, `cpu_exception=80`）高强度清理，主进程 `PID=12688` 与伴生看门狗 `PID=21012` 双双零日志猝死（Session 0 下 `clash-verge-service.exe` 与 `mini-mihomo.exe` 始终存活）。根因在于 `BUG-316` 初版看门狗直接以同名同路径 `clash-mini.exe --guardian` 无窗口（`CREATE_NO_WINDOW`）启动且主进程丢弃 `Child` 句柄不监控看门狗死活——导致无窗口看门狗要么在前期残留扫描中被先行单杀使主进程裸奔，要么在按 `clash-mini.exe` 应用组清理（`CGroupInfo` / `DoOptmGroupResidual` / `FastOptm`）时与主进程同组连坐双杀；同时原哨兵窗口采用 `(-32000, -32000)` 屏外最小化特征坐标、`LWA_ALPHA = 0` 与空标题，易在极限负载下被穿透。
 - **修正与改良方案**：实施四重纵深闭环加固：① **看门狗异名异目录物理隔离**：按需经 `.staging` 原子同步至 `%LOCALAPPDATA%\<APP_ID>\guard\clash-mini-guard.exe`（占用锁定时平滑落入 `clash-mini-guard-alt.exe`），传入 `--target-exe` 并脱离父 Job 独立拉起，彻底免疫按 `clash-mini.exe` 应用组批量强杀且不占用安装目录文件锁，同步在 `installer.nsi` 安装/卸载流程补齐停机与清理；② **主进程与看门狗双向互锁监督**：主进程通过独立内核态阻塞线程（`WaitForMultipleObjects([child, exit_event], INFINITE)`，`0%` CPU）反向监控看门狗，主动退出 `0ms` 唤醒，看门狗遭外部误杀时记录退出码并带退避自动重建；③ **主进程与看门狗双端挂载工作区哨兵窗口**：哨兵窗迁入主屏工作区原点 `1×1`、标题非空、`LWA_ALPHA = 1`（`1/255` 肉眼不可见、`WM_NCHITTEST -> HTTRANSPARENT` 穿透、隐藏 Owner 不占任务栏/Alt+Tab），看门狗同步挂载哨兵窗并以 `MsgWaitForMultipleObjects(..., QS_ALLINPUT)` 即时响应防 `IsHungAppWindow` 判死，同时将隐藏至托盘态一并纳入守护信号；④ **120s 稳态代数复位**：`STABLE_UPTIME_RESET_SECS` 定为 `120s`，稳定运行满 120s 后遭外部强杀自动将 `--gen` 重置为 `1`，兼顾启动崩溃 3 次熔断与 7×24 小时无限次零断流托盘自愈。
+
+### BUG-364（对应规范章节：5.2）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：Critical / TUN 模式域名嗅探与订阅 DNS 策略卫生
+- **涉及物理路径与行号**：`src-tauri/src/enhance/tun.rs:109-311`, `src-tauri/src/enhance/mod.rs:543-920, 1375-1380`
+- **根因与背景实证**：`v3.2.7` 现场取证发现系统代理模式与 Chrome 均可正常翻墙，唯常驻后台进程的 Edge 在 TUN 模式下全部外网超时（同机无痕/新启动 Edge 则可正常访问 Google）。日志与命名管道快照（`\\.\pipe\mini-mihomo`）证实双重原因：① **TUN 模式缺少 `sniffer` 域名嗅探配置**：Edge 后台网络进程（`--no-startup-window`）跨模式切换常驻期间持有了直连或路由器 IPv6 RA DNS（`fe80::1%3`）返回的真实/GFW 投毒 IP（如 `2001::1`、`69.171.235.22`），连接绕过 Fake-IP 且请求无 `Host`，由于未开启 `sniffer`，连接既无法命中 `RULE-SET,gfwlist,PROXY` 也未覆写投毒目标地址，全部直落 `MATCH,DIRECT` 刷 `i/o timeout`；② **机场订阅 `dns.nameserver-policy` 脏策略未做卫生清理**：如 `RtLvP3j0CQIN.yaml` 将 `+.google.com` 等 15 个海外域名固定指派给 `https://dns.cloudflare.com/dns-query` 且未开启 `respect-rules: true`，导致内核在大陆直连被墙 DoH 节点，非 A/AAAA 查询（实测 `TXT`）331ms 内直接返回 `SERVFAIL`（`DNS server failure`）。
+- **修正与改良方案**：① **TUN 模式默认注入并补全 `sniffer`**：在 `enhance::tun::use_tun(config, true)` 中强制开启 `sniffer.enable: true`，按需补缺 `force-dns-mapping: true`、`parse-pure-ip: true`、`override-destination: true`（确保投毒 IP 被 TLS/HTTP/QUIC 嗅探出的真实 SNI/Host 覆写后再经代理拨号）、`sniff`（`HTTP` `80, 8080-8880`；`TLS`/`QUIC` `443, 8443`），并合并 `skip-domain`（`Mijia Cloud`、`+.push.apple.com`）与私网/回环/CGNAT/ULA/链路本地 `skip-dst-address` 免误伤列表；② **新增 `sanitize_nameserver_policy` 卫生清理通道**：在 `enhance` 流水线尾部解析并清洗 `dns.nameserver-policy`，当 `respect-rules` 未启用（或条目显式带 `#DIRECT`）时剔除海外被墙公共 DNS 上游（如 `dns.cloudflare.com`、`dns.google`、`8.8.8.8`、`1.1.1.1` 等）并移除空键/空映射，保留国内/内网/`system` 策略；当 `respect-rules: true` 时按 `BUG-308` 原则将 4 家境外公共 DNS 明文 UDP 改写为 DoH，并为保留的海外策略上游自动补齐前置 `PROXY` 规则。
 
 ---
 

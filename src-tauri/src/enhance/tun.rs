@@ -110,6 +110,11 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             Value::from("inet6-address"),
             Value::Sequence(vec![Value::String(crate::constants::tun::TUN_INET6_ADDRESS.into())]),
         );
+
+        // TUN 模式下默认开启并补全 sniffer 域名嗅探：
+        // 避免常驻后台进程（如 Edge）持有切换前直连/Router IPv6 DNS 缓存的真实/投毒 IP
+        // 时因无域名而绕过 `RULE-SET,gfwlist,PROXY` 落入 `MATCH,DIRECT`。
+        merge_tun_sniffer_defaults(&mut config);
     } else {
         // 非 TUN（系统代理 / 手动）：不注入 fake-ip 等 TUN 专属 DNS 字段，交由内核默认
         // （redir-host）；也不做 IPv6 路由接管 —— 非全局接管场景本就不存在「绕过代理泄漏」。
@@ -136,4 +141,180 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
     revise!(config, "tun", tun_val);
 
     config
+}
+
+const DEFAULT_SNIFF_SKIP_DOMAINS: &[&str] = &["Mijia Cloud", "+.push.apple.com"];
+const DEFAULT_SNIFF_SKIP_DST_CIDRS: &[&str] = &[
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "100.64.0.0/10",
+    "169.254.0.0/16",
+    "::1/128",
+    "fc00::/7",
+    "fe80::/10",
+];
+
+fn insert_if_missing(map: &mut Mapping, key: &str, value: serde_yaml_ng::Value) {
+    let k = serde_yaml_ng::Value::from(key);
+    if !map.contains_key(&k) {
+        map.insert(k, value);
+    }
+}
+
+fn append_missing_str_items(map: &mut Mapping, key: &str, items: &[&str]) {
+    use serde_yaml_ng::Value;
+
+    let k = Value::from(key);
+    let mut seq = match map.get(&k) {
+        Some(Value::Sequence(existing)) => existing.clone(),
+        _ => Vec::with_capacity(items.len()),
+    };
+    for &item in items {
+        let already = seq.iter().any(|v| v.as_str() == Some(item));
+        if !already {
+            seq.push(Value::String(item.into()));
+        }
+    }
+    map.insert(k, Value::Sequence(seq));
+}
+
+fn merge_tun_sniffer_defaults(config: &mut Mapping) {
+    use serde_yaml_ng::Value;
+
+    let mut sniffer = config
+        .get("sniffer")
+        .and_then(|v| v.as_mapping())
+        .cloned()
+        .unwrap_or_default();
+
+    // TUN 模式必须开启 sniffer，确保非 Fake-IP / 缓存 IP / 污染 IP 流量可通过 TLS SNI / HTTP Host / QUIC SNI 还原域名
+    revise!(sniffer, "enable", true);
+    insert_if_missing(&mut sniffer, "force-dns-mapping", Value::Bool(true));
+    insert_if_missing(&mut sniffer, "parse-pure-ip", Value::Bool(true));
+    insert_if_missing(&mut sniffer, "override-destination", Value::Bool(true));
+
+    let mut sniff_map = sniffer
+        .get("sniff")
+        .and_then(|v| v.as_mapping())
+        .cloned()
+        .unwrap_or_default();
+
+    let mut http_proto = Mapping::new();
+    http_proto.insert(
+        Value::from("ports"),
+        Value::Sequence(vec![Value::Number(80.into()), Value::String("8080-8880".into())]),
+    );
+    http_proto.insert(Value::from("override-destination"), Value::Bool(true));
+    insert_if_missing(&mut sniff_map, "HTTP", Value::Mapping(http_proto));
+
+    for proto in ["TLS", "QUIC"] {
+        let mut proto_map = Mapping::new();
+        proto_map.insert(
+            Value::from("ports"),
+            Value::Sequence(vec![Value::Number(443.into()), Value::Number(8443.into())]),
+        );
+        insert_if_missing(&mut sniff_map, proto, Value::Mapping(proto_map));
+    }
+    sniffer.insert(Value::from("sniff"), Value::Mapping(sniff_map));
+
+    append_missing_str_items(&mut sniffer, "skip-domain", DEFAULT_SNIFF_SKIP_DOMAINS);
+    append_missing_str_items(&mut sniffer, "skip-dst-address", DEFAULT_SNIFF_SKIP_DST_CIDRS);
+
+    revise!(config, "sniffer", sniffer);
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use serde_yaml_ng::Value;
+
+    #[test]
+    fn use_tun_enabled_injects_sniffer_defaults_and_preserves_custom_fields() {
+        let cfg: Mapping = serde_yaml_ng::from_str(
+            r"
+ipv6: false
+dns:
+  enable: true
+tun:
+  enable: false
+",
+        )
+        .unwrap();
+
+        let out = use_tun(cfg, true);
+        let sniffer = out.get("sniffer").and_then(Value::as_mapping).unwrap();
+        assert_eq!(sniffer.get("enable").and_then(Value::as_bool), Some(true));
+        assert_eq!(sniffer.get("force-dns-mapping").and_then(Value::as_bool), Some(true));
+        assert_eq!(sniffer.get("parse-pure-ip").and_then(Value::as_bool), Some(true));
+        assert_eq!(sniffer.get("override-destination").and_then(Value::as_bool), Some(true));
+
+        let sniff = sniffer.get("sniff").and_then(Value::as_mapping).unwrap();
+        let http = sniff.get("HTTP").and_then(Value::as_mapping).unwrap();
+        assert_eq!(http.get("override-destination").and_then(Value::as_bool), Some(true));
+        assert!(sniff.get("TLS").is_some());
+        assert!(sniff.get("QUIC").is_some());
+
+        let skip_domain = sniffer.get("skip-domain").and_then(Value::as_sequence).unwrap();
+        assert!(skip_domain.iter().any(|v| v.as_str() == Some("Mijia Cloud")));
+        assert!(skip_domain.iter().any(|v| v.as_str() == Some("+.push.apple.com")));
+
+        let skip_dst = sniffer.get("skip-dst-address").and_then(Value::as_sequence).unwrap();
+        assert!(skip_dst.iter().any(|v| v.as_str() == Some("192.168.0.0/16")));
+        assert!(skip_dst.iter().any(|v| v.as_str() == Some("fe80::/10")));
+        assert!(!skip_dst.iter().any(|v| v.as_str() == Some("198.18.0.0/16")));
+    }
+
+    #[test]
+    fn use_tun_enabled_merges_partial_subscription_sniffer_without_duplicates() {
+        let cfg: Mapping = serde_yaml_ng::from_str(
+            r#"
+ipv6: false
+sniffer:
+  enable: false
+  override-destination: false
+  skip-domain:
+    - Mijia Cloud
+    - "+.internal.example"
+dns:
+  enable: true
+"#,
+        )
+        .unwrap();
+
+        let out = use_tun(cfg, true);
+        let sniffer = out.get("sniffer").and_then(Value::as_mapping).unwrap();
+        assert_eq!(sniffer.get("enable").and_then(Value::as_bool), Some(true));
+        assert_eq!(
+            sniffer.get("override-destination").and_then(Value::as_bool),
+            Some(false)
+        );
+        assert_eq!(sniffer.get("force-dns-mapping").and_then(Value::as_bool), Some(true));
+        assert_eq!(sniffer.get("parse-pure-ip").and_then(Value::as_bool), Some(true));
+
+        let skip_domain = sniffer.get("skip-domain").and_then(Value::as_sequence).unwrap();
+        assert_eq!(
+            skip_domain.iter().filter(|v| v.as_str() == Some("Mijia Cloud")).count(),
+            1
+        );
+        assert!(skip_domain.iter().any(|v| v.as_str() == Some("+.internal.example")));
+        assert!(skip_domain.iter().any(|v| v.as_str() == Some("+.push.apple.com")));
+    }
+
+    #[test]
+    fn use_tun_disabled_does_not_inject_sniffer() {
+        let cfg: Mapping = serde_yaml_ng::from_str(
+            r"
+ipv6: false
+dns:
+  enable: true
+",
+        )
+        .unwrap();
+
+        let out = use_tun(cfg, false);
+        assert!(out.get("sniffer").is_none());
+    }
 }

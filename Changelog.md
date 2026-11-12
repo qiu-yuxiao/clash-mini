@@ -1,3 +1,13 @@
+## v3.2.8
+
+### 🌐 TUN Mode Domain Sniffing & `nameserver-policy` Hygiene
+
+- **修复 TUN 模式下后台常驻浏览器（如 Edge）缓存真实/投毒 IP 绕过 Fake-IP 导致无法代理出境，及订阅 `dns.nameserver-policy` 触发 `SERVFAIL` 的问题（BUG-364）**：
+  - **TUN 模式默认注入并补全 `sniffer` 域名嗅探**：`enhance::tun::use_tun` 在启用 TUN 时强制开启 `sniffer.enable: true` 并按缺补全 `force-dns-mapping: true`、`parse-pure-ip: true`、`override-destination: true`、`HTTP`/`TLS`/`QUIC` 嗅探端口与 `Mijia Cloud` / `+.push.apple.com` / 私网保留网段 `skip-dst-address` 免误伤列表；即便浏览器持有了切换前残留或路由器 IPv6 DNS 投毒的裸 IP 连接，也能由 TLS SNI / HTTP Host / QUIC SNI 还原真实域名并覆写目标地址命中 `PROXY` 规则；
+  - **新增 `dns.nameserver-policy` 卫生清理流水线**：`enhance` 尾部新增 `sanitize_nameserver_policy`，针对机场订阅自带的不可达海外公共 DNS 策略（如 `+.google.com: https://dns.cloudflare.com/dns-query` 或明文 `8.8.8.8`），在未开启 `respect-rules` 时自动剔除直连被墙/投毒项并回落至 Fake-IP 与国内可达 `nameserver`（保留国内/内网/`system` 策略）；在 `respect-rules: true` 时复用 `BUG-308` 原则将境外明文 UDP 上游改写为 DoH 并自动补齐前置 `PROXY` 规则。
+
+---
+
 ## v3.2.7
 
 ### 🛡️ Four-Pillar Anti-Kill Isolation, Mutual Guardian Supervision & Workarea Sentinel
