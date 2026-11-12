@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-361)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-362)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -323,6 +323,13 @@
 - **涉及物理路径与行号**：`src-tauri/src/core/tray/mod.rs:215-260`
 - **根因与背景实证**：系统托盘左键单击仅单向执行激活恢复，当主窗口已处于前台可见且聚焦状态时再次点击托盘无法顺手收起窗口。
 - **修正与改良方案**：在不触碰任何托盘动态图标/菜单更新 API（严守 BUG-073 静态托盘红线）的前提下，左键单击回调先判断主窗口状态：若不处于轻量模式且主窗口当前可见、未最小化且已获焦点，则平稳隐藏主窗口；否则执行唤醒恢复并置顶聚焦。
+
+### BUG-362（对应规范章节：7.6 / 8.2）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / 远程订阅默认 `User-Agent` 与 UI 版本号解耦及自定义逃生阀闭环
+- **涉及物理路径与行号**：`src-tauri/src/constants.rs:4-12`, `src-tauri/src/utils/network.rs:78-92, 314-325`, `src-tauri/src/config/prfitem.rs:443-446, 596-606`
+- **根因与背景实证**：`NetworkManager::create_request_with_tls_mode` 直接使用 `format!("clash-verge/v{}", env!("CARGO_PKG_VERSION"))`（当前发出 `clash-verge/v3.2.5`）作为默认请求头，将机场面板协议能力协商锚点与本分支高频递增的 UI 产品版本号强耦合，存在「外壳虚高、内核未升」诱发机场超前下发不兼容新协议、未来涨破 `v10.0.0` 触发粗糙面板字典序比较归零、偏离上游 `v2.x` 白名单遭反代拦截及暴露私有版本指纹四大隐患；同时 `PrfItem::from_url` 在构造返回 `PrfOption` 时漏存 `user_agent` 字段且未过滤空串，导致单订阅自定义 `option.user_agent` 逃生阀导入后落盘丢失。
+- **修正与改良方案**：在 `constants::network` 定义单一事实源常量 `SUBSCRIPTION_COMPAT_USER_AGENT = "clash-verge/v2.5.10"`（与内置 `Mihomo v1.19.x` 同代的上游官方正式版纯净单段标识），与 `CARGO_PKG_VERSION` 及日常发版升号彻底解耦；`NetworkManager` 通过 `resolve_effective_user_agent` 对空白自定义值自动回退至该常量；补齐 `PrfItem::from_url` 对 `option.user_agent` 的清洗与持久化保留，并补充真实 HTTP 抓包与常量解耦回归单测。
 
 ---
 

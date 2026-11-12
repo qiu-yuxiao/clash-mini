@@ -1,3 +1,23 @@
+## v3.2.6
+
+### 🛡️ Deep Stability Hardening, Probe Semantics Overhaul & Subscription UA Decoupling
+
+- **远程机场订阅请求 `User-Agent` 与客户端 UI 版本号彻底解耦（BUG-362）**：
+  - **固定同代纯净单段兼容标识**：在 `constants::network` 设立单一事实源 `SUBSCRIPTION_COMPAT_USER_AGENT = "clash-verge/v2.5.10"`（对齐内置 `Mihomo v1.19.x` 协议代际），彻底取代原先动态拼接 `CARGO_PKG_VERSION` 的做法，根除「外壳虚高、内核未升」诱发机场超前下发不兼容新协议、未来涨破 `v10.0.0` 字典序比较归零、偏离上游 `v2.x` 白名单遭反代拦截及暴露私有版本指纹四大隐患；
+  - **单订阅自定义逃生阀闭环**：完整保留 `option.user_agent` 覆盖能力，空串自动回退兼容标识，并修复 `PrfItem::from_url` 导入时漏持久化自定义 `user_agent` 的问题。
+- **测速数据来源语义重建、废除陈旧兜底与自愈记账加固（BUG-317 / BUG-318 / BUG-321 / BUG-322 / BUG-344 / BUG-345 / BUG-349 / BUG-357 / BUG-359）**：
+  - **彻底废除 120s 陈旧历史延迟兜底**：后端重建 `DelayResultSource`（`LiveProbe` / `FreshMetricsCache` / `NotExecuted`）并经 `fromProbe` 标记透传前端，杜绝历史旧延迟冒充实时结果参与选点或虚增 30 分钟缓存 TTL；测速未执行或异常时经 `restoreDelaySnapshot` 精确回滚 `-2` 占位且保留原始时间戳；
+  - **并行竞速物理网络探针与自愈告警闭环**：三路公网 DNS `TCP:53` 探针改为 600ms 并行竞速 + 域名解析兜底（10~30ms 快速判活）；解耦内核 API 失活重启计数与全节点断流告警计数，确保跨重启或重启失败终态均可靠触发系统告警；超时 `0ms` 节点在延迟升序下恒定置底；节点卡片延迟徽章支持独立点击单点测速（不切换当前出口），顶栏新增断流/离线警示胶囊与一键重测恢复。
+- **系统服务、TUN 持久化锁盘与退出孤儿进程清理加固（BUG-319 / BUG-326 / BUG-328 / BUG-331 / BUG-346 / BUG-352）**：
+  - **会话临时回退锁盘保护与 SCM 三态核验**：冷启动服务瞬时繁忙触发临时回退时通过 `SESSION_TEMP_TUN_FALLBACK` 锁住磁盘 `enable_tun_mode` 原值不被后续 `save_file` 覆写；新增非阻塞注册表 SCM 核验区分「未安装 / 已禁用或二进制缺失 / 正常启用」；
+  - **提权优先退出清理与内核升级原子替换**：服务模式/TUN 退出优先经 `stop_core_by_service` 提权停止 Session 0 内核并无条件执行 `kill_all_mini_cores` 兜底清理；内核在线升级改为 `.staging` 原子暂存 + PE32+ AMD64 COFF/节表深度校验，严格区分文件损坏与杀软瞬时占用锁。
+- **协议解析、IPC 韧性、安全防护与交互细节全面打磨（BUG-320 / BUG-323 ~ BUG-325 / BUG-327 / BUG-329 ~ BUG-343 / BUG-347 ~ BUG-361）**：
+  - **通用协议解析与 Deep Link 修复**：统一 9 类代理 URI「先剥离 `#fragment` 与 `?query`、再按末尾 `@` 拆解 `userinfo@host:port`」预处理管道，补齐 VMess `sni` 映射并修复 `clash://install-config` 多参数截断；
+  - **连接期 SSRF 防护与 IPC 管道自愈**：远程订阅拉取直连挂载连接期异步 `SsrfSafeDnsResolver`（消除 DNS Rebinding TOCTOU）并对 `30x` 重定向逐跳校验；命名管道引入 `WaitNamedPipeW` 与幂等只读请求陈旧连接透明单次重建；
+  - **前端交互与低开销体验优化**：WebSocket 指数退避重连严格封顶 `15s` 并支持内核重载 250ms 防抖即时重连；统一 `F4` / `F1` / `Ctrl+F` 快捷键编辑态与全弹窗遮挡守卫；手动切点 `0ms` 乐观高亮并即时唤醒后台宽限期；特色皮肤双滑块 60fps 渲染与多路失焦持久化解耦；系统托盘左键单击支持唤醒与隐藏双向切换；解封常规屏幕高度下的顶栏帮助与诊断菜单。
+
+---
+
 ## v3.2.5
 
 ### 🛡️ Anti-360 External Kill Immunity & Zero-Drop Guardian Self-Healing

@@ -60,6 +60,7 @@
   - [7.3 订阅导入等待与 Provider 刷新协同](#73-订阅导入等待与-provider-刷新协同)
   - [7.4 订阅管理与右键上下文菜单](#74-订阅管理与右键上下文菜单)
   - [7.5 Mihomo 插件 API 与序列化小写补丁](#75-mihomo-插件-api-与序列化小写补丁)
+  - [7.6 远程订阅请求 User-Agent 版本解耦与兼容铁律](#76-远程订阅请求-user-agent-版本解耦与兼容铁律)
 - [🔧 八、工程发布体系与规范](#八工程发布体系与规范)
   - [8.1 Windows 测试清单与单测执行隔离](#81-windows-测试清单与单测执行隔离)
   - [8.2 静默发布全流程（Silent Release）](#82-静默发布全流程silent-release)
@@ -569,6 +570,15 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 - **Rust 枚举字段小写反序列化补丁**：针对内核 API 将部分枚举参数以全小写形式返回导致的反序列化崩溃问题，在本地插件中维护 `#[serde(rename_all = "lowercase")]` 补丁，保证前后端类型双向严密对齐，彻底解决 Allow LAN 等基础设置开关刷新时无故回弹的顽疾。
 
+### 7.6 远程订阅请求 User-Agent 版本解耦与兼容铁律
+
+主流机场面板解析客户端 `User-Agent` 的唯一技术目的是**格式路由**（识别 `clash-verge` 返回完整 Clash/Mihomo YAML）与**协议代际门槛协商**（按上游官方 Clash Verge Rev 外壳版本映射推定客户端内置 `mihomo` 内核支持的新协议族）。为彻底消除自研分支版本号高频演进带来的兼容性与隐私风险，确立以下四条铁律（BUG-362）：
+
+1. **代码单一事实源**：默认订阅兼容标识统一定义于 `src-tauri/src/constants.rs` 的 `constants::network::SUBSCRIPTION_COMPAT_USER_AGENT`（当前内置 `Mihomo v1.19.x`，对应固定值 **`"clash-verge/v2.5.10"`**），由 `src-tauri/src/utils/network.rs` 统一引用。
+2. **与客户端 UI 版本号彻底解耦**：严禁在默认请求头中动态拼接 `env!("CARGO_PKG_VERSION")`（如 `clash-verge/v3.2.5`），从根源上杜绝：①「外壳虚高、内核未升」诱发机场超前下发不兼容新协议导致内核启动崩溃；② 未来涨破 `v10.0.0` 触发粗糙面板 ASCII 字典序比较归零 Bug；③ 偏离上游真实存在的主版本段（`^clash-verge/v2\.`）遭 WAF / 反代白名单误杀；④ 暴露私有分支独有版本指纹。日常 UI 迭代与发版升号**一律不改动** `SUBSCRIPTION_COMPAT_USER_AGENT`。
+3. **纯净单段格式与唯一更新触发条件**：默认标识必须保持与公网主流桌面端逐字节一致的纯净单段 `clash-verge/vX.Y.Z`（严禁使用易被 Cloudflare 拦截的裸 `clash.meta/...`，亦严禁追加空格复合后缀破坏面板行尾正则或 `version_compare`）；**仅当未来升级替换内置 `sidecar/mini-mihomo` 内核大版本并引入新协议代际时，才同步审视调整为同代上游官方正式版号**。
+4. **保留单订阅自定义逃生阀**：支持在单个远程订阅配置项 `option.user_agent` 中按需覆盖请求头；空串或纯空白值自动回退至 `SUBSCRIPTION_COMPAT_USER_AGENT`，且 `PrfItem::from_url` 在导入与更新时完整持久化保留非空自定义 `user_agent`。
+
 ---
 
 ## 🔧 八、工程发布体系与规范
@@ -591,7 +601,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   ```
 - **自动化执行阶段**：
   1. **环境与令牌自检**：从 `github_token.txt` 读取 Token 注入环境变量；校验 dev 分支与工作区干净状态；校验本地 commit 全部推送完毕。
-  2. **版本号原子递增**：调用 `bump_version.py` 同步递增 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 与 `Cargo.lock`。
+  2. **版本号原子递增**：调用 `bump_version.py` 同步递增 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 与 `Cargo.lock`（注：严禁改动 `src-tauri/src/constants.rs` 中的订阅兼容标识 `SUBSCRIPTION_COMPAT_USER_AGENT`，详见 §7.6）。
   3. **Git 自动化流水**：原子提交 `release: bump version to <version>`，推送 `origin dev`，打 Tag `v<version>`，推送 `origin v<version>` 触发 CI。
   4. **云端 CI 轮询监测**：每 3 分钟轮询一次 Actions 任务状态，输出进度日志。
   5. **正式 Release 验收与下载**：监测到 Release 正式发布后，自动下载最新 `Clash.Mini_<version>_x64-setup.exe` 至本地 `portable_test/` 目录，验证文件大小正常（>0 MB）并输出汇总报告。
@@ -785,7 +795,7 @@ flowchart LR
 | **BUG-344** | 5.2 | **【直测路径已回退，并收口全路径陈旧兜底防线】** 撤回违背 §5.2 的 `delay_proxy_by_name` 直测分流；后端重建 `DelayResultSource` 语义标记并彻底移除单点/批量/后台自愈全路径的 120s `history` 兜底，经 `fromProbe` 标记约束前端 `injectBatchResults` 对 30s 复用数据的缓存寿命（封顶 30s），配合 `restoreDelaySnapshot` 保留原始 `updatedAt`。 |
 | **BUG-345** | 5.5 | 并行竞速物理网络探针：使用 `futures::future::select_ok` 并行发起三路公网 DNS `TCP:53` 握手探针（单路 600ms 超时），最快一路握手成功即在 10~30ms 内判定在线，全败则秒级平滑衔接域名解析兜底。 |
 | **BUG-346** | 3.6 | 内核升级原子暂存与真实 PE64 校验：引入 `.staging` 原子暂存替换流水线，经 `inspect_mihomo_pe_binary` 校验完整 PE32+ AMD64 头与节表并严格区分 `Corrupted` 与 `IoUnavailable`，经共享 `wait_for_mini_cores_exit` 确认旧内核释放文件锁后原子替换，异常自动清理 `.staging` 保留旧内核。 |
-| **BUG-347** | 4.3 | 前端 WebSocket 指数退避重连：升级为带随机抖动且严格以 `15s` 封顶的指数退避；监听 `verge://refresh-clash-config`（250ms 防抖合并对齐全局契约 + `listenerEpoch` 防竞态）清空退避并对仍持有陈旧 socket 句柄的活动通道主动关闭重连，同时响应 `Close` 消息触发重连。 |
+| **BUG-347** | 4.3 | 前端 WebSocket 指数退避重连：升级为带随机抖动且严格以 `15s` 封顶的指数退避；监听 `verge://refresh-clash-config`（250ms 防抖合并对齐全局契约 + `listenerEpoch` 防竞态）清空退避并对仍持有陈旧 socket 句柄的活动通道主动关闭重连，且无活动 owner 时收到 `Websocket error` 仍兜底触发重连。 |
 | **BUG-348** | 7.2 | 统一 URI 协议解析预处理管道：封装共享纯函数 `strip_fragment_and_query(input)` 统一接入全部 9 类 URI 协议（`ss`/`trojan`/`vless`/`hysteria2`/`hysteria`/`anytls`/`tuic`/`wireguard`/`socks5`），并补齐全部 9 协议含 `@` 查询参数的 `server` 主机名与 `port` 双断言及 VMess `sni` 回归单测。 |
 | **BUG-349** | 5.2 / 5.6 | 测速 0ms 超时置底全栈对齐与单测锁定：抽离 `sort_display_delays` 纯函数统一处理延迟升序（`0 -> u32::MAX` 垫底）与名称排序，并补充单元测试防止退化。 |
 | **BUG-350** | 2.4 | 现代化 Win32 SetWindowSubclass 窗口钩子：通过 `comctl32` 原生 `{SetWindowSubclass, DefSubclassProc, RemoveWindowSubclass}` 标准子类化架构绑定窗口生命周期，并在收到 `WM_NCDESTROY` 时自动解绑释放，原生支持任意次主窗口销毁与重建。 |
@@ -800,6 +810,7 @@ flowchart LR
 | **BUG-359** | 5.3 / 5.5 | 全节点超时或物理断网时顶栏轻量状态胶囊与一键自愈：后端监测在全节点不可达/物理离线及恢复时派发状态事件，顶栏展示警示胶囊，点击重测成功经 `broadcastNetworkHealth` 同步模块态，重测未执行、全超时或异常均给出明确 i18n 提示。 |
 | **BUG-360** | 2.8 | 节点过滤输入框自动测速择优状态微反馈：在过滤自动测速防抖等待与执行期间为过滤框提供清晰的轻量加载/脉冲视觉指示及无障碍提示，测速择优完成后平滑收起。 |
 | **BUG-361** | 2.9 | 系统托盘图标左键单击唤醒与隐藏双向切换：在不触碰任何托盘动态图标/菜单更新 API（严守 BUG-073 静态托盘红线）的前提下，左键单击回调先判断主窗口状态：若不处于轻量模式且主窗口当前可见、未最小化且已获焦点，则平稳隐藏主窗口；否则执行唤醒恢复并置顶聚焦。 |
+| **BUG-362** | 7.6 / 8.2 | 远程订阅默认 `User-Agent` 版本解耦与单订阅自定义逃生阀闭环：在 `constants::network` 定义单一事实源 `SUBSCRIPTION_COMPAT_USER_AGENT = "clash-verge/v2.5.10"` 与 `CARGO_PKG_VERSION` 彻底解耦，空串自动回退，并在 `PrfItem::from_url` 中完整持久化保留 `option.user_agent`。 |
 
 ---
 

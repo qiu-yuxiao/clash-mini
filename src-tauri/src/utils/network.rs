@@ -311,15 +311,9 @@ impl NetworkManager {
 
         let mut headers = HeaderMap::new();
 
-        // 设置 User-Agent
-        if let Some(ua) = user_agent {
-            headers.insert(USER_AGENT, HeaderValue::from_str(ua.as_str())?);
-        } else {
-            headers.insert(
-                USER_AGENT,
-                HeaderValue::from_str(&format!("clash-verge/v{}", env!("CARGO_PKG_VERSION")))?,
-            );
-        }
+        // 设置 User-Agent：单订阅非空自定义值优先，否则恒定使用与 UI 版本号解耦的订阅兼容标识（BUG-362）
+        let effective_ua = resolve_effective_user_agent(user_agent.as_deref());
+        headers.insert(USER_AGENT, HeaderValue::from_str(effective_ua)?);
 
         self.build_client(
             proxy_url,
@@ -399,9 +393,18 @@ impl NetworkManager {
     }
 }
 
+pub(crate) fn resolve_effective_user_agent(custom_ua: Option<&str>) -> &str {
+    match custom_ua.map(str::trim) {
+        Some(trimmed) if !trimmed.is_empty() => trimmed,
+        _ => crate::constants::network::SUBSCRIPTION_COMPAT_USER_AGENT,
+    }
+}
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
     #[tokio::test]
     async fn test_get_with_ssrf_guard_blocks_loopback_at_connect_time() {
@@ -417,5 +420,76 @@ mod tests {
                 "unexpected error chain: {chain}"
             );
         }
+    }
+
+    #[test]
+    fn test_subscription_compat_user_agent_decoupled_and_pure_single_token() {
+        let compat_ua = crate::constants::network::SUBSCRIPTION_COMPAT_USER_AGENT;
+        assert_eq!(compat_ua, "clash-verge/v2.5.10");
+        // 严禁包含空格复合后缀，确保兼容粗糙 PHP 面板 explode('/', $ua) 与行尾正则
+        assert!(!compat_ua.contains(' '));
+        assert!(compat_ua.starts_with("clash-verge/v2."));
+        // 严禁与客户端自身 UI 版本号（如 3.2.5）耦合
+        assert_ne!(compat_ua, format!("clash-verge/v{}", env!("CARGO_PKG_VERSION")));
+
+        assert_eq!(resolve_effective_user_agent(None), compat_ua);
+        assert_eq!(resolve_effective_user_agent(Some("")), compat_ua);
+        assert_eq!(resolve_effective_user_agent(Some("   \t  ")), compat_ua);
+        assert_eq!(
+            resolve_effective_user_agent(Some("  CustomSubUA/1.2  ")),
+            "CustomSubUA/1.2"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_network_manager_sends_compat_ua_by_default_and_honors_override() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server_task = tokio::spawn(async move {
+            let mut captured = Vec::with_capacity(2);
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut buf = vec![0u8; 4096];
+                let n = stream.read(&mut buf).await.unwrap();
+                captured.push(std::string::String::from_utf8_lossy(&buf[..n]).into_owned());
+                stream
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+                    .await
+                    .unwrap();
+            }
+            captured
+        });
+
+        let url = format!("http://{addr}/sub");
+        let nm = NetworkManager::new();
+        let resp_default = nm
+            .get_with_interrupt(&url, ProxyType::None, Some(5), None, false)
+            .await
+            .unwrap();
+        assert_eq!(resp_default.text_with_charset().unwrap(), "ok");
+
+        let resp_custom = nm
+            .get_with_interrupt(&url, ProxyType::None, Some(5), Some("MyAirportUA/2.0".into()), false)
+            .await
+            .unwrap();
+        assert_eq!(resp_custom.text_with_charset().unwrap(), "ok");
+
+        let captured = server_task.await.unwrap();
+        assert!(
+            captured[0]
+                .to_ascii_lowercase()
+                .contains("user-agent: clash-verge/v2.5.10\r\n"),
+            "unexpected default request headers: {}",
+            captured[0]
+        );
+        assert!(
+            captured[1].contains("MyAirportUA/2.0")
+                && captured[1]
+                    .to_ascii_lowercase()
+                    .contains("user-agent: myairportua/2.0\r\n"),
+            "unexpected custom request headers: {}",
+            captured[1]
+        );
     }
 }

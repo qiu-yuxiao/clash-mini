@@ -129,7 +129,11 @@ impl PrfOption {
         match (one, other) {
             (Some(a_ref), Some(b_ref)) => {
                 let mut result = a_ref.clone();
-                result.user_agent = b_ref.user_agent.clone().or(result.user_agent);
+                result.user_agent = match b_ref.user_agent.as_deref().map(str::trim) {
+                    Some("") => None,
+                    Some(non_empty) => Some(non_empty.into()),
+                    None => normalize_custom_user_agent(result.user_agent.as_deref()),
+                };
                 result.with_proxy = b_ref.with_proxy.or(result.with_proxy);
                 result.self_proxy = b_ref.self_proxy.or(result.self_proxy);
                 result.danger_accept_invalid_certs =
@@ -144,11 +148,23 @@ impl PrfOption {
                 result.timeout_seconds = b_ref.timeout_seconds.or(result.timeout_seconds);
                 Some(result)
             }
-            (Some(a_ref), None) => Some(a_ref.clone()),
-            (None, Some(b_ref)) => Some(b_ref.clone()),
+            (Some(a_ref), None) => {
+                let mut cloned = a_ref.clone();
+                cloned.user_agent = normalize_custom_user_agent(cloned.user_agent.as_deref());
+                Some(cloned)
+            }
+            (None, Some(b_ref)) => {
+                let mut cloned = b_ref.clone();
+                cloned.user_agent = normalize_custom_user_agent(cloned.user_agent.as_deref());
+                Some(cloned)
+            }
             (None, None) => None,
         }
     }
+}
+
+fn normalize_custom_user_agent(ua: Option<&str>) -> Option<String> {
+    ua.map(str::trim).filter(|s| !s.is_empty()).map(Into::into)
 }
 
 const MAX_YAML_SIZE: usize = 50 * 1024 * 1024; // 50MB YAML 解析上限
@@ -440,7 +456,7 @@ impl PrfItem {
         let self_proxy = option.is_some_and(|o| o.self_proxy.unwrap_or(false));
         let accept_invalid_certs = option.is_some_and(|o| o.danger_accept_invalid_certs.unwrap_or(false));
         let allow_auto_update = option.map(|o| o.allow_auto_update.unwrap_or(true));
-        let user_agent = option.and_then(|o| o.user_agent.clone());
+        let user_agent = normalize_custom_user_agent(option.and_then(|o| o.user_agent.as_deref()));
         let update_interval = option.and_then(|o| o.update_interval);
         let timeout = option.and_then(|o| o.timeout_seconds).unwrap_or(20);
         let EnhanceItems {
@@ -594,6 +610,7 @@ impl PrfItem {
             selected: None,
             extra,
             option: Some(PrfOption {
+                user_agent,
                 update_interval,
                 merge,
                 script,
@@ -1125,5 +1142,38 @@ mod tests {
         assert!(validate_url_no_ssrf(&allowed_ip).is_ok());
         let unresolvable_public = Url::parse("https://sub.nonexistent-airport-domain-test.example/api/v1").unwrap();
         assert!(validate_url_no_ssrf(&unresolvable_public).is_ok());
+    }
+
+    #[test]
+    fn test_prf_option_custom_user_agent_normalization_and_merge() {
+        // BUG-362: 单订阅自定义逃生阀 option.user_agent 去空白保留、空串自动清除回退默认兼容标识
+        assert_eq!(normalize_custom_user_agent(None), None);
+        assert_eq!(normalize_custom_user_agent(Some("")), None);
+        assert_eq!(normalize_custom_user_agent(Some("   ")), None);
+        assert_eq!(
+            normalize_custom_user_agent(Some("  SpecialPanelUA/3.0 ")),
+            Some("SpecialPanelUA/3.0".into())
+        );
+
+        let existing = PrfOption {
+            user_agent: Some("CustomUA/1.0".into()),
+            update_interval: Some(60),
+            ..Default::default()
+        };
+        let update_keep = PrfOption {
+            user_agent: None,
+            update_interval: Some(120),
+            ..Default::default()
+        };
+        let merged_keep = PrfOption::merge(Some(&existing), Some(&update_keep)).unwrap();
+        assert_eq!(merged_keep.user_agent.as_deref(), Some("CustomUA/1.0"));
+        assert_eq!(merged_keep.update_interval, Some(120));
+
+        let update_clear = PrfOption {
+            user_agent: Some("   ".into()),
+            ..Default::default()
+        };
+        let merged_clear = PrfOption::merge(Some(&existing), Some(&update_clear)).unwrap();
+        assert_eq!(merged_clear.user_agent, None);
     }
 }

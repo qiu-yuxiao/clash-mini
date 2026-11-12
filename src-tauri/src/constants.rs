@@ -3,6 +3,14 @@ use std::time::Duration;
 pub mod network {
     pub const DEFAULT_EXTERNAL_CONTROLLER: &str = "127.0.0.1:9098";
 
+    /// 远程机场订阅与默认 HTTP 请求的兼容 User-Agent 标识（BUG-362）。
+    ///
+    /// 【维护铁律（详见 `clash_mini_agreements.md` §7.6）】：
+    /// 1. 必须与客户端自身 UI 发行版本号（`CARGO_PKG_VERSION`）彻底解耦；
+    /// 2. 固定采用与当前内置 `mini-mihomo`（`Mihomo v1.19.x`）同协议代际的上游官方正式版纯净单段标识；
+    /// 3. 日常 UI 修复与发版升号一律不改动此常量，仅在升级替换内置内核大版本且引入新协议代际时同步审视更新。
+    pub const SUBSCRIPTION_COMPAT_USER_AGENT: &str = "clash-verge/v2.5.10";
+
     pub mod ports {
         pub const DEFAULT_MIXED: u16 = 10801;
         pub const DEFAULT_SOCKS: u16 = 10802;
