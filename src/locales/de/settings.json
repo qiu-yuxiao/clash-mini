@@ -576,6 +576,12 @@
     "testNotExecuted": "Test nicht ausgeführt: Core nicht bereit oder keine testbaren Knoten",
     "testFailed": "Geschwindigkeitstest fehlgeschlagen: {{message}}",
     "updated": "Aktualisiert",
-    "portSaved": "Proxy-Port gespeichert und neu geladen"
+    "portSaved": "Proxy-Port gespeichert und neu geladen",
+    "testSingleNodeTooltip": "Klicken, um nur diesen Knoten zu testen (ohne Wechsel)",
+    "networkOffline": "Offline",
+    "networkOfflineTooltip": "Physisches Netzwerk getrennt — zum erneuten Testen klicken",
+    "allNodesTimeout": "Alle Timeout",
+    "allNodesTimeoutTooltip": "Alle Proxy-Knoten nicht erreichbar — zum Neutesten klicken",
+    "filterAutoTestingTooltip": "Gefilterte Knoten werden gleich getestet (Esc zum Abbrechen)"
   }
 }

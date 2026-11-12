@@ -135,8 +135,12 @@ impl CoreManager {
 
         // 【核心架构约定】Mini 只有 PROXY 一个有效代理组。
         // 内核重启会重置 Selector 组的 now 字段为列表第一个节点（通常是广告假节点）。
-        // 这里在 stop 之前保存 PROXY 组的 now，在 start 之后恢复，避免前端显示假节点。
-        let saved_proxy_now = self.snapshot_proxy_group_now().await;
+        // 这里在 stop 之前保存 PROXY 组的 now，若内核已卡死导致快照返回 None，则回退读取
+        // 本地 profiles.yaml 中持久化的上次有效选点（过滤伪节点后），防止掉回列表首项（BUG-335）。
+        let saved_proxy_now = match self.snapshot_proxy_group_now().await {
+            Some(node) => Some(node),
+            None => Self::read_persisted_proxy_selection().await,
+        };
 
         self.stop_core_inner().await?;
         self.start_core_inner().await?;
@@ -316,6 +320,27 @@ impl CoreManager {
                 None
             }
         }
+    }
+
+    /// 当内核卡死重启无法获取实时快照时，回退读取本地 profiles.yaml 中持久化的上次有效选点（BUG-335）
+    async fn read_persisted_proxy_selection() -> Option<std::string::String> {
+        let profiles = Config::profiles().await.latest_arc();
+        let current_uid = profiles.current.as_deref()?;
+        let items = profiles.items.as_ref()?;
+        let item = items.iter().find(|it| it.uid.as_deref() == Some(current_uid))?;
+        let selected = item.selected.as_ref()?;
+        let target = selected
+            .iter()
+            .find(|s| s.name.as_deref() == Some("PROXY"))
+            .and_then(|s| s.now.as_deref())
+            .filter(|n| !n.is_empty() && !crate::utils::node::is_dummy_node(n))?;
+        logging!(
+            info,
+            Type::Core,
+            "实时快照不可用，回退读取持久化 PROXY 选点准备恢复: {}",
+            target
+        );
+        Some(target.to_string())
     }
 
     /// 恢复 PROXY 组的节点选择（内核重启后调用）

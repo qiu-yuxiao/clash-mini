@@ -283,23 +283,27 @@ fn resolve_probe_target(test_url: &str) -> String {
     }
 }
 
-/// 物理网络连通性探测。
-/// 优先直连公网高可用 DNS IP (TCP:53)，避开域名解析和代理环路，10~30ms 内完成物理网卡探测；
-/// 若均不可通，最后使用当前测速 URL 进行 DNS 查询兜底。超时上限由调用方指定。
+/// 物理网络连通性探测（BUG-317 / BUG-345）。
+/// 并发直连 3 个公网高可用 DNS IP (TCP:53)，单路限时 600ms，任一连通即毫秒级确认物理网卡在线；
+/// 若局域网封禁出站 53 端口导致 3 路均失败，仍在总超时预算内回退至域名 DNS 查询兜底，杜绝误判离线。
 async fn is_physical_network_online(timeout_secs: u64) -> bool {
-    let dur = Duration::from_secs(timeout_secs.max(1));
+    let dur = Duration::from_secs(timeout_secs.max(2));
     let check = async {
-        // 优先直连公网高可用 DNS IP (TCP:53)，避开域名解析和代理环路，毫秒级快速确认物理网卡状态
-        if tokio::net::TcpStream::connect("223.5.5.5:53").await.is_ok() {
+        let targets = ["223.5.5.5:53", "119.29.29.29:53", "1.1.1.1:53"];
+        let probes = targets.into_iter().map(|addr| {
+            Box::pin(async move {
+                match tokio::time::timeout(Duration::from_millis(600), tokio::net::TcpStream::connect(addr)).await {
+                    Ok(Ok(stream)) => Ok(stream),
+                    Ok(Err(e)) => Err(e),
+                    Err(_) => Err(std::io::Error::from(std::io::ErrorKind::TimedOut)),
+                }
+            })
+        });
+        if futures::future::select_ok(probes).await.is_ok() {
             return true;
         }
-        if tokio::net::TcpStream::connect("119.29.29.29:53").await.is_ok() {
-            return true;
-        }
-        if tokio::net::TcpStream::connect("1.1.1.1:53").await.is_ok() {
-            return true;
-        }
-        // 兜底：若特定局域网封禁出站 53 端口，回退至域名 DNS 查询
+
+        // 兜底：若特定局域网封禁出站 53 端口，在剩余超时预算内回退至域名 DNS 查询
         let test_url = get_test_url().await;
         let host_port = resolve_probe_target(&test_url);
         tokio::net::lookup_host(host_port).await.is_ok()
@@ -937,33 +941,74 @@ async fn trigger_backend_auto_select_inner(
         }
     }
 
+    let mut probe_executed = reused_cache;
+    let mut extra_peer_delays: Vec<(String, u32)> = Vec::new();
+
     if !reused_cache {
-        // 测量层根因修复：不再用 delay_proxy_by_name 对节点逐个自测
-        // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
-        // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
-        // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
-        //
-        // 带「测速失真复核」：主测速地址整体失败时改用备用 HTTPS 地址复核一次，
-        // 避免主地址被机场劫持/不兼容时误判「所有测速节点均不可达」。
-        delays = probe_metrics_group(&mihomo, "选点").await.unwrap_or_default();
+        let tun_enabled = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false)
+            || matches!(
+                *crate::core::CoreManager::global().get_running_mode(),
+                crate::core::manager::RunningMode::Service
+            );
+
+        // 【BUG-344 按运行模式智能分流】：
+        // - 非 TUN（Sidecar）模式下用户显式单点测速（valid_nodes.len() == 1 && !select）：
+        //   不存在 TUN 网卡自指回环，直接调用单代理延迟探针（毫秒级响应，避免百节点全组并发风暴），
+        //   严格共享 NODE_TEST_TIMEOUT_MS (5000ms) 与单点测速四条契约。
+        // - TUN 模式或批量/选点测速：统一走 PROXY__METRICS 测量组（彻底杜绝 TUN 回环假超时）；
+        //   当 TUN 单点测速触发整组拨测时，顺便把同批测得的其他节点新鲜延迟回填前端 UI。
+        if is_frontend_subset && valid_nodes.len() == 1 && !select && !tun_enabled {
+            let target = &valid_nodes[0];
+            let test_url = get_test_url().await;
+            match mihomo
+                .delay_proxy_by_name(target, &test_url, NODE_TEST_TIMEOUT_MS)
+                .await
+            {
+                Ok(res) => {
+                    probe_executed = true;
+                    if res.delay > 0 {
+                        delays.insert(target.clone(), res.delay as u32);
+                    }
+                }
+                Err(e) => {
+                    logging!(
+                        warn,
+                        Type::Lightweight,
+                        "[后台监测] 非 TUN 单点直测 [{target}] IPC 未就绪: {e}"
+                    );
+                }
+            }
+        } else if let Some(group_delays) = probe_metrics_group(&mihomo, "选点").await {
+            probe_executed = true;
+            if is_frontend_subset && valid_nodes.len() == 1 {
+                for (peer_name, &peer_delay) in &group_delays {
+                    if peer_name != &valid_nodes[0] && !is_dummy_node(peer_name) && peer_delay > 0 {
+                        extra_peer_delays.push((peer_name.clone(), peer_delay));
+                    }
+                }
+            }
+            delays = group_delays;
+        }
     }
 
     // 【单点测速语义：必须真实探测】valid_nodes.len() == 1 为用户显式单点测速（强即时意图）。
-    // 若测量组本次未返回任何数据（内核/测量组未就绪），一律判定为「测速未执行」：
+    // 若本次测速根本未能执行（内核/测量组/IPC 未就绪），一律判定为「测速未执行」：
     // 直接返回空结果，由前端提示「测速未执行」并按契约恢复原值 ——
     // agreements 5.2 第 3 条明确「测速未真正执行时严禁伪造成 Timeout」。
-    // 同样禁止走下方 history 兜底：那会把最多 FALLBACK_HISTORY_MAX_AGE_SECS(120s) 前的旧值
-    // 当作本次实时结果返回（旧死状态 / 旧延迟），与「点击即探活」的意图直接相悖。
-    if is_frontend_subset && valid_nodes.len() == 1 && delays.is_empty() {
+    if is_frontend_subset && valid_nodes.len() == 1 && !probe_executed {
         logging!(
             warn,
             Type::Lightweight,
-            "[后台监测] 单点测速未取得测量组数据，判定为「未执行」，返回空结果交由前端提示"
+            "[后台监测] 单点测速未取得内核探测响应，判定为「未执行」，返回空结果交由前端提示"
         );
         return Ok(AutoSelectOutcome {
             display: vec![],
             selected: false,
         });
+    }
+
+    if !extra_peer_delays.is_empty() && !crate::module::lightweight::is_in_lightweight_mode() {
+        crate::core::handle::Handle::notify_delay_results("PROXY".into(), extra_peer_delays);
     }
 
     // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history。
@@ -1046,11 +1091,8 @@ async fn trigger_backend_auto_select_inner(
         }
     }
 
-    // 展示结果按 sort_type 排序（仅影响返回顺序，不影响选点）
-    match sort_type {
-        2 => display.sort_by(|a, b| a.0.cmp(&b.0)), // 按名称排序
-        _ => display.sort_by_key(|r| r.1),          // 按延迟升序（默认）
-    }
+    // 展示结果按 sort_type 排序（仅影响返回顺序，不影响选点；BUG-322/BUG-349：0ms 超时节点置底）
+    sort_display_delays(&mut display, sort_type);
 
     let mut selected = false;
 
@@ -1170,9 +1212,25 @@ const fn check_interval_secs(is_retry_mode: bool, was_online: bool) -> u64 {
     }
 }
 
-/// 启动全局后台节点监测常驻线程
+fn sort_display_delays(display: &mut [(String, u32)], sort_type: i32) {
+    match sort_type {
+        2 => display.sort_by(|a, b| a.0.cmp(&b.0)),
+        _ => display.sort_by_key(|r| if r.1 == 0 { u32::MAX } else { r.1 }),
+    }
+}
+
+fn update_network_health_notice(last_notified: &mut &'static str, next_status: &'static str) {
+    if *last_notified != next_status {
+        *last_notified = next_status;
+        if !crate::module::lightweight::is_in_lightweight_mode() {
+            crate::core::handle::Handle::notice_message(next_status, "");
+        }
+    }
+}
+
+/// 启动全局后台节点监测常驻线程（BUG-353 panic 自愈监督）
 pub fn start_background_monitor() {
-    let handle = AsyncHandler::spawn(move || async move {
+    let handle = AsyncHandler::spawn_supervised("background_monitor", Type::Lightweight, move || async move {
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
         let thread_start_time = Instant::now();
         let mut last_check_time = Instant::now();
@@ -1187,6 +1245,8 @@ pub fn start_background_monitor() {
         let mut last_online_check_time: Option<Instant> = None;
         let mut last_auto_select_time: Option<Instant> = None;
         let mut auto_select_fail_count = 0u32;
+        let mut api_dead_heal_fail_count = 0u32;
+        let mut last_notified_health: &'static str = "network_health::ok";
         // 连续 API 异常计数：mihomo API 不可达时（get_group_by_name 超时/连接失败）累计，
         // 达到阈值后触发自愈，避免把内核卡死误判为"内核重载中"而放弃自愈。
         let mut api_error_count = 0u32;
@@ -1322,10 +1382,14 @@ pub fn start_background_monitor() {
                     self_heal_with_accounting(
                         &current_profile,
                         &mut auto_select_fail_count,
+                        &mut api_dead_heal_fail_count,
+                        &mut last_notified_health,
                         &mut last_auto_select_time,
                         &mut last_check_time,
                     )
                     .await;
+                } else {
+                    update_network_health_notice(&mut last_notified_health, "network_health::ok");
                 }
             } else if was_online && !is_online {
                 logging!(
@@ -1333,6 +1397,7 @@ pub fn start_background_monitor() {
                     Type::Lightweight,
                     "[后台监测] 检测到网络已断开，暂停健康检测与自愈"
                 );
+                update_network_health_notice(&mut last_notified_health, "network_health::offline");
             }
             was_online = is_online;
 
@@ -1368,6 +1433,8 @@ pub fn start_background_monitor() {
                             self_heal_with_accounting(
                                 &current_profile,
                                 &mut auto_select_fail_count,
+                                &mut api_dead_heal_fail_count,
+                                &mut last_notified_health,
                                 &mut last_auto_select_time,
                                 &mut last_check_time,
                             )
@@ -1406,9 +1473,10 @@ pub fn start_background_monitor() {
                                 }
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
+                                update_network_health_notice(&mut last_notified_health, "network_health::ok");
                             }
                             FailoverVerdict::ShouldFailover | FailoverVerdict::AllDead => {
-                                // 切换宽限期：切到新节点后 60 秒内缓存未稳，失败判定可接受，
+                                // 切换宽限期：切到新节点后 SWITCH_GRACE_PERIOD_SECS 内缓存未稳，失败判定可接受，
                                 // 不累计连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
                                 let in_grace = last_node_change_time
                                     .map(|t| t.elapsed() < Duration::from_secs(SWITCH_GRACE_PERIOD_SECS))
@@ -1445,10 +1513,6 @@ pub fn start_background_monitor() {
 
                                         // 【失败服务器登记】把刚被判死的活跃节点**所在服务器**记入冷却表，
                                         // 供本次自愈选点避让（详见 FAILED_SERVER_COOLDOWN_SECS 的注释）。
-                                        // 之所以按「服务器」而非「节点」：一台机器上常挂同一机场的多个端口节点，
-                                        // 只避让单节点会让自愈马上又选中同机的兄弟节点，形成死循环。
-                                        // 走到这里说明本轮判定基于**有效测速数据**——测速链路不可用时
-                                        // evaluate_failover 已直接返回 NoAction，不会进到本分支。
                                         {
                                             let mut server_map = load_node_server_map().await;
                                             if let Some(server) = server_map.remove(&active_node_name) {
@@ -1460,6 +1524,8 @@ pub fn start_background_monitor() {
                                         self_heal_with_accounting(
                                             &current_profile,
                                             &mut auto_select_fail_count,
+                                            &mut api_dead_heal_fail_count,
+                                            &mut last_notified_health,
                                             &mut last_auto_select_time,
                                             &mut last_check_time,
                                         )
@@ -1471,25 +1537,20 @@ pub fn start_background_monitor() {
                     }
                     Err(e) => {
                         api_error_count += 1;
-                        // 日志从 debug 升级为 warn：API 异常可能是内核卡死而非重载，
-                        // 需要在 normal 日志级别可见，便于排查。
                         logging!(
                             warn,
                             Type::Lightweight,
                             "[后台监测] 节点健康检查异常 (API不可达): {e}，连续异常次数: {}",
                             api_error_count
                         );
-                        // 连续 3 次 API 异常（正常模式约 45 秒，重试模式约 9 秒），
-                        // 说明不是内核重载的短暂现象，而是 mihomo API 持续不可达。
-                        // 触发自愈选点尝试恢复（若自愈也因 API 不可达而失败，
-                        // auto_select_fail_count 会累计，5 次后弹 Windows 警报）。
                         if api_error_count >= 3 {
                             api_error_count = 0;
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
-                            // 统一走冷却/计数/警报记账（与网络恢复、主路径一致，🟡6）
                             self_heal_with_accounting(
                                 &current_profile,
                                 &mut auto_select_fail_count,
+                                &mut api_dead_heal_fail_count,
+                                &mut last_notified_health,
                                 &mut last_auto_select_time,
                                 &mut last_check_time,
                             )
@@ -1547,9 +1608,38 @@ fn fire_self_heal_alert() {
 /// - 警报：连续 5 次失败弹 Windows 提示框（fire_self_heal_alert，内部 spawn_blocking）。
 ///
 /// 返回 true 表示实际发起了自愈（不在冷却中），false 表示处于冷却中被跳过。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelfHealAction {
+    None,
+    RestartCore,
+    FireAlert,
+}
+
+/// 纯函数状态机（BUG-318）：将「API 假死 3 次重启内核计数」与「全节点失联 5 次系统告警计数」彻底解耦。
+/// 当内核 API 可达但订阅节点全部不可达时，第 3 次失败仅跳过重启而不清零告警计数，确保第 5 次必然触发告警。
+fn evaluate_self_heal_counters(
+    auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+    api_alive: bool,
+) -> SelfHealAction {
+    if *api_dead_heal_fail_count >= 3 {
+        *api_dead_heal_fail_count = 0;
+        if !api_alive {
+            return SelfHealAction::RestartCore;
+        }
+    }
+    if *auto_select_fail_count >= 5 {
+        *auto_select_fail_count = 0;
+        return SelfHealAction::FireAlert;
+    }
+    SelfHealAction::None
+}
+
 async fn self_heal_with_accounting(
     profile_uid: &str,
     auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+    last_notified_health: &mut &'static str,
     last_auto_select_time: &mut Option<Instant>,
     last_check_time: &mut Instant,
 ) -> bool {
@@ -1558,7 +1648,6 @@ async fn self_heal_with_accounting(
     if let Some(last_time) = *last_auto_select_time {
         let elapsed = now.duration_since(last_time).as_secs();
         if elapsed < 25 {
-            // info 级别：自愈被冷却跳过是关键状态变化，正常日志级别应可见（此前 debug 级导致排障时不可见）
             logging!(
                 info,
                 Type::Lightweight,
@@ -1571,12 +1660,18 @@ async fn self_heal_with_accounting(
     let prev_auto_select_time = *last_auto_select_time;
     *last_auto_select_time = Some(now);
 
+    let mut failed_this_round = false;
     match trigger_backend_auto_select(profile_uid, None, 0, true, false).await {
         Ok(outcome) => {
             if outcome.selected {
                 *auto_select_fail_count = 0;
+                *api_dead_heal_fail_count = 0;
+                update_network_health_notice(last_notified_health, "network_health::ok");
             } else {
                 *auto_select_fail_count += 1;
+                *api_dead_heal_fail_count += 1;
+                failed_this_round = true;
+                update_network_health_notice(last_notified_health, "network_health::all_dead");
                 logging!(
                     warn,
                     Type::Lightweight,
@@ -1597,6 +1692,9 @@ async fn self_heal_with_accounting(
                 *last_auto_select_time = prev_auto_select_time;
             } else {
                 *auto_select_fail_count += 1;
+                *api_dead_heal_fail_count += 1;
+                failed_this_round = true;
+                update_network_health_notice(last_notified_health, "network_health::all_dead");
                 logging!(
                     warn,
                     Type::Lightweight,
@@ -1609,43 +1707,48 @@ async fn self_heal_with_accounting(
     }
     *last_check_time = Instant::now();
 
-    // 【方案B】连续 3 次 auto_select 失败 → 重启内核清除 mihomo 命名管道卡死状态。
-    // TUN 模式下测速请求可能卡住 mihomo 的命名管道通道（单通道），导致后续所有 API
-    // 请求超时（API 不可达死循环），自愈选点因 wait_for_clash_ready 阶段 1 必然 30 秒
-    // 超时而无效。重启内核可清除卡死状态，恢复 API 通道。
-    //
-    // 【新增判断】重启前先探测 API 是否可达：
-    // - API 可达 → 失败原因是节点侧不可达（如国际出口中断），重启内核无益且会造成
-    //   短暂断流，仅记录日志、重置计数，等待节点恢复后自愈自动接管。
-    // - API 不可达 → 命名管道可能卡死，重启内核恢复通道。
-    // 重启成功则重置计数；重启失败则弹 Windows 提示框通知用户。
-    if *auto_select_fail_count >= 3 {
-        *auto_select_fail_count = 0;
-        if is_clash_api_alive().await {
-            logging!(
-                warn,
-                Type::Lightweight,
-                "[后台监测] 连续 3 次自愈选点失败，但内核 API 可达，判定为节点侧不可达（如国际出口中断），跳过内核重启，等待节点恢复"
-            );
+    if failed_this_round {
+        let need_api_check = *api_dead_heal_fail_count >= 3;
+        let api_alive = if need_api_check {
+            is_clash_api_alive().await
         } else {
+            true
+        };
+        if need_api_check && api_alive {
             logging!(
                 warn,
                 Type::Lightweight,
-                "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，重启内核以恢复 API 通道"
+                "[后台监测] 连续 3 次自愈选点失败，但内核 API 可达，判定为节点侧不可达（保留告警计数={}），跳过内核重启",
+                *auto_select_fail_count
             );
-            match crate::core::manager::CoreManager::global().restart_core().await {
-                Ok(()) => {
-                    logging!(info, Type::Lightweight, "[后台监测] 重启内核成功，API 通道应已恢复");
-                }
-                Err(e) => {
-                    logging!(
-                        error,
-                        Type::Lightweight,
-                        "[后台监测] 重启内核失败: {e}，弹出 Windows 提示框"
-                    );
-                    fire_self_heal_alert();
+        }
+        match evaluate_self_heal_counters(auto_select_fail_count, api_dead_heal_fail_count, api_alive) {
+            SelfHealAction::RestartCore => {
+                logging!(
+                    warn,
+                    Type::Lightweight,
+                    "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，重启内核以恢复 API 通道"
+                );
+                match crate::core::manager::CoreManager::global().restart_core().await {
+                    Ok(()) => {
+                        *auto_select_fail_count = 0;
+                        logging!(info, Type::Lightweight, "[后台监测] 重启内核成功，API 通道应已恢复");
+                    }
+                    Err(e) => {
+                        *auto_select_fail_count = 0;
+                        logging!(
+                            error,
+                            Type::Lightweight,
+                            "[后台监测] 重启内核失败: {e}，弹出 Windows 提示框"
+                        );
+                        fire_self_heal_alert();
+                    }
                 }
             }
+            SelfHealAction::FireAlert => {
+                fire_self_heal_alert();
+            }
+            SelfHealAction::None => {}
         }
     }
     true
@@ -1653,7 +1756,7 @@ async fn self_heal_with_accounting(
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_probe_target;
+    use super::{SelfHealAction, evaluate_self_heal_counters, resolve_probe_target, sort_display_delays};
 
     #[test]
     fn test_resolve_probe_target_ipv4() {
@@ -1687,5 +1790,42 @@ mod tests {
     fn test_resolve_probe_target_malformed() {
         // 非法 URL fallback 到默认目标（HTTPS 默认端口 443）
         assert_eq!(resolve_probe_target("not-a-valid-url"), "cp.cloudflare.com:443");
+    }
+
+    #[test]
+    fn test_sort_display_delays_places_timeout_zero_at_bottom() {
+        // BUG-322 / BUG-349: 0ms 代表测速超时，按延迟升序排列时必须排在所有真实延迟之后
+        let mut items = vec![
+            ("Dead-A".to_string(), 0),
+            ("Slow-Node".to_string(), 220),
+            ("Fast-Node".to_string(), 45),
+            ("Dead-B".to_string(), 0),
+        ];
+        sort_display_delays(&mut items, 1);
+        assert_eq!(items[0], ("Fast-Node".to_string(), 45));
+        assert_eq!(items[1], ("Slow-Node".to_string(), 220));
+        assert_eq!(items[2].1, 0);
+        assert_eq!(items[3].1, 0);
+    }
+
+    #[test]
+    fn test_self_heal_counters_reach_five_when_api_alive() {
+        // BUG-318: 当内核 API 存活但所有节点不可达时，第 3 次失败不得清零告警计数，第 5 次必须触发告警
+        let mut alert_count = 0;
+        let mut api_dead_count = 0;
+        for round in 1..=4 {
+            alert_count += 1;
+            api_dead_count += 1;
+            let action = evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, true);
+            assert_eq!(action, SelfHealAction::None, "round {round} should not alert yet");
+        }
+        assert_eq!(alert_count, 4);
+        assert_eq!(api_dead_count, 1);
+
+        alert_count += 1;
+        api_dead_count += 1;
+        let fifth_action = evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, true);
+        assert_eq!(fifth_action, SelfHealAction::FireAlert);
+        assert_eq!(alert_count, 0);
     }
 }

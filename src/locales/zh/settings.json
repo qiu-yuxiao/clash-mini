@@ -576,6 +576,12 @@
     "testNotExecuted": "测速未执行：内核未就绪或暂无可测节点",
     "testFailed": "测速失败：{{message}}",
     "updated": "已更新",
-    "portSaved": "代理端口已保存并重载"
+    "portSaved": "代理端口已保存并重载",
+    "testSingleNodeTooltip": "点击单独测速此节点（不切换连接）",
+    "networkOffline": "网络断开",
+    "networkOfflineTooltip": "检测到物理网络断开，点击立即重测并尝试恢复",
+    "allNodesTimeout": "全节点超时",
+    "allNodesTimeoutTooltip": "当前所有代理节点均不可达，点击立即重新测速优选",
+    "filterAutoTestingTooltip": "即将对过滤结果自动测速优选（按 Esc 取消本次自动测速）"
   }
 }

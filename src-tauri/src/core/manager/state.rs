@@ -40,7 +40,24 @@ impl CoreManager {
         let gogc = std::env::var("GOGC").unwrap_or_else(|_| "100".to_string());
         let gomaxprocs = std::env::var("GOMAXPROCS").unwrap_or_else(|_| "2".to_string());
 
-        let (mut rx, child) = if custom_core_path.exists() {
+        // 【损坏内核防崩溃守卫 BUG-319】校验自定义热升级内核体积（>= 5MB），若存在 0 字节或半截损坏残留则清理并回退内置 sidecar
+        let use_custom_core = match std::fs::metadata(&custom_core_path) {
+            Ok(meta) if meta.len() >= 5 * 1024 * 1024 => true,
+            Ok(meta) => {
+                logging!(
+                    warn,
+                    Type::Core,
+                    "检测到损坏的自定义内核文件 ({} bytes < 5MB)，自动移除并回退内置内核: {}",
+                    meta.len(),
+                    custom_core_path.display()
+                );
+                let _ = std::fs::remove_file(&custom_core_path);
+                false
+            }
+            Err(_) => false,
+        };
+
+        let (mut rx, child) = if use_custom_core {
             logging!(
                 info,
                 Type::Core,
@@ -144,9 +161,23 @@ impl CoreManager {
                 pid,
                 result
             );
-            // 等待进程完全退出，最多2秒，确保端口释放
-            let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            // 轮询等待旧子进程真正退出以释放监听端口与 TUN 句柄（上限 2 秒，步进 50ms，BUG-326）
+            let wait_pid = sysinfo::Pid::from_u32(pid);
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async move {
+                loop {
+                    let alive = tokio::task::spawn_blocking(move || {
+                        let system = sysinfo::System::new_with_specifics(
+                            sysinfo::RefreshKind::nothing().with_processes(sysinfo::ProcessRefreshKind::nothing()),
+                        );
+                        system.process(wait_pid).is_some()
+                    })
+                    .await
+                    .unwrap_or(false);
+                    if !alive {
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                }
             })
             .await;
         }

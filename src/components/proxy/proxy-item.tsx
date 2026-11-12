@@ -6,12 +6,15 @@ import {
   SxProps,
   Theme,
 } from '@mui/material'
-import React, { memo } from 'react'
+import React, { memo, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { BaseLoading } from '@/components/base'
 import { useProxyDelayState } from '@/hooks/use-proxy-delay-state'
 import { useWindowDecorations } from '@/hooks/use-window'
+import { getProfiles } from '@/services/cmds'
 import { getDelayManager } from '@/services/delay'
+import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 
 interface Props {
@@ -45,6 +48,7 @@ export const ProxyItem = memo(
       onClick,
     } = props
 
+    const { t } = useTranslation()
     const { isMinimalWidth } = useWindowDecorations()
     const isMinimal = isMinimalWidth
 
@@ -54,6 +58,35 @@ export const ProxyItem = memo(
     const { delayValue, isPreset, timeout } = useProxyDelayState(
       proxy,
       group?.name ?? '',
+    )
+
+    // BUG-357: 右侧延迟徽章设为独立点击热区（阻止冒泡），仅对该单节点实时探活而不切换当前连接
+    const handleSingleDelayCheck = useCallback(
+      async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (isPreset || !proxy?.name || delayValue === -2) return
+        const targetGroup = group?.name || 'PROXY'
+        try {
+          const currentUid = (await getProfiles())?.current || ''
+          if (!currentUid) return
+          await getDelayManager().checkDelay(
+            currentUid,
+            proxy.name,
+            targetGroup,
+          )
+          getDelayManager().queueGroupNotification(targetGroup)
+        } catch (err) {
+          const msg = String(err instanceof Error ? err.message : err)
+          if (msg.includes('AUTO_SELECT_BUSY')) {
+            showNotice.info('settings.mini.testingInProgress')
+          } else if (msg.includes('AUTO_SELECT_NO_RESULT')) {
+            showNotice.error('settings.mini.testNotExecuted')
+          } else {
+            showNotice.error('settings.mini.testFailed', { message: msg })
+          }
+        }
+      },
+      [delayValue, group?.name, isPreset, proxy?.name],
     )
 
     return (
@@ -196,6 +229,8 @@ export const ProxyItem = memo(
         )}
 
         <Box
+          title={t('settings.mini.testSingleNodeTooltip')}
+          onClick={handleSingleDelayCheck}
           sx={{
             width: 65,
             height: '100%',
@@ -204,11 +239,28 @@ export const ProxyItem = memo(
             justifyContent: 'center',
             alignItems: 'center',
             boxSizing: 'border-box',
+            cursor: delayValue === -2 ? 'wait' : 'pointer',
+            '&:hover .the-delay': {
+              textDecoration: 'underline',
+            },
           }}
         >
           {delayValue === -2 && (
             <Widget>
               <BaseLoading />
+            </Widget>
+          )}
+
+          {delayValue === -1 && (
+            <Widget
+              className="the-delay"
+              sx={{
+                color: 'text.disabled',
+                cursor: 'pointer',
+                fontSize: '11px',
+              }}
+            >
+              -
             </Widget>
           )}
 
@@ -222,7 +274,7 @@ export const ProxyItem = memo(
                   timeout,
                   palette.mode === 'dark',
                 ),
-                cursor: 'default',
+                cursor: 'pointer',
                 fontSize: '11px',
                 fontWeight: 600,
               })}

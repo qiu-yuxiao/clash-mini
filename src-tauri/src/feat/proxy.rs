@@ -81,7 +81,9 @@ pub async fn copy_clash_env() {
         .unwrap_or_else(|| verge_cfg.proxy_host.as_deref().unwrap_or("127.0.0.1"));
 
     let app_handle = handle::Handle::app_handle();
-    let port = verge_cfg.verge_mixed_port.unwrap_or(7897);
+    let port = verge_cfg
+        .verge_mixed_port
+        .unwrap_or(crate::constants::network::ports::DEFAULT_MIXED);
     let http_proxy = format!("http://{ip}:{port}");
     let socks5_proxy = format!("socks5://{ip}:{port}");
 

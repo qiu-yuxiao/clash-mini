@@ -38,7 +38,8 @@
         "profileSwitched": "Профиль переключён",
         "profileReactivated": "Профиль перезапущен",
         "switchInterrupted": "Переключение профиля прервано новым выбором",
-        "batchDeleted": "Выбранные профили удалены"
+        "batchDeleted": "Выбранные профили удалены",
+        "quickRuleAdded": "Правило быстрой маршрутизации закреплено: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Принудительное обновление завершено",

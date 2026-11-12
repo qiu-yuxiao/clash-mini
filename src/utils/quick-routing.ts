@@ -103,8 +103,8 @@ export const addQuickRoutingRule = async (
     await enhanceProfiles()
 
     showNotice.success(
-      'profiles.page.feedback.notifications.profileSwitched',
-      `手动路径控制规则已置顶生效: ${newRule}`,
+      'profiles.page.feedback.notifications.quickRuleAdded',
+      { rule: newRule },
       2500,
     )
   } catch (e: unknown) {

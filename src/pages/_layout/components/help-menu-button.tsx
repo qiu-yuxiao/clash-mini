@@ -75,8 +75,15 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           cursor: 'pointer',
           outline: 'none',
           boxSizing: 'border-box',
+          // BUG-354: 默认 680px 窗口高度下不得隐藏帮助与诊断包入口；低于 830px 时自动停靠至设置面板右上角关闭按钮旁，零遮挡
           '@media (max-height: 830px)': {
-            display: 'none',
+            bottom: 'auto',
+            left: 'auto',
+            top: '3px',
+            right: '40px',
+            width: '28px',
+            height: '28px',
+            zIndex: 9999,
           },
           ...primaryBtn3DStyle,
         }}

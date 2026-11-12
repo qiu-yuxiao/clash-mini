@@ -165,7 +165,9 @@ const Layout = () => {
     depthFactor,
     vibrancyFactor,
     handleDepthFactorChange,
+    commitDepthFactorChange,
     handleVibrancyFactorChange,
+    commitVibrancyFactorChange,
   } = useSkinControls()
 
   // Update States
@@ -925,7 +927,9 @@ const Layout = () => {
         lastProcessedRef.current = { uid, counter: profileRefreshCounter }
       }
       await mutateProfiles()
-      closeAllConnectionsWithTimeout()
+      closeAllConnectionsWithTimeout().catch((err) =>
+        console.warn('[Layout] closeAllConnectionsWithTimeout failed:', err),
+      )
       showNotice.success(
         'profiles.page.feedback.notifications.profileSwitched',
         1000,
@@ -1115,6 +1119,41 @@ const Layout = () => {
 
   // Logs dialog state
   const [logsOpen, setLogsOpen] = useState(false)
+
+  // BUG-355: 绑定主界面键盘快捷键（F4=可见子集测速优选，F1=全量测速优选，Ctrl+F=聚焦节点过滤框）
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        drawerOpen ||
+        logsOpen ||
+        editProfileOpen ||
+        addUrlOpen ||
+        firstRunGuideOpen
+      ) {
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        window.dispatchEvent(
+          new CustomEvent('clash-mini-shortcut', { detail: 'focus-filter' }),
+        )
+      } else if (e.key === 'F4') {
+        e.preventDefault()
+        window.dispatchEvent(
+          new CustomEvent('clash-mini-shortcut', { detail: 'check-visible' }),
+        )
+      } else if (e.key === 'F1') {
+        e.preventDefault()
+        window.dispatchEvent(
+          new CustomEvent('clash-mini-shortcut', { detail: 'check-full' }),
+        )
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [addUrlOpen, drawerOpen, editProfileOpen, firstRunGuideOpen, logsOpen])
 
   // Custom Titlebar Render
   const customTitlebar = useMemo(
@@ -1333,7 +1372,9 @@ const Layout = () => {
                   onClick={() =>
                     patchVerge({
                       enable_always_on_top: !verge?.enable_always_on_top,
-                    })
+                    }).catch((err) =>
+                      console.error('[Layout] toggle pinWindow failed:', err),
+                    )
                   }
                   sx={(theme) => ({
                     ...get3DButtonStyle(
@@ -1507,8 +1548,10 @@ const Layout = () => {
                     themeActiveIndex={themeActiveIndex}
                     depthFactor={depthFactor}
                     handleDepthFactorChange={handleDepthFactorChange}
+                    commitDepthFactorChange={commitDepthFactorChange}
                     vibrancyFactor={vibrancyFactor}
                     handleVibrancyFactorChange={handleVibrancyFactorChange}
+                    commitVibrancyFactorChange={commitVibrancyFactorChange}
                     controlSkin={controlSkin}
                     setLogsOpen={setLogsOpen}
                     mode={mode}

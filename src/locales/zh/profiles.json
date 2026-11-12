@@ -38,7 +38,8 @@
         "profileSwitched": "订阅已切换",
         "profileReactivated": "订阅已激活",
         "switchInterrupted": "订阅切换被新选择中断",
-        "batchDeleted": "选中的订阅已成功删除"
+        "batchDeleted": "选中的订阅已成功删除",
+        "quickRuleAdded": "快捷分流规则已置顶生效: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "数据已强制刷新",

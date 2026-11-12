@@ -4,7 +4,7 @@ import {
   SwapVertRounded,
 } from '@mui/icons-material'
 import { Box, Button, IconButton, MenuItem } from '@mui/material'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -64,11 +64,25 @@ const LogPage = () => {
   )
 
   const virtuosoRef = useRef<VirtualListHandle>(null)
+  // BUG-338: 仅当滚动条停靠底部时才跟随新日志自动滚动（且使用 auto 即时定位替代 smooth 动画，消除 50ms 刷新抖动与回弹）
+  const isPinnedToBottomRef = useRef(true)
+
+  const handleListScroll = useCallback((e: Event) => {
+    const el = e.target as HTMLElement | null
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    isPinnedToBottomRef.current = distanceFromBottom <= 48
+  }, [])
 
   useEffect(() => {
-    if (!isDescending && filteredLogs.length > 0) {
+    if (
+      !isDescending &&
+      filteredLogs.length > 0 &&
+      isPinnedToBottomRef.current
+    ) {
       virtuosoRef.current?.scrollToIndex(filteredLogs.length - 1, {
-        behavior: 'smooth',
+        align: 'end',
+        behavior: 'auto',
       })
     }
   }, [filteredLogs.length, isDescending])
@@ -211,6 +225,7 @@ const LogPage = () => {
           ref={virtuosoRef}
           count={filteredLogs.length}
           estimateSize={50}
+          onScroll={handleListScroll}
           renderItem={(i) => (
             <LogItem value={filteredLogs[i]} searchState={searchState} />
           )}

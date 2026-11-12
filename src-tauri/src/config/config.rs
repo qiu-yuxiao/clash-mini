@@ -365,7 +365,7 @@ pub enum ConfigType {
     Check,
 }
 
-const MINIMAL_CONFIG_MIXED_PORT: u16 = 7897;
+const MINIMAL_CONFIG_MIXED_PORT: u16 = crate::constants::network::ports::DEFAULT_MIXED;
 
 fn generate_minimal_config() -> serde_yaml_ng::Mapping {
     let mut config = serde_yaml_ng::Mapping::new();

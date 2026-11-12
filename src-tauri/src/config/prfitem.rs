@@ -790,14 +790,22 @@ fn validate_url_no_ssrf(url: &Url) -> Result<()> {
         // 1. 静态字符串与直接 IP 校验
         match host {
             url::Host::Domain(d) => {
-                let lower = d.to_ascii_lowercase();
-                if lower == "localhost"
+                let lower = d.trim_end_matches('.').to_ascii_lowercase();
+                if lower.is_empty()
+                    || !lower.contains('.')
+                    || lower == "localhost"
+                    || lower.ends_with(".localhost")
+                    || lower.ends_with(".local")
+                    || lower.ends_with(".internal")
+                    || lower.ends_with(".lan")
+                    || lower.ends_with(".home.arpa")
                     || lower == "127.0.0.1"
                     || lower == "::1"
                     || lower == "0.0.0.0"
                     || lower.starts_with("169.254.")
+                    || lower.parse::<u32>().is_ok()
                 {
-                    bail!("cannot fetch subscription from localhost/loopback address");
+                    bail!("cannot fetch subscription from localhost/internal address");
                 }
             }
             url::Host::Ipv4(ip) => {

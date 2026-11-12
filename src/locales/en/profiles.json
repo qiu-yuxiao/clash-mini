@@ -38,7 +38,8 @@
         "profileSwitched": "Profile Switched",
         "profileReactivated": "Profile Reactivated",
         "switchInterrupted": "Profile switch interrupted by new selection",
-        "batchDeleted": "Selected profiles deleted successfully"
+        "batchDeleted": "Selected profiles deleted successfully",
+        "quickRuleAdded": "Quick routing rule pinned: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

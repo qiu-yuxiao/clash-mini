@@ -27,8 +27,10 @@ interface ThemeSettingsCardProps {
   themeActiveIndex: number
   depthFactor: number
   handleDepthFactorChange: (val: number) => void
+  commitDepthFactorChange?: (val: number) => void
   vibrancyFactor: number
   handleVibrancyFactorChange: (val: number) => void
+  commitVibrancyFactorChange?: (val: number) => void
   controlSkin: string
   setLogsOpen: (open: boolean) => void
   mode: 'light' | 'dark'
@@ -40,8 +42,10 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
   themeActiveIndex,
   depthFactor,
   handleDepthFactorChange,
+  commitDepthFactorChange,
   vibrancyFactor,
   handleVibrancyFactorChange,
+  commitVibrancyFactorChange,
   controlSkin,
   setLogsOpen,
   mode,
@@ -195,7 +199,11 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
           </Box>
 
           <Box
-            onClick={() => patchVerge({ theme_mode: 'system' })}
+            onClick={() =>
+              patchVerge({ theme_mode: 'system' }).catch((err) =>
+                console.error('[ThemeSettings] patchVerge failed:', err),
+              )
+            }
             sx={{
               flex: 1,
               height: '100%',
@@ -237,7 +245,11 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
           </Box>
 
           <Box
-            onClick={() => patchVerge({ theme_mode: 'light' })}
+            onClick={() =>
+              patchVerge({ theme_mode: 'light' }).catch((err) =>
+                console.error('[ThemeSettings] patchVerge failed:', err),
+              )
+            }
             sx={{
               flex: 1,
               height: '100%',
@@ -279,7 +291,11 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
           </Box>
 
           <Box
-            onClick={() => patchVerge({ theme_mode: 'dark' })}
+            onClick={() =>
+              patchVerge({ theme_mode: 'dark' }).catch((err) =>
+                console.error('[ThemeSettings] patchVerge failed:', err),
+              )
+            }
             sx={{
               flex: 1,
               height: '100%',
@@ -369,6 +385,9 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             max={getSlider1Max(controlSkin)}
             step={0.1}
             onChange={(_, val) => handleDepthFactorChange(val as number)}
+            onChangeCommitted={(_, val) =>
+              commitDepthFactorChange?.(val as number)
+            }
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
           />
         </ListItem>
@@ -418,6 +437,9 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             max={getSlider2Max(controlSkin)}
             step={0.1}
             onChange={(_, val) => handleVibrancyFactorChange(val as number)}
+            onChangeCommitted={(_, val) =>
+              commitVibrancyFactorChange?.(val as number)
+            }
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
           />
         </ListItem>

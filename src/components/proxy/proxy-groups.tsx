@@ -287,6 +287,48 @@ export const ProxyGroups = (props: Props) => {
     }
   })
 
+  // BUG-355: 绑定 F4 / F1 全局测速快捷键（F4=当前过滤可见子集测速优选，F1=全量节点测速优选）
+  const handleCheckFullGroup = useStableCallback(async (groupName: string) => {
+    if (testingGroupsRef.current[groupName]) return
+    updateTestingGroups((prev) => ({ ...prev, [groupName]: true }))
+    try {
+      const currentUid = (await getProfiles())?.current || ''
+      if (!currentUid) return
+      const allGroupNames = renderList
+        .filter((e) => e.group?.name === groupName && e.group?.all)
+        .flatMap((e) => (e.group?.all ?? []).map((p) => p.name))
+      const uniqueNames = Array.from(new Set(allGroupNames)).filter(
+        (name) => !!name && !isDummyNode(name),
+      )
+      for (const name of uniqueNames) {
+        getDelayManager().setDelay(name, groupName, -2)
+      }
+      getDelayManager().queueGroupNotification(groupName)
+      await triggerAutoSelect(currentUid, undefined, 0, true)
+    } catch (err) {
+      console.error('[ProxyGroups] F1 全量测速/选点失败:', err)
+    } finally {
+      if (isMountedRef.current) {
+        updateTestingGroups((prev) => ({ ...prev, [groupName]: false }))
+      }
+    }
+  })
+
+  useEffect(() => {
+    const onShortcut = (e: Event) => {
+      const action = (e as CustomEvent<string>).detail
+      if (action === 'check-visible') {
+        void handleCheckAll('PROXY')
+      } else if (action === 'check-full') {
+        void handleCheckFullGroup('PROXY')
+      }
+    }
+    window.addEventListener('clash-mini-shortcut', onShortcut)
+    return () => {
+      window.removeEventListener('clash-mini-shortcut', onShortcut)
+    }
+  }, [handleCheckAll, handleCheckFullGroup])
+
   // 滚到对应的节点
   const handleLocation = useStableCallback((group: IProxyGroupItem) => {
     if (!group) return

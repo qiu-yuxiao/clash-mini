@@ -29,7 +29,7 @@ use crate::{
     ret_failed_resp, utils,
 };
 
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 type WsReaderKey = (usize, ConnectionId);
 
@@ -378,11 +378,8 @@ impl Mihomo {
             reason: "Disconnected by client".into(),
         }));
 
-        if let Some(timeout) = force_timeout.filter(|timeout| *timeout > 0) {
-            let _ = tokio::time::timeout(Duration::from_millis(timeout), writer.send(close_message)).await;
-        } else {
-            let _ = writer.send(close_message).await;
-        }
+        let close_timeout = Duration::from_millis(force_timeout.unwrap_or(1000).max(500));
+        let _ = tokio::time::timeout(close_timeout, writer.send(close_message)).await;
         Ok(())
     }
 

@@ -5,7 +5,7 @@ import {
   SortOutlined,
 } from '@mui/icons-material'
 import type { SxProps, Theme } from '@mui/material'
-import { Box, IconButton } from '@mui/material'
+import { Box, CircularProgress, IconButton, Tooltip } from '@mui/material'
 import { keyframes } from '@mui/material'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -59,6 +59,8 @@ export const ProxyHead = ({
 
   const { t } = useTranslation()
   const [autoFocus, setAutoFocus] = useState(false)
+  const [pendingAutoTest, setPendingAutoTest] = useState(false)
+  const filterInputRef = useRef<HTMLInputElement | null>(null)
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTriggeredFilterRef = useRef<string>(filterText || '')
 
@@ -66,6 +68,21 @@ export const ProxyHead = ({
   useEffect(() => {
     onCheckDelayRef.current = onCheckDelay
   }, [onCheckDelay])
+
+  // BUG-355: 响应 Ctrl+F 全局快捷键聚焦并全选过滤框
+  useEffect(() => {
+    const onShortcut = (e: Event) => {
+      const action = (e as CustomEvent<string>).detail
+      if (action === 'focus-filter' && filterInputRef.current) {
+        filterInputRef.current.focus()
+        filterInputRef.current.select()
+      }
+    }
+    window.addEventListener('clash-mini-shortcut', onShortcut)
+    return () => {
+      window.removeEventListener('clash-mini-shortcut', onShortcut)
+    }
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -76,6 +93,7 @@ export const ProxyHead = ({
   }, [])
 
   const triggerAutoDelayTest = useCallback(() => {
+    setPendingAutoTest(false)
     // 延迟 60ms 确保 React 状态更新并完成过滤计算
     setTimeout(() => {
       onCheckDelayRef.current()
@@ -92,10 +110,14 @@ export const ProxyHead = ({
       // 清空过滤时不自动触发全量测速择优
       if (!trimmed) {
         lastTriggeredFilterRef.current = ''
+        setPendingAutoTest(false)
         return
       }
-      // 防抖 700ms 自动触发一次多路测速择优
+      // BUG-360: 700ms 防抖等待期间展示显式脉冲倒计时提示，支持按 Esc 取消本次自动测速
+      setPendingAutoTest(lastTriggeredFilterRef.current !== trimmed)
       filterTimerRef.current = setTimeout(() => {
+        filterTimerRef.current = null
+        setPendingAutoTest(false)
         if (lastTriggeredFilterRef.current !== trimmed) {
           lastTriggeredFilterRef.current = trimmed
           debugLog(`[ProxyHead] 过滤输入完成，自动触发测速择优: "${trimmed}"`)
@@ -112,6 +134,7 @@ export const ProxyHead = ({
         clearTimeout(filterTimerRef.current)
         filterTimerRef.current = null
       }
+      setPendingAutoTest(false)
       const trimmed = currentText.trim()
       if (!trimmed) return
       lastTriggeredFilterRef.current = trimmed
@@ -120,6 +143,15 @@ export const ProxyHead = ({
     },
     [triggerAutoDelayTest],
   )
+
+  const handleFilterKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && filterTimerRef.current) {
+      e.stopPropagation()
+      clearTimeout(filterTimerRef.current)
+      filterTimerRef.current = null
+      setPendingAutoTest(false)
+    }
+  }, [])
 
   useEffect(() => {
     // fix the focus conflict
@@ -208,10 +240,28 @@ export const ProxyHead = ({
         }}
       >
         <BaseSearchBox
+          inputRef={filterInputRef}
           autoFocus={autoFocus}
           value={filterText}
           onChangeText={handleFilterChangeText}
           onEnter={handleFilterEnter}
+          onKeyDownExtra={handleFilterKeyDown}
+          endAdornmentExtra={
+            pendingAutoTest || isTesting ? (
+              <Tooltip title={t('settings.mini.filterAutoTestingTooltip')}>
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    color: 'warning.main',
+                    mr: 0.25,
+                  }}
+                >
+                  <CircularProgress size={11} color="inherit" />
+                </Box>
+              </Tooltip>
+            ) : null
+          }
           onSearch={(_, state) =>
             onHeadState({
               filterText: state.text,

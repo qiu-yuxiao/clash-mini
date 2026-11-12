@@ -56,6 +56,50 @@ impl AsyncHandler {
         async_runtime::spawn_blocking(f)
     }
 
+    /// 生成具备 Panic 隔离与退避自恢复能力的长期守护后台任务（BUG-353）
+    /// 若内部 Future 正常退出则结束；若发生意外 Panic 则记录完整载荷并在应用未退出时经 2s 冷却自动重启守护。
+    #[track_caller]
+    pub fn spawn_supervised<F, Fut>(
+        task_name: &'static str,
+        log_type: clash_verge_logging::Type,
+        mut factory: F,
+    ) -> JoinHandle<()>
+    where
+        F: FnMut() -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        use futures::FutureExt as _;
+        async_runtime::spawn(async move {
+            loop {
+                if crate::core::handle::Handle::global().is_exiting() {
+                    break;
+                }
+                let fut = std::panic::AssertUnwindSafe(factory());
+                match fut.catch_unwind().await {
+                    Ok(()) => break,
+                    Err(panic_payload) => {
+                        let msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                            (*s).to_string()
+                        } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                            s.clone()
+                        } else {
+                            "unknown panic payload".to_string()
+                        };
+                        clash_verge_logging::logging!(
+                            error,
+                            log_type,
+                            "[SupervisedTask:{task_name}] 捕获未预期 Panic: {msg}，2s 后尝试自愈重启"
+                        );
+                        if crate::core::handle::Handle::global().is_exiting() {
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    }
+                }
+            }
+        })
+    }
+
     #[inline]
     #[track_caller]
     pub fn block_on<Fut>(fut: Fut) -> Fut::Output

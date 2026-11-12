@@ -785,10 +785,10 @@ flowchart LR
 | **BUG-344** | 5.2 | 单节点专属微测速与结果共享：在非 TUN Sidecar 模式下对显式单节点测速启用 `delay_proxy_by_name` 专属微探针（毫秒级直达、节约 95% 带宽与连接开销，严守不选点/不复用旧缓存/未执行不伪造 Timeout 契约）；在 TUN 模式下保持 `PROXY__METRICS` 防回环组测并将同批新鲜延迟同步回填前端缓存。 |
 | **BUG-345** | 5.5 | 并行竞速物理网络探针：使用 `futures::future::select_ok` 并行发起三路公网 DNS `TCP:53` 握手探针（单路 600ms 超时），最快一路握手成功即在 10~30ms 内判定在线，全败则秒级平滑衔接域名解析兜底。 |
 | **BUG-346** | 3.6 | 内核升级原子暂存与 PE 校验：引入 `.staging` 原子暂存替换流水线：解压后校验二进制体积（`>= 5 MB`）与 DOS/PE `MZ` 魔数头，校验通过再原子重命名替换正式文件，任何环节失败自动清理临时文件并保留旧内核完好可用。 |
-| **BUG-347** | 4.3 | 前端 WebSocket 指数退避重连：将前端 WebSocket 断线重连升级为带 `±20%` 随机抖动的指数退避（`1s -> 2s -> 4s -> 8s`，上限 `15s`），并监听内核重启/配置刷新事件瞬时清零退避计数立即重连。 |
+| **BUG-347** | 4.3 | 前端 WebSocket 指数退避重连：将前端 WebSocket 断线重连升级为带 `±20%` 随机抖动的指数退避（`1s -> 2s -> 4s -> 8s`，上限 `15s`），监听内核重启/配置刷新事件瞬时清零退避计数立即重连，并由 `use-mihomo-ws-subscription.test.ts` 单测锁定边界。 |
 | **BUG-348** | 7.2 | 统一 URI 协议解析预处理管道：封装共享纯函数 `strip_fragment_and_query(input)` 统一全协议 URI 预处理管道，并新增含 `@` 查询参数、Socks5 查询串与 VMess `sni` 的回归单元测试。 |
 | **BUG-349** | 5.2 / 5.6 | 测速 0ms 超时置底全栈对齐与单测锁定：抽离 `sort_display_delays` 纯函数统一处理延迟升序（`0 -> u32::MAX` 垫底）与名称排序，并补充单元测试防止退化。 |
-| **BUG-350** | 2.4 | 现代化 Win32 SetWindowSubclass 窗口钩子：升级采用 `Win32::UI::Shell::{SetWindowSubclass, DefSubclassProc, RemoveWindowSubclass}` 标准子类化架构，并在收到 `WM_NCDESTROY` 时自动解绑释放，原生支持任意次主窗口销毁与重建。 |
+| **BUG-350** | 2.4 | 现代化 Win32 SetWindowSubclass 窗口钩子：通过 `comctl32` 原生 `{SetWindowSubclass, DefSubclassProc, RemoveWindowSubclass}` 标准子类化架构绑定窗口生命周期，并在收到 `WM_NCDESTROY` 时自动解绑释放，原生支持任意次主窗口销毁与重建。 |
 | **BUG-351** | 3.2 | 韧性命名管道连接池与 WaitNamedPipeW：在 Windows 平台引入 `WaitNamedPipeW` 阻塞线程池事件等待配合退避重试，并在连接池层记录连接复用标记实现陈旧断开连接的无感单次重建。 |
 | **BUG-352** | 1.3 / 1.8 | ServiceManager 异步互斥化状态门控：将 `ServiceManager` 内部的 `operation_running: AtomicBool` 重构为 `tokio::sync::Mutex<()>` 异步互斥锁，使并发 `refresh`/`apply` 安全排队执行而不再相互报错。 |
 | **BUG-353** | 5.1 / 8.7 | 后台常驻守护任务 spawn_supervised 监督器：在 `AsyncHandler` 中新增 `spawn_supervised` 守护包装器（`AssertUnwindSafe(...).catch_unwind()` + 错误日志留痕 + 退避自重启，应用退出时自动终止），加固后台健康监测主循环。 |

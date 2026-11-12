@@ -39,6 +39,25 @@ struct VMessJson {
     host: Option<String>,
     path: Option<String>,
     tls: Option<String>,
+    sni: Option<String>,
+}
+
+/// 统一 URI 预处理管道（BUG-320 / BUG-348）：
+/// 严格遵循「先剥离 `#fragment` -> 再剥离 `?query` -> 最后交由各协议按最后一个 `@` 拆解 userinfo」顺序，
+/// 彻底杜绝查询参数或密码中含有 `@` 时主机端口被错误截断。
+fn strip_fragment_and_query(payload: &str) -> (&str, Option<&str>, Option<String>) {
+    let (before_frag, frag_opt) = match payload.split_once('#') {
+        Some((b, f)) => (
+            b,
+            Some(percent_encoding::percent_decode_str(f).decode_utf8_lossy().to_string()),
+        ),
+        None => (payload, None),
+    };
+    let (auth_host, query_opt) = match before_frag.split_once('?') {
+        Some((ah, q)) => (ah, Some(q)),
+        None => (before_frag, None),
+    };
+    (auth_host, query_opt, frag_opt)
 }
 
 pub fn decode_base64_robust(s: &str) -> Option<Vec<u8>> {
@@ -151,8 +170,32 @@ fn parse_vmess(link: &str) -> Option<serde_yaml_ng::Mapping> {
     map.insert(serde_yaml_ng::Value::from("cipher"), serde_yaml_ng::Value::from("auto"));
     map.insert(serde_yaml_ng::Value::from("udp"), serde_yaml_ng::Value::from(true));
 
+    let sni_val = json
+        .sni
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+
     if json.tls.as_deref() == Some("tls") {
         map.insert(serde_yaml_ng::Value::from("tls"), serde_yaml_ng::Value::from(true));
+        if let Some(sni) = sni_val.or_else(|| {
+            json.host
+                .as_deref()
+                .map(str::trim)
+                .filter(|h| !h.is_empty())
+                .map(str::to_string)
+        }) {
+            map.insert(
+                serde_yaml_ng::Value::from("servername"),
+                serde_yaml_ng::Value::from(sni),
+            );
+        }
+    } else if let Some(sni) = sni_val {
+        map.insert(
+            serde_yaml_ng::Value::from("servername"),
+            serde_yaml_ng::Value::from(sni),
+        );
     }
 
     let network = json.net.unwrap_or_default();
@@ -198,38 +241,34 @@ fn parse_vmess(link: &str) -> Option<serde_yaml_ng::Mapping> {
 
 fn parse_ss(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let payload = link.strip_prefix("ss://")?;
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "SS Node".to_string());
+    let (auth_host, _query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "SS Node".to_string());
 
-    let (method_pw, host_port) = if base_part.contains('@') {
-        let (m_p, h_p) = base_part.split_once('@')?;
-        (m_p.to_string(), h_p.to_string())
+    let (method_pw, host_port) = if auth_host.contains('@') {
+        let (m_p, h_p) = auth_host.rsplit_once('@')?;
+        (m_p.to_string(), h_p.trim_end_matches('/').to_string())
     } else {
-        let decoded = decode_base64_robust(base_part)?;
+        let decoded = decode_base64_robust(auth_host.trim_end_matches('/'))?;
         let decoded_str = String::from_utf8(decoded).ok()?;
-        let (m_p, h_p) = decoded_str.split_once('@')?;
-        (m_p.to_string(), h_p.to_string())
+        let (decoded_clean, _) = decoded_str.split_once('?').unwrap_or((&decoded_str, ""));
+        let (m_p, h_p) = decoded_clean.rsplit_once('@')?;
+        (m_p.to_string(), h_p.trim_end_matches('/').to_string())
     };
 
     let decoded_method_pw = if !method_pw.contains(':') {
         let decoded = decode_base64_robust(&method_pw)?;
         String::from_utf8(decoded).ok()?
     } else {
-        method_pw
+        percent_encoding::percent_decode_str(&method_pw)
+            .decode_utf8_lossy()
+            .to_string()
     };
 
     let mut mp_parts = decoded_method_pw.splitn(2, ':');
     let cipher = mp_parts.next()?.trim().to_string();
     let password = mp_parts.next()?.trim().to_string();
 
-    let mut hp_parts = host_port.splitn(2, '?');
-    let server_port = hp_parts.next()?;
-
-    let (server, port) = extract_host_port(server_port, 8388)?;
+    let (server, port) = extract_host_port(&host_port, 8388)?;
 
     let mut map = serde_yaml_ng::Mapping::new();
     map.insert(serde_yaml_ng::Value::from("type"), serde_yaml_ng::Value::from("ss"));
@@ -834,20 +873,13 @@ fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
 
 fn parse_wireguard(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let payload = link.strip_prefix("wireguard://")?;
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "WireGuard Node".to_string());
+    let (auth_host, query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "WireGuard Node".to_string());
 
     // wireguard://private-key@host:port?public-key=xxx&...
-    // private-key may be base64 encoded
-    let (private_key_raw, host_port_query) = base_part.split_once('@')?;
-
-    let (host_port, query) = host_port_query
-        .split_once('?')
-        .map_or((host_port_query, None as Option<&str>), |(hp, q)| (hp, Some(q)));
+    // 先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 与 host:port（BUG-348）
+    let (private_key_raw, host_port) = auth_host.rsplit_once('@')?;
+    let host_port = host_port.trim_end_matches('/');
 
     let (server, port) = extract_host_port(host_port, 51820)?;
 
@@ -1007,19 +1039,17 @@ fn parse_socks5(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let payload = link
         .strip_prefix("socks5://")
         .or_else(|| link.strip_prefix("socks://"))?;
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "SOCKS5 Node".to_string());
+    let (auth_host, _query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "SOCKS5 Node".to_string());
 
     // socks5://[username:password@]host:port
-    let (user_info, host_port) = if let Some(at_pos) = base_part.rfind('@') {
-        (Some(&base_part[..at_pos]), &base_part[at_pos + 1..])
+    // 先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 与 host:port（BUG-348）
+    let (user_info, host_port) = if let Some((ui, hp)) = auth_host.rsplit_once('@') {
+        (Some(ui), hp)
     } else {
-        (None, base_part)
+        (None, auth_host)
     };
+    let host_port = host_port.trim_end_matches('/');
 
     let (server, port) = extract_host_port(host_port, 1080)?;
 
@@ -2003,6 +2033,84 @@ mod tests {
                 .as_bool()
                 .unwrap(),
             true
+        );
+    }
+
+    #[test]
+    fn test_parse_vmess_sni_field_preserved() {
+        // BUG-320: vmess:// JSON 中携带独立 sni 字段且与 host 不同时，servername 必须优先取 sni
+        let raw_json = r#"{"v":"2","ps":"VMess-SNI","add":"1.2.3.4","port":"443","id":"11111111-2222-3333-4444-555555555555","aid":"0","net":"ws","type":"none","host":"ws.cdn.com","sni":"sni.origin.com","path":"/ws","tls":"tls"}"#;
+        let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, raw_json);
+        let link = format!("vmess://{encoded}");
+        let map = parse_vmess(&link).unwrap();
+        assert_eq!(
+            map.get(serde_yaml_ng::Value::from("servername"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "sni.origin.com"
+        );
+    }
+
+    #[test]
+    fn test_parse_ss_wireguard_socks5_query_with_at() {
+        // BUG-348: ?query 内含 @ 或尾斜杠时，先剥离 query 再拆 @，不得截坏 host:port
+        let user_b64 = base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, "aes-256-gcm:secret");
+        let ss_link = format!("ss://{user_b64}@ss.example.com:8388/?plugin=v2ray-plugin%3Bhost%3Dcdn@edge.com#SS-At");
+        let ss_map = parse_ss(&ss_link).unwrap();
+        assert_eq!(
+            ss_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "ss.example.com"
+        );
+        assert_eq!(
+            ss_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            8388
+        );
+
+        let wg_link = "wireguard://cHJpdmF0ZWtleQ==@wg.example.com:51820/?publickey=cHVibGlja2V5&reserved=1,2,3&peer=test@wg#WG-At";
+        let wg_map = parse_wireguard(wg_link).unwrap();
+        assert_eq!(
+            wg_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "wg.example.com"
+        );
+        assert_eq!(
+            wg_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            51820
+        );
+
+        let socks_link = "socks5://u@name:pass@198.51.100.10:1080/?tag=a@b#Socks-At";
+        let socks_map = parse_socks5(socks_link).unwrap();
+        assert_eq!(
+            socks_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "198.51.100.10"
+        );
+        assert_eq!(
+            socks_map
+                .get(serde_yaml_ng::Value::from("username"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "u@name"
         );
     }
 }

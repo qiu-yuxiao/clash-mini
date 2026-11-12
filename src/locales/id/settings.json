@@ -576,6 +576,12 @@
     "testNotExecuted": "Pengujian tidak dijalankan: inti belum siap atau tidak ada node yang bisa diuji",
     "testFailed": "Pengujian kecepatan gagal: {{message}}",
     "updated": "Diperbarui",
-    "portSaved": "Port proksi disimpan dan dimuat ulang"
+    "portSaved": "Port proksi disimpan dan dimuat ulang",
+    "testSingleNodeTooltip": "Klik untuk menguji node ini saja (tanpa berpindah)",
+    "networkOffline": "Offline",
+    "networkOfflineTooltip": "Jaringan fisik terputus — klik untuk menguji ulang",
+    "allNodesTimeout": "Semua Timeout",
+    "allNodesTimeoutTooltip": "Semua node proksi tidak terjangkau — klik untuk uji ulang",
+    "filterAutoTestingTooltip": "Menguji otomatis node terfilter sesaat lagi (tekan Esc untuk batal)"
   }
 }

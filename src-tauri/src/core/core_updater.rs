@@ -464,36 +464,80 @@ impl CoreUpdater {
 
         let temp_download_path_clone = temp_download_path.clone();
         let custom_core_path_clone = custom_core_path.clone();
+        let staging_core_path = cores_dir.join("mini-mihomo.exe.staging");
+        let staging_core_path_clone = staging_core_path.clone();
         let extract_res = tokio::task::spawn_blocking(move || -> Result<()> {
-            let mut dest_file =
-                fs::File::create(&custom_core_path_clone).context("failed to create destination core file")?;
-            if is_zip {
-                let archive_file =
-                    fs::File::open(&temp_download_path_clone).context("failed to open downloaded zip archive")?;
-                let mut archive = zip::ZipArchive::new(archive_file).context("failed to parse zip archive")?;
-                let mut mihomo_file_idx = None;
-                for i in 0..archive.len() {
-                    let file = archive.by_index(i)?;
-                    let name = file.name().to_lowercase();
-                    if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains(".")) {
-                        mihomo_file_idx = Some(i);
-                        break;
+            // 【原子暂存替换防线 BUG-319 / BUG-346】
+            // 严禁直接对正式路径 File::create（会在解压前将既有内核截断为 0 字节）；
+            // 统一先解压至 .staging 临时文件，校验体积与 MZ PE 签名通过后再原子覆盖。
+            let _ = fs::remove_file(&staging_core_path_clone);
+            let write_result = (|| -> Result<()> {
+                let mut dest_file =
+                    fs::File::create(&staging_core_path_clone).context("failed to create staging core file")?;
+                if is_zip {
+                    let archive_file =
+                        fs::File::open(&temp_download_path_clone).context("failed to open downloaded zip archive")?;
+                    let mut archive = zip::ZipArchive::new(archive_file).context("failed to parse zip archive")?;
+                    let mut mihomo_file_idx = None;
+                    for i in 0..archive.len() {
+                        let file = archive.by_index(i)?;
+                        let name = file.name().to_lowercase();
+                        if name.contains("mihomo") && (name.ends_with(".exe") || !name.contains('.')) {
+                            mihomo_file_idx = Some(i);
+                            break;
+                        }
                     }
+                    let idx = match mihomo_file_idx {
+                        Some(i) => i,
+                        None => {
+                            let _ = fs::remove_file(&temp_download_path_clone);
+                            bail!("在 ZIP 压缩包内未找到 mini-mihomo 程序二进制");
+                        }
+                    };
+                    let mut file = archive.by_index(idx)?;
+                    io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to staging")?;
+                } else {
+                    let archive_file =
+                        fs::File::open(&temp_download_path_clone).context("failed to open downloaded gz archive")?;
+                    let mut decoder = flate2::read::GzDecoder::new(archive_file);
+                    io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to staging")?;
                 }
-                let idx = match mihomo_file_idx {
-                    Some(i) => i,
-                    None => {
-                        let _ = fs::remove_file(&temp_download_path_clone);
-                        bail!("在 ZIP 压缩包内未找到 mini-mihomo 程序二进制");
-                    }
-                };
-                let mut file = archive.by_index(idx)?;
-                io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to destination")?;
-            } else {
-                let archive_file =
-                    fs::File::open(&temp_download_path_clone).context("failed to open downloaded gz archive")?;
-                let mut decoder = flate2::read::GzDecoder::new(archive_file);
-                io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to destination")?;
+                dest_file.sync_all().context("failed to sync staging core file")?;
+                Ok(())
+            })();
+
+            if let Err(err) = write_result {
+                let _ = fs::remove_file(&staging_core_path_clone);
+                return Err(err);
+            }
+
+            // 校验暂存二进制最小合法体积（>= 5 MB）与 DOS/PE 魔数头（"MZ"）
+            const MIN_VALID_CORE_BYTES: u64 = 5 * 1024 * 1024;
+            let meta = fs::metadata(&staging_core_path_clone).context("failed to stat staging core file")?;
+            if meta.len() < MIN_VALID_CORE_BYTES {
+                let _ = fs::remove_file(&staging_core_path_clone);
+                bail!(
+                    "解压后的内核二进制体积异常（{} bytes < 5MB），已中止替换保留原内核",
+                    meta.len()
+                );
+            }
+            {
+                use io::Read as _;
+                let mut check_f =
+                    fs::File::open(&staging_core_path_clone).context("failed to reopen staging core file")?;
+                let mut magic = [0u8; 2];
+                check_f
+                    .read_exact(&mut magic)
+                    .context("failed to read staging PE magic header")?;
+                if &magic != b"MZ" {
+                    let _ = fs::remove_file(&staging_core_path_clone);
+                    bail!("解压后的内核文件缺少有效 PE 签名头（MZ），已中止替换保留原内核");
+                }
+            }
+
+            if let Err(rename_err) = fs::rename(&staging_core_path_clone, &custom_core_path_clone) {
+                let _ = fs::remove_file(&staging_core_path_clone);
+                return Err(rename_err).context("failed to atomically replace custom core binary");
             }
             Ok(())
         })

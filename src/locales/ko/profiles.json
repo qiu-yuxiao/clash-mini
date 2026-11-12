@@ -38,7 +38,8 @@
         "profileSwitched": "프로필 전환됨",
         "profileReactivated": "프로필 재활성화됨",
         "switchInterrupted": "새 선택으로 인해 프로필 전환이 중단되었습니다",
-        "batchDeleted": "선택한 프로필이 삭제되었습니다"
+        "batchDeleted": "선택한 프로필이 삭제되었습니다",
+        "quickRuleAdded": "빠른 라우팅 규칙이 상단에 적용됨: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "강제 새로고침 완료",

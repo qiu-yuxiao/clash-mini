@@ -467,6 +467,7 @@ export interface TranslationResources {
             importSuccess: string
             profileReactivated: string
             profileSwitched: string
+            quickRuleAdded: string
             switchInterrupted: string
           }
         }
@@ -784,11 +785,14 @@ export interface TranslationResources {
         addUrlPlaceholder: string
         addUrlSuccess: string
         addUrlTooltip: string
+        allNodesTimeout: string
+        allNodesTimeoutTooltip: string
         connectionsActive: string
         connectionsClearHistory: string
         connectionsDisconnectAll: string
         connectionsHistory: string
         debugLogs: string
+        filterAutoTestingTooltip: string
         gfwlist: string
         gfwlistTooltip: string
         globalProxy: string
@@ -797,6 +801,8 @@ export interface TranslationResources {
         importPlaceholder: string
         localFile: string
         manual: string
+        networkOffline: string
+        networkOfflineTooltip: string
         nodeCount: string
         pathControl: string
         portSaved: string
@@ -819,6 +825,7 @@ export interface TranslationResources {
         testFailed: string
         testingInProgress: string
         testNotExecuted: string
+        testSingleNodeTooltip: string
         total: string
         tun: string
         unnamedConfig: string

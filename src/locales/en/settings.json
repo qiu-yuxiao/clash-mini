@@ -576,6 +576,12 @@
     "testNotExecuted": "Test not executed: core not ready or no testable nodes",
     "testFailed": "Speed test failed: {{message}}",
     "updated": "Updated",
-    "portSaved": "Proxy port saved and reloaded"
+    "portSaved": "Proxy port saved and reloaded",
+    "testSingleNodeTooltip": "Click to test this node only (without switching)",
+    "networkOffline": "Offline",
+    "networkOfflineTooltip": "Physical network offline — click to retest and recover",
+    "allNodesTimeout": "All Timeout",
+    "allNodesTimeoutTooltip": "All proxy nodes unreachable — click to retest and auto-select",
+    "filterAutoTestingTooltip": "Auto-testing filtered nodes shortly (press Esc to cancel)"
   }
 }

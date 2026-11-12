@@ -131,7 +131,7 @@ pub async fn clean_async() -> bool {
             }
         }
 
-        let stop_timeout = Duration::from_secs(2);
+        let stop_timeout = Duration::from_millis(3500);
 
         logging!(info, Type::System, "stop core");
         let stopped = match timeout(stop_timeout, CoreManager::global().stop_core()).await {
@@ -143,11 +143,20 @@ pub async fn clean_async() -> bool {
                 logging!(
                     warn,
                     Type::Window,
-                    "Warning: 停止core超时（可能系统正在关机），继续退出"
+                    "Warning: 停止core超时（可能系统正在关机或管道繁忙），尝试服务级强制停止兜底"
                 );
                 false
             }
         };
+        // 服务模式下 mini-mihomo.exe 运行在 Session 0 SYSTEM 权限下，普通权限 Process::kill() 会因 Error 5 失败；
+        // 当 stop_core 超时且服务 IPC 存在时，额外通过提权服务通道发送停止指令兜底（BUG-331）。
+        if !stopped && (tun_enabled || crate::core::service::is_service_ipc_path_exists()) {
+            let _ = timeout(
+                Duration::from_millis(1500),
+                crate::core::service::stop_core_by_service(),
+            )
+            .await;
+        }
         CoreManager::kill_all_mini_cores().await;
         stopped
     });

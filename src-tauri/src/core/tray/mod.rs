@@ -208,6 +208,22 @@ impl Tray {
     }
 }
 
+/// 记录主窗口最近一次失去焦点的毫秒时间戳（供点击系统托盘图标瞬间判定窗口原本是否处于前台聚焦态，BUG-361）
+static LAST_MAIN_WINDOW_BLUR_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+pub fn record_main_window_focus_change(focused: bool) {
+    use std::sync::atomic::Ordering;
+    if focused {
+        LAST_MAIN_WINDOW_BLUR_MS.store(0, Ordering::Release);
+    } else {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        LAST_MAIN_WINDOW_BLUR_MS.store(now_ms, Ordering::Release);
+    }
+}
+
 fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
     // 退出期间忽略托盘事件，避免在清理阶段触发新的操作
     if handle::Handle::global().is_exiting() {
@@ -224,7 +240,32 @@ fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
             return;
         }
 
-        AsyncHandler::spawn(|| async move {
+        // 在投递异步任务前同步采样窗口状态：Windows 点击托盘图标瞬间 Shell_TrayWnd 会抢走焦点，
+        // 若失焦发生在 450ms 以内且窗口当前可见未最小化，说明点击前主窗口正处于前台激活状态，左键单击应顺手隐藏收起（BUG-361）。
+        let should_hide_foreground = if lightweight::is_in_lightweight_mode() {
+            false
+        } else {
+            let state = WindowManager::get_main_window_state();
+            match state {
+                crate::utils::window_manager::WindowState::VisibleFocused => true,
+                crate::utils::window_manager::WindowState::VisibleUnfocused => {
+                    let blur_ms = LAST_MAIN_WINDOW_BLUR_MS.load(std::sync::atomic::Ordering::Acquire);
+                    let now_ms = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64;
+                    blur_ms > 0 && now_ms.saturating_sub(blur_ms) <= 450
+                }
+                _ => false,
+            }
+        };
+
+        AsyncHandler::spawn(move || async move {
+            if should_hide_foreground {
+                logging!(info, Type::Tray, "主窗口处于前台激活态，左键点击托盘收起隐藏窗口");
+                let _ = WindowManager::hide_main_window();
+                return;
+            }
             // exit_lightweight_mode 返回 true 表示成功退出（含直接显示窗口的兜底分支），
             // 返回 false 表示正在退出中（防抖限流）或显示失败，此时尝试主动 show 兜底。
             // 与 server.rs 单例唤醒路径（commands/visible 端点）的逻辑保持对称。

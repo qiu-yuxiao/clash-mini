@@ -576,6 +576,12 @@
     "testNotExecuted": "테스트 미실행: 코어가 준비되지 않았거나 테스트 가능한 노드가 없습니다",
     "testFailed": "속도 테스트 실패: {{message}}",
     "updated": "업데이트됨",
-    "portSaved": "프록시 포트가 저장되고 다시 로드되었습니다"
+    "portSaved": "프록시 포트가 저장되고 다시 로드되었습니다",
+    "testSingleNodeTooltip": "클릭하여 이 노드만 단독 속도 테스트 (연결 전환 안 함)",
+    "networkOffline": "오프라인",
+    "networkOfflineTooltip": "물리적 네트워크 연결 끊김 — 클릭하여 재측정 및 복구",
+    "allNodesTimeout": "전체 시간초과",
+    "allNodesTimeoutTooltip": "모든 프록시 노드에 연결할 수 없음 — 클릭하여 재측정 및 자동 선택",
+    "filterAutoTestingTooltip": "필터링된 노드 자동 속도 테스트 대기 중 (Esc 키로 취소)"
   }
 }

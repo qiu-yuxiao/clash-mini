@@ -69,7 +69,8 @@ mod app_init {
                             .max_connections(16)
                             .idle_timeout(std::time::Duration::from_secs(30))
                             .health_check_interval(std::time::Duration::from_secs(60))
-                            .reject_policy(RejectPolicy::Timeout(std::time::Duration::from_secs(5)))
+                            // 许可排队预算（2s）必须严格小于默认请求超时（5s），避免外层抢跑中断引发 Broken Pipe（BUG-324）
+                            .reject_policy(RejectPolicy::Timeout(std::time::Duration::from_secs(2)))
                             .build(),
                     )
                     .build(),
@@ -280,6 +281,9 @@ pub fn run() {
                     match event {
                         tauri::WindowEvent::CloseRequested { .. } => {
                             event_handlers::handle_window_close(&webview_window, event);
+                        }
+                        tauri::WindowEvent::Focused(focused) => {
+                            crate::core::tray::record_main_window_focus_change(*focused);
                         }
                         tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
                             // 窗口几何变化 → 节流 + 尾随补写持久化（拖拽期间不逐帧写盘，

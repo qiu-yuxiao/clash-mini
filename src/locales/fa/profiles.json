@@ -38,7 +38,8 @@
         "profileSwitched": "پروفایل تغییر یافت",
         "profileReactivated": "پروفایل مجدداً فعال شد",
         "switchInterrupted": "Profile switch interrupted by new selection",
-        "batchDeleted": "Selected profiles deleted successfully"
+        "batchDeleted": "Selected profiles deleted successfully",
+        "quickRuleAdded": "قانون مسیریابی سریع در بالا قرار گرفت: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

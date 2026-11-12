@@ -576,6 +576,12 @@
     "testNotExecuted": "Test yürütülmedi: çekirdek hazır değil veya test edilebilir düğüm yok",
     "testFailed": "Hız testi başarısız: {{message}}",
     "updated": "Güncellendi",
-    "portSaved": "Proxy bağlantı noktası kaydedildi ve yeniden yüklendi"
+    "portSaved": "Proxy bağlantı noktası kaydedildi ve yeniden yüklendi",
+    "testSingleNodeTooltip": "Yalnızca bu düğümü test etmek için tıklayın (geçiş yapmadan)",
+    "networkOffline": "Çevrimdışı",
+    "networkOfflineTooltip": "Fiziksel ağ bağlantısı kesildi — yeniden test için tıklayın",
+    "allNodesTimeout": "Tümü Zaman Aşımı",
+    "allNodesTimeoutTooltip": "Tüm proxy düğümlerine ulaşılamıyor — yeniden test için tıklayın",
+    "filterAutoTestingTooltip": "Filtrelenen düğümler birazdan otomatik test edilecek (iptal için Esc)"
   }
 }

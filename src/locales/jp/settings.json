@@ -576,6 +576,12 @@
     "testNotExecuted": "テスト未実行：コアが準備できていないか、テスト可能なノードがありません",
     "testFailed": "スピードテストに失敗しました：{{message}}",
     "updated": "更新しました",
-    "portSaved": "プロキシポートを保存し再読み込みしました"
+    "portSaved": "プロキシポートを保存し再読み込みしました",
+    "testSingleNodeTooltip": "クリックしてこのノードのみ速度テスト（接続は切り替えません）",
+    "networkOffline": "オフライン",
+    "networkOfflineTooltip": "物理ネットワーク切断 — クリックして再テスト・復旧",
+    "allNodesTimeout": "全ノード応答なし",
+    "allNodesTimeoutTooltip": "全プロキシノードに到達できません — クリックして再テスト・自動選択",
+    "filterAutoTestingTooltip": "絞り込み結果をまもなく自動テスト・最適選択します（Esc でキャンセル）"
   }
 }

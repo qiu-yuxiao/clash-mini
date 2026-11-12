@@ -290,19 +290,58 @@ fn force_set_window_outer_size(window: &WebviewWindow, width: f64, height: f64) 
     }
 }
 
-static OLD_WNDPROC: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
-    std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
-static HOOKED_HWND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+const WM_SIZING_SUBCLASS_ID: usize = 0x434D_535A; // 'CMSZ'
 
-/// 安装 WM_SIZING 消息处理器，防止上边缘缩放到最小高度后窗口 Y 坐标继续下移。
+#[link(name = "comctl32")]
+unsafe extern "system" {
+    fn SetWindowSubclass(
+        hwnd: windows::Win32::Foundation::HWND,
+        pfn_subclass: Option<
+            unsafe extern "system" fn(
+                windows::Win32::Foundation::HWND,
+                u32,
+                windows::Win32::Foundation::WPARAM,
+                windows::Win32::Foundation::LPARAM,
+                usize,
+                usize,
+            ) -> windows::Win32::Foundation::LRESULT,
+        >,
+        u_id_subclass: usize,
+        dw_ref_data: usize,
+    ) -> i32;
+
+    fn DefSubclassProc(
+        hwnd: windows::Win32::Foundation::HWND,
+        u_msg: u32,
+        w_param: windows::Win32::Foundation::WPARAM,
+        l_param: windows::Win32::Foundation::LPARAM,
+    ) -> windows::Win32::Foundation::LRESULT;
+
+    fn RemoveWindowSubclass(
+        hwnd: windows::Win32::Foundation::HWND,
+        pfn_subclass: Option<
+            unsafe extern "system" fn(
+                windows::Win32::Foundation::HWND,
+                u32,
+                windows::Win32::Foundation::WPARAM,
+                windows::Win32::Foundation::LPARAM,
+                usize,
+                usize,
+            ) -> windows::Win32::Foundation::LRESULT,
+        >,
+        u_id_subclass: usize,
+    ) -> i32;
+}
+
+/// 安装 WM_SIZING 消息处理器（现代 SetWindowSubclass 架构，BUG-332 / BUG-350），
+/// 防止上边缘缩放到最小高度后窗口 Y 坐标继续下移。
 ///
-/// 标准 WM_GETMINMAXINFO 只钳制尺寸不钳制位置，而上边缘缩放时 Windows 会持续增加 Y 坐标，
-/// 导致窗口缩到最小时整体向下平移。WM_SIZING 在系统应用矩形之前给出提议矩形，在此处
-/// 同时钳制尺寸和 Y 位置可根除该问题。
+/// 相比旧版 SetWindowLongPtrW + 全局静态 HOOKED_HWND：
+/// 1. SetWindowSubclass 对同一 (hwnd, proc, id) 天然幂等，系统睡眠恢复重复调用安全无栈溢出；
+/// 2. 在 WM_NCDESTROY 时自动解绑释放，彻底根除轻量模式销毁旧窗口并重建新窗口时因 Windows
+///    句柄表复用相同 HWND 数值导致误跳过钩子挂载的缺陷。
 pub(crate) fn setup_wm_sizing_hook(window: &WebviewWindow) {
     use raw_window_handle::HasWindowHandle as _;
-    use std::sync::atomic::Ordering;
-    use windows::Win32::UI::WindowsAndMessaging::{GWLP_WNDPROC, SetWindowLongPtrW};
 
     let handle = match window.window_handle() {
         Ok(h) => h,
@@ -316,54 +355,30 @@ pub(crate) fn setup_wm_sizing_hook(window: &WebviewWindow) {
         _ => return,
     };
 
-    // 按 HWND 重入保护：
-    // 1. 同一窗口在 RunEvent::Resumed（系统睡眠恢复）重复调用时跳过，防止 OLD_WNDPROC
-    //    被覆盖为 sizing_wndproc 自身地址导致无限递归；
-    // 2. 轻量模式销毁旧窗口并重建新窗口时，新 HWND 与旧 HWND 不同，允许为新窗口重新安装钩子。
-    let hwnd_val = hwnd.0 as isize;
-    if hwnd_val == 0 || HOOKED_HWND.load(Ordering::Acquire) == hwnd_val {
+    if hwnd.0.is_null() {
         return;
     }
 
+    // SAFETY: hwnd 来自当前有效 WebviewWindow，sizing_subclass_proc 遵循 SUBCLASSPROC ABI。
     unsafe {
-        let new_proc = Some(sizing_wndproc as unsafe extern "system" fn(_, _, _, _) -> _);
-        let old_proc_val = SetWindowLongPtrW(
-            hwnd,
-            GWLP_WNDPROC,
-            std::mem::transmute::<
-                Option<
-                    unsafe extern "system" fn(
-                        windows::Win32::Foundation::HWND,
-                        u32,
-                        windows::Win32::Foundation::WPARAM,
-                        windows::Win32::Foundation::LPARAM,
-                    ) -> windows::Win32::Foundation::LRESULT,
-                >,
-                isize,
-            >(new_proc),
-        );
-        if old_proc_val != 0 {
-            OLD_WNDPROC.store(old_proc_val as *mut _, Ordering::Release);
-            HOOKED_HWND.store(hwnd_val, Ordering::Release);
-        }
+        let _ = SetWindowSubclass(hwnd, Some(sizing_subclass_proc), WM_SIZING_SUBCLASS_ID, 0);
     }
 }
 
 /// WM_SIZING 子类化窗口过程。
 /// 拦截上边缘缩放（WMSZ_TOP / WMSZ_TOPLEFT / WMSZ_TOPRIGHT），
-/// 当提议高度小于最小尺寸时，修正 rect.top，使窗口位置和高度同时被钳制。
-unsafe extern "system" fn sizing_wndproc(
+/// 当提议高度小于最小尺寸时，修正 rect.top，使窗口位置和高度同时被钳制；
+/// 在窗口销毁（WM_NCDESTROY）时自动卸载子类化钩子。
+unsafe extern "system" fn sizing_subclass_proc(
     hwnd: windows::Win32::Foundation::HWND,
     msg: u32,
     wparam: windows::Win32::Foundation::WPARAM,
     lparam: windows::Win32::Foundation::LPARAM,
+    _u_id_subclass: usize,
+    _dw_ref_data: usize,
 ) -> windows::Win32::Foundation::LRESULT {
-    use std::sync::atomic::Ordering;
-    use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
     use windows::Win32::UI::HiDpi::GetDpiForWindow;
-    use windows::Win32::UI::WindowsAndMessaging::{
-        CallWindowProcW, DefWindowProcW, WM_SIZING, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT,
-    };
+    use windows::Win32::UI::WindowsAndMessaging::{WM_NCDESTROY, WM_SIZING, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT};
 
     if msg == WM_SIZING {
         let side = wparam.0 as u32;
@@ -381,25 +396,13 @@ unsafe extern "system" fn sizing_wndproc(
                 }
             }
         }
+    } else if msg == WM_NCDESTROY {
+        // SAFETY: 在 WM_NCDESTROY 中移除自身子类化节点是 Microsoft 官方规范做法
+        unsafe {
+            let _ = RemoveWindowSubclass(hwnd, Some(sizing_subclass_proc), WM_SIZING_SUBCLASS_ID);
+        }
     }
 
-    let old_proc = OLD_WNDPROC.load(Ordering::Acquire);
-    if !old_proc.is_null() {
-        // SAFETY: old_proc 是之前 SetWindowLongPtrW 返回的有效窗口过程
-        unsafe {
-            CallWindowProcW(
-                Some(std::mem::transmute::<
-                    *mut std::ffi::c_void,
-                    unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> windows::Win32::Foundation::LRESULT,
-                >(old_proc)),
-                hwnd,
-                msg,
-                wparam,
-                lparam,
-            )
-        }
-    } else {
-        // SAFETY: DefWindowProcW 是默认窗口过程，对所有参数安全
-        unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
-    }
+    // SAFETY: 委托子类化链中的下一个过程处理其余消息
+    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }

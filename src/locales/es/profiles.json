@@ -38,7 +38,8 @@
         "profileSwitched": "Suscripción cambiada",
         "profileReactivated": "Suscripción reactivada",
         "switchInterrupted": "Profile switch interrupted by new selection",
-        "batchDeleted": "Selected profiles deleted successfully"
+        "batchDeleted": "Selected profiles deleted successfully",
+        "quickRuleAdded": "Regla de enrutamiento rápido fijada: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

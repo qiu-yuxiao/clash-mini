@@ -6,14 +6,16 @@ import {
   Tooltip,
   Chip,
   CircularProgress,
+  keyframes,
 } from '@mui/material'
+import { useQueryClient } from '@tanstack/react-query'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useProxiesData } from '@/providers/app-data-context'
-import { getProxyAddr } from '@/services/cmds'
+import { frontendLog, getProxyAddr, triggerAutoSelect } from '@/services/cmds'
 import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
@@ -21,14 +23,25 @@ import type { IProxyItem } from '@/types/clash'
 import { get3DCardStyle } from '@/utils/button-styles'
 
 import {
+  getLatestNetworkHealth,
+  type NetworkHealthStatus,
+} from '../utils/notification-handlers'
+import {
   getFriendlyProtocolName,
   getSignalIcon,
   convertDelayColor,
 } from '../utils/style-helpers'
 
+const healthPulse = keyframes`
+  0% { opacity: 0.85; }
+  50% { opacity: 1; }
+  100% { opacity: 0.85; }
+`
+
 export const ActiveNodeStatusCard = () => {
   const { proxies } = useProxiesData()
-  const { profiles } = useProfiles()
+  const { profiles, patchCurrent } = useProfiles()
+  const queryClient = useQueryClient()
   const currentProfileUid = profiles?.current || ''
   // 判死/显示/轮换/探针阈值统一为 NODE_DELAY_MAX_MS(5000)，与后端死节点判定、
   // 探针超时（NODE_TEST_TIMEOUT_MS）一致；单点测速同样委托后端测量组，不再有独立的短超时。
@@ -79,6 +92,45 @@ export const ActiveNodeStatusCard = () => {
 
   const [testing, setTesting] = useState(false)
   const [nodeAddr, setNodeAddr] = useState<string>('')
+  const [networkHealth, setNetworkHealth] = useState<NetworkHealthStatus>(
+    getLatestNetworkHealth,
+  )
+
+  useEffect(() => {
+    const onHealth = (e: Event) => {
+      const detail = (e as CustomEvent<NetworkHealthStatus>).detail
+      if (detail) setNetworkHealth(detail)
+    }
+    window.addEventListener('clash-mini-network-health', onHealth)
+    return () => {
+      window.removeEventListener('clash-mini-network-health', onHealth)
+    }
+  }, [])
+
+  const handleSelfHealRetest = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!currentProfileUid || testing) return
+    setTesting(true)
+    try {
+      const results = await triggerAutoSelect(
+        currentProfileUid,
+        undefined,
+        0,
+        true,
+      )
+      if (results.some(([, d]) => d > 0 && d < latencyTimeout)) {
+        setNetworkHealth('network_health::ok')
+      }
+      void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
+    } catch (err) {
+      const msg = String(err instanceof Error ? err.message : err)
+      if (msg.includes('AUTO_SELECT_BUSY')) {
+        showNotice.info('settings.mini.testingInProgress')
+      }
+    } finally {
+      setTesting(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -191,9 +243,53 @@ export const ActiveNodeStatusCard = () => {
     }
 
     if (nextNodeName) {
+      // BUG-336: 顶栏点击轮换节点必须同步乐观更新 ['getProxies'] 缓存并持久化写回 profile.selected
+      const groupName = primaryGroup.name
+      const previousSnapshot = queryClient.getQueryData(['getProxies'])
+      queryClient.setQueryData(
+        ['getProxies'],
+        (old: Record<string, unknown> | undefined) => {
+          if (!old || typeof old !== 'object') return old
+          const next: Record<string, unknown> = { ...old }
+          if (Array.isArray(old.groups)) {
+            next.groups = old.groups.map((g: Record<string, unknown>) =>
+              g && g.name === groupName ? { ...g, now: nextNodeName } : g,
+            )
+          }
+          if (old.records && typeof old.records === 'object') {
+            const records = old.records as Record<
+              string,
+              Record<string, unknown>
+            >
+            if (records[groupName]) {
+              next.records = {
+                ...records,
+                [groupName]: { ...records[groupName], now: nextNodeName },
+              }
+            }
+          }
+          return next
+        },
+      )
+
       try {
-        await selectNodeForGroupWithTimeout(primaryGroup.name, nextNodeName)
+        await selectNodeForGroupWithTimeout(groupName, nextNodeName)
+        if (currentProfileUid) {
+          patchCurrent({
+            selected: [{ name: 'PROXY', now: nextNodeName }],
+          }).catch((saveErr) => {
+            const msg = `[ActiveNodeCard] 保存轮换节点选择失败: ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`
+            console.error(msg)
+            frontendLog('error', msg)
+          })
+        }
+        void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
       } catch (err) {
+        if (previousSnapshot !== undefined) {
+          queryClient.setQueryData(['getProxies'], previousSnapshot)
+        } else {
+          void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
+        }
         console.error('Failed to select node:', err)
       }
     }
@@ -353,7 +449,35 @@ export const ActiveNodeStatusCard = () => {
         />
       )}
 
-      {nodeAddr && (
+      {networkHealth !== 'network_health::ok' && (
+        <Tooltip
+          title={
+            networkHealth === 'network_health::offline'
+              ? t('settings.mini.networkOfflineTooltip')
+              : t('settings.mini.allNodesTimeoutTooltip')
+          }
+        >
+          <Chip
+            size="small"
+            color="error"
+            label={
+              networkHealth === 'network_health::offline'
+                ? t('settings.mini.networkOffline')
+                : t('settings.mini.allNodesTimeout')
+            }
+            onClick={handleSelfHealRetest}
+            sx={{
+              fontSize: '10px',
+              height: '20px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              animation: `${healthPulse} 1.8s infinite ease-in-out`,
+            }}
+          />
+        </Tooltip>
+      )}
+
+      {nodeAddr && networkHealth === 'network_health::ok' && (
         <Typography
           variant="caption"
           color={isRetro3DDark ? '#2C1F03' : 'text.secondary'}

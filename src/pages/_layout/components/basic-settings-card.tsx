@@ -20,10 +20,13 @@ interface BasicSettingsCardProps {
   handleSavePort: (port: number) => void
 }
 
+// BUG-341: 271px 窄窗与多语言（德/俄/英）适配——允许列收缩并省略过长标签，悬停 title 展示完整文案
 const gridItemSx = () => ({
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
+  minWidth: 0,
+  gap: 0.5,
   px: 0.5,
   py: 0.15,
 })
@@ -32,6 +35,9 @@ const labelSx = (isRetro3DDark: boolean) => ({
   fontSize: '13px',
   fontWeight: 'bold',
   color: isRetro3DDark ? '#2C1F03' : 'inherit',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
   whiteSpace: 'nowrap' as const,
 })
 
@@ -68,9 +74,13 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   )
   React.useEffect(() => {
     let alive = true
-    getAutoLaunchStatus().then((status) => {
-      if (alive && !isTogglingAutoLaunchRef.current) setRealAutoLaunch(status)
-    })
+    getAutoLaunchStatus()
+      .then((status) => {
+        if (alive && !isTogglingAutoLaunchRef.current) setRealAutoLaunch(status)
+      })
+      .catch((err) => {
+        console.warn('[BasicSettings] getAutoLaunchStatus failed:', err)
+      })
     return () => {
       alive = false
     }
@@ -115,13 +125,19 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          columnGap: 3,
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+          columnGap: 1.5,
         }}
       >
         {/* Row 1, Col 1: 开机自动启动 */}
         <Box sx={gridItemSx()}>
-          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
+          <Typography
+            variant="caption"
+            title={t('settings.sections.system.fields.autoLaunch', {
+              defaultValue: '开机自动启动',
+            })}
+            sx={labelSx(isRetro3DDark)}
+          >
             {t('settings.sections.system.fields.autoLaunch', {
               defaultValue: '开机自动启动',
             })}
@@ -139,12 +155,15 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
                 setRealAutoLaunch(status)
               } catch {
                 setRealAutoLaunch(null)
-                void getAutoLaunchStatus().then(setRealAutoLaunch)
+                void getAutoLaunchStatus()
+                  .then(setRealAutoLaunch)
+                  .catch(() => {})
               } finally {
                 isTogglingAutoLaunchRef.current = false
               }
             }}
             sx={{
+              flexShrink: 0,
               transform: 'scale(0.85)',
               transformOrigin: 'right center',
             }}
@@ -152,7 +171,11 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
         </Box>
         {/* Row 1, Col 2: Allow LAN */}
         <Box sx={gridItemSx()}>
-          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
+          <Typography
+            variant="caption"
+            title="Allow LAN"
+            sx={labelSx(isRetro3DDark)}
+          >
             Allow LAN
           </Typography>
           <Switch
@@ -166,6 +189,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               handleAllowLanChange(checked)
             }}
             sx={{
+              flexShrink: 0,
               transform: 'scale(0.85)',
               transformOrigin: 'right center',
             }}
@@ -173,7 +197,13 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
         </Box>
         {/* Row 2, Col 1: 启动时最小化 */}
         <Box sx={gridItemSx()}>
-          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
+          <Typography
+            variant="caption"
+            title={t('settings.sections.system.fields.silentStart', {
+              defaultValue: '启动时最小化',
+            })}
+            sx={labelSx(isRetro3DDark)}
+          >
             {t('settings.sections.system.fields.silentStart', {
               defaultValue: '启动时最小化',
             })}
@@ -181,10 +211,13 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           <Switch
             size="small"
             checked={verge?.enable_silent_start ?? false}
-            onChange={(_, checked: boolean) =>
-              patchVerge({ enable_silent_start: checked })
-            }
+            onChange={(_, checked: boolean) => {
+              patchVerge({ enable_silent_start: checked }).catch((err) => {
+                console.error('[BasicSettings] patchVerge failed:', err)
+              })
+            }}
             sx={{
+              flexShrink: 0,
               transform: 'scale(0.85)',
               transformOrigin: 'right center',
             }}
@@ -192,7 +225,11 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
         </Box>
         {/* Row 2, Col 2: Allow IPv6 */}
         <Box sx={gridItemSx()}>
-          <Typography variant="caption" sx={labelSx(isRetro3DDark)}>
+          <Typography
+            variant="caption"
+            title="Allow IPv6"
+            sx={labelSx(isRetro3DDark)}
+          >
             Allow IPv6
           </Typography>
           <Switch
@@ -202,6 +239,7 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
               handleIpv6Change(checked)
             }}
             sx={{
+              flexShrink: 0,
               transform: 'scale(0.85)',
               transformOrigin: 'right center',
             }}

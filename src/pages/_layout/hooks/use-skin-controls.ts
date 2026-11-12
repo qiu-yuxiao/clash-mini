@@ -51,18 +51,40 @@ export function useSkinControls() {
     }
   }, [])
 
+  // BUG-358: 拖动过程仅更新内存态与 CSS 变量（60fps 丝滑无阻塞），松手提交时（commit）再一次性写盘
   const handleDepthFactorChange = useCallback((val: number) => {
     setDepthFactor(val)
-    localStorage.setItem(`clash-mini-${readSkin()}-val1`, val.toString())
-    if (readSkin() === DEFAULT_SKIN) {
+    document.documentElement.style.setProperty('--depth-factor', val.toString())
+    document.documentElement.style.setProperty(
+      '--control-skin-val1',
+      val.toString(),
+    )
+  }, [])
+
+  const commitDepthFactorChange = useCallback((val: number) => {
+    const skin = readSkin()
+    localStorage.setItem(`clash-mini-${skin}-val1`, val.toString())
+    if (skin === DEFAULT_SKIN) {
       localStorage.setItem('clash-mini-depth-factor', val.toString())
     }
   }, [])
 
   const handleVibrancyFactorChange = useCallback((val: number) => {
     setVibrancyFactor(val)
-    localStorage.setItem(`clash-mini-${readSkin()}-val2`, val.toString())
-    if (readSkin() === DEFAULT_SKIN) {
+    document.documentElement.style.setProperty(
+      '--vibrancy-factor',
+      val.toString(),
+    )
+    document.documentElement.style.setProperty(
+      '--control-skin-val2',
+      val.toString(),
+    )
+  }, [])
+
+  const commitVibrancyFactorChange = useCallback((val: number) => {
+    const skin = readSkin()
+    localStorage.setItem(`clash-mini-${skin}-val2`, val.toString())
+    if (skin === DEFAULT_SKIN) {
       localStorage.setItem('clash-mini-vibrancy-factor', val.toString())
     }
   }, [])
@@ -96,6 +118,8 @@ export function useSkinControls() {
     depthFactor,
     vibrancyFactor,
     handleDepthFactorChange,
+    commitDepthFactorChange,
     handleVibrancyFactorChange,
+    commitVibrancyFactorChange,
   }
 }

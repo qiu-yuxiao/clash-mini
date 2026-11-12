@@ -54,9 +54,37 @@ fn extract_subscription_info(link_parsed: &Url) -> Option<(std::string::String, 
 fn extract_subscription_url(link_parsed: &Url) -> Option<std::string::String> {
     let query = link_parsed.query()?;
     let prefix = "url=";
-    let pos = query.find(prefix)?;
-    let raw_url = query[pos + prefix.len()..].trim();
-    Some(decode_subscription_url(raw_url))
+    let pos = query
+        .find("&url=")
+        .map(|i| i + 1)
+        .or_else(|| query.starts_with(prefix).then_some(0))?;
+    let after_prefix = query[pos + prefix.len()..].trim();
+    if after_prefix.is_empty() {
+        return None;
+    }
+
+    // 标准百分号编码订阅链接或不含内嵌 `?` 的直白链接，直接使用标准 query_pairs 提取，
+    // 避免把后续 `&name=...` 等扩展参数误拼入订阅 URL（BUG-323）。
+    let lower = after_prefix.to_ascii_lowercase();
+    let is_unencoded_nested_query = (lower.starts_with("http://") || lower.starts_with("https://"))
+        && after_prefix.split('&').next().is_some_and(|first| first.contains('?'));
+
+    if !is_unencoded_nested_query && let Some((_, val)) = link_parsed.query_pairs().find(|(k, _)| k == "url") {
+        let trimmed = val.trim();
+        if !trimmed.is_empty() {
+            return Some(decode_subscription_url(trimmed));
+        }
+    }
+
+    // 兼容未对内嵌 URL 进行百分号编码的非标链接（如 url=https://a.com/sub?token=1&flag=clash&name=MySub），
+    // 剥离已知的外层 deep-link 尾部参数（&name= / &silent=）。
+    let mut raw_url = after_prefix;
+    for marker in ["&name=", "&silent="] {
+        if let Some(idx) = raw_url.find(marker) {
+            raw_url = &raw_url[..idx];
+        }
+    }
+    Some(decode_subscription_url(raw_url.trim()))
 }
 
 fn decode_subscription_url(raw_url: &str) -> std::string::String {
@@ -151,5 +179,31 @@ async fn refresh_core_config() {
             logging!(error, Type::Config, "Apply config error: {}", err);
             handle::Handle::notice_message("update_failed", format!("{err}"));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_subscription_info_strips_outer_name_param() {
+        // BUG-323: 标准 deep link 携带 &name= 时，不得将 &name=... 误拼入订阅 URL
+        let parsed = Url::parse(
+            "clash://install-config?url=https%3A%2F%2Fexample.com%2Fsub%3Ftoken%3Dabc%26flag%3Dclash&name=MyAirport",
+        )
+        .unwrap();
+        let (url, name) = extract_subscription_info(&parsed).unwrap();
+        assert_eq!(url, "https://example.com/sub?token=abc&flag=clash");
+        assert_eq!(name.as_deref(), Some("MyAirport"));
+
+        // 未编码直白订阅链接 + &name=
+        let parsed_plain = Url::parse(
+            "clash://install-config?url=https://example.com/api/v1/client/subscribe?token=xyz&flag=meta&name=PlainSub",
+        )
+        .unwrap();
+        let (url2, name2) = extract_subscription_info(&parsed_plain).unwrap();
+        assert_eq!(url2, "https://example.com/api/v1/client/subscribe?token=xyz&flag=meta");
+        assert_eq!(name2.as_deref(), Some("PlainSub"));
     }
 }

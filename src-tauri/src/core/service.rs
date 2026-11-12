@@ -11,14 +11,12 @@ use clash_verge_service_ipc::CoreConfig;
 use compact_str::CompactString;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use scopeguard::defer;
 use std::{
     borrow::Cow,
     env::current_exe,
     future::Future,
     path::{Path, PathBuf},
     process::Command as StdCommand,
-    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 
@@ -34,11 +32,10 @@ pub enum ServiceStatus {
 }
 
 pub struct ServiceManager {
-    // 【注意】此处使用 parking_lot::Mutex，而 monitor.rs 中使用 std::sync::Mutex
-    // 两种 Mutex 都是正确的，仅风格不一致。若后续统一，建议全部使用 parking_lot::Mutex
-    // （性能更优且无需 unwrap 处理 poison error）
+    // 【注意】此处状态缓存使用 parking_lot::Mutex，操作串行化门控使用 tokio::sync::Mutex（BUG-328 / BUG-352），
+    // 使并发的服务状态刷新/启停请求有序排队执行，避免原先 AtomicBool 碰撞即报错误触 TUN 降级关闭。
     status: Mutex<ServiceStatus>,
-    operation_running: AtomicBool,
+    operation_lock: tokio::sync::Mutex<()>,
 }
 
 fn uninstall_service() -> Result<()> {
@@ -311,8 +308,8 @@ pub(super) async fn get_clash_logs_by_service() -> Result<Vec<CompactString>> {
     Ok(response.data.unwrap_or_default())
 }
 
-/// 通过服务停止core
-pub(super) async fn stop_core_by_service() -> Result<()> {
+/// 通过服务停止core（供 manager 与退出清理兜底共用，BUG-331）
+pub(crate) async fn stop_core_by_service() -> Result<()> {
     logging!(info, Type::Service, "通过服务停止核心 (IPC)");
 
     let response = clash_verge_service_ipc::stop_clash()
@@ -414,15 +411,8 @@ impl ServiceManager {
     }
 
     async fn run_operation(&self, operation: impl Future<Output = Result<()>>) -> Result<()> {
-        if self.operation_running.swap(true, Ordering::AcqRel) {
-            bail!("service operation already running");
-        }
-        defer! {
-            self.operation_running.store(false, Ordering::Release);
-        }
-
+        let _guard = self.operation_lock.lock().await;
         operation.await?;
-
         Ok(())
     }
 
@@ -515,5 +505,5 @@ async fn run_service_command(
 
 pub static SERVICE_MANAGER: Lazy<ServiceManager> = Lazy::new(|| ServiceManager {
     status: Mutex::new(ServiceStatus::Unavailable("Need Checks".into())),
-    operation_running: AtomicBool::new(false),
+    operation_lock: tokio::sync::Mutex::const_new(()),
 });

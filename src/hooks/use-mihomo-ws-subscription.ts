@@ -5,6 +5,18 @@ import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 import { type Message, type MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 export const RECONNECT_DELAY_MS = 1000
+export const MAX_RECONNECT_DELAY_MS = 15_000
+
+/** BUG-347: 指数退避 + ±20% 随机抖动，抑制内核异常期前端 WebSocket 1000ms 死循环重连风暴 */
+export const computeWsReconnectDelay = (attempt: number): number => {
+  const cappedExp = Math.min(Math.max(attempt, 0), 4)
+  const base = Math.min(
+    RECONNECT_DELAY_MS * Math.pow(2, cappedExp),
+    MAX_RECONNECT_DELAY_MS,
+  )
+  const jitter = 0.8 + Math.random() * 0.4
+  return Math.round(base * jitter)
+}
 
 interface SharedSubscriptionOwner {
   handleMessage: (data: string) => void
@@ -17,6 +29,7 @@ interface SharedSubscriptionEntry {
   refs: number
   ws: MihomoWebSocket | null
   reconnectTimer: ReturnType<typeof setTimeout> | null
+  reconnectAttempt: number
   connecting: boolean
   refHolders: Set<MutableRefObject<MihomoWebSocket | null>>
   owners: Set<SharedSubscriptionOwner>
@@ -64,6 +77,7 @@ const createSharedSubscriptionEntry = (
     refs: 0,
     ws: null,
     reconnectTimer: null,
+    reconnectAttempt: 0,
     connecting: false,
     refHolders: new Set(),
     owners: new Set(),
@@ -92,6 +106,7 @@ const createSharedSubscriptionEntry = (
       }
 
       entry.ws = ws
+      entry.reconnectAttempt = 0
       syncSharedWsRefs(entry)
       clearReconnectTimer()
 
@@ -112,13 +127,15 @@ const createSharedSubscriptionEntry = (
         activeOwner.handleMessage(msg.data)
       })
     } catch (err) {
+      const delayMs = computeWsReconnectDelay(entry.reconnectAttempt)
+      entry.reconnectAttempt += 1
       console.warn(
-        '[WS] 连接失败，将在重连间隔后重试:',
+        `[WS] 连接失败，将在 ${delayMs}ms 后退避重试:`,
         err instanceof Error ? err.message : String(err),
       )
       if (!entry.closed && !entry.ws) {
         clearReconnectTimer()
-        entry.reconnectTimer = setTimeout(entry.connectWs, RECONNECT_DELAY_MS)
+        entry.reconnectTimer = setTimeout(entry.connectWs, delayMs)
       }
     } finally {
       entry.connecting = false
@@ -131,7 +148,9 @@ const createSharedSubscriptionEntry = (
     clearReconnectTimer()
     await closeSharedSocket(entry)
     if (!entry.closed) {
-      entry.reconnectTimer = setTimeout(entry.connectWs, RECONNECT_DELAY_MS)
+      const delayMs = computeWsReconnectDelay(entry.reconnectAttempt)
+      entry.reconnectAttempt += 1
+      entry.reconnectTimer = setTimeout(entry.connectWs, delayMs)
     }
   }
 

@@ -16,6 +16,9 @@ type SearchProps = {
   defaultValue?: string
   autoFocus?: boolean
   placeholder?: string
+  inputRef?: React.Ref<HTMLInputElement>
+  endAdornmentExtra?: React.ReactNode
+  onKeyDownExtra?: (e: React.KeyboardEvent<HTMLDivElement>) => void
   onChangeText?: (text: string) => void
   onEnter?: (text: string) => void
   onSearch: (match: (content: string) => boolean, state: SearchState) => void
@@ -60,18 +63,24 @@ export const BaseSearchBox = ({
   defaultValue,
   autoFocus,
   placeholder,
+  inputRef,
+  endAdornmentExtra,
+  onKeyDownExtra,
   onChangeText,
   onEnter,
   onSearch,
 }: SearchProps) => {
   const { t } = useTranslation()
   const onSearchRef = useRef(onSearch)
-  const lastSearchStateRef = useRef<SearchState | null>(null)
 
   const [text, setText] = useControllableState<string>({
     controlled: value,
     defaultValue: defaultValue ?? '',
   })
+  // BUG-343: 初始化记录当前文本，仅在外部受控值真正变化或用户输入变化时触发单次 emitSearch
+  const lastSearchStateRef = useRef<SearchState | null>(
+    text ? null : { text: '' },
+  )
 
   const iconStyle = {
     fontSize: 18,
@@ -86,10 +95,9 @@ export const BaseSearchBox = ({
     const prevState = lastSearchStateRef.current
     if (prevState && prevState.text === nextText) return
 
+    lastSearchStateRef.current = { text: nextText }
     const compiled = compileStringMatcher(nextText)
     onSearchRef.current(compiled.matcher, { text: nextText })
-
-    lastSearchStateRef.current = { text: nextText }
   }, [])
 
   useEffect(() => {
@@ -113,6 +121,7 @@ export const BaseSearchBox = ({
 
   return (
     <StyledTextField
+      inputRef={inputRef}
       autoComplete="new-password"
       hiddenLabel
       fullWidth
@@ -125,6 +134,7 @@ export const BaseSearchBox = ({
       value={text}
       onChange={handleChangeText}
       onKeyDown={(e) => {
+        onKeyDownExtra?.(e)
         if (
           e.key === 'Enter' &&
           !e.nativeEvent.isComposing &&
@@ -137,7 +147,8 @@ export const BaseSearchBox = ({
         input: {
           sx: { pr: 4 },
           endAdornment: (
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              {endAdornmentExtra}
               <Tooltip title={t('shared.placeholders.resetInput')}>
                 <span>
                   <IconButton

@@ -109,14 +109,31 @@ impl Write for WrapStream {
     }
 }
 
+#[cfg(windows)]
+fn wait_named_pipe_blocking(socket_path: &str, timeout_ms: u32) -> bool {
+    use std::os::windows::ffi::OsStrExt as _;
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn WaitNamedPipeW(lpNamedPipeName: *const u16, nTimeOut: u32) -> i32;
+    }
+
+    let wide: Vec<u16> = std::ffi::OsStr::new(socket_path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    // SAFETY: `wide` is a valid NUL-terminated UTF-16 string living across the FFI call.
+    unsafe { WaitNamedPipeW(wide.as_ptr(), timeout_ms) != 0 }
+}
+
 pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
     let mut max_retry_count = 3;
     // WARNING: DO NOT decrease busy_retry_count!
     // Under high concurrency (e.g. 36 parallel speed test workers), Named Pipes often return ERROR_PIPE_BUSY.
-    // A retry count of 24 allows up to 3 seconds of retry time, preventing false error reports.
-    // Refer to BUG-171/BUG-172 agreements.
+    // A retry count of 24 with WaitNamedPipeW (<= 100ms per step, <= 2.4s total < 5.0s request timeout)
+    // wakes immediately when an instance frees up while avoiding outer timeout deadlock (BUG-330 / BUG-351).
     let mut busy_retry_count = 24;
-    const RETRY_DELAY: Duration = Duration::from_millis(125);
+    const PIPE_WAIT_MS: u32 = 100;
+    const FALLBACK_RETRY_DELAY: Duration = Duration::from_millis(80);
 
     let client = loop {
         match ClientOptions::new().open(socket_path) {
@@ -129,6 +146,15 @@ pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
                     )));
                 }
                 busy_retry_count -= 1;
+                let path_owned = socket_path.to_string();
+                let waited =
+                    tauri::async_runtime::spawn_blocking(move || wait_named_pipe_blocking(&path_owned, PIPE_WAIT_MS))
+                        .await
+                        .unwrap_or(false);
+                if !waited {
+                    tokio::time::sleep(FALLBACK_RETRY_DELAY).await;
+                }
+                continue;
             }
             Err(e) => {
                 log::warn!("failed to connect to named pipe: {socket_path}, {e}");
@@ -141,7 +167,7 @@ pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
                 max_retry_count -= 1;
             }
         }
-        tokio::time::sleep(RETRY_DELAY).await;
+        tokio::time::sleep(FALLBACK_RETRY_DELAY).await;
     };
     Ok(WrapStream::NamedPipe(client))
 }
@@ -358,13 +384,13 @@ impl IpcConnectionPool {
     }
 
     #[inline]
-    async fn get_connection<'a>(&'a self, socket_path: &str) -> Result<(IpcConnection, PoolPermit<'a>)> {
+    async fn get_connection<'a>(&'a self, socket_path: &str) -> Result<(IpcConnection, bool, PoolPermit<'a>)> {
         log::debug!("get connection from pool");
         // 确保获取 pool permit
         let permit = self.acquire_permit().await?;
-        // 开始创建连接
-        let conn = self.acquire_or_create_connection(socket_path).await?;
-        Ok((conn, permit))
+        // 开始创建或复用连接（返回 reused 标记以支持半开连接透明重建重试，BUG-329 / BUG-351）
+        let (conn, reused) = self.acquire_or_create_connection(socket_path).await?;
+        Ok((conn, reused, permit))
     }
 
     async fn acquire_permit<'a>(&'a self) -> Result<PoolPermit<'a>> {
@@ -396,18 +422,18 @@ impl IpcConnectionPool {
         }
     }
 
-    async fn acquire_or_create_connection(&self, socket_path: &str) -> Result<IpcConnection> {
+    async fn acquire_or_create_connection(&self, socket_path: &str) -> Result<(IpcConnection, bool)> {
         // 从池中获取连接并检查其有效性
         while let Some(conn) = self.connections.pop() {
             log::debug!("Attempting to reuse connection from pool");
             if conn.is_valid() {
-                return Ok(conn);
+                return Ok((conn, true));
             }
-            // log::debug!("Pooled connection is invalid, dropping...");
         }
 
         log::trace!("Pool empty, creating new connection");
-        Self::create_connection(socket_path).await
+        let conn = Self::create_connection(socket_path).await?;
+        Ok((conn, false))
     }
 
     async fn create_connection(socket_path: &str) -> Result<IpcConnection> {
@@ -454,8 +480,8 @@ impl LocalSocket for RequestBuilder {
         let reqwest_req = self.build()?;
         let timeout_dur = reqwest_req.timeout();
 
-        let method = reqwest_req.method();
-        let url = reqwest_req.url();
+        let method = reqwest_req.method().clone();
+        let url_str = reqwest_req.url().as_str().to_string();
         let headers = reqwest_req.headers().clone();
 
         let body_bytes = if let Some(body) = reqwest_req.body() {
@@ -464,22 +490,35 @@ impl LocalSocket for RequestBuilder {
             Bytes::new()
         };
 
-        let mut builder = http::Request::builder().method(method).uri(url.as_str());
-
-        if let Some(h) = builder.headers_mut() {
-            *h = headers;
-        }
-        let hyper_req = builder.body(Full::new(body_bytes))?;
+        let make_hyper_req =
+            |m: reqwest::Method, u: &str, h: &http::HeaderMap, b: &Bytes| -> Result<http::Request<Full<Bytes>>> {
+                let mut builder = http::Request::builder().method(m).uri(u);
+                if let Some(hdrs) = builder.headers_mut() {
+                    *hdrs = h.clone();
+                }
+                Ok(builder.body(Full::new(b.clone()))?)
+            };
 
         let process = async move {
             let pool = IpcConnectionPool::global()?;
-            let (mut conn, _permit) = pool.get_connection(socket_path).await?;
+            let (mut conn, reused, _permit) = pool.get_connection(socket_path).await?;
+            let first_req = make_hyper_req(method.clone(), &url_str, &headers, &body_bytes)?;
 
-            let hyper_res = conn
-                .sender
-                .send_request(hyper_req)
-                .await
-                .map_err(|e| Error::HttpParseError(e.to_string()))?;
+            let hyper_res = match conn.sender.send_request(first_req).await {
+                Ok(res) => res,
+                Err(first_err) if reused => {
+                    // 池中复用的空闲命名管道可能在对端热重载或空闲回收时已半关闭（is_ready 尚未感知），
+                    // 自动丢弃旧连接并新建物理管道透明重发 1 次（BUG-329 / BUG-351）。
+                    log::debug!("Pooled IPC connection closed ({first_err}), retrying once on fresh pipe");
+                    conn = IpcConnectionPool::create_connection(socket_path).await?;
+                    let retry_req = make_hyper_req(method, &url_str, &headers, &body_bytes)?;
+                    conn.sender
+                        .send_request(retry_req)
+                        .await
+                        .map_err(|e| Error::HttpParseError(e.to_string()))?
+                }
+                Err(e) => return Err(Error::HttpParseError(e.to_string())),
+            };
 
             let (res_parts, res_body) = hyper_res.into_parts();
             let collected_body = res_body

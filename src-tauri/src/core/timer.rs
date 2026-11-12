@@ -339,9 +339,43 @@ impl Timer {
     fn spawn_update_task(uid: String, command_tx: mpsc::UnboundedSender<TimerCommand>) {
         logging!(info, Type::Timer, "Starting timer task: uid={}", uid);
         AsyncHandler::spawn(move || async move {
-            Self::wait_until_resolve_done(Duration::from_millis(5000)).await;
-            let success = Self::async_task(&uid).await;
-            let _ = command_tx.send(TimerCommand::TaskFinished(uid, success));
+            use futures::FutureExt as _;
+            // RAII 兜底守卫：若任务被取消或异常展开，确保发送 TaskFinished 释放 state.running（BUG-334）
+            struct FinishGuard {
+                uid: Option<String>,
+                tx: mpsc::UnboundedSender<TimerCommand>,
+            }
+            impl Drop for FinishGuard {
+                fn drop(&mut self) {
+                    if let Some(uid) = self.uid.take() {
+                        let _ = self.tx.send(TimerCommand::TaskFinished(uid, false));
+                    }
+                }
+            }
+
+            let mut guard = FinishGuard {
+                uid: Some(uid.clone()),
+                tx: command_tx.clone(),
+            };
+            let run_fut = std::panic::AssertUnwindSafe(async {
+                Self::wait_until_resolve_done(Duration::from_millis(5000)).await;
+                Self::async_task(&uid).await
+            });
+            let success = match run_fut.catch_unwind().await {
+                Ok(ok) => ok,
+                Err(_) => {
+                    logging!(
+                        error,
+                        Type::Timer,
+                        "Timer task panicked for uid={}, recovering state",
+                        uid
+                    );
+                    false
+                }
+            };
+            if let Some(finished_uid) = guard.uid.take() {
+                let _ = command_tx.send(TimerCommand::TaskFinished(finished_uid, success));
+            }
         });
     }
 

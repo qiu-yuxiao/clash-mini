@@ -38,7 +38,8 @@
         "profileSwitched": "تم التبديل إلى الملف الشخصي",
         "profileReactivated": "تم إعادة تنشيط الملف الشخصي",
         "switchInterrupted": "Profile switch interrupted by new selection",
-        "batchDeleted": "Selected profiles deleted successfully"
+        "batchDeleted": "Selected profiles deleted successfully",
+        "quickRuleAdded": "تم تثبيت قاعدة التوجيه السريع: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

@@ -3,6 +3,27 @@ import { showNotice } from '@/services/notice-service'
 type NavigateFunction = (path: string, options?: unknown) => void
 type TranslateFunction = (key: string) => string
 
+export type NetworkHealthStatus =
+  | 'network_health::ok'
+  | 'network_health::offline'
+  | 'network_health::all_dead'
+
+let latestNetworkHealth: NetworkHealthStatus = 'network_health::ok'
+
+export const getLatestNetworkHealth = (): NetworkHealthStatus =>
+  latestNetworkHealth
+
+const broadcastNetworkHealth = (status: NetworkHealthStatus) => {
+  latestNetworkHealth = status
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent<NetworkHealthStatus>('clash-mini-network-health', {
+        detail: status,
+      }),
+    )
+  }
+}
+
 export const handleNoticeMessage = (
   status: string,
   msg: string,
@@ -85,6 +106,12 @@ export const handleNoticeMessage = (
         'settings.feedback.notifications.clash.changeFailed',
         msg,
       ),
+    // BUG-359: 后台监测上报的物理断网 / 全节点超时 / 恢复状态，驱动顶栏活跃节点卡片警示胶囊
+    'network_health::ok': () => broadcastNetworkHealth('network_health::ok'),
+    'network_health::offline': () =>
+      broadcastNetworkHealth('network_health::offline'),
+    'network_health::all_dead': () =>
+      broadcastNetworkHealth('network_health::all_dead'),
   }
 
   const handler = handlers[status]

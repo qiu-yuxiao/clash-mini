@@ -104,15 +104,32 @@ export async function batchTestWithFirstBatchSelect(
   const currentUid = (await getProfiles())?.current || ''
   if (!currentUid) return
 
+  const previousDelays = new Map<string, number>()
   for (const name of names) {
+    previousDelays.set(
+      name,
+      getDelayManager().getDelayUpdate(name, groupName)?.delay ?? -1,
+    )
     getDelayManager().setDelay(name, groupName, -2)
   }
   getDelayManager().queueGroupNotification(groupName)
 
   try {
-    await triggerAutoSelect(currentUid, undefined, 0, select)
+    // BUG-321: 必须将待测过滤子集 names 传入后端，严禁传 undefined 导致越过过滤词选到子集外节点
+    await triggerAutoSelect(currentUid, names, 0, select)
   } catch (err) {
     console.error('[Layout] 后端批量测速/选点失败:', err)
+    // 异常兜底：恢复仍处于 -2 测试态的节点原值，防止卡片转圈永久卡死
+    for (const name of names) {
+      if (getDelayManager().getDelayUpdate(name, groupName)?.delay === -2) {
+        getDelayManager().setDelay(
+          name,
+          groupName,
+          previousDelays.get(name) ?? -1,
+        )
+      }
+    }
+    getDelayManager().queueGroupNotification(groupName)
   }
 }
 

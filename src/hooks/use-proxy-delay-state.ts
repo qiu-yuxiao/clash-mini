@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from 'react'
+import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import {
   getDelayManager,
@@ -15,7 +15,13 @@ const PRESET_PROXY_NAMES = [
   'COMPATIBLE',
 ]
 
-const identity = (_: DelayUpdate, next: DelayUpdate): DelayUpdate => next
+// BUG-339: 浅比较去重 reducer，避免相同延迟对象引用变化触发无效重绘
+const delayReducer = (prev: DelayUpdate, next: DelayUpdate): DelayUpdate =>
+  prev.delay === next.delay &&
+  prev.updatedAt === next.updatedAt &&
+  prev.elapsed === next.elapsed
+    ? prev
+    : next
 
 const INITIAL_DELAY: DelayUpdate = { delay: -1, updatedAt: 0 }
 
@@ -61,10 +67,11 @@ export function useProxyDelayState(
   const isPreset = proxy ? PRESET_PROXY_NAMES.includes(proxy.name) : false
   // 惰性初始化：首帧直接从 DelayManager 缓存或 history 回落值计算初始延迟，消除挂载时的双重渲染
   const [delayState, setDelayState] = useReducer(
-    identity,
+    delayReducer,
     { proxy, groupName },
     ({ proxy: p, groupName: g }) => computeInitialDelay(p, g),
   )
+  const isFirstMountRef = useRef(true)
 
   // 死活着色阈值统一为 NODE_DELAY_MAX_MS(5000)，与后端死节点判定一致
   const timeout = NODE_DELAY_MAX_MS
@@ -85,6 +92,10 @@ export function useProxyDelayState(
   }, [proxy, groupName])
 
   useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false
+      return
+    }
     updateDelay()
   }, [updateDelay])
 

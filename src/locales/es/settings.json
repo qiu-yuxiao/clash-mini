@@ -576,6 +576,12 @@
     "testNotExecuted": "Prueba no ejecutada: el núcleo no está listo o no hay nodos disponibles",
     "testFailed": "Error en la prueba de velocidad: {{message}}",
     "updated": "Actualizado",
-    "portSaved": "Puerto proxy guardado y recargado"
+    "portSaved": "Puerto proxy guardado y recargado",
+    "testSingleNodeTooltip": "Clic para probar solo este nodo (sin cambiar conexión)",
+    "networkOffline": "Sin red",
+    "networkOfflineTooltip": "Red física desconectada — clic para volver a probar",
+    "allNodesTimeout": "Todos agotados",
+    "allNodesTimeoutTooltip": "Todos los nodos inaccesibles — clic para volver a probar",
+    "filterAutoTestingTooltip": "Probando nodos filtrados en breve (pulsa Esc para cancelar)"
   }
 }

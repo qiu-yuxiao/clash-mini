@@ -50,8 +50,13 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   const isProcessingRef = useRef(false)
 
   const { onSuccess, onError, enableConnectionCleanup = true } = options
+  // BUG-337: 用 ref 持有回调与最新配置，保证 changeProxy / handleProxyGroupChange 引用绝对稳定，
+  // 防止父级重绘击穿 ProxyRender 的 useMemo 与千节点列表的 React.memo
+  const onSuccessRef = useRef(onSuccess)
+  onSuccessRef.current = onSuccess
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
 
-  // 缓存
   const config = useMemo(
     () => ({
       autoCloseConnection: verge?.auto_close_connection ?? false,
@@ -59,6 +64,8 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
     }),
     [verge?.auto_close_connection, enableConnectionCleanup],
   )
+  const configRef = useRef(config)
+  configRef.current = config
 
   const persistSelection = useCallback(
     (proxyName: string, skipConfigSave: boolean) => {
@@ -75,40 +82,72 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
     },
     [current, patchCurrent],
   )
+  const persistSelectionRef = useRef(persistSelection)
+  persistSelectionRef.current = persistSelection
 
   const executeChange = useCallback(
     async (request: ProxyChangeRequest) => {
       const { groupName, proxyName, previousProxy, skipConfigSave } = request
       debugLog(`[ProxySelection] 代理切换: ${groupName} -> ${proxyName}`)
 
+      // BUG-356: 0ms 乐观高亮更新，点击瞬间即在 ['getProxies'] 缓存切至目标节点，失败自动回滚
+      const previousSnapshot = queryClient.getQueryData(['getProxies'])
+      queryClient.setQueryData(
+        ['getProxies'],
+        (old: Record<string, unknown> | undefined) => {
+          if (!old || typeof old !== 'object') return old
+          const next: Record<string, unknown> = { ...old }
+          if (Array.isArray(old.groups)) {
+            next.groups = old.groups.map((g: Record<string, unknown>) =>
+              g && g.name === groupName ? { ...g, now: proxyName } : g,
+            )
+          }
+          if (old.records && typeof old.records === 'object') {
+            const records = old.records as Record<
+              string,
+              Record<string, unknown>
+            >
+            if (records[groupName]) {
+              next.records = {
+                ...records,
+                [groupName]: { ...records[groupName], now: proxyName },
+              }
+            }
+          }
+          return next
+        },
+      )
+
       try {
         await selectNodeForGroupWithTimeout(groupName, proxyName)
-        onSuccess?.()
-        persistSelection(proxyName, skipConfigSave)
-        // 手动切节点后主动失效 ['getProxies'] 缓存，使活跃节点高亮与内核 now 同步。
-        // 自动选点由后端 refresh_proxies() 经 refresh-proxy-config 事件触发同样的失效，
-        // 手动路径此前漏了这一拍，导致高亮停在旧节点直到下次无关刷新。
+        onSuccessRef.current?.()
+        persistSelectionRef.current(proxyName, skipConfigSave)
         void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
         debugLog(
           `[ProxySelection] 代理和状态同步完成: ${groupName} -> ${proxyName}`,
         )
 
         if (
-          config.enableConnectionCleanup &&
-          config.autoCloseConnection &&
+          configRef.current.enableConnectionCleanup &&
+          configRef.current.autoCloseConnection &&
           previousProxy
         ) {
           void cleanupConnections(previousProxy)
         }
       } catch (error) {
+        if (previousSnapshot !== undefined) {
+          queryClient.setQueryData(['getProxies'], previousSnapshot)
+        } else {
+          void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
+        }
         console.error(
           `[ProxySelection] 代理切换失败: ${groupName} -> ${proxyName}`,
           error,
         )
-        onError?.(error)
+        onErrorRef.current?.(error)
       }
     },
-    [config, onError, onSuccess, persistSelection, queryClient],
+    [queryClient],
   )
 
   // L-27: flushChangeQueue 看起来有递归调用（finally 中可能再次调用自己），
