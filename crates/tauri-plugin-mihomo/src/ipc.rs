@@ -504,12 +504,16 @@ impl LocalSocket for RequestBuilder {
             let (mut conn, reused, _permit) = pool.get_connection(socket_path).await?;
             let first_req = make_hyper_req(method.clone(), &url_str, &headers, &body_bytes)?;
 
+            let is_idempotent_read = matches!(method, reqwest::Method::GET | reqwest::Method::HEAD);
             let hyper_res = match conn.sender.send_request(first_req).await {
                 Ok(res) => res,
-                Err(first_err) if reused => {
-                    // 池中复用的空闲命名管道可能在对端热重载或空闲回收时已半关闭（is_ready 尚未感知），
-                    // 自动丢弃旧连接并新建物理管道透明重发 1 次（BUG-329 / BUG-351）。
-                    log::debug!("Pooled IPC connection closed ({first_err}), retrying once on fresh pipe");
+                Err(first_err) if reused && is_idempotent_read => {
+                    // 池中复用的空闲命名管道可能在对端热重载或空闲回收时已半关闭（is_ready 尚未感知）；
+                    // 仅对 GET / HEAD 幂等只读请求自动丢弃旧连接并新建物理管道透明重发 1 次，
+                    // 非幂等写请求（PUT/POST/PATCH/DELETE）严禁传输层盲目重发以免内核重复执行（BUG-329 / BUG-351）。
+                    log::debug!(
+                        "Pooled IPC connection closed on idempotent {method} ({first_err}), retrying once on fresh pipe"
+                    );
                     conn = IpcConnectionPool::create_connection(socket_path).await?;
                     let retry_req = make_hyper_req(method, &url_str, &headers, &body_bytes)?;
                     conn.sender

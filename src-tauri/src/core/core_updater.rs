@@ -35,6 +35,48 @@ pub struct CoreUpgradeProgress {
 pub struct CoreUpdater;
 
 impl CoreUpdater {
+    pub const MIN_VALID_CORE_BYTES: u64 = 5 * 1024 * 1024;
+
+    /// 校验 Mihomo Windows PE 可执行文件的体积下限（>= 5MB）、DOS MZ 头、e_lfanew 偏移边界与 PE\0\0 签名头（BUG-319 / BUG-346）。
+    pub fn validate_mihomo_pe_binary(path: &std::path::Path) -> Result<()> {
+        use io::{Read as _, Seek as _};
+
+        let meta = fs::metadata(path).context("failed to stat core binary")?;
+        let file_len = meta.len();
+        if file_len < Self::MIN_VALID_CORE_BYTES {
+            bail!("内核二进制体积异常（{} bytes < 5MB），判定为截断或损坏文件", file_len);
+        }
+
+        let mut file = fs::File::open(path).context("failed to open core binary for PE validation")?;
+        let mut dos_header = [0u8; 64];
+        file.read_exact(&mut dos_header)
+            .context("failed to read 64-byte DOS header")?;
+        if &dos_header[0..2] != b"MZ" {
+            bail!("内核文件缺少有效 DOS MZ 签名头");
+        }
+
+        let e_lfanew =
+            u32::from_le_bytes([dos_header[0x3C], dos_header[0x3D], dos_header[0x3E], dos_header[0x3F]]) as u64;
+        if e_lfanew < 64 || e_lfanew.saturating_add(4) > file_len {
+            bail!(
+                "内核文件 PE 头偏移指针越界损坏 (e_lfanew={}, len={})",
+                e_lfanew,
+                file_len
+            );
+        }
+
+        file.seek(io::SeekFrom::Start(e_lfanew))
+            .context("failed to seek to PE signature offset")?;
+        let mut pe_sig = [0u8; 4];
+        file.read_exact(&mut pe_sig)
+            .context("failed to read PE\\0\\0 signature")?;
+        if &pe_sig != b"PE\0\0" {
+            bail!("内核文件缺少有效 Windows PE\\0\\0 签名头");
+        }
+
+        Ok(())
+    }
+
     pub async fn check_latest_release() -> Result<GithubRelease> {
         let url = "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest";
         let nm = NetworkManager::new();
@@ -460,6 +502,29 @@ impl CoreUpdater {
             return Err(anyhow::anyhow!("failed to stop core before upgrade: {}", e));
         }
 
+        // 服务模式下 stop_core IPC 返回时 Session 0 中的 mini-mihomo.exe 可能尚未完全释放映像文件句柄；
+        // 轮询等待进程彻底退出（上限 3 秒，步进 50ms），防止紧接着的 fs::rename 因共享冲突报错（BUG-346）。
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            loop {
+                let alive = tokio::task::spawn_blocking(|| {
+                    let system = sysinfo::System::new_with_specifics(
+                        sysinfo::RefreshKind::nothing().with_processes(sysinfo::ProcessRefreshKind::nothing()),
+                    );
+                    system
+                        .processes()
+                        .values()
+                        .any(|p| p.name().to_string_lossy().contains("mini-mihomo"))
+                })
+                .await
+                .unwrap_or(false);
+                if !alive {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        })
+        .await;
+
         emit_progress("extracting", 90, "正在解压并替换内核程序...");
 
         let temp_download_path_clone = temp_download_path.clone();
@@ -469,7 +534,7 @@ impl CoreUpdater {
         let extract_res = tokio::task::spawn_blocking(move || -> Result<()> {
             // 【原子暂存替换防线 BUG-319 / BUG-346】
             // 严禁直接对正式路径 File::create（会在解压前将既有内核截断为 0 字节）；
-            // 统一先解压至 .staging 临时文件，校验体积与 MZ PE 签名通过后再原子覆盖。
+            // 统一先解压至 .staging 临时文件，校验体积与 DOS/PE 签名头通过后再覆盖。
             let _ = fs::remove_file(&staging_core_path_clone);
             let write_result = (|| -> Result<()> {
                 let mut dest_file =
@@ -511,31 +576,30 @@ impl CoreUpdater {
                 return Err(err);
             }
 
-            // 校验暂存二进制最小合法体积（>= 5 MB）与 DOS/PE 魔数头（"MZ"）
-            const MIN_VALID_CORE_BYTES: u64 = 5 * 1024 * 1024;
-            let meta = fs::metadata(&staging_core_path_clone).context("failed to stat staging core file")?;
-            if meta.len() < MIN_VALID_CORE_BYTES {
+            if let Err(err) = Self::validate_mihomo_pe_binary(&staging_core_path_clone) {
                 let _ = fs::remove_file(&staging_core_path_clone);
-                bail!(
-                    "解压后的内核二进制体积异常（{} bytes < 5MB），已中止替换保留原内核",
-                    meta.len()
-                );
-            }
-            {
-                use io::Read as _;
-                let mut check_f =
-                    fs::File::open(&staging_core_path_clone).context("failed to reopen staging core file")?;
-                let mut magic = [0u8; 2];
-                check_f
-                    .read_exact(&mut magic)
-                    .context("failed to read staging PE magic header")?;
-                if &magic != b"MZ" {
-                    let _ = fs::remove_file(&staging_core_path_clone);
-                    bail!("解压后的内核文件缺少有效 PE 签名头（MZ），已中止替换保留原内核");
-                }
+                return Err(err).context("解压后的内核二进制未通过 PE 结构校验，已中止替换保留原内核");
             }
 
-            if let Err(rename_err) = fs::rename(&staging_core_path_clone, &custom_core_path_clone) {
+            // Windows 下杀毒软件扫描或 Session 0 映像句柄释放可能存在百毫秒级尾延迟，遇 PermissionDenied 短退避重试
+            let mut last_rename_err = None;
+            for attempt in 0..10 {
+                match fs::rename(&staging_core_path_clone, &custom_core_path_clone) {
+                    Ok(()) => {
+                        last_rename_err = None;
+                        break;
+                    }
+                    Err(err) if err.kind() == io::ErrorKind::PermissionDenied && attempt < 9 => {
+                        last_rename_err = Some(err);
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                    Err(err) => {
+                        last_rename_err = Some(err);
+                        break;
+                    }
+                }
+            }
+            if let Some(rename_err) = last_rename_err {
                 let _ = fs::remove_file(&staging_core_path_clone);
                 return Err(rename_err).context("failed to atomically replace custom core binary");
             }
@@ -596,5 +660,51 @@ impl CoreUpdater {
 
         emit_progress("done", 100, "内核更新成功！核心已成功重启。");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use std::io::Write as _;
+
+    #[test]
+    fn test_validate_mihomo_pe_binary_checks_size_and_pe_signature() {
+        let temp_dir = std::env::temp_dir().join(format!("clash_mini_pe_test_{}", std::process::id()));
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        // 1. 小于 5MB 的文件应被拦截
+        let small_path = temp_dir.join("small.exe");
+        fs::write(&small_path, b"MZ\x00\x00").unwrap();
+        assert!(CoreUpdater::validate_mihomo_pe_binary(&small_path).is_err());
+
+        // 2. 满 5MB 且带 MZ 头、但无有效 e_lfanew / PE\0\0 签名的伪造或半截损坏文件应被拦截
+        let fake_mz_path = temp_dir.join("fake_mz.exe");
+        {
+            let mut f = fs::File::create(&fake_mz_path).unwrap();
+            let mut buf = vec![0u8; CoreUpdater::MIN_VALID_CORE_BYTES as usize];
+            buf[0] = b'M';
+            buf[1] = b'Z';
+            buf[0x3C..0x40].copy_from_slice(&128u32.to_le_bytes());
+            buf[128..132].copy_from_slice(b"BAD!");
+            f.write_all(&buf).unwrap();
+        }
+        assert!(CoreUpdater::validate_mihomo_pe_binary(&fake_mz_path).is_err());
+
+        // 3. 满 5MB 且具备合法 MZ + e_lfanew + PE\0\0 签名的文件应通过校验
+        let valid_pe_path = temp_dir.join("valid_pe.exe");
+        {
+            let mut f = fs::File::create(&valid_pe_path).unwrap();
+            let mut buf = vec![0u8; CoreUpdater::MIN_VALID_CORE_BYTES as usize];
+            buf[0] = b'M';
+            buf[1] = b'Z';
+            buf[0x3C..0x40].copy_from_slice(&128u32.to_le_bytes());
+            buf[128..132].copy_from_slice(b"PE\0\0");
+            f.write_all(&buf).unwrap();
+        }
+        assert!(CoreUpdater::validate_mihomo_pe_binary(&valid_pe_path).is_ok());
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

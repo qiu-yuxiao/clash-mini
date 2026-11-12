@@ -314,20 +314,23 @@ export const ProxyGroups = (props: Props) => {
     }
   })
 
+  const handleAppShortcut = useStableCallback((e: Event) => {
+    const action = (e as CustomEvent<string>).detail
+    const targetGroupName =
+      renderList.find((item) => item.group?.name)?.group?.name || 'PROXY'
+    if (action === 'check-visible') {
+      void handleCheckAll(targetGroupName)
+    } else if (action === 'check-full') {
+      void handleCheckFullGroup(targetGroupName)
+    }
+  })
+
   useEffect(() => {
-    const onShortcut = (e: Event) => {
-      const action = (e as CustomEvent<string>).detail
-      if (action === 'check-visible') {
-        void handleCheckAll('PROXY')
-      } else if (action === 'check-full') {
-        void handleCheckFullGroup('PROXY')
-      }
-    }
-    window.addEventListener('clash-mini-shortcut', onShortcut)
+    window.addEventListener('clash-mini-shortcut', handleAppShortcut)
     return () => {
-      window.removeEventListener('clash-mini-shortcut', onShortcut)
+      window.removeEventListener('clash-mini-shortcut', handleAppShortcut)
     }
-  }, [handleCheckAll, handleCheckFullGroup])
+  }, [handleAppShortcut])
 
   // 滚到对应的节点
   const handleLocation = useStableCallback((group: IProxyGroupItem) => {

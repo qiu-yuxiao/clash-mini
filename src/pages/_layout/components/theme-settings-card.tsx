@@ -27,10 +27,10 @@ interface ThemeSettingsCardProps {
   themeActiveIndex: number
   depthFactor: number
   handleDepthFactorChange: (val: number) => void
-  commitDepthFactorChange?: (val: number) => void
+  commitDepthFactorChange: (val: number) => void
   vibrancyFactor: number
   handleVibrancyFactorChange: (val: number) => void
-  commitVibrancyFactorChange?: (val: number) => void
+  commitVibrancyFactorChange: (val: number) => void
   controlSkin: string
   setLogsOpen: (open: boolean) => void
   mode: 'light' | 'dark'
@@ -386,7 +386,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             step={0.1}
             onChange={(_, val) => handleDepthFactorChange(val as number)}
             onChangeCommitted={(_, val) =>
-              commitDepthFactorChange?.(val as number)
+              commitDepthFactorChange(val as number)
             }
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
           />
@@ -438,7 +438,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             step={0.1}
             onChange={(_, val) => handleVibrancyFactorChange(val as number)}
             onChangeCommitted={(_, val) =>
-              commitVibrancyFactorChange?.(val as number)
+              commitVibrancyFactorChange(val as number)
             }
             sx={{ ...get3DSliderStyle(theme, mode), width: '100px' }}
           />

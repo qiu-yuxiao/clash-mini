@@ -49,6 +49,12 @@ pub async fn trigger_auto_select(
     Ok(outcome.display)
 }
 
+/// 前端手动切换代理节点（顶栏轮换或列表点选）成功后即时通知后端刷新切换宽限期（BUG-336）
+#[tauri::command]
+pub fn notify_node_switched() {
+    crate::module::monitor::notify_manual_node_switched();
+}
+
 /// 根据节点名称和provider名称获取其server和port
 #[tauri::command]
 pub async fn get_proxy_addr(

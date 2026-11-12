@@ -155,6 +155,7 @@ mod app_init {
             // 供前端读取「真实的自启状态」（注册表），而不是只看配置值
             cmd::get_auto_launch_status,
             cmd::trigger_auto_select,
+            cmd::notify_node_switched,
             cmd::download_icon_cache,
             cmd::get_profiles,
             cmd::enhance_profiles,

@@ -217,9 +217,10 @@ impl CoreManager {
                 SERVICE_MANAGER
                     .handle_service_status(ServiceStatus::InstallRequired)
                     .await?;
-            } else {
-                // 2. 如果已安装，刷新并启动（若停止）
-                SERVICE_MANAGER.refresh().await?;
+            } else if let Err(e) = SERVICE_MANAGER.refresh().await {
+                // 2. 如果已安装但冷启动初次刷新暂未就绪（如 SCM 仍在拉起 AutoStart 服务），
+                // 记录警告并继续进入下方 30s 轮询等待，禁止直接短路退出（BUG-328）。
+                logging!(warn, Type::Service, "初次刷新已安装服务状态未就绪，继续轮询等待: {e}");
             }
 
             // 3. 轮询等待服务就绪
@@ -252,25 +253,41 @@ impl CoreManager {
         .await;
 
         if res.is_err() {
-            logging!(error, Type::Service, "系统服务启动或安装失败，执行回退至系统代理");
-            // 【前端通知】静默回退曾让用户误以为 TUN 已生效（BUG-298：开关显示成功
-            // 但内核实为 Sidecar，流量不被接管）。回退必须明确告知。
-            Handle::notice_message("warning", "系统服务未就绪，TUN 模式无法生效，已自动回退为系统代理模式");
-            self.fallback_to_system_proxy().await;
+            let service_installed = service::is_service_installed();
+            if service_installed {
+                logging!(
+                    error,
+                    Type::Service,
+                    "已安装系统服务在超时窗口内未就绪，本次会话临时回退至系统代理（保留磁盘 TUN 配置）"
+                );
+                Handle::notice_message(
+                    "warning",
+                    "系统服务响应超时，本次启动已临时切换为系统代理模式（下次启动将自动重试 TUN）",
+                );
+            } else {
+                logging!(error, Type::Service, "系统服务未安装或安装失败，执行回退至系统代理");
+                // 【前端通知】静默回退曾让用户误以为 TUN 已生效（BUG-298：开关显示成功
+                // 但内核实为 Sidecar，流量不被接管）。回退必须明确告知。
+                Handle::notice_message("warning", "系统服务未就绪，TUN 模式无法生效，已自动回退为系统代理模式");
+            }
+            self.fallback_to_system_proxy(!service_installed).await;
         }
     }
 
-    async fn fallback_to_system_proxy(&self) {
+    async fn fallback_to_system_proxy(&self, persist_to_disk: bool) {
         logging!(
             warn,
             Type::Service,
-            "检测到系统服务未就绪，执行配置回退：关闭 TUN 模式，开启系统代理"
+            "检测到系统服务未就绪，执行配置回退（persist_to_disk={}）：关闭 TUN 模式，开启系统代理",
+            persist_to_disk
         );
         // 【禁止走 feat::patch_verge】enable_tun_mode 变更会联动 RESTART_CORE 分支，
         // 与本函数的调用方（start_core / restart_core 的锁外前奏）构成 async fn
         // 静态递归（E0733），运行期还会经 VERGE_PATCH_LOCK 互相等待造成死锁。
-        // 这里只落定配置并应用系统代理：随后的启动/重启流程读到 enable_tun_mode=false
-        // 自行走 Sidecar，系统代理由 update_sysproxy 立即接管。
+        // 这里更新内存态并应用系统代理：随后的启动/重启流程读到 enable_tun_mode=false
+        // 自行走 Sidecar，系统代理由 update_sysproxy 立即接管；
+        // 当服务其实已安装、仅因冷启动 SCM 响应慢超时（persist_to_disk=false）时，
+        // 不覆写磁盘 verge.yaml，保证下次启动仍自动尝试恢复用户的 TUN 配置（BUG-328）。
         {
             let verge = Config::verge().await;
             verge.edit_draft(|d| {
@@ -278,9 +295,11 @@ impl CoreManager {
                 d.enable_system_proxy = Some(true);
             });
             verge.apply();
-            let data = verge.data_arc();
-            if let Err(e) = data.save_file() {
-                logging!(error, Type::Service, "应用回退配置失败: {}", e);
+            if persist_to_disk {
+                let data = verge.data_arc();
+                if let Err(e) = data.save_file() {
+                    logging!(error, Type::Service, "应用回退配置失败: {}", e);
+                }
             }
         }
         if let Err(e) = crate::core::sysopt::Sysopt::global().update_sysproxy().await {

@@ -941,74 +941,33 @@ async fn trigger_backend_auto_select_inner(
         }
     }
 
-    let mut probe_executed = reused_cache;
-    let mut extra_peer_delays: Vec<(String, u32)> = Vec::new();
-
     if !reused_cache {
-        let tun_enabled = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false)
-            || matches!(
-                *crate::core::CoreManager::global().get_running_mode(),
-                crate::core::manager::RunningMode::Service
-            );
-
-        // 【BUG-344 按运行模式智能分流】：
-        // - 非 TUN（Sidecar）模式下用户显式单点测速（valid_nodes.len() == 1 && !select）：
-        //   不存在 TUN 网卡自指回环，直接调用单代理延迟探针（毫秒级响应，避免百节点全组并发风暴），
-        //   严格共享 NODE_TEST_TIMEOUT_MS (5000ms) 与单点测速四条契约。
-        // - TUN 模式或批量/选点测速：统一走 PROXY__METRICS 测量组（彻底杜绝 TUN 回环假超时）；
-        //   当 TUN 单点测速触发整组拨测时，顺便把同批测得的其他节点新鲜延迟回填前端 UI。
-        if is_frontend_subset && valid_nodes.len() == 1 && !select && !tun_enabled {
-            let target = &valid_nodes[0];
-            let test_url = get_test_url().await;
-            match mihomo
-                .delay_proxy_by_name(target, &test_url, NODE_TEST_TIMEOUT_MS)
-                .await
-            {
-                Ok(res) => {
-                    probe_executed = true;
-                    if res.delay > 0 {
-                        delays.insert(target.clone(), res.delay as u32);
-                    }
-                }
-                Err(e) => {
-                    logging!(
-                        warn,
-                        Type::Lightweight,
-                        "[后台监测] 非 TUN 单点直测 [{target}] IPC 未就绪: {e}"
-                    );
-                }
-            }
-        } else if let Some(group_delays) = probe_metrics_group(&mihomo, "选点").await {
-            probe_executed = true;
-            if is_frontend_subset && valid_nodes.len() == 1 {
-                for (peer_name, &peer_delay) in &group_delays {
-                    if peer_name != &valid_nodes[0] && !is_dummy_node(peer_name) && peer_delay > 0 {
-                        extra_peer_delays.push((peer_name.clone(), peer_delay));
-                    }
-                }
-            }
-            delays = group_delays;
-        }
+        // 测量层根因修复：不再用 delay_proxy_by_name 对节点逐个自测
+        // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
+        // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
+        // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
+        //
+        // 带「测速失真复核」：主测速地址整体失败时改用备用 HTTPS 地址复核一次，
+        // 避免主地址被机场劫持/不兼容时误判「所有测速节点均不可达」。
+        delays = probe_metrics_group(&mihomo, "选点").await.unwrap_or_default();
     }
 
     // 【单点测速语义：必须真实探测】valid_nodes.len() == 1 为用户显式单点测速（强即时意图）。
-    // 若本次测速根本未能执行（内核/测量组/IPC 未就绪），一律判定为「测速未执行」：
+    // 若测量组本次未返回任何数据（内核/测量组未就绪），一律判定为「测速未执行」：
     // 直接返回空结果，由前端提示「测速未执行」并按契约恢复原值 ——
     // agreements 5.2 第 3 条明确「测速未真正执行时严禁伪造成 Timeout」。
-    if is_frontend_subset && valid_nodes.len() == 1 && !probe_executed {
+    // 同样禁止走下方 history 兜底：那会把最多 FALLBACK_HISTORY_MAX_AGE_SECS(120s) 前的旧值
+    // 当作本次实时结果返回（旧死状态 / 旧延迟），与「点击即探活」的意图直接相悖。
+    if is_frontend_subset && valid_nodes.len() == 1 && delays.is_empty() {
         logging!(
             warn,
             Type::Lightweight,
-            "[后台监测] 单点测速未取得内核探测响应，判定为「未执行」，返回空结果交由前端提示"
+            "[后台监测] 单点测速未取得测量组数据，判定为「未执行」，返回空结果交由前端提示"
         );
         return Ok(AutoSelectOutcome {
             display: vec![],
             selected: false,
         });
-    }
-
-    if !extra_peer_delays.is_empty() && !crate::module::lightweight::is_in_lightweight_mode() {
-        crate::core::handle::Handle::notify_delay_results("PROXY".into(), extra_peer_delays);
     }
 
     // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history。
@@ -1131,6 +1090,8 @@ async fn trigger_backend_auto_select_inner(
                         fastest_node
                     );
                     selected = true;
+                    notify_manual_node_switched();
+                    emit_network_health_notice("network_health::ok");
                     // 【关键修复】选点成功后同步回写 profile.selected，
                     // 否则唤醒/进入轻量模式时 restore_profile_selected_nodes
                     // 和 activateSelected 会用过时的 selected 值把节点切回旧节点。
@@ -1219,12 +1180,26 @@ fn sort_display_delays(display: &mut [(String, u32)], sort_type: i32) {
     }
 }
 
-fn update_network_health_notice(last_notified: &mut &'static str, next_status: &'static str) {
-    if *last_notified != next_status {
-        *last_notified = next_status;
-        if !crate::module::lightweight::is_in_lightweight_mode() {
-            crate::core::handle::Handle::notice_message(next_status, "");
+static LAST_NOTIFIED_HEALTH: parking_lot::Mutex<&'static str> = parking_lot::Mutex::new("network_health::ok");
+static LAST_MANUAL_NODE_SWITCH: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+
+/// 记录前端手动切换或自动优选产生的新节点切换时间戳（BUG-336），供后台监测第 0ms 即时刷新切换宽限期。
+pub fn notify_manual_node_switched() {
+    *LAST_MANUAL_NODE_SWITCH.lock() = Some(Instant::now());
+}
+
+fn emit_network_health_notice(next_status: &'static str) {
+    let should_emit = {
+        let mut guard = LAST_NOTIFIED_HEALTH.lock();
+        if *guard != next_status {
+            *guard = next_status;
+            true
+        } else {
+            false
         }
+    };
+    if should_emit && !crate::module::lightweight::is_in_lightweight_mode() {
+        crate::core::handle::Handle::notice_message(next_status, "");
     }
 }
 
@@ -1246,7 +1221,6 @@ pub fn start_background_monitor() {
         let mut last_auto_select_time: Option<Instant> = None;
         let mut auto_select_fail_count = 0u32;
         let mut api_dead_heal_fail_count = 0u32;
-        let mut last_notified_health: &'static str = "network_health::ok";
         // 连续 API 异常计数：mihomo API 不可达时（get_group_by_name 超时/连接失败）累计，
         // 达到阈值后触发自愈，避免把内核卡死误判为"内核重载中"而放弃自愈。
         let mut api_error_count = 0u32;
@@ -1383,13 +1357,12 @@ pub fn start_background_monitor() {
                         &current_profile,
                         &mut auto_select_fail_count,
                         &mut api_dead_heal_fail_count,
-                        &mut last_notified_health,
                         &mut last_auto_select_time,
                         &mut last_check_time,
                     )
                     .await;
                 } else {
-                    update_network_health_notice(&mut last_notified_health, "network_health::ok");
+                    emit_network_health_notice("network_health::ok");
                 }
             } else if was_online && !is_online {
                 logging!(
@@ -1397,7 +1370,7 @@ pub fn start_background_monitor() {
                     Type::Lightweight,
                     "[后台监测] 检测到网络已断开，暂停健康检测与自愈"
                 );
-                update_network_health_notice(&mut last_notified_health, "network_health::offline");
+                emit_network_health_notice("network_health::offline");
             }
             was_online = is_online;
 
@@ -1434,7 +1407,6 @@ pub fn start_background_monitor() {
                                 &current_profile,
                                 &mut auto_select_fail_count,
                                 &mut api_dead_heal_fail_count,
-                                &mut last_notified_health,
                                 &mut last_auto_select_time,
                                 &mut last_check_time,
                             )
@@ -1443,6 +1415,11 @@ pub fn start_background_monitor() {
                         continue;
                     }
                 };
+                if let Some(manual_ts) = LAST_MANUAL_NODE_SWITCH.lock().take() {
+                    last_node_change_time = Some(manual_ts);
+                    consecutive_fails = 0;
+                    is_retry_mode = false;
+                }
                 if Some(&active_node_name) != last_active_node.as_ref() {
                     logging!(
                         info,
@@ -1473,9 +1450,14 @@ pub fn start_background_monitor() {
                                 }
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
-                                update_network_health_notice(&mut last_notified_health, "network_health::ok");
+                                emit_network_health_notice("network_health::ok");
                             }
                             FailoverVerdict::ShouldFailover | FailoverVerdict::AllDead => {
+                                // 若在 evaluate_failover 拨测等待期间前端刚发生了手动节点切换（BUG-336），
+                                // 立即吸收最新切换时间戳并进入切换宽限期，消除拨测期切点竞态。
+                                if let Some(manual_ts) = LAST_MANUAL_NODE_SWITCH.lock().take() {
+                                    last_node_change_time = Some(manual_ts);
+                                }
                                 // 切换宽限期：切到新节点后 SWITCH_GRACE_PERIOD_SECS 内缓存未稳，失败判定可接受，
                                 // 不累计连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
                                 let in_grace = last_node_change_time
@@ -1525,7 +1507,6 @@ pub fn start_background_monitor() {
                                             &current_profile,
                                             &mut auto_select_fail_count,
                                             &mut api_dead_heal_fail_count,
-                                            &mut last_notified_health,
                                             &mut last_auto_select_time,
                                             &mut last_check_time,
                                         )
@@ -1550,7 +1531,6 @@ pub fn start_background_monitor() {
                                 &current_profile,
                                 &mut auto_select_fail_count,
                                 &mut api_dead_heal_fail_count,
-                                &mut last_notified_health,
                                 &mut last_auto_select_time,
                                 &mut last_check_time,
                             )
@@ -1616,21 +1596,24 @@ enum SelfHealAction {
 }
 
 /// 纯函数状态机（BUG-318）：将「API 假死 3 次重启内核计数」与「全节点失联 5 次系统告警计数」彻底解耦。
-/// 当内核 API 可达但订阅节点全部不可达时，第 3 次失败仅跳过重启而不清零告警计数，确保第 5 次必然触发告警。
+/// 1. 告警计数满 5 次优先触发 `FireAlert` 并重置双计数；
+/// 2. 第 3 次失败时若内核 API 不可达则触发 `RestartCore`（仅重置 `api_dead_heal_fail_count`，绝不清零 `auto_select_fail_count`）；
+/// 3. 若内核 API 可达则跳过重启并保留告警计数，确保无论期间是否重启过内核，连续 5 次失败必然触发系统告警。
 fn evaluate_self_heal_counters(
     auto_select_fail_count: &mut u32,
     api_dead_heal_fail_count: &mut u32,
     api_alive: bool,
 ) -> SelfHealAction {
+    if *auto_select_fail_count >= 5 {
+        *auto_select_fail_count = 0;
+        *api_dead_heal_fail_count = 0;
+        return SelfHealAction::FireAlert;
+    }
     if *api_dead_heal_fail_count >= 3 {
         *api_dead_heal_fail_count = 0;
         if !api_alive {
             return SelfHealAction::RestartCore;
         }
-    }
-    if *auto_select_fail_count >= 5 {
-        *auto_select_fail_count = 0;
-        return SelfHealAction::FireAlert;
     }
     SelfHealAction::None
 }
@@ -1639,7 +1622,6 @@ async fn self_heal_with_accounting(
     profile_uid: &str,
     auto_select_fail_count: &mut u32,
     api_dead_heal_fail_count: &mut u32,
-    last_notified_health: &mut &'static str,
     last_auto_select_time: &mut Option<Instant>,
     last_check_time: &mut Instant,
 ) -> bool {
@@ -1666,12 +1648,12 @@ async fn self_heal_with_accounting(
             if outcome.selected {
                 *auto_select_fail_count = 0;
                 *api_dead_heal_fail_count = 0;
-                update_network_health_notice(last_notified_health, "network_health::ok");
+                emit_network_health_notice("network_health::ok");
             } else {
                 *auto_select_fail_count += 1;
                 *api_dead_heal_fail_count += 1;
                 failed_this_round = true;
-                update_network_health_notice(last_notified_health, "network_health::all_dead");
+                emit_network_health_notice("network_health::all_dead");
                 logging!(
                     warn,
                     Type::Lightweight,
@@ -1694,7 +1676,7 @@ async fn self_heal_with_accounting(
                 *auto_select_fail_count += 1;
                 *api_dead_heal_fail_count += 1;
                 failed_this_round = true;
-                update_network_health_notice(last_notified_health, "network_health::all_dead");
+                emit_network_health_notice("network_health::all_dead");
                 logging!(
                     warn,
                     Type::Lightweight,
@@ -1727,15 +1709,16 @@ async fn self_heal_with_accounting(
                 logging!(
                     warn,
                     Type::Lightweight,
-                    "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，重启内核以恢复 API 通道"
+                    "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，重启内核以恢复 API 通道（保留告警计数={}）",
+                    *auto_select_fail_count
                 );
                 match crate::core::manager::CoreManager::global().restart_core().await {
                     Ok(()) => {
-                        *auto_select_fail_count = 0;
                         logging!(info, Type::Lightweight, "[后台监测] 重启内核成功，API 通道应已恢复");
                     }
                     Err(e) => {
                         *auto_select_fail_count = 0;
+                        *api_dead_heal_fail_count = 0;
                         logging!(
                             error,
                             Type::Lightweight,
@@ -1827,5 +1810,53 @@ mod tests {
         let fifth_action = evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, true);
         assert_eq!(fifth_action, SelfHealAction::FireAlert);
         assert_eq!(alert_count, 0);
+        assert_eq!(api_dead_count, 0);
+    }
+
+    #[test]
+    fn test_self_heal_counters_reach_five_when_api_dead_across_restart() {
+        // BUG-318: 当内核 API 不可达触发第 3 次 RestartCore 且重启后仍持续失败时，
+        // 告警计数不得被 RestartCore 清零，第 5 次必须可靠触发 FireAlert！
+        let mut alert_count = 0;
+        let mut api_dead_count = 0;
+
+        for round in 1..=2 {
+            alert_count += 1;
+            api_dead_count += 1;
+            assert_eq!(
+                evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, false),
+                SelfHealAction::None,
+                "round {round}"
+            );
+        }
+
+        // 第 3 次：触发 RestartCore，api_dead_count 归零，但 alert_count 必须保持为 3
+        alert_count += 1;
+        api_dead_count += 1;
+        assert_eq!(
+            evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, false),
+            SelfHealAction::RestartCore
+        );
+        assert_eq!(alert_count, 3);
+        assert_eq!(api_dead_count, 0);
+
+        // 第 4 次：重启后仍失败
+        alert_count += 1;
+        api_dead_count += 1;
+        assert_eq!(
+            evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, false),
+            SelfHealAction::None
+        );
+        assert_eq!(alert_count, 4);
+
+        // 第 5 次：必须触发 FireAlert 并清零双计数
+        alert_count += 1;
+        api_dead_count += 1;
+        assert_eq!(
+            evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, false),
+            SelfHealAction::FireAlert
+        );
+        assert_eq!(alert_count, 0);
+        assert_eq!(api_dead_count, 0);
     }
 }

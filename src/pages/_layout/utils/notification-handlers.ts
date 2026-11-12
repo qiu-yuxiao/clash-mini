@@ -13,7 +13,7 @@ let latestNetworkHealth: NetworkHealthStatus = 'network_health::ok'
 export const getLatestNetworkHealth = (): NetworkHealthStatus =>
   latestNetworkHealth
 
-const broadcastNetworkHealth = (status: NetworkHealthStatus) => {
+export const broadcastNetworkHealth = (status: NetworkHealthStatus) => {
   latestNetworkHealth = status
   if (typeof window !== 'undefined') {
     window.dispatchEvent(

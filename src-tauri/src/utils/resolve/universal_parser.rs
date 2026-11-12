@@ -286,19 +286,13 @@ fn parse_ss(link: &str) -> Option<serde_yaml_ng::Mapping> {
 }
 
 fn parse_trojan(link: &str) -> Option<serde_yaml_ng::Mapping> {
-    let payload = link.strip_prefix("trojan://")?;
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "Trojan Node".to_string());
+    let payload = link.strip_prefix("trojan://")?.trim();
+    let (auth_host, query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "Trojan Node".to_string());
 
-    // 先分离 query，再按最后一个 @ 拆分 userinfo：密码含未编码 @、query 值含 @ 都不会切错
-    let (auth_host, query) = base_part
-        .split_once('?')
-        .map_or((base_part, None as Option<&str>), |(ah, q)| (ah, Some(q)));
+    // 统一先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 并去除尾斜杠（BUG-348）
     let (password_raw, host_port) = auth_host.rsplit_once('@')?;
+    let host_port = host_port.trim_end_matches('/');
     let password = percent_encoding::percent_decode_str(password_raw)
         .decode_utf8_lossy()
         .to_string();
@@ -339,21 +333,16 @@ fn parse_trojan(link: &str) -> Option<serde_yaml_ng::Mapping> {
 }
 
 fn parse_vless(link: &str) -> Option<serde_yaml_ng::Mapping> {
-    let payload = link.strip_prefix("vless://")?;
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "VLESS Node".to_string());
+    let payload = link.strip_prefix("vless://")?.trim();
+    let (auth_host, query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "VLESS Node".to_string());
 
-    let mut subparts = base_part.splitn(2, '@');
-    let uuid = subparts.next()?.to_string();
-    let host_port_query = subparts.next()?;
-
-    let mut hpq_parts = host_port_query.splitn(2, '?');
-    let host_port = hpq_parts.next()?;
-    let query = hpq_parts.next();
+    // 统一先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 并去除尾斜杠（BUG-348）
+    let (uuid_raw, host_port) = auth_host.rsplit_once('@')?;
+    let host_port = host_port.trim_end_matches('/');
+    let uuid = percent_encoding::percent_decode_str(uuid_raw)
+        .decode_utf8_lossy()
+        .to_string();
 
     let (server, port) = extract_host_port(host_port, 443)?;
 
@@ -487,19 +476,13 @@ fn parse_vless(link: &str) -> Option<serde_yaml_ng::Mapping> {
 }
 
 fn parse_hysteria2(link: &str) -> Option<serde_yaml_ng::Mapping> {
-    let payload = link.strip_prefix("hysteria2://")?;
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "Hysteria2 Node".to_string());
+    let payload = link.strip_prefix("hysteria2://")?.trim();
+    let (auth_host, query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "Hysteria2 Node".to_string());
 
-    // 先分离 query，再按最后一个 @ 拆分 userinfo：密码含未编码 @、query 值含 @ 都不会切错
-    let (auth_host, query) = base_part
-        .split_once('?')
-        .map_or((base_part, None as Option<&str>), |(ah, q)| (ah, Some(q)));
+    // 统一先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 并去除尾斜杠（BUG-348）
     let (password_raw, host_port) = auth_host.rsplit_once('@')?;
+    let host_port = host_port.trim_end_matches('/');
     let password = percent_encoding::percent_decode_str(password_raw)
         .decode_utf8_lossy()
         .to_string();
@@ -558,22 +541,15 @@ fn parse_hysteria2(link: &str) -> Option<serde_yaml_ng::Mapping> {
 
 fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let payload = link.strip_prefix("hysteria://")?.trim();
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "Hysteria Node".to_string());
+    let (auth_host, query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "Hysteria Node".to_string());
 
     // hysteria v1 分享链接：hysteria://host:port?key=value...#name
     // 认证串通常放在 query（auth / auth_str），少数生成器会写成 userinfo 形式，这里一并兼容。
-    // 先分离 query，再按最后一个 @ 拆分 userinfo：query 值含 @ 时不会切错。
-    let (auth_host, query) = base_part
-        .split_once('?')
-        .map_or((base_part, None as Option<&str>), |(ah, q)| (ah, Some(q)));
+    // 统一先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 并去除尾斜杠（BUG-348）。
     let (host_port, userinfo) = match auth_host.rsplit_once('@') {
-        Some((user, hp)) => (hp, Some(user)),
-        None => (auth_host, None),
+        Some((user, hp)) => (hp.trim_end_matches('/'), Some(user)),
+        None => (auth_host.trim_end_matches('/'), None),
     };
 
     let (server, port) = extract_host_port(host_port, 443)?;
@@ -674,19 +650,13 @@ fn parse_hysteria(link: &str) -> Option<serde_yaml_ng::Mapping> {
 
 fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
     let payload = link.strip_prefix("anytls://")?.trim();
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "AnyTLS Node".to_string());
+    let (auth_host, query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "AnyTLS Node".to_string());
 
     // anytls 分享链接：anytls://password@host:port?sni=...&insecure=1#name
-    // 先分离 query，再按最后一个 @ 拆分 userinfo：query 值含 @ 时不会切错。
-    let (auth_host, query) = base_part
-        .split_once('?')
-        .map_or((base_part, None as Option<&str>), |(ah, q)| (ah, Some(q)));
+    // 统一先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 并去除尾斜杠（BUG-348）。
     let (password_raw, host_port) = auth_host.rsplit_once('@')?;
+    let host_port = host_port.trim_end_matches('/');
     let password = percent_encoding::percent_decode_str(password_raw)
         .decode_utf8_lossy()
         .to_string();
@@ -748,21 +718,15 @@ fn parse_anytls(link: &str) -> Option<serde_yaml_ng::Mapping> {
 }
 
 fn parse_tuic(link: &str) -> Option<serde_yaml_ng::Mapping> {
-    let payload = link.strip_prefix("tuic://")?;
-    let mut parts = payload.splitn(2, '#');
-    let base_part = parts.next()?;
-    let remarks = parts
-        .next()
-        .map(|r| percent_encoding::percent_decode_str(r).decode_utf8_lossy().to_string())
-        .unwrap_or_else(|| "TUIC Node".to_string());
+    let payload = link.strip_prefix("tuic://")?.trim();
+    let (auth_host, query, frag) = strip_fragment_and_query(payload);
+    let remarks = frag.unwrap_or_else(|| "TUIC Node".to_string());
 
     // tuic://uuid:password@host:port?...
     // or tuic://token@host:port?... (v4)
-    // 先分离 query，再按最后一个 @ 拆分 userinfo：token/密码含未编码 @、query 值含 @ 都不会切错
-    let (auth_host, query) = base_part
-        .split_once('?')
-        .map_or((base_part, None as Option<&str>), |(ah, q)| (ah, Some(q)));
+    // 统一先剥离 #fragment 与 ?query，再按最后一个 @ 拆分 userinfo 并去除尾斜杠（BUG-348）
     let (user_info, host_port) = auth_host.rsplit_once('@')?;
+    let host_port = host_port.trim_end_matches('/');
 
     let (server, port) = extract_host_port(host_port, 443)?;
 
@@ -2111,6 +2075,80 @@ mod tests {
                 .as_str()
                 .unwrap(),
             "u@name"
+        );
+
+        let vless_link = "vless://2513e61a-6982-39cd-9f0a-8f6fbc3fc5f0@vless.example.com:8443/?type=ws&path=%2Fws@v2&host=cdn@edge.com#VLESS-At";
+        let vless_map = parse_vless(vless_link).unwrap();
+        assert_eq!(
+            vless_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "vless.example.com"
+        );
+        assert_eq!(
+            vless_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            8443
+        );
+
+        let trojan_link = "trojan://p@ss@trojan.example.com:8443/?sni=sni.example.com&extra=a@b#Trojan-At";
+        let trojan_map = parse_trojan(trojan_link).unwrap();
+        assert_eq!(
+            trojan_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            8443
+        );
+
+        let hy2_link = "hysteria2://p@ss@hy2.example.com:8443/?sni=sni.example.com&obfs-password=k@y#Hy2-At";
+        let hy2_map = parse_hysteria2(hy2_link).unwrap();
+        assert_eq!(
+            hy2_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            8443
+        );
+
+        let hy1_link = "hysteria://hy1.example.com:8443/?auth=tok@en&upmbps=50&downmbps=100#Hy1-At";
+        let hy1_map = parse_hysteria(hy1_link).unwrap();
+        assert_eq!(
+            hy1_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            8443
+        );
+
+        let anytls_link = "anytls://p@ss@anytls.example.com:8443/?sni=sni.example.com&tag=x@y#AnyTLS-At";
+        let anytls_map = parse_anytls(anytls_link).unwrap();
+        assert_eq!(
+            anytls_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            8443
+        );
+
+        let tuic_link = "tuic://uuid:p@ss@tuic.example.com:8443/?sni=sni.example.com&tag=x@y#TUIC-At";
+        let tuic_map = parse_tuic(tuic_link).unwrap();
+        assert_eq!(
+            tuic_map
+                .get(serde_yaml_ng::Value::from("port"))
+                .unwrap()
+                .as_u64()
+                .unwrap(),
+            8443
         );
     }
 }

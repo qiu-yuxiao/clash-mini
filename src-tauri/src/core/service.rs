@@ -226,13 +226,27 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
     let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
     let bin_path = if custom_core_path.exists() {
-        logging!(
-            info,
-            Type::Service,
-            "Service using custom core: {}",
-            custom_core_path.display()
-        );
-        custom_core_path
+        match crate::core::core_updater::CoreUpdater::validate_mihomo_pe_binary(&custom_core_path) {
+            Ok(()) => {
+                logging!(
+                    info,
+                    Type::Service,
+                    "Service using custom core: {}",
+                    custom_core_path.display()
+                );
+                custom_core_path
+            }
+            Err(err) => {
+                logging!(
+                    warn,
+                    Type::Service,
+                    "Service 检测到损坏的自定义内核文件 ({err})，自动移除并回退内置内核: {}",
+                    custom_core_path.display()
+                );
+                let _ = std::fs::remove_file(&custom_core_path);
+                current_exe()?.with_file_name(format!("{clash_core}.exe"))
+            }
+        }
     } else {
         current_exe()?.with_file_name(format!("{clash_core}.exe"))
     };

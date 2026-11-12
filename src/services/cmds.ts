@@ -613,6 +613,11 @@ export async function getProxyAddr(name: string, provider?: string) {
   )
 }
 
+/** 通知后端健康监控循环用户刚完成手动切点，立即刷新切点宽限期并清零连续失败计数（BUG-336） */
+export function notifyNodeSwitched(): void {
+  void invoke('notify_node_switched').catch(() => {})
+}
+
 /** 打开外部网页链接（仅允许 http/https 协议） */
 export async function openWebUrl(url: string) {
   return withIpcTimeout(

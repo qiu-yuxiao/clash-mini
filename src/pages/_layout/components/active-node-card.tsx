@@ -15,7 +15,12 @@ import { useTranslation } from 'react-i18next'
 import { filterSort } from '@/components/proxy/use-filter-sort'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useProxiesData } from '@/providers/app-data-context'
-import { frontendLog, getProxyAddr, triggerAutoSelect } from '@/services/cmds'
+import {
+  frontendLog,
+  getProxyAddr,
+  notifyNodeSwitched,
+  triggerAutoSelect,
+} from '@/services/cmds'
 import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
@@ -23,6 +28,7 @@ import type { IProxyItem } from '@/types/clash'
 import { get3DCardStyle } from '@/utils/button-styles'
 
 import {
+  broadcastNetworkHealth,
   getLatestNetworkHealth,
   type NetworkHealthStatus,
 } from '../utils/notification-handlers'
@@ -119,13 +125,17 @@ export const ActiveNodeStatusCard = () => {
         true,
       )
       if (results.some(([, d]) => d > 0 && d < latencyTimeout)) {
-        setNetworkHealth('network_health::ok')
+        broadcastNetworkHealth('network_health::ok')
       }
       void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
     } catch (err) {
       const msg = String(err instanceof Error ? err.message : err)
       if (msg.includes('AUTO_SELECT_BUSY')) {
         showNotice.info('settings.mini.testingInProgress')
+      } else if (msg.includes('AUTO_SELECT_NO_RESULT')) {
+        showNotice.error('settings.mini.testNotExecuted')
+      } else {
+        showNotice.error('settings.mini.testFailed', { message: msg })
       }
     } finally {
       setTesting(false)
@@ -243,7 +253,7 @@ export const ActiveNodeStatusCard = () => {
     }
 
     if (nextNodeName) {
-      // BUG-336: 顶栏点击轮换节点必须同步乐观更新 ['getProxies'] 缓存并持久化写回 profile.selected
+      // BUG-336: 顶栏点击轮换节点必须同步乐观更新 ['getProxies'] 缓存、通知后端切点宽限期并持久化写回 profile.selected
       const groupName = primaryGroup.name
       const previousSnapshot = queryClient.getQueryData(['getProxies'])
       queryClient.setQueryData(
@@ -256,24 +266,13 @@ export const ActiveNodeStatusCard = () => {
               g && g.name === groupName ? { ...g, now: nextNodeName } : g,
             )
           }
-          if (old.records && typeof old.records === 'object') {
-            const records = old.records as Record<
-              string,
-              Record<string, unknown>
-            >
-            if (records[groupName]) {
-              next.records = {
-                ...records,
-                [groupName]: { ...records[groupName], now: nextNodeName },
-              }
-            }
-          }
           return next
         },
       )
 
       try {
         await selectNodeForGroupWithTimeout(groupName, nextNodeName)
+        notifyNodeSwitched()
         if (currentProfileUid) {
           patchCurrent({
             selected: [{ name: 'PROXY', now: nextNodeName }],

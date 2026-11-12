@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
-import { frontendLog } from '@/services/cmds'
+import { frontendLog, notifyNodeSwitched } from '@/services/cmds'
 import {
   closeConnectionWithTimeout,
   getConnectionsWithTimeout,
@@ -102,24 +102,13 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
               g && g.name === groupName ? { ...g, now: proxyName } : g,
             )
           }
-          if (old.records && typeof old.records === 'object') {
-            const records = old.records as Record<
-              string,
-              Record<string, unknown>
-            >
-            if (records[groupName]) {
-              next.records = {
-                ...records,
-                [groupName]: { ...records[groupName], now: proxyName },
-              }
-            }
-          }
           return next
         },
       )
 
       try {
         await selectNodeForGroupWithTimeout(groupName, proxyName)
+        notifyNodeSwitched()
         onSuccessRef.current?.()
         persistSelectionRef.current(proxyName, skipConfigSave)
         void queryClient.invalidateQueries({ queryKey: ['getProxies'] })

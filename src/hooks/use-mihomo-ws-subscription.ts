@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useLocalStorage } from 'foxact/use-local-storage'
 import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
@@ -7,15 +8,19 @@ import { type Message, type MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 export const RECONNECT_DELAY_MS = 1000
 export const MAX_RECONNECT_DELAY_MS = 15_000
 
-/** BUG-347: 指数退避 + ±20% 随机抖动，抑制内核异常期前端 WebSocket 1000ms 死循环重连风暴 */
+/**
+ * BUG-347: 指数退避 + 抖动，且严格保证上界不超过 MAX_RECONNECT_DELAY_MS (15000ms)，
+ * 抑制内核异常期前端 WebSocket 1000ms 死循环重连风暴。
+ */
 export const computeWsReconnectDelay = (attempt: number): number => {
   const cappedExp = Math.min(Math.max(attempt, 0), 4)
   const base = Math.min(
     RECONNECT_DELAY_MS * Math.pow(2, cappedExp),
     MAX_RECONNECT_DELAY_MS,
   )
-  const jitter = 0.8 + Math.random() * 0.4
-  return Math.round(base * jitter)
+  const minDelay = Math.round(base * 0.8)
+  const maxDelay = Math.min(Math.round(base * 1.2), MAX_RECONNECT_DELAY_MS)
+  return Math.round(minDelay + Math.random() * (maxDelay - minDelay))
 }
 
 interface SharedSubscriptionOwner {
@@ -40,6 +45,89 @@ interface SharedSubscriptionEntry {
 }
 
 const sharedSubscriptions = new Map<string, SharedSubscriptionEntry>()
+let refreshClashUnlisten: UnlistenFn | null = null
+let refreshClashListening = false
+
+/**
+ * 当后端完成内核重启或配置重载发出 `verge://refresh-clash-config` 时，
+ * 立即清空所有未连接 WS 通道的退避定时器并重置退避计数发起重连，消除最长 15s 陈旧等待窗（BUG-347）。
+ */
+export const flushAllWsReconnectBackoff = () => {
+  for (const entry of sharedSubscriptions.values()) {
+    if (entry.closed || entry.ws) continue
+    if (entry.reconnectTimer) {
+      clearTimeout(entry.reconnectTimer)
+      entry.reconnectTimer = null
+    }
+    entry.reconnectAttempt = 0
+    void entry.connectWs()
+  }
+}
+
+const ensureRefreshClashListener = () => {
+  if (
+    refreshClashListening ||
+    refreshClashUnlisten !== null ||
+    typeof window === 'undefined' ||
+    !('__TAURI_INTERNALS__' in window)
+  ) {
+    return
+  }
+  refreshClashListening = true
+  listen('verge://refresh-clash-config', () => {
+    flushAllWsReconnectBackoff()
+  })
+    .then((unlisten) => {
+      refreshClashListening = false
+      if (sharedSubscriptions.size === 0) {
+        unlisten()
+      } else {
+        refreshClashUnlisten = unlisten
+      }
+    })
+    .catch(() => {
+      refreshClashListening = false
+    })
+}
+
+const cleanupRefreshClashListenerIfIdle = () => {
+  if (sharedSubscriptions.size === 0 && refreshClashUnlisten) {
+    const unlisten = refreshClashUnlisten
+    refreshClashUnlisten = null
+    unlisten()
+  }
+}
+
+export const acquireSharedSubscriptionEntry = (
+  subscriptionCacheKey: string,
+  connect: () => Promise<MihomoWebSocket>,
+): SharedSubscriptionEntry => {
+  let entry = sharedSubscriptions.get(subscriptionCacheKey)
+  if (!entry) {
+    entry = createSharedSubscriptionEntry(connect)
+    sharedSubscriptions.set(subscriptionCacheKey, entry)
+  }
+  ensureRefreshClashListener()
+  entry.refs += 1
+  return entry
+}
+
+export const releaseSharedSubscriptionEntry = (
+  subscriptionCacheKey: string,
+  entry: SharedSubscriptionEntry,
+) => {
+  entry.refs -= 1
+  if (entry.refs <= 0) {
+    entry.closed = true
+    if (entry.reconnectTimer) {
+      clearTimeout(entry.reconnectTimer)
+      entry.reconnectTimer = null
+    }
+    sharedSubscriptions.delete(subscriptionCacheKey)
+    cleanupRefreshClashListenerIfIdle()
+    void closeSharedSocket(entry)
+  }
+}
 
 const syncSharedWsRefs = (entry: SharedSubscriptionEntry) => {
   entry.refHolders.forEach((ref) => {
@@ -265,13 +353,9 @@ export const useMihomoWsSubscription = <T>(
     if (!subscriptionCacheKey) return
 
     let isMounted = true
-    let entry = sharedSubscriptions.get(subscriptionCacheKey)
-    if (!entry) {
-      entry = createSharedSubscriptionEntry(() => connectRef.current())
-      sharedSubscriptions.set(subscriptionCacheKey, entry)
-    }
-
-    entry.refs += 1
+    const entry = acquireSharedSubscriptionEntry(subscriptionCacheKey, () =>
+      connectRef.current(),
+    )
     entry.refHolders.add(wsRef)
     wsRef.current = entry.ws
 
@@ -375,16 +459,7 @@ export const useMihomoWsSubscription = <T>(
         }
       }
 
-      entry.refs -= 1
-      if (entry.refs <= 0) {
-        entry.closed = true
-        if (entry.reconnectTimer) {
-          clearTimeout(entry.reconnectTimer)
-          entry.reconnectTimer = null
-        }
-        sharedSubscriptions.delete(subscriptionCacheKey)
-        void closeSharedSocket(entry)
-      }
+      releaseSharedSubscriptionEntry(subscriptionCacheKey, entry)
     }
     // eslint-disable-next-line react-compiler/react-compiler
     // eslint-disable-next-line react-hooks/exhaustive-deps, @eslint-react/exhaustive-deps

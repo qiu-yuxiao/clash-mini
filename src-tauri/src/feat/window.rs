@@ -132,12 +132,26 @@ pub async fn clean_async() -> bool {
         }
 
         let stop_timeout = Duration::from_millis(3500);
+        // 在调用 stop_core 之前预先采样运行模式（stop_core 内部 defer 会将模式置为 NotRunning）
+        let was_service_mode = matches!(
+            *CoreManager::global().get_running_mode(),
+            crate::core::manager::RunningMode::Service
+        );
+        let is_admin = crate::utils::sysinfo::is_current_app_handle_admin(crate::core::handle::Handle::app_handle());
 
         logging!(info, Type::System, "stop core");
-        let stopped = match timeout(stop_timeout, CoreManager::global().stop_core()).await {
-            Ok(_) => {
+        let mut stopped = match timeout(stop_timeout, CoreManager::global().stop_core()).await {
+            Ok(Ok(())) => {
                 logging!(info, Type::Window, "core已停止");
                 true
+            }
+            Ok(Err(e)) => {
+                logging!(
+                    warn,
+                    Type::Window,
+                    "Warning: 停止core返回错误 ({e})，尝试服务级兜底停止"
+                );
+                false
             }
             Err(_) => {
                 logging!(
@@ -149,15 +163,51 @@ pub async fn clean_async() -> bool {
             }
         };
         // 服务模式下 mini-mihomo.exe 运行在 Session 0 SYSTEM 权限下，普通权限 Process::kill() 会因 Error 5 失败；
-        // 当 stop_core 超时且服务 IPC 存在时，额外通过提权服务通道发送停止指令兜底（BUG-331）。
-        if !stopped && (tun_enabled || crate::core::service::is_service_ipc_path_exists()) {
-            let _ = timeout(
+        // 当 stop_core 失败或超时且处于服务态/服务已安装时，通过提权服务通道发送停止指令并轮询确认进程退出（BUG-331）。
+        if !stopped && (was_service_mode || tun_enabled || crate::core::service::is_service_installed()) {
+            match timeout(
                 Duration::from_millis(1500),
                 crate::core::service::stop_core_by_service(),
             )
-            .await;
+            .await
+            {
+                Ok(Ok(())) => {
+                    logging!(info, Type::Window, "已通过系统服务兜底停止内核");
+                    let _ = timeout(Duration::from_millis(1000), async {
+                        loop {
+                            let alive = tokio::task::spawn_blocking(|| {
+                                let system = sysinfo::System::new_with_specifics(
+                                    sysinfo::RefreshKind::nothing()
+                                        .with_processes(sysinfo::ProcessRefreshKind::nothing()),
+                                );
+                                system
+                                    .processes()
+                                    .values()
+                                    .any(|p| p.name().to_string_lossy().contains("mini-mihomo"))
+                            })
+                            .await
+                            .unwrap_or(false);
+                            if !alive {
+                                break;
+                            }
+                            tokio::time::sleep(Duration::from_millis(50)).await;
+                        }
+                    })
+                    .await;
+                    stopped = true;
+                }
+                Ok(Err(e)) => {
+                    logging!(warn, Type::Window, "Warning: 系统服务兜底停止内核失败: {e}");
+                }
+                Err(_) => {
+                    logging!(warn, Type::Window, "Warning: 系统服务兜底停止内核超时");
+                }
+            }
         }
-        CoreManager::kill_all_mini_cores().await;
+        // 非提权主进程无法跨会话 kill Session 0 SYSTEM 内核，仅在 Sidecar 模式或当前具有管理员权限时执行进程级兜底清理
+        if !was_service_mode || is_admin {
+            CoreManager::kill_all_mini_cores().await;
+        }
         stopped
     });
 

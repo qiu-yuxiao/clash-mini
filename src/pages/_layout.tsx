@@ -70,6 +70,7 @@ import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
+import { bindMainAppShortcuts } from '@/utils/disable-webview-shortcuts'
 import { hasRealProfileItem } from '@/utils/profile-items'
 
 // Sub-components
@@ -1120,40 +1121,14 @@ const Layout = () => {
   // Logs dialog state
   const [logsOpen, setLogsOpen] = useState(false)
 
-  // BUG-355: 绑定主界面键盘快捷键（F4=可见子集测速优选，F1=全量测速优选，Ctrl+F=聚焦节点过滤框）
+  // BUG-355: 统一经 disable-webview-shortcuts 模块绑定主界面快捷键（严格校验修饰键与输入焦点，不误伤 Alt+F4）
+  const isAnyOverlayOpen =
+    drawerOpen || logsOpen || editProfileOpen || addUrlOpen || firstRunGuideOpen
+  const isAnyOverlayOpenRef = useRef(isAnyOverlayOpen)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        drawerOpen ||
-        logsOpen ||
-        editProfileOpen ||
-        addUrlOpen ||
-        firstRunGuideOpen
-      ) {
-        return
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        window.dispatchEvent(
-          new CustomEvent('clash-mini-shortcut', { detail: 'focus-filter' }),
-        )
-      } else if (e.key === 'F4') {
-        e.preventDefault()
-        window.dispatchEvent(
-          new CustomEvent('clash-mini-shortcut', { detail: 'check-visible' }),
-        )
-      } else if (e.key === 'F1') {
-        e.preventDefault()
-        window.dispatchEvent(
-          new CustomEvent('clash-mini-shortcut', { detail: 'check-full' }),
-        )
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [addUrlOpen, drawerOpen, editProfileOpen, firstRunGuideOpen, logsOpen])
+    isAnyOverlayOpenRef.current = isAnyOverlayOpen
+  }, [isAnyOverlayOpen])
+  useEffect(() => bindMainAppShortcuts(() => isAnyOverlayOpenRef.current), [])
 
   // Custom Titlebar Render
   const customTitlebar = useMemo(

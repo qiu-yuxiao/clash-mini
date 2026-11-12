@@ -40,21 +40,23 @@ impl CoreManager {
         let gogc = std::env::var("GOGC").unwrap_or_else(|_| "100".to_string());
         let gomaxprocs = std::env::var("GOMAXPROCS").unwrap_or_else(|_| "2".to_string());
 
-        // 【损坏内核防崩溃守卫 BUG-319】校验自定义热升级内核体积（>= 5MB），若存在 0 字节或半截损坏残留则清理并回退内置 sidecar
-        let use_custom_core = match std::fs::metadata(&custom_core_path) {
-            Ok(meta) if meta.len() >= 5 * 1024 * 1024 => true,
-            Ok(meta) => {
-                logging!(
-                    warn,
-                    Type::Core,
-                    "检测到损坏的自定义内核文件 ({} bytes < 5MB)，自动移除并回退内置内核: {}",
-                    meta.len(),
-                    custom_core_path.display()
-                );
-                let _ = std::fs::remove_file(&custom_core_path);
-                false
+        // 【损坏内核防崩溃守卫 BUG-319 / BUG-346】统一校验自定义热升级内核体积与 PE 签名，若损坏则清理并回退内置 sidecar
+        let use_custom_core = if custom_core_path.exists() {
+            match crate::core::core_updater::CoreUpdater::validate_mihomo_pe_binary(&custom_core_path) {
+                Ok(()) => true,
+                Err(err) => {
+                    logging!(
+                        warn,
+                        Type::Core,
+                        "检测到损坏的自定义内核文件 ({err})，自动移除并回退内置内核: {}",
+                        custom_core_path.display()
+                    );
+                    let _ = std::fs::remove_file(&custom_core_path);
+                    false
+                }
             }
-            Err(_) => false,
+        } else {
+            false
         };
 
         let (mut rx, child) = if use_custom_core {
@@ -199,14 +201,17 @@ impl CoreManager {
                 let name = process.name();
                 let name_str = name.to_string_lossy();
                 if name_str.contains("mini-mihomo") {
-                    logging!(
-                        warn,
-                        Type::Core,
-                        "Killing leftover process: {} (PID: {})",
-                        name_str,
-                        pid
-                    );
-                    let _ = process.kill();
+                    if process.kill() {
+                        logging!(warn, Type::Core, "Killed leftover process: {} (PID: {})", name_str, pid);
+                    } else {
+                        logging!(
+                            warn,
+                            Type::Core,
+                            "Failed to kill leftover process (insufficient privilege or already exited): {} (PID: {})",
+                            name_str,
+                            pid
+                        );
+                    }
                 }
             }
         })

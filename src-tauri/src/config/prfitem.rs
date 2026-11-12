@@ -784,6 +784,34 @@ fn parse_subscription_content(data: &str) -> Result<(Mapping, String)> {
     }
 }
 
+/// 校验单个 IP 地址是否属于禁止访问的回环 / 私网 / 链路本地 / 唯一本地 / IPv4 映射私网地址（BUG-327）
+fn check_disallowed_ssrf_ip(ip: std::net::IpAddr) -> Result<()> {
+    let check_v4 = |ipv4: std::net::Ipv4Addr| -> Result<()> {
+        if ipv4.is_loopback() || ipv4.is_private() || ipv4.is_unspecified() || ipv4.is_link_local() {
+            bail!("cannot fetch subscription from private/loopback IP");
+        }
+        Ok(())
+    };
+
+    match ip {
+        std::net::IpAddr::V4(ipv4) => check_v4(ipv4),
+        std::net::IpAddr::V6(ipv6) => {
+            if let Some(mapped_v4) = ipv6.to_ipv4_mapped() {
+                check_v4(mapped_v4)?;
+            }
+            if ipv6.is_loopback() || ipv6.is_unspecified() {
+                bail!("cannot fetch subscription from loopback IP");
+            }
+            let segments = ipv6.segments();
+            // 链路本地地址 (fe80::/10) 与唯一本地地址 ULA (fc00::/7)
+            if (segments[0] & 0xffc0) == 0xfe80 || (segments[0] & 0xfe00) == 0xfc00 {
+                bail!("cannot fetch subscription from local/link-local IP");
+            }
+            Ok(())
+        }
+    }
+}
+
 /// SSRF 防护：禁止访问内网/回环地址
 fn validate_url_no_ssrf(url: &Url) -> Result<()> {
     if let Some(host) = url.host() {
@@ -803,29 +831,22 @@ fn validate_url_no_ssrf(url: &Url) -> Result<()> {
                     || lower == "::1"
                     || lower == "0.0.0.0"
                     || lower.starts_with("169.254.")
-                    || lower.parse::<u32>().is_ok()
                 {
                     bail!("cannot fetch subscription from localhost/internal address");
                 }
             }
             url::Host::Ipv4(ip) => {
-                if ip.is_loopback() || ip.is_private() || ip.is_unspecified() || ip.is_link_local() {
-                    bail!("cannot fetch subscription from private/loopback IP");
-                }
+                check_disallowed_ssrf_ip(std::net::IpAddr::V4(ip))?;
             }
             url::Host::Ipv6(ip) => {
-                if ip.is_loopback() || ip.is_unspecified() {
-                    bail!("cannot fetch subscription from loopback IP");
-                }
-                let segments = ip.segments();
-                // 链路本地地址 (fe80::/10) 唯一本地地址 (fc00::/7)
-                if (segments[0] & 0xffc0) == 0xfe80 || (segments[0] & 0xfe00) == 0xfc00 {
-                    bail!("cannot fetch subscription from local/link-local IP");
-                }
+                check_disallowed_ssrf_ip(std::net::IpAddr::V6(ip))?;
             }
         }
 
-        // 2. 动态 DNS 解析校验，防止 DNS 重绑定绕过
+        // 2. 动态 DNS 解析校验，拦截解析到回环/私网/ULA/IPv4-mapped 私网的域名。
+        // 【重要边界说明】ToSocketAddrs 走操作系统本地直连 DNS，而国内网络环境下大量正规机场订阅域名
+        // 在本地 ISP DNS 下会遭遇污染或 NXDOMAIN/超时，需交由后续 127.0.0.1:10801 代理回退链远端解析拉取；
+        // 因此本地 DNS 解析返回 Err 时必须放行，仅在解析成功且命中内网地址时阻断（BUG-327）。
         use std::net::ToSocketAddrs as _;
         let host_str = match host {
             url::Host::Domain(d) => d.to_string(),
@@ -835,26 +856,7 @@ fn validate_url_no_ssrf(url: &Url) -> Result<()> {
         let port = url.port().unwrap_or(80);
         if let Ok(addrs) = (host_str.as_str(), port).to_socket_addrs() {
             for addr in addrs {
-                let ip = addr.ip();
-                match ip {
-                    std::net::IpAddr::V4(ipv4) => {
-                        if ipv4.is_loopback() || ipv4.is_private() || ipv4.is_unspecified() || ipv4.is_link_local() {
-                            bail!("cannot fetch subscription from private/loopback IP");
-                        }
-                    }
-                    std::net::IpAddr::V6(ipv6) => {
-                        if ipv6.is_loopback() || ipv6.is_unspecified() {
-                            bail!("cannot fetch subscription from loopback IP");
-                        }
-                        let segments = ipv6.segments();
-                        if (segments[0] & 0xffc0) == 0xfe80 {
-                            bail!("cannot fetch subscription from link-local IP");
-                        }
-                        if (segments[0] & 0xfe00) == 0xfc00 {
-                            bail!("cannot fetch subscription from local range IP");
-                        }
-                    }
-                }
+                check_disallowed_ssrf_ip(addr.ip())?;
             }
         }
     }
@@ -1086,5 +1088,37 @@ mod tests {
         assert_eq!(item.uid.unwrap(), uid_smart);
         assert_eq!(item.name.unwrap(), name_smart);
         assert_eq!(item.file.unwrap(), file_smart);
+    }
+
+    #[test]
+    fn test_validate_url_no_ssrf_blocks_internal_and_mapped_ips() {
+        let blocked_urls = [
+            "http://localhost:8080/sub",
+            "http://localhost./sub",
+            "http://intranet/sub",
+            "http://router.local/sub",
+            "http://nas.lan/sub",
+            "http://127.0.0.1:7890/sub",
+            "http://192.168.1.1/sub",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[::1]:8080/sub",
+            "http://[fd00::1]/sub",
+            "http://[fe80::1]/sub",
+            "http://[::ffff:127.0.0.1]:8080/sub",
+            "http://[::ffff:10.0.0.1]/sub",
+        ];
+        for raw in blocked_urls {
+            let parsed = Url::parse(raw).unwrap();
+            assert!(
+                validate_url_no_ssrf(&parsed).is_err(),
+                "expected SSRF guard to block {raw}"
+            );
+        }
+
+        // 公网 IP 与本地无法直连解析但语法合法的公网订阅域名应放行（由代理链路拉取）
+        let allowed_ip = Url::parse("https://1.1.1.1/sub").unwrap();
+        assert!(validate_url_no_ssrf(&allowed_ip).is_ok());
+        let unresolvable_public = Url::parse("https://sub.nonexistent-airport-domain-test.example/api/v1").unwrap();
+        assert!(validate_url_no_ssrf(&unresolvable_public).is_ok());
     }
 }
