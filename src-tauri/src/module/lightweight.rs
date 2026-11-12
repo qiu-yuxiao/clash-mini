@@ -100,6 +100,7 @@ pub async fn entry_lightweight_mode() -> bool {
         && !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false)
     {
         let _ = WindowManager::hide_main_window();
+        crate::process::guardian::set_lightweight_mode_signal(true);
         crate::core::tray::update_lite_mode_menu(false);
         return true;
     }
@@ -170,6 +171,7 @@ pub async fn exit_lightweight_mode() -> bool {
     if get_state() == LightweightState::Normal {
         logging!(debug, Type::Lightweight, "轻量模式未激活，直接显示窗口");
         let _ = WindowManager::show_main_window().await;
+        crate::process::guardian::set_lightweight_mode_signal(false);
         crate::core::tray::update_lite_mode_menu(false);
         return true;
     }

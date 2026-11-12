@@ -548,7 +548,42 @@ Function CheckVCRuntime64
 FunctionEnd
 
 
+!macro KillGuardianProcesses
+  ; 先停止异名物理隔离的伴生看门狗进程（防止安装/卸载期间触发自愈重拉）
+  !if "${INSTALLMODE}" == "currentUser"
+    nsis_tauri_utils::FindProcessCurrentUser "clash-mini-guard.exe"
+  !else
+    nsis_tauri_utils::FindProcess "clash-mini-guard.exe"
+  !endif
+  Pop $R0
+  ${If} $R0 = 0
+    DetailPrint "Kill clash-mini-guard.exe..."
+    !if "${INSTALLMODE}" == "currentUser"
+      nsis_tauri_utils::KillProcessCurrentUser "clash-mini-guard.exe"
+    !else
+      nsis_tauri_utils::KillProcess "clash-mini-guard.exe"
+    !endif
+  ${EndIf}
+
+  !if "${INSTALLMODE}" == "currentUser"
+    nsis_tauri_utils::FindProcessCurrentUser "clash-mini-guard-alt.exe"
+  !else
+    nsis_tauri_utils::FindProcess "clash-mini-guard-alt.exe"
+  !endif
+  Pop $R0
+  ${If} $R0 = 0
+    DetailPrint "Kill clash-mini-guard-alt.exe..."
+    !if "${INSTALLMODE}" == "currentUser"
+      nsis_tauri_utils::KillProcessCurrentUser "clash-mini-guard-alt.exe"
+    !else
+      nsis_tauri_utils::KillProcess "clash-mini-guard-alt.exe"
+    !endif
+  ${EndIf}
+!macroend
+
 !macro CheckAllVergeProcesses
+  !insertmacro KillGuardianProcesses
+
   ; Check if clash-verge-service.exe is running
   !if "${INSTALLMODE}" == "currentUser"
     nsis_tauri_utils::FindProcessCurrentUser "clash-verge-service.exe"
@@ -906,6 +941,7 @@ Section Install
 
   nsExec::Exec 'netsh int tcp res'
 
+  !insertmacro KillGuardianProcesses
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
   !insertmacro CheckAllVergeProcesses
 
@@ -1093,6 +1129,7 @@ Section Uninstall
     !insertmacro NSIS_HOOK_PREUNINSTALL
   !endif
 
+  !insertmacro KillGuardianProcesses
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
   !insertmacro CheckAllVergeProcesses
   !insertmacro RemoveVergeService
@@ -1102,6 +1139,7 @@ Section Uninstall
   SetShellVarContext current
   Delete "$APPDATA\io.github.clash-mini.clash-mini\window-state.json"
   Delete "$APPDATA\io.github.clash-mini.clash-mini\.window-state.json"
+  RMDir /r "$LOCALAPPDATA\${BUNDLEID}\guard"
 
   ; Clean legacy auto-launch registry entries
   StrCpy $R1 "Software\Microsoft\Windows\CurrentVersion\Run"

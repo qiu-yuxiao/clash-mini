@@ -452,6 +452,7 @@ impl WindowManager {
             }
         }) {
             Ok(_) => {
+                crate::process::guardian::set_lightweight_mode_signal(true);
                 logging!(info, Type::Window, "窗口已成功隐藏");
                 WindowOperationResult::Hidden
             }
@@ -565,7 +566,10 @@ impl WindowManager {
                 // 异步等待主线程执行结果，让出 tokio worker 线程，避免死锁
                 // 加 5 秒超时保护：主线程被模态循环占用时不会永久阻塞
                 match tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
-                    Ok(Ok(true)) => WindowOperationResult::Shown,
+                    Ok(Ok(true)) => {
+                        crate::process::guardian::set_lightweight_mode_signal(false);
+                        WindowOperationResult::Shown
+                    }
                     Ok(Ok(false)) => WindowOperationResult::Failed,
                     Ok(Err(_)) => {
                         logging!(warn, Type::Window, "接收窗口激活结果失败（oneshot 发送端被丢弃）");
@@ -612,6 +616,7 @@ impl WindowManager {
 
         match build_new_window().await {
             Ok(_) => {
+                crate::process::guardian::set_lightweight_mode_signal(false);
                 logging!(info, Type::Window, "新窗口创建成功，等待前端渲染后显示");
 
                 true
