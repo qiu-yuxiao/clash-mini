@@ -353,11 +353,12 @@ impl CoreConfigValidator {
         let app_dir_str = dirs::path_to_str(&app_dir)?;
         logging!(info, Type::Validate, "验证目录: {}", app_dir_str);
 
-        // 使用子进程运行clash验证配置
+        // 使用子进程运行clash验证配置（与 Sidecar / Service 共用同一自定义热更内核校验选择器，BUG-319 / BUG-346）
         let cores_dir = app_dir.join("cores");
-        let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
-        let command = if custom_core_path.exists() {
+        let command = if let Some(custom_core_path) =
+            crate::core::core_updater::CoreUpdater::resolve_usable_custom_core(&cores_dir)
+        {
             app_handle
                 .shell()
                 .command(custom_core_path)

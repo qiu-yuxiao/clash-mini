@@ -77,10 +77,15 @@ impl Handle {
         Self::send_event(FrontendEvent::ProfileUpdateCompleted { uid });
     }
 
-    pub fn notify_delay_results(group: std::string::String, results: Vec<(std::string::String, u32)>) {
+    pub fn notify_delay_results(
+        group: std::string::String,
+        results: Vec<(std::string::String, u32)>,
+        from_probe: bool,
+    ) {
         Self::send_event(FrontendEvent::DelayResults {
             group: group.into(),
             results: results.into_iter().map(|(n, d)| (n.into(), d)).collect(),
+            from_probe,
         });
     }
 

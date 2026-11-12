@@ -1,28 +1,9 @@
 /**
  * 统一键盘快捷键收口治理模块（BUG-355）：
- * 1. `disableWebViewShortcuts`: 屏蔽 WebView2 浏览器原生默认热键（含原生 Ctrl+F 查找条、F5 刷新等）
- * 2. `bindMainAppShortcuts`: 在无弹窗遮挡时将业务快捷键安全分发给主界面，严格校验修饰键与输入焦点，绝不误伤 Alt+F4 / Ctrl+F4
+ * 在单一 `document` 级 `keydown` 监听器中统一处理：
+ * 1. 屏蔽 WebView2 浏览器原生默认热键（原生 Ctrl+F 查找条、F5 刷新、Alt+左右导航等，绝不拦截 Alt+F4 / Ctrl+F4）；
+ * 2. 在无任何弹窗/菜单遮挡、非输入编辑态、非 IME 合成且非长按连发时，安全派发业务快捷键（Ctrl+F / F4 / F1）。
  */
-export const disableWebViewShortcuts = () => {
-  const handleKeydown = (event: KeyboardEvent) => {
-    const disabledShortcuts =
-      ['F5', 'F7'].includes(event.key) ||
-      (event.altKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) ||
-      ((event.ctrlKey || event.metaKey) &&
-        ['F', 'G', 'H', 'J', 'P', 'Q', 'R', 'U'].includes(
-          event.key.toUpperCase(),
-        ))
-
-    if (disabledShortcuts) {
-      event.preventDefault()
-    }
-  }
-
-  document.addEventListener('keydown', handleKeydown)
-
-  return () => document.removeEventListener('keydown', handleKeydown)
-}
-
 export type AppShortcutAction = 'focus-filter' | 'check-visible' | 'check-full'
 
 const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -35,53 +16,90 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
   )
 }
 
+let activeOverlayGuard: (() => boolean) | null = null
+let documentListenerInstalled = false
+
+const handleUnifiedKeydown = (event: KeyboardEvent) => {
+  const isDisabledBrowserShortcut =
+    ['F5', 'F7'].includes(event.key) ||
+    (event.altKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) ||
+    ((event.ctrlKey || event.metaKey) &&
+      ['F', 'G', 'H', 'J', 'P', 'Q', 'R', 'U'].includes(
+        event.key.toUpperCase(),
+      ))
+
+  if (isDisabledBrowserShortcut) {
+    event.preventDefault()
+  }
+
+  if (
+    activeOverlayGuard === null ||
+    event.isComposing ||
+    event.repeat ||
+    activeOverlayGuard() ||
+    isEditableTarget(event.target)
+  ) {
+    return
+  }
+
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    !event.altKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === 'f'
+  ) {
+    event.preventDefault()
+    window.dispatchEvent(
+      new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
+        detail: 'focus-filter',
+      }),
+    )
+    return
+  }
+
+  if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    if (event.key === 'F4') {
+      event.preventDefault()
+      window.dispatchEvent(
+        new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
+          detail: 'check-visible',
+        }),
+      )
+    } else if (event.key === 'F1') {
+      event.preventDefault()
+      window.dispatchEvent(
+        new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
+          detail: 'check-full',
+        }),
+      )
+    }
+  }
+}
+
+const ensureDocumentShortcutListener = () => {
+  if (documentListenerInstalled || typeof document === 'undefined') return
+  document.addEventListener('keydown', handleUnifiedKeydown)
+  documentListenerInstalled = true
+}
+
+export const disableWebViewShortcuts = () => {
+  ensureDocumentShortcutListener()
+  return () => {
+    if (documentListenerInstalled && activeOverlayGuard === null) {
+      document.removeEventListener('keydown', handleUnifiedKeydown)
+      documentListenerInstalled = false
+    }
+  }
+}
+
 export const bindMainAppShortcuts = (
   isOverlayOpen: () => boolean,
 ): (() => void) => {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.isComposing || isOverlayOpen()) return
-
-    if (
-      (e.ctrlKey || e.metaKey) &&
-      !e.altKey &&
-      !e.shiftKey &&
-      e.key.toLowerCase() === 'f'
-    ) {
-      e.preventDefault()
-      window.dispatchEvent(
-        new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
-          detail: 'focus-filter',
-        }),
-      )
-      return
-    }
-
-    if (
-      !e.altKey &&
-      !e.ctrlKey &&
-      !e.metaKey &&
-      !e.shiftKey &&
-      !e.repeat &&
-      !isEditableTarget(e.target)
-    ) {
-      if (e.key === 'F4') {
-        e.preventDefault()
-        window.dispatchEvent(
-          new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
-            detail: 'check-visible',
-          }),
-        )
-      } else if (e.key === 'F1') {
-        e.preventDefault()
-        window.dispatchEvent(
-          new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
-            detail: 'check-full',
-          }),
-        )
-      }
+  ensureDocumentShortcutListener()
+  activeOverlayGuard = isOverlayOpen
+  return () => {
+    if (activeOverlayGuard === isOverlayOpen) {
+      activeOverlayGuard = null
     }
   }
-
-  window.addEventListener('keydown', handleKeyDown)
-  return () => window.removeEventListener('keydown', handleKeyDown)
 }

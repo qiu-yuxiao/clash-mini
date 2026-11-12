@@ -126,6 +126,10 @@ export const ActiveNodeStatusCard = () => {
       )
       if (results.some(([, d]) => d > 0 && d < latencyTimeout)) {
         broadcastNetworkHealth('network_health::ok')
+      } else if (results.length === 0) {
+        showNotice.error('settings.mini.testNotExecuted')
+      } else {
+        showNotice.error('settings.mini.allNodesTimeout')
       }
       void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
     } catch (err) {

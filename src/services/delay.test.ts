@@ -8,6 +8,7 @@ import {
   getDelayManager,
   HISTORY_FALLBACK_MAX_AGE_MS,
   NODE_DELAY_MAX_MS,
+  REUSED_METRICS_MAX_TTL_MS,
   resolveSignalDelayColor,
 } from './delay'
 
@@ -235,5 +236,48 @@ describe('resolveSignalDelayColor 与 formatDelayColor 延迟颜色标准完全�
   it('未测速 (-1) 与测试中 (-2) 返回 text.secondary', () => {
     expect(resolveSignalDelayColor(-1)).toBe('text.secondary')
     expect(resolveSignalDelayColor(-2)).toBe('text.secondary')
+  })
+})
+
+describe('BUG-344: DelayManager 快照恢复与数据来源语义校验', () => {
+  it('restoreDelaySnapshot 恢复已有快照时严格保留原始 updatedAt，无快照时清除 -2 占位', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+
+    const originalTs = Date.now() - 120_000
+    const snap = { delay: 95, updatedAt: originalTs }
+    dm.setDelay('节点A', 'PROXY', -2)
+    dm.restoreDelaySnapshot('节点A', 'PROXY', snap)
+    expect(dm.getDelayUpdate('节点A', 'PROXY')).toEqual(snap)
+
+    dm.setDelay('节点B', 'PROXY', -2)
+    dm.restoreDelaySnapshot('节点B', 'PROXY', undefined)
+    expect(dm.getDelayUpdate('节点B', 'PROXY')).toBeUndefined()
+  })
+
+  it('injectBatchResults 在 fromProbe=false（30s 缓存复用）时不虚增 30 分钟 TTL', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+
+    const before = Date.now()
+    dm.setDelay('复用节点1', 'PROXY', -2)
+    dm.injectBatchResults('PROXY', [['复用节点1', 66]], { fromProbe: false })
+
+    const reused = dm.getDelayUpdate('复用节点1', 'PROXY')
+    expect(reused?.delay).toBe(66)
+    // 剩余缓存寿命被封顶在 REUSED_METRICS_MAX_TTL_MS (30s)，updatedAt 远早于 before
+    expect(reused!.updatedAt).toBeLessThanOrEqual(
+      Date.now() - 30 * 60 * 1000 + REUSED_METRICS_MAX_TTL_MS + 50,
+    )
+    expect(reused!.updatedAt).toBeLessThan(before - 20 * 60 * 1000)
+
+    // 若节点已有非测试态实时缓存，fromProbe=false 保留其原始 updatedAt
+    const probeTs = Date.now() - 10_000
+    dm.restoreDelaySnapshot('复用节点2', 'PROXY', {
+      delay: 72,
+      updatedAt: probeTs,
+    })
+    dm.injectBatchResults('PROXY', [['复用节点2', 75]], { fromProbe: false })
+    expect(dm.getDelayUpdate('复用节点2', 'PROXY')?.updatedAt).toBe(probeTs)
   })
 })

@@ -104,32 +104,37 @@ export async function batchTestWithFirstBatchSelect(
   const currentUid = (await getProfiles())?.current || ''
   if (!currentUid) return
 
-  const previousDelays = new Map<string, number>()
+  const dm = getDelayManager()
+  const previousSnapshots = new Map<
+    string,
+    ReturnType<typeof dm.getDelayUpdate>
+  >()
   for (const name of names) {
-    previousDelays.set(
-      name,
-      getDelayManager().getDelayUpdate(name, groupName)?.delay ?? -1,
-    )
-    getDelayManager().setDelay(name, groupName, -2)
+    previousSnapshots.set(name, dm.getDelayUpdate(name, groupName))
+    dm.setDelay(name, groupName, -2)
   }
-  getDelayManager().queueGroupNotification(groupName)
+  dm.queueGroupNotification(groupName)
+
+  const rollbackPendingNodes = () => {
+    for (const name of names) {
+      if (dm.getDelayUpdate(name, groupName)?.delay === -2) {
+        dm.restoreDelaySnapshot(name, groupName, previousSnapshots.get(name))
+      }
+    }
+    dm.queueGroupNotification(groupName)
+  }
 
   try {
     // BUG-321: 必须将待测过滤子集 names 传入后端，严禁传 undefined 导致越过过滤词选到子集外节点
-    await triggerAutoSelect(currentUid, names, 0, select)
+    const results = await triggerAutoSelect(currentUid, names, 0, select)
+    if (results.length === 0) {
+      // 后端判定「测速未真正执行」（NotExecuted），回滚 -2 占位并保留原始 updatedAt（BUG-344）
+      rollbackPendingNodes()
+    }
   } catch (err) {
     console.error('[Layout] 后端批量测速/选点失败:', err)
-    // 异常兜底：恢复仍处于 -2 测试态的节点原值，防止卡片转圈永久卡死
-    for (const name of names) {
-      if (getDelayManager().getDelayUpdate(name, groupName)?.delay === -2) {
-        getDelayManager().setDelay(
-          name,
-          groupName,
-          previousDelays.get(name) ?? -1,
-        )
-      }
-    }
-    getDelayManager().queueGroupNotification(groupName)
+    // 异常兜底：恢复仍处于 -2 测试态的节点原始快照，防止卡片转圈永久卡死或虚增缓存寿命
+    rollbackPendingNodes()
   }
 }
 

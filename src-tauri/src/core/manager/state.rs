@@ -34,32 +34,16 @@ impl CoreManager {
         let config_dir = dirs::app_home_dir()?;
 
         let cores_dir = config_dir.join("cores");
-        let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
         let gomemlimit = std::env::var("GOMEMLIMIT").unwrap_or_else(|_| "128MiB".to_string());
         let gogc = std::env::var("GOGC").unwrap_or_else(|_| "100".to_string());
         let gomaxprocs = std::env::var("GOMAXPROCS").unwrap_or_else(|_| "2".to_string());
 
-        // 【损坏内核防崩溃守卫 BUG-319 / BUG-346】统一校验自定义热升级内核体积与 PE 签名，若损坏则清理并回退内置 sidecar
-        let use_custom_core = if custom_core_path.exists() {
-            match crate::core::core_updater::CoreUpdater::validate_mihomo_pe_binary(&custom_core_path) {
-                Ok(()) => true,
-                Err(err) => {
-                    logging!(
-                        warn,
-                        Type::Core,
-                        "检测到损坏的自定义内核文件 ({err})，自动移除并回退内置内核: {}",
-                        custom_core_path.display()
-                    );
-                    let _ = std::fs::remove_file(&custom_core_path);
-                    false
-                }
-            }
-        } else {
-            false
-        };
-
-        let (mut rx, child) = if use_custom_core {
+        // 【损坏内核防崩溃守卫 BUG-319 / BUG-346】统一校验托管热更内核体积与 PE32+/COFF 头：
+        // 确系结构损坏时清理并回退内置 sidecar；瞬时 I/O 占用时保留原文件并仅本次回退内置 sidecar
+        let (mut rx, child) = if let Some(custom_core_path) =
+            crate::core::core_updater::CoreUpdater::resolve_usable_custom_core(&cores_dir)
+        {
             logging!(
                 info,
                 Type::Core,
@@ -163,7 +147,7 @@ impl CoreManager {
                 pid,
                 result
             );
-            // 轮询等待旧子进程真正退出以释放监听端口与 TUN 句柄（上限 2 秒，步进 50ms，BUG-326）
+            // 轮询等待旧子进程真正退出以释放监听端口与 TUN 句柄（上限 2 秒，步进 50ms，BUG-326；join 异常保守视为仍存活）
             let wait_pid = sysinfo::Pid::from_u32(pid);
             let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async move {
                 loop {
@@ -174,7 +158,7 @@ impl CoreManager {
                         system.process(wait_pid).is_some()
                     })
                     .await
-                    .unwrap_or(false);
+                    .unwrap_or(true);
                     if !alive {
                         break;
                     }
@@ -184,6 +168,53 @@ impl CoreManager {
             .await;
         }
         Self::kill_all_mini_cores().await;
+    }
+
+    /// 检测系统中是否仍有 `mini-mihomo` 进程存活。
+    /// 若 `spawn_blocking` 调度异常，保守返回 `true`（视为仍存活，绝不提前误判为已退出）。
+    pub async fn has_running_mini_cores() -> bool {
+        tokio::task::spawn_blocking(|| {
+            let system = sysinfo::System::new_with_specifics(
+                sysinfo::RefreshKind::nothing().with_processes(sysinfo::ProcessRefreshKind::nothing()),
+            );
+            system
+                .processes()
+                .values()
+                .any(|p| p.name().to_string_lossy().contains("mini-mihomo"))
+        })
+        .await
+        .unwrap_or(true)
+    }
+
+    /// 轮询等待全部 `mini-mihomo` 进程彻底退出（供退出清理与热升级共用，BUG-331 / BUG-346）。
+    /// 返回 `true` 表示已确认全部退出，`false` 表示超时仍有存活或未能确认。
+    pub async fn wait_for_mini_cores_exit(max_wait: std::time::Duration) -> bool {
+        tokio::time::timeout(max_wait, async {
+            loop {
+                if !Self::has_running_mini_cores().await {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .is_ok()
+    }
+
+    /// 当退出流程已优先通过提权服务通道停止内核后，同步清理本地日志缓冲、IPC 连接池与残留句柄状态。
+    pub async fn cleanup_local_state_after_service_stop(&self) {
+        CLASH_LOGGER.clear_logs().await;
+        if let Ok(pool) = tauri_plugin_mihomo::IpcConnectionPool::global() {
+            pool.clear_pool();
+        }
+        if let Some(handle) = self.take_log_consumer_handle() {
+            handle.abort();
+        }
+        if let Some(child) = self.take_child_sidecar() {
+            let _ = child.kill();
+        }
+        self.set_running_mode(RunningMode::NotRunning);
+        self.after_core_process();
     }
 
     pub async fn kill_all_mini_cores() {

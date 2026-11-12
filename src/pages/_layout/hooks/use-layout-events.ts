@@ -97,14 +97,17 @@ export const useLayoutEvents = (
     )
 
     register(
-      addListener<{ group: string; results: Array<[string, number]> }>(
-        'verge://backend-delay-results',
-        ({ payload }) => {
-          if (payload.results && payload.results.length > 0) {
-            getDelayManager().injectBatchResults(payload.group, payload.results)
-          }
-        },
-      ),
+      addListener<{
+        group: string
+        results: Array<[string, number]>
+        fromProbe?: boolean
+      }>('verge://backend-delay-results', ({ payload }) => {
+        if (payload.results && payload.results.length > 0) {
+          getDelayManager().injectBatchResults(payload.group, payload.results, {
+            fromProbe: payload.fromProbe ?? true,
+          })
+        }
+      }),
     )
 
     return () => {

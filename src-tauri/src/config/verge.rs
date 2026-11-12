@@ -383,10 +383,51 @@ impl IVerge {
             ..Self::default()
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TempTunFallbackSnapshot {
+    persisted_enable_tun_mode: Option<bool>,
+    persisted_enable_system_proxy: Option<bool>,
+}
+
+/// 当冷启动期间已启用系统服务瞬时响应超时时，内存态临时回退为 Sidecar + 系统代理以保持界面诚实（BUG-298），
+/// 同时由本会话守卫锁定磁盘原始 `enable_tun_mode` / `enable_system_proxy` 值，防止后续改语言/皮肤等任意配置落盘把临时态覆写到 `verge.yaml`（BUG-328）。
+static SESSION_TEMP_TUN_FALLBACK: parking_lot::Mutex<Option<TempTunFallbackSnapshot>> = parking_lot::Mutex::new(None);
+
+impl IVerge {
+    /// 进入当次会话临时回退保护态（仅在首次触发时捕获磁盘原始期望，避免同会话重复回退覆盖原始快照）。
+    pub fn enter_temp_tun_fallback(persisted_tun: Option<bool>, persisted_sysproxy: Option<bool>) {
+        let mut guard = SESSION_TEMP_TUN_FALLBACK.lock();
+        if guard.is_none() {
+            *guard = Some(TempTunFallbackSnapshot {
+                persisted_enable_tun_mode: persisted_tun,
+                persisted_enable_system_proxy: persisted_sysproxy,
+            });
+        }
+    }
+
+    /// 解除当次会话临时回退保护态（用户显式切换 TUN / 系统代理开关，或服务未安装/禁用执行永久回退时调用）。
+    pub fn clear_temp_tun_fallback() {
+        *SESSION_TEMP_TUN_FALLBACK.lock() = None;
+    }
+
+    fn effective_for_disk(&self) -> std::borrow::Cow<'_, Self> {
+        let locked_snapshot = *SESSION_TEMP_TUN_FALLBACK.lock();
+        if let Some(snapshot) = locked_snapshot {
+            let mut disk_copy = self.clone();
+            disk_copy.enable_tun_mode = snapshot.persisted_enable_tun_mode;
+            disk_copy.enable_system_proxy = snapshot.persisted_enable_system_proxy;
+            std::borrow::Cow::Owned(disk_copy)
+        } else {
+            std::borrow::Cow::Borrowed(self)
+        }
+    }
 
     /// Save IVerge App Config
     pub fn save_file(&self) -> Result<()> {
-        help::save_yaml(&dirs::verge_path()?, &self, Some("# Clash Verge Config"))
+        let to_persist = self.effective_for_disk();
+        help::save_yaml(&dirs::verge_path()?, to_persist.as_ref(), Some("# Clash Verge Config"))
     }
 
     /// patch verge config
@@ -479,5 +520,39 @@ impl IVerge {
         } else {
             LevelFilter::Info
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_temp_tun_fallback_preserves_disk_state_until_cleared() {
+        IVerge::clear_temp_tun_fallback();
+
+        // 模拟冷启动时磁盘原始状态为 enable_tun_mode=true, enable_system_proxy=false
+        IVerge::enter_temp_tun_fallback(Some(true), Some(false));
+        // 同会话重复进入不会覆盖首次捕获的磁盘快照
+        IVerge::enter_temp_tun_fallback(Some(false), Some(true));
+
+        // 内存态已回退为 TUN=false, sysproxy=true，且用户随后修改了其它无关设置（如 language）
+        let in_memory = IVerge {
+            enable_tun_mode: Some(false),
+            enable_system_proxy: Some(true),
+            language: Some("en".into()),
+            ..IVerge::default()
+        };
+
+        let disk_view = in_memory.effective_for_disk();
+        assert_eq!(disk_view.enable_tun_mode, Some(true));
+        assert_eq!(disk_view.enable_system_proxy, Some(false));
+        assert_eq!(disk_view.language.as_deref(), Some("en"));
+
+        // 用户显式切换代理开关或执行永久回退后解除锁定，落盘视图与内存态重新一致
+        IVerge::clear_temp_tun_fallback();
+        let unlocked_view = in_memory.effective_for_disk();
+        assert_eq!(unlocked_view.enable_tun_mode, Some(false));
+        assert_eq!(unlocked_view.enable_system_proxy, Some(true));
     }
 }

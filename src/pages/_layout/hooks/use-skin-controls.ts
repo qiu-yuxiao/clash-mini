@@ -51,8 +51,31 @@ export function useSkinControls() {
 
   const dirtyDepthRef = useRef<number | null>(null)
   const dirtyVibrancyRef = useRef<number | null>(null)
+  const lastPersistedDepthRef = useRef<{ skin: string; val: number } | null>(
+    null,
+  )
+  const lastPersistedVibrancyRef = useRef<{ skin: string; val: number } | null>(
+    null,
+  )
   const depthTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const vibrancyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const persistDepthDeduplicated = useCallback((skin: string, val: number) => {
+    const prev = lastPersistedDepthRef.current
+    if (prev && prev.skin === skin && prev.val === val) return
+    writeDepthToStorage(skin, val)
+    lastPersistedDepthRef.current = { skin, val }
+  }, [])
+
+  const persistVibrancyDeduplicated = useCallback(
+    (skin: string, val: number) => {
+      const prev = lastPersistedVibrancyRef.current
+      if (prev && prev.skin === skin && prev.val === val) return
+      writeVibrancyToStorage(skin, val)
+      lastPersistedVibrancyRef.current = { skin, val }
+    },
+    [],
+  )
 
   const flushDirtyFactors = useCallback(() => {
     if (depthTimerRef.current !== null) {
@@ -65,16 +88,16 @@ export function useSkinControls() {
     }
     const skin = currentSkinRef.current
     if (dirtyDepthRef.current !== null) {
-      writeDepthToStorage(skin, dirtyDepthRef.current)
+      persistDepthDeduplicated(skin, dirtyDepthRef.current)
       dirtyDepthRef.current = null
     }
     if (dirtyVibrancyRef.current !== null) {
-      writeVibrancyToStorage(skin, dirtyVibrancyRef.current)
+      persistVibrancyDeduplicated(skin, dirtyVibrancyRef.current)
       dirtyVibrancyRef.current = null
     }
-  }, [])
+  }, [persistDepthDeduplicated, persistVibrancyDeduplicated])
 
-  // 监听皮肤切换自定义事件，并在页面卸载/隐藏时同步冲刷未落盘的脏值（BUG-358）
+  // 监听皮肤切换自定义事件，并在页面卸载/隐藏/失焦时同步冲刷未落盘的脏值（BUG-358）
   useEffect(() => {
     const handleSkinChanged = () => {
       flushDirtyFactors()
@@ -88,82 +111,112 @@ export function useSkinControls() {
         readFactor('val2', newSkin, 1.0, 'clash-mini-vibrancy-factor'),
       )
     }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushDirtyFactors()
+      }
+    }
     window.addEventListener('clash-mini-skin-changed', handleSkinChanged)
     window.addEventListener('pagehide', flushDirtyFactors)
     window.addEventListener('beforeunload', flushDirtyFactors)
+    window.addEventListener('blur', flushDirtyFactors)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       flushDirtyFactors()
       window.removeEventListener('clash-mini-skin-changed', handleSkinChanged)
       window.removeEventListener('pagehide', flushDirtyFactors)
       window.removeEventListener('beforeunload', flushDirtyFactors)
+      window.removeEventListener('blur', flushDirtyFactors)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [flushDirtyFactors])
 
-  // BUG-358: 拖动过程即时更新内存态与 CSS 变量（60fps 丝滑无阻塞），辅以 200ms 防抖落盘 + 松手/卸载即时冲刷双保险
-  const handleDepthFactorChange = useCallback((val: number) => {
-    setDepthFactor(val)
-    document.documentElement.style.setProperty('--depth-factor', val.toString())
-    document.documentElement.style.setProperty(
-      '--control-skin-val1',
-      val.toString(),
-    )
-    dirtyDepthRef.current = val
-    if (depthTimerRef.current !== null) {
-      clearTimeout(depthTimerRef.current)
-    }
-    depthTimerRef.current = setTimeout(() => {
-      depthTimerRef.current = null
-      if (dirtyDepthRef.current !== null) {
-        writeDepthToStorage(currentSkinRef.current, dirtyDepthRef.current)
-        dirtyDepthRef.current = null
+  // BUG-358: 拖动过程即时更新内存态与 CSS 变量（60fps 丝滑无阻塞），辅以 200ms 防抖落盘 + 松手去重/失焦/隐藏/卸载即时冲刷
+  const handleDepthFactorChange = useCallback(
+    (val: number) => {
+      setDepthFactor(val)
+      document.documentElement.style.setProperty(
+        '--depth-factor',
+        val.toString(),
+      )
+      document.documentElement.style.setProperty(
+        '--control-skin-val1',
+        val.toString(),
+      )
+      dirtyDepthRef.current = val
+      if (depthTimerRef.current !== null) {
+        clearTimeout(depthTimerRef.current)
       }
-    }, PERSIST_DEBOUNCE_MS)
-  }, [])
+      depthTimerRef.current = setTimeout(() => {
+        depthTimerRef.current = null
+        if (dirtyDepthRef.current !== null) {
+          persistDepthDeduplicated(
+            currentSkinRef.current,
+            dirtyDepthRef.current,
+          )
+          dirtyDepthRef.current = null
+        }
+      }, PERSIST_DEBOUNCE_MS)
+    },
+    [persistDepthDeduplicated],
+  )
 
-  const commitDepthFactorChange = useCallback((val: number) => {
-    if (depthTimerRef.current !== null) {
-      clearTimeout(depthTimerRef.current)
-      depthTimerRef.current = null
-    }
-    dirtyDepthRef.current = null
-    const skin = readSkin()
-    currentSkinRef.current = skin
-    writeDepthToStorage(skin, val)
-  }, [])
-
-  const handleVibrancyFactorChange = useCallback((val: number) => {
-    setVibrancyFactor(val)
-    document.documentElement.style.setProperty(
-      '--vibrancy-factor',
-      val.toString(),
-    )
-    document.documentElement.style.setProperty(
-      '--control-skin-val2',
-      val.toString(),
-    )
-    dirtyVibrancyRef.current = val
-    if (vibrancyTimerRef.current !== null) {
-      clearTimeout(vibrancyTimerRef.current)
-    }
-    vibrancyTimerRef.current = setTimeout(() => {
-      vibrancyTimerRef.current = null
-      if (dirtyVibrancyRef.current !== null) {
-        writeVibrancyToStorage(currentSkinRef.current, dirtyVibrancyRef.current)
-        dirtyVibrancyRef.current = null
+  const commitDepthFactorChange = useCallback(
+    (val: number) => {
+      if (depthTimerRef.current !== null) {
+        clearTimeout(depthTimerRef.current)
+        depthTimerRef.current = null
       }
-    }, PERSIST_DEBOUNCE_MS)
-  }, [])
+      dirtyDepthRef.current = null
+      const skin = readSkin()
+      currentSkinRef.current = skin
+      persistDepthDeduplicated(skin, val)
+    },
+    [persistDepthDeduplicated],
+  )
 
-  const commitVibrancyFactorChange = useCallback((val: number) => {
-    if (vibrancyTimerRef.current !== null) {
-      clearTimeout(vibrancyTimerRef.current)
-      vibrancyTimerRef.current = null
-    }
-    dirtyVibrancyRef.current = null
-    const skin = readSkin()
-    currentSkinRef.current = skin
-    writeVibrancyToStorage(skin, val)
-  }, [])
+  const handleVibrancyFactorChange = useCallback(
+    (val: number) => {
+      setVibrancyFactor(val)
+      document.documentElement.style.setProperty(
+        '--vibrancy-factor',
+        val.toString(),
+      )
+      document.documentElement.style.setProperty(
+        '--control-skin-val2',
+        val.toString(),
+      )
+      dirtyVibrancyRef.current = val
+      if (vibrancyTimerRef.current !== null) {
+        clearTimeout(vibrancyTimerRef.current)
+      }
+      vibrancyTimerRef.current = setTimeout(() => {
+        vibrancyTimerRef.current = null
+        if (dirtyVibrancyRef.current !== null) {
+          persistVibrancyDeduplicated(
+            currentSkinRef.current,
+            dirtyVibrancyRef.current,
+          )
+          dirtyVibrancyRef.current = null
+        }
+      }, PERSIST_DEBOUNCE_MS)
+    },
+    [persistVibrancyDeduplicated],
+  )
+
+  const commitVibrancyFactorChange = useCallback(
+    (val: number) => {
+      if (vibrancyTimerRef.current !== null) {
+        clearTimeout(vibrancyTimerRef.current)
+        vibrancyTimerRef.current = null
+      }
+      dirtyVibrancyRef.current = null
+      const skin = readSkin()
+      currentSkinRef.current = skin
+      persistVibrancyDeduplicated(skin, val)
+    },
+    [persistVibrancyDeduplicated],
+  )
 
   // CSS 变量注入
   useEffect(() => {

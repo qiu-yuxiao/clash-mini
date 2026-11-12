@@ -1121,9 +1121,17 @@ const Layout = () => {
   // Logs dialog state
   const [logsOpen, setLogsOpen] = useState(false)
 
-  // BUG-355: 统一经 disable-webview-shortcuts 模块绑定主界面快捷键（严格校验修饰键与输入焦点，不误伤 Alt+F4）
+  // BUG-355: 统一经 disable-webview-shortcuts 单一监听器绑定主界面快捷键（覆盖全部弹窗/菜单排除、编辑态保护与防误伤 Alt+F4）
   const isAnyOverlayOpen =
-    drawerOpen || logsOpen || editProfileOpen || addUrlOpen || firstRunGuideOpen
+    drawerOpen ||
+    logsOpen ||
+    editProfileOpen ||
+    addUrlOpen ||
+    firstRunGuideOpen ||
+    clientUpdateOpen ||
+    coreUpdateOpen ||
+    isColumnManagerOpen ||
+    Boolean(helpAnchorEl)
   const isAnyOverlayOpenRef = useRef(isAnyOverlayOpen)
   useEffect(() => {
     isAnyOverlayOpenRef.current = isAnyOverlayOpen

@@ -32,49 +32,200 @@ pub struct CoreUpgradeProgress {
     pub message: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CoreBinaryValidation {
+    /// 体积、DOS 头、COFF 头（AMD64 可执行映像）、PE32+ Optional Header 与节表边界均合法
+    Valid,
+    /// 文件确系截断或 PE 结构损坏（可安全清理该托管热更产物）
+    Corrupted(String),
+    /// 瞬时 I/O 不可读（如杀软扫描独占、句柄未释放、权限暂不可达），严禁误删原文件
+    IoUnavailable(String),
+}
+
 pub struct CoreUpdater;
 
 impl CoreUpdater {
     pub const MIN_VALID_CORE_BYTES: u64 = 5 * 1024 * 1024;
+    const IMAGE_FILE_MACHINE_AMD64: u16 = 0x8664;
+    const IMAGE_FILE_EXECUTABLE_IMAGE: u16 = 0x0002;
+    const IMAGE_NT_OPTIONAL_HDR64_MAGIC: u16 = 0x020B;
 
-    /// 校验 Mihomo Windows PE 可执行文件的体积下限（>= 5MB）、DOS MZ 头、e_lfanew 偏移边界与 PE\0\0 签名头（BUG-319 / BUG-346）。
-    pub fn validate_mihomo_pe_binary(path: &std::path::Path) -> Result<()> {
+    /// 深度检查 Mihomo Windows x64 PE32+ 可执行文件，严格区分「真实结构损坏」与「瞬时 I/O 不可读」（BUG-319 / BUG-346）。
+    pub fn inspect_mihomo_pe_binary(path: &std::path::Path) -> CoreBinaryValidation {
         use io::{Read as _, Seek as _};
 
-        let meta = fs::metadata(path).context("failed to stat core binary")?;
+        let meta = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(e) => return CoreBinaryValidation::IoUnavailable(format!("读取内核文件元数据失败: {e}")),
+        };
+        if !meta.is_file() {
+            return CoreBinaryValidation::Corrupted("目标内核路径不是普通文件".to_string());
+        }
         let file_len = meta.len();
         if file_len < Self::MIN_VALID_CORE_BYTES {
-            bail!("内核二进制体积异常（{} bytes < 5MB），判定为截断或损坏文件", file_len);
+            return CoreBinaryValidation::Corrupted(format!(
+                "内核二进制体积异常（{} bytes < 5MB），判定为截断或损坏文件",
+                file_len
+            ));
         }
 
-        let mut file = fs::File::open(path).context("failed to open core binary for PE validation")?;
+        let mut file = match fs::File::open(path) {
+            Ok(f) => f,
+            Err(e) => {
+                return CoreBinaryValidation::IoUnavailable(format!(
+                    "打开内核文件失败（可能正被安全软件扫描或其它进程占用）: {e}"
+                ));
+            }
+        };
+
         let mut dos_header = [0u8; 64];
-        file.read_exact(&mut dos_header)
-            .context("failed to read 64-byte DOS header")?;
+        if let Err(e) = file.read_exact(&mut dos_header) {
+            return if e.kind() == io::ErrorKind::UnexpectedEof {
+                CoreBinaryValidation::Corrupted(format!("读取 64 字节 DOS 头意外截断: {e}"))
+            } else {
+                CoreBinaryValidation::IoUnavailable(format!("读取 DOS 头 I/O 异常: {e}"))
+            };
+        }
         if &dos_header[0..2] != b"MZ" {
-            bail!("内核文件缺少有效 DOS MZ 签名头");
+            return CoreBinaryValidation::Corrupted("内核文件缺少有效 DOS MZ 签名头".to_string());
         }
 
         let e_lfanew =
             u32::from_le_bytes([dos_header[0x3C], dos_header[0x3D], dos_header[0x3E], dos_header[0x3F]]) as u64;
-        if e_lfanew < 64 || e_lfanew.saturating_add(4) > file_len {
-            bail!(
+        // 至少容纳 PE\0\0 (4B) + COFF FileHeader (20B) + OptionalHeader.Magic (2B) = 26 字节
+        if e_lfanew < 64 || e_lfanew.saturating_add(26) > file_len {
+            return CoreBinaryValidation::Corrupted(format!(
                 "内核文件 PE 头偏移指针越界损坏 (e_lfanew={}, len={})",
-                e_lfanew,
-                file_len
-            );
+                e_lfanew, file_len
+            ));
         }
 
-        file.seek(io::SeekFrom::Start(e_lfanew))
-            .context("failed to seek to PE signature offset")?;
-        let mut pe_sig = [0u8; 4];
-        file.read_exact(&mut pe_sig)
-            .context("failed to read PE\\0\\0 signature")?;
-        if &pe_sig != b"PE\0\0" {
-            bail!("内核文件缺少有效 Windows PE\\0\\0 签名头");
+        if let Err(e) = file.seek(io::SeekFrom::Start(e_lfanew)) {
+            return CoreBinaryValidation::IoUnavailable(format!("定位 PE 头偏移 I/O 失败: {e}"));
         }
 
-        Ok(())
+        let mut nt_prefix = [0u8; 26];
+        if let Err(e) = file.read_exact(&mut nt_prefix) {
+            return if e.kind() == io::ErrorKind::UnexpectedEof {
+                CoreBinaryValidation::Corrupted(format!("读取 PE/COFF 头意外截断: {e}"))
+            } else {
+                CoreBinaryValidation::IoUnavailable(format!("读取 PE/COFF 头 I/O 异常: {e}"))
+            };
+        }
+
+        if &nt_prefix[0..4] != b"PE\0\0" {
+            return CoreBinaryValidation::Corrupted("内核文件缺少有效 Windows PE\\0\\0 签名头".to_string());
+        }
+
+        let machine = u16::from_le_bytes([nt_prefix[4], nt_prefix[5]]);
+        if machine != Self::IMAGE_FILE_MACHINE_AMD64 {
+            return CoreBinaryValidation::Corrupted(format!(
+                "内核 COFF Machine 架构不匹配 (expected=0x{:04X}, actual=0x{:04X})",
+                Self::IMAGE_FILE_MACHINE_AMD64,
+                machine
+            ));
+        }
+
+        let num_sections = u16::from_le_bytes([nt_prefix[6], nt_prefix[7]]);
+        if !(1..=96).contains(&num_sections) {
+            return CoreBinaryValidation::Corrupted(format!("内核 COFF 节数量异常 (NumberOfSections={num_sections})"));
+        }
+
+        let size_of_opt_hdr = u16::from_le_bytes([nt_prefix[20], nt_prefix[21]]);
+        if size_of_opt_hdr < 112 {
+            return CoreBinaryValidation::Corrupted(format!(
+                "内核 PE32+ Optional Header 长度过小 (SizeOfOptionalHeader={size_of_opt_hdr})"
+            ));
+        }
+
+        let characteristics = u16::from_le_bytes([nt_prefix[22], nt_prefix[23]]);
+        if (characteristics & Self::IMAGE_FILE_EXECUTABLE_IMAGE) == 0 {
+            return CoreBinaryValidation::Corrupted(format!(
+                "内核 COFF Characteristics 未标记为可执行映像 (0x{characteristics:04X})"
+            ));
+        }
+
+        let opt_magic = u16::from_le_bytes([nt_prefix[24], nt_prefix[25]]);
+        if opt_magic != Self::IMAGE_NT_OPTIONAL_HDR64_MAGIC {
+            return CoreBinaryValidation::Corrupted(format!(
+                "内核 Optional Header Magic 非 64 位 PE32+ (expected=0x{:04X}, actual=0x{:04X})",
+                Self::IMAGE_NT_OPTIONAL_HDR64_MAGIC,
+                opt_magic
+            ));
+        }
+
+        let section_table_end = e_lfanew
+            .saturating_add(24)
+            .saturating_add(size_of_opt_hdr as u64)
+            .saturating_add((num_sections as u64).saturating_mul(40));
+        if section_table_end > file_len {
+            return CoreBinaryValidation::Corrupted(format!(
+                "内核 PE 节表越出文件末尾 (section_table_end={section_table_end}, len={file_len})"
+            ));
+        }
+
+        CoreBinaryValidation::Valid
+    }
+
+    /// 供解压暂存区 `.staging` 等必须通过完整校验的调用点使用。
+    pub fn validate_mihomo_pe_binary(path: &std::path::Path) -> Result<()> {
+        match Self::inspect_mihomo_pe_binary(path) {
+            CoreBinaryValidation::Valid => Ok(()),
+            CoreBinaryValidation::Corrupted(reason) => bail!("{reason}"),
+            CoreBinaryValidation::IoUnavailable(reason) => bail!("内核文件 I/O 校验失败: {reason}"),
+        }
+    }
+
+    /// 统一解析托管热升级目录 `cores/mini-mihomo.exe`（供 Sidecar / Service / Validate 三处消费方共用）：
+    /// - 文件不存在：静默返回 `None`（使用内置内核）；
+    /// - 校验通过（`Valid`）：返回可用的自定义内核路径；
+    /// - 瞬时 I/O 不可读（`IoUnavailable`，如杀软扫描锁定）：记录告警、**保留原文件不删除**，本次临时回退内置内核；
+    /// - 确系截断或 PE 结构损坏（`Corrupted`）：记录告警、清理损坏产物（若删除失败同样记录告警），回退内置内核。
+    pub fn resolve_usable_custom_core(cores_dir: &std::path::Path) -> Option<std::path::PathBuf> {
+        let custom_core_path = cores_dir.join("mini-mihomo.exe");
+        match fs::symlink_metadata(&custom_core_path) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return None,
+            Err(e) => {
+                logging!(
+                    warn,
+                    Type::Core,
+                    "读取托管热更内核元数据失败 ({e})，保留原文件并仅在本次回退内置内核: {}",
+                    custom_core_path.display()
+                );
+                return None;
+            }
+            Ok(_) => {}
+        }
+
+        match Self::inspect_mihomo_pe_binary(&custom_core_path) {
+            CoreBinaryValidation::Valid => Some(custom_core_path),
+            CoreBinaryValidation::IoUnavailable(reason) => {
+                logging!(
+                    warn,
+                    Type::Core,
+                    "托管热更内核当前暂时不可读 ({reason})，保留原文件不删除，本次临时回退内置内核: {}",
+                    custom_core_path.display()
+                );
+                None
+            }
+            CoreBinaryValidation::Corrupted(reason) => {
+                logging!(
+                    warn,
+                    Type::Core,
+                    "检测到结构损坏的托管热更内核 ({reason})，自动清理并回退内置内核: {}",
+                    custom_core_path.display()
+                );
+                if let Err(rm_err) = fs::remove_file(&custom_core_path) {
+                    logging!(
+                        warn,
+                        Type::Core,
+                        "清理损坏的托管热更内核失败 ({}): {rm_err}",
+                        custom_core_path.display()
+                    );
+                }
+                None
+            }
+        }
     }
 
     pub async fn check_latest_release() -> Result<GithubRelease> {
@@ -503,27 +654,14 @@ impl CoreUpdater {
         }
 
         // 服务模式下 stop_core IPC 返回时 Session 0 中的 mini-mihomo.exe 可能尚未完全释放映像文件句柄；
-        // 轮询等待进程彻底退出（上限 3 秒，步进 50ms），防止紧接着的 fs::rename 因共享冲突报错（BUG-346）。
-        let _ = tokio::time::timeout(std::time::Duration::from_secs(3), async {
-            loop {
-                let alive = tokio::task::spawn_blocking(|| {
-                    let system = sysinfo::System::new_with_specifics(
-                        sysinfo::RefreshKind::nothing().with_processes(sysinfo::ProcessRefreshKind::nothing()),
-                    );
-                    system
-                        .processes()
-                        .values()
-                        .any(|p| p.name().to_string_lossy().contains("mini-mihomo"))
-                })
-                .await
-                .unwrap_or(false);
-                if !alive {
-                    break;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            }
-        })
-        .await;
+        // 调用共享退出轮询（上限 3 秒，步进 50ms，join 异常保守视为仍存活），防止紧接着的 fs::rename 因共享冲突报错（BUG-346）。
+        if !CoreManager::wait_for_mini_cores_exit(std::time::Duration::from_secs(3)).await {
+            logging!(
+                warn,
+                Type::System,
+                "Core updater: 等待旧 mini-mihomo 进程彻底退出超过 3s，继续进入 rename 短退避"
+            );
+        }
 
         emit_progress("extracting", 90, "正在解压并替换内核程序...");
 
@@ -669,33 +807,54 @@ mod tests {
     use super::*;
     use std::io::Write as _;
 
+    fn build_minimal_valid_pe64_buffer(size: usize) -> Vec<u8> {
+        let mut buf = vec![0u8; size];
+        // DOS Header
+        buf[0] = b'M';
+        buf[1] = b'Z';
+        let e_lfanew = 128usize;
+        buf[0x3C..0x40].copy_from_slice(&(e_lfanew as u32).to_le_bytes());
+
+        // NT Signature: "PE\0\0"
+        buf[e_lfanew..e_lfanew + 4].copy_from_slice(b"PE\0\0");
+        // COFF FileHeader (20 bytes at e_lfanew + 4)
+        let coff = e_lfanew + 4;
+        buf[coff..coff + 2].copy_from_slice(&0x8664u16.to_le_bytes()); // Machine = AMD64
+        buf[coff + 2..coff + 4].copy_from_slice(&5u16.to_le_bytes()); // NumberOfSections = 5
+        buf[coff + 16..coff + 18].copy_from_slice(&240u16.to_le_bytes()); // SizeOfOptionalHeader = 240
+        buf[coff + 18..coff + 20].copy_from_slice(&0x0022u16.to_le_bytes()); // EXECUTABLE_IMAGE | LARGE_ADDRESS_AWARE
+
+        // OptionalHeader.Magic (2 bytes at e_lfanew + 24)
+        let opt = e_lfanew + 24;
+        buf[opt..opt + 2].copy_from_slice(&0x020Bu16.to_le_bytes()); // PE32+ (64-bit)
+        buf
+    }
+
     #[test]
-    fn test_validate_mihomo_pe_binary_checks_size_and_pe_signature() {
+    fn test_validate_mihomo_pe_binary_checks_pe64_coff_and_distinguishes_io() {
         let temp_dir = std::env::temp_dir().join(format!("clash_mini_pe_test_{}", std::process::id()));
         fs::create_dir_all(&temp_dir).unwrap();
 
-        // 1. 小于 5MB 的文件应被拦截
+        // 1. 不存在的文件应归类为 IoUnavailable，而非 Corrupted
+        let missing_path = temp_dir.join("missing.exe");
+        assert!(matches!(
+            CoreUpdater::inspect_mihomo_pe_binary(&missing_path),
+            CoreBinaryValidation::IoUnavailable(_)
+        ));
+        assert!(CoreUpdater::resolve_usable_custom_core(&temp_dir).is_none());
+
+        // 2. 小于 5MB 的截断文件应判定为 Corrupted
         let small_path = temp_dir.join("small.exe");
         fs::write(&small_path, b"MZ\x00\x00").unwrap();
-        assert!(CoreUpdater::validate_mihomo_pe_binary(&small_path).is_err());
+        assert!(matches!(
+            CoreUpdater::inspect_mihomo_pe_binary(&small_path),
+            CoreBinaryValidation::Corrupted(_)
+        ));
 
-        // 2. 满 5MB 且带 MZ 头、但无有效 e_lfanew / PE\0\0 签名的伪造或半截损坏文件应被拦截
-        let fake_mz_path = temp_dir.join("fake_mz.exe");
+        // 3. 满 5MB 且仅有 4 字节伪造 "MZ" + "PE\0\0"（无合法 AMD64 COFF / PE32+ Magic）必须被拦截为 Corrupted
+        let fake_sig_only_path = temp_dir.join("fake_sig_only.exe");
         {
-            let mut f = fs::File::create(&fake_mz_path).unwrap();
-            let mut buf = vec![0u8; CoreUpdater::MIN_VALID_CORE_BYTES as usize];
-            buf[0] = b'M';
-            buf[1] = b'Z';
-            buf[0x3C..0x40].copy_from_slice(&128u32.to_le_bytes());
-            buf[128..132].copy_from_slice(b"BAD!");
-            f.write_all(&buf).unwrap();
-        }
-        assert!(CoreUpdater::validate_mihomo_pe_binary(&fake_mz_path).is_err());
-
-        // 3. 满 5MB 且具备合法 MZ + e_lfanew + PE\0\0 签名的文件应通过校验
-        let valid_pe_path = temp_dir.join("valid_pe.exe");
-        {
-            let mut f = fs::File::create(&valid_pe_path).unwrap();
+            let mut f = fs::File::create(&fake_sig_only_path).unwrap();
             let mut buf = vec![0u8; CoreUpdater::MIN_VALID_CORE_BYTES as usize];
             buf[0] = b'M';
             buf[1] = b'Z';
@@ -703,7 +862,38 @@ mod tests {
             buf[128..132].copy_from_slice(b"PE\0\0");
             f.write_all(&buf).unwrap();
         }
+        assert!(matches!(
+            CoreUpdater::inspect_mihomo_pe_binary(&fake_sig_only_path),
+            CoreBinaryValidation::Corrupted(_)
+        ));
+        assert!(CoreUpdater::validate_mihomo_pe_binary(&fake_sig_only_path).is_err());
+
+        // 4. 满 5MB 但 COFF Machine 为 32 位 x86 (0x014c) 的错包文件必须被拦截为 Corrupted
+        let x86_pe_path = temp_dir.join("x86_pe.exe");
+        {
+            let mut f = fs::File::create(&x86_pe_path).unwrap();
+            let mut buf = build_minimal_valid_pe64_buffer(CoreUpdater::MIN_VALID_CORE_BYTES as usize);
+            buf[132..134].copy_from_slice(&0x014Cu16.to_le_bytes());
+            f.write_all(&buf).unwrap();
+        }
+        assert!(matches!(
+            CoreUpdater::inspect_mihomo_pe_binary(&x86_pe_path),
+            CoreBinaryValidation::Corrupted(_)
+        ));
+
+        // 5. 满 5MB 且具备完整合法 MZ + PE\0\0 + AMD64 COFF + PE32+ Magic + 节表边界的文件应通过校验
+        let valid_pe_path = temp_dir.join("mini-mihomo.exe");
+        {
+            let mut f = fs::File::create(&valid_pe_path).unwrap();
+            let buf = build_minimal_valid_pe64_buffer(CoreUpdater::MIN_VALID_CORE_BYTES as usize);
+            f.write_all(&buf).unwrap();
+        }
+        assert_eq!(
+            CoreUpdater::inspect_mihomo_pe_binary(&valid_pe_path),
+            CoreBinaryValidation::Valid
+        );
         assert!(CoreUpdater::validate_mihomo_pe_binary(&valid_pe_path).is_ok());
+        assert_eq!(CoreUpdater::resolve_usable_custom_core(&temp_dir), Some(valid_pe_path));
 
         let _ = fs::remove_dir_all(&temp_dir);
     }

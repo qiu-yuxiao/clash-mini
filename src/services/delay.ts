@@ -11,6 +11,8 @@ export interface DelayUpdate {
 }
 
 const CACHE_TTL = 30 * 60 * 1000
+// 后端子集测速复用测量组近期缓存（<30s，非实时拨测）注入前端时的最大缓存保鲜期（BUG-344）
+export const REUSED_METRICS_MAX_TTL_MS = 30 * 1000
 
 /**
  * history 回落的最大容忍时长。
@@ -253,6 +255,35 @@ class DelayManager {
     return update
   }
 
+  /**
+   * 恢复测速前的缓存快照（BUG-344）：
+   * - 若测速前存在有效缓存快照，原样恢复其原始 `updatedAt` 时间戳，严禁重新盖章 `Date.now()` 虚增 30min 寿命；
+   * - 若测速前无缓存，删除 `-2` 占位键并向监听者推送 `-1` 未测速通知，使其自然回落 `getDelayFix`。
+   */
+  restoreDelaySnapshot(
+    name: string,
+    group = 'PROXY',
+    snapshot?: DelayUpdate,
+  ): void {
+    const key = hashKey(name, group)
+    let restored: DelayUpdate
+    if (snapshot && snapshot.delay !== -2) {
+      restored = { ...snapshot }
+      this.cache.set(key, restored)
+    } else {
+      this.cache.delete(key)
+      restored = { delay: -1, updatedAt: 0 }
+    }
+
+    const queue = this.pendingItemUpdates.get(key)
+    if (queue) {
+      queue.push(restored)
+    } else {
+      this.pendingItemUpdates.set(key, [restored])
+    }
+    this.scheduleItemFlush()
+  }
+
   getDelayUpdate(name: string, group = 'PROXY') {
     const key = hashKey(name, group)
     const entry = this.cache.get(key)
@@ -316,8 +347,8 @@ class DelayManager {
       `[DelayManager] 开始单点测速（后端测量组），代理: ${name}, 组: ${group}`,
     )
 
-    // 记录原值：后端繁忙 / IPC 异常时用于恢复，避免伪造 Timeout 或卡死在「测速中」
-    const previous = this.getDelayUpdate(name, group)?.delay ?? -1
+    // 记录原始快照（含原始 updatedAt）：后端繁忙 / 未执行 / IPC 异常时原样恢复，避免伪造 Timeout、卡死 -2 或虚增缓存寿命
+    const previousSnapshot = this.getDelayUpdate(name, group)
 
     // 先将状态设置为测试中
     this.setDelay(name, group, -2)
@@ -347,24 +378,53 @@ class DelayManager {
       return this.setDelay(name, group, delay, { elapsed: elapsedTime })
     } catch (error) {
       // 控制面错误（AUTO_SELECT_BUSY 互斥抢占 / AUTO_SELECT_NO_RESULT 测速未执行 /
-      // IPC 异常）均不代表节点超时：恢复原值并抛出，交由调用方决定提示方式
+      // IPC 异常）均不代表节点超时：恢复原始快照（保留原 updatedAt）并抛出，交由调用方决定提示方式
       console.error(`[DelayManager] 单点测速失败，代理: ${name}`, error)
-      this.setDelay(name, group, previous)
+      this.restoreDelaySnapshot(name, group, previousSnapshot)
       throw error
     }
   }
 
   /**
    * 注入后台批量测速结果到缓存，并通知 UI 刷新
-   * 由 Tauri 事件 verge://backend-delay-results 驱动
+   * 由 Tauri 事件 verge://backend-delay-results 驱动（BUG-344 区分实时探测与近期缓存复用）
    */
-  injectBatchResults(group = 'PROXY', results: Array<[string, number]>) {
+  injectBatchResults(
+    group = 'PROXY',
+    results: Array<[string, number]>,
+    options?: { fromProbe?: boolean },
+  ) {
+    const fromProbe = options?.fromProbe ?? true
     debugLog(
-      `[DelayManager] 注入后台测速结果，组: ${group}, 数量: ${results.length}`,
+      `[DelayManager] 注入后台测速结果，组: ${group}, 数量: ${results.length}, fromProbe: ${fromProbe}`,
     )
     const now = Date.now()
     for (const [name, delay] of results) {
-      this.setDelay(name, group, delay, { elapsed: Date.now() - now })
+      if (fromProbe) {
+        this.setDelay(name, group, delay, { elapsed: Date.now() - now })
+      } else {
+        const key = hashKey(name, group)
+        const existing = this.cache.get(key)
+        const cappedUpdatedAt =
+          existing &&
+          existing.delay !== -2 &&
+          now - existing.updatedAt <= CACHE_TTL
+            ? existing.updatedAt
+            : now - CACHE_TTL + REUSED_METRICS_MAX_TTL_MS
+        const update: DelayUpdate = {
+          delay,
+          elapsed: Date.now() - now,
+          updatedAt: cappedUpdatedAt,
+        }
+        this.cache.set(key, update)
+        const queue = this.pendingItemUpdates.get(key)
+        if (queue) {
+          queue.push(update)
+        } else {
+          this.pendingItemUpdates.set(key, [update])
+        }
+        this.scheduleItemFlush()
+      }
     }
     this.queueGroupNotification(group)
   }

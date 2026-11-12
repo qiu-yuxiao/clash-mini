@@ -141,7 +141,69 @@ fn system32_sc_exe() -> PathBuf {
         .join("sc.exe")
 }
 
-pub fn is_service_installed() -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScmServiceRegistration {
+    /// SCM 中未注册 `clash_verge_service`
+    NotInstalled,
+    /// SCM 中虽有注册项，但启动类型被禁用（`SERVICE_DISABLED = 4`）或服务二进制文件缺失，无法自恢复
+    DisabledOrBroken,
+    /// SCM 中已正常注册且服务二进制文件存在
+    InstalledAndEnabled,
+}
+
+fn extract_service_exe_from_image_path(raw: &str) -> Option<PathBuf> {
+    let raw_trimmed = raw.trim();
+    let trimmed = raw_trimmed.strip_prefix(r"\??\").unwrap_or(raw_trimmed);
+    if trimmed.is_empty() || trimmed.contains('%') {
+        return None;
+    }
+    let exe_str = if let Some(rest) = trimmed.strip_prefix('"') {
+        rest.split_once('"').map(|(p, _)| p).unwrap_or(rest)
+    } else if let Some(idx) = trimmed.to_ascii_lowercase().find(".exe") {
+        &trimmed[..idx + 4]
+    } else {
+        trimmed
+    };
+    if exe_str.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(exe_str))
+    }
+}
+
+/// 检查 SCM 服务注册状态、禁用标志与二进制完整性（纯注册表毫秒级读取 + 必要时 `sc.exe` 兜底，BUG-328）。
+pub fn inspect_service_registration() -> ScmServiceRegistration {
+    use winreg::RegKey;
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+
+    match RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey(r"SYSTEM\CurrentControlSet\Services\clash_verge_service") {
+        Ok(subkey) => {
+            // Start == 4 为 Win32 SERVICE_DISABLED（与系统显示语言无关）
+            if let Ok(start_type) = subkey.get_value::<u32, _>("Start")
+                && start_type == 4
+            {
+                return ScmServiceRegistration::DisabledOrBroken;
+            }
+            if let Ok(image_path) = subkey.get_value::<std::string::String, _>("ImagePath")
+                && let Some(exe_path) = extract_service_exe_from_image_path(&image_path)
+                && !exe_path.exists()
+            {
+                return ScmServiceRegistration::DisabledOrBroken;
+            }
+            ScmServiceRegistration::InstalledAndEnabled
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => ScmServiceRegistration::NotInstalled,
+        Err(_) => {
+            if is_service_installed_via_sc() {
+                ScmServiceRegistration::InstalledAndEnabled
+            } else {
+                ScmServiceRegistration::NotInstalled
+            }
+        }
+    }
+}
+
+fn is_service_installed_via_sc() -> bool {
     use std::os::windows::process::CommandExt as _;
     let sc_path = system32_sc_exe();
     let output = std::process::Command::new(&sc_path)
@@ -156,6 +218,24 @@ pub fn is_service_installed() -> bool {
     } else {
         false
     }
+}
+
+pub fn is_service_installed() -> bool {
+    !matches!(inspect_service_registration(), ScmServiceRegistration::NotInstalled)
+}
+
+/// 异步非阻塞查询 SCM 服务注册与可用性状态，避免阻塞 tokio worker 线程（BUG-328）。
+pub async fn inspect_service_registration_async() -> ScmServiceRegistration {
+    tokio::task::spawn_blocking(inspect_service_registration)
+        .await
+        .unwrap_or(ScmServiceRegistration::NotInstalled)
+}
+
+pub async fn is_service_installed_async() -> bool {
+    !matches!(
+        inspect_service_registration_async().await,
+        ScmServiceRegistration::NotInstalled
+    )
 }
 
 fn start_service() -> Result<()> {
@@ -223,30 +303,17 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
 
     let app_dir = dirs::app_home_dir()?;
     let cores_dir = app_dir.join("cores");
-    let custom_core_path = cores_dir.join("mini-mihomo.exe");
 
-    let bin_path = if custom_core_path.exists() {
-        match crate::core::core_updater::CoreUpdater::validate_mihomo_pe_binary(&custom_core_path) {
-            Ok(()) => {
-                logging!(
-                    info,
-                    Type::Service,
-                    "Service using custom core: {}",
-                    custom_core_path.display()
-                );
-                custom_core_path
-            }
-            Err(err) => {
-                logging!(
-                    warn,
-                    Type::Service,
-                    "Service 检测到损坏的自定义内核文件 ({err})，自动移除并回退内置内核: {}",
-                    custom_core_path.display()
-                );
-                let _ = std::fs::remove_file(&custom_core_path);
-                current_exe()?.with_file_name(format!("{clash_core}.exe"))
-            }
-        }
+    let bin_path = if let Some(custom_core_path) =
+        crate::core::core_updater::CoreUpdater::resolve_usable_custom_core(&cores_dir)
+    {
+        logging!(
+            info,
+            Type::Service,
+            "Service using custom core: {}",
+            custom_core_path.display()
+        );
+        custom_core_path
     } else {
         current_exe()?.with_file_name(format!("{clash_core}.exe"))
     };
@@ -446,10 +513,17 @@ impl ServiceManager {
                 return Ok(());
             }
 
-            if is_service_installed() {
-                logging!(info, Type::Service, "服务已安装但未运行，尝试启动服务");
-                self.apply_service_status(ServiceStatus::StartRequired).await?;
-                return Ok(());
+            match inspect_service_registration_async().await {
+                ScmServiceRegistration::InstalledAndEnabled => {
+                    logging!(info, Type::Service, "服务已安装但未运行，尝试启动服务");
+                    self.apply_service_status(ServiceStatus::StartRequired).await?;
+                    return Ok(());
+                }
+                ScmServiceRegistration::DisabledOrBroken => {
+                    self.set_status(ServiceStatus::Unavailable("Service disabled or binary missing".into()));
+                    return Ok(());
+                }
+                ScmServiceRegistration::NotInstalled => {}
             }
 
             self.set_status(ServiceStatus::Unavailable("Service not installed".into()));
@@ -481,17 +555,25 @@ impl ServiceManager {
                 run_service_command(force_reinstall_service, "force reinstall service").await?;
                 wait_for_service_ipc(self).await?;
             }
-            ServiceStatus::InstallRequired => {
-                if is_service_installed() {
+            ServiceStatus::InstallRequired => match inspect_service_registration_async().await {
+                ScmServiceRegistration::InstalledAndEnabled => {
                     logging!(info, Type::Service, "服务已安装但未运行，转换为启动服务");
                     self.set_status(ServiceStatus::StartRequired);
                     run_service_command(start_service, "start service").await?;
                     return wait_for_service_ipc(self).await;
                 }
-                logging!(info, Type::Service, "需要安装服务，执行安装流程");
-                run_service_command(install_service, "install service").await?;
-                wait_for_service_ipc(self).await?;
-            }
+                ScmServiceRegistration::DisabledOrBroken => {
+                    logging!(info, Type::Service, "检测到服务已禁用或文件缺失，转换为重装服务");
+                    self.set_status(ServiceStatus::ReinstallRequired);
+                    run_service_command(reinstall_service, "reinstall service").await?;
+                    return wait_for_service_ipc(self).await;
+                }
+                ScmServiceRegistration::NotInstalled => {
+                    logging!(info, Type::Service, "需要安装服务，执行安装流程");
+                    run_service_command(install_service, "install service").await?;
+                    wait_for_service_ipc(self).await?;
+                }
+            },
             ServiceStatus::UninstallRequired => {
                 logging!(info, Type::Service, "服务需要卸载，执行卸载流程");
                 run_service_command(uninstall_service, "uninstall service").await?;

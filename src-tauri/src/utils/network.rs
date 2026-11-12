@@ -48,6 +48,25 @@ enum TlsRootMode {
     StaticWebpkiRoots,
 }
 
+/// 连接期异步 DNS 校验器（BUG-327）：在直连建连阶段实时解析并校验全部候选 IP，
+/// 消除预检 `ToSocketAddrs` 与真实建连之间的 DNS Rebinding TOCTOU 窗口。
+struct SsrfSafeDnsResolver;
+
+impl reqwest::dns::Resolve for SsrfSafeDnsResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_owned();
+        Box::pin(async move {
+            let resolved: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
+            for addr in &resolved {
+                crate::config::check_disallowed_ssrf_ip(addr.ip())
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::PermissionDenied, e.to_string()))?;
+            }
+            let iter: reqwest::dns::Addrs = Box::new(resolved.into_iter());
+            Ok(iter)
+        })
+    }
+}
+
 pub struct NetworkManager;
 
 impl Default for NetworkManager {
@@ -68,10 +87,25 @@ impl NetworkManager {
         accept_invalid_certs: bool,
         timeout_secs: Option<u64>,
         tls_root_mode: TlsRootMode,
+        ssrf_guard: bool,
     ) -> Result<Client> {
+        let redirect_policy = if ssrf_guard {
+            reqwest::redirect::Policy::custom(|attempt| {
+                if attempt.previous().len() >= 10 {
+                    return attempt.error("too many redirects");
+                }
+                if let Err(err) = crate::config::validate_url_no_ssrf(attempt.url()) {
+                    return attempt.error(err.to_string());
+                }
+                attempt.follow()
+            })
+        } else {
+            reqwest::redirect::Policy::limited(10)
+        };
+
         let mut builder = Client::builder()
             .tls_backend_rustls()
-            .redirect(reqwest::redirect::Policy::limited(10))
+            .redirect(redirect_policy)
             .tcp_keepalive(Duration::from_secs(60))
             .pool_max_idle_per_host(8)
             .pool_idle_timeout(Some(Duration::from_secs(15)));
@@ -80,12 +114,15 @@ impl NetworkManager {
             builder = builder.tls_backend_preconfigured(Self::static_webpki_tls_config()?);
         }
 
-        // 设置代理
+        // 设置代理（直连且启用 SSRF 守卫时挂载连接期 SsrfSafeDnsResolver，消除 DNS 重绑定窗口）
         if let Some(proxy_str) = proxy_url {
             let proxy = Proxy::all(proxy_str)?;
             builder = builder.proxy(proxy);
         } else {
             builder = builder.no_proxy();
+            if ssrf_guard {
+                builder = builder.dns_resolver(Arc::new(SsrfSafeDnsResolver));
+            }
         }
 
         builder = builder.default_headers(default_headers);
@@ -157,10 +194,12 @@ impl NetworkManager {
             user_agent,
             accept_invalid_certs,
             TlsRootMode::PlatformVerifier,
+            false,
         )
         .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn get_with_tls_mode(
         &self,
         url: &str,
@@ -169,6 +208,7 @@ impl NetworkManager {
         user_agent: Option<String>,
         accept_invalid_certs: bool,
         tls_root_mode: TlsRootMode,
+        ssrf_guard: bool,
     ) -> Result<HttpResponse> {
         let mut parsed = Url::parse(url)?;
         let mut extra_headers = HeaderMap::new();
@@ -198,6 +238,7 @@ impl NetworkManager {
                 user_agent,
                 accept_invalid_certs,
                 tls_root_mode,
+                ssrf_guard,
             )
             .await?;
 
@@ -245,6 +286,7 @@ impl NetworkManager {
         user_agent: Option<String>,
         accept_invalid_certs: bool,
         tls_root_mode: TlsRootMode,
+        ssrf_guard: bool,
     ) -> Result<Client> {
         let proxy_url: Option<std::string::String> = match proxy_type {
             ProxyType::None => None,
@@ -279,7 +321,14 @@ impl NetworkManager {
             );
         }
 
-        self.build_client(proxy_url, headers, accept_invalid_certs, timeout_secs, tls_root_mode)
+        self.build_client(
+            proxy_url,
+            headers,
+            accept_invalid_certs,
+            timeout_secs,
+            tls_root_mode,
+            ssrf_guard,
+        )
     }
 
     pub async fn get_with_interrupt(
@@ -290,6 +339,31 @@ impl NetworkManager {
         user_agent: Option<String>,
         accept_invalid_certs: bool,
     ) -> Result<HttpResponse> {
+        self.get_internal(url, proxy_type, timeout_secs, user_agent, accept_invalid_certs, false)
+            .await
+    }
+
+    pub async fn get_with_ssrf_guard(
+        &self,
+        url: &str,
+        proxy_type: ProxyType,
+        timeout_secs: Option<u64>,
+        user_agent: Option<String>,
+        accept_invalid_certs: bool,
+    ) -> Result<HttpResponse> {
+        self.get_internal(url, proxy_type, timeout_secs, user_agent, accept_invalid_certs, true)
+            .await
+    }
+
+    async fn get_internal(
+        &self,
+        url: &str,
+        proxy_type: ProxyType,
+        timeout_secs: Option<u64>,
+        user_agent: Option<String>,
+        accept_invalid_certs: bool,
+        ssrf_guard: bool,
+    ) -> Result<HttpResponse> {
         let platform_result = self
             .get_with_tls_mode(
                 url,
@@ -298,6 +372,7 @@ impl NetworkManager {
                 user_agent.clone(),
                 accept_invalid_certs,
                 TlsRootMode::PlatformVerifier,
+                ssrf_guard,
             )
             .await;
 
@@ -311,6 +386,7 @@ impl NetworkManager {
                     user_agent,
                     accept_invalid_certs,
                     TlsRootMode::StaticWebpkiRoots,
+                    ssrf_guard,
                 )
                 .await
                 .map_err(|fallback_err| {
@@ -319,6 +395,27 @@ impl NetworkManager {
                     )
                 }),
             Err(err) => Err(err),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_with_ssrf_guard_blocks_loopback_at_connect_time() {
+        // 即使绕过外层静态校验直接调用 get_with_ssrf_guard，连接期 SsrfSafeDnsResolver 也必须拒绝私网/回环地址
+        let res = NetworkManager::new()
+            .get_with_ssrf_guard("http://localhost:9/sub", ProxyType::None, Some(2), None, false)
+            .await;
+        assert!(res.is_err(), "SsrfSafeDnsResolver must block localhost at connect time");
+        if let Err(err) = res {
+            let chain = format!("{err:#}");
+            assert!(
+                chain.contains("private/loopback") || chain.contains("loopback") || chain.contains("Request failed"),
+                "unexpected error chain: {chain}"
+            );
         }
     }
 }

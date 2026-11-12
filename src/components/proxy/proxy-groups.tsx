@@ -15,7 +15,8 @@ import { useLocation } from 'react-router'
 
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { getProfiles, triggerAutoSelect } from '@/services/cmds'
-import { getDelayManager } from '@/services/delay'
+import { type DelayUpdate, getDelayManager } from '@/services/delay'
+import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
@@ -260,18 +261,50 @@ export const ProxyGroups = (props: Props) => {
       const currentUid = (await getProfiles())?.current || ''
       if (!currentUid) return
 
-      // 视觉占位：立即将待测节点标记为「测速中」以触发流光动画
+      const dm = getDelayManager()
+      const previousSnapshots = new Map<string, DelayUpdate | undefined>()
+      // 视觉占位：记录测速前原始快照并将待测节点标记为「测速中」以触发流光动画
       for (const name of visibleNames) {
-        getDelayManager().setDelay(name, groupName, -2)
+        previousSnapshots.set(name, dm.getDelayUpdate(name, groupName))
+        dm.setDelay(name, groupName, -2)
       }
-      getDelayManager().queueGroupNotification(groupName)
+      dm.queueGroupNotification(groupName)
+
+      const rollbackVisible = () => {
+        for (const name of visibleNames) {
+          if (dm.getDelayUpdate(name, groupName)?.delay === -2) {
+            dm.restoreDelaySnapshot(
+              name,
+              groupName,
+              previousSnapshots.get(name),
+            )
+          }
+        }
+        dm.queueGroupNotification(groupName)
+      }
 
       // 委托后端统一执行群发测速 + 择优（select=true）
       // 关键：传入当前可见节点子集 visibleNames，后端只在「该子集」内测速并挑最快，
       // 而非 PROXY 全量——所见即所测所选，与自动选点（全量）行为区分开
       try {
-        await triggerAutoSelect(currentUid, visibleNames, 0, true)
+        const results = await triggerAutoSelect(
+          currentUid,
+          visibleNames,
+          0,
+          true,
+        )
+        if (results.length === 0) {
+          rollbackVisible()
+          showNotice.error('settings.mini.testNotExecuted')
+        }
       } catch (err) {
+        rollbackVisible()
+        const msg = String(err instanceof Error ? err.message : err)
+        if (msg.includes('AUTO_SELECT_BUSY')) {
+          showNotice.info('settings.mini.testingInProgress')
+        } else {
+          showNotice.error('settings.mini.testFailed', { message: msg })
+        }
         console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
       }
     } catch (error) {
@@ -288,40 +321,75 @@ export const ProxyGroups = (props: Props) => {
   })
 
   // BUG-355: 绑定 F4 / F1 全局测速快捷键（F4=当前过滤可见子集测速优选，F1=全量节点测速优选）
-  const handleCheckFullGroup = useStableCallback(async (groupName: string) => {
-    if (testingGroupsRef.current[groupName]) return
-    updateTestingGroups((prev) => ({ ...prev, [groupName]: true }))
+  const handleCheckFull = useStableCallback(async () => {
+    const uiGroupName = renderList.find((item) => item.group?.name)?.group?.name
+    if (!uiGroupName || testingGroupsRef.current[uiGroupName]) return
+    updateTestingGroups((prev) => ({ ...prev, [uiGroupName]: true }))
+    const dm = getDelayManager()
+    const previousSnapshots = new Map<string, DelayUpdate | undefined>()
+    let uniqueNames: string[] = []
     try {
       const currentUid = (await getProfiles())?.current || ''
       if (!currentUid) return
       const allGroupNames = renderList
-        .filter((e) => e.group?.name === groupName && e.group?.all)
+        .filter((e) => e.group?.name === uiGroupName && e.group?.all)
         .flatMap((e) => (e.group?.all ?? []).map((p) => p.name))
-      const uniqueNames = Array.from(new Set(allGroupNames)).filter(
+      uniqueNames = Array.from(new Set(allGroupNames)).filter(
         (name) => !!name && !isDummyNode(name),
       )
       for (const name of uniqueNames) {
-        getDelayManager().setDelay(name, groupName, -2)
+        previousSnapshots.set(name, dm.getDelayUpdate(name, uiGroupName))
+        dm.setDelay(name, uiGroupName, -2)
       }
-      getDelayManager().queueGroupNotification(groupName)
-      await triggerAutoSelect(currentUid, undefined, 0, true)
+      dm.queueGroupNotification(uiGroupName)
+      const results = await triggerAutoSelect(currentUid, undefined, 0, true)
+      if (results.length === 0) {
+        for (const name of uniqueNames) {
+          if (dm.getDelayUpdate(name, uiGroupName)?.delay === -2) {
+            dm.restoreDelaySnapshot(
+              name,
+              uiGroupName,
+              previousSnapshots.get(name),
+            )
+          }
+        }
+        dm.queueGroupNotification(uiGroupName)
+        showNotice.error('settings.mini.testNotExecuted')
+      }
     } catch (err) {
+      for (const name of uniqueNames) {
+        if (dm.getDelayUpdate(name, uiGroupName)?.delay === -2) {
+          dm.restoreDelaySnapshot(
+            name,
+            uiGroupName,
+            previousSnapshots.get(name),
+          )
+        }
+      }
+      dm.queueGroupNotification(uiGroupName)
+      const msg = String(err instanceof Error ? err.message : err)
+      if (msg.includes('AUTO_SELECT_BUSY')) {
+        showNotice.info('settings.mini.testingInProgress')
+      } else {
+        showNotice.error('settings.mini.testFailed', { message: msg })
+      }
       console.error('[ProxyGroups] F1 全量测速/选点失败:', err)
     } finally {
       if (isMountedRef.current) {
-        updateTestingGroups((prev) => ({ ...prev, [groupName]: false }))
+        updateTestingGroups((prev) => ({ ...prev, [uiGroupName]: false }))
       }
     }
   })
 
   const handleAppShortcut = useStableCallback((e: Event) => {
     const action = (e as CustomEvent<string>).detail
-    const targetGroupName =
-      renderList.find((item) => item.group?.name)?.group?.name || 'PROXY'
+    const targetGroupName = renderList.find((item) => item.group?.name)?.group
+      ?.name
+    if (!targetGroupName) return
     if (action === 'check-visible') {
       void handleCheckAll(targetGroupName)
     } else if (action === 'check-full') {
-      void handleCheckFullGroup(targetGroupName)
+      void handleCheckFull()
     }
   })
 

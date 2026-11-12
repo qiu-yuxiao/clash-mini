@@ -474,9 +474,9 @@ impl PrfItem {
             );
         }
 
-        // 使用网络管理器发送请求
+        // 使用带连接期/重定向逐跳 SSRF 守卫的网络管理器发送请求（BUG-327）
         let resp = match NetworkManager::new()
-            .get_with_interrupt(
+            .get_with_ssrf_guard(
                 url.as_str(),
                 proxy_type,
                 Some(timeout),
@@ -785,7 +785,7 @@ fn parse_subscription_content(data: &str) -> Result<(Mapping, String)> {
 }
 
 /// 校验单个 IP 地址是否属于禁止访问的回环 / 私网 / 链路本地 / 唯一本地 / IPv4 映射私网地址（BUG-327）
-fn check_disallowed_ssrf_ip(ip: std::net::IpAddr) -> Result<()> {
+pub(crate) fn check_disallowed_ssrf_ip(ip: std::net::IpAddr) -> Result<()> {
     let check_v4 = |ipv4: std::net::Ipv4Addr| -> Result<()> {
         if ipv4.is_loopback() || ipv4.is_private() || ipv4.is_unspecified() || ipv4.is_link_local() {
             bail!("cannot fetch subscription from private/loopback IP");
@@ -812,8 +812,9 @@ fn check_disallowed_ssrf_ip(ip: std::net::IpAddr) -> Result<()> {
     }
 }
 
-/// SSRF 防护：禁止访问内网/回环地址
-fn validate_url_no_ssrf(url: &Url) -> Result<()> {
+/// SSRF 防护：禁止访问内网/回环地址（入口静态校验 + 本地预解析拦截，配合 `NetworkManager::get_with_ssrf_guard`
+/// 的连接期 `SsrfSafeDnsResolver` 与 30x 重定向逐跳复验形成多层防线，BUG-327）
+pub(crate) fn validate_url_no_ssrf(url: &Url) -> Result<()> {
     if let Some(host) = url.host() {
         // 1. 静态字符串与直接 IP 校验
         match host {
@@ -843,10 +844,14 @@ fn validate_url_no_ssrf(url: &Url) -> Result<()> {
             }
         }
 
-        // 2. 动态 DNS 解析校验，拦截解析到回环/私网/ULA/IPv4-mapped 私网的域名。
-        // 【重要边界说明】ToSocketAddrs 走操作系统本地直连 DNS，而国内网络环境下大量正规机场订阅域名
-        // 在本地 ISP DNS 下会遭遇污染或 NXDOMAIN/超时，需交由后续 127.0.0.1:10801 代理回退链远端解析拉取；
-        // 因此本地 DNS 解析返回 Err 时必须放行，仅在解析成功且命中内网地址时阻断（BUG-327）。
+        // 2. 动态 DNS 预解析校验，拦截解析到回环/私网/ULA/IPv4-mapped 私网的域名。
+        // 【多层防线与已知边界说明（BUG-327）】：
+        // - 本地 `ToSocketAddrs` 在国内 ISP DNS 下对被污染/NXDOMAIN 的正规机场订阅域名会返回 Err，
+        //   此处不直接拒绝，以便 `perform_profile_update` 后续回退至 `127.0.0.1:10801` 本地代理通道拉取；
+        // - 直连请求（`ProxyType::None`）由 `NetworkManager` 挂载连接期 `SsrfSafeDnsResolver` 消除 DNS Rebinding TOCTOU；
+        // - 直连与代理请求均挂载 `redirect::Policy::custom` 对每一跳 30x 重定向目标再次执行 `validate_url_no_ssrf`；
+        // - 已知架构边界：当请求经 HTTP 代理隧道（`ProxyType::Localhost` / `ProxyType::System`）交由远端节点解析域名且未发生 HTTP 重定向时，
+        //   客户端套接字层不可见远端 DNS 解析出的最终 IP，该场景依赖代理内核及出站节点侧策略隔离。
         use std::net::ToSocketAddrs as _;
         let host_str = match host {
             url::Host::Domain(d) => d.to_string(),

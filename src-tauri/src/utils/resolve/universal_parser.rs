@@ -2100,6 +2100,14 @@ mod tests {
         let trojan_map = parse_trojan(trojan_link).unwrap();
         assert_eq!(
             trojan_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "trojan.example.com"
+        );
+        assert_eq!(
+            trojan_map
                 .get(serde_yaml_ng::Value::from("port"))
                 .unwrap()
                 .as_u64()
@@ -2109,6 +2117,14 @@ mod tests {
 
         let hy2_link = "hysteria2://p@ss@hy2.example.com:8443/?sni=sni.example.com&obfs-password=k@y#Hy2-At";
         let hy2_map = parse_hysteria2(hy2_link).unwrap();
+        assert_eq!(
+            hy2_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "hy2.example.com"
+        );
         assert_eq!(
             hy2_map
                 .get(serde_yaml_ng::Value::from("port"))
@@ -2122,6 +2138,14 @@ mod tests {
         let hy1_map = parse_hysteria(hy1_link).unwrap();
         assert_eq!(
             hy1_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "hy1.example.com"
+        );
+        assert_eq!(
+            hy1_map
                 .get(serde_yaml_ng::Value::from("port"))
                 .unwrap()
                 .as_u64()
@@ -2133,6 +2157,14 @@ mod tests {
         let anytls_map = parse_anytls(anytls_link).unwrap();
         assert_eq!(
             anytls_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "anytls.example.com"
+        );
+        assert_eq!(
+            anytls_map
                 .get(serde_yaml_ng::Value::from("port"))
                 .unwrap()
                 .as_u64()
@@ -2142,6 +2174,14 @@ mod tests {
 
         let tuic_link = "tuic://uuid:p@ss@tuic.example.com:8443/?sni=sni.example.com&tag=x@y#TUIC-At";
         let tuic_map = parse_tuic(tuic_link).unwrap();
+        assert_eq!(
+            tuic_map
+                .get(serde_yaml_ng::Value::from("server"))
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "tuic.example.com"
+        );
         assert_eq!(
             tuic_map
                 .get(serde_yaml_ng::Value::from("port"))

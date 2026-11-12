@@ -441,8 +441,8 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **单点测速四条契约**（2026-10-08 确立三条，2026-10-17 补第 4 条）：
   1. **仅测量、不切换**：单点测速必须以「不选点」方式调用，严禁改写用户当前所选节点，也绝不回写 `profile.selected`。
   2. **全组拨测属既定代价**：内核只提供「组级拨测」接口，故单节点测速一次**同样会触发对该测量组全量成员的拨测**，耗时由最慢成员决定（拥塞期可达 ≈5000ms），而结果只回报所请求的那一个节点。此为换取「TUN 下无回环、全链路数据源唯一」的既定取舍，不予优化掉。
-  3. **不得伪造超时**：测速**未真正执行**时（内核未就绪 / 无可测节点 / 读不到 PROXY 组，即后端返回空结果），前端必须恢复原值并提示「测速未执行」，**严禁呈现为 Timeout**；仅当测速确已执行、而该节点未测得时，才允许以 Timeout 呈现。
-  4. **不复用缓存（2026-10-17 补充）**：`valid_nodes.len() == 1`（用户显式单点测速，强即时意图）时，**禁止复用测量组新鲜缓存**（`METRICS_REUSE_MAX_AGE_SECS` = 30s），必须发起实时拨测；且当测量组本次未返回任何数据时，**判定为「测速未执行」并返回空结果**（交由前端提示），**禁止走 history 兜底**（`FALLBACK_HISTORY_MAX_AGE_SECS` = 120s）——否则刚恢复的节点会在窗口内持续回报旧的死状态/旧延迟，或把未执行伪造成 Timeout（违反第 3 条）。批量场景（`len > 1`）为抑制全组拨测频率，仍允许复用新鲜缓存。
+  3. **不得伪造超时**：测速**未真正执行或未取得任何实时拨测结果**时（内核未就绪 / 无可测节点 / 读不到 PROXY 组 / 主备测速地址均整体失败 `DelayResultSource::NotExecuted`，即后端返回空结果），前端必须通过 `restoreDelaySnapshot` 原样恢复测速前的缓存快照（严格保留原始 `updatedAt` 时间戳，无原缓存则清除 `-2` 占位）并提示「测速未执行」，**严禁呈现为 Timeout，亦严禁重新盖章 `Date.now()` 虚增 30 分钟缓存寿命**；仅当测速确已执行（`LiveProbe`）而该节点未测得时，才允许以 Timeout 呈现。
+  4. **禁止陈旧 history 兜底与数据来源标记（2026-10-17 补充，v3.2.5 全路径收口）**：`valid_nodes.len() == 1`（用户显式单点测速）时**禁止复用测量组缓存**（`METRICS_REUSE_MAX_AGE_SECS` = 30s），必须发起实时拨测；批量子集场景（`len > 1`）为抑制全组拨测频率，允许在所求节点 `history` 全部新鲜（`< 30s`）时复用（标记 `DelayResultSource::FreshMetricsCache`）。**全路径（单点、批量子集、F1 全量及后台自愈选点）一律彻底废除 120s `history` 退化兜底**：一旦 `probe_metrics_group` 未取得实时数据，立即返回空结果 `NotExecuted`，严禁读取旧 `history` 冒充本次结果或混入 `candidates` 切换出口。同时 `verge://backend-delay-results` 事件携带 `fromProbe: bool` 语义标记：仅 `LiveProbe`（`fromProbe=true`）赋予 30 分钟实时缓存，30s 缓存复用（`fromProbe=false`）在前端强制封顶剩余保鲜期为 30 秒。
 - **互斥与可读反馈**：单点测速、群发测速与后台自愈共用同一互斥锁（`AUTO_SELECT_RUNNING`）。互斥抢占失败（`AUTO_SELECT_BUSY`）属正常竞争，前端**必须给出可读提示**，禁止静默无响应。
 - **所见即所选（子集约束）**：界面通过 F4 触发测速时，测速由内核全量执行，但最终挑出最优节点时**严格限制在用户当前界面的过滤/搜索子集内部**；全量自动优选（F1）则从全量成员中挑选。选点完成后自动持久化写回 `profile.selected`。
 
@@ -450,7 +450,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 - **自愈路径统一记账**：后台监测的三大触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）全部统一汇聚至 `self_heal_with_accounting` 统一记账函数。
 - **25 秒失败冷却防线**：若自愈选点失败或所有节点均不可达，强制进入 **25 秒冷却期**（v3.2.4 由原 60 秒缩短至 25 秒，既杜绝风暴式并发高频测速，又显著加快连续异常时的恢复时效），冷却期内严禁重复发起自愈冲击。
-- **连续 5 次系统级告警**：累计连续 **5 次**自愈全部失败时，调用 Win32 原生 `MessageBoxW` 弹出系统级告警弹窗，提醒用户订阅或本地网络存在致命故障。
+- **连续 5 次系统级告警与重启终态契约**：`evaluate_self_heal_counters` 与 `complete_restart_core_attempt` 将「API 假死 3 次重启计数」与「全节点断流 5 次告警计数」解耦——API 不可达满 3 次触发 `RestartCore` 时仅重置 `api_dead_heal_fail_count`：若内核重启成功（`Ok`），保留 `auto_select_fail_count` 继续累计至第 5 次可靠触发 Win32 原生 `MessageBoxW` 系统告警并重置双计数；若内核重启自身报错（`Err`），则定义为不可恢复终态，立即升级弹出内核重启失败系统告警并重置本轮双计数（内置原子单实例门控防止模态弹窗堆叠）。
 
 ### 5.4 订阅伪节点全链路拦截防线（node.rs）
 
@@ -516,7 +516,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 6.2 用户输入 URL 严格校验与 SSRF 防护
 
 - **网页唤起协议限制**：调用系统浏览器打开外部链接时，严格限制仅允许 `http://` 与 `https://` 协议，彻底阻断 `file://`、`javascript:`、`data:` 等危险伪协议。
-- **订阅导入 SSRF 防线**：解析并导入远程订阅链接前，先进行严格的网络地址预检，禁止解析指向回环地址（`127.0.0.1`、`localhost`）、私有私有局域网网段（`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`）及未指定地址（`0.0.0.0`），防御 SSRF 内网穿透攻击。
+- **订阅导入与更新多层 SSRF 防线**：远程订阅请求执行三层防护：① 入口静态与本地预检（`validate_url_no_ssrf` 拦截单标签主机名、`.localhost`/`.local`/`.internal`/`.lan`/`.home.arpa` 等保留后缀及回环/私网/链路本地/IPv6 ULA `fc00::/7`/IPv4-mapped 私网 IP；本地 `ToSocketAddrs` 解析返回 `Err` 时放行以便被污染订阅域名交由 `127.0.0.1:10801` 代理回退链拉取）；② 直连请求（`ProxyType::None`）挂载连接期异步 `SsrfSafeDnsResolver` 消除 DNS Rebinding TOCTOU 窗口；③ 直连与代理客户端统一挂载自定义重定向策略对每一跳 `30x` 目标再次执行 `validate_url_no_ssrf`。已知架构边界：经本地/系统 HTTP 代理隧道交由远端节点解析域名且未发生 HTTP 重定向时，客户端套接字层不可见远端最终解析 IP，由代理内核及出站节点侧隔离。
 - **图标下载安全验证**：远程节点或订阅图标下载前验证协议与主机合法性，防止非法远程利用。
 
 ### 6.3 安全解压机制（Zip Slip 防护）
@@ -756,25 +756,25 @@ flowchart LR
 | **BUG-315** | 4.1 / 4.2 / 5.1 / 5.3 / 5.5 | 隐身轻量模式进程异常退出根治与后台断流自愈加速治理（v3.2.4）：① 根治隐身轻量模式下 `clash-mini.exe` 进程终止与托盘图标消失：在 Tauri 事件循环 `RunEvent::ExitRequested` 建立无条件阻止退出铁律，除非显式托盘点击「退出」（`Handle::global().is_exiting()`），否则绝对调用 `api.prevent_exit()`，消除窗口销毁或系统 session 事件意外触发退出杀死主进程与后台断流葛优守护；② 物理网络探测根治断流死锁：将 `is_physical_network_online` 从域名解析（`lookup_host`）重构为优先直连公网高可用 DNS IP（`223.5.5.5:53`、`119.29.29.29:53`、`1.1.1.1:53`）进行毫秒级 TCP 握手，避开 TUN 模式下因节点断流导致的 DNS 域名解析失败，彻底打破「节点断流 → DNS 失败 → 误判网络离线 → 暂停健康检测 → 无法自愈切点」的死锁环；③ 缩短断流自愈感知与响应延迟：节点健康新鲜度阈值（`HEALTH_DATA_FRESH_SECS`）从 60s 缩短至 20s，节点切换宽限期（`SWITCH_GRACE_PERIOD_SECS`）从 60s 缩短至 20s，自愈失败冷却保护从 60s 缩短至 25s，突发断流响应时间大幅缩短至 15~20 秒 |
 | **BUG-316** | 4.1 / 4.2 / 5.1 | 第三方内存清理软件（360加速球）轻量模式强杀免疫与伴生看门狗静默自愈（v3.2.5）：① 现场定位 `v3.2.3`/`v3.2.4` 进入轻量模式 15~20 分钟后进程零日志消失、托盘灭失的真凶为本机 `360tray.exe`（`360perfoptm2.dll` `DoOptmGroupResidual` / `FastOptm`）在整机 CPU 满载越过 `cpu_exception=80` 触发智能加速时，因主窗口 `Tauri Window` 已销毁、托盘消息窗带 `WS_EX_TOOLWINDOW` 而不被识别，将无签名 `clash-mini.exe` 判定为关窗残留进程调用 `TerminateProcess(hProcess, 99)` 外部强杀；② 新增原生零 WebView 哨兵宿主窗口（隐藏 Owner + 屏外 `1×1` 全透明穿透 `WS_POPUP | WS_VISIBLE` 归属窗口，不占任务栏与 Alt+Tab，严守 `BUG-082` 不触碰工作集修剪），使 `EnumWindows` 恒满足可见非工具窗判据，从源头阻断误杀；③ `main.rs` 前置分流 `< 1.5MB`、`0%` CPU 内核事件阻塞的 `--guardian` 伴生看门狗，正常退出 `0ms` 同步退场，遭外部强杀时同步向 `latest.log` 补写 `PID` 与 `ExitCode` 死因证据，并在轻量模式下经 `1.5s` 避让安装/卸载器后以 `--guardian-respawn` 纯静默托盘态拉起，直连运行中的系统服务内核零断流恢复防断流守护；④ `monitor.rs` 补齐 `consecutive_fails > 0 -> 0` 事件恢复闭环日志，`logger.rs` 补齐 `String` 类型 panic 载荷解析 |
 | **BUG-317** | 5.5 | 网络探测与自愈：重构为并行竞争探测（每个 `TCP:53` 探针独立 `600ms` 超时预算），任一连通即刻返回 `true`；若 `TCP:53` 均不可达则在剩余预算内立即回退执行 `lookup_host` 域名解析兜底。 |
-| **BUG-318** | 5.3 | 自愈记账与告警：彻底解耦内核 API 失活重启计数与全节点断流告警计数：API 不可达满 3 次时执行内核重启恢复通道但绝不清零全节点告警计数，确保连续失败累计满 5 次时（无论期间是否触发过内核重启）均可靠触发 `fire_self_heal_alert()` Win32 告警并重置告警计数。 |
-| **BUG-319** | 3.6 | 内核在线升级：改为写入 `.staging` 临时文件，完成解压并经共享 `validate_mihomo_pe_binary` 校验文件体积（`>= 5 MB`）与真实 DOS `MZ` + `e_lfanew` + `PE\0\0` 签名合法、确认旧内核进程退出释放文件锁后再通过原子替换覆盖目标可执行文件；异常时清理 `.staging` 保留原可用内核；`state.rs` 启动选择托管热更内核前共用同一校验器，损坏时自动清理并回退内置 sidecar。 |
+| **BUG-318** | 5.3 | 自愈记账与告警：解耦 API 失活重启计数与全节点断流告警计数（`evaluate_self_heal_counters` + `complete_restart_core_attempt`）：API 不可达满 3 次触发内核重启时若重启成功则保留告警计数继续累计至第 5 次触发系统告警；若内核重启自身失败（`Err`）则按终态立即升级触发系统告警并重置本轮双计数（含原子弹窗防重入与双分支单测锁定）。 |
+| **BUG-319** | 3.6 | 内核在线升级：写入 `.staging` 临时文件，经共享 `CoreUpdater::inspect_mihomo_pe_binary` 完整校验体积（`>= 5 MB`）、DOS `MZ`、`e_lfanew`、PE32+ AMD64 COFF/OptionalHeader（`Machine=0x8664`、`Magic=0x020B`）与节表边界，并经共享 `wait_for_mini_cores_exit` 确认旧内核退出释放锁后原子替换；`state.rs`、`service.rs`、`validate.rs` 三处选核统一接入 `resolve_usable_custom_core`，严格区分结构损坏（删除回退并记日志）与瞬时 I/O 占用（保留文件回退内置 sidecar）。 |
 | **BUG-320** | 7.2 | 通用协议解析器：统一遵循「先剥离 `#fragment` -> 再剥离 `?query` -> 最后按末尾 `@` 拆解 `userinfo@host:port`」顺序修复全部 9 类 URI 协议解析器，并在 `VMessJson` 中补齐 `sni` 映射至 `servername`。 |
-| **BUG-321** | 2.8 / 5.2 | 过滤子集测速调度：将第二个参数修正为传入的 `names`（`triggerAutoSelect(currentUid, names, 0, select)`），并在异常分支兜底复位 `-2` 加载态。 |
+| **BUG-321** | 2.8 / 5.2 | 过滤子集测速调度：将第二个参数修正为传入的 `names`（`triggerAutoSelect(currentUid, names, 0, select)`），并在返回空结果（未执行）或异常分支通过 `restoreDelaySnapshot` 回滚 `-2` 加载态且保留原始 `updatedAt`。 |
 | **BUG-322** | 5.2 / 5.6 | 测速结果排序：将默认延迟排序键改为 `if r.1 == 0 { u32::MAX } else { r.1 }`，确保超时节点恒定排在有效节点末尾。 |
 | **BUG-323** | 6.2 / 7.3 | Deep Link 订阅导入：改为标准 URL 查询参数解析提取 `url` 字段并兼容百分号编码与未编码查询边界。 |
 | **BUG-324** | 3.2 | IPC 连接池超时层级：重构超时层级：连接池许可获取超时收敛为 `2s`，外层默认请求超时提升至 `5s`，确保排队等待严格短于请求总预算。 |
 | **BUG-325** | 4.3 | WebSocket 断开保护：为关闭帧发送强制赋予保底超时（默认 `1000ms`，下限 `500ms`），杜绝断开流程无限期等待。 |
-| **BUG-326** | 1.4 | Sidecar 进程退出同步：记录被停止子进程 PID 并轮询确认进程退出（步进 `50ms`，上限 `2000ms`），进程一退出即刻放行后续启动。 |
-| **BUG-327** | 6.2 | SSRF 内网域名防御：静态阶段拦截单标签主机名与内网保留后缀（`.localhost`/`localhost.`/`.local`/`.internal`/`.home.arpa`/`.lan`），动态阶段补齐 IPv6 ULA（`fc00::/7`）与 IPv4-mapped 私网拦截；同时保留非内网域名在本地系统 DNS 解析失败（如被墙订阅域名）时放行交由代理网络栈远端解析。 |
-| **BUG-328** | 1.3 / 1.8 | 服务状态并发与 TUN 保护：将 `ServiceManager` 操作门控升级为异步互斥排队；`lifecycle.rs` 在服务已安装（`is_service_installed()`）但启动期瞬时繁忙超时时，仅在当次运行期内存态临时回退 Sidecar + 系统代理并通知界面，绝不覆写磁盘 `verge.yaml` 中用户持久化的 `enable_tun_mode: true` 配置（仅服务未安装时持久化回退）。 |
+| **BUG-326** | 1.4 | Sidecar 进程退出同步：记录被停止子进程 PID 并轮询确认进程退出（步进 `50ms`，上限 `2000ms`，阻塞任务异常按未确认退出保守等待），进程一退出即刻放行后续启动。 |
+| **BUG-327** | 6.2 | SSRF 内网域名防御：静态与预检拦截单标签主机名、内网保留后缀及 IPv6 ULA（`fc00::/7`）/IPv4-mapped 私网；`NetworkManager::get_with_ssrf_guard` 在直连路径挂载连接期异步 `SsrfSafeDnsResolver` 消除 DNS Rebinding TOCTOU，在直连与代理双路径挂载 `30x` 重定向逐跳复验；本地预解析 `Err` 放行交由 `127.0.0.1:10801` 代理回退链拉取，并明确登记远端代理隧道解析边界。 |
+| **BUG-328** | 1.3 / 1.8 | 服务状态并发与 TUN 保护：`ServiceManager` 操作门控升级为异步互斥排队；`inspect_service_registration_async` 非阻塞区分 `NotInstalled`、`DisabledOrBroken`（`Start=4` 禁用或二进制缺失，直接跳过 30s 空等并持久回退）与 `InstalledAndEnabled`；已启用服务冷启动瞬时超时进入 `IVerge::enter_temp_tun_fallback` 会话锁定态，保护后续任意无关配置落盘均不覆写磁盘 `verge.yaml` 的原始 `enable_tun_mode` / `enable_system_proxy`。 |
 | **BUG-329** | 3.2 | 命名管道半开连接自愈：在本地管道请求发送层针对池化复用连接且仅限幂等只读方法（`GET` / `HEAD`）失败时自动驱逐旧连接并新建物理管道透明重发 1 次；非幂等写操作绝不自动重发，杜绝重复执行。 |
 | **BUG-330** | 3.2 | 命名管道繁忙退避互锁：集成 Win32 `WaitNamedPipeW` 原生事件唤醒等待并收敛单次最大等待步长，配合 `5s` 外层超时彻底消除互锁掐断。 |
-| **BUG-331** | 1.4 / 1.3 | 服务模式退出孤儿内核清理：退出清理将 `stop_core` 预算放宽至 `3.5s` 并严格校验内部 `Result`；若服务模式下超时或报错，显式调用 `service::stop_core_by_service()` 提权通道记录日志并轮询确认 Session 0 内核退出，非管理员服务模式下跳过无权限的用户态 `Process::kill`。 |
+| **BUG-331** | 1.4 / 1.3 | 服务模式退出孤儿内核清理：退出清理在服务模式或开启 TUN 时**优先**通过 `service::stop_core_by_service()` 提权通道停止 Session 0 内核、轮询确认进程退出并同步本地状态；提权超时/报错时回退 `CoreManager::stop_core()`，且末尾始终无条件执行 `kill_all_mini_cores()`（对无权限 Session 0 进程优雅告警放行，同时清理任意用户态残留内核）。 |
 | **BUG-332** | 2.4 | 轻量唤醒窗口句柄复用：迁移至绑定窗口生命周期的 Win32 `SetWindowSubclass` 并在 `WM_NCDESTROY` 时自动卸载清理句柄记录，彻底根除 `HWND` 复用失灵。 |
 | **BUG-333** | 1.1 | 终端环境变量端口规范：统一回退至协议默认混合端口常量 `crate::constants::network::ports::DEFAULT_MIXED`（`10801`）。 |
 | **BUG-334** | 8.7 | 定时订阅更新 Panic 防护：引入 RAII Drop 守卫与 `catch_unwind` 双重屏障，确保异步任务无论正常返回、取消或 Panic 均可靠投递 `TaskFinished` 释放运行态。 |
 | **BUG-335** | 4.1 / 5.4 | 内核异常重启选点恢复：当即时快照为 `None` 时自动回退读取当前激活 Profile 的 `selected` 持久化记录（过滤伪节点后）执行节点恢复。 |
-| **BUG-336** | 2.8 / 5.1 | 顶栏活跃节点轮换同步：切换成功后立即乐观更新并作废 `['getProxies']` 缓存、调用 `patchCurrent` 持久化写入 `selected`，并通过 `notify_node_switched` 即时刷新后端 `SWITCH_GRACE_PERIOD_SECS` 切换宽限期与连续失败计数（与列表手动点选共享）。 |
+| **BUG-336** | 2.8 / 5.1 | 顶栏活跃节点轮换同步：切换成功后立即乐观更新并作废 `['getProxies']` 缓存、持久化写入 `selected`，并通过 `notify_node_switched` 置位时间戳且触发专属 `NODE_SWITCH_NOTIFY.notify_one()` 第 0ms 唤醒监测循环吸收宽限期（前置在所有早退分支之前，且守护线程重启时自动复位静态状态）。 |
 | **BUG-337** | 2.8 | 节点虚拟列表 Memo 稳定性：在 `useProxySelection` 内使用 `useRef` 稳定持有 `onSuccess`/`onError` 回调并固定返回函数引用，保护虚拟列表行级缓存命中率。 |
 | **BUG-338** | 2.2 | 运行日志弹窗滚动抖动与劫持：移除高频 `smooth` 滚动冲突，改为仅在视口处于底部吸底状态时执行 `behavior: 'auto'` 即时跟随，用户上翻查阅时自动暂停拉拽。 |
 | **BUG-339** | 5.6 | 节点延迟状态双重渲染：在 reducer 中增加字段级浅相等短路比较（数值与状态完全相同时直接返回原引用），消除挂载与无变化通知带来的冗余重绘。 |
@@ -782,22 +782,22 @@ flowchart LR
 | **BUG-341** | 1.5 / 2.2 | 271px 窄窗多语种设置排版：为网格单元赋予 `minWidth: 0` 与标签文本 `overflow: 'hidden'`, `textOverflow: 'ellipsis'` 及完整 `title` 悬浮提示，保证 13 语种在 271px 下零溢出遮挡。 |
 | **BUG-342** | 8.9 | 快捷分流规则通知词条勘误：在全部 13 个语种资源中新增专属 `quickRuleAdded` 通知词条并更新 `quick-routing.ts` 调用。 |
 | **BUG-343** | 2.8 | 搜索框双重广播去重：收敛搜索匹配派发路径并记录上一次已广播键值，确保单次输入或筛选项变更仅触发一次广播。 |
-| **BUG-344** | 5.2 | **【已回退作废】** 原拟对非 TUN 单节点测速引入 `delay_proxy_by_name` 直测分流；经设计评审确认违背 §5.2「全链路统一委托 `PROXY__METRICS` 单一测量组且单点测速严禁落入 history 兜底」的核心防线，已完整撤回恢复原契约。 |
+| **BUG-344** | 5.2 | **【直测路径已回退，并收口全路径陈旧兜底防线】** 撤回违背 §5.2 的 `delay_proxy_by_name` 直测分流；后端重建 `DelayResultSource` 语义标记并彻底移除单点/批量/后台自愈全路径的 120s `history` 兜底，经 `fromProbe` 标记约束前端 `injectBatchResults` 对 30s 复用数据的缓存寿命（封顶 30s），配合 `restoreDelaySnapshot` 保留原始 `updatedAt`。 |
 | **BUG-345** | 5.5 | 并行竞速物理网络探针：使用 `futures::future::select_ok` 并行发起三路公网 DNS `TCP:53` 握手探针（单路 600ms 超时），最快一路握手成功即在 10~30ms 内判定在线，全败则秒级平滑衔接域名解析兜底。 |
-| **BUG-346** | 3.6 | 内核升级原子暂存与真实 PE 校验：引入 `.staging` 原子暂存替换流水线，解压后通过共享 `validate_mihomo_pe_binary` 校验二进制体积（`>= 5 MB`）、DOS `MZ` 头、`e_lfanew` 偏移与 `PE\0\0` 签名，确认旧内核进程释放文件锁后再原子覆盖正式文件，任何环节失败自动清理临时文件并保留旧内核完好可用。 |
-| **BUG-347** | 4.3 | 前端 WebSocket 指数退避重连：将前端 WebSocket 断线重连升级为带随机抖动的指数退避（`1s -> 2s -> 4s -> 8s`，抖动后严格以 `15s` 封顶），监听 `verge://refresh-clash-config` 内核重启/配置刷新事件瞬时清零退避计数立即重连，并由 `use-mihomo-ws-subscription.test.ts` 单测锁定边界。 |
-| **BUG-348** | 7.2 | 统一 URI 协议解析预处理管道：封装共享纯函数 `strip_fragment_and_query(input)` 统一接入全部 9 类 URI 协议（`ss`/`trojan`/`vless`/`hysteria2`/`hysteria`/`anytls`/`tuic`/`wireguard`/`socks5`），并补齐 9 协议含 `@` 查询参数与 VMess `sni` 的回归单元测试。 |
+| **BUG-346** | 3.6 | 内核升级原子暂存与真实 PE64 校验：引入 `.staging` 原子暂存替换流水线，经 `inspect_mihomo_pe_binary` 校验完整 PE32+ AMD64 头与节表并严格区分 `Corrupted` 与 `IoUnavailable`，经共享 `wait_for_mini_cores_exit` 确认旧内核释放文件锁后原子替换，异常自动清理 `.staging` 保留旧内核。 |
+| **BUG-347** | 4.3 | 前端 WebSocket 指数退避重连：升级为带随机抖动且严格以 `15s` 封顶的指数退避；监听 `verge://refresh-clash-config`（250ms 防抖合并对齐全局契约 + `listenerEpoch` 防竞态）清空退避并对仍持有陈旧 socket 句柄的活动通道主动关闭重连，同时响应 `Close` 消息触发重连。 |
+| **BUG-348** | 7.2 | 统一 URI 协议解析预处理管道：封装共享纯函数 `strip_fragment_and_query(input)` 统一接入全部 9 类 URI 协议（`ss`/`trojan`/`vless`/`hysteria2`/`hysteria`/`anytls`/`tuic`/`wireguard`/`socks5`），并补齐全部 9 协议含 `@` 查询参数的 `server` 主机名与 `port` 双断言及 VMess `sni` 回归单测。 |
 | **BUG-349** | 5.2 / 5.6 | 测速 0ms 超时置底全栈对齐与单测锁定：抽离 `sort_display_delays` 纯函数统一处理延迟升序（`0 -> u32::MAX` 垫底）与名称排序，并补充单元测试防止退化。 |
 | **BUG-350** | 2.4 | 现代化 Win32 SetWindowSubclass 窗口钩子：通过 `comctl32` 原生 `{SetWindowSubclass, DefSubclassProc, RemoveWindowSubclass}` 标准子类化架构绑定窗口生命周期，并在收到 `WM_NCDESTROY` 时自动解绑释放，原生支持任意次主窗口销毁与重建。 |
 | **BUG-351** | 3.2 | 韧性命名管道连接池与 WaitNamedPipeW：在 Windows 平台引入 `WaitNamedPipeW` 阻塞线程池事件等待配合退避重试，并在连接池层记录连接复用标记对幂等查询实现陈旧断开连接的无感单次重建。 |
 | **BUG-352** | 1.3 / 1.8 | ServiceManager 异步互斥化状态门控：将 `ServiceManager` 内部的 `operation_running: AtomicBool` 重构为 `tokio::sync::Mutex<()>` 异步互斥锁，使并发 `refresh`/`apply` 安全排队执行而不再相互报错。 |
 | **BUG-353** | 5.1 / 8.7 | 后台常驻守护任务 spawn_supervised 监督器：在 `AsyncHandler` 中新增 `spawn_supervised` 守护包装器（`AssertUnwindSafe(...).catch_unwind()` + 错误日志留痕 + 退避自重启，应用退出时自动终止），加固后台健康监测主循环。 |
 | **BUG-354** | 2.12 / 8.7 | 解封常规屏幕高度下的顶栏帮助与诊断菜单：将 `max-height: 830px` 下的 `display: none` 改为重定位至标题栏紧凑槽位，让默认窗口高度（680px）与常规屏幕用户随时可访问诊断导出、首次引导与项目主页。 |
-| **BUG-355** | 2.8 / 5.2 / 5.6 | F4 / F1 快捷测速择优与 Ctrl+F 搜索聚焦快捷键：统一收口快捷键治理，严格校验修饰键（保护 `Alt+F4` 等系统快捷键不受干扰）、排除编辑态与 IME 输入组合冲突：`F4` 触发当前可见过滤子集测速择优、`F1` 触发全量节点测速择优、`Ctrl+F` 自动聚焦并全选节点过滤输入框。 |
+| **BUG-355** | 2.8 / 5.2 / 5.6 | F4 / F1 快捷测速择优与 Ctrl+F 搜索聚焦快捷键：并入 `disable-webview-shortcuts.ts` 单一 `document` 级 `keydown` 监听器，对称校验全量弹窗/菜单遮挡（含客户端/内核更新弹窗、列管理弹窗与帮助菜单）、输入编辑态、IME 合成与长按防重（绝不误伤 `Alt+F4`/`Ctrl+F4`），并移除 `ProxyGroups` 硬编码 `'PROXY'` 兜底。 |
 | **BUG-356** | 2.8 / 2.10 | 手动点击切换代理节点 0ms 乐观高亮：点击节点瞬间对 `queryClient` 的 `['getProxies']` 缓存执行乐观 `now` 更新实现 `0ms` 即时选中高亮，后台异步提交并在极少数失败场景下自动回滚缓存。 |
 | **BUG-357** | 2.8 / 5.2 | 节点卡片延迟徽章独立点击单点测速热区：将节点卡片/紧凑卡片右侧延迟徽章设为独立点击热区（`e.stopPropagation()`），点击延迟数值仅对该节点执行单点实时测速（`select=false`）而不切换当前出口，点击卡片其余区域仍立即切换节点。 |
-| **BUG-358** | 2.7 | 特色皮肤双滑块拖动渲染与持久化落盘闭环：拖动过程 `onChange` 以内存态与 CSS 变量驱动 60fps 实时光影预览，同时结合防抖落盘、`onChangeCommitted` 松手提交及组件卸载 / `pagehide` 兜底同步写盘，兼顾 60fps 丝滑手感与零配置丢失。 |
-| **BUG-359** | 5.3 / 5.5 | 全节点超时或物理断网时顶栏轻量状态胶囊与一键自愈：后端监测在全节点不可达/物理离线及恢复（含手动选优成功）时派发状态事件，顶栏展示紧凑警示胶囊，点击重测成功后通过 `broadcastNetworkHealth` 同步全局模块态并补齐完整错误提示闭环。 |
+| **BUG-358** | 2.7 | 特色皮肤双滑块拖动渲染与持久化落盘闭环：拖动过程 `onChange` 以内存态与 CSS 变量驱动 60fps 实时光影预览，结合 200ms 防抖去重落盘、`onChangeCommitted` 去重提交及失焦/`visibilitychange`/`pagehide`/卸载多路冲刷，兼顾丝滑手感与零配置丢失。 |
+| **BUG-359** | 5.3 / 5.5 | 全节点超时或物理断网时顶栏轻量状态胶囊与一键自愈：后端监测在全节点不可达/物理离线及恢复时派发状态事件，顶栏展示警示胶囊，点击重测成功经 `broadcastNetworkHealth` 同步模块态，重测未执行、全超时或异常均给出明确 i18n 提示。 |
 | **BUG-360** | 2.8 | 节点过滤输入框自动测速择优状态微反馈：在过滤自动测速防抖等待与执行期间为过滤框提供清晰的轻量加载/脉冲视觉指示及无障碍提示，测速择优完成后平滑收起。 |
 | **BUG-361** | 2.9 | 系统托盘图标左键单击唤醒与隐藏双向切换：在不触碰任何托盘动态图标/菜单更新 API（严守 BUG-073 静态托盘红线）的前提下，左键单击回调先判断主窗口状态：若不处于轻量模式且主窗口当前可见、未最小化且已获焦点，则平稳隐藏主窗口；否则执行唤醒恢复并置顶聚焦。 |
 

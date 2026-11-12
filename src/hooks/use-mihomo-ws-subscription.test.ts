@@ -6,7 +6,9 @@ import {
   flushAllWsReconnectBackoff,
   MAX_RECONNECT_DELAY_MS,
   RECONNECT_DELAY_MS,
+  REFRESH_CLASH_DEBOUNCE_MS,
   releaseSharedSubscriptionEntry,
+  scheduleFlushWsReconnectBackoff,
 } from '@/hooks/use-mihomo-ws-subscription'
 import { batchTestWithFirstBatchSelect } from '@/pages/_layout/utils/profile-coordination'
 import * as cmds from '@/services/cmds'
@@ -76,6 +78,42 @@ describe('BUG-347: computeWsReconnectDelay 指数退避、严格上限与快速�
 
     releaseSharedSubscriptionEntry(cacheKey, entry)
   })
+
+  it('内核重启时即便通道仍持有陈旧 ws 句柄，flushAllWsReconnectBackoff 也会主动关闭并立即重连，且 250ms 防抖合并连发事件', async () => {
+    const staleClose = vi.fn().mockResolvedValue(undefined)
+    const staleSocket = {
+      addListener: vi.fn(),
+      close: staleClose,
+    } as unknown as MihomoWebSocket
+    const freshSocket = {
+      addListener: vi.fn(),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as MihomoWebSocket
+
+    const connectMock = vi
+      .fn<() => Promise<MihomoWebSocket>>()
+      .mockResolvedValueOnce(staleSocket)
+      .mockResolvedValueOnce(freshSocket)
+
+    const cacheKey = '$sub$test-ws-stale-socket'
+    const entry = acquireSharedSubscriptionEntry(cacheKey, connectMock)
+    await entry.connectWs()
+    expect(entry.ws).toBe(staleSocket)
+
+    // 模拟后端 reload 连发 3 次 refresh-clash-config：250ms 防抖合并为单次冲刷
+    scheduleFlushWsReconnectBackoff()
+    scheduleFlushWsReconnectBackoff()
+    scheduleFlushWsReconnectBackoff()
+
+    await new Promise((r) => setTimeout(r, REFRESH_CLASH_DEBOUNCE_MS + 60))
+    await vi.waitFor(() => {
+      expect(staleClose).toHaveBeenCalledTimes(1)
+      expect(connectMock).toHaveBeenCalledTimes(2)
+      expect(entry.ws).toBe(freshSocket)
+    })
+
+    releaseSharedSubscriptionEntry(cacheKey, entry)
+  })
 })
 
 describe('BUG-321: batchTestWithFirstBatchSelect 严格传递过滤节点子集', () => {
@@ -84,12 +122,18 @@ describe('BUG-321: batchTestWithFirstBatchSelect 严格传递过滤节点子集'
     getDelayManager().clearCache()
   })
 
-  it('将过滤后的节点数组原样传给 triggerAutoSelect，禁止传 undefined 越界选点', async () => {
+  it('将过滤后的节点数组原样传给 triggerAutoSelect，禁止传 undefined 越界选点，且返回空数组时回滚 -2 占位', async () => {
     vi.mocked(cmds.getProfiles).mockResolvedValue({
       current: 'uid-test-1',
       items: [],
     } as Awaited<ReturnType<typeof cmds.getProfiles>>)
     vi.mocked(cmds.triggerAutoSelect).mockResolvedValue([])
+
+    const originalTs = Date.now() - 90_000
+    getDelayManager().restoreDelaySnapshot('日本 01', 'PROXY', {
+      delay: 64,
+      updatedAt: originalTs,
+    })
 
     const subset = ['日本 01', '日本 02']
     await batchTestWithFirstBatchSelect(subset, true)
@@ -101,23 +145,34 @@ describe('BUG-321: batchTestWithFirstBatchSelect 严格传递过滤节点子集'
       0,
       true,
     )
+    // 返回空数组（NotExecuted）时必须回滚 -2，且保留原始 updatedAt
+    expect(getDelayManager().getDelayUpdate('日本 01', 'PROXY')).toEqual({
+      delay: 64,
+      updatedAt: originalTs,
+    })
+    expect(getDelayManager().getDelayUpdate('日本 02', 'PROXY')).toBeUndefined()
   })
 
-  it('后端异常时自动回滚仍处于 -2 测试态的节点延迟，防止永久转圈', async () => {
+  it('后端异常时自动回滚仍处于 -2 测试态的节点快照，防止永久转圈或虚增 TTL', async () => {
     vi.mocked(cmds.getProfiles).mockResolvedValue({
       current: 'uid-test-2',
       items: [],
     } as Awaited<ReturnType<typeof cmds.getProfiles>>)
     vi.mocked(cmds.triggerAutoSelect).mockRejectedValue(new Error('ipc busy'))
 
-    getDelayManager().setDelay('新加坡 01', 'PROXY', 88)
+    const oldTs = Date.now() - 180_000
+    getDelayManager().restoreDelaySnapshot('新加坡 01', 'PROXY', {
+      delay: 88,
+      updatedAt: oldTs,
+    })
     await batchTestWithFirstBatchSelect(['新加坡 01', '新加坡 02'], false)
 
-    expect(getDelayManager().getDelayUpdate('新加坡 01', 'PROXY')?.delay).toBe(
-      88,
-    )
-    expect(getDelayManager().getDelayUpdate('新加坡 02', 'PROXY')?.delay).toBe(
-      -1,
-    )
+    expect(getDelayManager().getDelayUpdate('新加坡 01', 'PROXY')).toEqual({
+      delay: 88,
+      updatedAt: oldTs,
+    })
+    expect(
+      getDelayManager().getDelayUpdate('新加坡 02', 'PROXY'),
+    ).toBeUndefined()
   })
 })

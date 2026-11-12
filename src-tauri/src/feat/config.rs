@@ -282,6 +282,11 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
 
     Config::verge().await.apply();
 
+    // 用户显式修改了流量接管模式（TUN 或系统代理）时，解除冷启动临时回退写盘保护，使新意图正常落盘（BUG-328）
+    if patch.enable_tun_mode.is_some() || patch.enable_system_proxy.is_some() {
+        IVerge::clear_temp_tun_fallback();
+    }
+
     if !not_save_file {
         // 分离数据获取和异步调用
         let verge_data = Config::verge().await.data_arc();

@@ -19,16 +19,16 @@
 ### BUG-318（对应规范章节：5.3）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：High / 自愈记账与告警
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs:1618-1755`
-- **根因与背景实证**：`self_heal_with_accounting` 在 `auto_select_fail_count >= 3` 时无论内核 API 是否可达均先将计数器清零（且 `RestartCore` 分支同样清零告警计数），导致全节点不可达或内核重启后仍持续不可达时，协议 5.3 节规定的连续 5 次失败 Win32 告警弹窗（`fire_self_heal_alert`）永远无法触发。
-- **修正与改良方案**：彻底解耦内核 API 失活重启计数与全节点断流告警计数：API 不可达满 3 次时执行内核重启恢复通道但绝不清零全节点告警计数，确保连续失败累计满 5 次时（无论期间是否触发过内核重启）均可靠触发 `fire_self_heal_alert()` Win32 告警并重置计数。
+- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs:1602-1960`
+- **根因与背景实证**：`self_heal_with_accounting` 在 `auto_select_fail_count >= 3` 时无论内核 API 是否可达均先将计数器清零（且 `RestartCore` 分支同样清零告警计数），导致全节点不可达或内核重启后仍持续不可达时，协议 5.3 节规定的连续 5 次失败 Win32 告警弹窗永远无法触发。
+- **修正与改良方案**：通过 `evaluate_self_heal_counters` 与 `complete_restart_core_attempt` 解耦内核 API 失活重启计数与全节点断流告警计数：API 不可达满 3 次触发 `RestartCore` 时，若内核重启成功（`Ok`）则保留 `auto_select_fail_count` 继续累计至第 5 次可靠触发系统告警；若内核重启自身报错（`Err`）则按不可恢复终态立即升级触发系统告警并重置本轮双计数（含原子弹窗防重入及成功/失败双分支单测锁定）。
 
 ### BUG-319（对应规范章节：3.6）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：High / 内核在线升级
-- **涉及物理路径与行号**：`src-tauri/src/core/core_updater.rs:468-560`, `src-tauri/src/core/manager/state.rs:40-58`
-- **根因与背景实证**：内核在线升级在解压前直接 `fs::File::create` 打开正式路径 `cores/mini-mihomo.exe`，瞬间将其截断为 0 字节；若下载中断或解压异常则残留损坏文件，后续启动触发 `0xc000007b` 致命错误。
-- **修正与改良方案**：改为写入 `.staging` 临时文件，完成解压并经共享 `validate_mihomo_pe_binary` 校验文件体积（`>= 5 MB`）与真实 DOS `MZ` + `e_lfanew` + `PE\0\0` 签名合法、确认旧内核进程释放文件锁后再通过原子替换覆盖目标可执行文件；异常时清理 `.staging` 保留原可用内核；`state.rs` 启动选择托管热更内核前共用同一校验器，损坏时自动清理并回退内置 sidecar。
+- **涉及物理路径与行号**：`src-tauri/src/core/core_updater.rs`, `src-tauri/src/core/manager/state.rs`, `src-tauri/src/core/service.rs`, `src-tauri/src/core/validate.rs`
+- **根因与背景实证**：内核在线升级在解压前直接 `fs::File::create` 打开正式路径 `cores/mini-mihomo.exe` 将其截断为 0 字节；若下载中断或解压异常则残留损坏文件触发 `0xc000007b` 致命错误，且各消费点校验口径不一、瞬时文件锁易误删完好内核。
+- **修正与改良方案**：改为写入 `.staging` 临时文件，经共享 `CoreUpdater::inspect_mihomo_pe_binary` 完整校验体积（`>= 5 MB`）、DOS `MZ`、`e_lfanew`、PE32+ AMD64 COFF/OptionalHeader（`Machine=0x8664`、`Magic=0x020B`）与节表边界，经共享 `wait_for_mini_cores_exit` 确认旧内核退出释放锁后再原子替换；`state.rs`、`service.rs`、`validate.rs` 三处统一接入 `resolve_usable_custom_core`，严格区分 `Corrupted`（删除并记日志）与 `IoUnavailable`（杀软扫描/瞬时锁占用时保留原文件并回退内置 sidecar）。
 
 ### BUG-320（对应规范章节：7.2）
 - **当前状态**：`代码已修正，待用户确认`
@@ -40,9 +40,9 @@
 ### BUG-321（对应规范章节：2.8 / 5.2）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：Medium / 过滤子集测速调度
-- **涉及物理路径与行号**：`src/pages/_layout/utils/profile-coordination.ts:97-117`
+- **涉及物理路径与行号**：`src/pages/_layout/utils/profile-coordination.ts:97-140`, `src/services/delay.ts`
 - **根因与背景实证**：`batchTestWithFirstBatchSelect(names, select)` 将前端子集卡片置为 `-2` 测速态后，调用 `triggerAutoSelect(currentUid, undefined, 0, select)` 误传硬编码 `undefined`，导致子集参数丢失及未覆盖卡片转圈残留。
-- **修正与改良方案**：将第二个参数修正为传入的 `names`（`triggerAutoSelect(currentUid, names, 0, select)`），并在异常分支兜底复位 `-2` 加载态。
+- **修正与改良方案**：将第二个参数修正为传入的 `names`（`triggerAutoSelect(currentUid, names, 0, select)`），并在后端返回空数组（未执行）或异常分支通过 `restoreDelaySnapshot` 回滚 `-2` 加载态且保留原始 `updatedAt`。
 
 ### BUG-322（对应规范章节：5.2 / 5.6）
 - **当前状态**：`代码已修正，待用户确认`
@@ -82,16 +82,16 @@
 ### BUG-327（对应规范章节：6.2）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：Low / SSRF 内网域名防御
-- **涉及物理路径与行号**：`src-tauri/src/config/prfitem.rs:788-865`
-- **根因与背景实证**：`validate_url_no_ssrf` 静态阶段未拦截单标签主机名及 `.localhost`、`.local`、`.internal`、`.lan`、`.home.arpa` 等内网保留后缀，且动态解析阶段 IPv6 漏检 `fc00::/7`（ULA）与 IPv4-mapped 私网地址。
-- **修正与改良方案**：静态阶段补齐单标签主机名与内网保留后缀拦截，动态解析阶段补齐 IPv6 ULA（`fc00::/7`）与 IPv4-mapped 私网拦截；同时保留非内网域名在本地系统 DNS 解析失败（如被墙机场订阅域名）时放行交由代理网络栈远端解析。
+- **涉及物理路径与行号**：`src-tauri/src/config/prfitem.rs`, `src-tauri/src/utils/network.rs`
+- **根因与背景实证**：`validate_url_no_ssrf` 静态阶段未拦截单标签主机名及 `.localhost`、`.local`、`.internal`、`.lan`、`.home.arpa` 等内网保留后缀，动态解析阶段漏检 IPv6 `fc00::/7`（ULA）与 IPv4-mapped 私网地址，且缺少直连建连期 DNS 重绑定防护与 30x 重定向逐跳校验。
+- **修正与改良方案**：静态与预解析补齐单标签主机名、内网保留后缀、IPv6 ULA 与 IPv4-mapped 私网拦截；`NetworkManager::get_with_ssrf_guard` 在直连路径挂载连接期异步 `SsrfSafeDnsResolver` 消除 DNS Rebinding TOCTOU，在直连与代理双路径挂载 `30x` 重定向逐跳 `validate_url_no_ssrf` 复验；本地预解析 `Err` 放行以便被污染订阅域名交由 `127.0.0.1:10801` 代理回退链拉取，并明确登记远端代理隧道解析边界。
 
 ### BUG-328（对应规范章节：1.3 / 1.8）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：High / 服务状态并发与 TUN 保护
-- **涉及物理路径与行号**：`src-tauri/src/core/service.rs:395-455`, `src-tauri/src/core/manager/lifecycle.rs:213-296`
-- **根因与背景实证**：`ServiceManager::run_operation` 使用单一 `AtomicBool` 防重入导致并发状态查询直接报错，且 `lifecycle.rs` 在系统服务已安装但启动期瞬时繁忙超时时，无差别将用户磁盘 `verge.yaml` 中的 `enable_tun_mode` 持久化改写为 `false`。
-- **修正与改良方案**：将 `ServiceManager` 操作门控升级为异步互斥排队；`lifecycle.rs` 严格区分「服务未安装」与「服务已安装（`is_service_installed()`）但瞬时响应超时」——后者允许进入完整就绪轮询窗口，若仍超时仅在当次运行期内存态临时回退 Sidecar + 系统代理并同步界面提示，绝不覆写磁盘 `verge.yaml` 中用户的 `enable_tun_mode: true` 配置。
+- **涉及物理路径与行号**：`src-tauri/src/core/service.rs`, `src-tauri/src/core/manager/lifecycle.rs`, `src-tauri/src/config/verge.rs`, `src-tauri/src/feat/config.rs`
+- **根因与背景实证**：`ServiceManager::run_operation` 使用单一 `AtomicBool` 防重入导致并发状态查询直接报错，且 `lifecycle.rs` 在已启用系统服务冷启动瞬时响应超时时改写内存/磁盘 `enable_tun_mode = false`，后续任意配置落盘均会覆盖用户持久化的 TUN 配置。
+- **修正与改良方案**：将 `ServiceManager` 操作门控升级为异步互斥排队；通过非阻塞 `inspect_service_registration_async()` 区分 `NotInstalled`、`DisabledOrBroken`（`Start=4` 禁用或二进制缺失，跳过 30s 空等并持久回退）与 `InstalledAndEnabled`；已启用服务冷启动超时进入 `IVerge::enter_temp_tun_fallback` 会话锁定态，确保后续改语言/皮肤等任意落盘仍保留磁盘原始 `enable_tun_mode` / `enable_system_proxy`（用户显式切换代理开关时自动解锁）。
 
 ### BUG-329（对应规范章节：3.2）
 - **当前状态**：`代码已修正，待用户确认`
@@ -110,9 +110,9 @@
 ### BUG-331（对应规范章节：1.4 / 1.3）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：High / 服务模式退出孤儿内核清理
-- **涉及物理路径与行号**：`src-tauri/src/feat/window.rs:134-175`, `src-tauri/src/core/manager/state.rs:187-215`
-- **根因与背景实证**：服务模式下退出清理若遇 `stop_core` 超时或返回 `Err`（旧逻辑 `Ok(_)` 忽略内部错误），普通用户会话进程调用 `Process::kill()` 终止 Session 0 下 `SYSTEM` 权限的 `mini-mihomo.exe` 会因 Win32 Error 5 拒绝访问失败，残留孤儿 TUN 内核。
-- **修正与改良方案**：退出清理将 `stop_core` 预算放宽至 `3.5s` 并严格校验 `Ok(Ok(()))`；在停止前采样运行模式与服务安装状态，若服务模式下 `stop_core` 超时或报错，显式通过 `service::stop_core_by_service()` 提权通道强制停止 Session 0 内核、记录日志并轮询确认进程退出，非管理员服务模式下跳过无权限的用户态 `Process::kill`。
+- **涉及物理路径与行号**：`src-tauri/src/feat/window.rs:134-240`, `src-tauri/src/core/manager/state.rs:175-260`
+- **根因与背景实证**：服务模式下退出清理若先走普通 `stop_core` 可能阻塞耗尽预算，且普通用户会话进程无法终止 Session 0 下 `SYSTEM` 权限的 `mini-mihomo.exe`，提权失败或模式漂移时易残留孤儿内核。
+- **修正与改良方案**：退出前预先采样运行模式，当处于服务模式或开启 TUN 时**优先**通过 `service::stop_core_by_service()` 提权通道停止 Session 0 内核、经共享 `wait_for_mini_cores_exit` 确认进程退出并清理本地状态；提权超时/报错时回退 `CoreManager::stop_core()`（非服务模式若有残留且服务已安装亦补服务级兜底），且末尾始终无条件执行 `kill_all_mini_cores()`（对无权限 Session 0 进程优雅告警放行，同时兜底清理任意用户态残留内核）。
 
 ### BUG-332（对应规范章节：2.4）
 - **当前状态**：`代码已修正，待用户确认`
@@ -145,9 +145,9 @@
 ### BUG-336（对应规范章节：2.8 / 5.1）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：High / 顶栏活跃节点轮换同步
-- **涉及物理路径与行号**：`src/pages/_layout/components/active-node-card.tsx:245-295`, `src/hooks/use-proxy-selection.ts:93-130`, `src-tauri/src/module/monitor.rs`
-- **根因与背景实证**：顶栏活跃节点卡片点击快速轮换（`handleCycleNode`）切换内核成功后漏调 `['getProxies']` 缓存更新与 `patchCurrent` 持久化，且前端手动切点未第 `0ms` 即刻通知后端刷新 `SWITCH_GRACE_PERIOD_SECS` 宽限期，存在轮询间隔窗口隐患。
-- **修正与改良方案**：切换成功后立即乐观更新并作废 `['getProxies']` 缓存、调用 `patchCurrent` 持久化写入 `selected`，并通过 `notify_node_switched` 即时重置后端节点切换宽限期与连续失败计数（与列表点击切换共享）。
+- **涉及物理路径与行号**：`src/pages/_layout/components/active-node-card.tsx`, `src/hooks/use-proxy-selection.ts`, `src/services/cmds.ts`, `src-tauri/src/module/monitor.rs`
+- **根因与背景实证**：顶栏活跃节点卡片点击快速轮换（`handleCycleNode`）切换内核成功后漏调 `['getProxies']` 缓存更新与 `patchCurrent` 持久化，且前端手动切点未第 `0ms` 唤醒后台监测吸收 `SWITCH_GRACE_PERIOD_SECS` 宽限期，存在轮询睡眠窗口隐患。
+- **修正与改良方案**：切换成功后立即乐观更新并作废 `['getProxies']` 缓存、调用 `patchCurrent` 持久化写入 `selected`，并通过 `notify_node_switched`（带异常告警日志）置位时间戳且触发专属 `NODE_SWITCH_NOTIFY.notify_one()` 第 `0ms` 唤醒监测循环在所有早退分支前吸收宽限期（不触发额外全组拨测，且守护线程启动/重启时自动复位静态状态）。
 
 ### BUG-337（对应规范章节：2.8）
 - **当前状态**：`代码已修正，待用户确认`
@@ -199,11 +199,11 @@
 - **修正与改良方案**：收敛搜索匹配派发路径并记录上一次已广播键值，确保单次输入或筛选项变更仅触发一次广播。
 
 ### BUG-344（对应规范章节：5.2）
-- **当前状态**：`已撤销回退（经评审确认违反 §5.2 单一测量组核心防线）`
-- **类别与级别**：Improvement / 单节点专属微测速与结果共享（已回退）
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs:940-1008`
-- **根因与背景实证**：原拟在非 TUN 模式下对显式单点测速启用 `delay_proxy_by_name` 直测以节约带宽；经提交设计评审确认，该分流违背《唯一协议》§5.2「全链路统一委托 `PROXY__METRICS` 单一测量组、全组拨测属既定代价」的核心契约，且将守卫改为 `!probe_executed` 会导致死节点落入 120s `history` 兜底污染前端缓存。
-- **修正与改良方案**：完整回退该条改动，恢复纯 `PROXY__METRICS` 拨测、`delays.is_empty()` 短路守卫及 §5.2 原文契约。
+- **当前状态**：`已撤销回退并收口全路径陈旧兜底防线，待用户确认`
+- **类别与级别**：Improvement / 单节点专属微测速回退与全路径陈旧 history 防线加固
+- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src-tauri/src/core/notification.rs`, `src-tauri/src/core/handle.rs`, `src/services/delay.ts`, `src/pages/_layout/hooks/use-layout-events.ts`, `src/pages/_layout/utils/profile-coordination.ts`, `src/components/proxy/proxy-groups.tsx`
+- **根因与背景实证**：原拟在非 TUN 模式下启用 `delay_proxy_by_name` 直测违背《唯一协议》§5.2 核心契约；且在单点、批量与后台自愈选点路径中，一旦测量组拨测未取得实时数据而退化读取 120s `history` 兜底，会导致陈旧延迟冒充实时结果甚至混入 `candidates` 切换出口，前端恢复或复用缓存时亦会误盖 `Date.now()` 30 分钟长寿命。
+- **修正与改良方案**：完整撤回 `delay_proxy_by_name` 直测分流；后端重建 `DelayResultSource`（`LiveProbe` / `FreshMetricsCache` / `NotExecuted`）并彻底移除全路径 120s `history` 兜底；`verge://backend-delay-results` 携带 `fromProbe` 标记对 30s 复用数据强制封顶前端缓存寿命为 30s；新增 `restoreDelaySnapshot` 在未执行或异常回滚时严格保留原始 `updatedAt` 时间戳。
 
 ### BUG-345（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -214,24 +214,24 @@
 
 ### BUG-346（对应规范章节：3.6）
 - **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 内核升级原子暂存与真实 PE 校验
-- **涉及物理路径与行号**：`src-tauri/src/core/core_updater.rs`, `src-tauri/src/core/manager/state.rs`
-- **根因与背景实证**：内核在线升级缺乏完整 PE 结构验证、旧内核进程句柄退出等待与失败无损回滚保护。
-- **修正与改良方案**：引入 `.staging` 原子暂存替换流水线，解压后通过共享 `validate_mihomo_pe_binary` 校验二进制体积（`>= 5 MB`）、DOS `MZ` 头、`e_lfanew` 偏移与 `PE\0\0` 签名，并在确认旧内核进程释放文件锁后原子重命名替换正式文件；任何环节失败自动清理临时文件并保留旧内核完好可用。
+- **类别与级别**：Improvement / 内核升级原子暂存与真实 PE64 校验
+- **涉及物理路径与行号**：`src-tauri/src/core/core_updater.rs`, `src-tauri/src/core/manager/state.rs`, `src-tauri/src/core/service.rs`, `src-tauri/src/core/validate.rs`
+- **根因与背景实证**：内核在线升级缺乏完整 PE32+ 结构验证、旧内核进程句柄退出等待与瞬时 I/O 占用防误删保护。
+- **修正与改良方案**：引入 `.staging` 原子暂存替换流水线，经 `inspect_mihomo_pe_binary` 校验二进制体积（`>= 5 MB`）、DOS `MZ`、`e_lfanew`、PE32+ AMD64 COFF/OptionalHeader 与节表边界，并严格区分结构损坏（`Corrupted`）与瞬时 I/O 不可读（`IoUnavailable`）；经共享 `wait_for_mini_cores_exit` 确认旧内核释放文件锁后原子替换，异常时自动清理临时文件并保留旧内核完好可用。
 
 ### BUG-347（对应规范章节：4.3）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：Improvement / 前端 WebSocket 指数退避重连
 - **涉及物理路径与行号**：`src/hooks/use-mihomo-ws-subscription.ts`, `src/hooks/use-mihomo-ws-subscription.test.ts`
-- **根因与背景实证**：内核重启或服务切换期间固定短周期重连产生高频无效 IPC/WS 风暴与错误日志刷屏。
-- **修正与改良方案**：将前端 WebSocket 断线重连升级为带随机抖动的指数退避（`1s -> 2s -> 4s -> 8s`，抖动后严格以 `15s` 封顶），监听 `verge://refresh-clash-config` 内核重启/配置刷新事件瞬时清零退避计数立即重连，并由单测锁定边界。
+- **根因与背景实证**：内核重启或服务切换期间固定短周期重连产生高频无效 IPC/WS 风暴，且内核重启后旧 socket 句柄未主动关闭重连。
+- **修正与改良方案**：将前端 WebSocket 断线重连升级为带随机抖动且严格以 `15s` 封顶的指数退避；监听 `verge://refresh-clash-config`（250ms 防抖合并 + `listenerEpoch` 防注册竞态）清空退避计数，并对仍持有陈旧 socket 句柄的活动通道主动关闭后立即重连，同时响应 `Close` 消息触发重连。
 
 ### BUG-348（对应规范章节：7.2）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：Improvement / 统一 URI 协议解析预处理管道
 - **涉及物理路径与行号**：`src-tauri/src/utils/resolve/universal_parser.rs`
 - **根因与背景实证**：各代理协议解析函数各自手工切分 `#` 与 `?`，容易在含 `@` 参数或尾斜杠边界下出现解析截断。
-- **修正与改良方案**：封装共享纯函数 `strip_fragment_and_query(input)` 统一接入全部 9 类 URI 协议（`ss`/`trojan`/`vless`/`hysteria2`/`hysteria`/`anytls`/`tuic`/`wireguard`/`socks5`），并补齐 9 协议含 `@` 查询参数与 VMess `sni` 的回归单元测试。
+- **修正与改良方案**：封装共享纯函数 `strip_fragment_and_query(input)` 统一接入全部 9 类 URI 协议（`ss`/`trojan`/`vless`/`hysteria2`/`hysteria`/`anytls`/`tuic`/`wireguard`/`socks5`），并补齐全部 9 协议含 `@` 查询参数的 `server` 主机名与 `port` 端口双断言及 VMess `sni` 回归单元测试。
 
 ### BUG-349（对应规范章节：5.2 / 5.6）
 - **当前状态**：`代码已修正，待用户确认`
@@ -279,8 +279,8 @@
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：Improvement / 补齐 F4 / F1 快捷测速择优与 Ctrl+F 搜索聚焦快捷键
 - **涉及物理路径与行号**：`src/pages/_layout.tsx`, `src/utils/disable-webview-shortcuts.ts`, `src/components/proxy/proxy-groups.tsx`
-- **根因与背景实证**：设计规范定义了 `F4`（可见子集测速择优）与 `F1`（全量测速择优），但主界面缺少对应的统一键盘快捷监听及 `Ctrl+F` 快速定位过滤框能力。
-- **修正与改良方案**：统一收口快捷键治理，严格校验修饰键（保护 `Alt+F4` 等系统快捷键不受干扰）、排除编辑态与 IME 输入组合冲突：`F4` 触发当前可见过滤子集测速择优、`F1` 触发全量节点测速择优、`Ctrl+F` 自动聚焦并全选节点过滤输入框。
+- **根因与背景实证**：设计规范定义了 `F4`（可见子集测速择优）与 `F1`（全量测速择优），但主界面缺少统一收口且对称保护编辑态与全量弹窗遮挡的键盘快捷监听。
+- **修正与改良方案**：并入 `disable-webview-shortcuts.ts` 单一 `document` 级 `keydown` 监听器，对 `Ctrl+F`、`F4`、`F1` 对称执行全量弹窗/菜单排除（覆盖抽屉、日志、编辑/导入/向导、客户端/内核升级、列管理与帮助菜单）、输入控件编辑态排除、IME 合成与长按连发保护（绝不误伤 `Alt+F4`/`Ctrl+F4`），并移除 `ProxyGroups` 硬编码 `'PROXY'` 兜底。
 
 ### BUG-356（对应规范章节：2.8 / 2.10）
 - **当前状态**：`代码已修正，待用户确认`
@@ -301,14 +301,14 @@
 - **类别与级别**：Improvement / 特色皮肤双滑块拖动渲染与持久化落盘解耦
 - **涉及物理路径与行号**：`src/pages/_layout/hooks/use-skin-controls.ts`, `src/pages/_layout/components/theme-settings-card.tsx`
 - **根因与背景实证**：拖动皮肤物理光影/色彩滑块时在高频 `onChange` 中同步反复读写 `localStorage` 并触发整树状态同步，造成快速拖动微卡顿。
-- **修正与改良方案**：拖动过程 `onChange` 以内存态与 CSS 变量驱动 60fps 实时光影预览，同时结合 200ms 防抖落盘、`onChangeCommitted` 松手提交及组件卸载 / `pagehide` 同步兜底写盘，兼顾 60fps 丝滑手感与零配置丢失。
+- **修正与改良方案**：拖动过程 `onChange` 以内存态与 CSS 变量驱动 60fps 实时光影预览，同时结合 200ms 防抖去重落盘、`onChangeCommitted` 去重提交及窗口失焦 / `visibilitychange` / `pagehide` / 组件卸载多路冲刷，兼顾 60fps 丝滑手感与零配置丢失。
 
 ### BUG-359（对应规范章节：5.3 / 5.5）
 - **当前状态**：`代码已修正，待用户确认`
 - **类别与级别**：Improvement / 全节点超时或物理断网时顶栏轻量状态胶囊与一键自愈
 - **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src/pages/_layout/components/active-node-card.tsx`, `src/pages/_layout/utils/notification-handlers.ts`
 - **根因与背景实证**：当物理网络中断或后台测速发现全部节点超时不可达时，主界面顶栏缺乏直观的故障定性提示与一键重测恢复入口。
-- **修正与改良方案**：后端监测在全节点不可达/物理离线及恢复（含手动选优成功）时派发状态事件，顶栏展示紧凑警示状态胶囊，点击重测成功后通过 `broadcastNetworkHealth` 同步全局模块态并补齐完整错误提示闭环（13 语种 i18n 齐全）。
+- **修正与改良方案**：后端监测在全节点不可达/物理离线及恢复（含选优成功）时派发状态事件，顶栏展示紧凑警示状态胶囊，点击重测成功后通过 `broadcastNetworkHealth` 同步全局模块态，且重测未执行、全超时或异常均给出明确 i18n 提示。
 
 ### BUG-360（对应规范章节：2.8）
 - **当前状态**：`代码已修正，待用户确认`

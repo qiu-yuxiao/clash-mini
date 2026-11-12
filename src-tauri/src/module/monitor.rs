@@ -40,6 +40,9 @@ pub static PROFILE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::con
 /// 用于通知/唤醒后台监测线程（如退出轻量模式时）
 pub static MONITOR_WAKEUP_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
+/// 用于通知后台监测线程：前端刚完成手动节点切换，需第 0ms 吸收宽限期时间戳（不触发额外全组拨测，BUG-336）
+pub static NODE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
 /// 节点延迟下限（毫秒）。小于此值的节点判定为假节点/广告节点。
 /// 此为系统核心既定设计，严禁讨论或调整。
 const NODE_DELAY_MIN_MS: u32 = 30;
@@ -72,10 +75,6 @@ const DEAD_CONFIRM_MIN_INTERVAL_SECS: u64 = 10;
 /// 宽限期内的失败判定只记日志、不计入连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
 /// 缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
 const SWITCH_GRACE_PERIOD_SECS: u64 = 20;
-
-/// 选点兜底 history 的最大可接受年龄（秒）。
-/// 超过此年龄的缓存延迟视为陈旧数据，不参与候选，防止把死节点的旧延迟选为最优。
-const FALLBACK_HISTORY_MAX_AGE_SECS: u64 = 120;
 
 /// 子集测速复用测量组数据的最大年龄（秒）。
 /// 前端发起子集测速时，若所求节点的 history 均在此时间内（刚被测量组拨测过），
@@ -225,12 +224,25 @@ async fn probe_metrics_group(mihomo: &tauri_plugin_mihomo::Mihomo, label: &str) 
     }
 }
 
+/// 延迟结果数据来源语义标记（BUG-344）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DelayResultSource {
+    /// 本次真实拨测 `PROXY__METRICS` 取得的新鲜实时结果
+    LiveProbe,
+    /// 前端批量子集测速在 `< METRICS_REUSE_MAX_AGE_SECS` (30s) 内复用的测量组近期缓存
+    FreshMetricsCache,
+    /// 测速未真正执行或测量链路整体不可用（未产生任何有效拨测结果）
+    NotExecuted,
+}
+
 /// 自动选点执行结果
 pub struct AutoSelectOutcome {
     /// 所有被测节点的延迟（含死节点/超时/错误），用于前端展示
     pub display: Vec<(String, u32)>,
     /// 是否存在可用（有效）节点并完成切换
     pub selected: bool,
+    /// 本次延迟结果的数据来源语义标记
+    pub source: DelayResultSource,
 }
 
 /// 正常健康检测间隔（秒）
@@ -795,6 +807,7 @@ pub async fn trigger_backend_auto_select(
         return Ok(AutoSelectOutcome {
             display: vec![],
             selected: false,
+            source: DelayResultSource::NotExecuted,
         });
     }
 
@@ -807,25 +820,28 @@ pub async fn trigger_backend_auto_select(
     // 🛡️ 防线二：轻量模式下直接跳过副作用分发，避免无用的跨进程通信和撞车风险
     // 【治本】不再调用 refresh_clash()：整份配置重载 + auto_close_connection 是真实断流推手；
     // 选点本身已是干净热切换（select_node_for_group），无需重载。仅把真实延迟结果回写前端。
-    if !crate::module::lightweight::is_in_lightweight_mode() {
-        if let Ok(outcome) = &result {
-            if !outcome.display.is_empty() {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 准备发送 {} 条延迟结果到前端...",
-                    outcome.display.len()
-                );
-                let t0 = std::time::Instant::now();
-                crate::core::handle::Handle::notify_delay_results("PROXY".into(), outcome.display.clone());
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] notify_delay_results 完成，耗时 {:?}",
-                    t0.elapsed()
-                );
-            }
-        }
+    if !crate::module::lightweight::is_in_lightweight_mode()
+        && let Ok(outcome) = &result
+        && !outcome.display.is_empty()
+        && outcome.source != DelayResultSource::NotExecuted
+    {
+        let from_probe = matches!(outcome.source, DelayResultSource::LiveProbe);
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 准备发送 {} 条延迟结果到前端 (source={:?}, from_probe={})...",
+            outcome.display.len(),
+            outcome.source,
+            from_probe
+        );
+        let t0 = std::time::Instant::now();
+        crate::core::handle::Handle::notify_delay_results("PROXY".into(), outcome.display.clone(), from_probe);
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] notify_delay_results 完成，耗时 {:?}",
+            t0.elapsed()
+        );
     }
 
     result
@@ -867,6 +883,7 @@ async fn trigger_backend_auto_select_inner(
                     return Ok(AutoSelectOutcome {
                         display: vec![],
                         selected: false,
+                        source: DelayResultSource::NotExecuted,
                     });
                 }
             };
@@ -887,6 +904,7 @@ async fn trigger_backend_auto_select_inner(
         return Ok(AutoSelectOutcome {
             display: vec![],
             selected: false,
+            source: DelayResultSource::NotExecuted,
         });
     }
 
@@ -904,8 +922,10 @@ async fn trigger_backend_auto_select_inner(
     // 注意：当 valid_nodes.len() == 1 时为用户显式单点测速，带有极强的即时探活意图，
     // 不应复用旧缓存（防止刚恢复的节点在 30 秒内持续返回旧的死状态），必须发起实时探测。
     // 存活节点复用真实延迟；死节点复用死状态（不写入 delays，下游 display 记 0 即 Timeout）。
-    let mut delays: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    let delays: std::collections::HashMap<String, u32>;
+    let source: DelayResultSource;
     let mut reused_cache = false;
+    let mut cached_delays: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     if is_frontend_subset && valid_nodes.len() > 1 {
         if let Ok(proxies) = mihomo.get_proxies().await {
             let threshold = Duration::from_secs(METRICS_REUSE_MAX_AGE_SECS);
@@ -935,13 +955,16 @@ async fn trigger_backend_auto_select_inner(
                     valid_nodes.len(),
                     cached.len()
                 );
-                delays = cached;
+                cached_delays = cached;
                 reused_cache = true;
             }
         }
     }
 
-    if !reused_cache {
+    if reused_cache {
+        delays = cached_delays;
+        source = DelayResultSource::FreshMetricsCache;
+    } else {
         // 测量层根因修复：不再用 delay_proxy_by_name 对节点逐个自测
         // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
         // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
@@ -949,48 +972,33 @@ async fn trigger_backend_auto_select_inner(
         //
         // 带「测速失真复核」：主测速地址整体失败时改用备用 HTTPS 地址复核一次，
         // 避免主地址被机场劫持/不兼容时误判「所有测速节点均不可达」。
-        delays = probe_metrics_group(&mihomo, "选点").await.unwrap_or_default();
-    }
-
-    // 【单点测速语义：必须真实探测】valid_nodes.len() == 1 为用户显式单点测速（强即时意图）。
-    // 若测量组本次未返回任何数据（内核/测量组未就绪），一律判定为「测速未执行」：
-    // 直接返回空结果，由前端提示「测速未执行」并按契约恢复原值 ——
-    // agreements 5.2 第 3 条明确「测速未真正执行时严禁伪造成 Timeout」。
-    // 同样禁止走下方 history 兜底：那会把最多 FALLBACK_HISTORY_MAX_AGE_SECS(120s) 前的旧值
-    // 当作本次实时结果返回（旧死状态 / 旧延迟），与「点击即探活」的意图直接相悖。
-    if is_frontend_subset && valid_nodes.len() == 1 && delays.is_empty() {
-        logging!(
-            warn,
-            Type::Lightweight,
-            "[后台监测] 单点测速未取得测量组数据，判定为「未执行」，返回空结果交由前端提示"
-        );
-        return Ok(AutoSelectOutcome {
-            display: vec![],
-            selected: false,
-        });
-    }
-
-    // 兜底：若 group delay 未返回任何数据（测量组尚未就绪），退化为读取各节点已维护的 history。
-    // 只接受内核确认存活（alive）且数据新鲜（<FALLBACK_HISTORY_MAX_AGE_SECS）的条目：
-    // 此前不过滤会把死节点/过期延迟填入候选，导致把不可达节点选为最优。
-    if !reused_cache && delays.is_empty() {
-        if let Ok(proxies) = mihomo.get_proxies().await {
-            let max_age = Duration::from_secs(FALLBACK_HISTORY_MAX_AGE_SECS);
-            for name in &valid_nodes {
-                if let Some(p) = proxies.proxies.get(name) {
-                    if !p.alive {
-                        continue;
-                    }
-                    let Some(age) = history_age(p) else {
-                        continue;
-                    };
-                    if age >= max_age {
-                        continue;
-                    }
-                    if let Some(h) = p.history.last() {
-                        delays.insert(name.clone(), h.delay as u32);
-                    }
+        //
+        // 【防线收口 BUG-344 / §5.2】：
+        // 无论单点测速、批量子集测速还是全量/后台自愈选点，只要 `probe_metrics_group` 返回 `None`
+        //（主/备测速地址均整体失败，属测速链路不可用或全部节点无响应）或返回空映射（测量组尚未产生任何结果），
+        // 统一判定为 `DelayResultSource::NotExecuted`：
+        // 1. 严禁退化读取最多 120s 前的节点 `history` 旧值冒充本次结果或混入 `candidates` 切换出口；
+        // 2. 严禁将未执行的测速伪造为满屏 `0ms` Timeout 推送前端；直接返回空结果交由调用方恢复快照或计入自愈失败。
+        match probe_metrics_group(&mihomo, "选点").await {
+            Some(probed) if !probed.is_empty() => {
+                delays = probed;
+                source = DelayResultSource::LiveProbe;
+            }
+            Some(_) | None => {
+                logging!(
+                    warn,
+                    Type::Lightweight,
+                    "[后台监测] 测量组拨测未取得有效实时数据（待测节点数={}），判定为「未执行」，不回退陈旧 history，返回空结果",
+                    valid_nodes.len()
+                );
+                if select && !crate::module::lightweight::is_in_lightweight_mode() {
+                    crate::core::handle::Handle::refresh_proxies();
                 }
+                return Ok(AutoSelectOutcome {
+                    display: vec![],
+                    selected: false,
+                    source: DelayResultSource::NotExecuted,
+                });
             }
         }
     }
@@ -1078,6 +1086,7 @@ async fn trigger_backend_auto_select_inner(
                 return Ok(AutoSelectOutcome {
                     display,
                     selected: false,
+                    source,
                 });
             }
 
@@ -1090,7 +1099,6 @@ async fn trigger_backend_auto_select_inner(
                         fastest_node
                     );
                     selected = true;
-                    notify_manual_node_switched();
                     emit_network_health_notice("network_health::ok");
                     // 【关键修复】选点成功后同步回写 profile.selected，
                     // 否则唤醒/进入轻量模式时 restore_profile_selected_nodes
@@ -1153,7 +1161,11 @@ async fn trigger_backend_auto_select_inner(
         }
     }
 
-    Ok(AutoSelectOutcome { display, selected })
+    Ok(AutoSelectOutcome {
+        display,
+        selected,
+        source,
+    })
 }
 
 async fn get_active_node_name() -> Option<String> {
@@ -1182,10 +1194,17 @@ fn sort_display_delays(display: &mut [(String, u32)], sort_type: i32) {
 
 static LAST_NOTIFIED_HEALTH: parking_lot::Mutex<&'static str> = parking_lot::Mutex::new("network_health::ok");
 static LAST_MANUAL_NODE_SWITCH: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+static ALERT_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 
-/// 记录前端手动切换或自动优选产生的新节点切换时间戳（BUG-336），供后台监测第 0ms 即时刷新切换宽限期。
+/// 记录前端手动切换产生的新节点切换时间戳并立即唤醒监测循环吸收（BUG-336），不触发额外全组拨测。
 pub fn notify_manual_node_switched() {
     *LAST_MANUAL_NODE_SWITCH.lock() = Some(Instant::now());
+    NODE_SWITCH_NOTIFY.notify_one();
+}
+
+fn reset_monitor_static_state() {
+    *LAST_NOTIFIED_HEALTH.lock() = "network_health::ok";
+    *LAST_MANUAL_NODE_SWITCH.lock() = None;
 }
 
 fn emit_network_health_notice(next_status: &'static str) {
@@ -1206,6 +1225,7 @@ fn emit_network_health_notice(next_status: &'static str) {
 /// 启动全局后台节点监测常驻线程（BUG-353 panic 自愈监督）
 pub fn start_background_monitor() {
     let handle = AsyncHandler::spawn_supervised("background_monitor", Type::Lightweight, move || async move {
+        reset_monitor_static_state();
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
         let thread_start_time = Instant::now();
         let mut last_check_time = Instant::now();
@@ -1306,7 +1326,19 @@ pub fn start_background_monitor() {
                         logging!(debug, Type::Lightweight, "[后台监测] 收到配置切换通知信号，立即唤醒监测");
                         last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
                     }
+                    _ = NODE_SWITCH_NOTIFY.notified() => {
+                        logging!(debug, Type::Lightweight, "[后台监测] 收到手动切点通知，立即刷新切换宽限期");
+                    }
                 }
+            }
+
+            // 在任意 continue 早退分支（无活动配置 / 离线 / API 异常）之前优先吸收前端手动切点时间戳（BUG-336），
+            // 确保 20s 切换宽限期第 0ms 即时重置且绝不被早退分支漏消费。
+            let pending_manual_ts = LAST_MANUAL_NODE_SWITCH.lock().take();
+            if let Some(manual_ts) = pending_manual_ts {
+                last_node_change_time = Some(manual_ts);
+                consecutive_fails = 0;
+                is_retry_mode = false;
             }
 
             let current_profile = match get_current_profile_uid().await {
@@ -1415,7 +1447,8 @@ pub fn start_background_monitor() {
                         continue;
                     }
                 };
-                if let Some(manual_ts) = LAST_MANUAL_NODE_SWITCH.lock().take() {
+                let mid_manual_ts = LAST_MANUAL_NODE_SWITCH.lock().take();
+                if let Some(manual_ts) = mid_manual_ts {
                     last_node_change_time = Some(manual_ts);
                     consecutive_fails = 0;
                     is_retry_mode = false;
@@ -1429,7 +1462,13 @@ pub fn start_background_monitor() {
                         active_node_name
                     );
                     last_active_node = Some(active_node_name.clone());
-                    last_node_change_time = Some(Instant::now());
+                    // 若手动切点通知已在当前宽限期内设置过精确点击时刻，保留该时间戳避免重复延展宽限期；
+                    // 否则（如自动选点切换或外部 REST 切换）以当前检测时刻开启宽限期。
+                    if last_node_change_time
+                        .is_none_or(|t| t.elapsed() >= Duration::from_secs(SWITCH_GRACE_PERIOD_SECS))
+                    {
+                        last_node_change_time = Some(Instant::now());
+                    }
                     consecutive_fails = 0;
                     is_retry_mode = false;
                 }
@@ -1455,7 +1494,8 @@ pub fn start_background_monitor() {
                             FailoverVerdict::ShouldFailover | FailoverVerdict::AllDead => {
                                 // 若在 evaluate_failover 拨测等待期间前端刚发生了手动节点切换（BUG-336），
                                 // 立即吸收最新切换时间戳并进入切换宽限期，消除拨测期切点竞态。
-                                if let Some(manual_ts) = LAST_MANUAL_NODE_SWITCH.lock().take() {
+                                let post_probe_manual_ts = LAST_MANUAL_NODE_SWITCH.lock().take();
+                                if let Some(manual_ts) = post_probe_manual_ts {
                                     last_node_change_time = Some(manual_ts);
                                 }
                                 // 切换宽限期：切到新节点后 SWITCH_GRACE_PERIOD_SECS 内缓存未稳，失败判定可接受，
@@ -1562,18 +1602,37 @@ pub fn start_background_monitor() {
 /// （其底层为 MessageBoxW 同步阻塞调用，会阻塞当前 tokio worker 线程直到用户点击"确定"）。
 /// 这是有意为之：连续 5 次失败说明网络环境已严重恶化，继续健康检测与自愈已无意义，
 /// 弹窗期间停下来等用户处理是正确行为。
-fn fire_self_heal_alert() {
-    logging!(
-        warn,
-        Type::Lightweight,
-        "[后台监测] 连续 5 次自愈选点失败，弹出 Windows 提示框"
-    );
-    tokio::task::spawn_blocking(|| {
-        crate::show_error_dialog(
-            "Clash Mini - 网络警报",
-            "后台自动优选节点连续 5 次失败，当前所有代理节点均已失效，无法正常连接网络。\n\n请检查您的网络连接或节点订阅状态。",
+fn fire_self_heal_alert_dialog(log_reason: &'static str, body: &'static str) {
+    logging!(warn, Type::Lightweight, "{log_reason}");
+    if ALERT_DIALOG_OPEN
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 系统网络警报弹窗已在显示中，跳过重复弹窗"
         );
+        return;
+    }
+    tokio::task::spawn_blocking(move || {
+        crate::show_error_dialog("Clash Mini - 网络警报", body);
+        ALERT_DIALOG_OPEN.store(false, Ordering::Release);
     });
+}
+
+fn fire_self_heal_alert() {
+    fire_self_heal_alert_dialog(
+        "[后台监测] 连续 5 次自愈选点失败，弹出 Windows 提示框",
+        "后台自动优选节点连续 5 次失败，当前所有代理节点均已失效，无法正常连接网络。\n\n请检查您的网络连接或节点订阅状态。",
+    );
+}
+
+fn fire_core_restart_failed_alert() {
+    fire_self_heal_alert_dialog(
+        "[后台监测] 内核重启恢复失败，立即升级触发终态 Windows 提示框",
+        "后台检测到代理内核通信异常且自动重启内核失败，当前无法正常恢复代理连接。\n\n请检查系统服务权限或手动重启 Clash Mini。",
+    );
 }
 
 /// 执行一次自愈选点并统一记账：25 秒冷却保护 + auto_select_fail_count 累计 +
@@ -1595,11 +1654,13 @@ enum SelfHealAction {
     FireAlert,
 }
 
-/// 纯函数状态机（BUG-318）：将「API 假死 3 次重启内核计数」与「全节点失联 5 次系统告警计数」彻底解耦。
-/// 1. 告警计数满 5 次优先触发 `FireAlert` 并重置双计数；
-/// 2. 第 3 次失败时若内核 API 不可达则触发 `RestartCore`（仅重置 `api_dead_heal_fail_count`，绝不清零 `auto_select_fail_count`）；
-/// 3. 若内核 API 可达则跳过重启并保留告警计数，确保无论期间是否重启过内核，连续 5 次失败必然触发系统告警。
-fn evaluate_self_heal_counters(
+/// 纯函数状态机（BUG-318）：将「API 假死 3 次重启内核计数」与「全节点失联 5 次系统告警计数」解耦。
+/// 1. 告警计数满 5 次优先触发终态 `FireAlert` 并重置双计数；
+/// 2. 第 3 次失败时若内核 API 不可达则触发 `RestartCore`（此时仅重置 `api_dead_heal_fail_count`）；
+///    后续由 `complete_restart_core_attempt` 根据重启结果裁决：重启成功则保留 `auto_select_fail_count` 继续累计至第 5 次告警，
+///    若内核重启自身报错（`Err`）则视为不可恢复终态，立即升级触发 `FireAlert` 并重置本轮双计数；
+/// 3. 若内核 API 可达则跳过重启并保留告警计数。
+const fn evaluate_self_heal_counters(
     auto_select_fail_count: &mut u32,
     api_dead_heal_fail_count: &mut u32,
     api_alive: bool,
@@ -1616,6 +1677,23 @@ fn evaluate_self_heal_counters(
         }
     }
     SelfHealAction::None
+}
+
+/// 处理 `SelfHealAction::RestartCore` 的内核重启结果（纯函数，BUG-318）：
+/// - `restart_ok == true`：保留 `auto_select_fail_count` 不清零，使重启后若仍断流可在第 5 次可靠触发 `FireAlert`；
+/// - `restart_ok == false`：内核重启自身失败属终态故障，立即升级返回 `SelfHealAction::FireAlert` 并重置本轮双计数。
+const fn complete_restart_core_attempt(
+    restart_ok: bool,
+    auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+) -> SelfHealAction {
+    if restart_ok {
+        SelfHealAction::None
+    } else {
+        *auto_select_fail_count = 0;
+        *api_dead_heal_fail_count = 0;
+        SelfHealAction::FireAlert
+    }
 }
 
 async fn self_heal_with_accounting(
@@ -1709,22 +1787,30 @@ async fn self_heal_with_accounting(
                 logging!(
                     warn,
                     Type::Lightweight,
-                    "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，重启内核以恢复 API 通道（保留告警计数={}）",
+                    "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，尝试重启内核以恢复 API 通道（当前告警计数={}）",
                     *auto_select_fail_count
                 );
                 match crate::core::manager::CoreManager::global().restart_core().await {
                     Ok(()) => {
-                        logging!(info, Type::Lightweight, "[后台监测] 重启内核成功，API 通道应已恢复");
+                        let _ = complete_restart_core_attempt(true, auto_select_fail_count, api_dead_heal_fail_count);
+                        logging!(
+                            info,
+                            Type::Lightweight,
+                            "[后台监测] 重启内核成功，API 通道应已恢复（保留告警计数={}）",
+                            *auto_select_fail_count
+                        );
                     }
                     Err(e) => {
-                        *auto_select_fail_count = 0;
-                        *api_dead_heal_fail_count = 0;
                         logging!(
                             error,
                             Type::Lightweight,
-                            "[后台监测] 重启内核失败: {e}，弹出 Windows 提示框"
+                            "[后台监测] 重启内核失败: {e}，立即升级为终态告警并重置本轮计数"
                         );
-                        fire_self_heal_alert();
+                        if complete_restart_core_attempt(false, auto_select_fail_count, api_dead_heal_fail_count)
+                            == SelfHealAction::FireAlert
+                        {
+                            fire_core_restart_failed_alert();
+                        }
                     }
                 }
             }
@@ -1739,7 +1825,11 @@ async fn self_heal_with_accounting(
 
 #[cfg(test)]
 mod tests {
-    use super::{SelfHealAction, evaluate_self_heal_counters, resolve_probe_target, sort_display_delays};
+    use super::{
+        LAST_MANUAL_NODE_SWITCH, LAST_NOTIFIED_HEALTH, SelfHealAction, complete_restart_core_attempt,
+        evaluate_self_heal_counters, notify_manual_node_switched, reset_monitor_static_state, resolve_probe_target,
+        sort_display_delays,
+    };
 
     #[test]
     fn test_resolve_probe_target_ipv4() {
@@ -1830,12 +1920,16 @@ mod tests {
             );
         }
 
-        // 第 3 次：触发 RestartCore，api_dead_count 归零，但 alert_count 必须保持为 3
+        // 第 3 次：触发 RestartCore，api_dead_count 归零，重启成功后 complete_restart_core_attempt 必须保留 alert_count=3
         alert_count += 1;
         api_dead_count += 1;
         assert_eq!(
             evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, false),
             SelfHealAction::RestartCore
+        );
+        assert_eq!(
+            complete_restart_core_attempt(true, &mut alert_count, &mut api_dead_count),
+            SelfHealAction::None
         );
         assert_eq!(alert_count, 3);
         assert_eq!(api_dead_count, 0);
@@ -1858,5 +1952,46 @@ mod tests {
         );
         assert_eq!(alert_count, 0);
         assert_eq!(api_dead_count, 0);
+    }
+
+    #[test]
+    fn test_complete_restart_core_attempt_escalates_on_restart_error() {
+        // BUG-318: 当第 3 次触发 RestartCore 且内核重启自身失败（Err）时，立即升级为终态 FireAlert 并归零本轮双计数
+        let mut alert_count = 3;
+        let mut api_dead_count = 3;
+        assert_eq!(
+            evaluate_self_heal_counters(&mut alert_count, &mut api_dead_count, false),
+            SelfHealAction::RestartCore
+        );
+        assert_eq!(
+            complete_restart_core_attempt(false, &mut alert_count, &mut api_dead_count),
+            SelfHealAction::FireAlert
+        );
+        assert_eq!(alert_count, 0);
+        assert_eq!(api_dead_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_manual_node_switch_wakes_notify_and_reset_clears_statics() {
+        reset_monitor_static_state();
+        *LAST_NOTIFIED_HEALTH.lock() = "network_health::all_dead";
+
+        notify_manual_node_switched();
+        assert!(LAST_MANUAL_NODE_SWITCH.lock().is_some());
+        // 确认 NODE_SWITCH_NOTIFY 已存入许可，select! 可第 0ms 唤醒
+        let notified_res = tokio::time::timeout(
+            std::time::Duration::from_millis(20),
+            super::NODE_SWITCH_NOTIFY.notified(),
+        )
+        .await;
+        assert!(
+            notified_res.is_ok(),
+            "NODE_SWITCH_NOTIFY should store permit immediately"
+        );
+
+        // 守护线程重启时必须复位进程级 static 状态
+        reset_monitor_static_state();
+        assert_eq!(*LAST_NOTIFIED_HEALTH.lock(), "network_health::ok");
+        assert!(LAST_MANUAL_NODE_SWITCH.lock().is_none());
     }
 }

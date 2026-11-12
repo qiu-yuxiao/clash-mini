@@ -7,6 +7,7 @@ import { type Message, type MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 export const RECONNECT_DELAY_MS = 1000
 export const MAX_RECONNECT_DELAY_MS = 15_000
+export const REFRESH_CLASH_DEBOUNCE_MS = 250
 
 /**
  * BUG-347: 指数退避 + 抖动，且严格保证上界不超过 MAX_RECONNECT_DELAY_MS (15000ms)，
@@ -47,21 +48,41 @@ interface SharedSubscriptionEntry {
 const sharedSubscriptions = new Map<string, SharedSubscriptionEntry>()
 let refreshClashUnlisten: UnlistenFn | null = null
 let refreshClashListening = false
+let refreshClashListenerEpoch = 0
+let refreshClashDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * 当后端完成内核重启或配置重载发出 `verge://refresh-clash-config` 时，
- * 立即清空所有未连接 WS 通道的退避定时器并重置退避计数发起重连，消除最长 15s 陈旧等待窗（BUG-347）。
+ * 立即清空所有活动 WS 通道的退避定时器与退避计数；对已持有陈旧 socket 句柄的通道先主动关闭再立即重连，
+ * 彻底消除最长 15s 陈旧等待窗与半死句柄滞留（BUG-347）。
  */
 export const flushAllWsReconnectBackoff = () => {
   for (const entry of sharedSubscriptions.values()) {
-    if (entry.closed || entry.ws) continue
+    if (entry.closed) continue
     if (entry.reconnectTimer) {
       clearTimeout(entry.reconnectTimer)
       entry.reconnectTimer = null
     }
     entry.reconnectAttempt = 0
-    void entry.connectWs()
+    if (entry.ws) {
+      void (async () => {
+        await closeSharedSocket(entry)
+        if (!entry.closed && !entry.connecting && !entry.ws) {
+          await entry.connectWs()
+        }
+      })()
+    } else if (!entry.connecting) {
+      void entry.connectWs()
+    }
   }
+}
+
+export const scheduleFlushWsReconnectBackoff = () => {
+  if (refreshClashDebounceTimer !== null) return
+  refreshClashDebounceTimer = setTimeout(() => {
+    refreshClashDebounceTimer = null
+    flushAllWsReconnectBackoff()
+  }, REFRESH_CLASH_DEBOUNCE_MS)
 }
 
 const ensureRefreshClashListener = () => {
@@ -74,12 +95,16 @@ const ensureRefreshClashListener = () => {
     return
   }
   refreshClashListening = true
+  const epoch = ++refreshClashListenerEpoch
   listen('verge://refresh-clash-config', () => {
-    flushAllWsReconnectBackoff()
+    scheduleFlushWsReconnectBackoff()
   })
     .then((unlisten) => {
       refreshClashListening = false
-      if (sharedSubscriptions.size === 0) {
+      if (
+        epoch !== refreshClashListenerEpoch ||
+        sharedSubscriptions.size === 0
+      ) {
         unlisten()
       } else {
         refreshClashUnlisten = unlisten
@@ -91,10 +116,18 @@ const ensureRefreshClashListener = () => {
 }
 
 const cleanupRefreshClashListenerIfIdle = () => {
-  if (sharedSubscriptions.size === 0 && refreshClashUnlisten) {
-    const unlisten = refreshClashUnlisten
-    refreshClashUnlisten = null
-    unlisten()
+  if (sharedSubscriptions.size === 0) {
+    refreshClashListenerEpoch += 1
+    refreshClashListening = false
+    if (refreshClashDebounceTimer !== null) {
+      clearTimeout(refreshClashDebounceTimer)
+      refreshClashDebounceTimer = null
+    }
+    if (refreshClashUnlisten) {
+      const unlisten = refreshClashUnlisten
+      refreshClashUnlisten = null
+      unlisten()
+    }
   }
 }
 
@@ -210,7 +243,16 @@ const createSharedSubscriptionEntry = (
       ws.addListener((msg: Message) => {
         if (msg.type !== 'Text') return
         const activeOwner = pickActiveOwner(entry)
-        if (!activeOwner) return
+        if (!activeOwner) {
+          if (
+            msg.data.startsWith('Websocket error') &&
+            !entry.closed &&
+            entry.ws === ws
+          ) {
+            void entry.scheduleReconnect()
+          }
+          return
+        }
 
         activeOwner.handleMessage(msg.data)
       })
