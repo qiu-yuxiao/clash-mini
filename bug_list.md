@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-362)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-363)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -330,6 +330,13 @@
 - **涉及物理路径与行号**：`src-tauri/src/constants.rs:4-12`, `src-tauri/src/utils/network.rs:78-92, 314-325`, `src-tauri/src/config/prfitem.rs:443-446, 596-606`
 - **根因与背景实证**：`NetworkManager::create_request_with_tls_mode` 直接使用 `format!("clash-verge/v{}", env!("CARGO_PKG_VERSION"))`（当前发出 `clash-verge/v3.2.5`）作为默认请求头，将机场面板协议能力协商锚点与本分支高频递增的 UI 产品版本号强耦合，存在「外壳虚高、内核未升」诱发机场超前下发不兼容新协议、未来涨破 `v10.0.0` 触发粗糙面板字典序比较归零、偏离上游 `v2.x` 白名单遭反代拦截及暴露私有版本指纹四大隐患；同时 `PrfItem::from_url` 在构造返回 `PrfOption` 时漏存 `user_agent` 字段且未过滤空串，导致单订阅自定义 `option.user_agent` 逃生阀导入后落盘丢失。
 - **修正与改良方案**：在 `constants::network` 定义单一事实源常量 `SUBSCRIPTION_COMPAT_USER_AGENT = "clash-verge/v2.5.10"`（与内置 `Mihomo v1.19.x` 同代的上游官方正式版纯净单段标识），与 `CARGO_PKG_VERSION` 及日常发版升号彻底解耦；`NetworkManager` 通过 `resolve_effective_user_agent` 对空白自定义值自动回退至该常量；补齐 `PrfItem::from_url` 对 `option.user_agent` 的清洗与持久化保留，并补充真实 HTTP 抓包与常量解耦回归单测。
+
+### BUG-363（对应规范章节：4.1 / 4.2 / 5.1）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：Critical / 轻量模式防强杀四重闭环（异名物理隔离看门狗 + 双向互锁监督 + 双端工作区哨兵窗 + 120s 稳态代数复位）
+- **涉及物理路径与行号**：`src-tauri/src/process/guardian.rs:1-1436`, `src-tauri/src/module/lightweight.rs:99-107, 170-177`, `src-tauri/src/utils/window_manager.rs:447-460, 568-573, 617-624`, `src-tauri/packages/windows/installer.nsi:551-586, 944-947, 1132-1143`
+- **根因与背景实证**：`v3.2.6` 现场运行 2 小时 30 分钟后（`21:05:24` ~ `23:34:59`），用户唤醒后再次关闭窗口进入轻量模式，叠加整机负载飙升至 `CPU 100% / 内存 94%` 触发 `360tray.exe`（`360perfoptm2.dll` `switch_smart_mode=1`, `cpu_exception=80`）高强度清理，主进程 `PID=12688` 与伴生看门狗 `PID=21012` 双双零日志猝死（Session 0 下 `clash-verge-service.exe` 与 `mini-mihomo.exe` 始终存活）。根因在于 `BUG-316` 初版看门狗直接以同名同路径 `clash-mini.exe --guardian` 无窗口（`CREATE_NO_WINDOW`）启动且主进程丢弃 `Child` 句柄不监控看门狗死活——导致无窗口看门狗要么在前期残留扫描中被先行单杀使主进程裸奔，要么在按 `clash-mini.exe` 应用组清理（`CGroupInfo` / `DoOptmGroupResidual` / `FastOptm`）时与主进程同组连坐双杀；同时原哨兵窗口采用 `(-32000, -32000)` 屏外最小化特征坐标、`LWA_ALPHA = 0` 与空标题，易在极限负载下被穿透。
+- **修正与改良方案**：实施四重纵深闭环加固：① **看门狗异名异目录物理隔离**：按需经 `.staging` 原子同步至 `%LOCALAPPDATA%\<APP_ID>\guard\clash-mini-guard.exe`（占用锁定时平滑落入 `clash-mini-guard-alt.exe`），传入 `--target-exe` 并脱离父 Job 独立拉起，彻底免疫按 `clash-mini.exe` 应用组批量强杀且不占用安装目录文件锁，同步在 `installer.nsi` 安装/卸载流程补齐停机与清理；② **主进程与看门狗双向互锁监督**：主进程通过独立内核态阻塞线程（`WaitForMultipleObjects([child, exit_event], INFINITE)`，`0%` CPU）反向监控看门狗，主动退出 `0ms` 唤醒，看门狗遭外部误杀时记录退出码并带退避自动重建；③ **主进程与看门狗双端挂载工作区哨兵窗口**：哨兵窗迁入主屏工作区原点 `1×1`、标题非空、`LWA_ALPHA = 1`（`1/255` 肉眼不可见、`WM_NCHITTEST -> HTTRANSPARENT` 穿透、隐藏 Owner 不占任务栏/Alt+Tab），看门狗同步挂载哨兵窗并以 `MsgWaitForMultipleObjects(..., QS_ALLINPUT)` 即时响应防 `IsHungAppWindow` 判死，同时将隐藏至托盘态一并纳入守护信号；④ **120s 稳态代数复位**：`STABLE_UPTIME_RESET_SECS` 定为 `120s`，稳定运行满 120s 后遭外部强杀自动将 `--gen` 重置为 `1`，兼顾启动崩溃 3 次熔断与 7×24 小时无限次零断流托盘自愈。
 
 ---
 
