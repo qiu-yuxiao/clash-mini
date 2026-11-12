@@ -1,3 +1,16 @@
+## v3.2.7
+
+### 🛡️ Four-Pillar Anti-Kill Isolation, Mutual Guardian Supervision & Workarea Sentinel
+
+- **根治高负载下第三方清理软件按应用组连坐双杀导致的轻量模式托盘与进程静默消失（BUG-363）**：
+  - **现场取证定因**：定位 `v3.2.6` 在轻量模式运行 2 小时 30 分钟后（整机负载达 `CPU 100% / 内存 94%` 触发 `360tray.exe` / `360perfoptm2.dll` 高强度清理），主进程与同名同目录无窗口 `--guardian` 看门狗遭应用组连坐双杀（或看门狗被先行单杀后主进程裸奔）且原屏外 `(-32000, -32000)` + `Alpha=0` 哨兵窗被穿透的复合根因；
+  - **第一重｜看门狗异名异目录物理隔离**：看门狗按需经 `.staging` 原子同步至 `%LOCALAPPDATA%\io.github.clash-mini.clash-mini\guard\clash-mini-guard.exe`（锁占用时自动回退 `clash-mini-guard-alt.exe`），通过 `--target-exe` 指向安装目录主程序并脱离父作业组（`CREATE_BREAKAWAY_FROM_JOB`）独立驻留，彻底免疫按 `clash-mini.exe` 应用组批量强杀且零安装目录文件锁占用；NSIS 安装/卸载脚本同步补齐前置停机与隔离目录清理；
+  - **第二重｜主进程与看门狗双向互锁监督**：主进程新增零 CPU 内核态阻塞监督线程（`WaitForMultipleObjects([child, exit_event], INFINITE)`），正常退出 `0ms` 即时退场，若看门狗在运行期遭外部误杀则自动回收退出码、留存诊断日志并带退避重建守护；
+  - **第三重｜主进程与看门狗双端工作区哨兵窗**：双端常驻哨兵窗迁入主显示器工作区左上角 `1×1` 像素、非空窗口标题、`LWA_ALPHA = 1`（`1/255` 肉眼不可见、`WM_NCHITTEST -> HTTRANSPARENT` 100% 鼠标穿透、隐藏 Owner 不占任务栏与 Alt+Tab），看门狗采用 `MsgWaitForMultipleObjects(..., QS_ALLINPUT)` 泵送消息确保 `IsHungAppWindow` 恒为 `FALSE`，并将普通隐藏至托盘态一并纳入守护信号闭环；
+  - **第四重｜120s 稳态存活代数自动复位**：主进程稳定运行满 `120s` 后若遭外部强杀，自动将自愈拉起代数重置为 `1`，兼顾启动期连续崩溃 3 次熔断保护与 7×24 小时无限次零断流托盘自愈。
+
+---
+
 ## v3.2.6
 
 ### 🛡️ Deep Stability Hardening, Probe Semantics Overhaul & Subscription UA Decoupling
