@@ -1,3 +1,17 @@
+## v3.2.9
+
+### 🛡️ 轻量守护架构重构与 Session-0 隔离（BUG-365）
+
+- **Session-0 Broker 隔离看门狗**：在拉起 `clash-mini-guard.exe` 时引入 WMI / Task Scheduler Broker 通道以脱离父进程受限 Job Object，避免随主进程所属应用组被联动强杀，并补充场景六（Job 强杀脱离）端到端测试（`test_scenario6_job_termination_wmi_broker_escape`）。
+- **双阶段退出证明与非静默守护日志**：完善主动退出与看门狗核验的双阶段退出证明（Exit-Proof）联动，补充基于系统启动指纹与会话纪元（Boot/Epoch）的累计熔断器（取代时间归零计数）、`MoveFileExW` 原子落盘更新及非静默 `guardian.log` 诊断日志。
+- **360 进程与 WER 诊断过滤（A4）**：在诊断模块补充 360 相关进程探测、豁免状态识别与 WER 记录过滤辅助函数，提升现场失踪问题的可观测性。
+
+### 🌐 TUN 三态域名嗅探与 DNS 统一清洗（BUG-364 / BUG-362）
+
+- **三态 TUN 域名嗅探开关（Auto / On / Off）**：新增 `enable_tun_sniffer` 三态配置及前端基础设置交互，按“自动 / 开启 / 关闭”统一强制同步权威 `sniffer` 必需字段与 HTTP `override-destination` 策略。
+- **DNS 策略统一清洗**：在配置增强管线中统一清洗 `nameserver`、`fallback` 与 `nameserver-policy`，剥离尾缀 `#DIRECT` / `#PROXY` 标记，并确保 `fallback` 代理策略跳过国内公共 DNS。
+- **规范与代码注释对齐（BUG-362）**：补充 `src-tauri/src/constants.rs` 订阅 User-Agent 设计依据说明，并与 `clash_mini_agreements.md` / `bug_list.md` 台账同步对齐。
+
 ## v3.2.8
 
 ### 🌐 TUN Mode Domain Sniffing & `nameserver-policy` Hygiene
