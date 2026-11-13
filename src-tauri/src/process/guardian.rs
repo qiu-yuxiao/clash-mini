@@ -1033,12 +1033,11 @@ pub fn get_diagnostic_summary() -> String {
 #[cfg(windows)]
 mod win32_impl {
     use super::{
-        BROKER_BREAKAWAY_JOB, Command, Duration,
-        GUARD_RAPID_DEATH_WINDOW_SECS, GuardHeartbeat, GuardianArgs, HEARTBEAT_INTERVAL_MS, INSTALLER_WAIT_MAX_SECS,
-        INTENTIONAL_EXIT_FILENAME, IntentionalExitProof, IntentionalProofCheck, MAX_RAPID_RESPAWN_GEN, MainHeartbeat,
-        Path, PathBuf, RESPAWN_SAFETY_DELAY_MS, TcpListener, append_structured_guardian_log,
-        clear_intentional_exit_proof_in, compute_guard_rebuild_backoff_ms, current_unix_ms,
-        evaluate_and_record_respawn_in, evaluate_intentional_exit_proof, format_exit_code_diagnosis,
+        BROKER_BREAKAWAY_JOB, Command, Duration, GUARD_RAPID_DEATH_WINDOW_SECS, GuardHeartbeat, GuardianArgs,
+        HEARTBEAT_INTERVAL_MS, INSTALLER_WAIT_MAX_SECS, INTENTIONAL_EXIT_FILENAME, IntentionalExitProof,
+        IntentionalProofCheck, MAX_RAPID_RESPAWN_GEN, MainHeartbeat, Path, PathBuf, RESPAWN_SAFETY_DELAY_MS,
+        TcpListener, append_structured_guardian_log, clear_intentional_exit_proof_in, compute_guard_rebuild_backoff_ms,
+        current_unix_ms, evaluate_and_record_respawn_in, evaluate_intentional_exit_proof, format_exit_code_diagnosis,
         format_local_timestamp, is_guardian_respawn, is_installer_or_uninstaller_running, read_respawn_state_from,
         reset_respawn_state_for_clean_start_in, resolve_isolated_guardian_dir, sync_guardian_binary_to_dir,
         write_guard_heartbeat_to, write_intentional_exit_proof_with_retry, write_main_heartbeat_to,
@@ -2934,12 +2933,7 @@ mod win32_impl {
         }
 
         let work_dir = args.target_exe.parent().filter(|p| p.is_dir());
-        let spawn_res = spawn_isolated_process_with(
-            &args.target_exe,
-            |_| launch_args.clone(),
-            work_dir,
-            false,
-        );
+        let spawn_res = spawn_isolated_process_with(&args.target_exe, |_| launch_args.clone(), work_dir, false);
 
         match spawn_res {
             Ok(respawned) => {
