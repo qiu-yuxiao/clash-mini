@@ -105,7 +105,7 @@ pub fn resolve_setup_async() {
             .unwrap_or(false);
 
         let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
-        let is_respawn = crate::process::guardian::is_guardian_respawn();
+        let is_respawn = crate::process::guardian::is_guardian_silent_respawn();
         let should_silent = is_silent_start && has_silent_arg;
 
         if is_respawn || (should_silent && enable_auto_lightweight) {

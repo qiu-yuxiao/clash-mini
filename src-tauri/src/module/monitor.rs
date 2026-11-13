@@ -1254,6 +1254,9 @@ pub fn start_background_monitor() {
                 break;
             }
 
+            crate::process::guardian::ensure_guardian_supervisor();
+            crate::process::guardian::record_main_heartbeat_if_due();
+
             cycle_count += 1;
 
             // 【v2.6.5 隐患 C 修复】周期性心跳日志

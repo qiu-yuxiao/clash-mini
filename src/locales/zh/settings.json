@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "检测到物理网络断开，点击立即重测并尝试恢复",
     "allNodesTimeout": "全节点超时",
     "allNodesTimeoutTooltip": "当前所有代理节点均不可达，点击立即重新测速优选",
-    "filterAutoTestingTooltip": "即将对过滤结果自动测速优选（按 Esc 取消本次自动测速）"
+    "filterAutoTestingTooltip": "即将对过滤结果自动测速优选（按 Esc 取消本次自动测速）",
+    "tunSniffer": "TUN 域名嗅探",
+    "tunSnifferTooltip": "TUN 模式下识别缓存 IP 的原始域名（自动态将尊重订阅中显式关闭的 sniffer.enable）",
+    "tunSnifferAuto": "自动",
+    "tunSnifferOn": "开启",
+    "tunSnifferOff": "关闭",
+    "tunSnifferNeedTunTooltip": "仅在 TUN 模式下生效（当前未开启 TUN，切换后生效）"
   }
 }

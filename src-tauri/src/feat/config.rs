@@ -99,7 +99,13 @@ bitflags! {
      }
 }
 
-fn determine_update_flags(old_config: &IVerge, patch: &IVerge) -> UpdateFlags {
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct VergePatchResets {
+    /// 当请求显式传入 `"enable_tun_sniffer": null` 时，将已覆写值重置回 `None`（跟随订阅/自动态）
+    pub reset_tun_sniffer: bool,
+}
+
+fn determine_update_flags(old_config: &IVerge, patch: &IVerge, resets: VergePatchResets) -> UpdateFlags {
     let tun_mode = patch.enable_tun_mode;
     let auto_launch = patch.enable_auto_launch;
     let system_proxy = patch.enable_system_proxy;
@@ -125,6 +131,7 @@ fn determine_update_flags(old_config: &IVerge, patch: &IVerge) -> UpdateFlags {
     let enable_always_on_top = patch.enable_always_on_top;
     let rule_fallback = &patch.rule_fallback;
     let enable_builtin_enhanced = patch.enable_builtin_enhanced;
+    let enable_tun_sniffer = patch.enable_tun_sniffer;
 
     // 契约 1.3：TUN 模式与系统服务生命周期严格绑定。
     // 开启 TUN 时需切入 Service 模式，关闭 TUN 时必须停止系统服务中的内核并切回用户态 Sidecar。
@@ -159,10 +166,20 @@ fn determine_update_flags(old_config: &IVerge, patch: &IVerge) -> UpdateFlags {
     if restart_core_needed {
         update_flags.insert(UpdateFlags::RESTART_CORE);
     }
-    if tun_mode.is_some() || rule_fallback.is_some() || enable_builtin_enhanced.is_some() {
+    if tun_mode.is_some()
+        || enable_tun_sniffer.is_some()
+        || resets.reset_tun_sniffer
+        || rule_fallback.is_some()
+        || enable_builtin_enhanced.is_some()
+    {
         update_flags.insert(UpdateFlags::CLASH_CONFIG | UpdateFlags::GROUP_SYS_TRAY);
     }
-    if home_cards.is_some() || patch.theme_mode.is_some() || patch.theme_setting.is_some() {
+    if home_cards.is_some()
+        || patch.theme_mode.is_some()
+        || patch.theme_setting.is_some()
+        || enable_tun_sniffer.is_some()
+        || resets.reset_tun_sniffer
+    {
         update_flags.insert(UpdateFlags::VERGE_CONFIG);
     }
     if auto_launch.is_some() {
@@ -265,13 +282,22 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
 }
 
 pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
+    patch_verge_with_resets(patch, not_save_file, VergePatchResets::default()).await
+}
+
+pub async fn patch_verge_with_resets(patch: &IVerge, not_save_file: bool, resets: VergePatchResets) -> Result<()> {
     let _guard = VERGE_PATCH_LOCK.lock().await;
 
     let old_config = (*Config::verge().await.latest_arc()).clone();
 
-    Config::verge().await.edit_draft(|d| d.patch_config(patch));
+    Config::verge().await.edit_draft(|d| {
+        d.patch_config(patch);
+        if resets.reset_tun_sniffer {
+            d.enable_tun_sniffer = None;
+        }
+    });
 
-    let update_flags = determine_update_flags(&old_config, patch);
+    let update_flags = determine_update_flags(&old_config, patch, resets);
     logging!(debug, Type::Setup, "Determined update flags: {:?}", update_flags);
     let process_flag_result = process_terminated_flags(update_flags, patch).await;
 
@@ -305,4 +331,28 @@ pub async fn fetch_verge_config() -> Result<SharedDraft<IVerge>> {
     let draft = Config::verge().await;
     let data = draft.data_arc();
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reset_tun_sniffer_triggers_clash_tray_and_verge_flags() {
+        let old = IVerge {
+            enable_tun_sniffer: Some(false),
+            ..IVerge::default()
+        };
+        let patch = IVerge::default();
+        let flags = determine_update_flags(
+            &old,
+            &patch,
+            VergePatchResets {
+                reset_tun_sniffer: true,
+            },
+        );
+        assert!(flags.contains(UpdateFlags::CLASH_CONFIG));
+        assert!(flags.contains(UpdateFlags::GROUP_SYS_TRAY));
+        assert!(flags.contains(UpdateFlags::VERGE_CONFIG));
+    }
 }

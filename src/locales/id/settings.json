@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "Jaringan fisik terputus — klik untuk menguji ulang",
     "allNodesTimeout": "Semua Timeout",
     "allNodesTimeoutTooltip": "Semua node proksi tidak terjangkau — klik untuk uji ulang",
-    "filterAutoTestingTooltip": "Menguji otomatis node terfilter sesaat lagi (tekan Esc untuk batal)"
+    "filterAutoTestingTooltip": "Menguji otomatis node terfilter sesaat lagi (tekan Esc untuk batal)",
+    "tunSniffer": "Sniffer Domain TUN",
+    "tunSnifferTooltip": "Deteksi domain asli untuk IP ter-cache pada mode TUN (Auto mengikuti sniffer.enable: false pada profil)",
+    "tunSnifferAuto": "Auto",
+    "tunSnifferOn": "On",
+    "tunSnifferOff": "Off",
+    "tunSnifferNeedTunTooltip": "Hanya berlaku di mode TUN (aktifkan mode TUN)"
   }
 }

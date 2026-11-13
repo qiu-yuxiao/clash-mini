@@ -28,6 +28,7 @@ export interface IVergeConfig {
   enable_always_on_top?: boolean
 
   enable_tun_mode?: boolean
+  enable_tun_sniffer?: boolean | null
   enable_auto_light_weight_mode?: boolean
   auto_light_weight_minutes?: number
   enable_auto_launch?: boolean

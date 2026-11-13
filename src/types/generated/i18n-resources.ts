@@ -828,6 +828,12 @@ export interface TranslationResources {
         testSingleNodeTooltip: string
         total: string
         tun: string
+        tunSniffer: string
+        tunSnifferAuto: string
+        tunSnifferNeedTunTooltip: string
+        tunSnifferOff: string
+        tunSnifferOn: string
+        tunSnifferTooltip: string
         unnamedConfig: string
         updated: string
       }

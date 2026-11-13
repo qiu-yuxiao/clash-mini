@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "물리적 네트워크 연결 끊김 — 클릭하여 재측정 및 복구",
     "allNodesTimeout": "전체 시간초과",
     "allNodesTimeoutTooltip": "모든 프록시 노드에 연결할 수 없음 — 클릭하여 재측정 및 자동 선택",
-    "filterAutoTestingTooltip": "필터링된 노드 자동 속도 테스트 대기 중 (Esc 키로 취소)"
+    "filterAutoTestingTooltip": "필터링된 노드 자동 속도 테스트 대기 중 (Esc 키로 취소)",
+    "tunSniffer": "TUN 도메인 스니핑",
+    "tunSnifferTooltip": "TUN 모드에서 캐시된 IP의 원본 도메인 감지(자동은 프로필의 sniffer.enable: false를 따름)",
+    "tunSnifferAuto": "자동",
+    "tunSnifferOn": "켜짐",
+    "tunSnifferOff": "꺼짐",
+    "tunSnifferNeedTunTooltip": "TUN 모드에서만 적용됩니다(TUN 모드를 켜세요)"
   }
 }

@@ -81,6 +81,9 @@ pub struct IVerge {
     /// clash tun mode
     pub enable_tun_mode: Option<bool>,
 
+    /// tun mode domain sniffer switch (`None` = auto unless subscription sets false)
+    pub enable_tun_sniffer: Option<bool>,
+
     /// can the app auto startup
     pub enable_auto_launch: Option<bool>,
 
@@ -461,6 +464,7 @@ impl IVerge {
         patch!(collapse_navbar);
 
         patch!(enable_tun_mode);
+        patch!(enable_tun_sniffer);
         patch!(enable_auto_launch);
         patch!(enable_silent_start);
         patch!(enable_hover_jump_navigator);

@@ -385,7 +385,7 @@ pub fn run() {
             event_handlers::handle_ready_resumed(app_handle);
         }
         tauri::RunEvent::Exit => {
-            crate::process::guardian::notify_intentional_exit();
+            crate::process::guardian::confirm_intentional_exit_with_reason("run_event_exit");
             logging!(info, Type::System, "Application exited");
         }
         // Clash Mini 是托盘驻留应用，关闭或销毁窗口绝不可退出主进程；
@@ -393,6 +393,7 @@ pub fn run() {
         // 无论系统消息是否有退出码（code 是否为 None）、无论是否在轻量模式，
         // 只要未进入明确退出流程，一律阻止退出，确保托盘和后台守护永驻。
         tauri::RunEvent::ExitRequested { api, .. } if !handle::Handle::global().is_exiting() => {
+            crate::process::guardian::cancel_intentional_exit("prevent_exit");
             api.prevent_exit();
         }
         _ => {}

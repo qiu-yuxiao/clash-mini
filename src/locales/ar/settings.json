@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "الشبكة الفعلية غير متصلة — انقر لإعادة الاختبار",
     "allNodesTimeout": "انتهاء المهلة",
     "allNodesTimeoutTooltip": "جميع عقد الوكيل غير قابلة للوصول — انقر لإعادة الاختبار",
-    "filterAutoTestingTooltip": "سيتم اختبار العقد المصفاة تلقائيًا قريبًا (اضغط Esc للإلغاء)"
+    "filterAutoTestingTooltip": "سيتم اختبار العقد المصفاة تلقائيًا قريبًا (اضغط Esc للإلغاء)",
+    "tunSniffer": "فحص نطاقات TUN",
+    "tunSnifferTooltip": "التعرف على النطاقات الأصلية لعناوين IP المخزنة مؤقتًا في وضع TUN (تلقائي يحترم sniffer.enable: false)",
+    "tunSnifferAuto": "تلقائي",
+    "tunSnifferOn": "تشغيل",
+    "tunSnifferOff": "إيقاف",
+    "tunSnifferNeedTunTooltip": "يعمل في وضع TUN فقط (فعّل وضع TUN لتشغيله)"
   }
 }

@@ -87,7 +87,7 @@ pub async fn auto_lightweight_boot() -> Result<()> {
     let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
     let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
     let should_silent = is_silent_start && has_silent_arg;
-    if should_silent || crate::process::guardian::is_guardian_respawn() {
+    if should_silent || crate::process::guardian::is_guardian_silent_respawn() {
         entry_lightweight_mode().await;
     }
     Ok(())
@@ -96,7 +96,7 @@ pub async fn auto_lightweight_boot() -> Result<()> {
 pub async fn entry_lightweight_mode() -> bool {
     let _guard = LIGHTWEIGHT_LOCK.lock().await;
     let verge = Config::verge().await;
-    if !crate::process::guardian::is_guardian_respawn()
+    if !crate::process::guardian::is_guardian_silent_respawn()
         && !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false)
     {
         let _ = WindowManager::hide_main_window();

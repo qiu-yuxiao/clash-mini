@@ -5,7 +5,17 @@ pub mod network {
 
     /// 远程机场订阅与默认 HTTP 请求的兼容 User-Agent 标识（BUG-362）。
     ///
-    /// 【维护铁律（详见 `clash_mini_agreements.md` §7.6）】：
+    /// 【选型与核实依据】：
+    /// - 对应上游官方仓库 `clash-verge-rev/clash-verge-rev` 的正式发行代际标签 `v2.5.10`
+    ///   （2026-11 发布，内置同类 `Mihomo v1.19.x` 内核）。主流订阅转换/机场面板
+    ///   （Subconverter / Xboard / V2Board / SSPanel 等）通过匹配 `clash-verge/v2.x`
+    ///   来下发兼容 Clash.Meta/Mihomo 的 YAML 配置并开放同代协议族。
+    /// - 权衡说明：相比动态生成客户端版本号或轮换随机 UA，固定单段兼容 UA 的代价是默认
+    ///   请求头指纹可聚类；但能彻底规避 `clash-mini/3.x` 被面板误判为未知/不兼容分支或
+    ///   超前下发未支持协议字段导致内核解析失败。需要差异化 UA 时可通过单订阅的
+    ///   `option.user_agent` 覆盖。
+    ///
+    /// 【维护铁律（详见 `clash_mini_agreements.md` §7.6 / §8.2）】：
     /// 1. 必须与客户端自身 UI 发行版本号（`CARGO_PKG_VERSION`）彻底解耦；
     /// 2. 固定采用与当前内置 `mini-mihomo`（`Mihomo v1.19.x`）同协议代际的上游官方正式版纯净单段标识；
     /// 3. 日常 UI 修复与发版升号一律不改动此常量，仅在升级替换内置内核大版本且引入新协议代际时同步审视更新。

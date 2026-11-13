@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "偵測到實體網路斷開，點擊立即重測並嘗試恢復",
     "allNodesTimeout": "全節點逾時",
     "allNodesTimeoutTooltip": "目前所有代理節點均不可達，點擊立即重新測速優選",
-    "filterAutoTestingTooltip": "即將對過濾結果自動測速優選（按 Esc 取消本次自動測速）"
+    "filterAutoTestingTooltip": "即將對過濾結果自動測速優選（按 Esc 取消本次自動測速）",
+    "tunSniffer": "TUN 網域嗅探",
+    "tunSnifferTooltip": "TUN 模式下識別快取 IP 的原始網域（自動模式將尊重訂閱中明確關閉的 sniffer.enable）",
+    "tunSnifferAuto": "自動",
+    "tunSnifferOn": "開啟",
+    "tunSnifferOff": "關閉",
+    "tunSnifferNeedTunTooltip": "僅在 TUN 模式下生效（目前未開啟 TUN，切換後生效）"
   }
 }

@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "Физическая сеть отключена — нажмите для повторной проверки",
     "allNodesTimeout": "Все недоступны",
     "allNodesTimeoutTooltip": "Все прокси-узлы недоступны — нажмите для повторного выбора",
-    "filterAutoTestingTooltip": "Скоро авто-тест отфильтрованных узлов (Esc — отмена)"
+    "filterAutoTestingTooltip": "Скоро авто-тест отфильтрованных узлов (Esc — отмена)",
+    "tunSniffer": "Перехват доменов TUN",
+    "tunSnifferTooltip": "Определение исходных доменов для кэшированных IP в режиме TUN (Авто учитывает sniffer.enable: false профиля)",
+    "tunSnifferAuto": "Авто",
+    "tunSnifferOn": "Вкл",
+    "tunSnifferOff": "Выкл",
+    "tunSnifferNeedTunTooltip": "Действует только в режиме TUN (включите режим TUN)"
   }
 }

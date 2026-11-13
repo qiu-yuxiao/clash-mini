@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "物理ネットワーク切断 — クリックして再テスト・復旧",
     "allNodesTimeout": "全ノード応答なし",
     "allNodesTimeoutTooltip": "全プロキシノードに到達できません — クリックして再テスト・自動選択",
-    "filterAutoTestingTooltip": "絞り込み結果をまもなく自動テスト・最適選択します（Esc でキャンセル）"
+    "filterAutoTestingTooltip": "絞り込み結果をまもなく自動テスト・最適選択します（Esc でキャンセル）",
+    "tunSniffer": "TUN ドメインスニッフィング",
+    "tunSnifferTooltip": "TUN モードでキャッシュ済み IP の元ドメインを判別（自動はプロファイルの sniffer.enable: false を尊重）",
+    "tunSnifferAuto": "自動",
+    "tunSnifferOn": "オン",
+    "tunSnifferOff": "オフ",
+    "tunSnifferNeedTunTooltip": "TUN モード時のみ有効（TUN モードに切り替えてください）"
   }
 }

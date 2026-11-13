@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "Физик челтәр өзелгән — яңадан тикшерү өчен басыгыз",
     "allNodesTimeout": "Барысы тайм-аут",
     "allNodesTimeoutTooltip": "Барлык прокси төеннәр җитәрлек түгел — яңадан сайлау өчен басыгыз",
-    "filterAutoTestingTooltip": "Фильтрланган төеннәрне авто-тикшерү (Esc — баш тарту)"
+    "filterAutoTestingTooltip": "Фильтрланган төеннәрне авто-тикшерү (Esc — баш тарту)",
+    "tunSniffer": "TUN Domain Sniffer",
+    "tunSnifferTooltip": "Sniff original domains for cached IPs in TUN mode (Auto respects explicit sniffer.enable: false in profiles)",
+    "tunSnifferAuto": "Auto",
+    "tunSnifferOn": "On",
+    "tunSnifferOff": "Off",
+    "tunSnifferNeedTunTooltip": "Effective only in TUN mode (enable TUN mode to activate)"
   }
 }

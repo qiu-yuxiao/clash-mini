@@ -11,7 +11,7 @@ use self::{
     merge::use_merge,
     script::use_script,
     seq::{SeqMap, use_seq},
-    tun::use_tun,
+    tun::use_tun_with_sniffer,
 };
 use crate::config::IVerge;
 use crate::utils::dirs;
@@ -28,6 +28,7 @@ struct ConfigValues {
     clash_config: Mapping,
     clash_core: Option<String>,
     enable_tun: bool,
+    enable_tun_sniffer: Option<bool>,
     enable_builtin: bool,
     socks_enabled: bool,
     http_enabled: bool,
@@ -90,15 +91,17 @@ async fn get_config_values() -> ConfigValues {
     let verge_arc = verge.latest_arc();
     let IVerge {
         ref enable_tun_mode,
+        ref enable_tun_sniffer,
         ref enable_builtin_enhanced,
         ref verge_socks_enabled,
         ref verge_http_enabled,
         ..
     } = *verge_arc;
 
-    let (clash_core, enable_tun, enable_builtin, socks_enabled, http_enabled) = (
+    let (clash_core, enable_tun, enable_tun_sniffer, enable_builtin, socks_enabled, http_enabled) = (
         Some(verge_arc.get_valid_clash_core()),
         enable_tun_mode.unwrap_or(false),
+        *enable_tun_sniffer,
         enable_builtin_enhanced.unwrap_or(true),
         verge_socks_enabled.unwrap_or(false),
         verge_http_enabled.unwrap_or(false),
@@ -111,6 +114,7 @@ async fn get_config_values() -> ConfigValues {
         clash_config,
         clash_core,
         enable_tun,
+        enable_tun_sniffer,
         enable_builtin,
         socks_enabled,
         http_enabled,
@@ -544,18 +548,35 @@ struct ParsedDnsUpstream {
     host: std::string::String,
     is_plain: bool,
     force_direct: bool,
-    explicit_proxy: bool,
     is_special: bool,
+    clean_upstream: std::string::String,
 }
 
 fn parse_dns_upstream(raw: &str) -> ParsedDnsUpstream {
-    let (without_frag, frag_opt) = match raw.split_once('#') {
+    let trimmed = raw.trim();
+    let (without_frag, frag_opt) = match trimmed.split_once('#') {
         Some((before, frag)) => (before.trim(), Some(frag.trim())),
-        None => (raw.trim(), None),
+        None => (trimmed, None),
     };
-    let head = frag_opt.and_then(|f| f.split('&').next()).unwrap_or("").trim();
-    let force_direct = head.eq_ignore_ascii_case("direct");
-    let explicit_proxy = head.eq_ignore_ascii_case("proxy");
+    let mut force_direct = false;
+    let mut kept_frags: Vec<&str> = Vec::new();
+    if let Some(frag) = frag_opt {
+        for part in frag.split('&').map(str::trim).filter(|p| !p.is_empty()) {
+            // C12：mihomo 原生并不识别 `#DIRECT` / `#PROXY` 政策后缀；
+            // `#DIRECT` 在直连不可达语义下供清理器降级使用，且与 `#PROXY` 一并剥离，
+            // 仅保留 `#h3=true` 等合法 mihomo 参数。
+            if part.eq_ignore_ascii_case("direct") {
+                force_direct = true;
+            } else if !part.eq_ignore_ascii_case("proxy") {
+                kept_frags.push(part);
+            }
+        }
+    }
+    let clean_upstream = if kept_frags.is_empty() {
+        without_frag.to_string()
+    } else {
+        format!("{without_frag}#{}", kept_frags.join("&"))
+    };
 
     let (scheme, rest) = match without_frag.split_once("://") {
         Some((s, r)) => (s.to_ascii_lowercase(), r),
@@ -563,69 +584,114 @@ fn parse_dns_upstream(raw: &str) -> ParsedDnsUpstream {
     };
     let is_special = scheme == "dhcp" || scheme == "rcode" || rest.eq_ignore_ascii_case("system");
     let is_plain = scheme.is_empty() || scheme == "udp" || scheme == "tcp";
-
-    let authority = rest.split(['/', '?']).next().unwrap_or("").trim();
-    let host = if let Some(stripped) = authority.strip_prefix('[') {
-        stripped.split(']').next().unwrap_or("").trim()
-    } else if authority.matches(':').count() == 1 {
-        authority.split(':').next().unwrap_or("").trim()
-    } else {
-        authority
-    }
-    .to_ascii_lowercase();
+    let host = extract_upstream_host(without_frag)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
 
     ParsedDnsUpstream {
         host,
         is_plain,
         force_direct,
-        explicit_proxy,
         is_special,
+        clean_upstream,
     }
 }
 
-fn is_blocked_foreign_public_dns(host: &str) -> bool {
-    const FOREIGN_DNS_IPS: &[&str] = &[
-        "8.8.8.8",
-        "8.8.4.4",
-        "1.1.1.1",
-        "1.0.0.1",
-        "9.9.9.9",
-        "149.112.112.112",
-        "208.67.222.222",
-        "208.67.220.220",
-        "2001:4860:4860::8888",
-        "2001:4860:4860::8844",
-        "2606:4700:4700::1111",
-        "2606:4700:4700::1001",
-        "2620:fe::fe",
-        "2620:fe::9",
-        "2620:119:35::35",
-        "2620:119:53::53",
+const fn is_shared_cgnat_v4(ip: std::net::Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    octets[0] == 100 && (octets[1] & 0b1100_0000) == 64
+}
+
+const fn is_ula_or_link_local_v6(ip: std::net::Ipv6Addr) -> bool {
+    let seg0 = ip.segments()[0];
+    (seg0 & 0xfe00) == 0xfc00 || (seg0 & 0xffc0) == 0xfe80
+}
+
+fn is_local_or_domestic_dns_host(host: &str) -> bool {
+    const CN_DNS_IPV4: &[&str] = &[
+        "223.5.5.5",
+        "223.6.6.6",
+        "119.29.29.29",
+        "119.28.28.28",
+        "114.114.114.114",
+        "114.114.115.115",
+        "180.76.76.76",
+        "180.184.1.1",
+        "180.184.2.2",
+        "1.2.4.8",
+        "210.2.4.8",
     ];
-    const FOREIGN_DNS_DOMAINS: &[&str] = &[
-        "dns.cloudflare.com",
-        "cloudflare-dns.com",
-        "dns.google",
-        "dns.google.com",
-        "8888.google",
-        "quad9.net",
-        "opendns.com",
-        "adguard-dns.com",
-        "dns.adguard.com",
-        "nextdns.io",
-        "cleanbrowsing.org",
-        "controld.com",
+    const CN_DNS_IPV6: &[&str] = &["2400:3200::1", "2400:3200:baba::1", "2402:4e00::", "2402:4e00:1::"];
+    const CN_OR_LOCAL_DOMAINS: &[&str] = &[
+        "doh.pub",
+        "dot.pub",
+        "dns.pub",
+        "alidns.com",
+        "dns.alidns.com",
+        "doh.360.cn",
+        "dot.360.cn",
+        "360.cn",
+        "dnspod.cn",
+        "dns.dnspod.cn",
+        "bytedns.com",
+        "cn",
+        "lan",
+        "local",
+        "internal",
+        "home",
+        "home.arpa",
+        "localhost",
+        "corp",
+        "intranet",
     ];
 
-    if FOREIGN_DNS_IPS.contains(&host) {
+    if host.is_empty() {
         return true;
     }
-    FOREIGN_DNS_DOMAINS.iter().any(|domain| {
-        host == *domain
-            || (host.len() > domain.len()
-                && host.ends_with(domain)
-                && host.as_bytes()[host.len() - domain.len() - 1] == b'.')
+    if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
+        return ip.is_private()
+            || ip.is_loopback()
+            || ip.is_link_local()
+            || is_shared_cgnat_v4(ip)
+            || CN_DNS_IPV4.contains(&host);
+    }
+    if let Ok(ip) = host.parse::<std::net::Ipv6Addr>() {
+        return ip.is_loopback() || ip.is_unspecified() || is_ula_or_link_local_v6(ip) || CN_DNS_IPV6.contains(&host);
+    }
+    if !host.contains('.') {
+        return true;
+    }
+    CN_OR_LOCAL_DOMAINS.iter().any(|suffix| {
+        host == *suffix
+            || (host.len() > suffix.len()
+                && host.ends_with(suffix)
+                && host.as_bytes()[host.len() - suffix.len() - 1] == b'.')
     })
+}
+
+fn collect_dns_field_strings(dns: &Mapping, field: &str) -> Vec<std::string::String> {
+    let Some(val) = dns.get(field) else {
+        return Vec::new();
+    };
+    match val {
+        Value::String(s) => vec![s.clone()],
+        Value::Sequence(seq) => seq.iter().filter_map(Value::as_str).map(ToString::to_string).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn derive_domestic_doh_upstream(dns: &Mapping) -> std::string::String {
+    for raw in collect_dns_field_strings(dns, "nameserver") {
+        let parsed = parse_dns_upstream(&raw);
+        if !parsed.is_special
+            && !parsed.is_plain
+            && !parsed.clean_upstream.is_empty()
+            && is_local_or_domestic_dns_host(&parsed.host)
+        {
+            return parsed.clean_upstream;
+        }
+    }
+    "https://doh.pub/dns-query".to_string()
 }
 
 fn foreign_plain_doh_url(host: &str) -> Option<&'static str> {
@@ -634,51 +700,169 @@ fn foreign_plain_doh_url(host: &str) -> Option<&'static str> {
         "8.8.4.4" => Some("https://8.8.4.4/dns-query"),
         "1.1.1.1" => Some("https://1.1.1.1/dns-query"),
         "1.0.0.1" => Some("https://1.0.0.1/dns-query"),
+        "9.9.9.9" => Some("https://9.9.9.9/dns-query"),
+        "149.112.112.112" => Some("https://149.112.112.112/dns-query"),
+        "208.67.222.222" | "208.67.220.220" => Some("https://doh.opendns.com/dns-query"),
         _ => None,
     }
 }
 
-fn dns_host_proxy_rule(host: &str) -> Option<std::string::String> {
-    if host.is_empty() {
-        return None;
+fn dual_secondary_v4(ip: &str) -> Option<&'static str> {
+    match ip {
+        "8.8.8.8" => Some("8.8.4.4"),
+        "8.8.4.4" => Some("8.8.8.8"),
+        "1.1.1.1" => Some("1.0.0.1"),
+        "1.0.0.1" => Some("1.1.1.1"),
+        "9.9.9.9" => Some("149.112.112.112"),
+        "149.112.112.112" => Some("9.9.9.9"),
+        "208.67.222.222" => Some("208.67.220.220"),
+        "208.67.220.220" => Some("208.67.222.222"),
+        _ => None,
     }
-    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
-        return match ip {
-            std::net::IpAddr::V4(_) => Some(format!("IP-CIDR,{host}/32,PROXY,no-resolve")),
-            std::net::IpAddr::V6(_) => Some(format!("IP-CIDR6,{host}/128,PROXY,no-resolve")),
-        };
-    }
-    Some(format!("DOMAIN,{host},PROXY"))
 }
 
-/// 机场订阅的 `dns.nameserver-policy` 常见脏配置（如将 `+.google.com` 等指向
-/// `https://dns.cloudflare.com/dns-query` 或明文 `8.8.8.8`）的卫生清理：
-/// - 当 `respect-rules` 未开启（或条目显式标注 `#DIRECT`）时，内核直连海外公共 DNS，
-///   在大陆网络下必然被阻断或投毒（实测返回 SERVFAIL），故剔除不可达海外公共 DNS 条目，
-///   让其回落到正常 Fake-IP 与可达 `nameserver`，同时保留国内/内网/system 策略。
-/// - 当 `respect-rules: true` 时，将 4 家境外公共 DNS 明文 UDP 改写为 DoH（复用 BUG-308
-///   原则），并为保留的境外 DNS 上游补齐前置 `PROXY` 规则。
+fn dual_secondary_v6(ip: &str) -> Option<&'static str> {
+    match ip {
+        "2001:4860:4860::8888" => Some("2001:4860:4860::8844"),
+        "2001:4860:4860::8844" => Some("2001:4860:4860::8888"),
+        "2606:4700:4700::1111" => Some("2606:4700:4700::1001"),
+        "2606:4700:4700::1001" => Some("2606:4700:4700::1111"),
+        "2620:fe::fe" => Some("2620:fe::9"),
+        "2620:fe::9" => Some("2620:fe::fe"),
+        "2620:119:35::35" => Some("2620:119:53::53"),
+        "2620:119:53::53" => Some("2620:119:35::35"),
+        _ => None,
+    }
+}
+
+fn known_domain_landing_v4_ips(domain: &str) -> &'static [&'static str] {
+    match domain {
+        "dns.google" | "dns.google.com" | "8888.google" => &["8.8.8.8", "8.8.4.4"],
+        "cloudflare-dns.com" | "dns.cloudflare.com" => &["1.1.1.1", "1.0.0.1"],
+        "dns.quad9.net" => &["9.9.9.9", "149.112.112.112"],
+        "doh.opendns.com" => &["208.67.222.222", "208.67.220.220"],
+        _ => &[],
+    }
+}
+
+/// 统一从一组 DNS 上游主机生成前置 `PROXY` 保通规则（A9：`dns.fallback` 与 `nameserver-policy` 共用真源）。
+///
+/// - 私网/环回/链路本地/境内 DNS IP 自动跳过；
+/// - IP 字面量补全双活辅 IP（Google / Cloudflare / Quad9 / OpenDNS 双向对偶）；
+/// - 域名型上游生成 `DOMAIN,<host>,PROXY`，并对已知域名补齐固定落地 IPv4 规则。
+fn dns_upstream_proxy_rules_from_hosts<'a, I>(hosts: I) -> Vec<std::string::String>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    let mut rules = Vec::new();
+    let mut seen = HashSet::new();
+
+    for raw_host in hosts {
+        let host = raw_host.trim().to_ascii_lowercase();
+        if host.is_empty() || is_local_or_domestic_dns_host(&host) {
+            continue;
+        }
+        let mut candidates: Vec<std::string::String> = Vec::new();
+
+        if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
+            if ip.is_private() || ip.is_loopback() || ip.is_link_local() || is_shared_cgnat_v4(ip) {
+                continue;
+            }
+            candidates.push(format!("IP-CIDR,{host}/32,PROXY,no-resolve"));
+            if let Some(peer) = dual_secondary_v4(&host) {
+                candidates.push(format!("IP-CIDR,{peer}/32,PROXY,no-resolve"));
+            }
+        } else if let Ok(ip) = host.parse::<std::net::Ipv6Addr>() {
+            if ip.is_loopback() || ip.is_unspecified() || is_ula_or_link_local_v6(ip) {
+                continue;
+            }
+            candidates.push(format!("IP-CIDR6,{host}/128,PROXY,no-resolve"));
+            if let Some(peer) = dual_secondary_v6(&host) {
+                candidates.push(format!("IP-CIDR6,{peer}/128,PROXY,no-resolve"));
+            }
+        } else {
+            candidates.push(format!("DOMAIN,{host},PROXY"));
+            for landing_ip in known_domain_landing_v4_ips(&host) {
+                candidates.push(format!("IP-CIDR,{landing_ip}/32,PROXY,no-resolve"));
+            }
+        }
+
+        for rule in candidates {
+            if seen.insert(rule.clone()) {
+                rules.push(rule);
+            }
+        }
+    }
+
+    rules
+}
+
+fn find_dns_proxy_rule_insert_pos(rules: &[Value]) -> usize {
+    if let Some(gfw_idx) = rules.iter().position(|r| r.as_str() == Some("RULE-SET,gfwlist,PROXY")) {
+        let mut pos = gfw_idx + 1;
+        while let Some(next_str) = rules.get(pos).and_then(Value::as_str) {
+            if next_str.ends_with(",PROXY") || next_str.ends_with(",PROXY,no-resolve") {
+                pos += 1;
+            } else {
+                break;
+            }
+        }
+        return pos;
+    }
+
+    rules
+        .iter()
+        .position(|r| {
+            r.as_str().is_some_and(|s| {
+                s.starts_with("IP-CIDR,127.0.0.0/8,")
+                    || s.starts_with("GEOIP,")
+                    || s.starts_with("IP-CIDR6,::/0,")
+                    || s.starts_with("MATCH,")
+            })
+        })
+        .unwrap_or(rules.len())
+}
+
+/// 机场订阅 DNS 统一卫生治理（BUG-308 / BUG-364 / A9 / C10-C12 / §3.7）：
+/// - 统一覆盖 `dns.nameserver`、`dns.fallback` 与 `dns.nameserver-policy`（绝不触碰
+///   必须保持明文的 `default-nameserver`，也不删除任何 `nameserver-policy` 策略键）；
+/// - 仅以 `is_local_or_domestic_dns_host` 判定是否境内/内网可达（不再因条目出现在
+///   `fallback` 而误判，也不为境内 DNS 生成 `PROXY` 规则）；
+/// - 剥离 Mihomo 不识别的 `#DIRECT` / `#PROXY` 伪后缀，保留 `#h3=true` 等原生参数；
+/// - `respect-rules` 未开启（或携带 `#DIRECT`）时，将不可达海外上游就地改写为由 `nameserver`
+///   推导的可达境内 DoH（兜底 `https://doh.pub/dns-query`）并去重；
+/// - `respect-rules: true` 时，将境外明文 UDP 公共 DNS 升级为 DoH（消除 TCP 承载 UDP
+///   竞速取消），并与 `dns_fallback_proxy_rules` 共用真源向 `rules` 补齐 `PROXY` 规则。
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod nameserver_policy_tests {
-    use super::sanitize_nameserver_policy;
+    use super::sanitize_dns_upstreams;
     use serde_yaml_ng::{Mapping, Value};
 
     #[test]
-    fn prunes_unreachable_foreign_policy_upstreams_when_respect_rules_disabled() {
+    fn rewrites_unreachable_foreign_upstreams_and_preserves_keys_when_respect_rules_disabled() {
         let config: Mapping = serde_yaml_ng::from_str(
             r#"
 dns:
   enable: true
   nameserver:
-    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+    - https://dns.google/dns-query
+    - 8.8.8.8
+  fallback:
+    - https://1.1.1.1/dns-query
+    - 8.8.4.4
+  default-nameserver:
+    - 223.5.5.5
+    - 8.8.8.8
   nameserver-policy:
     "+.google.com": https://dns.cloudflare.com/dns-query
     "+.github.com": 8.8.8.8
+    "+.unknown-foreign.example": https://dns.mullvad.net/dns-query
     "+.mixed.example":
       - https://dns.cloudflare.com/dns-query
-      - https://doh.pub/dns-query
-      - https://doh.pub/dns-query
+      - https://dns.alidns.com/dns-query
+      - https://dns.alidns.com/dns-query
     "+.corp.local": 10.0.0.1
     "geosite:cn": https://dns.alidns.com/dns-query
     "*.lan": system
@@ -686,16 +870,53 @@ dns:
         )
         .unwrap();
 
-        let cleaned = sanitize_nameserver_policy(config);
-        let policy = cleaned
-            .get("dns")
-            .unwrap()
-            .get("nameserver-policy")
-            .and_then(Value::as_mapping)
-            .unwrap();
+        let cleaned = sanitize_dns_upstreams(config);
+        let dns = cleaned.get("dns").unwrap();
 
-        assert!(policy.get("+.google.com").is_none());
-        assert!(policy.get("+.github.com").is_none());
+        // C10：respect-rules: false 下，nameserver 与 fallback 中的海外加密/明文上游亦就地降级为境内 DoH 并去重
+        let nameserver: Vec<&str> = dns
+            .get("nameserver")
+            .and_then(Value::as_sequence)
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(nameserver, vec!["https://dns.alidns.com/dns-query"]);
+
+        let fallback: Vec<&str> = dns
+            .get("fallback")
+            .and_then(Value::as_sequence)
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(fallback, vec!["https://dns.alidns.com/dns-query"]);
+
+        // default-nameserver 保持明文不动
+        let defaults: Vec<&str> = dns
+            .get("default-nameserver")
+            .and_then(Value::as_sequence)
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(defaults, vec!["223.5.5.5", "8.8.8.8"]);
+
+        let policy = dns.get("nameserver-policy").and_then(Value::as_mapping).unwrap();
+
+        // BUG-364：绝不因海外上游不可达而删除策略键，统一就地改写为配置推导的可达境内 DoH
+        assert_eq!(
+            policy.get("+.google.com").and_then(Value::as_str),
+            Some("https://dns.alidns.com/dns-query")
+        );
+        assert_eq!(
+            policy.get("+.github.com").and_then(Value::as_str),
+            Some("https://dns.alidns.com/dns-query")
+        );
+        assert_eq!(
+            policy.get("+.unknown-foreign.example").and_then(Value::as_str),
+            Some("https://dns.alidns.com/dns-query")
+        );
         assert_eq!(policy.get("+.corp.local").and_then(Value::as_str), Some("10.0.0.1"));
         assert_eq!(
             policy.get("geosite:cn").and_then(Value::as_str),
@@ -705,15 +926,17 @@ dns:
 
         let mixed = policy.get("+.mixed.example").and_then(Value::as_sequence).unwrap();
         assert_eq!(mixed.len(), 1);
-        assert_eq!(mixed[0].as_str(), Some("https://doh.pub/dns-query"));
+        assert_eq!(mixed[0].as_str(), Some("https://dns.alidns.com/dns-query"));
     }
 
     #[test]
-    fn removes_empty_nameserver_policy_key_completely() {
+    fn preserves_nameserver_policy_with_doh_pub_fallback_when_no_domestic_nameserver() {
         let config: Mapping = serde_yaml_ng::from_str(
             r#"
 dns:
   enable: true
+  nameserver:
+    - https://1.1.1.1/dns-query
   nameserver-policy:
     "+.google.com": https://dns.cloudflare.com/dns-query
     "+.youtube.com": https://dns.google/dns-query
@@ -721,33 +944,58 @@ dns:
         )
         .unwrap();
 
-        let cleaned = sanitize_nameserver_policy(config);
-        let dns = cleaned.get("dns").and_then(Value::as_mapping).unwrap();
-        assert!(dns.get("nameserver-policy").is_none());
+        let cleaned = sanitize_dns_upstreams(config);
+        let dns = cleaned.get("dns").unwrap();
+        let nameserver: Vec<&str> = dns
+            .get("nameserver")
+            .and_then(Value::as_sequence)
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(nameserver, vec!["https://doh.pub/dns-query"]);
+
+        let policy = dns.get("nameserver-policy").and_then(Value::as_mapping).unwrap();
+        assert_eq!(
+            policy.get("+.google.com").and_then(Value::as_str),
+            Some("https://doh.pub/dns-query")
+        );
+        assert_eq!(
+            policy.get("+.youtube.com").and_then(Value::as_str),
+            Some("https://doh.pub/dns-query")
+        );
     }
 
     #[test]
-    fn respect_rules_true_rewrites_plain_udp_keeps_doh_and_injects_proxy_rules() {
+    fn respect_rules_true_rewrites_plain_udp_keeps_doh_and_injects_dual_proxy_rules() {
         let config: Mapping = serde_yaml_ng::from_str(
             r#"
 dns:
   enable: true
   respect-rules: true
+  nameserver:
+    - https://doh.pub/dns-query
+  fallback:
+    - https://doh.pub/dns-query
+    - 223.5.5.5
   nameserver-policy:
     "+.google.com": https://dns.cloudflare.com/dns-query
     "+.github.com": 8.8.8.8
     "+.blocked-direct.com": https://dns.google/dns-query#DIRECT
+    "+.proxied-h3.com": https://8.8.8.8/dns-query#PROXY&h3=true
+    "+.cn-in-fallback.com": https://doh.pub/dns-query
     "+.local.lan": 192.168.1.1
 rules:
   - RULE-SET,gfwlist,PROXY
   - IP-CIDR,8.8.8.8/32,PROXY,no-resolve
+  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve
   - GEOIP,CN,DIRECT
   - MATCH,DIRECT
 "#,
         )
         .unwrap();
 
-        let cleaned = sanitize_nameserver_policy(config);
+        let cleaned = sanitize_dns_upstreams(config);
         let policy = cleaned
             .get("dns")
             .unwrap()
@@ -763,7 +1011,21 @@ rules:
             policy.get("+.github.com").and_then(Value::as_str),
             Some("https://8.8.8.8/dns-query")
         );
-        assert!(policy.get("+.blocked-direct.com").is_none());
+        // 废弃的 `#DIRECT` 海外条目不再删除键，改写为境内可达 DoH 且不写入 `#DIRECT`
+        assert_eq!(
+            policy.get("+.blocked-direct.com").and_then(Value::as_str),
+            Some("https://doh.pub/dns-query")
+        );
+        // C12：剥离 `#PROXY` 伪后缀的同时保留合法 Mihomo `#h3=true` 参数
+        assert_eq!(
+            policy.get("+.proxied-h3.com").and_then(Value::as_str),
+            Some("https://8.8.8.8/dns-query#h3=true")
+        );
+        // C11：境内 DoH 即使出现在 fallback 中也不得被误判为境外
+        assert_eq!(
+            policy.get("+.cn-in-fallback.com").and_then(Value::as_str),
+            Some("https://doh.pub/dns-query")
+        );
         assert_eq!(policy.get("+.local.lan").and_then(Value::as_str), Some("192.168.1.1"));
 
         let rules: Vec<&str> = cleaned
@@ -779,6 +1041,10 @@ rules:
                 "RULE-SET,gfwlist,PROXY",
                 "IP-CIDR,8.8.8.8/32,PROXY,no-resolve",
                 "DOMAIN,dns.cloudflare.com,PROXY",
+                "IP-CIDR,1.1.1.1/32,PROXY,no-resolve",
+                "IP-CIDR,1.0.0.1/32,PROXY,no-resolve",
+                "IP-CIDR,8.8.4.4/32,PROXY,no-resolve",
+                "IP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
                 "GEOIP,CN,DIRECT",
                 "MATCH,DIRECT",
             ]
@@ -786,176 +1052,207 @@ rules:
     }
 }
 
-fn sanitize_nameserver_policy(mut config: Mapping) -> Mapping {
-    use serde_yaml_ng::Value;
+#[derive(Default)]
+struct SanitizeDnsCounters {
+    rewritten_foreign: usize,
+    rewritten_plain: usize,
+}
 
+fn push_unique_string(target: &mut Vec<std::string::String>, value: std::string::String) {
+    if !target.iter().any(|existing| existing == &value) {
+        target.push(value);
+    }
+}
+
+fn sanitize_upstream_items<'a, I>(
+    raw_items: I,
+    respect_rules: bool,
+    domestic_fallback: &str,
+    proxy_hosts: &mut Vec<std::string::String>,
+    counters: &mut SanitizeDnsCounters,
+) -> Vec<std::string::String>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    let mut cleaned: Vec<std::string::String> = Vec::new();
+    for raw in raw_items {
+        let parsed = parse_dns_upstream(raw);
+        if parsed.clean_upstream.is_empty() {
+            continue;
+        }
+        if parsed.is_special || is_local_or_domestic_dns_host(&parsed.host) {
+            push_unique_string(&mut cleaned, parsed.clean_upstream);
+            continue;
+        }
+
+        if parsed.force_direct || !respect_rules {
+            counters.rewritten_foreign += 1;
+            push_unique_string(&mut cleaned, domestic_fallback.to_string());
+            continue;
+        }
+
+        let target_upstream = if parsed.is_plain {
+            if let Some(doh) = foreign_plain_doh_url(&parsed.host) {
+                counters.rewritten_plain += 1;
+                doh.to_string()
+            } else {
+                parsed.clean_upstream
+            }
+        } else {
+            parsed.clean_upstream
+        };
+
+        let target_host = extract_upstream_host(&target_upstream)
+            .unwrap_or(parsed.host)
+            .to_ascii_lowercase();
+        if !target_host.is_empty() {
+            push_unique_string(proxy_hosts, target_host);
+        }
+        push_unique_string(&mut cleaned, target_upstream);
+    }
+    cleaned
+}
+
+fn sanitize_dns_list_field(
+    dns: &mut Mapping,
+    field: &str,
+    respect_rules: bool,
+    domestic_fallback: &str,
+    proxy_hosts: &mut Vec<std::string::String>,
+    counters: &mut SanitizeDnsCounters,
+) {
+    let Some(val) = dns.get_mut(field) else {
+        return;
+    };
+    let (was_scalar, raw_items): (bool, Vec<std::string::String>) = match val {
+        Value::String(s) => (true, vec![s.clone()]),
+        Value::Sequence(seq) => (
+            false,
+            seq.iter().filter_map(Value::as_str).map(ToString::to_string).collect(),
+        ),
+        _ => return,
+    };
+    if raw_items.is_empty() {
+        return;
+    }
+
+    let cleaned = sanitize_upstream_items(
+        raw_items.iter().map(std::string::String::as_str),
+        respect_rules,
+        domestic_fallback,
+        proxy_hosts,
+        counters,
+    );
+
+    if cleaned.is_empty() {
+        *val = if was_scalar {
+            Value::String(domestic_fallback.to_string())
+        } else {
+            Value::Sequence(vec![Value::String(domestic_fallback.to_string())])
+        };
+    } else if was_scalar && cleaned.len() == 1 {
+        if let Some(single) = cleaned.into_iter().next() {
+            *val = Value::String(single);
+        }
+    } else {
+        *val = Value::Sequence(cleaned.into_iter().map(Value::String).collect());
+    }
+}
+
+fn sanitize_nameserver_policy_map(
+    dns: &mut Mapping,
+    respect_rules: bool,
+    domestic_fallback: &str,
+    proxy_hosts: &mut Vec<std::string::String>,
+    counters: &mut SanitizeDnsCounters,
+) {
+    let Some(Value::Mapping(policy)) = dns.get_mut("nameserver-policy") else {
+        return;
+    };
+    let mut next_policy = Mapping::with_capacity(policy.len());
+
+    for (key, val) in policy.iter() {
+        let (was_scalar, raw_items): (bool, Vec<&str>) = match val {
+            Value::String(s) => (true, vec![s.as_str()]),
+            Value::Sequence(seq) => (false, seq.iter().filter_map(Value::as_str).collect()),
+            other => {
+                next_policy.insert(key.clone(), other.clone());
+                continue;
+            }
+        };
+
+        let cleaned = sanitize_upstream_items(raw_items, respect_rules, domestic_fallback, proxy_hosts, counters);
+
+        if cleaned.is_empty() {
+            next_policy.insert(key.clone(), Value::String(domestic_fallback.to_string()));
+        } else if was_scalar && cleaned.len() == 1 {
+            if let Some(single) = cleaned.into_iter().next() {
+                next_policy.insert(key.clone(), Value::String(single));
+            }
+        } else {
+            next_policy.insert(
+                key.clone(),
+                Value::Sequence(cleaned.into_iter().map(Value::String).collect()),
+            );
+        }
+    }
+
+    *policy = next_policy;
+}
+
+fn inject_dns_proxy_rules(config: &mut Mapping, proxy_hosts: &[std::string::String]) {
+    if proxy_hosts.is_empty() {
+        return;
+    }
+    let generated = dns_upstream_proxy_rules_from_hosts(proxy_hosts.iter().map(std::string::String::as_str));
+    let existing_rules = config.get("rules").and_then(Value::as_sequence);
+    let to_insert: Vec<Value> = generated
+        .into_iter()
+        .filter(|rule| {
+            !existing_rules
+                .map(|seq| seq.iter().any(|r| r.as_str() == Some(rule.as_str())))
+                .unwrap_or(false)
+        })
+        .map(Value::String)
+        .collect();
+    if !to_insert.is_empty()
+        && let Some(Value::Sequence(rules)) = config.get_mut("rules")
+    {
+        let insert_pos = find_dns_proxy_rule_insert_pos(rules);
+        rules.splice(insert_pos..insert_pos, to_insert);
+    }
+}
+
+fn sanitize_dns_upstreams(mut config: Mapping) -> Mapping {
     let mut proxy_hosts: Vec<std::string::String> = Vec::new();
-    let mut dropped_entries: usize = 0;
-    let mut rewritten_plain: usize = 0;
-    let mut dropped_keys: usize = 0;
+    let mut counters = SanitizeDnsCounters::default();
 
     if let Some(Value::Mapping(dns)) = config.get_mut("dns") {
         let respect_rules = dns.get("respect-rules").and_then(Value::as_bool).unwrap_or(false);
+        let domestic_fallback = derive_domestic_doh_upstream(dns);
 
-        let remove_empty_policy = if let Some(Value::Mapping(policy)) = dns.get_mut("nameserver-policy") {
-            let mut next_policy = Mapping::with_capacity(policy.len());
-
-            for (key, val) in policy.iter() {
-                let (was_scalar, raw_items): (bool, Vec<&str>) = match val {
-                    Value::String(s) => (true, vec![s.as_str()]),
-                    Value::Sequence(seq) => (false, seq.iter().filter_map(|v| v.as_str()).collect()),
-                    _ => {
-                        dropped_keys += 1;
-                        continue;
-                    }
-                };
-
-                let mut cleaned: Vec<std::string::String> = Vec::with_capacity(raw_items.len());
-                for raw in raw_items {
-                    let trimmed = raw.trim();
-                    if trimmed.is_empty() {
-                        dropped_entries += 1;
-                        continue;
-                    }
-                    let parsed = parse_dns_upstream(trimmed);
-                    if parsed.is_special {
-                        if !cleaned.iter().any(|x| x == trimmed) {
-                            cleaned.push(trimmed.to_string());
-                        }
-                        continue;
-                    }
-
-                    let resolved = if is_blocked_foreign_public_dns(&parsed.host) {
-                        if parsed.force_direct || (!respect_rules && !parsed.explicit_proxy) {
-                            dropped_entries += 1;
-                            continue;
-                        }
-                        if !parsed.explicit_proxy && respect_rules && !proxy_hosts.iter().any(|h| h == &parsed.host) {
-                            proxy_hosts.push(parsed.host.clone());
-                        }
-                        if parsed.is_plain {
-                            if let Some(doh) = foreign_plain_doh_url(&parsed.host) {
-                                rewritten_plain += 1;
-                                doh.to_string()
-                            } else {
-                                trimmed.to_string()
-                            }
-                        } else {
-                            trimmed.to_string()
-                        }
-                    } else {
-                        trimmed.to_string()
-                    };
-
-                    if !cleaned.iter().any(|x| x == &resolved) {
-                        cleaned.push(resolved);
-                    }
-                }
-
-                if cleaned.is_empty() {
-                    dropped_keys += 1;
-                } else if was_scalar && cleaned.len() == 1 {
-                    if let Some(single) = cleaned.into_iter().next() {
-                        next_policy.insert(key.clone(), Value::String(single));
-                    }
-                } else {
-                    next_policy.insert(
-                        key.clone(),
-                        Value::Sequence(cleaned.into_iter().map(Value::String).collect()),
-                    );
-                }
-            }
-
-            let is_empty = next_policy.is_empty();
-            *policy = next_policy;
-            is_empty
-        } else {
-            false
-        };
-
-        if remove_empty_policy {
-            dns.remove("nameserver-policy");
+        for field in ["nameserver", "fallback"] {
+            sanitize_dns_list_field(
+                dns,
+                field,
+                respect_rules,
+                &domestic_fallback,
+                &mut proxy_hosts,
+                &mut counters,
+            );
         }
+        sanitize_nameserver_policy_map(dns, respect_rules, &domestic_fallback, &mut proxy_hosts, &mut counters);
     }
 
-    if !proxy_hosts.is_empty() {
-        let mut to_insert: Vec<Value> = Vec::new();
-        let existing_rules = config.get("rules").and_then(Value::as_sequence);
-        for host in &proxy_hosts {
-            if let Some(rule) = dns_host_proxy_rule(host) {
-                let already_present = existing_rules
-                    .map(|seq| seq.iter().any(|r| r.as_str() == Some(rule.as_str())))
-                    .unwrap_or(false);
-                if !already_present && !to_insert.iter().any(|r| r.as_str() == Some(rule.as_str())) {
-                    to_insert.push(Value::String(rule));
-                }
-            }
-        }
-        if !to_insert.is_empty() {
-            if let Some(Value::Sequence(rules)) = config.get_mut("rules") {
-                let insert_pos = rules
-                    .iter()
-                    .position(|r| {
-                        r.as_str().is_some_and(|s| {
-                            s.starts_with("GEOIP,") || s.starts_with("IP-CIDR6,::/0,") || s.starts_with("MATCH,")
-                        })
-                    })
-                    .unwrap_or(rules.len());
-                rules.splice(insert_pos..insert_pos, to_insert);
-            }
-        }
-    }
+    inject_dns_proxy_rules(&mut config, &proxy_hosts);
 
-    if dropped_entries > 0 || rewritten_plain > 0 || dropped_keys > 0 {
+    if counters.rewritten_foreign > 0 || counters.rewritten_plain > 0 {
         logging!(
             info,
             Type::Config,
-            "DNS nameserver-policy 已完成卫生处理：移除不可达海外策略项 {dropped_entries} 条（空键 {dropped_keys} 个），明文改写 DoH {rewritten_plain} 条"
-        );
-    }
-    config
-}
-
-fn sanitize_foreign_plain_dns_upstreams(mut config: Mapping) -> Mapping {
-    use serde_yaml_ng::Value;
-
-    const FOREIGN_PUBLIC_DNS_DOH: [(&str, &str); 4] = [
-        ("8.8.8.8", "https://8.8.8.8/dns-query"),
-        ("8.8.4.4", "https://8.8.4.4/dns-query"),
-        ("1.1.1.1", "https://1.1.1.1/dns-query"),
-        ("1.0.0.1", "https://1.0.0.1/dns-query"),
-    ];
-
-    let Some(Value::Mapping(dns)) = config.get_mut("dns") else {
-        return config;
-    };
-    let Some(Value::Sequence(nameservers)) = dns.get_mut("nameserver") else {
-        return config;
-    };
-
-    let mut rewritten: Vec<std::string::String> = Vec::new();
-    for entry in nameservers.iter_mut() {
-        let Value::String(raw) = entry else { continue };
-        let trimmed = raw.trim();
-        // 已是加密上游（带 scheme）不动
-        if trimmed.contains("://") {
-            continue;
-        }
-        // 明文形式：裸 IP 或 `IP:53` 端口写法，取主机部分比对
-        let Some(host) = extract_upstream_host(trimmed) else {
-            continue;
-        };
-        if let Some((ip, doh)) = FOREIGN_PUBLIC_DNS_DOH.iter().find(|(ip, _)| *ip == host) {
-            *entry = Value::String(doh.to_string());
-            rewritten.push((*ip).to_string());
-        }
-    }
-    if !rewritten.is_empty() {
-        logging!(
-            info,
-            Type::Core,
-            "DNS nameserver 境外明文 UDP 上游已改写为 DoH（消除穿代理 UDP 竞速取消）：{}",
-            rewritten.join(", ")
+            "DNS 上游完成统一卫生处理：海外不可达改写境内 DoH {} 条，明文 UDP 升级 DoH {} 条",
+            counters.rewritten_foreign,
+            counters.rewritten_plain
         );
     }
     config
@@ -975,8 +1272,8 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
         Some(idx) => s.get(idx + 3..)?,
         None => s,
     };
-    // 去掉 path
-    let host_port = s.split('/').next()?;
+    // 去掉 path 与 query
+    let host_port = s.split(['/', '?']).next()?;
 
     let host = if let Some(rest) = host_port.strip_prefix('[') {
         // `[IPv6]:port`
@@ -993,95 +1290,17 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
     (!host.is_empty()).then(|| std::string::String::from(host))
 }
 
-/// 由 `dns.fallback` 中的境外上游生成强制走代理的规则。
-///
-/// 【为什么必须有】`dns.respect-rules: true` 时，内核为解析域名而发出的上游连接同样要
-/// 过规则匹配；而本程序默认 `rule_fallback = "direct"`，于是 fallback 里的境外 DoH
-/// （1.1.1.1 / 8.8.8.8 / 8.8.4.4 …）会一路漏到 `MATCH,DIRECT`。这三家在大陆直连被墙，
-/// fallback 整链随之失效，`fallback-filter.geoip` 的防投毒能力等于关闭 —— 投毒应答
-/// （如 Teredo 段的 `2001::1`）被直接采信，客户端随后反复连接这些不存在的地址，
-/// 表现为 `i/o timeout` 刷屏 → TUN 断流。
-///
-/// v3.0.0 现场日志实证：`dial DIRECT (match Match/) mihomo --> 8.8.8.8:443 error ...`。
-/// 3.0.7 现场日志实证：`dial DIRECT (match Match/) mihomo --> 8.8.4.4:443 error ...`。
-///
-/// 处理规则：
-/// 1. IP 字面量：生成 `IP-CIDR,<ip>/32,PROXY,no-resolve`（IPv6 为 /128）；
-/// 2. 公共 DNS 对偶补齐：Google DNS（8.8.8.8 ↔ 8.8.4.4）、Cloudflare DNS（1.1.1.1 ↔ 1.0.0.1）
-///    自动注入辅 IP 规则，消除仅配置主 IP 时内核或系统轮询辅 IP 漏入 MATCH,DIRECT 造成的超时；
-/// 3. 域名型上游：生成 `DOMAIN,<host>,PROXY`；对已知域名（如 `dns.google`）自动补齐其固定落地 IP（8.8.8.8 与 8.8.4.4）。
+/// 由 `dns.fallback` 中的境外上游生成强制走代理的规则（与 `nameserver-policy` 共用规则生成真源）。
 fn dns_fallback_proxy_rules(dns: Option<&Value>) -> Vec<Value> {
-    let mut rules = Vec::new();
-    let mut seen = HashSet::new();
-
     let Some(Value::Mapping(dns_map)) = dns else {
-        return rules;
+        return Vec::new();
     };
-    // `fallback` 允许标量或列表两种写法，统一成迭代
-    let Some(fallback) = dns_map.get(Value::from("fallback")) else {
-        return rules;
-    };
-    let servers: Vec<&Value> = match fallback {
-        Value::Sequence(seq) => seq.iter().collect(),
-        other => vec![other],
-    };
-
-    for server in servers {
-        let Some(raw) = server.as_str() else {
-            continue;
-        };
-        let Some(host) = extract_upstream_host(raw) else {
-            continue;
-        };
-
-        let mut candidate_rules: Vec<std::string::String> = Vec::new();
-
-        if let Ok(ip) = host.parse::<std::net::Ipv4Addr>() {
-            // 私网、环回与链路本地地址不走代理，避免误伤局域网网关与本地服务
-            if ip.is_private() || ip.is_loopback() || ip.is_link_local() {
-                continue;
-            }
-            candidate_rules.push(format!("IP-CIDR,{host}/32,PROXY,no-resolve"));
-            // 对偶补齐知名公共 DNS 的辅 IP：
-            // Google: 8.8.8.8 <-> 8.8.4.4
-            // Cloudflare: 1.1.1.1 <-> 1.0.0.1
-            // 客户端与内核在 fallback 时若轮询到对偶 IP，未补齐会漏到 MATCH,DIRECT 导致超时
-            if host == "8.8.8.8" {
-                candidate_rules.push("IP-CIDR,8.8.4.4/32,PROXY,no-resolve".to_string());
-            } else if host == "8.8.4.4" {
-                candidate_rules.push("IP-CIDR,8.8.8.8/32,PROXY,no-resolve".to_string());
-            } else if host == "1.1.1.1" {
-                candidate_rules.push("IP-CIDR,1.0.0.1/32,PROXY,no-resolve".to_string());
-            } else if host == "1.0.0.1" {
-                candidate_rules.push("IP-CIDR,1.1.1.1/32,PROXY,no-resolve".to_string());
-            }
-        } else if let Ok(ip) = host.parse::<std::net::Ipv6Addr>() {
-            // 环回、未指定、ULA 与链路本地地址不走代理
-            let seg0 = ip.segments()[0];
-            if ip.is_loopback() || ip.is_unspecified() || (seg0 & 0xfe00) == 0xfc00 || (seg0 & 0xffc0) == 0xfe80 {
-                continue;
-            }
-            candidate_rules.push(format!("IP-CIDR6,{host}/128,PROXY,no-resolve"));
-        } else {
-            // 域名型境外上游（如 dns.google）：
-            // 1. 生成 DOMAIN,{host},PROXY 规则，确保内核建立连接时直接匹配走代理；
-            // 2. 针对已知域名（如 dns.google），其固定解析落地为 8.8.8.8 / 8.8.4.4，
-            //    补充 IP-CIDR 规则，杜绝内核解析后直连其辅 IP 导致 i/o timeout。
-            candidate_rules.push(format!("DOMAIN,{host},PROXY"));
-            if host == "dns.google" {
-                candidate_rules.push("IP-CIDR,8.8.8.8/32,PROXY,no-resolve".to_string());
-                candidate_rules.push("IP-CIDR,8.8.4.4/32,PROXY,no-resolve".to_string());
-            }
-        }
-
-        for rule in candidate_rules {
-            if seen.insert(rule.clone()) {
-                rules.push(Value::from(rule.as_str()));
-            }
-        }
-    }
-
-    rules
+    let servers = collect_dns_field_strings(dns_map, "fallback");
+    let hosts: Vec<std::string::String> = servers.iter().filter_map(|raw| extract_upstream_host(raw)).collect();
+    dns_upstream_proxy_rules_from_hosts(hosts.iter().map(std::string::String::as_str))
+        .into_iter()
+        .map(|rule| Value::from(rule.as_str()))
+        .collect()
 }
 
 async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
@@ -1437,6 +1656,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
         clash_config,
         clash_core,
         enable_tun,
+        enable_tun_sniffer,
         enable_builtin,
         socks_enabled,
         http_enabled,
@@ -1486,13 +1706,12 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
 
     config = enforce_mini_agreements(config).await;
 
-    config = use_tun(config, enable_tun);
+    config = use_tun_with_sniffer(config, enable_tun, enable_tun_sniffer);
     config = use_sort(config);
 
     // dns settings
     config = apply_mandatory_dns_settings(config);
-    config = sanitize_foreign_plain_dns_upstreams(config);
-    config = sanitize_nameserver_policy(config);
+    config = sanitize_dns_upstreams(config);
 
     let mut exists_keys_set = HashSet::new();
     exists_keys_set.extend(exists_keys);
@@ -1702,8 +1921,26 @@ fallback:
                 std::string::String::from("IP-CIDR,8.8.4.4/32,PROXY,no-resolve"),
                 std::string::String::from("DOMAIN,dns.google,PROXY"),
                 std::string::String::from("IP-CIDR6,2606:4700:4700::1111/128,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR6,2606:4700:4700::1001/128,PROXY,no-resolve"),
             ],
-            "域名型上游与对偶辅IP生成走代理规则，按出现顺序去重"
+            "域名型上游与双活对偶辅IP（含IPv4/IPv6）生成走代理规则，按出现顺序去重"
+        );
+
+        // Quad9 与 OpenDNS 对偶辅 IP 自动补全（A9）
+        let quad9_opendns: Mapping =
+            serde_yaml_ng::from_str("fallback: ['https://9.9.9.9/dns-query', '208.67.222.222']").unwrap();
+        let quad9_rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(quad9_opendns)))
+            .iter()
+            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .collect();
+        assert_eq!(
+            quad9_rules,
+            vec![
+                std::string::String::from("IP-CIDR,9.9.9.9/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,149.112.112.112/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,208.67.222.222/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,208.67.220.220/32,PROXY,no-resolve"),
+            ]
         );
 
         // 单独配置 8.8.8.8 时，应自动补齐对偶辅 IP 8.8.4.4
@@ -1741,19 +1978,21 @@ fallback:
         assert!(dns_fallback_proxy_rules(Some(&Value::Mapping(empty))).is_empty());
     }
 
-    /// 回归（BUG-308）：订阅自带 `dns.nameserver` 含境外明文 UDP 上游（如 8.8.8.8）时，
+    /// 回归（BUG-308 / C10）：订阅自带 `dns.nameserver` / `dns.fallback` 含境外明文 UDP 上游（如 8.8.8.8）时，
     /// `respect-rules: true` 下该查询穿代理，TCP 承载节点（anytls）上 UDP-over-TCP 会话
     /// 建立慢于境内 DoH、在 DNS 并发赛跑中必被取消（3.1.7 现场实证 7 条
-    /// `failed to create session` 全落在 anytls 窗口内）。锁定「明文境外公共 DNS → DoH
-    /// 改写、境内明文与加密上游保留、default-nameserver 不动」的卫生改写约定。
+    /// `failed to create session` 全落在 anytls 窗口内）；`respect-rules: false` 下直连必超时的
+    /// 境外加密 DoH/DoT 与明文上游统一就地降级为境内 DoH。锁定「明文境外公共 DNS → DoH
+    /// 改写并去重、境内明文与加密上游保留、default-nameserver 不动」的卫生改写约定。
     #[test]
     fn foreign_plain_dns_upstreams_in_nameserver_are_sanitized_to_doh() {
-        use super::sanitize_foreign_plain_dns_upstreams;
+        use super::sanitize_dns_upstreams;
         use serde_yaml_ng::Mapping;
 
         let config: Mapping = serde_yaml_ng::from_str(
             r"
 dns:
+  respect-rules: true
   nameserver:
     - https://doh.pub/dns-query
     - https://dns.alidns.com/dns-query
@@ -1767,11 +2006,14 @@ dns:
   default-nameserver:
     - 223.6.6.6
     - 8.8.8.8
+rules:
+  - RULE-SET,gfwlist,PROXY
+  - MATCH,DIRECT
 ",
         )
         .unwrap();
 
-        let sanitized = sanitize_foreign_plain_dns_upstreams(config);
+        let sanitized = sanitize_dns_upstreams(config);
         let dns = sanitized.get("dns").unwrap();
         let nameservers: Vec<std::string::String> = dns
             .get("nameserver")
@@ -1787,8 +2029,7 @@ dns:
             vec![
                 std::string::String::from("https://doh.pub/dns-query"),
                 std::string::String::from("https://dns.alidns.com/dns-query"),
-                // 境外明文 UDP → DoH 改写（裸 IP 与 :53 端口两种写法）
-                std::string::String::from("https://8.8.8.8/dns-query"),
+                // 境外明文 UDP → DoH 改写并去重（裸 IP 与 :53 端口合并）
                 std::string::String::from("https://8.8.8.8/dns-query"),
                 std::string::String::from("https://1.1.1.1/dns-query"),
                 // 境内明文上游直连可达，保留
@@ -1800,6 +2041,21 @@ dns:
             ],
             "仅境外公共 DNS 明文形式被改写为 DoH"
         );
+
+        // respect-rules: true 时 nameserver 中的境外上游亦自动补齐 PROXY 保通规则
+        let rules: Vec<&str> = sanitized
+            .get("rules")
+            .unwrap()
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert!(rules.contains(&"IP-CIDR,8.8.8.8/32,PROXY,no-resolve"));
+        assert!(rules.contains(&"IP-CIDR,8.8.4.4/32,PROXY,no-resolve"));
+        assert!(rules.contains(&"IP-CIDR,1.1.1.1/32,PROXY,no-resolve"));
+        assert!(!rules.contains(&"IP-CIDR,223.5.5.5/32,PROXY,no-resolve"));
+        assert!(!rules.contains(&"IP-CIDR,114.114.114.114/32,PROXY,no-resolve"));
 
         // default-nameserver 按协议定义必须为明文 IP，不得改写
         let defaults: Vec<std::string::String> = dns
@@ -1821,11 +2077,42 @@ dns:
 
         // 无 dns 段 / 无 nameserver 时安全跳过
         let no_dns: Mapping = serde_yaml_ng::from_str("mixed-port: 7890").unwrap();
-        let untouched = sanitize_foreign_plain_dns_upstreams(no_dns);
+        let untouched = sanitize_dns_upstreams(no_dns);
         assert!(untouched.get("dns").is_none());
         let no_nameserver: Mapping = serde_yaml_ng::from_str("dns:\n  enable: true").unwrap();
-        let untouched = sanitize_foreign_plain_dns_upstreams(no_nameserver);
+        let untouched = sanitize_dns_upstreams(no_nameserver);
         assert!(untouched.get("dns").unwrap().get("nameserver").is_none());
+    }
+
+    #[test]
+    fn dns_fallback_proxy_rules_skip_domestic_public_dns() {
+        use super::dns_fallback_proxy_rules;
+        use serde_yaml_ng::{Mapping, Value};
+
+        // C11：境内公共 DNS IP / DoH 域名即使误配在 fallback 中也不得生成 PROXY 规则
+        let dns: Mapping = serde_yaml_ng::from_str(
+            r"
+fallback:
+  - 223.5.5.5
+  - 114.114.114.114
+  - https://doh.pub/dns-query
+  - https://dns.alidns.com/dns-query
+  - https://1.1.1.1/dns-query
+",
+        )
+        .unwrap();
+
+        let rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(dns)))
+            .iter()
+            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .collect();
+        assert_eq!(
+            rules,
+            vec![
+                std::string::String::from("IP-CIDR,1.1.1.1/32,PROXY,no-resolve"),
+                std::string::String::from("IP-CIDR,1.0.0.1/32,PROXY,no-resolve"),
+            ]
+        );
     }
 
     #[test]

@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "شبکه فیزیکی قطع است — برای تست مجدد کلیک کنید",
     "allNodesTimeout": "همه تایم‌اوت",
     "allNodesTimeoutTooltip": "همه گره‌ها در دسترس نیستند — برای تست مجدد کلیک کنید",
-    "filterAutoTestingTooltip": "تست خودکار گره‌های فیلترشده به‌زودی (Esc برای لغو)"
+    "filterAutoTestingTooltip": "تست خودکار گره‌های فیلترشده به‌زودی (Esc برای لغو)",
+    "tunSniffer": "شنود دامنه TUN",
+    "tunSnifferTooltip": "تشخیص دامنه اصلی برای IPهای کش‌شده در حالت TUN (حالت خودکار به sniffer.enable: false پروفایل احترام می‌گذارد)",
+    "tunSnifferAuto": "خودکار",
+    "tunSnifferOn": "روشن",
+    "tunSnifferOff": "خاموش",
+    "tunSnifferNeedTunTooltip": "فقط در حالت TUN فعال است (حالت TUN را روشن کنید)"
   }
 }

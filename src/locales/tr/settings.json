@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "Fiziksel ağ bağlantısı kesildi — yeniden test için tıklayın",
     "allNodesTimeout": "Tümü Zaman Aşımı",
     "allNodesTimeoutTooltip": "Tüm proxy düğümlerine ulaşılamıyor — yeniden test için tıklayın",
-    "filterAutoTestingTooltip": "Filtrelenen düğümler birazdan otomatik test edilecek (iptal için Esc)"
+    "filterAutoTestingTooltip": "Filtrelenen düğümler birazdan otomatik test edilecek (iptal için Esc)",
+    "tunSniffer": "TUN Alan Adı Koklayıcı",
+    "tunSnifferTooltip": "TUN modunda önbellekteki IP'ler için özgün alan adlarını algılar (Otomatik, profildeki sniffer.enable: false ayarına uyar)",
+    "tunSnifferAuto": "Oto",
+    "tunSnifferOn": "Açık",
+    "tunSnifferOff": "Kap.",
+    "tunSnifferNeedTunTooltip": "Yalnızca TUN modunda etkindir (TUN modunu etkinleştirin)"
   }
 }

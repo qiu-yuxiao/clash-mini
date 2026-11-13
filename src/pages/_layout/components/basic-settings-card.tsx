@@ -1,4 +1,4 @@
-import { Box, Typography, TextField, useTheme } from '@mui/material'
+import { Box, Tooltip, Typography, TextField, useTheme } from '@mui/material'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -6,7 +6,13 @@ import { Switch } from '@/components/base'
 import { getAutoLaunchStatus } from '@/services/cmds'
 import type { IClashInfo } from '@/types/clash'
 import type { IVergeConfig } from '@/types/verge'
-import { get3DCardStyle, get3DInputStyle } from '@/utils/button-styles'
+import {
+  get3DCardStyle,
+  get3DInputStyle,
+  get3DSegmentedActiveStyle,
+  get3DSegmentedActiveTextColor,
+  get3DSegmentedContainerStyle,
+} from '@/utils/button-styles'
 import type { BaseConfig } from 'tauri-plugin-mihomo-api'
 
 interface BasicSettingsCardProps {
@@ -95,6 +101,36 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
   const onLocalSave = () => {
     handleSavePort(localPort)
   }
+
+  const isTunModeEnabled = Boolean(verge?.enable_tun_mode)
+  const normalizedSniffer =
+    verge?.enable_tun_sniffer === true
+      ? true
+      : verge?.enable_tun_sniffer === false
+        ? false
+        : null
+  const snifferActiveIndex =
+    normalizedSniffer === null ? 0 : normalizedSniffer ? 1 : 2
+  const snifferOptions = [
+    {
+      index: 0,
+      value: null as boolean | null,
+      key: 'settings.mini.tunSnifferAuto',
+      defaultLabel: '自动',
+    },
+    {
+      index: 1,
+      value: true as boolean | null,
+      key: 'settings.mini.tunSnifferOn',
+      defaultLabel: '开启',
+    },
+    {
+      index: 2,
+      value: false as boolean | null,
+      key: 'settings.mini.tunSnifferOff',
+      defaultLabel: '关闭',
+    },
+  ] as const
 
   return (
     <Box
@@ -245,6 +281,115 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
             }}
           />
         </Box>
+        {/* Row 3 (Full Width): TUN 域名嗅探（三态：自动跟随 / 开启 / 关闭，仅 TUN 模式下生效） */}
+        <Tooltip
+          title={
+            isTunModeEnabled
+              ? t('settings.mini.tunSnifferTooltip', {
+                  defaultValue:
+                    'TUN 模式下识别缓存 IP 的原始域名（自动态将尊重订阅中显式关闭的 sniffer.enable）',
+                })
+              : t('settings.mini.tunSnifferNeedTunTooltip', {
+                  defaultValue:
+                    '仅在 TUN 模式下生效（当前未开启 TUN，切换后生效）',
+                })
+          }
+          placement="top"
+          arrow
+        >
+          <Box
+            sx={{
+              ...gridItemSx(),
+              gridColumn: '1 / -1',
+              opacity: isTunModeEnabled ? 1 : 0.48,
+            }}
+          >
+            <Typography
+              variant="caption"
+              title={t('settings.mini.tunSniffer', {
+                defaultValue: 'TUN 域名嗅探',
+              })}
+              sx={labelSx(isRetro3DDark)}
+            >
+              {t('settings.mini.tunSniffer', {
+                defaultValue: 'TUN 域名嗅探',
+              })}
+            </Typography>
+            <Box
+              aria-disabled={!isTunModeEnabled}
+              sx={(tTheme) => ({
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                width: 118,
+                flexShrink: 0,
+                bgcolor: 'action.hover',
+                borderRadius: '4px',
+                p: '1px',
+                height: 20,
+                userSelect: 'none',
+                cursor: isTunModeEnabled ? 'pointer' : 'not-allowed',
+                ...get3DSegmentedContainerStyle(tTheme),
+              })}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '33.333%',
+                  height: '100%',
+                  zIndex: 0,
+                  transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: `translate3d(${snifferActiveIndex * 100}%, 0, 0)`,
+                }}
+              >
+                <Box sx={(tTheme) => get3DSegmentedActiveStyle(tTheme)} />
+              </Box>
+              {snifferOptions.map((opt) => {
+                const isSelected = snifferActiveIndex === opt.index
+                return (
+                  <Box
+                    key={opt.key}
+                    onClick={() => {
+                      if (!isTunModeEnabled) return
+                      if (normalizedSniffer === opt.value) return
+                      patchVerge({ enable_tun_sniffer: opt.value }).catch(
+                        (err) => {
+                          console.error(
+                            '[BasicSettings] patchVerge failed:',
+                            err,
+                          )
+                        },
+                      )
+                    }}
+                    sx={{
+                      flex: 1,
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      zIndex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      px: 0.25,
+                      color: isSelected
+                        ? get3DSegmentedActiveTextColor(theme)
+                        : isRetro3DDark
+                          ? 'rgba(44, 31, 3, 0.75)'
+                          : 'text.secondary',
+                    }}
+                  >
+                    {t(opt.key, { defaultValue: opt.defaultLabel })}
+                  </Box>
+                )
+              })}
+            </Box>
+          </Box>
+        </Tooltip>
         {/* Mixed Port: full-width row below grid */}
         <Box
           sx={{

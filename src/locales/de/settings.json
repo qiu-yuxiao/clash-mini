@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "Physisches Netzwerk getrennt — zum erneuten Testen klicken",
     "allNodesTimeout": "Alle Timeout",
     "allNodesTimeoutTooltip": "Alle Proxy-Knoten nicht erreichbar — zum Neutesten klicken",
-    "filterAutoTestingTooltip": "Gefilterte Knoten werden gleich getestet (Esc zum Abbrechen)"
+    "filterAutoTestingTooltip": "Gefilterte Knoten werden gleich getestet (Esc zum Abbrechen)",
+    "tunSniffer": "TUN Domain-Sniffing",
+    "tunSnifferTooltip": "Erkennt Original-Domains für zwischengespeicherte IPs im TUN-Modus (Auto respektiert sniffer.enable: false im Profil)",
+    "tunSnifferAuto": "Auto",
+    "tunSnifferOn": "An",
+    "tunSnifferOff": "Aus",
+    "tunSnifferNeedTunTooltip": "Nur im TUN-Modus wirksam (TUN-Modus aktivieren)"
   }
 }

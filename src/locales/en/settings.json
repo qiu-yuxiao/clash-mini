@@ -582,6 +582,12 @@
     "networkOfflineTooltip": "Physical network offline — click to retest and recover",
     "allNodesTimeout": "All Timeout",
     "allNodesTimeoutTooltip": "All proxy nodes unreachable — click to retest and auto-select",
-    "filterAutoTestingTooltip": "Auto-testing filtered nodes shortly (press Esc to cancel)"
+    "filterAutoTestingTooltip": "Auto-testing filtered nodes shortly (press Esc to cancel)",
+    "tunSniffer": "TUN Domain Sniffer",
+    "tunSnifferTooltip": "Sniff original domains for cached IPs in TUN mode (Auto respects explicit sniffer.enable: false in profiles)",
+    "tunSnifferAuto": "Auto",
+    "tunSnifferOn": "On",
+    "tunSnifferOff": "Off",
+    "tunSnifferNeedTunTooltip": "Effective only in TUN mode (enable TUN mode to activate)"
   }
 }

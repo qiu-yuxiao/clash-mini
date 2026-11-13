@@ -136,11 +136,13 @@ Clash Mini 诊断包
 本包由「设置 → 帮助 → 导出诊断包」生成，用于问题排查。
 
 内容：
-  logs/                     最近的轮转日志：应用主日志 + service/sidecar 内核日志
+  logs/                         最近的轮转日志：应用主日志 + service/sidecar 内核日志
+  guard/                        看门狗隔离状态与独立诊断心跳快照
   runtime-config.redacted.yaml  内核运行时配置（已脱敏）
   verge.yaml.redacted.yaml      应用配置（已脱敏）
   profiles.yaml.redacted.yaml   订阅配置（已脱敏）
-  system-info.txt           版本与运行摘要
+  system-info.txt               版本与运行摘要
+  wer-crash-report.txt          Windows 崩溃事件 / WER 转储 / 360 占用只读排查摘要
 
 脱敏说明：
   配置文件已整体脱敏；日志正文已按敏感字段名（password / token / secret /
@@ -195,8 +197,251 @@ fn file_opts() -> zip::write::SimpleFileOptions {
     zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated)
 }
 
+struct WindowsA4Diagnostics {
+    summary_line: String,
+    report_body: String,
+}
+
+fn is_360_process_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    matches!(
+        lower.as_str(),
+        "360tray.exe"
+            | "360safe.exe"
+            | "360sd.exe"
+            | "360rp.exe"
+            | "zhudongfangyu.exe"
+            | "360speedld.exe"
+            | "360leakfixer.exe"
+            | "360bdoctor.exe"
+    )
+}
+
+fn summarize_360_useroptm_ini(content: &str) -> String {
+    let lower = content.to_ascii_lowercase();
+    let targets = ["clash-mini", "clash-mini-guard", "verge-mihomo"];
+    let matched: Vec<&str> = targets.into_iter().filter(|t| lower.contains(t)).collect();
+    if matched.is_empty() {
+        format!(
+            "found (bytes={}, exemptions=none [clash-mini / clash-mini-guard 未命中白名单])",
+            content.len()
+        )
+    } else {
+        format!("found (bytes={}, matched=[{}])", content.len(), matched.join(", "))
+    }
+}
+
+fn filter_wer_events_for_clash(raw: &str) -> String {
+    const MAX_REPORT_CHARS: usize = 8192;
+    let blocks: Vec<&str> = raw.split("Event[").filter(|s| !s.trim().is_empty()).collect();
+    let relevant: Vec<String> = blocks
+        .iter()
+        .filter(|blk| {
+            let lower = blk.to_ascii_lowercase();
+            lower.contains("clash-mini") || lower.contains("verge-mihomo") || lower.contains("msedgewebview2")
+        })
+        .take(10)
+        .map(|blk| format!("Event[{}", redact_log_text(blk.trim())))
+        .collect();
+
+    let combined = if relevant.is_empty() {
+        format!(
+            "未在最近 15 条 Application(1000/1001/1002) 事件中命中 clash-mini / verge-mihomo 崩溃或挂起记录（总扫 {} 条）",
+            blocks.len()
+        )
+    } else {
+        relevant.join("\n\n")
+    };
+    if combined.len() <= MAX_REPORT_CHARS {
+        combined
+    } else {
+        let mut end = MAX_REPORT_CHARS;
+        while end > 0 && !combined.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!(
+            "{}\n[... WER 输出已按 {} 字节上限截断 ...]",
+            &combined[..end],
+            MAX_REPORT_CHARS
+        )
+    }
+}
+
+#[cfg(windows)]
+fn collect_360_processes_readonly() -> String {
+    let sys = sysinfo::System::new_with_specifics(
+        sysinfo::RefreshKind::nothing().with_processes(sysinfo::ProcessRefreshKind::nothing()),
+    );
+    let mut hits: Vec<String> = sys
+        .processes()
+        .values()
+        .filter(|p| is_360_process_name(&p.name().to_string_lossy()))
+        .map(|p| format!("{}(pid={})", p.name().to_string_lossy(), p.pid()))
+        .collect();
+    hits.sort();
+    if hits.is_empty() {
+        "none".to_string()
+    } else {
+        hits.join(", ")
+    }
+}
+
+#[cfg(windows)]
+fn collect_360_exemption_readonly() -> Vec<String> {
+    const MAX_INI_BYTES: usize = 256 * 1024;
+    let mut candidates: Vec<(&str, PathBuf)> = Vec::new();
+    if let Some(appdata) = std::env::var_os("APPDATA").filter(|v| !v.is_empty()) {
+        let base = PathBuf::from(appdata);
+        candidates.push((
+            r"%APPDATA%\360Safe\360SpeedLd\useroptm2.ini",
+            base.join(r"360Safe\360SpeedLd\useroptm2.ini"),
+        ));
+        candidates.push((r"%APPDATA%\360Safe\useroptm2.ini", base.join(r"360Safe\useroptm2.ini")));
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) {
+        candidates.push((
+            r"%LOCALAPPDATA%\360Safe\360SpeedLd\useroptm2.ini",
+            PathBuf::from(local).join(r"360Safe\360SpeedLd\useroptm2.ini"),
+        ));
+    }
+    if let Some(progdata) = std::env::var_os("ProgramData").filter(|v| !v.is_empty()) {
+        candidates.push((
+            r"%ProgramData%\360Safe\360SpeedLd\useroptm2.ini",
+            PathBuf::from(progdata).join(r"360Safe\360SpeedLd\useroptm2.ini"),
+        ));
+    }
+
+    let mut out = Vec::new();
+    for (label, path) in candidates {
+        if let Ok(bytes) = std::fs::read(&path) {
+            let capped = &bytes[..bytes.len().min(MAX_INI_BYTES)];
+            let text = String::from_utf8_lossy(capped);
+            out.push(format!("{label}: {}", summarize_360_useroptm_ini(&text)));
+        }
+    }
+    if out.is_empty() {
+        out.push("未发现 useroptm2.ini".to_string());
+    }
+    out
+}
+
+#[cfg(windows)]
+fn collect_crash_dumps_readonly() -> Vec<String> {
+    let Some(local) = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) else {
+        return vec!["LOCALAPPDATA 环境变量缺失".to_string()];
+    };
+    let dump_dir = PathBuf::from(local).join("CrashDumps");
+    let Ok(rd) = std::fs::read_dir(dump_dir) else {
+        return vec![r"%LOCALAPPDATA%\CrashDumps 不存在或不可读".to_string()];
+    };
+    let mut hits: Vec<String> = Vec::new();
+    for entry in rd.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let lower = name.to_ascii_lowercase();
+        if lower.contains("clash-mini") || lower.contains("verge-mihomo") {
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            hits.push(format!(r"%LOCALAPPDATA%\CrashDumps\{name} ({size} bytes)"));
+            if hits.len() >= 10 {
+                break;
+            }
+        }
+    }
+    if hits.is_empty() {
+        hits.push("无 clash-mini / verge-mihomo 崩溃转储文件".to_string());
+    }
+    hits
+}
+
+#[cfg(windows)]
+fn run_bounded_wevtutil() -> String {
+    use std::io::Read as _;
+    use std::os::windows::process::CommandExt as _;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let mut child = match std::process::Command::new("wevtutil.exe")
+        .args([
+            "qe",
+            "Application",
+            "/q:*[System[(EventID=1000 or EventID=1001 or EventID=1002)]]",
+            "/c:15",
+            "/rd:true",
+            "/f:text",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(err) => return format!("调用 wevtutil.exe 失败: {err}"),
+    };
+
+    let reader_handle = child.stdout.take().map(|mut out| {
+        std::thread::spawn(move || {
+            let mut buf = Vec::with_capacity(16 * 1024);
+            let _ = (&mut out).take(128 * 1024).read_to_end(&mut buf);
+            String::from_utf8_lossy(&buf).into_owned()
+        })
+    });
+
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(4);
+    let exited = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(40));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+        }
+    };
+
+    let stdout_text = reader_handle.and_then(|h| h.join().ok()).unwrap_or_default();
+    match exited {
+        Some(status) if status.success() => filter_wer_events_for_clash(&stdout_text),
+        Some(status) => format!("wevtutil 返回非零状态 ({status})"),
+        None => "wevtutil 查询超时（4s 上限）已中止".to_string(),
+    }
+}
+
+fn collect_windows_a4_diagnostics() -> WindowsA4Diagnostics {
+    #[cfg(windows)]
+    {
+        let procs = collect_360_processes_readonly();
+        let exemptions = collect_360_exemption_readonly();
+        let dumps = collect_crash_dumps_readonly();
+        let wer = run_bounded_wevtutil();
+
+        let summary_line = format!("360={procs}; 豁免检查=[{}]", exemptions.join("; "));
+        let report_body = format!(
+            "=== A4 只读终端崩溃与拦截环境排查（{}） ===\n\n\
+             [1] 活跃 360 相关进程:\n{procs}\n\n\
+             [2] 360 加速球豁免检查 (useroptm2.ini 只读):\n{}\n\n\
+             [3] 本机 CrashDumps (%LOCALAPPDATA%\\CrashDumps):\n{}\n\n\
+             [4] Windows Application 事件日志 (EventID 1000/1001/1002 只读最近 15 条过滤):\n{wer}\n",
+            Local::now().format("%Y-%m-%d %H:%M:%S"),
+            exemptions.join("\n"),
+            dumps.join("\n"),
+        );
+        WindowsA4Diagnostics {
+            summary_line,
+            report_body,
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        WindowsA4Diagnostics {
+            summary_line: "非 Windows 平台跳过".to_string(),
+            report_body: "非 Windows 平台无 WER / 360 排查项\n".to_string(),
+        }
+    }
+}
+
 /// 收集版本与运行摘要（不含任何敏感内容）。
-async fn collect_system_info() -> String {
+async fn collect_system_info(a4_summary: &str) -> String {
     let verge = Config::verge().await.latest_arc();
     let clash_cfg = Config::clash().await.data_arc();
     // IClashTemp 是运行时配置结构，没有 ipv6 字段；用户持久化设置要经 get_client_info 取
@@ -229,12 +474,15 @@ async fn collect_system_info() -> String {
          verge 配置版本  : {:?}（程序支持 {}）\n\
          clash 配置版本  : {:?}（程序支持 {}）\n\
          TUN 模式        : {:?}\n\
+         TUN 域名嗅探    : {:?}\n\
          系统代理        : {:?}\n\
          Allow IPv6      : {:?}\n\
          规则兜底        : {:?}\n\
          日志级别        : {:?}\n\
          日志轮转        : {:?} KB × {:?} 个\n\
-         节点总数        : {}\n",
+         节点总数        : {}\n\
+         守护状态        : {}\n\
+         A4 环境排查     : {}\n",
         Local::now().format("%Y-%m-%d %H:%M:%S"),
         crate::core::handle::Handle::app_handle().package_info().version,
         std::env::consts::OS,
@@ -244,6 +492,7 @@ async fn collect_system_info() -> String {
         clash_version,
         crate::config::CURRENT_CLASH_CONFIG_VERSION,
         verge.enable_tun_mode,
+        verge.enable_tun_sniffer,
         verge.enable_system_proxy,
         clash_info.ipv6,
         verge.rule_fallback,
@@ -251,6 +500,8 @@ async fn collect_system_info() -> String {
         verge.app_log_max_size,
         verge.app_log_max_count,
         node_count,
+        crate::process::guardian::get_diagnostic_summary(),
+        a4_summary,
     )
 }
 
@@ -344,11 +595,35 @@ async fn export_bundle_inner() -> Result<String> {
         }
     }
 
-    // 3) 版本与运行摘要
-    zip.start_file("system-info.txt", file_opts())?;
-    zip.write_all(collect_system_info().await.as_bytes())?;
+    // 3) 看门狗状态与独立诊断心跳快照（A1 / A2 / A7 / A8）
+    let guard_dir = crate::process::guardian::resolve_isolated_guardian_dir();
+    for state_name in [
+        crate::process::guardian::MAIN_HEARTBEAT_FILENAME,
+        crate::process::guardian::GUARD_HEARTBEAT_FILENAME,
+        crate::process::guardian::RESPAWN_STATE_FILENAME,
+        crate::process::guardian::INTENTIONAL_EXIT_FILENAME,
+    ] {
+        if let Ok(text) = tokio::fs::read_to_string(guard_dir.join(state_name)).await {
+            zip.start_file(format!("guard/{state_name}"), file_opts())?;
+            zip.write_all(text.as_bytes())?;
+        }
+    }
 
-    // 4) 说明
+    // 4) A4 终端崩溃与 360 环境只读排查 + 版本与运行摘要
+    let a4 = tokio::task::spawn_blocking(collect_windows_a4_diagnostics)
+        .await
+        .unwrap_or_else(|e| WindowsA4Diagnostics {
+            summary_line: format!("A4 诊断任务执行异常: {e}"),
+            report_body: format!("A4 诊断任务执行异常: {e}\n"),
+        });
+
+    zip.start_file("system-info.txt", file_opts())?;
+    zip.write_all(collect_system_info(&a4.summary_line).await.as_bytes())?;
+
+    zip.start_file("wer-crash-report.txt", file_opts())?;
+    zip.write_all(a4.report_body.as_bytes())?;
+
+    // 5) 说明
     zip.start_file("README.txt", file_opts())?;
     zip.write_all(BUNDLE_README.as_bytes())?;
 
@@ -509,5 +784,38 @@ proxies:
         assert!(!out.contains("TOKEN-abcdef-123"), "裸 Bearer 未脱敏: {out}");
         // 非敏感上下文保留
         assert!(out.contains("GET /configs"));
+    }
+
+    #[test]
+    fn a4_helpers_detect_360_processes_exemptions_and_filter_wer() {
+        assert!(is_360_process_name("360tray.exe"));
+        assert!(is_360_process_name("360SpeedLd.EXE"));
+        assert!(!is_360_process_name("clash-mini.exe"));
+
+        let empty_ini = "[whitelist]\n1=foo.exe\n";
+        assert!(summarize_360_useroptm_ini(empty_ini).contains("exemptions=none"));
+        let exempt_ini = "[whitelist]\n1=clash-mini.exe\n2=clash-mini-guard.exe\n";
+        let summary = summarize_360_useroptm_ini(exempt_ini);
+        assert!(summary.contains("clash-mini") && summary.contains("clash-mini-guard"));
+
+        let wevt_sample = "\
+Event[0]:
+  Log Name: Application
+  Event ID: 1000
+  Description:
+Faulting application name: unrelated.exe, token=secret123
+Event[1]:
+  Log Name: Application
+  Event ID: 1000
+  Description:
+Faulting application name: clash-mini.exe, version: 3.2.8.0, url=https://a.example?token=secret-wer-tok
+";
+        let filtered = filter_wer_events_for_clash(wevt_sample);
+        assert!(filtered.contains("clash-mini.exe"));
+        assert!(!filtered.contains("unrelated.exe"));
+        assert!(!filtered.contains("secret-wer-tok"));
+
+        let no_hit = filter_wer_events_for_clash("Event[0]:\n  Faulting application name: calc.exe\n");
+        assert!(no_hit.contains("未在最近 15 条"));
     }
 }

@@ -18,7 +18,15 @@ macro_rules! append {
     };
 }
 
-pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
+pub fn use_tun(config: Mapping, enable: bool) -> Mapping {
+    use_tun_with_sniffer(config, enable, None)
+}
+
+/// 在 TUN 开关之外进一步支持用户可配的域名嗅探开关 `enable_sniffer`（A10 / `§3.7`）：
+/// - `None`：默认启用，但如果订阅显式声明了 `sniffer.enable: false` 则严格尊重，不强行覆盖；
+/// - `Some(true)`：强制启用 `sniffer` 并补全缺失默认配置；
+/// - `Some(false)`：尊重关闭（若订阅含 `sniffer` 段则将其 `enable` 置为 `false`，否则不注入 `sniffer`）。
+pub fn use_tun_with_sniffer(mut config: Mapping, enable: bool, enable_sniffer: Option<bool>) -> Mapping {
     let tun_key = Value::from("tun");
     let tun_val = config.get(&tun_key);
     let mut tun_val = tun_val.map_or_else(Mapping::new, |val| {
@@ -111,10 +119,9 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
             Value::Sequence(vec![Value::String(crate::constants::tun::TUN_INET6_ADDRESS.into())]),
         );
 
-        // TUN 模式下默认开启并补全 sniffer 域名嗅探：
-        // 避免常驻后台进程（如 Edge）持有切换前直连/Router IPv6 DNS 缓存的真实/投毒 IP
-        // 时因无域名而绕过 `RULE-SET,gfwlist,PROXY` 落入 `MATCH,DIRECT`。
-        merge_tun_sniffer_defaults(&mut config);
+        // TUN 模式下默认按需开启并补全 sniffer 域名嗅探（A10 / §3.7）：
+        // 若用户或订阅显式关闭，则尊重关闭状态；否则补全缺失的 TLS/HTTP/QUIC 嗅探与排除段。
+        apply_tun_sniffer_policy(&mut config, enable_sniffer);
     } else {
         // 非 TUN（系统代理 / 手动）：不注入 fake-ip 等 TUN 专属 DNS 字段，交由内核默认
         // （redir-host）；也不做 IPv6 路由接管 —— 非全局接管场景本就不存在「绕过代理泄漏」。
@@ -145,27 +152,40 @@ pub fn use_tun(mut config: Mapping, enable: bool) -> Mapping {
 
 const DEFAULT_SNIFF_SKIP_DOMAINS: &[&str] = &["Mijia Cloud", "+.push.apple.com"];
 const DEFAULT_SNIFF_SKIP_DST_CIDRS: &[&str] = &[
+    "0.0.0.0/8",
     "127.0.0.0/8",
     "10.0.0.0/8",
     "172.16.0.0/12",
     "192.168.0.0/16",
     "100.64.0.0/10",
     "169.254.0.0/16",
+    "224.0.0.0/4",
+    "255.255.255.255/32",
+    "::/128",
     "::1/128",
     "fc00::/7",
     "fe80::/10",
+    "ff00::/8",
+    "::ffff:127.0.0.0/104",
+    "::ffff:10.0.0.0/104",
+    "::ffff:172.16.0.0/108",
+    "::ffff:192.168.0.0/112",
+    "::ffff:100.64.0.0/106",
+    "::ffff:169.254.0.0/112",
+    "223.5.5.5/32",
+    "223.6.6.6/32",
+    "114.114.114.114/32",
+    "119.29.29.29/32",
 ];
 
-fn insert_if_missing(map: &mut Mapping, key: &str, value: serde_yaml_ng::Value) {
-    let k = serde_yaml_ng::Value::from(key);
+fn insert_if_missing(map: &mut Mapping, key: &str, value: Value) {
+    let k = Value::from(key);
     if !map.contains_key(&k) {
         map.insert(k, value);
     }
 }
 
 fn append_missing_str_items(map: &mut Mapping, key: &str, items: &[&str]) {
-    use serde_yaml_ng::Value;
-
     let k = Value::from(key);
     let mut seq = match map.get(&k) {
         Some(Value::Sequence(existing)) => existing.clone(),
@@ -180,24 +200,51 @@ fn append_missing_str_items(map: &mut Mapping, key: &str, items: &[&str]) {
     map.insert(k, Value::Sequence(seq));
 }
 
-fn merge_tun_sniffer_defaults(config: &mut Mapping) {
-    use serde_yaml_ng::Value;
+fn apply_tun_sniffer_policy(config: &mut Mapping, enable_sniffer: Option<bool>) {
+    let sub_explicit_disable = config
+        .get("sniffer")
+        .and_then(Value::as_mapping)
+        .and_then(|m| m.get("enable"))
+        .and_then(Value::as_bool)
+        == Some(false);
 
+    match enable_sniffer {
+        Some(false) => {
+            if let Some(Value::Mapping(sniffer)) = config.get_mut("sniffer") {
+                revise!(sniffer, "enable", false);
+            }
+        }
+        None if sub_explicit_disable => {}
+        Some(true) => merge_tun_sniffer_defaults(config, true),
+        None => merge_tun_sniffer_defaults(config, false),
+    }
+}
+
+fn merge_tun_sniffer_defaults(config: &mut Mapping, force_enable: bool) {
     let mut sniffer = config
         .get("sniffer")
-        .and_then(|v| v.as_mapping())
+        .and_then(Value::as_mapping)
         .cloned()
         .unwrap_or_default();
 
-    // TUN 模式必须开启 sniffer，确保非 Fake-IP / 缓存 IP / 污染 IP 流量可通过 TLS SNI / HTTP Host / QUIC SNI 还原域名
-    revise!(sniffer, "enable", true);
-    insert_if_missing(&mut sniffer, "force-dns-mapping", Value::Bool(true));
-    insert_if_missing(&mut sniffer, "parse-pure-ip", Value::Bool(true));
+    if force_enable {
+        revise!(sniffer, "enable", true);
+    } else {
+        insert_if_missing(&mut sniffer, "enable", Value::Bool(true));
+    }
+    // C9: 当 sniffer 激活时，force-dns-mapping 与 parse-pure-ip 为防缓存 IP 漏出必需开关，
+    // 必须权威覆写为 true，杜绝订阅设置 `{ enable: true, force-dns-mapping: false, parse-pure-ip: false }` 的空壳配置。
+    revise!(sniffer, "force-dns-mapping", true);
+    revise!(sniffer, "parse-pure-ip", true);
     insert_if_missing(&mut sniffer, "override-destination", Value::Bool(true));
+    let effective_override_dest = sniffer
+        .get("override-destination")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
 
     let mut sniff_map = sniffer
         .get("sniff")
-        .and_then(|v| v.as_mapping())
+        .and_then(Value::as_mapping)
         .cloned()
         .unwrap_or_default();
 
@@ -206,8 +253,15 @@ fn merge_tun_sniffer_defaults(config: &mut Mapping) {
         Value::from("ports"),
         Value::Sequence(vec![Value::Number(80.into()), Value::String("8080-8880".into())]),
     );
-    http_proto.insert(Value::from("override-destination"), Value::Bool(true));
+    http_proto.insert(
+        Value::from("override-destination"),
+        Value::Bool(effective_override_dest),
+    );
     insert_if_missing(&mut sniff_map, "HTTP", Value::Mapping(http_proto));
+    if let Some(Value::Mapping(existing_http)) = sniff_map.get_mut("HTTP") {
+        // C9: 强制对齐顶层与 sniff.HTTP.override-destination，避免二者互相矛盾
+        revise!(existing_http, "override-destination", effective_override_dest);
+    }
 
     for proto in ["TLS", "QUIC"] {
         let mut proto_map = Mapping::new();
@@ -263,12 +317,14 @@ tun:
 
         let skip_dst = sniffer.get("skip-dst-address").and_then(Value::as_sequence).unwrap();
         assert!(skip_dst.iter().any(|v| v.as_str() == Some("192.168.0.0/16")));
-        assert!(skip_dst.iter().any(|v| v.as_str() == Some("fe80::/10")));
+        assert!(skip_dst.iter().any(|v| v.as_str() == Some("224.0.0.0/4")));
+        assert!(skip_dst.iter().any(|v| v.as_str() == Some("ff00::/8")));
+        assert!(skip_dst.iter().any(|v| v.as_str() == Some("223.5.5.5/32")));
         assert!(!skip_dst.iter().any(|v| v.as_str() == Some("198.18.0.0/16")));
     }
 
     #[test]
-    fn use_tun_enabled_merges_partial_subscription_sniffer_without_duplicates() {
+    fn use_tun_respects_subscription_explicit_disable_unless_overridden_by_user() {
         let cfg: Mapping = serde_yaml_ng::from_str(
             r#"
 ipv6: false
@@ -284,13 +340,26 @@ dns:
         )
         .unwrap();
 
-        let out = use_tun(cfg, true);
-        let sniffer = out.get("sniffer").and_then(Value::as_mapping).unwrap();
+        // A10：自动模式（None）尊重订阅显式 sniffer.enable: false
+        let respected = use_tun_with_sniffer(cfg.clone(), true, None);
+        let sniffer_auto = respected.get("sniffer").and_then(Value::as_mapping).unwrap();
+        assert_eq!(sniffer_auto.get("enable").and_then(Value::as_bool), Some(false));
+
+        // 用户显式强开（Some(true)）：开启并合并缺失默认值，且 HTTP.override-destination 与顶层统一为 false
+        let forced = use_tun_with_sniffer(cfg, true, Some(true));
+        let sniffer = forced.get("sniffer").and_then(Value::as_mapping).unwrap();
         assert_eq!(sniffer.get("enable").and_then(Value::as_bool), Some(true));
         assert_eq!(
             sniffer.get("override-destination").and_then(Value::as_bool),
             Some(false)
         );
+        let http = sniffer
+            .get("sniff")
+            .and_then(Value::as_mapping)
+            .and_then(|s| s.get("HTTP"))
+            .and_then(Value::as_mapping)
+            .unwrap();
+        assert_eq!(http.get("override-destination").and_then(Value::as_bool), Some(false));
         assert_eq!(sniffer.get("force-dns-mapping").and_then(Value::as_bool), Some(true));
         assert_eq!(sniffer.get("parse-pure-ip").and_then(Value::as_bool), Some(true));
 
@@ -301,6 +370,68 @@ dns:
         );
         assert!(skip_domain.iter().any(|v| v.as_str() == Some("+.internal.example")));
         assert!(skip_domain.iter().any(|v| v.as_str() == Some("+.push.apple.com")));
+    }
+
+    #[test]
+    fn use_tun_respects_user_explicit_sniffer_disable() {
+        let cfg: Mapping = serde_yaml_ng::from_str(
+            r"
+ipv6: false
+sniffer:
+  enable: true
+dns:
+  enable: true
+",
+        )
+        .unwrap();
+
+        let disabled = use_tun_with_sniffer(cfg, true, Some(false));
+        let sniffer = disabled.get("sniffer").and_then(Value::as_mapping).unwrap();
+        assert_eq!(sniffer.get("enable").and_then(Value::as_bool), Some(false));
+
+        let bare_cfg: Mapping = serde_yaml_ng::from_str("ipv6: false\ndns:\n  enable: true\n").unwrap();
+        let disabled_bare = use_tun_with_sniffer(bare_cfg, true, Some(false));
+        assert!(disabled_bare.get("sniffer").is_none());
+    }
+
+    #[test]
+    fn use_tun_enforces_required_sniffer_fields_and_unifies_http_override() {
+        let cfg: Mapping = serde_yaml_ng::from_str(
+            r"
+ipv6: false
+sniffer:
+  enable: true
+  force-dns-mapping: false
+  parse-pure-ip: false
+  override-destination: false
+  sniff:
+    HTTP:
+      ports: [80]
+      override-destination: true
+dns:
+  enable: true
+",
+        )
+        .unwrap();
+
+        let out = use_tun_with_sniffer(cfg, true, None);
+        let sniffer = out.get("sniffer").and_then(Value::as_mapping).unwrap();
+        assert_eq!(sniffer.get("enable").and_then(Value::as_bool), Some(true));
+        // C9: 不允许「enable: true 但必需字段为 false」的空壳配置
+        assert_eq!(sniffer.get("force-dns-mapping").and_then(Value::as_bool), Some(true));
+        assert_eq!(sniffer.get("parse-pure-ip").and_then(Value::as_bool), Some(true));
+        // 顶层显式 override-destination: false 保留，但必须强制统一 sniff.HTTP.override-destination
+        assert_eq!(
+            sniffer.get("override-destination").and_then(Value::as_bool),
+            Some(false)
+        );
+        let http = sniffer
+            .get("sniff")
+            .and_then(Value::as_mapping)
+            .and_then(|s| s.get("HTTP"))
+            .and_then(Value::as_mapping)
+            .unwrap();
+        assert_eq!(http.get("override-destination").and_then(Value::as_bool), Some(false));
     }
 
     #[test]
