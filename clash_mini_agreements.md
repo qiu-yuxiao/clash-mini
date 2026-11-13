@@ -711,6 +711,11 @@ flowchart LR
 - **理由**：20s < 2×15s 体检周期 << 300s 测量组自然周期，使「按需拨测」退化为约每 30s 一次全组拨测（约 10 倍放大）。恢复 60s 由按需拨测约束频率，符合 §5.1/§5.2 的设计意图。
 - **影响**：不破坏 §5.2 单一测量组契约；轻量模式切换后的误切换/抖动窗口随阈值回到基线量级。
 
+### Sync-2 · 守护者复活状态 fail-closed 修正（guardian.rs，P0-6）
+- **改动**：在 `evaluate_and_record_respawn_in` 调用 `read_respawn_state_checked` 前插入预检：当复活状态文件缺失且 `cli_gen > 0`（非干净冷启动）时，直接返回错误 `fail-closed 拒绝拉起`，不再依赖 `read_respawn_state_checked` 对 `NotFound` 返回 `Ok(Default)` 的 fail-open 行为。保留 `:797` 原始 `Err(NotFound) => Ok(Default)` 行以兼容干净冷启动 `cli_gen == 0`。
+- **理由**：原 `read_respawn_state_checked` 对 `NotFound` 返回 `Ok(Default)` 属 fail-open，使「复活状态缺失」绕过累计熔断，与 §3.7:398 契约方向相反。审计发现28 纠正了报告 2.5.3(a)/P0-6 原误写的 fail-closed 方向，明确「零复活只能归物理前提被证伪」。
+- **影响**：非干净冷启动且状态文件缺失时严格拒绝拉起，累计熔断语义恢复；干净冷启动路径不变。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |

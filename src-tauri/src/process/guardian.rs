@@ -854,6 +854,9 @@ pub fn reset_respawn_state_for_clean_start_in(
 
 /// Fail-closed 评估并在 `commit=true` 时持久化复活代数（C3 + C4）：
 /// 状态文件读取损坏或写入失败一律返回 `Err`，调用方必须放弃拉起。
+/// 此外，进入本函数前若状态文件缺失且 `cli_gen > 0`（非干净冷启动），
+/// 直接以 `Err` 拒绝拉起，避免 :797 的 `NotFound => Ok(Default)` 把缺失当成
+/// 干净会话、绕过累计熔断（与 §3.7:398 契约方向一致）。
 #[allow(clippy::too_many_arguments)]
 pub fn evaluate_and_record_respawn_in(
     guard_dir: &Path,
@@ -864,6 +867,16 @@ pub fn evaluate_and_record_respawn_in(
     boot_fingerprint: &str,
     commit: bool,
 ) -> Result<Option<u32>, String> {
+    // 契约 §3.7:398：状态读写失败一律按 fail-closed 停止复活。
+    // 状态文件缺失且并非干净冷启动（cli_gen>0）时，预算状态不可信，
+    // 直接拒绝拉起，避免 :797 把 NotFound 当成干净会话、将累计熔断计数
+    // 从 0 重算后绕过 MAX_RAPID_RESPAWN_GEN。
+    let state_path = guard_dir.join(RESPAWN_STATE_FILENAME);
+    if !state_path.exists() && cli_gen > 0 {
+        return Err(format!(
+            "复活状态文件缺失且非干净冷启动 (cli_gen={cli_gen})，fail-closed 拒绝拉起"
+        ));
+    }
     let state = read_respawn_state_checked(guard_dir)?;
     let Some(next_gen) = evaluate_respawn_budget(&state, cli_gen, epoch_id, boot_fingerprint) else {
         return Ok(None);
