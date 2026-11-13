@@ -18,9 +18,8 @@ macro_rules! append {
     };
 }
 
-pub fn use_tun(config: Mapping, enable: bool) -> Mapping {
-    use_tun_with_sniffer(config, enable, None)
-}
+// `use_tun`(两参) 已删除（C-1）：三态改造后主入口为 `use_tun_with_sniffer`，
+// 旧两参签名失去生产意义，仅测试曾引用，已改为 `use_tun_with_sniffer(cfg, enable, None)`。
 
 /// 在 TUN 开关之外进一步支持用户可配的域名嗅探开关 `enable_sniffer`（A10 / `§3.7`）：
 /// - `None`：默认启用，但如果订阅显式声明了 `sniffer.enable: false` 则严格尊重，不强行覆盖；
@@ -298,7 +297,7 @@ tun:
         )
         .unwrap();
 
-        let out = use_tun(cfg, true);
+        let out = use_tun_with_sniffer(cfg, true, None);
         let sniffer = out.get("sniffer").and_then(Value::as_mapping).unwrap();
         assert_eq!(sniffer.get("enable").and_then(Value::as_bool), Some(true));
         assert_eq!(sniffer.get("force-dns-mapping").and_then(Value::as_bool), Some(true));
@@ -445,7 +444,7 @@ dns:
         )
         .unwrap();
 
-        let out = use_tun(cfg, false);
+        let out = use_tun_with_sniffer(cfg, false, None);
         assert!(out.get("sniffer").is_none());
     }
 }

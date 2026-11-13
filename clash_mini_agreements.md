@@ -721,6 +721,11 @@ flowchart LR
 - **理由**：双注入点靠去重掩盖、`respect_rules=false` 时产生孤儿规则，是审计 F-2 指出的隐患；fragment 串味会让降级 DOH 带上非预期参数（D-1）。
 - **影响**：DNS PROXY 规则唯一真源；国内公共 DNS 走直连降级路径不变。
 
+### Sync-4 · 删除 use_tun 两参死壳（enhance/tun.rs，C-1）
+- **改动**：删除 `use_tun(config, enable)` 两参死壳（生产路径零调用，仅测试引用），其两个调用点（`:301`、`:448`）改为显式 `use_tun_with_sniffer(cfg, true/false, None)`，保留带 sniffer 参数的完整实现 `use_tun_with_sniffer`。
+- **理由**：`use_tun` 是审计 C-1 指出的死壳，长期零调用会误导后续维护者并掩盖真实入口（应走 `use_tun_with_sniffer`）。
+- **影响**：TUN 启用/禁用行为不变；调用链唯一真源收敛到 `use_tun_with_sniffer`。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
