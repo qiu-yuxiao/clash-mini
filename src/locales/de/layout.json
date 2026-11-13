@@ -28,6 +28,24 @@
       "openGithubStar": "GitHub testen & ⭐ Star geben",
       "retestNodes": "Erneut testen & besten Knoten wählen"
     },
+    "antivirus": {
+      "menuLabel": "Antivirus-Ausnahme-Hinweis",
+      "title": "Antivirus-Software & Clash Mini – Kompatibilität",
+      "whyTitle": "Warum entfernen Antivirus-Programme Clash Mini?",
+      "why": "Clash Mini enthält einen „Prozess-Wächter“: Wird der Proxy-Kern unerwartet beendet, startet ihn das Programm automatisch neu, um Netzabbrüche zu vermeiden. Genau dieses „automatische Erzeugen von Hintergrundprozessen“ überwachen Sicherheitspakete wie 360 besonders genau – das kann fälschlich als verdächtig eingestuft werden, und beim „Aufräumen/Beschleunigen“ wird dann auch das Tray-Symbol oder der Hintergrundprozess entfernt. Das ist ein Fehlalarm – Clash Mini ist Open Source, der komplette Code ist prüfbar, es gibt keinerlei verdecktes Verhalten.",
+      "benefitTitle": "Was bringt der Eintrag in die Vertrauensliste?",
+      "benefit": "Nach dem Hinzufügen von Clash Mini zur „Vertrauenszone / Whitelist“ von 360:\n· Das Tray-Symbol bleibt stabil erhalten, auch im Leichtmodus;\n· Der Kern startet nach einem Absturz automatisch neu – die Wiederherstellung wird zuverlässiger;\n· Es erscheinen keine Block- oder „bereinigt“-Meldungen mehr, die sich auf Clash Mini beziehen.",
+      "optionalTitle": "Muss ich Clash Mini überhaupt freigeben?",
+      "optional": "Nein, das ist völlig Ihre Entscheidung:/n· Ohne 360 (oder wenn Ihr Antivirus Clash Mini nicht blockiert) ist nichts zu tun;\n· Auch mit 360 bleibt die Kernfunktion des Proxys ohne Freigabe voll erhalten: Solange Sie Clash Mini selbst öffnen, arbeitet es ganz normal.",
+      "consequenceTitle": "Was passiert ohne Whitelist-Eintrag?",
+      "consequence": "Mit 360 und ohne Vertrauenszone-Eintrag können auftreten:/n· Verschwinden des Tray-Symbols nach der „Aufräum“-Aktion von 360 (im Leichtmodus besonders auffällig);\n· Kein automatischer Neustart nach einem Kern-Absturz – Sie müssen Clash Mini manuell neu öffnen.\nAll das wird durch die Blockierung seitens 360 verursacht; ein erneutes Öffnen stellt alles wieder her. Das Programm selbst ist nicht defekt.",
+      "howTitle": "So fügen Sie Clash Mini zur Vertrauenszone von 360 hinzu",
+      "how": "Öffnen Sie 360 Safety Guard → „Troja-Firewall / Vertrauen & Schutz“ → „Vertrauenszone“ → fügen Sie clash-mini.exe aus dem Installationsordner von Clash Mini hinzu (Standard: C://Program Files\\Clash Mini\\). Die Bezeichnungen unterscheiden sich je nach Version – suchen Sie in den Einstellungen nach „Vertrauenszone“ oder „Whitelist“.",
+      "briefTitle": "Nutzen Sie 360 oder ein anderes Antivirus-Programm?",
+      "brief": "Seine „Aufräum“-Funktion kann das Tray-Symbol von Clash Mini entfernen (im Leichtmodus besonders auffällig). Der Eintrag in die Vertrauensliste verhindert das vollständig; ohne ihn funktioniert der Proxy normal – das Symbol verschwindet nur gelegentlich und ein erneutes Öffnen behebt es.",
+      "briefOpen": "Vollständige Erklärung",
+      "close": "Verstanden"
+    },
     "helpMenu": {
       "github": "⭐ Star auf GitHub geben",
       "wiki": "Hilfe (Wiki)",

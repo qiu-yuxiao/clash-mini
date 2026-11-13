@@ -27,6 +27,7 @@ interface HelpMenuButtonProps {
   handleClientCheck: () => void
   handleCoreCheck: () => void
   onReopenFirstRunGuide: () => void
+  onOpenAntivirusWhitelist: () => void
   clientCheckLoading: boolean
   coreCheckLoading: boolean
   appVersion: string
@@ -42,6 +43,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
   handleClientCheck,
   handleCoreCheck,
   onReopenFirstRunGuide,
+  onOpenAntivirusWhitelist,
   clientCheckLoading,
   coreCheckLoading,
   appVersion,
@@ -155,6 +157,15 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
           sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           🧭 {t('layout.components.helpMenu.firstRunGuide')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            handleHelpClose()
+            onOpenAntivirusWhitelist()
+          }}
+          sx={getMenuItemHoverStyle(theme, controlSkin)}
+        >
+          🛡️ {t('layout.components.antivirus.menuLabel')}
         </MenuItem>
         <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
         <MenuItem

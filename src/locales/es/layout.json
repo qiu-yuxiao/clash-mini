@@ -28,6 +28,24 @@
       "openGithubStar": "Probar red y dar ⭐ Star en GitHub",
       "retestNodes": "Reintentar y elegir mejor nodo"
     },
+    "antivirus": {
+      "menuLabel": "Guía de lista blanca del antivirus",
+      "title": "Compatibilidad de antivirus con Clash Mini",
+      "whyTitle": "¿Por qué los antivirus eliminan Clash Mini?",
+      "why": "Clash Mini incluye un «guardián de procesos»: si el núcleo del proxy se cierra inesperadamente, lo reinicia automáticamente para evitar cortes de red. Justo ese comportamiento de «crear procesos en segundo plano automáticamente» es lo que vigilan de cerca los antivirus como 360, por lo que puede confundirse con un programa sospechoso y, al «limpiar/acelerar», arrastrarse el icono de la bandeja o el proceso en segundo plano. Es un falso positivo — Clash Mini es de código abierto, todo su código es auditable y no oculta nada.",
+      "benefitTitle": "¿Qué ventajas tiene añadirlo a la lista de confianza?",
+      "benefit": "Tras añadir Clash Mini a la «Zona de confianza / lista blanca» de 360:\n· El icono de la bandeja permanece estable, incluso en modo ligero;\n· El núcleo se reinicia automáticamente tras un fallo, con una recuperación más fiable;\n· Ya no aparecen avisos de bloqueo ni de «limpiado» dirigidos a Clash Mini.",
+      "optionalTitle": "¿Puedo no añadirlo a la lista blanca?",
+      "optional": "Por supuesto, es totalmente tu decisión:/n· Si no usas 360 (o tu antivirus no bloquea Clash Mini), no hay que hacer nada;\n· Incluso con 360, sin lista blanca la función principal del proxy no se ve afectada: mientras abras Clash Mini tú mismo, funciona con normalidad.",
+      "consequenceTitle": "¿Qué pasa sin la lista blanca?",
+      "consequence": "Si usas 360 sin añadir Clash Mini a la zona de confianza, puede ocurrir:/n· Que el icono de la bandeja desaparezca tras la «limpieza» de 360 (sobre todo en modo ligero);\n· Que no haya reinicio automático tras un fallo del núcleo: tendrás que volver a abrir Clash Mini manualmente.\nTodo ello se debe al bloqueo de 360; al reabrir Clash Mini todo vuelve a la normalidad. El programa no está dañado.",
+      "howTitle": "Cómo añadir Clash Mini a la Zona de confianza de 360",
+      "how": "Abre 360 Safety Guard → «Cortafuegos anti-Troya / Confianza y protección» → «Zona de confianza» → añade clash-mini.exe desde la carpeta de instalación de Clash Mini (predeterminado: C://Program Files\\Clash Mini\\). Los nombres de sección varían según la versión; busca «zona de confianza» o «lista blanca» en su configuración.",
+      "briefTitle": "¿Usas 360 u otro antivirus?",
+      "brief": "Su función de «limpieza» puede eliminar el icono de Clash Mini en la bandeja (sobre todo en modo ligero). Añadirlo a la lista de confianza lo evita por completo; sin añadirla el proxy funciona igual — el icono solo desaparece de vez en cuando y con volver a abrirlo basta.",
+      "briefOpen": "Ver explicación completa",
+      "close": "Entendido"
+    },
     "helpMenu": {
       "github": "Dar ⭐ Star en GitHub",
       "wiki": "Guía de ayuda (Wiki)",

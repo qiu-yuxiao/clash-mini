@@ -28,6 +28,24 @@
       "openGithubStar": "Test & ⭐ Star on GitHub",
       "retestNodes": "Re-test & Select Best Node"
     },
+    "antivirus": {
+      "menuLabel": "Antivirus Whitelist Guide",
+      "title": "Antivirus Software & Clash Mini Compatibility",
+      "whyTitle": "Why do antivirus tools clean up Clash Mini?",
+      "why": "Clash Mini includes a process guardian: if the proxy core exits unexpectedly, it restarts it automatically to keep your connection alive. This “automatically spawning background processes” behavior is exactly what security suites like 360 monitor closely, so it can be misjudged as suspicious and swept away by their “clean-up / speed-up” actions, taking the tray icon or the background process with it. It is a false positive — Clash Mini is open source, fully auditable, and hides nothing.",
+      "benefitTitle": "What do I gain by adding Clash Mini to the trust list?",
+      "benefit": "After adding Clash Mini to 360's Trust Zone / whitelist:/n/u00b7 The tray icon stays resident, even in lightweight mode;\n· The proxy core restarts automatically after a crash, making auto-recovery far more reliable;\n· No more interception pop-ups or “cleaned” notifications targeting Clash Mini.",
+      "optionalTitle": "Can I skip the whitelist?",
+      "optional": "Absolutely — it is entirely your choice:/n/u00b7 If you don't run 360 (or your antivirus doesn't block Clash Mini), do nothing;\n· Even with 360 installed, skipping the whitelist doesn't break core proxying: Clash Mini works fine whenever you open it yourself.",
+      "consequenceTitle": "What happens without the whitelist?",
+      "consequence": "If you run 360 without adding Clash Mini to the trust zone, you may see:/n/u00b7 The tray icon vanish after 360's “clean-up” sweeps (most visible in lightweight mode);\n· No automatic restart after a core crash — you must reopen Clash Mini manually.\nAll of this is caused by 360 interception; simply reopening Clash Mini restores everything. The app itself is not broken.",
+      "howTitle": "How to add Clash Mini to 360's Trust Zone",
+      "how": "Open 360 Safety Guard → “Trojan Firewall / Trust & Protection” → “Trust Zone” → add clash-mini.exe from Clash Mini's install directory (default: C://Program Files\\Clash Mini\\). Entry names vary slightly across 360 versions; search for “Trust Zone” or “whitelist” in its settings.",
+      "briefTitle": "Running 360 or another antivirus?",
+      "brief": "Its “clean-up” may sweep away Clash Mini's tray icon (most visible in lightweight mode). Adding it to the trust list prevents this entirely; skipping it doesn't affect normal proxying — the icon may just disappear occasionally and reopening fixes it.",
+      "briefOpen": "Full details",
+      "close": "Got it"
+    },
     "helpMenu": {
       "github": "⭐ Star on GitHub",
       "wiki": "Help Guide (Wiki)",

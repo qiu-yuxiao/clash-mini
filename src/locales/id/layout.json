@@ -28,6 +28,24 @@
       "openGithubStar": "Uji Koneksi & Beri ⭐ Star",
       "retestNodes": "Uji Ulang & Pilih Node Terbaik"
     },
+    "antivirus": {
+      "menuLabel": "Panduan whitelist antivirus",
+      "title": "Kompatibilitas antivirus dengan Clash Mini",
+      "whyTitle": "Mengapa antivirus menghapus Clash Mini?",
+      "why": "Clash Mini memiliki «penjaga proses»: jika inti proxy berhenti tiba-tiba, ia memulai ulang secara otomatis agar koneksi tidak terputus. Perilaku «membuat proses latar belakang secara otomatis» ini justru yang diawasi ketat antivirus seperti 360, sehingga bisa dianggap mencurigakan dan saat «pembersihan/percepatan» ikon tray atau proses latar belakang ikut ditutup. Ini kesalahan deteksi — Clash Mini open source, seluruh kodenya bisa diperiksa, dan tidak ada perilaku tersembunyi.",
+      "benefitTitle": "Apa manfaat menambahkan ke daftar tepercaya?",
+      "benefit": "Setelah Clash Mini ditambahkan ke «Zona Tepercaya / whitelist» 360:\n· Ikon tray tetap stabil, bahkan di mode ringan;\n· Inti di-start ulang otomatis setelah crash — pemulihan lebih andal;\n· Tidak ada lagi notifikasi pemblokiran atau «dibersihkan» yang menyasar Clash Mini.",
+      "optionalTitle": "Bolehkah tidak ditambahkan ke whitelist?",
+      "optional": "Tentu, ini sepenuhnya pilihan Anda:/n· Jika tidak memakai 360 (atau antivirus Anda tidak memblokir Clash Mini), tidak perlu melakukan apa pun;\n· Bahkan dengan 360 terpasang, tanpa whitelist fungsi proxy inti tetap normal: selama Anda membuka Clash Mini sendiri, ia bekerja sebagaimana mestinya.",
+      "consequenceTitle": "Apa yang terjadi tanpa whitelist?",
+      "consequence": "Jika Anda memakai 360 tanpa menambahkan Clash Mini ke zona tepercaya, mungkin terjadi:/n· Ikon tray hilang setelah «pembersihan» 360 (paling terlihat di mode ringan);\n· Tidak ada start-ulang otomatis setelah inti crash — Anda harus membuka Clash Mini kembali secara manual.\nSemua itu disebabkan pemblokiran 360; membuka kembali Clash Mini mengembalikan semuanya. Programnya sendiri tidak rusak.",
+      "howTitle": "Cara menambahkan Clash Mini ke Zona Tepercaya 360",
+      "how": "Buka 360 Safety Guard → «Firewall Trojan / Kepercayaan & Perlindungan» → «Zona Tepercaya» → tambahkan clash-mini.exe dari folder instalasi Clash Mini (bawaan: C://Program Files\\Clash Mini\\). Nama menu sedikit berbeda antar versi 360; cari «Zona Tepercaya» atau «whitelist» di pengaturannya.",
+      "briefTitle": "Memakai 360 atau antivirus lain?",
+      "brief": "Fitur «pembersihan»-nya bisa menghapus ikon Clash Mini di tray (paling terlihat di mode ringan). Menambahkannya ke daftar tepercaya mencegahnya sepenuhnya; tanpa itu proxy tetap normal — ikonnya hanya kadang hilang dan cukup dibuka ulang.",
+      "briefOpen": "Lihat penjelasan lengkap",
+      "close": "Mengerti"
+    },
     "helpMenu": {
       "github": "Beri ⭐ Star di GitHub",
       "wiki": "Panduan Bantuan (Wiki)",

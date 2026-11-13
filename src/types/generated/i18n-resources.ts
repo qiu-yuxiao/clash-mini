@@ -200,6 +200,24 @@ export interface TranslationResources {
         selectLanguage: string
       }
       components: {
+        antivirus: {
+          benefit: string
+          benefitTitle: string
+          brief: string
+          briefOpen: string
+          briefTitle: string
+          close: string
+          consequence: string
+          consequenceTitle: string
+          how: string
+          howTitle: string
+          menuLabel: string
+          optional: string
+          optionalTitle: string
+          title: string
+          why: string
+          whyTitle: string
+        }
         dialogs: {
           client: {
             changelog: string

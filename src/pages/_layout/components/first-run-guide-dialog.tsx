@@ -54,6 +54,8 @@ interface FirstRunGuideDialogProps {
   onOpenWiki: () => void
   onOpenGithub?: () => void
   onLater: () => void
+  /** 打开「安全软件白名单说明」弹窗（弹窗本体挂载在 _layout，此处仅触发） */
+  onOpenWhitelistGuide?: () => void
 }
 
 export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
@@ -63,6 +65,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
   onOpenWiki,
   onOpenGithub,
   onLater,
+  onOpenWhitelistGuide,
 }) => {
   const { t } = useTranslation()
   const theme = useTheme()
@@ -1081,6 +1084,77 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                   </Button>
                 </Box>
               </Box>
+
+              {/* 卡片 3：安全软件（360 等）白名单简要提示——如实说明误杀原因、加白好处、可不加与不加的后果，
+                  完整说明通过 onOpenWhitelistGuide 打开 _layout 挂载的 AntivirusWhitelistDialog */}
+              {onOpenWhitelistGuide && (
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '8px',
+                    mt: 1.5,
+                    bgcolor: isRetro3D
+                      ? 'rgba(255, 255, 255, 0.22)'
+                      : (t2) =>
+                          t2.palette.mode === 'dark'
+                            ? 'rgba(128, 128, 128, 0.09)'
+                            : 'rgba(0, 0, 0, 0.04)',
+                    border: '1px solid',
+                    borderColor: isRetro3D
+                      ? 'rgba(122, 62, 0, 0.35)'
+                      : (t2) => t2.palette.divider,
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 700,
+                      color: 'text.primary',
+                      mb: 0.5,
+                      fontSize: '13px',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    🛡️ {t('layout.components.antivirus.briefTitle')}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: secondaryText,
+                      lineHeight: 1.55,
+                      fontSize: '12.5px',
+                    }}
+                  >
+                    {t('layout.components.antivirus.brief')}
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      mt: 0.75,
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                    }}
+                  >
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={onOpenWhitelistGuide}
+                      sx={{
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        color: 'primary.main',
+                        py: 0.2,
+                        px: 0.75,
+                        minHeight: 'auto',
+                      }}
+                    >
+                      📄 {t('layout.components.antivirus.briefOpen')}
+                    </Button>
+                  </Box>
+                </Box>
+              )}
             </DialogContent>
 
             <DialogActions
