@@ -36,7 +36,8 @@
       "chainsColumn": "المسار",
       "chainsDirect": "مباشر",
       "chainsReject": "محجوب",
-      "chainsProxy": "بروكسي"
+      "chainsProxy": "بروكسي",
+      "chainsDisconnected": "مفصول"
     },
     "contextMenu": {
       "setDirect": "تعيين كاتصال مباشر عام",
@@ -44,7 +45,8 @@
       "setReject": "حجبه (REJECT)",
       "disconnect": "قطع هذا الاتصال",
       "copyAddress": "نسخ عنوان الاتصال",
-      "viewDetail": "عرض التفاصيل"
+      "viewDetail": "عرض التفاصيل",
+      "restoreDefault": "استعادة المسار الافتراضي"
     }
   },
   "notices": {

@@ -789,9 +789,9 @@ flowchart LR
 
 ### Sync-10 · 路径控制精准规则生成与四态路由可逆闭环（BUG-367）
 - **改动**：
-  1. `src/utils/quick-routing.ts`：重构 `addQuickRoutingRule` 改为纯精确匹配（`DOMAIN,<host>,<TARGET>` / `IP-CIDR,<ip>/32,<TARGET>` / `IP-CIDR6,<ip>/128,<TARGET>` / `PROCESS-NAME,<proc>,<TARGET>`），彻底废除擅自剥离子域与降级 `DOMAIN-SUFFIX` 的扩域逻辑；同步重构 `buildProxyRule` 仅对显式通配符（`*.domain`/`.domain`）生成 `DOMAIN-SUFFIX` 并修复 IPv6 CIDR 生成为 `IP-CIDR6`；新增 `parseManagedMergeRules` 与 `removeQuickRoutingRule`（先 `enhanceProfiles()` 重载再关闭匹配旧连接），保存或移除规则时广播 `clash-mini-merge-rules-changed` 事件；
-  2. `src/utils/path-control.ts` + `src/components/connection/connection-table.tsx` + `src/pages/_layout/components/connections-panel.tsx` + `src/pages/_layout.tsx`：在「路径控制」表落地 **直连 / 代理 / 封锁 / 已断开** 四态状态解析与样式展示，持久保存手动断开记录并与 `Merge` 置顶规则（含历史已存在规则）合并显示于表内，新增右键「恢复默认路由」就地解封/重连；
-  3. 同步更新全部 13 个语种 `connections.json`（`chainsDisconnected`、`restoreDefault`）与 `profiles.json`（`quickRuleRemoved`）并通过 `i18n:check` / `vitest`。
+  1. `src/utils/quick-routing.ts`：重构 `addQuickRoutingRule` 改为纯精确匹配（`DOMAIN,<host>,<TARGET>` / `IP-CIDR,<ip>/32,<TARGET>` / `IP-CIDR6,<ip>/128,<TARGET>` / `PROCESS-NAME,<proc>,<TARGET>`），彻底废除擅自剥离子域与降级 `DOMAIN-SUFFIX` 的扩域逻辑；同步重构 `buildProxyRule` 仅对显式通配符（`*.domain`/`.domain`）生成 `DOMAIN-SUFFIX` 并修复 IPv6 CIDR 生成为 `IP-CIDR6`；新增 `parseManagedMergeRulesFromYaml`、`readManagedMergeRules` 与 `removeQuickRoutingRule`，并在写入或移除规则后广播 `clash-mini-merge-rules-changed` 事件；
+  2. `src/utils/path-control.ts` + `src/hooks/use-path-control.ts` + `src/components/connection/connection-table.tsx` + `src/components/connection/connection-detail.tsx` + `src/pages/_layout/components/connections-panel.tsx` + `src/pages/_layout.tsx`：在「路径控制」表落地 **直连 / 代理 / 封锁 / 已断开** 四态状态解析与样式展示，先重载再精确关闭存量匹配连接，持久保存手动断开记录并与 `Merge` 置顶规则（含历史已存在规则）合并显示于表内（置顶展示已断开/已封锁条目并兼容详情弹窗空端口/空时间显示），新增右键「恢复默认路由」就地解封/重连；
+  3. 同步更新全部 13 个语种 `connections.json`（`chainsDisconnected`、`restoreDefault`）与 `profiles.json`（`quickRuleRemoved`），重生成 `src/types/generated/i18n-keys.ts`（`877 → 880`），补充 `src/utils/quick-routing.test.ts` 与 `src/utils/path-control.test.ts`，并通过 `i18n:check` / `vitest`。
 - **影响**：彻底消除路径控制封锁单个子域误伤兄弟/通配域名的问题，并使封锁或手动断开的链接可直接在表内识别状态并一键还原，无需转到「添加网址」。
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表

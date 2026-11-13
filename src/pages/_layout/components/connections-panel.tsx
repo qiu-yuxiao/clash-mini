@@ -6,21 +6,25 @@ import { BaseSearchBox, BaseEmpty } from '@/components/base'
 import type { ConnectionDetailRef } from '@/components/connection/connection-detail'
 import { ConnectionTable } from '@/components/connection/connection-table'
 import type { ConnectionMonitorData } from '@/hooks/use-connection-data'
+import type { PathControlActions } from '@/hooks/use-path-control'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
-import type { IConnectionsItem } from '@/types/connection'
 import {
   get3DButtonStyle,
   get3DSegmentedContainerStyle,
   get3DSegmentedActiveStyle,
   get3DSegmentedActiveTextColor,
 } from '@/utils/button-styles'
+import type { PathControlConnectionItem } from '@/utils/path-control'
 
 interface ConnectionsPanelProps {
   connectionsType: 'active' | 'closed'
   setConnectionsType: (type: 'active' | 'closed') => void
   connectionsData: ConnectionMonitorData | undefined
+  activeCount?: number
+  closedCount?: number
   handleSearch: (match: (content: string) => boolean, state?: unknown) => void
-  filterConn: IConnectionsItem[]
+  filterConn: PathControlConnectionItem[]
+  pathControlActions?: PathControlActions
   detailRef: React.RefObject<ConnectionDetailRef | null>
   isColumnManagerOpen: boolean
   setIsColumnManagerOpen: (open: boolean) => void
@@ -32,8 +36,11 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
   connectionsType,
   setConnectionsType,
   connectionsData,
+  activeCount,
+  closedCount,
   handleSearch,
   filterConn,
+  pathControlActions,
   detailRef,
   isColumnManagerOpen,
   setIsColumnManagerOpen,
@@ -137,7 +144,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
             {t('settings.mini.connectionsActive', {
               defaultValue: '活跃',
             })}{' '}
-            ({connectionsData?.activeConnections?.length || 0})
+            ({activeCount ?? (connectionsData?.activeConnections?.length || 0)})
           </Box>
 
           {/* Closed Option */}
@@ -163,7 +170,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
             {t('settings.mini.connectionsHistory', {
               defaultValue: '历史',
             })}{' '}
-            ({connectionsData?.closedConnections?.length || 0})
+            ({closedCount ?? (connectionsData?.closedConnections?.length || 0)})
           </Box>
         </Box>
       </Box>
@@ -236,6 +243,13 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
             connections={filterConn}
             onShowDetail={(detail, el) =>
               detailRef.current?.open(detail, connectionsType === 'closed', el)
+            }
+            onMarkDisconnected={pathControlActions?.markConnectionDisconnected}
+            onClearDisconnectedTarget={
+              pathControlActions?.clearDisconnectedTarget
+            }
+            onCloseMatchingTarget={
+              pathControlActions?.closeMatchingActiveConnections
             }
             columnManagerOpen={isColumnManagerOpen}
             onCloseColumnManager={() => setIsColumnManagerOpen(false)}

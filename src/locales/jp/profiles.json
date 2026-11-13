@@ -39,7 +39,8 @@
         "profileReactivated": "プロファイルが再アクティブ化されました。",
         "switchInterrupted": "Profile switch interrupted by new selection",
         "batchDeleted": "選択したプロファイルが正常に削除されました",
-        "quickRuleAdded": "クイックルーティングルールを最優先適用しました: {{rule}}"
+        "quickRuleAdded": "クイックルーティングルールを最優先適用しました: {{rule}}",
+        "quickRuleRemoved": "クイックルーティングルールを削除しました: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

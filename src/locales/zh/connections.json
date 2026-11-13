@@ -36,7 +36,8 @@
       "chainsColumn": "路由",
       "chainsDirect": "直连",
       "chainsReject": "封锁",
-      "chainsProxy": "代理"
+      "chainsProxy": "代理",
+      "chainsDisconnected": "已断开"
     },
     "contextMenu": {
       "setDirect": "设为全局直连",
@@ -44,7 +45,8 @@
       "setReject": "封锁它 (REJECT)",
       "disconnect": "断开此连接",
       "copyAddress": "复制连接地址",
-      "viewDetail": "查看详细信息"
+      "viewDetail": "查看详细信息",
+      "restoreDefault": "恢复默认路由"
     }
   },
   "notices": {

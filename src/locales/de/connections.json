@@ -36,7 +36,8 @@
       "chainsColumn": "Route",
       "chainsDirect": "Direkt",
       "chainsReject": "Blockiert",
-      "chainsProxy": "Über Proxy"
+      "chainsProxy": "Über Proxy",
+      "chainsDisconnected": "Getrennt"
     },
     "contextMenu": {
       "setDirect": "Als global direkt festlegen",
@@ -44,7 +45,8 @@
       "setReject": "Blockieren (REJECT)",
       "disconnect": "Verbindung trennen",
       "copyAddress": "Verbindungsadresse kopieren",
-      "viewDetail": "Details anzeigen"
+      "viewDetail": "Details anzeigen",
+      "restoreDefault": "Standardroute wiederherstellen"
     }
   },
   "notices": {

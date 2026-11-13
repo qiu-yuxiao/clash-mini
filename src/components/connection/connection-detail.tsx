@@ -94,12 +94,18 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const theme = useTheme()
   const chains = [...(data?.chains ?? [])].reverse().join(' / ')
   const rule = rulePayload ? `${data?.rule}(${rulePayload})` : data?.rule
-  const host = metadata?.host
-    ? `${metadata.host}:${metadata.destinationPort}`
-    : `${metadata?.remoteDestination}:${metadata.destinationPort}`
+  const rawHost =
+    metadata?.host ||
+    metadata?.remoteDestination ||
+    metadata?.destinationIP ||
+    metadata?.process ||
+    '--'
+  const host = metadata?.destinationPort
+    ? `${rawHost}:${metadata.destinationPort}`
+    : rawHost
   const Destination = metadata?.destinationIP
     ? metadata.destinationIP
-    : metadata?.remoteDestination
+    : metadata?.remoteDestination || '--'
 
   const information = [
     { label: t('connections.components.fields.host'), value: host },
@@ -130,11 +136,13 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
     },
     {
       label: t('connections.components.fields.time'),
-      value: dayjs(data?.start).fromNow(),
+      value: data?.start ? dayjs(data.start).fromNow() : '--',
     },
     {
       label: t('connections.components.fields.source'),
-      value: `${metadata?.sourceIP ?? ''}:${metadata?.sourcePort ?? ''}`,
+      value: metadata?.sourceIP
+        ? `${metadata.sourceIP}:${metadata?.sourcePort ?? ''}`
+        : '--',
     },
     {
       label: t('connections.components.fields.destination'),

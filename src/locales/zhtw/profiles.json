@@ -39,7 +39,8 @@
         "profileReactivated": "訂閱已啟用",
         "switchInterrupted": "配置切換被新的選擇中斷",
         "batchDeleted": "選取的訂閱已成功刪除",
-        "quickRuleAdded": "快捷分流規則已置頂生效: {{rule}}"
+        "quickRuleAdded": "快捷分流規則已置頂生效: {{rule}}",
+        "quickRuleRemoved": "已移除快捷分流規則: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

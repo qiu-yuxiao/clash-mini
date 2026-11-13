@@ -36,7 +36,8 @@
       "chainsColumn": "Юнәлеш",
       "chainsDirect": "Директ",
       "chainsReject": "Блокланган",
-      "chainsProxy": "Прокси"
+      "chainsProxy": "Прокси",
+      "chainsDisconnected": "Өзелгән"
     },
     "contextMenu": {
       "setDirect": "Гомуми директ тоташу итеп билгеләү",
@@ -44,7 +45,8 @@
       "setReject": "Блоклау (REJECT)",
       "disconnect": "Бу тоташуны өзү",
       "copyAddress": "Тоташу адресын күчерү",
-      "viewDetail": "Детальләрне карау"
+      "viewDetail": "Детальләрне карау",
+      "restoreDefault": "Килешү маршрутын кайтару"
     }
   },
   "notices": {

@@ -36,7 +36,8 @@
       "chainsColumn": "Rota",
       "chainsDirect": "Doğrudan",
       "chainsReject": "Engellendi",
-      "chainsProxy": "Proxy"
+      "chainsProxy": "Proxy",
+      "chainsDisconnected": "Kesildi"
     },
     "contextMenu": {
       "setDirect": "Genel doğrudan bağlantı olarak ayarla",
@@ -44,7 +45,8 @@
       "setReject": "Engelle (REJECT)",
       "disconnect": "Bu bağlantıyı kes",
       "copyAddress": "Bağlantı adresini kopyala",
-      "viewDetail": "Ayrıntıları görüntüle"
+      "viewDetail": "Ayrıntıları görüntüle",
+      "restoreDefault": "Varsayılan Rotaya Dön"
     }
   },
   "notices": {

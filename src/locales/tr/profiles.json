@@ -39,7 +39,8 @@
         "profileReactivated": "Profil Yeniden Etkinleştirildi",
         "switchInterrupted": "Profile switch interrupted by new selection",
         "batchDeleted": "Seçili profiller başarıyla silindi",
-        "quickRuleAdded": "Hızlı yönlendirme kuralı sabitlendi: {{rule}}"
+        "quickRuleAdded": "Hızlı yönlendirme kuralı sabitlendi: {{rule}}",
+        "quickRuleRemoved": "Hızlı yönlendirme kuralı kaldırıldı: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

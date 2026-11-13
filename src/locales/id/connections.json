@@ -36,7 +36,8 @@
       "chainsColumn": "Rute",
       "chainsDirect": "Langsung",
       "chainsReject": "Diblokir",
-      "chainsProxy": "Proksi"
+      "chainsProxy": "Proksi",
+      "chainsDisconnected": "Terputus"
     },
     "contextMenu": {
       "setDirect": "Jadikan koneksi langsung global",
@@ -44,7 +45,8 @@
       "setReject": "Blokir (REJECT)",
       "disconnect": "Putuskan koneksi ini",
       "copyAddress": "Salin alamat koneksi",
-      "viewDetail": "Lihat detail"
+      "viewDetail": "Lihat detail",
+      "restoreDefault": "Pulihkan Rute Default"
     }
   },
   "notices": {

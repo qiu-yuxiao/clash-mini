@@ -5,6 +5,7 @@ import {
   ContentCopyRounded,
   InfoOutlined,
   BlockRounded,
+  RestoreRounded,
 } from '@mui/icons-material'
 import { Box, Menu, MenuItem, alpha, type Theme } from '@mui/material'
 import {
@@ -22,10 +23,28 @@ import { useTranslation } from 'react-i18next'
 
 import { closeConnectionWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
-import type { IConnectionsItem } from '@/types/connection'
-import { addQuickRoutingRule } from '@/utils/quick-routing'
+import {
+  extractConnectionTarget,
+  formatPathControlHostLabel,
+  resolveConnectionControlStatus,
+  type PathControlConnectionItem,
+  type PathControlStatus,
+  type PathControlTarget,
+} from '@/utils/path-control'
+import {
+  addQuickRoutingRule,
+  removeQuickRoutingRule,
+  type QuickRoutingTarget,
+} from '@/utils/quick-routing'
 
 const ROW_HEIGHT = 20
+
+const STATUS_COLOR_MAP: Record<PathControlStatus, string> = {
+  direct: 'success.main',
+  proxy: 'primary.main',
+  reject: 'error.main',
+  disconnected: 'warning.main',
+}
 
 const SX_OUTER: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
@@ -110,11 +129,14 @@ const SX_ROW_BASE: React.ComponentProps<typeof Box>['sx'] = {
 }
 
 interface RowComponentProps {
-  row: Row<IConnectionsItem>
+  row: Row<PathControlConnectionItem>
   virtualStart: number
   virtualSize: number
-  onShowDetail: (data: IConnectionsItem, el?: HTMLElement) => void
-  onContextMenu: (event: React.MouseEvent, row: IConnectionsItem) => void
+  onShowDetail: (data: PathControlConnectionItem, el?: HTMLElement) => void
+  onContextMenu: (
+    event: React.MouseEvent,
+    row: PathControlConnectionItem,
+  ) => void
 }
 
 const RowComponent = memo(
@@ -167,9 +189,9 @@ const RowComponent = memo(
               sx={[
                 SX_DATA_CELL_BASE,
                 {
-                  flex: isChains ? '0 0 64px' : '1 1 0%',
+                  flex: isChains ? '0 0 74px' : '1 1 0%',
                   minWidth: 0,
-                  width: isChains ? '64px' : 'auto',
+                  width: isChains ? '74px' : 'auto',
                   px: isChains ? 0.5 : 1.5,
                   justifyContent: isChains ? 'center' : 'flex-start',
                   borderRight: (theme) =>
@@ -194,19 +216,28 @@ const RowComponent = memo(
 )
 
 interface Props {
-  connections: IConnectionsItem[]
-  onShowDetail: (data: IConnectionsItem, el?: HTMLElement) => void
+  connections: PathControlConnectionItem[]
+  onShowDetail: (data: PathControlConnectionItem, el?: HTMLElement) => void
+  onMarkDisconnected?: (row: PathControlConnectionItem) => void
+  onClearDisconnectedTarget?: (targetKey?: string, connId?: string) => void
+  onCloseMatchingTarget?: (target: PathControlTarget) => Promise<void>
   columnManagerOpen?: boolean
   onCloseColumnManager?: () => void
 }
 
 export const ConnectionTable = (props: Props) => {
   const { t } = useTranslation()
-  const { connections, onShowDetail: rawOnShowDetail } = props
+  const {
+    connections,
+    onShowDetail: rawOnShowDetail,
+    onMarkDisconnected,
+    onClearDisconnectedTarget,
+    onCloseMatchingTarget,
+  } = props
   const onShowDetailRef = useRef(rawOnShowDetail)
   onShowDetailRef.current = rawOnShowDetail
   const onShowDetail = useCallback(
-    (data: IConnectionsItem, el?: HTMLElement) =>
+    (data: PathControlConnectionItem, el?: HTMLElement) =>
       onShowDetailRef.current(data, el),
     [],
   )
@@ -214,12 +245,12 @@ export const ConnectionTable = (props: Props) => {
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number
     mouseY: number
-    row: IConnectionsItem
+    row: PathControlConnectionItem
     anchorEl: HTMLElement
   } | null>(null)
 
   const handleContextMenu = useCallback(
-    (event: React.MouseEvent, row: IConnectionsItem) => {
+    (event: React.MouseEvent, row: PathControlConnectionItem) => {
       event.preventDefault()
       setContextMenu({
         mouseX: event.clientX + 2,
@@ -235,67 +266,92 @@ export const ConnectionTable = (props: Props) => {
     setContextMenu(null)
   }, [])
 
-  const handleDirect = useCallback(async () => {
-    if (!contextMenu) return
-    const { row } = contextMenu
-    const { metadata } = row
-    setContextMenu(null)
-    if (metadata.host) {
-      await addQuickRoutingRule('domain', metadata.host, 'DIRECT')
-    } else if (metadata.destinationIP) {
-      await addQuickRoutingRule('domain', metadata.destinationIP, 'DIRECT')
-    } else if (metadata.process) {
-      await addQuickRoutingRule('process', metadata.process, 'DIRECT')
-    }
-  }, [contextMenu])
+  const applyQuickRoute = useCallback(
+    async (targetGroup: QuickRoutingTarget) => {
+      if (!contextMenu) return
+      const { row } = contextMenu
+      setContextMenu(null)
 
-  const handleProxy = useCallback(async () => {
-    if (!contextMenu) return
-    const { row } = contextMenu
-    const { metadata } = row
-    setContextMenu(null)
-    if (metadata.host) {
-      await addQuickRoutingRule('domain', metadata.host, 'PROXY')
-    } else if (metadata.destinationIP) {
-      await addQuickRoutingRule('domain', metadata.destinationIP, 'PROXY')
-    } else if (metadata.process) {
-      await addQuickRoutingRule('process', metadata.process, 'PROXY')
-    }
-  }, [contextMenu])
+      const target =
+        row._target ?? extractConnectionTarget(row, row._managedRule)
+      if (!target) return
 
-  const handleReject = useCallback(async () => {
-    if (!contextMenu) return
-    const { row } = contextMenu
-    const { metadata } = row
-    setContextMenu(null)
-    if (metadata.host) {
-      await addQuickRoutingRule('domain', metadata.host, 'REJECT')
-    } else if (metadata.destinationIP) {
-      await addQuickRoutingRule('domain', metadata.destinationIP, 'REJECT')
-    } else if (metadata.process) {
-      await addQuickRoutingRule('process', metadata.process, 'REJECT')
-    }
-  }, [contextMenu])
+      const replaceRawRules =
+        row._isSynthetic && row._managedRule
+          ? [row._managedRule.raw]
+          : undefined
+
+      const appliedRule = await addQuickRoutingRule(
+        target.type,
+        target.value,
+        targetGroup,
+        replaceRawRules ? { replaceRawRules } : undefined,
+      )
+      if (appliedRule) {
+        onClearDisconnectedTarget?.(target.key, row.id)
+        await onCloseMatchingTarget?.(target)
+      }
+    },
+    [contextMenu, onClearDisconnectedTarget, onCloseMatchingTarget],
+  )
+
+  const handleDirect = useCallback(
+    () => applyQuickRoute('DIRECT'),
+    [applyQuickRoute],
+  )
+
+  const handleProxy = useCallback(
+    () => applyQuickRoute('PROXY'),
+    [applyQuickRoute],
+  )
+
+  const handleReject = useCallback(
+    () => applyQuickRoute('REJECT'),
+    [applyQuickRoute],
+  )
 
   const handleDisconnect = useCallback(async () => {
     if (!contextMenu) return
     const { row } = contextMenu
     setContextMenu(null)
+    if (row._isSynthetic) return
+
+    onMarkDisconnected?.(row)
     try {
       await closeConnectionWithTimeout(row.id)
     } catch (err) {
       console.error(err)
     }
-  }, [contextMenu])
+  }, [contextMenu, onMarkDisconnected])
+
+  const handleRestoreDefault = useCallback(async () => {
+    if (!contextMenu) return
+    const { row } = contextMenu
+    setContextMenu(null)
+
+    const target = row._target ?? extractConnectionTarget(row, row._managedRule)
+    if (row._managedRule) {
+      await removeQuickRoutingRule({ rawRule: row._managedRule.raw })
+    }
+    if (target || row.id) {
+      onClearDisconnectedTarget?.(target?.key, row.id)
+    }
+  }, [contextMenu, onClearDisconnectedTarget])
 
   const handleCopy = useCallback(async () => {
     if (!contextMenu) return
     const { row } = contextMenu
     setContextMenu(null)
     const metadata = row.metadata ?? {}
-    const host = metadata.host || metadata.remoteDestination
+    const host =
+      metadata.host ||
+      metadata.remoteDestination ||
+      metadata.destinationIP ||
+      metadata.process ||
+      ''
     const port = metadata.destinationPort
-    const address = (port ? `${host}:${port}` : host) || ''
+    const address = (port && host ? `${host}:${port}` : host) || ''
+    if (!address) return
     try {
       await navigator.clipboard.writeText(address)
       showNotice.success('connections.notices.copied', { address }, 2000)
@@ -311,43 +367,60 @@ export const ConnectionTable = (props: Props) => {
     onShowDetail(row, anchorEl)
   }, [contextMenu, onShowDetail])
 
-  const columnDefs = useMemo<ColumnDef<IConnectionsItem>[]>(() => {
+  const getStatusLabel = useCallback(
+    (status: PathControlStatus): string => {
+      switch (status) {
+        case 'direct':
+          return t('connections.components.miniTable.chainsDirect')
+        case 'reject':
+          return t('connections.components.miniTable.chainsReject')
+        case 'disconnected':
+          return t('connections.components.miniTable.chainsDisconnected', {
+            defaultValue: '已断开',
+          })
+        case 'proxy':
+        default:
+          return t('connections.components.miniTable.chainsProxy')
+      }
+    },
+    [t],
+  )
+
+  const columnDefs = useMemo<ColumnDef<PathControlConnectionItem>[]>(() => {
     return [
       {
         id: 'host',
         accessorFn: (row) => {
-          const m = row.metadata ?? {}
-          return m.host
-            ? `${m.host}:${m.destinationPort}`
-            : `${m.remoteDestination}:${m.destinationPort}`
+          const base = formatPathControlHostLabel(row)
+          const port = row.metadata?.destinationPort
+          return port ? `${base}:${port}` : base
         },
         header: () => t('connections.components.miniTable.hostColumn'),
-        cell: (ctx) => {
-          const row = ctx.row.original
-          const m = row.metadata ?? {}
-          return m.host
-            ? `${m.host}:${m.destinationPort}`
-            : `${m.remoteDestination}:${m.destinationPort}`
-        },
+        cell: (ctx) => ctx.getValue<string>(),
       },
       {
         id: 'chains',
         accessorFn: (row) => {
-          const chains = row.chains || []
-          if (chains.length === 0)
-            return t('connections.components.miniTable.chainsDirect')
-          const upperChains = chains.map((c) => c.toUpperCase())
-          if (upperChains.includes('REJECT'))
-            return t('connections.components.miniTable.chainsReject')
-          if (upperChains.includes('DIRECT'))
-            return t('connections.components.miniTable.chainsDirect')
-          return t('connections.components.miniTable.chainsProxy')
+          const status = resolveConnectionControlStatus(row)
+          return getStatusLabel(status)
         },
         header: () => t('connections.components.miniTable.chainsColumn'),
-        cell: (ctx) => ctx.getValue<string>(),
+        cell: (ctx) => {
+          const status = resolveConnectionControlStatus(ctx.row.original)
+          const label = getStatusLabel(status)
+          return (
+            <Box
+              component="span"
+              title={ctx.row.original._managedRule?.raw}
+              sx={{ color: STATUS_COLOR_MAP[status], fontWeight: 600 }}
+            >
+              {label}
+            </Box>
+          )
+        },
       },
     ]
-  }, [t])
+  }, [t, getStatusLabel])
 
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -395,9 +468,9 @@ export const ConnectionTable = (props: Props) => {
                         sx={[
                           SX_HEADER_CELL_BASE,
                           {
-                            flex: isChains ? '0 0 64px' : '1 1 0%',
+                            flex: isChains ? '0 0 74px' : '1 1 0%',
                             minWidth: 0,
-                            width: isChains ? '64px' : 'auto',
+                            width: isChains ? '74px' : 'auto',
                             px: isChains ? 0.5 : 1.5,
                             borderRight: (theme) =>
                               !isChains
@@ -513,11 +586,26 @@ export const ConnectionTable = (props: Props) => {
         </MenuItem>
         <MenuItem
           onClick={handleDisconnect}
+          disabled={Boolean(contextMenu?.row._isSynthetic)}
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
         >
           <LinkOffRounded sx={{ fontSize: 18, color: 'error.main' }} />
           {t('connections.components.contextMenu.disconnect')}
         </MenuItem>
+        {Boolean(
+          contextMenu?.row._managedRule ||
+            contextMenu?.row._controlStatus === 'disconnected',
+        ) && (
+          <MenuItem
+            onClick={handleRestoreDefault}
+            sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+          >
+            <RestoreRounded sx={{ fontSize: 18, color: 'info.main' }} />
+            {t('connections.components.contextMenu.restoreDefault', {
+              defaultValue: '恢复默认路由',
+            })}
+          </MenuItem>
+        )}
         <MenuItem
           onClick={handleCopy}
           sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}

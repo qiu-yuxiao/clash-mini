@@ -9,10 +9,16 @@
 - **删除 WMI / Task Scheduler COM「代启动」代理块与场景六自证测试（P0-4）**：两块 COM 通道只做到「代启动」不做到「常驻托管」，解决的是 Job Object 而非 360 按应用组连坐，属无效复杂度；场景六测试测的是 Job 机制而非真实死因，属自证测试。`spawn_isolated_process_with` 收敛为 `CREATE_BREAKAWAY_FROM_JOB` 单一跨树脱离通道，`guardian.rs` 从 4187 行收敛至约 3500 行，并修正「broker 恒等比较导致每次成功拉起误刷 WARN」的失效判断。
 - **复活判决 fail-closed（P0-6）**：复活状态缺失且非干净冷启动时，拒绝拉起主进程，杜绝在未知状态下盲目复活。
 
-### 🌐 DNS / 配置增强修正
+### 🌐 DNS / 配置增强与 IPv6 流量防偷跑修正
 
 - **合并 DNS PROXY 双注入点（B-1 / F-2）**：消除同一注入逻辑的两处分叉，收敛为单一真源；修正 fragment 标记串味（D-1）。
 - **删除 `use_tun` 两参死壳（C-1）**：生产路径零调用的死壳移除，调用链唯一真源收敛到 `use_tun_with_sniffer`。
+- **GFWList 模式移除 `IP-CIDR6,::/0,PROXY` 兜底（BUG-366）**：去除 `MATCH,DIRECT` 前对未命中 GeoIP CN 的 IPv6 全量强制代理规则，防止国内 CDN/通讯/下载工具 IPv6 与非名单域名 IPv6 流量偷跑进机场节点计费（「代理全部流量」模式保持 `MATCH,PROXY` 不变）；同步清理审计检出的 `Clippy` / `TOCTOU` 与更新元数据说明对齐（`Clash Mini v3.3.0`）。
+
+### 🎯 路径控制精确分流与四态可逆闭环（BUG-367）
+
+- **精确规则生成（禁止扩域）**：在「路径控制」表右键执行 `全局直连 / 代理分流 / 封锁它` 时严格按目标类型生成精确规则（域名 `DOMAIN,<exact_host>`、IPv4 `IP-CIDR,<ip>/32`、IPv6 `IP-CIDR6,<ip>/128`、进程 `PROCESS-NAME,<proc>`），彻底修复封锁 `play.googleapis.com` 被擅自改写为宽泛 `DOMAIN-SUFFIX,googleapis.com,REJECT` 误伤兄弟/子域名的问题；「添加网址」亦改为普通域名精确生成 `DOMAIN`，仅显式 `*.domain`/`.domain` 生成 `DOMAIN-SUFFIX`。
+- **四态展示与表内就地恢复**：下发 `DIRECT / PROXY / REJECT` 后先重载配置再精确关闭对应存量活跃连接；`路由` 列完整呈现 **直连 / 代理 / 封锁 / 已断开** 四态并将已封锁（`Merge` 覆写规则）与手动断开的链接保留在表内，支持右键重路由或一键「恢复默认路由」（13 语种全量同步）。
 
 ### 🩺 稳定性
 

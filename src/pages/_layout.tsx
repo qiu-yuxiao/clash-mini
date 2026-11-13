@@ -39,6 +39,7 @@ import { useHeadStateNew } from '@/components/proxy/use-head-state'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
+import { usePathControl } from '@/hooks/use-path-control'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemState } from '@/hooks/use-system-state'
@@ -71,6 +72,10 @@ import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
 import { bindMainAppShortcuts } from '@/utils/disable-webview-shortcuts'
+import {
+  prioritizePathControlConnections,
+  type PathControlConnectionItem,
+} from '@/utils/path-control'
 import { hasRealProfileItem } from '@/utils/profile-items'
 
 // Sub-components
@@ -458,24 +463,46 @@ const Layout = () => {
     response: { data: connectionsData },
     clearClosedConnections,
   } = useConnectionData({ enabled: drawerOpen && !isMinimalWidth })
+  const {
+    activeControlConnections,
+    closedControlConnections,
+    actions: pathControlActions,
+  } = usePathControl({
+    activeConnections: connectionsData?.activeConnections ?? [],
+    closedConnections: connectionsData?.closedConnections ?? [],
+    enabled: drawerOpen && !isMinimalWidth,
+  })
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const detailRef = useRef<ConnectionDetailRef | null>(null)
 
-  const filterConn = useMemo(() => {
+  const filterConn = useMemo<PathControlConnectionItem[]>(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
     const conns =
-      (connectionsType === 'active'
-        ? connectionsData?.activeConnections
-        : connectionsData?.closedConnections) ?? []
-    let matchConns = conns.filter((conn) => {
-      const { host, destinationIP, process } = conn.metadata ?? {}
+      connectionsType === 'active'
+        ? activeControlConnections
+        : closedControlConnections
+    const matchConns = conns.filter((conn) => {
+      const { host, destinationIP, remoteDestination, process } =
+        conn.metadata ?? {}
       return (
-        match(host || '') || match(destinationIP || '') || match(process || '')
+        match(host || '') ||
+        match(destinationIP || '') ||
+        match(remoteDestination || '') ||
+        match(process || '')
       )
     })
-    if (orderFunc) matchConns = orderFunc(matchConns)
-    return matchConns
-  }, [connectionsData, connectionsType, match])
+    if (connectionsType === 'active') {
+      return prioritizePathControlConnections(matchConns, orderFunc)
+    }
+    return orderFunc
+      ? (orderFunc(matchConns) as PathControlConnectionItem[])
+      : matchConns
+  }, [
+    activeControlConnections,
+    closedControlConnections,
+    connectionsType,
+    match,
+  ])
 
   const handleSearch = useCallback((match: (content: string) => boolean) => {
     setMatch(() => match)
@@ -1552,8 +1579,11 @@ const Layout = () => {
                       connectionsType={connectionsType}
                       setConnectionsType={setConnectionsType}
                       connectionsData={connectionsData}
+                      activeCount={activeControlConnections.length}
+                      closedCount={closedControlConnections.length}
                       handleSearch={handleSearch}
                       filterConn={filterConn}
+                      pathControlActions={pathControlActions}
                       detailRef={detailRef}
                       isColumnManagerOpen={isColumnManagerOpen}
                       setIsColumnManagerOpen={setIsColumnManagerOpen}

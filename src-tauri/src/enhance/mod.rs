@@ -691,7 +691,12 @@ fn derive_domestic_doh_upstream(dns: &Mapping) -> std::string::String {
             // 降级保通模板必须去掉 fragment（如 `#h3=true`）：fragment 只用于「原样保留
             // 订阅条目」，而 domestic_fallback 是派生的通用境内 DoH，携带他家/他字段的
             // 参数会导致降级后仍解析失败（D-1）。
-            return std::string::String::from(parsed.clean_upstream.split('#').next().unwrap());
+            return std::string::String::from(
+                parsed
+                    .clean_upstream
+                    .split_once('#')
+                    .map_or(parsed.clean_upstream.as_str(), |(base, _)| base),
+            );
         }
     }
     "https://doh.pub/dns-query".to_string()
@@ -1293,7 +1298,7 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
     (!host.is_empty()).then(|| std::string::String::from(host))
 }
 
-/// 由 `dns.fallback` 中的境外上游生成强制走代理的规则（与 `nameserver-policy` 共用规则生成真源）。
+// 原由 `dns.fallback` 独立生成强制走代理规则（已重构并由下方注释说明单一路径替代）：
 // `dns_fallback_proxy_rules` 已删除（B-1/F-2）：PROXY 规则统一由
 // `sanitize_dns_upstreams` → `inject_dns_proxy_rules` 单一路径生成，
 // 覆盖 fallback + nameserver + nameserver-policy 三域，不再有第二注入点。
@@ -1483,37 +1488,27 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         }
     }
 
-    // 【IPv6 兜底】GFWList 是纯域名规则集（behavior: domain），对「纯 IPv6 真实地址」
-    // 无从按域名匹配，会全部漏到 MATCH 兜底。若兜底为 DIRECT，境外/投毒 IPv6 就直连
-    // 超时（实测无 IPv6 出口时每条 i/o timeout，形成 TUN 断流刷屏）。故在 MATCH 之前
-    // 为 IPv6 补兜底：境内 GEOIP 直连，其余 IPv6 统一走代理。
-    //
-    // 【必须用 GEOIP 而非 GEOIP6】mihomo（Clash Meta）不支持 `GEOIP6` 规则类型
-    // （那是老 Clash Premium 的语法），写入即 `unsupported rule type: GEOIP6`，
-    // 配置校验失败、内核拒绝启动、全部流量回落直连（v3.0.0 现场实证）。
-    // mihomo 的 `GEOIP` 自动覆盖 IPv4/IPv6（查 mmdb 对应段），语义等价且合法。
-    //
-    // 【刻意不加 no-resolve】v3.0.0 现场日志显示 375 条 i/o timeout 中仍有 85 条
-    // （22.7%）目标是**域名**（icube-api*.tiktok-row.net 等）：域名目标不会命中带
-    // no-resolve 的 IP 类规则，仍然漏到 MATCH,DIRECT。去掉 no-resolve 后，内核会先
-    // 解析再判定，于是「解析出任意 IPv6 的域名」也能落到这里：
-    //   - 解析结果是境内 IPv6 → 上一条 GEOIP,CN,DIRECT 接住（故它同样不能带 no-resolve）
-    //   - 其余 IPv6 → 本规则走代理
-    //   - 只有 A 记录的域名 → 两条 IPv6 规则都不匹配，行为与之前一致
-    // 代价仅为规则匹配期多一次解析，结果走内核 DNS 缓存，可接受。
+    // 【国内 GEOIP 兜底】
+    // 1) 【必须用 GEOIP 而非 GEOIP6】mihomo（Clash Meta）不支持 `GEOIP6` 规则类型
+    //    （老 Clash Premium 语法），写入即 `unsupported rule type: GEOIP6`，会导致配置校验失败、
+    //    内核拒绝启动并全部流量回落直连。mihomo 的 `GEOIP` 自动覆盖 IPv4/IPv6（查 mmdb 对应段）。
+    // 2) 【刻意不加 no-resolve】保持域名目标先由内核 DNS 解析后再比对 CN IP 段直连。
+    // 3) 【不再注入 IP-CIDR6,::/0,PROXY】原位于 GEOIP,CN,DIRECT 与 MATCH,DIRECT 之间的
+    //    `IP-CIDR6,::/0,PROXY` 会将境内 CDN/下载/通讯 IPv6 流量及非 GFWList 域名 AAAA 会话
+    //    全部送入付费代理节点偷跑流量，故默认 GFWList 模式保持对称直连兜底 `MATCH,DIRECT`。
     // Read verge config to get the rule fallback type
     let verge = Config::verge().await.latest_arc();
     let rule_fallback = verge.rule_fallback.as_deref().unwrap_or("direct");
 
     // Add MATCH final rule according to the fallback type
-    // 注意：IPv6 兜底（GEOIP,CN,DIRECT + IP-CIDR6,::/0,PROXY）仅在 GFWList 模式（rule_fallback != "proxy"）下生效；
-    // 当用户选择「代理全部流量」（rule_fallback == "proxy"）时，直接落入 MATCH,PROXY，
-    // 避免 GEOIP,CN,DIRECT 把国内流量强制直连、破坏「代理全部流量」的全局代理语义。
+    // 注意：默认 GFWList 模式（rule_fallback != "proxy"）仅注入 GEOIP,CN,DIRECT + MATCH,DIRECT 对称兜底；
+    // 已移除原先位于 MATCH,DIRECT 之前的 IP-CIDR6,::/0,PROXY，避免境内未命中 GeoIP 的 CDN/下载/通讯 IPv6 流量
+    // 及非 GFWList 域名 AAAA 会话偷跑进机场付费节点计费。
+    // 仅当用户选择「代理全部流量」（rule_fallback == "proxy"）时，直接落入 MATCH,PROXY。
     if rule_fallback == "proxy" {
         final_rules.push(Value::from("MATCH,PROXY"));
     } else {
         final_rules.push(Value::from("GEOIP,CN,DIRECT"));
-        final_rules.push(Value::from("IP-CIDR6,::/0,PROXY"));
         final_rules.push(Value::from("MATCH,DIRECT"));
     }
 
@@ -1806,9 +1801,9 @@ append-rules:
 
         let rules = config.get("rules").and_then(Value::as_sequence).unwrap();
         // prepend(1) + GFWList(1) + IP-CIDR(6) + IP-CIDR6(5) + IPv4-mapped(6)
-        // + append(1) + IPv6 兜底(2: GEOIP,CN + IP-CIDR6,::/0) + MATCH(1) = 23
-        // MATCH=DIRECT because default rule_fallback is "direct" (GFWList mode)
-        assert_eq!(rules.len(), 23);
+        // + append(1) + GEOIP,CN(1) + MATCH(1) = 22
+        // MATCH=DIRECT because default rule_fallback is "direct" (GFWList mode); IP-CIDR6,::/0,PROXY 已移除
+        assert_eq!(rules.len(), 22);
         assert_eq!(rules[0].as_str(), Some("PROCESS-NAME,custom-process,DIRECT"));
         assert_eq!(rules[1].as_str(), Some("RULE-SET,gfwlist,PROXY"));
         assert_eq!(rules[2].as_str(), Some("IP-CIDR,127.0.0.0/8,DIRECT,no-resolve"));
@@ -1851,8 +1846,7 @@ append-rules:
         // 刻意不带 no-resolve：否则域名目标会跳过这两条规则、仍漏到 MATCH,DIRECT
         // GEOIP 而非 GEOIP6：mihomo 不支持 GEOIP6 规则类型（配置校验直接失败）
         assert_eq!(rules[20].as_str(), Some("GEOIP,CN,DIRECT"));
-        assert_eq!(rules[21].as_str(), Some("IP-CIDR6,::/0,PROXY"));
-        assert_eq!(rules[22].as_str(), Some("MATCH,DIRECT"));
+        assert_eq!(rules[21].as_str(), Some("MATCH,DIRECT"));
 
         // Verify prepend-rules and append-rules keys are removed
         assert!(config.get("prepend-rules").is_none());
@@ -1891,10 +1885,7 @@ fallback:
             .iter()
             .filter_map(|raw| extract_upstream_host(raw))
             .collect();
-        let rules: Vec<std::string::String> = dns_upstream_proxy_rules_from_hosts(hosts.iter().map(|s| s.as_str()))
-            .into_iter()
-            .map(std::string::String::from)
-            .collect();
+        let rules: Vec<std::string::String> = dns_upstream_proxy_rules_from_hosts(hosts.iter().map(|s| s.as_str()));
 
         assert_eq!(
             rules,
@@ -1918,10 +1909,7 @@ fallback:
             .filter_map(|raw| extract_upstream_host(raw))
             .collect();
         let quad9_rules: Vec<std::string::String> =
-            dns_upstream_proxy_rules_from_hosts(quad9_hosts.iter().map(|s| s.as_str()))
-                .into_iter()
-                .map(std::string::String::from)
-                .collect();
+            dns_upstream_proxy_rules_from_hosts(quad9_hosts.iter().map(|s| s.as_str()));
         assert_eq!(
             quad9_rules,
             vec![
@@ -1939,10 +1927,7 @@ fallback:
             .filter_map(|raw| extract_upstream_host(raw))
             .collect();
         let single_rules: Vec<std::string::String> =
-            dns_upstream_proxy_rules_from_hosts(single_hosts.iter().map(|s| s.as_str()))
-                .into_iter()
-                .map(std::string::String::from)
-                .collect();
+            dns_upstream_proxy_rules_from_hosts(single_hosts.iter().map(|s| s.as_str()));
         assert_eq!(
             single_rules,
             vec![
@@ -1958,10 +1943,7 @@ fallback:
             .filter_map(|raw| extract_upstream_host(raw))
             .collect();
         let domain_rules: Vec<std::string::String> =
-            dns_upstream_proxy_rules_from_hosts(domain_hosts.iter().map(|s| s.as_str()))
-                .into_iter()
-                .map(std::string::String::from)
-                .collect();
+            dns_upstream_proxy_rules_from_hosts(domain_hosts.iter().map(|s| s.as_str()));
         assert_eq!(
             domain_rules,
             vec![
@@ -2103,10 +2085,7 @@ fallback:
             .iter()
             .filter_map(|raw| extract_upstream_host(raw))
             .collect();
-        let rules: Vec<std::string::String> = dns_upstream_proxy_rules_from_hosts(hosts.iter().map(|s| s.as_str()))
-            .into_iter()
-            .map(std::string::String::from)
-            .collect();
+        let rules: Vec<std::string::String> = dns_upstream_proxy_rules_from_hosts(hosts.iter().map(|s| s.as_str()));
         assert_eq!(
             rules,
             vec![

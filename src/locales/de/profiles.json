@@ -39,7 +39,8 @@
         "profileReactivated": "Abonnement erneut aktiviert",
         "switchInterrupted": "Profile switch interrupted by new selection",
         "batchDeleted": "Selected profiles deleted successfully",
-        "quickRuleAdded": "Schnell-Routing-Regel oben angeheftet: {{rule}}"
+        "quickRuleAdded": "Schnell-Routing-Regel oben angeheftet: {{rule}}",
+        "quickRuleRemoved": "Schnell-Routing-Regel entfernt: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

@@ -36,7 +36,8 @@
       "chainsColumn": "経路",
       "chainsDirect": "ダイレクト",
       "chainsReject": "ブロック",
-      "chainsProxy": "プロキシ"
+      "chainsProxy": "プロキシ",
+      "chainsDisconnected": "切断済み"
     },
     "contextMenu": {
       "setDirect": "グローバルダイレクトに設定",
@@ -44,7 +45,8 @@
       "setReject": "ブロック (REJECT)",
       "disconnect": "この接続を切断",
       "copyAddress": "接続アドレスをコピー",
-      "viewDetail": "詳細を表示"
+      "viewDetail": "詳細を表示",
+      "restoreDefault": "デフォルトルートに戻す"
     }
   },
   "notices": {

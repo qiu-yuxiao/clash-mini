@@ -39,7 +39,8 @@
         "profileReactivated": "Профиль яңадан активлаштырылды",
         "switchInterrupted": "Profile switch interrupted by new selection",
         "batchDeleted": "Selected profiles deleted successfully",
-        "quickRuleAdded": "Тиз маршрутлау кагыйдәсе беркетелде: {{rule}}"
+        "quickRuleAdded": "Тиз маршрутлау кагыйдәсе беркетелде: {{rule}}",
+        "quickRuleRemoved": "Тиз маршрут кагыйдәсе бетерелде: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",

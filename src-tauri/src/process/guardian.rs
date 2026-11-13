@@ -784,11 +784,23 @@ pub fn write_guard_heartbeat_to(guard_dir: &Path, hb: &GuardHeartbeat) -> io::Re
 }
 
 pub fn read_respawn_state_checked(guard_dir: &Path) -> Result<RespawnSessionState, String> {
+    read_respawn_state_checked_for_gen(guard_dir, 0)
+}
+
+fn read_respawn_state_checked_for_gen(guard_dir: &Path, cli_gen: u32) -> Result<RespawnSessionState, String> {
     let path = guard_dir.join(RESPAWN_STATE_FILENAME);
     match fs::read(&path) {
         Ok(bytes) => serde_json::from_slice::<RespawnSessionState>(&bytes)
             .map_err(|err| format!("respawn_state.json 解析损坏: {err}")),
-        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(RespawnSessionState::default()),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            if cli_gen > 0 {
+                Err(format!(
+                    "复活状态文件缺失且非干净冷启动 (cli_gen={cli_gen})，fail-closed 拒绝拉起"
+                ))
+            } else {
+                Ok(RespawnSessionState::default())
+            }
+        }
         Err(err) => Err(format!("读取 respawn_state.json 失败: {err}")),
     }
 }
@@ -865,13 +877,8 @@ pub fn evaluate_and_record_respawn_in(
     // 状态文件缺失且并非干净冷启动（cli_gen>0）时，预算状态不可信，
     // 直接拒绝拉起，避免 :797 把 NotFound 当成干净会话、将累计熔断计数
     // 从 0 重算后绕过 MAX_RAPID_RESPAWN_GEN。
-    let state_path = guard_dir.join(RESPAWN_STATE_FILENAME);
-    if !state_path.exists() && cli_gen > 0 {
-        return Err(format!(
-            "复活状态文件缺失且非干净冷启动 (cli_gen={cli_gen})，fail-closed 拒绝拉起"
-        ));
-    }
-    let state = read_respawn_state_checked(guard_dir)?;
+    // 单次 fs::read 直接在 NotFound 分支对 cli_gen > 0 fail-closed，消除先 exists() 再 read() 的窄 TOCTOU
+    let state = read_respawn_state_checked_for_gen(guard_dir, cli_gen)?;
     let Some(next_gen) = evaluate_respawn_budget(&state, cli_gen, epoch_id, boot_fingerprint) else {
         return Ok(None);
     };
@@ -1658,9 +1665,10 @@ mod win32_impl {
 
         // P0-1: 同 Job 降级通道已关闭——跨树逃逸全失败即 fail-closed 返回错误，由上层落 ERROR 并标记「守护未就绪」。
         if !allow_degraded {
-            return Err(format!("Breakaway={breakaway_err}"));
+            Err(format!("Breakaway={breakaway_err}"))
+        } else {
+            Err(format!("Breakaway={breakaway_err}; 同Job降级已禁用(P0-1)"))
         }
-        return Err(format!("Breakaway={breakaway_err}; 同Job降级已禁用(P0-1)"));
     }
 
     fn build_companion_args(main_exe: &Path, session: &GuardianSession, generation: u32, broker: &str) -> Vec<String> {
@@ -3190,6 +3198,16 @@ mod tests {
             evaluate_and_record_respawn_in(&dir, "epoch-b", 0, 200, base_ms + 99_020_000, "boot:1760000001", false)
                 .is_err()
         );
+
+        // 非干净冷启动 (cli_gen > 0) 且持久化状态文件缺失时，单次 read_respawn_state_checked_for_gen 必须 fail-closed
+        let missing_dir = std::env::temp_dir().join(format!("clash_mini_respawn_missing_gen_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&missing_dir);
+        let _ = std::fs::create_dir_all(&missing_dir);
+        let missing_err =
+            evaluate_and_record_respawn_in(&missing_dir, "epoch-c", 1, 300, base_ms, "boot:1760000001", false)
+                .expect_err("cli_gen > 0 without respawn_state.json must fail closed");
+        assert!(missing_err.contains("cli_gen=1"));
+        let _ = std::fs::remove_dir_all(&missing_dir);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -36,7 +36,8 @@
       "chainsColumn": "Маршрут",
       "chainsDirect": "Напрямую",
       "chainsReject": "Заблокировано",
-      "chainsProxy": "Через прокси"
+      "chainsProxy": "Через прокси",
+      "chainsDisconnected": "Отключено"
     },
     "contextMenu": {
       "setDirect": "Сделать глобальное прямое подключение",
@@ -44,7 +45,8 @@
       "setReject": "Заблокировать (REJECT)",
       "disconnect": "Разорвать соединение",
       "copyAddress": "Копировать адрес соединения",
-      "viewDetail": "Подробная информация"
+      "viewDetail": "Подробная информация",
+      "restoreDefault": "Сбросить маршрут"
     }
   },
   "notices": {

@@ -17,6 +17,7 @@ export interface TranslationResources {
         contextMenu: {
           copyAddress: string
           disconnect: string
+          restoreDefault: string
           setDirect: string
           setProxy: string
           setReject: string
@@ -39,6 +40,7 @@ export interface TranslationResources {
         miniTable: {
           chainsColumn: string
           chainsDirect: string
+          chainsDisconnected: string
           chainsProxy: string
           chainsReject: string
           hostColumn: string
@@ -486,6 +488,7 @@ export interface TranslationResources {
             profileReactivated: string
             profileSwitched: string
             quickRuleAdded: string
+            quickRuleRemoved: string
             switchInterrupted: string
           }
         }

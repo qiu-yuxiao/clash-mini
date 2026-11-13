@@ -36,7 +36,8 @@
       "chainsColumn": "경로",
       "chainsDirect": "직접 연결",
       "chainsReject": "차단",
-      "chainsProxy": "프록시"
+      "chainsProxy": "프록시",
+      "chainsDisconnected": "연결 끊김"
     },
     "contextMenu": {
       "setDirect": "전역 직접 연결로 설정",
@@ -44,7 +45,8 @@
       "setReject": "차단 (REJECT)",
       "disconnect": "이 연결 끊기",
       "copyAddress": "연결 주소 복사",
-      "viewDetail": "상세 정보 보기"
+      "viewDetail": "상세 정보 보기",
+      "restoreDefault": "기본 경로 복원"
     }
   },
   "notices": {

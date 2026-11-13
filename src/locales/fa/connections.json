@@ -36,7 +36,8 @@
       "chainsColumn": "مسیر",
       "chainsDirect": "مستقیم",
       "chainsReject": "مسدود",
-      "chainsProxy": "پروکسی"
+      "chainsProxy": "پروکسی",
+      "chainsDisconnected": "قطع‌شده"
     },
     "contextMenu": {
       "setDirect": "تنظیم به‌عنوان اتصال مستقیم سراسری",
@@ -44,7 +45,8 @@
       "setReject": "مسدودسازی (REJECT)",
       "disconnect": "قطع این اتصال",
       "copyAddress": "کپی نشانی اتصال",
-      "viewDetail": "مشاهده جزئیات"
+      "viewDetail": "مشاهده جزئیات",
+      "restoreDefault": "بازگردانی مسیر پیش‌فرض"
     }
   },
   "notices": {

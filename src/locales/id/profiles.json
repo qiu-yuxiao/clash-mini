@@ -39,7 +39,8 @@
         "profileReactivated": "Profil Diaktifkan Kembali",
         "switchInterrupted": "Profile switch interrupted by new selection",
         "batchDeleted": "Selected profiles deleted successfully",
-        "quickRuleAdded": "Aturan perutean cepat disematkan: {{rule}}"
+        "quickRuleAdded": "Aturan perutean cepat disematkan: {{rule}}",
+        "quickRuleRemoved": "Aturan perutean cepat dihapus: {{rule}}"
       },
       "notices": {
         "forceRefreshCompleted": "Force refresh completed",
