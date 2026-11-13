@@ -716,6 +716,11 @@ flowchart LR
 - **理由**：原 `read_respawn_state_checked` 对 `NotFound` 返回 `Ok(Default)` 属 fail-open，使「复活状态缺失」绕过累计熔断，与 §3.7:398 契约方向相反。审计发现28 纠正了报告 2.5.3(a)/P0-6 原误写的 fail-closed 方向，明确「零复活只能归物理前提被证伪」。
 - **影响**：非干净冷启动且状态文件缺失时严格拒绝拉起，累计熔断语义恢复；干净冷启动路径不变。
 
+### Sync-3 · DNS PROXY 规则双注入点合并 + fragment 串味修正（enhance/mod.rs，B-1/F-2 + D-1）
+- **改动**：① 删除重复的 DNS PROXY 规则注入点 `dns_fallback_proxy_rules`（enforce 早期只读 fallback、清洗前不写），统一收敛到末端 `inject_dns_proxy_rules` 的单一三域注入，消除 `respect_rules=false` 时遗留的孤儿规则（B-1/F-2，P1）；② `derive_domestic_doh_upstream` 修正：降级模板拼接前用 `split('#').next()` 剥离 `#h3=true` 等 fragment，避免串味到 DOH 降级主机（D-1，P2）。两个测试 `dns_fallback_upstreams_are_forced_through_proxy` / `dns_fallback_proxy_rules_skip_domestic_public_dns` 改为直接调用 `collect_dns_field_strings` + `extract_upstream_host` + `dns_upstream_proxy_rules_from_hosts`，去掉对已删除函数的引用。
+- **理由**：双注入点靠去重掩盖、`respect_rules=false` 时产生孤儿规则，是审计 F-2 指出的隐患；fragment 串味会让降级 DOH 带上非预期参数（D-1）。
+- **影响**：DNS PROXY 规则唯一真源；国内公共 DNS 走直连降级路径不变。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |

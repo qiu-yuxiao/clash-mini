@@ -688,7 +688,10 @@ fn derive_domestic_doh_upstream(dns: &Mapping) -> std::string::String {
             && !parsed.clean_upstream.is_empty()
             && is_local_or_domestic_dns_host(&parsed.host)
         {
-            return parsed.clean_upstream;
+            // 降级保通模板必须去掉 fragment（如 `#h3=true`）：fragment 只用于「原样保留
+            // 订阅条目」，而 domestic_fallback 是派生的通用境内 DoH，携带他家/他字段的
+            // 参数会导致降级后仍解析失败（D-1）。
+            return std::string::String::from(parsed.clean_upstream.split('#').next().unwrap());
         }
     }
     "https://doh.pub/dns-query".to_string()
@@ -1291,17 +1294,9 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
 }
 
 /// 由 `dns.fallback` 中的境外上游生成强制走代理的规则（与 `nameserver-policy` 共用规则生成真源）。
-fn dns_fallback_proxy_rules(dns: Option<&Value>) -> Vec<Value> {
-    let Some(Value::Mapping(dns_map)) = dns else {
-        return Vec::new();
-    };
-    let servers = collect_dns_field_strings(dns_map, "fallback");
-    let hosts: Vec<std::string::String> = servers.iter().filter_map(|raw| extract_upstream_host(raw)).collect();
-    dns_upstream_proxy_rules_from_hosts(hosts.iter().map(std::string::String::as_str))
-        .into_iter()
-        .map(|rule| Value::from(rule.as_str()))
-        .collect()
-}
+// `dns_fallback_proxy_rules` 已删除（B-1/F-2）：PROXY 规则统一由
+// `sanitize_dns_upstreams` → `inject_dns_proxy_rules` 单一路径生成，
+// 覆盖 fallback + nameserver + nameserver-policy 三域，不再有第二注入点。
 
 async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
@@ -1450,22 +1445,8 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // Add GFWList rule:
     final_rules.push(Value::from("RULE-SET,gfwlist,PROXY"));
 
-    // 【DNS 上游保通】让 fallback 里的境外 DoH 走代理，救活防投毒链路。
-    // 放在 gfwlist 之后、用户 append-rules 之前：既不抢用户自定义规则的最终决定权，
-    // 又早于所有私网/MATCH 规则，避免被 `MATCH,DIRECT` 兜走。
-    // 规则由真实 `dns.fallback` 推导（不写死 IP），订阅换上游时自动跟随。
-    let dns_rules = dns_fallback_proxy_rules(config.get(Value::from("dns")));
-    if !dns_rules.is_empty() {
-        for rule in &dns_rules {
-            final_rules.push(rule.clone());
-        }
-        logging!(
-            info,
-            Type::Core,
-            "DNS fallback 上游共 {} 条规则已强制走代理（防投毒链路保通）",
-            dns_rules.len()
-        );
-    }
+    // DNS fallback 上游走代理的 PROXY 规则已统一由 `inject_dns_proxy_rules` 在
+    // `sanitize_dns_upstreams` 末端生成（B-1/F-2 单点注入），此处不再重复注入。
 
     // Add local LAN bypass rules (DIRECT) to avoid DNS loopback & LAN routing deadlock
     // 【IPv4 私网 / 环回 / 链路本地】防止「代理所有流量」（MATCH,PROXY）下本地流量被误转远端代理
@@ -1884,8 +1865,8 @@ append-rules:
     /// 本用例锁定「按 fallback 里的 IP 字面量生成走代理规则」这一约定。
     #[test]
     fn dns_fallback_upstreams_are_forced_through_proxy() {
-        use super::dns_fallback_proxy_rules;
-        use serde_yaml_ng::{Mapping, Value};
+        use super::{collect_dns_field_strings, dns_upstream_proxy_rules_from_hosts, extract_upstream_host};
+        use serde_yaml_ng::Mapping;
 
         // 标量与列表混用 + 各种 scheme / 端口 / h3 参数 / 去重
         let dns: Mapping = serde_yaml_ng::from_str(
@@ -1906,10 +1887,13 @@ fallback:
         )
         .unwrap();
 
-        let generated = dns_fallback_proxy_rules(Some(&Value::Mapping(dns)));
-        let rules: Vec<std::string::String> = generated
+        let hosts: Vec<std::string::String> = collect_dns_field_strings(&dns, "fallback")
             .iter()
-            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .filter_map(|raw| extract_upstream_host(raw))
+            .collect();
+        let rules: Vec<std::string::String> = dns_upstream_proxy_rules_from_hosts(hosts.iter().map(|s| s.as_str()))
+            .into_iter()
+            .map(std::string::String::from)
             .collect();
 
         assert_eq!(
@@ -1929,10 +1913,15 @@ fallback:
         // Quad9 与 OpenDNS 对偶辅 IP 自动补全（A9）
         let quad9_opendns: Mapping =
             serde_yaml_ng::from_str("fallback: ['https://9.9.9.9/dns-query', '208.67.222.222']").unwrap();
-        let quad9_rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(quad9_opendns)))
+        let quad9_hosts: Vec<std::string::String> = collect_dns_field_strings(&quad9_opendns, "fallback")
             .iter()
-            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .filter_map(|raw| extract_upstream_host(raw))
             .collect();
+        let quad9_rules: Vec<std::string::String> =
+            dns_upstream_proxy_rules_from_hosts(quad9_hosts.iter().map(|s| s.as_str()))
+                .into_iter()
+                .map(std::string::String::from)
+                .collect();
         assert_eq!(
             quad9_rules,
             vec![
@@ -1945,10 +1934,15 @@ fallback:
 
         // 单独配置 8.8.8.8 时，应自动补齐对偶辅 IP 8.8.4.4
         let single_google: Mapping = serde_yaml_ng::from_str("fallback: ['https://8.8.8.8/dns-query']").unwrap();
-        let single_rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(single_google)))
+        let single_hosts: Vec<std::string::String> = collect_dns_field_strings(&single_google, "fallback")
             .iter()
-            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .filter_map(|raw| extract_upstream_host(raw))
             .collect();
+        let single_rules: Vec<std::string::String> =
+            dns_upstream_proxy_rules_from_hosts(single_hosts.iter().map(|s| s.as_str()))
+                .into_iter()
+                .map(std::string::String::from)
+                .collect();
         assert_eq!(
             single_rules,
             vec![
@@ -1959,10 +1953,15 @@ fallback:
 
         // 单独配置 dns.google 时，应同时生成 DOMAIN 与 8.8.8.8/8.8.4.4 落地规则
         let domain_google: Mapping = serde_yaml_ng::from_str("fallback: ['https://dns.google/dns-query']").unwrap();
-        let domain_rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(domain_google)))
+        let domain_hosts: Vec<std::string::String> = collect_dns_field_strings(&domain_google, "fallback")
             .iter()
-            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .filter_map(|raw| extract_upstream_host(raw))
             .collect();
+        let domain_rules: Vec<std::string::String> =
+            dns_upstream_proxy_rules_from_hosts(domain_hosts.iter().map(|s| s.as_str()))
+                .into_iter()
+                .map(std::string::String::from)
+                .collect();
         assert_eq!(
             domain_rules,
             vec![
@@ -1972,10 +1971,8 @@ fallback:
             ]
         );
 
-        // 没有 dns 段 / 没有 fallback 时不得凭空造规则
-        assert!(dns_fallback_proxy_rules(None).is_empty());
-        let empty: Mapping = serde_yaml_ng::from_str("enable: true").unwrap();
-        assert!(dns_fallback_proxy_rules(Some(&Value::Mapping(empty))).is_empty());
+        // 没有上游时不得凭空造规则
+        assert!(dns_upstream_proxy_rules_from_hosts(std::iter::empty::<&str>()).is_empty());
     }
 
     /// 回归（BUG-308 / C10）：订阅自带 `dns.nameserver` / `dns.fallback` 含境外明文 UDP 上游（如 8.8.8.8）时，
@@ -2085,9 +2082,9 @@ rules:
     }
 
     #[test]
-    fn dns_fallback_proxy_rules_skip_domestic_public_dns() {
-        use super::dns_fallback_proxy_rules;
-        use serde_yaml_ng::{Mapping, Value};
+    fn dns_upstream_proxy_rules_skip_domestic_public_dns() {
+        use super::{collect_dns_field_strings, dns_upstream_proxy_rules_from_hosts, extract_upstream_host};
+        use serde_yaml_ng::Mapping;
 
         // C11：境内公共 DNS IP / DoH 域名即使误配在 fallback 中也不得生成 PROXY 规则
         let dns: Mapping = serde_yaml_ng::from_str(
@@ -2102,9 +2099,13 @@ fallback:
         )
         .unwrap();
 
-        let rules: Vec<std::string::String> = dns_fallback_proxy_rules(Some(&Value::Mapping(dns)))
+        let hosts: Vec<std::string::String> = collect_dns_field_strings(&dns, "fallback")
             .iter()
-            .map(|r| std::string::String::from(r.as_str().unwrap_or_default()))
+            .filter_map(|raw| extract_upstream_host(raw))
+            .collect();
+        let rules: Vec<std::string::String> = dns_upstream_proxy_rules_from_hosts(hosts.iter().map(|s| s.as_str()))
+            .into_iter()
+            .map(std::string::String::from)
             .collect();
         assert_eq!(
             rules,
