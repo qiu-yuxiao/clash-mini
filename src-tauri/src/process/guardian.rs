@@ -1039,12 +1039,12 @@ pub fn get_diagnostic_summary() -> String {
 #[cfg(windows)]
 mod win32_impl {
     use super::{
-        BROKER_BREAKAWAY_JOB, BROKER_SAME_JOB_DEGRADED, BROKER_TASK_SCHEDULER_COM, BROKER_WMI_SESSION0, Command,
-        Duration, GUARD_RAPID_DEATH_WINDOW_SECS, GuardHeartbeat, GuardianArgs, HEARTBEAT_INTERVAL_MS,
-        INSTALLER_WAIT_MAX_SECS, INTENTIONAL_EXIT_FILENAME, IntentionalExitProof, IntentionalProofCheck,
-        MAX_RAPID_RESPAWN_GEN, MainHeartbeat, Path, PathBuf, RESPAWN_SAFETY_DELAY_MS, TcpListener,
-        append_structured_guardian_log, clear_intentional_exit_proof_in, compute_guard_rebuild_backoff_ms,
-        current_unix_ms, evaluate_and_record_respawn_in, evaluate_intentional_exit_proof, format_exit_code_diagnosis,
+        BROKER_BREAKAWAY_JOB, BROKER_TASK_SCHEDULER_COM, BROKER_WMI_SESSION0, Command, Duration,
+        GUARD_RAPID_DEATH_WINDOW_SECS, GuardHeartbeat, GuardianArgs, HEARTBEAT_INTERVAL_MS, INSTALLER_WAIT_MAX_SECS,
+        INTENTIONAL_EXIT_FILENAME, IntentionalExitProof, IntentionalProofCheck, MAX_RAPID_RESPAWN_GEN, MainHeartbeat,
+        Path, PathBuf, RESPAWN_SAFETY_DELAY_MS, TcpListener, append_structured_guardian_log,
+        clear_intentional_exit_proof_in, compute_guard_rebuild_backoff_ms, current_unix_ms,
+        evaluate_and_record_respawn_in, evaluate_intentional_exit_proof, format_exit_code_diagnosis,
         format_local_timestamp, is_guardian_respawn, is_installer_or_uninstaller_running, read_respawn_state_from,
         reset_respawn_state_for_clean_start_in, resolve_isolated_guardian_dir, sync_guardian_binary_to_dir,
         write_guard_heartbeat_to, write_intentional_exit_proof_with_retry, write_main_heartbeat_to,
@@ -2089,21 +2089,12 @@ mod win32_impl {
             ));
         }
 
-        let proc = spawn_via_std_command(
-            exe,
-            &make_args(BROKER_SAME_JOB_DEGRADED),
-            work_dir,
-            CREATE_NO_WINDOW,
-            BROKER_SAME_JOB_DEGRADED,
-            true,
-        )
-        .map_err(|e| format!("WMI={wmi_err}; TaskScheduler={ts_err}; Breakaway={breakaway_err}; Direct={e}"))?;
-        logging!(
-            error,
-            Type::Setup,
-            "[Guardian] 所有跨树逃逸代理均失败，已降级同 Job 运行: WMI={wmi_err}; TS={ts_err}; Breakaway={breakaway_err}"
-        );
-        Ok(proc)
+        // P0-1: 已关闭「同 Job 降级」通道。审计结论：WMI/TaskScheduler/Breakaway 三级跨树逃逸全失败后，
+        // 退回同 Job 运行恰好复现 360 按应用组连坐强杀的死因，且随后被上层误报「守护已就绪」。
+        // 即便 allow_degraded=true 也不再降级，直接返回错误，由上层落 ERROR 并标记「守护未就绪」。
+        return Err(format!(
+            "WMI={wmi_err}; TaskScheduler={ts_err}; Breakaway={breakaway_err}; 同Job降级已禁用(P0-1)"
+        ));
     }
 
     fn build_companion_args(main_exe: &Path, session: &GuardianSession, generation: u32, broker: &str) -> Vec<String> {
@@ -2141,7 +2132,7 @@ mod win32_impl {
             guard_exe,
             |broker| build_companion_args(main_exe, session, generation, broker),
             work_dir,
-            true,
+            false,
             true,
         )?;
         if spawned.degraded || spawned.broker != BROKER_WMI_SESSION0 {
@@ -3383,7 +3374,7 @@ mod win32_impl {
             &args.target_exe,
             |_| launch_args.clone(),
             work_dir,
-            true,
+            false,
             in_lightweight,
         );
 
