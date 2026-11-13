@@ -61,6 +61,7 @@
   - [7.4 订阅管理与右键上下文菜单](#74-订阅管理与右键上下文菜单)
   - [7.5 Mihomo 插件 API 与序列化小写补丁](#75-mihomo-插件-api-与序列化小写补丁)
   - [7.6 远程订阅请求 User-Agent 版本解耦与兼容铁律](#76-远程订阅请求-user-agent-版本解耦与兼容铁律)
+  - [7.7 路径控制精准规则生成与四态路由可逆闭环](#77-路径控制精准规则生成与四态路由可逆闭环)
 - [🔧 八、工程发布体系与规范](#八工程发布体系与规范)
   - [8.1 Windows 测试清单与单测执行隔离](#81-windows-测试清单与单测执行隔离)
   - [8.2 静默发布全流程（Silent Release）](#82-静默发布全流程silent-release)
@@ -365,10 +366,9 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - IPv4-mapped IPv6（`::ffff:a.b.c.d`）按 IPv4 私网段**逐一映射**直连（`::ffff:127.0.0.0/104`、`::ffff:10.0.0.0/104`、`::ffff:172.16.0.0/108`、`::ffff:192.168.0.0/112`、`::ffff:100.64.0.0/106`、`::ffff:169.254.0.0/112`）。**严禁**整体把 `::ffff:0:0/96` 设为 DIRECT —— 那会把国外目标一并直连、绕过代理。
 - **`dns.fake-ip-range6` 与 `fc00::/7` 的硬约束**：`fake-ip-range6` 必须落在 `fc00::/7` **之外**（当前 `2001:2::/64`，安全）。因 `fc00::/7` 已被设为直连，一旦改成社区常见的 ULA 取值（如 `fdfe:dcba:9877::/64`），fake IPv6 就会撞上该直连规则。改此值前必须先核对本约束。
 - **DNS 劫持必须显式覆盖 TCP**：mihomo 的 `dns-hijack` **不书写协议时默认按 `udp://` 处理**，故必须写为 `["any:53", "tcp://any:53"]`；否则 TCP 53 的 DNS 查询不被劫持、改按规则转发，形成 DNS 泄漏面。
-- **IPv6 兜底必须在 MATCH 之前，且不得带 `no-resolve`（2026-10-21 铁律）**：GFWList 是纯域名规则集，IPv6 目标无从按域名命中，会漏到 `MATCH` 兜底；若兜底为 DIRECT，境外/投毒 IPv6 直连即 `i/o timeout`，表现为 TUN 断流。故固定注入 `GEOIP,CN,DIRECT` + `IP-CIDR6,::/0,PROXY`。
-  - **必须用 `GEOIP` 而非 `GEOIP6`**：mihomo（Clash Meta）**不支持 `GEOIP6` 规则类型**（老 Clash Premium 语法），写入即 `unsupported rule type: GEOIP6`，配置校验失败、内核拒绝启动、全部流量回落直连（v3.0.0 现场实证）。mihomo 的 `GEOIP` 自动覆盖 IPv4/IPv6（查 mmdb 对应段），语义等价且合法。
-  - **两条都必须放在本地网段直连规则之后、`MATCH` 之前**：放前面会抢走 IPv4-mapped 私网段与 TUN 自身 ULA 的直连判定。
-  - **`no-resolve` 必须去掉**：带 `no-resolve` 的 IP 类规则对**域名**目标直接跳过。v3.0.0 现场 375 条 `i/o timeout` 中仍有 85 条（22.7%）目标是域名（`icube-api*.tiktok-row.net` 等），正是因为域名目标绕过了这两条规则又漏回 `MATCH,DIRECT`。去掉后由内核先解析再判定：境内 IPv6 → 前一条直连；其余 IPv6 → 走代理；只有 A 记录的域名 → 两条都不匹配、行为不变。
+- **GFWList 模式兜底策略与禁止 `IP-CIDR6,::/0,PROXY` 全量代管（BUG-366 / v3.3.0 修正，替代 2026-10-21 旧兜底）**：
+  - **移除 `MATCH,DIRECT` 前的 `IP-CIDR6,::/0,PROXY`**：在默认 GFWList 模式（`rule_fallback != "proxy"`）下，尾部仅固定注入 `GEOIP,CN,DIRECT` + `MATCH,DIRECT`，**严禁重新加入 `IP-CIDR6,::/0,PROXY`**。原 `IP-CIDR6,::/0,PROXY` 会将所有未命中 GeoIP CN 或新分配的国内 CDN/通讯/下载工具 IPv6 流量以及非 GFWList 域名的 IPv6 会话一并送入机场付费节点，造成巨额无效流量偷跑；仅当用户主动切换「代理全部流量」（`rule_fallback == "proxy"`）时，才在尾部使用 `MATCH,PROXY`。
+  - **必须用 `GEOIP` 而非 `GEOIP6`**：mihomo（Clash Meta）**不支持 `GEOIP6` 规则类型**（老 Clash Premium 语法），写入即 `unsupported rule type: GEOIP6`，配置校验失败、内核拒绝启动、全部流量回落直连（v3.0.0 现场实证）。mihomo 的 `GEOIP,CN,DIRECT` 自动覆盖 IPv4/IPv6（查 mmdb 对应段）且保持**不带 `no-resolve`**（对域名先解析再判定境内 IP 直连），并须置于私网/TUN 本地直连规则之后、`MATCH` 之前。
 - **`dns.fallback` 的上游必须强制走代理（2026-10-21 铁律，2026-10-23 辅 IP 对偶补齐）**：`dns.respect-rules: true` 时，内核为解析域名发出的上游连接**同样要过规则匹配**；而默认 `rule_fallback = "direct"`，于是 fallback 里的境外 DoH（`1.1.1.1` / `8.8.8.8` / `8.8.4.4`）会一路漏到 `MATCH,DIRECT`。这三家在大陆直连被墙 → fallback 整链失效 → `fallback-filter.geoip` 防投毒能力等于关闭 → 投毒应答（如 Teredo 段的 `2001::1`）被采信 → 客户端反复连不存在的地址刷 `i/o timeout` → **TUN 断流**。
   - **落地方式**：由 `enhance::dns_upstream_proxy_rules_from_hosts` 对 `dns.fallback`、`dns.nameserver` 与 `dns.nameserver-policy` 的非境内主机统一推导，生成 `IP-CIDR,<ip>/32,PROXY,no-resolve`（IPv6 则 `IP-CIDR6,<ip>/128`）或 `DOMAIN,<host>,PROXY`；同时通过 `is_local_or_domestic_dns_host` 跳过私网与国内公共 DNS（如 `223.5.5.5`、`doh.pub` 等），对已知四大公共 DNS（Google / Cloudflare / Quad9 / OpenDNS）额外补齐 BUG-302 对偶辅 IP 及已知域名落地 IP，其余自定义境外解析器按实际主机名/IP 动态跟随，不写死唯一订阅上游。
   - **插入位置**：`RULE-SET,gfwlist` 之后、用户 `append-rules` 之前。既不抢用户规则最终决定权，又早于全部私网与 `MATCH` 规则。
@@ -589,6 +589,20 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 3. **纯净单段格式、核实依据与唯一更新触发条件**：默认标识必须保持与上游主流桌面端逐字节一致的纯净单段 `clash-verge/vX.Y.Z`（依据：已核实 GitHub 官方仓库 `clash-verge-rev/clash-verge-rev` 2026-11 正式发行版 `v2.5.10`，同代内置 `Mihomo v1.19.x` 内核；主流订阅转换及机场面板依 `clash-verge/v2.x` 下发 Mihomo YAML；权衡定值可聚类指纹与未知 `v3.x` 分支兼容性风险后，固定采用上游同代基线并以单订阅 `option.user_agent` 作为自定义逃生阀）。严禁使用易被拦截的裸 `clash.meta/...` 或追加空格后缀；**仅当未来升级替换内置 `sidecar/mini-mihomo` 内核大版本并引入新协议代际时，才同步审视调整为同代上游官方正式版号（见 §8.2 发版前检查清单与 `src-tauri/src/constants.rs` 文档注释）**。
 4. **保留单订阅自定义逃生阀**：支持在单个远程订阅配置项 `option.user_agent` 中按需覆盖请求头；空串或纯空白值自动回退至 `SUBSCRIPTION_COMPAT_USER_AGENT`，且 `PrfItem::from_url` 在导入与更新时完整持久化保留非空自定义 `user_agent`。
 
+### 7.7 路径控制精准规则生成与四态路由可逆闭环
+
+针对主窗口右侧「路径控制」监控表与「流量接管模式 -> 添加网址」的规则下发与状态可视化，确立以下工程契约（BUG-367）：
+
+1. **精确目标匹配铁律（严禁擅自截断域名或隐式扩域）**：
+   - 在「路径控制」表右键执行「全局直连」、「代理分流」或「封锁它」时，必须严格按用户选中条目的精确目标生成 `Merge` `prepend-rules` 规则：
+     - 主机域名统一生成 `DOMAIN,<exact_host>,<TARGET>`，**严禁调用 `slice(-2/-3)` 剥离子域、严禁隐式改写为 `DOMAIN-SUFFIX`**（杜绝封锁 `play.googleapis.com` 误生成 `DOMAIN-SUFFIX,googleapis.com,REJECT` 扩大打击面）；
+     - 纯 IPv4 地址生成 `IP-CIDR,<ip>/32,<TARGET>`；纯 IPv6 地址（兼容方括号与 `%zone` 剥离）生成 `IP-CIDR6,<ip>/128,<TARGET>`；进程目标生成 `PROCESS-NAME,<proc>,<TARGET>`；
+     - 「添加网址」批量导入中，仅当用户显式填写通配语法（`*.example.com` 或 `.example.com`）时生成 `DOMAIN-SUFFIX,example.com,PROXY`；无通配前缀的域名一律生成精确 `DOMAIN,<host>,PROXY`。
+2. **先重载后切流、四态独立表达与表内可逆解封**：
+   - 规则下发必须按「写入 `Merge` → `enhanceProfiles()` 内核重载 → 精确关闭当前命中该目标的活跃连接」顺序执行，保证存量长连接即刻生效切换或阻断。
+   - 表格 `路由`（`chains`）列必须完整区分并展示四种状态：**`直连`（`DIRECT`）**、**`代理`（`PROXY`）**、**`封锁`（`REJECT`）**、**`已断开`（`DISCONNECTED`）**。
+   - **技术边界与状态合成机制**：当连接被手动「断开此连接」或命中 `REJECT` 规则瞬时阻断后，Mihomo 活跃连接表（`/connections` WS）会移除该 socket 句柄（且客户端未主动重试前不会重建 TCP 连接）。为此前端在「路径控制」表将 Mihomo 实时连接与本地持久化的「手动已断开记录」以及 `Merge` `prepend-rules` 置顶管控条目（含历史手工写入的 `DOMAIN-SUFFIX` / `REJECT` / 置顶直连或代理规则）合成统一视图：被封锁或手动断开的链接保留在表中并显示清晰状态；当目标重建新活跃流时自动洗去「已断开」标记；用户在表内右键即可直接将其重设为 `PROXY`/`DIRECT` 或点击「恢复默认路由」删除置顶覆写规则，无需离开「路径控制」表跳转「添加网址」。
+
 ---
 
 ## 🔧 八、工程发布体系与规范
@@ -764,6 +778,21 @@ flowchart LR
 ### Sync-8 · 3.3.0 发版版本号统一 bump 与 Changelog
 - **改动**：版本号 `3.2.9 → 3.3.0`，五处同步：`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`、`updater/app-update.json`、`Cargo.lock`（`clash-mini` 包版本行）；`CHANGELOG.md` 顶部新增 v3.3.0 条目（守护架构收敛 P0-1/P0-4/P0-6、DNS/配置增强修正 B-1/F-2/D-1/C-1、拨测风暴回退、安全软件白名单说明引导）。
 - **说明**：本版本号变更不含任何运行时逻辑改动，仅发布元数据；本版本聚合自 v3.2.9 以来的全部未推送提交（`e4b3448c`…`a8493c29`）。按当前纪律**仅本地提交、不执行 push**；push 与 CI 发版须待用户明确授权后另行执行。
+
+### Sync-9 · GFWList 模式移除 IPv6 全代理兜底 + 审核遗留 Clippy/TOCTOU 清理（BUG-366）
+- **改动**：
+  1. `src-tauri/src/enhance/mod.rs`：移除 `enforce_mini_agreements` 在 `rule_fallback != "proxy"`（GFWList 模式）尾部注入的 `- IP-CIDR6,::/0,PROXY`，仅保留 `GEOIP,CN,DIRECT` + `MATCH,DIRECT` 对称兜底；同步将 `test_enforce_mini_agreements_logic` 断言总数由 `23` 调整为 `22` 并校验索引 `20/21`；
+  2. `src-tauri/src/enhance/mod.rs`：将第 `1296` 行悬空 `///` 文档注释修正为 `//`（消除 `clippy::empty_line_after_doc_comments` 硬错误），并用 `split_once('#')` 替换第 `694` 行 `.unwrap()`；
+  3. `src-tauri/src/process/guardian.rs`：将非干净冷启动缺档检测收敛进 `read_respawn_state_checked` 的单次 `fs::read`（`NotFound` 分支直接判错，消除窄 TOCTOU 并补齐单测），并精简 `spawn_isolated_process_with` 冗余 `if !allow_degraded` 返回消除 `clippy::needless_return`；
+  4. `updater/app-update.json`：将 `notes` 由 `"Clash Mini v3.2.9"` 修正为 `"Clash Mini v3.3.0"`。
+- **影响**：默认 GFWList 模式下国内及非名单 IPv6 流量不再绕经机场节点计费；「代理全部流量」模式（`MATCH,PROXY`）语义保持不变；`cargo clippy --all-targets --all-features -- -D warnings` 恢复零报错零警告。
+
+### Sync-10 · 路径控制精准规则生成与四态路由可逆闭环（BUG-367）
+- **改动**：
+  1. `src/utils/quick-routing.ts`：重构 `addQuickRoutingRule` 改为纯精确匹配（`DOMAIN,<host>,<TARGET>` / `IP-CIDR,<ip>/32,<TARGET>` / `IP-CIDR6,<ip>/128,<TARGET>` / `PROCESS-NAME,<proc>,<TARGET>`），彻底废除擅自剥离子域与降级 `DOMAIN-SUFFIX` 的扩域逻辑；同步重构 `buildProxyRule` 仅对显式通配符（`*.domain`/`.domain`）生成 `DOMAIN-SUFFIX` 并修复 IPv6 CIDR 生成为 `IP-CIDR6`；新增 `parseManagedMergeRules` 与 `removeQuickRoutingRule`（先 `enhanceProfiles()` 重载再关闭匹配旧连接），保存或移除规则时广播 `clash-mini-merge-rules-changed` 事件；
+  2. `src/utils/path-control.ts` + `src/components/connection/connection-table.tsx` + `src/pages/_layout/components/connections-panel.tsx` + `src/pages/_layout.tsx`：在「路径控制」表落地 **直连 / 代理 / 封锁 / 已断开** 四态状态解析与样式展示，持久保存手动断开记录并与 `Merge` 置顶规则（含历史已存在规则）合并显示于表内，新增右键「恢复默认路由」就地解封/重连；
+  3. 同步更新全部 13 个语种 `connections.json`（`chainsDisconnected`、`restoreDefault`）与 `profiles.json`（`quickRuleRemoved`）并通过 `i18n:check` / `vitest`。
+- **影响**：彻底消除路径控制封锁单个子域误伤兄弟/通配域名的问题，并使封锁或手动断开的链接可直接在表内识别状态并一键还原，无需转到「添加网址」。
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 

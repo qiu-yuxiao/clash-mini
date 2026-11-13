@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-365)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-367)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -351,6 +351,20 @@
 - **涉及物理路径与行号**：`src-tauri/Cargo.toml`, `src-tauri/src/process/guardian.rs`, `src-tauri/src/module/lightweight.rs`, `src-tauri/src/module/monitor.rs`, `src-tauri/src/utils/resolve/mod.rs`, `src-tauri/src/utils/window_manager.rs`, `src-tauri/src/feat/window.rs`, `src-tauri/src/cmd/diagnostics.rs`, `src-tauri/src/lib.rs`
 - **根因与背景实证**：`v3.2.8` 会话日志（归档 `2026-11-13_12-29-24.log`：于 `2026-11-13 10:39:56` 启动、`10:45:39` 再次进入轻量模式并在 `11:10:18` 最后一条日志后，原勘误曾误记为 `11:06:16`）主进程与 `clash-mini-guard.exe` 再次无声消失（Windows Application/System 事件日志无崩溃，WER 无转储）。现场取证确认：`360tray.exe` 智能加速（`switch_smart_mode=1`, `cpu-max=100`）激活、`ScanLog_2026-11-13_10_43_42.txt` 拦截过自启且 `useroptm2.ini` 缺失 `clash-mini` 豁免、`speedupopt.db` 已含 `clash-mini-guard` 优化记录、活跃主进程处于 Win32 Job 内（`IsProcessInJob=True`）。代码审查与复审进一步暴露：**原实现仅在可观测与死亡后判决着墨，未解决看门狗未脱离父 Job 遭 360 按进程组连坐双杀的防护根因**；同时存在带外凭证缺少 `pid && session_id` AND 匹配/TTL/两阶段（`prepared`/`confirmed`）、`3600s` 时间清零漏洞与写状态吞错、同名 `.tmp.<pid>` 竞争与 delete-then-rename 竞态、日志/错误静默出口及诊断包缺少 360/WER 事件采集等问题。
 - **修正与改良方案**：按评审报告 `A1–A12` + 复审 `C1–C15` 落地全链路根因隔离与纵深加固：① **A6 Session-0 Broker 会话脱离隔离（核心防双杀）**：看门狗与复活主进程优先经 Session-0 **WMI (`Win32_Process.Create` → `WmiPrvSE.exe`)** → **Task Scheduler COM (`ITaskService`) 一次性任务** → **`CREATE_BREAKAWAY_FROM_JOB`** 级联拉起（彻底脱离父 Job，同 Job 回退显式标记 `same_job_degraded` 告警）；新增真实 `CreateJobObjectW` + `TerminateJobObject` 场景 6 端到端测试验证脱离父 Job 存活；② **A7 + C1–C2 两阶段严格带外退出双真源**：`prepare_exit()` 写 `phase="prepared"`（30s TTL），`RunEvent::Exit` 在退出窗口升级 `phase="confirmed"`（120s TTL），带重试写入并在退出取消时双路复位；看门狗强制校验 `proof.pid == parent_pid && proof.session_id == session_id`（AND 匹配 + TTL）并在 `GUARD_SAFETY_DELAY_ENTER = 3500ms` 前后双次复核；③ **A8 + C3–C4 无时间清零会话熔断（fail-closed）**：废除 `120s` 与 `3600s` 冷却清零，按 `boot_fingerprint + session_epoch_id` 持久化单会话累计计数（上限 `<= 3` 次），读写失败一律 fail-closed 停机熔断；④ **C5–C7/C15 原子 I/O 与非静默审计**：全量文件替换为递增 `ATOMIC_TEMP_SEQ` 唯一临时文件 + `MoveFileExW(..., MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`；独立 `logs/guardian.log` 写失败触发 stderr/`tracing`/主日志回退，补齐 `GetExitCodeProcess`、降级、早期 `cancel`、`lightweight` 状态对齐等全分支日志；⑤ **A4 代码化取证**：`cmd/diagnostics.rs` 新增只读采集 360 进程/扫描豁免列表、CrashDumps 与有界超时 `wevtutil` WER/Application 事件输出至 `wer-crash-report.txt` 与 `system-info.txt`。
+
+### BUG-366（对应规范章节：3.7 / 4.1 / 8.5）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / IPv6 全代理偷跑治理与审核遗留 Clippy / TOCTOU 清理
+- **涉及物理路径与行号**：`src-tauri/src/enhance/mod.rs:694, 1296, 1495-1522, 1808-1860`, `src-tauri/src/process/guardian.rs:786-880, 1658-1666`, `updater/app-update.json:3`
+- **根因与背景实证**：① `enforce_mini_agreements` 在 GFWList 模式（`rule_fallback != "proxy"`）末尾的 `GEOIP,CN,DIRECT` 与 `MATCH,DIRECT` 之间强行注入 `IP-CIDR6,::/0,PROXY`，导致未覆盖于 `GeoIP/CN` 或直连 CDN/下载/通讯应用的 IPv6 流量及非 GFWList 域名 AAAA 解析全部绕过默认直连策略进入付费机场节点计费；② 提交审核同时检出 `enhance/mod.rs:1296` 悬空 `///` 文档注释（触发 `clippy::empty_line_after_doc_comments` 阻断严格 Lint）、`enhance/mod.rs:694` 冗余 `.unwrap()`、`guardian.rs:1660` 冗余 `if !allow_degraded` 分支（触发 `clippy::needless_return`）及 `evaluate_and_record_respawn_in` 先 `exists()` 再 `fs::read()` 的窄 TOCTOU 窗口；③ `updater/app-update.json:3` 发布说明仍滞留 `"Clash Mini v3.2.9"`。
+- **修正与改良方案**：① 移除 GFWList 模式下 `MATCH,DIRECT` 前的 `- IP-CIDR6,::/0,PROXY`（保留 `GEOIP,CN,DIRECT` + `MATCH,DIRECT` 对称兜底，仅当用户切换「代理全部流量」即 `rule_fallback == "proxy"` 时落入 `MATCH,PROXY`），并同步更新 `test_enforce_mini_agreements_logic` 断言与协议规范 `§3.7`；② 将 `enhance/mod.rs:1296` 改为普通 `//` 注释、用 `split_once('#')` 安全解包替换 `.unwrap()`；③ 将非干净冷启动缺失状态文件判定收敛进 `read_respawn_state_checked` 的单次 `fs::read`（`NotFound` 分支按模式裁决）消除 TOCTOU 并补齐单测，同时精简 `guardian.rs:1660` 单出口返回；④ 将 `updater/app-update.json` 的 `notes` 对齐为 `"Clash Mini v3.3.0"`。
+
+### BUG-367（对应规范章节：2.2 / 7.7 / 8.9）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / 路径控制精准规则目标化与四态路由可逆闭环
+- **涉及物理路径与行号**：`src/utils/quick-routing.ts`, `src/utils/path-control.ts`, `src/components/connection/connection-table.tsx`, `src/pages/_layout/components/connections-panel.tsx`, `src/pages/_layout.tsx`, `src/locales/*/connections.json`, `src/locales/*/profiles.json`
+- **根因与背景实证**：① `addQuickRoutingRule` 与 `buildProxyRule` 存在自动截断域名父级与强制后缀化缺陷（`parts.slice(-2/-3)` + `DOMAIN-SUFFIX`）：用户在「路径控制」表封锁 `play.googleapis.com` 时被擅自改写为 `DOMAIN-SUFFIX,googleapis.com,REJECT`（或宽泛后缀匹配），误杀同名或上/下级无关域，且 IPv6 字符判定缺少 `a-f` 并错误套用 `IP-CIDR`；② `ConnectionTable` 仅消费 Mihomo WebSocket 实时活跃/内存历史流：`路由` 列仅能映射 `直连 / 封锁 / 代理` 三者之一，手动「断开此连接」仅调用 `closeConnectionWithTimeout` 使连接从活跃表瞬间消失；手动「封锁」后置顶的 `REJECT` 规则未关闭旧 socket，而新触发的 `REJECT` 连接被内核瞬时关闭落入易失历史区；表格也缺少直接解除 `Merge` 封锁或重连已断开条目的「恢复默认路由」操作。
+- **修正与改良方案**：① **精确目标匹配**：路径控制右键 `全局直连 / 代理分流 / 封锁它` 一律生成精确规则——域名 `DOMAIN,<exact_host>,<TARGET>`（禁止截断父域、禁止自动转 `DOMAIN-SUFFIX`）、IPv4 `IP-CIDR,<ip>/32,<TARGET>`、IPv6 `IP-CIDR6,<ip>/128,<TARGET>`、进程 `PROCESS-NAME,<proc>,<TARGET>`；「添加网址」中仅显式 `*.domain`/`.domain` 输入生成 `DOMAIN-SUFFIX`，纯域名同样保持精确 `DOMAIN`；② **先重载后切流 + 四态可逆呈现**：下发 `DIRECT/PROXY/REJECT` 先 `enhanceProfiles()` 再关闭命中该目标的存量活跃连接；前端融合持久化「手动已断开记录」（新活跃流到达时自动转正消除）与 `Merge` 覆写规则集条目，在「路径控制」表统一呈现 **直连 / 代理 / 封锁 / 已断开** 四态徽标与排序，且使已断开及被封锁链接留驻表内、右键直接支持重路由或一键「恢复默认路由」。
 
 ---
 
