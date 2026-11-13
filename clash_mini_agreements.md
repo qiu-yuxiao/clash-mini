@@ -761,6 +761,10 @@ flowchart LR
 - **明确不做**：① 不修改、不绕过任何安全软件配置（不硬写 360 例外）；② 安装器完成页不加文案——`installer.nsi` 是 Tauri bundler 的 `{{this}}` 占位模板（构建时重新生成，语言串在外部 crate），直接改会被构建覆盖，风险高且不可靠。
 - **影响**：纯增量 UI + 文案，不触碰任何代理/守护逻辑；`pnpm typecheck` 通过。
 
+### Sync-8 · 3.3.0 发版版本号统一 bump 与 Changelog
+- **改动**：版本号 `3.2.9 → 3.3.0`，五处同步：`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`、`updater/app-update.json`、`Cargo.lock`（`clash-mini` 包版本行）；`CHANGELOG.md` 顶部新增 v3.3.0 条目（守护架构收敛 P0-1/P0-4/P0-6、DNS/配置增强修正 B-1/F-2/D-1/C-1、拨测风暴回退、安全软件白名单说明引导）。
+- **说明**：本版本号变更不含任何运行时逻辑改动，仅发布元数据；本版本聚合自 v3.2.9 以来的全部未推送提交（`e4b3448c`…`a8493c29`）。按当前纪律**仅本地提交、不执行 push**；push 与 CI 发版须待用户明确授权后另行执行。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
