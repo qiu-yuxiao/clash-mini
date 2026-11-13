@@ -737,7 +737,17 @@ flowchart LR
 - **P0-5（守护者移出被清理组 / 服务化）· 裁定：本仓不可达，标记为阻塞，本版本不做。** 审计推荐 (a) 用已有 Session 0 服务 `clash-verge-service.exe` 加「主进程存活探测 + 拉起」循环、删除整套 `guardian.rs`。但根因核实：`clash-verge-service.exe` 源码位于**外部独立仓库**（`src-tauri/Cargo.toml:108` 的 `clash_verge_service_ipc` git 依赖，`rev = 21e661fa…`），本工作区**不含服务二进制源码**，无法在仓内为其加「主进程看门狗」；且服务当前仅守护 mihomo 内核，不探测/拉起 GUI。盲目删除 4174 行 `guardian.rs` 会让 360 杀主进程后无人复活——比现状更糟，正是用户最忌讳的「改崩」。同时「360 不会杀服务」属现场假设、未经独立验证。故 P0-5 的**真正前置**为：① 在外部 `clash-verge-service` 仓库为服务增加「探测并拉起 ClashMini 主进程」能力；② 独立验证 360 不按应用组清理 Session 0 服务。二者均超出本仓范围，列为后续专项，不在 3.3.0 实施。过渡态仍保留最小必要机制集（`prevent_exit` + 单退出意图文件凭证 + 单脱离 Job 通道 + Boot/Epoch 累计熔断）。
 - **P0-2（删同步失败降级回主程序路径）· 裁定：暂缓，疑似回归风险。** 审计将其视为「请回 v3.2.5 同名同目录形态」。但根因核实：`resolve_guardian_executable` 在「隔离二进制同步失败」时回退 `main_exe` 是**常见可用路径**（受限用户目录同步不可达时，从安装目录拉起看门狗本就是正常形态）。改为硬 `Err` 会使任何良性同步失败都导致看门狗完全无法启动，属韧性回归。需先在可控环境下验证同步失败的真实频率与后果，再决定，本版本不动。
 - **P0-3（停用主进程内监督线程重建循环）· 裁定：暂缓。** 审计指该线程在 `TerminateProcess` 时与主进程同归于尽、重建代码永无执行机会。结论成立，但删除需谨慎处理该线程的其他职责（存活探测/退出意图监听），避免误删功能；列为下一轮收敛项。
-- **P0-4（删 WMI / TaskScheduler COM 块及场景 6 测试，约 460 行）· 裁定：暂缓。** 该块仅做到「代启动」不做到「常驻托管」，确属半成品；但 460 行删除 + 测试改动属高范围改动，且场景 6 测试是当前唯一对跨树逃逸的端到端验证，删除前需先建立替代验证（服务化落地或受控集成测试）。本版本不动，避免大范围改动引入不稳定。
+- **P0-4（删 WMI / TaskScheduler COM 块及场景 6 测试，约 460 行）· 裁定：暂缓。** 该块仅做到「代启动」不做到「常驻托管」，确属半成品；但 460 行删除 + 测试改动属高范围改动，且场景 6 测试是当前唯一对跨树逃逸的端到端验证，删除前需先建立替代验证（服务化落地或受控集成测试）。本版本不动，避免大范围改动引入不稳定。**（注：此项后续经用户授权「删掉叠加上去却无效的机制」已在 Sync-6 推翻执行，见下。）**
+
+### Sync-6 · 删除 WMI / Task Scheduler COM 块与场景 6 测试，收敛为 Breakaway 单通道（guardian.rs，P0-4）
+- **改动**：推翻本文件「3.3.0 架构裁定」中对 P0-4 的暂缓决定（用户授权删除「叠加上去却没有作用」的机制）。删除与收敛范围：
+  1. COM 块约 400 行：`ComInitGuard`、`ensure_com_security`、`OwnedVariant`、`escape_windows_arg`、`build_quoted_arguments`、`build_quoted_command_line`、`build_wmi_hidden_startup_info`、`wmi_spawn_process`、`task_scheduler_spawn_process`；
+  2. 场景 6 测试及 helper 约 216 行——原以 `PING.EXE` + `allow_degraded=false` + `TerminateJobObject` 自证 Job 机制，测的并非 360 按应用组连坐的真实死因，属自证测试；
+  3. `BROKER_TASK_SCHEDULER_COM`、`BROKER_SAME_JOB_DEGRADED` 两个 const 及对应 import；
+  4. `spawn_isolated_process_with` 收敛为 Breakaway 单一跨树脱离通道，并移除已无消费者的 `hide_window` 参数（原仅供已删除的 WMI 隐藏启动使用）；
+  5. `spawn_companion_child` 中「`broker != BROKER_WMI_SESSION0` 即记 SUPERVISOR_BROKER_FALLBACK」的失效判断——P0-4 后 broker 恒为 Breakaway，该条件恒真、每次成功拉起都会误刷 WARN；现仅在 `degraded`（Breakaway 成功但子进程仍落在 Job 内）时记 ERROR。
+- **理由**：两块 COM 代理只做到「代启动」不做到「常驻托管」，且解决的是 Job Object 而非 360 按应用组连坐，属无效复杂度；场景 6 测试测的是被删除机制本身，不构成对防误杀的验证。清理后 `guardian.rs` 从 4187 行降至约 3500 行，保留最小必要机制集（`prevent_exit` + 单退出意图文件凭证 + Breakaway 单通道 + Boot/Epoch 累计熔断 + P0-6 fail-closed 判决）。残留警告（未用 import/参数）已全部清零，`cargo check` 通过。
+- **影响**：正常拉起路径行为不变（Breakaway 成功即返回）；三级逃逸中两级已不存在，逃逸失败统一 fail-closed 报错。防误杀的真正根因解仍是「360 信任/防护白名单」（环境配置，代码层无法替代），代码层守护只能推迟「消失」。
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 

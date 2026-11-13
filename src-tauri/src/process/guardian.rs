@@ -48,14 +48,8 @@ pub const RESPAWN_STATE_FILENAME: &str = "respawn_state.json";
 /// 进程独立拉起代理名称：Session-0 WMI `Win32_Process::Create`（`WmiPrvSE.exe`）。
 pub const BROKER_WMI_SESSION0: &str = "wmi_session0";
 
-/// 进程独立拉起代理名称：Task Scheduler 2.0 COM (`ITaskService`)。
-pub const BROKER_TASK_SCHEDULER_COM: &str = "task_scheduler_com";
-
 /// 进程独立拉起代理名称：直接子进程 `CREATE_BREAKAWAY_FROM_JOB`。
 pub const BROKER_BREAKAWAY_JOB: &str = "breakaway_from_job";
-
-/// 进程独立拉起代理名称：同 Job 降级拉起。
-pub const BROKER_SAME_JOB_DEGRADED: &str = "same_job_degraded";
 
 /// 检测到主进程非预期终止后，拉起前的安全避让等待毫秒数（避让安装/卸载器与主动退出写盘竞态，A7）。
 const RESPAWN_SAFETY_DELAY_MS: u64 = 3500;
@@ -1039,7 +1033,7 @@ pub fn get_diagnostic_summary() -> String {
 #[cfg(windows)]
 mod win32_impl {
     use super::{
-        BROKER_BREAKAWAY_JOB, BROKER_TASK_SCHEDULER_COM, BROKER_WMI_SESSION0, Command, Duration,
+        BROKER_BREAKAWAY_JOB, Command, Duration,
         GUARD_RAPID_DEATH_WINDOW_SECS, GuardHeartbeat, GuardianArgs, HEARTBEAT_INTERVAL_MS, INSTALLER_WAIT_MAX_SECS,
         INTENTIONAL_EXIT_FILENAME, IntentionalExitProof, IntentionalProofCheck, MAX_RAPID_RESPAWN_GEN, MainHeartbeat,
         Path, PathBuf, RESPAWN_SAFETY_DELAY_MS, TcpListener, append_structured_guardian_log,
@@ -1052,11 +1046,10 @@ mod win32_impl {
     use clash_verge_logging::{Type, logging};
     use std::{
         ffi::{OsStr, c_void},
-        mem::ManuallyDrop,
         os::windows::{ffi::OsStrExt as _, io::AsRawHandle as _, process::CommandExt as _},
         process::Child,
         sync::{
-            Mutex, Once, OnceLock,
+            Mutex, OnceLock,
             atomic::{AtomicBool, AtomicI8, AtomicIsize, AtomicU32, AtomicU64, Ordering},
         },
         time::Instant,
@@ -1542,406 +1535,6 @@ mod win32_impl {
         }
     }
 
-    struct ComInitGuard {
-        should_uninit: bool,
-    }
-
-    impl ComInitGuard {
-        fn enter() -> Result<Self, String> {
-            use windows::Win32::Foundation::RPC_E_CHANGED_MODE;
-            use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx};
-
-            // SAFETY: 当前线程按需求初始化 COM 套间，仅在 S_OK / S_FALSE 时配对 CoUninitialize。
-            let hr = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-            if hr.is_ok() {
-                Ok(Self { should_uninit: true })
-            } else if hr == RPC_E_CHANGED_MODE {
-                Ok(Self { should_uninit: false })
-            } else {
-                Err(format!("CoInitializeEx failed: {hr}"))
-            }
-        }
-    }
-
-    impl Drop for ComInitGuard {
-        fn drop(&mut self) {
-            if self.should_uninit {
-                use windows::Win32::System::Com::CoUninitialize;
-                // SAFETY: 仅在当前线程成功 CoInitializeEx 时成对释放 COM 套间。
-                unsafe { CoUninitialize() };
-            }
-        }
-    }
-
-    fn ensure_com_security() {
-        static COM_SECURITY_ONCE: Once = Once::new();
-        COM_SECURITY_ONCE.call_once(|| {
-            use windows::Win32::System::Com::{
-                CoInitializeSecurity, EOAC_NONE, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
-            };
-            // SAFETY: 进程生命周期内仅初始化一次默认 COM 安全上下文（已初始化时返回 RPC_E_TOO_LATE 可忽略）。
-            unsafe {
-                let _ = CoInitializeSecurity(
-                    None,
-                    -1,
-                    None,
-                    None,
-                    RPC_C_AUTHN_LEVEL_CALL,
-                    RPC_C_IMP_LEVEL_IMPERSONATE,
-                    None,
-                    EOAC_NONE,
-                    None,
-                );
-            }
-        });
-    }
-
-    #[derive(Default)]
-    struct OwnedVariant(windows::Win32::System::Variant::VARIANT);
-
-    impl Drop for OwnedVariant {
-        fn drop(&mut self) {
-            use windows::Win32::System::Variant::VariantClear;
-            // SAFETY: self.0 始终为有效或 zero-init 的 VARIANT。
-            unsafe {
-                let _ = VariantClear(&raw mut self.0);
-            }
-        }
-    }
-
-    impl OwnedVariant {
-        fn from_bstr(s: &str) -> Self {
-            use windows::Win32::System::Variant::{VARIANT, VARIANT_0, VARIANT_0_0, VARIANT_0_0_0, VT_BSTR};
-            use windows::core::BSTR;
-
-            Self(VARIANT {
-                Anonymous: VARIANT_0 {
-                    Anonymous: ManuallyDrop::new(VARIANT_0_0 {
-                        vt: VT_BSTR,
-                        wReserved1: 0,
-                        wReserved2: 0,
-                        wReserved3: 0,
-                        Anonymous: VARIANT_0_0_0 {
-                            bstrVal: ManuallyDrop::new(BSTR::from(s)),
-                        },
-                    }),
-                },
-            })
-        }
-
-        const fn from_i32(v: i32) -> Self {
-            use windows::Win32::System::Variant::{VARIANT, VARIANT_0, VARIANT_0_0, VARIANT_0_0_0, VT_I4};
-
-            Self(VARIANT {
-                Anonymous: VARIANT_0 {
-                    Anonymous: ManuallyDrop::new(VARIANT_0_0 {
-                        vt: VT_I4,
-                        wReserved1: 0,
-                        wReserved2: 0,
-                        wReserved3: 0,
-                        Anonymous: VARIANT_0_0_0 { lVal: v },
-                    }),
-                },
-            })
-        }
-
-        const fn from_unknown(unk: windows::core::IUnknown) -> Self {
-            use windows::Win32::System::Variant::{VARIANT, VARIANT_0, VARIANT_0_0, VARIANT_0_0_0, VT_UNKNOWN};
-
-            Self(VARIANT {
-                Anonymous: VARIANT_0 {
-                    Anonymous: ManuallyDrop::new(VARIANT_0_0 {
-                        vt: VT_UNKNOWN,
-                        wReserved1: 0,
-                        wReserved2: 0,
-                        wReserved3: 0,
-                        Anonymous: VARIANT_0_0_0 {
-                            punkVal: ManuallyDrop::new(Some(unk)),
-                        },
-                    }),
-                },
-            })
-        }
-    }
-
-    fn escape_windows_arg(arg: &str) -> String {
-        if !arg.is_empty() && !arg.chars().any(|c| c == ' ' || c == '\t' || c == '"') {
-            return arg.to_string();
-        }
-        let mut out = String::with_capacity(arg.len() + 2);
-        out.push('"');
-        let mut backslashes = 0usize;
-        for ch in arg.chars() {
-            match ch {
-                '\\' => backslashes += 1,
-                '"' => {
-                    for _ in 0..backslashes * 2 + 1 {
-                        out.push('\\');
-                    }
-                    out.push('"');
-                    backslashes = 0;
-                }
-                _ => {
-                    for _ in 0..backslashes {
-                        out.push('\\');
-                    }
-                    backslashes = 0;
-                    out.push(ch);
-                }
-            }
-        }
-        for _ in 0..backslashes * 2 {
-            out.push('\\');
-        }
-        out.push('"');
-        out
-    }
-
-    fn build_quoted_arguments(args: &[String]) -> String {
-        args.iter().map(|a| escape_windows_arg(a)).collect::<Vec<_>>().join(" ")
-    }
-
-    fn build_quoted_command_line(exe: &Path, args: &[String]) -> String {
-        let exe_quoted = escape_windows_arg(&exe.to_string_lossy());
-        if args.is_empty() {
-            exe_quoted
-        } else {
-            format!("{exe_quoted} {}", build_quoted_arguments(args))
-        }
-    }
-
-    fn build_wmi_hidden_startup_info(services: &windows::Win32::System::Wmi::IWbemServices) -> Option<OwnedVariant> {
-        use windows::Win32::System::Wmi::{IWbemClassObject, WBEM_GENERIC_FLAG_TYPE};
-        use windows::core::{BSTR, Interface as _, w};
-
-        let mut startup_cls: Option<IWbemClassObject> = None;
-        // SAFETY: services 已连接并通过 CoSetProxyBlanket 设置认证上下文。
-        unsafe {
-            services
-                .GetObject(
-                    &BSTR::from("Win32_ProcessStartup"),
-                    WBEM_GENERIC_FLAG_TYPE(0),
-                    None,
-                    Some(&raw mut startup_cls),
-                    None,
-                )
-                .ok()?;
-            let startup_inst = startup_cls?.SpawnInstance(0).ok()?;
-            let show_hide = OwnedVariant::from_i32(0); // SW_HIDE = 0
-            startup_inst.Put(w!("ShowWindow"), 0, &raw const show_hide.0, 0).ok()?;
-            let unk = startup_inst.cast::<windows::core::IUnknown>().ok()?;
-            Some(OwnedVariant::from_unknown(unk))
-        }
-    }
-
-    /// A6 一级代理：通过 Session-0 WMI 提供程序（`WmiPrvSE.exe`）执行 `Win32_Process::Create`。
-    /// 无需提升权限亦无控制台闪烁，子进程天然继承交互用户桌面并脱离父进程树与父 Job Object。
-    fn wmi_spawn_process(
-        exe: &Path,
-        args: &[String],
-        work_dir: Option<&Path>,
-        hide_window: bool,
-    ) -> Result<u32, String> {
-        use windows::Win32::System::Com::{
-            CLSCTX_INPROC_SERVER, CoCreateInstance, CoSetProxyBlanket, EOAC_NONE, RPC_C_AUTHN_LEVEL_CALL,
-            RPC_C_IMP_LEVEL_IMPERSONATE,
-        };
-        use windows::Win32::System::Rpc::{RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE};
-        use windows::Win32::System::Variant::VariantToUInt32;
-        use windows::Win32::System::Wmi::{IWbemClassObject, IWbemLocator, WBEM_GENERIC_FLAG_TYPE, WbemLocator};
-        use windows::core::{BSTR, PCWSTR, w};
-
-        let _com = ComInitGuard::enter()?;
-        ensure_com_security();
-        let cmdline = build_quoted_command_line(exe, args);
-
-        // SAFETY: 所有 COM 接口与 BSTR/VARIANT 参数均严格按 Windows SDK WMI Win32_Process.Create 规范传递与析构。
-        unsafe {
-            let locator: IWbemLocator = CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER)
-                .map_err(|e| format!("CoCreateInstance(WbemLocator): {e}"))?;
-            let empty = BSTR::new();
-            let services = locator
-                .ConnectServer(&BSTR::from("ROOT\\CIMV2"), &empty, &empty, &empty, 0, &empty, None)
-                .map_err(|e| format!("WMI ConnectServer: {e}"))?;
-
-            CoSetProxyBlanket(
-                &services,
-                RPC_C_AUTHN_WINNT,
-                RPC_C_AUTHZ_NONE,
-                PCWSTR::null(),
-                RPC_C_AUTHN_LEVEL_CALL,
-                RPC_C_IMP_LEVEL_IMPERSONATE,
-                None,
-                EOAC_NONE,
-            )
-            .map_err(|e| format!("CoSetProxyBlanket: {e}"))?;
-
-            let class_path = BSTR::from("Win32_Process");
-            let mut proc_cls: Option<IWbemClassObject> = None;
-            services
-                .GetObject(
-                    &class_path,
-                    WBEM_GENERIC_FLAG_TYPE(0),
-                    None,
-                    Some(&raw mut proc_cls),
-                    None,
-                )
-                .map_err(|e| format!("WMI GetObject(Win32_Process): {e}"))?;
-            let proc_cls = proc_cls.ok_or_else(|| "Win32_Process class object is null".to_string())?;
-
-            let mut in_sig: Option<IWbemClassObject> = None;
-            proc_cls
-                .GetMethod(w!("Create"), 0, &raw mut in_sig, std::ptr::null_mut())
-                .map_err(|e| format!("WMI GetMethod(Create): {e}"))?;
-            let in_params = in_sig
-                .ok_or_else(|| "Win32_Process::Create input signature is null".to_string())?
-                .SpawnInstance(0)
-                .map_err(|e| format!("WMI SpawnInstance: {e}"))?;
-
-            let cmd_var = OwnedVariant::from_bstr(&cmdline);
-            in_params
-                .Put(w!("CommandLine"), 0, &raw const cmd_var.0, 0)
-                .map_err(|e| format!("WMI Put(CommandLine): {e}"))?;
-
-            let _dir_var = if let Some(dir) = work_dir.filter(|p| p.is_dir()) {
-                let dir_var = OwnedVariant::from_bstr(&dir.to_string_lossy());
-                in_params
-                    .Put(w!("CurrentDirectory"), 0, &raw const dir_var.0, 0)
-                    .map_err(|e| format!("WMI Put(CurrentDirectory): {e}"))?;
-                Some(dir_var)
-            } else {
-                None
-            };
-
-            let _startup_var = if hide_window {
-                build_wmi_hidden_startup_info(&services).inspect(|sv| {
-                    let _ = in_params.Put(w!("ProcessStartupInformation"), 0, &raw const sv.0, 0);
-                })
-            } else {
-                None
-            };
-
-            let mut out_params: Option<IWbemClassObject> = None;
-            services
-                .ExecMethod(
-                    &class_path,
-                    &BSTR::from("Create"),
-                    WBEM_GENERIC_FLAG_TYPE(0),
-                    None,
-                    &in_params,
-                    Some(&raw mut out_params),
-                    None,
-                )
-                .map_err(|e| format!("WMI ExecMethod(Create): {e}"))?;
-            let out_params = out_params.ok_or_else(|| "WMI ExecMethod returned null out_params".to_string())?;
-
-            let mut ret_var = OwnedVariant::default();
-            out_params
-                .Get(w!("ReturnValue"), 0, &raw mut ret_var.0, None, None)
-                .map_err(|e| format!("WMI Get(ReturnValue): {e}"))?;
-            let ret_val = VariantToUInt32(&raw const ret_var.0).map_err(|e| format!("WMI ReturnValue decode: {e}"))?;
-            if ret_val != 0 {
-                return Err(format!("Win32_Process::Create failed with ReturnValue={ret_val}"));
-            }
-
-            let mut pid_var = OwnedVariant::default();
-            out_params
-                .Get(w!("ProcessId"), 0, &raw mut pid_var.0, None, None)
-                .map_err(|e| format!("WMI Get(ProcessId): {e}"))?;
-            VariantToUInt32(&raw const pid_var.0).map_err(|e| format!("WMI ProcessId decode: {e}"))
-        }
-    }
-
-    /// A6 二级代理：当 WMI 服务异常时，退化走 Task Scheduler 2.0 COM (`ITaskService`) 触发脱离当前 Job 的一次性即时任务并自动删表。
-    fn task_scheduler_spawn_process(exe: &Path, args: &[String], work_dir: Option<&Path>) -> Result<u32, String> {
-        use windows::Win32::Foundation::{VARIANT_FALSE, VARIANT_TRUE};
-        use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
-        use windows::Win32::System::TaskScheduler::{
-            IExecAction, ITaskService, TASK_ACTION_EXEC, TASK_CREATE_OR_UPDATE, TASK_INSTANCES_PARALLEL,
-            TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_LUA, TaskScheduler,
-        };
-        use windows::Win32::System::Variant::VARIANT;
-        use windows::core::{BSTR, Interface as _};
-
-        let _com = ComInitGuard::enter()?;
-        ensure_com_security();
-
-        let seq = super::ATOMIC_TEMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let task_name = format!(
-            "ClashMiniGuard_{}_{}",
-            // SAFETY: GetCurrentProcessId 无前置状态要求。
-            unsafe { GetCurrentProcessId() },
-            seq
-        );
-        let task_name_bstr = BSTR::from(task_name.as_str());
-        let args_str = build_quoted_arguments(args);
-
-        // SAFETY: 遵循 Task Scheduler 2.0 COM 接口创建、按需启动（Run）并立即清理临时任务定义。
-        unsafe {
-            let service: ITaskService = CoCreateInstance(&TaskScheduler, None, CLSCTX_INPROC_SERVER)
-                .map_err(|e| format!("CoCreateInstance(TaskScheduler): {e}"))?;
-            let empty = VARIANT::default();
-            service
-                .Connect(&empty, &empty, &empty, &empty)
-                .map_err(|e| format!("ITaskService::Connect: {e}"))?;
-            let root = service
-                .GetFolder(&BSTR::from("\\"))
-                .map_err(|e| format!("ITaskService::GetFolder: {e}"))?;
-            let task_def = service.NewTask(0).map_err(|e| format!("ITaskService::NewTask: {e}"))?;
-
-            let principal = task_def.Principal().map_err(|e| format!("Task::Principal: {e}"))?;
-            principal
-                .SetLogonType(TASK_LOGON_INTERACTIVE_TOKEN)
-                .map_err(|e| format!("Principal::SetLogonType: {e}"))?;
-            principal
-                .SetRunLevel(TASK_RUNLEVEL_LUA)
-                .map_err(|e| format!("Principal::SetRunLevel: {e}"))?;
-
-            let settings = task_def.Settings().map_err(|e| format!("Task::Settings: {e}"))?;
-            let _ = settings.SetDisallowStartIfOnBatteries(VARIANT_FALSE);
-            let _ = settings.SetStopIfGoingOnBatteries(VARIANT_FALSE);
-            let _ = settings.SetExecutionTimeLimit(&BSTR::from("PT0S"));
-            let _ = settings.SetHidden(VARIANT_TRUE);
-            let _ = settings.SetMultipleInstances(TASK_INSTANCES_PARALLEL);
-
-            let actions = task_def.Actions().map_err(|e| format!("Task::Actions: {e}"))?;
-            let action = actions
-                .Create(TASK_ACTION_EXEC)
-                .map_err(|e| format!("Actions::Create: {e}"))?;
-            let exec_action: IExecAction = action.cast().map_err(|e| format!("Action::cast(IExecAction): {e}"))?;
-            exec_action
-                .SetPath(&BSTR::from(exe.to_string_lossy().as_ref()))
-                .map_err(|e| format!("ExecAction::SetPath: {e}"))?;
-            if !args_str.is_empty() {
-                exec_action
-                    .SetArguments(&BSTR::from(args_str.as_str()))
-                    .map_err(|e| format!("ExecAction::SetArguments: {e}"))?;
-            }
-            if let Some(dir) = work_dir.filter(|p| p.is_dir()) {
-                exec_action
-                    .SetWorkingDirectory(&BSTR::from(dir.to_string_lossy().as_ref()))
-                    .map_err(|e| format!("ExecAction::SetWorkingDirectory: {e}"))?;
-            }
-
-            let registered = root
-                .RegisterTaskDefinition(
-                    &task_name_bstr,
-                    &task_def,
-                    TASK_CREATE_OR_UPDATE.0,
-                    &empty,
-                    &empty,
-                    TASK_LOGON_INTERACTIVE_TOKEN,
-                    &empty,
-                )
-                .map_err(|e| format!("RegisterTaskDefinition: {e}"))?;
-
-            let run_res = registered.Run(&empty);
-            let _ = root.DeleteTask(&task_name_bstr, 0);
-            let running = run_res.map_err(|e| format!("RegisteredTask::Run: {e}"))?;
-            running.EnginePID().map_err(|e| format!("RunningTask::EnginePID: {e}"))
-        }
-    }
-
     pub(super) struct SpawnedProcess {
         pub(super) pid: u32,
         owned_handle: Handle,
@@ -2030,39 +1623,20 @@ mod win32_impl {
         })
     }
 
-    /// A6 独立进程树拉起级联：
-    /// `WmiSession0` (`WmiPrvSE.exe`) -> `TaskSchedulerCom` (`ITaskService`) -> `CREATE_BREAKAWAY_FROM_JOB` -> (可选)同 Job 降级。
+    /// P0-4 收敛后的独立进程树拉起：仅保留 `CREATE_BREAKAWAY_FROM_JOB` 单一跨树脱离通道。
+    /// WMI Session-0 与 Task Scheduler COM 两块「代启动」代理已删除（只做到代启动、不做到常驻托管，
+    /// 且解决的是 Job Object 而非 360 按应用组连坐）。
     pub(super) fn spawn_isolated_process_with<F>(
         exe: &Path,
         make_args: F,
         work_dir: Option<&Path>,
         allow_degraded: bool,
-        hide_window: bool,
     ) -> Result<SpawnedProcess, String>
     where
         F: Fn(&str) -> Vec<String>,
     {
-        let wmi_err = match wmi_spawn_process(exe, &make_args(BROKER_WMI_SESSION0), work_dir, hide_window)
-            .and_then(|pid| open_spawned_broker_process(pid, BROKER_WMI_SESSION0))
-        {
-            Ok(proc) => return Ok(proc),
-            Err(err) => err,
-        };
-
-        let ts_err = match task_scheduler_spawn_process(exe, &make_args(BROKER_TASK_SCHEDULER_COM), work_dir)
-            .and_then(|pid| open_spawned_broker_process(pid, BROKER_TASK_SCHEDULER_COM))
-        {
-            Ok(proc) => {
-                logging!(
-                    warn,
-                    Type::Setup,
-                    "[Guardian] WMI Broker ({wmi_err}) 不可用，已切换 Task Scheduler COM 完成跨树隔离拉起"
-                );
-                return Ok(proc);
-            }
-            Err(err) => err,
-        };
-
+        // P0-4: 已删除 WMI Session-0 与 Task Scheduler COM 两块「代启动」代理（仅做到代启动、不做到常驻托管，
+        // 且解决的是 Job Object 而非 360 按应用组连坐）。现仅保留 Breakaway 单一跨树脱离通道。
         let breakaway_err = match spawn_via_std_command(
             exe,
             &make_args(BROKER_BREAKAWAY_JOB),
@@ -2075,7 +1649,7 @@ mod win32_impl {
                 logging!(
                     warn,
                     Type::Setup,
-                    "[Guardian] WMI ({wmi_err}) 与 TaskScheduler ({ts_err}) 不可用，退回 Breakaway 成功 (in_job={:?})",
+                    "[Guardian] 经 Breakaway 跨树隔离拉起成功 (in_job={:?})",
                     proc.in_job
                 );
                 return Ok(proc);
@@ -2083,18 +1657,11 @@ mod win32_impl {
             Err(err) => err,
         };
 
+        // P0-1: 同 Job 降级通道已关闭——跨树逃逸全失败即 fail-closed 返回错误，由上层落 ERROR 并标记「守护未就绪」。
         if !allow_degraded {
-            return Err(format!(
-                "WMI={wmi_err}; TaskScheduler={ts_err}; Breakaway={breakaway_err}"
-            ));
+            return Err(format!("Breakaway={breakaway_err}"));
         }
-
-        // P0-1: 已关闭「同 Job 降级」通道。审计结论：WMI/TaskScheduler/Breakaway 三级跨树逃逸全失败后，
-        // 退回同 Job 运行恰好复现 360 按应用组连坐强杀的死因，且随后被上层误报「守护已就绪」。
-        // 即便 allow_degraded=true 也不再降级，直接返回错误，由上层落 ERROR 并标记「守护未就绪」。
-        return Err(format!(
-            "WMI={wmi_err}; TaskScheduler={ts_err}; Breakaway={breakaway_err}; 同Job降级已禁用(P0-1)"
-        ));
+        return Err(format!("Breakaway={breakaway_err}; 同Job降级已禁用(P0-1)"));
     }
 
     fn build_companion_args(main_exe: &Path, session: &GuardianSession, generation: u32, broker: &str) -> Vec<String> {
@@ -2133,21 +1700,18 @@ mod win32_impl {
             |broker| build_companion_args(main_exe, session, generation, broker),
             work_dir,
             false,
-            true,
         )?;
-        if spawned.degraded || spawned.broker != BROKER_WMI_SESSION0 {
+        // P0-4 后 broker 恒为 Breakaway 单通道，原「broker != WMI_SESSION0 即视为回退」的判断已失真：
+        // 仅在 Breakaway 成功但子进程仍落在 Job 内（degraded）时记 ERROR，正常拉起不再刷 WARN。
+        if spawned.degraded {
             append_structured_guardian_log(
                 &session.log_dir,
-                if spawned.degraded { "ERROR" } else { "WARN" },
+                "ERROR",
                 &session.session_id,
                 session.pid,
                 Some(spawned.pid),
                 generation,
-                if spawned.degraded {
-                    "BREAKAWAY_DEGRADED"
-                } else {
-                    "SUPERVISOR_BROKER_FALLBACK"
-                },
+                "BREAKAWAY_DEGRADED",
                 &format!(
                     "伴生看门狗经 broker={} 拉起 (parent_in_job={:?}, guard_in_job={:?}, degraded={})",
                     spawned.broker, session.parent_in_job, spawned.in_job, spawned.degraded
@@ -3375,7 +2939,6 @@ mod win32_impl {
             |_| launch_args.clone(),
             work_dir,
             false,
-            in_lightweight,
         );
 
         match spawn_res {
@@ -3894,222 +3457,6 @@ mod tests {
                 drop(lock);
                 assert_eq!(read_json_file::<RespawnSessionState>(&target), Some(baseline));
             }
-        }
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    /// 场景 6 E2E 辅助子进程（仅当 `CLASH_MINI_S6_DIR` 存在时运行，日常 `cargo test` 立即返回）。
-    #[cfg(windows)]
-    #[test]
-    fn scenario6_trapped_main_helper() {
-        let Ok(dir_str) = std::env::var("CLASH_MINI_S6_DIR") else {
-            return;
-        };
-        let Ok(event_name) = std::env::var("CLASH_MINI_S6_EVENT") else {
-            return;
-        };
-        let dir = PathBuf::from(dir_str);
-
-        unsafe extern "system" {
-            fn OpenEventW(dw_desired_access: u32, b_inherit_handle: i32, lp_name: *const u16) -> *mut std::ffi::c_void;
-            fn WaitForSingleObject(h_handle: *mut std::ffi::c_void, dw_milliseconds: u32) -> u32;
-            fn CloseHandle(h_object: *mut std::ffi::c_void) -> i32;
-        }
-        const SYNCHRONIZE: u32 = 0x0010_0000;
-        let event_w = super::win32_impl::to_wide_null(&event_name);
-        // SAFETY: 打开测试父进程创建的本地同步命名事件，等待其完成 AssignProcessToJobObject 后再唤醒。
-        unsafe {
-            let ev = OpenEventW(SYNCHRONIZE, 0, event_w.as_ptr());
-            assert!(!ev.is_null(), "failed to open scenario6 sync event");
-            assert_eq!(WaitForSingleObject(ev, 10_000), 0);
-            let _ = CloseHandle(ev);
-        }
-
-        // 1. 验证当前子进程确实被囚禁在父测试创建的无 Breakaway Job 内
-        assert_eq!(super::win32_impl::query_current_process_in_job(), Some(true));
-
-        // 2. 验证传统 CREATE_BREAKAWAY_FROM_JOB 在无 BREAKAWAY_OK 的 Job 下必然失败
-        {
-            use std::os::windows::process::CommandExt as _;
-            const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            let breakaway_res = std::process::Command::new(r"C:\Windows\System32\PING.EXE")
-                .args(["-n", "2", "127.0.0.1"])
-                .creation_flags(CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW)
-                .spawn();
-            assert!(
-                breakaway_res.is_err(),
-                "CREATE_BREAKAWAY_FROM_JOB unexpectedly succeeded inside non-breakaway Job"
-            );
-        }
-
-        // 3. 调用生产 A6 隔离拉起通道（allow_degraded=false：必须真逃逸成功）
-        let spawned = super::win32_impl::spawn_isolated_process_with(
-            std::path::Path::new(r"C:\Windows\System32\PING.EXE"),
-            |_| vec!["-n".to_string(), "45".to_string(), "127.0.0.1".to_string()],
-            None,
-            false,
-            true,
-        )
-        .unwrap_or_else(|e| panic!("A6 isolated spawn failed inside trapped Job: {e}"));
-
-        assert!(!spawned.degraded);
-        assert_eq!(spawned.in_job, Some(false));
-        assert!(
-            spawned.broker == BROKER_WMI_SESSION0 || spawned.broker == super::BROKER_TASK_SCHEDULER_COM,
-            "unexpected broker: {}",
-            spawned.broker
-        );
-
-        let payload = serde_json::json!({
-            "trapped_pid": std::process::id(),
-            "companion_pid": spawned.pid,
-            "broker": spawned.broker,
-        });
-        let _ = std::fs::write(dir.join("s6_result.json"), payload.to_string());
-        std::thread::sleep(std::time::Duration::from_secs(30));
-    }
-
-    /// 场景 6 真实端到端验证：
-    /// 在非 Breakaway Windows Job 内模拟主进程被强制 assign -> `TerminateJobObject` 整树强杀后，
-    /// 验证经 A6 Broker 拉起的独立进程真正在该 Job 之外（`IsProcessInJob == false`）且完整存活。
-    #[cfg(windows)]
-    #[test]
-    fn test_scenario6_job_termination_wmi_broker_escape() {
-        use std::os::windows::io::AsRawHandle as _;
-        use windows::Win32::Foundation::HANDLE;
-        use windows::Win32::System::JobObjects::{
-            AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation, SetInformationJobObject,
-            TerminateJobObject,
-        };
-
-        unsafe extern "system" {
-            fn CreateEventW(
-                lp_event_attributes: *const std::ffi::c_void,
-                b_manual_reset: i32,
-                b_initial_state: i32,
-                lp_name: *const u16,
-            ) -> *mut std::ffi::c_void;
-            fn SetEvent(h_event: *mut std::ffi::c_void) -> i32;
-            fn OpenProcess(dw_desired_access: u32, b_inherit_handle: i32, dw_process_id: u32) -> *mut std::ffi::c_void;
-            fn TerminateProcess(h_process: *mut std::ffi::c_void, u_exit_code: u32) -> i32;
-            fn WaitForSingleObject(h_handle: *mut std::ffi::c_void, dw_milliseconds: u32) -> u32;
-            fn CloseHandle(h_object: *mut std::ffi::c_void) -> i32;
-        }
-        const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
-        const PROCESS_TERMINATE: u32 = 0x0001;
-        const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
-        const WAIT_TIMEOUT: u32 = 0x0000_0102;
-
-        let dir = std::env::temp_dir().join(format!("clash_mini_s6_e2e_{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let _ = std::fs::create_dir_all(&dir);
-        let result_path = dir.join("s6_result.json");
-        let event_name = format!(
-            "Local\\ClashMiniS6Assigned_{}_{}",
-            std::process::id(),
-            current_unix_ms()
-        );
-        let event_w = super::win32_impl::to_wide_null(&event_name);
-
-        // SAFETY: 创建仅含 KILL_ON_JOB_CLOSE、显式禁止 Breakaway 的真实 Win32 Job Object 与同步事件。
-        unsafe {
-            let h_ready = CreateEventW(std::ptr::null(), 1, 0, event_w.as_ptr());
-            assert!(!h_ready.is_null());
-
-            let h_job = CreateJobObjectW(None, None).unwrap_or_else(|e| panic!("CreateJobObjectW failed: {e}"));
-            let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-            SetInformationJobObject(
-                h_job,
-                JobObjectExtendedLimitInformation,
-                (&raw const info).cast(),
-                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-            )
-            .unwrap_or_else(|e| panic!("SetInformationJobObject failed: {e}"));
-
-            let exe = std::env::current_exe().unwrap_or_else(|e| panic!("current_exe failed: {e}"));
-            let mut trapped_child = std::process::Command::new(exe)
-                .args([
-                    "--exact",
-                    "process::guardian::tests::scenario6_trapped_main_helper",
-                    "--nocapture",
-                ])
-                .env("CLASH_MINI_S6_DIR", &dir)
-                .env("CLASH_MINI_S6_EVENT", &event_name)
-                .spawn()
-                .unwrap_or_else(|e| panic!("spawn trapped child failed: {e}"));
-
-            AssignProcessToJobObject(h_job, HANDLE(trapped_child.as_raw_handle()))
-                .unwrap_or_else(|e| panic!("AssignProcessToJobObject failed: {e}"));
-            assert_ne!(SetEvent(h_ready), 0);
-
-            // 等待被困子进程完成 Job 检查并经 WMI/TaskScheduler Broker 拉起独立伴生进程
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
-            let mut companion_pid: Option<u32> = None;
-            while std::time::Instant::now() < deadline {
-                if let Ok(bytes) = std::fs::read(&result_path)
-                    && let Ok(val) = serde_json::from_slice::<serde_json::Value>(&bytes)
-                {
-                    companion_pid = val
-                        .get("companion_pid")
-                        .and_then(serde_json::Value::as_u64)
-                        .map(|p| p as u32);
-                    if companion_pid.is_some() {
-                        break;
-                    }
-                }
-                if let Ok(Some(status)) = trapped_child.try_wait() {
-                    let _ = CloseHandle(h_ready);
-                    let _ = TerminateJobObject(h_job, 99);
-                    let _ = CloseHandle(h_job.0);
-                    let _ = std::fs::remove_dir_all(&dir);
-                    panic!("trapped child exited early before spawning companion: {status}");
-                }
-                std::thread::sleep(std::time::Duration::from_millis(50));
-            }
-            let _ = CloseHandle(h_ready);
-
-            let companion_pid = companion_pid.unwrap_or_else(|| {
-                let _ = TerminateJobObject(h_job, 99);
-                let _ = trapped_child.wait();
-                let _ = CloseHandle(h_job.0);
-                let _ = std::fs::remove_dir_all(&dir);
-                panic!("timed out waiting for scenario6 companion spawn");
-            });
-
-            let h_companion = OpenProcess(
-                PROCESS_SYNCHRONIZE | PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
-                0,
-                companion_pid,
-            );
-            assert!(
-                !h_companion.is_null(),
-                "OpenProcess on escaped companion {companion_pid} failed"
-            );
-            assert_eq!(super::win32_impl::query_handle_in_job(h_companion), Some(false));
-
-            // 核心破坏性验证：TerminateJobObject(h_job, 99) 整树强杀主进程 Job
-            TerminateJobObject(h_job, 99).unwrap_or_else(|e| panic!("TerminateJobObject failed: {e}"));
-            let _ = CloseHandle(h_job.0);
-
-            let wait_trapped = trapped_child.wait();
-            assert_eq!(wait_trapped.ok().and_then(|s| s.code()), Some(99));
-
-            // 断言独立进程逃逸成功：主 Job 死绝后 500ms 仍然存活且不在任何 Job 内（或不在被杀 Job）
-            let alive_res = WaitForSingleObject(h_companion, 500);
-            assert_eq!(
-                alive_res, WAIT_TIMEOUT,
-                "escaped companion died after TerminateJobObject!"
-            );
-            assert_eq!(super::win32_impl::query_handle_in_job(h_companion), Some(false));
-
-            // 清理临时伴生验证进程与目录
-            let _ = TerminateProcess(h_companion, 0);
-            let _ = WaitForSingleObject(h_companion, 3_000);
-            let _ = CloseHandle(h_companion);
         }
 
         let _ = std::fs::remove_dir_all(&dir);
