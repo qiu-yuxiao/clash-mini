@@ -42,3 +42,7 @@ debug.log
 .clash-mini-wiki/
 .clash-mini-wiki
 
+# i18n 工具生成的临时备份文件，不应入库
+# （pre-commit 钩子的 i18n-format 会生成并清理它们，但 `git add src/locales` 曾把它们误扫入提交；加入忽略避免复发）
+*.bak
+
