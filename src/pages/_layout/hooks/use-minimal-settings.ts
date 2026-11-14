@@ -8,7 +8,11 @@ import {
   isPortInUse,
   patchClashConfig,
 } from '@/services/cmds'
-import { hideNotice, showNotice } from '@/services/notice-service'
+import {
+  markLoadingNotice,
+  settleLoadingNotice,
+  showNotice,
+} from '@/services/notice-service'
 import { queryClient } from '@/services/query-client'
 import type { IClashInfo } from '@/types/clash'
 
@@ -69,24 +73,38 @@ export const useMinimalSettings = () => {
 
     // 与 _layout 的代理方式切换共用同一条「正在调整」提示，避免同一句话维护两份词条
     const waitId = showNotice.info('layout.notices.adjusting', 0)
+    markLoadingNotice(waitId)
     beginLongOperation()
     try {
       await patchClashConfig({ [field]: checked })
       await mutateInfo()
-      showNotice.success('settings.mini.updated')
+      if (checked) {
+        showNotice.success('settings.mini.settingEnabled')
+      } else {
+        showNotice.success('settings.mini.settingDisabled')
+      }
     } catch (err: unknown) {
       await mutateInfo()
-      showNotice.error(err instanceof Error ? err.message : String(err))
+      showNotice.error(err)
     } finally {
-      hideNotice(waitId)
+      settleLoadingNotice(waitId)
       endLongOperation()
     }
   }
 
-  /** 保存代理端口：占用检查 → 同时写内核与 verge → 失败回滚输入框。 */
+  /** 保存代理端口：范围校验 → 占用检查 → 同时写内核与 verge → 失败回滚输入框。 */
   const handleSavePort = async (port: number) => {
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      showNotice.error('settings.mini.invalidPort')
+      setMixedPortVal(currentPort())
+      return
+    }
     if (port === verge?.verge_mixed_port && port === clashInfo?.mixed_port)
       return
+
+    const waitId = showNotice.info('layout.notices.adjusting', 0)
+    markLoadingNotice(waitId)
+    beginLongOperation()
     try {
       const inUse = await isPortInUse(port)
       if (inUse) {
@@ -96,14 +114,21 @@ export const useMinimalSettings = () => {
         setMixedPortVal(currentPort())
         return
       }
-      await Promise.all([
+      const [, applied] = await Promise.all([
         patchInfo({ 'mixed-port': port }),
-        patchVerge({ verge_mixed_port: port }),
+        patchVerge({ verge_mixed_port: port }, { silentError: true }),
       ])
+      if (!applied) {
+        setMixedPortVal(currentPort())
+        return
+      }
       showNotice.success('settings.mini.portSaved')
     } catch (err) {
       showNotice.error(err)
       setMixedPortVal(currentPort())
+    } finally {
+      settleLoadingNotice(waitId)
+      endLongOperation()
     }
   }
 

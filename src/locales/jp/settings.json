@@ -580,7 +580,6 @@
     "testingInProgress": "スピードテスト中です。しばらくしてから再試行してください",
     "testNotExecuted": "テスト未実行：コアが準備できていないか、テスト可能なノードがありません",
     "testFailed": "スピードテストに失敗しました：{{message}}",
-    "updated": "更新しました",
     "portSaved": "プロキシポートを保存し再読み込みしました",
     "testSingleNodeTooltip": "クリックしてこのノードのみ速度テスト（接続は切り替えません）",
     "networkOffline": "オフライン",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "自動",
     "tunSnifferOn": "オン",
     "tunSnifferOff": "オフ",
-    "tunSnifferNeedTunTooltip": "TUN モード時のみ有効（TUN モードに切り替えてください）"
+    "tunSnifferNeedTunTooltip": "TUN モード時のみ有効（TUN モードに切り替えてください）",
+    "settingEnabled": "有効にしました",
+    "settingDisabled": "無効にしました",
+    "tunSnifferUpdated": "TUN ドメインスニファー設定を更新しました",
+    "autoLaunchVerifyFailed": "自動起動の状態確認に失敗しました。セキュリティソフトにブロックされた可能性があります",
+    "invalidPort": "有効なポート番号（1〜65535）を入力してください"
   }
 }

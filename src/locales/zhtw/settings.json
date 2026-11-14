@@ -580,7 +580,6 @@
     "testingInProgress": "正在測速中，請稍候再試",
     "testNotExecuted": "測速未執行：核心未就緒或暫無可測節點",
     "testFailed": "測速失敗：{{message}}",
-    "updated": "已更新",
     "portSaved": "代理連接埠已儲存並重新載入",
     "testSingleNodeTooltip": "點擊單獨測速此節點（不切換連線）",
     "networkOffline": "網路斷開",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "自動",
     "tunSnifferOn": "開啟",
     "tunSnifferOff": "關閉",
-    "tunSnifferNeedTunTooltip": "僅在 TUN 模式下生效（目前未開啟 TUN，切換後生效）"
+    "tunSnifferNeedTunTooltip": "僅在 TUN 模式下生效（目前未開啟 TUN，切換後生效）",
+    "settingEnabled": "已開啟",
+    "settingDisabled": "已關閉",
+    "tunSnifferUpdated": "TUN 網域嗅探設定已更新",
+    "autoLaunchVerifyFailed": "開機自啟狀態校驗未生效，可能被安全軟體攔截",
+    "invalidPort": "請輸入有效的連接埠號（1–65535）"
   }
 }

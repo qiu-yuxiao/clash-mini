@@ -580,7 +580,6 @@
     "testingInProgress": "Hız testi sürüyor, lütfen daha sonra tekrar deneyin",
     "testNotExecuted": "Test yürütülmedi: çekirdek hazır değil veya test edilebilir düğüm yok",
     "testFailed": "Hız testi başarısız: {{message}}",
-    "updated": "Güncellendi",
     "portSaved": "Proxy bağlantı noktası kaydedildi ve yeniden yüklendi",
     "testSingleNodeTooltip": "Yalnızca bu düğümü test etmek için tıklayın (geçiş yapmadan)",
     "networkOffline": "Çevrimdışı",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "Oto",
     "tunSnifferOn": "Açık",
     "tunSnifferOff": "Kap.",
-    "tunSnifferNeedTunTooltip": "Yalnızca TUN modunda etkindir (TUN modunu etkinleştirin)"
+    "tunSnifferNeedTunTooltip": "Yalnızca TUN modunda etkindir (TUN modunu etkinleştirin)",
+    "settingEnabled": "Etkinleştirildi",
+    "settingDisabled": "Devre dışı bırakıldı",
+    "tunSnifferUpdated": "TUN alan adı koklayıcı ayarı güncellendi",
+    "autoLaunchVerifyFailed": "Otomatik başlatma doğrulanamadı; güvenlik yazılımı engellemiş olabilir",
+    "invalidPort": "Lütfen geçerli bir bağlantı noktası numarası girin (1-65535)"
   }
 }

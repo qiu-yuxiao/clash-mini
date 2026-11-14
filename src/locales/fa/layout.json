@@ -141,6 +141,9 @@
     "clientUpToDate": "از قبل جدیدترین نسخه است",
     "clientCheckFailed": "بررسی به‌روزرسانی ناموفق بود: {{message}}",
     "clientInstallCompleted": "به‌روزرسانی نصب شد. برای اعمال تغییرات، برنامه را راه‌اندازی مجدد کنید.",
-    "clientUpdateFailed": "به‌روزرسانی ناموفق بود: {{message}}"
+    "clientUpdateFailed": "به‌روزرسانی ناموفق بود: {{message}}",
+    "switchedToGlobalProxy": "به پروکسی سراسری تغییر یافت",
+    "switchedToGfwlist": "به حالت GFWList تغییر یافت",
+    "switchedToAddUrl": "به حالت پروکسی نشانی‌های افزوده‌شده تغییر یافت"
   }
 }

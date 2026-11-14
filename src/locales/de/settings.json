@@ -580,7 +580,6 @@
     "testingInProgress": "Geschwindigkeitstest läuft, bitte später erneut versuchen",
     "testNotExecuted": "Test nicht ausgeführt: Core nicht bereit oder keine testbaren Knoten",
     "testFailed": "Geschwindigkeitstest fehlgeschlagen: {{message}}",
-    "updated": "Aktualisiert",
     "portSaved": "Proxy-Port gespeichert und neu geladen",
     "testSingleNodeTooltip": "Klicken, um nur diesen Knoten zu testen (ohne Wechsel)",
     "networkOffline": "Offline",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "Auto",
     "tunSnifferOn": "An",
     "tunSnifferOff": "Aus",
-    "tunSnifferNeedTunTooltip": "Nur im TUN-Modus wirksam (TUN-Modus aktivieren)"
+    "tunSnifferNeedTunTooltip": "Nur im TUN-Modus wirksam (TUN-Modus aktivieren)",
+    "settingEnabled": "Aktiviert",
+    "settingDisabled": "Deaktiviert",
+    "tunSnifferUpdated": "TUN-Domain-Sniffer aktualisiert",
+    "autoLaunchVerifyFailed": "Autostart-Überprüfung fehlgeschlagen; möglicherweise blockiert",
+    "invalidPort": "Bitte geben Sie eine gültige Portnummer ein (1-65535)"
   }
 }

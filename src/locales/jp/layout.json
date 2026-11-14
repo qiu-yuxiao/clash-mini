@@ -141,6 +141,9 @@
     "clientUpToDate": "最新バージョンです",
     "clientCheckFailed": "更新の確認に失敗しました: {{message}}",
     "clientInstallCompleted": "更新のインストールが完了しました。変更を適用するにはアプリを再起動してください。",
-    "clientUpdateFailed": "更新に失敗しました: {{message}}"
+    "clientUpdateFailed": "更新に失敗しました: {{message}}",
+    "switchedToGlobalProxy": "グローバルプロキシに切り替えました",
+    "switchedToGfwlist": "GFWList モードに切り替えました",
+    "switchedToAddUrl": "URL追加プロキシモードに切り替えました"
   }
 }

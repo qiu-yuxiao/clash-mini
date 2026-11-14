@@ -141,6 +141,9 @@
     "clientUpToDate": "لديك بالفعل أحدث إصدار",
     "clientCheckFailed": "فشل التحقق من التحديثات: {{message}}",
     "clientInstallCompleted": "تم تثبيت التحديث. أعد تشغيل التطبيق لتطبيق التغييرات.",
-    "clientUpdateFailed": "فشل التحديث: {{message}}"
+    "clientUpdateFailed": "فشل التحديث: {{message}}",
+    "switchedToGlobalProxy": "تم التبديل إلى الوكيل العام",
+    "switchedToGfwlist": "تم التبديل إلى وضع GFWList",
+    "switchedToAddUrl": "تم التبديل إلى وضع وكيل إضافة الروابط"
   }
 }

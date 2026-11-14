@@ -3,7 +3,17 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Switch } from '@/components/base'
-import { getAutoLaunchStatus } from '@/services/cmds'
+import type { PatchVergeOptions } from '@/hooks/use-verge'
+import {
+  beginLongOperation,
+  endLongOperation,
+  getAutoLaunchStatus,
+} from '@/services/cmds'
+import {
+  markLoadingNotice,
+  settleLoadingNotice,
+  showNotice,
+} from '@/services/notice-service'
 import type { IClashInfo } from '@/types/clash'
 import type { IVergeConfig } from '@/types/verge'
 import {
@@ -19,7 +29,10 @@ interface BasicSettingsCardProps {
   verge: IVergeConfig | null
   clashConfig: BaseConfig | null
   clashInfo?: IClashInfo | null
-  patchVerge: (val: Partial<IVergeConfig>) => Promise<void>
+  patchVerge: (
+    val: Partial<IVergeConfig>,
+    options?: PatchVergeOptions,
+  ) => Promise<boolean | undefined>
   handleAllowLanChange: (checked: boolean) => void
   handleIpv6Change: (checked: boolean) => void
   mixedPortVal: number
@@ -184,17 +197,38 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
             onChange={async (_, checked: boolean) => {
               isTogglingAutoLaunchRef.current = true
               setRealAutoLaunch(checked)
+              const waitId = showNotice.info('layout.notices.adjusting', 0)
+              markLoadingNotice(waitId)
+              beginLongOperation()
               try {
-                await patchVerge({ enable_auto_launch: checked })
+                const applied = await patchVerge(
+                  { enable_auto_launch: checked },
+                  { silentError: true },
+                )
+                if (!applied) {
+                  const status = await getAutoLaunchStatus().catch(() => null)
+                  setRealAutoLaunch(status)
+                  return
+                }
                 // 后端写入注册表成功后，再对账确认真实状态
                 const status = await getAutoLaunchStatus()
                 setRealAutoLaunch(status)
-              } catch {
+                if (status !== checked) {
+                  showNotice.warning('settings.mini.autoLaunchVerifyFailed')
+                } else if (checked) {
+                  showNotice.success('settings.mini.settingEnabled')
+                } else {
+                  showNotice.success('settings.mini.settingDisabled')
+                }
+              } catch (err) {
                 setRealAutoLaunch(null)
                 void getAutoLaunchStatus()
                   .then(setRealAutoLaunch)
                   .catch(() => {})
+                showNotice.error(err)
               } finally {
+                settleLoadingNotice(waitId)
+                endLongOperation()
                 isTogglingAutoLaunchRef.current = false
               }
             }}
@@ -247,10 +281,27 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
           <Switch
             size="small"
             checked={verge?.enable_silent_start ?? false}
-            onChange={(_, checked: boolean) => {
-              patchVerge({ enable_silent_start: checked }).catch((err) => {
-                console.error('[BasicSettings] patchVerge failed:', err)
-              })
+            onChange={async (_, checked: boolean) => {
+              const waitId = showNotice.info('layout.notices.adjusting', 0)
+              markLoadingNotice(waitId)
+              beginLongOperation()
+              try {
+                const applied = await patchVerge(
+                  { enable_silent_start: checked },
+                  { silentError: true },
+                )
+                if (!applied) return
+                if (checked) {
+                  showNotice.success('settings.mini.settingEnabled')
+                } else {
+                  showNotice.success('settings.mini.settingDisabled')
+                }
+              } catch (err) {
+                showNotice.error(err)
+              } finally {
+                settleLoadingNotice(waitId)
+                endLongOperation()
+              }
             }}
             sx={{
               flexShrink: 0,
@@ -351,17 +402,33 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
                 return (
                   <Box
                     key={opt.key}
-                    onClick={() => {
-                      if (!isTunModeEnabled) return
+                    onClick={async () => {
+                      if (!isTunModeEnabled) {
+                        showNotice.warning(
+                          'settings.mini.tunSnifferNeedTunTooltip',
+                        )
+                        return
+                      }
                       if (normalizedSniffer === opt.value) return
-                      patchVerge({ enable_tun_sniffer: opt.value }).catch(
-                        (err) => {
-                          console.error(
-                            '[BasicSettings] patchVerge failed:',
-                            err,
-                          )
-                        },
+                      const waitId = showNotice.info(
+                        'layout.notices.adjusting',
+                        0,
                       )
+                      markLoadingNotice(waitId)
+                      beginLongOperation()
+                      try {
+                        const applied = await patchVerge(
+                          { enable_tun_sniffer: opt.value },
+                          { silentError: true },
+                        )
+                        if (!applied) return
+                        showNotice.success('settings.mini.tunSnifferUpdated')
+                      } catch (err) {
+                        showNotice.error(err)
+                      } finally {
+                        settleLoadingNotice(waitId)
+                        endLongOperation()
+                      }
                     }}
                     sx={{
                       flex: 1,

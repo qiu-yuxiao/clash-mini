@@ -580,7 +580,6 @@
     "testingInProgress": "A speed test is in progress, please try again later",
     "testNotExecuted": "Test not executed: core not ready or no testable nodes",
     "testFailed": "Speed test failed: {{message}}",
-    "updated": "Updated",
     "portSaved": "Proxy port saved and reloaded",
     "testSingleNodeTooltip": "Click to test this node only (without switching)",
     "networkOffline": "Offline",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "Auto",
     "tunSnifferOn": "On",
     "tunSnifferOff": "Off",
-    "tunSnifferNeedTunTooltip": "Effective only in TUN mode (enable TUN mode to activate)"
+    "tunSnifferNeedTunTooltip": "Effective only in TUN mode (enable TUN mode to activate)",
+    "settingEnabled": "Enabled",
+    "settingDisabled": "Disabled",
+    "tunSnifferUpdated": "TUN domain sniffer updated",
+    "autoLaunchVerifyFailed": "Auto-launch verification failed; it may be blocked by security software",
+    "invalidPort": "Please enter a valid port number (1-65535)"
   }
 }

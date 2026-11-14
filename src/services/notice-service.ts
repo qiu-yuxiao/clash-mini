@@ -345,6 +345,16 @@ const baseShowNotice = (
  * @example showNotice.error("shared.feedback.notifications.common.refreshFailed", err); // Simply pass an Error directly; but we recommend using { err } with i18n key and placeholders.
  * @example showNotice.error("profiles.page.feedback.errors.invalidUrl", { url }, 4000);
  */
+export const MIN_LOADING_NOTICE_DWELL_MS = 320
+
+interface ActiveLoadingNotice {
+  id: number
+  startedAt: number
+  settleTimerId?: ReturnType<typeof setTimeout>
+}
+
+const activeLoadingNotices = new Map<number, ActiveLoadingNotice>()
+
 export const showNotice: ShowNotice = Object.assign(baseShowNotice, {
   success: (message: NoticeContent, ...extras: NoticeExtra[]) =>
     baseShowNotice('success', message, ...extras),
@@ -356,7 +366,51 @@ export const showNotice: ShowNotice = Object.assign(baseShowNotice, {
     baseShowNotice('warning', message, ...extras),
 })
 
+/** 记录持久“操作进行中”提示的显示起始时间，避免快速切换时一闪而过 */
+export function markLoadingNotice(waitId: number) {
+  const existing = activeLoadingNotices.get(waitId)
+  if (existing?.settleTimerId) {
+    clearTimeout(existing.settleTimerId)
+  }
+  activeLoadingNotices.set(waitId, {
+    id: waitId,
+    startedAt: Date.now(),
+  })
+}
+
+/** 结束“操作进行中”提示：若已展示满最短停留时间则立即关闭，否则补齐剩余时间后再关闭 */
+export function settleLoadingNotice(
+  waitId: number,
+  minDwellMs = MIN_LOADING_NOTICE_DWELL_MS,
+) {
+  const tracked = activeLoadingNotices.get(waitId)
+  if (!tracked) {
+    hideNotice(waitId)
+    return
+  }
+  if (tracked.settleTimerId) {
+    return
+  }
+
+  const elapsed = Date.now() - tracked.startedAt
+  const remaining = Math.max(0, minDwellMs - elapsed)
+  if (remaining === 0) {
+    hideNotice(waitId)
+    return
+  }
+
+  tracked.settleTimerId = setTimeout(() => {
+    hideNotice(waitId)
+  }, remaining)
+}
+
 export function hideNotice(id: number) {
+  const tracked = activeLoadingNotices.get(id)
+  if (tracked?.settleTimerId) {
+    clearTimeout(tracked.settleTimerId)
+  }
+  activeLoadingNotices.delete(id)
+
   const notice = notices.find((candidate) => candidate.id === id)
   if (notice?.timerId) {
     clearTimeout(notice.timerId)

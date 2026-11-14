@@ -141,6 +141,9 @@
     "clientUpToDate": "Already the latest version",
     "clientCheckFailed": "Failed to check for updates: {{message}}",
     "clientInstallCompleted": "Update installed. Please restart the app to apply changes.",
-    "clientUpdateFailed": "Update failed: {{message}}"
+    "clientUpdateFailed": "Update failed: {{message}}",
+    "switchedToGlobalProxy": "Switched to Global Proxy",
+    "switchedToGfwlist": "Switched to GFWList mode",
+    "switchedToAddUrl": "Switched to Add URL proxy mode"
   }
 }

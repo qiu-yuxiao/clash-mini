@@ -1,10 +1,13 @@
 import { createTheme, type Theme } from '@mui/material'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { CUSTOM_TITLEBAR_HEIGHT, MIN_WINDOW_WIDTH } from '@/constants'
 import {
+  MIN_LOADING_NOTICE_DWELL_MS,
   getSnapshotNotices,
   hideNotice,
+  markLoadingNotice,
+  settleLoadingNotice,
   showNotice,
 } from '@/services/notice-service'
 
@@ -129,5 +132,65 @@ describe('popup-styles 窄窗弹窗几何锁定与皮肤统一样式', () => {
 
     hideNotice(id)
     expect(getSnapshotNotices().some((item) => item.id === id)).toBe(false)
+  })
+
+  it('settleLoadingNotice 在极快操作完成后保留加载提示满最短停留时间再退场', () => {
+    vi.useFakeTimers()
+    try {
+      const waitId = showNotice.info('loading-dwell-fast', 0)
+      markLoadingNotice(waitId)
+
+      vi.advanceTimersByTime(50)
+      settleLoadingNotice(waitId)
+      expect(getSnapshotNotices().some((item) => item.id === waitId)).toBe(true)
+
+      vi.advanceTimersByTime(MIN_LOADING_NOTICE_DWELL_MS - 50 - 1)
+      expect(getSnapshotNotices().some((item) => item.id === waitId)).toBe(true)
+
+      vi.advanceTimersByTime(1)
+      expect(getSnapshotNotices().some((item) => item.id === waitId)).toBe(
+        false,
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('settleLoadingNotice 在耗时操作超过最短停留时间后立即关闭', () => {
+    vi.useFakeTimers()
+    try {
+      const waitId = showNotice.info('loading-dwell-slow', 0)
+      markLoadingNotice(waitId)
+
+      vi.advanceTimersByTime(MIN_LOADING_NOTICE_DWELL_MS + 10)
+      settleLoadingNotice(waitId)
+      expect(getSnapshotNotices().some((item) => item.id === waitId)).toBe(
+        false,
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('hideNotice 手动关闭加载提示时应清理挂起的 settle 定时器', () => {
+    vi.useFakeTimers()
+    try {
+      const waitId = showNotice.info('loading-dwell-cancel', 0)
+      markLoadingNotice(waitId)
+
+      vi.advanceTimersByTime(40)
+      settleLoadingNotice(waitId)
+      hideNotice(waitId)
+      expect(getSnapshotNotices().some((item) => item.id === waitId)).toBe(
+        false,
+      )
+
+      const nextId = showNotice.success('loading-dwell-next', 0)
+      vi.advanceTimersByTime(MIN_LOADING_NOTICE_DWELL_MS)
+      expect(getSnapshotNotices().some((item) => item.id === nextId)).toBe(true)
+      hideNotice(nextId)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

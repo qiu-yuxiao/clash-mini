@@ -141,6 +141,9 @@
     "clientUpToDate": "Инде соңгы версия",
     "clientCheckFailed": "Яңартуларны тикшерү уңышсыз: {{message}}",
     "clientInstallCompleted": "Яңарту урнаштырылды. Үзгәрешләрне куллану өчен кушымтаны кабаттан башлагыз.",
-    "clientUpdateFailed": "Яңарту уңышсыз: {{message}}"
+    "clientUpdateFailed": "Яңарту уңышсыз: {{message}}",
+    "switchedToGlobalProxy": "Глобаль прокси режимына күчерелде",
+    "switchedToGfwlist": "GFWList режимына күчерелде",
+    "switchedToAddUrl": "Өстәлгән URL прокси режимына күчерелде"
   }
 }

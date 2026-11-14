@@ -141,6 +141,9 @@
     "clientUpToDate": "当前已是最新版本",
     "clientCheckFailed": "检查更新失败: {{message}}",
     "clientInstallCompleted": "更新安装完毕，请重启应用以应用更改",
-    "clientUpdateFailed": "更新失败: {{message}}"
+    "clientUpdateFailed": "更新失败: {{message}}",
+    "switchedToGlobalProxy": "已切换至全局代理",
+    "switchedToGfwlist": "已切换至 GFWList 模式",
+    "switchedToAddUrl": "已切换至添加网址模式"
   }
 }

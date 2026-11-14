@@ -141,6 +141,9 @@
     "clientUpToDate": "У вас уже последняя версия",
     "clientCheckFailed": "Не удалось проверить обновления: {{message}}",
     "clientInstallCompleted": "Обновление установлено. Перезапустите приложение, чтобы применить изменения.",
-    "clientUpdateFailed": "Ошибка обновления: {{message}}"
+    "clientUpdateFailed": "Ошибка обновления: {{message}}",
+    "switchedToGlobalProxy": "Переключено на глобальный прокси",
+    "switchedToGfwlist": "Переключено в режим GFWList",
+    "switchedToAddUrl": "Переключено в режим прокси для добавленных URL"
   }
 }

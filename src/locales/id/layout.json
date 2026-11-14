@@ -141,6 +141,9 @@
     "clientUpToDate": "Sudah versi terbaru",
     "clientCheckFailed": "Gagal memeriksa pembaruan: {{message}}",
     "clientInstallCompleted": "Pembaruan terpasang. Silakan mulai ulang aplikasi untuk menerapkan perubahan.",
-    "clientUpdateFailed": "Gagal memperbarui: {{message}}"
+    "clientUpdateFailed": "Gagal memperbarui: {{message}}",
+    "switchedToGlobalProxy": "Beralih ke Proxy Global",
+    "switchedToGfwlist": "Beralih ke mode GFWList",
+    "switchedToAddUrl": "Beralih ke mode proxy Tambah URL"
   }
 }

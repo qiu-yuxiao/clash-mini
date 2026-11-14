@@ -580,7 +580,6 @@
     "testingInProgress": "Prueba de velocidad en curso, inténtelo más tarde",
     "testNotExecuted": "Prueba no ejecutada: el núcleo no está listo o no hay nodos disponibles",
     "testFailed": "Error en la prueba de velocidad: {{message}}",
-    "updated": "Actualizado",
     "portSaved": "Puerto proxy guardado y recargado",
     "testSingleNodeTooltip": "Clic para probar solo este nodo (sin cambiar conexión)",
     "networkOffline": "Sin red",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "Auto",
     "tunSnifferOn": "Sí",
     "tunSnifferOff": "No",
-    "tunSnifferNeedTunTooltip": "Solo efectivo en modo TUN (active el modo TUN)"
+    "tunSnifferNeedTunTooltip": "Solo efectivo en modo TUN (active el modo TUN)",
+    "settingEnabled": "Activado",
+    "settingDisabled": "Desactivado",
+    "tunSnifferUpdated": "Sniffer de dominios TUN actualizado",
+    "autoLaunchVerifyFailed": "Error al verificar el inicio automático; puede estar bloqueado por seguridad",
+    "invalidPort": "Introduzca un número de puerto válido (1-65535)"
   }
 }

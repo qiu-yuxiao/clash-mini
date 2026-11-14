@@ -580,7 +580,6 @@
     "testingInProgress": "اختبار السرعة جارٍ، يرجى المحاولة لاحقًا",
     "testNotExecuted": "لم يُنفَّذ الاختبار: النواة غير جاهزة أو لا توجد عقد قابلة للاختبار",
     "testFailed": "فشل اختبار السرعة: {{message}}",
-    "updated": "تم التحديث",
     "portSaved": "تم حفظ منفذ البروكسي وإعادة تحميله",
     "testSingleNodeTooltip": "انقر لاختبار هذه العقدة فقط (دون التبديل)",
     "networkOffline": "غير متصل",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "تلقائي",
     "tunSnifferOn": "تشغيل",
     "tunSnifferOff": "إيقاف",
-    "tunSnifferNeedTunTooltip": "يعمل في وضع TUN فقط (فعّل وضع TUN لتشغيله)"
+    "tunSnifferNeedTunTooltip": "يعمل في وضع TUN فقط (فعّل وضع TUN لتشغيله)",
+    "settingEnabled": "تم التفعيل",
+    "settingDisabled": "تم التعطيل",
+    "tunSnifferUpdated": "تم تحديث إعدادات فاحص نطاقات TUN",
+    "autoLaunchVerifyFailed": "فشل التحقق من التشغيل التلقائي؛ قد يكون محظوراً بواسطة برنامج الأمان",
+    "invalidPort": "يرجى إدخال رقم منفذ صالح (1-65535)"
   }
 }

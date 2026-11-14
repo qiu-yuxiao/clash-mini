@@ -580,7 +580,6 @@
     "testingInProgress": "正在测速中，请稍候再试",
     "testNotExecuted": "测速未执行：内核未就绪或暂无可测节点",
     "testFailed": "测速失败：{{message}}",
-    "updated": "已更新",
     "portSaved": "代理端口已保存并重载",
     "testSingleNodeTooltip": "点击单独测速此节点（不切换连接）",
     "networkOffline": "网络断开",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "自动",
     "tunSnifferOn": "开启",
     "tunSnifferOff": "关闭",
-    "tunSnifferNeedTunTooltip": "仅在 TUN 模式下生效（当前未开启 TUN，切换后生效）"
+    "tunSnifferNeedTunTooltip": "仅在 TUN 模式下生效（当前未开启 TUN，切换后生效）",
+    "settingEnabled": "已开启",
+    "settingDisabled": "已关闭",
+    "tunSnifferUpdated": "TUN 域名嗅探设置已更新",
+    "autoLaunchVerifyFailed": "开机自启状态校验未生效，可能被安全软件拦截",
+    "invalidPort": "请输入有效的端口号（1–65535）"
   }
 }

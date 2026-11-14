@@ -141,6 +141,9 @@
     "clientUpToDate": "Ya tiene la última versión",
     "clientCheckFailed": "Error al buscar actualizaciones: {{message}}",
     "clientInstallCompleted": "Actualización instalada. Reinicie la aplicación para aplicar los cambios.",
-    "clientUpdateFailed": "Error al actualizar: {{message}}"
+    "clientUpdateFailed": "Error al actualizar: {{message}}",
+    "switchedToGlobalProxy": "Cambiado a proxy global",
+    "switchedToGfwlist": "Cambiado al modo GFWList",
+    "switchedToAddUrl": "Cambiado al modo proxy Añadir URL"
   }
 }

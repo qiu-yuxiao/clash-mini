@@ -141,6 +141,9 @@
     "clientUpToDate": "이미 최신 버전입니다",
     "clientCheckFailed": "업데이트 확인 실패: {{message}}",
     "clientInstallCompleted": "업데이트 설치가 완료되었습니다. 변경 사항을 적용하려면 앱을 재시작하세요.",
-    "clientUpdateFailed": "업데이트 실패: {{message}}"
+    "clientUpdateFailed": "업데이트 실패: {{message}}",
+    "switchedToGlobalProxy": "글로벌 프록시로 전환되었습니다",
+    "switchedToGfwlist": "GFWList 모드로 전환되었습니다",
+    "switchedToAddUrl": "URL 추가 프록시 모드로 전환되었습니다"
   }
 }

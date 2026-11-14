@@ -141,6 +141,9 @@
     "clientUpToDate": "Zaten en son sürümdesiniz",
     "clientCheckFailed": "Güncellemeler kontrol edilemedi: {{message}}",
     "clientInstallCompleted": "Güncelleme kuruldu. Değişiklikleri uygulamak için uygulamayı yeniden başlatın.",
-    "clientUpdateFailed": "Güncelleme başarısız: {{message}}"
+    "clientUpdateFailed": "Güncelleme başarısız: {{message}}",
+    "switchedToGlobalProxy": "Genel Proxy moduna geçildi",
+    "switchedToGfwlist": "GFWList moduna geçildi",
+    "switchedToAddUrl": "URL Ekle proxy moduna geçildi"
   }
 }

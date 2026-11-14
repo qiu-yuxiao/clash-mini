@@ -580,7 +580,6 @@
     "testingInProgress": "Pengujian kecepatan sedang berlangsung, coba lagi nanti",
     "testNotExecuted": "Pengujian tidak dijalankan: inti belum siap atau tidak ada node yang bisa diuji",
     "testFailed": "Pengujian kecepatan gagal: {{message}}",
-    "updated": "Diperbarui",
     "portSaved": "Port proksi disimpan dan dimuat ulang",
     "testSingleNodeTooltip": "Klik untuk menguji node ini saja (tanpa berpindah)",
     "networkOffline": "Offline",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "Auto",
     "tunSnifferOn": "On",
     "tunSnifferOff": "Off",
-    "tunSnifferNeedTunTooltip": "Hanya berlaku di mode TUN (aktifkan mode TUN)"
+    "tunSnifferNeedTunTooltip": "Hanya berlaku di mode TUN (aktifkan mode TUN)",
+    "settingEnabled": "Diaktifkan",
+    "settingDisabled": "Dinonaktifkan",
+    "tunSnifferUpdated": "Pengaturan sniffer domain TUN diperbarui",
+    "autoLaunchVerifyFailed": "Verifikasi status mulai otomatis gagal; mungkin diblokir perangkat lunak keamanan",
+    "invalidPort": "Masukkan nomor port yang valid (1-65535)"
   }
 }

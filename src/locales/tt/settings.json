@@ -580,7 +580,6 @@
     "testingInProgress": "Тизлек тикшерүе бара, соңрак кабат карагыз",
     "testNotExecuted": "Тикшерү үтәлмәде: төп программа әзер түгел яки тикшерергә мөмкин төен юк",
     "testFailed": "Тизлек тикшерүе уңышсыз: {{message}}",
-    "updated": "Яңартылды",
     "portSaved": "Прокси порты сакланды һәм яңадан йөкләнде",
     "testSingleNodeTooltip": "Бу төенне генә тикшерү өчен басыгыз (күчермичә)",
     "networkOffline": "Челтәр юк",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "Auto",
     "tunSnifferOn": "On",
     "tunSnifferOff": "Off",
-    "tunSnifferNeedTunTooltip": "Effective only in TUN mode (enable TUN mode to activate)"
+    "tunSnifferNeedTunTooltip": "Effective only in TUN mode (enable TUN mode to activate)",
+    "settingEnabled": "Кабызылды",
+    "settingDisabled": "Сүндерелде",
+    "tunSnifferUpdated": "TUN домен снифферы көйләүләре яңартылды",
+    "autoLaunchVerifyFailed": "Автоматик җибәрү халәтен тикшерү уңышсыз; куркынычсызлык программасы чикләгән булырга мөмкин",
+    "invalidPort": "Зинһар, дөрес порт номерын кертегез (1–65535)"
   }
 }

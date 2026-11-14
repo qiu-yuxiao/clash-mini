@@ -580,7 +580,6 @@
     "testingInProgress": "Идёт проверка задержки, попробуйте позже",
     "testNotExecuted": "Проверка не выполнена: ядро не готово или нет доступных узлов",
     "testFailed": "Ошибка проверки задержки: {{message}}",
-    "updated": "Обновлено",
     "portSaved": "Порт прокси сохранён и перезагружен",
     "testSingleNodeTooltip": "Нажмите для проверки только этого узла (без переключения)",
     "networkOffline": "Нет сети",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "Авто",
     "tunSnifferOn": "Вкл",
     "tunSnifferOff": "Выкл",
-    "tunSnifferNeedTunTooltip": "Действует только в режиме TUN (включите режим TUN)"
+    "tunSnifferNeedTunTooltip": "Действует только в режиме TUN (включите режим TUN)",
+    "settingEnabled": "Включено",
+    "settingDisabled": "Отключено",
+    "tunSnifferUpdated": "Настройка сниффера доменов TUN обновлена",
+    "autoLaunchVerifyFailed": "Не удалось подтвердить статус автозапуска; возможно, блокировка антивирусом",
+    "invalidPort": "Введите корректный номер порта (1–65535)"
   }
 }

@@ -332,6 +332,9 @@ export interface TranslationResources {
         profileLinkCopied: string
         profileSaved: string
         subscriptionUpdated: string
+        switchedToAddUrl: string
+        switchedToGfwlist: string
+        switchedToGlobalProxy: string
         switchedToManualMode: string
         systemProxyEnabled: string
         tunModeEnabled: string
@@ -808,6 +811,7 @@ export interface TranslationResources {
         addUrlTooltip: string
         allNodesTimeout: string
         allNodesTimeoutTooltip: string
+        autoLaunchVerifyFailed: string
         connectionsDisconnectAll: string
         debugLogs: string
         filterAutoTestingTooltip: string
@@ -819,6 +823,7 @@ export interface TranslationResources {
         importCustomRoutes: string
         importCustomRoutesTooltip: string
         importPlaceholder: string
+        invalidPort: string
         localFile: string
         manual: string
         networkOffline: string
@@ -835,6 +840,8 @@ export interface TranslationResources {
         routesImportSuccess: string
         saveCustomRoutes: string
         saveCustomRoutesTooltip: string
+        settingDisabled: string
+        settingEnabled: string
         statusDelayExcellent: string
         statusDelayGood: string
         statusDelayHigh: string
@@ -860,8 +867,8 @@ export interface TranslationResources {
         tunSnifferOff: string
         tunSnifferOn: string
         tunSnifferTooltip: string
+        tunSnifferUpdated: string
         unnamedConfig: string
-        updated: string
       }
       modals: {
         backup: {

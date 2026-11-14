@@ -580,7 +580,6 @@
     "testingInProgress": "آزمایش سرعت در جریان است، بعداً دوباره تلاش کنید",
     "testNotExecuted": "آزمایش اجرا نشد: هسته آماده نیست یا گره قابل آزمایشی وجود ندارد",
     "testFailed": "آزمایش سرعت ناموفق بود: {{message}}",
-    "updated": "به‌روزرسانی شد",
     "portSaved": "درگاه پروکسی ذخیره و بارگذاری مجدد شد",
     "testSingleNodeTooltip": "برای تست فقط همین گره کلیک کنید (بدون تغییر اتصال)",
     "networkOffline": "آفلاین",
@@ -593,6 +592,11 @@
     "tunSnifferAuto": "خودکار",
     "tunSnifferOn": "روشن",
     "tunSnifferOff": "خاموش",
-    "tunSnifferNeedTunTooltip": "فقط در حالت TUN فعال است (حالت TUN را روشن کنید)"
+    "tunSnifferNeedTunTooltip": "فقط در حالت TUN فعال است (حالت TUN را روشن کنید)",
+    "settingEnabled": "فعال شد",
+    "settingDisabled": "غیرفعال شد",
+    "tunSnifferUpdated": "تنظیم اسنیفر دامنه TUN به‌روزرسانی شد",
+    "autoLaunchVerifyFailed": "تأیید وضعیت اجرای خودکار ناموفق بود؛ ممکن است مسدود شده باشد",
+    "invalidPort": "لطفاً یک شماره درگاه معتبر وارد کنید (۱ تا ۶۵۵۳۵)"
   }
 }

@@ -194,7 +194,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - 右侧连接与路由监控表遵循大窗（>285px）挂载观测、窄窗（≤285px）彻底卸载不渲染、不订阅的统一信号门控。
   - **该断点与窗口最小宽度（271px）不是同一个数**：断点是排版门槛（比较内容宽度），最小宽度是几何下限。最小宽度必须小于断点，保证窗口缩到最小时必然进入窄窗模式，且内容宽度 272–285 区间行为与历史版本一致（否则三列卡片会被挤进 272px）。
 - **窄窗 `271px` 弹窗/通知区域锁定与视觉风格统一规范**：
-  - 所有模态弹窗（`BaseDialog`、`AddUrlDialog`、`AntivirusWhitelistDialog`、`FirstRunGuideDialog`、`HelpMenuButton` 一/二级弹窗、`LayoutDialogs`）与顶部反馈通知（`NoticeManager`）宽度均严格锁定为 `MIN_WINDOW_WIDTH`（`271px`）并锚定于左侧窄窗区域（`left: 0, width: 271px`），顶部按 `resolveNarrowOverlayTopOffset` 避让 `CUSTOM_TITLEBAR_HEIGHT`（`30px`；原生装饰栏或极窄隐匿隐藏标题栏时贴顶 `0px`），即使在宽窗口（`>285px`）下也绝不居中漂移或撑满宽窗；
+  - 所有模态弹窗（`BaseDialog`、`AddUrlDialog`、`AntivirusWhitelistDialog`、`FirstRunGuideDialog`、`HelpMenuButton` 一/二级弹窗、`LayoutDialogs`）与顶部反馈通知（`NoticeManager`）宽度均严格锁定为 `MIN_WINDOW_WIDTH`（`271px`）并锚定于左侧窄窗区域（`left: 0, width: 271px`），顶部按 `resolveNarrowOverlayTopOffset` 避让 `CUSTOM_TITLEBAR_HEIGHT`（`30px`；原生装饰栏或极窄隐匿隐藏标题栏时贴顶 `0px`），即使在宽窗口（`>285px`）下也绝不居中漂移或撑满宽窗；且 `NoticeManager` `zIndex` 必须高于 MUI `Tooltip`（`2200 > 1500`）并带内边距（`px: 6px, pt: 4px`），防止操作反馈通知被悬浮 Tooltip 遮挡（BUG-371）；
   - 所有窄窗弹窗、`BaseStyledSelect` 下拉选单、全局/输入框右键菜单以及右侧连接表的详情/右键小菜单（`ConnectionDetail` 与 `ConnectionTable` 右键菜单，保留跟随鼠标的小尺寸及宽窗就地展示定位）均统一复用 `src/utils/popup-styles.ts`（`getPopupCardStyle` / `getPopupSkinTokens`）的 3D 实体拟物卡片表面与皮肤高对比语义配色；
   - 「系统调试运行日志」弹窗内部工具栏（日志暂停/播放、升降序、一键清空）与日志级别选择下拉框（固定 `95px`）采用紧凑排版，配合 `overflowWrap: 'anywhere'` 自动换行，彻底消除 `271px` 视口下的任何横向滚动条。
 
@@ -271,7 +271,8 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **权威数据源分离（不得混淆）**：设置界面的开关**必须绑定「用户持久化配置」**，而不是内核 REST API 返回的**运行时配置**。原因：运行时配置会被后端按场景强制改写（如 TUN 模式下顶层 `ipv6` 恒被强制为 `true` 以接管 IPv6 路由防泄漏），若 UI 直接绑运行时值，开关会被强制弹回、无法切换。落地：`ClashInfo` 额外暴露用户在 `clash.yaml` 中持久化的 `ipv6` / `allow_lan`，开关统一绑 `clashInfo.*`（`get_clash_info` 取 `Config::clash().get_client_info()`，读用户存储配置而非运行时）。
 - **乐观更新契约**：开关切换时**先**把补丁写入 `queryClient` 缓存（`setQueryData`）以获得 0ms 手感，**再**发后端请求；请求**成功**后重取权威值同步、**失败**则立即回滚（`refetch`）——保证「UI 状态 ≠ 后端状态」的窗口尽可能短。开关触发的 `patch_*` 属长操作（可能重启内核、阻塞 IPC 达 60s），必须配 `beginLongOperation` / `endLongOperation` 抑制 IPC 超时提示风暴。
 - **queryClient 必须同源**：全应用**只能存在一个** `QueryClient` 实例（`main.tsx` 的 `QueryClientProvider` 与各处 `import { queryClient }` 必须指向同一 `@/services/query-client` 单例）；`useQueryClient()` 与直接 import 不可各自持有不同实例，否则乐观更新会写进另一个缓存、UI 不刷新。
-- **并发点击语义**：`patchVerge` 使用 `useLockFn`，其语义是**丢弃**并发调用（而非排队）——这是**有意为之**，用于防止并发 patch 引发内核反复 reload 与 IPC 风暴。因乐观更新写在锁内，被丢弃的调用不会改 UI，故缓存与「未执行」的事实保持一致。
+- **并发点击语义**：`patchVerge` 使用 `useLockFn`，其语义是**丢弃**并发调用（而非排队）——这是**有意为之**，用于防止并发 patch 引发内核反复 reload 与 IPC 风暴。因乐观更新写在锁内，被丢弃的调用不会改 UI，故缓存与「未执行」的事实保持一致；成功执行时返回 `true`（并发丢弃时 `useLockFn` 解析为 `undefined`），调用方据此判断是否跳过成功提示，且可传 `{ silentError: true }` 由外层统一展示单次错误弹窗，避免 `useVerge` 与调用方重复弹窗（BUG-371）。
+- **设置开关操作反馈三段式契约（BUG-371）**：流量接管模式与基础设置中的所有二选一 / 三选一开关与端口保存操作，必须严格按「进行中提示（`showNotice.info(..., 0)` + `markLoadingNotice(waitId)`）→ 结果提示（`showNotice.success` / `warning`）→ 失败单弹窗（`showNotice.error`）→ `finally { settleLoadingNotice(waitId) }`」闭环实现；`settleLoadingNotice` 保证快速完成（`<320ms`）的后端 IPC 调用也能让用户看清"正在调整"状态条后再自然退场。
 
 ### 2.10.1 开机自启：注册表方案与启动对账（2026-10-22 定）
 
@@ -848,6 +849,13 @@ flowchart LR
   3. **过期延迟缓存主动唤醒重算与活跃节点卡片同步**（`src/services/delay.ts`、`src/hooks/use-proxy-delay-state.ts`、`src/pages/_layout/components/active-node-card.tsx`）：`DelayManager::evictExpiredCache` 仅保留 `-2` 测试占位并清理过期缓存，同时向单节点与组监听者广播 `{ delay: -1, updatedAt: 0 }` 哨兵事件；`useProxyDelayState` 与 `ActiveNodeCard` 收到哨兵后分别通过 `computeInitialDelay` / `getDelayFix` 回落重算，`ActiveNodeCard` 并在 `activeNodeRecord` 变化时主动对齐 `delay`。
 - **影响**：消除长时挂机/网络波动/缓存过期后前后端延迟显示长期卡死在 `Timeout` 的同步断层，保持多端延迟状态一致。
 
+### Sync-17 · 流量接管模式与基础设置开关操作反馈三段式弹窗退化修复（BUG-371）
+- **改动**：
+  1. **通知最小停留时长防闪烁与浮层层级修正**（`src/services/notice-service.ts`、`src/components/layout/notice-manager.tsx`）：新增 `MIN_LOADING_NOTICE_DWELL_MS = 320`、`markLoadingNotice(waitId)` 与 `settleLoadingNotice(waitId)`，并在 `hideNotice` 时同步清理挂起 `settle` 定时器，确保快速完成的 IPC 操作（如 `Allow LAN`、`IPv6`、规则兜底切换）也能稳定展示「正在调整」过程提示后平滑退场；同步将 `NoticeManager` `zIndex` 从 `1500` 提升至 `2200`（严格高于 MUI `Tooltip` 的 `1500`）并增加 `px: '6px', pt: '4px'` 内边距，避免反馈弹窗被开关自身 Tooltip 遮挡。
+  2. **`patchVerge` 并发丢弃识别与单错误弹窗去重**（`src/hooks/use-verge.ts`、`src/hooks/use-service-installer.ts`）：保持 `useLockFn` 丢弃语义不变，使 `patchVerge` 执行成功时返回 `true`（并发丢弃时解析为 `undefined`）供调用方跳过误导性成功提示；同时为 `patchVerge` 与 `useServiceInstaller` 新增 `{ silentError?: boolean }` 选项，外层操作通过单次 `showNotice.error` 统一弹窗而不再与内层重复。
+  3. **全量接入二选一 / 三选一开关与端口校验闭环**（`src/pages/_layout.tsx`、`src/pages/_layout/hooks/use-minimal-settings.ts`、`src/pages/_layout/components/basic-settings-card.tsx`）：补齐「代理方式」三选一（`全局代理 / GFWList / 添加网址`，含重复点击跳过与成功/失败反馈）、「流量接管模式」三选一、「Allow LAN」「IPv6」「开机自动启动」（含写入后对账不一致的防拦截告警 `autoLaunchVerifyFailed`）、「启动时最小化」、「TUN 域名嗅探」三态（含非 TUN 模式点击提示 `tunSnifferNeedTunTooltip`）及代理端口保存（补充 `1–65535` 范围校验 `invalidPort`）的完整「进行中 → 成功/告警 → 失败单弹窗」提示闭环；同步更新全部 13 语种资源、重生成 `i18n-keys.ts`（`892` 键）并在 `src/utils/popup-styles.test.ts` 补齐 `markLoadingNotice` / `settleLoadingNotice` / `hideNotice` 单元测试。
+- **影响**：用户操作「流量接管模式」「代理方式」「基础设置」任意开关或保存端口时，均可稳定看到清晰的进行中过程提示、明确的结果反馈及不重不漏的错误/警示弹窗。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
@@ -978,6 +986,7 @@ flowchart LR
 | **BUG-368** | 2.8 / 4.2 / 5.1 / 5.2 / 5.3 / 5.4 | 修复 3s 重试复核误命中 10s 死缓存跳过二次真实拨测；引入 `METRICS_PROBE_LOCK` 与实时快照复用抑制并发/背靠背拨测风暴；故障转移成功后精确关闭仍挂死在原故障节点上的存量连接；前后端统一升级多关键词包含（`\|`/`｜`）与排除（`-`/`!`/`！`）节点过滤引擎并补齐双端单测。 |
 | **BUG-369** | 2.8 / 5.2 / 5.4 / 5.6 | 修复 `DelayManager` 在 `-2` 测试态下复用注入误砍合法缓存寿命、补充唤醒测速 `-2` 快照回滚、`evaluate_failover` 体检直播延迟与 `restart_core` 立即唤醒推送；将 `useHeadStateNew` 重构为 `useSyncExternalStore` 模块级单例彻底根除 `filterText` 被并发 `sortType` 覆写；新增规范化连接指纹 `deduplicate_cloned_proxies` 同配置克隆去重与持久化真 HTTPS 验真状态机（1 次过真即单向粘滞、有在线参照通过前提下连续失败 `> 5` 次永久拉黑并在前后端全链路隐藏）。 |
 | **BUG-370** | 2.8 / 5.2 / 5.6 | 修复局部测速 URL 失真、后台恢复未同步 UI 与前端延迟缓存过期冻结的三处同步缺口：`probe_metrics_group` 在非全量失效时触发备用测速 URL（`FALLBACK_TEST_URL` ↔ `DEFAULT_TEST_URL`）复测并合并最健康延迟；`evaluate_failover` 新增 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 去重，确保从异常态恢复及正常 300s 体检新测量落地时及时向前端推送更新；`DelayManager::evictExpiredCache` 淘汰过期非 `-2` 缓存时主动向节点与组监听者广播 `{ delay: -1, updatedAt: 0 }` 唤醒重算，并同步修复 `useProxyDelayState` 与 `ActiveNodeCard` 的回落/切换同步（见 §5.2、§5.6、Sync-16）。 |
+| **BUG-371** | 2.2 / 2.10 | 修复「流量接管模式（含代理方式）」与「基础设置」二选一/三选一开关操作期间与操作结果/失败反馈弹窗退化缺失问题：`notice-service` 新增 `MIN_LOADING_NOTICE_DWELL_MS`（`320ms`）最小停留防护（`markLoadingNotice` / `settleLoadingNotice`）防止快速 IPC 切换一闪而过；`NoticeManager` `zIndex` 升至 `2200` 高于 MUI Tooltip（`1500`）；`patchVerge` 与 `useServiceInstaller` 支持并发丢弃判定返回值与 `{ silentError }` 单次报错去重；补齐 `handleRuleFallbackChange`、开机自启（含注册表校验不一致告警）、启动时最小化、TUN 域名嗅探（含非 TUN 模式点击警示）及端口 `1–65535` 校验全套三段式反馈弹窗（见 §2.2、§2.10、Sync-17）。 |
 
 ---
 

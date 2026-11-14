@@ -67,7 +67,11 @@ import {
 } from '@/services/cmds'
 import { getDelayManager } from '@/services/delay'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
-import { showNotice, hideNotice } from '@/services/notice-service'
+import {
+  showNotice,
+  markLoadingNotice,
+  settleLoadingNotice,
+} from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
 import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
@@ -414,8 +418,11 @@ const Layout = () => {
 
   const handleRuleFallbackChange = async (
     fallback: 'direct' | 'proxy' | 'addurl',
-  ) => {
+  ): Promise<boolean> => {
+    if (verge?.rule_fallback === fallback) return true
+
     const waitId = showNotice.info('layout.notices.adjustingProxyMode', 0)
+    markLoadingNotice(waitId)
 
     // 标记长操作开始：patchVerge({rule_fallback}) 后端会 update_config_checked
     // 重新生成运行时配置并 reload mihomo，期间 IPC 通道阻塞。
@@ -426,24 +433,44 @@ const Layout = () => {
       // 重新生成运行时配置（读取新 rule_fallback 生成 MATCH 兜底规则）并 reload mihomo。
       // 此处无需再调 enhanceProfiles()，否则会触发第二次冗余 reload，
       // 叠加 react-query revalidate 可能引发 IPC 阻塞 + Notice 风暴。
-      await patchVerge({ rule_fallback: fallback })
+      const applied = await patchVerge(
+        { rule_fallback: fallback },
+        { silentError: true },
+      )
+      if (!applied) return false
+
       await patchClashMode('rule')
       await activateSelected()
       // 后端 patchVerge 已触发 verge://refresh-clash-config 事件，
       // 前端 use-layout-events 中的 250ms 防抖会合并 revalidate，
       // 此处再调 refreshClashConfig() 属冗余，已移除。
+      if (fallback === 'proxy') {
+        showNotice.success('layout.notices.switchedToGlobalProxy')
+      } else if (fallback === 'direct') {
+        showNotice.success('layout.notices.switchedToGfwlist')
+      } else {
+        showNotice.success('layout.notices.switchedToAddUrl')
+      }
+      return true
     } catch (err: unknown) {
-      showNotice.error(err instanceof Error ? err.message : String(err))
+      showNotice.error(err)
+      return false
     } finally {
-      hideNotice(waitId)
+      settleLoadingNotice(waitId)
       endLongOperation()
     }
   }
 
   const [addUrlOpen, setAddUrlOpen] = useState(false)
   const handleAddUrlClick = async () => {
-    await handleRuleFallbackChange('addurl')
-    setAddUrlOpen(true)
+    if (verge?.rule_fallback === 'addurl') {
+      setAddUrlOpen(true)
+      return
+    }
+    const ok = await handleRuleFallbackChange('addurl')
+    if (ok) {
+      setAddUrlOpen(true)
+    }
   }
 
   const themeModeVal = verge?.theme_mode || 'system'
@@ -1094,6 +1121,7 @@ const Layout = () => {
     if (targetMode === currentMode) return
 
     const waitId = showNotice.info('layout.notices.adjusting', 0)
+    markLoadingNotice(waitId)
 
     // 标记长操作开始：patchVerge / restartCore 期间 mihomo reload 或内核重启
     // 会阻塞 IPC 通道，此时所有 IPC timeout 静默（已有持久 Notice 提示用户），
@@ -1102,42 +1130,45 @@ const Layout = () => {
     try {
       if (targetMode === 'manual') {
         try {
-          await patchVerge({
-            enable_system_proxy: false,
-            enable_tun_mode: false,
-          })
+          const applied = await patchVerge(
+            {
+              enable_system_proxy: false,
+              enable_tun_mode: false,
+            },
+            { silentError: true },
+          )
+          if (!applied) return
           await mutateSystemState()
           if (verge?.auto_close_connection) {
             await closeAllConnectionsWithTimeout().catch(() =>
               console.warn('[layout] closeAllConnectionsWithTimeout failed'),
             )
           }
-          hideNotice(waitId)
           showNotice.success('layout.notices.switchedToManualMode')
         } catch (err) {
-          hideNotice(waitId)
           showNotice.error(err)
         }
       } else if (targetMode === 'system') {
         try {
-          await patchVerge({
-            enable_system_proxy: true,
-            enable_tun_mode: false,
-          })
+          const applied = await patchVerge(
+            {
+              enable_system_proxy: true,
+              enable_tun_mode: false,
+            },
+            { silentError: true },
+          )
+          if (!applied) return
           await mutateSystemState()
-          hideNotice(waitId)
           showNotice.success('layout.notices.systemProxyEnabled')
         } catch (err) {
-          hideNotice(waitId)
           showNotice.error(err)
         }
       } else if (targetMode === 'tun') {
         if (!isTunModeAvailable) {
           try {
-            await installServiceAndRestartCore()
+            await installServiceAndRestartCore({ silentError: true })
             await mutateSystemState()
           } catch {
-            hideNotice(waitId)
             showNotice.error('layout.notices.tunServiceConfigFailed')
             return
           }
@@ -1145,19 +1176,22 @@ const Layout = () => {
 
         try {
           // patchVerge 检测 enable_tun_mode 变更后自动在后端执行 RESTART_CORE 切换运行模式
-          await patchVerge({
-            enable_system_proxy: false,
-            enable_tun_mode: true,
-          })
+          const applied = await patchVerge(
+            {
+              enable_system_proxy: false,
+              enable_tun_mode: true,
+            },
+            { silentError: true },
+          )
+          if (!applied) return
           await mutateSystemState()
-          hideNotice(waitId)
           showNotice.success('layout.notices.tunModeEnabled')
         } catch (err) {
-          hideNotice(waitId)
           showNotice.error(err)
         }
       }
     } finally {
+      settleLoadingNotice(waitId)
       endLongOperation()
     }
   }
@@ -1574,7 +1608,9 @@ const Layout = () => {
                   {/* Section 4: Theme Settings */}
                   <ThemeSettingsCard
                     verge={verge ?? null}
-                    patchVerge={patchVerge}
+                    patchVerge={async (val) => {
+                      await patchVerge(val)
+                    }}
                     themeActiveIndex={themeActiveIndex}
                     depthFactor={depthFactor}
                     handleDepthFactorChange={handleDepthFactorChange}

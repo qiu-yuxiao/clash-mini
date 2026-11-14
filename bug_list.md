@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-370)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-371)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -386,6 +386,13 @@
 - **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src/services/delay.ts`, `src/services/delay.test.ts`, `src/hooks/use-proxy-delay-state.ts`, `src/pages/_layout/components/active-node-card.tsx`
 - **根因与背景实证**：2026-11-15 `v3.3.2` 现场运行日志（`03:19:22 ~ 04:12:00`）证实 `日本8` 代理与内核连接（0 条错误）全程完全通畅，但前端列表与顶栏活跃节点卡片持续显示全员 `Timeout` 达一两个小时：① **主测速地址部分失真 + 快照传染**：`probe_metrics_group` 仅在整组返回 `Err`（0 个节点通过）时切备用地址复核，当订阅中哪怕仅有 1 个非目标/假节点对 `cp.cloudflare.com/generate_204` 返回 `204` 时即跳过备用地址，`LAST_METRICS_PROBE` 存下对当前目标子集全灭的单地址残缺快照并在 6ms 后被自愈复用，推送全员 `0ms (Timeout)` 与 `proxy.alive=false`；② **前后端同步“报忧不报喜”断层**：1 分钟后 `03:22:59` 后台复检确认恢复正常且后续内核 300s `PROXY__METRICS` 周期均健康，但在不触发重选与免拨测分支下后端从不向前端补发可用延迟或 `refresh_proxies()`；③ **前端缓存淘汰不通知与顶栏卡片僵死**：`DelayManager` 定时清理过期 30 分钟缓存时不通知订阅者重算，即使刷新 `['getProxies']`，`ActiveNodeStatusCard` `useEffect` 仅依赖 `hasRecord` 布尔值而不跟踪 `activeNodeRecord` 引用变更，导致活跃节点栏长期死锁在旧 `Timeout`。
 - **修正与改良方案**：① `probe_metrics_group` 新增 `should_recheck_with_fallback`（目标节点或非假节点在主地址均未取得 `[30ms, 5000ms)` 有效延迟时切备用地址复核）与 `merge_probe_delays` 有效延迟合并，`LAST_METRICS_PROBE` 引入 `dual_url_verified` 门控并封堵 `history` 全死假新鲜复用；② `evaluate_failover` 在 `!need_probe` 且活跃节点 `Alive` 时，若处于恢复（`force_confirm_probe` / `LAST_NOTIFIED_HEALTH != "network_health::ok"`）或内核自然周期产出了未上屏新时间戳（`LAST_SYNCED_ACTIVE_HISTORY_TIME`），立即向前端推送可用延迟与 `refresh_proxies()`；③ `DelayManager.evictExpiredCache()` 淘汰过期条目（跳过 `-2` 测试态）时主动派发重置通知驱动 `useProxyDelayState` / `ActiveNodeStatusCard` 回落重算，且 `ActiveNodeStatusCard` 直接响应 `activeNodeRecord` 更新，并补齐 Rust 与 Vitest 单测锁定。
+
+### BUG-371（对应规范章节：2.2 / 2.10）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / 流量接管模式与基础设置开关操作过程/结果/失败弹窗提示退化修复
+- **涉及物理路径与行号**：`src/services/notice-service.ts`, `src/components/layout/notice-manager.tsx`, `src/hooks/use-verge.ts`, `src/hooks/use-service-installer.ts`, `src/pages/_layout.tsx`, `src/pages/_layout/hooks/use-minimal-settings.ts`, `src/pages/_layout/components/basic-settings-card.tsx`, `src/utils/popup-styles.test.ts`, `src/locales/*/layout.json`, `src/locales/*/settings.json`
+- **根因与背景实证**：① `handleRuleFallbackChange`（代理方式三选一）、`BasicSettingsCard` 内的「开机自动启动」「启动时最小化」「TUN 域名嗅探」三选一以及「混合代理端口」保存缺少进行中提示、成功反馈、范围校验及权限/受限提示；② 快速完成的后端 IPC（如 `Allow LAN`、`IPv6`、规则兜底，5~40ms）在人眼感知前即调用 `hideNotice(waitId)` 关闭「正在调整」横幅，造成未弹窗的视觉错觉；③ `NoticeManager` `zIndex: 1500` 与 MUI `Tooltip` 默认层级相同，紧邻开关悬停 Tooltip 时易被遮挡；④ `patchVerge` 先行弹出 `showNotice.error` 后又 `throw err`，导致外层 `catch` 重复弹窗，且 `useLockFn` 并发丢弃时解析为 `undefined` 被调用方误判为成功而误弹成功通知。
+- **修正与改良方案**：① `notice-service` 新增 `MIN_LOADING_NOTICE_DWELL_MS = 320`、`markLoadingNotice` 与 `settleLoadingNotice`，快速操作亦保证过程提示至少稳定停留 `320ms` 后平滑退场，并将 `NoticeManager` `zIndex` 升至 `2200` 与增设内边距；② `patchVerge` 成功执行返回 `true`（并发丢弃时返回 `undefined`）且 `patchVerge` / `useServiceInstaller` 支持 `{ silentError: true }` 消除双弹窗；③ 为「代理方式」「流量接管模式」「Allow LAN」「IPv6」「开机自动启动」（含注册表结果对账不一致告警）、「启动时最小化」「TUN 域名嗅探」（含非 TUN 模式点击警示）与端口保存（含 `1–65535` 校验）全面恢复统一「进行中 → 成功/告警 → 失败单弹窗」闭环并同步 13 语种及 Vitest 单测。
 
 ---
 
