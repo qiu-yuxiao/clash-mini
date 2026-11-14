@@ -4,7 +4,6 @@
   "webviews": ["main"],
   "windows": ["main"],
   "permissions": [
-    "updater:default",
     "dialog:default",
     "dialog:allow-ask",
     "dialog:allow-message",
@@ -17,7 +16,6 @@
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "core:window:allow-set-theme",
-    "notification:default",
     "http:default",
     "http:allow-fetch",
     {

@@ -958,6 +958,7 @@ Section Install
   DetailPrint "Removing window-state.json / .window-state.json"
   Delete "$APPDATA\io.github.clash-mini.clash-mini\window-state.json"
   Delete "$APPDATA\io.github.clash-mini.clash-mini\.window-state.json"
+  RMDir /r "$LOCALAPPDATA\${BUNDLEID}\guard"
 
   ; Clean legacy auto-launch registry entries
   StrCpy $R1 "Software\Microsoft\Windows\CurrentVersion\Run"

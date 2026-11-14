@@ -175,6 +175,22 @@ async fn initialize_config_files() -> Result<()> {
     Ok(())
 }
 
+/// 清理历史版本（v3.2.5 ~ v3.3.2）遗留的伴生看门狗目录与独立日志（静默容错，不阻断启动）
+async fn cleanup_legacy_guardian_artifacts() {
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) {
+        let legacy_guard_dir = PathBuf::from(local_app_data).join(dirs::APP_ID).join("guard");
+        if legacy_guard_dir.exists() {
+            let _ = fs::remove_dir_all(&legacy_guard_dir).await;
+        }
+    }
+    if let Ok(log_dir) = dirs::app_logs_dir() {
+        let legacy_guard_log = log_dir.join("guardian.log");
+        if legacy_guard_log.exists() {
+            let _ = fs::remove_file(&legacy_guard_log).await;
+        }
+    }
+}
+
 /// Initialize all the config files
 /// before tauri setup
 pub async fn init_config() -> Result<()> {
@@ -188,6 +204,7 @@ pub async fn init_config() -> Result<()> {
     initialize_config_files().await?;
 
     AsyncHandler::spawn(|| async {
+        cleanup_legacy_guardian_artifacts().await;
         if let Err(e) = delete_log().await {
             logging!(warn, Type::Setup, "Failed to clean old logs: {}", e);
         }

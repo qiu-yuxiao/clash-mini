@@ -9,21 +9,6 @@ use std::sync::atomic::{AtomicU8, Ordering};
 // 引入全局异步互斥排队锁，彻底消除轻量模式极速开关时，销毁与创建窗口在异步层面的竞态冲突
 static LIGHTWEIGHT_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-/// 轻量模式 cleanup 任务的 JoinHandle，用于退出时主动中止
-static LIGHTWEIGHT_CLEANUP_HANDLE: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>> =
-    std::sync::Mutex::new(None);
-
-/// 中止轻量模式 cleanup 后台任务
-pub fn abort_lightweight_cleanup() {
-    let value = LIGHTWEIGHT_CLEANUP_HANDLE
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .take();
-    if let Some(handle) = value {
-        handle.abort();
-    }
-}
-
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LightweightState {
@@ -61,14 +46,8 @@ fn transition_and_log(from: LightweightState, to: LightweightState) -> bool {
         .is_ok()
     {
         match to {
-            LightweightState::Normal => {
-                crate::process::guardian::set_lightweight_mode_signal(false);
-                logging!(info, Type::Lightweight, "轻量模式已关闭");
-            }
-            LightweightState::In => {
-                crate::process::guardian::set_lightweight_mode_signal(true);
-                logging!(info, Type::Lightweight, "轻量模式已开启");
-            }
+            LightweightState::Normal => logging!(info, Type::Lightweight, "轻量模式已关闭"),
+            LightweightState::In => logging!(info, Type::Lightweight, "轻量模式已开启"),
             LightweightState::Exiting => logging!(info, Type::Lightweight, "正在退出轻量模式"),
         }
         true
@@ -87,7 +66,7 @@ pub async fn auto_lightweight_boot() -> Result<()> {
     let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
     let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
     let should_silent = is_silent_start && has_silent_arg;
-    if should_silent || crate::process::guardian::is_guardian_silent_respawn() {
+    if should_silent {
         entry_lightweight_mode().await;
     }
     Ok(())
@@ -96,11 +75,8 @@ pub async fn auto_lightweight_boot() -> Result<()> {
 pub async fn entry_lightweight_mode() -> bool {
     let _guard = LIGHTWEIGHT_LOCK.lock().await;
     let verge = Config::verge().await;
-    if !crate::process::guardian::is_guardian_silent_respawn()
-        && !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false)
-    {
+    if !verge.data_arc().enable_auto_light_weight_mode.unwrap_or(false) {
         let _ = WindowManager::hide_main_window();
-        crate::process::guardian::set_lightweight_mode_signal(true);
         crate::core::tray::update_lite_mode_menu(false);
         return true;
     }
@@ -146,8 +122,6 @@ pub async fn entry_lightweight_mode() -> bool {
     // 💡 说明：进入轻量模式时【不再】激进清空所有网络连接 (GC)。
     //    按用户要求，轻量模式不等于关闭程序——正在下载的链接不能被切断重连，
     //    故仅保留下方资源回收动作，不影响用户实际代理流量。
-    // 进入前 abort 上一个 cleanup 任务，避免累积（FM-09）。
-    abort_lightweight_cleanup();
     // 【方案A】不再 spawn 独立任务调 wait_for_clash_ready + trigger_backend_auto_select，
     // 改为唤醒监测线程由其统一执行。消除开机自启时轻量模式 spawn 与监测线程首次运行
     // 并发 wait_for_clash_ready，避免两路同时轮询 mihomo API 叠加 TUN 测速卡住
@@ -162,16 +136,11 @@ pub async fn entry_lightweight_mode() -> bool {
 pub async fn exit_lightweight_mode() -> bool {
     let _guard = LIGHTWEIGHT_LOCK.lock().await;
 
-    // 🛡️ [FM-09 修复] 退出轻量模式时，立即 abort 在途的 cleanup 任务，
-    // 防止 2 秒内快速连续进出时，后台 cleanup 任务在主窗口已经恢复挂载后误分发清理动作。
-    abort_lightweight_cleanup();
-
     // 状态为 Normal 时，窗口可能仅被隐藏（enable_auto_light_weight_mode=false 路径），
     // 直接显示窗口即可恢复，避免"窗口隐藏但无法退出"的卡死状态。
     if get_state() == LightweightState::Normal {
         logging!(debug, Type::Lightweight, "轻量模式未激活，直接显示窗口");
         let _ = WindowManager::show_main_window().await;
-        crate::process::guardian::set_lightweight_mode_signal(false);
         crate::core::tray::update_lite_mode_menu(false);
         return true;
     }

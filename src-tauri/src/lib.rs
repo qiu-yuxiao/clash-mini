@@ -50,7 +50,6 @@ mod app_init {
     pub fn setup_plugins(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
         #[allow(unused_mut)]
         let mut builder = builder
-            .plugin(tauri_plugin_notification::init())
             .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_clipboard_manager::init())
             .plugin(tauri_plugin_process::init())
@@ -194,10 +193,6 @@ pub(crate) fn show_error_dialog(title: &str, message: &str) {
     }
 }
 
-pub fn maybe_run_guardian_mode() -> Option<i32> {
-    process::guardian::maybe_run_guardian_mode()
-}
-
 pub fn run() {
     if let Err(err) = app_init::init_singleton_check() {
         let msg = format!(
@@ -223,9 +218,6 @@ pub fn run() {
             resolve::init_work_dir_and_logger()?;
 
             logging!(info, Type::Setup, "开始应用初始化...");
-            // 挂载防第三方内存优化软件误杀的常驻零渲染哨兵窗口（UI 主线程）与超轻量伴生看门狗（BUG-316）
-            crate::process::guardian::init_resident_sentinel_window();
-            crate::process::guardian::start_guardian_companion();
 
             if let Err(e) = app_init::setup_autostart(app) {
                 logging!(error, Type::Setup, "Failed to setup autostart: {}", e);
@@ -246,30 +238,6 @@ pub fn run() {
             crate::process::AsyncHandler::spawn(|| async move {
                 if let Err(e) = crate::feat::cleanup_icon_cache(MAX_ICON_CACHE_FILES).await {
                     logging!(warn, Type::Setup, "清理旧图标缓存失败: {}", e);
-                }
-            });
-
-            // UI 线程心跳探针：每 5 秒向 UI 线程投递闭包，
-            // 若 5 秒内未执行则写入警告日志，用于精确定位 UI 线程卡死时间点
-            crate::process::AsyncHandler::spawn(|| async move {
-                use std::sync::Arc;
-                use std::sync::atomic::{AtomicBool, Ordering};
-                use std::time::Duration;
-                let alive = Arc::new(AtomicBool::new(false));
-                loop {
-                    if handle::Handle::global().is_exiting() {
-                        break;
-                    }
-                    let app_handle = handle::Handle::app_handle();
-                    alive.store(false, Ordering::SeqCst);
-                    let alive_clone = Arc::clone(&alive);
-                    let _ = app_handle.run_on_main_thread(move || {
-                        alive_clone.store(true, Ordering::SeqCst);
-                    });
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                    if !alive.load(Ordering::SeqCst) {
-                        logging!(error, Type::System, "[心跳探针] UI 线程 5 秒未响应，可能已卡死");
-                    }
                 }
             });
 
@@ -385,7 +353,6 @@ pub fn run() {
             event_handlers::handle_ready_resumed(app_handle);
         }
         tauri::RunEvent::Exit => {
-            crate::process::guardian::confirm_intentional_exit_with_reason("run_event_exit");
             logging!(info, Type::System, "Application exited");
         }
         // Clash Mini 是托盘驻留应用，关闭或销毁窗口绝不可退出主进程；
@@ -393,7 +360,6 @@ pub fn run() {
         // 无论系统消息是否有退出码（code 是否为 None）、无论是否在轻量模式，
         // 只要未进入明确退出流程，一律阻止退出，确保托盘和后台守护永驻。
         tauri::RunEvent::ExitRequested { api, .. } if !handle::Handle::global().is_exiting() => {
-            crate::process::guardian::cancel_intentional_exit("prevent_exit");
             api.prevent_exit();
         }
         _ => {}

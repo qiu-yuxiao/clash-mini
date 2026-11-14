@@ -1,6 +1,5 @@
 import path from 'node:path'
 
-import legacy from '@vitejs/plugin-legacy'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import svgr from 'vite-plugin-svgr'
@@ -9,21 +8,9 @@ export default defineConfig({
   base: './',
   root: 'src',
   server: { port: 3000 },
-  plugins: [
-    svgr(),
-    react(),
-    legacy({
-      modernTargets: ['edge>=109'],
-      renderLegacyChunks: false,
-      modernPolyfills: ['es.object.has-own', 'web.structured-clone'],
-      additionalModernPolyfills: [
-        path.resolve('./src/polyfills/matchMedia.js'),
-        path.resolve('./src/polyfills/WeakRef.js'),
-        path.resolve('./src/polyfills/RegExp.js'),
-      ],
-    }),
-  ],
+  plugins: [svgr(), react()],
   build: {
+    target: 'edge109',
     outDir: '../dist',
     emptyOutDir: true,
     chunkSizeWarningLimit: 4000,

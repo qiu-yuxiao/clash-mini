@@ -42,6 +42,6 @@ Clash Mini 内置了「进程守护」机制：当代理内核（mihomo）意外
 
 ## 六、技术背景（面向开发者）
 
-- Clash Mini 代码层的守护机制（`prevent_exit` + 单退出意图文件凭证 + Breakaway 单通道 + Boot/Epoch 累计熔断）只能推迟「被清理」，**无法对抗安全软件的进程拦截**；
+- Clash Mini 仅采用 Tauri 标准 `RunEvent::ExitRequested`（`prevent_exit`）维持托盘与后台驻留，已彻底移除伴生看门狗 / `1×1` 隐形哨兵窗口 / `Breakaway` 等反误杀进程机制，避免不必要的安全软件误报叠加；
 - 将 `clash-mini.exe` 加入安全软件信任/防护白名单属于**环境配置**，是防误杀的唯一根因解，代码层无法替代；
 - App 不修改、不绕过任何安全软件配置，仅提供上述透明说明。

@@ -12,9 +12,8 @@ use serde::{Deserialize, Serialize};
 use serde_yaml_ng::Mapping;
 use smartstring::alias::String;
 use std::time::Duration;
-// TODO, use other re-export
-use reqwest_dav::re_exports::url::form_urlencoded;
 use tauri::Url;
+use url::form_urlencoded;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct PrfItem {

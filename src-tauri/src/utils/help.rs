@@ -1,4 +1,4 @@
-use crate::{config::with_encryption, enhance::seq::SeqMap};
+use crate::enhance::seq::SeqMap;
 use anyhow::{Context as _, Result, anyhow, bail};
 use clash_verge_logging::{Type, logging};
 use nanoid::nanoid;
@@ -19,7 +19,7 @@ pub fn read_yaml<T: DeserializeOwned>(path: &PathBuf) -> Result<T> {
     let yaml_str =
         std::fs::read_to_string(path).with_context(|| format!("failed to read the file \"{}\"", path.display()))?;
 
-    Ok(with_encryption(|| serde_yaml_ng::from_str::<T>(&yaml_str))?)
+    Ok(serde_yaml_ng::from_str::<T>(&yaml_str)?)
 }
 
 /// read mapping from yaml
@@ -62,7 +62,7 @@ pub fn read_seq_map(path: &PathBuf) -> Result<SeqMap> {
 /// can set `prefix` string to add some comments
 /// 使用原子写入（临时文件 + rename）避免 TOCTOU 竞态和写入中途损坏
 pub fn save_yaml<T: Serialize>(path: &PathBuf, data: &T, prefix: Option<&str>) -> Result<()> {
-    let data_str = with_encryption(|| serde_yaml_ng::to_string(data))?;
+    let data_str = serde_yaml_ng::to_string(data)?;
 
     let yaml_str = match prefix {
         Some(prefix) => format!("{prefix}\n\n{data_str}"),
