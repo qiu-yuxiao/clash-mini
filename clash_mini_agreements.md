@@ -251,6 +251,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 - **双控制滑块解耦与独立存储**：在不同皮肤下，两个控制滑块对应不同的底层物理参数（如 Depth/Vibrancy、Radius/Accent 等），各参数在 LocalStorage 中使用独立字段存储，切换皮肤不产生数值污染。
 - **字体族共鸣对齐**：各皮肤严格匹配中英文字体组合（如 Retro 3D 匹配 Trebuchet MS / SimHei；Cyberpunk 匹配 Consolas / NSimSun 等），确保跨语言视觉一致。
+- **三态分段开关尺寸与纵向对齐规范**：`ThemeSettingsCard` 中的主题模式三态开关（`系统 / 浅色 / 深色`）统一与 `BasicSettingsCard` 中的 `TUN 域名嗅探` 三态开关保持完全一致的 `118 × 20px` 外框尺寸与 `11px` 粗体字号，并通过 `marginInlineEnd: 4px` 对齐两张同列设置卡片内部开关的左右边界（标题文字仍保持最左对齐），同时对标题与选项文字统一施加 `textOverflow: 'ellipsis'` 与 `title` 悬浮提示以兼容多语种长文案。
 
 ### 2.8 主页节点列表与活跃节点轮换
 
@@ -806,6 +807,10 @@ flowchart LR
   1. **窄窗 `271px` 浮层锁定与视觉统一**：`src/constants.ts` 定义 `CUSTOM_TITLEBAR_HEIGHT = 30`，新增 `src/utils/popup-styles.ts`（含 `popup-styles.test.ts`）统一收敛 `resolveNarrowOverlayTopOffset`、`useNarrowOverlayTopOffset`、`getPopupCardStyle`、`getPopupSkinTokens` 与窄窗对话框/通知定位契约；同步改造 `base-dialog.tsx`、`notice-manager.tsx`、`add-url-dialog.tsx`、`antivirus-whitelist-dialog.tsx`、`first-run-guide-dialog.tsx`、`help-menu-button.tsx`（含一级菜单与二级弹窗）、`layout-dialogs.tsx`、`base-styled-select.tsx`、`connection-detail.tsx`、`connection-table.tsx`、`_layout.tsx`、`use-custom-theme.ts` 与 `src/assets/styles/index.scss`，确保窄窗弹窗/通知始终锁定左侧 `271px` 且不遮挡标题栏，全端菜单/弹窗视觉风格统一。
   2. **路径控制单表融合与自定义路由备份/恢复**：`src/utils/path-control.ts` 与 `src/hooks/use-path-control.ts` 将目标去重后的近期已关闭连接（`_isClosed: true`）直接合入路径控制单表并维护排序；`src/utils/quick-routing.ts` 新增 `serializeCustomRoutingBackup`、`parseCustomRoutingBackup`、`exportCustomRoutingRules` 与 `importCustomRoutingRules`；`src/pages/_layout/components/connections-panel.tsx`、`src/components/connection/connection-table.tsx` 与 `src/pages/_layout.tsx` 移除「活跃 / 历史」开关，在 `路径控制（右键点击链接）` 右侧新增与 `断开全部` 同款 3D 风格的「保存路由」「导入路由」按钮；同步更新 13 个语种 `settings.json` 并重生成 `i18n-types`（`885` 键），增补 `path-control.test.ts` 与 `quick-routing.test.ts` 单测。
 - **影响**：宽窗口下弹窗/顶部通知不再偏移或撑开，右键菜单与弹窗卡片统一呈现 3D 实体拟物风格；路径控制表消除「活跃/历史」切换认知负担且支持短连接就地管控与重装后自定义路由一键恢复；前端校验与全套 113 项单测全绿通过。
+
+### Sync-12 · 主题设置三态开关尺寸放大并与 TUN 域名嗅探开关纵向对齐
+- **改动**：`src/pages/_layout/components/theme-settings-card.tsx` 将主题模式三态切换器（`系统 / 浅色 / 深色`）由 `100 × 18px`（字号 `10px`）放大至与 `BasicSettingsCard` 中 `TUN 域名嗅探` 开关完全一致的 `118 × 20px`（字号 `11px`），外加 `flexShrink: 0` 与 `marginInlineEnd: '4px'` 使左右边缘严格上下对齐在同一垂线上，同时合并三态选项为数据驱动渲染并补齐 `minWidth: 0` / `overflow: 'hidden'` / `textOverflow: 'ellipsis'` / `title` 多语种截断防护。
+- **影响**：左侧设置栏中「TUN 域名嗅探」与「主题设置」两个三态开关在视觉体量与左右垂线位置上完全对齐；仅涉及纯前端样式与布局调整，不触碰代理/主题业务状态。
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 

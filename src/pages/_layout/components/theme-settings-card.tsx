@@ -154,14 +154,23 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: 0.5,
+          minWidth: 0,
           mb: 0.5,
         }}
       >
         <Typography
           variant="subtitle2"
+          title={t('settings.components.verge.theme.title', {
+            defaultValue: '主题设置',
+          })}
           sx={{
             fontWeight: 'bold',
             fontSize: '13px',
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
             color: isRetro3DDark ? '#2C1F03' : 'inherit',
           }}
         >
@@ -174,11 +183,14 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
+            width: 118,
+            flexShrink: 0,
+            // Align horizontally with BasicSettingsCard's gridItemSx (px: 0.5 -> 4px right inset)
+            marginInlineEnd: '4px',
             bgcolor: 'action.hover',
             borderRadius: '4px',
             p: '1px',
-            width: '100px',
-            height: 18,
+            height: 20,
             userSelect: 'none',
             ...get3DSegmentedContainerStyle(theme),
           })}
@@ -198,143 +210,87 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({
             <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
           </Box>
 
-          <Box
-            onClick={() =>
-              patchVerge({ theme_mode: 'system' }).catch((err) =>
-                console.error('[ThemeSettings] patchVerge failed:', err),
-              )
-            }
-            sx={{
-              flex: 1,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color:
-                themeActiveIndex === 0
-                  ? get3DSegmentedActiveTextColor(theme)
-                  : isRetro3DDark
-                    ? 'rgba(44, 31, 3, 0.75)'
-                    : 'text.secondary',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              zIndex: 1,
-              transition: 'color 0.2s ease',
-              '&:hover': {
-                color:
-                  themeActiveIndex === 0
+          {(
+            [
+              {
+                mode: 'system',
+                key: 'settings.sections.appearance.system',
+                defaultLabel: '系统',
+              },
+              {
+                mode: 'light',
+                key: 'settings.sections.appearance.light',
+                defaultLabel: '浅色',
+              },
+              {
+                mode: 'dark',
+                key: 'settings.sections.appearance.dark',
+                defaultLabel: '深色',
+              },
+            ] as const
+          ).map((option, index) => {
+            const label = t(option.key, {
+              defaultValue: option.defaultLabel,
+            })
+            const isSelected = themeActiveIndex === index
+            return (
+              <Box
+                key={option.mode}
+                title={label}
+                onClick={() =>
+                  patchVerge({ theme_mode: option.mode }).catch((err) =>
+                    console.error('[ThemeSettings] patchVerge failed:', err),
+                  )
+                }
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  px: 0.25,
+                  overflow: 'hidden',
+                  color: isSelected
                     ? get3DSegmentedActiveTextColor(theme)
                     : isRetro3DDark
-                      ? '#2C1F03'
-                      : undefined,
-              },
-              '&:active': {
-                color:
-                  themeActiveIndex === 0
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? 'rgba(44, 31, 3, 0.5)'
-                      : undefined,
-              },
-            }}
-          >
-            {t('settings.sections.appearance.system', {
-              defaultValue: '系统',
-            })}
-          </Box>
-
-          <Box
-            onClick={() =>
-              patchVerge({ theme_mode: 'light' }).catch((err) =>
-                console.error('[ThemeSettings] patchVerge failed:', err),
-              )
-            }
-            sx={{
-              flex: 1,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color:
-                themeActiveIndex === 1
-                  ? get3DSegmentedActiveTextColor(theme)
-                  : isRetro3DDark
-                    ? 'rgba(44, 31, 3, 0.75)'
-                    : 'text.secondary',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              zIndex: 1,
-              transition: 'color 0.2s ease',
-              '&:hover': {
-                color:
-                  themeActiveIndex === 1
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? '#2C1F03'
-                      : undefined,
-              },
-              '&:active': {
-                color:
-                  themeActiveIndex === 1
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? 'rgba(44, 31, 3, 0.5)'
-                      : undefined,
-              },
-            }}
-          >
-            {t('settings.sections.appearance.light', {
-              defaultValue: '浅色',
-            })}
-          </Box>
-
-          <Box
-            onClick={() =>
-              patchVerge({ theme_mode: 'dark' }).catch((err) =>
-                console.error('[ThemeSettings] patchVerge failed:', err),
-              )
-            }
-            sx={{
-              flex: 1,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color:
-                themeActiveIndex === 2
-                  ? get3DSegmentedActiveTextColor(theme)
-                  : isRetro3DDark
-                    ? 'rgba(44, 31, 3, 0.75)'
-                    : 'text.secondary',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              zIndex: 1,
-              transition: 'color 0.2s ease',
-              '&:hover': {
-                color:
-                  themeActiveIndex === 2
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? '#2C1F03'
-                      : undefined,
-              },
-              '&:active': {
-                color:
-                  themeActiveIndex === 2
-                    ? get3DSegmentedActiveTextColor(theme)
-                    : isRetro3DDark
-                      ? 'rgba(44, 31, 3, 0.5)'
-                      : undefined,
-              },
-            }}
-          >
-            {t('settings.sections.appearance.dark', {
-              defaultValue: '深色',
-            })}
-          </Box>
+                      ? 'rgba(44, 31, 3, 0.75)'
+                      : 'text.secondary',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  zIndex: 1,
+                  transition: 'color 0.2s ease',
+                  '&:hover': {
+                    color: isSelected
+                      ? get3DSegmentedActiveTextColor(theme)
+                      : isRetro3DDark
+                        ? '#2C1F03'
+                        : undefined,
+                  },
+                  '&:active': {
+                    color: isSelected
+                      ? get3DSegmentedActiveTextColor(theme)
+                      : isRetro3DDark
+                        ? 'rgba(44, 31, 3, 0.5)'
+                        : undefined,
+                  },
+                }}
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '100%',
+                  }}
+                >
+                  {label}
+                </Box>
+              </Box>
+            )
+          })}
         </Box>
       </Box>
 
