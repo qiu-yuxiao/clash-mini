@@ -1,6 +1,11 @@
-import { Select, SelectProps, styled } from '@mui/material'
+import { Select, SelectProps, styled, useTheme } from '@mui/material'
+
+import { getPopupMenuPaperProps } from '@/utils/popup-styles'
 
 export const BaseStyledSelect = styled((props: SelectProps<string>) => {
+  const theme = useTheme()
+  const { MenuProps, ...rest } = props
+
   return (
     <Select
       size="small"
@@ -11,7 +16,14 @@ export const BaseStyledSelect = styled((props: SelectProps<string>) => {
         mr: 1,
         '[role="button"]': { py: 0.65 },
       }}
-      {...props}
+      {...rest}
+      MenuProps={{
+        ...MenuProps,
+        slotProps: {
+          ...MenuProps?.slotProps,
+          paper: MenuProps?.slotProps?.paper ?? getPopupMenuPaperProps(theme),
+        },
+      }}
     />
   )
 })(({ theme }) => ({

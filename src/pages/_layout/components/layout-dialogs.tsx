@@ -1,11 +1,14 @@
 import { CloseRounded } from '@mui/icons-material'
 import {
   Box,
-  Typography,
-  TextField,
   Button,
   Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
+  TextField,
+  Typography,
   useTheme,
   type SxProps,
   type Theme,
@@ -14,15 +17,19 @@ import { type Update } from '@tauri-apps/plugin-updater'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { MIN_WINDOW_WIDTH } from '@/constants'
+import { get3DButtonStyle, get3DInputStyle } from '@/utils/button-styles'
 import {
-  get3DInputStyle,
-  get3DCardStyle,
-  get3DButtonStyle,
-} from '@/utils/button-styles'
+  getNarrowDialogSlotProps,
+  getNarrowDialogSx,
+  getPopupActionsSx,
+  getPopupContentSx,
+  getPopupSkinTokens,
+  getPopupTitleSx,
+  useNarrowOverlayTopOffset,
+} from '@/utils/popup-styles'
 
 import LogsPage from '../../logs'
-import { isSameVersion, formatCoreVersion } from '../utils/style-helpers'
+import { formatCoreVersion, isSameVersion } from '../utils/style-helpers'
 
 interface GithubAsset {
   name: string
@@ -113,6 +120,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
 }) => {
   const theme = useTheme()
   const { t } = useTranslation()
+  const topOffset = useNarrowOverlayTopOffset()
+  const tokens = getPopupSkinTokens(theme)
 
   return (
     <>
@@ -120,129 +129,130 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
       <Dialog
         open={editProfileOpen}
         onClose={() => setEditProfileOpen(false)}
-        fullWidth
         maxWidth={false}
-        slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              p: 3,
-              width: 'calc(100% - 32px)',
-              maxWidth: '450px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              fontFamily: 'var(--control-font-family)',
-              color: theme.palette.text.primary,
-            },
-          },
-        }}
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset)}
       >
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 'bold',
-            mb: 2,
-            fontFamily: 'var(--control-font-family)',
-          }}
-        >
-          ⚙️ {t('layout.components.dialogs.editProfile.title')}
-        </Typography>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-          <Box>
-            <Typography
-              id="profile-name-label"
-              variant="body2"
-              sx={{
-                mb: 0.5,
-                fontWeight: 'bold',
-                fontFamily: 'var(--control-font-family)',
-              }}
-            >
-              {t('layout.components.dialogs.editProfile.nameLabel')}
-            </Typography>
-            <TextField
-              aria-labelledby="profile-name-label"
-              fullWidth
-              size="small"
-              value={editProfileName}
-              onChange={(e) => setEditProfileName(e.target.value)}
-              sx={get3DInputStyle(theme)}
-            />
-          </Box>
-
-          <Box>
-            <Typography
-              id="profile-url-label"
-              variant="body2"
-              sx={{
-                mb: 0.5,
-                fontWeight: 'bold',
-                fontFamily: 'var(--control-font-family)',
-              }}
-            >
-              {t('layout.components.dialogs.editProfile.urlLabel')}
-            </Typography>
-            <TextField
-              aria-labelledby="profile-url-label"
-              fullWidth
-              size="small"
-              value={editProfileUrl}
-              disabled={isEditProfileLocal}
-              onChange={(e) => setEditProfileUrl(e.target.value)}
-              sx={get3DInputStyle(theme)}
-            />
-          </Box>
-
-          <Box>
-            <Typography
-              id="profile-interval-label"
-              variant="body2"
-              sx={{
-                mb: 0.5,
-                fontWeight: 'bold',
-                fontFamily: 'var(--control-font-family)',
-              }}
-            >
-              {t('layout.components.dialogs.editProfile.intervalLabel')}
-            </Typography>
-            <TextField
-              aria-labelledby="profile-interval-label"
-              fullWidth
-              size="small"
-              type="number"
-              value={editProfileInterval}
-              disabled={isEditProfileLocal}
-              onChange={(e) => setEditProfileInterval(Number(e.target.value))}
-              sx={get3DInputStyle(theme)}
-            />
-          </Box>
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
-          <Button
-            onClick={() => setEditProfileOpen(false)}
+        <DialogTitle sx={getPopupTitleSx(theme)}>
+          <Box
             sx={{
-              fontSize: '12px',
-              height: '28px',
-              px: '16px',
-              ...defaultBtn3DStyle,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.75,
+              fontWeight: 'bold',
+              fontSize: '15.5px',
+              lineHeight: 1.35,
             }}
           >
-            {t('shared.actions.cancel')}
-          </Button>
+            <span>⚙️</span>
+            <span>{t('layout.components.dialogs.editProfile.title')}</span>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={getPopupContentSx()}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box>
+              <Typography
+                id="profile-name-label"
+                variant="body2"
+                sx={{
+                  mb: 0.5,
+                  fontWeight: 'bold',
+                  fontSize: '12.5px',
+                  color: tokens.primaryText,
+                  fontFamily: 'var(--control-font-family)',
+                }}
+              >
+                {t('layout.components.dialogs.editProfile.nameLabel')}
+              </Typography>
+              <TextField
+                aria-labelledby="profile-name-label"
+                fullWidth
+                size="small"
+                value={editProfileName}
+                onChange={(e) => setEditProfileName(e.target.value)}
+                sx={get3DInputStyle(theme)}
+              />
+            </Box>
+
+            <Box>
+              <Typography
+                id="profile-url-label"
+                variant="body2"
+                sx={{
+                  mb: 0.5,
+                  fontWeight: 'bold',
+                  fontSize: '12.5px',
+                  color: tokens.primaryText,
+                  fontFamily: 'var(--control-font-family)',
+                }}
+              >
+                {t('layout.components.dialogs.editProfile.urlLabel')}
+              </Typography>
+              <TextField
+                aria-labelledby="profile-url-label"
+                fullWidth
+                size="small"
+                value={editProfileUrl}
+                disabled={isEditProfileLocal}
+                onChange={(e) => setEditProfileUrl(e.target.value)}
+                sx={get3DInputStyle(theme)}
+              />
+            </Box>
+
+            <Box>
+              <Typography
+                id="profile-interval-label"
+                variant="body2"
+                sx={{
+                  mb: 0.5,
+                  fontWeight: 'bold',
+                  fontSize: '12.5px',
+                  color: tokens.primaryText,
+                  fontFamily: 'var(--control-font-family)',
+                }}
+              >
+                {t('layout.components.dialogs.editProfile.intervalLabel')}
+              </Typography>
+              <TextField
+                aria-labelledby="profile-interval-label"
+                fullWidth
+                size="small"
+                type="number"
+                value={editProfileInterval}
+                disabled={isEditProfileLocal}
+                onChange={(e) => setEditProfileInterval(Number(e.target.value))}
+                sx={get3DInputStyle(theme)}
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+
+        <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
           <Button
+            fullWidth
             onClick={handleSaveProfile}
             sx={{
-              fontSize: '12px',
-              height: '28px',
-              px: '16px',
               ...primaryBtn3DStyle,
+              py: 0.85,
+              fontSize: '13px',
             }}
           >
             {t('shared.actions.save')}
           </Button>
-        </Box>
+          <Button
+            fullWidth
+            onClick={() => setEditProfileOpen(false)}
+            sx={{
+              ...defaultBtn3DStyle,
+              py: 0.7,
+              fontSize: '12.5px',
+            }}
+          >
+            {t('shared.actions.cancel')}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Client Update Dialog */}
@@ -253,149 +263,146 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             setClientUpdateOpen(false)
           }
         }}
-        fullWidth
         maxWidth={false}
-        slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              p: 3,
-              width: 'calc(100% - 32px)',
-              maxWidth: '500px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              fontFamily: 'var(--control-font-family)',
-              color: theme.palette.text.primary,
-            },
-          },
-        }}
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset)}
       >
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 'bold',
-            mb: 2,
-            fontFamily: 'var(--control-font-family)',
-          }}
-        >
-          🚀 {t('layout.components.dialogs.client.title')}
-        </Typography>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography
-            variant="body2"
-            sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}
-          >
-            {t('layout.components.dialogs.update.currentVersion', {
-              version: appVersion
-                ? `v${appVersion}`
-                : t('layout.components.dialogs.update.unknown'),
-            })}
-          </Typography>
-          <Typography
-            variant="body2"
+        <DialogTitle sx={getPopupTitleSx(theme)}>
+          <Box
             sx={{
-              mb: 1,
-              fontFamily: 'var(--control-font-family)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.75,
               fontWeight: 'bold',
+              fontSize: '15.5px',
+              lineHeight: 1.35,
             }}
           >
-            {t('layout.components.dialogs.update.latestVersion', {
-              version: clientUpdateObj?.version
-                ? `v${clientUpdateObj.version}`
-                : t('layout.components.dialogs.update.unknown'),
-            })}
-          </Typography>
-        </Box>
+            <span>🚀</span>
+            <span>{t('layout.components.dialogs.client.title')}</span>
+          </Box>
+        </DialogTitle>
 
-        <Typography
-          variant="body2"
-          sx={{
-            fontWeight: 'bold',
-            mb: 1,
-            fontFamily: 'var(--control-font-family)',
-          }}
-        >
-          {t('layout.components.dialogs.client.changelog')}
-        </Typography>
-        <Box
-          sx={{
-            maxHeight: '200px',
-            overflowY: 'auto',
-            p: 2,
-            mt: 1,
-            mb: 2,
-            borderRadius: '4px',
-            fontSize: '13px',
-            whiteSpace: 'pre-wrap',
-            fontFamily: 'var(--control-font-family)',
-            ...get3DCardStyle(theme, 'default'),
-          }}
-        >
-          {clientUpdateObj?.body ||
-            t('layout.components.dialogs.client.changelogEmpty')}
-        </Box>
-
-        {clientStatus !== 'idle' && (
-          <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
-            <Box
-              sx={{
-                width: '100%',
-                height: '8px',
-                backgroundColor:
-                  theme.palette.mode === 'light'
-                    ? 'rgba(0,0,0,0.1)'
-                    : 'rgba(255,255,255,0.1)',
-                borderRadius: '4px',
-                overflow: 'hidden',
-              }}
-            >
-              <Box
-                sx={{
-                  width: `${clientProgress}%`,
-                  height: '100%',
-                  background: 'var(--primary-main)',
-                  transition: 'width 0.2s ease',
-                }}
-              />
-            </Box>
+        <DialogContent sx={getPopupContentSx()}>
+          <Box sx={{ mb: 1.25 }}>
             <Typography
               variant="body2"
               sx={{
-                mt: 1,
-                fontSize: '12px',
-                opacity: 0.8,
+                mb: 0.5,
+                fontSize: '12.5px',
+                color: tokens.secondaryText,
                 fontFamily: 'var(--control-font-family)',
               }}
             >
-              {clientProgressMessage}
+              {t('layout.components.dialogs.update.currentVersion', {
+                version: appVersion
+                  ? `v${appVersion}`
+                  : t('layout.components.dialogs.update.unknown'),
+              })}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontSize: '12.5px',
+                fontWeight: 'bold',
+                color: tokens.primaryText,
+                fontFamily: 'var(--control-font-family)',
+              }}
+            >
+              {t('layout.components.dialogs.update.latestVersion', {
+                version: clientUpdateObj?.version
+                  ? `v${clientUpdateObj.version}`
+                  : t('layout.components.dialogs.update.unknown'),
+              })}
             </Typography>
           </Box>
-        )}
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-          <Button
-            onClick={() => setClientUpdateOpen(false)}
-            disabled={clientStatus === 'downloading'}
+          <Typography
+            variant="body2"
             sx={{
-              ...get3DButtonStyle(theme, 'outlined', 'default'),
-              mr: 1,
+              fontWeight: 'bold',
+              mb: 0.75,
+              fontSize: '12.5px',
+              color: tokens.primaryText,
+              fontFamily: 'var(--control-font-family)',
             }}
           >
-            {t('shared.actions.close')}
-          </Button>
+            {t('layout.components.dialogs.client.changelog')}
+          </Typography>
+          <Box
+            sx={{
+              maxHeight: '160px',
+              overflowY: 'auto',
+              p: 1.25,
+              borderRadius: '6px',
+              fontSize: '12px',
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              fontFamily: 'var(--control-font-family)',
+              bgcolor: tokens.subtleSurfaceBg,
+              border: `1px solid ${tokens.subtleSurfaceBorder}`,
+              color: tokens.primaryText,
+            }}
+          >
+            {clientUpdateObj?.body ||
+              t('layout.components.dialogs.client.changelogEmpty')}
+          </Box>
+
+          {clientStatus !== 'idle' && (
+            <Box sx={{ width: '100%', mt: 1.5 }}>
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '8px',
+                  bgcolor: tokens.subtleSurfaceBg,
+                  border: `1px solid ${tokens.subtleSurfaceBorder}`,
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${clientProgress}%`,
+                    height: '100%',
+                    background: 'var(--primary-main)',
+                    transition: 'width 0.2s ease',
+                  }}
+                />
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 0.75,
+                  fontSize: '12px',
+                  color: tokens.secondaryText,
+                  wordBreak: 'break-word',
+                  fontFamily: 'var(--control-font-family)',
+                }}
+              >
+                {clientProgressMessage}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
           <Button
+            fullWidth
             onClick={handleClientUpgrade}
             disabled={
               clientStatus === 'downloading' ||
               clientStatus === 'done' ||
-              !!(
+              Boolean(
                 clientUpdateObj &&
-                isSameVersion(appVersion, clientUpdateObj.version)
+                  isSameVersion(appVersion, clientUpdateObj.version),
               )
             }
             sx={{
               ...get3DButtonStyle(theme, 'contained', 'primary'),
+              py: 0.85,
+              fontSize: '13px',
             }}
           >
             {clientStatus === 'done'
@@ -407,7 +414,19 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
                   ? t('layout.components.dialogs.update.upToDate')
                   : t('layout.components.dialogs.update.updateNow')}
           </Button>
-        </Box>
+          <Button
+            fullWidth
+            onClick={() => setClientUpdateOpen(false)}
+            disabled={clientStatus === 'downloading'}
+            sx={{
+              ...get3DButtonStyle(theme, 'outlined', 'default'),
+              py: 0.7,
+              fontSize: '12.5px',
+            }}
+          >
+            {t('shared.actions.close')}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Core Update Dialog */}
@@ -422,114 +441,108 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             setCoreUpdateOpen(false)
           }
         }}
-        fullWidth
         maxWidth={false}
-        slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              p: 3,
-              width: 'calc(100% - 32px)',
-              maxWidth: '450px',
-              borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              fontFamily: 'var(--control-font-family)',
-              color: theme.palette.text.primary,
-            },
-          },
-        }}
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset)}
       >
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 'bold',
-            mb: 2,
-            fontFamily: 'var(--control-font-family)',
-          }}
-        >
-          ⚙️ {t('layout.components.dialogs.core.title')}
-        </Typography>
-
-        <Box sx={{ mb: 2 }}>
-          <Typography
-            variant="body2"
-            sx={{ mb: 1, fontFamily: 'var(--control-font-family)' }}
-          >
-            {t('layout.components.dialogs.update.currentVersion', {
-              version: coreVersion
-                ? formatCoreVersion(coreVersion)
-                : t('layout.components.dialogs.update.unknown'),
-            })}
-          </Typography>
-          <Typography
-            variant="body2"
+        <DialogTitle sx={getPopupTitleSx(theme)}>
+          <Box
             sx={{
-              mb: 1,
-              fontFamily: 'var(--control-font-family)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.75,
               fontWeight: 'bold',
+              fontSize: '15.5px',
+              lineHeight: 1.35,
             }}
           >
-            {t('layout.components.dialogs.update.latestVersion', {
-              version: coreUpdateRelease?.tag_name
-                ? formatCoreVersion(coreUpdateRelease.tag_name)
-                : t('layout.components.dialogs.core.fetching'),
-            })}
-          </Typography>
-        </Box>
+            <span>⚙️</span>
+            <span>{t('layout.components.dialogs.core.title')}</span>
+          </Box>
+        </DialogTitle>
 
-        {coreUpgradeStatus !== 'idle' && (
-          <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
-            <Box
-              sx={{
-                width: '100%',
-                height: '8px',
-                backgroundColor:
-                  theme.palette.mode === 'light'
-                    ? 'rgba(0,0,0,0.1)'
-                    : 'rgba(255,255,255,0.1)',
-                borderRadius: '4px',
-                overflow: 'hidden',
-              }}
-            >
-              <Box
-                sx={{
-                  width: `${coreUpgradeProgress}%`,
-                  height: '100%',
-                  background: 'var(--primary-main)',
-                  transition: 'width 0.2s ease',
-                }}
-              />
-            </Box>
+        <DialogContent sx={getPopupContentSx()}>
+          <Box
+            sx={{
+              p: 1.25,
+              borderRadius: '6px',
+              bgcolor: tokens.subtleSurfaceBg,
+              border: `1px solid ${tokens.subtleSurfaceBorder}`,
+            }}
+          >
             <Typography
               variant="body2"
               sx={{
-                mt: 1,
-                fontSize: '12px',
-                opacity: 0.8,
+                mb: 0.6,
+                fontSize: '12.5px',
+                color: tokens.secondaryText,
                 fontFamily: 'var(--control-font-family)',
               }}
             >
-              {coreUpgradeMessage}
+              {t('layout.components.dialogs.update.currentVersion', {
+                version: coreVersion
+                  ? formatCoreVersion(coreVersion)
+                  : t('layout.components.dialogs.update.unknown'),
+              })}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontSize: '12.5px',
+                fontWeight: 'bold',
+                color: tokens.primaryText,
+                fontFamily: 'var(--control-font-family)',
+              }}
+            >
+              {t('layout.components.dialogs.update.latestVersion', {
+                version: coreUpdateRelease?.tag_name
+                  ? formatCoreVersion(coreUpdateRelease.tag_name)
+                  : t('layout.components.dialogs.core.fetching'),
+              })}
             </Typography>
           </Box>
-        )}
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          {coreUpgradeStatus !== 'idle' && (
+            <Box sx={{ width: '100%', mt: 1.5 }}>
+              <Box
+                sx={{
+                  width: '100%',
+                  height: '8px',
+                  bgcolor: tokens.subtleSurfaceBg,
+                  border: `1px solid ${tokens.subtleSurfaceBorder}`,
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${coreUpgradeProgress}%`,
+                    height: '100%',
+                    background: 'var(--primary-main)',
+                    transition: 'width 0.2s ease',
+                  }}
+                />
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 0.75,
+                  fontSize: '12px',
+                  color: tokens.secondaryText,
+                  wordBreak: 'break-word',
+                  fontFamily: 'var(--control-font-family)',
+                }}
+              >
+                {coreUpgradeMessage}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
           <Button
-            onClick={() => setCoreUpdateOpen(false)}
-            disabled={
-              coreUpgradeStatus === 'checking' ||
-              coreUpgradeStatus === 'downloading' ||
-              coreUpgradeStatus === 'extracting'
-            }
-            sx={{
-              ...get3DButtonStyle(theme, 'outlined', 'default'),
-              mr: 1,
-            }}
-          >
-            {t('shared.actions.close')}
-          </Button>
-          <Button
+            fullWidth
             onClick={handleCoreUpgrade}
             disabled={
               coreUpgradeStatus === 'checking' ||
@@ -540,6 +553,8 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
             }
             sx={{
               ...get3DButtonStyle(theme, 'contained', 'primary'),
+              py: 0.85,
+              fontSize: '13px',
             }}
           >
             {coreUpgradeStatus === 'done'
@@ -550,7 +565,23 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
                   ? t('layout.components.dialogs.update.upToDate')
                   : t('layout.components.dialogs.update.updateNow')}
           </Button>
-        </Box>
+          <Button
+            fullWidth
+            onClick={() => setCoreUpdateOpen(false)}
+            disabled={
+              coreUpgradeStatus === 'checking' ||
+              coreUpgradeStatus === 'downloading' ||
+              coreUpgradeStatus === 'extracting'
+            }
+            sx={{
+              ...get3DButtonStyle(theme, 'outlined', 'default'),
+              py: 0.7,
+              fontSize: '12.5px',
+            }}
+          >
+            {t('shared.actions.close')}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       {/* Logs View Dialog */}
@@ -559,32 +590,28 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
         onClose={() => setLogsOpen(false)}
         fullWidth={false}
         maxWidth={false}
-        slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              background: 'var(--theme-bg, var(--background-color))',
-              height: '480px',
-              width: `${MIN_WINDOW_WIDTH}px`,
-              maxWidth: '100%',
-              m: '0 auto',
-              position: 'relative',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              boxSizing: 'border-box',
-              '& .base-page > header': {
-                pr: 5,
-                pl: 1.5,
-                flex: '0 0 44px',
-              },
-              '& .base-page > header .MuiTypography-root': {
-                fontSize: '15px',
-                fontWeight: 600,
-              },
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset, {
+          paperSx: {
+            height: '480px',
+            position: 'relative',
+            '& .base-page > header': {
+              pr: 5,
+              pl: 1.5,
+              flex: '0 0 42px',
+              borderBottom: `1px solid ${tokens.dividerColor}`,
+              color: tokens.primaryText,
+            },
+            '& .base-page > header .MuiTypography-root': {
+              fontSize: '14.5px',
+              fontWeight: 700,
+              color: tokens.primaryText,
+            },
+            '& .base-container': {
+              color: theme.palette.text.primary,
             },
           },
-        }}
+        })}
       >
         <IconButton
           size="small"
@@ -592,10 +619,10 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
           onClick={() => setLogsOpen(false)}
           sx={{
             position: 'absolute',
-            top: 10,
-            right: 10,
+            top: 8,
+            right: 8,
             zIndex: 10,
-            color: 'text.secondary',
+            color: tokens.secondaryText,
           }}
         >
           <CloseRounded aria-hidden="true" fontSize="small" />

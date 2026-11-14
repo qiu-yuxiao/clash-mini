@@ -575,12 +575,12 @@ export const useCustomTheme = (externalControlSkin?: string) => {
         }
 
         /* 修复可能的白色边框 */
-        .MuiPaper-root {
+        .MuiPaper-root:not(.popup-card-paper) {
           border-color: var(--window-border-color) !important;
         }
 
         /* 确保模态框和对话框也使用暗色主题 */
-        .MuiDialog-paper {
+        .MuiDialog-paper:not(.popup-card-paper) {
           background-color: ${mode === 'light' ? '#ffffff' : '#2E303D'} !important;
         }
 

@@ -1,54 +1,72 @@
-import { Box, Typography, Button, useTheme } from '@mui/material'
-import React from 'react'
+import { Box, Button, Tooltip, Typography, useTheme } from '@mui/material'
+import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox, BaseEmpty } from '@/components/base'
 import type { ConnectionDetailRef } from '@/components/connection/connection-detail'
 import { ConnectionTable } from '@/components/connection/connection-table'
-import type { ConnectionMonitorData } from '@/hooks/use-connection-data'
 import type { PathControlActions } from '@/hooks/use-path-control'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
-import {
-  get3DButtonStyle,
-  get3DSegmentedContainerStyle,
-  get3DSegmentedActiveStyle,
-  get3DSegmentedActiveTextColor,
-} from '@/utils/button-styles'
+import { get3DButtonStyle } from '@/utils/button-styles'
 import type { PathControlConnectionItem } from '@/utils/path-control'
+import {
+  exportCustomRoutingRules,
+  importCustomRoutingRules,
+} from '@/utils/quick-routing'
 
 interface ConnectionsPanelProps {
-  connectionsType: 'active' | 'closed'
-  setConnectionsType: (type: 'active' | 'closed') => void
-  connectionsData: ConnectionMonitorData | undefined
-  activeCount?: number
-  closedCount?: number
   handleSearch: (match: (content: string) => boolean, state?: unknown) => void
   filterConn: PathControlConnectionItem[]
   pathControlActions?: PathControlActions
   detailRef: React.RefObject<ConnectionDetailRef | null>
   isColumnManagerOpen: boolean
   setIsColumnManagerOpen: (open: boolean) => void
-  clearClosedConnections: () => void
   containerRef?: React.RefObject<HTMLDivElement | null>
 }
 
 export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
-  connectionsType,
-  setConnectionsType,
-  connectionsData,
-  activeCount,
-  closedCount,
   handleSearch,
   filterConn,
   pathControlActions,
   detailRef,
   isColumnManagerOpen,
   setIsColumnManagerOpen,
-  clearClosedConnections,
   containerRef,
 }) => {
   const { t } = useTranslation()
   const theme = useTheme()
+  const [routeIoBusy, setRouteIoBusy] = useState(false)
+
+  const actionBtnSx = {
+    fontSize: 11,
+    height: 20,
+    px: 1.25,
+    minWidth: 'auto',
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+    ...get3DButtonStyle(theme, 'contained', 'primary'),
+  } as const
+
+  const handleSaveCustomRoutes = async () => {
+    if (routeIoBusy) return
+    setRouteIoBusy(true)
+    try {
+      await exportCustomRoutingRules()
+    } finally {
+      setRouteIoBusy(false)
+    }
+  }
+
+  const handleImportCustomRoutes = async () => {
+    if (routeIoBusy) return
+    setRouteIoBusy(true)
+    try {
+      await importCustomRoutingRules()
+    } finally {
+      setRouteIoBusy(false)
+    }
+  }
 
   return (
     <Box
@@ -73,7 +91,8 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1,
+          gap: 0.75,
+          flexWrap: 'wrap',
           px: 0.5,
           width: '100%',
           justifyContent: 'flex-start',
@@ -85,94 +104,54 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
             fontWeight: 'bold',
             fontSize: '11px',
             whiteSpace: 'nowrap',
+            flexShrink: 0,
           }}
         >
           {t('settings.mini.pathControl', {
             defaultValue: '路径控制（右键点击链接）',
           })}
         </Typography>
-        <Box
-          sx={(theme) => ({
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            bgcolor: 'action.hover',
-            borderRadius: '4px',
-            p: '1px',
-            width: '140px',
-            height: 18,
-            userSelect: 'none',
-            ...get3DSegmentedContainerStyle(theme),
+        <Tooltip
+          title={t('settings.mini.saveCustomRoutesTooltip', {
+            defaultValue:
+              '将所有自定义路径控制路由规则保存到指定文件（重装后可导入恢复）',
           })}
+          arrow
         >
-          {/* Sliding Background Indicator */}
-          <Box
-            sx={{
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              width: '50%',
-              height: '100%',
-              zIndex: 0,
-              transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: `translate3d(${connectionsType === 'active' ? 0 : 100}%, 0, 0)`,
-            }}
-          >
-            <Box sx={(theme) => get3DSegmentedActiveStyle(theme)} />
-          </Box>
-
-          {/* Active Option */}
-          <Box
-            onClick={() => setConnectionsType('active')}
-            sx={{
-              flex: 1,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color:
-                connectionsType === 'active'
-                  ? get3DSegmentedActiveTextColor(theme)
-                  : 'text.secondary',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              zIndex: 1,
-              transition: 'color 0.2s ease',
-            }}
-          >
-            {t('settings.mini.connectionsActive', {
-              defaultValue: '活跃',
-            })}{' '}
-            ({activeCount ?? (connectionsData?.activeConnections?.length || 0)})
-          </Box>
-
-          {/* Closed Option */}
-          <Box
-            onClick={() => setConnectionsType('closed')}
-            sx={{
-              flex: 1,
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color:
-                connectionsType === 'closed'
-                  ? get3DSegmentedActiveTextColor(theme)
-                  : 'text.secondary',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              zIndex: 1,
-              transition: 'color 0.2s ease',
-            }}
-          >
-            {t('settings.mini.connectionsHistory', {
-              defaultValue: '历史',
-            })}{' '}
-            ({closedCount ?? (connectionsData?.closedConnections?.length || 0)})
-          </Box>
-        </Box>
+          <span>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={routeIoBusy}
+              onClick={handleSaveCustomRoutes}
+              sx={actionBtnSx}
+            >
+              {t('settings.mini.saveCustomRoutes', {
+                defaultValue: '保存路由',
+              })}
+            </Button>
+          </span>
+        </Tooltip>
+        <Tooltip
+          title={t('settings.mini.importCustomRoutesTooltip', {
+            defaultValue: '从保存的文件导入自定义路径控制路由规则',
+          })}
+          arrow
+        >
+          <span>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={routeIoBusy}
+              onClick={handleImportCustomRoutes}
+              sx={actionBtnSx}
+            >
+              {t('settings.mini.importCustomRoutes', {
+                defaultValue: '导入路由',
+              })}
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       {/* Search and Action Row */}
@@ -192,36 +171,12 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
           size="small"
           variant="contained"
           onClick={() => closeAllConnectionsWithTimeout()}
-          sx={{
-            fontSize: 11,
-            height: 20,
-            px: 1.5,
-            minWidth: 'auto',
-            ...get3DButtonStyle(theme, 'contained', 'primary'),
-          }}
+          sx={actionBtnSx}
         >
           {t('settings.mini.connectionsDisconnectAll', {
             defaultValue: '断开全部',
           })}
         </Button>
-        {connectionsType === 'closed' && (
-          <Button
-            size="small"
-            variant="contained"
-            onClick={clearClosedConnections}
-            sx={{
-              fontSize: 11,
-              height: 20,
-              px: 1.5,
-              minWidth: 'auto',
-              ...get3DButtonStyle(theme, 'contained', 'primary'),
-            }}
-          >
-            {t('settings.mini.connectionsClearHistory', {
-              defaultValue: '清空历史',
-            })}
-          </Button>
-        )}
       </Box>
 
       {/* Connection Table Container */}
@@ -242,7 +197,11 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
           <ConnectionTable
             connections={filterConn}
             onShowDetail={(detail, el) =>
-              detailRef.current?.open(detail, connectionsType === 'closed', el)
+              detailRef.current?.open(
+                detail,
+                Boolean(detail._isClosed || detail._isSynthetic),
+                el,
+              )
             }
             onMarkDisconnected={pathControlActions?.markConnectionDisconnected}
             onClearDisconnectedTarget={

@@ -28,6 +28,9 @@ export const MIN_WINDOW_HEIGHT = 126
 export const MAX_WINDOW_WIDTH = 640
 export const MAX_WINDOW_HEIGHT = 860
 
+/** 自定义标题栏固定高度（px），所有窄窗弹窗、遮罩与顶部通知不得覆盖此区域 */
+export const CUSTOM_TITLEBAR_HEIGHT = 30
+
 /** 窄窗判定断点：内容宽度 ≤ 该值走 1 列紧凑布局，> 该值走 3 列宽窗布局 */
 export const MINI_WIDTH_THRESHOLD = 285
 /**

@@ -1,7 +1,7 @@
 import i18n from 'i18next'
 import { ReactNode, isValidElement } from 'react'
 
-type NoticeType = 'success' | 'error' | 'info'
+export type NoticeType = 'success' | 'error' | 'info' | 'warning'
 
 export interface NoticeTranslationDescriptor {
   key: string
@@ -34,6 +34,7 @@ type ShowNotice = ((
   success: NoticeShortcut
   error: NoticeShortcut
   info: NoticeShortcut
+  warning: NoticeShortcut
 }
 
 type NoticeSubscriber = () => void
@@ -43,6 +44,7 @@ const MAX_NOTICES = 50
 const DEFAULT_DURATIONS: Readonly<Record<NoticeType, number>> = {
   success: 3000,
   info: 5000,
+  warning: 6000,
   error: 8000,
 }
 
@@ -332,10 +334,10 @@ const baseShowNotice = (
 }
 
 /**
- * Shows a global notice; `showNotice.success / error / info` are the usual entry points.
+ * Shows a global notice; `showNotice.success / error / info / warning` are the usual entry points.
  *
  * - `message`: i18n key string, `{ key, params }`, ReactNode, Error/any value (message is extracted)
- * - `extras` parsed left-to-right: first plain object is i18n params; next value is raw payload; first number overrides duration (ms, 0 = persistent; defaults: success 3000 / info 5000 / error 8000)
+ * - `extras` parsed left-to-right: first plain object is i18n params; next value is raw payload; first number overrides duration (ms, 0 = persistent; defaults: success 3000 / info 5000 / warning 6000 / error 8000)
  * - Returns a notice id for manual closing via `hideNotice(id)`
  *
  * @example showNotice.success("profiles.page.feedback.notifications.batchDeleted");
@@ -350,6 +352,8 @@ export const showNotice: ShowNotice = Object.assign(baseShowNotice, {
     baseShowNotice('error', message, ...extras),
   info: (message: NoticeContent, ...extras: NoticeExtra[]) =>
     baseShowNotice('info', message, ...extras),
+  warning: (message: NoticeContent, ...extras: NoticeExtra[]) =>
+    baseShowNotice('warning', message, ...extras),
 })
 
 export function hideNotice(id: number) {

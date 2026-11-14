@@ -1,11 +1,4 @@
-import {
-  Box,
-  Button,
-  Popover,
-  useTheme,
-  alpha,
-  type Theme,
-} from '@mui/material'
+import { Box, Button, Popover, useTheme } from '@mui/material'
 import { useLockFn } from 'ahooks'
 import dayjs from 'dayjs'
 import { useImperativeHandle, useState, type Ref } from 'react'
@@ -15,12 +8,14 @@ import { closeConnectionWithTimeout } from '@/services/mihomo-api'
 import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
+import { getPopupCardStyle, getPopupSkinTokens } from '@/utils/popup-styles'
 
 export interface ConnectionDetailRef {
   open: (detail: IConnectionsItem, closed: boolean, el?: HTMLElement) => void
 }
 
 export function ConnectionDetail({ ref }: { ref?: Ref<ConnectionDetailRef> }) {
+  const theme = useTheme()
   const [open, setOpen] = useState(false)
   const [detail, setDetail] = useState<IConnectionsItem>(null!)
   const [closed, setClosed] = useState(false)
@@ -55,18 +50,13 @@ export function ConnectionDetail({ ref }: { ref?: Ref<ConnectionDetailRef> }) {
       }}
       slotProps={{
         paper: {
+          className: 'popup-card-paper',
           sx: {
+            ...getPopupCardStyle(theme),
             maxWidth: '520px',
             maxHeight: '480px',
             overflowY: 'auto',
-            background: (theme: Theme) => theme.palette.background.paper,
-            border: '1px solid',
-            borderColor: (theme: Theme) => alpha(theme.palette.divider, 0.5),
-            boxShadow: (theme: Theme) =>
-              `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.25)}`,
-            borderRadius: 2,
-            p: 2.5,
-            color: (theme: Theme) => theme.palette.text.primary,
+            p: 2,
           },
         },
       }}
@@ -92,6 +82,7 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const { t } = useTranslation()
   const { metadata, rulePayload } = data
   const theme = useTheme()
+  const tokens = getPopupSkinTokens(theme)
   const chains = [...(data?.chains ?? [])].reverse().join(' / ')
   const rule = rulePayload ? `${data?.rule}(${rulePayload})` : data?.rule
   const rawHost =
@@ -164,11 +155,12 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
     <Box
       sx={{
         userSelect: 'text',
-        color: theme.palette.text.secondary,
+        color: tokens.secondaryText,
         fontSize: '12px',
         display: 'flex',
         flexDirection: 'column',
         gap: 0.75,
+        fontFamily: 'var(--control-font-family)',
       }}
     >
       {information.map((each) => (
@@ -179,7 +171,7 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
           <span
             style={{
               wordBreak: 'break-all',
-              color: theme.palette.text.primary,
+              color: tokens.primaryText,
               flex: 1,
             }}
           >
@@ -189,7 +181,14 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
       ))}
 
       {!closed && (
-        <Box sx={{ textAlign: 'right', mt: 1.5 }}>
+        <Box
+          sx={{
+            textAlign: 'right',
+            mt: 1,
+            pt: 1.25,
+            borderTop: `1px solid ${tokens.dividerColor}`,
+          }}
+        >
           <Button
             size="small"
             title={t('connections.components.actions.closeConnection')}
@@ -197,8 +196,8 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
               onDelete()
               onClose?.()
             }}
-            sx={(theme) => ({
-              ...get3DButtonStyle(theme, 'contained', 'error'),
+            sx={(currentTheme) => ({
+              ...get3DButtonStyle(currentTheme, 'contained', 'error'),
             })}
           >
             {t('connections.components.actions.closeConnection')}

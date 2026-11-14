@@ -97,9 +97,9 @@ body {
 
 
 /* 强制下拉框、Select 选项、Autocomplete 列表及弹出 Popover/Menu 背景 95%/98% 不透明，且加毛玻璃效果，防止文字穿透重叠 */
-.MuiMenu-paper,
-.MuiPopover-paper,
-.MuiAutocomplete-paper {
+.MuiMenu-paper:not(.popup-card-paper),
+.MuiPopover-paper:not(.popup-card-paper),
+.MuiAutocomplete-paper:not(.popup-card-paper) {
   background: var(--theme-popover-bg) !important;
   border: 1px solid var(--theme-border) !important;
   box-shadow: var(--theme-box-shadow-subtle) !important;

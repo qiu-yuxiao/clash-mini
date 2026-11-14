@@ -36,6 +36,7 @@ import { ResizeHandles } from '@/components/layout/resize-handles'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import { useHeadStateNew } from '@/components/proxy/use-head-state'
+import { CUSTOM_TITLEBAR_HEIGHT } from '@/constants'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
@@ -76,6 +77,10 @@ import {
   prioritizePathControlConnections,
   type PathControlConnectionItem,
 } from '@/utils/path-control'
+import {
+  getPopupMenuItemStyle,
+  getPopupMenuPaperProps,
+} from '@/utils/popup-styles'
 import { hasRealProfileItem } from '@/utils/profile-items'
 
 // Sub-components
@@ -113,7 +118,7 @@ import {
   getFilteredNodeNames,
   triggerAutoSelectAndRefresh,
 } from './_layout/utils/profile-coordination'
-import { OS, getMenuItemHoverStyle } from './_layout/utils/style-helpers'
+import { OS } from './_layout/utils/style-helpers'
 
 import 'dayjs/locale/ru'
 import 'dayjs/locale/zh-cn'
@@ -454,34 +459,23 @@ const Layout = () => {
     () => () => true,
   )
   const curOrderOpt: OrderKey = 'default'
-  const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>(
-    'active',
-  )
-  // 右侧连接/路由表的"挂载"与"数据订阅"共用同一宽度开关（isMinimalWidth）：
-  // 大窗口(宽>285) 同时开，窄窗口(宽≤285) 同时关，杜绝"看得见/看不见"与"订阅/不订阅"脱节。
+  // 右侧连接/路由表的“挂载”与“数据订阅”共用同一宽度开关（isMinimalWidth）：
+  // 大窗口(宽>285) 同时开，窄窗口(宽≤285) 同时关，杜绝“看得见/看不见”与“订阅/不订阅”脱节。
   const {
     response: { data: connectionsData },
-    clearClosedConnections,
   } = useConnectionData({ enabled: drawerOpen && !isMinimalWidth })
-  const {
-    activeControlConnections,
-    closedControlConnections,
-    actions: pathControlActions,
-  } = usePathControl({
-    activeConnections: connectionsData?.activeConnections ?? [],
-    closedConnections: connectionsData?.closedConnections ?? [],
-    enabled: drawerOpen && !isMinimalWidth,
-  })
+  const { activeControlConnections, actions: pathControlActions } =
+    usePathControl({
+      activeConnections: connectionsData?.activeConnections ?? [],
+      closedConnections: connectionsData?.closedConnections ?? [],
+      enabled: drawerOpen && !isMinimalWidth,
+    })
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
   const detailRef = useRef<ConnectionDetailRef | null>(null)
 
   const filterConn = useMemo<PathControlConnectionItem[]>(() => {
     const orderFunc = orderFunctionMap[curOrderOpt]
-    const conns =
-      connectionsType === 'active'
-        ? activeControlConnections
-        : closedControlConnections
-    const matchConns = conns.filter((conn) => {
+    const matchConns = activeControlConnections.filter((conn) => {
       const { host, destinationIP, remoteDestination, process } =
         conn.metadata ?? {}
       return (
@@ -491,18 +485,8 @@ const Layout = () => {
         match(process || '')
       )
     })
-    if (connectionsType === 'active') {
-      return prioritizePathControlConnections(matchConns, orderFunc)
-    }
-    return orderFunc
-      ? (orderFunc(matchConns) as PathControlConnectionItem[])
-      : matchConns
-  }, [
-    activeControlConnections,
-    closedControlConnections,
-    connectionsType,
-    match,
-  ])
+    return prioritizePathControlConnections(matchConns, orderFunc)
+  }, [activeControlConnections, match])
 
   const handleSearch = useCallback((match: (content: string) => boolean) => {
     setMatch(() => match)
@@ -1159,6 +1143,7 @@ const Layout = () => {
     editProfileOpen ||
     addUrlOpen ||
     firstRunGuideOpen ||
+    antivirusWhitelistOpen ||
     clientUpdateOpen ||
     coreUpdateOpen ||
     isColumnManagerOpen ||
@@ -1182,9 +1167,9 @@ const Layout = () => {
             alignItems: 'center',
             padding: '0 8px 0 10px',
             boxSizing: 'border-box',
-            height: '30px',
-            minHeight: '30px',
-            maxHeight: '30px',
+            height: `${CUSTOM_TITLEBAR_HEIGHT}px`,
+            minHeight: `${CUSTOM_TITLEBAR_HEIGHT}px`,
+            maxHeight: `${CUSTOM_TITLEBAR_HEIGHT}px`,
             borderBottom: '1px solid var(--divider-color)',
             background: 'var(--background-color)',
             userSelect: 'none',
@@ -1228,7 +1213,7 @@ const Layout = () => {
               flexShrink: 0,
               display: 'flex',
               alignItems: 'center',
-              height: '30px',
+              height: `${CUSTOM_TITLEBAR_HEIGHT}px`,
             }}
           >
             <WindowControls />
@@ -1310,7 +1295,9 @@ const Layout = () => {
             display: 'flex',
             flexDirection: 'column',
             height:
-              decorated || isDecorationsHidden ? '100vh' : 'calc(100vh - 30px)',
+              decorated || isDecorationsHidden
+                ? '100vh'
+                : `calc(100vh - ${CUSTOM_TITLEBAR_HEIGHT}px)`,
             width: '100vw',
             overflow: 'hidden',
             position: 'relative',
@@ -1576,18 +1563,12 @@ const Layout = () => {
                 {!isMinimalWidth && (
                   <ErrorBoundary FallbackComponent={AreaErrorFallback}>
                     <ConnectionsPanel
-                      connectionsType={connectionsType}
-                      setConnectionsType={setConnectionsType}
-                      connectionsData={connectionsData}
-                      activeCount={activeControlConnections.length}
-                      closedCount={closedControlConnections.length}
                       handleSearch={handleSearch}
                       filterConn={filterConn}
                       pathControlActions={pathControlActions}
                       detailRef={detailRef}
                       isColumnManagerOpen={isColumnManagerOpen}
                       setIsColumnManagerOpen={setIsColumnManagerOpen}
-                      clearClosedConnections={clearClosedConnections}
                     />
                   </ErrorBoundary>
                 )}
@@ -1631,11 +1612,7 @@ const Layout = () => {
                       horizontal: 'left',
                     },
                     slotProps: {
-                      paper: {
-                        sx: {
-                          maxHeight: 640,
-                        },
-                      },
+                      paper: getPopupMenuPaperProps(theme, { maxHeight: 640 }),
                     },
                   }}
                   sx={{
@@ -1867,53 +1844,32 @@ const Layout = () => {
         open={profileMenuAnchorPosition !== null}
         onClose={() => setProfileMenuAnchorPosition(null)}
         slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              minWidth: '160px',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              '& .MuiList-root': {
-                padding: '4px 0',
-              },
-            },
-          },
+          paper: getPopupMenuPaperProps(theme, { minWidth: '160px' }),
         }}
       >
-        <MenuItem
-          onClick={handleEditProfileClick}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleEditProfileClick}>
           📝 {t('shared.actions.edit')}
         </MenuItem>
-        <MenuItem
-          onClick={handleEditProfileFileClick}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleEditProfileFileClick}>
           📄 {t('profiles.components.menu.editFile')}
         </MenuItem>
-        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <Divider />
         <MenuItem
           onClick={handleCopyProfileLinkClick}
           disabled={isContextMenuLocal || !contextMenuTargetItem?.url}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           🔗 {t('profiles.components.menu.copyLink')}
         </MenuItem>
         <MenuItem
           onClick={handleUpdateProfileClick}
           disabled={isContextMenuLocal}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           🔄 {t('profiles.components.menu.update')}
         </MenuItem>
-        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <Divider />
         <MenuItem
           onClick={handleDeleteProfileClick}
-          sx={{
-            ...getMenuItemHoverStyle(theme, controlSkin),
-            color: 'error.main',
-          }}
+          sx={getPopupMenuItemStyle(theme, { danger: true })}
         >
           ❌ {t('shared.actions.delete')}
         </MenuItem>
@@ -1933,17 +1889,7 @@ const Layout = () => {
         open={importInputContextMenu !== null}
         onClose={() => setImportInputContextMenu(null)}
         slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              minWidth: '160px',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              '& .MuiList-root': {
-                padding: '4px 0',
-              },
-            },
-          },
+          paper: getPopupMenuPaperProps(theme, { minWidth: '160px' }),
         }}
       >
         <MenuItem
@@ -1953,7 +1899,6 @@ const Layout = () => {
             importInputRef.current.selectionStart ===
               importInputRef.current.selectionEnd
           }
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           ✂️ {t('shared.actions.cut')}
         </MenuItem>
@@ -1964,31 +1909,20 @@ const Layout = () => {
             importInputRef.current.selectionStart ===
               importInputRef.current.selectionEnd
           }
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
         >
           📋 {t('shared.actions.copy')}
         </MenuItem>
-        <MenuItem
-          onClick={handleImportInputPaste}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleImportInputPaste}>
           📥 {t('shared.actions.paste')}
         </MenuItem>
-        <MenuItem
-          onClick={handleImportInputSelectAll}
-          disabled={!url}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleImportInputSelectAll} disabled={!url}>
           🔍 {t('shared.actions.selectAll')}
         </MenuItem>
-        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <Divider />
         <MenuItem
           onClick={handleImportInputClear}
           disabled={!url}
-          sx={{
-            ...getMenuItemHoverStyle(theme, controlSkin),
-            color: 'error.main',
-          }}
+          sx={getPopupMenuItemStyle(theme, { danger: true })}
         >
           🧹 {t('shared.actions.clearInput')}
         </MenuItem>

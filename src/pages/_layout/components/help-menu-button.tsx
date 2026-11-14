@@ -1,9 +1,14 @@
 import { HelpOutlineRounded } from '@mui/icons-material'
 import {
+  Box,
   Button,
-  Menu,
-  MenuItem,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
+  MenuItem,
+  MenuList,
   useTheme,
   type SxProps,
   type Theme,
@@ -14,11 +19,19 @@ import { useTranslation } from 'react-i18next'
 
 import { exportDiagnosticBundle, showInFolder } from '@/services/cmds'
 import { hideNotice, showNotice } from '@/services/notice-service'
-
+import { get3DButtonStyle } from '@/utils/button-styles'
 import {
-  getMenuItemHoverStyle,
-  formatCoreVersion,
-} from '../utils/style-helpers'
+  getNarrowDialogSlotProps,
+  getNarrowDialogSx,
+  getPopupActionsSx,
+  getPopupContentSx,
+  getPopupMenuItemStyle,
+  getPopupSkinTokens,
+  getPopupTitleSx,
+  useNarrowOverlayTopOffset,
+} from '@/utils/popup-styles'
+
+import { formatCoreVersion } from '../utils/style-helpers'
 
 interface HelpMenuButtonProps {
   helpAnchorEl: HTMLElement | null
@@ -48,11 +61,25 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
   coreCheckLoading,
   appVersion,
   coreVersion,
-  controlSkin,
+  controlSkin: _controlSkin,
   primaryBtn3DStyle,
 }) => {
   const { t } = useTranslation()
   const theme = useTheme()
+  const topOffset = useNarrowOverlayTopOffset()
+  const tokens = getPopupSkinTokens(theme)
+
+  const itemBaseSx = {
+    borderRadius: '6px',
+    px: 1.25,
+    py: 0.8,
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+  }
+  const menuItemSx = getPopupMenuItemStyle(theme, { extraSx: itemBaseSx })
+  const primaryMenuItemSx = getPopupMenuItemStyle(theme, {
+    extraSx: { ...itemBaseSx, fontWeight: 700 },
+  })
 
   return (
     <>
@@ -60,7 +87,7 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
         variant="contained"
         onClick={handleHelpClick}
         aria-label={t('layout.components.helpMenu.buttonAriaLabel')}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={Boolean(helpAnchorEl)}
         sx={{
           position: 'absolute',
@@ -93,135 +120,150 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
         <HelpOutlineRounded sx={{ fontSize: '16px' }} />
       </Button>
 
-      <Menu
-        anchorEl={helpAnchorEl}
+      <Dialog
         open={Boolean(helpAnchorEl)}
         onClose={handleHelpClose}
-        anchorOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              minWidth: '220px',
-              mb: '8px',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              '& .MuiList-root': {
-                padding: '4px 0',
-              },
-            },
-          },
-        }}
+        maxWidth={false}
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset)}
       >
-        <MenuItem
-          onClick={async () => {
-            handleHelpClose()
-            try {
-              await open('https://github.com/qiu-yuxiao/clash-mini')
-            } catch (err) {
-              console.error('Failed to open help link:', err)
-            }
-          }}
-          sx={{
-            ...getMenuItemHoverStyle(theme, controlSkin),
-            fontWeight: 700,
-          }}
-        >
-          ⭐ {t('layout.components.helpMenu.github')}
-        </MenuItem>
-        <MenuItem
-          onClick={async () => {
-            handleHelpClose()
-            try {
-              await open('https://github.com/qiu-yuxiao/clash-mini/wiki')
-            } catch (err) {
-              console.error('Failed to open wiki link:', err)
-            }
-          }}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
-          💡 {t('layout.components.helpMenu.wiki')}
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleHelpClose()
-            onReopenFirstRunGuide()
-          }}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
-          🧭 {t('layout.components.helpMenu.firstRunGuide')}
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleHelpClose()
-            onOpenAntivirusWhitelist()
-          }}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
-          🛡️ {t('layout.components.antivirus.menuLabel')}
-        </MenuItem>
-        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
-        <MenuItem
-          onClick={async () => {
-            handleHelpClose()
-            const waitId = showNotice.info(
-              t('layout.components.helpMenu.generatingDiagnostics'),
-              0,
-            )
-            try {
-              const zipPath = await exportDiagnosticBundle()
-              if (!zipPath) return
-              showNotice.success(
-                t('layout.components.helpMenu.diagnosticsExported', {
-                  path: zipPath,
-                }),
-              )
-              // 优先使用文件管理器高亮选中该 zip 文件，失败则兜底打开所在目录
-              await showInFolder(zipPath).catch(async (err) => {
-                console.warn(
-                  'showInFolder failed, falling back to open dir:',
-                  err,
-                )
-                const dir = zipPath.replace(/[\\/][^\\/]+$/, '')
-                if (dir && dir !== zipPath) {
-                  await open(dir).catch((openErr) => {
-                    console.error('Failed to open diagnostics dir:', openErr)
-                  })
+        <DialogTitle sx={getPopupTitleSx(theme)}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.75,
+              fontWeight: 'bold',
+              fontSize: '15.5px',
+              lineHeight: 1.35,
+            }}
+          >
+            <span>❓</span>
+            <span>{t('layout.components.helpMenu.buttonAriaLabel')}</span>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={getPopupContentSx({ px: 1.25, py: 1 })}>
+          <MenuList disablePadding>
+            <MenuItem
+              onClick={async () => {
+                handleHelpClose()
+                try {
+                  await open('https://github.com/qiu-yuxiao/clash-mini')
+                } catch (err) {
+                  console.error('Failed to open help link:', err)
                 }
-              })
-            } finally {
-              hideNotice(waitId)
-            }
-          }}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
-          📦 {t('layout.components.helpMenu.exportDiagnostics')}
-        </MenuItem>
-        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
-        <MenuItem
-          onClick={handleClientCheck}
-          disabled={clientCheckLoading}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
-          🚀 {t('layout.components.helpMenu.checkAppUpdate')}{' '}
-          {appVersion ? `(v${appVersion})` : ''}
-        </MenuItem>
-        <MenuItem
-          onClick={handleCoreCheck}
-          disabled={coreCheckLoading}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
-          ⚙️ {t('layout.components.helpMenu.checkCoreUpdate')}{' '}
-          {coreVersion ? `(${formatCoreVersion(coreVersion)})` : ''}
-        </MenuItem>
-      </Menu>
+              }}
+              sx={primaryMenuItemSx}
+            >
+              ⭐ {t('layout.components.helpMenu.github')}
+            </MenuItem>
+            <MenuItem
+              onClick={async () => {
+                handleHelpClose()
+                try {
+                  await open('https://github.com/qiu-yuxiao/clash-mini/wiki')
+                } catch (err) {
+                  console.error('Failed to open wiki link:', err)
+                }
+              }}
+              sx={menuItemSx}
+            >
+              💡 {t('layout.components.helpMenu.wiki')}
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleHelpClose()
+                onReopenFirstRunGuide()
+              }}
+              sx={menuItemSx}
+            >
+              🧭 {t('layout.components.helpMenu.firstRunGuide')}
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleHelpClose()
+                onOpenAntivirusWhitelist()
+              }}
+              sx={menuItemSx}
+            >
+              🛡️ {t('layout.components.antivirus.menuLabel')}
+            </MenuItem>
+            <Divider sx={{ my: 0.5, borderColor: tokens.dividerColor }} />
+            <MenuItem
+              onClick={async () => {
+                handleHelpClose()
+                const waitId = showNotice.info(
+                  t('layout.components.helpMenu.generatingDiagnostics'),
+                  0,
+                )
+                try {
+                  const zipPath = await exportDiagnosticBundle()
+                  if (!zipPath) return
+                  showNotice.success(
+                    t('layout.components.helpMenu.diagnosticsExported', {
+                      path: zipPath,
+                    }),
+                  )
+                  // 优先使用文件管理器高亮选中该 zip 文件，失败则兜底打开所在目录
+                  await showInFolder(zipPath).catch(async (err) => {
+                    console.warn(
+                      'showInFolder failed, falling back to open dir:',
+                      err,
+                    )
+                    const dir = zipPath.replace(/[\\/][^\\/]+$/, '')
+                    if (dir && dir !== zipPath) {
+                      await open(dir).catch((openErr) => {
+                        console.error(
+                          'Failed to open diagnostics dir:',
+                          openErr,
+                        )
+                      })
+                    }
+                  })
+                } finally {
+                  hideNotice(waitId)
+                }
+              }}
+              sx={menuItemSx}
+            >
+              📦 {t('layout.components.helpMenu.exportDiagnostics')}
+            </MenuItem>
+            <Divider sx={{ my: 0.5, borderColor: tokens.dividerColor }} />
+            <MenuItem
+              onClick={handleClientCheck}
+              disabled={clientCheckLoading}
+              sx={menuItemSx}
+            >
+              🚀 {t('layout.components.helpMenu.checkAppUpdate')}{' '}
+              {appVersion ? `(v${appVersion})` : ''}
+            </MenuItem>
+            <MenuItem
+              onClick={handleCoreCheck}
+              disabled={coreCheckLoading}
+              sx={menuItemSx}
+            >
+              ⚙️ {t('layout.components.helpMenu.checkCoreUpdate')}{' '}
+              {coreVersion ? `(${formatCoreVersion(coreVersion)})` : ''}
+            </MenuItem>
+          </MenuList>
+        </DialogContent>
+
+        <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
+          <Button
+            fullWidth
+            sx={{
+              ...get3DButtonStyle(theme, 'outlined', 'default'),
+              py: 0.65,
+              fontSize: '12.5px',
+            }}
+            onClick={handleHelpClose}
+          >
+            {t('shared.actions.close')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   )
 }

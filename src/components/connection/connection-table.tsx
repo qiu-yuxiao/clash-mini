@@ -7,7 +7,7 @@ import {
   BlockRounded,
   RestoreRounded,
 } from '@mui/icons-material'
-import { Box, Menu, MenuItem, alpha, type Theme } from '@mui/material'
+import { Box, Menu, MenuItem, alpha, useTheme } from '@mui/material'
 import {
   ColumnDef,
   flexRender,
@@ -31,6 +31,11 @@ import {
   type PathControlStatus,
   type PathControlTarget,
 } from '@/utils/path-control'
+import {
+  getPopupMenuItemStyle,
+  getPopupMenuPaperProps,
+  getPopupSkinTokens,
+} from '@/utils/popup-styles'
 import {
   addQuickRoutingRule,
   removeQuickRoutingRule,
@@ -227,6 +232,11 @@ interface Props {
 
 export const ConnectionTable = (props: Props) => {
   const { t } = useTranslation()
+  const theme = useTheme()
+  const tokens = getPopupSkinTokens(theme)
+  const menuItemSx = getPopupMenuItemStyle(theme, {
+    extraSx: { gap: 1.5, py: 1, px: 2, fontSize: '12.5px' },
+  })
   const {
     connections,
     onShowDetail: rawOnShowDetail,
@@ -314,7 +324,7 @@ export const ConnectionTable = (props: Props) => {
     if (!contextMenu) return
     const { row } = contextMenu
     setContextMenu(null)
-    if (row._isSynthetic) return
+    if (row._isSynthetic || row._isClosed) return
 
     onMarkDisconnected?.(row)
     try {
@@ -550,74 +560,52 @@ export const ConnectionTable = (props: Props) => {
             : undefined
         }
         slotProps={{
-          paper: {
-            sx: {
-              background: (theme: Theme) => theme.palette.background.paper,
-              border: '1px solid',
-              borderColor: (theme: Theme) => theme.palette.divider,
-              borderRadius: 1.5,
-              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.25)',
-              minWidth: 200,
-              py: 0.5,
-            },
-          },
+          paper: getPopupMenuPaperProps(theme, { minWidth: 200 }),
         }}
       >
-        <MenuItem
-          onClick={handleDirect}
-          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
-        >
-          <FlashOnRounded sx={{ fontSize: 18, color: 'success.main' }} />
+        <MenuItem onClick={handleDirect} sx={menuItemSx}>
+          <FlashOnRounded sx={{ fontSize: 18, color: tokens.readyColor }} />
           {t('connections.components.contextMenu.setDirect')}
         </MenuItem>
-        <MenuItem
-          onClick={handleProxy}
-          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
-        >
-          <PublicRounded sx={{ fontSize: 18, color: 'primary.main' }} />
+        <MenuItem onClick={handleProxy} sx={menuItemSx}>
+          <PublicRounded
+            sx={{ fontSize: 18, color: tokens.accentPrimaryColor }}
+          />
           {t('connections.components.contextMenu.setProxy')}
         </MenuItem>
-        <MenuItem
-          onClick={handleReject}
-          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
-        >
-          <BlockRounded sx={{ fontSize: 18, color: 'error.main' }} />
+        <MenuItem onClick={handleReject} sx={menuItemSx}>
+          <BlockRounded sx={{ fontSize: 18, color: tokens.errorColor }} />
           {t('connections.components.contextMenu.setReject')}
         </MenuItem>
         <MenuItem
           onClick={handleDisconnect}
-          disabled={Boolean(contextMenu?.row._isSynthetic)}
-          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
+          disabled={Boolean(
+            contextMenu?.row._isSynthetic || contextMenu?.row._isClosed,
+          )}
+          sx={menuItemSx}
         >
-          <LinkOffRounded sx={{ fontSize: 18, color: 'error.main' }} />
+          <LinkOffRounded sx={{ fontSize: 18, color: tokens.errorColor }} />
           {t('connections.components.contextMenu.disconnect')}
         </MenuItem>
         {Boolean(
           contextMenu?.row._managedRule ||
             contextMenu?.row._controlStatus === 'disconnected',
         ) && (
-          <MenuItem
-            onClick={handleRestoreDefault}
-            sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
-          >
-            <RestoreRounded sx={{ fontSize: 18, color: 'info.main' }} />
+          <MenuItem onClick={handleRestoreDefault} sx={menuItemSx}>
+            <RestoreRounded sx={{ fontSize: 18, color: tokens.infoColor }} />
             {t('connections.components.contextMenu.restoreDefault', {
               defaultValue: '恢复默认路由',
             })}
           </MenuItem>
         )}
-        <MenuItem
-          onClick={handleCopy}
-          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
-        >
-          <ContentCopyRounded sx={{ fontSize: 18, color: 'text.secondary' }} />
+        <MenuItem onClick={handleCopy} sx={menuItemSx}>
+          <ContentCopyRounded
+            sx={{ fontSize: 18, color: tokens.secondaryText }}
+          />
           {t('connections.components.contextMenu.copyAddress')}
         </MenuItem>
-        <MenuItem
-          onClick={handleDetail}
-          sx={{ gap: 1.5, py: 1, px: 2, fontSize: '12.5px' }}
-        >
-          <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary' }} />
+        <MenuItem onClick={handleDetail} sx={menuItemSx}>
+          <InfoOutlined sx={{ fontSize: 18, color: tokens.secondaryText }} />
           {t('connections.components.contextMenu.viewDetail')}
         </MenuItem>
       </Menu>

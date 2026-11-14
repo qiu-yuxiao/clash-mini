@@ -36,6 +36,7 @@ export interface DisconnectedTargetRecord {
 export interface PathControlConnectionItem extends IConnectionsItem {
   _controlStatus?: PathControlStatus
   _isSynthetic?: boolean
+  _isClosed?: boolean
   _managedRule?: ManagedMergeRule
   _target?: PathControlTarget
   _disconnectedKey?: string
@@ -498,12 +499,14 @@ function matchDisconnectedRecordRule(
  */
 export function composeActivePathControlConnections(params: {
   activeConnections: IConnectionsItem[]
+  closedConnections?: IConnectionsItem[]
   managedRules: ManagedMergeRule[]
   disconnectedRecords: DisconnectedTargetRecord[]
   disconnectedIds?: Set<string>
 }): PathControlConnectionItem[] {
   const {
     activeConnections,
+    closedConnections = [],
     managedRules,
     disconnectedRecords,
     disconnectedIds,
@@ -558,7 +561,38 @@ export function composeActivePathControlConnections(params: {
     syntheticRows.push(buildSyntheticManagedRuleRow(rule))
   }
 
-  return [...enrichedLive, ...syntheticRows]
+  // Merge target-deduplicated recent closed connections in reverse chronological
+  // order (closedConnections appends newly closed sockets to the tail).
+  const recentClosedRows: PathControlConnectionItem[] = []
+  for (let i = closedConnections.length - 1; i >= 0; i -= 1) {
+    const conn = closedConnections[i]
+    const target = extractConnectionTarget(conn)
+    if (!target || coveredKeys.has(target.key)) {
+      continue
+    }
+    const matchedRule = findMatchingManagedRule(conn, managedRules)
+    if (matchedRule && coveredRuleRaws.has(matchedRule.raw)) {
+      continue
+    }
+    coveredKeys.add(target.key)
+    if (matchedRule) {
+      coveredRuleRaws.add(matchedRule.raw)
+    }
+    recentClosedRows.push({
+      ...conn,
+      curUpload: 0,
+      curDownload: 0,
+      _isClosed: true,
+      _target: target,
+      _managedRule: matchedRule ?? undefined,
+      _controlStatus: resolveConnectionControlStatus(conn, {
+        disconnectedIds,
+        matchedRule,
+      }),
+    })
+  }
+
+  return [...enrichedLive, ...syntheticRows, ...recentClosedRows]
 }
 
 /**
@@ -576,6 +610,9 @@ export function enrichClosedPathControlConnections(params: {
     const matchedRule = findMatchingManagedRule(conn, managedRules)
     return {
       ...conn,
+      curUpload: 0,
+      curDownload: 0,
+      _isClosed: true,
       _target: target ?? undefined,
       _managedRule: matchedRule ?? undefined,
       _controlStatus: resolveConnectionControlStatus(conn, {
@@ -618,9 +655,12 @@ export function prioritizePathControlConnections(
   const syntheticRejected: PathControlConnectionItem[] = []
   const liveRows: PathControlConnectionItem[] = []
   const syntheticIdlePinned: PathControlConnectionItem[] = []
+  const closedRows: PathControlConnectionItem[] = []
 
   for (const row of rows) {
-    if (!row._isSynthetic) {
+    if (!row._isSynthetic && row._isClosed) {
+      closedRows.push(row)
+    } else if (!row._isSynthetic) {
       liveRows.push(row)
     } else if (row._controlStatus === 'disconnected') {
       syntheticDisconnected.push(row)
@@ -640,5 +680,6 @@ export function prioritizePathControlConnections(
     ...syntheticRejected,
     ...orderedLive,
     ...syntheticIdlePinned,
+    ...closedRows,
   ]
 }

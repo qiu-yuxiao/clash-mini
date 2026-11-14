@@ -7,17 +7,17 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   InputAdornment,
+  Menu,
+  MenuItem,
   TextField,
   Typography,
   useTheme,
-  Menu,
-  MenuItem,
-  Divider,
 } from '@mui/material'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import type React from 'react'
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useVerge } from '@/hooks/use-verge'
@@ -28,14 +28,18 @@ import {
 } from '@/providers/app-data-context'
 import { getProfiles, triggerAutoSelect } from '@/services/cmds'
 import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
+import { get3DButtonStyle, get3DInputStyle } from '@/utils/button-styles'
 import {
-  get3DCardStyle,
-  get3DButtonStyle,
-  get3DInputStyle,
-  getActiveSkin,
-} from '@/utils/button-styles'
-
-import { getMenuItemHoverStyle } from '../utils/style-helpers'
+  getNarrowDialogSlotProps,
+  getNarrowDialogSx,
+  getPopupActionsSx,
+  getPopupContentSx,
+  getPopupMenuItemStyle,
+  getPopupMenuPaperProps,
+  getPopupSkinTokens,
+  getPopupTitleSx,
+  useNarrowOverlayTopOffset,
+} from '@/utils/popup-styles'
 
 export const CLASH_MINI_GITHUB_URL = 'https://github.com/qiu-yuxiao/clash-mini'
 export const CLASH_MINI_WIKI_URL =
@@ -69,7 +73,8 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
 }) => {
   const { t } = useTranslation()
   const theme = useTheme()
-  const controlSkin = theme.controlSkin || 'default'
+  const topOffset = useNarrowOverlayTopOffset()
+  const tokens = getPopupSkinTokens(theme)
 
   const [step, setStep] = useState<'input' | 'ready'>('input')
   const [url, setUrl] = useState('')
@@ -475,14 +480,9 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     onLater()
   }
 
-  // 弹窗卡片底色来自 get3DCardStyle：retro-3d 皮肤为金黄渐变，其主题灰白
-  // 次级文字（text.secondary/disabled）反差几乎为零，换用与卡片配套的深棕系
-  // （#2C1F03 即 get3DCardStyle default 的 textColor）；其他皮肤沿用主题色
-  const isRetro3D = getActiveSkin(theme) === 'retro-3d'
-  const secondaryText = isRetro3D ? 'rgba(44, 31, 3, 0.78)' : 'text.secondary'
-  const disabledText = isRetro3D ? 'rgba(44, 31, 3, 0.55)' : 'text.disabled'
-  const readyColor = isRetro3D ? '#1B5E20' : 'success.main'
-  const warningColor = isRetro3D ? '#8C4A03' : 'warning.main'
+  // 弹窗卡片底色来自 getPopupCardStyle：retro-3d 皮肤使用与卡片配套的深棕语义色，其余皮肤沿用主题色
+  const { isRetro3D, secondaryText, disabledText, readyColor, warningColor } =
+    tokens
   const starAccentColor = isRetro3D
     ? '#7A3E00'
     : theme.palette.mode === 'dark'
@@ -543,38 +543,15 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
             handleDismissLater()
           }
         }}
-        fullWidth
         maxWidth={false}
-        slotProps={{
-          paper: {
-            onKeyDown: handleDialogKeyDown,
-            sx: {
-              ...get3DCardStyle(theme, 'default'),
-              m: 0,
-              p: 0,
-              overflow: 'hidden',
-              width: '100%',
-              maxWidth: '520px',
-              borderRadius: '8px',
-            },
-          },
-        }}
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset, {
+          onKeyDown: handleDialogKeyDown,
+        })}
       >
         {step === 'input' ? (
           <>
-            <DialogTitle
-              sx={{
-                color: 'inherit',
-                px: 1.75,
-                py: 1.5,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                gap: 0.6,
-                borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
-              }}
-            >
+            <DialogTitle sx={getPopupTitleSx(theme)}>
               <Box
                 sx={{
                   display: 'flex',
@@ -592,7 +569,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               {stepBadge(1)}
             </DialogTitle>
 
-            <DialogContent sx={{ px: 1.75, py: 1.75 }}>
+            <DialogContent sx={getPopupContentSx({ py: 1.75 })}>
               <Typography
                 variant="body2"
                 sx={{
@@ -792,17 +769,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               </Box>
             </DialogContent>
 
-            <DialogActions
-              disableSpacing
-              sx={{
-                flexDirection: 'column',
-                alignItems: 'center',
-                px: 1.75,
-                py: 1.5,
-                gap: 1,
-                borderTop: (t2) => `1px solid ${t2.palette.divider}`,
-              }}
-            >
+            <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
               <Button
                 fullWidth
                 sx={{
@@ -832,19 +799,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
           </>
         ) : (
           <>
-            <DialogTitle
-              sx={{
-                color: readyColor,
-                px: 1.75,
-                py: 1.5,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                gap: 0.6,
-                borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
-              }}
-            >
+            <DialogTitle sx={getPopupTitleSx(theme, { color: readyColor })}>
               <Box
                 sx={{
                   display: 'flex',
@@ -862,7 +817,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               {stepBadge(2)}
             </DialogTitle>
 
-            <DialogContent sx={{ px: 1.75, py: 1.75 }}>
+            <DialogContent sx={getPopupContentSx({ py: 1.75 })}>
               {/* 卡片 1：实时节点连通仪表盘 */}
               <Box
                 sx={{
@@ -971,7 +926,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     <Typography
                       variant="body2"
                       sx={{
-                        color: 'text.primary',
+                        color: tokens.primaryText,
                         fontWeight: 700,
                         fontSize: '13px',
                         lineHeight: 1.4,
@@ -1109,7 +1064,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     variant="body2"
                     sx={{
                       fontWeight: 700,
-                      color: 'text.primary',
+                      color: tokens.primaryText,
                       mb: 0.5,
                       fontSize: '13px',
                       lineHeight: 1.45,
@@ -1157,17 +1112,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
               )}
             </DialogContent>
 
-            <DialogActions
-              disableSpacing
-              sx={{
-                flexDirection: 'column',
-                alignItems: 'center',
-                px: 1.75,
-                py: 1.5,
-                gap: 1,
-                borderTop: (t2) => `1px solid ${t2.palette.divider}`,
-              }}
-            >
+            <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
               <Button
                 fullWidth
                 sx={{
@@ -1209,54 +1154,26 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
         open={contextMenu !== null}
         onClose={() => setContextMenu(null)}
         slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              minWidth: '150px',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              '& .MuiList-root': {
-                padding: '4px 0',
-              },
-            },
-          },
+          paper: getPopupMenuPaperProps(theme, { minWidth: '150px' }),
         }}
       >
-        <MenuItem
-          onClick={handleCut}
-          disabled={!url}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleCut} disabled={!url}>
           ✂️ {t('shared.actions.cut')}
         </MenuItem>
-        <MenuItem
-          onClick={handleCopy}
-          disabled={!url}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleCopy} disabled={!url}>
           📋 {t('shared.actions.copy')}
         </MenuItem>
-        <MenuItem
-          onClick={handlePaste}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handlePaste}>
           📥 {t('shared.actions.paste')}
         </MenuItem>
-        <MenuItem
-          onClick={handleSelectAll}
-          disabled={!url}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleSelectAll} disabled={!url}>
           🔍 {t('shared.actions.selectAll')}
         </MenuItem>
-        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <Divider />
         <MenuItem
           onClick={handleClear}
           disabled={!url}
-          sx={{
-            ...getMenuItemHoverStyle(theme, controlSkin),
-            color: 'error.main',
-          }}
+          sx={getPopupMenuItemStyle(theme, { danger: true })}
         >
           🧹 {t('shared.actions.clearInput')}
         </MenuItem>

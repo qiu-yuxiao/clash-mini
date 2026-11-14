@@ -1,28 +1,33 @@
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  TextField,
-  useTheme,
+  Divider,
   Menu,
   MenuItem,
-  Divider,
+  TextField,
+  useTheme,
 } from '@mui/material'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
-import React, { useState, useRef } from 'react'
+import React, { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { showNotice } from '@/services/notice-service'
+import { get3DButtonStyle, get3DInputStyle } from '@/utils/button-styles'
 import {
-  get3DCardStyle,
-  get3DButtonStyle,
-  get3DInputStyle,
-} from '@/utils/button-styles'
+  getNarrowDialogSlotProps,
+  getNarrowDialogSx,
+  getPopupActionsSx,
+  getPopupContentSx,
+  getPopupMenuItemStyle,
+  getPopupMenuPaperProps,
+  getPopupTitleSx,
+  useNarrowOverlayTopOffset,
+} from '@/utils/popup-styles'
 import { addQuickRoutingRules } from '@/utils/quick-routing'
-
-import { getMenuItemHoverStyle } from '../utils/style-helpers'
 
 interface AddUrlDialogProps {
   open: boolean
@@ -35,14 +40,15 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
 }) => {
   const { t } = useTranslation()
   const theme = useTheme()
+  const topOffset = useNarrowOverlayTopOffset()
   const [text, setText] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const controlSkin = theme.controlSkin || 'default'
 
   // Context Menu State for Input Box (Mouse Paste Bug Fix)
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number
     mouseY: number
+    hasSelection: boolean
   } | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null)
 
@@ -80,9 +86,13 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
 
   const handleContextMenu = (event: React.MouseEvent) => {
     event.preventDefault()
+    const input = inputRef.current
+    const selectionStart = input?.selectionStart ?? 0
+    const selectionEnd = input?.selectionEnd ?? 0
     setContextMenu({
       mouseX: event.clientX,
       mouseY: event.clientY,
+      hasSelection: selectionStart !== selectionEnd,
     })
   }
 
@@ -184,37 +194,37 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
     }
   }
 
+  const hasSelection = Boolean(contextMenu?.hasSelection)
+
   return (
     <>
       <Dialog
         open={open}
         onClose={handleClose}
-        fullWidth
         maxWidth={false}
-        slotProps={{
-          paper: {
-            sx: {
-              ...get3DCardStyle(theme, 'default'),
-              p: 0,
-              overflow: 'hidden',
-              width: 'calc(100% - 32px)',
-              maxWidth: '380px',
-            },
-          },
-        }}
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset)}
       >
-        <DialogTitle
-          sx={{
-            color: 'inherit',
-            fontWeight: 'bold',
-            fontSize: '15px',
-            px: 2,
-            py: 1.5,
-          }}
-        >
-          {t('settings.mini.addUrl', { defaultValue: '添加网址' })}
+        <DialogTitle sx={getPopupTitleSx(theme)}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.75,
+              fontWeight: 'bold',
+              fontSize: '15.5px',
+              lineHeight: 1.35,
+            }}
+          >
+            <span>🌐</span>
+            <span>
+              {t('settings.mini.addUrl', { defaultValue: '添加网址' })}
+            </span>
+          </Box>
         </DialogTitle>
-        <DialogContent sx={{ px: 2, pb: 1 }}>
+
+        <DialogContent sx={getPopupContentSx()}>
           <TextField
             autoFocus
             multiline
@@ -232,20 +242,31 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
             onContextMenu={handleContextMenu}
           />
         </DialogContent>
-        <DialogActions sx={{ px: 2, py: 1.5, gap: 1 }}>
+
+        <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
           <Button
-            sx={get3DButtonStyle(theme, 'outlined', 'default')}
-            onClick={handleClose}
-            disabled={submitting}
-          >
-            {t('shared.actions.cancel', { defaultValue: '取消' })}
-          </Button>
-          <Button
-            sx={get3DButtonStyle(theme, 'contained', 'primary')}
+            fullWidth
+            sx={{
+              ...get3DButtonStyle(theme, 'contained', 'primary'),
+              py: 0.85,
+              fontSize: '13px',
+            }}
             onClick={handleAdd}
             disabled={submitting}
           >
             {t('settings.mini.addUrlButton', { defaultValue: '添加' })}
+          </Button>
+          <Button
+            fullWidth
+            sx={{
+              ...get3DButtonStyle(theme, 'outlined', 'default'),
+              py: 0.7,
+              fontSize: '12.5px',
+            }}
+            onClick={handleClose}
+            disabled={submitting}
+          >
+            {t('shared.actions.cancel', { defaultValue: '取消' })}
           </Button>
         </DialogActions>
       </Dialog>
@@ -264,60 +285,26 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
         open={contextMenu !== null}
         onClose={() => setContextMenu(null)}
         slotProps={{
-          paper: {
-            className: 'theme-panel',
-            sx: {
-              minWidth: '160px',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              '& .MuiList-root': {
-                padding: '4px 0',
-              },
-            },
-          },
+          paper: getPopupMenuPaperProps(theme, { minWidth: '160px' }),
         }}
       >
-        <MenuItem
-          onClick={handleCut}
-          disabled={
-            !inputRef.current ||
-            inputRef.current.selectionStart === inputRef.current.selectionEnd
-          }
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleCut} disabled={!hasSelection}>
           ✂️ {t('shared.actions.cut')}
         </MenuItem>
-        <MenuItem
-          onClick={handleCopy}
-          disabled={
-            !inputRef.current ||
-            inputRef.current.selectionStart === inputRef.current.selectionEnd
-          }
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleCopy} disabled={!hasSelection}>
           📋 {t('shared.actions.copy')}
         </MenuItem>
-        <MenuItem
-          onClick={handlePaste}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handlePaste}>
           📥 {t('shared.actions.paste')}
         </MenuItem>
-        <MenuItem
-          onClick={handleSelectAll}
-          disabled={!text}
-          sx={getMenuItemHoverStyle(theme, controlSkin)}
-        >
+        <MenuItem onClick={handleSelectAll} disabled={!text}>
           🔍 {t('shared.actions.selectAll')}
         </MenuItem>
-        <Divider sx={{ my: '4px', borderColor: 'rgba(255, 255, 255, 0.12)' }} />
+        <Divider />
         <MenuItem
           onClick={handleClear}
           disabled={!text}
-          sx={{
-            ...getMenuItemHoverStyle(theme, controlSkin),
-            color: 'error.main',
-          }}
+          sx={getPopupMenuItemStyle(theme, { danger: true })}
         >
           🧹 {t('shared.actions.clearInput')}
         </MenuItem>

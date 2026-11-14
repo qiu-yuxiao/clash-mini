@@ -1,13 +1,25 @@
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  useTheme,
   type SxProps,
   type Theme,
 } from '@mui/material'
 import { ReactNode } from 'react'
+
+import { get3DButtonStyle } from '@/utils/button-styles'
+import {
+  getNarrowDialogSlotProps,
+  getNarrowDialogSx,
+  getPopupActionsSx,
+  getPopupContentSx,
+  getPopupTitleSx,
+  useNarrowOverlayTopOffset,
+} from '@/utils/popup-styles'
 
 interface Props {
   title: ReactNode
@@ -42,26 +54,64 @@ export const BaseDialog: React.FC<Props> = ({
   onCancel,
   onClose,
 }) => {
+  const theme = useTheme()
+  const topOffset = useNarrowOverlayTopOffset()
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
       disableEnforceFocus={disableEnforceFocus}
+      maxWidth={false}
+      sx={getNarrowDialogSx(topOffset)}
+      slotProps={getNarrowDialogSlotProps(theme, topOffset)}
     >
-      <DialogTitle>{title}</DialogTitle>
+      <DialogTitle sx={getPopupTitleSx(theme)}>
+        <Box sx={{ fontWeight: 'bold', fontSize: '15.5px', lineHeight: 1.35 }}>
+          {title}
+        </Box>
+      </DialogTitle>
 
-      <DialogContent sx={contentSx}>{children}</DialogContent>
+      <DialogContent
+        sx={[
+          getPopupContentSx(),
+          ...(Array.isArray(contentSx)
+            ? contentSx
+            : contentSx
+              ? [contentSx]
+              : []),
+        ]}
+      >
+        {children}
+      </DialogContent>
 
       {!disableFooter && (
-        <DialogActions>
-          {!disableCancel && (
-            <Button variant="outlined" onClick={onCancel}>
-              {cancelBtn}
+        <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
+          {!disableOk && (
+            <Button
+              fullWidth
+              loading={loading}
+              sx={{
+                ...get3DButtonStyle(theme, 'contained', 'primary'),
+                py: 0.85,
+                fontSize: '13px',
+              }}
+              onClick={onOk}
+            >
+              {okBtn}
             </Button>
           )}
-          {!disableOk && (
-            <Button loading={loading} variant="contained" onClick={onOk}>
-              {okBtn}
+          {!disableCancel && (
+            <Button
+              fullWidth
+              sx={{
+                ...get3DButtonStyle(theme, 'outlined', 'default'),
+                py: 0.7,
+                fontSize: '12.5px',
+              }}
+              onClick={onCancel}
+            >
+              {cancelBtn}
             </Button>
           )}
         </DialogActions>

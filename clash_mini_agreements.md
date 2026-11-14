@@ -193,7 +193,10 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - 窄窗（≤285px）：节点列表自动切换为 1 列纵向信息行；顶部活跃节点栏紧凑展示 2 项核心指标。
   - 右侧连接与路由监控表遵循大窗（>285px）挂载观测、窄窗（≤285px）彻底卸载不渲染、不订阅的统一信号门控。
   - **该断点与窗口最小宽度（271px）不是同一个数**：断点是排版门槛（比较内容宽度），最小宽度是几何下限。最小宽度必须小于断点，保证窗口缩到最小时必然进入窄窗模式，且内容宽度 272–285 区间行为与历史版本一致（否则三列卡片会被挤进 272px）。
-- **系统调试运行日志弹窗尺寸与布局规范**：为契合极窄竖屏与单手微型窗口体验，「系统调试运行日志」弹窗（`LayoutDialogs` 中的 `Logs View Dialog`）宽度强制锁定与全局最小窗口常数 `MIN_WINDOW_WIDTH`（`271px`）完全等宽（`width: 271px, maxWidth: 100%, m: '0 auto'`），居中展示。同时其内部工具栏（日志暂停/播放、升降序、一键清空）与日志级别选择下拉框（固定 `95px`）采用紧凑排版，确保标题栏与右上方关闭图标无缝排布，日志数据内容配合 `overflowWrap: 'anywhere'` 自动换行，彻底消除 271px 视口下的任何横向滚动条。
+- **窄窗 `271px` 弹窗/通知区域锁定与视觉风格统一规范**：
+  - 所有模态弹窗（`BaseDialog`、`AddUrlDialog`、`AntivirusWhitelistDialog`、`FirstRunGuideDialog`、`HelpMenuButton` 一/二级弹窗、`LayoutDialogs`）与顶部反馈通知（`NoticeManager`）宽度均严格锁定为 `MIN_WINDOW_WIDTH`（`271px`）并锚定于左侧窄窗区域（`left: 0, width: 271px`），顶部按 `resolveNarrowOverlayTopOffset` 避让 `CUSTOM_TITLEBAR_HEIGHT`（`30px`；原生装饰栏或极窄隐匿隐藏标题栏时贴顶 `0px`），即使在宽窗口（`>285px`）下也绝不居中漂移或撑满宽窗；
+  - 所有窄窗弹窗、`BaseStyledSelect` 下拉选单、全局/输入框右键菜单以及右侧连接表的详情/右键小菜单（`ConnectionDetail` 与 `ConnectionTable` 右键菜单，保留跟随鼠标的小尺寸及宽窗就地展示定位）均统一复用 `src/utils/popup-styles.ts`（`getPopupCardStyle` / `getPopupSkinTokens`）的 3D 实体拟物卡片表面与皮肤高对比语义配色；
+  - 「系统调试运行日志」弹窗内部工具栏（日志暂停/播放、升降序、一键清空）与日志级别选择下拉框（固定 `95px`）采用紧凑排版，配合 `overflowWrap: 'anywhere'` 自动换行，彻底消除 `271px` 视口下的任何横向滚动条。
 
 ### 2.3 窗口尺寸常量与边界约束
 
@@ -602,6 +605,10 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
    - 规则下发必须按「写入 `Merge` → `enhanceProfiles()` 内核重载 → 精确关闭当前命中该目标的活跃连接」顺序执行，保证存量长连接即刻生效切换或阻断。
    - 表格 `路由`（`chains`）列必须完整区分并展示四种状态：**`直连`（`DIRECT`）**、**`代理`（`PROXY`）**、**`封锁`（`REJECT`）**、**`已断开`（`DISCONNECTED`）**。
    - **技术边界与状态合成机制**：当连接被手动「断开此连接」或命中 `REJECT` 规则瞬时阻断后，Mihomo 活跃连接表（`/connections` WS）会移除该 socket 句柄（且客户端未主动重试前不会重建 TCP 连接）。为此前端在「路径控制」表将 Mihomo 实时连接与本地持久化的「手动已断开记录」以及 `Merge` `prepend-rules` 置顶管控条目（含历史手工写入的 `DOMAIN-SUFFIX` / `REJECT` / 置顶直连或代理规则）合成统一视图：被封锁或手动断开的链接保留在表中并显示清晰状态；当目标重建新活跃流时自动洗去「已断开」标记；用户在表内右键即可直接将其重设为 `PROXY`/`DIRECT` 或点击「恢复默认路由」删除置顶覆写规则，无需离开「路径控制」表跳转「添加网址」。
+3. **单表融合近期已关闭连接（废除「活跃 / 历史」二选一开关）**：
+   - `ConnectionsPanel` 移除 `活跃 / 历史` 分段切换与「清空历史」按钮；`composeActivePathControlConnections` 将 `closedConnections` 按逆序（最新关闭优先）对目标去重后合入同一路径控制表（自动排除已被实时活跃连接、手动已断开记录或 `Merge` 托管规则覆盖的目标，实时速率置零并标记 `_isClosed: true`），排于实时流与置顶托管规则之后（`_isClosed` 行对详情按关闭态展示并在右键菜单禁用「断开连接」），解决短连接一闪而过无法在主表就地右键管控的问题。
+4. **自定义路由规则可移植备份与重装恢复**：
+   - 在 `路径控制（右键点击链接）` 右侧提供与 `断开全部` 风格完全一致的紧凑 3D 按钮 `保存路由`（`exportCustomRoutingRules`）与 `导入路由`（`importCustomRoutingRules`），通过 `@tauri-apps/plugin-dialog` 与 `@tauri-apps/plugin-fs` 将 `Merge` `prepend-rules` 导出为带版本元数据的 UTF-8 YAML 备份文件；全新重装后可一键从指定备份文件合并导入至 `Merge` `prepend-rules`，并在操作期间通过 `beginLongOperation`/`endLongOperation` 护航完成 `enhanceProfiles()` 重载与 `clash-mini-merge-rules-changed` 界面同步刷新（13 语种全量同步）。
 
 ---
 
@@ -793,6 +800,12 @@ flowchart LR
   2. `src/utils/path-control.ts` + `src/hooks/use-path-control.ts` + `src/components/connection/connection-table.tsx` + `src/components/connection/connection-detail.tsx` + `src/pages/_layout/components/connections-panel.tsx` + `src/pages/_layout.tsx`：在「路径控制」表落地 **直连 / 代理 / 封锁 / 已断开** 四态状态解析与样式展示，先重载再精确关闭存量匹配连接，持久保存手动断开记录并与 `Merge` 置顶规则（含历史已存在规则）合并显示于表内（置顶展示已断开/已封锁条目并兼容详情弹窗空端口/空时间显示），新增右键「恢复默认路由」就地解封/重连；
   3. 同步更新全部 13 个语种 `connections.json`（`chainsDisconnected`、`restoreDefault`）与 `profiles.json`（`quickRuleRemoved`），重生成 `src/types/generated/i18n-keys.ts`（`877 → 880`），补充 `src/utils/quick-routing.test.ts` 与 `src/utils/path-control.test.ts`，并通过 `i18n:check` / `vitest`。
 - **影响**：彻底消除路径控制封锁单个子域误伤兄弟/通配域名的问题，并使封锁或手动断开的链接可直接在表内识别状态并一键还原，无需转到「添加网址」。
+
+### Sync-11 · 窄窗 271px 全局弹窗/通知锁定与卡片视觉统一 + 路径控制单表融合及自定义路由导出/导入
+- **改动**：
+  1. **窄窗 `271px` 浮层锁定与视觉统一**：`src/constants.ts` 定义 `CUSTOM_TITLEBAR_HEIGHT = 30`，新增 `src/utils/popup-styles.ts`（含 `popup-styles.test.ts`）统一收敛 `resolveNarrowOverlayTopOffset`、`useNarrowOverlayTopOffset`、`getPopupCardStyle`、`getPopupSkinTokens` 与窄窗对话框/通知定位契约；同步改造 `base-dialog.tsx`、`notice-manager.tsx`、`add-url-dialog.tsx`、`antivirus-whitelist-dialog.tsx`、`first-run-guide-dialog.tsx`、`help-menu-button.tsx`（含一级菜单与二级弹窗）、`layout-dialogs.tsx`、`base-styled-select.tsx`、`connection-detail.tsx`、`connection-table.tsx`、`_layout.tsx`、`use-custom-theme.ts` 与 `src/assets/styles/index.scss`，确保窄窗弹窗/通知始终锁定左侧 `271px` 且不遮挡标题栏，全端菜单/弹窗视觉风格统一。
+  2. **路径控制单表融合与自定义路由备份/恢复**：`src/utils/path-control.ts` 与 `src/hooks/use-path-control.ts` 将目标去重后的近期已关闭连接（`_isClosed: true`）直接合入路径控制单表并维护排序；`src/utils/quick-routing.ts` 新增 `serializeCustomRoutingBackup`、`parseCustomRoutingBackup`、`exportCustomRoutingRules` 与 `importCustomRoutingRules`；`src/pages/_layout/components/connections-panel.tsx`、`src/components/connection/connection-table.tsx` 与 `src/pages/_layout.tsx` 移除「活跃 / 历史」开关，在 `路径控制（右键点击链接）` 右侧新增与 `断开全部` 同款 3D 风格的「保存路由」「导入路由」按钮；同步更新 13 个语种 `settings.json` 并重生成 `i18n-types`（`885` 键），增补 `path-control.test.ts` 与 `quick-routing.test.ts` 单测。
+- **影响**：宽窗口下弹窗/顶部通知不再偏移或撑开，右键菜单与弹窗卡片统一呈现 3D 实体拟物风格；路径控制表消除「活跃/历史」切换认知负担且支持短连接就地管控与重装后自定义路由一键恢复；前端校验与全套 113 项单测全绿通过。
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 

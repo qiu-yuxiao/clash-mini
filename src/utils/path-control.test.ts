@@ -235,4 +235,169 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
 
     expect(ordered.map((r) => r.id)).toEqual(['d', 'r', 'l2', 'l1', 'p'])
   })
+
+  it('composeActivePathControlConnections 将近期已关闭连接按目标去重并合入单表，且保持近期优先顺序', () => {
+    const active: IConnectionsItem[] = [
+      {
+        id: 'live-1',
+        metadata: {
+          network: 'tcp',
+          type: 'HTTPS',
+          sourceIP: '127.0.0.1',
+          destinationIP: '1.1.1.1',
+          sourcePort: '1',
+          destinationPort: '443',
+          host: 'live.example.com',
+          processPath: '',
+        },
+        upload: 100,
+        download: 200,
+        start: '2026-01-01T00:00:05Z',
+        chains: ['Proxy'],
+        rule: 'Match',
+        rulePayload: '',
+        curUpload: 10,
+        curDownload: 20,
+      },
+    ]
+
+    const closed: IConnectionsItem[] = [
+      {
+        id: 'closed-old-dup',
+        metadata: {
+          network: 'tcp',
+          type: 'HTTPS',
+          sourceIP: '127.0.0.1',
+          destinationIP: '2.2.2.2',
+          sourcePort: '2',
+          destinationPort: '443',
+          host: 'dup.example.com',
+          processPath: '',
+        },
+        upload: 50,
+        download: 60,
+        start: '2026-01-01T00:00:01Z',
+        chains: ['DIRECT'],
+        rule: 'Match',
+        rulePayload: '',
+        curUpload: 99,
+        curDownload: 88,
+      },
+      {
+        id: 'closed-live-dup',
+        metadata: {
+          network: 'tcp',
+          type: 'HTTPS',
+          sourceIP: '127.0.0.1',
+          destinationIP: '1.1.1.1',
+          sourcePort: '3',
+          destinationPort: '443',
+          host: 'live.example.com',
+          processPath: '',
+        },
+        upload: 10,
+        download: 20,
+        start: '2026-01-01T00:00:02Z',
+        chains: ['Proxy'],
+        rule: 'Match',
+        rulePayload: '',
+        curUpload: 5,
+        curDownload: 6,
+      },
+      {
+        id: 'closed-pinned-dup',
+        metadata: {
+          network: 'tcp',
+          type: 'HTTPS',
+          sourceIP: '127.0.0.1',
+          destinationIP: '3.3.3.3',
+          sourcePort: '4',
+          destinationPort: '443',
+          host: 'pinned.example.com',
+          processPath: '',
+        },
+        upload: 10,
+        download: 20,
+        start: '2026-01-01T00:00:03Z',
+        chains: ['DIRECT'],
+        rule: 'DOMAIN',
+        rulePayload: 'pinned.example.com',
+        curUpload: 1,
+        curDownload: 1,
+      },
+      {
+        id: 'closed-older-uniq',
+        metadata: {
+          network: 'tcp',
+          type: 'HTTPS',
+          sourceIP: '127.0.0.1',
+          destinationIP: '4.4.4.4',
+          sourcePort: '5',
+          destinationPort: '443',
+          host: 'older.example.com',
+          processPath: '',
+        },
+        upload: 30,
+        download: 40,
+        start: '2026-01-01T00:00:04Z',
+        chains: ['Proxy'],
+        rule: 'Match',
+        rulePayload: '',
+        curUpload: 7,
+        curDownload: 8,
+      },
+      {
+        id: 'closed-new-dup',
+        metadata: {
+          network: 'tcp',
+          type: 'HTTPS',
+          sourceIP: '127.0.0.1',
+          destinationIP: '2.2.2.2',
+          sourcePort: '6',
+          destinationPort: '443',
+          host: 'dup.example.com',
+          processPath: '',
+        },
+        upload: 70,
+        download: 80,
+        start: '2026-01-01T00:00:00Z',
+        chains: ['DIRECT'],
+        rule: 'Match',
+        rulePayload: '',
+        curUpload: 123,
+        curDownload: 456,
+      },
+    ]
+
+    const composed = composeActivePathControlConnections({
+      activeConnections: active,
+      closedConnections: closed,
+      managedRules: [
+        {
+          raw: 'DOMAIN,pinned.example.com,DIRECT',
+          ruleType: 'DOMAIN',
+          value: 'pinned.example.com',
+          matchKey: 'pinned.example.com',
+          target: 'DIRECT',
+        },
+      ],
+      disconnectedRecords: [],
+    })
+
+    const closedRows = composed.filter((r) => r._isClosed)
+    expect(closedRows.map((r) => r.id)).toEqual([
+      'closed-new-dup',
+      'closed-older-uniq',
+    ])
+    expect(closedRows[0]?.curUpload).toBe(0)
+    expect(closedRows[0]?.curDownload).toBe(0)
+
+    const prioritized = prioritizePathControlConnections(composed)
+    expect(prioritized.map((r) => r.id)).toEqual([
+      'live-1',
+      'synthetic:rule:DOMAIN,pinned.example.com,DIRECT',
+      'closed-new-dup',
+      'closed-older-uniq',
+    ])
+  })
 })

@@ -11,11 +11,16 @@ import {
 import type React from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { get3DButtonStyle } from '@/utils/button-styles'
 import {
-  get3DCardStyle,
-  get3DButtonStyle,
-  getActiveSkin,
-} from '@/utils/button-styles'
+  getNarrowDialogSlotProps,
+  getNarrowDialogSx,
+  getPopupActionsSx,
+  getPopupContentSx,
+  getPopupSkinTokens,
+  getPopupTitleSx,
+  useNarrowOverlayTopOffset,
+} from '@/utils/popup-styles'
 
 /**
  * 安全软件白名单说明弹窗：
@@ -37,11 +42,8 @@ export const AntivirusWhitelistDialog: React.FC<
 > = ({ open, onClose }) => {
   const { t } = useTranslation()
   const theme = useTheme()
-
-  // 弹窗卡片底色来自 get3DCardStyle：retro-3d 皮肤主题灰白次级文字反差几乎为零，
-  // 与 first-run-guide-dialog 一致换用配套深棕系；其他皮肤沿用主题色
-  const isRetro3D = getActiveSkin(theme) === 'retro-3d'
-  const secondaryText = isRetro3D ? 'rgba(44, 31, 3, 0.78)' : 'text.secondary'
+  const topOffset = useNarrowOverlayTopOffset()
+  const tokens = getPopupSkinTokens(theme)
 
   const sections: WhitelistSection[] = [
     {
@@ -70,35 +72,11 @@ export const AntivirusWhitelistDialog: React.FC<
     <Dialog
       open={open}
       onClose={onClose}
-      fullWidth
       maxWidth={false}
-      slotProps={{
-        paper: {
-          sx: {
-            ...get3DCardStyle(theme, 'default'),
-            m: 0,
-            p: 0,
-            overflow: 'hidden',
-            width: '100%',
-            maxWidth: '520px',
-            borderRadius: '8px',
-          },
-        },
-      }}
+      sx={getNarrowDialogSx(topOffset)}
+      slotProps={getNarrowDialogSlotProps(theme, topOffset)}
     >
-      <DialogTitle
-        sx={{
-          color: 'inherit',
-          px: 1.75,
-          py: 1.5,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          gap: 0.6,
-          borderBottom: (t2) => `1px solid ${t2.palette.divider}`,
-        }}
-      >
+      <DialogTitle sx={getPopupTitleSx(theme)}>
         <Box
           sx={{
             display: 'flex',
@@ -115,7 +93,7 @@ export const AntivirusWhitelistDialog: React.FC<
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ px: 1.75, py: 1.75 }}>
+      <DialogContent sx={getPopupContentSx({ py: 1.75 })}>
         {sections.map((section) => (
           <Box
             key={section.title}
@@ -125,7 +103,7 @@ export const AntivirusWhitelistDialog: React.FC<
               variant="body2"
               sx={{
                 fontWeight: 700,
-                color: 'text.primary',
+                color: tokens.primaryText,
                 mb: 0.5,
                 fontSize: '13px',
                 lineHeight: 1.45,
@@ -136,7 +114,7 @@ export const AntivirusWhitelistDialog: React.FC<
             <Typography
               variant="body2"
               sx={{
-                color: secondaryText,
+                color: tokens.secondaryText,
                 lineHeight: 1.55,
                 fontSize: '12.5px',
                 whiteSpace: 'pre-line',
@@ -148,14 +126,7 @@ export const AntivirusWhitelistDialog: React.FC<
         ))}
       </DialogContent>
 
-      <DialogActions
-        disableSpacing
-        sx={{
-          px: 1.75,
-          py: 1.5,
-          borderTop: (t2) => `1px solid ${t2.palette.divider}`,
-        }}
-      >
+      <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
         <Button
           fullWidth
           sx={{

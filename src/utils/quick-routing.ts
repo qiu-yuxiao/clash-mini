@@ -1,6 +1,11 @@
+import { open, save } from '@tauri-apps/plugin-dialog'
+import { readFile, writeFile } from '@tauri-apps/plugin-fs'
+import dayjs from 'dayjs'
 import yaml from 'js-yaml'
 
 import {
+  beginLongOperation,
+  endLongOperation,
   enhanceProfiles,
   readProfileFile,
   saveProfileFile,
@@ -498,5 +503,172 @@ export const addQuickRoutingRules = async (
     console.error('Failed to add bulk routing rules:', e)
     showNotice.error(e instanceof Error ? e.message : String(e))
     return 0
+  }
+}
+
+interface CustomRoutingBackupPayload {
+  version?: number
+  exportedAt?: string
+  'prepend-rules'?: unknown
+  rules?: unknown
+}
+
+/**
+ * Serializes managed Merge `prepend-rules` into a portable YAML backup string.
+ */
+export function serializeCustomRoutingBackup(
+  rules: ReadonlyArray<string | { raw: string }>,
+): string {
+  const ruleLines: string[] = []
+  const seenKeys = new Set<string>()
+
+  for (const item of rules) {
+    const raw = (typeof item === 'string' ? item : item.raw).trim()
+    if (!raw || raw.startsWith('#')) continue
+    const parsed = parseManagedMergeRuleLine(raw)
+    if (!parsed) continue
+    const dedupKey = getRuleIdentityKey(parsed.raw) ?? parsed.raw
+    if (seenKeys.has(dedupKey)) continue
+    seenKeys.add(dedupKey)
+    ruleLines.push(parsed.raw)
+  }
+
+  const payload: CustomRoutingBackupPayload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    'prepend-rules': ruleLines,
+  }
+
+  return `# Clash Mini Custom Routing Rules Backup\n${yaml.dump(payload, {
+    noRefs: true,
+    lineWidth: -1,
+  })}`
+}
+
+/**
+ * Parses a custom routing backup YAML (or plain rule list) and validates managed rules.
+ */
+export function parseCustomRoutingBackup(content: string): string[] {
+  const trimmed = content.trim()
+  if (!trimmed) return []
+
+  let candidates: unknown[] = []
+  try {
+    const parsed = yaml.load(trimmed)
+    if (Array.isArray(parsed)) {
+      candidates = parsed
+    } else if (parsed && typeof parsed === 'object') {
+      const obj = parsed as CustomRoutingBackupPayload
+      if (Array.isArray(obj['prepend-rules'])) {
+        candidates = obj['prepend-rules']
+      } else if (Array.isArray(obj.rules)) {
+        candidates = obj.rules
+      }
+    }
+  } catch {
+    return []
+  }
+
+  const validRules: string[] = []
+  const seenKeys = new Set<string>()
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue
+    const line = candidate.trim()
+    if (!line || line.startsWith('#')) continue
+    const parsedRule = parseManagedMergeRuleLine(line)
+    if (!parsedRule) continue
+    const dedupKey = getRuleIdentityKey(parsedRule.raw) ?? parsedRule.raw
+    if (seenKeys.has(dedupKey)) continue
+    seenKeys.add(dedupKey)
+    validRules.push(parsedRule.raw)
+  }
+
+  return validRules
+}
+
+/**
+ * Exports all custom Path Control routing rules from the Merge profile to a user-chosen YAML file.
+ * Returns the exported rule count, or null if cancelled / failed.
+ */
+export async function exportCustomRoutingRules(): Promise<number | null> {
+  try {
+    const managedRules = await withMergeFileLock(() => readManagedMergeRules())
+    if (managedRules.length === 0) {
+      showNotice.info('settings.mini.routesExportEmpty')
+      return 0
+    }
+
+    const filePath = await save({
+      defaultPath: `clash-mini-routes-${dayjs().format('YYYY-MM-DD')}.yaml`,
+      filters: [{ name: 'YAML', extensions: ['yaml', 'yml'] }],
+    })
+    if (!filePath) return null
+
+    const content = serializeCustomRoutingBackup(managedRules)
+    await writeFile(filePath, new TextEncoder().encode(content))
+
+    showNotice.success('settings.mini.routesExportSuccess', {
+      count: managedRules.length,
+    })
+    return managedRules.length
+  } catch (e: unknown) {
+    console.error('Failed to export custom routing rules:', e)
+    showNotice.error(e instanceof Error ? e.message : String(e))
+    return null
+  }
+}
+
+/**
+ * Imports custom Path Control routing rules from a user-selected backup file into the Merge profile.
+ * Returns the number of imported rules, or null if cancelled / failed.
+ */
+export async function importCustomRoutingRules(): Promise<number | null> {
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      filters: [{ name: 'YAML', extensions: ['yaml', 'yml'] }],
+    })
+    const filePath = Array.isArray(selected) ? selected[0] : selected
+    if (!filePath) return null
+
+    const bytes = await readFile(filePath)
+    const content = new TextDecoder('utf-8').decode(bytes)
+    const importedRules = parseCustomRoutingBackup(content)
+
+    if (importedRules.length === 0) {
+      showNotice.info('settings.mini.routesImportEmpty')
+      return 0
+    }
+
+    await withMergeFileLock(async () => {
+      const mergeObj = await loadMergeObject()
+      let nextPrependRules = readMergePrependRules(mergeObj)
+      for (let i = importedRules.length - 1; i >= 0; i -= 1) {
+        nextPrependRules = upsertPrependRule(nextPrependRules, importedRules[i])
+      }
+      mergeObj['prepend-rules'] = nextPrependRules
+      await saveProfileFile(
+        'Merge',
+        yaml.dump(mergeObj, { noRefs: true, lineWidth: -1 }),
+      )
+    })
+
+    beginLongOperation()
+    try {
+      await enhanceProfiles()
+    } finally {
+      endLongOperation()
+    }
+    emitMergeRulesChanged()
+
+    showNotice.success('settings.mini.routesImportSuccess', {
+      count: importedRules.length,
+    })
+    return importedRules.length
+  } catch (e: unknown) {
+    console.error('Failed to import custom routing rules:', e)
+    showNotice.error(e instanceof Error ? e.message : String(e))
+    return null
   }
 }

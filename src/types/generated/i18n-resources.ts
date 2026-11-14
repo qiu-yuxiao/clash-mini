@@ -808,10 +808,7 @@ export interface TranslationResources {
         addUrlTooltip: string
         allNodesTimeout: string
         allNodesTimeoutTooltip: string
-        connectionsActive: string
-        connectionsClearHistory: string
         connectionsDisconnectAll: string
-        connectionsHistory: string
         debugLogs: string
         filterAutoTestingTooltip: string
         gfwlist: string
@@ -819,6 +816,8 @@ export interface TranslationResources {
         globalProxy: string
         globalProxyTooltip: string
         importConfig: string
+        importCustomRoutes: string
+        importCustomRoutesTooltip: string
         importPlaceholder: string
         localFile: string
         manual: string
@@ -830,6 +829,12 @@ export interface TranslationResources {
         profilesTitle: string
         proxyMethod: string
         rotateNodeTooltip: string
+        routesExportEmpty: string
+        routesExportSuccess: string
+        routesImportEmpty: string
+        routesImportSuccess: string
+        saveCustomRoutes: string
+        saveCustomRoutesTooltip: string
         statusDelayExcellent: string
         statusDelayGood: string
         statusDelayHigh: string

@@ -1,48 +1,23 @@
 import { CloseRounded } from '@mui/icons-material'
-import {
-  Snackbar,
-  Alert,
-  IconButton,
-  Box,
-  type SnackbarOrigin,
-} from '@mui/material'
-import React, { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { Alert, Box, IconButton, useTheme } from '@mui/material'
+import React, { useCallback, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { MIN_WINDOW_WIDTH } from '@/constants'
 import {
-  subscribeNotices,
-  hideNotice,
   getSnapshotNotices,
+  hideNotice,
   showNotice,
+  subscribeNotices,
 } from '@/services/notice-service'
 import type { TranslationKey } from '@/types/generated/i18n-keys'
 import type { IVergeConfig } from '@/types/verge'
+import { getActiveSkin } from '@/utils/button-styles'
+import { useNarrowOverlayTopOffset } from '@/utils/popup-styles'
 
 type NoticePosition = NonNullable<IVergeConfig['notice_position']>
 type NoticeItem = ReturnType<typeof getSnapshotNotices>[number]
 type TranslationFn = ReturnType<typeof useTranslation>['t']
-
-const VALID_POSITIONS: NoticePosition[] = [
-  'top-left',
-  'top-right',
-  'bottom-left',
-  'bottom-right',
-]
-
-const resolvePosition = (position?: NoticePosition | null): NoticePosition => {
-  if (position && VALID_POSITIONS.includes(position)) {
-    return position
-  }
-  return 'top-right'
-}
-
-const getAnchorOrigin = (position: NoticePosition): SnackbarOrigin => {
-  const [vertical, horizontal] = position.split('-') as [
-    SnackbarOrigin['vertical'],
-    SnackbarOrigin['horizontal'],
-  ]
-  return { vertical, horizontal }
-}
 
 const resolveNoticeMessage = (
   notice: NoticeItem,
@@ -130,13 +105,16 @@ interface NoticeManagerProps {
   position?: NoticePosition | null
 }
 
-export const NoticeManager: React.FC<NoticeManagerProps> = ({ position }) => {
+export const NoticeManager: React.FC<NoticeManagerProps> = ({
+  position: _position,
+}) => {
   const { t } = useTranslation()
-  const resolvedPosition = useMemo(() => resolvePosition(position), [position])
-  const anchorOrigin = useMemo(
-    () => getAnchorOrigin(resolvedPosition),
-    [resolvedPosition],
-  )
+  const theme = useTheme()
+  const topOffset = useNarrowOverlayTopOffset()
+  const skin = getActiveSkin(theme)
+  const borderRadius =
+    skin === 'cyberpunk' || skin === 'monochrome' ? '0px' : '6px'
+
   const currentNotices = useSyncExternalStore(
     subscribeNotices,
     getSnapshotNotices,
@@ -167,36 +145,66 @@ export const NoticeManager: React.FC<NoticeManagerProps> = ({ position }) => {
     <Box
       sx={{
         position: 'fixed',
-        top: anchorOrigin.vertical === 'top' ? '20px' : 'auto',
-        bottom: anchorOrigin.vertical === 'bottom' ? '20px' : 'auto',
-        left: anchorOrigin.horizontal === 'left' ? '20px' : 'auto',
-        right: anchorOrigin.horizontal === 'right' ? '20px' : 'auto',
+        top: `${topOffset}px`,
+        left: 0,
+        right: 'auto',
+        bottom: 'auto',
+        width: `${MIN_WINDOW_WIDTH}px`,
+        minWidth: `${MIN_WINDOW_WIDTH}px`,
+        maxWidth: `${MIN_WINDOW_WIDTH}px`,
+        boxSizing: 'border-box',
         zIndex: 1500,
         display: 'flex',
         flexDirection: 'column',
-        gap: '10px',
-        maxWidth: '360px',
+        gap: '4px',
+        pointerEvents: 'none',
       }}
     >
       {currentNotices.map((notice) => (
-        <Snackbar
+        <Box
           key={notice.id}
-          open={true}
-          anchorOrigin={anchorOrigin}
           sx={{
-            position: 'relative',
-            transform: 'none',
-            top: 'auto',
-            right: 'auto',
-            bottom: 'auto',
-            left: 'auto',
             width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+            pointerEvents: 'auto',
           }}
         >
           <Alert
             severity={notice.type}
             variant="filled"
-            sx={{ width: '100%' }}
+            sx={{
+              width: '100%',
+              minWidth: 0,
+              maxWidth: '100%',
+              boxSizing: 'border-box',
+              borderRadius,
+              px: 1.25,
+              py: 0.5,
+              fontSize: '12px',
+              lineHeight: 1.45,
+              fontFamily: 'var(--control-font-family)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.28)',
+              '& .MuiAlert-icon': {
+                py: '3px',
+                mr: 1,
+                fontSize: '18px',
+              },
+              '& .MuiAlert-message': {
+                py: '2px',
+                flex: 1,
+                minWidth: 0,
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+              },
+              '& .MuiAlert-action': {
+                pt: 0,
+                pl: 0.5,
+                mr: -0.5,
+                alignItems: 'center',
+              },
+            }}
             onContextMenu={(event) => {
               event.preventDefault()
               event.stopPropagation()
@@ -214,7 +222,7 @@ export const NoticeManager: React.FC<NoticeManagerProps> = ({ position }) => {
           >
             {resolveNoticeMessage(notice, t)}
           </Alert>
-        </Snackbar>
+        </Box>
       ))}
     </Box>
   )

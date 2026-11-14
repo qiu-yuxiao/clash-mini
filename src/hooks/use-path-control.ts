@@ -10,7 +10,6 @@ import {
   appendDisconnectedId,
   composeActivePathControlConnections,
   createDisconnectedRecordFromConnection,
-  enrichClosedPathControlConnections,
   loadDisconnectedIds,
   loadDisconnectedRecords,
   matchesConnectionTarget,
@@ -120,26 +119,18 @@ export function usePathControl({
     () =>
       composeActivePathControlConnections({
         activeConnections,
+        closedConnections,
         managedRules,
         disconnectedRecords: effectiveDisconnectedRecords,
         disconnectedIds: disconnectedIdSet,
       }),
     [
       activeConnections,
+      closedConnections,
       managedRules,
       effectiveDisconnectedRecords,
       disconnectedIdSet,
     ],
-  )
-
-  const closedControlConnections = useMemo(
-    () =>
-      enrichClosedPathControlConnections({
-        closedConnections,
-        managedRules,
-        disconnectedIds: disconnectedIdSet,
-      }),
-    [closedConnections, managedRules, disconnectedIdSet],
   )
 
   const markConnectionDisconnected = useCallback(
@@ -244,7 +235,6 @@ export function usePathControl({
   return {
     managedRules,
     activeControlConnections,
-    closedControlConnections,
     actions,
   }
 }
