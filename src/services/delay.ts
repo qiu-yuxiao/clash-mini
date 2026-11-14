@@ -8,6 +8,8 @@ export interface DelayUpdate {
   delay: number
   elapsed?: number
   updatedAt: number
+  /** 进入 `-2` 测试态前若存在有效缓存，暂存其原始 updatedAt，避免复用注入时误砍为 30s 寿命（BUG-369） */
+  preTestUpdatedAt?: number
 }
 
 const CACHE_TTL = 30 * 60 * 1000
@@ -236,10 +238,29 @@ class DelayManager {
     debugLog(
       `[DelayManager] 设置延迟，代理: ${name}, 组: ${group}, 延迟: ${delay}`,
     )
+    const now = Date.now()
+    const existing = this.cache.get(key)
+    let preTestUpdatedAt: number | undefined
+    if (delay === -2 && existing) {
+      if (
+        existing.delay !== -2 &&
+        existing.updatedAt > 0 &&
+        now - existing.updatedAt <= CACHE_TTL
+      ) {
+        preTestUpdatedAt = existing.updatedAt
+      } else if (
+        existing.delay === -2 &&
+        existing.preTestUpdatedAt &&
+        now - existing.preTestUpdatedAt <= CACHE_TTL
+      ) {
+        preTestUpdatedAt = existing.preTestUpdatedAt
+      }
+    }
     const update: DelayUpdate = {
       delay,
       elapsed: meta?.elapsed,
-      updatedAt: Date.now(),
+      updatedAt: now,
+      ...(preTestUpdatedAt !== undefined ? { preTestUpdatedAt } : {}),
     }
 
     this.cache.set(key, update)
@@ -410,7 +431,12 @@ class DelayManager {
           existing.delay !== -2 &&
           now - existing.updatedAt <= CACHE_TTL
             ? existing.updatedAt
-            : now - CACHE_TTL + REUSED_METRICS_MAX_TTL_MS
+            : existing &&
+                existing.delay === -2 &&
+                existing.preTestUpdatedAt &&
+                now - existing.preTestUpdatedAt <= CACHE_TTL
+              ? existing.preTestUpdatedAt
+              : now - CACHE_TTL + REUSED_METRICS_MAX_TTL_MS
         const update: DelayUpdate = {
           delay,
           elapsed: Date.now() - now,

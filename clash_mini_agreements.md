@@ -454,6 +454,9 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   4. **禁止陈旧 history 兜底、数据来源标记与并发拨测风暴抑制（2026-10-17 确立，BUG-344 / BUG-368 收口）**：`valid_nodes.len() == 1`（用户显式单点测速）时**禁止复用任何测量组缓存/快照并禁用并发合并**，必须发起实时拨测；批量子集场景（`len > 1`）优先在 `< METRICS_REUSE_MAX_AGE_SECS`（30s）内复用最近一次完整 `probe_metrics_group` 实时快照（解决 Mihomo 对死节点不追加 `history` 导致按节点逐一判断 `all_fresh` 失效并误发整组拨测的问题），否则再校对各节点 `history` 新鲜度，命中复用时标记 `DelayResultSource::FreshMetricsCache`。故障自愈链（`self_heal_with_accounting`）允许在 `SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS`（10s）内直接复用 `evaluate_failover` 二次确认刚产出的全组快照（若尚未上屏则保留首个消费方 `LiveProbe` 语义），同时全量全组拨测统一由 `METRICS_PROBE_LOCK` 串行化并在非强制复核/非单点调用上启用 `PROBE_COALESCE_WINDOW_MS`（1500ms）短窗口并发合并，彻底消除多调用方同时或背靠背向同一机场节点服务器发起多轮全组握手风暴。**全路径一律彻底废除 120s `history` 退化兜底**：一旦 `probe_metrics_group` 未取得实时数据，立即返回空结果 `NotExecuted`。同时 `verge://backend-delay-results` 事件携带 `fromProbe: bool` 语义标记：仅 `LiveProbe`（`fromProbe=true`）赋予 30 分钟实时缓存，缓存复用（`fromProbe=false`）在前端强制封顶剩余保鲜期为 30 秒。
 - **互斥与可读反馈**：单点测速、群发测速与后台自愈共用同一互斥锁（`AUTO_SELECT_RUNNING`）。互斥抢占失败（`AUTO_SELECT_BUSY`）属正常竞争，前端**必须给出可读提示**，禁止静默无响应。
 - **所见即所选（子集约束）**：界面通过 F4 触发测速时，测速由内核全量执行，但最终挑出最优节点时**严格限制在用户当前界面的过滤/搜索子集内部**；全量自动优选（F1）则从全量成员中挑选。选点完成后自动持久化写回 `profile.selected`。
+- **后台体检实时延迟同步与 `-2` 状态寿命保护（BUG-369，v3.3.2）**：
+  - `monitor::evaluate_failover` 触发 `probe_metrics_group` 取得新鲜实时延迟后，非轻量模式下通过 `Handle::notify_delay_results("PROXY", ..., true)` + `Handle::refresh_proxies()` 同步广播至前端并置 `reported_live_to_ui = true`，使断网恢复或后台体检后列表立即更新延迟而不长期显示 `-`；`lifecycle::restart_core` 完成后立即调用 `MONITOR_WAKEUP_NOTIFY.notify_one()` 唤醒首轮检测。
+  - `DelayManager::setDelay(..., -2)` 在已有未过期缓存时暂存 `preTestUpdatedAt`，后续 `injectBatchResults(..., { fromProbe: false })` 据此延续测试前合法缓存寿命，避免先置流光占位的节点被误砍至 `30s` 过期并退化为 `-`；`_layout.tsx::triggerWakeupLatencyTest` 对 `-2` 测试占位补全测前快照捕获与空/异常返回回滚机制。
 
 ### 5.3 统一记账与 25 秒失败冷却保护（v3.2.4 / v3.3.2 优化）
 
@@ -477,6 +480,10 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **节点多关键词包含与排除同源过滤（`match_node_filter` / `matchNodeFilter`，BUG-368，v3.3.2）**：
   - 后端 `src-tauri/src/utils/node.rs::match_node_filter` 与前端 `src/utils/node.ts::matchNodeFilter` **1:1 逐条同源**，分别统一接入 `monitor.rs`（恢复、判定、选点、写回 4 处）、`lifecycle.rs::select_fallback_in_subset`、`src/components/proxy/use-filter-sort.ts` 与 `src/hooks/use-profiles.ts`，严禁任何模块保留私有 `.contains` / `.includes` 分叉；
   - 语法语义（大小写不敏感）：空格分隔多个 `AND` 子句；子句内支持半角 `|` 或全角 `｜` 分隔多关键词 `OR` 匹配（自动折叠符号两侧空白，兼容 `日本 | 新加坡 | 台湾`）；以 `-`、`!` 或 `！` 开头的子句表示排除（如 `-香港`、`日本|新加坡 -倍率`）；空串、仅空白及输入态孤立符号（`-`、`!`、`|`）放行返回 `true`。
+- **同配置克隆去重与真 HTTPS 验真状态机防线（BUG-369，v3.3.2）**：
+  - **规范化连接指纹与克隆去重（`utils/node.rs` + `enhance/mod.rs`）**：`proxy_endpoint_fingerprint` 剥离 `name` 字段后对包含合法 `server` 与 `port` 的规范化 YAML 连接字段计算 SHA-256 指纹；`enforce_mini_agreements` 通过 `deduplicate_cloned_proxies` 折叠同配置借壳克隆体（优先保留不含 `:` / `：` 的名称，不再堆砌中文关键词），维持 `[PROXY, PROXY__METRICS]` 双组架构不变。
+  - **单向粘滞真值 + 有参照累积拉黑（`node_https_verify.json`）**：后台 `run_https_verification_pass` 仅在存在待观察节点（既非 `verified_true` 也未确认拉黑）且物理网络在线时，使用非 `204` HTTPS 内容地址（主 `github.githubassets.com` favicon，备 `wikipedia.org` favicon）并发验真；**通过 1 次即永久置 `verified_true = true`**（永不降级也不再重测）；**仅当同批至少 1 个参照节点通过真 HTTPS 验真时**才对其余未通过的未验真指纹累加 `fail_count`，连续失败超过 `HTTPS_VERIFY_MAX_FAILS`（`5` 次，即 `>= 6` 轮）永久判定为假节点。
+  - **全链路择优与永久隐身隔离**：`prioritize_verified_candidates` 与 `lifecycle::select_fallback_in_subset` 优先从 `verified_true` 池择优（全员未验真时按延迟兜底并在冷启动首轮选点触发前置验真）；`enhance`、`monitor`、`lifecycle` 全链路跳过永久拉黑假节点；前端通过 `get_confirmed_fake_proxy_names` 命令在 `calcuProxies` 中过滤隐藏，新确认拉黑时后端立即触发 `Handle::refresh_proxies()` 同步消隐。
 
 ### 5.5 物理网络连通性双频快速探测（TCP:53 探针，v3.2.4 优化）
 
@@ -494,6 +501,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - 起因：2026-10-24 实测事故——活跃节点栏已显示 Timeout，节点列表同一节点仍显示绿色 106ms（history 里的陈旧成功值）。
 - **同一节点的延迟订阅必须支持多订阅者**：活跃节点栏与节点列表项会同时订阅同一个 `PROXY::节点名`，任一订阅者的注册/注销都不得影响其它订阅者，注销必须精确到具体订阅者。此前单订阅模型下后注册者顶掉先注册者，被顶掉者永久停留在挂载时的旧值，导致「上面已 Timeout、下面还是绿的」。
 - **自愈失败也必须刷新前端代理缓存**：选点成功与失败（所有节点不可达）都要向前端广播代理数据刷新，否则前端长期握着陈旧的 `alive`/`history`，界面延迟与真实连通状态脱节。
+- **组头过滤/排序状态全局单例同步（BUG-369，v3.3.2）**：`useHeadStateNew` 重构为基于 `useSyncExternalStore` 的模块级单一事实源共享状态库并导出 `getGroupHeadState`，配合无实质变更 no-op 短路、本地脏键合并与即时 `localStorage` 同步及 100ms 防抖落盘（`save_proxy_head_state`），彻底消除 `_layout.tsx` 写入 `sortType` 与节点页组件写入 `filterText` 时双份独立 `useReducer` 实例互相覆盖导致过滤词（如 `-香港`）丢失的竞态。
 
 ### 5.7 无人值守资源节约与静默门控
 
@@ -817,6 +825,17 @@ flowchart LR
   4. **前后端同源多关键词包含与排除过滤（`utils/node.rs`、`utils/node.ts`、`monitor.rs`、`lifecycle.rs`、`use-filter-sort.ts`、`use-profiles.ts`）**：新增共享匹配引擎 `match_node_filter` / `matchNodeFilter`（支持 `|` / `｜` 多关键词 `OR`、空格分词 `AND` 以及 `-` / `!` / `！` 前缀排除，孤立输入符号放行），并补充 Rust 与 Vitest 逐条对齐单元测试（含 `should_probe`、`try_reuse_probe_snapshot` 与 `collect_dead_node_connection_ids` 单测）。
 - **影响**：严格维持 `§5.2` 单一 `PROXY__METRICS` 测量组架构与正常切点/轻量模式不断流原则，同时将单节点断流/服务抖动下的故障自愈准确度、抗服务器握手风暴能力及长连接恢复速度提升至毫秒级。
 
+### Sync-14 · 彻底移除遗留伴生看门狗（guardian）及无用历史冗余代码（`ab67dab7`）
+- **改动**：彻底删除 `src-tauri/src/utils/guardian.rs` 及残余看门狗互锁/隐形哨兵/Session-0 拉起/NSIS 守卫残件，清理跨前后端已失活的无用常量、配置字段与死代码；保留用户可控的安全软件白名单引导（`AntivirusWhitelistDialog` & `docs/antivirus-whitelist.md`）、`logger.rs` Panic Hook 及故障计数归零单行恢复日志。
+- **影响**：轻量模式回归干净的单主进程 + 静态托盘架构（`§4.1`），消除后台无谓拉起损耗与安全软件误报面，构建与前后端测试全绿。
+
+### Sync-15 · 节点延迟显示修复、组头状态单例化与真 HTTPS 验真状态机 / 同配置克隆去重（BUG-369）
+- **改动**：
+  1. **修复断网重连/体检后延迟长期显示 `-`**：`DelayManager` 在 `-2` 测试态下记录 `preTestUpdatedAt` 并在 `fromProbe=false` 时延续有效缓存寿命；`monitor::evaluate_failover` 在 `probe_metrics_group` 取得实时数据且未处于轻量模式时主动推送 `delay-results` 并置 `reported_live_to_ui = true`；`lifecycle::restart_core` 完成后立即 `MONITOR_WAKEUP_NOTIFY.notify_one()`；`_layout.tsx::triggerWakeupLatencyTest` 补齐 `-2` 测试占位快照保存与空/异常回滚。
+  2. **修复 `filterText` 被并发 `useHeadStateNew` 覆盖**：重构 `src/components/proxy/use-head-state.ts` 为模块级 `useSyncExternalStore` 单例共享状态库，新增 `getGroupHeadState` 供 `profile-coordination.ts` 读取并引入 no-op 更新短路与远端加载不覆盖本地未持久化修改的脏键合并。
+  3. **节点同配置克隆去重与真 HTTPS 验真持久化状态机**：`src-tauri/src/utils/node.rs` 新增规范化连接指纹 `proxy_endpoint_fingerprint`、克隆折叠 `deduplicate_cloned_proxies` 与状态机 store（`node_https_verify.json`，`verified_true` 单向粘滞、参照节点在线门控下的 `fail_count > 5` 永久拉黑）；接入 `enhance/mod.rs`、`module/monitor.rs`、`core/manager/lifecycle.rs`，新增 Tauri 命令 `get_confirmed_fake_proxy_names` 并在 `src/services/cmds.ts` 中透明隐藏永久拉黑假节点。
+- **影响**：在不新增代理组、不堆砌过滤词、不引入断流重启的前提下，实现基于真 HTTPS 数据包验真的假节点自动永久隔离、同配置借壳信息条克隆自动合并，以及组头过滤条件与节点延迟显示的跨组件/跨休眠一致性。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
@@ -945,6 +964,7 @@ flowchart LR
 | **BUG-366** | 3.7 / 4.1 / 8.5 | GFWList 模式移除 `MATCH,DIRECT` 前的 `- IP-CIDR6,::/0,PROXY` 兜底消除 IPv6 流量偷跑，清理悬空文档注释 / `.unwrap()` / 单导出冗余分支与 `read_respawn_state_checked` TOCTOU，同步对齐 `app-update.json` 说明。 |
 | **BUG-367** | 2.2 / 7.7 / 8.9 | 路径控制精准目标化规则生成（禁止扩域为 `DOMAIN-SUFFIX`）与「直连 / 代理 / 封锁 / 已断开」四态单表融合，补齐自定义 `Merge` 路由 `.yaml` 一键导出保存与重装后导入恢复闭环。 |
 | **BUG-368** | 2.8 / 4.2 / 5.1 / 5.2 / 5.3 / 5.4 | 修复 3s 重试复核误命中 10s 死缓存跳过二次真实拨测；引入 `METRICS_PROBE_LOCK` 与实时快照复用抑制并发/背靠背拨测风暴；故障转移成功后精确关闭仍挂死在原故障节点上的存量连接；前后端统一升级多关键词包含（`\|`/`｜`）与排除（`-`/`!`/`！`）节点过滤引擎并补齐双端单测。 |
+| **BUG-369** | 2.8 / 5.2 / 5.4 / 5.6 | 修复 `DelayManager` 在 `-2` 测试态下复用注入误砍合法缓存寿命、补充唤醒测速 `-2` 快照回滚、`evaluate_failover` 体检直播延迟与 `restart_core` 立即唤醒推送；将 `useHeadStateNew` 重构为 `useSyncExternalStore` 模块级单例彻底根除 `filterText` 被并发 `sortType` 覆写；新增规范化连接指纹 `deduplicate_cloned_proxies` 同配置克隆去重与持久化真 HTTPS 验真状态机（1 次过真即单向粘滞、有在线参照通过前提下连续失败 `> 5` 次永久拉黑并在前后端全链路隐藏）。 |
 
 ---
 

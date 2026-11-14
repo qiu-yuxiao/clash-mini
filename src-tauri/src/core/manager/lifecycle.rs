@@ -135,6 +135,8 @@ impl CoreManager {
 
         // 【强咬合防线】重启完成后通知前端拉取最新配置和活跃节点
         Handle::refresh_clash();
+        // 【BUG-369】内核重启（含崩溃自动重启）后立即唤醒后台监测，尽快完成新一轮体检并推送延迟
+        crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
 
         Ok(())
     }
@@ -332,7 +334,7 @@ impl CoreManager {
         let mihomo = Handle::mihomo().await.clone();
         match mihomo.get_group_by_name("PROXY").await {
             Ok(group) => match group.now {
-                Some(node) if !node.is_empty() => {
+                Some(node) if !node.is_empty() && !crate::utils::node::is_confirmed_fake_node(&node) => {
                     logging!(info, Type::Core, "快照 PROXY 组当前节点: {}", node);
                     Some(node)
                 }
@@ -356,7 +358,9 @@ impl CoreManager {
             .iter()
             .find(|s| s.name.as_deref() == Some("PROXY"))
             .and_then(|s| s.now.as_deref())
-            .filter(|n| !n.is_empty() && !crate::utils::node::is_dummy_node(n))?;
+            .filter(|n| {
+                !n.is_empty() && !crate::utils::node::is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n)
+            })?;
         logging!(
             info,
             Type::Core,
@@ -413,14 +417,12 @@ impl CoreManager {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
 
-        // 防御：内置出站（DIRECT/REJECT…）不是可选择的节点，拿它去 select 必然报
-        // `proxy not exist`。放到「API 就绪 + 组列表已填充」之后处理，跳过这次注定
-        // 失败的 IPC，直接走与「还原失败」相同的子集兜底，恢复语义不变。
-        if is_builtin_outbound(node) {
+        // 防御：内置出站（DIRECT/REJECT…）及永久拉黑假节点不可选为恢复目标
+        if is_builtin_outbound(node) || crate::utils::node::is_confirmed_fake_node(node) {
             logging!(
                 info,
                 Type::Core,
-                "跳过 PROXY 组节点恢复：{} 属内置出站，直接按子集兜底",
+                "跳过 PROXY 组节点恢复：{} 属内置出站或已确认假节点，直接按子集兜底",
                 node
             );
             let filter_text = read_filter_text().await;
@@ -511,11 +513,19 @@ async fn select_fallback_in_subset(mihomo: &Mihomo, filter_text: &str) {
         return;
     };
     let Some(all) = group_info.all else { return };
+    let valid = |n: &&std::string::String| {
+        !crate::utils::node::is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n)
+    };
     let fallback = all
         .iter()
-        .filter(|n| !crate::utils::node::is_dummy_node(n))
+        .filter(|n| valid(n) && crate::utils::node::is_verified_true_node(n))
         .find(|n| crate::utils::node::match_node_filter(n, filter_text))
-        .or_else(|| all.iter().find(|n| !crate::utils::node::is_dummy_node(n)));
+        .or_else(|| {
+            all.iter()
+                .filter(valid)
+                .find(|n| crate::utils::node::match_node_filter(n, filter_text))
+        })
+        .or_else(|| all.iter().find(valid));
     if let Some(fb) = fallback {
         match mihomo.select_node_for_group("PROXY", fb).await {
             Ok(()) => logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb),

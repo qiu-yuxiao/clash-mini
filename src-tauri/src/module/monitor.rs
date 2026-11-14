@@ -126,6 +126,116 @@ const FAILED_SERVER_COOLDOWN_SECS: u64 = 600;
 /// 触发无意义的切节点抖动 / 误判全部节点死亡。
 const FALLBACK_TEST_URL: &str = "https://www.gstatic.com/generate_204";
 
+/// 真 HTTPS 内容拉取验真 URL（非 `204` 地址，识别“对 generate_204 放行但真网页卡死/劫持”的假节点）
+const VERIFY_HTTPS_URL_PRIMARY: &str = "https://github.githubassets.com/favicons/favicon.svg";
+/// 备用真 HTTPS 内容拉取验真 URL
+const VERIFY_HTTPS_URL_FALLBACK: &str = "https://www.wikipedia.org/static/favicon/wikipedia.ico";
+/// 后台定期真 HTTPS 验真间隔（仅当存在尚未验真或尚未确认拉黑的候选节点时才执行）
+const HTTPS_VERIFY_INTERVAL_SECS: u64 = 180;
+/// 后台真 HTTPS 验真单次并发探测超时
+const HTTPS_VERIFY_TIMEOUT_MS: u32 = 6000;
+/// 活跃节点未验真时触发即时真 HTTPS 复核的冷却时间（避免每次 15s 循环重复验证）
+const ACTIVE_VERIFY_COOLDOWN_SECS: u64 = 60;
+
+static LAST_ACTIVE_VERIFY_CHECK: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+
+fn prioritize_verified_candidates_with<F>(candidates: Vec<(String, u32)>, is_verified: F) -> Vec<(String, u32)>
+where
+    F: Fn(&str) -> bool,
+{
+    if candidates.iter().any(|(name, _)| is_verified(name)) {
+        candidates.into_iter().filter(|(name, _)| is_verified(name)).collect()
+    } else {
+        candidates
+    }
+}
+
+fn prioritize_verified_candidates(candidates: Vec<(String, u32)>) -> Vec<(String, u32)> {
+    prioritize_verified_candidates_with(candidates, crate::utils::node::is_verified_true_node)
+}
+
+/// 对当前运行节点执行一轮真 HTTPS（非 `204`）验真并推进持久化状态机：
+/// - 若全部节点均已 `verified_true` 或 `is_confirmed_fake`，零流量直接返回；
+/// - 物理断网或主/备真 HTTPS 地址无一通过时，绝不递增任何节点失败计数；
+/// - 新确认永久拉黑假节点且非轻量模式时，通知前端刷新代理列表以隐藏。
+async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candidate_nodes: &[String], reason: &str) {
+    if !crate::utils::node::has_pending_unverified_nodes(candidate_nodes) {
+        return;
+    }
+    if !is_physical_network_online(2).await {
+        return;
+    }
+
+    let delays = match mihomo
+        .delay_group("PROXY__METRICS", VERIFY_HTTPS_URL_PRIMARY, HTTPS_VERIFY_TIMEOUT_MS)
+        .await
+    {
+        Ok(d) if !d.is_empty() => d,
+        primary_res => {
+            if let Err(ref e) = primary_res {
+                logging!(
+                    debug,
+                    Type::Lightweight,
+                    "[HTTPS验真/{reason}] 主验证 URL 探测失败({e})，尝试备用验证 URL"
+                );
+            }
+            match mihomo
+                .delay_group("PROXY__METRICS", VERIFY_HTTPS_URL_FALLBACK, HTTPS_VERIFY_TIMEOUT_MS)
+                .await
+            {
+                Ok(d) => d,
+                Err(e) => {
+                    logging!(
+                        debug,
+                        Type::Lightweight,
+                        "[HTTPS验真/{reason}] 主/备验证 URL 均无响应({e})，跳过本轮失败累计"
+                    );
+                    return;
+                }
+            }
+        }
+    };
+
+    let passed_set: HashSet<String> = delays
+        .iter()
+        .filter(|(_, d)| (NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(d))
+        .map(|(name, _)| name.clone())
+        .collect();
+    if passed_set.is_empty() {
+        logging!(
+            debug,
+            Type::Lightweight,
+            "[HTTPS验真/{reason}] 本批 0 个节点通过真 HTTPS 验真（疑离线或校验受阻），跳过本轮失败累计"
+        );
+        return;
+    }
+
+    let passed_names: Vec<String> = passed_set.iter().cloned().collect();
+    let failed_names: Vec<String> = candidate_nodes
+        .iter()
+        .filter(|n| {
+            !passed_set.contains(n.as_str()) && !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n)
+        })
+        .cloned()
+        .collect();
+
+    let outcome = crate::utils::node::record_https_verify_results(&passed_names, &failed_names);
+    if outcome.newly_verified > 0 || outcome.newly_confirmed_fake > 0 {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[HTTPS验真/{reason}] 通过 {} 个(新验真 {})，未通过 {} 个，新确认永久拉黑 {} 个",
+            passed_names.len(),
+            outcome.newly_verified,
+            failed_names.len(),
+            outcome.newly_confirmed_fake
+        );
+    }
+    if outcome.newly_confirmed_fake > 0 && !crate::module::lightweight::is_in_lightweight_mode() {
+        crate::core::handle::Handle::refresh_proxies();
+    }
+}
+
 /// 服务器级失败登记表：server → 最近一次被判定失败的时刻。
 static FAILED_SERVERS: OnceLock<Mutex<HashMap<String, Instant>>> = OnceLock::new();
 
@@ -685,7 +795,10 @@ pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow:
                         .filter_text
                         .trim()
                         .to_string();
-                    if is_dummy_node(node) || !match_node_filter(node, &filter_text) {
+                    if is_dummy_node(node)
+                        || crate::utils::node::is_confirmed_fake_node(node)
+                        || !match_node_filter(node, &filter_text)
+                    {
                         logging!(
                             warn,
                             Type::Lightweight,
@@ -799,8 +912,8 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         _ => return Ok(FailoverVerdict::NoAction), // 直连/拒绝节点或无选中，不动作
     };
 
-    // 假/广告节点 → 视为需要重选（无需等 url-test）
-    if is_dummy_node(&active_node) {
+    // 假/广告节点或 HTTPS 验真永久拉黑节点 → 视为需要重选（无需等 url-test）
+    if is_dummy_node(&active_node) || crate::utils::node::is_confirmed_fake_node(&active_node) {
         return Ok(FailoverVerdict::ShouldFailover);
     }
 
@@ -818,22 +931,47 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
         // 二次复核（force_confirm_probe=true）禁用短窗口合并，保证物理层面独立复核。
-        let measured = probe_metrics_group(&mihomo, "体检", !force_confirm_probe)
-            .await
-            .is_some();
+        let probed_opt = probe_metrics_group(&mihomo, "体检", !force_confirm_probe).await;
 
         // 【测速失真防护】主/备测速地址都整体失败 = 测速链路不可用，**不是**「节点已死」。
         // 此时 mihomo 已把全组成员标记为 not-alive，若据此判死会触发无意义的切节点抖动。
         // 2026-10-18 实测：机场劫持 HTTP 测速地址期间内核返回 `all proxies timeout`，
         // app 误判「所有测速节点均不可达」，连续多轮自愈全部落空。
         // 故本轮直接 NoAction（主循环会清零连续失败计数，不触发自愈），等下一周期重试。
-        if !measured {
+        let Some(probed_delays) = probed_opt else {
             logging!(
                 warn,
                 Type::Lightweight,
                 "[后台监测] 测速链路不可用，本轮不判定活跃节点死活（避免测速失真引发切点抖动）"
             );
             return Ok(FailoverVerdict::NoAction);
+        };
+
+        // 【BUG-369 修复】后台定期体检刚刚完成了一次真实的整组延迟探测，若本次取得了有效节点延迟，
+        // 立即把新鲜结果通过 `delay-results` 推送给前端列表（同时触发代理状态刷新），
+        // 避免离线重连或静默恢复期间 UI 节点延迟长期停留在 "-"。
+        if !probed_delays.is_empty() && !crate::module::lightweight::is_in_lightweight_mode() {
+            let already_reported = LAST_METRICS_PROBE
+                .lock()
+                .as_ref()
+                .is_some_and(|s| s.reported_live_to_ui);
+            if !already_reported {
+                let display: Vec<(String, u32)> = group_info
+                    .all
+                    .as_deref()
+                    .unwrap_or(&[])
+                    .iter()
+                    .filter(|n| !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n))
+                    .map(|n| (n.clone(), probed_delays.get(n).copied().unwrap_or(0)))
+                    .collect();
+                if !display.is_empty() {
+                    crate::core::handle::Handle::notify_delay_results("PROXY".into(), display, true);
+                    crate::core::handle::Handle::refresh_proxies();
+                    if let Some(snap) = LAST_METRICS_PROBE.lock().as_mut() {
+                        snap.reported_live_to_ui = true;
+                    }
+                }
+            }
         }
 
         // 拨测后重读，确保 proxy.alive 与 proxy.history.last() 反映最新真实状态，
@@ -844,22 +982,59 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
             .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
     }
 
-    // 活跃节点本身健康或数据缺失 → 不动作
+    let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
+    let filter_text = filter_config.filter_text.trim();
+    let members = group_info.all.clone().unwrap_or_default();
+
+    // 活跃节点本身健康或数据缺失 → 若尚未通过真 HTTPS 验真：先在冷却允许时即时执行真 HTTPS 复核；
+    // 只有确属“在参照节点通过前提下曾验真失败（has_verify_failure_node）”且子集内存在已验真健康节点时，才切往已验真节点
     match proxies.proxies.get(&active_node).map(node_status) {
-        Some(NodeStatus::Alive(_)) | Some(NodeStatus::Unknown) | None => {
+        Some(NodeStatus::Alive(_)) => {
+            if !crate::utils::node::is_verified_true_node(&active_node) {
+                let can_verify_now = LAST_ACTIVE_VERIFY_CHECK
+                    .lock()
+                    .is_none_or(|t| t.elapsed() >= Duration::from_secs(ACTIVE_VERIFY_COOLDOWN_SECS));
+                if can_verify_now {
+                    *LAST_ACTIVE_VERIFY_CHECK.lock() = Some(Instant::now());
+                    let verify_members: Vec<String> = members
+                        .iter()
+                        .filter(|n| !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n))
+                        .cloned()
+                        .collect();
+                    run_https_verification_pass(&mihomo, &verify_members, "活跃节点即时验真").await;
+                }
+                if crate::utils::node::has_verify_failure_node(&active_node) {
+                    let has_verified_healthy = members.iter().any(|name| {
+                        name != &active_node
+                            && !is_dummy_node(name)
+                            && !crate::utils::node::is_confirmed_fake_node(name)
+                            && crate::utils::node::is_verified_true_node(name)
+                            && match_node_filter(name, filter_text)
+                            && matches!(proxies.proxies.get(name).map(node_status), Some(NodeStatus::Alive(_)))
+                    });
+                    if has_verified_healthy {
+                        logging!(
+                            info,
+                            Type::Lightweight,
+                            "[后台监测] 当前节点 {} 真 HTTPS 验真失败且子集内存在已验真健康节点，触发切往已验真节点",
+                            active_node
+                        );
+                        return Ok(FailoverVerdict::ShouldFailover);
+                    }
+                }
+            }
+            return Ok(FailoverVerdict::NoAction);
+        }
+        Some(NodeStatus::Unknown) | None => {
             return Ok(FailoverVerdict::NoAction);
         }
         Some(NodeStatus::Dead) => {}
     }
 
-    // 活跃节点已死：在子集（filterText）内寻找健康候选
-    let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
-    let filter_text = filter_config.filter_text.trim();
-    let members = group_info.all.clone().unwrap_or_default();
-
+    // 活跃节点已死：在子集（filterText）内寻找健康候选（剔除假/已拉黑节点）
     let mut found_healthy = false;
     for name in &members {
-        if name == &active_node || is_dummy_node(name) {
+        if name == &active_node || is_dummy_node(name) || crate::utils::node::is_confirmed_fake_node(name) {
             continue;
         }
         if !match_node_filter(name, filter_text) {
@@ -996,7 +1171,10 @@ async fn trigger_backend_auto_select_inner(
     // is_frontend_subset 用于下方「测量组数据新鲜时跳过全组拨测」的判定
     let is_frontend_subset = matches!(&node_names, Some(names) if !names.is_empty());
     let valid_nodes: Vec<String> = match node_names {
-        Some(names) if !names.is_empty() => names.into_iter().filter(|n| !is_dummy_node(n)).collect(),
+        Some(names) if !names.is_empty() => names
+            .into_iter()
+            .filter(|n| !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n))
+            .collect(),
         _ => {
             let group_info = mihomo
                 .get_group_by_name("PROXY")
@@ -1016,7 +1194,11 @@ async fn trigger_backend_auto_select_inner(
             let filter_text = filter_config.filter_text.trim();
             nodes
                 .into_iter()
-                .filter(|n| !is_dummy_node(n) && match_node_filter(n, filter_text))
+                .filter(|n| {
+                    !is_dummy_node(n)
+                        && !crate::utils::node::is_confirmed_fake_node(n)
+                        && match_node_filter(n, filter_text)
+                })
                 .collect()
         }
     };
@@ -1198,9 +1380,23 @@ async fn trigger_backend_auto_select_inner(
     let mut selected_node: Option<String> = None;
 
     if select {
+        // 冷启动/全员未验真兜底：若当前有效延迟候选中尚无任何 verified_true 节点，
+        // 触发一轮并发真 HTTPS 验真（仅当存在待观察节点且物理在线时生效）
+        if !candidates.is_empty()
+            && !candidates
+                .iter()
+                .any(|(n, _)| crate::utils::node::is_verified_true_node(n))
+        {
+            run_https_verification_pass(&mihomo, &valid_nodes, "选点前置验真").await;
+            candidates.retain(|(n, _)| !crate::utils::node::is_confirmed_fake_node(n));
+        }
+
+        // 优先从 verified_true 节点中按延迟择优；若全员未验真则保底回退到全部有效延迟候选
+        let selection_pool = prioritize_verified_candidates(candidates);
+
         // 选点固定按延迟升序取全局最快节点，不受 sort_type 影响
         // （修复：原逻辑依赖 results.first()，在 sort_type=2 时会误选首个字母序节点）
-        if let Some((fastest_node, delay)) = candidates.iter().min_by_key(|r| r.1) {
+        if let Some((fastest_node, delay)) = selection_pool.iter().min_by_key(|r| r.1) {
             logging!(
                 info,
                 Type::Lightweight,
@@ -1434,6 +1630,7 @@ pub fn start_background_monitor() {
         let mut was_online = true;
         let mut is_first_run = true;
         let mut last_online_check_time: Option<Instant> = None;
+        let mut last_https_verify_time: Option<Instant> = None;
         let mut last_auto_select_time: Option<Instant> = None;
         let mut auto_select_fail_count = 0u32;
         let mut api_dead_heal_fail_count = 0u32;
@@ -1602,6 +1799,23 @@ pub fn start_background_monitor() {
                 // 如果当前处于离线状态，跳过本次检测
                 if !is_online {
                     continue;
+                }
+
+                // 定期真 HTTPS 验真：仅当存在“未验真真值且尚未确认拉黑”的待观察节点时执行；
+                // 全部节点状态尘埃落定（verified_true 或 is_confirmed_fake）后零流量跳过。
+                if last_https_verify_time.is_none_or(|t| t.elapsed() >= Duration::from_secs(HTTPS_VERIFY_INTERVAL_SECS))
+                {
+                    last_https_verify_time = Some(Instant::now());
+                    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+                    if let Ok(proxy_group) = mihomo.get_group_by_name("PROXY").await {
+                        let members: Vec<String> = proxy_group
+                            .all
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|n| !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n))
+                            .collect();
+                        run_https_verification_pass(&mihomo, &members, "后台定期验真").await;
+                    }
                 }
 
                 // 检测活动节点是否发生变化（包括自动选点和手动切换）
@@ -2022,14 +2236,15 @@ async fn self_heal_with_accounting(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
         DelayResultSource, Duration, HashMap, Instant, LAST_MANUAL_NODE_SWITCH, LAST_METRICS_PROBE,
         LAST_NOTIFIED_HEALTH, METRICS_REUSE_MAX_AGE_SECS, MetricsProbeSnapshot, NodeStatus,
         SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SelfHealAction, collect_dead_node_connection_ids,
         complete_restart_core_attempt, evaluate_self_heal_counters, notify_manual_node_switched,
-        reset_monitor_static_state, resolve_probe_target, should_probe_active_node, sort_display_delays,
-        try_reuse_probe_snapshot,
+        prioritize_verified_candidates_with, reset_monitor_static_state, resolve_probe_target,
+        should_probe_active_node, sort_display_delays, try_reuse_probe_snapshot,
     };
 
     #[test]
@@ -2328,5 +2543,24 @@ mod tests {
         assert!(collect_dead_node_connection_ids(&conns, "香港1 (005024)", Some("香港1 (005024)")).is_empty());
         assert!(collect_dead_node_connection_ids(&conns, "DIRECT", Some("台湾1 (005024)")).is_empty());
         assert!(collect_dead_node_connection_ids(&conns, "", Some("台湾1 (005024)")).is_empty());
+    }
+
+    #[test]
+    fn test_prioritize_verified_candidates_prefers_verified_nodes() {
+        let candidates = vec![
+            ("unverified-fast".to_owned(), 20),
+            ("verified-mid".to_owned(), 80),
+            ("verified-fast".to_owned(), 45),
+        ];
+        // 有 verified_true 节点时只保留已验真池（哪怕未验真节点延迟数字更低，绝不误选）
+        let pool = prioritize_verified_candidates_with(candidates.clone(), |name| name.starts_with("verified-"));
+        assert_eq!(pool.len(), 2);
+        let fastest = pool.iter().min_by_key(|r| r.1).unwrap();
+        assert_eq!(fastest.0, "verified-fast");
+
+        // 全员均未验真时保底回退全部有效延迟候选，避免无点可选
+        let fallback_pool = prioritize_verified_candidates_with(candidates, |_| false);
+        assert_eq!(fallback_pool.len(), 3);
+        assert_eq!(fallback_pool.iter().min_by_key(|r| r.1).unwrap().0, "unverified-fast");
     }
 }

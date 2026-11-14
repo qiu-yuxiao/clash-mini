@@ -279,5 +279,20 @@ describe('BUG-344: DelayManager 快照恢复与数据来源语义校验', () => 
     })
     dm.injectBatchResults('PROXY', [['复用节点2', 75]], { fromProbe: false })
     expect(dm.getDelayUpdate('复用节点2', 'PROXY')?.updatedAt).toBe(probeTs)
+
+    // 【BUG-369】若节点测试前已有有效缓存，先置 -2 测试态再注入 fromProbe=false，
+    // 仍应保留测试前有效 updatedAt，不得误砍寿命到 30s
+    const priorTs = Date.now() - 120_000
+    dm.restoreDelaySnapshot('复用节点3', 'PROXY', {
+      delay: 88,
+      updatedAt: priorTs,
+    })
+    dm.setDelay('复用节点3', 'PROXY', -2)
+    expect(dm.getDelayUpdate('复用节点3', 'PROXY')?.preTestUpdatedAt).toBe(
+      priorTs,
+    )
+    dm.injectBatchResults('PROXY', [['复用节点3', 91]], { fromProbe: false })
+    expect(dm.getDelayUpdate('复用节点3', 'PROXY')?.delay).toBe(91)
+    expect(dm.getDelayUpdate('复用节点3', 'PROXY')?.updatedAt).toBe(priorTs)
   })
 })

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
 
@@ -15,6 +15,8 @@ export interface HeadState {
 type HeadStateStorage = Record<string, Record<string, HeadState>>
 
 const HEAD_STATE_KEY = 'proxy-head-state'
+const EMPTY_PROFILE_STATE: Record<string, HeadState> = {}
+
 export const DEFAULT_STATE: HeadState = {
   open: false,
   showType: true,
@@ -22,106 +24,191 @@ export const DEFAULT_STATE: HeadState = {
   filterText: '',
 }
 
-type HeadStateAction =
-  | { type: 'reset' }
-  | { type: 'replace'; payload: HeadStateStorage }
-  | {
-      type: 'update'
-      profileUid: string
-      groupName: string
-      patch: Partial<HeadState>
-    }
+let headStateStore: HeadStateStorage = {}
+let initializedSync = false
+let backendLoadStarted = false
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+const dirtyKeys = new Set<string>()
+const listeners = new Set<() => void>()
 
-// use-head-state-reducer
-function headStateReducer(
-  state: HeadStateStorage,
-  action: HeadStateAction,
-): HeadStateStorage {
-  switch (action.type) {
-    case 'reset':
-      return {}
-    case 'replace':
-      return action.payload
-    case 'update': {
-      const { profileUid, groupName, patch } = action
-      const profileState = state[profileUid] || {}
-      const prev = profileState[groupName] || DEFAULT_STATE
-      return {
-        ...state,
-        [profileUid]: {
-          ...profileState,
-          [groupName]: { ...prev, ...patch },
-        },
-      }
-    }
-    default:
-      return state
+function readLocalStorageStore(): HeadStateStorage | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem(HEAD_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    return parsed && typeof parsed === 'object'
+      ? (parsed as HeadStateStorage)
+      : null
+  } catch {
+    return null
   }
+}
+
+function writeLocalStorageStore(data: HeadStateStorage): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(data))
+  } catch {}
+}
+
+function ensureInitializedSync(): void {
+  if (initializedSync) return
+  initializedSync = true
+  const local = readLocalStorageStore()
+  if (local) {
+    headStateStore = local
+  }
+}
+
+function notifyListeners(): void {
+  listeners.forEach((listener) => listener())
+}
+
+function subscribe(listener: () => void): () => void {
+  ensureInitializedSync()
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function getSnapshot(): HeadStateStorage {
+  ensureInitializedSync()
+  return headStateStore
+}
+
+function scheduleBackendPersist(): void {
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer)
+  }
+  persistTimer = setTimeout(async () => {
+    persistTimer = null
+    try {
+      await invoke('save_proxy_head_state', { state: headStateStore })
+    } catch (err) {
+      console.warn('[useHeadState] 保存 head_state 到后端失败:', err)
+    }
+  }, 100)
+}
+
+function mergeBackendData(remote: HeadStateStorage): boolean {
+  let changed = false
+  const nextStore: HeadStateStorage = { ...headStateStore }
+  for (const [profileUid, groups] of Object.entries(remote)) {
+    if (!groups || typeof groups !== 'object') continue
+    const existingProfile = nextStore[profileUid] || {}
+    let mergedProfile: Record<string, HeadState> | null = null
+    for (const [groupName, groupState] of Object.entries(groups)) {
+      if (!groupState || typeof groupState !== 'object') continue
+      if (dirtyKeys.has(`${profileUid}::${groupName}`)) continue
+      if (!mergedProfile) {
+        mergedProfile = { ...existingProfile }
+      }
+      mergedProfile[groupName] = { ...DEFAULT_STATE, ...groupState }
+      changed = true
+    }
+    if (mergedProfile) {
+      nextStore[profileUid] = mergedProfile
+    }
+  }
+  if (changed) {
+    headStateStore = nextStore
+    writeLocalStorageStore(headStateStore)
+  }
+  return changed
+}
+
+function ensureBackendLoaded(): void {
+  ensureInitializedSync()
+  if (backendLoadStarted) return
+  backendLoadStarted = true
+  invoke<HeadStateStorage>('get_proxy_head_state')
+    .then((data) => {
+      if (data && typeof data === 'object' && mergeBackendData(data)) {
+        notifyListeners()
+      }
+    })
+    .catch((err) => {
+      console.warn(
+        '[useHeadState] 从后端加载状态失败，继续使用 localStorage 缓存:',
+        err,
+      )
+    })
+}
+
+export function updateHeadState(
+  profileUid: string,
+  groupName: string,
+  patch: Partial<HeadState>,
+): void {
+  if (!profileUid) return
+  ensureInitializedSync()
+  const profileState = headStateStore[profileUid] || {}
+  const prev = profileState[groupName] || DEFAULT_STATE
+  const next: HeadState = { ...prev, ...patch }
+
+  if (
+    prev.open === next.open &&
+    prev.showType === next.showType &&
+    prev.sortType === next.sortType &&
+    prev.filterText === next.filterText
+  ) {
+    return
+  }
+
+  dirtyKeys.add(`${profileUid}::${groupName}`)
+  headStateStore = {
+    ...headStateStore,
+    [profileUid]: {
+      ...profileState,
+      [groupName]: next,
+    },
+  }
+  writeLocalStorageStore(headStateStore)
+  scheduleBackendPersist()
+  notifyListeners()
+}
+
+export function getGroupHeadState(
+  profileUid: string,
+  groupName = 'PROXY',
+): HeadState {
+  ensureInitializedSync()
+  if (!profileUid) return DEFAULT_STATE
+  return headStateStore[profileUid]?.[groupName] ?? DEFAULT_STATE
+}
+
+/** 测试辅助：重置全局单例存储状态（仅用于 Vitest 单元测试） */
+export function resetHeadStateStoreForTest(initial?: HeadStateStorage): void {
+  if (persistTimer !== null) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  headStateStore = initial ?? {}
+  initializedSync = true
+  backendLoadStarted = false
+  dirtyKeys.clear()
+  notifyListeners()
 }
 
 export function useHeadStateNew() {
   const { profiles } = useProfiles()
   const current = profiles?.current || ''
-  const [state, dispatch] = useReducer(headStateReducer, {})
-  const isLoadedRef = useRef(false)
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
-  // 1. Load entire storage once on mount
   useEffect(() => {
-    invoke<HeadStateStorage>('get_proxy_head_state')
-      .then((data) => {
-        if (data && typeof data === 'object') {
-          dispatch({ type: 'replace', payload: data })
-          localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(data))
-        }
-      })
-      .catch((err) => {
-        console.warn(
-          '[useHeadState] 从后端加载状态失败，尝试 localStorage 兜底:',
-          err,
-        )
-        try {
-          const data = JSON.parse(
-            localStorage.getItem(HEAD_STATE_KEY) ?? 'null',
-          ) as HeadStateStorage
-          if (data && typeof data === 'object') {
-            dispatch({ type: 'replace', payload: data })
-          }
-        } catch (e) {
-          console.warn(
-            '[useHeadState] localStorage 兜底也失败，状态初始化为空:',
-            e,
-          )
-        }
-      })
-      .finally(() => {
-        isLoadedRef.current = true
-      })
+    ensureBackendLoaded()
   }, [])
-
-  // 2. Save entire storage only when state updates from user interaction
-  useEffect(() => {
-    // 🛡️ [ISSUE-04 修复] 首次挂载从后端/localStorage 加载初始数据时跳过保存，
-    // 仅在初始数据加载完成后、用户后续主动修改 headState 时才发起 IPC 保存。
-    if (!isLoadedRef.current || Object.keys(state).length === 0) return
-    const timer = setTimeout(async () => {
-      try {
-        localStorage.setItem(HEAD_STATE_KEY, JSON.stringify(state))
-        await invoke('save_proxy_head_state', { state })
-      } catch (err) {
-        console.warn('[useHeadState] 保存 head_state 到后端失败:', err)
-      }
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [state])
 
   const setHeadState = useCallback(
     (groupName: string, obj: Partial<HeadState>) => {
       if (!current) return
-      dispatch({ type: 'update', profileUid: current, groupName, patch: obj })
+      updateHeadState(current, groupName, obj)
     },
     [current],
   )
 
-  const currentProfileState = state[current] || {}
+  const currentProfileState = state[current] || EMPTY_PROFILE_STATE
   return [currentProfileState, setHeadState] as const
 }

@@ -128,3 +128,9 @@ pub async fn get_proxy_head_state() -> CmdResult<serde_json::Value> {
     let val = serde_json::from_str(&content).stringify_err()?;
     Ok(val)
 }
+
+/// 获取当前运行配置中已确认永久拉黑的假节点名称列表（供前端隐藏显示）
+#[tauri::command]
+pub fn get_confirmed_fake_proxy_names() -> Vec<std::string::String> {
+    crate::utils::node::confirmed_fake_node_names()
+}

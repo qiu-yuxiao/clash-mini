@@ -1307,14 +1307,16 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
     //    过滤广告/假节点（"网址"、"官网"、"剩余流量" 等），避免它们进入 PROXY 组后
     //    被内核 reload_config 选中触发自愈死循环
-    let mut proxy_names = Vec::new();
+    let mut raw_entries: Vec<(std::string::String, Option<std::string::String>)> = Vec::new();
+    let mut raw_fp_map: std::collections::HashMap<std::string::String, std::string::String> =
+        std::collections::HashMap::new();
     if let Some(Value::Sequence(proxies)) = config.get("proxies") {
         for p in proxies {
             let Some(m) = p.as_mapping() else {
                 // 纯字符串形式（"- 节点名"）没有 server 字段，沿用名字过滤
                 if let Some(name) = p.as_str() {
                     if !crate::utils::node::is_dummy_node(name) {
-                        proxy_names.push(Value::from(name.to_owned()));
+                        raw_entries.push((name.to_owned(), None));
                     }
                 }
                 continue;
@@ -1340,9 +1342,28 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
                     continue;
                 }
             }
-            proxy_names.push(Value::from(name.to_owned()));
+            let fp = crate::utils::node::proxy_endpoint_fingerprint(m);
+            if let Some(ref fp_str) = fp {
+                raw_fp_map.insert(name.to_owned(), fp_str.clone());
+                if crate::utils::node::is_confirmed_fake_fp(fp_str) {
+                    logging!(info, Type::Config, "跳过真 HTTPS 验真已确认拉黑的假节点: {name}");
+                    continue;
+                }
+            }
+            raw_entries.push((name.to_owned(), fp));
         }
     }
+
+    crate::utils::node::set_runtime_node_fingerprints(raw_fp_map);
+    let (deduped_names, clone_removed) = crate::utils::node::deduplicate_cloned_proxies(raw_entries);
+    if clone_removed > 0 {
+        logging!(
+            info,
+            Type::Config,
+            "订阅入组去重：折叠同 server:port 同配置克隆节点 {clone_removed} 个"
+        );
+    }
+    let proxy_names: Vec<Value> = deduped_names.into_iter().map(Value::from).collect();
 
     // 2. Extract all proxy-provider names from `proxy-providers` mapping
     let mut provider_names = Vec::new();
@@ -2120,5 +2141,65 @@ fallback:
             Some("2606:4700:4700::1001")
         );
         assert_eq!(extract_upstream_host("   ").as_deref(), None);
+    }
+
+    #[tokio::test]
+    async fn test_enforce_mini_agreements_deduplicates_clones_and_skips_confirmed_fake() {
+        use super::enforce_mini_agreements;
+        use serde_yaml_ng::{Mapping, Value};
+
+        let _ = crate::utils::dirs::PORTABLE_FLAG.get_or_init(|| true);
+
+        let yaml_str = r"
+proxies:
+  - name: 距离下次重置剩余：25 天
+    type: ss
+    server: 198.51.100.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-real-clone
+  - name: 香港1
+    type: ss
+    server: 198.51.100.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-real-clone
+  - name: 伪装正常名实则已拉黑
+    type: ss
+    server: 198.51.100.99
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-confirmed-fake
+";
+        let config: Mapping = serde_yaml_ng::from_str(yaml_str).unwrap();
+        let fake_mapping = config
+            .get("proxies")
+            .and_then(Value::as_sequence)
+            .and_then(|s| s[2].as_mapping())
+            .unwrap();
+        let fake_fp = crate::utils::node::proxy_endpoint_fingerprint(fake_mapping).unwrap();
+
+        crate::utils::node::set_verify_record_for_test(
+            &fake_fp,
+            Some(crate::utils::node::NodeVerifyRecord {
+                verified_true: false,
+                fail_count: crate::utils::node::HTTPS_VERIFY_MAX_FAILS + 1,
+                last_verified_at: 100,
+            }),
+        );
+
+        let enforced = enforce_mini_agreements(config).await;
+        crate::utils::node::set_verify_record_for_test(&fake_fp, None);
+
+        let groups = enforced.get("proxy-groups").and_then(Value::as_sequence).unwrap();
+        assert_eq!(groups.len(), 2);
+        let proxy_proxies = groups[0]
+            .as_mapping()
+            .unwrap()
+            .get("proxies")
+            .and_then(Value::as_sequence)
+            .unwrap();
+        let names: Vec<&str> = proxy_proxies.iter().filter_map(Value::as_str).collect();
+        assert_eq!(names, vec!["香港1"]);
     }
 }

@@ -585,6 +585,23 @@ const Layout = () => {
       // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
       wakeupTestTimerRef.current = setTimeout(async () => {
         wakeupTestTimerRef.current = null // setTimeout 已触发，清除ID
+        const dm = getDelayManager()
+        const previousSnapshots = new Map<
+          string,
+          ReturnType<typeof dm.getDelayUpdate>
+        >()
+        const rollbackPending = () => {
+          for (const name of names) {
+            if (dm.getDelayUpdate(name, 'PROXY')?.delay === -2) {
+              dm.restoreDelaySnapshot(
+                name,
+                'PROXY',
+                previousSnapshots.get(name),
+              )
+            }
+          }
+          dm.queueGroupNotification('PROXY')
+        }
         try {
           if (!isMountedRef.current) return
 
@@ -593,20 +610,32 @@ const Layout = () => {
           if (currentUid !== capturedUid || !isMountedRef.current) {
             return
           }
-          // 视觉占位：立即将 PROXY 全节点标记为「测速中」以触发流光动画
+          // 视觉占位：记录测速前缓存快照后置 `-2` 测试态（BUG-369：空/异常返回时回滚）
           for (const name of names) {
-            getDelayManager().setDelay(name, 'PROXY', -2)
+            previousSnapshots.set(name, dm.getDelayUpdate(name, 'PROXY'))
+            dm.setDelay(name, 'PROXY', -2)
           }
-          getDelayManager().queueGroupNotification('PROXY')
+          dm.queueGroupNotification('PROXY')
           // 委托后端静默测速填充缓存（不传子集=全量测速）；select=false 严禁切换用户当前节点
           if (currentUid && isMountedRef.current) {
-            await triggerAutoSelect(currentUid, undefined, 0, false)
+            const results = await triggerAutoSelect(
+              currentUid,
+              undefined,
+              0,
+              false,
+            )
+            if (results.length === 0) {
+              rollbackPending()
+            }
+          } else {
+            rollbackPending()
           }
           if (isMountedRef.current) {
             await refreshAllRef.current()
           }
         } catch (err) {
           console.error('[Layout] 唤醒后后台测速异常:', err)
+          rollbackPending()
         } finally {
           isWakeupTestingRef.current = false // H-15: 释放互斥锁
         }

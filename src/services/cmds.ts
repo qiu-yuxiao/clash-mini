@@ -302,13 +302,15 @@ export async function calcuProxies(): Promise<{
   proxies: IProxyItem[]
 }> {
   // M2-14: 移除 try-catch，让错误传播给调用方决定降级策略
-  const [proxyResponse, providerResponse] = await Promise.all([
+  const [proxyResponse, providerResponse, fakeNames] = await Promise.all([
     getProxies(),
     calcuProxyProviders(),
+    getConfirmedFakeProxyNames(),
   ])
 
   const proxyRecord = proxyResponse?.proxies ?? {}
   const providerRecord = providerResponse ?? {}
+  const fakeSet = new Set(fakeNames)
 
   // provider name map
   const providerMap = Object.fromEntries(
@@ -344,14 +346,23 @@ export async function calcuProxies(): Promise<{
           ...proxyGroup,
           all: (proxyGroup.all ?? [])
             .map((item) => generateItem(item))
-            .filter((item) => item?.name && !isDummyNode(item.name)),
+            .filter(
+              (item) =>
+                item?.name &&
+                !isDummyNode(item.name) &&
+                !fakeSet.has(item.name),
+            ),
         },
       ]
     : []
 
   // 非组节点（DIRECT/REJECT 及无子节点的叶子节点），供渲染使用
   const proxies = Object.values(proxyRecord).filter(
-    (p) => !p?.all?.length && p?.name && !isDummyNode(p.name),
+    (p) =>
+      !p?.all?.length &&
+      p?.name &&
+      !isDummyNode(p.name) &&
+      !fakeSet.has(p.name),
   )
 
   return {
@@ -618,6 +629,16 @@ export function notifyNodeSwitched(): void {
   void invoke('notify_node_switched').catch((err) => {
     console.warn('[IPC] notify_node_switched failed:', err)
   })
+}
+
+/** 获取后端真 HTTPS 验真已永久拉黑的假节点名称列表（前端列表隐藏显示） */
+export async function getConfirmedFakeProxyNames(): Promise<string[]> {
+  try {
+    const names = await invoke<string[]>('get_confirmed_fake_proxy_names')
+    return Array.isArray(names) ? names : []
+  } catch {
+    return []
+  }
 }
 
 /** 打开外部网页链接（仅允许 http/https 协议） */

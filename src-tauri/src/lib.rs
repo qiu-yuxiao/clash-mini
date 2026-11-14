@@ -155,6 +155,7 @@ mod app_init {
             cmd::get_auto_launch_status,
             cmd::trigger_auto_select,
             cmd::notify_node_switched,
+            cmd::get_confirmed_fake_proxy_names,
             cmd::download_icon_cache,
             cmd::get_profiles,
             cmd::enhance_profiles,

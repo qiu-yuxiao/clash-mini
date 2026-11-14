@@ -1,5 +1,8 @@
 import { filterSort } from '@/components/proxy/use-filter-sort'
-import type { HeadState } from '@/components/proxy/use-head-state'
+import {
+  getGroupHeadState,
+  type HeadState,
+} from '@/components/proxy/use-head-state'
 import { calcuProxies, getProfiles, triggerAutoSelect } from '@/services/cmds'
 import {
   getDelayManager,
@@ -56,20 +59,11 @@ export async function getFilteredNodeNames(): Promise<string[]> {
       currentUid = profiles?.current || ''
     } catch {}
 
-    let filterText = ''
-    let sortType = 0
-
-    try {
-      const headStateStr = localStorage.getItem('proxy-head-state')
-      if (headStateStr && currentUid) {
-        const headStateStorage = JSON.parse(headStateStr)
-        const groupState = headStateStorage?.[currentUid]?.[groupName]
-        if (groupState) {
-          filterText = groupState.filterText || ''
-          sortType = groupState.sortType || 0
-        }
-      }
-    } catch {}
+    const groupState = currentUid
+      ? getGroupHeadState(currentUid, groupName)
+      : undefined
+    const filterText = groupState?.filterText || ''
+    const sortType = groupState?.sortType ?? 0
 
     const filtered = filterSort(
       allProxies,
