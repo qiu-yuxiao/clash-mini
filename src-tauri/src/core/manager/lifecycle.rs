@@ -440,8 +440,8 @@ impl CoreManager {
                 "跳过 PROXY 组节点恢复：{} 属内置出站，直接按子集兜底",
                 node
             );
-            let filter_lower = read_filter_text().await;
-            select_fallback_in_subset(&mihomo, &filter_lower).await;
+            let filter_text = read_filter_text().await;
+            select_fallback_in_subset(&mihomo, &filter_text).await;
             return;
         }
 
@@ -453,8 +453,8 @@ impl CoreManager {
                 Type::Core,
                 "跳过 PROXY 组节点恢复：目标节点 {node} 不在组成员中，直接按子集兜底"
             );
-            let filter_lower = read_filter_text().await;
-            select_fallback_in_subset(&mihomo, &filter_lower).await;
+            let filter_text = read_filter_text().await;
+            select_fallback_in_subset(&mihomo, &filter_text).await;
             return;
         }
 
@@ -480,8 +480,8 @@ impl CoreManager {
                             e
                         );
                         // 读取用户保存的 filterText，在子集范围内选点兜底
-                        let filter_lower = read_filter_text().await;
-                        select_fallback_in_subset(&mihomo, &filter_lower).await;
+                        let filter_text = read_filter_text().await;
+                        select_fallback_in_subset(&mihomo, &filter_text).await;
                         break;
                     }
                     logging!(
@@ -518,12 +518,12 @@ async fn read_filter_text() -> String {
     };
     value[current_uid.as_str()]["PROXY"]["filterText"]
         .as_str()
-        .map(|s| s.trim().to_lowercase())
+        .map(|s| s.trim().to_string())
         .unwrap_or_default()
 }
 
 /// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底
-async fn select_fallback_in_subset(mihomo: &Mihomo, filter_lower: &str) {
+async fn select_fallback_in_subset(mihomo: &Mihomo, filter_text: &str) {
     let Ok(group_info) = mihomo.get_group_by_name("PROXY").await else {
         return;
     };
@@ -531,7 +531,7 @@ async fn select_fallback_in_subset(mihomo: &Mihomo, filter_lower: &str) {
     let fallback = all
         .iter()
         .filter(|n| !crate::utils::node::is_dummy_node(n))
-        .find(|n| filter_lower.is_empty() || n.to_lowercase().contains(filter_lower))
+        .find(|n| crate::utils::node::match_node_filter(n, filter_text))
         .or_else(|| all.iter().find(|n| !crate::utils::node::is_dummy_node(n)));
     if let Some(fb) = fallback {
         match mihomo.select_node_for_group("PROXY", fb).await {

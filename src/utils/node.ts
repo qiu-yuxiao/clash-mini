@@ -101,3 +101,65 @@ export const isDummyNode = (name: string): boolean => {
     (phrase) => normalized === phrase || normalized.startsWith(phrase),
   )
 }
+
+const stripExclusionPrefix = (token: string): string => {
+  if (
+    token.startsWith('-') ||
+    token.startsWith('!') ||
+    token.startsWith('！')
+  ) {
+    return token.slice(1).trim()
+  }
+  return token
+}
+
+/**
+ * 节点名多关键词与排除过滤匹配。
+ *
+ * 【必须与后端保持一致】后端实现在 `src-tauri/src/utils/node.rs::match_node_filter`。
+ * - 大小写不敏感；
+ * - 空串 / 纯空白 / 孤立符号（`-`、`!`、`|`）返回 `true`；
+ * - 空格分隔多个 `AND` 子句；
+ * - 子句内支持 `|` 或全角 `｜` 分隔多关键词 `OR` 匹配（允许两侧空格，如 `日本 | 新加坡`）；
+ * - 以 `-`、`!` 或 `！` 开头的子句表示排除（如 `-香港`、`日本|新加坡 -倍率`）。
+ */
+export const matchNodeFilter = (name: string, filterText: string): boolean => {
+  const trimmed = (filterText || '').trim()
+  if (!trimmed) return true
+
+  const nameLower = (name || '').toLowerCase()
+  const collapsed = trimmed
+    .toLowerCase()
+    .replace(/｜/g, '|')
+    .split('|')
+    .map((part) => part.trim())
+    .join('|')
+
+  for (const token of collapsed.split(/\s+/).filter(Boolean)) {
+    if (
+      token.startsWith('-') ||
+      token.startsWith('!') ||
+      token.startsWith('！')
+    ) {
+      for (const part of token.split('|')) {
+        const term = stripExclusionPrefix(part)
+        if (term && nameLower.includes(term)) {
+          return false
+        }
+      }
+    } else {
+      const branches = token
+        .split('|')
+        .map((part) => part.trim())
+        .filter(Boolean)
+      if (
+        branches.length > 0 &&
+        !branches.some((branch) => nameLower.includes(branch))
+      ) {
+        return false
+      }
+    }
+  }
+
+  return true
+}

@@ -404,8 +404,9 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 ### 4.2 不断网不断流铁律与后端连接维持
 
-- **网络连接连续性铁律**：**进入轻量模式、退出轻量模式或在轻量模式下自愈切节点，绝对禁止切断已建立的用户网络连接**。
-- **内核进程与虚拟网卡不间断**：内核子进程与 TUN 网卡始终保持正常全速运行，下载、语音通话、游戏代理等长连接长流绝不发生瞬间闪断。
+- **网络连接连续性铁律**：**进入轻量模式、退出轻量模式或在正常状态下自愈/手动切换节点，绝对禁止全量切断已建立的用户网络连接**。
+- **故障转移精确断死留活（BUG-368，v3.3.2）**：仅当后台监测经二次复核确认活跃节点 `dead_node` 已不可用并成功转移至不同健康节点 `new_node` 时，调用 `close_connections_on_dead_node` 仅针对 `chains` 命中 `dead_node` 的存量连接执行精确关闭（最多等待 `3s` 超时），**严禁触碰 `DIRECT` 与其他健康节点连接**，使卡死在已瘫痪节点的 HTTP/2 / gRPC 长连接立即在新出口重建恢复。
+- **内核进程与虚拟网卡不间断**：内核子进程与 TUN 网卡始终保持正常全速运行，正常流量与健康长连接绝不发生瞬间闪断。
 
 ### 4.3 前端 WebSocket 熔断与自动重连自愈
 
@@ -435,7 +436,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **防抖自愈判定**：严格执行**连续 2 次检测失败**才正式触发全节点批量选点自愈，彻底滤除网络微抖动造成的过度切换。
 - **严格判死阈值（5000ms）**：测速超时硬限为 **5000ms**；延迟有效区间锁定为 `[30ms, 5000ms)`；超过 5000ms 或产生握手错误一律判死。**该值历史上在 2000ms 与 5000ms 之间反复调整过不止一次，2026-10 定型为 5000ms（BUG-304 现场双路对照监控实证）：链路拥塞簇内仅 TCP 握手即需 1.1~2.1s（SYN 丢包按 1s RTO 重传的整秒台阶指纹），叠加 TLS 握手与 204 探测往返后，「慢而可用」的活节点总耗时稳定超过 2s——2000ms 预算会把拥塞期的整组活节点误判为断流；而真死节点（机场集群故障）5s 内同样超时，不会产生误活。除非有同等量级的现场实证，禁止回调至 2000ms。**
 - **切换宽限期（20 秒，v3.2.4 优化）**：任何节点切换（含自动选点与手动切换）后 20 秒内，失败判定只记日志、不计入连续失败次数，防止「切到尚未拨测的新节点 → 缓存陈旧误判 → 再次切走」的乒乓震荡。v3.2.4 从原 60 秒缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
-- **探测按需降频（20 秒新鲜度，v3.2.4 优化）**：体检不再每周期对测量组全组拨测，改为按缓存新鲜度决策——活跃节点健康且 history < 20 秒直接信缓存（v3.2.4 由 60 秒缩短至 20 秒，使突发断流在 15~20 秒内即可被快速感知）；判死后 10 秒内不重复拨测。避免稳态探测风暴引发自激误报。
+- **探测按需降频（20 秒新鲜度 + 二次独立复核，v3.2.4 / v3.3.2）**：体检不再每周期对测量组全组拨测，改为按缓存新鲜度决策——活跃节点健康且 history < 20 秒直接信缓存；常规状态下刚判死 10 秒内不重复拨测。当已进入重试复核阶段（`consecutive_fails > 0`，每 3 秒复检）时，通过 `should_probe_active_node(..., force_confirm_probe=true)` **强制跳过 10 秒死节点去抖缓存并禁用短窗合并，执行第二次物理独立全组拨测**（BUG-368），确保连续 2 次失败绝非读取同一份缓存的假复核。
 
 #### 5.1.1 诊断探针（临时，随 v2.9.3 诊断版注入）
 
@@ -457,19 +458,19 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   1. **仅测量、不切换**：单点测速必须以「不选点」方式调用，严禁改写用户当前所选节点，也绝不回写 `profile.selected`。
   2. **全组拨测属既定代价**：内核只提供「组级拨测」接口，故单节点测速一次**同样会触发对该测量组全量成员的拨测**，耗时由最慢成员决定（拥塞期可达 ≈5000ms），而结果只回报所请求的那一个节点。此为换取「TUN 下无回环、全链路数据源唯一」的既定取舍，不予优化掉。
   3. **不得伪造超时**：测速**未真正执行或未取得任何实时拨测结果**时（内核未就绪 / 无可测节点 / 读不到 PROXY 组 / 主备测速地址均整体失败 `DelayResultSource::NotExecuted`，即后端返回空结果），前端必须通过 `restoreDelaySnapshot` 原样恢复测速前的缓存快照（严格保留原始 `updatedAt` 时间戳，无原缓存则清除 `-2` 占位）并提示「测速未执行」，**严禁呈现为 Timeout，亦严禁重新盖章 `Date.now()` 虚增 30 分钟缓存寿命**；仅当测速确已执行（`LiveProbe`）而该节点未测得时，才允许以 Timeout 呈现。
-  4. **禁止陈旧 history 兜底与数据来源标记（2026-10-17 补充，v3.2.5 全路径收口）**：`valid_nodes.len() == 1`（用户显式单点测速）时**禁止复用测量组缓存**（`METRICS_REUSE_MAX_AGE_SECS` = 30s），必须发起实时拨测；批量子集场景（`len > 1`）为抑制全组拨测频率，允许在所求节点 `history` 全部新鲜（`< 30s`）时复用（标记 `DelayResultSource::FreshMetricsCache`）。**全路径（单点、批量子集、F1 全量及后台自愈选点）一律彻底废除 120s `history` 退化兜底**：一旦 `probe_metrics_group` 未取得实时数据，立即返回空结果 `NotExecuted`，严禁读取旧 `history` 冒充本次结果或混入 `candidates` 切换出口。同时 `verge://backend-delay-results` 事件携带 `fromProbe: bool` 语义标记：仅 `LiveProbe`（`fromProbe=true`）赋予 30 分钟实时缓存，30s 缓存复用（`fromProbe=false`）在前端强制封顶剩余保鲜期为 30 秒。
+  4. **禁止陈旧 history 兜底、数据来源标记与并发拨测风暴抑制（2026-10-17 确立，BUG-344 / BUG-368 收口）**：`valid_nodes.len() == 1`（用户显式单点测速）时**禁止复用任何测量组缓存/快照并禁用并发合并**，必须发起实时拨测；批量子集场景（`len > 1`）优先在 `< METRICS_REUSE_MAX_AGE_SECS`（30s）内复用最近一次完整 `probe_metrics_group` 实时快照（解决 Mihomo 对死节点不追加 `history` 导致按节点逐一判断 `all_fresh` 失效并误发整组拨测的问题），否则再校对各节点 `history` 新鲜度，命中复用时标记 `DelayResultSource::FreshMetricsCache`。故障自愈链（`self_heal_with_accounting`）允许在 `SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS`（10s）内直接复用 `evaluate_failover` 二次确认刚产出的全组快照（若尚未上屏则保留首个消费方 `LiveProbe` 语义），同时全量全组拨测统一由 `METRICS_PROBE_LOCK` 串行化并在非强制复核/非单点调用上启用 `PROBE_COALESCE_WINDOW_MS`（1500ms）短窗口并发合并，彻底消除多调用方同时或背靠背向同一机场节点服务器发起多轮全组握手风暴。**全路径一律彻底废除 120s `history` 退化兜底**：一旦 `probe_metrics_group` 未取得实时数据，立即返回空结果 `NotExecuted`。同时 `verge://backend-delay-results` 事件携带 `fromProbe: bool` 语义标记：仅 `LiveProbe`（`fromProbe=true`）赋予 30 分钟实时缓存，缓存复用（`fromProbe=false`）在前端强制封顶剩余保鲜期为 30 秒。
 - **互斥与可读反馈**：单点测速、群发测速与后台自愈共用同一互斥锁（`AUTO_SELECT_RUNNING`）。互斥抢占失败（`AUTO_SELECT_BUSY`）属正常竞争，前端**必须给出可读提示**，禁止静默无响应。
 - **所见即所选（子集约束）**：界面通过 F4 触发测速时，测速由内核全量执行，但最终挑出最优节点时**严格限制在用户当前界面的过滤/搜索子集内部**；全量自动优选（F1）则从全量成员中挑选。选点完成后自动持久化写回 `profile.selected`。
 
-### 5.3 统一记账与 25 秒失败冷却保护（v3.2.4 优化）
+### 5.3 统一记账与 25 秒失败冷却保护（v3.2.4 / v3.3.2 优化）
 
-- **自愈路径统一记账**：后台监测的三大触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）全部统一汇聚至 `self_heal_with_accounting` 统一记账函数。
+- **自愈路径统一记账**：后台监测的三大触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）全部统一汇聚至 `self_heal_with_accounting` 统一记账函数；若前两路传入有效活跃死节点且选出了不同的新节点，自愈成功后顺带执行 `close_connections_on_dead_node` 精确清死连接。
 - **25 秒失败冷却防线**：若自愈选点失败或所有节点均不可达，强制进入 **25 秒冷却期**（v3.2.4 由原 60 秒缩短至 25 秒，既杜绝风暴式并发高频测速，又显著加快连续异常时的恢复时效），冷却期内严禁重复发起自愈冲击。
 - **连续 5 次系统级告警与重启终态契约**：`evaluate_self_heal_counters` 与 `complete_restart_core_attempt` 将「API 假死 3 次重启计数」与「全节点断流 5 次告警计数」解耦——API 不可达满 3 次触发 `RestartCore` 时仅重置 `api_dead_heal_fail_count`：若内核重启成功（`Ok`），保留 `auto_select_fail_count` 继续累计至第 5 次可靠触发 Win32 原生 `MessageBoxW` 系统告警并重置双计数；若内核重启自身报错（`Err`），则定义为不可恢复终态，立即升级弹出内核重启失败系统告警并重置本轮双计数（内置原子单实例门控防止模态弹窗堆叠）。
 
-### 5.4 订阅伪节点全链路拦截防线（node.rs）
+### 5.4 订阅伪节点全链路拦截防线与节点多关键词过滤同源契约（node.rs / node.ts）
 
-针对订阅源经常恶意混入的广告与公告假节点（如包含「官网」「剩余流量」「过期时间」「续费」「公告」「购买」等条目），构建全链路共享防护网：
+针对订阅源经常恶意混入的广告与公告假节点（如包含「官网」「剩余流量」「过期时间」「续费」「公告」「购买」等条目），以及前后端节点搜索/自愈过滤子集，构建全链路共享防护与同源匹配引擎：
 - **统一判定函数**：在 `src-tauri/src/utils/node.rs` 维护统一共享的 `is_dummy_node` 过滤引擎。
 - **三道铁锁拦截**：
   1. **配置生成层**（`enhance::enforce_mini_agreements`）：在将订阅节点注入 `PROXY` 组时强制剥离所有伪节点，防止其进入候选列表。
@@ -480,6 +481,9 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - 中文广告短语：必须**归一化后「完全匹配或以该短语开头」**（先剥两端包裹符号与「节点-」类通用前缀）。
   - **严禁前端对中文短语用 `includes` 子串匹配**：会把 `日本群组-A`、`美国-网址专线`、`上海-群节点-01`、`HK-流量优化` 这类真实节点误判为伪节点而从前端列表隐藏，造成「**后端能选中、前端却看不到**」的高危不一致。
   - 取舍：前缀匹配会漏判「广告短语不在开头」的伪节点（如 `【剩余流量】80GB`）。这是**有意为之**——漏判伪节点代价很小（无延迟不会被选中，后端仍有三道拦截），而误杀真实节点会直接让用户少一个可用节点。
+- **节点多关键词包含与排除同源过滤（`match_node_filter` / `matchNodeFilter`，BUG-368，v3.3.2）**：
+  - 后端 `src-tauri/src/utils/node.rs::match_node_filter` 与前端 `src/utils/node.ts::matchNodeFilter` **1:1 逐条同源**，分别统一接入 `monitor.rs`（恢复、判定、选点、写回 4 处）、`lifecycle.rs::select_fallback_in_subset`、`src/components/proxy/use-filter-sort.ts` 与 `src/hooks/use-profiles.ts`，严禁任何模块保留私有 `.contains` / `.includes` 分叉；
+  - 语法语义（大小写不敏感）：空格分隔多个 `AND` 子句；子句内支持半角 `|` 或全角 `｜` 分隔多关键词 `OR` 匹配（自动折叠符号两侧空白，兼容 `日本 | 新加坡 | 台湾`）；以 `-`、`!` 或 `！` 开头的子句表示排除（如 `-香港`、`日本|新加坡 -倍率`）；空串、仅空白及输入态孤立符号（`-`、`!`、`|`）放行返回 `true`。
 
 ### 5.5 物理网络连通性双频快速探测（TCP:53 探针，v3.2.4 优化）
 
@@ -812,6 +816,14 @@ flowchart LR
 - **改动**：`src/pages/_layout/components/theme-settings-card.tsx` 将主题模式三态切换器（`系统 / 浅色 / 深色`）由 `100 × 18px`（字号 `10px`）放大至与 `BasicSettingsCard` 中 `TUN 域名嗅探` 开关完全一致的 `118 × 20px`（字号 `11px`），外加 `flexShrink: 0` 与 `marginInlineEnd: '4px'` 使左右边缘严格上下对齐在同一垂线上，同时合并三态选项为数据驱动渲染并补齐 `minWidth: 0` / `overflow: 'hidden'` / `textOverflow: 'ellipsis'` / `title` 多语种截断防护。
 - **影响**：左侧设置栏中「TUN 域名嗅探」与「主题设置」两个三态开关在视觉体量与左右垂线位置上完全对齐；仅涉及纯前端样式与布局调整，不触碰代理/主题业务状态。
 
+### Sync-13 · 断流自愈二次真探测、测量组并发抑制、精确死连接清理与多关键词/排除节点过滤（BUG-368）
+- **改动**：
+  1. **二次复核真探测（`monitor.rs`）**：抽离 `should_probe_active_node(..., force_confirm_probe)`，当 `consecutive_fails > 0` 进入 3s 重试复核回合时强制跳过 `DEAD_CONFIRM_MIN_INTERVAL_SECS`（10s）缓存并禁用短窗合并，确保连续 2 次失败源自两次物理独立的全组 `PROXY__METRICS` 拨测，彻底根除「首次判死 → 3s 后命中旧缓存直接跳过复测并立刻误切节点」的隐疾。
+  2. **并发与背靠背拨测风暴抑制（`monitor.rs`）**：在 `probe_metrics_group` 引入进程级 `METRICS_PROBE_LOCK` 互斥与 `PROBE_COALESCE_WINDOW_MS`（`1500ms`）短窗口并发合并，同时记录最近一次完整实时延迟快照 `LAST_METRICS_PROBE` 与纯函数 `try_reuse_probe_snapshot`：故障自愈在 `SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS`（`10s`）内直接复用确认回合刚刚完成的全组拨测结果（缩短切换耗时约 5s 并消除背靠背握手风暴）；前端批量子集（`len > 1`）在 `< 30s` 内直接消费实时快照避开 Mihomo 对死节点不写 `history` 引发的假陈旧重测；显式单点测速（`len == 1`）仍严格执行实时独立拨测（§5.2 契约 4）。
+  3. **故障转移精确断死留活（`monitor.rs`）**：`AutoSelectOutcome` 新增 `selected_node`，仅在故障触发的 `self_heal_with_accounting` 成功切换至不同于 `dead_node` 的健康新节点时，调用 `close_connections_on_dead_node`（基于 pure helper `collect_dead_node_connection_ids`）在 3s 超时保护下仅关闭 `chains` 命中 `dead_node` 的存量挂死连接，完全保留 `DIRECT` 及其他健康节点会话，避免 HTTP/2 / gRPC 长连接在内核切换节点后长期卡死挂起。
+  4. **前后端同源多关键词包含与排除过滤（`utils/node.rs`、`utils/node.ts`、`monitor.rs`、`lifecycle.rs`、`use-filter-sort.ts`、`use-profiles.ts`）**：新增共享匹配引擎 `match_node_filter` / `matchNodeFilter`（支持 `|` / `｜` 多关键词 `OR`、空格分词 `AND` 以及 `-` / `!` / `！` 前缀排除，孤立输入符号放行），并补充 Rust 与 Vitest 逐条对齐单元测试（含 `should_probe`、`try_reuse_probe_snapshot` 与 `collect_dead_node_connection_ids` 单测）。
+- **影响**：严格维持 `§5.2` 单一 `PROXY__METRICS` 测量组架构与正常切点/轻量模式不断流原则，同时将单节点断流/服务抖动下的故障自愈准确度、抗服务器握手风暴能力及长连接恢复速度提升至毫秒级。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
@@ -937,6 +949,9 @@ flowchart LR
 | **BUG-363** | 4.1 / 4.2 / 5.1 | 轻量模式防强杀第一阶段四重闭环：伴生看门狗异名异目录物理隔离（`%LOCALAPPDATA%\<APP_ID>\guard\clash-mini-guard.exe` + `--target-exe` + NSIS 安装卸载联动）、主进程与看门狗双向互锁监督重建、双端挂载主屏工作区 `1×1` `LWA_ALPHA = 1` 穿透哨兵窗口（原 `120s` 稳态代数复位已在 `BUG-365` 中废除）。 |
 | **BUG-364** | 3.7 | TUN 模式 `sniffer` 三态控制与 DNS 全链路统一治理：提供 `Auto / On / Off`（`null / true / false` + `enable_tun_mode` 门控）与后端显式 `null` 复位，开启时权威强制 `force-dns-mapping` / `parse-pure-ip` 并统一顶层与 `sniff.HTTP` `override-destination`，尊重 `Auto` 态下订阅显式 `sniffer.enable: false`；`sanitize_dns_upstreams` 统一治理 `dns.nameserver` / `fallback` / `nameserver-policy`（固定保留策略键与 `default-nameserver`），以 `is_local_or_domestic_dns_host` 统一内外判定并剥离 `#DIRECT`/`#PROXY` 伪后缀（保留 `#h3=true`），按 `respect-rules` 插入境内替代 DoH 或 `PROXY` 保通规则。 |
 | **BUG-365** | 4.1 / 4.2 / 5.1 / 8.7 | `v3.2.8` 轻量模式双进程消失 Session-0 隔离与守护系统性加固：Session-0 WMI (`WmiPrvSE.exe`) + Task Scheduler COM (`ITaskService`) Broker 脱离父 Job 隔离（含 `same_job_degraded` 显式告警与 Scenario 6 端到端测试）、独立 `logs/guardian.log` 账本（含写失败非静默回退与全退场/降级日志）、15s 独立 `guard/` 心跳、`MoveFileExW` + 递增序列原子替换、两阶段 `prepared`/`confirmed` 带外凭证（`pid && session_id` + 30s/120s TTL + `3500ms` 二次复核）、无时间清零的 OS 启动指纹 + 纪元会话熔断（fail-closed）及 `cmd/diagnostics.rs` 360/WER 只读取证接入。 |
+| **BUG-366** | 3.7 / 4.1 / 8.5 | GFWList 模式移除 `MATCH,DIRECT` 前的 `- IP-CIDR6,::/0,PROXY` 兜底消除 IPv6 流量偷跑，清理悬空文档注释 / `.unwrap()` / 单导出冗余分支与 `read_respawn_state_checked` TOCTOU，同步对齐 `app-update.json` 说明。 |
+| **BUG-367** | 2.2 / 7.7 / 8.9 | 路径控制精准目标化规则生成（禁止扩域为 `DOMAIN-SUFFIX`）与「直连 / 代理 / 封锁 / 已断开」四态单表融合，补齐自定义 `Merge` 路由 `.yaml` 一键导出保存与重装后导入恢复闭环。 |
+| **BUG-368** | 2.8 / 4.2 / 5.1 / 5.2 / 5.3 / 5.4 | 修复 3s 重试复核误命中 10s 死缓存跳过二次真实拨测；引入 `METRICS_PROBE_LOCK` 与实时快照复用抑制并发/背靠背拨测风暴；故障转移成功后精确关闭仍挂死在原故障节点上的存量连接；前后端统一升级多关键词包含（`\|`/`｜`）与排除（`-`/`!`/`！`）节点过滤引擎并补齐双端单测。 |
 
 ---
 

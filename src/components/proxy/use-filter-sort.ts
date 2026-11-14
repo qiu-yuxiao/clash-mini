@@ -1,5 +1,6 @@
 import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import type { IProxyItem } from '@/types/clash'
+import { matchNodeFilter } from '@/utils/node'
 
 // default | delay | alphabet
 export type ProxySortType = 0 | 1 | 2
@@ -18,7 +19,7 @@ export function filterSort(
 
 /**
  * filter the proxy
- * according to simple lowercase includes search with trim
+ * delegates to shared multi-keyword/exclusion matcher (`matchNodeFilter`)
  */
 function filterProxies(
   proxies: IProxyItem[],
@@ -26,11 +27,9 @@ function filterProxies(
   filterText: string,
 ) {
   if (!proxies) return []
-  const query = (filterText || '').trim()
-  if (!query) return proxies
+  if (!filterText?.trim()) return proxies
 
-  const target = query.toLowerCase()
-  return proxies.filter((p) => (p?.name ?? '').toLowerCase().includes(target))
+  return proxies.filter((p) => matchNodeFilter(p?.name ?? '', filterText))
 }
 
 /**

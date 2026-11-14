@@ -13,9 +13,10 @@ import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
 import { queryClient } from '@/services/query-client'
 import type { IProfileItem, IProfilesConfig } from '@/types/profile'
 import { debugLog } from '@/utils/debug'
+import { matchNodeFilter } from '@/utils/node'
 
-// 从 localStorage 的 proxy-head-state 读取当前 profile 的过滤词（与后端 match_filter 语义一致：
-// 大小写不敏感子串匹配）。读取失败或为空时返回 ''，等价于"无过滤"，即全部节点都在子集内。
+// 从 localStorage 的 proxy-head-state 读取当前 profile 的过滤词（与后端 match_node_filter 语义一致：
+// 支持 | 多关键词 OR、空格 AND 与 - / ! 前缀排除）。读取失败或为空时返回 ''，等价于"无过滤"，即全部节点都在子集内。
 // 该 key 由 use-head-state.ts 在加载/变更时写入，activateSelected 运行时通常已就绪。
 function readActiveFilterText(uid?: string): string {
   if (!uid) return ''
@@ -238,9 +239,7 @@ export const useProfiles = () => {
         // 仅当它在用户当前 filterText 子集内时才信任并切过去；越界则不再强加给内核，
         // 而是把本地 selected 校正为内核实际节点 currentNow，避免"前端显示 ≠ 内核实际选路"复现。
         const filterText = readActiveFilterText(current?.uid)
-        const savedInSubset =
-          filterText.trim() === '' ||
-          savedProxyName.toLowerCase().includes(filterText.trim().toLowerCase())
+        const savedInSubset = matchNodeFilter(savedProxyName, filterText)
 
         if (!savedInSubset) {
           const msg = `[ActivateSelected] 保存的代理 ${savedProxyName} 不在当前过滤范围「${filterText}」内（疑似被污染的持久选择），不切内核，改为校正 selected 为内核实际节点 ${currentNow}`

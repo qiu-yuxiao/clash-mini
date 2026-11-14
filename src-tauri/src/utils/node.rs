@@ -103,9 +103,56 @@ fn normalize_dummy_name(name: &str) -> String {
     s
 }
 
+/// 节点名过滤匹配（与前端 `src/utils/node.ts::matchNodeFilter` 逐条对齐）。
+///
+/// 语法规则（大小写不敏感）：
+/// - 空串 / 仅空白 / 孤立符号（`-`、`!`、`|`）：返回 `true`（避免输入未完成时列表闪烁清空）；
+/// - 空格分隔多子句（`AND` 关系）；
+/// - 子句内支持 `|` 或全角 `｜` 分隔多关键词（`OR` 关系，允许符号两侧带空格，如 `日本 | 新加坡`）；
+/// - 以 `-`、`!` 或 `！` 开头的子句表示排除（不含对应关键词才匹配，如 `-香港`、`日本|新加坡 -倍率`）。
+pub fn match_node_filter(name: &str, filter_text: &str) -> bool {
+    let trimmed = filter_text.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+
+    let name_lower = name.to_lowercase();
+    let filter_lower = trimmed.to_lowercase();
+    // 归一化管道符并消除管道符两侧空白，保证「日本 | 新加坡」与「日本|新加坡」语义一致
+    let collapsed = filter_lower
+        .replace('｜', "|")
+        .split('|')
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("|");
+
+    for token in collapsed.split_whitespace() {
+        if token.starts_with('-') || token.starts_with('!') || token.starts_with('！') {
+            for part in token.split('|') {
+                let term = part
+                    .strip_prefix('-')
+                    .or_else(|| part.strip_prefix('!'))
+                    .or_else(|| part.strip_prefix('！'))
+                    .unwrap_or(part)
+                    .trim();
+                if !term.is_empty() && name_lower.contains(term) {
+                    return false;
+                }
+            }
+        } else {
+            let branches: Vec<&str> = token.split('|').map(str::trim).filter(|b| !b.is_empty()).collect();
+            if !branches.is_empty() && !branches.iter().any(|b| name_lower.contains(b)) {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_dummy_node, is_valid_node_server};
+    use super::{is_dummy_node, is_valid_node_server, match_node_filter};
 
     #[test]
     fn test_valid_node_server() {
@@ -168,5 +215,52 @@ mod tests {
         assert!(is_dummy_node("节点：剩余流量"));
         // 多层包裹
         assert!(is_dummy_node("【(剩余流量)】"));
+    }
+
+    #[test]
+    fn test_match_node_filter() {
+        // 空值、纯空白及孤立符号全部放行（避免输入未完成时列表闪烁清空）
+        for empty in ["", "   ", "-", "!", "！", "|", "｜", "  -  "] {
+            assert!(match_node_filter("香港1 (005024)", empty), "empty-like '{empty}'");
+        }
+        assert!(match_node_filter("日本 01 [IPLC]", "日本 -"));
+
+        // 单关键词大小写不敏感匹配
+        assert!(match_node_filter("HK-BGP-01", "hk"));
+        assert!(match_node_filter("日本 01 [IPLC]", "日本"));
+        assert!(!match_node_filter("新加坡 01", "日本"));
+
+        // 多关键词 OR 匹配（半角 | / 全角 ｜ / 两侧空格 / 尾部悬空 |）
+        let or_queries = ["日本|新加坡|台湾", "日本 | 新加坡 ｜ 台湾", "日本|"];
+        for q in or_queries {
+            assert!(match_node_filter("日本 01", q), "query '{q}'");
+            if !q.ends_with('|') {
+                assert!(match_node_filter("新加坡-专线", q), "query '{q}'");
+                assert!(match_node_filter("台湾-原生", q), "query '{q}'");
+            }
+            assert!(!match_node_filter("香港1 (005024)", q), "query '{q}'");
+        }
+
+        // 纯排除语法（- / ! / ！）与多排除
+        assert!(!match_node_filter("香港1 (005024)", "-香港"));
+        assert!(match_node_filter("日本 01", "-香港"));
+        assert!(!match_node_filter("HK-01", "!hk"));
+        assert!(!match_node_filter("高倍率 3x", "！倍率"));
+        assert!(!match_node_filter("香港-专线", "-香港 -英国"));
+        assert!(!match_node_filter("英国-01", "-香港|-英国"));
+        assert!(match_node_filter("新加坡-01", "-香港|-英国"));
+
+        // 组合语法：OR + AND + 排除
+        assert!(match_node_filter("日本 专线 01", "日本 | 新加坡 -倍率 -香港"));
+        assert!(match_node_filter("新加坡 BGP 02", "日本 | 新加坡 -倍率 -香港"));
+        assert!(!match_node_filter("日本 2x高倍率", "日本 | 新加坡 -倍率 -香港"));
+        assert!(!match_node_filter("香港-日本中转", "日本 | 新加坡 -倍率 -香港"));
+
+        assert!(match_node_filter("HK BGP IPLC-01", "hk bgp -倍率"));
+        assert!(!match_node_filter("HK BGP 3倍率", "hk bgp -倍率"));
+
+        // 含内部连字符与空格的真实节点名
+        assert!(match_node_filter("英国-3倍率", "英国-3倍率"));
+        assert!(match_node_filter("香港1 (005024)", "香港1 (005024)"));
     }
 }

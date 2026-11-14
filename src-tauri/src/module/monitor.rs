@@ -80,9 +80,31 @@ const DEAD_CONFIRM_MIN_INTERVAL_SECS: u64 = 10;
 const SWITCH_GRACE_PERIOD_SECS: u64 = 20;
 
 /// 子集测速复用测量组数据的最大年龄（秒）。
-/// 前端发起子集测速时，若所求节点的 history 均在此时间内（刚被测量组拨测过），
+/// 前端发起子集测速时，若所求节点的测量数据均在此时间内（刚被测量组拨测过），
 /// 直接复用缓存构建结果，跳过全组拨测。
 const METRICS_REUSE_MAX_AGE_SECS: u64 = 30;
+
+/// 并发拨测合并窗口（毫秒）：等待 `METRICS_PROBE_LOCK` 期间若前序全组拨测刚刚完成，
+/// 直接复用其结果，抑制并发调用触发的背靠背全组握手风暴。
+const PROBE_COALESCE_WINDOW_MS: u64 = 1500;
+
+/// 自愈复用测量组实时快照的最大年龄（秒）：
+/// 避免 `evaluate_failover` 刚完成二次确认全组拨测，数毫秒后 `self_heal_with_accounting`
+/// 又重打一轮全组拨测。
+const SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS: u64 = 10;
+
+/// 全局测量组拨测互斥锁：串行化 `PROXY__METRICS` 全组拨测，消除多调用方并发风暴。
+static METRICS_PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+#[derive(Debug, Clone)]
+struct MetricsProbeSnapshot {
+    completed_at: Instant,
+    delays: HashMap<String, u32>,
+    reported_live_to_ui: bool,
+}
+
+/// 最近一次成功执行的 `probe_metrics_group` 全量实时延迟快照。
+static LAST_METRICS_PROBE: parking_lot::Mutex<Option<MetricsProbeSnapshot>> = parking_lot::Mutex::new(None);
 
 /// 「失败服务器」冷却时长（秒）。
 ///
@@ -180,20 +202,97 @@ async fn load_node_server_map() -> HashMap<String, String> {
     }
 }
 
-/// 带「测速失真复核」的整组拨测。
+/// 复用最近一次完整 `probe_metrics_group` 的全量实时延迟快照。
+///
+/// 按完整拨测快照复用可避开 Mihomo 对死节点「只写 alive=false、不追加 history」导致的陈旧伪判定。
+/// - 显式单点测速（`is_frontend_subset && subset_len <= 1`）严禁复用（§5.2 契约 4）；
+/// - 故障自愈在 `< SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS` 内可复用刚刚完成的确认拨测结果，
+///   并在尚未上屏时保留 `LiveProbe` 语义；
+/// - 前端批量子集测速（`subset_len > 1`）在 `< METRICS_REUSE_MAX_AGE_SECS` 内复用，标记 `FreshMetricsCache`。
+fn try_reuse_probe_snapshot(
+    snapshot: &mut Option<MetricsProbeSnapshot>,
+    now: Instant,
+    is_frontend_subset: bool,
+    subset_len: usize,
+    allow_self_heal_reuse: bool,
+) -> Option<(HashMap<String, u32>, DelayResultSource)> {
+    if is_frontend_subset && subset_len <= 1 {
+        return None;
+    }
+    let snap = snapshot.as_mut()?;
+    if snap.delays.is_empty() {
+        return None;
+    }
+    let age = now.saturating_duration_since(snap.completed_at);
+    if allow_self_heal_reuse && age < Duration::from_secs(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS) {
+        let source = if !snap.reported_live_to_ui {
+            snap.reported_live_to_ui = true;
+            DelayResultSource::LiveProbe
+        } else {
+            DelayResultSource::FreshMetricsCache
+        };
+        return Some((snap.delays.clone(), source));
+    }
+    if is_frontend_subset && subset_len > 1 && age < Duration::from_secs(METRICS_REUSE_MAX_AGE_SECS) {
+        return Some((snap.delays.clone(), DelayResultSource::FreshMetricsCache));
+    }
+    None
+}
+
+/// 带「测速失真复核」的整组拨测（含全局互斥与短窗口并发合并）。
 ///
 /// 先用主测速 URL 拨测；若整体失败（mihomo 返回 all proxies timeout 等），
 /// 再用 `FALLBACK_TEST_URL` 复核一次。两次都失败才认定「测速不可用」。
 ///
 /// 返回 `Some(map)` = 测速链路可用（map 内为本次测得的节点延迟，可能为空但链路正常）；
 /// `None` = 主/备地址都整体失败，属测速链路问题，**不可据此判定节点已死**。
-async fn probe_metrics_group(mihomo: &tauri_plugin_mihomo::Mihomo, label: &str) -> Option<HashMap<String, u32>> {
+async fn probe_metrics_group(
+    mihomo: &tauri_plugin_mihomo::Mihomo,
+    label: &str,
+    allow_coalesce: bool,
+) -> Option<HashMap<String, u32>> {
+    let _probe_guard = METRICS_PROBE_LOCK.lock().await;
+    if allow_coalesce {
+        let cached = {
+            let guard = LAST_METRICS_PROBE.lock();
+            guard.as_ref().and_then(|snap| {
+                if !snap.delays.is_empty()
+                    && snap.completed_at.elapsed() < Duration::from_millis(PROBE_COALESCE_WINDOW_MS)
+                {
+                    Some(snap.delays.clone())
+                } else {
+                    None
+                }
+            })
+        };
+        if let Some(delays) = cached {
+            logging!(
+                info,
+                Type::Lightweight,
+                "[后台监测] [{label}] 复用刚结束的并发测量组实时拨测结果（{} 个存活节点），抑制重叠拨测风暴",
+                delays.len()
+            );
+            return Some(delays);
+        }
+    }
+
+    let record_snapshot = |delays: HashMap<String, u32>| -> HashMap<String, u32> {
+        if !delays.is_empty() {
+            *LAST_METRICS_PROBE.lock() = Some(MetricsProbeSnapshot {
+                completed_at: Instant::now(),
+                delays: delays.clone(),
+                reported_live_to_ui: false,
+            });
+        }
+        delays
+    };
+
     let test_url = get_test_url().await;
     match mihomo
         .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
         .await
     {
-        Ok(d) => return Some(d),
+        Ok(d) => return Some(record_snapshot(d)),
         Err(e) => {
             logging!(
                 warn,
@@ -214,7 +313,7 @@ async fn probe_metrics_group(mihomo: &tauri_plugin_mihomo::Mihomo, label: &str) 
                 Type::Lightweight,
                 "[后台监测] [{label}] 备用测速地址可用 → 判定为主测速地址失真，节点侧正常"
             );
-            Some(d)
+            Some(record_snapshot(d))
         }
         Err(e) => {
             logging!(
@@ -222,6 +321,7 @@ async fn probe_metrics_group(mihomo: &tauri_plugin_mihomo::Mihomo, label: &str) 
                 Type::Lightweight,
                 "[后台监测] [{label}] 主/备测速地址均整体失败（{e}）→ 判定为测速链路不可用（不视为节点已死）"
             );
+            *LAST_METRICS_PROBE.lock() = None;
             None
         }
     }
@@ -244,6 +344,8 @@ pub struct AutoSelectOutcome {
     pub display: Vec<(String, u32)>,
     /// 是否存在可用（有效）节点并完成切换
     pub selected: bool,
+    /// 本次实际切换后的 PROXY 新出口节点名（仅 `selected == true` 时为 `Some`）
+    pub selected_node: Option<String>,
     /// 本次延迟结果的数据来源语义标记
     pub source: DelayResultSource,
 }
@@ -347,6 +449,7 @@ pub struct FilterConfig {
 // 识别广告/假节点的实现已迁移到 crate::utils::node::is_dummy_node
 // 以便 enhance/mod.rs 和 lifecycle.rs 共享同一份判定逻辑，避免遗漏
 pub use crate::utils::node::is_dummy_node;
+use crate::utils::node::match_node_filter;
 
 /// 从 `proxy_head_state.json` 一次性读取并解析 FilterConfig 和 sort_type
 /// 【性能优化】：将原来两次独立的磁盘读取和 JSON 解析合并为一次
@@ -381,15 +484,6 @@ async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<
     };
     let sort_type = group_state["sortType"].as_i64().map(|v| v as i32);
     (filter_config, sort_type)
-}
-
-/// 过滤匹配算法：支持首尾去空、大小写不敏感的普通子串模糊匹配
-/// `filter_lower` 应由调用方预先执行 trim + to_lowercase，避免在 filter 闭包中重复计算
-fn match_filter(name: &str, filter_lower: &str) -> bool {
-    if filter_lower.is_empty() {
-        return true;
-    }
-    name.to_lowercase().contains(filter_lower)
 }
 
 /// 获取当前活动 Profile 的 UID
@@ -583,21 +677,21 @@ pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow:
             if let (Some(_group), Some(node)) = (&entry.name, &entry.now) {
                 if !node.is_empty() {
                     // 【治本修复②】恢复前校验节点是否在当前 filterText 子集内，
-                    // 越界（被污染的持久选择）或伪节点不还原，交给定语 auto-select 在子集内重选，
+                    // 越界（被污染的持久选择）或伪节点不还原，交由后续 auto-select 在子集内重选，
                     // 避免"轻量唤醒后前端显示节点 ≠ 内核实际选路"的污染复现。
-                    let filter_lower = get_filter_and_sort_config(profile_uid)
+                    let filter_text = get_filter_and_sort_config(profile_uid)
                         .await
                         .0
                         .filter_text
                         .trim()
-                        .to_lowercase();
-                    if is_dummy_node(node) || (!filter_lower.is_empty() && !match_filter(node, &filter_lower)) {
+                        .to_string();
+                    if is_dummy_node(node) || !match_node_filter(node, &filter_text) {
                         logging!(
                             warn,
                             Type::Lightweight,
                             "[后台监测] 跳过恢复越界/伪节点 {}（不在过滤范围「{}」内，疑似被污染的持久选择），交由自动选点重选",
                             node,
-                            filter_lower
+                            filter_text
                         );
                         return Ok(());
                     }
@@ -665,18 +759,34 @@ fn history_age(proxy: &tauri_plugin_mihomo::models::Proxy) -> Option<Duration> {
     Some(Duration::from_secs(age_secs.max(0) as u64))
 }
 
+/// 判定本次体检是否需要发起真实全组拨测。
+///
+/// - 当 `force_confirm_probe == true`（处于连续失败复核阶段，`consecutive_fails > 0`）时，
+///   无条件返回 `true` 强制执行第二次独立拨测（消除 `RETRY_CHECK_INTERVAL_SECS (3s) < DEAD_CONFIRM_MIN_INTERVAL_SECS (10s)`
+///   导致复核回合误读首次失败缓存、实质退化为单次判死的隐患）；
+/// - 正常阶段按活跃节点缓存新鲜度按需拨测，避免稳态拨测风暴。
+fn should_probe_active_node(status: NodeStatus, age: Option<Duration>, force_confirm_probe: bool) -> bool {
+    if force_confirm_probe {
+        return true;
+    }
+    match (status, age) {
+        // 健康且数据新鲜 → 可信，不拨测
+        (NodeStatus::Alive(_), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS) => false,
+        // 常规模式下刚测死 → 10 秒内不重复拨测
+        (NodeStatus::Dead, Some(age)) if age < Duration::from_secs(DEAD_CONFIRM_MIN_INTERVAL_SECS) => false,
+        // 其余：健康但陈旧 / 死判定陈旧 / 数据缺失 / 时间戳不可解析 → 拨测确认
+        _ => true,
+    }
+}
+
 /// 评估当前活跃节点是否需要故障转移。
 /// 返回 Err 表示 Mihomo API 不可达（交由调用方累计 api_error_count）。
 ///
-/// 【探测降频】按缓存新鲜度决定是否对测量组发起即时拨测，而非每个体检周期都拨测：
-/// - 活跃节点健康且数据新鲜（<HEALTH_DATA_FRESH_SECS）→ 直接信缓存，不拨测；
-/// - 健康但数据陈旧 / 数据缺失（Unknown）→ 拨测刷新后再判；
-/// - 已判死 → 仅当缓存超过 DEAD_CONFIRM_MIN_INTERVAL_SECS 才拨测复核，
-///   10 秒内刚测过的死判定直接可信（重试 3s 周期下避免对同一死节点密集拨测）。
-///
-/// 此前每个体检周期（正常 15s/重试 3s）都全组拨测 70+ 节点，稳态约 280 次/分钟探测，
-/// 会自激误报（实测 81ms 的节点 17 秒后被误判死），故改为按需拨测。
-async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
+/// 【探测降频 + 二次真实复核】：
+/// - 正常监测（`force_confirm_probe=false`）按缓存新鲜度按需拨测；
+/// - 连续失败复核轮（`force_confirm_probe=true`）强制执行一次独立全组实时拨测，
+///   确保 2 次失败判定源自两次独立探活而非同一份缓存。
+async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
     let group_info = mihomo
@@ -701,21 +811,16 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
 
     let need_probe = match proxies.proxies.get(&active_node) {
         None => false, // 活跃节点不在代理列表（异常），不动作
-        Some(p) => match (node_status(p), history_age(p)) {
-            // 健康且数据新鲜 → 可信，不拨测
-            (NodeStatus::Alive(_), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS) => false,
-            // 死判定且 10 秒内刚拨测过 → 可信，不重复拨测
-            (NodeStatus::Dead, Some(age)) if age < Duration::from_secs(DEAD_CONFIRM_MIN_INTERVAL_SECS) => false,
-            // 其余：健康但陈旧 / 死判定陈旧 / 数据缺失 / 时间戳不可解析 → 拨测确认
-            _ => true,
-        },
+        Some(p) => should_probe_active_node(node_status(p), history_age(p), force_confirm_probe),
     };
 
     if need_probe {
         // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
-        // 带「测速失真复核」：主 URL 整体失败时用备用 HTTPS URL 复核一次
-        let measured = probe_metrics_group(&mihomo, "体检").await.is_some();
+        // 二次复核（force_confirm_probe=true）禁用短窗口合并，保证物理层面独立复核。
+        let measured = probe_metrics_group(&mihomo, "体检", !force_confirm_probe)
+            .await
+            .is_some();
 
         // 【测速失真防护】主/备测速地址都整体失败 = 测速链路不可用，**不是**「节点已死」。
         // 此时 mihomo 已把全组成员标记为 not-alive，若据此判死会触发无意义的切节点抖动。
@@ -749,7 +854,7 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
 
     // 活跃节点已死：在子集（filterText）内寻找健康候选
     let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
-    let filter_lower = filter_config.filter_text.trim().to_lowercase();
+    let filter_text = filter_config.filter_text.trim();
     let members = group_info.all.clone().unwrap_or_default();
 
     let mut found_healthy = false;
@@ -757,7 +862,7 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         if name == &active_node || is_dummy_node(name) {
             continue;
         }
-        if !filter_lower.is_empty() && !match_filter(name, &filter_lower) {
+        if !match_node_filter(name, filter_text) {
             continue;
         }
         if let Some(NodeStatus::Alive(_)) = proxies.proxies.get(name).map(node_status) {
@@ -785,6 +890,17 @@ pub async fn trigger_backend_auto_select(
     select: bool,
     skip_wait_ready: bool,
 ) -> anyhow::Result<AutoSelectOutcome> {
+    trigger_backend_auto_select_with_options(profile_uid, node_names, sort_type, select, skip_wait_ready, false).await
+}
+
+async fn trigger_backend_auto_select_with_options(
+    profile_uid: &str,
+    node_names: Option<Vec<String>>,
+    sort_type: i32,
+    select: bool,
+    skip_wait_ready: bool,
+    allow_self_heal_reuse: bool,
+) -> anyhow::Result<AutoSelectOutcome> {
     // 互斥锁防止并发调用
     if AUTO_SELECT_RUNNING
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -810,13 +926,15 @@ pub async fn trigger_backend_auto_select(
         return Ok(AutoSelectOutcome {
             display: vec![],
             selected: false,
+            selected_node: None,
             source: DelayResultSource::NotExecuted,
         });
     }
 
     // 直接调用内部函数
     // 如果发生 panic，_guard 会在栈展开时自动释放锁
-    let result = trigger_backend_auto_select_inner(profile_uid, node_names, sort_type, select).await;
+    let result =
+        trigger_backend_auto_select_inner(profile_uid, node_names, sort_type, select, allow_self_heal_reuse).await;
 
     // 锁已通过 Drop Guard 释放，在此之后执行副作用操作
     // （refresh_clash 和 notify_delay_results 不影响选点逻辑，放在锁外可减少锁持有时间）
@@ -839,6 +957,9 @@ pub async fn trigger_backend_auto_select(
         );
         let t0 = std::time::Instant::now();
         crate::core::handle::Handle::notify_delay_results("PROXY".into(), outcome.display.clone(), from_probe);
+        if from_probe && let Some(snap) = LAST_METRICS_PROBE.lock().as_mut() {
+            snap.reported_live_to_ui = true;
+        }
         logging!(
             info,
             Type::Lightweight,
@@ -855,6 +976,7 @@ async fn trigger_backend_auto_select_inner(
     node_names: Option<Vec<String>>,
     sort_type: i32,
     select: bool,
+    allow_self_heal_reuse: bool,
 ) -> anyhow::Result<AutoSelectOutcome> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
@@ -886,14 +1008,15 @@ async fn trigger_backend_auto_select_inner(
                     return Ok(AutoSelectOutcome {
                         display: vec![],
                         selected: false,
+                        selected_node: None,
                         source: DelayResultSource::NotExecuted,
                     });
                 }
             };
-            let filter_lower = filter_config.filter_text.trim().to_lowercase();
+            let filter_text = filter_config.filter_text.trim();
             nodes
                 .into_iter()
-                .filter(|n| !is_dummy_node(n) && match_filter(n, &filter_lower))
+                .filter(|n| !is_dummy_node(n) && match_node_filter(n, filter_text))
                 .collect()
         }
     };
@@ -907,6 +1030,7 @@ async fn trigger_backend_auto_select_inner(
         return Ok(AutoSelectOutcome {
             display: vec![],
             selected: false,
+            selected_node: None,
             source: DelayResultSource::NotExecuted,
         });
     }
@@ -919,89 +1043,95 @@ async fn trigger_backend_auto_select_inner(
         valid_nodes.len()
     );
 
-    // 【子集测速降频】前端发起的批量子集测速（如可见列表测速）：
-    // 若所求节点的测量组 history 均新鲜（<METRICS_REUSE_MAX_AGE_SECS，即刚被拨测过），
-    // 直接复用缓存构建结果，跳过全组拨测——避免界面批量渲染频繁触发全组拨测。
-    // 注意：当 valid_nodes.len() == 1 时为用户显式单点测速，带有极强的即时探活意图，
-    // 不应复用旧缓存（防止刚恢复的节点在 30 秒内持续返回旧的死状态），必须发起实时探测。
-    // 存活节点复用真实延迟；死节点复用死状态（不写入 delays，下游 display 记 0 即 Timeout）。
+    // 【拨测复用与并发风暴抑制】：
+    // 1. 优先查近期完整 `probe_metrics_group` 快照（支持自愈复用 <10s 二次确认结果、
+    //    以及前端批量子集复用 <30s 结果，避开 Mihomo 死节点不更新 history 的退化）；
+    // 2. 若无进程内近期快照且属于前端批量子集（len > 1），再查 Mihomo 测量组自然周期 history；
+    // 3. 显式单点测速（valid_nodes.len() == 1）绝不复用任何缓存，必须发起实时探测。
     let delays: std::collections::HashMap<String, u32>;
     let source: DelayResultSource;
-    let mut reused_cache = false;
-    let mut cached_delays: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-    if is_frontend_subset && valid_nodes.len() > 1 {
-        if let Ok(proxies) = mihomo.get_proxies().await {
-            let threshold = Duration::from_secs(METRICS_REUSE_MAX_AGE_SECS);
-            let mut cached: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-            let mut all_fresh = true;
-            for name in &valid_nodes {
-                match proxies.proxies.get(name) {
-                    Some(p) if history_age(p).is_some_and(|age| age < threshold) => {
-                        if p.alive {
-                            if let Some(h) = p.history.last() {
-                                cached.insert(name.clone(), h.delay as u32);
+    let reused_snapshot = try_reuse_probe_snapshot(
+        &mut LAST_METRICS_PROBE.lock(),
+        Instant::now(),
+        is_frontend_subset,
+        valid_nodes.len(),
+        allow_self_heal_reuse,
+    );
+    if let Some((snap_delays, snap_source)) = reused_snapshot {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 复用近期测量组实时拨测快照（待测 {} 个节点，source={:?}），跳过重复全组拨测",
+            valid_nodes.len(),
+            snap_source
+        );
+        delays = snap_delays;
+        source = snap_source;
+    } else {
+        let mut reused_cache = false;
+        let mut cached_delays: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        if is_frontend_subset && valid_nodes.len() > 1 {
+            if let Ok(proxies) = mihomo.get_proxies().await {
+                let threshold = Duration::from_secs(METRICS_REUSE_MAX_AGE_SECS);
+                let mut cached: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+                let mut all_fresh = true;
+                for name in &valid_nodes {
+                    match proxies.proxies.get(name) {
+                        Some(p) if history_age(p).is_some_and(|age| age < threshold) => {
+                            if p.alive {
+                                if let Some(h) = p.history.last() {
+                                    cached.insert(name.clone(), h.delay as u32);
+                                }
                             }
                         }
-                    }
-                    // 存在无数据/数据陈旧的节点 → 需全组拨测刷新
-                    _ => {
-                        all_fresh = false;
-                        break;
+                        // 存在无数据/数据陈旧的节点 → 需全组拨测刷新
+                        _ => {
+                            all_fresh = false;
+                            break;
+                        }
                     }
                 }
-            }
-            if all_fresh {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 子集测速复用测量组新鲜缓存（{} 个节点，{} 个存活），跳过全组拨测",
-                    valid_nodes.len(),
-                    cached.len()
-                );
-                cached_delays = cached;
-                reused_cache = true;
+                if all_fresh {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 子集测速复用测量组新鲜缓存（{} 个节点，{} 个存活），跳过全组拨测",
+                        valid_nodes.len(),
+                        cached.len()
+                    );
+                    cached_delays = cached;
+                    reused_cache = true;
+                }
             }
         }
-    }
 
-    if reused_cache {
-        delays = cached_delays;
-        source = DelayResultSource::FreshMetricsCache;
-    } else {
-        // 测量层根因修复：不再用 delay_proxy_by_name 对节点逐个自测
-        // （TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
-        // 改为对「测量组 PROXY__METRICS」发起 group delay：Mihomo 内核直接拨测每个成员，
-        // 单调用、无回环，拿到全量子集的新鲜延迟后挑最快。测量组由 enhance 模块随 PROXY 组一同注入。
-        //
-        // 带「测速失真复核」：主测速地址整体失败时改用备用 HTTPS 地址复核一次，
-        // 避免主地址被机场劫持/不兼容时误判「所有测速节点均不可达」。
-        //
-        // 【防线收口 BUG-344 / §5.2】：
-        // 无论单点测速、批量子集测速还是全量/后台自愈选点，只要 `probe_metrics_group` 返回 `None`
-        //（主/备测速地址均整体失败，属测速链路不可用或全部节点无响应）或返回空映射（测量组尚未产生任何结果），
-        // 统一判定为 `DelayResultSource::NotExecuted`：
-        // 1. 严禁退化读取最多 120s 前的节点 `history` 旧值冒充本次结果或混入 `candidates` 切换出口；
-        // 2. 严禁将未执行的测速伪造为满屏 `0ms` Timeout 推送前端；直接返回空结果交由调用方恢复快照或计入自愈失败。
-        match probe_metrics_group(&mihomo, "选点").await {
-            Some(probed) if !probed.is_empty() => {
-                delays = probed;
-                source = DelayResultSource::LiveProbe;
-            }
-            Some(_) | None => {
-                logging!(
-                    warn,
-                    Type::Lightweight,
-                    "[后台监测] 测量组拨测未取得有效实时数据（待测节点数={}），判定为「未执行」，不回退陈旧 history，返回空结果",
-                    valid_nodes.len()
-                );
-                if select && !crate::module::lightweight::is_in_lightweight_mode() {
-                    crate::core::handle::Handle::refresh_proxies();
+        if reused_cache {
+            delays = cached_delays;
+            source = DelayResultSource::FreshMetricsCache;
+        } else {
+            let allow_coalesce = !(is_frontend_subset && valid_nodes.len() == 1);
+            match probe_metrics_group(&mihomo, "选点", allow_coalesce).await {
+                Some(probed) if !probed.is_empty() => {
+                    delays = probed;
+                    source = DelayResultSource::LiveProbe;
                 }
-                return Ok(AutoSelectOutcome {
-                    display: vec![],
-                    selected: false,
-                    source: DelayResultSource::NotExecuted,
-                });
+                Some(_) | None => {
+                    logging!(
+                        warn,
+                        Type::Lightweight,
+                        "[后台监测] 测量组拨测未取得有效实时数据（待测节点数={}），判定为「未执行」，不回退陈旧 history，返回空结果",
+                        valid_nodes.len()
+                    );
+                    if select && !crate::module::lightweight::is_in_lightweight_mode() {
+                        crate::core::handle::Handle::refresh_proxies();
+                    }
+                    return Ok(AutoSelectOutcome {
+                        display: vec![],
+                        selected: false,
+                        selected_node: None,
+                        source: DelayResultSource::NotExecuted,
+                    });
+                }
             }
         }
     }
@@ -1065,6 +1195,7 @@ async fn trigger_backend_auto_select_inner(
     sort_display_delays(&mut display, sort_type);
 
     let mut selected = false;
+    let mut selected_node: Option<String> = None;
 
     if select {
         // 选点固定按延迟升序取全局最快节点，不受 sort_type 影响
@@ -1089,6 +1220,7 @@ async fn trigger_backend_auto_select_inner(
                 return Ok(AutoSelectOutcome {
                     display,
                     selected: false,
+                    selected_node: None,
                     source,
                 });
             }
@@ -1102,6 +1234,7 @@ async fn trigger_backend_auto_select_inner(
                         fastest_node
                     );
                     selected = true;
+                    selected_node = Some(fastest_node.clone());
                     emit_network_health_notice("network_health::ok");
                     // 【关键修复】选点成功后同步回写 profile.selected，
                     // 否则唤醒/进入轻量模式时 restore_profile_selected_nodes
@@ -1109,13 +1242,13 @@ async fn trigger_backend_auto_select_inner(
                     // 单组架构下 selected 数组只含 PROXY 一项。
                     // 【治本修复①】写回前校验节点是否在当前 filterText 子集内；
                     // 越界（被污染的持久选择）不写回，避免污染 selected 后再次复现前后端不一致。
-                    let filter_lower = get_filter_and_sort_config(profile_uid)
+                    let filter_text = get_filter_and_sort_config(profile_uid)
                         .await
                         .0
                         .filter_text
                         .trim()
-                        .to_lowercase();
-                    if filter_lower.is_empty() || match_filter(fastest_node, &filter_lower) {
+                        .to_string();
+                    if match_node_filter(fastest_node, &filter_text) {
                         let new_selected = vec![PrfSelected {
                             name: Some("PROXY".into()),
                             now: Some(fastest_node.clone().into()),
@@ -1134,7 +1267,7 @@ async fn trigger_backend_auto_select_inner(
                             Type::Lightweight,
                             "[后台监测] 最优节点 {} 不在当前过滤范围「{}」内，跳过回写 profile.selected 以免污染",
                             fastest_node,
-                            filter_lower
+                            filter_text
                         );
                     }
                     // 【二次bug修复】通知前端刷新代理缓存。
@@ -1167,8 +1300,67 @@ async fn trigger_backend_auto_select_inner(
     Ok(AutoSelectOutcome {
         display,
         selected,
+        selected_node,
         source,
     })
+}
+
+/// 筛选仅经过已确认故障节点 `dead_node` 的存量连接 ID（不触碰 DIRECT 及其他健康节点连接）。
+fn collect_dead_node_connection_ids(
+    connections: &[tauri_plugin_mihomo::models::Connection],
+    dead_node: &str,
+    new_node: Option<&str>,
+) -> Vec<String> {
+    if dead_node.is_empty()
+        || matches!(dead_node, "DIRECT" | "REJECT" | "PROXY" | "PROXY__METRICS")
+        || new_node == Some(dead_node)
+    {
+        return Vec::new();
+    }
+    connections
+        .iter()
+        .filter(|conn| conn.chains.iter().any(|chain| chain == dead_node))
+        .map(|conn| conn.id.clone())
+        .collect()
+}
+
+/// 故障转移切换至 `new_node` 后，精确关闭仍挂死在原故障节点 `dead_node` 上的存量活跃连接。
+///
+/// 正常切节点或轻量模式唤醒严禁全量断流（§4.2）；仅当后台监测确认 `dead_node` 已失效并转移至
+/// 其他节点时，清理 pinned 在死节点上的 HTTP/2 / gRPC 长连接，使上层应用立即在新节点上重连恢复。
+async fn close_connections_on_dead_node(dead_node: &str, new_node: &str) {
+    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+    let _ = tokio::time::timeout(Duration::from_secs(3), async {
+        let conns = match mihomo.get_connections().await {
+            Ok(c) => c,
+            Err(e) => {
+                logging!(
+                    debug,
+                    Type::Lightweight,
+                    "[后台监测] 故障转移清理原节点连接时获取连接列表失败: {e}"
+                );
+                return;
+            }
+        };
+        let list = conns.connections.as_deref().unwrap_or_default();
+        let ids = collect_dead_node_connection_ids(list, dead_node, Some(new_node));
+        if ids.is_empty() {
+            return;
+        }
+        let total = ids.len();
+        let results = futures::future::join_all(ids.iter().map(|id| mihomo.close_connection(id))).await;
+        let closed_count = results.into_iter().filter(Result::is_ok).count();
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 故障转移已切换至 {}，精确清理原故障节点 {} 上的 {}/{} 条残留连接",
+            new_node,
+            dead_node,
+            closed_count,
+            total
+        );
+    })
+    .await;
 }
 
 async fn get_active_node_name() -> Option<String> {
@@ -1208,6 +1400,7 @@ pub fn notify_manual_node_switched() {
 fn reset_monitor_static_state() {
     *LAST_NOTIFIED_HEALTH.lock() = "network_health::ok";
     *LAST_MANUAL_NODE_SWITCH.lock() = None;
+    *LAST_METRICS_PROBE.lock() = None;
 }
 
 fn emit_network_health_notice(next_status: &'static str) {
@@ -1380,11 +1573,12 @@ pub fn start_background_monitor() {
                 is_retry_mode = false;
 
                 // 如果当前活跃节点已死（测量组判定），立刻触发一次自愈选点
-                if evaluate_failover(&current_profile)
+                if evaluate_failover(&current_profile, false)
                     .await
                     .map(|v| v != FailoverVerdict::NoAction)
                     .unwrap_or(false)
                 {
+                    let dead_node = get_active_node_name().await;
                     logging!(
                         info,
                         Type::Lightweight,
@@ -1393,6 +1587,7 @@ pub fn start_background_monitor() {
                     // 委托后端执行网络恢复自愈选点（统一走冷却/计数/警报记账，🟡6）
                     self_heal_with_accounting(
                         &current_profile,
+                        dead_node.as_deref(),
                         &mut auto_select_fail_count,
                         &mut api_dead_heal_fail_count,
                         &mut last_auto_select_time,
@@ -1443,6 +1638,7 @@ pub fn start_background_monitor() {
                             // 统一走冷却/计数/警报记账（与主路径、网络恢复、evaluate_failover Err 一致）
                             self_heal_with_accounting(
                                 &current_profile,
+                                None,
                                 &mut auto_select_fail_count,
                                 &mut api_dead_heal_fail_count,
                                 &mut last_auto_select_time,
@@ -1479,7 +1675,7 @@ pub fn start_background_monitor() {
                     is_retry_mode = false;
                 }
 
-                match evaluate_failover(&current_profile).await {
+                match evaluate_failover(&current_profile, consecutive_fails > 0).await {
                     Ok(verdict) => {
                         // API 调用成功，重置 API 异常计数
                         api_error_count = 0;
@@ -1551,6 +1747,7 @@ pub fn start_background_monitor() {
                                         // 统一走冷却/计数/警报记账（与网络恢复、API 异常路径一致，🟡6）
                                         self_heal_with_accounting(
                                             &current_profile,
+                                            Some(&active_node_name),
                                             &mut auto_select_fail_count,
                                             &mut api_dead_heal_fail_count,
                                             &mut last_auto_select_time,
@@ -1575,6 +1772,7 @@ pub fn start_background_monitor() {
                             logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
                             self_heal_with_accounting(
                                 &current_profile,
+                                None,
                                 &mut auto_select_fail_count,
                                 &mut api_dead_heal_fail_count,
                                 &mut last_auto_select_time,
@@ -1704,6 +1902,7 @@ const fn complete_restart_core_attempt(
 
 async fn self_heal_with_accounting(
     profile_uid: &str,
+    dead_node: Option<&str>,
     auto_select_fail_count: &mut u32,
     api_dead_heal_fail_count: &mut u32,
     last_auto_select_time: &mut Option<Instant>,
@@ -1727,12 +1926,18 @@ async fn self_heal_with_accounting(
     *last_auto_select_time = Some(now);
 
     let mut failed_this_round = false;
-    match trigger_backend_auto_select(profile_uid, None, 0, true, false).await {
+    match trigger_backend_auto_select_with_options(profile_uid, None, 0, true, false, true).await {
         Ok(outcome) => {
             if outcome.selected {
                 *auto_select_fail_count = 0;
                 *api_dead_heal_fail_count = 0;
                 emit_network_health_notice("network_health::ok");
+                if let (Some(dead), Some(new_node)) = (dead_node, outcome.selected_node.as_deref())
+                    && !dead.is_empty()
+                    && dead != new_node
+                {
+                    close_connections_on_dead_node(dead, new_node).await;
+                }
             } else {
                 *auto_select_fail_count += 1;
                 *api_dead_heal_fail_count += 1;
@@ -1832,9 +2037,12 @@ async fn self_heal_with_accounting(
 #[cfg(test)]
 mod tests {
     use super::{
-        LAST_MANUAL_NODE_SWITCH, LAST_NOTIFIED_HEALTH, SelfHealAction, complete_restart_core_attempt,
-        evaluate_self_heal_counters, notify_manual_node_switched, reset_monitor_static_state, resolve_probe_target,
-        sort_display_delays,
+        DelayResultSource, Duration, HashMap, Instant, LAST_MANUAL_NODE_SWITCH, LAST_METRICS_PROBE,
+        LAST_NOTIFIED_HEALTH, METRICS_REUSE_MAX_AGE_SECS, MetricsProbeSnapshot, NodeStatus,
+        SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SelfHealAction, collect_dead_node_connection_ids,
+        complete_restart_core_attempt, evaluate_self_heal_counters, notify_manual_node_switched,
+        reset_monitor_static_state, resolve_probe_target, should_probe_active_node, sort_display_delays,
+        try_reuse_probe_snapshot,
     };
 
     #[test]
@@ -1999,5 +2207,139 @@ mod tests {
         reset_monitor_static_state();
         assert_eq!(*LAST_NOTIFIED_HEALTH.lock(), "network_health::ok");
         assert!(LAST_MANUAL_NODE_SWITCH.lock().is_none());
+        assert!(LAST_METRICS_PROBE.lock().is_none());
+    }
+
+    #[test]
+    fn test_should_probe_active_node_forces_second_confirmation() {
+        // 正常监测模式下：3 秒前刚测死的节点会命中 10s 去抖缓存（不拨测）
+        assert!(!should_probe_active_node(
+            NodeStatus::Dead,
+            Some(Duration::from_secs(3)),
+            false
+        ));
+        // 重试复核模式下（consecutive_fails > 0）：即使仅过去 3 秒，也必须强制发起第二次真实独立拨测
+        assert!(should_probe_active_node(
+            NodeStatus::Dead,
+            Some(Duration::from_secs(3)),
+            true
+        ));
+        // 健康节点 <60s 常规跳过；陈旧 >=60s 触发拨测
+        assert!(!should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(15)),
+            false
+        ));
+        assert!(should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(60)),
+            false
+        ));
+        assert!(should_probe_active_node(NodeStatus::Unknown, None, false));
+    }
+
+    #[test]
+    fn test_try_reuse_probe_snapshot_respects_single_node_self_heal_and_ttl() {
+        let base_now = Instant::now();
+        let mut delays = HashMap::new();
+        delays.insert("日本-01".to_string(), 75u32);
+
+        let make_snap = |age_secs: u64| {
+            Some(MetricsProbeSnapshot {
+                completed_at: base_now - Duration::from_secs(age_secs),
+                delays: delays.clone(),
+                reported_live_to_ui: false,
+            })
+        };
+
+        // 1. 显式单点测速（subset_len == 1）绝不复用快照，即使刚结束 1s（§5.2 契约 4）
+        let mut snap1 = make_snap(1);
+        assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, false).is_none());
+        assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, true).is_none());
+
+        // 2. 非自愈全量 F1（allow_self_heal_reuse=false, is_frontend_subset=false）不走缓存复用
+        let mut snap2 = make_snap(2);
+        assert!(try_reuse_probe_snapshot(&mut snap2, base_now, false, 10, false).is_none());
+
+        // 3. 自愈在 < SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS 内复用二次确认快照：
+        // 首次消费获得 LiveProbe 语义，随后再次复用降级为 FreshMetricsCache
+        let mut snap3 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS - 1);
+        let first = try_reuse_probe_snapshot(&mut snap3, base_now, false, 10, true);
+        assert_eq!(
+            first.map(|(m, s)| (m.get("日本-01").copied(), s)),
+            Some((Some(75), DelayResultSource::LiveProbe))
+        );
+        let second = try_reuse_probe_snapshot(&mut snap3, base_now, false, 10, true);
+        assert_eq!(second.map(|(_, s)| s), Some(DelayResultSource::FreshMetricsCache));
+
+        // 4. 超过自愈 TTL（>=10s）但未超子集 TTL（<30s）：自愈不复用，批量子集复用且标记 FreshMetricsCache
+        let mut snap4 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS);
+        assert!(try_reuse_probe_snapshot(&mut snap4, base_now, false, 10, true).is_none());
+        let subset_hit = try_reuse_probe_snapshot(&mut snap4, base_now, true, 5, false);
+        assert_eq!(subset_hit.map(|(_, s)| s), Some(DelayResultSource::FreshMetricsCache));
+
+        // 5. 超过子集 TTL（>=30s）不再复用
+        let mut snap5 = make_snap(METRICS_REUSE_MAX_AGE_SECS);
+        assert!(try_reuse_probe_snapshot(&mut snap5, base_now, true, 5, false).is_none());
+    }
+
+    #[test]
+    fn test_collect_dead_node_connection_ids_surgical_cleanup() {
+        use tauri_plugin_mihomo::models::{Connection, ConnectionMetaData, ConnectionType, DNSMode, Network};
+
+        let make_conn = |id: &str, chains: &[&str]| Connection {
+            id: id.to_string(),
+            metadata: ConnectionMetaData {
+                network: Network::TCP,
+                connection_type: ConnectionType::HTTP,
+                source_ip: "127.0.0.1".to_string(),
+                destination_ip: "1.1.1.1".to_string(),
+                source_geo_ip: None,
+                destination_geo_ip: None,
+                source_ip_asn: String::new(),
+                destination_ip_asn: String::new(),
+                source_port: "10000".to_string(),
+                destination_port: "443".to_string(),
+                inbound_ip: String::new(),
+                inbound_port: String::new(),
+                inbound_name: String::new(),
+                inbound_user: String::new(),
+                host: "example.com".to_string(),
+                dns_mode: DNSMode::Normal,
+                uid: 0,
+                process: "antigravity.exe".to_string(),
+                process_path: String::new(),
+                special_proxy: String::new(),
+                special_rules: String::new(),
+                remote_destination: String::new(),
+                dscp: 0,
+                sniff_host: String::new(),
+                extra: HashMap::new(),
+            },
+            upload: 0,
+            download: 0,
+            start: "2026-11-14T00:00:00Z".to_string(),
+            chains: chains.iter().map(|s| (*s).to_string()).collect(),
+            provider_chains: None,
+            rule: "MATCH".to_string(),
+            rule_payload: String::new(),
+            extra: HashMap::new(),
+        };
+
+        let conns = vec![
+            make_conn("dead-1", &["香港1 (005024)", "PROXY"]),
+            make_conn("direct-1", &["DIRECT"]),
+            make_conn("healthy-1", &["台湾1 (005024)", "PROXY"]),
+            make_conn("dead-2", &["香港1 (005024)"]),
+        ];
+
+        // 仅精确选中挂在原死节点上的两条连接，绝不触碰 DIRECT 与其他健康节点连接
+        let ids = collect_dead_node_connection_ids(&conns, "香港1 (005024)", Some("台湾1 (005024)"));
+        assert_eq!(ids, vec!["dead-1".to_string(), "dead-2".to_string()]);
+
+        // 新旧节点相同或内置策略出站时禁止误删连接
+        assert!(collect_dead_node_connection_ids(&conns, "香港1 (005024)", Some("香港1 (005024)")).is_empty());
+        assert!(collect_dead_node_connection_ids(&conns, "DIRECT", Some("台湾1 (005024)")).is_empty());
+        assert!(collect_dead_node_connection_ids(&conns, "", Some("台湾1 (005024)")).is_empty());
     }
 }

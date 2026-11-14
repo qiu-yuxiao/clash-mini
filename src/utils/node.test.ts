@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isDummyNode } from './node'
+import { isDummyNode, matchNodeFilter } from './node'
 
 // 本文件的断言必须与后端 `src-tauri/src/utils/node.rs` 的测试逐条对应。
 // 前后端判定不一致会直接造成「后端能选中、前端却隐藏」的节点，属于高危一致性问题。
@@ -69,5 +69,55 @@ describe('isDummyNode 广告与说明假节点判定', () => {
     expect(isDummyNode('日本 02 [原生IP]')).toBe(false)
     expect(isDummyNode('新加坡 01 [Trojan]')).toBe(false)
     expect(isDummyNode('美国 05 [VLESS]')).toBe(false)
+  })
+})
+
+describe('matchNodeFilter 节点多关键词与排除过滤（与后端逐条对齐）', () => {
+  it('空值、纯空白及孤立符号全部放行', () => {
+    for (const empty of ['', '   ', '-', '!', '！', '|', '｜', '  -  ']) {
+      expect(matchNodeFilter('香港1 (005024)', empty)).toBe(true)
+    }
+    expect(matchNodeFilter('日本 01 [IPLC]', '日本 -')).toBe(true)
+  })
+
+  it('单关键词大小写不敏感匹配', () => {
+    expect(matchNodeFilter('HK-BGP-01', 'hk')).toBe(true)
+    expect(matchNodeFilter('日本 01 [IPLC]', '日本')).toBe(true)
+    expect(matchNodeFilter('新加坡 01', '日本')).toBe(false)
+  })
+
+  it('多关键词 OR 匹配（半角 |、全角 ｜、两侧空格及尾部悬空 |）', () => {
+    for (const q of ['日本|新加坡|台湾', '日本 | 新加坡 ｜ 台湾']) {
+      expect(matchNodeFilter('日本 01', q)).toBe(true)
+      expect(matchNodeFilter('新加坡-专线', q)).toBe(true)
+      expect(matchNodeFilter('台湾-原生', q)).toBe(true)
+      expect(matchNodeFilter('香港1 (005024)', q)).toBe(false)
+    }
+    expect(matchNodeFilter('日本 01', '日本|')).toBe(true)
+    expect(matchNodeFilter('香港1 (005024)', '日本|')).toBe(false)
+  })
+
+  it('纯排除语法（- / ! / ！）与多排除', () => {
+    expect(matchNodeFilter('香港1 (005024)', '-香港')).toBe(false)
+    expect(matchNodeFilter('日本 01', '-香港')).toBe(true)
+    expect(matchNodeFilter('HK-01', '!hk')).toBe(false)
+    expect(matchNodeFilter('高倍率 3x', '！倍率')).toBe(false)
+    expect(matchNodeFilter('香港-专线', '-香港 -英国')).toBe(false)
+    expect(matchNodeFilter('英国-01', '-香港|-英国')).toBe(false)
+    expect(matchNodeFilter('新加坡-01', '-香港|-英国')).toBe(true)
+  })
+
+  it('组合语法：OR + AND + 排除，且兼容含内部连字符与空格的节点名', () => {
+    const combo = '日本 | 新加坡 -倍率 -香港'
+    expect(matchNodeFilter('日本 专线 01', combo)).toBe(true)
+    expect(matchNodeFilter('新加坡 BGP 02', combo)).toBe(true)
+    expect(matchNodeFilter('日本 2x高倍率', combo)).toBe(false)
+    expect(matchNodeFilter('香港-日本中转', combo)).toBe(false)
+
+    expect(matchNodeFilter('HK BGP IPLC-01', 'hk bgp -倍率')).toBe(true)
+    expect(matchNodeFilter('HK BGP 3倍率', 'hk bgp -倍率')).toBe(false)
+
+    expect(matchNodeFilter('英国-3倍率', '英国-3倍率')).toBe(true)
+    expect(matchNodeFilter('香港1 (005024)', '香港1 (005024)')).toBe(true)
   })
 })
