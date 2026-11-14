@@ -78,11 +78,18 @@ export function useProxyDelayState(
 
   useEffect(() => {
     if (isPreset || !proxy) return
-    getDelayManager().setListener(proxy.name, groupName, setDelayState)
+    const handleUpdate = (update: DelayUpdate) => {
+      if (update.delay === -1 && update.updatedAt === 0) {
+        setDelayState(computeInitialDelay(proxy, groupName))
+      } else {
+        setDelayState(update)
+      }
+    }
+    getDelayManager().setListener(proxy.name, groupName, handleUpdate)
     return () => {
       // 必须带上具体 listener：同节点可能有多个订阅者（活跃节点栏也在监听），
       // 无参调用会把它一并摘掉，导致那边永久收不到延迟更新。
-      getDelayManager().removeListener(proxy.name, groupName, setDelayState)
+      getDelayManager().removeListener(proxy.name, groupName, handleUpdate)
     }
   }, [proxy, groupName, isPreset])
 

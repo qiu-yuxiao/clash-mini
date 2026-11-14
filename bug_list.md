@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-367)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-370)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -372,6 +372,20 @@
 - **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src-tauri/src/utils/node.rs`, `src-tauri/src/core/manager/lifecycle.rs`, `src/utils/node.ts`, `src/utils/node.test.ts`, `src/components/proxy/use-filter-sort.ts`, `src/hooks/use-profiles.ts`
 - **根因与背景实证**：2026-11-14 现场日志排障实证四大软件隐患：① **3s 重试复核实质退化为单次判死**：`DEAD_CONFIRM_MIN_INTERVAL_SECS (10s) > RETRY_CHECK_INTERVAL_SECS (3s)`，导致首次失败 `consecutive_fails=1` 进入 3s 重试后，第 2 轮 `evaluate_failover` 必然命中 `age < 10s` 去抖窗口直接置 `need_probe = false`，读取首次失败的同一份死缓存即判定 `consecutive_fails = 2` 并触发切换；② **并发与背靠背 41 节点握手风暴**：`evaluate_failover` 二次确认刚测完 `PROXY__METRICS`，数毫秒后 `self_heal_with_accounting` 又以 `node_names=None` 再打一轮全组 `delay_group`（叠加用户 F4/F1 操作可并发重入），对单机多端口共享上游（如 HK `45.144.x.x`）形成短时并发建连冲击与额外 5s 等待；③ **故障转移不清理挂死在原失效节点上的长连接**：切换到健康新节点后，HTTP/2 / gRPC 多路复用长连接（如 Antigravity 客户端）仍死锁在旧节点的半开 socket 上等待操作系统 TCP 超时（数分钟假断流）；④ **节点过滤仅支持单关键词 `contains`**：用户无法同时筛选多地区可用池（如 `日本|新加坡|台湾`）或快速排除失效/高倍率区域（如 `-香港`、`-倍率`）。
 - **修正与改良方案**：① `evaluate_failover` 接入 `should_probe_active_node(..., force_confirm_probe)`，当 `consecutive_fails > 0` 时强制跳过 10s 缓存与 1.5s 合并窗口执行独立全组复测；② `probe_metrics_group` 引入 `METRICS_PROBE_LOCK` 全局互斥 + `PROBE_COALESCE_WINDOW_MS (1500ms)` 短窗口合并 + `LAST_METRICS_PROBE` 快照，`try_reuse_probe_snapshot` 允许自愈在 `< 10s` 内直接复用确认结果（并修补 Mihomo 死节点不写 `history` 导致子集复测失效问题），单点测速（`len == 1`）保持严禁复用；③ `AutoSelectOutcome` 携带 `selected_node`，仅当故障自愈成功切换至不同于原死节点 `dead_node` 的新节点时，由 `close_connections_on_dead_node` 在 `3s` 超时内精确关闭 `chains` 命中 `dead_node` 的存量连接（绝不波及 `DIRECT` 与健康节点）；④ 新增前后端 1:1 对齐的 `match_node_filter` / `matchNodeFilter`（支持 `|` / `｜` OR、空格 AND 与 `-` / `!` / `！` 排除），统一接入全部筛选/恢复/自愈入口并补齐双端单测。
+
+### BUG-369（对应规范章节：2.8 / 5.2 / 5.4 / 5.6）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / 断网重连延迟丢失、过滤条件被覆盖及假节点/借壳克隆节点隔离
+- **涉及物理路径与行号**：`src-tauri/src/utils/node.rs`, `src-tauri/src/enhance/mod.rs`, `src-tauri/src/module/monitor.rs`, `src-tauri/src/core/manager/lifecycle.rs`, `src-tauri/src/cmd/proxy.rs`, `src-tauri/src/lib.rs`, `src/services/delay.ts`, `src/components/proxy/use-head-state.ts`, `src/pages/_layout.tsx`
+- **根因与背景实证**：① `DelayManager` 在 `-2` 测试态占位下收到 `fromProbe=false` 复用结果时未保留测试前合法 `updatedAt`，误将缓存寿命砍至 `30s` 并很快回落为 `-`，且 `evaluate_failover` 体检测速成功及 `restart_core` 后未唤醒并推送延迟到前端；② `useHeadStateNew` 在多组件持有各自 `useReducer` 实例，`_layout.tsx` 写入 `sortType` 时以旧状态覆盖节点页写入的 `filterText`；③ 订阅中存在大量借壳克隆广告节点及对 `generate_204` 放行但真 HTTPS 网页不可达的假节点，纯靠堆砌过滤词易漏杀或误伤真实节点。
+- **修正与改良方案**：① 为 `DelayManager` 新增 `preTestUpdatedAt` 保留原始有效寿命，并在 `evaluate_failover` 拨测分支、`restart_core`（`MONITOR_WAKEUP_NOTIFY`）及唤醒测速异常回滚中打通延迟同步；② 将 `useHeadStateNew` 重构为 `useSyncExternalStore` 模块级单一事实源共享状态库；③ 新增标准化连接指纹 `proxy_endpoint_fingerprint` 与同配置克隆去重 `deduplicate_cloned_proxies`，并构建真 HTTPS（非 `204`）持久化验真状态机（1 次过真永久粘滞、有在线参照通过下连续失败 `> 5` 轮永久拉黑，全链路隐身并在前端 `calcuProxies` 透明过滤）。
+
+### BUG-370（对应规范章节：5.2 / 5.6）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：Critical / 部分测速失真 + 恢复同步静默 + 缓存冻结导致全屏与顶栏长期假 `Timeout`（代理实际畅通）
+- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src/services/delay.ts`, `src/services/delay.test.ts`, `src/hooks/use-proxy-delay-state.ts`, `src/pages/_layout/components/active-node-card.tsx`
+- **根因与背景实证**：2026-11-15 `v3.3.2` 现场运行日志（`03:19:22 ~ 04:12:00`）证实 `日本8` 代理与内核连接（0 条错误）全程完全通畅，但前端列表与顶栏活跃节点卡片持续显示全员 `Timeout` 达一两个小时：① **主测速地址部分失真 + 快照传染**：`probe_metrics_group` 仅在整组返回 `Err`（0 个节点通过）时切备用地址复核，当订阅中哪怕仅有 1 个非目标/假节点对 `cp.cloudflare.com/generate_204` 返回 `204` 时即跳过备用地址，`LAST_METRICS_PROBE` 存下对当前目标子集全灭的单地址残缺快照并在 6ms 后被自愈复用，推送全员 `0ms (Timeout)` 与 `proxy.alive=false`；② **前后端同步“报忧不报喜”断层**：1 分钟后 `03:22:59` 后台复检确认恢复正常且后续内核 300s `PROXY__METRICS` 周期均健康，但在不触发重选与免拨测分支下后端从不向前端补发可用延迟或 `refresh_proxies()`；③ **前端缓存淘汰不通知与顶栏卡片僵死**：`DelayManager` 定时清理过期 30 分钟缓存时不通知订阅者重算，即使刷新 `['getProxies']`，`ActiveNodeStatusCard` `useEffect` 仅依赖 `hasRecord` 布尔值而不跟踪 `activeNodeRecord` 引用变更，导致活跃节点栏长期死锁在旧 `Timeout`。
+- **修正与改良方案**：① `probe_metrics_group` 新增 `should_recheck_with_fallback`（目标节点或非假节点在主地址均未取得 `[30ms, 5000ms)` 有效延迟时切备用地址复核）与 `merge_probe_delays` 有效延迟合并，`LAST_METRICS_PROBE` 引入 `dual_url_verified` 门控并封堵 `history` 全死假新鲜复用；② `evaluate_failover` 在 `!need_probe` 且活跃节点 `Alive` 时，若处于恢复（`force_confirm_probe` / `LAST_NOTIFIED_HEALTH != "network_health::ok"`）或内核自然周期产出了未上屏新时间戳（`LAST_SYNCED_ACTIVE_HISTORY_TIME`），立即向前端推送可用延迟与 `refresh_proxies()`；③ `DelayManager.evictExpiredCache()` 淘汰过期条目（跳过 `-2` 测试态）时主动派发重置通知驱动 `useProxyDelayState` / `ActiveNodeStatusCard` 回落重算，且 `ActiveNodeStatusCard` 直接响应 `activeNodeRecord` 更新，并补齐 Rust 与 Vitest 单测锁定。
 
 ---
 

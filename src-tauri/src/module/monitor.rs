@@ -101,6 +101,7 @@ struct MetricsProbeSnapshot {
     completed_at: Instant,
     delays: HashMap<String, u32>,
     reported_live_to_ui: bool,
+    dual_url_verified: bool,
 }
 
 /// 最近一次成功执行的 `probe_metrics_group` 全量实时延迟快照。
@@ -117,6 +118,9 @@ static LAST_METRICS_PROBE: parking_lot::Mutex<Option<MetricsProbeSnapshot>> = pa
 /// 【机制】活跃节点被判死时，把**它所在服务器**记入冷却表；随后选点优先避开这些
 /// 服务器上的节点（若剔除后无候选则回退全量，保证始终有节点可选）。
 const FAILED_SERVER_COOLDOWN_SECS: u64 = 600;
+
+/// 默认主测速 URL。
+const DEFAULT_TEST_URL: &str = "https://cp.cloudflare.com/generate_204";
 
 /// 备用测速 URL（与主 URL 不同域名，均为 HTTPS）。
 ///
@@ -312,25 +316,65 @@ async fn load_node_server_map() -> HashMap<String, String> {
     }
 }
 
+fn secondary_test_url(primary_url: &str) -> &'static str {
+    if primary_url.trim().eq_ignore_ascii_case(FALLBACK_TEST_URL) {
+        DEFAULT_TEST_URL
+    } else {
+        FALLBACK_TEST_URL
+    }
+}
+
+const fn is_valid_probe_delay(delay: u32) -> bool {
+    delay >= NODE_DELAY_MIN_MS && delay < NODE_DELAY_MAX_MS
+}
+
+fn should_recheck_with_fallback(primary_delays: &HashMap<String, u32>, expected_nodes: &[String]) -> bool {
+    if !expected_nodes.is_empty() {
+        !expected_nodes
+            .iter()
+            .any(|name| primary_delays.get(name).copied().is_some_and(is_valid_probe_delay))
+    } else {
+        !primary_delays.iter().any(|(name, &d)| {
+            !is_dummy_node(name) && !crate::utils::node::is_confirmed_fake_node(name) && is_valid_probe_delay(d)
+        })
+    }
+}
+
+fn merge_probe_delays(mut primary: HashMap<String, u32>, fallback: HashMap<String, u32>) -> HashMap<String, u32> {
+    for (name, fb_delay) in fallback {
+        if is_valid_probe_delay(fb_delay) {
+            primary.insert(name, fb_delay);
+        } else if !primary.get(&name).copied().is_some_and(is_valid_probe_delay) {
+            primary.entry(name).or_insert(fb_delay);
+        }
+    }
+    primary
+}
+
 /// 复用最近一次完整 `probe_metrics_group` 的全量实时延迟快照。
 ///
 /// 按完整拨测快照复用可避开 Mihomo 对死节点「只写 alive=false、不追加 history」导致的陈旧伪判定。
 /// - 显式单点测速（`is_frontend_subset && subset_len <= 1`）严禁复用（§5.2 契约 4）；
 /// - 故障自愈在 `< SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS` 内可复用刚刚完成的确认拨测结果，
 ///   并在尚未上屏时保留 `LiveProbe` 语义；
-/// - 前端批量子集测速（`subset_len > 1`）在 `< METRICS_REUSE_MAX_AGE_SECS` 内复用，标记 `FreshMetricsCache`。
+/// - 前端批量子集测速（`subset_len > 1`）在 `< METRICS_REUSE_MAX_AGE_SECS` 内复用，标记 `FreshMetricsCache`；
+/// - 未经主/备双地址复核的快照若对当前 `expected_nodes` 全灭，禁止复用（BUG-370）。
 fn try_reuse_probe_snapshot(
     snapshot: &mut Option<MetricsProbeSnapshot>,
     now: Instant,
     is_frontend_subset: bool,
     subset_len: usize,
     allow_self_heal_reuse: bool,
+    expected_nodes: &[String],
 ) -> Option<(HashMap<String, u32>, DelayResultSource)> {
     if is_frontend_subset && subset_len <= 1 {
         return None;
     }
     let snap = snapshot.as_mut()?;
     if snap.delays.is_empty() {
+        return None;
+    }
+    if !snap.dual_url_verified && should_recheck_with_fallback(&snap.delays, expected_nodes) {
         return None;
     }
     let age = now.saturating_duration_since(snap.completed_at);
@@ -351,15 +395,16 @@ fn try_reuse_probe_snapshot(
 
 /// 带「测速失真复核」的整组拨测（含全局互斥与短窗口并发合并）。
 ///
-/// 先用主测速 URL 拨测；若整体失败（mihomo 返回 all proxies timeout 等），
-/// 再用 `FALLBACK_TEST_URL` 复核一次。两次都失败才认定「测速不可用」。
+/// 先用主测速 URL 拨测；若整体失败，或主 URL 仅部分外区/假节点响应而目标节点均无有效延迟（部分失真），
+/// 立即用备用测速 URL 复核一次并合并有效延迟。两次均整体失败才认定「测速链路不可用」。
 ///
-/// 返回 `Some(map)` = 测速链路可用（map 内为本次测得的节点延迟，可能为空但链路正常）；
+/// 返回 `Some(map)` = 测速链路可用（map 内为本次测得的节点延迟）；
 /// `None` = 主/备地址都整体失败，属测速链路问题，**不可据此判定节点已死**。
 async fn probe_metrics_group(
     mihomo: &tauri_plugin_mihomo::Mihomo,
     label: &str,
     allow_coalesce: bool,
+    expected_nodes: &[String],
 ) -> Option<HashMap<String, u32>> {
     let _probe_guard = METRICS_PROBE_LOCK.lock().await;
     if allow_coalesce {
@@ -368,6 +413,7 @@ async fn probe_metrics_group(
             guard.as_ref().and_then(|snap| {
                 if !snap.delays.is_empty()
                     && snap.completed_at.elapsed() < Duration::from_millis(PROBE_COALESCE_WINDOW_MS)
+                    && (snap.dual_url_verified || !should_recheck_with_fallback(&snap.delays, expected_nodes))
                 {
                     Some(snap.delays.clone())
                 } else {
@@ -386,35 +432,74 @@ async fn probe_metrics_group(
         }
     }
 
-    let record_snapshot = |delays: HashMap<String, u32>| -> HashMap<String, u32> {
+    let record_snapshot = |delays: HashMap<String, u32>, dual_url_verified: bool| -> HashMap<String, u32> {
         if !delays.is_empty() {
             *LAST_METRICS_PROBE.lock() = Some(MetricsProbeSnapshot {
                 completed_at: Instant::now(),
                 delays: delays.clone(),
                 reported_live_to_ui: false,
+                dual_url_verified,
             });
         }
         delays
     };
 
     let test_url = get_test_url().await;
+    let fallback_url = secondary_test_url(&test_url);
     match mihomo
         .delay_group("PROXY__METRICS", &test_url, NODE_TEST_TIMEOUT_MS)
         .await
     {
-        Ok(d) => return Some(record_snapshot(d)),
+        Ok(primary_delays) => {
+            if !should_recheck_with_fallback(&primary_delays, expected_nodes) {
+                return Some(record_snapshot(primary_delays, false));
+            }
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] [{label}] 主测速地址下目标节点均未取得有效延迟（总响应节点={}），改用备用地址复核: {fallback_url}",
+                primary_delays.len()
+            );
+            match mihomo
+                .delay_group("PROXY__METRICS", fallback_url, NODE_TEST_TIMEOUT_MS)
+                .await
+            {
+                Ok(fallback_delays) => {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] [{label}] 备用测速地址复核完成（响应节点={}），合并主备有效延迟",
+                        fallback_delays.len()
+                    );
+                    let merged = merge_probe_delays(primary_delays, fallback_delays);
+                    return Some(record_snapshot(merged, true));
+                }
+                Err(e) => {
+                    logging!(
+                        warn,
+                        Type::Lightweight,
+                        "[后台监测] [{label}] 备用测速地址复核整体失败（{e}），保留主地址测速结果"
+                    );
+                    if primary_delays.is_empty() {
+                        *LAST_METRICS_PROBE.lock() = None;
+                        return None;
+                    }
+                    return Some(record_snapshot(primary_delays, true));
+                }
+            }
+        }
         Err(e) => {
             logging!(
                 warn,
                 Type::Lightweight,
-                "[后台监测] [{label}] 主测速地址整体失败（{e}），改用备用地址复核: {FALLBACK_TEST_URL}"
+                "[后台监测] [{label}] 主测速地址整体失败（{e}），改用备用地址复核: {fallback_url}"
             );
         }
     }
 
     // 主 URL 整体失败 → 可能是机场劫持/不兼容该测试地址（测速失真），换备用 URL 复核
     match mihomo
-        .delay_group("PROXY__METRICS", FALLBACK_TEST_URL, NODE_TEST_TIMEOUT_MS)
+        .delay_group("PROXY__METRICS", fallback_url, NODE_TEST_TIMEOUT_MS)
         .await
     {
         Ok(d) => {
@@ -423,7 +508,7 @@ async fn probe_metrics_group(
                 Type::Lightweight,
                 "[后台监测] [{label}] 备用测速地址可用 → 判定为主测速地址失真，节点侧正常"
             );
-            Some(record_snapshot(d))
+            Some(record_snapshot(d, true))
         }
         Err(e) => {
             logging!(
@@ -489,7 +574,7 @@ async fn get_test_url() -> String {
     verge
         .default_latency_test
         .as_deref()
-        .unwrap_or("https://cp.cloudflare.com/generate_204")
+        .unwrap_or(DEFAULT_TEST_URL)
         .to_string()
 }
 
@@ -931,7 +1016,13 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
         // 二次复核（force_confirm_probe=true）禁用短窗口合并，保证物理层面独立复核。
-        let probed_opt = probe_metrics_group(&mihomo, "体检", !force_confirm_probe).await;
+        let probed_opt = probe_metrics_group(
+            &mihomo,
+            "体检",
+            !force_confirm_probe,
+            std::slice::from_ref(&active_node),
+        )
+        .await;
 
         // 【测速失真防护】主/备测速地址都整体失败 = 测速链路不可用，**不是**「节点已死」。
         // 此时 mihomo 已把全组成员标记为 not-alive，若据此判死会触发无意义的切节点抖动。
@@ -950,6 +1041,7 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         // 【BUG-369 修复】后台定期体检刚刚完成了一次真实的整组延迟探测，若本次取得了有效节点延迟，
         // 立即把新鲜结果通过 `delay-results` 推送给前端列表（同时触发代理状态刷新），
         // 避免离线重连或静默恢复期间 UI 节点延迟长期停留在 "-"。
+        let mut ui_synced_in_probe = false;
         if !probed_delays.is_empty() && !crate::module::lightweight::is_in_lightweight_mode() {
             let already_reported = LAST_METRICS_PROBE
                 .lock()
@@ -967,6 +1059,7 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
                 if !display.is_empty() {
                     crate::core::handle::Handle::notify_delay_results("PROXY".into(), display, true);
                     crate::core::handle::Handle::refresh_proxies();
+                    ui_synced_in_probe = true;
                     if let Some(snap) = LAST_METRICS_PROBE.lock().as_mut() {
                         snap.reported_live_to_ui = true;
                     }
@@ -980,6 +1073,55 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
             .get_proxies()
             .await
             .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
+
+        if ui_synced_in_probe {
+            *LAST_SYNCED_ACTIVE_HISTORY_TIME.lock() = proxies
+                .proxies
+                .get(&active_node)
+                .and_then(|p| p.history.last())
+                .map(|h| h.time.clone());
+        }
+    } else if !crate::module::lightweight::is_in_lightweight_mode()
+        && matches!(
+            proxies.proxies.get(&active_node).map(node_status),
+            Some(NodeStatus::Alive(_))
+        )
+    {
+        // 【BUG-370 修复】免拨测确认恢复（如重试解除、离线恢复）或内核 PROXY__METRICS 自然周期（300s）
+        // 刚刚刷新出比上次上屏更新的可用结果时，同步向前端推送可用延迟与 refresh_proxies()，
+        // 彻底打通“断流报 Timeout、恢复却静默”的同步断层。
+        let active_hist_time = proxies
+            .proxies
+            .get(&active_node)
+            .and_then(|p| p.history.last())
+            .map(|h| h.time.clone());
+        let health_not_ok = *LAST_NOTIFIED_HEALTH.lock() != "network_health::ok";
+        let has_unsynced_batch = active_hist_time
+            .as_ref()
+            .is_some_and(|t| LAST_SYNCED_ACTIVE_HISTORY_TIME.lock().as_ref() != Some(t));
+        if force_confirm_probe || health_not_ok || has_unsynced_batch {
+            let fresh_alive_display: Vec<(String, u32)> = group_info
+                .all
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .filter(|n| !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n))
+                .filter_map(|n| {
+                    let p = proxies.proxies.get(n)?;
+                    match (node_status(p), history_age(p)) {
+                        (NodeStatus::Alive(d), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS) => {
+                            Some((n.clone(), d))
+                        }
+                        _ => None,
+                    }
+                })
+                .collect();
+            if !fresh_alive_display.is_empty() {
+                crate::core::handle::Handle::notify_delay_results("PROXY".into(), fresh_alive_display, true);
+                crate::core::handle::Handle::refresh_proxies();
+                *LAST_SYNCED_ACTIVE_HISTORY_TIME.lock() = active_hist_time;
+            }
+        }
     }
 
     let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
@@ -1238,6 +1380,7 @@ async fn trigger_backend_auto_select_inner(
         is_frontend_subset,
         valid_nodes.len(),
         allow_self_heal_reuse,
+        &valid_nodes,
     );
     if let Some((snap_delays, snap_source)) = reused_snapshot {
         logging!(
@@ -1273,7 +1416,7 @@ async fn trigger_backend_auto_select_inner(
                         }
                     }
                 }
-                if all_fresh {
+                if all_fresh && cached.values().any(|&d| is_valid_probe_delay(d)) {
                     logging!(
                         info,
                         Type::Lightweight,
@@ -1292,7 +1435,7 @@ async fn trigger_backend_auto_select_inner(
             source = DelayResultSource::FreshMetricsCache;
         } else {
             let allow_coalesce = !(is_frontend_subset && valid_nodes.len() == 1);
-            match probe_metrics_group(&mihomo, "选点", allow_coalesce).await {
+            match probe_metrics_group(&mihomo, "选点", allow_coalesce, &valid_nodes).await {
                 Some(probed) if !probed.is_empty() => {
                     delays = probed;
                     source = DelayResultSource::LiveProbe;
@@ -1585,6 +1728,7 @@ fn sort_display_delays(display: &mut [(String, u32)], sort_type: i32) {
 
 static LAST_NOTIFIED_HEALTH: parking_lot::Mutex<&'static str> = parking_lot::Mutex::new("network_health::ok");
 static LAST_MANUAL_NODE_SWITCH: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+static LAST_SYNCED_ACTIVE_HISTORY_TIME: parking_lot::Mutex<Option<String>> = parking_lot::Mutex::new(None);
 static ALERT_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 
 /// 记录前端手动切换产生的新节点切换时间戳并立即唤醒监测循环吸收（BUG-336），不触发额外全组拨测。
@@ -1596,6 +1740,7 @@ pub fn notify_manual_node_switched() {
 fn reset_monitor_static_state() {
     *LAST_NOTIFIED_HEALTH.lock() = "network_health::ok";
     *LAST_MANUAL_NODE_SWITCH.lock() = None;
+    *LAST_SYNCED_ACTIVE_HISTORY_TIME.lock() = None;
     *LAST_METRICS_PROBE.lock() = None;
 }
 
@@ -2239,12 +2384,13 @@ async fn self_heal_with_accounting(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        DelayResultSource, Duration, HashMap, Instant, LAST_MANUAL_NODE_SWITCH, LAST_METRICS_PROBE,
-        LAST_NOTIFIED_HEALTH, METRICS_REUSE_MAX_AGE_SECS, MetricsProbeSnapshot, NodeStatus,
-        SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SelfHealAction, collect_dead_node_connection_ids,
-        complete_restart_core_attempt, evaluate_self_heal_counters, notify_manual_node_switched,
-        prioritize_verified_candidates_with, reset_monitor_static_state, resolve_probe_target,
-        should_probe_active_node, sort_display_delays, try_reuse_probe_snapshot,
+        DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
+        LAST_METRICS_PROBE, LAST_NOTIFIED_HEALTH, LAST_SYNCED_ACTIVE_HISTORY_TIME, METRICS_REUSE_MAX_AGE_SECS,
+        MetricsProbeSnapshot, NodeStatus, SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SelfHealAction,
+        collect_dead_node_connection_ids, complete_restart_core_attempt, evaluate_self_heal_counters,
+        merge_probe_delays, notify_manual_node_switched, prioritize_verified_candidates_with,
+        reset_monitor_static_state, resolve_probe_target, secondary_test_url, should_probe_active_node,
+        should_recheck_with_fallback, sort_display_delays, try_reuse_probe_snapshot,
     };
 
     #[test]
@@ -2409,6 +2555,7 @@ mod tests {
         reset_monitor_static_state();
         assert_eq!(*LAST_NOTIFIED_HEALTH.lock(), "network_health::ok");
         assert!(LAST_MANUAL_NODE_SWITCH.lock().is_none());
+        assert!(LAST_SYNCED_ACTIVE_HISTORY_TIME.lock().is_none());
         assert!(LAST_METRICS_PROBE.lock().is_none());
     }
 
@@ -2446,43 +2593,52 @@ mod tests {
         let mut delays = HashMap::new();
         delays.insert("日本-01".to_string(), 75u32);
 
-        let make_snap = |age_secs: u64| {
+        let make_snap = |age_secs: u64, dual_url_verified: bool| {
             Some(MetricsProbeSnapshot {
                 completed_at: base_now - Duration::from_secs(age_secs),
                 delays: delays.clone(),
                 reported_live_to_ui: false,
+                dual_url_verified,
             })
         };
+        let empty_expected: Vec<String> = Vec::new();
 
         // 1. 显式单点测速（subset_len == 1）绝不复用快照，即使刚结束 1s（§5.2 契约 4）
-        let mut snap1 = make_snap(1);
-        assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, false).is_none());
-        assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, true).is_none());
+        let mut snap1 = make_snap(1, false);
+        assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, false, &empty_expected).is_none());
+        assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, true, &empty_expected).is_none());
 
         // 2. 非自愈全量 F1（allow_self_heal_reuse=false, is_frontend_subset=false）不走缓存复用
-        let mut snap2 = make_snap(2);
-        assert!(try_reuse_probe_snapshot(&mut snap2, base_now, false, 10, false).is_none());
+        let mut snap2 = make_snap(2, false);
+        assert!(try_reuse_probe_snapshot(&mut snap2, base_now, false, 10, false, &empty_expected).is_none());
 
         // 3. 自愈在 < SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS 内复用二次确认快照：
         // 首次消费获得 LiveProbe 语义，随后再次复用降级为 FreshMetricsCache
-        let mut snap3 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS - 1);
-        let first = try_reuse_probe_snapshot(&mut snap3, base_now, false, 10, true);
+        let mut snap3 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS - 1, false);
+        let first = try_reuse_probe_snapshot(&mut snap3, base_now, false, 10, true, &empty_expected);
         assert_eq!(
             first.map(|(m, s)| (m.get("日本-01").copied(), s)),
             Some((Some(75), DelayResultSource::LiveProbe))
         );
-        let second = try_reuse_probe_snapshot(&mut snap3, base_now, false, 10, true);
+        let second = try_reuse_probe_snapshot(&mut snap3, base_now, false, 10, true, &empty_expected);
         assert_eq!(second.map(|(_, s)| s), Some(DelayResultSource::FreshMetricsCache));
 
         // 4. 超过自愈 TTL（>=10s）但未超子集 TTL（<30s）：自愈不复用，批量子集复用且标记 FreshMetricsCache
-        let mut snap4 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS);
-        assert!(try_reuse_probe_snapshot(&mut snap4, base_now, false, 10, true).is_none());
-        let subset_hit = try_reuse_probe_snapshot(&mut snap4, base_now, true, 5, false);
+        let mut snap4 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, false);
+        assert!(try_reuse_probe_snapshot(&mut snap4, base_now, false, 10, true, &empty_expected).is_none());
+        let subset_hit = try_reuse_probe_snapshot(&mut snap4, base_now, true, 5, false, &empty_expected);
         assert_eq!(subset_hit.map(|(_, s)| s), Some(DelayResultSource::FreshMetricsCache));
 
         // 5. 超过子集 TTL（>=30s）不再复用
-        let mut snap5 = make_snap(METRICS_REUSE_MAX_AGE_SECS);
-        assert!(try_reuse_probe_snapshot(&mut snap5, base_now, true, 5, false).is_none());
+        let mut snap5 = make_snap(METRICS_REUSE_MAX_AGE_SECS, false);
+        assert!(try_reuse_probe_snapshot(&mut snap5, base_now, true, 5, false, &empty_expected).is_none());
+
+        // 6. 未经主/备双 URL 复核且对期望目标节点全灭的快照禁止复用；已完成双 URL 复核的快照允许复用
+        let expected_other = vec!["香港-01".to_string(), "新加坡-01".to_string()];
+        let mut snap_unverified = make_snap(1, false);
+        assert!(try_reuse_probe_snapshot(&mut snap_unverified, base_now, true, 2, true, &expected_other).is_none());
+        let mut snap_verified = make_snap(1, true);
+        assert!(try_reuse_probe_snapshot(&mut snap_verified, base_now, true, 2, true, &expected_other).is_some());
     }
 
     #[test]
@@ -2562,5 +2718,53 @@ mod tests {
         let fallback_pool = prioritize_verified_candidates_with(candidates, |_| false);
         assert_eq!(fallback_pool.len(), 3);
         assert_eq!(fallback_pool.iter().min_by_key(|r| r.1).unwrap().0, "unverified-fast");
+    }
+
+    #[test]
+    fn test_partial_distortion_fallback_and_merge() {
+        // 1. 主/备测速 URL 互换（含首尾空白与大小写兼容）
+        assert_eq!(secondary_test_url(DEFAULT_TEST_URL), FALLBACK_TEST_URL);
+        assert_eq!(secondary_test_url(FALLBACK_TEST_URL), DEFAULT_TEST_URL);
+        assert_eq!(
+            secondary_test_url(&format!("  {}  ", FALLBACK_TEST_URL.to_ascii_uppercase())),
+            DEFAULT_TEST_URL
+        );
+
+        // 2. 局部测速失真判定：仅期望外节点的延全都无效（即便其它节点有值）也触发备用 URL 复测
+        let mut partial_distortion = HashMap::new();
+        partial_distortion.insert("其它节点".to_string(), 90u32);
+        partial_distortion.insert("香港-01".to_string(), 0u32);
+        partial_distortion.insert("日本-01".to_string(), 5000u32);
+        let expected = vec!["香港-01".to_string(), "日本-01".to_string()];
+        assert!(should_recheck_with_fallback(&partial_distortion, &expected));
+
+        // 期望节点中只要存在有效延迟即无需复测
+        partial_distortion.insert("日本-01".to_string(), 85u32);
+        assert!(!should_recheck_with_fallback(&partial_distortion, &expected));
+
+        // expected_nodes 为空时，仅当存在非虚拟有效延迟节点才跳过复测
+        let mut all_dead = HashMap::new();
+        all_dead.insert("DIRECT".to_string(), 10u32);
+        all_dead.insert("日本-01".to_string(), 0u32);
+        assert!(should_recheck_with_fallback(&all_dead, &[]));
+        all_dead.insert("日本-01".to_string(), 75u32);
+        assert!(!should_recheck_with_fallback(&all_dead, &[]));
+
+        // 3. merge_probe_delays：有效备用延迟补全无效主测速结果，但不覆盖已有效的主延迟
+        let mut primary = HashMap::new();
+        primary.insert("节点A".to_string(), 0u32);
+        primary.insert("节点B".to_string(), 95u32);
+        primary.insert("节点C".to_string(), 0u32);
+
+        let mut fallback = HashMap::new();
+        fallback.insert("节点A".to_string(), 110u32);
+        fallback.insert("节点B".to_string(), 0u32);
+        fallback.insert("节点D".to_string(), 150u32);
+
+        let merged = merge_probe_delays(primary, fallback);
+        assert_eq!(merged.get("节点A").copied(), Some(110));
+        assert_eq!(merged.get("节点B").copied(), Some(95));
+        assert_eq!(merged.get("节点C").copied(), Some(0));
+        assert_eq!(merged.get("节点D").copied(), Some(150));
     }
 }

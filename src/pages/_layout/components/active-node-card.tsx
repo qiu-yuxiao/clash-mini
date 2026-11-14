@@ -21,7 +21,11 @@ import {
   notifyNodeSwitched,
   triggerAutoSelect,
 } from '@/services/cmds'
-import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
+import {
+  getDelayManager,
+  NODE_DELAY_MAX_MS,
+  type DelayUpdate,
+} from '@/services/delay'
 import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
 import type { IProxyItem } from '@/types/clash'
@@ -75,6 +79,23 @@ export const ActiveNodeStatusCard = () => {
     activeNodeRecordRef.current = activeNodeRecord
   }, [activeNodeRecord])
 
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve().then(() => {
+      if (cancelled) return
+      if (!activeNodeName || !primaryGroup?.name || !activeNodeRecord) {
+        setDelay(-1)
+        return
+      }
+      setDelay(
+        getDelayManager().getDelayFix(activeNodeRecord, primaryGroup.name),
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [activeNodeName, primaryGroup?.name, activeNodeRecord])
+
   // 通过 listener 响应式订阅延迟更新，不再依赖 proxiesData 驱动重算
   useEffect(() => {
     const record = activeNodeRecordRef.current
@@ -82,8 +103,17 @@ export const ActiveNodeStatusCard = () => {
 
     setDelay(getDelayManager().getDelayFix(record, primaryGroup.name))
 
-    const handler = (update: { delay: number }) => {
-      setDelay(update.delay)
+    const handler = (update: DelayUpdate) => {
+      if (update.delay === -1 && update.updatedAt === 0) {
+        const latestRecord = activeNodeRecordRef.current
+        setDelay(
+          latestRecord && primaryGroup?.name
+            ? getDelayManager().getDelayFix(latestRecord, primaryGroup.name)
+            : -1,
+        )
+      } else {
+        setDelay(update.delay)
+      }
     }
     getDelayManager().setListener(activeNodeName, primaryGroup.name, handler)
     return () => {

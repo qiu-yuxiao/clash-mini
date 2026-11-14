@@ -67,18 +67,39 @@ class DelayManager {
     if (typeof window !== 'undefined') {
       this.cleanupIntervalId = setInterval(
         () => {
-          const now = Date.now()
-          const expiredKeys: string[] = []
-          this.cache.forEach((entry, key) => {
-            if (now - entry.updatedAt > CACHE_TTL) {
-              expiredKeys.push(key)
-            }
-          })
-          expiredKeys.forEach((key) => this.cache.delete(key))
+          this.evictExpiredCache()
         },
         5 * 60 * 1000,
       ) // Clean up expired cache every 5 minutes
     }
+  }
+
+  /** 清理过期延迟缓存，并主动通知对应订阅者/分组回落重算，避免清理后 UI 仍凝固于旧状态（BUG-370） */
+  evictExpiredCache(now = Date.now()): number {
+    let evicted = 0
+    const affectedGroups = new Set<string>()
+    for (const [key, entry] of Array.from(this.cache.entries())) {
+      if (entry.delay === -2) continue
+      if (now - entry.updatedAt > CACHE_TTL) {
+        this.cache.delete(key)
+        evicted += 1
+        const sepIdx = key.indexOf('::')
+        const group = sepIdx >= 0 ? key.slice(0, sepIdx) : 'PROXY'
+        affectedGroups.add(group)
+        const resetUpdate: DelayUpdate = { delay: -1, updatedAt: 0 }
+        const queue = this.pendingItemUpdates.get(key)
+        if (queue) {
+          queue.push(resetUpdate)
+        } else {
+          this.pendingItemUpdates.set(key, [resetUpdate])
+        }
+      }
+    }
+    if (evicted > 0) {
+      this.scheduleItemFlush()
+      affectedGroups.forEach((group) => this.queueGroupNotification(group))
+    }
+    return evicted
   }
 
   private scheduleOnNextFrame(run: () => void): void {
@@ -310,7 +331,8 @@ class DelayManager {
     const entry = this.cache.get(key)
     if (!entry) return undefined
 
-    if (Date.now() - entry.updatedAt > CACHE_TTL) {
+    if (entry.delay !== -2 && Date.now() - entry.updatedAt > CACHE_TTL) {
+      this.cache.delete(key)
       return undefined
     }
 

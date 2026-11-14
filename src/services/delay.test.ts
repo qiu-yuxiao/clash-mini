@@ -296,3 +296,47 @@ describe('BUG-344: DelayManager 快照恢复与数据来源语义校验', () => 
     expect(dm.getDelayUpdate('复用节点3', 'PROXY')?.updatedAt).toBe(priorTs)
   })
 })
+
+describe('BUG-370: DelayManager 过期缓存淘汰主动唤醒监听者回落重算', () => {
+  const NODE = '回归-缓存淘汰节点'
+
+  it('过期的 0ms Timeout 缓存被淘汰后会立即推送重置事件，使回落延迟即时反映最新 history', async () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    dm.removeListener(NODE, 'PROXY')
+
+    const updates: Array<{ delay: number; updatedAt: number }> = []
+    dm.setListener(NODE, 'PROXY', (u) => updates.push(u))
+
+    const expiredTs = Date.now() - 31 * 60 * 1000
+    dm.restoreDelaySnapshot(NODE, 'PROXY', { delay: 0, updatedAt: expiredTs })
+
+    const evictedCount = dm.evictExpiredCache()
+    expect(evictedCount).toBe(1)
+    expect(dm.getDelayUpdate(NODE, 'PROXY')).toBeUndefined()
+
+    await new Promise((r) => setTimeout(r, 50))
+    expect(updates).toContainEqual({ delay: -1, updatedAt: 0 })
+
+    const aliveProxy = {
+      name: NODE,
+      type: 'AnyTLS',
+      udp: true,
+      alive: true,
+      history: [{ time: new Date().toISOString(), delay: 146 }],
+    } as unknown as IProxyItem
+    expect(dm.getDelayFix(aliveProxy, 'PROXY')).toBe(146)
+
+    dm.removeListener(NODE, 'PROXY')
+  })
+
+  it('正在测速中 (-2) 的缓存条目不会被误淘汰', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+    dm.setDelay(NODE, 'PROXY', -2)
+
+    const evictedCount = dm.evictExpiredCache(Date.now() + 60 * 60 * 1000)
+    expect(evictedCount).toBe(0)
+    expect(dm.getDelayUpdate(NODE, 'PROXY')?.delay).toBe(-2)
+  })
+})

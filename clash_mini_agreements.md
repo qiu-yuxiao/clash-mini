@@ -457,6 +457,9 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **后台体检实时延迟同步与 `-2` 状态寿命保护（BUG-369，v3.3.2）**：
   - `monitor::evaluate_failover` 触发 `probe_metrics_group` 取得新鲜实时延迟后，非轻量模式下通过 `Handle::notify_delay_results("PROXY", ..., true)` + `Handle::refresh_proxies()` 同步广播至前端并置 `reported_live_to_ui = true`，使断网恢复或后台体检后列表立即更新延迟而不长期显示 `-`；`lifecycle::restart_core` 完成后立即调用 `MONITOR_WAKEUP_NOTIFY.notify_one()` 唤醒首轮检测。
   - `DelayManager::setDelay(..., -2)` 在已有未过期缓存时暂存 `preTestUpdatedAt`，后续 `injectBatchResults(..., { fromProbe: false })` 据此延续测试前合法缓存寿命，避免先置流光占位的节点被误砍至 `30s` 过期并退化为 `-`；`_layout.tsx::triggerWakeupLatencyTest` 对 `-2` 测试占位补全测前快照捕获与空/异常返回回滚机制。
+- **部分测速失真复核与免拨测恢复前端同步闭环（BUG-370，v3.3.3）**：
+  - `probe_metrics_group` 在主测速地址返回 `Ok(map)` 时通过 `should_recheck_with_fallback` 检查当前目标节点（`expected_nodes`；空集时检查非假节点集合）是否均未取得 `[30ms, 5000ms)` 有效延迟；命中“部分失真”时立即切 `secondary_test_url` 复核并由 `merge_probe_delays` 合并主备有效延迟。未经双地址复核的残缺单地址快照（`dual_url_verified == false` 且目标节点全失）禁止被 `try_reuse_probe_snapshot` / 短窗合并 / 前端历史复用机制沿用。
+  - `evaluate_failover` 在活跃节点健康（`NodeStatus::Alive`）且处于非轻量模式时，无论走了 `need_probe` 实时拨测还是命中 `!need_probe`（如 `force_confirm_probe` 复检恢复、健康状态复位 `LAST_NOTIFIED_HEALTH != "network_health::ok"` 或内核 300s `PROXY__METRICS` 自然周期推进了新的 `history.last().time`），均通过 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 去重并向前端推送最新可用延迟列表与 `refresh_proxies()`，彻底堵住“断流报 Timeout、恢复不回传”同步断层。
 
 ### 5.3 统一记账与 25 秒失败冷却保护（v3.2.4 / v3.3.2 优化）
 
@@ -502,6 +505,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **同一节点的延迟订阅必须支持多订阅者**：活跃节点栏与节点列表项会同时订阅同一个 `PROXY::节点名`，任一订阅者的注册/注销都不得影响其它订阅者，注销必须精确到具体订阅者。此前单订阅模型下后注册者顶掉先注册者，被顶掉者永久停留在挂载时的旧值，导致「上面已 Timeout、下面还是绿的」。
 - **自愈失败也必须刷新前端代理缓存**：选点成功与失败（所有节点不可达）都要向前端广播代理数据刷新，否则前端长期握着陈旧的 `alive`/`history`，界面延迟与真实连通状态脱节。
 - **组头过滤/排序状态全局单例同步（BUG-369，v3.3.2）**：`useHeadStateNew` 重构为基于 `useSyncExternalStore` 的模块级单一事实源共享状态库并导出 `getGroupHeadState`，配合无实质变更 no-op 短路、本地脏键合并与即时 `localStorage` 同步及 100ms 防抖落盘（`save_proxy_head_state`），彻底消除 `_layout.tsx` 写入 `sortType` 与节点页组件写入 `filterText` 时双份独立 `useReducer` 实例互相覆盖导致过滤词（如 `-香港`）丢失的竞态。
+- **过期延迟缓存主动解冻与顶栏活跃卡片响应式联动（BUG-370，v3.3.3）**：`DelayManager.evictExpiredCache()` 在淘汰过期缓存条目（严禁淘汰进行中的 `-2` 测试态）时主动向对应节点/分组订阅者推送重置通知（`{ delay: -1, updatedAt: 0 }`），驱动 `useProxyDelayState` 与 `ActiveNodeStatusCard` 即时按当前 `proxy` 快照回落重算；`ActiveNodeStatusCard` 同步直接响应 `activeNodeRecord` 引用变化刷新延迟展示，杜绝同名活跃节点在后台刷新后永久卡死在旧 `Timeout`。
 
 ### 5.7 无人值守资源节约与静默门控
 
@@ -836,6 +840,14 @@ flowchart LR
   3. **节点同配置克隆去重与真 HTTPS 验真持久化状态机**：`src-tauri/src/utils/node.rs` 新增规范化连接指纹 `proxy_endpoint_fingerprint`、克隆折叠 `deduplicate_cloned_proxies` 与状态机 store（`node_https_verify.json`，`verified_true` 单向粘滞、参照节点在线门控下的 `fail_count > 5` 永久拉黑）；接入 `enhance/mod.rs`、`module/monitor.rs`、`core/manager/lifecycle.rs`，新增 Tauri 命令 `get_confirmed_fake_proxy_names` 并在 `src/services/cmds.ts` 中透明隐藏永久拉黑假节点。
 - **影响**：在不新增代理组、不堆砌过滤词、不引入断流重启的前提下，实现基于真 HTTPS 数据包验真的假节点自动永久隔离、同配置借壳信息条克隆自动合并，以及组头过滤条件与节点延迟显示的跨组件/跨休眠一致性。
 
+### Sync-16: 局部测速 URL 失真备用 URL 复测、后台恢复 UI 同步及过期延迟缓存唤醒重算（BUG-370）
+- **问题定位**：当主测速 URL 对部分节点出现局部失真超时、或后台测速恢复后未将更新后的延迟历史同步至前端，以及前端 `DelayManager` 缓存满 `delay-timeout` 过期被清理时未唤醒活跃监听者重算，会导致代理列表与顶部活跃节点卡片长期停留在 `Timeout` 假象中。
+- **核心变更**：
+  1. **局部测速失真自动备用 URL 复测与快照融合**（`src-tauri/src/module/monitor.rs`）：引入 `secondary_test_url`、`is_valid_probe_delay`、`should_recheck_with_fallback`、`merge_probe_delays` 与 `MetricsProbeSnapshot.dual_url_verified`；在 `probe_metrics_group` 发现目标节点存在部分失真时使用备用 URL（`FALLBACK_TEST_URL` ↔ `DEFAULT_TEST_URL`）复测并合并最健康延迟，`try_reuse_probe_snapshot` 与子集复用路径同步校验目标节点及 `dual_url_verified` 状态；
+  2. **恢复态与定期体检 UI 延迟同步**（`src-tauri/src/module/monitor.rs`）：新增静态状态 `LAST_SYNCED_ACTIVE_HISTORY_TIME`（并在 `reset_monitor_static_state` 中复位），使 `evaluate_failover` 在异常恢复与每轮正常测量更新且尚未通过 probe 推送时，将最新延迟历史主动同步至前端 UI；
+  3. **过期延迟缓存主动唤醒重算与活跃节点卡片同步**（`src/services/delay.ts`、`src/hooks/use-proxy-delay-state.ts`、`src/pages/_layout/components/active-node-card.tsx`）：`DelayManager::evictExpiredCache` 仅保留 `-2` 测试占位并清理过期缓存，同时向单节点与组监听者广播 `{ delay: -1, updatedAt: 0 }` 哨兵事件；`useProxyDelayState` 与 `ActiveNodeCard` 收到哨兵后分别通过 `computeInitialDelay` / `getDelayFix` 回落重算，`ActiveNodeCard` 并在 `activeNodeRecord` 变化时主动对齐 `delay`。
+- **影响**：消除长时挂机/网络波动/缓存过期后前后端延迟显示长期卡死在 `Timeout` 的同步断层，保持多端延迟状态一致。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
@@ -965,6 +977,7 @@ flowchart LR
 | **BUG-367** | 2.2 / 7.7 / 8.9 | 路径控制精准目标化规则生成（禁止扩域为 `DOMAIN-SUFFIX`）与「直连 / 代理 / 封锁 / 已断开」四态单表融合，补齐自定义 `Merge` 路由 `.yaml` 一键导出保存与重装后导入恢复闭环。 |
 | **BUG-368** | 2.8 / 4.2 / 5.1 / 5.2 / 5.3 / 5.4 | 修复 3s 重试复核误命中 10s 死缓存跳过二次真实拨测；引入 `METRICS_PROBE_LOCK` 与实时快照复用抑制并发/背靠背拨测风暴；故障转移成功后精确关闭仍挂死在原故障节点上的存量连接；前后端统一升级多关键词包含（`\|`/`｜`）与排除（`-`/`!`/`！`）节点过滤引擎并补齐双端单测。 |
 | **BUG-369** | 2.8 / 5.2 / 5.4 / 5.6 | 修复 `DelayManager` 在 `-2` 测试态下复用注入误砍合法缓存寿命、补充唤醒测速 `-2` 快照回滚、`evaluate_failover` 体检直播延迟与 `restart_core` 立即唤醒推送；将 `useHeadStateNew` 重构为 `useSyncExternalStore` 模块级单例彻底根除 `filterText` 被并发 `sortType` 覆写；新增规范化连接指纹 `deduplicate_cloned_proxies` 同配置克隆去重与持久化真 HTTPS 验真状态机（1 次过真即单向粘滞、有在线参照通过前提下连续失败 `> 5` 次永久拉黑并在前后端全链路隐藏）。 |
+| **BUG-370** | 2.8 / 5.2 / 5.6 | 修复局部测速 URL 失真、后台恢复未同步 UI 与前端延迟缓存过期冻结的三处同步缺口：`probe_metrics_group` 在非全量失效时触发备用测速 URL（`FALLBACK_TEST_URL` ↔ `DEFAULT_TEST_URL`）复测并合并最健康延迟；`evaluate_failover` 新增 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 去重，确保从异常态恢复及正常 300s 体检新测量落地时及时向前端推送更新；`DelayManager::evictExpiredCache` 淘汰过期非 `-2` 缓存时主动向节点与组监听者广播 `{ delay: -1, updatedAt: 0 }` 唤醒重算，并同步修复 `useProxyDelayState` 与 `ActiveNodeCard` 的回落/切换同步（见 §5.2、§5.6、Sync-16）。 |
 
 ---
 
