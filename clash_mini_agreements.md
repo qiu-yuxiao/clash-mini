@@ -398,7 +398,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 ### 4.2 不断网不断流铁律与后端连接维持
 
-- **网络连接连续性铁律**：**进入轻量模式、退出轻量模式或在正常状态下自愈/手动切换节点，绝对禁止全量切断已建立的用户网络连接**。
+- **网络连接连续性铁律**：**进入轻量模式、退出轻量模式或在正常状态下自愈/手动切换节点，绝对禁止全量切断已建立的用户网络连接**。本条是 §5 章首「🎯 本章最高方针 · 连续性优先」在生命周期场景的具体落地；方针中的优先级硬序与「非必要不主动切换」同样适用于本节涉及的一切自动行为，且方针效力高于本条。
 - **故障转移默认不清连接（Sync-18 修订，取代 BUG-368 的「精确断死留活」）**：`select_node_for_group` 本身是干净热切换，已有连接不受影响；v3.3.2 的 `close_connections_on_dead_node` 仅按 `chains` 命中筛选，**没有 age / upload / download / alive 过滤**，无法区分「已挂死的连接」与「仍在正常传输的健康长连接」，在后台测速周期性择优选点时会把 HTTP/2 / gRPC 长流（Antigravity 等）直接 RST，使「链路只是抖了一下」升级为「会话态丢失的硬断」。故自愈成功切换后**默认不清理任何存量连接**（`DEAD_CONN_CLEANUP_ENABLED = false`，并输出「已切换、跳过清理」日志），长连接交由应用层自身重连。`close_connections_on_dead_node` / `collect_dead_node_connection_ids` 实现与单测保留但不在默认路径调用；重新开启的前提是引入 ConfirmedDead 迟滞状态确证旧节点已死，且只对「确已无流量」的连接执行清理（评审报告 S4）。
 - **内核进程与虚拟网卡不间断**：内核子进程与 TUN 网卡始终保持正常全速运行，正常流量与健康长连接绝不发生瞬间闪断。
 
@@ -421,6 +421,18 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ---
 
 ## 📡 五、后台监控、健康探针与自愈体系
+
+### 🎯 本章最高方针 · 连续性优先（v3.3.4 确立，Sync-21）
+
+> **一切后台自动测速与自动选节点功能，其唯一目的是尽可能保持链路不断流，并在确已断流时把断流时间压到最短。「选出最小延迟节点」只是切换发生时顺带取得的附随收益，不构成切换的理由，更不是功能目标。非必要不主动切换节点，不主动触碰已建立的连接。**
+
+- **适用范围**：后台监测线程、健康探针、故障自愈、初始化自动选点等**无需用户逐次确认**的自动行为。用户显式触发的 F1 / F4 测速与手动选点不受本方针约束（此时「选快节点」就是用户的直接意图）。`PROXY` 控制组为 `select` 类型、`PROXY__METRICS` 测量组虽为 `url-test` / 300s 周期但不承载用户流量，故内核侧不存在自动择优切换出口（见 §5.2 / §7.1）；本方针约束的是应用层 `select_node_for_group("PROXY", ...)` 及一切后台拨测。
+- **「必要」的判定标准（穷举）**：仅当 ① 当前出口节点已被确证不可用（`NodeStatus::Dead`、假/广告节点、真 HTTPS 验真失败或永久拉黑），或 ② 有明确证据表明维持现状将导致断流、或显著延长断流时间，才构成切换的必要性。**下列情形一律不构成必要**：别的节点延迟更低、周期测速结果波动、测速地址失真、物理网络由离线转在线、内核 Controller API 瞬时异常、窗口/轻量模式/配置生命周期变化。
+- **优先级硬序**：**链路连续性 > 恢复时效 > 节点延迟**。三者冲突时一律按此顺序裁决；任何以「择优」为目的的后台切换均属违约。延迟优化只能发生在「已因上述必要性决定切换之后」的候选选择环节（现有 `min_by_key` 选点即属此类附随收益，不构成触发理由）。
+- **初始化场景的具体约束（Sync-22）**：冷启动、轻量模式唤醒、Profile 切换时的初始化自动选点，**仅当当前 `PROXY.now` 结构性失效**（空 / `DIRECT` / `REJECT` / 伪节点 / 验真永久拉黑 / 已不在新配置或当前过滤子集内）才允许切点；出口有效时只做全组测速刷新延迟、不换节点。刻意不以「没有健康延迟」「别的节点更快」为切点理由——冷启动时内核尚未拨测，`alive` / `history` 不可靠；真死节点交由后台监测经连续 2 次确认 + 死节点门检自愈，不在初始化阶段抢占判断。F1/F4 手动选点与后台故障自愈不受此约束。
+- **切换动作不得制造断流**：切点必须是 `select_node_for_group` 干净热切换；默认路径严禁 `close_connection`、配置重载、内核重启。确需清理存量连接时，须先确证旧节点已死且连接确已无流量，且该能力默认关闭（见 §4.2 / Sync-18）。
+- **测量行为不得成为断流源**：后台自动测速只用于取得判活证据，不得因拨测本身扰动链路、污染 `alive` / `history` 或诱发误判；多路测量源须统一 URL、超时与互斥（见 §5.2，S5 待收口）。
+- **举证责任与上位效力**：新增或调整任何后台自动切换逻辑，必须先说明「若不切换会发生何种断流、切换如何缩短它」；无法举证者一律默认不切换。本方针是本章全部条款、参数与实现的最高裁决依据，亦是 `docs/node-health-architecture.md` 等下层设计文档的主文件；与本章其他条款冲突时以本方针为准（S6 文档治理待完成）。
 
 ### 5.1 恒定 15 秒健康监测与防抖自愈机制
 
@@ -894,6 +906,41 @@ flowchart LR
 - **边界与未处理**：`DEAD_CONN_CLEANUP_ENABLED` **仍保持 `false`**——S4 只确证了节点状态，并未实现 `collect_dead_node_connection_ids` 所需的 age / upload / download / alive「无流量」过滤，清连接能力不恢复（见 §4.2 / Sync-18）。「新节点显著更优」在「原节点确已死」前提下退化为「新节点须有 `[30ms, 5000ms)` 有效延迟」，现有 `candidates` 过滤已满足，未另加延迟差门槛。真死节点自愈最多推迟 30 秒，由既有 20 秒宽限 + 25 秒冷却覆盖。S5（统一测量源与时钟、移除 `force_confirm_probe` 3 秒强制双拨测）、S6（两份架构文档主次裁定、§5.1 三档周期与 60 秒新鲜度同步、§5.1.1 临时探针章节清理）仍未处理。
 - **影响**：一次拨测失败不再被升级为「节点已死」，自愈只在确证失效时执行，且 10 分钟内最多 3 次、两次间隔不少于 2 分钟；未新增配置项、未改动前端、未改动代理组架构、未改动发版流程，F1/F4 手动选点与冷启动初始化选点路径完全不受影响。
 
+### Sync-21 · 确立「连续性优先」最高方针并回溯 S1–S4 合规性（v3.3.4，方针治理）
+
+- **问题定位**：v3.3.3 评审的结论是「代码基本没错，错在思维逻辑把自愈做成了主动优化」。S1–S4 逐项修复后仍缺少一条统摄全部后台自动行为的上位原则，导致每次新增测速/选点能力只能靠条款堆叠防抖，无法回答「这次切换是否必要」；而 §4.2 的「不断网不断流铁律」只覆盖生命周期场景，未上升为本章全局目的。
+- **方针文本**：见 §5 章首「🎯 本章最高方针 · 连续性优先」（目的 / 适用范围 / 必要性穷举 / 优先级硬序 / 切换与测量约束 / 举证责任与上位效力六项），§4.2 首条补交叉引用。
+- **合规性回溯（已本地提交的 4 笔改动，逐笔核对）**：
+
+| 提交 | 关键事实 | 判定 |
+| :--- | :--- | :---: |
+| `12a7219a` · S1 | 主测速地址整体失败、备用成功 ⇒ `MetricsProbeOutcome.primary_url_distorted` 显式进入裁决层，`evaluate_failover` 直接 `NoAction` 并清零 `consecutive_fails` | ✅ 遵守：把测量抖动从切换理由中剔除 |
+| `12a7219a` · S2 | `DEAD_CONN_CLEANUP_ENABLED = false`，自愈切点后默认不调用 `close_connections_on_dead_node` | ✅ 遵守：直接消除「切点 RST 健康长流」这一断流源，对应方针最高优先级 |
+| `4994df3b` · S3 | `decide_self_heal` 统一裁决三条入口；`NetworkRecovered` 恒判 `Wait`，`ApiUnreachable` 须 3 次异常且 `is_clash_api_alive()` 复核仍不可达 | ✅ 遵守：收编绕过防抖的入口，减少非必要切换与同周期双拨测 |
+| `746780a5` · hook | `.husky/pre-commit` 两条暂存文件探测赋值补「无匹配不报错」兜底 | ⚪ 不适用：工程工具链，不改变任何运行期测速/切换行为 |
+| `803d0579` · S4 | `Suspect` 迟滞、切点前「原节点确已死」门检、`120s` 最小间隔 / `600s` 内最多 3 次速率上限、`ShouldMigrate` 显式隔离 | ✅ 遵守：把触发理由收紧为「确证失效」，并写明「别的节点更快不构成切点理由」 |
+
+- **按方针三要点的结论**：① 目的=不断流/缩短断流 —— S2 与 S4 门检/速率上限已落实，切点一律 `select_node_for_group` 干净热切换，**成立**；② 最小延迟仅为附随收益 —— S4 门检决定「是否切」，选点 `min_by_key` 只决定「切到谁」，二者层次分明，**成立**；③ 非必要不主动切换 —— S1/S3/S4 三层收敛，4 笔改动**遵守**，但存量代码仍有下列未收敛项。
+- **方针确立后仍未收敛（不在本次范围，登记备查）**：
+  1. **冷启动 / Profile 切换的初始化自动选点**：前端 `triggerAutoSelectAndRefresh` → `batchTestWithFirstBatchSelect` 与 `monitor.rs` 的 `is_first_run` 分支，会覆盖 `restore_profile_selected_nodes` 恢复的用户持久选择、按最快节点重选；发生在连接建立前或配置刚变更，不直接产生断流，但「不切换就会断流」的举证缺失，与「非必要不主动切换」精神不完全一致。**【Sync-22 已收口】**
+  2. **选点未比较当前节点**：`trigger_backend_auto_select_inner` 无条件调用 `select_node_for_group("PROXY", fastest_node)`，选回同一节点仍执行一次写（幂等、不断流），属方针最轻残余。**【Sync-22 已收口】**
+  3. **多测量源污染**：180s / 60s 真 HTTPS 验真（不同 URL、6000ms 超时、未取 `METRICS_PROBE_LOCK`）与 `force_confirm_probe` 3 秒强制双拨测（§5.1）仍可能改写 `alive` / `history` 并诱发误判切换（S5）。
+  4. **`ShouldMigrate` 两条路径**（假/拉黑节点重选、真 HTTPS 验真失败迁移）会在原节点 `Alive` 时切换；因有「节点不可用」证据，且受连续 2 次确认 + 速率上限 + 不清连接约束，判为方针定义的「必要」，保留。
+- **文档治理**：`docs/node-health-architecture.md` 的「切换零断流 / 自愈仅兜底 / 真断网安静等待」与本方针一致，但仍需标注主次；§5.1 的 15/3/5 三档周期、60 秒新鲜度与 §5.1.1 临时探针章节同步（S6）。
+- **影响**：纯规范追加，未改动任何代码、未新增配置项、未改动前端、未改动代理组架构、未改动发版流程，不改变 S1–S4 既有运行期行为。
+
+### Sync-22 · 初始化自动选点遵守「连续性优先」方针（v3.3.4，BUG-376）
+
+- **问题定位**：Sync-21 回溯登记的第 1、2 项未收敛。`triggerAutoSelectAndRefresh` 在轻量模式唤醒 / Profile 切换 / 首次启动三种场景下无条件以 `select=true` 调用 `batchTestWithFirstBatchSelect`，会覆盖刚由 `activateSelected` / `restore_profile_selected_nodes` 恢复的用户持久出口、按全局最快节点重选；其 10 秒兜底定时器又以「当前节点没有健康延迟」为由再选一次点，而冷启动时内核尚未拨测、该条件必然为真。后端纯托盘启动的 `is_first_run` 分支同样无条件 `select=true`。此外 `trigger_backend_auto_select_inner` 选出的最优节点与当前出口相同时仍执行一次 `select_node_for_group` 写入。四者都属于方针禁止的「非必要主动切换」。
+- **核心变更**：
+  1. **前端持久出口门检**：`src/pages/_layout/utils/profile-coordination.ts` 新增 `hasUsablePersistedExit(names)`，仅做结构性校验（`PROXY.now` 非空、非伪节点、仍在当前过滤子集内）；有效时 `triggerAutoSelectAndRefresh` 主流程与 10 秒兜底定时器改传 `select=false`，只刷新延迟、不换节点，失效时才允许重选。读取组信息异常一律 fail-open（允许重选），避免退化成无出口。
+  2. **后端纯托盘启动门检**：`monitor.rs` 新增纯函数 `persisted_exit_is_usable(now, all, filter_text, confirmed_fake)` 与 async 包装 `has_usable_persisted_exit`；`is_first_run` 分支以 `select = !has_usable_persisted_exit(&uid)` 调用初始化选点。判定刻意不读 `alive` / `history`：冷启动数据不可靠，「没有健康延迟」不等于「节点已死」。
+  3. **选回同一节点不再写入**：`trigger_backend_auto_select_inner` 在 `select_node_for_group` 前比对当前 `PROXY.now`，一致时跳过切换写入并输出「保持现状」日志；`profile.selected` 回写与前端刷新仍照常执行（幂等），`AutoSelectOutcome` 语义不变。读取组信息失败按原逻辑执行，零回归面。
+  4. **单测锁定**：新增 `test_persisted_exit_is_usable_gates_init_auto_select`（覆盖有效 / 空 / 越界 / `DIRECT` / `REJECT` / 伪节点 / 验真拉黑 / 过滤不匹配 / 成员表缺失）与前端 `profile-coordination.test.ts`（5 个用例覆盖有效 / 空 / 越界 / 伪节点 / 读取异常 fail-open）。
+- **刻意保留的边界**：F1/F4 手动选点与后台故障自愈**完全不受影响**——方针约束的是「无需用户逐次确认的自动行为」；`PROXY` 控制组仍为 `select` 类型，初始化选点在出口结构性失效时依旧会建立可用出口，不牺牲可用性。真死节点的恢复时效不变，仍由 S1–S4 已收口的连续 2 次确认 + 死节点门检链路负责。
+- **验证**：`cargo fmt --all` 已应用，`cargo check -p clash-mini --lib` / `cargo clippy -p clash-mini --lib` / `pnpm typecheck` / `biome format` / `eslint --max-warnings=0` 全部 exit 0；前端 `vitest run` 相关 2 个文件 **11 passed**。Rust 单测二进制编译成功，运行受本机 `STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)` 阻断（DLL 入口点缺失，非断言失败），纯函数同一契约由前端 5 个实跑用例覆盖。
+- **影响**：Sync-21 登记的第 1、2 项已收口；§5 最高方针新增「初始化场景的具体约束」条款；未新增配置项、未改动代理组架构、未改动发版流程，不改变 S1–S4 既有运行期行为。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
@@ -1029,6 +1076,7 @@ flowchart LR
 | **BUG-373** | 5.1 / 5.3 | 三条自愈入口收编统一裁决器：新增 `SelfHealTrigger` / `SelfHealDecision` / `decide_self_heal` 纯函数与 `FAILOVER_CONFIRM_FAILS` / `API_ERROR_HEAL_THRESHOLD` 常量；网络离线转在线恢复恒判 `Wait`（安静等待 + 立即重新测量，删除一次判定即自愈与同周期双拨测），API 连续异常达阈值后先经 `is_clash_api_alive()` 复核，仅仍不可达才放行；主路径连续 2 次确认改由裁决器判定，BUG-318 记账链路不变（见 §5.1 / §5.3 / Sync-19）。 |
 | **BUG-374** | 附录 A / 工程工具链 | 修复 husky `sh -e` 执行 pre-commit 时 `VAR=$(... | grep ...)` 无匹配返回 1 触发 errexit 静默终止：为 `.husky/pre-commit` 两条暂存文件探测赋值补 `|| true` 兜底，使纯文档提交、仅 agreement 提交可正常走完 `cargo make pre-commit`，并让「修改顺序铁律」提示分支恢复可达；未改动 husky 自动生成文件、未使用 `--no-verify`。 |
 | **BUG-375** | 4.2 / 5.1 / 5.3 | 三态健康迟滞、自愈门检与切换速率上限：`NodeStatus` 新增 `Suspect` 与纯函数 `classify_node_status`，`alive=false` 但 30 秒内曾成功判疑似抖动而非已死；`FailoverVerdict` 新增 `ShouldMigrate`、`SelfHealOrigin` 区分三类来源，仅节点侧故障转移经「原节点确已死」门检复核；新增 120 秒最小实际切换间隔与 600 秒 / 3 次滑动窗口上限（见 §5.1 / §5.3 / Sync-20）；`DEAD_CONN_CLEANUP_ENABLED` 因缺少无流量过滤仍保持关闭。 |
+| **BUG-376** | §5 最高方针 / Sync-21 / Sync-22 | 初始化自动选点遵守「连续性优先」：前端 `hasUsablePersistedExit` 与后端 `persisted_exit_is_usable` / `has_usable_persisted_exit` 门检使冷启动、轻量模式唤醒、Profile 切换及纯托盘启动仅在持久出口结构性失效时才允许切点，有效时只刷新延迟、不覆盖用户选择；10 秒兜底定时器不再以「没有健康延迟」为由选点；`trigger_backend_auto_select_inner` 选回同一节点时跳过 `select_node_for_group` 写入。F1/F4 手动选点与后台故障自愈不受影响（见 Sync-22）。 |
 
 ---
 

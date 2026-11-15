@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-375)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-376)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -421,6 +421,13 @@
 - **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`NodeStatus` / `classify_node_status` / `node_status` / `should_probe_active_node` / `evaluate_failover` / `FailoverVerdict` / `SelfHealOrigin` / `self_heal_requires_dead_gate` / `should_proceed_with_self_heal` / `auto_switch_permitted` / `self_heal_with_accounting` / `start_background_monitor`）, `clash_mini_agreements.md`（§5.1 / §5.3 / Sync-20）
 - **根因与背景实证**：v3.3.3 review 的 D1/D2：`node_status` 仅 `Alive / Dead / Unknown` 三值，`alive=false` 或延迟越界即判 `Dead`，没有「疑似/降级」档；而 Mihomo 对拨测失败节点只写 `alive=false`、不追加 `history`，`history.last()` 仍是上一次成功记录，因此**一次测量抖动**即被当成「节点已死」，连续 2 次独立拨测确认反而放大了这一误判。`trigger_backend_auto_select_inner` 按全局最小延迟选点，不要求原节点确已死、无延迟差门槛，自愈「成功」只表示选出了不同节点，自愈由「兜底」漂移成「主动择优」。此外 20 秒切换宽限期与 25 秒失败冷却各自约束「判定」与「发起选点」，缺少以「实际切换」为单位的速率上限，无法兜住周期性切点。S1/S2/S3 已分别切断测速失真误判、清连接硬断与三条绕过防抖的入口，但健康状态模型与选点前提未动。
 - **修正与改良方案**：① `NodeStatus` 新增 `Suspect`，抽出纯函数 `classify_node_status(alive, last_delay, age_secs)`：`!alive` 但 `history.last()` 仍为有效延迟且年龄 < `SUSPECT_WINDOW_SECS (30s)` 判疑似抖动，`evaluate_failover` 直接 `NoAction`、不累计失败；超过窗口或时间戳不可解析（保守）才判 `Dead`，`should_probe_active_node` 对 `Suspect` 要求新拨测确认；② `self_heal_with_accounting` 切点前用同一权威来源 `get_proxies() + node_status()` 复核 `dead_node`，纯函数 `should_proceed_with_self_heal` 仅放行 `Dead`，自愈回归「仅兜底」；③ **实施中发现并处理迁移类回归**：`FailoverVerdict` 新增 `ShouldMigrate`，把「假/广告或验真永久拉黑节点重选」与「活跃节点真 HTTPS 验真失败且子集内有已验真健康节点」两条既有路径从 `ShouldFailover` 中分离；`SelfHealOrigin` 区分 `ConfirmedDead / NodeMigration / ApiChannelDown`，`self_heal_requires_dead_gate` 使门检仅对 `ConfirmedDead` 生效，二者仍走连续 2 次确认与统一记账但跳过死节点门检；④ 新增 `MIN_AUTO_SWITCH_INTERVAL_SECS (120s)` 与 `AUTO_SWITCH_WINDOW_SECS (600s) / MAX_AUTO_SWITCHES_PER_WINDOW (3)`，主循环维护 `recent_auto_switches: Vec<Instant>`，仅真正换到不同节点时计入，由纯函数 `auto_switch_permitted` 裁决；⑤ 新增 4 组纯函数单测覆盖三态边界、门检状态、门检适用范围与速率上限；⑥ 同步 §5.1 / §5.3、新增 Sync-20、附录 A 与 Changelog。**边界**：`DEAD_CONN_CLEANUP_ENABLED` 仍为 `false`——S4 未实现无流量过滤，清连接能力不恢复；「新节点显著更优」在「原节点确已死」前提下退化为「新节点须有有效延迟」，现有 `candidates` 过滤已满足，未另加延迟差门槛；F1/F4 手动选点与冷启动初始化选点不受影响。
+
+### BUG-376（对应规范章节：§5 最高方针 / Sync-21 / Sync-22）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / 初始化自动选点无条件覆盖用户持久出口，违反「连续性优先」最高方针
+- **涉及物理路径与行号**：`src/pages/_layout/utils/profile-coordination.ts`（`triggerAutoSelectAndRefresh` / 新增 `hasUsablePersistedExit` / 10 秒兜底定时器）、`src-tauri/src/module/monitor.rs`（`is_first_run` / 新增 `has_usable_persisted_exit` / `persisted_exit_is_usable` / `trigger_backend_auto_select_inner`）、`clash_mini_agreements.md`（§5 最高方针 / Sync-21 收口标注 / 新增 Sync-22 / 附录 A）
+- **根因与背景实证**：Sync-21 按「连续性优先」方针回溯时登记的两条未收敛项。① 前端 `triggerAutoSelectAndRefresh` 在轻量模式唤醒、Profile 切换、首次启动三种场景下无条件 `batchTestWithFirstBatchSelect(names, true)`，把刚由 `activateSelectedRef` 恢复的用户持久出口覆盖为全局最快节点；其 10 秒兜底定时器以「当前节点没有健康延迟」为由再选一次点，而冷启动时内核尚未拨测、`history` 为空使该条件必然成立，等于固定再切一次。② 后端纯托盘启动 `is_first_run` 先 `restore_profile_selected_nodes` 再无条件 `trigger_backend_auto_select(..., select=true)`，同样自相矛盾。③ `trigger_backend_auto_select_inner` 选出的 `fastest_node` 与本就是当前出口时仍执行一次 `select_node_for_group` 写入。三者都以「选最小延迟节点」为目的，按方针「最小延迟只是附随收益、非必要不主动切换」属违约；其中唤醒场景配置根本没变，切点尤无必要。
+- **修正与改良方案**：① 前端新增 `hasUsablePersistedExit(names)`，只做结构性校验（`PROXY.now` 非空、非伪节点、仍在当前过滤子集内），有效时主流程与兜底定时器均改传 `select=false`——只全组测速刷新延迟、不换节点；读取异常 fail-open 保守允许重选，避免退化成无出口。② 后端新增纯函数 `persisted_exit_is_usable` 与 async 包装 `has_usable_persisted_exit`，`is_first_run` 改以 `select = !has_usable_persisted_exit(&uid)` 调用；判定刻意不读 `alive` / `history`（冷启动数据不可靠，「没有健康延迟」≠「节点已死」），真死节点交由 S1–S4 已收口的连续 2 次确认 + 死节点门检自愈，不在初始化阶段抢占。③ 选点前比对当前 `PROXY.now`，一致时跳过 `select_node_for_group` 写入并输出「保持现状」日志，`profile.selected` 回写与前端刷新照常（幂等），`AutoSelectOutcome` 语义不变；读取失败按原逻辑执行。④ 新增 Rust 纯函数单测 `test_persisted_exit_is_usable_gates_init_auto_select` 与前端 `profile-coordination.test.ts` 5 个用例；§5 方针新增「初始化场景的具体约束」条款、Sync-21 两项标注已收口、新增 Sync-22、附录 A 补映射。**边界**：F1/F4 手动选点与后台故障自愈完全不受影响；出口结构性失效时初始化选点仍会建立可用出口，不牺牲可用性。
 
 ---
 

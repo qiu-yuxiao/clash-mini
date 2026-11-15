@@ -26,6 +26,13 @@
 - **切换速率上限**：新增 120 秒最小实际切换间隔与 600 秒内最多 3 次的滑动窗口约束（纯函数 `auto_switch_permitted`），主循环维护 `recent_auto_switches`，仅真正换到不同节点时计入；与 25 秒「发起选点冷却」互补，压住周期性切点。
 - **边界与规范同步**：`DEAD_CONN_CLEANUP_ENABLED` 仍保持关闭（缺少 age / 流量过滤，清连接能力不恢复）；F1/F4 手动选点与冷启动初始化选点完全不受影响。§5.1 / §5.3 补三态与速率契约，新增 Sync-20 与附录 A 映射，新增 4 组纯函数单测。
 
+### 🎯 初始化自动选点遵守「连续性优先」最高方针（BUG-376）
+
+- **持久出口不再被无条件覆盖**：`triggerAutoSelectAndRefresh` 在轻量模式唤醒、Profile 切换、首次启动时先由新增的 `hasUsablePersistedExit` 判断 `PROXY.now` 是否仍结构性有效（非空、非伪节点、仍在当前过滤子集内）；有效时改以 `select=false` 只做全组测速刷新延迟、不换节点，仅当出口失效才允许重选建立可用出口。10 秒兜底定时器同步收紧，不再以「当前节点没有健康延迟」为由选点——冷启动时内核尚未拨测，该条件必然为真，等于固定再切一次。
+- **纯托盘启动同源门检**：后端 `is_first_run` 先 `restore_profile_selected_nodes` 再无条件 `select=true` 的自相矛盾已修，改由纯函数 `persisted_exit_is_usable` 与 `has_usable_persisted_exit` 裁决。判定刻意不读 `alive` / `history`，把「节点是否真死」交给 S1–S4 已收口的连续 2 次确认 + 死节点门检自愈，不在初始化阶段抢占；读取异常 fail-open，保证仍能建立出口。
+- **选回同一节点不再写入**：`trigger_backend_auto_select_inner` 在切点前比对当前出口，一致时跳过 `select_node_for_group` 并输出「保持现状」日志；`profile.selected` 回写与前端刷新照常执行（幂等），`AutoSelectOutcome` 语义不变。
+- **规范与单测同步**：§5 最高方针新增「初始化场景的具体约束」条款，Sync-21 登记的第 1、2 项标注已收口，新增 Sync-22 与附录 A BUG-376 映射；新增 Rust 纯函数单测与前端 `profile-coordination.test.ts`（5 个用例）。F1/F4 手动选点与后台故障自愈完全不受影响。
+
 ---
 
 ## v3.3.3

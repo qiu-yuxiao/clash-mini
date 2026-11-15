@@ -132,6 +132,30 @@ export async function batchTestWithFirstBatchSelect(
   }
 }
 
+/**
+ * 最高方针「连续性优先」（agreements §5 / Sync-22）：判断当前 `PROXY.now` 是否仍是
+ * 结构性有效的用户持久出口，供启动 / 唤醒 / Profile 切换的初始化自动选点决定是否允许切点。
+ *
+ * - 有效（非空、非伪节点、仍在当前过滤子集内）→ 只做全组测速刷新，**不换节点**；
+ * - 失效（空 / 伪节点 / 不在新配置与过滤范围内）→ 才允许重选，保证有可用出口。
+ *
+ * 刻意不检查 alive / history：冷启动时内核尚未拨测，这些数据不可靠；「没有健康延迟」
+ * 不等于「节点已死」，不构成切换理由。真死节点由后台监测经连续 2 次确认 + 死节点门检自愈，
+ * 不在此抢占。读取组信息失败一律返回 false（保守允许选点），避免退化成无出口。
+ */
+export async function hasUsablePersistedExit(
+  names: string[],
+): Promise<boolean> {
+  try {
+    const group = await getProxyByNameWithTimeout('PROXY')
+    const now = group?.now || ''
+    if (!now || isDummyNode(now)) return false
+    return names.includes(now)
+  } catch {
+    return false
+  }
+}
+
 export async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<unknown>,
   fallbackTimerRef: { current: number | null },
@@ -166,7 +190,9 @@ export async function triggerAutoSelectAndRefresh(
     }
     const names = await getFilteredNodeNames()
     if (names.length === 0) return
-    await batchTestWithFirstBatchSelect(names, true)
+    // 最高方针「连续性优先」：用户持久出口仍有效时只刷新延迟，不按最快节点覆盖它
+    const keepExit = await hasUsablePersistedExit(names)
+    await batchTestWithFirstBatchSelect(names, !keepExit)
     if (setHeadState) {
       setHeadState('PROXY', { sortType: 1 })
     }
@@ -196,7 +222,10 @@ export async function triggerAutoSelectAndRefresh(
       if (!hasHealth) {
         const names = await getFilteredNodeNames()
         if (names.length === 0) return
-        await batchTestWithFirstBatchSelect(names, true)
+        // 最高方针「连续性优先」：「没有健康延迟」不等于「节点已死」，不构成切点理由；
+        // 仅当持久出口结构性失效时才允许重选，其余只补测刷新延迟。
+        const keepExit = await hasUsablePersistedExit(names)
+        await batchTestWithFirstBatchSelect(names, !keepExit)
         if (setHeadState) {
           setHeadState('PROXY', { sortType: 1 })
         }

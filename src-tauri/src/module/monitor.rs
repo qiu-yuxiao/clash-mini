@@ -1407,6 +1407,44 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
     Ok(verdict)
 }
 
+/// 纯判定部分（便于单测锁定「什么才算结构性有效」）：只做结构性校验，
+/// 不读 `alive` / `history`，也不发起任何网络调用。
+fn persisted_exit_is_usable(
+    now: Option<&str>,
+    all: Option<&[String]>,
+    filter_text: &str,
+    confirmed_fake: bool,
+) -> bool {
+    let Some(now) = now.filter(|n| !n.is_empty()) else {
+        return false;
+    };
+    if now == "DIRECT" || now == "REJECT" || is_dummy_node(now) || confirmed_fake {
+        return false;
+    }
+    if !match_node_filter(now, filter_text.trim()) {
+        return false;
+    }
+    all.is_some_and(|nodes| nodes.iter().any(|n| n == now))
+}
+
+/// 最高方针「连续性优先」（agreements §5 / Sync-22）：判断当前 `PROXY.now` 是否仍是
+/// 结构性有效的用户持久出口，供**纯托盘启动**的初始化自动选点决定是否允许切点。
+///
+/// 仅用于初始化场景，F1/F4 手动选点与后台故障自愈不受此判断约束。刻意不检查
+/// `alive` / `history`：冷启动时内核尚未拨测，这些数据不可靠，「没有健康延迟」
+/// 不等于「节点已死」；真死节点由后台监测经连续 2 次确认 + 死节点门检自愈，
+/// 不在此抢占。任何读取失败一律返回 `false`（保守允许选点），保证仍能建立可用出口。
+async fn has_usable_persisted_exit(profile_uid: &str) -> bool {
+    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+    let Ok(group) = mihomo.get_group_by_name("PROXY").await else {
+        return false;
+    };
+    let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
+    let now = group.now.as_deref();
+    let confirmed_fake = now.is_some_and(crate::utils::node::is_confirmed_fake_node);
+    persisted_exit_is_usable(now, group.all.as_deref(), &filter_config.filter_text, confirmed_fake)
+}
+
 /// 自动并发测速并优选切换到符合过滤条件的最快节点
 /// - `sort_type`: 0=从配置文件读取, 1=按延迟排序, 2=按名称排序（仅影响展示顺序）
 /// - `select`: true=测速完成后将 PROXY 切换至最快节点；false=仅测速填充展示，不切换
@@ -1775,14 +1813,39 @@ async fn trigger_backend_auto_select_inner(
                 });
             }
 
-            match mihomo.select_node_for_group("PROXY", fastest_node).await {
+            // 最高方针「连续性优先」（Sync-22）：最优节点若本就是当前出口，跳过一次
+            // 无意义的 select_node_for_group 写入。读取组信息失败时按原逻辑执行，
+            // 不改变任何既有语义；回写 profile.selected 与前端刷新仍照常进行（幂等）。
+            let already_current = mihomo
+                .get_group_by_name("PROXY")
+                .await
+                .ok()
+                .and_then(|g| g.now)
+                .is_some_and(|n| n == fastest_node.as_str());
+            if already_current {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 最优节点 {} 已是当前出口，保持现状（不发起切换写入）",
+                    fastest_node
+                );
+            }
+            let switch_result = if already_current {
+                Ok(())
+            } else {
+                mihomo.select_node_for_group("PROXY", fastest_node).await.map(|_| ())
+            };
+
+            match switch_result {
                 Ok(_) => {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 成功将 PROXY 策略组切换为: {}",
-                        fastest_node
-                    );
+                    if !already_current {
+                        logging!(
+                            info,
+                            Type::Lightweight,
+                            "[后台监测] 成功将 PROXY 策略组切换为: {}",
+                            fastest_node
+                        );
+                    }
                     selected = true;
                     selected_node = Some(fastest_node.clone());
                     emit_network_health_notice("network_health::ok");
@@ -2045,8 +2108,11 @@ pub fn start_background_monitor() {
                 if matches!(window_state, crate::utils::window_manager::WindowState::NotExist) {
                     if let Some(uid) = get_current_profile_uid().await {
                         let _ = restore_profile_selected_nodes(&uid).await;
-                        // 委托后端执行初始化自动选点（前序 wait_for_clash_ready 已通过，跳过冗余等待）；结果经事件回写前端 UI
-                        let _ = trigger_backend_auto_select(&uid, None, 0, true, true).await;
+                        // 最高方针「连续性优先」（Sync-22）：持久出口仍有效时只做全组测速刷新，
+                        // 不按最快节点覆盖用户选择；仅当出口结构性失效才允许重选。
+                        // 前序 wait_for_clash_ready 已通过，跳过冗余等待；结果经事件回写前端 UI。
+                        let select = !has_usable_persisted_exit(&uid).await;
+                        let _ = trigger_backend_auto_select(&uid, None, 0, select, true).await;
                     }
                 }
             } else {
@@ -2729,7 +2795,8 @@ mod tests {
     use super::{
         API_ERROR_HEAL_THRESHOLD, FAILOVER_CONFIRM_FAILS, MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS,
         SUSPECT_WINDOW_SECS, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
-        classify_node_status, decide_self_heal, self_heal_requires_dead_gate, should_proceed_with_self_heal,
+        classify_node_status, decide_self_heal, persisted_exit_is_usable, self_heal_requires_dead_gate,
+        should_proceed_with_self_heal,
     };
     use super::{
         DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
@@ -2799,6 +2866,37 @@ mod tests {
             Some(MIN_AUTO_SWITCH_INTERVAL_SECS),
             MAX_AUTO_SWITCHES_PER_WINDOW
         ));
+    }
+
+    #[test]
+    fn test_persisted_exit_is_usable_gates_init_auto_select() {
+        let all = vec!["日本-01".to_string(), "香港-01".to_string()];
+
+        // 用户持久出口结构性有效 → 保持现状，初始化选点不得切点
+        assert!(persisted_exit_is_usable(Some("日本-01"), Some(&all), "", false));
+        assert!(persisted_exit_is_usable(Some("日本-01"), Some(&all), "日本", false));
+
+        // 无选中 / 空出口 → 允许重选，保证仍能建立可用出口
+        assert!(!persisted_exit_is_usable(None, Some(&all), "", false));
+        assert!(!persisted_exit_is_usable(Some(""), Some(&all), "", false));
+
+        // 节点已从新配置中消失（换订阅 / 被污染的持久选择）→ 允许重选
+        assert!(!persisted_exit_is_usable(Some("新加坡-01"), Some(&all), "", false));
+
+        // DIRECT / REJECT / 广告节点 / 验真永久拉黑 → 允许重选
+        assert!(!persisted_exit_is_usable(Some("DIRECT"), Some(&all), "", false));
+        assert!(!persisted_exit_is_usable(Some("REJECT"), Some(&all), "", false));
+        assert!(!persisted_exit_is_usable(
+            Some("https://promo.example.com"),
+            Some(&all),
+            "",
+            false
+        ));
+        assert!(!persisted_exit_is_usable(Some("日本-01"), Some(&all), "", true));
+
+        // 不在当前过滤子集内 / 成员表读不到 → 保守允许重选
+        assert!(!persisted_exit_is_usable(Some("日本-01"), Some(&all), "香港", false));
+        assert!(!persisted_exit_is_usable(Some("日本-01"), None, "", false));
     }
 
     #[test]
