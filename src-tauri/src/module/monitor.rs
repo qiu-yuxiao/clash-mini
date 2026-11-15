@@ -68,6 +68,22 @@ const NODE_TEST_TIMEOUT_MS: u32 = NODE_DELAY_MAX_MS;
 /// 恢复为 v3.2.2 基线的 60 秒（≈ 4× NORMAL_CHECK_INTERVAL_SECS），由「按需拨测」约束频率。
 const HEALTH_DATA_FRESH_SECS: u64 = 60;
 
+/// 疑似抖动窗口（秒，S4 / BUG-375）。
+/// Mihomo 对拨测失败的节点只写 `alive=false`、不追加 history，故 `history.last()`
+/// 仍是上一次成功记录。若该记录仍在本窗口内，说明节点「刚失败、之前是好的」，
+/// 只能判 `Suspect`，不得直接判 `Dead` 进入自愈链；超过窗口（长期无成功记录）才判死。
+/// 代价是真死节点的自愈最多推迟本窗口时长，由 20s 宽限 + 25s 冷却覆盖，不影响可恢复性。
+const SUSPECT_WINDOW_SECS: u64 = 30;
+
+/// 两次自愈**实际切换**的最小间隔（秒，S4）。
+/// 与 `self_heal_with_accounting` 的 25 秒「尝试冷却」语义不同：冷却约束「发起选点」，
+/// 本值约束「真正换节点」，避免真故障恢复期反复热切换。
+const MIN_AUTO_SWITCH_INTERVAL_SECS: u64 = 120;
+
+/// 自愈切换速率上限的滑动窗口（秒）与窗口内最大切换次数（S4）。
+const AUTO_SWITCH_WINDOW_SECS: u64 = 600;
+const MAX_AUTO_SWITCHES_PER_WINDOW: usize = 3;
+
 /// 死节点确认拨测的最小间隔（秒）。
 /// 活跃节点被判死后，若其 history 在此时间内（说明刚拨测过），直接信缓存判定，
 /// 避免重试模式 3s 周期下对同一死节点密集重复拨测。
@@ -952,15 +968,60 @@ pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow:
     Ok(())
 }
 
-/// 单节点健康状态（由测量组维护的 history/alive 判定，TUN 下可靠）
+/// 单节点健康状态（由测量组维护的 history/alive 判定，TUN 下可靠）。
+/// S4 起由二值扩为三态：`Suspect` 吸收「一次拨测失败」的测量抖动，
+/// 只有 `Dead` 才构成自愈证据，避免抖动直接落到最重档。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NodeStatus {
     /// 测量组尚未测过该节点（数据缺失），不动作、等待测量
     Unknown,
-    /// 节点不可用（测速超时/失败/假节点）
+    /// 疑似抖动：`alive=false` 但上一次成功拨测仍在 `SUSPECT_WINDOW_SECS` 内。
+    /// 不是「节点已死」，不得据此累计失败或触发自愈。
+    Suspect,
+    /// 节点已确认不可用（测速超时/失败/假节点，且无近期成功记录）
     Dead,
     /// 节点健康，附带真实延迟
     Alive(u32),
+}
+
+/// 单节点健康三态分类（纯函数，便于单测锁定边界）。
+///
+/// - 无 history → `Unknown`（数据缺失，不误判）；
+/// - `alive` 且延迟在 `[NODE_DELAY_MIN_MS, NODE_DELAY_MAX_MS)` → `Alive`；
+/// - `!alive` 但 `history.last()` 仍是有效成功延迟且其年龄 < `SUSPECT_WINDOW_SECS` → `Suspect`；
+/// - 其余（延迟越界、`!alive` 且历史陈旧、时间戳不可解析）→ `Dead`。
+///
+/// 「时间戳不可解析」保守判 `Dead` 而非 `Suspect`：宁可让真死节点正常进入自愈，
+/// 也不能因解析失败把长期不可用的节点永久挡在自愈链之外。
+fn classify_node_status(alive: bool, last_delay: Option<u32>, age_secs: Option<u64>) -> NodeStatus {
+    let Some(delay) = last_delay else {
+        return NodeStatus::Unknown;
+    };
+    let valid_delay = (NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&delay);
+    if alive && valid_delay {
+        return NodeStatus::Alive(delay);
+    }
+    if !alive && valid_delay && age_secs.is_some_and(|age| age < SUSPECT_WINDOW_SECS) {
+        return NodeStatus::Suspect;
+    }
+    NodeStatus::Dead
+}
+
+/// 自愈前门检（S4）：只有**确证已死**的原节点才允许自愈切点。
+/// `Suspect` / `Alive` / `Unknown` 都说明原节点并未确证失效——自愈是兜底，不是择优，
+/// 「别的节点更快」永远不构成切点理由（那属于 F1 手动选点）。
+const fn should_proceed_with_self_heal(dead_status: NodeStatus) -> bool {
+    matches!(dead_status, NodeStatus::Dead)
+}
+
+/// 自愈切换速率上限（S4，纯函数）。
+/// `last_switch_age_secs` 为距上次实际切换的秒数；`recent_switch_count` 为
+/// `AUTO_SWITCH_WINDOW_SECS` 滑动窗口内已发生的实际切换次数（由调用方裁剪）。
+fn auto_switch_permitted(last_switch_age_secs: Option<u64>, recent_switch_count: usize) -> bool {
+    if last_switch_age_secs.is_some_and(|age| age < MIN_AUTO_SWITCH_INTERVAL_SECS) {
+        return false;
+    }
+    recent_switch_count < MAX_AUTO_SWITCHES_PER_WINDOW
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -968,10 +1029,29 @@ enum NodeStatus {
 pub enum FailoverVerdict {
     /// 当前活跃节点健康或数据缺失，无需动作
     NoAction,
-    /// 活跃节点已死且子集内存在健康候选，应触发选点
+    /// 活跃节点已死且子集内存在健康候选，应触发选点（故障转移）
     ShouldFailover,
+    /// 活跃节点**仍可用但不可信**（假/广告节点、验真永久拉黑、真 HTTPS 验真失败），
+    /// 需迁移到已验真健康节点（S4：与「节点已死」区分，不适用原节点确已死门检）
+    ShouldMigrate,
     /// 子集内全部节点均不可用
     AllDead,
+}
+
+/// 自愈请求来源（S4）：决定「原节点确已死」门检是否适用。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelfHealOrigin {
+    /// 节点侧故障转移：原节点经连续 2 次独立体检确认已死，必须过门检
+    ConfirmedDead,
+    /// 不可信节点迁移：原节点仍可用但假/验真失败，门检不适用
+    NodeMigration,
+    /// 内核 API 通道故障：无原节点信息，沿用 BUG-318 重启/告警链路
+    ApiChannelDown,
+}
+
+/// 门检适用范围（纯函数，便于单测锁定）：仅节点侧故障转移需要「原节点确已死」复核。
+const fn self_heal_requires_dead_gate(origin: SelfHealOrigin) -> bool {
+    matches!(origin, SelfHealOrigin::ConfirmedDead)
 }
 
 /// 后台监测所有自愈请求的统一裁决输入（S3，§5.1 / §5.3）。
@@ -1033,18 +1113,10 @@ const fn decide_self_heal(trigger: SelfHealTrigger) -> SelfHealDecision {
 /// 彻底取代旧设计「后端用 delay_proxy_by_name 自测活跃节点」的不可靠路径。
 fn node_status(proxy: &tauri_plugin_mihomo::models::Proxy) -> NodeStatus {
     // 测量组尚未测过该节点 → 数据缺失，不误判
-    // 取最近一次 history 延迟；缺失则同样视为 Unknown
-    let last = match proxy.history.last() {
-        Some(h) => h.delay as u32,
-        None => return NodeStatus::Unknown,
-    };
-    // alive=false（测速失败）或延迟不在 [MIN, MAX) 区间 → 死
-    //（低于下限 = 机场伪造假节点/广告节点，达到/超过上限 = 测速超时）
-    if !proxy.alive || !(NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&last) {
-        NodeStatus::Dead
-    } else {
-        NodeStatus::Alive(last)
-    }
+    let last_delay = proxy.history.last().map(|h| h.delay as u32);
+    // 用同一份 history 时间戳判断「刚失败」还是「长期不可用」（S4 三态）
+    let age_secs = history_age(proxy).map(|age| age.as_secs());
+    classify_node_status(proxy.alive, last_delay, age_secs)
 }
 
 /// 节点上次拨测距现在的时长（基于 history 中 RFC3339 时间戳）。
@@ -1075,6 +1147,8 @@ fn should_probe_active_node(status: NodeStatus, age: Option<Duration>, force_con
         (NodeStatus::Alive(_), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS) => false,
         // 常规模式下刚测死 → 10 秒内不重复拨测
         (NodeStatus::Dead, Some(age)) if age < Duration::from_secs(DEAD_CONFIRM_MIN_INTERVAL_SECS) => false,
+        // 疑似抖动需要尽快用新拨测确认，但不得沿用死节点的 10 秒去抖缓存
+        (NodeStatus::Suspect, _) => true,
         // 其余：健康但陈旧 / 死判定陈旧 / 数据缺失 / 时间戳不可解析 → 拨测确认
         _ => true,
     }
@@ -1100,9 +1174,10 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         _ => return Ok(FailoverVerdict::NoAction), // 直连/拒绝节点或无选中，不动作
     };
 
-    // 假/广告节点或 HTTPS 验真永久拉黑节点 → 视为需要重选（无需等 url-test）
+    // 假/广告节点或 HTTPS 验真永久拉黑节点 → 视为需要重选（无需等 url-test）。
+    // S4：这是「不可信节点迁移」而非「节点已死」，不能套用原节点确已死门检。
     if is_dummy_node(&active_node) || crate::utils::node::is_confirmed_fake_node(&active_node) {
-        return Ok(FailoverVerdict::ShouldFailover);
+        return Ok(FailoverVerdict::ShouldMigrate);
     }
 
     let mut proxies = mihomo
@@ -1285,10 +1360,22 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
                             "[后台监测] 当前节点 {} 真 HTTPS 验真失败且子集内存在已验真健康节点，触发切往已验真节点",
                             active_node
                         );
-                        return Ok(FailoverVerdict::ShouldFailover);
+                        // S4：原节点仍健康，属「不可信节点迁移」，不是故障转移
+                        return Ok(FailoverVerdict::ShouldMigrate);
                     }
                 }
             }
+            return Ok(FailoverVerdict::NoAction);
+        }
+        // 【S4 · 三态迟滞】一次拨测失败但近期曾成功 ⇒ 疑似抖动，不是节点已死。
+        // 本轮不累计失败、不进自愈链；由下一周期按新鲜度重新拨测确认。
+        Some(NodeStatus::Suspect) => {
+            logging!(
+                info,
+                Type::Lightweight,
+                "[后台监测] 活跃节点 {} 仅为疑似抖动（alive=false 但近期曾成功），本轮不判死、不累计失败",
+                active_node
+            );
             return Ok(FailoverVerdict::NoAction);
         }
         Some(NodeStatus::Unknown) | None => {
@@ -1904,6 +1991,8 @@ pub fn start_background_monitor() {
         let mut last_online_check_time: Option<Instant> = None;
         let mut last_https_verify_time: Option<Instant> = None;
         let mut last_auto_select_time: Option<Instant> = None;
+        // S4：最近发生的「自愈实际切换」时间戳，用于最小间隔 + 滑动窗口速率上限
+        let mut recent_auto_switches: Vec<Instant> = Vec::new();
         let mut auto_select_fail_count = 0u32;
         let mut api_dead_heal_fail_count = 0u32;
         // 连续 API 异常计数：mihomo API 不可达时（get_group_by_name 超时/连接失败）累计，
@@ -2113,10 +2202,12 @@ pub fn start_background_monitor() {
                                 self_heal_with_accounting(
                                     &current_profile,
                                     None,
+                                    SelfHealOrigin::ApiChannelDown,
                                     &mut auto_select_fail_count,
                                     &mut api_dead_heal_fail_count,
                                     &mut last_auto_select_time,
                                     &mut last_check_time,
+                                    &mut recent_auto_switches,
                                 )
                                 .await;
                             } else {
@@ -2175,7 +2266,16 @@ pub fn start_background_monitor() {
                                 is_retry_mode = false;
                                 emit_network_health_notice("network_health::ok");
                             }
-                            FailoverVerdict::ShouldFailover | FailoverVerdict::AllDead => {
+                            FailoverVerdict::ShouldFailover
+                            | FailoverVerdict::AllDead
+                            | FailoverVerdict::ShouldMigrate => {
+                                // S4：区分「节点已死故障转移」与「不可信节点迁移」，
+                                // 只有前者需要过「原节点确已死」门检。
+                                let self_heal_origin = if matches!(verdict, FailoverVerdict::ShouldMigrate) {
+                                    SelfHealOrigin::NodeMigration
+                                } else {
+                                    SelfHealOrigin::ConfirmedDead
+                                };
                                 // 若在 evaluate_failover 拨测等待期间前端刚发生了手动节点切换（BUG-336），
                                 // 立即吸收最新切换时间戳并进入切换宽限期，消除拨测期切点竞态。
                                 let post_probe_manual_ts = LAST_MANUAL_NODE_SWITCH.lock().take();
@@ -2232,10 +2332,12 @@ pub fn start_background_monitor() {
                                         self_heal_with_accounting(
                                             &current_profile,
                                             Some(&active_node_name),
+                                            self_heal_origin,
                                             &mut auto_select_fail_count,
                                             &mut api_dead_heal_fail_count,
                                             &mut last_auto_select_time,
                                             &mut last_check_time,
+                                            &mut recent_auto_switches,
                                         )
                                         .await;
                                     }
@@ -2267,10 +2369,12 @@ pub fn start_background_monitor() {
                                 self_heal_with_accounting(
                                     &current_profile,
                                     None,
+                                    SelfHealOrigin::ApiChannelDown,
                                     &mut auto_select_fail_count,
                                     &mut api_dead_heal_fail_count,
                                     &mut last_auto_select_time,
                                     &mut last_check_time,
+                                    &mut recent_auto_switches,
                                 )
                                 .await;
                             } else {
@@ -2404,13 +2508,18 @@ const fn complete_restart_core_attempt(
     }
 }
 
+// 统一记账函数历史上就承载多条自愈入口的计数/冷却/告警状态，S3 起新增裁决来源、
+// S4 起新增切换速率窗口，参数数量随之增长；项目既有惯例允许此处保留显式参数列表。
+#[allow(clippy::too_many_arguments)]
 async fn self_heal_with_accounting(
     profile_uid: &str,
     dead_node: Option<&str>,
+    origin: SelfHealOrigin,
     auto_select_fail_count: &mut u32,
     api_dead_heal_fail_count: &mut u32,
     last_auto_select_time: &mut Option<Instant>,
     last_check_time: &mut Instant,
+    recent_auto_switches: &mut Vec<Instant>,
 ) -> bool {
     // 25 秒冷却保护：auto_select 失败后至少等 25 秒再重试
     let now = Instant::now();
@@ -2426,6 +2535,63 @@ async fn self_heal_with_accounting(
             return false;
         }
     }
+
+    // 【S4 · 原节点确已死门检（BUG-375）】裁决器放行只说明「连续 2 次体检失败」。
+    // 切点前必须再读一次**同一权威来源**（get_proxies + node_status）确认原节点此刻仍确证已死；
+    // 若它在拨测等待期间已恢复（Alive / Suspect / Unknown），说明只是一次抖动，放弃切点。
+    // 自愈是兜底而非择优——「别的节点更快」永远不构成切点理由（那属于 F1 手动选点）。
+    // 本门检只适用于 ConfirmedDead：不可信节点迁移（原节点本就健康，见 ShouldMigrate）与
+    // API 通道故障（无原节点信息，沿用 BUG-318 重启/告警链路）均跳过。
+    if self_heal_requires_dead_gate(origin)
+        && let Some(dead) = dead_node.filter(|name| !name.is_empty())
+    {
+        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+        match mihomo.get_proxies().await {
+            Ok(proxies) => {
+                let status = proxies
+                    .proxies
+                    .get(dead)
+                    .map(node_status)
+                    .unwrap_or(NodeStatus::Unknown);
+                if !should_proceed_with_self_heal(status) {
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 自愈门检：原节点 {} 当前状态为 {:?}，未确证已死 → 放弃本次切点",
+                        dead,
+                        status
+                    );
+                    return false;
+                }
+            }
+            Err(e) => {
+                logging!(
+                    warn,
+                    Type::Lightweight,
+                    "[后台监测] 自愈门检读取节点状态失败 ({e})，保守放弃本次切点"
+                );
+                return false;
+            }
+        }
+    }
+
+    // 【S4 · 切换速率上限】先裁剪滑动窗口，再按「实际切换」次数而非选点尝试次数裁决。
+    recent_auto_switches.retain(|t| now.duration_since(*t).as_secs() < AUTO_SWITCH_WINDOW_SECS);
+    let last_switch_age = recent_auto_switches.last().map(|t| now.duration_since(*t).as_secs());
+    if !auto_switch_permitted(last_switch_age, recent_auto_switches.len()) {
+        logging!(
+            warn,
+            Type::Lightweight,
+            "[后台监测] 自愈切换速率保护：距上次切换 {:?}s / 窗口内已切 {} 次（下限 {}s，{}s 内上限 {} 次），跳过本次切点",
+            last_switch_age,
+            recent_auto_switches.len(),
+            MIN_AUTO_SWITCH_INTERVAL_SECS,
+            AUTO_SWITCH_WINDOW_SECS,
+            MAX_AUTO_SWITCHES_PER_WINDOW
+        );
+        return false;
+    }
+
     let prev_auto_select_time = *last_auto_select_time;
     *last_auto_select_time = Some(now);
 
@@ -2436,6 +2602,15 @@ async fn self_heal_with_accounting(
                 *auto_select_fail_count = 0;
                 *api_dead_heal_fail_count = 0;
                 emit_network_health_notice("network_health::ok");
+                // S4：仅「真正换到不同节点」才计入速率窗口；选回同一节点不算一次切换。
+                // dead_node 为 None 的 API 通道故障路径无基准，按「执行了切点」计入。
+                let changed = match (dead_node, outcome.selected_node.as_deref()) {
+                    (Some(d), Some(n)) => d != n,
+                    _ => true,
+                };
+                if changed {
+                    recent_auto_switches.push(Instant::now());
+                }
                 if let (Some(dead), Some(new_node)) = (dead_node, outcome.selected_node.as_deref())
                     && !dead.is_empty()
                     && dead != new_node
@@ -2552,7 +2727,9 @@ async fn self_heal_with_accounting(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        API_ERROR_HEAL_THRESHOLD, FAILOVER_CONFIRM_FAILS, SelfHealDecision, SelfHealTrigger, decide_self_heal,
+        API_ERROR_HEAL_THRESHOLD, FAILOVER_CONFIRM_FAILS, MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS,
+        SUSPECT_WINDOW_SECS, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
+        classify_node_status, decide_self_heal, self_heal_requires_dead_gate, should_proceed_with_self_heal,
     };
     use super::{
         DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
@@ -2563,6 +2740,66 @@ mod tests {
         reset_monitor_static_state, resolve_probe_target, secondary_test_url, should_probe_active_node,
         should_recheck_with_fallback, sort_display_delays, try_reuse_probe_snapshot,
     };
+
+    #[test]
+    fn test_classify_node_status_suspect_hysteresis() {
+        // 健康节点
+        assert_eq!(classify_node_status(true, Some(80), Some(5)), NodeStatus::Alive(80));
+        // 一次拨测失败但上一次成功拨测仍在疑似窗口内 → 抖动，不判死
+        assert_eq!(classify_node_status(false, Some(80), Some(5)), NodeStatus::Suspect);
+        assert_eq!(
+            classify_node_status(false, Some(80), Some(SUSPECT_WINDOW_SECS - 1)),
+            NodeStatus::Suspect
+        );
+        // 超过疑似窗口、或时间戳不可解析（保守）→ 确证已死
+        assert_eq!(
+            classify_node_status(false, Some(80), Some(SUSPECT_WINDOW_SECS)),
+            NodeStatus::Dead
+        );
+        assert_eq!(classify_node_status(false, Some(80), None), NodeStatus::Dead);
+        // 延迟越界（假节点 / 超时）即便 alive 也判死；无 history 判 Unknown
+        assert_eq!(classify_node_status(true, Some(0), Some(5)), NodeStatus::Dead);
+        assert_eq!(classify_node_status(true, Some(5000), Some(5)), NodeStatus::Dead);
+        assert_eq!(classify_node_status(true, None, None), NodeStatus::Unknown);
+    }
+
+    #[test]
+    fn test_self_heal_requires_confirmed_dead_origin() {
+        // 自愈是兜底不是择优：只有原节点确证已死才允许切点
+        assert!(should_proceed_with_self_heal(NodeStatus::Dead));
+        assert!(!should_proceed_with_self_heal(NodeStatus::Suspect));
+        assert!(!should_proceed_with_self_heal(NodeStatus::Alive(80)));
+        assert!(!should_proceed_with_self_heal(NodeStatus::Unknown));
+    }
+
+    #[test]
+    fn test_dead_gate_applies_only_to_confirmed_dead_failover() {
+        // 只有节点侧故障转移需要「原节点确已死」复核；
+        // 不可信节点迁移（原节点本就健康）与 API 通道故障（无原节点信息）不得被门检挡住。
+        assert!(self_heal_requires_dead_gate(SelfHealOrigin::ConfirmedDead));
+        assert!(!self_heal_requires_dead_gate(SelfHealOrigin::NodeMigration));
+        assert!(!self_heal_requires_dead_gate(SelfHealOrigin::ApiChannelDown));
+    }
+
+    #[test]
+    fn test_auto_switch_permitted_rate_limits() {
+        // 从未切换过 → 放行
+        assert!(auto_switch_permitted(None, 0));
+        // 距上次实际切换不足最小间隔 → 拒绝
+        assert!(!auto_switch_permitted(Some(0), 0));
+        assert!(!auto_switch_permitted(Some(MIN_AUTO_SWITCH_INTERVAL_SECS - 1), 0));
+        // 达到最小间隔且窗口内次数未达上限 → 放行
+        assert!(auto_switch_permitted(Some(MIN_AUTO_SWITCH_INTERVAL_SECS), 0));
+        assert!(auto_switch_permitted(
+            Some(MIN_AUTO_SWITCH_INTERVAL_SECS),
+            MAX_AUTO_SWITCHES_PER_WINDOW - 1
+        ));
+        // 窗口内次数达上限 → 拒绝
+        assert!(!auto_switch_permitted(
+            Some(MIN_AUTO_SWITCH_INTERVAL_SECS),
+            MAX_AUTO_SWITCHES_PER_WINDOW
+        ));
+    }
 
     #[test]
     fn test_decide_self_heal_unifies_all_three_triggers() {

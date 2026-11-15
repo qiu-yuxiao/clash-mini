@@ -19,6 +19,13 @@
 - **根因**：husky 9 的 `.husky/_/h` 以 `sh -e` 执行 `.husky/pre-commit`，脚本前两行 `VAR=$(git diff --cached --name-only | grep ...)` 的退出码等于 grep 的退出码，而 grep 无匹配返回 1 会触发 errexit 立即终止整个 hook。因此「纯文档提交」「只改 agreement」「只改代码未带 agreement」等组合全部被静默拦下，`cargo make pre-commit` 与第 9~21 行「修改顺序铁律」提示都不会执行，该提示分支沦为死代码；实测五种暂存组合中仅「代码 + agreement 同时暂存」能走到第 9 行。
 - **修复**：两条赋值末尾补 `|| true`，把「有没有匹配」交还给后续 `if` 判断；纯文档提交恢复正常，仅改代码未带 agreement 时现在能真正打印铁律提示并 `exit 1`。未改动 husky 自动生成文件 `.husky/_/h`，未使用 `--no-verify`，未放宽「修改顺序铁律」本身。
 
+### 🩺 三态健康迟滞、自愈门检与切换速率上限（BUG-375）
+
+- **一次拨测失败不再判死**：`NodeStatus` 新增 `Suspect` 档并抽出纯函数 `classify_node_status`；Mihomo 对失败节点只写 `alive=false`、不追加 `history`，故当 `history.last()` 仍是 30 秒内有效成功记录时判为疑似抖动，`evaluate_failover` 返回 `NoAction`、不累计失败；超过 `SUSPECT_WINDOW_SECS` 或时间戳不可解析才判 `Dead`。真死节点自愈最多推迟 30 秒，由既有 20 秒宽限 + 25 秒冷却覆盖。
+- **自愈回归「仅兜底」**：新增「原节点确已死」门检，切点前重读同一权威来源 `get_proxies() + node_status()` 复核原节点，非 `Dead` 一律放弃切点；「别的节点更快」不再构成自愈理由。实施中发现「假/拉黑节点重选」与「真 HTTPS 验真失败迁移」两条既有路径也走同一自愈链，新增 `ShouldMigrate` 裁决与 `SelfHealOrigin` 三类来源显式隔离，门检仅对 `ConfirmedDead` 生效，避免误挡验真迁移。
+- **切换速率上限**：新增 120 秒最小实际切换间隔与 600 秒内最多 3 次的滑动窗口约束（纯函数 `auto_switch_permitted`），主循环维护 `recent_auto_switches`，仅真正换到不同节点时计入；与 25 秒「发起选点冷却」互补，压住周期性切点。
+- **边界与规范同步**：`DEAD_CONN_CLEANUP_ENABLED` 仍保持关闭（缺少 age / 流量过滤，清连接能力不恢复）；F1/F4 手动选点与冷启动初始化选点完全不受影响。§5.1 / §5.3 补三态与速率契约，新增 Sync-20 与附录 A 映射，新增 4 组纯函数单测。
+
 ---
 
 ## v3.3.3

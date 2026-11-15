@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-374)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-375)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -414,6 +414,13 @@
 - **涉及物理路径与行号**：`.husky/pre-commit:6-7, 9-21`, `.husky/_/h:17`（husky 9.1.7 自动生成）
 - **根因与背景实证**：husky 9 的 wrapper 以 `sh -e "$s"` 执行项目 hook，`-e` 下任何非 0 语句立即终止脚本；而 `STAGED_CODE_FILES=$(git diff --cached --name-only | grep -E ...)` 与 `STAGED_AGREEMENTS_FILE=$(...)` 两条赋值语句的退出码等于管道末条 `grep` 的退出码，grep 无匹配返回 1。三条 shell 规则叠加后，只要暂存区未**同时**包含「代码类文件（`.ts/.tsx/.rs/tauri.conf.json`）」与 `clash_mini_agreements.md`，hook 就在第 6 或第 7 行静默退出（实测纯文档、只改代码、只改 agreement 三种组合 `exit=1`，仅「代码 + agreement」`exit=0`），后续的 `cargo make pre-commit`、cargo-make/pnpm 可用性检查与第 9~21 行「修改顺序铁律」提示全部不执行；因要走到第 9 行必须两条 grep 均匹配，`[ -z "$STAGED_AGREEMENTS_FILE" ]` 恒为假，该提示分支实际上是死代码。现场表现：BUG-372 的纯文档登记提交被拦、改动滞留暂存区，只能把文档与 `.rs` 合并提交才得以推进，破坏了按逻辑拆分 commit 的能力。
 - **修正与改良方案**：① 两条命令替换末尾补 `|| true`，使赋值恒返回 0、grep 的标准输出保持不变，把「有没有匹配」交还给第 9 行 `if` 判断；② 修复后纯文档提交可正常走完全部检查，仅改代码未带 agreement 时真正打印铁律提示并 `exit 1`，「修改顺序铁律」按原设计生效；③ 不改动 husky 自动生成文件 `.husky/_/h`（升级会覆盖）、不使用 `--no-verify`、不放宽铁律本身；④ 登记 `Changelog.md` 与 `clash_mini_agreements.md` 附录 A 映射。
+
+### BUG-375（对应规范章节：4.2 / 5.1 / 5.3）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / 二值健康判定把测量抖动升级为自愈切点，自愈漂移为「主动择优」且缺少切换速率上限
+- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`NodeStatus` / `classify_node_status` / `node_status` / `should_probe_active_node` / `evaluate_failover` / `FailoverVerdict` / `SelfHealOrigin` / `self_heal_requires_dead_gate` / `should_proceed_with_self_heal` / `auto_switch_permitted` / `self_heal_with_accounting` / `start_background_monitor`）, `clash_mini_agreements.md`（§5.1 / §5.3 / Sync-20）
+- **根因与背景实证**：v3.3.3 review 的 D1/D2：`node_status` 仅 `Alive / Dead / Unknown` 三值，`alive=false` 或延迟越界即判 `Dead`，没有「疑似/降级」档；而 Mihomo 对拨测失败节点只写 `alive=false`、不追加 `history`，`history.last()` 仍是上一次成功记录，因此**一次测量抖动**即被当成「节点已死」，连续 2 次独立拨测确认反而放大了这一误判。`trigger_backend_auto_select_inner` 按全局最小延迟选点，不要求原节点确已死、无延迟差门槛，自愈「成功」只表示选出了不同节点，自愈由「兜底」漂移成「主动择优」。此外 20 秒切换宽限期与 25 秒失败冷却各自约束「判定」与「发起选点」，缺少以「实际切换」为单位的速率上限，无法兜住周期性切点。S1/S2/S3 已分别切断测速失真误判、清连接硬断与三条绕过防抖的入口，但健康状态模型与选点前提未动。
+- **修正与改良方案**：① `NodeStatus` 新增 `Suspect`，抽出纯函数 `classify_node_status(alive, last_delay, age_secs)`：`!alive` 但 `history.last()` 仍为有效延迟且年龄 < `SUSPECT_WINDOW_SECS (30s)` 判疑似抖动，`evaluate_failover` 直接 `NoAction`、不累计失败；超过窗口或时间戳不可解析（保守）才判 `Dead`，`should_probe_active_node` 对 `Suspect` 要求新拨测确认；② `self_heal_with_accounting` 切点前用同一权威来源 `get_proxies() + node_status()` 复核 `dead_node`，纯函数 `should_proceed_with_self_heal` 仅放行 `Dead`，自愈回归「仅兜底」；③ **实施中发现并处理迁移类回归**：`FailoverVerdict` 新增 `ShouldMigrate`，把「假/广告或验真永久拉黑节点重选」与「活跃节点真 HTTPS 验真失败且子集内有已验真健康节点」两条既有路径从 `ShouldFailover` 中分离；`SelfHealOrigin` 区分 `ConfirmedDead / NodeMigration / ApiChannelDown`，`self_heal_requires_dead_gate` 使门检仅对 `ConfirmedDead` 生效，二者仍走连续 2 次确认与统一记账但跳过死节点门检；④ 新增 `MIN_AUTO_SWITCH_INTERVAL_SECS (120s)` 与 `AUTO_SWITCH_WINDOW_SECS (600s) / MAX_AUTO_SWITCHES_PER_WINDOW (3)`，主循环维护 `recent_auto_switches: Vec<Instant>`，仅真正换到不同节点时计入，由纯函数 `auto_switch_permitted` 裁决；⑤ 新增 4 组纯函数单测覆盖三态边界、门检状态、门检适用范围与速率上限；⑥ 同步 §5.1 / §5.3、新增 Sync-20、附录 A 与 Changelog。**边界**：`DEAD_CONN_CLEANUP_ENABLED` 仍为 `false`——S4 未实现无流量过滤，清连接能力不恢复；「新节点显著更优」在「原节点确已死」前提下退化为「新节点须有有效延迟」，现有 `candidates` 过滤已满足，未另加延迟差门槛；F1/F4 手动选点与冷启动初始化选点不受影响。
 
 ---
 
