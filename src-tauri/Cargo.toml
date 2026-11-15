@@ -12,7 +12,8 @@ rust-version = "1.95"
 
 [lib]
 name = "app_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# 纯 Windows 桌面端仅需 rlib 供二进制与单测链接，移除上游移动端遗留的 staticlib / cdylib 冗余产物
+crate-type = ["rlib"]
 
 [features]
 default = ["custom-protocol"]

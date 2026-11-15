@@ -611,6 +611,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
   ```
   底层通过 `CLASH_MINI_TEST_LINK=1` 注入已编译好的 Windows 资源清单库（`resource.lib`）。
 - **单元测试并发与环境隔离**：所有单元测试（特别是 `save_profile`、`agreements` 等涉及配置读写与全局状态的测试）必须使用独立的测试上下文或临摹环境，严禁在并发单测中共享全局 App Handle 或共享全局 Draft 状态，保障全套 146 项主库单元测试（含工作区子 crate 共 198 项通过、1 项显式忽略）随时执行 100% 稳定全绿。
+- **开发与单测编译防膨胀规范**：Clash Mini 为纯 Windows 桌面端，`src-tauri/Cargo.toml` 的 `[lib]` 仅保留 `crate-type = ["rlib"]`（禁止恢复移动端遗留的 `staticlib` / `cdylib` 双份链接产物）；根 `Cargo.toml` 的 `[profile.dev]` 与 `[profile.test]` 统一对齐 `codegen-units = 64`、一等自研 crate（工作区成员与本地 `tauri-plugin-mihomo`）设置 `debug = 1` 保留完整行号栈回溯、第三方外部依赖（`package."*"`）设置 `debug = false` 剥离巨型冗余 PDB 符号，确保 `cargo check` / `clippy` 与 `pnpm cargo-test` 共享同一份依赖编译缓存。
 
 ### 8.2 静默发布全流程（Silent Release）
 

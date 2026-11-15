@@ -24,11 +24,33 @@ rpath = false
 incremental = true
 codegen-units = 64
 opt-level = 0
-debug = true
+debug = 1
 strip = "none"
 overflow-checks = true
 lto = false
 rpath = false
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.dev.package.tauri-plugin-mihomo]
+debug = 1
+
+[profile.test]
+incremental = true
+codegen-units = 64
+opt-level = 0
+debug = 1
+strip = "none"
+overflow-checks = true
+lto = false
+rpath = false
+
+[profile.test.package."*"]
+debug = false
+
+[profile.test.package.tauri-plugin-mihomo]
+debug = 1
 
 [profile.fast-release]
 inherits = "release"
