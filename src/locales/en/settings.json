@@ -281,8 +281,7 @@
     },
     "clashCore": {
       "variants": {
-        "release": "Release Version",
-        "alpha": "Alpha Version"
+        "release": "Release Version"
       }
     },
     "liteMode": {

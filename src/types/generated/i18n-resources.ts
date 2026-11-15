@@ -952,7 +952,6 @@ export interface TranslationResources {
         }
         clashCore: {
           variants: {
-            alpha: string
             release: string
           }
         }

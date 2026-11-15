@@ -9,14 +9,11 @@ import {
   calcuProxies,
   calcuProxyProviders,
   frontendLog,
-  getAppUptime,
   getRunningMode,
   getSystemProxy,
 } from '@/services/cmds'
 import {
   getBaseConfigWithTimeout,
-  getRuleProvidersWithTimeout,
-  getRulesWithTimeout,
   getProxyByNameWithTimeout,
 } from '@/services/mihomo-api'
 import { queryClient } from '@/services/query-client'
@@ -26,12 +23,9 @@ import type { Proxy as ProxyNode, ProxyProvider } from 'tauri-plugin-mihomo-api'
 
 import {
   ClashConfigContext,
-  CoreDataStatusContext,
   ProxiesContext,
   RefreshersContext,
-  RulesContext,
   SystemContext,
-  UptimeContext,
 } from './app-data-context'
 
 const TQ_MIHOMO = {
@@ -201,24 +195,6 @@ export const AppDataProvider = ({
     staleTime: 5 * 60_000,
   })
 
-  const { data: ruleProviders, refetch: _refetchRuleProviders } = useQuery({
-    queryKey: ['getRuleProviders'],
-    queryFn: getRuleProvidersWithTimeout,
-    enabled: !isMinimalWidth,
-    ...TQ_MIHOMO,
-    // 同上：宽度翻转重新启用时复用缓存，避免额外 IPC
-    staleTime: 5 * 60_000,
-  })
-
-  const { data: rulesData, refetch: _refetchRules } = useQuery({
-    queryKey: ['getRules'],
-    queryFn: getRulesWithTimeout,
-    enabled: !isMinimalWidth,
-    ...TQ_MIHOMO,
-    // 同上：宽度翻转重新启用时复用缓存，避免额外 IPC
-    staleTime: 5 * 60_000,
-  })
-
   const { data: sysproxy, refetch: _refetchSysproxy } = useQuery({
     queryKey: ['getSystemProxy'],
     queryFn: getSystemProxy,
@@ -237,14 +213,6 @@ export const AppDataProvider = ({
     ...TQ_DEFAULTS,
   })
 
-  const { data: uptimeData } = useQuery({
-    queryKey: ['appUptime'],
-    queryFn: getAppUptime,
-    ...TQ_DEFAULTS,
-    enabled: false,
-    retry: 1,
-  })
-
   const refreshProxy = useStableFn(
     async (options?: { forceFull?: boolean }) => {
       if (options?.forceFull) {
@@ -254,10 +222,8 @@ export const AppDataProvider = ({
     },
   )
   const refreshClashConfig = useStableFn(_refetchClashConfig)
-  const refreshRules = useStableFn(_refetchRules)
   const refreshSysproxy = useStableFn(_refetchSysproxy)
   const refreshProxyProviders = useStableFn(_refetchProxyProviders)
-  const refreshRuleProviders = useStableFn(_refetchRuleProviders)
 
   // L-32: 事件监听器的 useEffect 依赖于 refresh 函数
   // 但这些函数都通过 useStableFn 包裹，引用是稳定的，不会导致不必要的重新注册
@@ -284,10 +250,6 @@ export const AppDataProvider = ({
       lastProfileId = newProfileId
       lastProfileUpdateTime = now
       void queryClient.invalidateQueries({ queryKey: ['getProfiles'] })
-      refreshRules().catch(() => console.warn('[app-data] refreshRules failed'))
-      refreshRuleProviders().catch(() =>
-        console.warn('[app-data] refreshRuleProviders failed'),
-      )
     }
 
     const handleRefreshProxy = () => {
@@ -346,34 +308,28 @@ export const AppDataProvider = ({
         clearTimeout(lastProxyTimer)
       }
     }
-  }, [refreshProxy, refreshRules, refreshRuleProviders])
+  }, [refreshProxy])
 
   const refreshAll = useCallback(async () => {
     // WARN-001 修复：全量刷新时强制绕过 isMiniStatus 精简路径，确保代理列表完整加载
     forceFullProxiesRef.current = true
-    // 窄窗(宽≤285)下 rules/proxyProviders/ruleProviders 的 Query enabled=false，
-    // 这些接口的 DOM 消费者（路由表格）未挂载，拉取后无消费者且耗费 IPC。
-    // 跳过它们；若用户随后切到宽窗，Query 会因 enabled 变化自动 refetch。
+    // 窄窗(宽≤285)下 proxyProviders 的 Query enabled=false，
+    // 消费方未挂载，拉取后无消费者且耗费 IPC。
+    // 跳过它；若用户随后切到宽窗，Query 会因 enabled 变化自动 refetch。
     const tasks: Promise<unknown>[] = [
       refreshProxy(),
       refreshClashConfig(),
       refreshSysproxy(),
     ]
     if (!isMinimalWidth) {
-      tasks.push(
-        refreshRules(),
-        refreshProxyProviders(),
-        refreshRuleProviders(),
-      )
+      tasks.push(refreshProxyProviders())
     }
     await Promise.all(tasks)
   }, [
     refreshProxy,
     refreshClashConfig,
-    refreshRules,
     refreshSysproxy,
     refreshProxyProviders,
-    refreshRuleProviders,
     isMinimalWidth,
   ])
 
@@ -387,14 +343,6 @@ export const AppDataProvider = ({
       isProxiesPending,
     }),
     [proxiesData, proxyProviders, isProxiesPending],
-  )
-
-  const rulesValue = useMemo(
-    () => ({
-      rules: rulesData?.rules ?? [],
-      ruleProviders: ruleProviders?.providers || {},
-    }),
-    [rulesData, ruleProviders],
   )
 
   const clashConfigValue = useMemo(
@@ -445,49 +393,32 @@ export const AppDataProvider = ({
     }
   }, [sysproxy, runningMode, verge, clashConfig, isSettingsOpen])
 
-  const uptimeValue = useMemo(() => ({ uptime: uptimeData || 0 }), [uptimeData])
-
-  const coreDataStatusValue = useMemo(
-    () => ({ isCoreDataPending: isProxiesPending || isClashConfigPending }),
-    [isProxiesPending, isClashConfigPending],
-  )
-
   const refreshersValue = useMemo(
     () => ({
       refreshProxy,
       refreshClashConfig,
-      refreshRules,
       refreshSysproxy,
       refreshProxyProviders,
-      refreshRuleProviders,
       refreshAll,
     }),
     [
       refreshProxy,
       refreshClashConfig,
-      refreshRules,
       refreshSysproxy,
       refreshProxyProviders,
-      refreshRuleProviders,
       refreshAll,
     ],
   )
 
   return (
     <ProxiesContext value={proxiesValue}>
-      <RulesContext value={rulesValue}>
-        <ClashConfigContext value={clashConfigValue}>
-          <SystemContext value={systemValue}>
-            <UptimeContext value={uptimeValue}>
-              <CoreDataStatusContext value={coreDataStatusValue}>
-                <RefreshersContext value={refreshersValue}>
-                  {children}
-                </RefreshersContext>
-              </CoreDataStatusContext>
-            </UptimeContext>
-          </SystemContext>
-        </ClashConfigContext>
-      </RulesContext>
+      <ClashConfigContext value={clashConfigValue}>
+        <SystemContext value={systemValue}>
+          <RefreshersContext value={refreshersValue}>
+            {children}
+          </RefreshersContext>
+        </SystemContext>
+      </ClashConfigContext>
     </ProxiesContext>
   )
 }

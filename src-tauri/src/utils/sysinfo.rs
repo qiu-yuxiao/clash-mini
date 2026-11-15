@@ -1,8 +1,5 @@
 use parking_lot::RwLock;
-use std::{
-    fmt::{Debug, Display},
-    time::Instant,
-};
+use std::fmt::{Debug, Display};
 use sysinfo::{Networks, System};
 use tauri::{AppHandle, Manager as _, Runtime, State};
 use tauri_plugin_clipboard_manager::ClipboardExt as _;
@@ -35,7 +32,6 @@ impl Default for SysInfo {
 pub struct AppInfo {
     app_version: String,
     app_core_mode: String,
-    pub app_startup_time: Instant,
     pub app_is_admin: bool,
 }
 
@@ -46,7 +42,6 @@ impl Default for AppInfo {
             app_version: "0.0.0".into(),
             app_core_mode: "NotRunning".into(),
             app_is_admin: false,
-            app_startup_time: Instant::now(),
         }
     }
 }
@@ -136,11 +131,6 @@ pub fn init_platform<R: Runtime>(app: &tauri::App<R>) {
 #[tauri::command]
 pub fn get_system_info(state: State<'_, RwLock<Platform>>) -> Result<String, String> {
     Ok(state.inner().read().to_string())
-}
-
-#[tauri::command]
-pub fn get_app_uptime(state: State<'_, RwLock<Platform>>) -> Result<u128, String> {
-    Ok(state.inner().read().appinfo.app_startup_time.elapsed().as_millis())
 }
 
 #[tauri::command]

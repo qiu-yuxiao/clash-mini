@@ -610,7 +610,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
   pnpm cargo-test
   ```
   底层通过 `CLASH_MINI_TEST_LINK=1` 注入已编译好的 Windows 资源清单库（`resource.lib`）。
-- **单元测试并发与环境隔离**：所有单元测试（特别是 `save_profile`、`agreements` 等涉及配置读写与全局状态的测试）必须使用独立的测试上下文或临摹环境，严禁在并发单测中共享全局 App Handle 或共享全局 Draft 状态，保障全套 143 项单元测试随时执行 100% 稳定全绿。
+- **单元测试并发与环境隔离**：所有单元测试（特别是 `save_profile`、`agreements` 等涉及配置读写与全局状态的测试）必须使用独立的测试上下文或临摹环境，严禁在并发单测中共享全局 App Handle 或共享全局 Draft 状态，保障全套 146 项主库单元测试（含工作区子 crate 共 198 项通过、1 项显式忽略）随时执行 100% 稳定全绿。
 
 ### 8.2 静默发布全流程（Silent Release）
 
@@ -685,7 +685,7 @@ flowchart LR
 ### 8.8 前端单测基线与最小覆盖
 
 - **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
+- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 130 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ### 8.9 用户可见文案 i18n 硬约束

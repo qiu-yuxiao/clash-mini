@@ -299,30 +299,12 @@ pub fn show_in_folder(path: &Path) -> Result<()> {
     if !path.exists() {
         return Err(anyhow::anyhow!("Target path does not exist: {}", path.display()));
     }
-    #[cfg(target_os = "windows")]
-    {
-        use std::process::Command;
-        // Windows explorer /select,"<path>"
-        let mut cmd = Command::new("explorer");
-        cmd.arg(format!("/select,{}", path.display()));
-        cmd.spawn()?;
-        Ok(())
-    }
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-        Command::new("open").arg("-R").arg(path).spawn()?;
-        Ok(())
-    }
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        if let Some(parent) = path.parent() {
-            open::that_detached(parent)?;
-        } else {
-            open::that_detached(path)?;
-        }
-        Ok(())
-    }
+    use std::process::Command;
+    // Windows explorer /select,"<path>"
+    let mut cmd = Command::new("explorer");
+    cmd.arg(format!("/select,{}", path.display()));
+    cmd.spawn()?;
+    Ok(())
 }
 
 /// copy the file to the dist path and return the dist path

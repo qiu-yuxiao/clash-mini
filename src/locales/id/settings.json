@@ -281,8 +281,7 @@
     },
     "clashCore": {
       "variants": {
-        "release": "Versi Rilis",
-        "alpha": "Versi Alpha"
+        "release": "Versi Rilis"
       }
     },
     "liteMode": {

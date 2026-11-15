@@ -25,7 +25,7 @@ use crate::{
 
 // Log rotation strategy:
 // - Size-based rotation: rotates when log file exceeds max_size (default 128KB)
-// - File count limit: keeps only max_count log files (default 8), deletes oldest when exceeded
+// - File count limit: keeps only max_count log files (default 40), deletes oldest when exceeded
 // - Naming: uses timestamps for rotated files, "latest" for current log
 //
 // TODO: Add time-based rotation (e.g. daily rotation) as an additional or
@@ -46,7 +46,7 @@ impl Default for Logger {
             sidecar_file_writer: Arc::new(RwLock::new(None)),
             log_level: Arc::new(RwLock::new(LevelFilter::Info)),
             log_max_size: AtomicU64::new(128),
-            log_max_count: AtomicUsize::new(8),
+            log_max_count: AtomicUsize::new(40),
         }
     }
 }
@@ -65,7 +65,7 @@ impl Logger {
             (
                 verge.get_log_level(),
                 verge.app_log_max_size.unwrap_or(128),
-                verge.app_log_max_count.unwrap_or(8),
+                verge.app_log_max_count.unwrap_or(40),
             )
         };
         let log_level = std::env::var("RUST_LOG")

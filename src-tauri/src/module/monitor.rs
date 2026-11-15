@@ -104,18 +104,6 @@ const PROBE_COALESCE_WINDOW_MS: u64 = 1500;
 /// 又重打一轮全组拨测。
 const SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS: u64 = 10;
 
-/// 故障转移成功后是否清理原节点存量连接（默认关闭，Sync-18）。
-///
-/// 【为什么默认关闭】v3.3.2 的 `close_connections_on_dead_node` 仅按 `chains` 命中筛选，
-/// 没有 age / upload / download / alive 过滤，无法区分「已挂死的连接」与「仍在正常传输的
-/// 健康长连接」。而 `select_node_for_group` 本身是干净热切换，已有连接不受影响——真正把
-/// Antigravity 等 HTTP/2 / gRPC 长流 RST 掉的是这次清理。后台测速周期性择优选点时，
-/// 会把「链路只是抖了一下」直接升级为「旧节点全部连接被切断」的硬断。
-///
-/// 长连接交由应用层自身重连。重新开启的前提：引入 ConfirmedDead 迟滞状态确证旧节点已死，
-/// 并且只对「确已无流量」的连接执行清理（评审报告 S4，不在本次改动范围）。
-const DEAD_CONN_CLEANUP_ENABLED: bool = false;
-
 /// 全局测量组拨测互斥锁：串行化 `PROXY__METRICS` 全组拨测，消除多调用方并发风暴。
 static METRICS_PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -1925,67 +1913,6 @@ async fn trigger_backend_auto_select_inner(
     })
 }
 
-/// 筛选仅经过已确认故障节点 `dead_node` 的存量连接 ID（不触碰 DIRECT 及其他健康节点连接）。
-fn collect_dead_node_connection_ids(
-    connections: &[tauri_plugin_mihomo::models::Connection],
-    dead_node: &str,
-    new_node: Option<&str>,
-) -> Vec<String> {
-    if dead_node.is_empty()
-        || matches!(dead_node, "DIRECT" | "REJECT" | "PROXY" | "PROXY__METRICS")
-        || new_node == Some(dead_node)
-    {
-        return Vec::new();
-    }
-    connections
-        .iter()
-        .filter(|conn| conn.chains.iter().any(|chain| chain == dead_node))
-        .map(|conn| conn.id.clone())
-        .collect()
-}
-
-/// 故障转移切换至 `new_node` 后，关闭挂在原节点 `dead_node` 上的存量连接。
-///
-/// 【默认不启用，见 `DEAD_CONN_CLEANUP_ENABLED`（Sync-18）】正常切节点或轻量模式唤醒严禁
-/// 全量断流（§4.2）。当前实现仅按 `chains` 命中筛选，无法区分「已挂死的连接」与「仍在正常
-/// 传输的健康长连接」，在后台测速周期性择优选点时会误杀 HTTP/2 / gRPC 长流；故自愈默认路径
-/// 不再调用本函数，长连接交由应用层自身重连。保留实现与单测，待引入 ConfirmedDead 迟滞状态
-/// 与「无流量」过滤后再评估开启。
-async fn close_connections_on_dead_node(dead_node: &str, new_node: &str) {
-    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-    let _ = tokio::time::timeout(Duration::from_secs(3), async {
-        let conns = match mihomo.get_connections().await {
-            Ok(c) => c,
-            Err(e) => {
-                logging!(
-                    debug,
-                    Type::Lightweight,
-                    "[后台监测] 故障转移清理原节点连接时获取连接列表失败: {e}"
-                );
-                return;
-            }
-        };
-        let list = conns.connections.as_deref().unwrap_or_default();
-        let ids = collect_dead_node_connection_ids(list, dead_node, Some(new_node));
-        if ids.is_empty() {
-            return;
-        }
-        let total = ids.len();
-        let results = futures::future::join_all(ids.iter().map(|id| mihomo.close_connection(id))).await;
-        let closed_count = results.into_iter().filter(Result::is_ok).count();
-        logging!(
-            info,
-            Type::Lightweight,
-            "[后台监测] 故障转移已切换至 {}，精确清理原故障节点 {} 上的 {}/{} 条残留连接",
-            new_node,
-            dead_node,
-            closed_count,
-            total
-        );
-    })
-    .await;
-}
-
 async fn get_active_node_name() -> Option<String> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
     let group_info = mihomo.get_group_by_name("PROXY").await.ok()?;
@@ -2688,17 +2615,13 @@ async fn self_heal_with_accounting(
                     && !dead.is_empty()
                     && dead != new_node
                 {
-                    if DEAD_CONN_CLEANUP_ENABLED {
-                        close_connections_on_dead_node(dead, new_node).await;
-                    } else {
-                        logging!(
-                            info,
-                            Type::Lightweight,
-                            "[后台监测] 自愈已切换 {} → {}，默认不清理原节点存量连接（长连接由应用层自行重连）",
-                            dead,
-                            new_node
-                        );
-                    }
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] 自愈已切换 {} → {}，不清理原节点存量连接（长连接由应用层自行重连）",
+                        dead,
+                        new_node
+                    );
                 }
             } else {
                 *auto_select_fail_count += 1;
@@ -2809,10 +2732,9 @@ mod tests {
         DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
         LAST_METRICS_PROBE, LAST_NOTIFIED_HEALTH, LAST_SYNCED_ACTIVE_HISTORY_TIME, METRICS_REUSE_MAX_AGE_SECS,
         MetricsProbeSnapshot, NodeStatus, SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SelfHealAction,
-        collect_dead_node_connection_ids, complete_restart_core_attempt, evaluate_self_heal_counters,
-        merge_probe_delays, notify_manual_node_switched, prioritize_verified_candidates_with,
-        reset_monitor_static_state, resolve_probe_target, secondary_test_url, should_probe_active_node,
-        should_recheck_with_fallback, sort_display_delays, try_reuse_probe_snapshot,
+        complete_restart_core_attempt, evaluate_self_heal_counters, merge_probe_delays, notify_manual_node_switched,
+        prioritize_verified_candidates_with, reset_monitor_static_state, resolve_probe_target, secondary_test_url,
+        should_probe_active_node, should_recheck_with_fallback, sort_display_delays, try_reuse_probe_snapshot,
     };
 
     #[test]
@@ -3220,66 +3142,6 @@ mod tests {
         let expected_hit = vec!["日本-01".to_string()];
         let mut snap_hit = make_snap(1);
         assert!(try_reuse_probe_snapshot(&mut snap_hit, base_now, true, 2, true, &expected_hit).is_some());
-    }
-
-    #[test]
-    fn test_collect_dead_node_connection_ids_surgical_cleanup() {
-        use tauri_plugin_mihomo::models::{Connection, ConnectionMetaData, ConnectionType, DNSMode, Network};
-
-        let make_conn = |id: &str, chains: &[&str]| Connection {
-            id: id.to_string(),
-            metadata: ConnectionMetaData {
-                network: Network::TCP,
-                connection_type: ConnectionType::HTTP,
-                source_ip: "127.0.0.1".to_string(),
-                destination_ip: "1.1.1.1".to_string(),
-                source_geo_ip: None,
-                destination_geo_ip: None,
-                source_ip_asn: String::new(),
-                destination_ip_asn: String::new(),
-                source_port: "10000".to_string(),
-                destination_port: "443".to_string(),
-                inbound_ip: String::new(),
-                inbound_port: String::new(),
-                inbound_name: String::new(),
-                inbound_user: String::new(),
-                host: "example.com".to_string(),
-                dns_mode: DNSMode::Normal,
-                uid: 0,
-                process: "antigravity.exe".to_string(),
-                process_path: String::new(),
-                special_proxy: String::new(),
-                special_rules: String::new(),
-                remote_destination: String::new(),
-                dscp: 0,
-                sniff_host: String::new(),
-                extra: HashMap::new(),
-            },
-            upload: 0,
-            download: 0,
-            start: "2026-11-14T00:00:00Z".to_string(),
-            chains: chains.iter().map(|s| (*s).to_string()).collect(),
-            provider_chains: None,
-            rule: "MATCH".to_string(),
-            rule_payload: String::new(),
-            extra: HashMap::new(),
-        };
-
-        let conns = vec![
-            make_conn("dead-1", &["香港1 (005024)", "PROXY"]),
-            make_conn("direct-1", &["DIRECT"]),
-            make_conn("healthy-1", &["台湾1 (005024)", "PROXY"]),
-            make_conn("dead-2", &["香港1 (005024)"]),
-        ];
-
-        // 仅精确选中挂在原死节点上的两条连接，绝不触碰 DIRECT 与其他健康节点连接
-        let ids = collect_dead_node_connection_ids(&conns, "香港1 (005024)", Some("台湾1 (005024)"));
-        assert_eq!(ids, vec!["dead-1".to_string(), "dead-2".to_string()]);
-
-        // 新旧节点相同或内置策略出站时禁止误删连接
-        assert!(collect_dead_node_connection_ids(&conns, "香港1 (005024)", Some("香港1 (005024)")).is_empty());
-        assert!(collect_dead_node_connection_ids(&conns, "DIRECT", Some("台湾1 (005024)")).is_empty());
-        assert!(collect_dead_node_connection_ids(&conns, "", Some("台湾1 (005024)")).is_empty());
     }
 
     #[test]

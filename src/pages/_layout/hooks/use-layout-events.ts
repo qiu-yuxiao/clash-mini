@@ -76,7 +76,6 @@ export const useLayoutEvents = (
         revalidateKeys([
           'getVergeConfig',
           'getSystemProxy',
-          'getAutoProxy',
           'getRunningMode',
           'isServiceAvailable',
           'getSystemState',

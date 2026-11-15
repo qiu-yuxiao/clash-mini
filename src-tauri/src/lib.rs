@@ -31,7 +31,6 @@ use tauri_plugin_mihomo::RejectPolicy;
 pub static APP_HANDLE: OnceCell<AppHandle> = OnceCell::new();
 
 const MAIN_WINDOW_LABEL: &str = "main";
-const MAX_ICON_CACHE_FILES: usize = 100;
 
 /// Application initialization helper functions
 mod app_init {
@@ -125,11 +124,9 @@ mod app_init {
 
     pub fn generate_handlers() -> impl Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync + 'static {
         tauri::generate_handler![
-            crate::utils::sysinfo::get_app_uptime,
             crate::utils::sysinfo::app_is_admin,
             cmd::is_port_in_use,
             cmd::get_sys_proxy,
-            cmd::get_auto_proxy,
             cmd::open_logs_dir,
             cmd::show_in_folder,
             cmd::open_web_url,
@@ -148,7 +145,6 @@ mod app_init {
             cmd::save_proxy_head_state,
             cmd::get_proxy_head_state,
             cmd::get_clash_logs,
-            cmd::close_all_connections,
             cmd::get_verge_config,
             cmd::patch_verge_config,
             // 供前端读取「真实的自启状态」（注册表），而不是只看配置值
@@ -156,7 +152,6 @@ mod app_init {
             cmd::trigger_auto_select,
             cmd::notify_node_switched,
             cmd::get_confirmed_fake_proxy_names,
-            cmd::download_icon_cache,
             cmd::get_profiles,
             cmd::enhance_profiles,
             cmd::patch_profiles_config,
@@ -234,13 +229,6 @@ pub fn run() {
             crate::utils::sysinfo::init_platform(app);
 
             logging!(info, Type::Setup, "初始化已启动");
-
-            // 启动时自动清理图标缓存（保留最新 N 个文件）
-            crate::process::AsyncHandler::spawn(|| async move {
-                if let Err(e) = crate::feat::cleanup_icon_cache(MAX_ICON_CACHE_FILES).await {
-                    logging!(warn, Type::Setup, "清理旧图标缓存失败: {}", e);
-                }
-            });
 
             Ok(())
         })

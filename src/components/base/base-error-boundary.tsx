@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next'
 // - 数据展示类（列表、图表）尽量细粒度，单条目失败不影响整体
 // - 用户操作类稍粗粒度，保证操作的完整性
 // - 错误边界**只能捕获渲染期异常**，捕获不到事件处理与异步代码里的错误
-//   （异步错误请走 error-reporter / showNotice）
+//   （异步错误请走 showNotice 与日志记录）
 // - 边界不宜过密：优先给高频出错、依赖第三方渲染的组件加
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   const { t } = useTranslation()

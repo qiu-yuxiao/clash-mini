@@ -25,16 +25,6 @@ pub async fn uninstall_service() -> CmdResult {
 }
 
 #[tauri::command]
-pub async fn reinstall_service() -> CmdResult {
-    execute_service_operation_sync(ServiceStatus::ReinstallRequired, "Reinstall").await
-}
-
-#[tauri::command]
-pub async fn repair_service() -> CmdResult {
-    execute_service_operation_sync(ServiceStatus::ForceReinstallRequired, "Repair").await
-}
-
-#[tauri::command]
 pub async fn is_service_available() -> CmdResult<bool> {
     service::is_service_available().await.stringify_err()?;
     Ok(true)

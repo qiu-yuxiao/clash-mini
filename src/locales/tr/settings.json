@@ -281,8 +281,7 @@
     },
     "clashCore": {
       "variants": {
-        "release": "Kararlı Sürüm",
-        "alpha": "Alfa Sürümü"
+        "release": "Kararlı Sürüm"
       }
     },
     "liteMode": {

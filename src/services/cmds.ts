@@ -15,7 +15,7 @@ import type {
   IProfileOption,
 } from '@/types/profile'
 import type { IVergeConfig, ValidationOutcome } from '@/types/verge'
-import { debugLog, isDebugLoggingEnabled } from '@/utils/debug'
+import { isDebugLoggingEnabled } from '@/utils/debug'
 import { isDummyNode } from '@/utils/node'
 import { getProxies, getProxyProviders } from 'tauri-plugin-mihomo-api'
 
@@ -466,28 +466,6 @@ export async function getSystemProxy() {
   )
 }
 
-export async function getAutoProxy() {
-  try {
-    debugLog('[API] 开始调用 get_auto_proxy')
-    const result = await withIpcTimeout(
-      invoke<{
-        enable: boolean
-        url: string
-      }>('get_auto_proxy'),
-      10_000,
-      'getAutoProxy',
-    )
-    debugLog('[API] get_auto_proxy 调用成功:', result)
-    return result
-  } catch (error) {
-    console.error('[API] get_auto_proxy 调用失败:', error)
-    return {
-      enable: false,
-      url: '',
-    }
-  }
-}
-
 export async function restartCore() {
   return withIpcTimeout(invoke<void>('restart_core'), 60_000, 'restartCore')
 }
@@ -528,29 +506,12 @@ export async function showInFolder(path: string) {
   return invoke<void>('show_in_folder', { path })
 }
 
-export async function downloadIconCache(url: string, name: string) {
-  return withIpcTimeout(
-    invoke<string>('download_icon_cache', { url, name }),
-    30_000,
-    'downloadIconCache',
-  )
-}
-
 // 获取当前运行模式
 export const getRunningMode = async () => {
   return withIpcTimeout(
     invoke<string>('get_running_mode'),
     10_000,
     'getRunningMode',
-  )
-}
-
-// 获取应用运行时间
-export const getAppUptime = async () => {
-  return withIpcTimeout(
-    invoke<number>('get_app_uptime'),
-    10_000,
-    'getAppUptime',
   )
 }
 

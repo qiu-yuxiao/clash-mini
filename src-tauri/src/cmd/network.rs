@@ -5,7 +5,7 @@ use clash_verge_logging::{Type, logging};
 use gethostname::gethostname;
 use network_interface::{NetworkInterface, NetworkInterfaceConfig as _};
 use serde_yaml_ng::Mapping;
-use sysproxy::{Autoproxy, Sysproxy};
+use sysproxy::Sysproxy;
 
 /// get the system proxy
 #[tauri::command]
@@ -33,27 +33,6 @@ pub async fn get_sys_proxy() -> CmdResult<Mapping> {
         sys_proxy.enable,
         sys_proxy.host,
         sys_proxy.port
-    );
-    Ok(map)
-}
-
-/// 获取自动代理配置
-#[tauri::command]
-pub async fn get_auto_proxy() -> CmdResult<Mapping> {
-    Sysopt::global().wait_idle().await;
-    let auto_proxy = Autoproxy::get_auto_proxy().stringify_err()?;
-    let Autoproxy { ref enable, ref url } = auto_proxy;
-
-    let mut map = Mapping::new();
-    map.insert("enable".into(), (*enable).into());
-    map.insert("url".into(), url.as_str().into());
-
-    logging!(
-        debug,
-        Type::Network,
-        "返回自动代理配置（缓存）: enable={}, url={}",
-        auto_proxy.enable,
-        auto_proxy.url
     );
     Ok(map)
 }

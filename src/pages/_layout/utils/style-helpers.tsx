@@ -7,7 +7,7 @@ import {
   SignalWifi1Bar as SignalWeak,
   WifiOff as SignalError,
 } from '@mui/icons-material'
-import { alpha, type Theme } from '@mui/material'
+import type { Theme } from '@mui/material'
 
 import {
   getDelayManager,
@@ -17,8 +17,6 @@ import {
 import getSystem from '@/utils/get-system'
 
 const OS = getSystem()
-
-export const portableFlag = false
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string
 
@@ -110,93 +108,6 @@ export function convertDelayColor(
     default:
       return 'default'
   }
-}
-
-export const getMenuItemHoverStyle = (theme: Theme, skin: string) => {
-  const isLight = theme.palette.mode === 'light'
-
-  let fontFamily = 'Trebuchet MS, SimHei, sans-serif'
-  if (skin === 'original') fontFamily = 'Segoe UI, Microsoft YaHei, sans-serif'
-  else if (skin === 'modern-flat') fontFamily = 'Outfit, DengXian, sans-serif'
-  else if (skin === 'frosted-glass')
-    fontFamily = 'Segoe UI Light, Microsoft YaHei Light, sans-serif'
-  else if (skin === 'cyberpunk') fontFamily = 'Consolas, NSimSun, monospace'
-  else if (skin === 'monochrome') fontFamily = 'Georgia, KaiTi, serif'
-
-  const baseStyle = {
-    fontFamily,
-    fontSize: '13px',
-    padding: '8px 16px',
-    transition: 'all 0.15s ease',
-    color: theme.palette.text.primary,
-  }
-
-  if (skin === 'retro-3d') {
-    return {
-      ...baseStyle,
-      fontWeight: 'bold',
-      '&:hover': {
-        background:
-          'linear-gradient(135deg, #FFE082 0%, #FFD54F 35%, #FFB300 70%, #B8860B 100%) !important',
-        color: '#2C1F03 !important',
-        textShadow: '0 1px 0 rgba(255, 255, 255, 0.45)',
-      },
-    }
-  }
-  if (skin === 'original') {
-    return {
-      ...baseStyle,
-      fontWeight: 500,
-      '&:hover': {
-        background: 'rgba(91, 92, 157, 0.08) !important',
-        color: 'var(--primary-main) !important',
-      },
-    }
-  }
-  if (skin === 'modern-flat') {
-    return {
-      ...baseStyle,
-      fontWeight: 'bold',
-      '&:hover': {
-        background: `${alpha(theme.palette.primary.main, 0.1)} !important`,
-        color: `${theme.palette.primary.main} !important`,
-      },
-    }
-  }
-  if (skin === 'frosted-glass') {
-    return {
-      ...baseStyle,
-      '&:hover': {
-        background: 'rgba(255, 255, 255, 0.12) !important',
-        color: `${theme.palette.primary.main} !important`,
-      },
-    }
-  }
-  if (skin === 'cyberpunk') {
-    return {
-      ...baseStyle,
-      fontWeight: 'bold',
-      borderRadius: '0px',
-      border: '1px solid transparent',
-      '&:hover': {
-        background: '#39ff14 !important',
-        color: '#000000 !important',
-        border: '1px solid #39ff14 !important',
-        boxShadow: '0 0 8px #39ff14',
-      },
-    }
-  }
-  if (skin === 'monochrome') {
-    return {
-      ...baseStyle,
-      borderRadius: '0px',
-      '&:hover': {
-        background: isLight ? '#000000 !important' : '#ffffff !important',
-        color: isLight ? '#ffffff !important' : '#000000 !important',
-      },
-    }
-  }
-  return baseStyle
 }
 
 export const getFriendlyProtocolName = (type?: string) => {
