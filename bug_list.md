@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-373)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-374)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -407,6 +407,13 @@
 - **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`start_background_monitor` 网络恢复分支 / `get_active_node_name` None 分支 / `evaluate_failover` Err 分支 / `decide_self_heal` / `self_heal_with_accounting`）, `clash_mini_agreements.md`（§5.1 / §5.3 / Sync-19）
 - **根因与背景实证**：§5.1 与 §5.3 明文规定「严格执行连续 2 次检测失败才自愈」，但主循环保留三条独立绕过路径：① `!was_online && is_online` 分支调用一次 `evaluate_failover(&current_profile, false)`，只要返回 `!= NoAction` 即以 `get_active_node_name()` 作为 `dead_node` 立即执行 `self_heal_with_accounting`，且该分支不 `continue`，本周期主路径随后再次调用 `evaluate_failover`，形成同周期两次全组拨测；② `get_active_node_name()` 返回 `None`（API 不可达）时 `api_error_count >= 3` 直接自愈；③ `evaluate_failover` 返回 `Err` 时同样 `>= 3` 直接自愈。物理网络 60s 探测翻转、内核 API 瞬时抖动均可一次触发切点，是「每 2–5 分钟切一次节点」的周期性来源之一；规范文本「连续 2 次」与实现三条后门长期自相矛盾。
 - **修正与改良方案**：① 新增 `FAILOVER_CONFIRM_FAILS = 2` / `API_ERROR_HEAL_THRESHOLD = 3` 常量与 `SelfHealTrigger` / `SelfHealDecision` / `decide_self_heal` 纯函数统一裁决器，所有入口必须构造 trigger 并接受 `Allow` / `Wait` 裁决，仅 `Allow` 方可调用 `self_heal_with_accounting`（后者退化为纯记账执行函数，前置条件写入文档注释）；② `NetworkRecovered` 恒判 `Wait`：删除一次判定即自愈与 `dead_node` 传参，保留计数复位与 `network_health::ok`，将 `last_check_time` 前拨强制本周期立即走主路径统一体检，即便判死也只累计第 1 次失败、3 秒后第二次独立拨测确认才可能自愈，同周期双拨测消失；③ `ApiUnreachable` 两处改用常量阈值，达阈值后先 `is_clash_api_alive()`（3s 超时）复核，API 已恢复则清零计数、跳过切点交下一周期测量，仅仍不可达才放行，BUG-318 的 `evaluate_self_heal_counters` / `RestartCore` / 连续 5 次告警链路不变；④ `NodeConfirmedDead` 由裁决器按连续 2 次判定（主路径切换宽限期逻辑保留）；⑤ 新增 `test_decide_self_heal_unifies_all_three_triggers` 单测锁定三条分支与阈值边界；⑥ 同步 §5.1 / §5.3 明确「节点侧故障 vs 内核 API 通道故障」两类边界、消除规范内部矛盾，新增 Sync-19 与附录 A 映射。
+
+### BUG-374（对应规范章节：附录 A / 工程工具链）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：Medium / Git pre-commit hook 静默拦截合法提交
+- **涉及物理路径与行号**：`.husky/pre-commit:6-7, 9-21`, `.husky/_/h:17`（husky 9.1.7 自动生成）
+- **根因与背景实证**：husky 9 的 wrapper 以 `sh -e "$s"` 执行项目 hook，`-e` 下任何非 0 语句立即终止脚本；而 `STAGED_CODE_FILES=$(git diff --cached --name-only | grep -E ...)` 与 `STAGED_AGREEMENTS_FILE=$(...)` 两条赋值语句的退出码等于管道末条 `grep` 的退出码，grep 无匹配返回 1。三条 shell 规则叠加后，只要暂存区未**同时**包含「代码类文件（`.ts/.tsx/.rs/tauri.conf.json`）」与 `clash_mini_agreements.md`，hook 就在第 6 或第 7 行静默退出（实测纯文档、只改代码、只改 agreement 三种组合 `exit=1`，仅「代码 + agreement」`exit=0`），后续的 `cargo make pre-commit`、cargo-make/pnpm 可用性检查与第 9~21 行「修改顺序铁律」提示全部不执行；因要走到第 9 行必须两条 grep 均匹配，`[ -z "$STAGED_AGREEMENTS_FILE" ]` 恒为假，该提示分支实际上是死代码。现场表现：BUG-372 的纯文档登记提交被拦、改动滞留暂存区，只能把文档与 `.rs` 合并提交才得以推进，破坏了按逻辑拆分 commit 的能力。
+- **修正与改良方案**：① 两条命令替换末尾补 `|| true`，使赋值恒返回 0、grep 的标准输出保持不变，把「有没有匹配」交还给第 9 行 `if` 判断；② 修复后纯文档提交可正常走完全部检查，仅改代码未带 agreement 时真正打印铁律提示并 `exit 1`，「修改顺序铁律」按原设计生效；③ 不改动 husky 自动生成文件 `.husky/_/h`（升级会覆盖）、不使用 `--no-verify`、不放宽铁律本身；④ 登记 `Changelog.md` 与 `clash_mini_agreements.md` 附录 A 映射。
 
 ---
 

@@ -1013,6 +1013,7 @@ flowchart LR
 | **BUG-371** | 2.2 / 2.10 | 修复「流量接管模式（含代理方式）」与「基础设置」二选一/三选一开关操作期间与操作结果/失败反馈弹窗退化缺失问题：`notice-service` 新增 `MIN_LOADING_NOTICE_DWELL_MS`（`320ms`）最小停留防护（`markLoadingNotice` / `settleLoadingNotice`）防止快速 IPC 切换一闪而过；`NoticeManager` `zIndex` 升至 `2200` 高于 MUI Tooltip（`1500`）；`patchVerge` 与 `useServiceInstaller` 支持并发丢弃判定返回值与 `{ silentError }` 单次报错去重；补齐 `handleRuleFallbackChange`、开机自启（含注册表校验不一致告警）、启动时最小化、TUN 域名嗅探（含非 TUN 模式点击警示）及端口 `1–65535` 校验全套三段式反馈弹窗（见 §2.2、§2.10、Sync-17）。 |
 | **BUG-372** | 4.2 / 5.1 / 5.2 / 5.3 / 5.8 | 测速失真误判自愈与周期性清连接误杀健康长流修复：`probe_metrics_group` 返回 `MetricsProbeOutcome { delays, primary_url_distorted }`，主 URL 整体失败且备用成功时 `evaluate_failover` 直接 `NoAction` 并清零失败计数；`try_reuse_probe_snapshot` / 1500ms 短窗合并改为「目标全灭一律禁止复用」并移除 `dual_url_verified`；新增默认关闭 `DEAD_CONN_CLEANUP_ENABLED`，自愈切换后不再关闭任何存量连接（见 §4.2 / §5.2 / Sync-18）。 |
 | **BUG-373** | 5.1 / 5.3 | 三条自愈入口收编统一裁决器：新增 `SelfHealTrigger` / `SelfHealDecision` / `decide_self_heal` 纯函数与 `FAILOVER_CONFIRM_FAILS` / `API_ERROR_HEAL_THRESHOLD` 常量；网络离线转在线恢复恒判 `Wait`（安静等待 + 立即重新测量，删除一次判定即自愈与同周期双拨测），API 连续异常达阈值后先经 `is_clash_api_alive()` 复核，仅仍不可达才放行；主路径连续 2 次确认改由裁决器判定，BUG-318 记账链路不变（见 §5.1 / §5.3 / Sync-19）。 |
+| **BUG-374** | 附录 A / 工程工具链 | 修复 husky `sh -e` 执行 pre-commit 时 `VAR=$(... | grep ...)` 无匹配返回 1 触发 errexit 静默终止：为 `.husky/pre-commit` 两条暂存文件探测赋值补 `|| true` 兜底，使纯文档提交、仅 agreement 提交可正常走完 `cargo make pre-commit`，并让「修改顺序铁律」提示分支恢复可达；未改动 husky 自动生成文件、未使用 `--no-verify`。 |
 
 ---
 

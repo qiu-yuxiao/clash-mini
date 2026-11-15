@@ -14,6 +14,11 @@
 - **内核 API 通道故障增加存活复核**：`get_active_node_name()` 失败与 `evaluate_failover` 异常两处达到连续 3 次阈值后先 `is_clash_api_alive()` 复核，API 已恢复则跳过切点并清零计数，仅复核仍不可达才自愈；BUG-318 的重启内核与连续 5 次告警链路不变。
 - **规范与单测同步**：§5.1 明确「节点侧故障连续 2 次」与「内核 API 通道故障独立门控」两类边界、消除规范内部矛盾，§5.3 改为统一裁决，新增 Sync-19 与附录 A BUG-372 / BUG-373 映射；新增 `test_decide_self_heal_unifies_all_three_triggers` 覆盖三条分支与阈值边界。
 
+### 🧰 修复 pre-commit hook 静默拦截合法提交（BUG-374）
+
+- **根因**：husky 9 的 `.husky/_/h` 以 `sh -e` 执行 `.husky/pre-commit`，脚本前两行 `VAR=$(git diff --cached --name-only | grep ...)` 的退出码等于 grep 的退出码，而 grep 无匹配返回 1 会触发 errexit 立即终止整个 hook。因此「纯文档提交」「只改 agreement」「只改代码未带 agreement」等组合全部被静默拦下，`cargo make pre-commit` 与第 9~21 行「修改顺序铁律」提示都不会执行，该提示分支沦为死代码；实测五种暂存组合中仅「代码 + agreement 同时暂存」能走到第 9 行。
+- **修复**：两条赋值末尾补 `|| true`，把「有没有匹配」交还给后续 `if` 判断；纯文档提交恢复正常，仅改代码未带 agreement 时现在能真正打印铁律提示并 `exit 1`。未改动 husky 自动生成文件 `.husky/_/h`，未使用 `--no-verify`，未放宽「修改顺序铁律」本身。
+
 ---
 
 ## v3.3.3

@@ -3,8 +3,13 @@
 # =========================================================================
 # 【修改顺序铁律】唯一协议与代码同步审计
 # =========================================================================
-STAGED_CODE_FILES=$(git diff --cached --name-only | grep -E '\.(ts|tsx|rs)$|tauri\.conf\.json$')
-STAGED_AGREEMENTS_FILE=$(git diff --cached --name-only | grep -E '^clash_mini_agreements\.md$')
+# husky 9 的 .husky/_/h 用 `sh -e` 执行本脚本：任何非 0 语句都会立即终止整个 hook。
+# `VAR=$(... | grep ...)` 的退出码等于 grep 的退出码，而 grep 无匹配返回 1，
+# 因此纯文档提交（或任何未同时包含代码与 agreement 的提交）会在下面两行被静默拦下，
+# 连 cargo make pre-commit 与第 9~21 行的「修改顺序铁律」提示都不会执行。
+# `|| true` 让赋值恒成功，把「有没有匹配」交还给下面的 if 判断（BUG-374）。
+STAGED_CODE_FILES=$(git diff --cached --name-only | grep -E '\.(ts|tsx|rs)$|tauri\.conf\.json$' || true)
+STAGED_AGREEMENTS_FILE=$(git diff --cached --name-only | grep -E '^clash_mini_agreements\.md$' || true)
 
 if [ -n "$STAGED_CODE_FILES" ] && [ -z "$STAGED_AGREEMENTS_FILE" ]; then
   echo "========================================================================="
