@@ -588,6 +588,12 @@ pub struct AutoSelectOutcome {
     pub source: DelayResultSource,
 }
 
+/// 节点侧自愈所需的连续独立确认次数（§5.1：连续 2 次检测失败才自愈）
+const FAILOVER_CONFIRM_FAILS: u32 = 2;
+
+/// 内核 API 通道连续异常达到该次数后，才允许进入统一自愈裁决（非节点侧故障，见 §5.1）
+const API_ERROR_HEAL_THRESHOLD: u32 = 3;
+
 /// 正常健康检测间隔（秒）
 const NORMAL_CHECK_INTERVAL_SECS: u64 = 15;
 
@@ -966,6 +972,60 @@ pub enum FailoverVerdict {
     ShouldFailover,
     /// 子集内全部节点均不可用
     AllDead,
+}
+
+/// 后台监测所有自愈请求的统一裁决输入（S3，§5.1 / §5.3）。
+///
+/// 旧实现把「是否自愈」分散写在三个分支里：网络恢复凭一次 `evaluate_failover`
+/// 就立即切点，API 异常各自用 `>= 3` 直接触发，二者都绕过「连续 2 次失败」。
+/// 现在任何入口都必须先构造本枚举并交由 `decide_self_heal` 裁决，
+/// 只有 `SelfHealDecision::Allow` 才允许调用 `self_heal_with_accounting`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelfHealTrigger {
+    /// 主路径：连续独立体检确认活跃节点失效
+    NodeConfirmedDead { consecutive_fails: u32 },
+    /// 物理网络离线转在线：只代表链路恢复，不构成节点故障证据
+    NetworkRecovered,
+    /// 内核 API 通道连续异常；`api_alive_on_recheck` 为阈值触发后的 API 存活复核结果
+    ApiUnreachable {
+        api_error_count: u32,
+        api_alive_on_recheck: bool,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelfHealDecision {
+    Allow,
+    Wait,
+}
+
+/// 统一裁决器（纯函数，便于单测锁定三条入口的防抖契约）：
+/// - 节点侧故障：必须连续 `FAILOVER_CONFIRM_FAILS` 次独立体检确认；
+/// - 网络恢复：恒为 `Wait`，安静等待并交主路径重新测量，禁止立即自愈；
+/// - 内核 API 故障：属通道故障而非节点故障，适用独立门控——连续
+///   `API_ERROR_HEAL_THRESHOLD` 次异常且复核时 API 仍不可达才放行；
+///   复核时 API 已恢复则清零计数、交下一周期重新测量，避免用陈旧故障结论切点。
+const fn decide_self_heal(trigger: SelfHealTrigger) -> SelfHealDecision {
+    match trigger {
+        SelfHealTrigger::NodeConfirmedDead { consecutive_fails } => {
+            if consecutive_fails >= FAILOVER_CONFIRM_FAILS {
+                SelfHealDecision::Allow
+            } else {
+                SelfHealDecision::Wait
+            }
+        }
+        SelfHealTrigger::NetworkRecovered => SelfHealDecision::Wait,
+        SelfHealTrigger::ApiUnreachable {
+            api_error_count,
+            api_alive_on_recheck,
+        } => {
+            if api_error_count >= API_ERROR_HEAL_THRESHOLD && !api_alive_on_recheck {
+                SelfHealDecision::Allow
+            } else {
+                SelfHealDecision::Wait
+            }
+        }
+    }
 }
 
 /// 依据测量组（PROXY__METRICS，url-test）维护的 history/alive 判定节点状态。
@@ -1833,7 +1893,7 @@ pub fn start_background_monitor() {
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
         let thread_start_time = Instant::now();
         let mut last_check_time = Instant::now();
-        let mut consecutive_fails = 0;
+        let mut consecutive_fails: u32 = 0;
         let mut is_retry_mode = false;
         let mut last_active_node: Option<String> = None;
         // 节点切换时间：切换后 SWITCH_GRACE_PERIOD_SECS 内为宽限期，
@@ -1968,31 +2028,23 @@ pub fn start_background_monitor() {
                 consecutive_fails = 0;
                 is_retry_mode = false;
 
-                // 如果当前活跃节点已死（测量组判定），立刻触发一次自愈选点
-                if evaluate_failover(&current_profile, false)
-                    .await
-                    .map(|v| v != FailoverVerdict::NoAction)
-                    .unwrap_or(false)
-                {
-                    let dead_node = get_active_node_name().await;
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 当前活跃节点不可用，立即触发网络恢复自愈选点"
-                    );
-                    // 委托后端执行网络恢复自愈选点（统一走冷却/计数/警报记账，🟡6）
-                    self_heal_with_accounting(
-                        &current_profile,
-                        dead_node.as_deref(),
-                        &mut auto_select_fail_count,
-                        &mut api_dead_heal_fail_count,
-                        &mut last_auto_select_time,
-                        &mut last_check_time,
-                    )
-                    .await;
-                } else {
-                    emit_network_health_notice("network_health::ok");
-                }
+                // 【S3 统一裁决】物理网络恢复只说明链路可用，不构成节点故障证据。
+                // 旧实现在此凭一次 `evaluate_failover != NoAction` 就立即自愈（绕过连续 2 次判定），
+                // 且本周期主路径还会再拨测一次，形成双拨测；现在统一裁决器恒判 Wait，
+                // 只放行一次体检，由主路径按连续失败计数裁决。
+                debug_assert_eq!(
+                    decide_self_heal(SelfHealTrigger::NetworkRecovered),
+                    SelfHealDecision::Wait
+                );
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 网络恢复：不立即自愈，交由统一裁决器重新测量并按连续 2 次失败计数"
+                );
+                // 与唤醒分支同一手法：把上次检测时刻前拨，强制本周期立即执行统一体检；
+                // 若体检判死也只累计第 1 次失败，3 秒后第二次独立拨测确认才可能自愈。
+                last_check_time = Instant::now() - Duration::from_secs(NORMAL_CHECK_INTERVAL_SECS + 1);
+                emit_network_health_notice("network_health::ok");
             } else if was_online && !is_online {
                 logging!(
                     warn,
@@ -2035,9 +2087,8 @@ pub fn start_background_monitor() {
                     Some(name) => name,
                     None => {
                         // API 不可达（内核崩了/未就绪）。累计 api_error_count，
-                        // 达到阈值后统一走 self_heal_with_accounting 触发自愈，
-                        // 冷却/失败计数/Windows 警报与主路径、网络恢复路径完全一致，
-                        // 避免绕过 60 秒冷却导致内核全死时背靠背狂拨测。
+                        // 达到阈值后先复核 API 存活，再交统一裁决器决定是否自愈（S3）；
+                        // 复核已恢复则只清零计数，交下一周期主路径重新测量，避免陈旧故障结论切点。
                         api_error_count += 1;
                         logging!(
                             warn,
@@ -2045,19 +2096,37 @@ pub fn start_background_monitor() {
                             "[后台监测] 读取当前节点失败 (API不可达)，连续异常次数: {}",
                             api_error_count,
                         );
-                        if api_error_count >= 3 {
-                            api_error_count = 0;
-                            logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
-                            // 统一走冷却/计数/警报记账（与主路径、网络恢复、evaluate_failover Err 一致）
-                            self_heal_with_accounting(
-                                &current_profile,
-                                None,
-                                &mut auto_select_fail_count,
-                                &mut api_dead_heal_fail_count,
-                                &mut last_auto_select_time,
-                                &mut last_check_time,
-                            )
-                            .await;
+                        if api_error_count >= API_ERROR_HEAL_THRESHOLD {
+                            let api_alive_on_recheck = is_clash_api_alive().await;
+                            if decide_self_heal(SelfHealTrigger::ApiUnreachable {
+                                api_error_count,
+                                api_alive_on_recheck,
+                            }) == SelfHealDecision::Allow
+                            {
+                                api_error_count = 0;
+                                logging!(
+                                    warn,
+                                    Type::Lightweight,
+                                    "[后台监测] 连续 3 次 API 异常且复核仍不可达，触发自愈选点"
+                                );
+                                // 统一走冷却/计数/警报记账（与主路径、evaluate_failover Err 一致）
+                                self_heal_with_accounting(
+                                    &current_profile,
+                                    None,
+                                    &mut auto_select_fail_count,
+                                    &mut api_dead_heal_fail_count,
+                                    &mut last_auto_select_time,
+                                    &mut last_check_time,
+                                )
+                                .await;
+                            } else {
+                                api_error_count = 0;
+                                logging!(
+                                    info,
+                                    Type::Lightweight,
+                                    "[后台监测] API 通道复核已恢复，跳过自愈选点，交由下一周期统一重新测量"
+                                );
+                            }
                         }
                         continue;
                     }
@@ -2138,7 +2207,9 @@ pub fn start_background_monitor() {
                                         consecutive_fails
                                     );
 
-                                    if consecutive_fails >= 2 {
+                                    if decide_self_heal(SelfHealTrigger::NodeConfirmedDead { consecutive_fails })
+                                        == SelfHealDecision::Allow
+                                    {
                                         consecutive_fails = 0;
                                         is_retry_mode = false;
 
@@ -2180,18 +2251,36 @@ pub fn start_background_monitor() {
                             "[后台监测] 节点健康检查异常 (API不可达): {e}，连续异常次数: {}",
                             api_error_count
                         );
-                        if api_error_count >= 3 {
-                            api_error_count = 0;
-                            logging!(warn, Type::Lightweight, "[后台监测] 连续 3 次 API 异常，触发自愈选点");
-                            self_heal_with_accounting(
-                                &current_profile,
-                                None,
-                                &mut auto_select_fail_count,
-                                &mut api_dead_heal_fail_count,
-                                &mut last_auto_select_time,
-                                &mut last_check_time,
-                            )
-                            .await;
+                        if api_error_count >= API_ERROR_HEAL_THRESHOLD {
+                            let api_alive_on_recheck = is_clash_api_alive().await;
+                            if decide_self_heal(SelfHealTrigger::ApiUnreachable {
+                                api_error_count,
+                                api_alive_on_recheck,
+                            }) == SelfHealDecision::Allow
+                            {
+                                api_error_count = 0;
+                                logging!(
+                                    warn,
+                                    Type::Lightweight,
+                                    "[后台监测] 连续 3 次 API 异常且复核仍不可达，触发自愈选点"
+                                );
+                                self_heal_with_accounting(
+                                    &current_profile,
+                                    None,
+                                    &mut auto_select_fail_count,
+                                    &mut api_dead_heal_fail_count,
+                                    &mut last_auto_select_time,
+                                    &mut last_check_time,
+                                )
+                                .await;
+                            } else {
+                                api_error_count = 0;
+                                logging!(
+                                    info,
+                                    Type::Lightweight,
+                                    "[后台监测] API 通道复核已恢复，跳过自愈选点，交由下一周期统一重新测量"
+                                );
+                            }
                         }
                     }
                 }
@@ -2255,8 +2344,10 @@ fn fire_core_restart_failed_alert() {
 /// 执行一次自愈选点并统一记账：25 秒冷却保护 + auto_select_fail_count 累计 +
 /// 连续 5 次弹 Windows 警报。
 ///
-/// 后台监测的三处自愈触发路径（主路径 / 网络恢复 / API 异常）共用本函数，
-/// 避免冷却与计数逻辑各写一份导致行为不一致（🟡6）。
+/// **调用前置条件（S3，§5.1 / §5.3）**：所有触发入口必须先经 `decide_self_heal`
+/// 统一裁决且结果为 `SelfHealDecision::Allow`；网络恢复恒判 `Wait`，不得进入本函数。
+/// 本函数只负责冷却与计数记账，不再承担「是否应当自愈」的判定，
+/// 避免防抖契约分散在多个分支（🟡6 / Sync-19）。
 ///
 /// - 冷却：auto_select 失败后至少等 25 秒再重试；处于冷却中直接返回 false 跳过。
 /// - 计数：选点成功归零；失败或非 BUSY 报错加 1；AUTO_SELECT_BUSY 冲突不计失败、
@@ -2461,6 +2552,9 @@ async fn self_heal_with_accounting(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
+        API_ERROR_HEAL_THRESHOLD, FAILOVER_CONFIRM_FAILS, SelfHealDecision, SelfHealTrigger, decide_self_heal,
+    };
+    use super::{
         DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
         LAST_METRICS_PROBE, LAST_NOTIFIED_HEALTH, LAST_SYNCED_ACTIVE_HISTORY_TIME, METRICS_REUSE_MAX_AGE_SECS,
         MetricsProbeSnapshot, NodeStatus, SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SelfHealAction,
@@ -2469,6 +2563,55 @@ mod tests {
         reset_monitor_static_state, resolve_probe_target, secondary_test_url, should_probe_active_node,
         should_recheck_with_fallback, sort_display_delays, try_reuse_probe_snapshot,
     };
+
+    #[test]
+    fn test_decide_self_heal_unifies_all_three_triggers() {
+        // 1. 节点侧故障：第 1 次失败必须等待，达到连续 2 次才放行
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead { consecutive_fails: 1 }),
+            SelfHealDecision::Wait
+        );
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                consecutive_fails: FAILOVER_CONFIRM_FAILS
+            }),
+            SelfHealDecision::Allow
+        );
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead { consecutive_fails: 5 }),
+            SelfHealDecision::Allow
+        );
+
+        // 2. 网络恢复恒判 Wait：物理链路恢复不构成节点故障证据，禁止一次判定即自愈
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NetworkRecovered),
+            SelfHealDecision::Wait
+        );
+
+        // 3. 内核 API 通道故障：未达阈值等待；达阈值但复核时 API 已恢复仍等待；
+        //    仅「达阈值且复核仍不可达」放行，避免用陈旧故障结论切点
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::ApiUnreachable {
+                api_error_count: API_ERROR_HEAL_THRESHOLD - 1,
+                api_alive_on_recheck: false,
+            }),
+            SelfHealDecision::Wait
+        );
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::ApiUnreachable {
+                api_error_count: API_ERROR_HEAL_THRESHOLD,
+                api_alive_on_recheck: true,
+            }),
+            SelfHealDecision::Wait
+        );
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::ApiUnreachable {
+                api_error_count: API_ERROR_HEAL_THRESHOLD,
+                api_alive_on_recheck: false,
+            }),
+            SelfHealDecision::Allow
+        );
+    }
 
     #[test]
     fn test_resolve_probe_target_ipv4() {

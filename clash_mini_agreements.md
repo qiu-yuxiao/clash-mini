@@ -427,7 +427,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 为确保在无人值守、前台关闭或轻量模式下 24/7 网络的高可用性，后台维护着高可靠守护监测线程：
 - **恒定 15 秒监测周期**：监测周期在轻量模式与前台窗口开启时**严格恒定为 15 秒**，不做任何放慢（代理运行与前台窗口开闭无关，节点假死应在 15 秒内被捕获）。
 - **重试加速（3 秒）**：当探测到当前活跃节点异常或初次失败时，周期立即动态收紧为 **3 秒**，执行高频复检。
-- **防抖自愈判定**：严格执行**连续 2 次检测失败**才正式触发全节点批量选点自愈，彻底滤除网络微抖动造成的过度切换。
+- **防抖自愈判定与统一裁决器（Sync-19）**：节点侧自愈严格执行**连续 2 次独立检测失败**才正式触发全节点批量选点自愈，彻底滤除网络微抖动造成的过度切换。后台监测**所有**自愈请求（主路径 / 网络恢复 / API 异常）必须构造 `SelfHealTrigger` 并交由 `decide_self_heal` 纯函数裁决，仅 `SelfHealDecision::Allow` 时方可调用 `self_heal_with_accounting`，严禁任一分支各自直接触发：① `NodeConfirmedDead` 要求 `consecutive_fails >= FAILOVER_CONFIRM_FAILS (2)`；② `NetworkRecovered` **恒判 `Wait`**——物理网络恢复只说明链路可用，不构成节点故障证据，必须安静等待并交主路径重新测量（旧实现凭一次 `evaluate_failover != NoAction` 立即自愈、且同周期主路径重复拨测，已删除）；③ `ApiUnreachable` 属**内核 API 通道故障**、不是节点侧故障，故适用独立门控：连续 `API_ERROR_HEAL_THRESHOLD (3)` 次异常后须再经 `is_clash_api_alive()` 复核，仅当 API 仍不可达才放行，复核时已恢复则清零计数并交下一周期测量。**两类故障边界明确**，不再出现「规范写连续 2 次、实现却留三条后门」的自相矛盾；BUG-318 的连续失败 / 内核重启 / 系统告警记账链路不变。
 - **测速失真不记失败（Sync-18）**：体检得出「主测速地址整体失败、备用地址可用 ⇒ 测速地址失真、节点侧正常」时，`evaluate_failover` 直接返回 `NoAction`，主循环清零 `consecutive_fails` 并复位健康态；该结论必须由 `probe_metrics_group` 以 `MetricsProbeOutcome.primary_url_distorted` 显式传回裁决层，**严禁只写日志不进裁决**。
 - **严格判死阈值（5000ms）**：测速超时硬限为 **5000ms**；延迟有效区间锁定为 `[30ms, 5000ms)`；超过 5000ms 或产生握手错误一律判死。**该值历史上在 2000ms 与 5000ms 之间反复调整过不止一次，2026-10 定型为 5000ms（BUG-304 现场双路对照监控实证）：链路拥塞簇内仅 TCP 握手即需 1.1~2.1s（SYN 丢包按 1s RTO 重传的整秒台阶指纹），叠加 TLS 握手与 204 探测往返后，「慢而可用」的活节点总耗时稳定超过 2s——2000ms 预算会把拥塞期的整组活节点误判为断流；而真死节点（机场集群故障）5s 内同样超时，不会产生误活。除非有同等量级的现场实证，禁止回调至 2000ms。**
 - **切换宽限期（20 秒，v3.2.4 优化）**：任何节点切换（含自动选点与手动切换）后 20 秒内，失败判定只记日志、不计入连续失败次数，防止「切到尚未拨测的新节点 → 缓存陈旧误判 → 再次切走」的乒乓震荡。v3.2.4 从原 60 秒缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
@@ -466,7 +466,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 ### 5.3 统一记账与 25 秒失败冷却保护（v3.2.4 / v3.3.2 优化）
 
-- **自愈路径统一记账**：后台监测的三大触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）全部统一汇聚至 `self_heal_with_accounting` 统一记账函数。**【Sync-18 修订】** 自愈成功切换后不再执行 `close_connections_on_dead_node`（现行规范见 §4.2），默认路径不触碰任何存量连接；`dead_node` / `selected_node` 仅用于输出「已切换、跳过清理」日志，25 秒冷却与统一记账契约不变。
+- **自愈路径统一裁决与记账（Sync-19）**：后台监测的全部触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）**必须先经 `decide_self_heal` 统一裁决**（规则见 §5.1），仅 `SelfHealDecision::Allow` 时才汇聚至 `self_heal_with_accounting` 统一记账函数；网络离线转在线恢复恒判 `Wait`，不再进入自愈路径，也不再于该分支额外拨测一次。**【Sync-18 修订】** 自愈成功切换后不再执行 `close_connections_on_dead_node`（现行规范见 §4.2），默认路径不触碰任何存量连接；`dead_node` / `selected_node` 仅用于输出「已切换、跳过清理」日志，25 秒冷却与统一记账契约不变。
 - **25 秒失败冷却防线**：若自愈选点失败或所有节点均不可达，强制进入 **25 秒冷却期**（v3.2.4 由原 60 秒缩短至 25 秒，既杜绝风暴式并发高频测速，又显著加快连续异常时的恢复时效），冷却期内严禁重复发起自愈冲击。
 - **连续 5 次系统级告警与重启终态契约**：`evaluate_self_heal_counters` 与 `complete_restart_core_attempt` 将「API 假死 3 次重启计数」与「全节点断流 5 次告警计数」解耦——API 不可达满 3 次触发 `RestartCore` 时仅重置 `api_dead_heal_fail_count`：若内核重启成功（`Ok`），保留 `auto_select_fail_count` 继续累计至第 5 次可靠触发 Win32 原生 `MessageBoxW` 系统告警并重置双计数；若内核重启自身报错（`Err`），则定义为不可恢复终态，立即升级弹出内核重启失败系统告警并重置本轮双计数（内置原子单实例门控防止模态弹窗堆叠）。
 
@@ -869,6 +869,17 @@ flowchart LR
 - **本次未处理（按「一个一个来」留待后续）**：三条绕过「连续 2 次」的自愈入口收编（S3）；Healthy / Suspect / ConfirmedDead 迟滞状态、切换稳定确认期与单位时间切换上限（S4）；统一测量源与时钟、移除 `force_confirm_probe` 的 3s 强制双拨测（S5）；两份架构文档主次裁定、§5.1 三档周期与 60s 新鲜度同步、§5.1.1 临时探针章节清理（S6）。
 - **影响**：主测速地址抖动不再被判成节点已死、不再触发自愈；即便自愈确因真实节点故障发生，也不再关闭任何存量连接，长连接由应用层自行重连。周期性长流断线的根因被切断；未新增配置项、未改动前端、未改动代理组架构、未改动发版流程。
 
+### Sync-19 · 三条自愈入口收编统一裁决器（v3.3.3 评审 S3，BUG-373）
+
+- **问题定位**：`§5.1` 规定「连续 2 次检测失败才自愈」，但主循环存在三条独立绕过：`!was_online && is_online` 分支凭一次 `evaluate_failover != NoAction` 立即调用 `self_heal_with_accounting`（并以 `get_active_node_name()` 传入 `dead_node`），且该分支不 `continue`，同周期主路径还会再拨测一次形成双拨测；`get_active_node_name()` 返回 `None` 与 `evaluate_failover` 返回 `Err` 两处各自用 `api_error_count >= 3` 直接自愈。防抖承诺被架空，规范文本与实现互相矛盾。
+- **核心变更（仅 `src-tauri/src/module/monitor.rs`）**：
+  1. **统一裁决器**：新增 `FAILOVER_CONFIRM_FAILS = 2` / `API_ERROR_HEAL_THRESHOLD = 3` 常量、`SelfHealTrigger` / `SelfHealDecision` 与纯函数 `decide_self_heal`；节点侧故障须连续 2 次确认，网络恢复恒判 `Wait`，内核 API 通道故障须连续 3 次异常且复核仍不可达才放行。`self_heal_with_accounting` 退化为纯记账执行函数，调用前置条件写入其文档注释。
+  2. **网络恢复改为安静等待 + 重新测量**：删除「一次判定即自愈」与 `dead_node` 传参；复位 `consecutive_fails` / `is_retry_mode`、派发 `network_health::ok` 后，将 `last_check_time` 前拨，强制本周期立即走主路径统一体检（与唤醒分支同一手法）。即便体检判死也只累计第 1 次失败，3 秒后第二次独立拨测确认才可能自愈；同周期双拨测随之消失。
+  3. **API 异常增加存活复核**：两处阈值判断改用常量，达到阈值后先 `is_clash_api_alive()`（3s 超时）复核；API 已恢复则清零计数、跳过切点并交下一周期测量，仅复核仍不可达才经裁决器放行。BUG-318 的 `evaluate_self_heal_counters` / `RestartCore` / 连续 5 次告警链路不变。
+  4. **单测锁定**：新增 `test_decide_self_heal_unifies_all_three_triggers` 覆盖三条分支与阈值边界（1 次失败等待 / 2 次放行、网络恢复恒等待、API 未达阈值与复核已恢复均等待、达阈值且仍不可达放行）。
+- **本次未处理**：Healthy / Suspect / ConfirmedDead 迟滞状态、切换稳定确认期与单位时间切换上限（S4）；统一测量源与时钟、移除 `force_confirm_probe` 的 3s 强制双拨测（S5）；两份架构文档主次裁定、§5.1 三档周期与 60s 新鲜度同步、§5.1.1 临时探针章节清理（S6）。
+- **影响**：网络抖动 / 断网重连 / 内核 API 瞬时异常不再各自绕过防抖直接切点；未新增配置项、未改动前端、未改动代理组架构、未改动发版流程，也不改变真实节点故障连续 2 次确认后的自愈时效。
+
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
 | 缺陷编号 | 对应章节 | 修复性质与关键技术点 |
@@ -1000,6 +1011,8 @@ flowchart LR
 | **BUG-369** | 2.8 / 5.2 / 5.4 / 5.6 | 修复 `DelayManager` 在 `-2` 测试态下复用注入误砍合法缓存寿命、补充唤醒测速 `-2` 快照回滚、`evaluate_failover` 体检直播延迟与 `restart_core` 立即唤醒推送；将 `useHeadStateNew` 重构为 `useSyncExternalStore` 模块级单例彻底根除 `filterText` 被并发 `sortType` 覆写；新增规范化连接指纹 `deduplicate_cloned_proxies` 同配置克隆去重与持久化真 HTTPS 验真状态机（1 次过真即单向粘滞、有在线参照通过前提下连续失败 `> 5` 次永久拉黑并在前后端全链路隐藏）。 |
 | **BUG-370** | 2.8 / 5.2 / 5.6 | 修复局部测速 URL 失真、后台恢复未同步 UI 与前端延迟缓存过期冻结的三处同步缺口：`probe_metrics_group` 在非全量失效时触发备用测速 URL（`FALLBACK_TEST_URL` ↔ `DEFAULT_TEST_URL`）复测并合并最健康延迟；`evaluate_failover` 新增 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 去重，确保从异常态恢复及正常 300s 体检新测量落地时及时向前端推送更新；`DelayManager::evictExpiredCache` 淘汰过期非 `-2` 缓存时主动向节点与组监听者广播 `{ delay: -1, updatedAt: 0 }` 唤醒重算，并同步修复 `useProxyDelayState` 与 `ActiveNodeCard` 的回落/切换同步（见 §5.2、§5.6、Sync-16）。 |
 | **BUG-371** | 2.2 / 2.10 | 修复「流量接管模式（含代理方式）」与「基础设置」二选一/三选一开关操作期间与操作结果/失败反馈弹窗退化缺失问题：`notice-service` 新增 `MIN_LOADING_NOTICE_DWELL_MS`（`320ms`）最小停留防护（`markLoadingNotice` / `settleLoadingNotice`）防止快速 IPC 切换一闪而过；`NoticeManager` `zIndex` 升至 `2200` 高于 MUI Tooltip（`1500`）；`patchVerge` 与 `useServiceInstaller` 支持并发丢弃判定返回值与 `{ silentError }` 单次报错去重；补齐 `handleRuleFallbackChange`、开机自启（含注册表校验不一致告警）、启动时最小化、TUN 域名嗅探（含非 TUN 模式点击警示）及端口 `1–65535` 校验全套三段式反馈弹窗（见 §2.2、§2.10、Sync-17）。 |
+| **BUG-372** | 4.2 / 5.1 / 5.2 / 5.3 / 5.8 | 测速失真误判自愈与周期性清连接误杀健康长流修复：`probe_metrics_group` 返回 `MetricsProbeOutcome { delays, primary_url_distorted }`，主 URL 整体失败且备用成功时 `evaluate_failover` 直接 `NoAction` 并清零失败计数；`try_reuse_probe_snapshot` / 1500ms 短窗合并改为「目标全灭一律禁止复用」并移除 `dual_url_verified`；新增默认关闭 `DEAD_CONN_CLEANUP_ENABLED`，自愈切换后不再关闭任何存量连接（见 §4.2 / §5.2 / Sync-18）。 |
+| **BUG-373** | 5.1 / 5.3 | 三条自愈入口收编统一裁决器：新增 `SelfHealTrigger` / `SelfHealDecision` / `decide_self_heal` 纯函数与 `FAILOVER_CONFIRM_FAILS` / `API_ERROR_HEAL_THRESHOLD` 常量；网络离线转在线恢复恒判 `Wait`（安静等待 + 立即重新测量，删除一次判定即自愈与同周期双拨测），API 连续异常达阈值后先经 `is_clash_api_alive()` 复核，仅仍不可达才放行；主路径连续 2 次确认改由裁决器判定，BUG-318 记账链路不变（见 §5.1 / §5.3 / Sync-19）。 |
 
 ---
 

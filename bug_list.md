@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-371)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-373)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -393,6 +393,20 @@
 - **涉及物理路径与行号**：`src/services/notice-service.ts`, `src/components/layout/notice-manager.tsx`, `src/hooks/use-verge.ts`, `src/hooks/use-service-installer.ts`, `src/pages/_layout.tsx`, `src/pages/_layout/hooks/use-minimal-settings.ts`, `src/pages/_layout/components/basic-settings-card.tsx`, `src/utils/popup-styles.test.ts`, `src/locales/*/layout.json`, `src/locales/*/settings.json`
 - **根因与背景实证**：① `handleRuleFallbackChange`（代理方式三选一）、`BasicSettingsCard` 内的「开机自动启动」「启动时最小化」「TUN 域名嗅探」三选一以及「混合代理端口」保存缺少进行中提示、成功反馈、范围校验及权限/受限提示；② 快速完成的后端 IPC（如 `Allow LAN`、`IPv6`、规则兜底，5~40ms）在人眼感知前即调用 `hideNotice(waitId)` 关闭「正在调整」横幅，造成未弹窗的视觉错觉；③ `NoticeManager` `zIndex: 1500` 与 MUI `Tooltip` 默认层级相同，紧邻开关悬停 Tooltip 时易被遮挡；④ `patchVerge` 先行弹出 `showNotice.error` 后又 `throw err`，导致外层 `catch` 重复弹窗，且 `useLockFn` 并发丢弃时解析为 `undefined` 被调用方误判为成功而误弹成功通知。
 - **修正与改良方案**：① `notice-service` 新增 `MIN_LOADING_NOTICE_DWELL_MS = 320`、`markLoadingNotice` 与 `settleLoadingNotice`，快速操作亦保证过程提示至少稳定停留 `320ms` 后平滑退场，并将 `NoticeManager` `zIndex` 升至 `2200` 与增设内边距；② `patchVerge` 成功执行返回 `true`（并发丢弃时返回 `undefined`）且 `patchVerge` / `useServiceInstaller` 支持 `{ silentError: true }` 消除双弹窗；③ 为「代理方式」「流量接管模式」「Allow LAN」「IPv6」「开机自动启动」（含注册表结果对账不一致告警）、「启动时最小化」「TUN 域名嗅探」（含非 TUN 模式点击警示）与端口保存（含 `1–65535` 校验）全面恢复统一「进行中 → 成功/告警 → 失败单弹窗」闭环并同步 13 语种及 Vitest 单测。
+
+### BUG-372（对应规范章节：4.2 / 5.1 / 5.2 / 5.3 / 5.8）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：Critical / 后台测速失真误判自愈与周期性清连接导致 HTTP/2 · gRPC 长流硬断（Antigravity 频繁掉线）
+- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`probe_metrics_group` / `MetricsProbeOutcome` / `evaluate_failover` / `try_reuse_probe_snapshot` / `self_heal_with_accounting` / `close_connections_on_dead_node`）, `clash_mini_agreements.md`（§4.2 / §5.1 / §5.2 / §5.3 / §5.8 / Sync-18）
+- **根因与背景实证**：v3.3.3 现场后台测速每 2–5 分钟切一次节点并顺手清掉一批旧连接，日志已打印「备用测速地址可用 → 判定为主测速地址失真，节点侧正常」却仍累加 `consecutive_fails` 触发自愈，链路仅抖动即被切成硬断，导致 Google Antigravity 长连接反复掉线。代码层面四处叠加：① `probe_metrics_group` 的「主地址整体失败 + 备用成功」结论只写日志并置 `dual_url_verified`，该字段全库仅用于快照复用 / 合并窗口 / 单测，**从未进入 `FailoverVerdict` 或 `consecutive_fails`**；② `evaluate_failover` 丢弃本轮实测 `probed_delays`，改为重读 `get_proxies()` + `node_status()`（`alive` / `history.last().delay`）判死，而主地址拨测失败时内核已把全组成员标为 not-alive（`alive` 与 `history` 可来自不同轮次、不同 URL），据此判死即误判；③ 自愈选点按全局最小延迟执行，**不要求原活跃节点已死、无延迟差门槛**，「自愈成功」仅表示选出了不同节点；④ `collect_dead_node_connection_ids` 只按 `chains` 命中筛选，**无 age / upload / download / alive 过滤**，`join_all` 无差别 `close_connection`，关闭的是「所有经过旧节点的连接」而非注释所称「仍挂死的连接」。`select_node_for_group` 本身是干净热切换、存量连接不受影响，真正切断长流的是第 ④ 步，§4.2「精确断死留活」的设计意图与实现不符。
+- **修正与改良方案**：① **S1-A 结论进入裁决**：`probe_metrics_group` 返回结构化 `MetricsProbeOutcome { delays, primary_url_distorted }`，主地址整体失败且备用成功时置 `true`；`evaluate_failover` 在保留 UI 延迟同步与 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 记账等副作用后据此直接 `return NoAction`，主循环随之清零 `consecutive_fails`、解除重试态并复位健康通知；「主地址部分失真 + 备用复核成功」分支因备用拨测已刷新内核 `alive`、合并延迟可用，仍保留健康裁决以免掩盖真实节点故障；② **S1-B 门控方向修正**：`try_reuse_probe_snapshot` 与 `PROBE_COALESCE_WINDOW_MS` 短窗合并由「未经双地址复核且目标节点全灭才禁止复用」改为「目标节点全灭一律禁止复用」，堵住 `dual_url_verified` 为残缺单地址快照开的绿灯，并移除已失效的该字段及对应单测断言；③ **S2 清连接退出默认路径**：新增 `DEAD_CONN_CLEANUP_ENABLED = false`，`self_heal_with_accounting` 切换成功后默认不调用 `close_connections_on_dead_node`、仅输出跳过日志，切换回归干净热切换，存量 HTTP/2 / gRPC 长流交由应用层自行重连；实现与 `test_collect_dead_node_connection_ids_surgical_cleanup` 保留待 S4 引入 ConfirmedDead 迟滞状态与「无流量」过滤后再评估恢复；④ 同步 `clash_mini_agreements.md` §4.2 / §5.1 / §5.2 / §5.3 / §5.8、Sync-13 / Sync-16 / 附录 A BUG-368 修订标注并新增 Sync-18。
+
+### BUG-373（对应规范章节：5.1 / 5.3）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：High / 三条自愈入口绕过「连续 2 次」防抖判定与网络恢复同周期双拨测
+- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`start_background_monitor` 网络恢复分支 / `get_active_node_name` None 分支 / `evaluate_failover` Err 分支 / `decide_self_heal` / `self_heal_with_accounting`）, `clash_mini_agreements.md`（§5.1 / §5.3 / Sync-19）
+- **根因与背景实证**：§5.1 与 §5.3 明文规定「严格执行连续 2 次检测失败才自愈」，但主循环保留三条独立绕过路径：① `!was_online && is_online` 分支调用一次 `evaluate_failover(&current_profile, false)`，只要返回 `!= NoAction` 即以 `get_active_node_name()` 作为 `dead_node` 立即执行 `self_heal_with_accounting`，且该分支不 `continue`，本周期主路径随后再次调用 `evaluate_failover`，形成同周期两次全组拨测；② `get_active_node_name()` 返回 `None`（API 不可达）时 `api_error_count >= 3` 直接自愈；③ `evaluate_failover` 返回 `Err` 时同样 `>= 3` 直接自愈。物理网络 60s 探测翻转、内核 API 瞬时抖动均可一次触发切点，是「每 2–5 分钟切一次节点」的周期性来源之一；规范文本「连续 2 次」与实现三条后门长期自相矛盾。
+- **修正与改良方案**：① 新增 `FAILOVER_CONFIRM_FAILS = 2` / `API_ERROR_HEAL_THRESHOLD = 3` 常量与 `SelfHealTrigger` / `SelfHealDecision` / `decide_self_heal` 纯函数统一裁决器，所有入口必须构造 trigger 并接受 `Allow` / `Wait` 裁决，仅 `Allow` 方可调用 `self_heal_with_accounting`（后者退化为纯记账执行函数，前置条件写入文档注释）；② `NetworkRecovered` 恒判 `Wait`：删除一次判定即自愈与 `dead_node` 传参，保留计数复位与 `network_health::ok`，将 `last_check_time` 前拨强制本周期立即走主路径统一体检，即便判死也只累计第 1 次失败、3 秒后第二次独立拨测确认才可能自愈，同周期双拨测消失；③ `ApiUnreachable` 两处改用常量阈值，达阈值后先 `is_clash_api_alive()`（3s 超时）复核，API 已恢复则清零计数、跳过切点交下一周期测量，仅仍不可达才放行，BUG-318 的 `evaluate_self_heal_counters` / `RestartCore` / 连续 5 次告警链路不变；④ `NodeConfirmedDead` 由裁决器按连续 2 次判定（主路径切换宽限期逻辑保留）；⑤ 新增 `test_decide_self_heal_unifies_all_three_triggers` 单测锁定三条分支与阈值边界；⑥ 同步 §5.1 / §5.3 明确「节点侧故障 vs 内核 API 通道故障」两类边界、消除规范内部矛盾，新增 Sync-19 与附录 A 映射。
 
 ---
 

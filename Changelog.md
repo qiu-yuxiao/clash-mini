@@ -1,3 +1,21 @@
+## v3.3.4（待发布）
+
+### 🛡️ 修复测速失真误判自愈与周期性清连接导致的长流硬断（BUG-372）
+
+- **测速失真结论进入健康裁决**：`probe_metrics_group` 改为返回结构化 `MetricsProbeOutcome`，当主测速地址整体失败、备用地址成功时明确标记「主测速地址失真」；`evaluate_failover` 在保留 UI 延迟同步与记账副作用后据此直接返回 `NoAction` 并清零连续失败计数，终结「日志判定节点侧正常、后台仍累加失败触发自愈」的自相矛盾。
+- **快照复用门控纠偏与失效字段清理**：`try_reuse_probe_snapshot` 与 `1500ms` 短窗合并统一改为「目标节点全灭一律禁止复用」，移除 `dual_url_verified` 字段及其为残缺单地址快照开绿灯的分支，同步更新对应单测断言。
+- **故障转移默认不再清理存量连接**：新增默认关闭的 `DEAD_CONN_CLEANUP_ENABLED`，自愈切换成功后仅执行干净热切换、不再按 `chains` 无差别关闭旧节点连接，HTTP/2 / gRPC 长连接应用（如 Antigravity）不再因后台每 2–5 分钟一次测速切点被硬断；清理实现与单测保留待后续迟滞状态机评估。
+- **规范同步**：`clash_mini_agreements.md` §4.2 / §5.1 / §5.2 / §5.3 / §5.8 与 Sync-13 / Sync-16 / 附录 A BUG-368 补齐修订标注，新增 Sync-18 记录根因链与 S3~S6 未处理清单。
+
+### 🔁 三条自愈入口收编统一裁决器（BUG-373）
+
+- **网络恢复不再一次判定即切点**：物理网络离线转在线后改为「安静等待 + 重新测量」，删除一次 `evaluate_failover` 即自愈的分支与 `dead_node` 传参，并消除该周期主路径重复拨测造成的双拨测；恢复后首次体检即使判死也只累计第 1 次失败，3 秒后第二次独立拨测确认才可能自愈。
+- **自愈触发统一裁决**：新增 `SelfHealTrigger` / `SelfHealDecision` / `decide_self_heal` 纯函数与 `FAILOVER_CONFIRM_FAILS` / `API_ERROR_HEAL_THRESHOLD` 常量，主路径、网络恢复、API 异常三条入口全部先经裁决器，仅 `Allow` 才进入 `self_heal_with_accounting` 记账执行。
+- **内核 API 通道故障增加存活复核**：`get_active_node_name()` 失败与 `evaluate_failover` 异常两处达到连续 3 次阈值后先 `is_clash_api_alive()` 复核，API 已恢复则跳过切点并清零计数，仅复核仍不可达才自愈；BUG-318 的重启内核与连续 5 次告警链路不变。
+- **规范与单测同步**：§5.1 明确「节点侧故障连续 2 次」与「内核 API 通道故障独立门控」两类边界、消除规范内部矛盾，§5.3 改为统一裁决，新增 Sync-19 与附录 A BUG-372 / BUG-373 映射；新增 `test_decide_self_heal_unifies_all_three_triggers` 覆盖三条分支与阈值边界。
+
+---
+
 ## v3.3.3
 
 ### 💬 全面恢复流量接管与基础设置开关操作过程/结果/失败反馈弹窗（BUG-371）
