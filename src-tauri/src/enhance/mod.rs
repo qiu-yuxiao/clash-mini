@@ -1220,9 +1220,9 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
 
 async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
-    //    过滤广告/假节点（"网址"、"官网"、"剩余流量" 等），避免它们进入 PROXY 组后
-    //    被内核 reload_config 选中触发自愈死循环
-    let mut raw_entries: Vec<(std::string::String, Option<std::string::String>)> = Vec::new();
+    //    先收集全部有效 server 的原始条目再做拓扑分组：既拦截单条广告/结构横幅，
+    //    也能对「共享横幅端点但混入未知新文案」的组整组连坐清剿，并将寄生真地区节点折叠归真。
+    let mut raw_entries: Vec<crate::utils::node::RawProxyEntry> = Vec::new();
     let mut raw_fp_map: std::collections::HashMap<std::string::String, std::string::String> =
         std::collections::HashMap::new();
     if let Some(Value::Sequence(proxies)) = config.get("proxies") {
@@ -1230,18 +1230,17 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
             let Some(m) = p.as_mapping() else {
                 // 纯字符串形式（"- 节点名"）没有 server 字段，沿用名字过滤
                 if let Some(name) = p.as_str() {
-                    if !crate::utils::node::is_dummy_node(name) {
-                        raw_entries.push((name.to_owned(), None));
-                    }
+                    raw_entries.push(crate::utils::node::RawProxyEntry {
+                        name: name.to_owned(),
+                        fingerprint: None,
+                        is_dummy: crate::utils::node::is_dummy_node(name),
+                    });
                 }
                 continue;
             };
             let Some(name) = m.get("name").and_then(Value::as_str) else {
                 continue;
             };
-            if crate::utils::node::is_dummy_node(name) {
-                continue;
-            }
             // 【BUG-301】占位假节点的名字可伪装成 URL 绕过名字过滤（现场：
             // "v0-网址:xxx" + server='1'），但 server 字段藏不住。按 server 有效性
             // 拦截入组；节点定义保留在 proxies: 中（与 dummy 过滤同策略），只是
@@ -1260,25 +1259,40 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
             let fp = crate::utils::node::proxy_endpoint_fingerprint(m);
             if let Some(ref fp_str) = fp {
                 raw_fp_map.insert(name.to_owned(), fp_str.clone());
-                if crate::utils::node::is_confirmed_fake_fp(fp_str) {
+                // 仅按持久化 HTTPS 验真状态预过滤，拓扑连坐由本次订阅独立重算（防端口复用误伤）
+                if crate::utils::node::is_https_quarantined_fp(fp_str) {
                     logging!(info, Type::Config, "跳过真 HTTPS 验真已确认拉黑的假节点: {name}");
                     continue;
                 }
             }
-            raw_entries.push((name.to_owned(), fp));
+            raw_entries.push(crate::utils::node::RawProxyEntry {
+                name: name.to_owned(),
+                fingerprint: fp,
+                is_dummy: crate::utils::node::is_dummy_node(name),
+            });
         }
     }
 
+    let topology = crate::utils::node::resolve_proxy_clone_topology(raw_entries);
     crate::utils::node::set_runtime_node_fingerprints(raw_fp_map);
-    let (deduped_names, clone_removed) = crate::utils::node::deduplicate_cloned_proxies(raw_entries);
-    if clone_removed > 0 {
+    crate::utils::node::set_runtime_tainted_banner_fps(topology.tainted_fps);
+    if topology.tainted_banner_removed > 0 {
         logging!(
             info,
             Type::Config,
-            "订阅入组去重：折叠同 server:port 同配置克隆节点 {clone_removed} 个"
+            "订阅拓扑净化：同指纹横幅连坐剔除寄生节点 {} 个",
+            topology.tainted_banner_removed
         );
     }
-    let proxy_names: Vec<Value> = deduped_names.into_iter().map(Value::from).collect();
+    if topology.clone_removed > 0 {
+        logging!(
+            info,
+            Type::Config,
+            "订阅入组去重：折叠同 server:port 同配置克隆节点 {} 个",
+            topology.clone_removed
+        );
+    }
+    let proxy_names: Vec<Value> = topology.names.into_iter().map(Value::from).collect();
 
     // 2. Extract all proxy-provider names from `proxy-providers` mapping
     let mut provider_names = Vec::new();
@@ -2186,5 +2200,98 @@ proxies:
         rule_cfg.insert(Value::from("mode"), Value::from("global"));
         let kept = apply_builtin_guards(rule_cfg, None, true);
         assert_eq!(kept.get("mode").and_then(Value::as_str), Some("global"));
+    }
+
+    #[tokio::test]
+    async fn test_enforce_mini_agreements_eliminates_hk_backed_banner_clones() {
+        use super::enforce_mini_agreements;
+        use serde_yaml_ng::{Mapping, Value};
+
+        let _ = crate::utils::dirs::PORTABLE_FLAG.get_or_init(|| true);
+
+        // 复现用户订阅真实结构：4 条信息横幅全部绑定同一真实香港后端，混入任意未知广告文案；
+        // 另外 2 条挂载在真「日本1」端点上的横幅（未知广告文案排在前面）。
+        let yaml_str = r"
+proxies:
+  - name: 剩余流量：167.26 GB (045017)
+    type: ss
+    server: 203.0.113.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-banner-shared
+  - name: 距离下次重置剩余：24 天 (045017)
+    type: ss
+    server: 203.0.113.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-banner-shared
+  - name: 套餐到期：2027-02-09 (045017)
+    type: ss
+    server: 203.0.113.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-banner-shared
+  - name: 永久官网:666.boostqz.com (045017)
+    type: ss
+    server: 203.0.113.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-banner-shared
+  - name: 全新盲盒活动：详情见频道
+    type: ss
+    server: 203.0.113.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-banner-shared
+  - name: 客服通知：欢迎使用
+    type: ss
+    server: 203.0.113.20
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-jp-real
+  - name: 日本1 (045017)
+    type: ss
+    server: 203.0.113.20
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-jp-real
+";
+        let config: Mapping = serde_yaml_ng::from_str(yaml_str).unwrap();
+        let enforced = enforce_mini_agreements(config).await;
+
+        let groups = enforced.get("proxy-groups").and_then(Value::as_sequence).unwrap();
+        let proxy_proxies = groups[0]
+            .as_mapping()
+            .unwrap()
+            .get("proxies")
+            .and_then(Value::as_sequence)
+            .unwrap();
+        let names: Vec<&str> = proxy_proxies.iter().filter_map(Value::as_str).collect();
+        // 横幅专用端点的全部 5 条连坐清零；寄生于真节点的未知文案折叠归真为「日本1 (045017)」
+        assert_eq!(names, vec!["日本1 (045017)"]);
+
+        // 端口复用校验：后续配置把同一端点重新分配给真实香港节点时，不得被前序内存态连坐误伤
+        let reassigned_yaml = r"
+proxies:
+  - name: 香港1 (045017)
+    type: ss
+    server: 203.0.113.10
+    port: 8443
+    cipher: aes-128-gcm
+    password: pass-banner-shared
+";
+        let reassigned: Mapping = serde_yaml_ng::from_str(reassigned_yaml).unwrap();
+        let enforced_reassigned = enforce_mini_agreements(reassigned).await;
+        let reassigned_names: Vec<&str> = enforced_reassigned
+            .get("proxy-groups")
+            .and_then(Value::as_sequence)
+            .and_then(|g| g[0].as_mapping())
+            .and_then(|m| m.get("proxies"))
+            .and_then(Value::as_sequence)
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(reassigned_names, vec!["香港1 (045017)"]);
     }
 }

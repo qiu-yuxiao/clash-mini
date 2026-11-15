@@ -55,7 +55,405 @@ pub fn is_dummy_node(name: &str) -> bool {
             return true;
         }
     }
+    is_structural_banner_name(name, &lower)
+}
+
+const REGION_SUBSTRINGS_CJK: &[&str] = &[
+    "香港",
+    "台湾",
+    "台灣",
+    "澳门",
+    "澳門",
+    "日本",
+    "新加坡",
+    "狮城",
+    "美国",
+    "美國",
+    "韩国",
+    "韓國",
+    "首尔",
+    "东京",
+    "大阪",
+    "硅谷",
+    "洛杉矶",
+    "西雅图",
+    "圣何塞",
+    "纽约",
+    "英国",
+    "英國",
+    "伦敦",
+    "德国",
+    "德國",
+    "法兰克福",
+    "法国",
+    "法國",
+    "巴黎",
+    "荷兰",
+    "荷蘭",
+    "阿姆斯特丹",
+    "俄罗斯",
+    "俄羅斯",
+    "莫斯科",
+    "加拿大",
+    "多伦多",
+    "温哥华",
+    "澳洲",
+    "澳大利亚",
+    "悉尼",
+    "墨尔本",
+    "新西兰",
+    "印度",
+    "孟买",
+    "印尼",
+    "雅加达",
+    "马来西亚",
+    "吉隆坡",
+    "泰国",
+    "曼谷",
+    "越南",
+    "菲律宾",
+    "土耳其",
+    "伊斯坦布尔",
+    "阿根廷",
+    "巴西",
+    "圣保罗",
+    "智利",
+    "墨西哥",
+    "南非",
+    "埃及",
+    "阿联酋",
+    "迪拜",
+    "以色列",
+    "乌克兰",
+    "波兰",
+    "瑞典",
+    "瑞士",
+    "苏黎世",
+    "意大利",
+    "西班牙",
+    "爱尔兰",
+    "芬兰",
+    "挪威",
+    "丹麦",
+    "奥地利",
+    "比利时",
+    "捷克",
+    "匈牙利",
+    "罗马尼亚",
+    "卢森堡",
+    "冰岛",
+    "葡萄牙",
+    "希腊",
+    "中国",
+    "上海",
+    "北京",
+    "广州",
+    "深圳",
+    "欧洲",
+    "北美",
+    "南美",
+    "亚太",
+    "hong kong",
+];
+
+const REGION_ASCII_TOKENS: &[&str] = &[
+    "hk",
+    "hkg",
+    "hongkong",
+    "tw",
+    "tpe",
+    "taiwan",
+    "mo",
+    "mac",
+    "jp",
+    "jpn",
+    "japan",
+    "tyo",
+    "osa",
+    "nrt",
+    "kix",
+    "tokyo",
+    "osaka",
+    "sg",
+    "sgp",
+    "sin",
+    "singapore",
+    "usa",
+    "america",
+    "lax",
+    "sjc",
+    "sea",
+    "ord",
+    "ewr",
+    "nyc",
+    "iad",
+    "dfw",
+    "kr",
+    "kor",
+    "korea",
+    "icn",
+    "sel",
+    "seoul",
+    "uk",
+    "gbr",
+    "britain",
+    "england",
+    "lon",
+    "london",
+    "de",
+    "deu",
+    "germany",
+    "fra",
+    "frankfurt",
+    "fr",
+    "france",
+    "par",
+    "paris",
+    "nl",
+    "nld",
+    "netherlands",
+    "ams",
+    "amsterdam",
+    "ru",
+    "rus",
+    "russia",
+    "mow",
+    "moscow",
+    "ca",
+    "can",
+    "canada",
+    "yyz",
+    "yvr",
+    "toronto",
+    "au",
+    "aus",
+    "australia",
+    "syd",
+    "sydney",
+    "mel",
+    "ind",
+    "india",
+    "bom",
+    "idn",
+    "indonesia",
+    "cgk",
+    "mys",
+    "malaysia",
+    "kul",
+    "th",
+    "tha",
+    "thailand",
+    "bkk",
+    "vn",
+    "vnm",
+    "vietnam",
+    "ph",
+    "phl",
+    "philippines",
+    "mnl",
+    "tr",
+    "tur",
+    "turkey",
+    "ist",
+    "arg",
+    "argentina",
+    "bra",
+    "brazil",
+    "gru",
+    "uae",
+    "dxb",
+    "dubai",
+    "bgp",
+    "iplc",
+    "iepl",
+];
+
+const BANNER_DOMAIN_TLDS: &[&str] = &[
+    "com", "net", "org", "xyz", "top", "vip", "cc", "io", "me", "club", "link", "site", "shop", "info", "icu", "cyou",
+    "online", "store", "tech", "app", "dev", "cloud", "pw", "co", "tv", "im", "la", "pro", "ltd", "work", "fun",
+    "live", "ink", "buzz", "click", "cn", "hk", "tw", "jp", "sg", "uk", "us", "ru", "kr", "de",
+];
+
+const fn is_code_context_byte(b: Option<u8>) -> bool {
+    matches!(b, Some(b'-' | b'_' | b'[' | b']' | b'0'..=b'9'))
+}
+
+/// 判断节点名是否带有地区或专线暗示（必须与前端 `src/utils/node.ts::hasRegionHint` 逐条对齐）。
+/// 用于区分真实代理节点与不含地区名的订阅说明横幅，防止结构形态识别及拓扑消歧误杀真实节点。
+pub fn has_region_hint(name: &str) -> bool {
+    if name.trim().is_empty() {
+        return false;
+    }
+    // 1. 国旗 Emoji（Regional Indicator Symbols）
+    if name.chars().any(|c| ('\u{1F1E6}'..='\u{1F1FF}').contains(&c)) {
+        return true;
+    }
+    // 2. 中文地区/城市名与带空格地区词
+    let lower = name.to_lowercase();
+    if REGION_SUBSTRINGS_CJK.iter().any(|kw| lower.contains(kw)) {
+        return true;
+    }
+    // 3. 独立边界的 ASCII 地区/专线字母段（邻接 `.` 时跳过，避免把官网后缀 `.hk`/`.us` 误作地区）
+    let bytes = name.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_alphabetic() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
+            i += 1;
+        }
+        let end = i;
+        let left = start.checked_sub(1).and_then(|idx| bytes.get(idx).copied());
+        let right = bytes.get(end).copied();
+        if left == Some(b'.') || right == Some(b'.') {
+            continue;
+        }
+        let Some(raw) = name.get(start..end) else {
+            continue;
+        };
+        let token = raw.to_ascii_lowercase();
+        if REGION_ASCII_TOKENS.contains(&token.as_str()) {
+            return true;
+        }
+        if token == "cn" && (raw == "CN" || right == Some(b'2')) {
+            return true;
+        }
+        if token == "us" && (raw == "US" || is_code_context_byte(left) || is_code_context_byte(right)) {
+            return true;
+        }
+    }
     false
+}
+
+/// 在带冒号/中文语境的横幅中识别内嵌裸域名（如 `永久官网:666.boostqz.com`）。
+/// 纯 ASCII 文本且不含冒号时直接放行，避免误杀以原始主机域名命名的真实节点（如 `vps1.myserver.com`）。
+fn has_embedded_banner_domain(name: &str, lower: &str) -> bool {
+    if !(name.contains(':') || name.contains('：') || !name.is_ascii()) {
+        return false;
+    }
+    let bytes = lower.as_bytes();
+    for (idx, &b) in bytes.iter().enumerate() {
+        if b != b'.' || idx < 2 || idx + 2 >= bytes.len() {
+            continue;
+        }
+        // `.` 左侧必须为至少 2 个 `[a-z0-9-]` 且紧邻 `.` 的字符不是 `-`
+        let prev = bytes[idx - 1];
+        if !(prev.is_ascii_lowercase() || prev.is_ascii_digit()) {
+            continue;
+        }
+        let mut l = idx;
+        while l > 0 {
+            let c = bytes[l - 1];
+            if c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-' {
+                l -= 1;
+            } else {
+                break;
+            }
+        }
+        if idx - l < 2 {
+            continue;
+        }
+        // `.` 右侧必须为纯 `[a-z]+` 常见 TLD，且后面不紧跟 `[a-z0-9.]`
+        let mut r = idx + 1;
+        while r < bytes.len() && bytes[r].is_ascii_lowercase() {
+            r += 1;
+        }
+        if r == idx + 1 {
+            continue;
+        }
+        if bytes
+            .get(r)
+            .is_some_and(|&next| next.is_ascii_lowercase() || next.is_ascii_digit() || next == b'.')
+        {
+            continue;
+        }
+        if let Some(tld) = lower.get(idx + 1..r) {
+            if BANNER_DOMAIN_TLDS.contains(&tld) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// 识别首个冒号右侧带有日期（`20xx-xx` / `20xx年xx`）、流量配额（`GB/TB/MB/PB`）或倒计时（`天/小时/days`）的键值横幅。
+fn has_colon_quota_or_date(lower: &str) -> bool {
+    let Some((pos, ch)) = lower.match_indices([':', '：']).next() else {
+        return false;
+    };
+    let Some(rhs) = lower.get(pos + ch.len()..) else {
+        return false;
+    };
+    let bytes = rhs.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_digit() {
+            i += 1;
+            continue;
+        }
+        let num_start = i;
+        // 避免匹配长数字中间片段
+        if num_start > 0 && (bytes[num_start - 1].is_ascii_digit() || bytes[num_start - 1] == b'.') {
+            i += 1;
+            continue;
+        }
+        while i < bytes.len() && bytes[i].is_ascii_digit() {
+            i += 1;
+        }
+        let int_end = i;
+
+        // 1. 年月日期形态：`20\d{2}[-/.年]\d`
+        if int_end - num_start == 4 && rhs.get(num_start..num_start + 2) == Some("20") {
+            if let Some(tail) = rhs.get(int_end..) {
+                let mut tail_chars = tail.chars();
+                if matches!(tail_chars.next(), Some('-' | '/' | '.' | '年'))
+                    && tail_chars.next().is_some_and(|c| c.is_ascii_digit())
+                {
+                    return true;
+                }
+            }
+        }
+
+        // 2. 配额 / 倒计时形态：支持小数（如 `167.26 GB`）与可选空白
+        let mut after_num = int_end;
+        if bytes.get(after_num) == Some(&b'.') && bytes.get(after_num + 1).is_some_and(u8::is_ascii_digit) {
+            after_num += 1;
+            while after_num < bytes.len() && bytes[after_num].is_ascii_digit() {
+                after_num += 1;
+            }
+        }
+        let mut k = after_num;
+        while k < bytes.len() && bytes[k].is_ascii_whitespace() {
+            k += 1;
+        }
+        if let Some(after_ws) = rhs.get(k..) {
+            for unit in ["gib", "tib", "gb", "tb", "mb", "pb"] {
+                if after_ws.starts_with(unit) && bytes.get(k + unit.len()).is_none_or(|b| !b.is_ascii_lowercase()) {
+                    return true;
+                }
+            }
+            if after_ws.starts_with("天") || after_ws.starts_with("小时") {
+                return true;
+            }
+            for unit in ["days", "day"] {
+                if after_ws.starts_with(unit) && bytes.get(k + unit.len()).is_none_or(|b| !b.is_ascii_lowercase()) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+/// 非穷举结构形态识别：不含任何地区暗示时，按内嵌横幅域名与冒号配额/日期格式捕获未知广告文案。
+fn is_structural_banner_name(name: &str, lower: &str) -> bool {
+    if has_region_hint(name) {
+        return false;
+    }
+    has_embedded_banner_domain(name, lower) || has_colon_quota_or_date(lower)
 }
 
 /// 节点 server 字段有效性：IP 字面量，或至少含一个点的域名。
@@ -208,6 +606,7 @@ pub struct VerifyBatchOutcome {
 
 static VERIFY_STORE: RwLock<Option<NodeVerifyStoreData>> = RwLock::new(None);
 static RUNTIME_NODE_FINGERPRINTS: RwLock<Option<HashMap<String, String>>> = RwLock::new(None);
+static RUNTIME_TAINTED_BANNER_FPS: RwLock<Option<HashSet<String>>> = RwLock::new(None);
 
 fn current_unix_ts() -> i64 {
     SystemTime::now()
@@ -337,8 +736,21 @@ fn is_preferred_clone_name(name: &str) -> bool {
     !name.contains(':') && !name.contains('：')
 }
 
+/// 克隆体同指纹名称优选等级：`(!colon && region) > region > !colon > fallback`，
+/// 确保横幅寄宿于真地区节点（如 `香港1`）时永远保留真地区名称，令地域排除过滤生效。
+fn clone_name_rank(name: &str) -> u8 {
+    let region = has_region_hint(name);
+    let no_colon = is_preferred_clone_name(name);
+    match (region, no_colon) {
+        (true, true) => 3,
+        (true, false) => 2,
+        (false, true) => 1,
+        (false, false) => 0,
+    }
+}
+
 /// 折叠除 `name` 外连接配置完全一致的订阅克隆体（例如信息展示假名字借壳真节点配置）。
-/// 若多个条目指纹相同，优先保留名称不含冒号 `:` / `：` 的条目，同优先级保留订阅靠前条目；
+/// 若多个条目指纹相同，优先保留「带地区暗示且不含冒号」的名称，同优先级保留订阅靠前条目；
 /// 没有指纹（`None`）的条目原样保留。返回 `(去重后名称列表, 被折叠条数)`。
 pub fn deduplicate_cloned_proxies(entries: Vec<(String, Option<String>)>) -> (Vec<String>, usize) {
     let mut names: Vec<String> = Vec::with_capacity(entries.len());
@@ -352,7 +764,7 @@ pub fn deduplicate_cloned_proxies(entries: Vec<(String, Option<String>)>) -> (Ve
         };
         if let Some(&existing_idx) = fp_to_idx.get(&fp) {
             removed += 1;
-            if is_preferred_clone_name(&name) && !is_preferred_clone_name(&names[existing_idx]) {
+            if clone_name_rank(&name) > clone_name_rank(&names[existing_idx]) {
                 names[existing_idx] = name;
             }
         } else {
@@ -365,8 +777,97 @@ pub fn deduplicate_cloned_proxies(entries: Vec<(String, Option<String>)>) -> (Ve
     (names, removed)
 }
 
-fn extract_fingerprints_from_sequence(seq: &[serde_yaml_ng::Value]) -> HashMap<String, String> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawProxyEntry {
+    pub name: String,
+    pub fingerprint: Option<String>,
+    pub is_dummy: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProxyTopologyOutcome {
+    pub names: Vec<String>,
+    pub clone_removed: usize,
+    pub tainted_banner_removed: usize,
+    pub tainted_fps: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FpGroupStats {
+    total: usize,
+    has_dummy: bool,
+    has_regional_non_dummy: bool,
+    all_colon: bool,
+}
+
+impl Default for FpGroupStats {
+    fn default() -> Self {
+        Self {
+            total: 0,
+            has_dummy: false,
+            has_regional_non_dummy: false,
+            all_colon: true,
+        }
+    }
+}
+
+/// 先全量分析原始 `proxies` 同指纹分组，再执行伪节点连坐剔除与真节点去重归真：
+/// 1. 同一连接指纹被 `>= 2` 条节点共用、不含任何带地区暗示的非伪节点，且被任一伪节点或全员冒号结构污染时，
+///    判定该端点为订阅说明专用端点，整组连坐全灭并记入 `tainted_fps`；
+/// 2. 若同指纹组内存在带地区暗示的真节点（如横幅挂靠 `香港1`），吞掉所有横幅并保留最高优先级地区名，
+///    确保用户 `-香港` 等地域排除规则可靠命中；
+/// 3. 孤立 `is_dummy` 条目单独过滤，不额外污染无指纹或孤立真实节点。
+pub fn resolve_proxy_clone_topology(entries: Vec<RawProxyEntry>) -> ProxyTopologyOutcome {
+    let mut group_stats: HashMap<&str, FpGroupStats> = HashMap::new();
+    for entry in &entries {
+        let Some(fp) = entry.fingerprint.as_deref() else {
+            continue;
+        };
+        let stats = group_stats.entry(fp).or_default();
+        stats.total += 1;
+        if entry.is_dummy {
+            stats.has_dummy = true;
+        } else if has_region_hint(&entry.name) {
+            stats.has_regional_non_dummy = true;
+        }
+        if is_preferred_clone_name(&entry.name) {
+            stats.all_colon = false;
+        }
+    }
+
+    let tainted_fps: HashSet<String> = group_stats
+        .into_iter()
+        .filter(|(_, s)| s.total >= 2 && !s.has_regional_non_dummy && (s.has_dummy || s.all_colon))
+        .map(|(fp, _)| fp.to_owned())
+        .collect();
+
+    let mut tainted_banner_removed = 0usize;
+    let mut clean_entries: Vec<(String, Option<String>)> = Vec::with_capacity(entries.len());
+    for entry in entries {
+        if entry.fingerprint.as_deref().is_some_and(|fp| tainted_fps.contains(fp)) {
+            if !entry.is_dummy {
+                tainted_banner_removed += 1;
+            }
+            continue;
+        }
+        if entry.is_dummy {
+            continue;
+        }
+        clean_entries.push((entry.name, entry.fingerprint));
+    }
+
+    let (names, clone_removed) = deduplicate_cloned_proxies(clean_entries);
+    ProxyTopologyOutcome {
+        names,
+        clone_removed,
+        tainted_banner_removed,
+        tainted_fps,
+    }
+}
+
+fn extract_runtime_topology_from_sequence(seq: &[serde_yaml_ng::Value]) -> (HashMap<String, String>, HashSet<String>) {
     let mut map = HashMap::new();
+    let mut raw_entries = Vec::with_capacity(seq.len());
     for item in seq {
         let Some(m) = item.as_mapping() else {
             continue;
@@ -374,22 +875,50 @@ fn extract_fingerprints_from_sequence(seq: &[serde_yaml_ng::Value]) -> HashMap<S
         let Some(name) = m.get("name").and_then(serde_yaml_ng::Value::as_str) else {
             continue;
         };
-        if let Some(fp) = proxy_endpoint_fingerprint(m) {
-            map.insert(name.to_owned(), fp);
+        if let Some(server) = m.get("server").and_then(serde_yaml_ng::Value::as_str) {
+            if !is_valid_node_server(server) {
+                continue;
+            }
         }
+        let fp = proxy_endpoint_fingerprint(m);
+        if let Some(ref fp_str) = fp {
+            map.insert(name.to_owned(), fp_str.clone());
+        }
+        raw_entries.push(RawProxyEntry {
+            name: name.to_owned(),
+            fingerprint: fp,
+            is_dummy: is_dummy_node(name),
+        });
     }
-    map
+    let tainted = resolve_proxy_clone_topology(raw_entries).tainted_fps;
+    (map, tainted)
 }
 
 /// 注册当前运行态 `proxies:` 的 `node_name -> fingerprint` 映射
 pub fn set_runtime_node_fingerprints(map: HashMap<String, String>) {
-    let mut guard = RUNTIME_NODE_FINGERPRINTS.write();
-    *guard = Some(map);
+    *RUNTIME_NODE_FINGERPRINTS.write() = Some(map);
 }
 
-/// 若运行态指纹映射尚未加载，尝试从 `clash-mini.yaml` 的 `proxies:` 冷启动回填
+/// 注册当前运行态被订阅拓扑连坐认定的纯横幅展示端点的连接指纹集合（仅内存态）
+pub fn set_runtime_tainted_banner_fps(fps: HashSet<String>) {
+    *RUNTIME_TAINTED_BANNER_FPS.write() = Some(fps);
+}
+
+fn set_runtime_topology_if_none(map: HashMap<String, String>, tainted: HashSet<String>) {
+    let mut fp_guard = RUNTIME_NODE_FINGERPRINTS.write();
+    if fp_guard.is_none() {
+        *fp_guard = Some(map);
+    }
+    drop(fp_guard);
+    let mut taint_guard = RUNTIME_TAINTED_BANNER_FPS.write();
+    if taint_guard.is_none() {
+        *taint_guard = Some(tainted);
+    }
+}
+
+/// 若运行态指纹或横幅连坐集合尚未加载，尝试从 `clash-mini.yaml` 的 `proxies:` 冷启动回填
 pub fn ensure_runtime_node_fingerprints_loaded() {
-    if RUNTIME_NODE_FINGERPRINTS.read().is_some() {
+    if RUNTIME_NODE_FINGERPRINTS.read().is_some() && RUNTIME_TAINTED_BANNER_FPS.read().is_some() {
         return;
     }
     let home = if cfg!(test) {
@@ -397,23 +926,28 @@ pub fn ensure_runtime_node_fingerprints_loaded() {
     } else {
         crate::utils::dirs::app_home_dir().ok()
     };
-    let map = home
+    let (map, tainted) = home
         .and_then(|dir| std::fs::read_to_string(dir.join(crate::constants::files::RUNTIME_CONFIG)).ok())
         .and_then(|content| serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&content).ok())
         .and_then(|val| {
             val.get("proxies")
                 .and_then(serde_yaml_ng::Value::as_sequence)
-                .map(|seq| extract_fingerprints_from_sequence(seq))
+                .map(|seq| extract_runtime_topology_from_sequence(seq))
         })
         .unwrap_or_default();
-    let mut guard = RUNTIME_NODE_FINGERPRINTS.write();
-    if guard.is_none() {
-        *guard = Some(map);
-    }
+    set_runtime_topology_if_none(map, tainted);
 }
 
-/// 查询指定指纹是否仍处于真 HTTPS 验真软隔离（24h）窗口内
-pub fn is_confirmed_fake_fp(fp: &str) -> bool {
+fn is_tainted_banner_fp(fp: &str) -> bool {
+    ensure_runtime_node_fingerprints_loaded();
+    RUNTIME_TAINTED_BANNER_FPS
+        .read()
+        .as_ref()
+        .is_some_and(|set| set.contains(fp))
+}
+
+/// 仅查询指纹是否处于持久化真 HTTPS 验真 24h 软隔离窗口内（不含内存级拓扑连坐集合，供配置重构独立重算）
+pub fn is_https_quarantined_fp(fp: &str) -> bool {
     ensure_verify_store_loaded();
     let now_ts = current_unix_ts();
     VERIFY_STORE.read().as_ref().is_some_and(|store| {
@@ -422,6 +956,11 @@ pub fn is_confirmed_fake_fp(fp: &str) -> bool {
             .get(fp)
             .is_some_and(|rec| rec.is_confirmed_fake_at(now_ts))
     })
+}
+
+/// 查询指定指纹是否应按假节点屏蔽（含真 HTTPS 验真 24h 软隔离，以及同配置横幅连坐集合）
+pub fn is_confirmed_fake_fp(fp: &str) -> bool {
+    is_https_quarantined_fp(fp) || is_tainted_banner_fp(fp)
 }
 
 /// 查询指定指纹是否已通过真 HTTPS 验真（单向粘滞真值）
@@ -467,7 +1006,7 @@ pub fn has_verify_failure_node(name: &str) -> bool {
     })
 }
 
-/// 返回当前运行配置中所有仍在软隔离期内的假节点名称列表（供前端隐藏显示）
+/// 返回当前运行配置中所有仍在软隔离期内或被拓扑连坐认定的假节点名称列表（供前端隐藏显示）
 pub fn confirmed_fake_node_names() -> Vec<String> {
     ensure_runtime_node_fingerprints_loaded();
     let pairs: Vec<(String, String)> = {
@@ -482,19 +1021,29 @@ pub fn confirmed_fake_node_names() -> Vec<String> {
     }
     ensure_verify_store_loaded();
     let now_ts = current_unix_ts();
-    let mut names = Vec::new();
-    if let Some(store) = VERIFY_STORE.read().as_ref() {
-        for (name, fp) in pairs {
-            if store
-                .records
-                .get(&fp)
-                .is_some_and(|rec| rec.is_confirmed_fake_at(now_ts))
-            {
-                names.push(name);
-            }
-        }
-    }
-    names
+    let tainted_fps = RUNTIME_TAINTED_BANNER_FPS.read().clone().unwrap_or_default();
+    let https_fake_fps: HashSet<String> = VERIFY_STORE
+        .read()
+        .as_ref()
+        .map(|store| {
+            pairs
+                .iter()
+                .filter(|(_, fp)| {
+                    !tainted_fps.contains(fp)
+                        && store
+                            .records
+                            .get(fp)
+                            .is_some_and(|rec| rec.is_confirmed_fake_at(now_ts))
+                })
+                .map(|(_, fp)| fp.clone())
+                .collect()
+        })
+        .unwrap_or_default();
+    pairs
+        .into_iter()
+        .filter(|(_, fp)| tainted_fps.contains(fp) || https_fake_fps.contains(fp))
+        .map(|(name, _)| name)
+        .collect()
 }
 
 /// 判断给定候选节点中是否仍存在“未验真真值且当前未处于软隔离期内”的待观察节点
@@ -513,12 +1062,15 @@ pub fn has_pending_unverified_nodes(candidates: &[String]) -> bool {
     }
     ensure_verify_store_loaded();
     let now_ts = current_unix_ts();
-    VERIFY_STORE.read().as_ref().is_none_or(|store| {
+    let tainted_fps = RUNTIME_TAINTED_BANNER_FPS.read().clone().unwrap_or_default();
+    let store_guard = VERIFY_STORE.read();
+    store_guard.as_ref().is_none_or(|store| {
         fps.iter().any(|fp| {
-            store
-                .records
-                .get(fp)
-                .is_none_or(|rec| !rec.verified_true && !rec.is_confirmed_fake_at(now_ts))
+            !tainted_fps.contains(fp)
+                && store
+                    .records
+                    .get(fp)
+                    .is_none_or(|rec| !rec.verified_true && !rec.is_confirmed_fake_at(now_ts))
         })
     })
 }
@@ -695,9 +1247,10 @@ pub fn record_https_verify_results(passed_names: &[String], failed_names: &[Stri
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        HTTPS_VERIFY_BAN_TTL_SECS, HTTPS_VERIFY_MAX_FAILS, NodeVerifyRecord, NodeVerifyStoreData,
-        apply_verify_batch_to_records, clear_unverified_failures_in_records, deduplicate_cloned_proxies, is_dummy_node,
-        is_valid_node_server, load_verify_store_from_path, match_node_filter, proxy_endpoint_fingerprint,
+        HTTPS_VERIFY_BAN_TTL_SECS, HTTPS_VERIFY_MAX_FAILS, NodeVerifyRecord, NodeVerifyStoreData, RawProxyEntry,
+        apply_verify_batch_to_records, clear_unverified_failures_in_records, deduplicate_cloned_proxies,
+        has_region_hint, is_dummy_node, is_valid_node_server, load_verify_store_from_path, match_node_filter,
+        proxy_endpoint_fingerprint, resolve_proxy_clone_topology,
     };
     use std::collections::HashMap;
 
@@ -1013,5 +1566,108 @@ server: 1.2.3.4
 
         let missing = load_verify_store_from_path(&tmp);
         assert!(missing.records.is_empty());
+    }
+
+    #[test]
+    fn test_has_region_hint_and_structural_banner_detection() {
+        // 1. 真实订阅实战漏网文案：含冒号倒计时/配额/日期或内嵌横幅域名（无地区暗示）
+        assert!(is_dummy_node("距离下次重置剩余：24 天 (045017)"));
+        assert!(is_dummy_node("永久官网:666.boostqz.com (045017)"));
+        assert!(is_dummy_node("有效期至：2027-02-09"));
+        assert!(is_dummy_node("更新日期：2026年11月"));
+        assert!(is_dummy_node("Remaining: 30 days"));
+        assert!(is_dummy_node("Quota: 167.26 GB"));
+        assert!(is_dummy_node("Contact us: boostqz.com"));
+        // .hk 后缀相邻点号不算地区暗示，应识别为官网域名横幅
+        assert!(!has_region_hint("永久官网:abc.hk"));
+        assert!(is_dummy_node("永久官网:abc.hk"));
+
+        // 2. 地区暗示校验：中英文、国旗、边界 IATA/国家码与 CN2/US 消歧
+        assert!(has_region_hint("🇭🇰 HK-01"));
+        assert!(has_region_hint("香港1 (045017)"));
+        assert!(has_region_hint("us-01 [VLESS]"));
+        assert!(has_region_hint("CN2-GIA-01"));
+        assert!(!has_region_hint("About us: boostqz.com"));
+
+        // 3. 防误杀真实节点名（不含横幅结构或带真实地区暗示）
+        assert!(!is_dummy_node("vps1.myserver.com"));
+        assert!(!is_dummy_node("新加坡：备用"));
+        assert!(!is_dummy_node("专线：10Gbps"));
+        assert!(!is_dummy_node("【剩余流量】80GB"));
+        assert!(!is_dummy_node("最新官网发布页"));
+        assert!(!is_dummy_node("香港1 (045017)"));
+    }
+
+    #[test]
+    fn test_resolve_proxy_clone_topology_taint_and_parasite_cases() {
+        // 场景 A：机场把多条横幅绑在同一真实可用香港端点上，且混入全新未知广告文案（不含任何地区真节点）
+        // 预期：整组指纹连坐 0 保留全灭，绝不留任何一个横幅进入 PROXY
+        let entries_banner_only = vec![
+            RawProxyEntry {
+                name: "剩余流量：167.26 GB (045017)".to_owned(),
+                fingerprint: Some("fp-banner".to_owned()),
+                is_dummy: is_dummy_node("剩余流量：167.26 GB (045017)"),
+            },
+            RawProxyEntry {
+                name: "距离下次重置剩余：24 天 (045017)".to_owned(),
+                fingerprint: Some("fp-banner".to_owned()),
+                is_dummy: is_dummy_node("距离下次重置剩余：24 天 (045017)"),
+            },
+            RawProxyEntry {
+                name: "全网独创全新福利宣传语".to_owned(), // 完全未知文案，is_dummy = false
+                fingerprint: Some("fp-banner".to_owned()),
+                is_dummy: is_dummy_node("全网独创全新福利宣传语"),
+            },
+            RawProxyEntry {
+                name: "香港1 (045017)".to_owned(),
+                fingerprint: Some("fp-hk1".to_owned()),
+                is_dummy: is_dummy_node("香港1 (045017)"),
+            },
+        ];
+        let out_a = resolve_proxy_clone_topology(entries_banner_only);
+        assert_eq!(out_a.names, vec!["香港1 (045017)"]);
+        assert_eq!(out_a.tainted_banner_removed, 1);
+        assert!(out_a.tainted_fps.contains("fp-banner"));
+
+        // 场景 B：机场把未知文案横幅直接挂在真实「香港1」节点同一指纹上，且排在「香港1」前面
+        // 预期：有真实地区节点同行不整组全灭，但优选等级强制折叠归真为「香港1 (045017)」，令 -香港 可靠排除
+        let entries_parasite = vec![
+            RawProxyEntry {
+                name: "距离下次重置剩余：24 天 (045017)".to_owned(),
+                fingerprint: Some("fp-hk1".to_owned()),
+                is_dummy: true,
+            },
+            RawProxyEntry {
+                name: "全网独创客服宣传语".to_owned(),
+                fingerprint: Some("fp-hk1".to_owned()),
+                is_dummy: false,
+            },
+            RawProxyEntry {
+                name: "香港1 (045017)".to_owned(),
+                fingerprint: Some("fp-hk1".to_owned()),
+                is_dummy: false,
+            },
+        ];
+        let out_b = resolve_proxy_clone_topology(entries_parasite);
+        assert_eq!(out_b.names, vec!["香港1 (045017)"]);
+        assert_eq!(out_b.clone_removed, 1);
+        assert!(out_b.tainted_fps.is_empty());
+
+        // 场景 C：真实双带冒号地区节点共享同一指纹（如「新加坡：备用」「新加坡：主」）不被误伤
+        let entries_dual_colon_region = vec![
+            RawProxyEntry {
+                name: "新加坡：备用".to_owned(),
+                fingerprint: Some("fp-sg".to_owned()),
+                is_dummy: false,
+            },
+            RawProxyEntry {
+                name: "新加坡：主".to_owned(),
+                fingerprint: Some("fp-sg".to_owned()),
+                is_dummy: false,
+            },
+        ];
+        let out_c = resolve_proxy_clone_topology(entries_dual_colon_region);
+        assert_eq!(out_c.names, vec!["新加坡：备用"]);
+        assert!(out_c.tainted_fps.is_empty());
     }
 }

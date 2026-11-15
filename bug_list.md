@@ -3,63 +3,33 @@
 > [!IMPORTANT]
 > **AI 协同开发与维护规范 (CRITICAL MAINTENANCE RULES)**:
 > 1. **待验证/排查中 Bug 强制卡片化**：所有状态为 `排查中` 或 `代码已修正，待用户确认` 的条目必须在顶部「待验证与活动中 Bug 详情」区以结构化卡片登记，严禁在用户明确人工确认前提前归档入底部历史表。
-> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-378` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
+> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-382` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
 
 ---
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-379 后台监测稳态 60s 全组盲测风暴治理：被动下行流量证活 + 停滞秒级复核 + 空闲 300s 降频
+### BUG-383 借壳可用后端（如香港节点）的订阅说明/广告假节点漏网并绕过地域排除过滤
 
-- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)（`evaluate_failover`、`should_probe_active_node`、`sample_active_node_traffic`）
-- **问题描述**：`HEALTH_DATA_FRESH_SECS` 原固定为 `60` 秒，导致即便用户正在流畅浏览/看视频，后台守护线程仍每分钟对 `PROXY__METRICS` 全组所有节点发起一轮 `delay_group` 并发握手拨测（以 50 节点计每小时高达 3,000 次跨网握手，干扰长流且耗费机场/硬件资源）；而简单拉长阈值又会拖慢真死节点的自愈发现速度。
-- **修复方案**：引入基于本地命名管道 `/connections` 的**被动流量证活状态机**（零外网发包、`history` 缓存保鲜封顶 `480s < 600s` 前端兜底上限，且严守 §5.2 铁律绝不启用 `/proxies/{name}/delay`）：
-  1. **活跃传输态（`delta_download > 0`）**：下行回包直接证实远端真实存活，保鲜上限放宽至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s)`，稳态拨测频率直降 **87.5%**；
-  2. **黑洞停滞态（`delta_upload > 0 && delta_download == 0`）**：有出无回立即突破缓存在本轮 15s 周期内触发 `probe_metrics_group` 复核（配 `STALL_REPROBE_COOLDOWN_SECS = 60s` 防单向流抖动冷却），使用中突发死节点恢复响应从最慢 `63s` 缩短至 **`~18s`**；
-  3. **完全空闲态（无字节变化）**：保鲜窗口放宽至 `IDLE_HEALTH_FRESH_SECS (300s)`，对齐 `PROXY__METRICS` 自然周期，静默挂机拨测直降 **80%**；非 `Alive`（`Suspect`/`Dead`/`Unknown`）仍强制实拨，保留 BUG-377 异源隔离不变式。
-- **状态**：代码已修正，待用户确认
-
----
-
-### BUG-380 真 HTTPS 验真「终身死刑」改为 24h 软隔离自动缓刑 + 手动更新订阅解封
-
-- **对应模块**：[node.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/node.rs)（`NodeVerifyRecord`、`apply_verify_batch_to_records`、`clear_unverified_https_failures`）、[profile.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/profile.rs)（`update_profile`）
-- **问题描述**：此前 `node_https_verify.json` 的假节点判定一旦累计失败超过 5 次，便在无过期机制与解封入口的情况下对节点指纹永久拉黑屏蔽；机场短时维护或 GitHub/Wikipedia 验真源偶发抽风后，真节点即使早已恢复也永远无法在 Clash Mini 中重见天日（重启或重导同节点订阅均无效）。
-- **修复方案**：
-  1. 复用持久化字段 `last_verified_at` 实行 **24 小时软隔离 TTL**（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`，零格式迁移成本）：满 24h 自动解除隔离并在下一轮恢复观察；期间若重新失败则清零重计一轮 6 次宽限期，若通过则升级单向粘滞真值 `verified_true = true`；
-  2. 新增 `clear_unverified_https_failures()`，并在用户**手动点击更新订阅**（`is_mannual_trigger == true`）时自动清空所有未验真节点的历史失败计数与软隔离标记（保留已验真白名单），立即随配置重载/列表刷新恢复可见。
-- **状态**：代码已修正，待用户确认
-
----
-
-### BUG-381 内置脚本增强退场：`boa_engine` 改为原生 Rust 卫兵
-
-- **对应模块**：[enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)（`apply_builtin_guards`）、[enhance/chain.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/chain.rs)、[config.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/config.rs)、[prfitem.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/prfitem.rs)、[validate.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/validate.rs)、[Cargo.toml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/Cargo.toml)
-- **问题描述**：Clash Mini 遵循零脚本编辑器的极简哲学，前端早已不提供 JS 脚本入口，但后端仍全量引入重型 Rust JS 引擎 `boa_engine`（`v0.21.1`），并在每次 `enhance()` 与配置初始化时执行 `meta_guard.js` / `meta_hy_alpn.js`（仅做 2 项极简 YAML 字段归一化）以及创建无用的默认 `Script` 增强文件，白白增大二进制体积、编译耗时与内存开销。
-- **修复方案**：
-  1. 在 [enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs) 以原生 Rust `apply_builtin_guards` 等价替代原内置 `meta_guard.js`（`mode: script` → `rule`）与 `meta_hy_alpn.js`（`hysteria` 字符串 `alpn` → 单元素数组）；
-  2. 移除 `boa_engine` 依赖、`src-tauri/src/enhance/script.rs` 与 `builtin/*.js`；停止 `ensure_default_profile_items` / `create_enhance_items` 新建 `Script` 项，同时保持对存量 `profiles.yaml` 中历史 `type: script` 条目与旧 `.js` 文件的 100% 向后兼容放行（安全忽略无操作）。
-- **状态**：代码已修正，待用户确认
-
----
-
-### BUG-382 清理不可达流媒体解锁 `/unlock` 子系统与零使用 `tauri-plugin-http`
-
-- **对应模块**：[src-tauri/src/cmd/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/mod.rs)、[src-tauri/src/lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)、[src-tauri/Cargo.toml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/Cargo.toml)、[desktop.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/capabilities/desktop.json)、[src/pages/_routers.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_routers.tsx)、[src/pages/_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[package.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/package.json)
-- **问题描述**：Clash Mini 为单窗极简路由设计，UI 从未暴露 `/unlock` 路由入口，`src/pages/unlock.tsx` 与后端 `cmd::media_unlock_checker`（`get_unlock_items`、`check_media_unlock`）、前端 `@tauri-apps/plugin-http` 与后端 `tauri-plugin-http`（额外拖入重复的 `reqwest v0.12.28` 依赖树）均属于无实际触达路径的遗留死代码，既膨胀产物体积又增加 WebView 网络插件攻击面（另经核查 `Cargo.lock` 中 `zip v4.6.1` 为 Tauri 转递的精简无 `flate2` 版本，主包压缩继续保留 `zip = "8.6.0"`）。
-- **修复方案**：
-  1. 移除前端 `src/pages/unlock.tsx`、`_routers.tsx` `/unlock` 路由、`_layout.tsx` `/unlock` 分支、`UNLOCK_TIMEOUT_MS` 及后端 `cmd/media_unlock_checker` 模块与 Tauri IPC 命令注册，并用 `pnpm i18n:format` / `pnpm i18n:types` 清理对应废弃翻译键（保留活跃的 `navigation.menu.unlock` 菜单锁定控制键）；
-  2. 全链路移除 `tauri-plugin-http`、`@tauri-apps/plugin-http` 与 `capabilities/desktop.json` `http:*` 权限，使前端零直接 HTTP 插件暴露，外部网络请求统一收口至受 SSRF 防护的 Rust `NetworkManager`。
+- **对应模块**：[node.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/node.rs)（`has_region_hint`、`is_dummy_node`、`resolve_proxy_clone_topology`、`RUNTIME_TAINTED_BANNER_FPS`）、[enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)（`enforce_mini_agreements`）、[node.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.ts)（`isDummyNode`）
+- **问题描述**：部分机场把「剩余流量 / 下次重置 / 套餐到期 / 永久官网」等多条信息横幅绑在同一真实可用香港节点端口上：① 靠前缀词表无法穷举「距离下次重置剩余：24 天」「永久官网:xxx.com」等新文案；② 因后端本身是真实香港出口，真 HTTPS 验真拿到 `200 OK` 直接将其标成 `verified_true`（BUG-380 本意拦截的是断网/不可用假节点，对此类真实借壳节点无效）；③ 旧去重逻辑在计算指纹前就先行删掉了先导广告条目导致连坐证据丢失，且对剩余克隆体强留 1 个无地区名横幅放进 `PROXY` 组，导致用户输入 `-香港` 排除香港节点时该香港后端伪节点仍留在可用池中并被自动选中，造成依赖非香港地区的工具（如 Antigravity）断流。
+- **修复方案**：改用「拓扑连坐 + 非穷举结构形态识别 + 寄生归真」三层治本防线：
+  1. **全量原始指纹连坐与寄生归真（`resolve_proxy_clone_topology`）**：`enforce_mini_agreements` 在剔除伪节点**前**先对全量有效 `proxies:` 按连接指纹分组；若同指纹组 `>= 2` 条被任一伪节点（或全员冒号键值结构）污染且组内**无**带地区暗示（`has_region_hint`）的非伪节点，则认定为专用横幅展示端口，**整组 `0` 保留全灭**（同时登记内存 `RUNTIME_TAINTED_BANNER_FPS` 供全链路隐藏）；若同指纹组内存在真实地区节点（如横幅挂靠 `香港1`），则吞掉全部横幅并优先保留带地区名的节点（`(!colon && has_region) > has_region > !colon > fallback`），使 `-香港` 精准生效；
+  2. **前后端 1:1 非穷举结构形态兜底（`is_structural_banner_name` / `isStructuralBannerName`）**：在不含地区暗示的前提下，自动识别含非节点语境裸域名（`xxx.com` 等常见后缀）及冒号键值配额/日期倒计时格式（如 `xxx：24 天`、`xxx：100 GB`、`2027-02-09`），独立端口的单条新形态横幅亦可零配置拦截。
 - **状态**：代码已修正，待用户确认
 
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
-历史已确认关闭条目（`BUG-057` ~ `BUG-378`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
+历史已确认关闭条目（`BUG-057` ~ `BUG-382`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
 
 | 缺陷编号 | 对应版本基线 | 状态 |
 | :--- | :---: | :---: |
+| **BUG-382** | v3.4.0 | 代码已修正，已确认 |
+| **BUG-381** | v3.4.0 | 代码已修正，已确认 |
+| **BUG-380** | v3.4.0 | 代码已修正，已确认 |
+| **BUG-379** | v3.4.0 | 代码已修正，已确认 |
 | **BUG-378** | v3.3.4 | 文档已修正（废弃草案已物理移除），已确认 |
 | **BUG-377** | v3.3.4 | 代码已修正，已确认 |
 | **BUG-376** | v3.3.4 | 代码已修正，已确认 |

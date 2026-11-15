@@ -1,6 +1,6 @@
 # Clash Mini 开发设计书
 
-> **适用版本**：v3.3.4 及后续版本  
+> **适用版本**：v3.4.0 及后续版本  
 > **文档性质**：本文档是 Clash Mini 项目的**权威系统设计规范与工程开发宪章**。所有功能开发、重构优化与代码审核必须严格遵循本文档中定义的架构约定、业务逻辑与安全红线。  
 > **维护说明**：本文档聚焦于**系统设计意图（做什么、为什么、架构边界与关键参数）**；具体代码实现见配套索引 `docs/implementation-notes.md`，架构全局图谱见 `docs/ARCHITECTURE.md`，历史避坑指南见 `clash_mini_pitfalls.md`。
 
@@ -454,16 +454,17 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
   1. **配置生成层**（`enhance::enforce_mini_agreements`）：在将订阅节点注入 `PROXY` 组时强制剥离所有伪节点，防止其进入候选列表。
   2. **状态恢复层**（`lifecycle::restore_proxy_group_now`）：回退恢复节点选择时，强行避开伪节点。
   3. **自愈决策层**（`monitor::evaluate_failover`）：挑选最优节点时，自动跳过任何伪节点，彻底斩断「内核重载默认选中伪节点 $\rightarrow$ 后台自愈切回真节点 $\rightarrow$ 重载再次切回伪节点」的死循环。
-- **前后端判定必须同源（2026-10-20 确立）**：前端 `src/utils/node.ts::isDummyNode` 必须与后端 `utils/node.rs::is_dummy_node` **逐条对齐**，且 `node.test.ts` 与后端测试用例一一对应。
+- **前后端判定必须同源（2026-10-20 确立，BUG-383 补强结构识别）**：前端 `src/utils/node.ts::isDummyNode` 必须与后端 `utils/node.rs::is_dummy_node` **逐条对齐**，且 `node.test.ts` 与后端测试用例一一对应。
   - 英文广告词（expire / traffic / website / subscribe）与 URL scheme：允许**子串**匹配。
   - 中文广告短语：必须**归一化后「完全匹配或以该短语开头」**（先剥两端包裹符号与「节点-」类通用前缀）。
+  - **结构形态横幅识别（`is_structural_banner_name` / `isStructuralBannerName`，BUG-383，非穷举兜底）**：当且仅当名称**不含任何地区/专线暗示**（`!has_region_hint(name)`，涵盖国旗 Emoji、中文地区城市名及独立边界/大小写消歧的 IATA/国家地区代码与 `bgp`/`iplc`/`iepl`）时，命中以下任一结构形态即判定为伪节点：① **非纯节点域名语境的内嵌裸域名**（`has_embedded_banner_domain`：含 `:`/`：` 或非纯 ASCII 且出现不含地区后缀混写的 `<label>.<tld>`，不误杀纯 ASCII 服务器域名如 `vps1.myserver.com`）；② **冒号键值配额或日期倒计时格式**（`has_colon_quota_or_date`：首个 `:`/`：` 右侧包含 `20xx-xx`/`20xx年xx` 日期、数字配额单位 `GB/TB/MB/PB/GiB/TiB` 后不接 `[a-z]`，或 `天`/`小时`/`day`/`days` 倒计时）。
   - **严禁前端对中文短语用 `includes` 子串匹配**：会把 `日本群组-A`、`美国-网址专线`、`上海-群节点-01`、`HK-流量优化` 这类真实节点误判为伪节点而从前端列表隐藏，造成「**后端能选中、前端却看不到**」的高危不一致。
-  - 取舍：前缀匹配会漏判「广告短语不在开头」的伪节点（如 `【剩余流量】80GB`）。这是**有意为之**——漏判伪节点代价很小（无延迟不会被选中，后端仍有三道拦截），而误杀真实节点会直接让用户少一个可用节点。
+  - 取舍：前缀匹配会漏判「广告短语不在开头且无冒号键值/域名形态」的孤立伪节点（如 `【剩余流量】80GB`、`最新官网发布页`）。这是**有意为之**——单条目不靠穷举词表硬拆，绑在同一展示端口的多行说明则交由下方「指纹连坐分组裁决」兜底整组清理，误杀真实节点的风险降到最低。
 - **节点多关键词包含与排除同源过滤（`match_node_filter` / `matchNodeFilter`，BUG-368，v3.3.2）**：
   - 后端 `src-tauri/src/utils/node.rs::match_node_filter` 与前端 `src/utils/node.ts::matchNodeFilter` **1:1 逐条同源**，分别统一接入 `monitor.rs`（恢复、判定、选点、写回 4 处）、`lifecycle.rs::select_fallback_in_subset`、`src/components/proxy/use-filter-sort.ts` 与 `src/hooks/use-profiles.ts`，严禁任何模块保留私有 `.contains` / `.includes` 分叉；
   - 语法语义（大小写不敏感）：空格分隔多个 `AND` 子句；子句内支持半角 `|` 或全角 `｜` 分隔多关键词 `OR` 匹配（自动折叠符号两侧空白，兼容 `日本 | 新加坡 | 台湾`）；以 `-`、`!` 或 `！` 开头的子句表示排除（如 `-香港`、`日本|新加坡 -倍率`）；空串、仅空白及输入态孤立符号（`-`、`!`、`|`）放行返回 `true`。
-- **同配置克隆去重与真 HTTPS 验真状态机防线（BUG-369，v3.3.2）**：
-  - **规范化连接指纹与克隆去重（`utils/node.rs` + `enhance/mod.rs`）**：`proxy_endpoint_fingerprint` 剥离 `name` 字段后对包含合法 `server` 与 `port` 的规范化 YAML 连接字段计算 SHA-256 指纹；`enforce_mini_agreements` 通过 `deduplicate_cloned_proxies` 折叠同配置借壳克隆体（优先保留不含 `:` / `：` 的名称，不再堆砌中文关键词），维持 `[PROXY, PROXY__METRICS]` 双组架构不变。
+- **同配置克隆去重、指纹连坐清剿与真 HTTPS 验真状态机防线（BUG-369 / BUG-380 / BUG-383）**：
+  - **规范化连接指纹、全量拓扑连坐与克隆优选（`utils/node.rs` + `enhance/mod.rs`）**：`proxy_endpoint_fingerprint` 剥离 `name` 字段后对包含合法 `server` 与 `port` 的规范化 YAML 连接字段计算 SHA-256 指纹；`enforce_mini_agreements` 在剔除伪节点**之前**先对全部有效 `server` 的原始 `proxies:` 构造 `RawProxyEntry` 交由 `resolve_proxy_clone_topology` 分组裁决：① **共享横幅端点连坐全灭**：对 `>= 2` 条共用同一指纹的分组，若组内存在任一 `is_dummy_node` 成员（或全组成员均为含 `:`/`：` 键值结构），且没有任何非伪节点成员带地区暗示（`!has_region_hint`），说明该后端专用于承载订阅横幅、无论另起何种新广告文案均整组 `0` 保留全部剔除，并将其指纹写入内存级 `RUNTIME_TAINTED_BANNER_FPS`（供 `is_confirmed_fake_fp` / `confirmed_fake_node_names` 与冷启动 `ensure_runtime_node_fingerprints_loaded` 全链路同步隐身）；② **借壳寄生真节点归真**：若同指纹组内存在带地区暗示的真节点（如横幅直接挂靠 `香港1`），则吞掉全部横幅并按优选等级 `(!colon && has_region) > has_region > !colon > fallback` 唯一保留真地区节点名称，确保用户 `-香港` 等地域排除过滤稳定生效。维持 `[PROXY, PROXY__METRICS]` 双组架构不变。
   - **单向粘滞真值 + 24h 可恢复软隔离与手动订阅解封（`node_https_verify.json`，BUG-380）**：后台 `run_https_verification_pass` 仅在存在待观察节点（既非 `verified_true` 也未处于 24h 软隔离期内）且物理网络在线时，使用非 `204` HTTPS 内容地址（主 `github.githubassets.com` favicon，备 `wikipedia.org` favicon）并发验真；**通过 1 次即永久置 `verified_true = true`**（永不降级也不再重测）；**仅当同批至少 1 个参照节点通过真 HTTPS 验真时**才对其余未通过的未验真指纹累加 `fail_count`，连续失败超过 `HTTPS_VERIFY_MAX_FAILS`（`5` 次，即 `>= 6` 轮）进入 **24 小时软隔离（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`，复用 `last_verified_at` 判定，零格式迁移）**。隔离期满后自动解除隐藏并清零重新观察；此外，用户在 UI **手动触发更新订阅**（`is_mannual_trigger == true`）时调用 `clear_unverified_https_failures()` 立即重置未验真失败记录与软隔离标记（保留 `verified_true` 白名单）。
   - **全链路择优与软隔离期间隐身**：`prioritize_verified_candidates` 与 `lifecycle::select_fallback_in_subset` 优先从 `verified_true` 池择优（全员未验真时按延迟兜底并在冷启动首轮选点触发前置验真）；`enhance`、`monitor`、`lifecycle` 全链路在 24h 软隔离期内跳过被隔离节点；前端通过 `get_confirmed_fake_proxy_names` 命令在 `calcuProxies` 中过滤隐藏，新进入软隔离或手动更新解封时后端同步触发 `Handle::refresh_proxies()` 刷新可见性。
 
@@ -850,10 +851,11 @@ flowchart LR
 | **BUG-376** | §5 最高方针 | 初始化自动选点遵守「连续性优先」：前端 `hasUsablePersistedExit` 与后端 `persisted_exit_is_usable` / `has_usable_persisted_exit` 门检使冷启动、轻量模式唤醒、Profile 切换及纯托盘启动仅在持久出口结构性失效时才允许切点，有效时只刷新延迟、不覆盖用户选择；10 秒兜底定时器不再以「没有健康延迟」为由选点；`trigger_backend_auto_select_inner` 选回同一节点时跳过 `select_node_for_group` 写入。F1/F4 手动选点与后台故障自愈不受影响（见 §5 最高方针）。 |
 | **BUG-377** | §5 最高方针 / 5.1 / 5.2 | 统一后台测量源并隔离异源验真污染：删除验真独立的 6000ms 超时改用 `NODE_TEST_TIMEOUT_MS (5000ms)`，验真两次全组拨测纳入 `METRICS_PROBE_LOCK` 使 5 处 `delay_group` 全部串行化；删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 3 秒强制双拨测，`should_probe_active_node` 收紧为仅「健康且 60s 内新鲜」免拨测、体检拨测禁用 1500ms 短窗合并，判死只建立在本轮主/备 URL 实拨结果上，杜绝验真写入的 `[5000, 6000)` 越界延迟 + 新鲜时间戳在免拨测轮被误判为节点已死并触发自愈切点。三态迟滞、连续 2 次裁决器、死节点门检与切换速率上限保持不变（见 §5.1 / §5.2）。 |
 | **BUG-378** | §5 最高方针 / 5.1 / 5.2 / 5.5 / 5.6 | 文档治理：消除 S1–S5 落地后的规范内部矛盾。§5.5「离线转在线秒级触发自愈」改写为恒判 `Wait`；§5.1 补齐 15 / 3 / 5 三档周期并把已不存在的 `[探针]` 章节改为溯源说明；§5.2 澄清废除的是后端测速取数兜底、与 §5.6 前端 `history` 回落作用域不同（原历史草案 `docs/node-health-architecture.md` 已于 v3.3.4 随宪章收口彻底清理移除）。 |
-| **BUG-379** | 5.1 / 5.2 | **【待用户确认】** 终结后台 60s 全组盲测风暴并维持 §5.2 无回环铁律：`monitor.rs` 引入基于本地 `/connections` 字节增量的被动流量证活状态机——活跃下行传输（`Flowing`）免拨测上限延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s < 600s)`、完全空闲（`Idle`）对齐测量组周期 `IDLE_HEALTH_FRESH_SECS (300s)`、有出无回黑洞（`Stalled`）带 `STALL_REPROBE_COOLDOWN_SECS (60s)` 冷却立即实拨复核；非 `Alive` 仍强制实拨，保留 BUG-377 异源隔离不变式。 |
-| **BUG-380** | §5 最高方针 / 5.4 | **【待用户确认】** 真 HTTPS 验真由不可逆永久拉黑改为 24h 可恢复软隔离：`NodeVerifyRecord::is_confirmed_fake_at` 复用 `last_verified_at` 实施 `HTTPS_VERIFY_BAN_TTL_SECS (86_400)` TTL 期满自动缓刑重测；`feat/profile.rs::update_profile` 在用户手动更新订阅时调用 `clear_unverified_https_failures()` 立即重置未验真失败记录（保留 `verified_true` 白名单）并刷新列表；同步在 §2.8/§5 明确记录过滤框 700ms 地域策略即时切换特例豁免。 |
-| **BUG-381** | 2.12 / 6.4 | **【待用户确认】** 移除重型嵌入式 JS 引擎 `boa_engine` 与 `enhance/script.rs` / 内置 `.js` 文件，改用原生 Rust `apply_builtin_guards` 完成 `mode: script` 归一与 `hysteria` string `alpn` 转数组；停止新建 `Script` 默认项，保留存量 `profiles.yaml` 历史 `type: script` 兼容忽略。 |
-| **BUG-382** | 2.11 / 6.1 | **【待用户确认】** 清理不可达流媒体解锁 `/unlock` 路由（`src/pages/unlock.tsx`、`cmd/media_unlock_checker` 及废弃翻译键）与零使用 `tauri-plugin-http` / `@tauri-apps/plugin-http`，收紧 WebView 网络接口暴露并消除重复 `reqwest v0.12.28` 依赖树。 |
+| **BUG-379** | 5.1 / 5.2 | 终结后台 60s 全组盲测风暴并维持 §5.2 无回环铁律：`monitor.rs` 引入基于本地 `/connections` 字节增量的被动流量证活状态机——活跃下行传输（`Flowing`）免拨测上限延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s < 600s)`、完全空闲（`Idle`）对齐测量组周期 `IDLE_HEALTH_FRESH_SECS (300s)`、有出无回黑洞（`Stalled`）带 `STALL_REPROBE_COOLDOWN_SECS (60s)` 冷却立即实拨复核；非 `Alive` 仍强制实拨，保留 BUG-377 异源隔离不变式。 |
+| **BUG-380** | §5 最高方针 / 5.4 | 真 HTTPS 验真由不可逆永久拉黑改为 24h 可恢复软隔离：`NodeVerifyRecord::is_confirmed_fake_at` 复用 `last_verified_at` 实施 `HTTPS_VERIFY_BAN_TTL_SECS (86_400)` TTL 期满自动缓刑重测；`feat/profile.rs::update_profile` 在用户手动更新订阅时调用 `clear_unverified_https_failures()` 立即重置未验真失败记录（保留 `verified_true` 白名单）并刷新列表；同步在 §2.8/§5 明确记录过滤框 700ms 地域策略即时切换特例豁免。 |
+| **BUG-381** | 2.12 / 6.4 | 移除重型嵌入式 JS 引擎 `boa_engine` 与 `enhance/script.rs` / 内置 `.js` 文件，改用原生 Rust `apply_builtin_guards` 完成 `mode: script` 归一与 `hysteria` string `alpn` 转数组；停止新建 `Script` 默认项，保留存量 `profiles.yaml` 历史 `type: script` 兼容忽略。 |
+| **BUG-382** | 2.11 / 6.1 | 清理不可达流媒体解锁 `/unlock` 路由（`src/pages/unlock.tsx`、`cmd/media_unlock_checker` 及废弃翻译键）与零使用 `tauri-plugin-http` / `@tauri-apps/plugin-http`，收紧 WebView 网络接口暴露并消除重复 `reqwest v0.12.28` 依赖树。 |
+| **BUG-383** | 2.8 / 5.4 | **【待用户确认】** 根治借壳真实可用后端（如香港出口）的订阅横幅假节点漏网并绕过用户 `-香港` 排除过滤问题：前后端 1:1 增设非穷举结构形态判定（`is_structural_banner_name` / `isStructuralBannerName`：无地区暗示下的内嵌裸域名与冒号键值配额/日期格式），后端 `enforce_mini_agreements` 改在剔除前先行按 `RawProxyEntry` 指纹分组执行 `resolve_proxy_clone_topology`——共享横幅专用端点整组连坐 `0` 保留并登记内存 `RUNTIME_TAINTED_BANNER_FPS`，寄生真地区节点组强制折叠归真为带地区名的节点，令真实香港借壳体稳妥受控于地域过滤与排除规则。 |
 
 ---
 

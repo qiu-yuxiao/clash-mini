@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isDummyNode, matchNodeFilter } from './node'
+import { hasRegionHint, isDummyNode, matchNodeFilter } from './node'
 
 // 本文件的断言必须与后端 `src-tauri/src/utils/node.rs` 的测试逐条对应。
 // 前后端判定不一致会直接造成「后端能选中、前端却隐藏」的节点，属于高危一致性问题。
@@ -69,6 +69,29 @@ describe('isDummyNode 广告与说明假节点判定', () => {
     expect(isDummyNode('日本 02 [原生IP]')).toBe(false)
     expect(isDummyNode('新加坡 01 [Trojan]')).toBe(false)
     expect(isDummyNode('美国 05 [VLESS]')).toBe(false)
+  })
+
+  it('结构形态横幅识别（不含地区暗示时的冒号配额/日期/内嵌域名，BUG-383）', () => {
+    expect(isDummyNode('距离下次重置剩余：24 天 (045017)')).toBe(true)
+    expect(isDummyNode('永久官网:666.boostqz.com (045017)')).toBe(true)
+    expect(isDummyNode('有效期至：2027-02-09')).toBe(true)
+    expect(isDummyNode('更新日期：2026年11月')).toBe(true)
+    expect(isDummyNode('Remaining: 30 days')).toBe(true)
+    expect(isDummyNode('Quota: 167.26 GB')).toBe(true)
+    expect(isDummyNode('Contact us: boostqz.com')).toBe(true)
+    expect(hasRegionHint('永久官网:abc.hk')).toBe(false)
+    expect(isDummyNode('永久官网:abc.hk')).toBe(true)
+
+    expect(hasRegionHint('🇭🇰 HK-01')).toBe(true)
+    expect(hasRegionHint('香港1 (045017)')).toBe(true)
+    expect(hasRegionHint('us-01 [VLESS]')).toBe(true)
+    expect(hasRegionHint('CN2-GIA-01')).toBe(true)
+    expect(hasRegionHint('About us: boostqz.com')).toBe(false)
+
+    // 防误杀真实节点名
+    expect(isDummyNode('vps1.myserver.com')).toBe(false)
+    expect(isDummyNode('新加坡：备用')).toBe(false)
+    expect(isDummyNode('专线：10Gbps')).toBe(false)
   })
 })
 

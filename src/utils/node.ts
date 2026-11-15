@@ -97,9 +97,370 @@ export const isDummyNode = (name: string): boolean => {
   }
 
   const normalized = normalizeDummyName(lower)
-  return AD_PHRASES.some(
-    (phrase) => normalized === phrase || normalized.startsWith(phrase),
+  if (
+    AD_PHRASES.some(
+      (phrase) => normalized === phrase || normalized.startsWith(phrase),
+    )
+  ) {
+    return true
+  }
+  return isStructuralBannerName(name, lower)
+}
+
+const REGION_SUBSTRINGS_CJK = [
+  '香港',
+  '台湾',
+  '台灣',
+  '澳门',
+  '澳門',
+  '日本',
+  '新加坡',
+  '狮城',
+  '美国',
+  '美國',
+  '韩国',
+  '韓國',
+  '首尔',
+  '东京',
+  '大阪',
+  '硅谷',
+  '洛杉矶',
+  '西雅图',
+  '圣何塞',
+  '纽约',
+  '英国',
+  '英國',
+  '伦敦',
+  '德国',
+  '德國',
+  '法兰克福',
+  '法国',
+  '法國',
+  '巴黎',
+  '荷兰',
+  '荷蘭',
+  '阿姆斯特丹',
+  '俄罗斯',
+  '俄羅斯',
+  '莫斯科',
+  '加拿大',
+  '多伦多',
+  '温哥华',
+  '澳洲',
+  '澳大利亚',
+  '悉尼',
+  '墨尔本',
+  '新西兰',
+  '印度',
+  '孟买',
+  '印尼',
+  '雅加达',
+  '马来西亚',
+  '吉隆坡',
+  '泰国',
+  '曼谷',
+  '越南',
+  '菲律宾',
+  '土耳其',
+  '伊斯坦布尔',
+  '阿根廷',
+  '巴西',
+  '圣保罗',
+  '智利',
+  '墨西哥',
+  '南非',
+  '埃及',
+  '阿联酋',
+  '迪拜',
+  '以色列',
+  '乌克兰',
+  '波兰',
+  '瑞典',
+  '瑞士',
+  '苏黎世',
+  '意大利',
+  '西班牙',
+  '爱尔兰',
+  '芬兰',
+  '挪威',
+  '丹麦',
+  '奥地利',
+  '比利时',
+  '捷克',
+  '匈牙利',
+  '罗马尼亚',
+  '卢森堡',
+  '冰岛',
+  '葡萄牙',
+  '希腊',
+  '中国',
+  '上海',
+  '北京',
+  '广州',
+  '深圳',
+  '欧洲',
+  '北美',
+  '南美',
+  '亚太',
+  'hong kong',
+] as const
+
+const REGION_ASCII_TOKENS = new Set([
+  'hk',
+  'hkg',
+  'hongkong',
+  'tw',
+  'tpe',
+  'taiwan',
+  'mo',
+  'mac',
+  'jp',
+  'jpn',
+  'japan',
+  'tyo',
+  'osa',
+  'nrt',
+  'kix',
+  'tokyo',
+  'osaka',
+  'sg',
+  'sgp',
+  'sin',
+  'singapore',
+  'usa',
+  'america',
+  'lax',
+  'sjc',
+  'sea',
+  'ord',
+  'ewr',
+  'nyc',
+  'iad',
+  'dfw',
+  'kr',
+  'kor',
+  'korea',
+  'icn',
+  'sel',
+  'seoul',
+  'uk',
+  'gbr',
+  'britain',
+  'england',
+  'lon',
+  'london',
+  'de',
+  'deu',
+  'germany',
+  'fra',
+  'frankfurt',
+  'fr',
+  'france',
+  'par',
+  'paris',
+  'nl',
+  'nld',
+  'netherlands',
+  'ams',
+  'amsterdam',
+  'ru',
+  'rus',
+  'russia',
+  'mow',
+  'moscow',
+  'ca',
+  'can',
+  'canada',
+  'yyz',
+  'yvr',
+  'toronto',
+  'au',
+  'aus',
+  'australia',
+  'syd',
+  'sydney',
+  'mel',
+  'ind',
+  'india',
+  'bom',
+  'idn',
+  'indonesia',
+  'cgk',
+  'mys',
+  'malaysia',
+  'kul',
+  'th',
+  'tha',
+  'thailand',
+  'bkk',
+  'vn',
+  'vnm',
+  'vietnam',
+  'ph',
+  'phl',
+  'philippines',
+  'mnl',
+  'tr',
+  'tur',
+  'turkey',
+  'ist',
+  'arg',
+  'argentina',
+  'bra',
+  'brazil',
+  'gru',
+  'uae',
+  'dxb',
+  'dubai',
+  'bgp',
+  'iplc',
+  'iepl',
+])
+
+const BANNER_DOMAIN_TLDS = new Set([
+  'com',
+  'net',
+  'org',
+  'xyz',
+  'top',
+  'vip',
+  'cc',
+  'io',
+  'me',
+  'club',
+  'link',
+  'site',
+  'shop',
+  'info',
+  'icu',
+  'cyou',
+  'online',
+  'store',
+  'tech',
+  'app',
+  'dev',
+  'cloud',
+  'pw',
+  'co',
+  'tv',
+  'im',
+  'la',
+  'pro',
+  'ltd',
+  'work',
+  'fun',
+  'live',
+  'ink',
+  'buzz',
+  'click',
+  'cn',
+  'hk',
+  'tw',
+  'jp',
+  'sg',
+  'uk',
+  'us',
+  'ru',
+  'kr',
+  'de',
+])
+
+const isCodeContextChar = (ch: string | undefined): boolean =>
+  ch !== undefined && /[-_[\]0-9]/.test(ch)
+
+/** 判断节点名是否带有地区或专线暗示（与后端 `node.rs::has_region_hint` 逐条对齐） */
+export const hasRegionHint = (name: string): boolean => {
+  if (!name || !name.trim()) return false
+
+  for (const ch of name) {
+    const cp = ch.codePointAt(0)
+    if (cp !== undefined && cp >= 0x1f1e6 && cp <= 0x1f1ff) {
+      return true
+    }
+  }
+
+  const lower = name.toLowerCase()
+  if (REGION_SUBSTRINGS_CJK.some((kw) => lower.includes(kw))) {
+    return true
+  }
+
+  const re = /[A-Za-z]+/g
+  for (;;) {
+    const match = re.exec(name)
+    if (!match) break
+    const raw = match[0]
+    const start = match.index
+    const end = start + raw.length
+    const left = start > 0 ? name[start - 1] : undefined
+    const right = end < name.length ? name[end] : undefined
+    if (left === '.' || right === '.') continue
+
+    const token = raw.toLowerCase()
+    if (REGION_ASCII_TOKENS.has(token)) return true
+    if (token === 'cn' && (raw === 'CN' || right === '2')) return true
+    if (
+      token === 'us' &&
+      (raw === 'US' || isCodeContextChar(left) || isCodeContextChar(right))
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+const isLowerAlnum = (ch: string | undefined): boolean =>
+  ch !== undefined && ch >= 'a' && ch <= 'z'
+    ? true
+    : ch !== undefined && ch >= '0' && ch <= '9'
+
+const hasEmbeddedBannerDomain = (name: string, lower: string): boolean => {
+  const hasNonAscii = [...name].some((ch) => (ch.codePointAt(0) ?? 0) > 0x7f)
+  if (!(name.includes(':') || name.includes('：') || hasNonAscii)) {
+    return false
+  }
+
+  for (let i = 2; i < lower.length - 1; i++) {
+    if (lower[i] !== '.') continue
+    if (!isLowerAlnum(lower[i - 1])) continue
+
+    let l = i
+    while (l > 0 && (isLowerAlnum(lower[l - 1]) || lower[l - 1] === '-')) {
+      l--
+    }
+    if (i - l < 2) continue
+
+    let r = i + 1
+    while (r < lower.length && lower[r] >= 'a' && lower[r] <= 'z') {
+      r++
+    }
+    if (r === i + 1) continue
+
+    const next = lower[r]
+    if (isLowerAlnum(next) || next === '.') continue
+
+    if (BANNER_DOMAIN_TLDS.has(lower.slice(i + 1, r))) {
+      return true
+    }
+  }
+
+  return false
+}
+
+const hasColonQuotaOrDate = (lower: string): boolean => {
+  const colonIdx = lower.search(/[:：]/)
+  if (colonIdx === -1) return false
+  const rhs = lower.slice(colonIdx + 1)
+  return (
+    /(?:^|[^0-9.])20\d{2}[-/.年]\d/.test(rhs) ||
+    /(?:^|[^0-9.])\d+(?:\.\d+)?\s*(?:gib|tib|gb|tb|mb|pb)(?![a-z])/.test(rhs) ||
+    /(?:^|[^0-9.])\d+(?:\.\d+)?\s*(?:天|小时|days?(?![a-z]))/.test(rhs)
   )
+}
+
+const isStructuralBannerName = (name: string, lower: string): boolean => {
+  if (hasRegionHint(name)) return false
+  return hasEmbeddedBannerDomain(name, lower) || hasColonQuotaOrDate(lower)
 }
 
 const stripExclusionPrefix = (token: string): string => {
