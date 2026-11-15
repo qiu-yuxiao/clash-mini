@@ -112,10 +112,10 @@
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [
       "eslint --fix --max-warnings=0",
-      "biome format --write"
+      "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true"
     ],
     "*.{css,scss,json,yaml,yml}": [
-      "biome format --write"
+      "biome format --write --no-errors-on-unmatched --files-ignore-unknown=true"
     ]
   },
   "type": "module",

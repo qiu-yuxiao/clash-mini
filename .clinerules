@@ -5,12 +5,12 @@
 
 1. **礼貌自我介绍**：向用户报到，简短介绍自己的助理代号（如 Antigravity）、擅长领域以及针对本次会话拟推进的核心目标。
 2. **审查 `.brain` 联接**：检查项目根目录下的 `.brain` 文件夹是否指向了当前会话的 `Artifact Directory Path`（即系统提供的 `C:\Users\sun_y\.gemini\antigravity\brain\<当前会话 ID>`）。
-3. **呈报建交指令**：向用户明确展示用于重建 `.brain` 联接的 PowerShell 指令，并请求用户口头授权：
+3. **呈报建交指令**：向用户明确展示用于重建 `.brain` 联接的安全指令（严禁使用 `Remove-Item -Recurse -Force` 误删联接源目录，必须用 `cmd /c rmdir` 仅卸载联接点），并请求用户口头授权：
    ```powershell
-   if (Test-Path .brain) { rmdir .brain }; cmd /c mklink /j .brain "<当前会话的绝对路径>"
+   cmd /c "if exist .brain rmdir .brain & mklink /j .brain \"<当前会话的绝对路径>\""
    ```
 4. **获取授权与初始化**：在用户确认并授权后执行该命令。联接建立成功后，方可顺着 `.brain/` 路径去读取和维护本架构中的 `memory_summary.md` 和 `task.md`。
-5. **前置跨目录越界授权（跨目录调查铁律）**：如果后续任务需要读取或操作当前工作区外的任何本地路径（如外部代理配置目录等），你必须在开始调查前，主动使用 `ask_permission` 工具对该外部路径的**父级目录（Parent Directory）**申请一次性递归读取/写入授权，严禁直接使用点对点文件读取的方式频繁弹出确认弹窗打扰用户。授权通过后，若需要执行分析或处理脚本，必须严格遵守 pitfalls.md 的第十二条规定，将脚本在 package.json 中注册为脚本任务，并使用 pnpm 格式执行，并在命令中引用该外部授权路径，达到“单次授权、后续全局静默”的最佳实践。
+5. **前置跨目录越界授权（跨目录调查铁律）**：如果后续任务需要读取或操作当前工作区外的任何本地路径（如外部代理配置目录等），你必须在开始调查前，主动使用 `ask_permission` 工具对该外部路径的**父级目录（Parent Directory）**申请一次性递归读取/写入授权，严禁直接使用点对点文件读取的方式频繁弹出确认弹窗打扰用户。授权通过后，若需要执行分析或处理脚本，必须严格遵守 [clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md) 的第九条与第十条规定，优先使用 `.py` 脚本执行，并与相关前置/校验命令合并为单次调用，达到“单次授权、后续全局静默”的最佳实践。
 
 ---
 
@@ -19,7 +19,7 @@
 
 1. **[.cursorrules](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.cursorrules) / [.clinerules](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.clinerules) (The Meta-Constitution)**: This file. Serves as the entry point and defines meta-rules for document management and modification sequence.
 2. **[clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md) (The Law - Behavioral Redlines)**: The sole source of truth for AI behavioral rules, command execution boundaries, system safety guidelines, and historical mistakes.
-3. **[clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) (The Contract - Product Specs & SOP)**: The sole source of truth for software specifications, port allocations, UI layouts, and the release checklist SOP (Section V).
+3. **[clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) (The Contract - Product Specs & SOP)**: The sole source of truth for software specifications, port allocations, UI layouts, and the release checklist SOP (Section VIII).
 4. **[clash_mini_silent_release.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_silent_release.md) (一键静默发行准则)**: Defines the guidelines and silent workflow for automated releases to prevent user popup interruption.
 5. **[memory_summary.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.brain/memory_summary.md) (The Brain - Session Memory)**: Temporary session-level details, compiler directories, and current environment cache cleaning commands.
 6. **[task.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.brain/task.md) (The Active Task - Lifecycle)**: The active task's lifecycle plan, checklist, and verification walkthrough. Cleared/reset after every milestone release.
@@ -27,14 +27,13 @@
 ---
 
 ## 🚨 【知识库维护与 DRY 铁律 (DOCUMENT MAINTENANCE & DRY RULES)】
-1. **绝对禁止信息复制**：长期的行为红线和命令禁令只能且必须存在于 [clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md)；长期的软件设计指标和发布SOP只能存在于 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md)。绝对禁止在其他文件中复制这些规则或参数，一律使用 markdown 链接引用。
-2. **最高红线：发现任何错误必须先报告对齐，绝对禁止偷偷修复**：在发现代码库、更名或配置有任何历史遗留疏忽时，**在动手进行任何代码/配置修改前，必须先在对话中将问题及修复方案公开、坦诚地报告给用户并获得允许**。严禁以任何借口偷偷修改、提交 and 发布。
-3. **修改顺序铁律**：在改动任何业务代码（TS/React, Rust, JSON 等）前，必须首先在 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 的对应章节中将相关设计或行为变更写入协议。保存更新后，方可修改代码。
+1. **绝对禁止信息复制**：长期的行为红线和命令禁令只能且必须存在于 [clash_mini_pitfalls.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_pitfalls.md)；长期的软件设计指标和发布 SOP 只能存在于 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md)。绝对禁止在其他文件中复制这些规则或参数，一律使用 markdown 链接引用。
+2. **最高红线：发现任何错误必须先报告对齐，绝对禁止偷偷修复**：在发现代码库、更名或配置有任何历史遗留疏忽时，**在动手进行任何代码/配置修改前，必须先在对话中将问题及修复方案公开、坦诚地报告给用户并获得允许**。严禁以任何借口偷偷修改、提交和发布。
+3. **修改顺序与提交铁律（与 `.husky/pre-commit` 对齐）**：纯文档提交可独立进行；凡涉及任何业务代码或窗口配置（`.ts` / `.tsx` / `.rs` / `tauri.conf.json`）改动时，必须同步更新 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 并在**同一次提交中暂存 `clash_mini_agreements.md`**（`.husky/pre-commit` 强制拦截未同步协议的源码提交，严禁使用 `--no-verify` 绕过）。
 4. **重大文档重构自我监督机制**：当对核心配置文件或规则文档进行合并、重构或迁移时，Agent 必须在 [task.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.brain/task.md) 中添加包含以下四个维度的显式自检清单：
    - 编写并运行 `keyword_scan.py`，100% 审计关键端口和 UI 参数的保留状态。
    - 运行 `git diff` 逐行审计修改。
    - 开启独立的 `Document Auditor` 子代理对新旧文件执行交叉审计。
    - 在聊天对话中公开子代理的完整交叉审计报告供用户复核。
-5. **命令执行红线**：启动开发调试服务器或任何接管网络的命令，必须在对话中获得用户口头授权。对于静态校验（如 `pnpm web:build` 或 `cargo check`），Agent 应当主动执行无需频繁打扰用户。
-6. **发布前强验机制 (Release Pre-flight Checks)**：在运行发布打 Tag 脚本前，必须确保 `python verify.py` 本地校验 100% 通过（脚本已集成此拦截）。AI 必须亲自在 `Cargo.lock` 和 `pnpm-lock.yaml` 中审查第三方包 of Resolved Git Commit，确保依赖已指向最新修复版本；且必须本地运行并检查 `extract_update_logs.mjs` 输出的日志内容是否与当前缺陷修复相符，严禁直接无脑发布。
-
+5. **命令执行与代理保护红线**：启动开发调试服务器或任何接管网络的命令，必须在对话中获得用户口头授权；**严禁杀灭、重启或干扰运行中的 `clash-mini`、`mini-mihomo`、`clash_verge_service`、`verge-mihomo`、`clash-verge` 及端口 `10801`/`9098`/`33335`**。对于静态校验（如 `pnpm web:build` 或 `cargo check`），Agent 应当主动执行无需频繁打扰用户。
+6. **发布前强验机制 (Release Pre-flight Checks)**：在运行发布打 Tag 脚本前，必须确保 `python verify.py` 本地校验 100% 通过（脚本已集成此拦截）。AI 必须亲自在 `Cargo.lock` 和 `pnpm-lock.yaml` 中审查第三方包的 Resolved Git Commit，确保依赖已指向最新修复版本；且必须本地运行并检查 `extract_update_logs.mjs` 输出的日志内容是否与当前缺陷修复相符，严禁直接无脑发布。

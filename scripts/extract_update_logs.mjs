@@ -1,6 +1,6 @@
-import fs from 'fs/promises'
-import { existsSync } from 'fs'
 import { execSync } from 'child_process'
+import { existsSync } from 'fs'
+import fs from 'fs/promises'
 import path from 'path'
 
 async function run() {
@@ -70,7 +70,7 @@ async function run() {
     }
   }
 
-  // 3. Try to read resolved bugs from bug_list.md matching the current version
+  // 3. Try to read resolved/matched bugs from bug_list.md for the current version
   let resolvedBugsSection = ''
   const bugListPath = path.join(process.cwd(), 'bug_list.md')
   if (existsSync(bugListPath)) {
@@ -78,29 +78,88 @@ async function run() {
       const data = await fs.readFile(bugListPath, 'utf-8')
       const lines = data.split('\n')
       const bugs = []
+      const seenBugs = new Set()
 
+      const headingBugs = new Set()
+      if (changelogSection) {
+        for (const m of changelogSection.matchAll(/^###\s+[^\n]*$/gm)) {
+          for (const b of m[0].matchAll(/\bBUG-\d+\b/g)) {
+            headingBugs.add(b[0])
+          }
+        }
+      }
+
+      // 3a. Archived 3-column table: | **BUG-XXX** | vX.Y.Z | 状态 |
       for (const line of lines) {
         if (line.trim().startsWith('|') && line.includes('BUG-')) {
           const parts = line.split('|').map((p) => p.trim())
-          if (parts.length >= 5) {
-            const bugId = parts[1].replace(/^\*\*|\*\*$/g, '') // strip ** if present
-            const desc = parts[2]
-            const resolveVer = parts[3] // e.g. v1.1.6 or 1.1.7
+          if (parts.length >= 4) {
+            const bugId = parts[1].replace(/\*/g, '').trim()
+            if (!bugId.startsWith('BUG-')) continue
+            const resolveVer = parts[2]
+            const statusOrDesc = parts[3]
 
             const verNormalized = resolveVer
               .replace(/^v/, '')
               .replace(/-(full|all)$/, '')
-            if (verNormalized === version) {
-              bugs.push(`- **${bugId}**: ${desc}`)
+            if (verNormalized === version && !seenBugs.has(bugId)) {
+              seenBugs.add(bugId)
+              bugs.push(`- **${bugId}**: ${statusOrDesc}`)
             }
           }
         }
       }
 
+      // 3b. Pending cards fallback: ### BUG-XXX（...）
+      const escapedVer = version.replace(/\./g, '\\.')
+      const explicitVerTagRegex = new RegExp(`\\bv?${escapedVer}\\b`, 'i')
+      let currentCard = null
+
+      const flushCard = (card) => {
+        if (!card || seenBugs.has(card.bugId)) return
+        const isMatched =
+          headingBugs.has(card.bugId) ||
+          explicitVerTagRegex.test(card.heading) ||
+          explicitVerTagRegex.test(card.statusLine)
+        if (!isMatched) return
+        seenBugs.add(card.bugId)
+        const summary = card.category || card.heading
+        bugs.push(`- **${card.bugId}**: ${summary}`)
+      }
+
+      for (const line of lines) {
+        const cardMatch = line.match(/^###\s+(BUG-\d+)\b(.*)/)
+        if (cardMatch) {
+          flushCard(currentCard)
+          currentCard = {
+            bugId: cardMatch[1],
+            heading: line.replace(/^###\s+/, '').trim(),
+            statusLine: '',
+            category: '',
+          }
+          continue
+        }
+        if (currentCard) {
+          if (line.startsWith('---') || line.startsWith('## ')) {
+            flushCard(currentCard)
+            currentCard = null
+            continue
+          }
+          if (line.includes('**当前状态**')) {
+            currentCard.statusLine = line
+          } else if (line.includes('**类别与级别**')) {
+            currentCard.category = line
+              .replace(/^-\s*\*\*类别与级别\*\*：\s*/, '')
+              .trim()
+          }
+        }
+      }
+      flushCard(currentCard)
+
       if (bugs.length > 0) {
         resolvedBugsSection = `### 🐞 Fixed Bugs\n${bugs.join('\n')}`
         console.log(
-          `Found ${bugs.length} resolved bugs for version ${version} in bug_list.md`,
+          `Found ${bugs.length} matching bugs for version ${version} in bug_list.md`,
         )
       }
     } catch (err) {
@@ -163,10 +222,11 @@ async function run() {
 
   console.log('Extracted update logs:\n' + finalLogs)
 
-  // Write to GITHUB_ENV if available
-  const githubEnv = process.env.GITHUB_ENV
-  if (githubEnv) {
-    await fs.appendFile(githubEnv, `UPDATE_LOGS<<EOF\n${finalLogs}\nEOF\n`)
+  const envFile = process.env.GITHUB_ENV
+  if (envFile) {
+    const delimiter = 'EOF_UPDATE_LOGS_' + Date.now()
+    const envContent = `UPDATE_LOGS<<${delimiter}\n${finalLogs}\n${delimiter}\n`
+    await fs.appendFile(envFile, envContent, 'utf-8')
     console.log('Successfully wrote UPDATE_LOGS to GITHUB_ENV')
   }
 }

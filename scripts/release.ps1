@@ -1,4 +1,4 @@
-# Clash Mini One-Click Silent Release Script (Windows PowerShell)
+﻿# Clash Mini One-Click Silent Release Script (Windows PowerShell)
 # Usage: .\scripts\release.ps1 <version>
 # Example: .\scripts\release.ps1 1.4.5
 #
@@ -164,7 +164,7 @@ if (-not $SkipBumpAndTag) {
 
     git config --local http.sslBackend openssl
     git config --local http.sslVerify false
-    git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock
+    git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml updater/app-update.json Cargo.lock
     git commit -m "release: bump version to $Version" --allow-empty --no-verify
     if ($LASTEXITCODE -ne 0) { Log-Error "git commit failed"; exit 1 }
 

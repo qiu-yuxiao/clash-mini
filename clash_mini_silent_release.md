@@ -22,7 +22,7 @@
 ## 🛡️ Proxy Server Protection Rule (Highest Priority)
 
 - The local execution environment runs a TUN mode proxy server, and **the release workflow requires no proxy configuration**.
-- **It is strictly forbidden** to kill or interfere with the following processes and ports: `verge-mihomo`, `clash-verge`, `mini-mihomo`, ports `10801`, `9098`.
+- **It is strictly forbidden** to kill, stop, restart, or interfere with the following live proxy processes, services, and ports: `clash-mini`, `mini-mihomo`, `clash_verge_service`, `verge-mihomo`, `clash-verge`, ports `10801`, `9098`, `33335`.
 - Release scripts must not contain any `Stop-Process` or `taskkill` commands targeting the above processes.
 
 ---
@@ -157,10 +157,11 @@ validate → build → update_dev → publish
 - `publish`: Extracts release notes from Changelog.md and publishes the Draft Release to official (~1 minute).
 
 > [!IMPORTANT]
-> **The maintenance of `app-update.json` belongs entirely to the CI's `update_dev` job. `release.ps1` does not generate or commit this file.**
-> The CI will automatically write the correct signature, file size, and download URL after the build is successful.
+> **`updater/app-update.json` follows a two-stage update contract:**
+> - **Local bump (`scripts/bump_version.py`)**: Updates `version`, `notes`, `pub_date`, and `platforms.windows-x86_64.url` (`Clash.Mini_<version>_x64-setup.exe`) so local four-file version checks (`Makefile.toml` `check-version-consistency`) stay aligned.
+> - **CI automation (`update_dev` job)**: Overwrites `updater/app-update.json` with the real build `signature`, `size`, `url`, `notes` (extracted from `Changelog.md`), and `pub_date`, then pushes back to `dev`.
 >
-> **⚠️ 手动发布（绕过 CI pipeline 时）必须同步更新 `updater/app-update.json` 中的 `version`、`pub_date`、`url` 三个字段**，否则客户端版本升级界面显示异常。
+> **⚠️ 手动发布（绕过 CI pipeline 时）必须同步更新 `updater/app-update.json` 中的 `version`、`pub_date`、`url`、`signature`、`size` 等字段**，否则客户端自动更新检查与校验将失败。
 
 ### Release Assets (Since v1.3.8)
 
@@ -177,7 +178,6 @@ validate → build → update_dev → publish
 
 ### Prohibitions
 
-- Using official version numbers in the `TAG_NAME` of `autobuild.yml` is strictly forbidden; autobuild must use a fixed `autobuild` tag.
 - Mixing conditionally skipped jobs as `needs` dependencies in `release.yml` is strictly forbidden.
 - Including non-Windows platform artifact links in official Release release notes is strictly forbidden.
 
@@ -188,7 +188,7 @@ validate → build → update_dev → publish
 ### `Clash.Mini_<version>_x64-setup.exe` (Primary Asset)
 
 - NSIS installer, supports Tauri auto-updater.
-- Users run the installer, and the program is installed in `C:\Users\<username>\AppData\Local\Programs\clash-mini\`.
+- Users run the NSIS installer, and by default the program is installed per-machine in `C:\Program Files\Clash Mini\`.
 - Auto-updates download the new `setup.exe` and run the installer automatically.
 
 ### `Clash.Mini_<version>_x64_portable.zip` (Optional Asset)
@@ -221,7 +221,7 @@ validate → build → update_dev → publish
 Confirm before release:
 
 - [ ] Local code is fully committed and pushed (`git log origin/dev..dev` has no output).
-- [ ] `clash_mini_agreements.md` has registered the new features/modifications (and has been committed separately).
+- [ ] `clash_mini_agreements.md` has registered the new features/modifications (staged alongside any `.ts`/`.tsx`/`.rs`/`tauri.conf.json` commit per `.husky/pre-commit`).
 - [ ] `bug_list.md` has updated the Bug statuses (and has been committed separately).
 - [ ] `Changelog.md` has added the release notes for this version (used by CI to auto-generate Release Notes).
 - [ ] Version numbers are consistent in `package.json`, `tauri.conf.json`, `Cargo.toml`, and `updater/app-update.json`（自动/手动发布均需检查，两者不一致时 pre-push hook 会拒绝推送）.

@@ -10,13 +10,13 @@
 
 | 代码标识 | 类型 | 服务的设计规则 |
 |---|---|---|
-| `mini-mihomo` / `mini-mihomo-alpha` | 内核二进制名 | 与原版 `verge-mihomo` 物理隔离（§1.9） |
+| `mini-mihomo` | 内核二进制名 | 与原版 `verge-mihomo` 物理隔离（§1.4） |
 | `clash_verge_service` | 系统服务名 | TUN 模式服务共享（§1.5） |
 | `verge.yaml` / `profiles.yaml` | 配置文件 | 与原版配置隔离（§1.3） |
 | `AppData\Roaming\io.github.clash-mini.clash-mini` | 数据目录 | 配置独立加载（§1.3） |
 | `10801` / `9098` | Mixed / Controller 端口 | 端口避让原版（§1.4） |
 | `33335`(Release) / `33336`(Dev) | 单实例检测端口 | 单实例隔离（§1.8） |
-| `GOMEMLIMIT=96MiB` / `GOGC=50` / `GOMAXPROCS=2` / `geodata-loader=memconservative` | 内核环境变量 | 壳进程/内核内存基准（§1.2） |
+| `GOMEMLIMIT=128MiB` / `GOGC=100` / `GOMAXPROCS=2`（默认值，可环境变量覆盖）/ `geodata-loader=memconservative` | 内核环境变量与配置 | 内核内存配额基准（§1.6 / §3.5 / §3.4） |
 | `SetProcessWorkingSetSize` / `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW` | Windows API | 已**废弃**，v1.9.4 起删除（§1.2） |
 | `optimize_window_memory` | 函数 | 已**废弃**删除（§1.2） |
 
@@ -37,8 +37,8 @@
 | `ProxyGroups` / `ConnectionTable` / `ProxyVirtualList` / `ProxyItem` / `ProxyHead` | 前端组件 | 类 Excel 表格，滚动条隐藏（§2.10） |
 | `EnhancedCanvasTrafficGraph` / `TrafficGraph` | 前端图表组件 | 宽窗大图 / 窄窗小图切换（§2.2） |
 | `get3DButtonStyle` / `--depth-factor` / `--vibrancy-factor` | 皮肤样式 | 3D 拟物与双控制变量联动（§2.4/2.8/STYLE-001） |
-| `tray-icon.png` / `clash_mini_ragdoll_metal` | 托盘图标资源 | 静态猫咪头像（§2.1/2.18） |
-| `set_icon` / `set_tooltip` / `set_menu` | 托盘 API | **禁止**运行期调用，防 `E_FAIL`（§2.18, BUG-073） |
+| `tray-icon.png` / `tray-icon-sys.png` / `tray-icon-tun.png` | 托盘图标资源 | 三态代理模式静态图标资产（§2.9） |
+| `Tray::update_icon` / `update_lite_mode_menu` | 托盘 API | 仅模式切换调用 `set_icon`、轻量切换调用 `set_text`，零轮询/零动态重构菜单（§2.9） |
 | BUG-259 窗口操作必须在 UI 主线程 | 线程约束 | 见 §八 工程规范 8.3 |
 
 ## 三、内核与运行时
@@ -48,7 +48,6 @@
 | `NetworkManager` Fallback（Localhost → System → Direct） | 后端网络托管 | 内核更新请求严禁裸 HTTP；三级降级（§3.3） |
 | `formatCoreVersion` | 前端函数 | 内核版本前缀剥离 + `Ver.` 统一格式（§3.3） |
 | `fix_dirty_url` / `validate_url_no_ssrf` | 函数 | 订阅 URL SSRF 防护（§6.2） |
-| `download_icon_cache` | 函数 | 图标下载 URL 协议 + SSRF 校验（§6.2） |
 | `safe_extract_zip` | 函数 | Zip Slip 防护，替代 `zip.extract`（§6.2） |
 | `serde_json::to_string` | 序列化 | JS 脚本传参防注入，替代字符串拼接（§6.2） |
 | `boa_engine` | JS 引擎 | 原型链冻结等沙箱加固（§6.3） |
@@ -70,7 +69,7 @@
 | 代码标识 | 类型 | 服务的设计规则 |
 |---|---|---|
 | `evaluate_failover` / `delay_group("PROXY__METRICS", ...)` | 后端函数 | 每次判定前内核级即时拨测，消除 5 分钟盲区（§5.1 / v2.6.6 修复） |
-| `NODE_DELAY_MAX_MS`(2000) / `NODE_TEST_TIMEOUT_MS`(2000) | 常量 | 探针超时 == 判死阈值 == 2000ms（§5.1） |
+| `NODE_DELAY_MAX_MS`(5000) / `NODE_TEST_TIMEOUT_MS`(5000) | 常量 | 探针超时 == 判死阈值 == 5000ms（§5.1 / §5.2） |
 | `AUTO_SELECT_BUSY` | 状态 | 选点冲突不算失败，不冷却（§5.1） |
 | `api_error_count` / `auto_select_fail_count` | 计数器 | API 异常计数触发自愈 / 5 次弹窗（§5.1） |
 | `check_active_node_health` | 已废弃函数 | 旧 15s 自测方案（TUN 下测不准）被 PROXY__METRICS 取代（§5.1 历史） |
@@ -84,7 +83,6 @@
 | `getSystemProxy`(`sysproxy`) / `getRunningMode`(`runningMode`) / `getClashConfig`(`clashConfig`) | 前端查询 | `enabled = isSettingsOpen && !isMiniStatus`（§5.3） |
 | `LogsPage` / `logsOpen` | 前端 | 日志弹窗关闭即卸载，注销 WS（§5.3） |
 | `TrafficDataSampler` / `snapshotIntervalMs`(1000ms) | 前端采样 | 流量图重绘节流（§5.3） |
-| `app-data-provider.tsx` / `getAppUptime`(`appUptime`) | 前端 | 运行时间轮询消除（§5.3） |
 | `use-layout-events` | 前端 | 测速回传监听器生命周期（§5.6） |
 
 ## 六、安全与健壮性
@@ -112,7 +110,7 @@
 | `trigger_backend_auto_select` → `select_node_for_group("PROXY", ...)` → `profiles_patch_item_safe` | 后端链路 | 选点成功回写 `profile.selected`（§7.1） |
 | `handleImportProfile` / `restartCore()` | 前端 | 导入后重启内核（§7.2） |
 | `viewProfile(uid)` / `patchProfile(uid, ...)` / `mutateProfiles()` | 后端/前端 | 订阅右键菜单与编辑（§7.3） |
-| `getMenuItemHoverStyle` / `get3DInputStyle` / `get3DButtonStyle` | 样式函数 | 菜单/对话框 6 皮肤适配（§7.3） |
+| `getPopupCardStyle` / `getPopupSkinTokens` / `get3DInputStyle` / `get3DButtonStyle` | 样式函数 | 菜单/对话框 6 皮肤适配（§2.2 / §7.4） |
 | `FindProcessMode`(枚举, `rename_all="lowercase"`) | Rust 枚举 | 解决 Allow LAN 等开关回弹（§7.3） |
 | `_layout.tsx` / `src/locales`(`settings.json`) / `routingTooltipRules` | 前端/国际化 | 策略分流倾向文案统一（§7.5） |
 | `debounce`(泛型约束) / `calcuProxyProviders`(禁 `as unknown as IProxyItem`) | 编码约束 | 类型安全（§7.6） |

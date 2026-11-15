@@ -284,16 +284,45 @@ jobs:
           echo "Sig: $SETUP_SIG"
           echo "Sig content: $SIG_CONTENT"
 
-          # 生成 app-update.json
-          node -e "
+          # 生成 app-update.json（从 Changelog.md 提取对应版本说明）
+          VERSION="$VERSION" SIG_CONTENT="$SIG_CONTENT" SETUP_SIZE="$SETUP_SIZE" SETUP_FILENAME="$SETUP_FILENAME" node <<'EOF'
             const fs = require('fs');
-            const version = '$VERSION';
-            const sig = '$SIG_CONTENT';
-            const size = $SETUP_SIZE;
-            const encodedFilename = encodeURIComponent('$SETUP_FILENAME');
+            const version = process.env.VERSION;
+            const sig = process.env.SIG_CONTENT;
+            const size = Number(process.env.SETUP_SIZE);
+            const encodedFilename = encodeURIComponent(process.env.SETUP_FILENAME);
+
+            let notes = 'Clash Mini v' + version;
+            if (fs.existsSync('Changelog.md')) {
+              const lines = fs.readFileSync('Changelog.md', 'utf8').split(/\r?\n/);
+              const titleRegex = new RegExp('^##\\s+v?' + version.replace(/\./g, '\\.') + '\\b', 'i');
+              const nextTitleRegex = /^##\s+v?\d+/i;
+              let capturing = false;
+              const captured = [];
+              for (const line of lines) {
+                if (titleRegex.test(line)) {
+                  capturing = true;
+                  continue;
+                }
+                if (capturing) {
+                  if (
+                    nextTitleRegex.test(line) ||
+                    line.trim() === '## 原始版本历史 (Clash Verge History)'
+                  ) {
+                    break;
+                  }
+                  captured.push(line);
+                }
+              }
+              const extracted = captured.join('\n').trim();
+              if (extracted) {
+                notes = extracted;
+              }
+            }
+
             const data = {
               version: version,
-              notes: 'Clash Mini v' + version,
+              notes: notes,
               pub_date: new Date().toISOString(),
               platforms: {
                 'windows-x86_64': {
@@ -305,7 +334,7 @@ jobs:
             };
             fs.writeFileSync('updater/app-update.json', JSON.stringify(data, null, 2) + '\n', 'utf8');
             console.log('✅ app-update.json updated');
-          "
+          EOF
 
       - name: Commit and push to dev branch
         run: |
@@ -358,10 +387,10 @@ jobs:
           ## 下载地址
 
           ### Windows 64位 安装版（推荐，支持自动更新）
-          - [64位安装版](${DOWNLOAD_URL}/Clash%20Mini_${VERSION}_x64-setup.exe)
+          - [64位安装版](${DOWNLOAD_URL}/Clash.Mini_${VERSION}_x64-setup.exe)
 
           ### Windows 64位绿色便携版（免安装）
-          - [64位便携版](${DOWNLOAD_URL}/Clash%20Mini_${VERSION}_x64_portable.zip)
+          - [64位便携版](${DOWNLOAD_URL}/Clash.Mini_${VERSION}_x64_portable.zip)
 
           ### 项目主页
           - [GitHub 主页](https://github.com/qiu-yuxiao/clash-mini)

@@ -15,15 +15,15 @@
    - **要求**：在向用户解释、说明或排查本程序的任何配置项、网络策略、功能逻辑、界面元素（如策略组类型、测速行为、数据结构）时，必须首先在本地代码库和 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 协议文件中进行实证检索，确保该逻辑在当前项目中确实存在。
    - **禁止**：严禁凭空套用原版项目（`Clash Verge`）的默认逻辑、通用 Clash/Mihomo 规范或历史记忆来进行解答。严禁在未经本地代码实证的情况下，将未实现的概念当作“程序已有逻辑”向用户汇报。
 
-3. **完全透明与独立提交律 (Law of Transparency & Isolated Commit)**
+3. **完全透明与协议同步提交律 (Law of Transparency & Contract-Synced Commit)**
    - **要求**：
      1. 修复 Bug 前必须先在 [bug_list.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/bug_list.md) 中以卡片形式登记（状态为 `代码已修正，待用户确认`）。
-     2. 修改任何协议或发行文档后，**必须执行独立的 Git 提交（Git Commit）**，然后才能修改业务代码。
+     2. 纯文档/脚本整理可独立提交；凡提交任何源码或配置（`.ts` / `.tsx` / `.rs` / `tauri.conf.json`）改动时，必须同步更新并在**同一次提交中暂存 `clash_mini_agreements.md`**（与 `.husky/pre-commit` 校验规则严格一致），严禁使用 `--no-verify` 绕过钩子。
    - **禁止**：严禁在后台执行任何形式的“默默顺手修复（Silent Fix）”。
 
 4. **本地运行安全律 (Law of Environment Safety)**
    - **要求**：启动本地 `dev` 服务进行验证前，必须确保前端和 Rust 配置中的网络接管模式（TUN、系统代理）为 `false`。
-   - **禁止**：严禁在本地启动或运行任何生产构建出的 `clash-mini.exe`；禁止执行任何修改物理宿主机路由表或劫持全局系统代理的命令；**严禁杀灭除本项目开发版（`clash-mini`）之外的任何原版 Clash/Mihomo 代理进程（如 `verge-mihomo`、`clash-verge`），这关系到宿主机网络连通性与 Agent 在线状态，是绝对不可触碰的生命线。**
+   - **禁止**：严禁在本地未经授权启动 `clash-mini.exe`、`pnpm dev` 或 `cargo run`；禁止执行任何修改物理宿主机路由表或劫持全局系统代理的命令；**严禁杀灭、停止、重启或探测宿主机正在运行的正式/原版代理进程与服务（`clash-mini`、`mini-mihomo`、`clash_verge_service`、`verge-mihomo`、`clash-verge`）及其活跃端口（`10801`、`9098`、`33335`）和命名管道（`\\.\pipe\mini-mihomo`）**——宿主机的网络连通性与 Agent 在线会话正通过这些进程路由，是绝对不可触碰的生命线。
 
 5. **云端静默发行律 (Law of Silent Release)**
    - **要求**：凡涉及编译与 GitHub 发行操作，必须严格遵循 [clash_mini_silent_release.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_silent_release.md) 中的静默双轨判定和流程。
@@ -61,5 +61,5 @@
     - **禁止**：严禁修改全局 Git 配置；严禁漏掉恢复（`--unset`）命令；严禁将 GitHub Token 以明文字符串硬编码到任何脚本、日志或命令文本中。
 
 12. **Bug 状态变更人工确认唯一性与防抢跑律 (Law of User-Controlled Bug Confirmation & Archiving)**
-    - **要求**：`bug_list.md` 中任何 Bug 的状态变更（即从“待确认”向“已确认”的迁移）和归档至历史表格动作，必须绝对且唯一依赖于用户在当前对话中发出的明确人工“同意/已确认/已验证”指令。在版本正式发行和发布前，Bug 必须作为卡片存放在 `bug_list.md` 顶部的待验证区，严禁提前写入底部历史归档表格。具体发版、测试与确认的步骤顺序，必须严格遵循 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 第五章节中定义的 SOP。
+    - **要求**：`bug_list.md` 中任何 Bug 的状态变更（即从“待确认”向“已确认”的迁移）和归档至历史表格动作，必须绝对且唯一依赖于用户在当前对话中发出的明确人工“同意/已确认/已验证”指令。在版本正式发行和发布前，Bug 必须作为卡片存放在 `bug_list.md` 顶部的待验证区，严禁提前写入底部历史归档表格。具体发版、测试与确认的步骤顺序，必须严格遵循 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 第八章节中定义的 SOP。
     - **禁止**：严禁在发布新版本前为了让预检脚本通过而抢跑修改状态为 `已确认`；严禁在底部历史归档表格中录入状态为 `待用户确认` 的条目进行提前占位或规避校验。

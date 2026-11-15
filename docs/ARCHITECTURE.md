@@ -6,9 +6,6 @@
 > | 来源文档 | 角色 | 本整合文档如何引用 |
 > |---|---|---|
 > | `clash_mini_agreements.md` | **权威设计规范**（要做什么 / 为什么） | 第 5 节「关键设计决策」的契约来源 |
-> | `docs/node-health-architecture.md` | 节点健康 / 故障转移子系统的**从零设计** | 第 3.2 / 5.1 / 5.2 / 5.3 的核心依据 |
-> | `docs/ipc_optimization_proposal.md` | IPC 吞吐优化方案（差量更新 / 可见性门控） | 第 4.4 / 5.5 的依据 |
-> | `docs/design-review-2026-07-21.md` | 设计书对照代码的**验证状态** | 第 8 节「设计验证状态」 |
 > | `docs/implementation-notes.md` | 设计规则 → 代码标识的**备查索引** | 第 7 节「文件索引」与之互补 |
 > | `clash_mini_pitfalls.md` | Agent 运行期**红线基本法** | 仅约束 AI 行为，不影响架构；见附录 |
 >
@@ -85,7 +82,7 @@ flowchart TB
 | 关注点 | 关键文件 | 说明 |
 |---|---|---|
 | 页面外壳 | `src/pages/_layout.tsx` | 主布局（~2400 行，下一阶段计划拆 hooks：useProfileManagement / useCoreUpdate / useSkinControl / useImportContextMenu） |
-| 缓存中枢 | `src/providers/app-data-provider.tsx` | 拥有全部 react-query 缓存（代理 / 配置 / 规则 / 连接 / 系统代理 / 运行模式），监听 `profile-changed` 与 `verge://refresh-proxy-config` 事件并失效缓存 |
+| 缓存中枢 | `src/providers/app-data-provider.tsx` | 拥有活跃 react-query 缓存（代理 / 配置 / 系统代理 / 运行模式等），监听 `profile-changed`、`verge://refresh-proxy-config` 等事件并失效缓存 |
 | IPC 封装 | `src/services/cmds.ts` | 每个后端 `invoke` 包 `withIpcTimeout`（如 `importProfile` / `patchVergeConfig` / `triggerAutoSelect` / `restartCore`） |
 | 内核 API 封装 | `src/services/mihomo-api.ts` | 封装 `tauri-plugin-mihomo-api` 访客函数（带超时），如 `selectNodeForGroupWithTimeout` |
 | 共享 WS 订阅 | `src/hooks/use-mihomo-ws-subscription.ts` | 通用共享 WebSocket 订阅管理器（重连 / 每 key 共享 socket / 节流 / 写入 react-query 缓存）；常驻遥测的唯一入口 |
@@ -97,14 +94,14 @@ flowchart TB
 
 | 模块 | 路径 | 职责 |
 |---|---|---|
-| **IPC 命令层** | `src-tauri/src/cmd/` | 全部 `#[taui::command]`（`app.rs` `clash.rs` `core_update.rs` `lightweight.rs` `profile.rs` `proxy.rs` `runtime.rs` `service.rs` `verge.rs` …），注册于 `lib.rs` 的 `generate_handlers!` |
+| **IPC 命令层** | `src-tauri/src/cmd/` | 全部 `#[tauri::command]`（`app.rs` `clash.rs` `core_update.rs` `diagnostics.rs` `profile.rs` `proxy.rs` `runtime.rs` `service.rs` `verge.rs` …），注册于 `lib.rs` 的 `generate_handlers!` |
 | **内核生命周期** | `src-tauri/src/core/manager/` | `CoreManager` 单例；`RunningMode`（Service / Sidecar / NotRunning）；`start_core`/`stop_core`/`restart_core`；Service vs Sidecar 决策；重启/热重载前后 `PROXY.now` 快照-恢复 |
 | **配置生成（enhance）** | `src-tauri/src/enhance/` | `enhance()` 合并所有 profile 的 proxies/merge/script/rules + 全局 Merge/Script，最后 `enforce_mini_agreements` 把 proxy-groups 改写成 `[PROXY(select), PROXY__METRICS(url-test)]` 并注入 GFWList 规则 |
 | **配置 / 状态** | `src-tauri/src/config/` | `Config` 单例（4 个 `Draft<T>` 已提交 vs 在途）；`IVerge` / `IProfiles` / `PrfItem` / `IClashTemp` |
 | **特性编排** | `src-tauri/src/feat/` | `patch_verge`（用 `UpdateFlags` 位标决定重启内核 / 更新系统代理 / 刷新托盘 / 切语言）、`toggle_system_proxy` / `toggle_tun_mode` |
 | **监测与自愈引擎** | `src-tauri/src/module/monitor.rs` | 长驻守护线程：正常 15s / 离线 5s / 重试 3s 周期；`evaluate_failover` 读 `PROXY__METRICS` 权威值；`trigger_backend_auto_select` 统一测速+选点；回写 `profile.selected`（三层防污染校验）；网络在线/离线探测；统一记账 `self_heal_with_accounting` |
 | **轻量模式** | `src-tauri/src/module/lightweight.rs` | 三态 CAS 状态机（Normal / In / Exiting）+ 全局锁；进入时销毁主窗口、熔断前端 WS、不断用户连接；退出自动重连 |
-| **托盘 / 事件** | `src-tauri/src/core/tray/` `src-tauri/src/core/notification.rs` | 极简静态托盘（禁动态更新图标防 `E_FAIL`）；`FrontendEvent` 枚举 + `Handle::notify_*` 向后端→前端 emit 事件（轻量模式静默丢弃） |
+| **托盘 / 事件** | `src-tauri/src/core/tray/` `src-tauri/src/core/notification.rs` | 静态极简双项菜单托盘（仅代理模式变更时 `Tray::update_icon` 切换 3 套静态 PNG，零轮询/零动态重构菜单）；`FrontendEvent` 枚举 + `Handle::notify_*` 向后端→前端 emit 事件（轻量模式静默丢弃） |
 
 ### 3.3 内核桥接插件（`tauri-plugin-mihomo`）
 
@@ -168,7 +165,7 @@ sequenceDiagram
 ### 4.4 遥测回传（推而非轮询）
 
 - **常驻实时流**：`/traffic` `/memory` `/connections` `/logs` 四条 WebSocket，由 `tauri-plugin-mihomo` 透传，前端经 `use-mihomo-ws-subscription` 节流写入 react-query 缓存。
-- **一次性读取**：proxies / groups / rules / providers / delays 走普通 `invoke` → 本地套接字 HTTP。
+- **一次性读取**：proxies / groups / providers / delays 走普通 `invoke` → 本地套接字 HTTP。
 - **控制事件**：后端→前端经 Tauri 事件（`profile-changed`、`verge://refresh-proxy-config`、`verge://backend-delay-results`、`verge://notice-message`），`app-data-provider` 监听后失效缓存。
 
 ### 4.5 轻量模式的数据流差异
@@ -179,7 +176,7 @@ sequenceDiagram
 
 ## 5. 关键设计决策整合（契约摘要）
 
-> 以下为设计书核心契约的收敛，逐条可在 `clash_mini_agreements.md` / `node-health-architecture.md` 找到依据。
+> 以下为设计书核心契约的收敛，逐条可在 `clash_mini_agreements.md` 找到依据。
 
 ### 5.1 测量归内核 · 双组解耦（治本地基）
 `PROXY=select` + `PROXY__METRICS=url-test` 把"控制"与"测量"彻底解耦：手动选点持久、测量又可靠，且**在 TUN 下无自指回环**（旧设计在 TUN 下"测活跃节点自身返回 timeout"的根因被从测量源消除）。
@@ -192,7 +189,7 @@ sequenceDiagram
 
 ### 5.4 手动优先 · 自愈仅兜底
 - 周期：**正常在线 15s**、**离线 5s**（快速探测网络恢复）、**重试 3s**（前台/后台/轻量统一由同一常驻线程驱动，节奏一致）。
-- 连续 **2 次**失败才触发批量自愈；自愈失败 **60s** 冷却；连续 **5 次**失败弹 Windows 警报。
+- `Suspect` 三态迟滞（`30s` 窗口），连续 **2 次**物理拨测确证失败经 `decide_self_heal` + 原节点确已死门检才触发自愈；失败冷却 **25s**，实际切换间隔 `>= 120s` 且 `600s` 窗内最多 `3` 次；连续 **5 次**失败弹 Windows 警报。
 - 内核 API 连续 **3 次**异常也触发一次自愈（旧代码静默 debug 导致内核卡死时监测失效，已修）。
 - 三处自愈路径统一走 `self_heal_with_accounting` 记账，禁止裸 `trigger_backend_auto_select` 绕过冷却。
 
@@ -201,7 +198,7 @@ sequenceDiagram
 - **窗口可见性门控**：仅当窗口最小化/隐藏（非单纯失焦）超过 1s 才断 WS + `clear_all_ws_connections`；恢复时先 REST 预取再 WS。
 - **节流与日志批处理**：连接表 1–2s 节流、流量图 3s、日志 50 条/250ms 批处理（Error 立即 flush）。
 
-> 注：以上吞吐数值（38MB→~1.25MB 等）与节流节奏为 `ipc_optimization_proposal.md` 的**设计目标**，代表优化方向而非运行时实测值。
+> 注：以上吞吐数值（38MB→~1.25MB 等）与节流节奏代表 IPC 优化设计目标，而非运行时实测值。
 
 ### 5.6 轻量模式状态机
 三态 CAS（Normal / In / Exiting）+ 全局锁 + 失败回滚；进入销毁主窗口、熔断 WS、不断用户连接；退出自动重连。窗口尺寸"进入存盘、唤醒读回套用"。
@@ -216,7 +213,7 @@ sequenceDiagram
 ## 6. IPC 接口速查
 
 ### 6.1 前端 → 后端（部分关键 invoke）
-`getProfiles` / `importProfile` / `enhanceProfiles` / `patchVergeConfig` / `patchClashConfig` / `triggerAutoSelect` / `restartCore` / `getRunningMode` / `installService` / `entryLightweightMode` / `exitLightweightMode` / `saveProxyHeadState` / `getClashLogs` / `checkMediaUnlock`。
+`getProfiles` / `importProfile` / `enhanceProfiles` / `patchVergeConfig` / `patchClashConfig` / `triggerAutoSelect` / `restartCore` / `getRunningMode` / `installService` / `saveProxyHeadState` / `getClashLogs` / `checkMediaUnlock`。
 
 ### 6.2 后端 → 内核（mihomo 插件命令）
 `select_node_for_group` / `delay_group` / `get_proxies` / `get_groups` / `reload_config` / `flush_dns` / `ws_traffic` / `ws_memory` / `ws_connections` / `ws_logs` / `clear_all_ws_connections`。
@@ -239,28 +236,21 @@ sequenceDiagram
 | 实时 WS 管线 | `src/hooks/use-mihomo-ws-subscription.ts` |
 | 内核客户端（HTTP+WS 本地套接字） | `crates/tauri-plugin-mihomo/src/{lib,ipc,mihomo,commands}.rs` |
 | 设计契约（权威） | `clash_mini_agreements.md` |
-| 健康子系统深设计 | `docs/node-health-architecture.md` |
-| IPC 优化深设计 | `docs/ipc_optimization_proposal.md` |
-| 设计书对照代码验证 | `docs/design-review-2026-07-21.md` |
 | 设计规则→代码标识 | `docs/implementation-notes.md` |
 
 ---
 
-## 8. 设计验证状态（评审于 2026-07-21，基线 v2.6.9；当前代码版本见 `package.json` = 2.7.0）
+## 8. 现行版本基线（`v3.3.4`，见 `package.json`）
 
-总体结论：**地基正确、核心落地、图纸与代码存在少量脱节但已对齐**。
+总体结论：**架构收敛、单 `PROXY` 组 + `PROXY__METRICS` 测量解耦、连续性优先方针落地**。
 
-- ✅ 已落地的治本设计：双组解耦、热切换零断流、三层防污染校验、轻量状态机、主线程纪律、事件双过滤 + poison-tolerant 锁 + Drop Guard。
-- 🔴 3 项曾为高优先真实风险（均在评审后已修并已提交）：① 手动切节点后高亮停旧节点（`47aa63c8`）；② `proxy_head_state.json` 非原子写（`159a4fe9`）；③ 进入轻量 `destroy_main_window` oneshot 无超时（`4b566b72`）。
-- 🟡 监测控制逻辑三件套（周期恒定、内核全死计数、冷却记账统一）已修并收口到 `self_heal_with_accounting`。
-- 设计书脱节条目已对齐：§4.3/§5.1 周期改为"恒定 15s"；§5.5 改为"选点限定子集、测速覆盖全量"；删除 §5.1 实现级编码规范（设计书不写编码规范）。
-
-> 详细逐项带文件:行号见 `docs/design-review-2026-07-21.md`。本整合文档只做诊断汇总，未改任何代码。
+- ✅ 已落地的核心机制：双组解耦、热切换零断流（不清理存量连接）、三层防污染校验、轻量模式三态机、主线程纪律、`decide_self_heal` 统一裁决、`Suspect` 迟滞与切换速率上限、真 HTTPS 验真状态机及精准目标化路径控制。
+- 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源。
 
 ---
 
 ## 9. 维护说明
 
-- 本文件是**整合视图/导航**，不是新规范。改行为契约请改 `clash_mini_agreements.md`；改某子系统深设计请改对应 `docs/*.md`，并保持 `implementation-notes.md` 的代码索引同步。
+- 本文件是**整合视图/导航**，不是新规范。改行为契约请改 `clash_mini_agreements.md`，并保持 `implementation-notes.md` 的代码索引同步。
 - 架构图见同目录 `ARCHITECTURE.svg`（也可在本文第 2 节内联 Mermaid 查看）。
 - 术语约定：本项目中"子集"= 前端按地域名过滤后可见的节点集合，选点/防断流只允许在子集内（详见 §5.2）。

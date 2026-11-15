@@ -13,13 +13,7 @@ Before contributing, you need to set up your development environment. Follow the
 1. **Install Rust and Node.js**  
    Our project requires both Rust and Node.js. Follow the official installation instructions [here](https://tauri.app/start/prerequisites/).
 
-### Windows Users
-
-> [!NOTE]  
-> **Windows ARM users must also install [LLVM](https://github.com/llvm/llvm-project/releases) (including clang) and set the corresponding environment variables.**  
-> The `ring` crate depends on `clang` when building on Windows ARM.
-
-Additional steps for Windows:
+### Windows x64 Setup
 
 - Ensure Rust and Node.js are added to your system `PATH`.
 
@@ -46,12 +40,6 @@ Node.js dependencies:
 
 ```bash
 pnpm install
-```
-
-Ubuntu-only system packages:
-
-```bash
-sudo apt-get install -y libxslt1.1 libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 ```
 
 ### Download the Mihomo Core Binary (Automatic)
@@ -83,12 +71,6 @@ Fast build for testing:
 pnpm build:fast
 ```
 
-### Clean Build
-
-```bash
-pnpm clean
-```
-
 ### Portable Version (Windows Only)
 
 ```bash
@@ -103,7 +85,7 @@ pnpm portable
 
 ```bash
 # Rust backend
-cargo clippy-all
+cargo clippy --all-targets --all-features -- -D warnings
 # Frontend
 pnpm lint
 ```
