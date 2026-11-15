@@ -803,7 +803,7 @@ flowchart LR
 | **BUG-330** | 3.2 | 命名管道繁忙退避互锁：集成 Win32 `WaitNamedPipeW` 原生事件唤醒等待并收敛单次最大等待步长，配合 `5s` 外层超时彻底消除互锁掐断。 |
 | **BUG-331** | 1.4 / 1.3 | 服务模式退出孤儿内核清理：退出清理在服务模式或开启 TUN 时**优先**通过 `service::stop_core_by_service()` 提权通道停止 Session 0 内核、轮询确认进程退出并同步本地状态；提权超时/报错时回退 `CoreManager::stop_core()`，且末尾始终无条件执行 `kill_all_mini_cores()`（对无权限 Session 0 进程优雅告警放行，同时清理任意用户态残留内核）。 |
 | **BUG-332** | 2.4 | 轻量唤醒窗口句柄复用：迁移至绑定窗口生命周期的 Win32 `SetWindowSubclass` 并在 `WM_NCDESTROY` 时自动卸载清理句柄记录，彻底根除 `HWND` 复用失灵。 |
-| **BUG-333** | 1.1 | 终端环境变量端口规范：统一回退至协议默认混合端口常量 `crate::constants::network::ports::DEFAULT_MIXED`（`10801`）。 |
+| **BUG-333** | 1.1 | [`copy_clash_env` 因全栈零调用已随收尾清理连同 `feat/proxy.rs` 移除；`DEFAULT_MIXED = 10801` 默认混合端口规范现行生效] 终端环境变量端口规范：统一回退至协议默认混合端口常量 `crate::constants::network::ports::DEFAULT_MIXED`（`10801`）。 |
 | **BUG-334** | 8.7 | 定时订阅更新 Panic 防护：引入 RAII Drop 守卫与 `catch_unwind` 双重屏障，确保异步任务无论正常返回、取消或 Panic 均可靠投递 `TaskFinished` 释放运行态。 |
 | **BUG-335** | 4.1 / 5.4 | 内核异常重启选点恢复：当即时快照为 `None` 时自动回退读取当前激活 Profile 的 `selected` 持久化记录（过滤伪节点后）执行节点恢复。 |
 | **BUG-336** | 2.8 / 5.1 | 顶栏活跃节点轮换同步：切换成功后立即乐观更新并作废 `['getProxies']` 缓存、持久化写入 `selected`，并通过 `notify_node_switched` 置位时间戳且触发专属 `NODE_SWITCH_NOTIFY.notify_one()` 第 0ms 唤醒监测循环吸收宽限期（前置在所有早退分支之前，且守护线程重启时自动复位静态状态）。 |

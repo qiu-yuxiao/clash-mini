@@ -3,454 +3,84 @@
 > [!IMPORTANT]
 > **AI 协同开发与维护规范 (CRITICAL MAINTENANCE RULES)**:
 > 1. **待验证/排查中 Bug 强制卡片化**：所有状态为 `排查中` 或 `代码已修正，待用户确认` 的条目必须在顶部「待验证与活动中 Bug 详情」区以结构化卡片登记，严禁在用户明确人工确认前提前归档入底部历史表。
-> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-316` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
+> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-378` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-378)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-317（对应规范章节：5.5）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Critical / 网络探测与自愈
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs:289-308, 1298-1347`
-- **根因与背景实证**：`is_physical_network_online` 顺序串行 `await` 三个公网 DNS `TCP:53` 地址且未设单连接超时，在静默丢弃 53 端口的企业/校园/酒店网络下首个连接耗尽全部 2s 预算，导致备选 DNS 与 `lookup_host` 域名解析兜底永不执行，后台健康巡检与断流自愈停摆。
-- **修正与改良方案**：重构为并行竞争探测（每个 `TCP:53` 探针独立 `600ms` 超时预算），任一连通即刻返回 `true`；若 `TCP:53` 均不可达则在剩余预算内立即回退执行 `lookup_host` 域名解析兜底。
-
-### BUG-318（对应规范章节：5.3）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 自愈记账与告警
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs:1602-1960`
-- **根因与背景实证**：`self_heal_with_accounting` 在 `auto_select_fail_count >= 3` 时无论内核 API 是否可达均先将计数器清零（且 `RestartCore` 分支同样清零告警计数），导致全节点不可达或内核重启后仍持续不可达时，协议 5.3 节规定的连续 5 次失败 Win32 告警弹窗永远无法触发。
-- **修正与改良方案**：通过 `evaluate_self_heal_counters` 与 `complete_restart_core_attempt` 解耦内核 API 失活重启计数与全节点断流告警计数：API 不可达满 3 次触发 `RestartCore` 时，若内核重启成功（`Ok`）则保留 `auto_select_fail_count` 继续累计至第 5 次可靠触发系统告警；若内核重启自身报错（`Err`）则按不可恢复终态立即升级触发系统告警并重置本轮双计数（含原子弹窗防重入及成功/失败双分支单测锁定）。
-
-### BUG-319（对应规范章节：3.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 内核在线升级
-- **涉及物理路径与行号**：`src-tauri/src/core/core_updater.rs`, `src-tauri/src/core/manager/state.rs`, `src-tauri/src/core/service.rs`, `src-tauri/src/core/validate.rs`
-- **根因与背景实证**：内核在线升级在解压前直接 `fs::File::create` 打开正式路径 `cores/mini-mihomo.exe` 将其截断为 0 字节；若下载中断或解压异常则残留损坏文件触发 `0xc000007b` 致命错误，且各消费点校验口径不一、瞬时文件锁易误删完好内核。
-- **修正与改良方案**：改为写入 `.staging` 临时文件，经共享 `CoreUpdater::inspect_mihomo_pe_binary` 完整校验体积（`>= 5 MB`）、DOS `MZ`、`e_lfanew`、PE32+ AMD64 COFF/OptionalHeader（`Machine=0x8664`、`Magic=0x020B`）与节表边界，经共享 `wait_for_mini_cores_exit` 确认旧内核退出释放锁后再原子替换；`state.rs`、`service.rs`、`validate.rs` 三处统一接入 `resolve_usable_custom_core`，严格区分 `Corrupted`（删除并记日志）与 `IoUnavailable`（杀软扫描/瞬时锁占用时保留原文件并回退内置 sidecar）。
-
-### BUG-320（对应规范章节：7.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 通用协议解析器
-- **涉及物理路径与行号**：`src-tauri/src/utils/resolve/universal_parser.rs`
-- **根因与背景实证**：`parse_ss` 与 `parse_wireguard` 在剥离 `?` 查询串前先按 `@` 切分导致含 `@` 查询参数截断主机地址；`parse_socks5` 漏剥离 `?` 查询串导致端口解析失败；`VMessJson` 缺失 `sni` 字段反序列化映射导致 CDN 域名前置节点 TLS 握手失败。
-- **修正与改良方案**：统一遵循「先剥离 `#fragment` -> 再剥离 `?query` -> 最后按末尾 `@` 拆解 `userinfo@host:port`」顺序修复全部 9 类 URI 协议解析器，并在 `VMessJson` 中补齐 `sni` 映射至 `servername`。
-
-### BUG-321（对应规范章节：2.8 / 5.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 过滤子集测速调度
-- **涉及物理路径与行号**：`src/pages/_layout/utils/profile-coordination.ts:97-140`, `src/services/delay.ts`
-- **根因与背景实证**：`batchTestWithFirstBatchSelect(names, select)` 将前端子集卡片置为 `-2` 测速态后，调用 `triggerAutoSelect(currentUid, undefined, 0, select)` 误传硬编码 `undefined`，导致子集参数丢失及未覆盖卡片转圈残留。
-- **修正与改良方案**：将第二个参数修正为传入的 `names`（`triggerAutoSelect(currentUid, names, 0, select)`），并在后端返回空数组（未执行）或异常分支通过 `restoreDelaySnapshot` 回滚 `-2` 加载态且保留原始 `updatedAt`。
-
-### BUG-322（对应规范章节：5.2 / 5.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 测速结果排序
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs:1050-1053`
-- **根因与背景实证**：后端批量测速展示矩阵中超时不可达节点延迟记为 `0`，默认升序排序 `display.sort_by_key(|r| r.1)` 将 `0ms` 死节点排在所有正常节点最前面。
-- **修正与改良方案**：将默认延迟排序键改为 `if r.1 == 0 { u32::MAX } else { r.1 }`，确保超时节点恒定排在有效节点末尾。
-
-### BUG-323（对应规范章节：6.2 / 7.3）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / Deep Link 订阅导入
-- **涉及物理路径与行号**：`src-tauri/src/utils/resolve/scheme.rs:54-60`
-- **根因与背景实证**：`extract_subscription_url` 采用字符串盲切至末尾，当 `clash://install-config?url=...&name=...` 含后续参数时将 `&name=...` 一并拼入订阅 URL 请求机场引发 HTTP 400。
-- **修正与改良方案**：改为标准 URL 查询参数解析提取 `url` 字段并兼容百分号编码与未编码查询边界。
-
-### BUG-324（对应规范章节：3.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / IPC 连接池超时层级
-- **涉及物理路径与行号**：`crates/tauri-plugin-mihomo/src/ipc.rs:474-504`, `crates/tauri-plugin-mihomo/src/mihomo.rs:32, 184`
-- **根因与背景实证**：命名管道连接池排队获取许可超时（5s）大于外层默认请求超时（3s），高并发满载排队至 3s 时外层提前取消 Future 引发 Broken Pipe。
-- **修正与改良方案**：重构超时层级：连接池许可获取超时收敛为 `2s`，外层默认请求超时提升至 `5s`，确保排队等待严格短于请求总预算。
-
-### BUG-325（对应规范章节：4.3）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / WebSocket 断开保护
-- **涉及物理路径与行号**：`crates/tauri-plugin-mihomo/src/mihomo.rs:381-385`
-- **根因与背景实证**：WebSocket `disconnect` 在 `force_timeout` 传入 `None` 或 `Some(0)` 时走无超时分支裸 `await` 发送关闭帧，若内核侧通道满载阻塞将导致调用方永久挂起。
-- **修正与改良方案**：为关闭帧发送强制赋予保底超时（默认 `1000ms`，下限 `500ms`），杜绝断开流程无限期等待。
-
-### BUG-326（对应规范章节：1.4）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Low / Sidecar 进程退出同步
-- **涉及物理路径与行号**：`src-tauri/src/core/manager/state.rs:148-151`
-- **根因与背景实证**：`stop_core_by_sidecar` 杀死子进程后仅固定 `sleep(100ms)` 而未确认进程真正退出，高连接负载下重启内核存在旧进程尚未释放端口的竞态。
-- **修正与改良方案**：记录被停止子进程 PID 并轮询确认进程退出（步进 `50ms`，上限 `2000ms`），进程一退出即刻放行后续启动。
-
-### BUG-327（对应规范章节：6.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Low / SSRF 内网域名防御
-- **涉及物理路径与行号**：`src-tauri/src/config/prfitem.rs`, `src-tauri/src/utils/network.rs`
-- **根因与背景实证**：`validate_url_no_ssrf` 静态阶段未拦截单标签主机名及 `.localhost`、`.local`、`.internal`、`.lan`、`.home.arpa` 等内网保留后缀，动态解析阶段漏检 IPv6 `fc00::/7`（ULA）与 IPv4-mapped 私网地址，且缺少直连建连期 DNS 重绑定防护与 30x 重定向逐跳校验。
-- **修正与改良方案**：静态与预解析补齐单标签主机名、内网保留后缀、IPv6 ULA 与 IPv4-mapped 私网拦截；`NetworkManager::get_with_ssrf_guard` 在直连路径挂载连接期异步 `SsrfSafeDnsResolver` 消除 DNS Rebinding TOCTOU，在直连与代理双路径挂载 `30x` 重定向逐跳 `validate_url_no_ssrf` 复验；本地预解析 `Err` 放行以便被污染订阅域名交由 `127.0.0.1:10801` 代理回退链拉取，并明确登记远端代理隧道解析边界。
-
-### BUG-328（对应规范章节：1.3 / 1.8）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 服务状态并发与 TUN 保护
-- **涉及物理路径与行号**：`src-tauri/src/core/service.rs`, `src-tauri/src/core/manager/lifecycle.rs`, `src-tauri/src/config/verge.rs`, `src-tauri/src/feat/config.rs`
-- **根因与背景实证**：`ServiceManager::run_operation` 使用单一 `AtomicBool` 防重入导致并发状态查询直接报错，且 `lifecycle.rs` 在已启用系统服务冷启动瞬时响应超时时改写内存/磁盘 `enable_tun_mode = false`，后续任意配置落盘均会覆盖用户持久化的 TUN 配置。
-- **修正与改良方案**：将 `ServiceManager` 操作门控升级为异步互斥排队；通过非阻塞 `inspect_service_registration_async()` 区分 `NotInstalled`、`DisabledOrBroken`（`Start=4` 禁用或二进制缺失，跳过 30s 空等并持久回退）与 `InstalledAndEnabled`；已启用服务冷启动超时进入 `IVerge::enter_temp_tun_fallback` 会话锁定态，确保后续改语言/皮肤等任意落盘仍保留磁盘原始 `enable_tun_mode` / `enable_system_proxy`（用户显式切换代理开关时自动解锁）。
-
-### BUG-329（对应规范章节：3.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 命名管道半开连接自愈
-- **涉及物理路径与行号**：`crates/tauri-plugin-mihomo/src/ipc.rs:274-277, 502-525`
-- **根因与背景实证**：内核重载或空闲断开命名管道后，连接池 `sender.is_ready()` 仍可能为 `true`，首次复用即抛 `HttpParseError` 且无透明重连重试，引发前端查询偶发红框报错。
-- **修正与改良方案**：在本地管道请求发送层针对池化复用连接且仅限幂等只读方法（`GET` / `HEAD`）失败时自动驱逐旧连接并新建物理管道透明重发 1 次；非幂等写操作绝不自动重发，杜绝内核侧重复执行指令。
-
-### BUG-330（对应规范章节：3.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 命名管道繁忙退避互锁
-- **涉及物理路径与行号**：`crates/tauri-plugin-mihomo/src/ipc.rs:113-145, 500-503`, `crates/tauri-plugin-mihomo/src/mihomo.rs:32`
-- **根因与背景实证**：命名管道 `ERROR_PIPE_BUSY` 24 次固定休眠退避总耗时 `3000ms` 与旧外层超时 `3000ms` 等长互锁，后半程建连成功亦来不及完成 HTTP 交互即被掐断。
-- **修正与改良方案**：集成 Win32 `WaitNamedPipeW` 原生事件唤醒等待并收敛单次最大等待步长，配合 `5s` 外层超时彻底消除互锁掐断。
-
-### BUG-331（对应规范章节：1.4 / 1.3）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 服务模式退出孤儿内核清理
-- **涉及物理路径与行号**：`src-tauri/src/feat/window.rs:134-240`, `src-tauri/src/core/manager/state.rs:175-260`
-- **根因与背景实证**：服务模式下退出清理若先走普通 `stop_core` 可能阻塞耗尽预算，且普通用户会话进程无法终止 Session 0 下 `SYSTEM` 权限的 `mini-mihomo.exe`，提权失败或模式漂移时易残留孤儿内核。
-- **修正与改良方案**：退出前预先采样运行模式，当处于服务模式或开启 TUN 时**优先**通过 `service::stop_core_by_service()` 提权通道停止 Session 0 内核、经共享 `wait_for_mini_cores_exit` 确认进程退出并清理本地状态；提权超时/报错时回退 `CoreManager::stop_core()`（非服务模式若有残留且服务已安装亦补服务级兜底），且末尾始终无条件执行 `kill_all_mini_cores()`（对无权限 Session 0 进程优雅告警放行，同时兜底清理任意用户态残留内核）。
-
-### BUG-332（对应规范章节：2.4）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 轻量唤醒窗口句柄复用
-- **涉及物理路径与行号**：`src-tauri/src/utils/resolve/window.rs:293-350`, `src-tauri/src/utils/window_manager.rs:629-720`
-- **根因与背景实证**：轻量模式销毁主窗口时未复位静态 `HOOKED_HWND`，若唤醒重建主窗口时 Windows 句柄表复用相同 `HWND` 值会误判已挂载而跳过 `WM_SIZING` 防下移钩子。
-- **修正与改良方案**：迁移至绑定窗口生命周期的 Win32 `SetWindowSubclass` 并在 `WM_NCDESTROY` 时自动卸载清理句柄记录，彻底根除 `HWND` 复用失灵。
-
-### BUG-333（对应规范章节：1.1）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 终端环境变量端口规范
-- **涉及物理路径与行号**：`src-tauri/src/feat/proxy.rs:76-88`
-- **根因与背景实证**：`copy_clash_env` 在 `verge_mixed_port` 未显式落盘时回退硬编码原版端口 `7897` 而非协议规定的 `10801`，导致复制出的终端代理命令连接被拒。
-- **修正与改良方案**：统一回退至协议默认混合端口常量 `crate::constants::network::ports::DEFAULT_MIXED`（`10801`）。
-
-### BUG-334（对应规范章节：8.7）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 定时订阅更新 Panic 防护
-- **涉及物理路径与行号**：`src-tauri/src/core/timer.rs:268-283, 339-346`
-- **根因与背景实证**：订阅自动更新异步任务未设置 Panic / Drop 复位保护，一旦任务中途异常展开将漏发 `TaskFinished`，导致 `state.running` 永久卡死在 `true`。
-- **修正与改良方案**：引入 RAII Drop 守卫与 `catch_unwind` 双重屏障，确保异步任务无论正常返回、取消或 Panic 均可靠投递 `TaskFinished` 释放运行态。
-
-### BUG-335（对应规范章节：4.1 / 5.4）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 内核异常重启选点恢复
-- **涉及物理路径与行号**：`src-tauri/src/core/manager/lifecycle.rs:139-147, 301-319`
-- **根因与背景实证**：内核卡死重启前 `snapshot_proxy_group_now()` 超时返回 `None`，重启后未回退读取本地 `profiles.yaml` 中持久化的上次有效选点，导致代理组掉回列表首项。
-- **修正与改良方案**：当即时快照为 `None` 时自动回退读取当前激活 Profile 的 `selected` 持久化记录（过滤伪节点后）执行节点恢复。
-
-### BUG-336（对应规范章节：2.8 / 5.1）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 顶栏活跃节点轮换同步
-- **涉及物理路径与行号**：`src/pages/_layout/components/active-node-card.tsx`, `src/hooks/use-proxy-selection.ts`, `src/services/cmds.ts`, `src-tauri/src/module/monitor.rs`
-- **根因与背景实证**：顶栏活跃节点卡片点击快速轮换（`handleCycleNode`）切换内核成功后漏调 `['getProxies']` 缓存更新与 `patchCurrent` 持久化，且前端手动切点未第 `0ms` 唤醒后台监测吸收 `SWITCH_GRACE_PERIOD_SECS` 宽限期，存在轮询睡眠窗口隐患。
-- **修正与改良方案**：切换成功后立即乐观更新并作废 `['getProxies']` 缓存、调用 `patchCurrent` 持久化写入 `selected`，并通过 `notify_node_switched`（带异常告警日志）置位时间戳且触发专属 `NODE_SWITCH_NOTIFY.notify_one()` 第 `0ms` 唤醒监测循环在所有早退分支前吸收宽限期（不触发额外全组拨测，且守护线程启动/重启时自动复位静态状态）。
-
-### BUG-337（对应规范章节：2.8）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 节点虚拟列表 Memo 稳定性
-- **涉及物理路径与行号**：`src/components/proxy/proxy-groups.tsx:80-84`, `src/hooks/use-proxy-selection.ts:45, 110-165`, `src/components/proxy/proxy-render.tsx:27-61`
-- **根因与背景实证**：`ProxyGroups` 每次渲染传入新匿名配置对象导致 `useProxySelection` 返回易变回调，击穿 `ProxyRender` 与 `ProxyItem` 的 `useMemo`/`React.memo`，大节点列表随流量跳动全量重绘。
-- **修正与改良方案**：在 `useProxySelection` 内使用 `useRef` 稳定持有 `onSuccess`/`onError` 回调并固定返回函数引用，保护虚拟列表行级缓存命中率。
-
-### BUG-338（对应规范章节：2.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 运行日志弹窗滚动抖动与劫持
-- **涉及物理路径与行号**：`src/pages/logs.tsx:68-75`
-- **根因与背景实证**：日志弹窗随 50ms 日志批次无条件触发 `behavior: 'smooth'` 平滑滚动动画，造成主线程动画队列堆积掉帧，并在用户向上翻阅历史日志时暴力拉回底部。
-- **修正与改良方案**：移除高频 `smooth` 滚动冲突，改为仅在视口处于底部吸底状态时执行 `behavior: 'auto'` 即时跟随，用户上翻查阅时自动暂停拉拽。
-
-### BUG-339（对应规范章节：5.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 节点延迟状态双重渲染
-- **涉及物理路径与行号**：`src/hooks/use-proxy-delay-state.ts:18, 63-89`
-- **根因与背景实证**：`useProxyDelayState` 惰性初始化计算延迟后挂载 `useEffect` 再次生成新对象触发重渲染，导致长列表滚动时每个可见节点卡片双倍渲染。
-- **修正与改良方案**：在 reducer 中增加字段级浅相等短路比较（数值与状态完全相同时直接返回原引用），消除挂载与无变化通知带来的冗余重绘。
-
-### BUG-340（对应规范章节：2.10 / 2.11）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 浮动配置 Promise 异常兜底
-- **涉及物理路径与行号**：`src/pages/_layout/components/theme-settings-card.tsx`, `src/pages/_layout/components/basic-settings-card.tsx`, `src/pages/_layout.tsx`
-- **根因与背景实证**：多处开关与主题切换直接触发浮动 `patchVerge(...)` Promise 而未附带 `.catch()`，当 IPC 繁忙抛出异常时产生 Unhandled Promise Rejection。
-- **修正与改良方案**：为相关事件处理器中的浮动异步配置写入统一补齐 `.catch()` 错误吸收与日志记录。
-
-### BUG-341（对应规范章节：1.5 / 2.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / 271px 窄窗多语种设置排版
-- **涉及物理路径与行号**：`src/pages/_layout/components/basic-settings-card.tsx:31-36, 116-121`
-- **根因与背景实证**：271px 最小窗口宽度下，西文长标签在固定双列网格中配合 `whiteSpace: 'nowrap'` 无截断溢出并遮挡右侧开关控件。
-- **修正与改良方案**：为网格单元赋予 `minWidth: 0` 与标签文本 `overflow: 'hidden'`, `textOverflow: 'ellipsis'` 及完整 `title` 悬浮提示，保证 13 语种在 271px 下零溢出遮挡。
-
-### BUG-342（对应规范章节：8.9）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Low / 快捷分流规则通知词条勘误
-- **涉及物理路径与行号**：`src/utils/quick-routing.ts:105-109`, `src/locales/*/profiles.json`
-- **根因与背景实证**：连接面板添加快捷分流规则成功后复用了 `profiles.page.feedback.notifications.profileSwitched`，误向用户提示“订阅已切换”。
-- **修正与改良方案**：在全部 13 个语种资源中新增专属 `quickRuleAdded` 通知词条并更新 `quick-routing.ts` 调用。
-
-### BUG-343（对应规范章节：2.8）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Low / 搜索框双重广播去重
-- **涉及物理路径与行号**：`src/components/base/base-search-box.tsx:95-106`
-- **根因与背景实证**：`BaseSearchBox` 在输入事件回调与 `useEffect` 中对同一输入变动重复调用 `emitSearch` 两次，造成双倍过滤计算。
-- **修正与改良方案**：收敛搜索匹配派发路径并记录上一次已广播键值，确保单次输入或筛选项变更仅触发一次广播。
-
-### BUG-344（对应规范章节：5.2）
-- **当前状态**：`已撤销回退并收口全路径陈旧兜底防线，待用户确认`
-- **类别与级别**：Improvement / 单节点专属微测速回退与全路径陈旧 history 防线加固
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src-tauri/src/core/notification.rs`, `src-tauri/src/core/handle.rs`, `src/services/delay.ts`, `src/pages/_layout/hooks/use-layout-events.ts`, `src/pages/_layout/utils/profile-coordination.ts`, `src/components/proxy/proxy-groups.tsx`
-- **根因与背景实证**：原拟在非 TUN 模式下启用 `delay_proxy_by_name` 直测违背《唯一协议》§5.2 核心契约；且在单点、批量与后台自愈选点路径中，一旦测量组拨测未取得实时数据而退化读取 120s `history` 兜底，会导致陈旧延迟冒充实时结果甚至混入 `candidates` 切换出口，前端恢复或复用缓存时亦会误盖 `Date.now()` 30 分钟长寿命。
-- **修正与改良方案**：完整撤回 `delay_proxy_by_name` 直测分流；后端重建 `DelayResultSource`（`LiveProbe` / `FreshMetricsCache` / `NotExecuted`）并彻底移除全路径 120s `history` 兜底；`verge://backend-delay-results` 携带 `fromProbe` 标记对 30s 复用数据强制封顶前端缓存寿命为 30s；新增 `restoreDelaySnapshot` 在未执行或异常回滚时严格保留原始 `updatedAt` 时间戳。
-
-### BUG-345（对应规范章节：5.5）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 并行竞速物理网络探针
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs:289-308`
-- **根因与背景实证**：串行物理网络探针在任一上游 DNS 抖动时增加数百毫秒至数秒无谓等待。
-- **修正与改良方案**：使用 `futures::future::select_ok` 并行发起三路公网 DNS `TCP:53` 握手探针（单路 600ms 超时），最快一路握手成功即在 10~30ms 内判定在线，全败则秒级平滑衔接域名解析兜底。
-
-### BUG-346（对应规范章节：3.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 内核升级原子暂存与真实 PE64 校验
-- **涉及物理路径与行号**：`src-tauri/src/core/core_updater.rs`, `src-tauri/src/core/manager/state.rs`, `src-tauri/src/core/service.rs`, `src-tauri/src/core/validate.rs`
-- **根因与背景实证**：内核在线升级缺乏完整 PE32+ 结构验证、旧内核进程句柄退出等待与瞬时 I/O 占用防误删保护。
-- **修正与改良方案**：引入 `.staging` 原子暂存替换流水线，经 `inspect_mihomo_pe_binary` 校验二进制体积（`>= 5 MB`）、DOS `MZ`、`e_lfanew`、PE32+ AMD64 COFF/OptionalHeader 与节表边界，并严格区分结构损坏（`Corrupted`）与瞬时 I/O 不可读（`IoUnavailable`）；经共享 `wait_for_mini_cores_exit` 确认旧内核释放文件锁后原子替换，异常时自动清理临时文件并保留旧内核完好可用。
-
-### BUG-347（对应规范章节：4.3）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 前端 WebSocket 指数退避重连
-- **涉及物理路径与行号**：`src/hooks/use-mihomo-ws-subscription.ts`, `src/hooks/use-mihomo-ws-subscription.test.ts`
-- **根因与背景实证**：内核重启或服务切换期间固定短周期重连产生高频无效 IPC/WS 风暴，且内核重启后旧 socket 句柄未主动关闭重连。
-- **修正与改良方案**：将前端 WebSocket 断线重连升级为带随机抖动且严格以 `15s` 封顶的指数退避；监听 `verge://refresh-clash-config`（250ms 防抖合并 + `listenerEpoch` 防注册竞态）清空退避计数，并对仍持有陈旧 socket 句柄的活动通道主动关闭后立即重连，同时响应 `Close` 消息触发重连。
-
-### BUG-348（对应规范章节：7.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 统一 URI 协议解析预处理管道
-- **涉及物理路径与行号**：`src-tauri/src/utils/resolve/universal_parser.rs`
-- **根因与背景实证**：各代理协议解析函数各自手工切分 `#` 与 `?`，容易在含 `@` 参数或尾斜杠边界下出现解析截断。
-- **修正与改良方案**：封装共享纯函数 `strip_fragment_and_query(input)` 统一接入全部 9 类 URI 协议（`ss`/`trojan`/`vless`/`hysteria2`/`hysteria`/`anytls`/`tuic`/`wireguard`/`socks5`），并补齐全部 9 协议含 `@` 查询参数的 `server` 主机名与 `port` 端口双断言及 VMess `sni` 回归单元测试。
-
-### BUG-349（对应规范章节：5.2 / 5.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 测速 0ms 超时置底全栈对齐与单测锁定
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`
-- **根因与背景实证**：后端展示矩阵与候选排序缺少独立纯函数封装与针对 `0ms` 超时节点的回归单测锁定。
-- **修正与改良方案**：抽离 `sort_display_delays` 纯函数统一处理延迟升序（`0 -> u32::MAX` 垫底）与名称排序，并补充单元测试防止退化。
-
-### BUG-350（对应规范章节：2.4）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 现代化 Win32 SetWindowSubclass 窗口钩子
-- **涉及物理路径与行号**：`src-tauri/src/utils/resolve/window.rs:293-395`
-- **根因与背景实证**：传统 `SetWindowLongPtrW(GWLP_WNDPROC)` 依赖全局静态旧过程指针，与其他窗口过程链及窗口销毁重建生命周期耦合脆弱。
-- **修正与改良方案**：通过 `comctl32` 原生 `{SetWindowSubclass, DefSubclassProc, RemoveWindowSubclass}` 标准子类化架构绑定窗口生命周期，并在收到 `WM_NCDESTROY` 时自动解绑释放，原生支持任意次主窗口销毁与重建。
-
-### BUG-351（对应规范章节：3.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 韧性命名管道连接池与 WaitNamedPipeW
-- **涉及物理路径与行号**：`crates/tauri-plugin-mihomo/src/ipc.rs`
-- **根因与背景实证**：`ERROR_PIPE_BUSY` 期间纯 `tokio::time::sleep` 盲轮询延迟偏高且无法感知管道即时空闲事件。
-- **修正与改良方案**：在 Windows 平台引入 `WaitNamedPipeW` 阻塞线程池事件等待配合退避重试，并在连接池层记录连接复用标记对幂等查询实现陈旧断开连接的无感单次重建。
-
-### BUG-352（对应规范章节：1.3 / 1.8）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / ServiceManager 异步互斥化状态门控
-- **涉及物理路径与行号**：`src-tauri/src/core/service.rs:395-455`
-- **根因与背景实证**：启动期多路异步任务并发查询/刷新系统服务状态时缺乏串行协调。
-- **修正与改良方案**：将 `ServiceManager` 内部的 `operation_running: AtomicBool` 重构为 `tokio::sync::Mutex<()>` 异步互斥锁，使并发 `refresh`/`apply` 安全排队执行而不再相互报错。
-
-### BUG-353（对应规范章节：5.1 / 8.7）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 后台常驻守护任务 spawn_supervised 监督器
-- **涉及物理路径与行号**：`src-tauri/src/process/async_handler.rs`, `src-tauri/src/module/monitor.rs`
-- **根因与背景实证**：后台长期运行协程若遭遇极端第三方库或数据边界 Panic 会静默终止，缺乏自动拉起防线。
-- **修正与改良方案**：在 `AsyncHandler` 中新增 `spawn_supervised` 守护包装器（`AssertUnwindSafe(...).catch_unwind()` + 错误日志留痕 + 退避自重启，应用退出时自动终止），加固后台健康监测主循环。
-
-### BUG-354（对应规范章节：2.12 / 8.7）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 解封常规屏幕高度下的顶栏帮助与诊断菜单
-- **涉及物理路径与行号**：`src/pages/_layout/components/help-menu-button.tsx`
-- **根因与背景实证**：`HelpMenuButton` 设置了 `@media (max-height: 830px) { display: none }`，导致默认窗口高度（680px）及主流 1080p/笔记本缩放屏下用户完全看不到 GitHub Star、Wiki、重新打开新手引导与导出诊断包入口。
-- **修正与改良方案**：将 `max-height: 830px` 下的隐藏改为重定位至标题栏紧凑槽位，让默认窗口高度与常规屏幕用户随时可访问诊断导出、首次引导与项目主页。
-
-### BUG-355（对应规范章节：2.8 / 5.2 / 5.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 补齐 F4 / F1 快捷测速择优与 Ctrl+F 搜索聚焦快捷键
-- **涉及物理路径与行号**：`src/pages/_layout.tsx`, `src/utils/disable-webview-shortcuts.ts`, `src/components/proxy/proxy-groups.tsx`
-- **根因与背景实证**：设计规范定义了 `F4`（可见子集测速择优）与 `F1`（全量测速择优），但主界面缺少统一收口且对称保护编辑态与全量弹窗遮挡的键盘快捷监听。
-- **修正与改良方案**：并入 `disable-webview-shortcuts.ts` 单一 `document` 级 `keydown` 监听器，对 `Ctrl+F`、`F4`、`F1` 对称执行全量弹窗/菜单排除（覆盖抽屉、日志、编辑/导入/向导、客户端/内核升级、列管理与帮助菜单）、输入控件编辑态排除、IME 合成与长按连发保护（绝不误伤 `Alt+F4`/`Ctrl+F4`），并移除 `ProxyGroups` 硬编码 `'PROXY'` 兜底。
-
-### BUG-356（对应规范章节：2.8 / 2.10）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 手动点击切换代理节点 0ms 乐观高亮
-- **涉及物理路径与行号**：`src/hooks/use-proxy-selection.ts`
-- **根因与背景实证**：手动点击节点卡片切换出口时需等待后端 IPC 与代理表重刷完成后高亮才移动，存在 200~800ms 视觉滞后。
-- **修正与改良方案**：点击节点瞬间对 `queryClient` 的 `['getProxies']` 缓存执行乐观 `now` 更新实现 `0ms` 即时选中高亮，后台异步提交并在极少数失败场景下自动回滚缓存。
-
-### BUG-357（对应规范章节：2.8 / 5.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 节点卡片延迟徽章独立点击单点测速热区
-- **涉及物理路径与行号**：`src/components/proxy/proxy-item.tsx`
-- **根因与背景实证**：节点卡片整行点击会直接切换当前出口节点，用户缺少在不中断当前活跃连接的前提下单独探测某一备用节点实时延迟的快捷入口。
-- **修正与改良方案**：将节点卡片右侧延迟徽章设为独立点击热区（`e.stopPropagation()`），点击延迟数值仅对该节点执行单点实时测速（`select=false`）而不切换当前出口，点击卡片其余区域仍立即切换节点。
-
-### BUG-358（对应规范章节：2.7）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 特色皮肤双滑块拖动渲染与持久化落盘解耦
-- **涉及物理路径与行号**：`src/pages/_layout/hooks/use-skin-controls.ts`, `src/pages/_layout/components/theme-settings-card.tsx`
-- **根因与背景实证**：拖动皮肤物理光影/色彩滑块时在高频 `onChange` 中同步反复读写 `localStorage` 并触发整树状态同步，造成快速拖动微卡顿。
-- **修正与改良方案**：拖动过程 `onChange` 以内存态与 CSS 变量驱动 60fps 实时光影预览，同时结合 200ms 防抖去重落盘、`onChangeCommitted` 去重提交及窗口失焦 / `visibilitychange` / `pagehide` / 组件卸载多路冲刷，兼顾 60fps 丝滑手感与零配置丢失。
-
-### BUG-359（对应规范章节：5.3 / 5.5）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 全节点超时或物理断网时顶栏轻量状态胶囊与一键自愈
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src/pages/_layout/components/active-node-card.tsx`, `src/pages/_layout/utils/notification-handlers.ts`
-- **根因与背景实证**：当物理网络中断或后台测速发现全部节点超时不可达时，主界面顶栏缺乏直观的故障定性提示与一键重测恢复入口。
-- **修正与改良方案**：后端监测在全节点不可达/物理离线及恢复（含选优成功）时派发状态事件，顶栏展示紧凑警示状态胶囊，点击重测成功后通过 `broadcastNetworkHealth` 同步全局模块态，且重测未执行、全超时或异常均给出明确 i18n 提示。
-
-### BUG-360（对应规范章节：2.8）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 节点过滤输入框自动测速择优状态微反馈
-- **涉及物理路径与行号**：`src/pages/_layout.tsx`, `src/locales/*/layout.json`
-- **根因与背景实证**：节点过滤框输入后 700ms 防抖自动触发并发测速择优期间缺少视觉状态指示，用户不易感知后台正在自动筛选测速。
-- **修正与改良方案**：在过滤自动测速防抖等待与执行期间为过滤框提供清晰的轻量加载/脉冲视觉指示及无障碍提示，测速择优完成后平滑收起。
-
-### BUG-361（对应规范章节：2.9）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Improvement / 系统托盘图标左键单击唤醒与隐藏双向切换
-- **涉及物理路径与行号**：`src-tauri/src/core/tray/mod.rs:215-260`
-- **根因与背景实证**：系统托盘左键单击仅单向执行激活恢复，当主窗口已处于前台可见且聚焦状态时再次点击托盘无法顺手收起窗口。
-- **修正与改良方案**：在不触碰任何托盘动态图标/菜单更新 API（严守 BUG-073 静态托盘红线）的前提下，左键单击回调先判断主窗口状态：若不处于轻量模式且主窗口当前可见、未最小化且已获焦点，则平稳隐藏主窗口；否则执行唤醒恢复并置顶聚焦。
-
-### BUG-362（对应规范章节：7.6 / 8.2）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 远程订阅默认 `User-Agent` 与 UI 版本号解耦及自定义逃生阀闭环
-- **涉及物理路径与行号**：`src-tauri/src/constants.rs:4-12`, `src-tauri/src/utils/network.rs:78-92, 314-325`, `src-tauri/src/config/prfitem.rs:443-446, 596-606`
-- **根因与背景实证**：`NetworkManager::create_request_with_tls_mode` 直接使用 `format!("clash-verge/v{}", env!("CARGO_PKG_VERSION"))`（当前发出 `clash-verge/v3.2.5`）作为默认请求头，将机场面板协议能力协商锚点与本分支高频递增的 UI 产品版本号强耦合，存在「外壳虚高、内核未升」诱发机场超前下发不兼容新协议、未来涨破 `v10.0.0` 触发粗糙面板字典序比较归零、偏离上游 `v2.x` 白名单遭反代拦截及暴露私有版本指纹四大隐患；同时 `PrfItem::from_url` 在构造返回 `PrfOption` 时漏存 `user_agent` 字段且未过滤空串，导致单订阅自定义 `option.user_agent` 逃生阀导入后落盘丢失。
-- **修正与改良方案**：在 `constants::network` 定义单一事实源常量 `SUBSCRIPTION_COMPAT_USER_AGENT = "clash-verge/v2.5.10"`（已核实对应上游 `clash-verge-rev/clash-verge-rev` 2026-11 正式版 `v2.5.10` / 内置 `Mihomo v1.19.x` 同代基线，并在 `constants.rs` 注释写明选型依据与定值指纹权衡），与 `CARGO_PKG_VERSION` 及日常发版升号彻底解耦（随 `v3.2.6+` 合并发行）；`NetworkManager` 通过 `resolve_effective_user_agent` 对空白自定义值自动回退至该常量；补齐 `PrfItem::from_url` 对 `option.user_agent` 的清洗与持久化保留，并补充真实 HTTP 抓包与常量解耦回归单测，同步在 `§8.2` 发版清单补齐内核大版本升级核对项。
-
-### BUG-363（对应规范章节：4.1 / 4.2 / 5.1）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Critical / 轻量模式防强杀四重闭环（异名物理隔离看门狗 + 双向互锁监督 + 双端工作区哨兵窗；原 120s 稳态代数复位已在 BUG-365 废除）
-- **涉及物理路径与行号**：`src-tauri/src/process/guardian.rs:1-1436`, `src-tauri/src/module/lightweight.rs:99-107, 170-177`, `src-tauri/src/utils/window_manager.rs:447-460, 568-573, 617-624`, `src-tauri/packages/windows/installer.nsi:551-586, 944-947, 1132-1143`
-- **根因与背景实证**：`v3.2.6` 现场运行 2 小时 30 分钟后（`21:05:24` ~ `23:34:59`），用户唤醒后再次关闭窗口进入轻量模式，叠加整机负载飙升至 `CPU 100% / 内存 94%` 触发 `360tray.exe`（`360perfoptm2.dll` `switch_smart_mode=1`, `cpu_exception=80`）高强度清理，主进程 `PID=12688` 与伴生看门狗 `PID=21012` 双双零日志猝死（Session 0 下 `clash-verge-service.exe` 与 `mini-mihomo.exe` 始终存活）。根因在于 `BUG-316` 初版看门狗直接以同名同路径 `clash-mini.exe --guardian` 无窗口（`CREATE_NO_WINDOW`）启动且主进程丢弃 `Child` 句柄不监控看门狗死活——导致无窗口看门狗要么在前期残留扫描中被先行单杀使主进程裸奔，要么在按 `clash-mini.exe` 应用组清理（`CGroupInfo` / `DoOptmGroupResidual` / `FastOptm`）时与主进程同组连坐双杀；同时原哨兵窗口采用 `(-32000, -32000)` 屏外最小化特征坐标、`LWA_ALPHA = 0` 与空标题，易在极限负载下被穿透。
-- **修正与改良方案**：实施四重纵深闭环加固：① **看门狗异名异目录物理隔离**：按需经 `.staging` 原子同步至 `%LOCALAPPDATA%\<APP_ID>\guard\clash-mini-guard.exe`（占用锁定时平滑落入 `clash-mini-guard-alt.exe`），传入 `--target-exe` 并脱离父 Job 独立拉起，彻底免疫按 `clash-mini.exe` 应用组批量强杀且不占用安装目录文件锁，同步在 `installer.nsi` 安装/卸载流程补齐停机与清理；② **主进程与看门狗双向互锁监督**：主进程通过独立内核态阻塞线程（`WaitForMultipleObjects([child, exit_event], INFINITE)`，`0%` CPU）反向监控看门狗，主动退出 `0ms` 唤醒，看门狗遭外部误杀时记录退出码并带退避自动重建；③ **主进程与看门狗双端挂载工作区哨兵窗口**：哨兵窗迁入主屏工作区原点 `1×1`、标题非空、`LWA_ALPHA = 1`（`1/255` 肉眼不可见、`WM_NCHITTEST -> HTTRANSPARENT` 穿透、隐藏 Owner 不占任务栏/Alt+Tab），看门狗同步挂载哨兵窗并以 `MsgWaitForMultipleObjects(..., QS_ALLINPUT)` 即时响应防 `IsHungAppWindow` 判死，同时将隐藏至托盘态一并纳入守护信号；④ **稳态代数复位初版**（`v3.2.7/v3.2.8` 初版曾定 `120s` 复位，已在 `BUG-365` 复审中废除并替换为无时间清零的 OS 启动指纹+会话纪元累计熔断）。（注：初版已随 `v3.2.7` / `v3.2.8` 合并发行，但 `v3.2.8` 现场仍复现双进程消失并暴露可观测性、Job 隔离与门控缺口，后续系统性架构重构见 `BUG-365`）。
-
-### BUG-364（对应规范章节：3.7）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Critical / TUN 模式域名嗅探与订阅 DNS 策略卫生
-- **涉及物理路径与行号**：`src-tauri/src/enhance/tun.rs`, `src-tauri/src/enhance/mod.rs`, `src-tauri/src/config/verge.rs`, `src-tauri/src/cmd/verge.rs`, `src-tauri/src/feat/config.rs`, `src/pages/_layout/components/basic-settings-card.tsx`, `src/types/verge.ts`, `src/locales/*/settings.json`
-- **根因与背景实证**：`v3.2.7` 现场取证发现系统代理模式与 Chrome 均可正常翻墙，唯常驻后台进程的 Edge 在 TUN 模式下全部外网超时（同机无痕/新启动 Edge 则可正常访问 Google）。日志与命名管道快照（`\\.\pipe\mini-mihomo`）证实双重原因：① **TUN 模式缺少 `sniffer` 域名嗅探配置**：Edge 后台网络进程（`--no-startup-window`）跨模式切换常驻期间持有了直连或路由器 IPv6 RA DNS（`fe80::1%3`）返回的真实/GFW 投毒 IP（如 `2001::1`、`69.171.235.22`），连接绕过 Fake-IP 且请求无 `Host`，由于未开启 `sniffer`，连接既无法命中 `RULE-SET,gfwlist,PROXY` 也未覆写投毒目标地址，全部直落 `MATCH,DIRECT` 刷 `i/o timeout`；② **机场订阅 `dns.nameserver-policy` 脏策略未做卫生清理**：如 `RtLvP3j0CQIN.yaml` 将 `+.google.com` 等 15 个海外域名固定指派给 `https://dns.cloudflare.com/dns-query` 且未开启 `respect-rules: true`，导致内核在大陆直连被墙 DoH 节点，非 A/AAAA 查询（实测 `TXT`）331ms 内直接返回 `SERVFAIL`（`DNS server failure`）。原 `v3.2.8` 首版修正存在默认分支删除策略键、`dns_host_proxy_rule` 丢失 BUG-302 对偶辅 IP、规则插入在 `GEOIP/MATCH` 前却晚于部分规则、`sniffer.enable` 无条件覆写等遗留缺陷。
-- **修正与改良方案**：① **TUN `sniffer` 三态开关与权威字段锁定**：在 `basic-settings-card.tsx`、`cmd/verge.rs` 与 `feat/config.rs` 实现 `Auto / On / Off`（`null / true / false` + 非 TUN 模式禁用）三态控制及显式 `null` 复位，`enhance::tun::apply_tun_sniffer_policy` 在启用时**权威强制** `force-dns-mapping: true`、`parse-pure-ip: true` 并统一顶层与 `sniff.HTTP` 的 `override-destination`（杜绝订阅残留关闭值造成空壳嗅探），同时在 `Auto` 态尊重订阅显式 `sniffer.enable: false`（`insert_if_missing` 不强盖）、扩充 `skip-dst-address` 覆盖组播/广播/IPv4-mapped 私网与国内 DNS；② **DNS 三域统一治理与内外判据统一**：由 `sanitize_dns_upstreams` 统一处理 `dns.nameserver`、`dns.fallback` 与 `dns.nameserver-policy`（保留 `nameserver-policy` 全部策略键与 `default-nameserver` 明文），以 `is_local_or_domestic_dns_host` 作为国内外/局域网唯一判据（阻止国内 DNS 进入 `PROXY` 规则及 `fallback` 误判），并剥离 `#DIRECT`/`#PROXY` 伪后缀（保留 `#h3=true`）；在 `respect-rules: false` 或 `#DIRECT` 下就地重映射为境内 DoH，在 `respect-rules: true` 下经共享规则生成器于 `RULE-SET,gfwlist` 后、`append-rules` 前插入 `PROXY` 保通规则。
-
-### BUG-365（对应规范章节：4.1 / 4.2 / 5.1 / 8.7）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Critical / `v3.2.8` 轻量模式双进程静默消失 Session-0 会话隔离、可观测性与守护闭环系统性加固
-- **涉及物理路径与行号**：`src-tauri/Cargo.toml`, `src-tauri/src/process/guardian.rs`, `src-tauri/src/module/lightweight.rs`, `src-tauri/src/module/monitor.rs`, `src-tauri/src/utils/resolve/mod.rs`, `src-tauri/src/utils/window_manager.rs`, `src-tauri/src/feat/window.rs`, `src-tauri/src/cmd/diagnostics.rs`, `src-tauri/src/lib.rs`
-- **根因与背景实证**：`v3.2.8` 会话日志（归档 `2026-11-13_12-29-24.log`：于 `2026-11-13 10:39:56` 启动、`10:45:39` 再次进入轻量模式并在 `11:10:18` 最后一条日志后，原勘误曾误记为 `11:06:16`）主进程与 `clash-mini-guard.exe` 再次无声消失（Windows Application/System 事件日志无崩溃，WER 无转储）。现场取证确认：`360tray.exe` 智能加速（`switch_smart_mode=1`, `cpu-max=100`）激活、`ScanLog_2026-11-13_10_43_42.txt` 拦截过自启且 `useroptm2.ini` 缺失 `clash-mini` 豁免、`speedupopt.db` 已含 `clash-mini-guard` 优化记录、活跃主进程处于 Win32 Job 内（`IsProcessInJob=True`）。代码审查与复审进一步暴露：**原实现仅在可观测与死亡后判决着墨，未解决看门狗未脱离父 Job 遭 360 按进程组连坐双杀的防护根因**；同时存在带外凭证缺少 `pid && session_id` AND 匹配/TTL/两阶段（`prepared`/`confirmed`）、`3600s` 时间清零漏洞与写状态吞错、同名 `.tmp.<pid>` 竞争与 delete-then-rename 竞态、日志/错误静默出口及诊断包缺少 360/WER 事件采集等问题。
-- **修正与改良方案**：按评审报告 `A1–A12` + 复审 `C1–C15` 落地全链路根因隔离与纵深加固：① **A6 Session-0 Broker 会话脱离隔离（核心防双杀）**：看门狗与复活主进程优先经 Session-0 **WMI (`Win32_Process.Create` → `WmiPrvSE.exe`)** → **Task Scheduler COM (`ITaskService`) 一次性任务** → **`CREATE_BREAKAWAY_FROM_JOB`** 级联拉起（彻底脱离父 Job，同 Job 回退显式标记 `same_job_degraded` 告警）；新增真实 `CreateJobObjectW` + `TerminateJobObject` 场景 6 端到端测试验证脱离父 Job 存活；② **A7 + C1–C2 两阶段严格带外退出双真源**：`prepare_exit()` 写 `phase="prepared"`（30s TTL），`RunEvent::Exit` 在退出窗口升级 `phase="confirmed"`（120s TTL），带重试写入并在退出取消时双路复位；看门狗强制校验 `proof.pid == parent_pid && proof.session_id == session_id`（AND 匹配 + TTL）并在 `GUARD_SAFETY_DELAY_ENTER = 3500ms` 前后双次复核；③ **A8 + C3–C4 无时间清零会话熔断（fail-closed）**：废除 `120s` 与 `3600s` 冷却清零，按 `boot_fingerprint + session_epoch_id` 持久化单会话累计计数（上限 `<= 3` 次），读写失败一律 fail-closed 停机熔断；④ **C5–C7/C15 原子 I/O 与非静默审计**：全量文件替换为递增 `ATOMIC_TEMP_SEQ` 唯一临时文件 + `MoveFileExW(..., MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`；独立 `logs/guardian.log` 写失败触发 stderr/`tracing`/主日志回退，补齐 `GetExitCodeProcess`、降级、早期 `cancel`、`lightweight` 状态对齐等全分支日志；⑤ **A4 代码化取证**：`cmd/diagnostics.rs` 新增只读采集 360 进程/扫描豁免列表、CrashDumps 与有界超时 `wevtutil` WER/Application 事件输出至 `wer-crash-report.txt` 与 `system-info.txt`。
-
-### BUG-366（对应规范章节：3.7 / 4.1 / 8.5）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / IPv6 全代理偷跑治理与审核遗留 Clippy / TOCTOU 清理
-- **涉及物理路径与行号**：`src-tauri/src/enhance/mod.rs:694, 1296, 1495-1522, 1808-1860`, `src-tauri/src/process/guardian.rs:786-880, 1658-1666`, `updater/app-update.json:3`
-- **根因与背景实证**：① `enforce_mini_agreements` 在 GFWList 模式（`rule_fallback != "proxy"`）末尾的 `GEOIP,CN,DIRECT` 与 `MATCH,DIRECT` 之间强行注入 `IP-CIDR6,::/0,PROXY`，导致未覆盖于 `GeoIP/CN` 或直连 CDN/下载/通讯应用的 IPv6 流量及非 GFWList 域名 AAAA 解析全部绕过默认直连策略进入付费机场节点计费；② 提交审核同时检出 `enhance/mod.rs:1296` 悬空 `///` 文档注释（触发 `clippy::empty_line_after_doc_comments` 阻断严格 Lint）、`enhance/mod.rs:694` 冗余 `.unwrap()`、`guardian.rs:1660` 冗余 `if !allow_degraded` 分支（触发 `clippy::needless_return`）及 `evaluate_and_record_respawn_in` 先 `exists()` 再 `fs::read()` 的窄 TOCTOU 窗口；③ `updater/app-update.json:3` 发布说明仍滞留 `"Clash Mini v3.2.9"`。
-- **修正与改良方案**：① 移除 GFWList 模式下 `MATCH,DIRECT` 前的 `- IP-CIDR6,::/0,PROXY`（保留 `GEOIP,CN,DIRECT` + `MATCH,DIRECT` 对称兜底，仅当用户切换「代理全部流量」即 `rule_fallback == "proxy"` 时落入 `MATCH,PROXY`），并同步更新 `test_enforce_mini_agreements_logic` 断言与协议规范 `§3.7`；② 将 `enhance/mod.rs:1296` 改为普通 `//` 注释、用 `split_once('#')` 安全解包替换 `.unwrap()`；③ 将非干净冷启动缺失状态文件判定收敛进 `read_respawn_state_checked` 的单次 `fs::read`（`NotFound` 分支按模式裁决）消除 TOCTOU 并补齐单测，同时精简 `guardian.rs:1660` 单出口返回；④ 将 `updater/app-update.json` 的 `notes` 对齐为 `"Clash Mini v3.3.0"`。
-
-### BUG-367（对应规范章节：2.2 / 7.7 / 8.9）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 路径控制精准规则目标化与四态路由可逆闭环
-- **涉及物理路径与行号**：`src/utils/quick-routing.ts`, `src/utils/path-control.ts`, `src/hooks/use-path-control.ts`, `src/components/connection/connection-table.tsx`, `src/components/connection/connection-detail.tsx`, `src/pages/_layout/components/connections-panel.tsx`, `src/pages/_layout.tsx`, `src/locales/*/connections.json`, `src/locales/*/profiles.json`, `src/types/generated/i18n-keys.ts`
-- **根因与背景实证**：① `addQuickRoutingRule` 与 `buildProxyRule` 存在自动截断域名父级与强制后缀化缺陷（`parts.slice(-2/-3)` + `DOMAIN-SUFFIX`）：用户在「路径控制」表封锁 `play.googleapis.com` 时被擅自改写为 `DOMAIN-SUFFIX,googleapis.com,REJECT`（或宽泛后缀匹配），误杀同名或上/下级无关域，且 IPv6 字符判定缺少 `a-f` 并错误套用 `IP-CIDR`；② `ConnectionTable` 仅消费 Mihomo WebSocket 实时活跃/内存历史流：`路由` 列仅能映射 `直连 / 封锁 / 代理` 三者之一，手动「断开此连接」仅调用 `closeConnectionWithTimeout` 使连接从活跃表瞬间消失；手动「封锁」后置顶的 `REJECT` 规则未关闭旧 socket，而新触发的 `REJECT` 连接被内核瞬时关闭落入易失历史区；表格也缺少直接解除 `Merge` 封锁或重连已断开条目的「恢复默认路由」操作。
-- **修正与改良方案**：① **精确目标匹配**：路径控制右键 `全局直连 / 代理分流 / 封锁它` 一律生成精确规则——域名 `DOMAIN,<exact_host>,<TARGET>`（禁止截断父域、禁止自动转 `DOMAIN-SUFFIX`）、IPv4 `IP-CIDR,<ip>/32,<TARGET>`、IPv6 `IP-CIDR6,<ip>/128,<TARGET>`、进程 `PROCESS-NAME,<proc>,<TARGET>`；「添加网址」中仅显式 `*.domain`/`.domain` 输入生成 `DOMAIN-SUFFIX`，纯域名同样保持精确 `DOMAIN`；② **先重载后切流 + 四态可逆呈现**：下发 `DIRECT/PROXY/REJECT` 先 `enhanceProfiles()` 再关闭命中该目标的存量活跃连接；前端融合持久化「手动已断开记录」（新活跃流到达时自动转正消除）与 `Merge` 覆写规则集条目，在「路径控制」表统一呈现 **直连 / 代理 / 封锁 / 已断开** 四态徽标与排序，且使已断开及被封锁链接留驻表内、右键直接支持重路由或一键「恢复默认路由」。
-
-### BUG-368（对应规范章节：2.8 / 4.2 / 5.1 / 5.2 / 5.3 / 5.4）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 断流自愈二次复核失真、并发拨测风暴、残余死连接卡死与单关键词过滤局限
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src-tauri/src/utils/node.rs`, `src-tauri/src/core/manager/lifecycle.rs`, `src/utils/node.ts`, `src/utils/node.test.ts`, `src/components/proxy/use-filter-sort.ts`, `src/hooks/use-profiles.ts`
-- **根因与背景实证**：2026-11-14 现场日志排障实证四大软件隐患：① **3s 重试复核实质退化为单次判死**：`DEAD_CONFIRM_MIN_INTERVAL_SECS (10s) > RETRY_CHECK_INTERVAL_SECS (3s)`，导致首次失败 `consecutive_fails=1` 进入 3s 重试后，第 2 轮 `evaluate_failover` 必然命中 `age < 10s` 去抖窗口直接置 `need_probe = false`，读取首次失败的同一份死缓存即判定 `consecutive_fails = 2` 并触发切换；② **并发与背靠背 41 节点握手风暴**：`evaluate_failover` 二次确认刚测完 `PROXY__METRICS`，数毫秒后 `self_heal_with_accounting` 又以 `node_names=None` 再打一轮全组 `delay_group`（叠加用户 F4/F1 操作可并发重入），对单机多端口共享上游（如 HK `45.144.x.x`）形成短时并发建连冲击与额外 5s 等待；③ **故障转移不清理挂死在原失效节点上的长连接**：切换到健康新节点后，HTTP/2 / gRPC 多路复用长连接（如 Antigravity 客户端）仍死锁在旧节点的半开 socket 上等待操作系统 TCP 超时（数分钟假断流）；④ **节点过滤仅支持单关键词 `contains`**：用户无法同时筛选多地区可用池（如 `日本|新加坡|台湾`）或快速排除失效/高倍率区域（如 `-香港`、`-倍率`）。
-- **修正与改良方案**：① `evaluate_failover` 接入 `should_probe_active_node(..., force_confirm_probe)`，当 `consecutive_fails > 0` 时强制跳过 10s 缓存与 1.5s 合并窗口执行独立全组复测；② `probe_metrics_group` 引入 `METRICS_PROBE_LOCK` 全局互斥 + `PROBE_COALESCE_WINDOW_MS (1500ms)` 短窗口合并 + `LAST_METRICS_PROBE` 快照，`try_reuse_probe_snapshot` 允许自愈在 `< 10s` 内直接复用确认结果（并修补 Mihomo 死节点不写 `history` 导致子集复测失效问题），单点测速（`len == 1`）保持严禁复用；③ `AutoSelectOutcome` 携带 `selected_node`，仅当故障自愈成功切换至不同于原死节点 `dead_node` 的新节点时，由 `close_connections_on_dead_node` 在 `3s` 超时内精确关闭 `chains` 命中 `dead_node` 的存量连接（绝不波及 `DIRECT` 与健康节点）；④ 新增前后端 1:1 对齐的 `match_node_filter` / `matchNodeFilter`（支持 `|` / `｜` OR、空格 AND 与 `-` / `!` / `！` 排除），统一接入全部筛选/恢复/自愈入口并补齐双端单测。
-
-### BUG-369（对应规范章节：2.8 / 5.2 / 5.4 / 5.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 断网重连延迟丢失、过滤条件被覆盖及假节点/借壳克隆节点隔离
-- **涉及物理路径与行号**：`src-tauri/src/utils/node.rs`, `src-tauri/src/enhance/mod.rs`, `src-tauri/src/module/monitor.rs`, `src-tauri/src/core/manager/lifecycle.rs`, `src-tauri/src/cmd/proxy.rs`, `src-tauri/src/lib.rs`, `src/services/delay.ts`, `src/components/proxy/use-head-state.ts`, `src/pages/_layout.tsx`
-- **根因与背景实证**：① `DelayManager` 在 `-2` 测试态占位下收到 `fromProbe=false` 复用结果时未保留测试前合法 `updatedAt`，误将缓存寿命砍至 `30s` 并很快回落为 `-`，且 `evaluate_failover` 体检测速成功及 `restart_core` 后未唤醒并推送延迟到前端；② `useHeadStateNew` 在多组件持有各自 `useReducer` 实例，`_layout.tsx` 写入 `sortType` 时以旧状态覆盖节点页写入的 `filterText`；③ 订阅中存在大量借壳克隆广告节点及对 `generate_204` 放行但真 HTTPS 网页不可达的假节点，纯靠堆砌过滤词易漏杀或误伤真实节点。
-- **修正与改良方案**：① 为 `DelayManager` 新增 `preTestUpdatedAt` 保留原始有效寿命，并在 `evaluate_failover` 拨测分支、`restart_core`（`MONITOR_WAKEUP_NOTIFY`）及唤醒测速异常回滚中打通延迟同步；② 将 `useHeadStateNew` 重构为 `useSyncExternalStore` 模块级单一事实源共享状态库；③ 新增标准化连接指纹 `proxy_endpoint_fingerprint` 与同配置克隆去重 `deduplicate_cloned_proxies`，并构建真 HTTPS（非 `204`）持久化验真状态机（1 次过真永久粘滞、有在线参照通过下连续失败 `> 5` 轮永久拉黑，全链路隐身并在前端 `calcuProxies` 透明过滤）。
-
-### BUG-370（对应规范章节：5.2 / 5.6）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Critical / 部分测速失真 + 恢复同步静默 + 缓存冻结导致全屏与顶栏长期假 `Timeout`（代理实际畅通）
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`, `src/services/delay.ts`, `src/services/delay.test.ts`, `src/hooks/use-proxy-delay-state.ts`, `src/pages/_layout/components/active-node-card.tsx`
-- **根因与背景实证**：2026-11-15 `v3.3.2` 现场运行日志（`03:19:22 ~ 04:12:00`）证实 `日本8` 代理与内核连接（0 条错误）全程完全通畅，但前端列表与顶栏活跃节点卡片持续显示全员 `Timeout` 达一两个小时：① **主测速地址部分失真 + 快照传染**：`probe_metrics_group` 仅在整组返回 `Err`（0 个节点通过）时切备用地址复核，当订阅中哪怕仅有 1 个非目标/假节点对 `cp.cloudflare.com/generate_204` 返回 `204` 时即跳过备用地址，`LAST_METRICS_PROBE` 存下对当前目标子集全灭的单地址残缺快照并在 6ms 后被自愈复用，推送全员 `0ms (Timeout)` 与 `proxy.alive=false`；② **前后端同步“报忧不报喜”断层**：1 分钟后 `03:22:59` 后台复检确认恢复正常且后续内核 300s `PROXY__METRICS` 周期均健康，但在不触发重选与免拨测分支下后端从不向前端补发可用延迟或 `refresh_proxies()`；③ **前端缓存淘汰不通知与顶栏卡片僵死**：`DelayManager` 定时清理过期 30 分钟缓存时不通知订阅者重算，即使刷新 `['getProxies']`，`ActiveNodeStatusCard` `useEffect` 仅依赖 `hasRecord` 布尔值而不跟踪 `activeNodeRecord` 引用变更，导致活跃节点栏长期死锁在旧 `Timeout`。
-- **修正与改良方案**：① `probe_metrics_group` 新增 `should_recheck_with_fallback`（目标节点或非假节点在主地址均未取得 `[30ms, 5000ms)` 有效延迟时切备用地址复核）与 `merge_probe_delays` 有效延迟合并，`LAST_METRICS_PROBE` 引入 `dual_url_verified` 门控并封堵 `history` 全死假新鲜复用；② `evaluate_failover` 在 `!need_probe` 且活跃节点 `Alive` 时，若处于恢复（`force_confirm_probe` / `LAST_NOTIFIED_HEALTH != "network_health::ok"`）或内核自然周期产出了未上屏新时间戳（`LAST_SYNCED_ACTIVE_HISTORY_TIME`），立即向前端推送可用延迟与 `refresh_proxies()`；③ `DelayManager.evictExpiredCache()` 淘汰过期条目（跳过 `-2` 测试态）时主动派发重置通知驱动 `useProxyDelayState` / `ActiveNodeStatusCard` 回落重算，且 `ActiveNodeStatusCard` 直接响应 `activeNodeRecord` 更新，并补齐 Rust 与 Vitest 单测锁定。
-
-### BUG-371（对应规范章节：2.2 / 2.10）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 流量接管模式与基础设置开关操作过程/结果/失败弹窗提示退化修复
-- **涉及物理路径与行号**：`src/services/notice-service.ts`, `src/components/layout/notice-manager.tsx`, `src/hooks/use-verge.ts`, `src/hooks/use-service-installer.ts`, `src/pages/_layout.tsx`, `src/pages/_layout/hooks/use-minimal-settings.ts`, `src/pages/_layout/components/basic-settings-card.tsx`, `src/utils/popup-styles.test.ts`, `src/locales/*/layout.json`, `src/locales/*/settings.json`
-- **根因与背景实证**：① `handleRuleFallbackChange`（代理方式三选一）、`BasicSettingsCard` 内的「开机自动启动」「启动时最小化」「TUN 域名嗅探」三选一以及「混合代理端口」保存缺少进行中提示、成功反馈、范围校验及权限/受限提示；② 快速完成的后端 IPC（如 `Allow LAN`、`IPv6`、规则兜底，5~40ms）在人眼感知前即调用 `hideNotice(waitId)` 关闭「正在调整」横幅，造成未弹窗的视觉错觉；③ `NoticeManager` `zIndex: 1500` 与 MUI `Tooltip` 默认层级相同，紧邻开关悬停 Tooltip 时易被遮挡；④ `patchVerge` 先行弹出 `showNotice.error` 后又 `throw err`，导致外层 `catch` 重复弹窗，且 `useLockFn` 并发丢弃时解析为 `undefined` 被调用方误判为成功而误弹成功通知。
-- **修正与改良方案**：① `notice-service` 新增 `MIN_LOADING_NOTICE_DWELL_MS = 320`、`markLoadingNotice` 与 `settleLoadingNotice`，快速操作亦保证过程提示至少稳定停留 `320ms` 后平滑退场，并将 `NoticeManager` `zIndex` 升至 `2200` 与增设内边距；② `patchVerge` 成功执行返回 `true`（并发丢弃时返回 `undefined`）且 `patchVerge` / `useServiceInstaller` 支持 `{ silentError: true }` 消除双弹窗；③ 为「代理方式」「流量接管模式」「Allow LAN」「IPv6」「开机自动启动」（含注册表结果对账不一致告警）、「启动时最小化」「TUN 域名嗅探」（含非 TUN 模式点击警示）与端口保存（含 `1–65535` 校验）全面恢复统一「进行中 → 成功/告警 → 失败单弹窗」闭环并同步 13 语种及 Vitest 单测。
-
-### BUG-372（对应规范章节：4.2 / 5.1 / 5.2 / 5.3 / 5.8）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Critical / 后台测速失真误判自愈与周期性清连接导致 HTTP/2 · gRPC 长流硬断（Antigravity 频繁掉线）
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`probe_metrics_group` / `MetricsProbeOutcome` / `evaluate_failover` / `try_reuse_probe_snapshot` / `self_heal_with_accounting` / `close_connections_on_dead_node`）, `clash_mini_agreements.md`（§4.2 / §5.1 / §5.2 / §5.3 / §5.8 / Sync-18）
-- **根因与背景实证**：v3.3.3 现场后台测速每 2–5 分钟切一次节点并顺手清掉一批旧连接，日志已打印「备用测速地址可用 → 判定为主测速地址失真，节点侧正常」却仍累加 `consecutive_fails` 触发自愈，链路仅抖动即被切成硬断，导致 Google Antigravity 长连接反复掉线。代码层面四处叠加：① `probe_metrics_group` 的「主地址整体失败 + 备用成功」结论只写日志并置 `dual_url_verified`，该字段全库仅用于快照复用 / 合并窗口 / 单测，**从未进入 `FailoverVerdict` 或 `consecutive_fails`**；② `evaluate_failover` 丢弃本轮实测 `probed_delays`，改为重读 `get_proxies()` + `node_status()`（`alive` / `history.last().delay`）判死，而主地址拨测失败时内核已把全组成员标为 not-alive（`alive` 与 `history` 可来自不同轮次、不同 URL），据此判死即误判；③ 自愈选点按全局最小延迟执行，**不要求原活跃节点已死、无延迟差门槛**，「自愈成功」仅表示选出了不同节点；④ `collect_dead_node_connection_ids` 只按 `chains` 命中筛选，**无 age / upload / download / alive 过滤**，`join_all` 无差别 `close_connection`，关闭的是「所有经过旧节点的连接」而非注释所称「仍挂死的连接」。`select_node_for_group` 本身是干净热切换、存量连接不受影响，真正切断长流的是第 ④ 步，§4.2「精确断死留活」的设计意图与实现不符。
-- **修正与改良方案**：① **S1-A 结论进入裁决**：`probe_metrics_group` 返回结构化 `MetricsProbeOutcome { delays, primary_url_distorted }`，主地址整体失败且备用成功时置 `true`；`evaluate_failover` 在保留 UI 延迟同步与 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 记账等副作用后据此直接 `return NoAction`，主循环随之清零 `consecutive_fails`、解除重试态并复位健康通知；「主地址部分失真 + 备用复核成功」分支因备用拨测已刷新内核 `alive`、合并延迟可用，仍保留健康裁决以免掩盖真实节点故障；② **S1-B 门控方向修正**：`try_reuse_probe_snapshot` 与 `PROBE_COALESCE_WINDOW_MS` 短窗合并由「未经双地址复核且目标节点全灭才禁止复用」改为「目标节点全灭一律禁止复用」，堵住 `dual_url_verified` 为残缺单地址快照开的绿灯，并移除已失效的该字段及对应单测断言；③ **S2 清连接退出默认路径**：新增 `DEAD_CONN_CLEANUP_ENABLED = false`，`self_heal_with_accounting` 切换成功后默认不调用 `close_connections_on_dead_node`、仅输出跳过日志，切换回归干净热切换，存量 HTTP/2 / gRPC 长流交由应用层自行重连；实现与 `test_collect_dead_node_connection_ids_surgical_cleanup` 保留待 S4 引入 ConfirmedDead 迟滞状态与「无流量」过滤后再评估恢复；④ 同步 `clash_mini_agreements.md` §4.2 / §5.1 / §5.2 / §5.3 / §5.8、Sync-13 / Sync-16 / 附录 A BUG-368 修订标注并新增 Sync-18。
-
-### BUG-373（对应规范章节：5.1 / 5.3）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 三条自愈入口绕过「连续 2 次」防抖判定与网络恢复同周期双拨测
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`start_background_monitor` 网络恢复分支 / `get_active_node_name` None 分支 / `evaluate_failover` Err 分支 / `decide_self_heal` / `self_heal_with_accounting`）, `clash_mini_agreements.md`（§5.1 / §5.3 / Sync-19）
-- **根因与背景实证**：§5.1 与 §5.3 明文规定「严格执行连续 2 次检测失败才自愈」，但主循环保留三条独立绕过路径：① `!was_online && is_online` 分支调用一次 `evaluate_failover(&current_profile, false)`，只要返回 `!= NoAction` 即以 `get_active_node_name()` 作为 `dead_node` 立即执行 `self_heal_with_accounting`，且该分支不 `continue`，本周期主路径随后再次调用 `evaluate_failover`，形成同周期两次全组拨测；② `get_active_node_name()` 返回 `None`（API 不可达）时 `api_error_count >= 3` 直接自愈；③ `evaluate_failover` 返回 `Err` 时同样 `>= 3` 直接自愈。物理网络 60s 探测翻转、内核 API 瞬时抖动均可一次触发切点，是「每 2–5 分钟切一次节点」的周期性来源之一；规范文本「连续 2 次」与实现三条后门长期自相矛盾。
-- **修正与改良方案**：① 新增 `FAILOVER_CONFIRM_FAILS = 2` / `API_ERROR_HEAL_THRESHOLD = 3` 常量与 `SelfHealTrigger` / `SelfHealDecision` / `decide_self_heal` 纯函数统一裁决器，所有入口必须构造 trigger 并接受 `Allow` / `Wait` 裁决，仅 `Allow` 方可调用 `self_heal_with_accounting`（后者退化为纯记账执行函数，前置条件写入文档注释）；② `NetworkRecovered` 恒判 `Wait`：删除一次判定即自愈与 `dead_node` 传参，保留计数复位与 `network_health::ok`，将 `last_check_time` 前拨强制本周期立即走主路径统一体检，即便判死也只累计第 1 次失败、3 秒后第二次独立拨测确认才可能自愈，同周期双拨测消失；③ `ApiUnreachable` 两处改用常量阈值，达阈值后先 `is_clash_api_alive()`（3s 超时）复核，API 已恢复则清零计数、跳过切点交下一周期测量，仅仍不可达才放行，BUG-318 的 `evaluate_self_heal_counters` / `RestartCore` / 连续 5 次告警链路不变；④ `NodeConfirmedDead` 由裁决器按连续 2 次判定（主路径切换宽限期逻辑保留）；⑤ 新增 `test_decide_self_heal_unifies_all_three_triggers` 单测锁定三条分支与阈值边界；⑥ 同步 §5.1 / §5.3 明确「节点侧故障 vs 内核 API 通道故障」两类边界、消除规范内部矛盾，新增 Sync-19 与附录 A 映射。
-
-### BUG-374（对应规范章节：附录 A / 工程工具链）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Medium / Git pre-commit hook 静默拦截合法提交
-- **涉及物理路径与行号**：`.husky/pre-commit:6-7, 9-21`, `.husky/_/h:17`（husky 9.1.7 自动生成）
-- **根因与背景实证**：husky 9 的 wrapper 以 `sh -e "$s"` 执行项目 hook，`-e` 下任何非 0 语句立即终止脚本；而 `STAGED_CODE_FILES=$(git diff --cached --name-only | grep -E ...)` 与 `STAGED_AGREEMENTS_FILE=$(...)` 两条赋值语句的退出码等于管道末条 `grep` 的退出码，grep 无匹配返回 1。三条 shell 规则叠加后，只要暂存区未**同时**包含「代码类文件（`.ts/.tsx/.rs/tauri.conf.json`）」与 `clash_mini_agreements.md`，hook 就在第 6 或第 7 行静默退出（实测纯文档、只改代码、只改 agreement 三种组合 `exit=1`，仅「代码 + agreement」`exit=0`），后续的 `cargo make pre-commit`、cargo-make/pnpm 可用性检查与第 9~21 行「修改顺序铁律」提示全部不执行；因要走到第 9 行必须两条 grep 均匹配，`[ -z "$STAGED_AGREEMENTS_FILE" ]` 恒为假，该提示分支实际上是死代码。现场表现：BUG-372 的纯文档登记提交被拦、改动滞留暂存区，只能把文档与 `.rs` 合并提交才得以推进，破坏了按逻辑拆分 commit 的能力。
-- **修正与改良方案**：① 两条命令替换末尾补 `|| true`，使赋值恒返回 0、grep 的标准输出保持不变，把「有没有匹配」交还给第 9 行 `if` 判断；② 修复后纯文档提交可正常走完全部检查，仅改代码未带 agreement 时真正打印铁律提示并 `exit 1`，「修改顺序铁律」按原设计生效；③ 不改动 husky 自动生成文件 `.husky/_/h`（升级会覆盖）、不使用 `--no-verify`、不放宽铁律本身；④ 登记 `Changelog.md` 与 `clash_mini_agreements.md` 附录 A 映射。
-
-### BUG-375（对应规范章节：4.2 / 5.1 / 5.3）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 二值健康判定把测量抖动升级为自愈切点，自愈漂移为「主动择优」且缺少切换速率上限
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`NodeStatus` / `classify_node_status` / `node_status` / `should_probe_active_node` / `evaluate_failover` / `FailoverVerdict` / `SelfHealOrigin` / `self_heal_requires_dead_gate` / `should_proceed_with_self_heal` / `auto_switch_permitted` / `self_heal_with_accounting` / `start_background_monitor`）, `clash_mini_agreements.md`（§5.1 / §5.3 / Sync-20）
-- **根因与背景实证**：v3.3.3 review 的 D1/D2：`node_status` 仅 `Alive / Dead / Unknown` 三值，`alive=false` 或延迟越界即判 `Dead`，没有「疑似/降级」档；而 Mihomo 对拨测失败节点只写 `alive=false`、不追加 `history`，`history.last()` 仍是上一次成功记录，因此**一次测量抖动**即被当成「节点已死」，连续 2 次独立拨测确认反而放大了这一误判。`trigger_backend_auto_select_inner` 按全局最小延迟选点，不要求原节点确已死、无延迟差门槛，自愈「成功」只表示选出了不同节点，自愈由「兜底」漂移成「主动择优」。此外 20 秒切换宽限期与 25 秒失败冷却各自约束「判定」与「发起选点」，缺少以「实际切换」为单位的速率上限，无法兜住周期性切点。S1/S2/S3 已分别切断测速失真误判、清连接硬断与三条绕过防抖的入口，但健康状态模型与选点前提未动。
-- **修正与改良方案**：① `NodeStatus` 新增 `Suspect`，抽出纯函数 `classify_node_status(alive, last_delay, age_secs)`：`!alive` 但 `history.last()` 仍为有效延迟且年龄 < `SUSPECT_WINDOW_SECS (30s)` 判疑似抖动，`evaluate_failover` 直接 `NoAction`、不累计失败；超过窗口或时间戳不可解析（保守）才判 `Dead`，`should_probe_active_node` 对 `Suspect` 要求新拨测确认；② `self_heal_with_accounting` 切点前用同一权威来源 `get_proxies() + node_status()` 复核 `dead_node`，纯函数 `should_proceed_with_self_heal` 仅放行 `Dead`，自愈回归「仅兜底」；③ **实施中发现并处理迁移类回归**：`FailoverVerdict` 新增 `ShouldMigrate`，把「假/广告或验真永久拉黑节点重选」与「活跃节点真 HTTPS 验真失败且子集内有已验真健康节点」两条既有路径从 `ShouldFailover` 中分离；`SelfHealOrigin` 区分 `ConfirmedDead / NodeMigration / ApiChannelDown`，`self_heal_requires_dead_gate` 使门检仅对 `ConfirmedDead` 生效，二者仍走连续 2 次确认与统一记账但跳过死节点门检；④ 新增 `MIN_AUTO_SWITCH_INTERVAL_SECS (120s)` 与 `AUTO_SWITCH_WINDOW_SECS (600s) / MAX_AUTO_SWITCHES_PER_WINDOW (3)`，主循环维护 `recent_auto_switches: Vec<Instant>`，仅真正换到不同节点时计入，由纯函数 `auto_switch_permitted` 裁决；⑤ 新增 4 组纯函数单测覆盖三态边界、门检状态、门检适用范围与速率上限；⑥ 同步 §5.1 / §5.3、新增 Sync-20、附录 A 与 Changelog。**边界**：`DEAD_CONN_CLEANUP_ENABLED` 仍为 `false`——S4 未实现无流量过滤，清连接能力不恢复；「新节点显著更优」在「原节点确已死」前提下退化为「新节点须有有效延迟」，现有 `candidates` 过滤已满足，未另加延迟差门槛；F1/F4 手动选点与冷启动初始化选点不受影响。
-
-### BUG-376（对应规范章节：§5 最高方针 / Sync-21 / Sync-22）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：High / 初始化自动选点无条件覆盖用户持久出口，违反「连续性优先」最高方针
-- **涉及物理路径与行号**：`src/pages/_layout/utils/profile-coordination.ts`（`triggerAutoSelectAndRefresh` / 新增 `hasUsablePersistedExit` / 10 秒兜底定时器）、`src-tauri/src/module/monitor.rs`（`is_first_run` / 新增 `has_usable_persisted_exit` / `persisted_exit_is_usable` / `trigger_backend_auto_select_inner`）、`clash_mini_agreements.md`（§5 最高方针 / Sync-21 收口标注 / 新增 Sync-22 / 附录 A）
-- **根因与背景实证**：Sync-21 按「连续性优先」方针回溯时登记的两条未收敛项。① 前端 `triggerAutoSelectAndRefresh` 在轻量模式唤醒、Profile 切换、首次启动三种场景下无条件 `batchTestWithFirstBatchSelect(names, true)`，把刚由 `activateSelectedRef` 恢复的用户持久出口覆盖为全局最快节点；其 10 秒兜底定时器以「当前节点没有健康延迟」为由再选一次点，而冷启动时内核尚未拨测、`history` 为空使该条件必然成立，等于固定再切一次。② 后端纯托盘启动 `is_first_run` 先 `restore_profile_selected_nodes` 再无条件 `trigger_backend_auto_select(..., select=true)`，同样自相矛盾。③ `trigger_backend_auto_select_inner` 选出的 `fastest_node` 与本就是当前出口时仍执行一次 `select_node_for_group` 写入。三者都以「选最小延迟节点」为目的，按方针「最小延迟只是附随收益、非必要不主动切换」属违约；其中唤醒场景配置根本没变，切点尤无必要。
-- **修正与改良方案**：① 前端新增 `hasUsablePersistedExit(names)`，只做结构性校验（`PROXY.now` 非空、非伪节点、仍在当前过滤子集内），有效时主流程与兜底定时器均改传 `select=false`——只全组测速刷新延迟、不换节点；读取异常 fail-open 保守允许重选，避免退化成无出口。② 后端新增纯函数 `persisted_exit_is_usable` 与 async 包装 `has_usable_persisted_exit`，`is_first_run` 改以 `select = !has_usable_persisted_exit(&uid)` 调用；判定刻意不读 `alive` / `history`（冷启动数据不可靠，「没有健康延迟」≠「节点已死」），真死节点交由 S1–S4 已收口的连续 2 次确认 + 死节点门检自愈，不在初始化阶段抢占。③ 选点前比对当前 `PROXY.now`，一致时跳过 `select_node_for_group` 写入并输出「保持现状」日志，`profile.selected` 回写与前端刷新照常（幂等），`AutoSelectOutcome` 语义不变；读取失败按原逻辑执行。④ 新增 Rust 纯函数单测 `test_persisted_exit_is_usable_gates_init_auto_select` 与前端 `profile-coordination.test.ts` 5 个用例；§5 方针新增「初始化场景的具体约束」条款、Sync-21 两项标注已收口、新增 Sync-22、附录 A 补映射。**边界**：F1/F4 手动选点与后台故障自愈完全不受影响；出口结构性失效时初始化选点仍会建立可用出口，不牺牲可用性。
-
-### BUG-377（对应规范章节：§5 最高方针 / §5.1 / §5.2 / Sync-23）
-- **当前状态**：`代码已修正，待用户确认`
-- **类别与级别**：Critical / 多测量源污染健康证据导致误判自愈与周期性切点
-- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`run_https_verification_pass` / `HTTPS_VERIFY_TIMEOUT_MS` / `DEAD_CONFIRM_MIN_INTERVAL_SECS` / `should_probe_active_node` / `evaluate_failover` / 主循环体检调用 / 单测）、`clash_mini_agreements.md`（§5 最高方针 / §5.1 / §5.2 / Sync-21 收口标注 / 新增 Sync-23 / 附录 A）
-- **根因与背景实证**：Sync-21 回溯登记的第 3 项，也是 S1 修复「备用测速地址可用、节点侧正常却仍累加失败」后剩下的**残余误判入口**。① 全仓共 5 处 `delay_group("PROXY__METRICS", ...)`，其中真 HTTPS 验真（180s 定期 + 60s 即时）使用 `github.githubassets.com` / `wikipedia.org` 两个非 `204` 地址与 **6000ms** 超时，既不同于主/备测速 URL 与 `NODE_TEST_TIMEOUT_MS (5000ms)` 口径，也未取 `METRICS_PROBE_LOCK`，与 `probe_metrics_group` 并发时会背靠背各打一轮全组握手并互相覆盖同一批 proxy 的共享 `alive` / `history`。② 验真成功时可能把 `[5000, 6000)` 的延迟写进 `history.last()`：`classify_node_status` 因 `valid_delay` 越界判 `Dead`，而时间戳又被刷新为「刚测过」。③ 旧 `should_probe_active_node` 有「`Dead` 且 `history` < `DEAD_CONFIRM_MIN_INTERVAL_SECS (10s)` → 免拨测」去抖缓存，恰好命中这一组合：`need_probe=false`，本轮没有主 URL 实拨，`evaluate_failover` 直接把这份异源测量当作节点已死证据 → `consecutive_fails++` → 连续 2 次后进入自愈切点。此时主测速日志完全正常，故现象与 S1 相同但污染源不同。④ `force_confirm_probe` 在 `consecutive_fails > 0` 时无条件每 3 秒强制全组拨测并禁用 1500ms 合并窗口，额外制造握手风暴，与方针「测量行为不得成为断流源」冲突。
-- **修正与改良方案**：① 删除 `HTTPS_VERIFY_TIMEOUT_MS`，验真两次 `delay_group` 统一改用 `NODE_TEST_TIMEOUT_MS (5000ms)`，`passed_set` 过滤区间与判死阈值 `[30, 5000)` 一致，不再产出伪 `Dead` 延迟。② 两次验真拨测纳入 `METRICS_PROBE_LOCK`，使全仓 5 处全组拨测全部串行化，消除并发覆盖与背靠背握手；验真结果仍只写入 `node.rs` 的 verify 状态机。③ 删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 `force_confirm_probe` 参数：`should_probe_active_node` 收紧为「仅 `Alive` 且 `history` < `HEALTH_DATA_FRESH_SECS (60s)` 免拨测，其余（`Suspect` / `Dead` / `Unknown` / 陈旧 / 时间戳缺失）一律实拨」；`evaluate_failover` 体检拨测一律 `allow_coalesce=false`，裁决只建立在本轮主/备 URL 实拨后重读的 `alive` / `history` 上。免拨测轮只能得到 `Alive` / `Unknown`，二者均 `NoAction`，异源测量写入的 `history` 永远无法在免拨测轮变成判死理由；连续 2 次失败天然来自两轮互相独立的物理拨测，BUG-368 的独立复核契约不回退。④ 单测改写为 `test_should_probe_active_node_only_skips_fresh_healthy`（含 59s/60s 边界），新增 `test_https_verify_tainted_history_can_never_skip_probe` 复现「5500ms 越界延迟 + 2s 新鲜时间戳」并锁定其必须强制实拨。**边界**：`NodeStatus` 三态迟滞、连续 2 次裁决器、死节点门检、切换速率上限、`DEAD_CONN_CLEANUP_ENABLED=false` 与 F1/F4 手动测速选点全部保持不变；验真识别假节点的功能与 180s/60s 周期不变。
-
-### BUG-378（对应规范章节：§5 最高方针 / §5.1 / §5.2 / §5.5 / §5.6 / Sync-24）
-- **当前状态**：`文档已修正，待用户确认`（纯文档治理，运行期代码零改动）
-- **类别与级别**：Low / 规范内部矛盾与下层架构文档失效标注缺失，可能误导后续改动
-- **涉及物理路径与行号**：`clash_mini_agreements.md`（§5 最高方针 / §5.1 / §5.1.1 / §5.2 / §5.5 / Sync-18~21 收口标注 / 新增 Sync-24 / 附录 A）、`docs/node-health-architecture.md`（文件头状态声明与差异对照表）、`bug_list.md`、`Changelog.md`
-- **根因与背景实证**：S1–S5 逐项改动运行期行为后，文档层留下四类不一致：① §5.5 仍写「离线转在线……必要时秒级触发故障自愈」，与 S3 的 `NetworkRecovered` 恒判 `Wait` 正面冲突；② §5.1 标题「恒定 15 秒」被读成全局唯一周期（实际为 15/3/5 三档），§5.1.1 仍以现在时描述 `[探针]` INFO 日志，而全局检索确认 `src-tauri/src/` 与 `src/` 中已无任何该前缀日志；③ `docs/node-health-architecture.md` 是 v2.9.x「从零重写」草案，开篇即写「现存 `monitor.rs` 守护线程属于被替换对象」，主张「app 完全不插手测量」「删除自测线程」「移除 `DelayManager` 自测回写」，与现行实现直接冲突却未标注失效；④ §5.2「全路径废除 history 退化兜底」与 §5.6 前端 `HISTORY_FALLBACK_MAX_AGE_MS = 10 分钟` 回落（`src/services/delay.ts:26` 确实存在）字面对立。这些不改变当前程序输出，但按文档写代码会把刚收口的误判切点重新引回来。
-- **修正与改良方案**：① §5.5 按 Sync-19 重写，明确「恒判 `Wait`、只放行一次统一体检、旧表述作废」，§5 方针去掉「S6 待完成」标注。② §5.1 基线周期条款补齐 15/3/5 三档与 `check_interval_secs` 唯一裁决入口，说明标题「恒定 15 秒」特指在线正常态；§5.1.1 改为「已移除，本节仅保留溯源」并写明全局检索结果与后续临时排查纪律。③ §5.2 补作用域澄清：废除的是后端测速取数路径的陈旧兜底，前端展示层回落见 §5.6，二者不冲突。④ `docs/node-health-architecture.md` 文件头追加「历史设计草案 / 非现行规范 / 禁止作为改代码依据」状态声明与「草案主张 ↔ 现行实现」四项对照表，明确 agreement §5 为主文件；草案正文作为设计史料原样保留。⑤ Sync-18/19/20/21 里「S5 / S6 未处理」的历史快照补收口标注（保留原始记录、不改历史结论），新增 Sync-24 与附录 A 映射。**边界**：不触碰任何运行期代码、参数、配置项与发版流程；`HISTORY_FALLBACK_MAX_AGE_MS` 与 §5.6 三级真源保持不变。
+_当前暂无待验证或活动中的 Bug（`BUG-317` ~ `BUG-378` 已完成逐项源码核查并归档）。_
 
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
-历史已确认关闭条目（`BUG-057` ~ `BUG-316`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
+历史已确认关闭条目（`BUG-057` ~ `BUG-378`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
 
 | 缺陷编号 | 对应版本基线 | 状态 |
 | :--- | :---: | :---: |
+| **BUG-378** | v3.3.4 | 文档已修正（废弃草案已物理移除），已确认 |
+| **BUG-377** | v3.3.4 | 代码已修正，已确认 |
+| **BUG-376** | v3.3.4 | 代码已修正，已确认 |
+| **BUG-375** | v3.3.4 | 代码已修正，已确认 |
+| **BUG-374** | v3.3.4 | 代码已修正，已确认 |
+| **BUG-373** | v3.3.4 | 代码已修正，已确认 |
+| **BUG-372** | v3.3.4 | 代码已修正，已确认 |
+| **BUG-371** | v3.3.3 | 代码已修正，已确认 |
+| **BUG-370** | v3.3.3 | 代码已修正，已确认 |
+| **BUG-369** | v3.3.3 | 代码已修正，已确认 |
+| **BUG-368** | v3.3.2 | ②④现行生效，①已由 BUG-377 收口，③清连接已停用移除，已确认 |
+| **BUG-367** | v3.3.0 | 代码已修正，已确认 |
+| **BUG-366** | v3.3.0 | 代码已修正，已确认 |
+| **BUG-365** | v3.2.9 | 看门狗与 Session-0 拉起已于 v3.3.3 废止移除（仅留 WER/CrashDumps 取证），已确认 |
+| **BUG-364** | v3.2.8 | 代码已修正，已确认 |
+| **BUG-363** | v3.2.7 | 看门狗与哨兵窗已于 v3.3.3 废止移除（仅留安装清理与白名单指引），已确认 |
+| **BUG-362** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-361** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-360** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-359** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-358** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-357** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-356** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-355** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-354** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-353** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-352** | v3.2.6 | 代码已修正，已确认（与 BUG-328 同源归档） |
+| **BUG-351** | v3.2.6 | 代码已修正，已确认（与 BUG-329/BUG-330 同源归档） |
+| **BUG-350** | v3.2.6 | 代码已修正，已确认（与 BUG-332 同源归档） |
+| **BUG-349** | v3.2.6 | 代码已修正，已确认（与 BUG-322 同源归档） |
+| **BUG-348** | v3.2.6 | 代码已修正，已确认（与 BUG-320 同源归档） |
+| **BUG-347** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-346** | v3.2.6 | 代码已修正，已确认（与 BUG-319 同源归档） |
+| **BUG-345** | v3.2.6 | 代码已修正，已确认（与 BUG-317 同源归档） |
+| **BUG-344** | v3.2.6 | 直测已回退并收口加固，已确认 |
+| **BUG-343** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-342** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-341** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-340** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-339** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-338** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-337** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-336** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-335** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-334** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-333** | v3.2.6 | copy_clash_env 零调用死命令已移除（10801 默认端口现行生效），已确认 |
+| **BUG-332** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-331** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-330** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-329** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-328** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-327** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-326** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-325** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-324** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-323** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-322** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-321** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-320** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-319** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-318** | v3.2.6 | 代码已修正，已确认 |
+| **BUG-317** | v3.2.6 | 代码已修正，已确认 |
 | **BUG-316** | v3.2.5 | 代码已修正，已确认 |
 | **BUG-315** | v3.2.4 | 代码已修正，已确认 |
 | **BUG-314** | v3.2.3 | 代码已修正，已确认 |
