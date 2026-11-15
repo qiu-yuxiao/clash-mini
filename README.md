@@ -6,10 +6,6 @@
 [![Built with Tauri](https://img.shields.io/badge/Built%20with-Tauri-24C8D8?style=flat-square&logo=tauri)](https://tauri.app)
 [![Language: Rust](https://img.shields.io/badge/Language-Rust-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
 
-> [!WARNING]
-> **AI Assistant Instructions**:
-> AI collaborative development on this project is governed by the [`.cursorrules`](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.cursorrules) protocol in the root directory. Before using any tools to troubleshoot or modify the project, you must first read and strictly comply with the "New Assistant Registration Protocol" in `.cursorrules` to establish relations with the Master. Bypassing this ritual to directly perform other development tasks is prohibited.
-
 Clash Mini is a customized enhancement of **Clash Verge**, optimized for tailored workflows, enhanced 3D visual styles, and performance.
 
 ---

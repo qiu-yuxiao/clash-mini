@@ -7,10 +7,6 @@
     "core:default",
     "fs:allow-read-file",
     "fs:allow-exists",
-    {
-      "identifier": "fs:scope",
-      "allow": ["$APPDATA/**"]
-    },
     "fs:allow-write-file",
     {
       "identifier": "fs:scope",
@@ -22,7 +18,6 @@
     "fs:allow-appcache-read-recursive",
     "fs:allow-appconfig-read",
     "fs:allow-appconfig-read-recursive",
-    "core:window:allow-create",
     "core:window:allow-center",
     "core:window:allow-request-user-attention",
     "core:window:allow-set-resizable",
@@ -31,6 +26,7 @@
     "core:window:allow-set-closable",
     "core:window:allow-set-title",
     "core:window:allow-maximize",
+    "core:window:allow-toggle-maximize",
     "core:window:allow-unmaximize",
     "core:window:allow-minimize",
     "core:window:allow-unminimize",
@@ -54,14 +50,6 @@
     "core:window:allow-set-cursor-position",
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-start-dragging",
-    "core:window:allow-maximize",
-    "core:window:allow-toggle-maximize",
-    "core:window:allow-unmaximize",
-    "core:window:allow-minimize",
-    "core:window:allow-unminimize",
-    "core:window:allow-set-maximizable",
-    "core:window:allow-set-minimizable",
-    "core:webview:allow-print",
     "core:window:allow-is-decorated",
     "core:window:allow-is-maximized",
     "core:window:allow-is-minimized",
@@ -75,7 +63,6 @@
     "process:allow-exit",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
-    "shell:default",
     "dialog:default"
   ]
 }

@@ -513,7 +513,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 ### 6.1 Tauri 权限最小化与沙箱加固
 
 严格遵循最小权限安全原则：
-- **移除危险 Shell 权限**：彻底剔除 Tauri 配置中开放的系统命令生成、执行、标准输入输出交互权限，前端环境无法执行任意本地 Shell 指令。
+- **移除危险 Shell 与冗余窗口/WebView 权限**：仅保留 `shell:allow-open` 唤起外部链接，彻底剔除 `shell:default`、命令执行权限以及无用的窗口/WebView 创建与打印权限（`core:window:allow-create`、`core:webview:allow-create-webview*`、`core:webview:allow-print`），并清理 `migrated.json` 重复权限声明，前端环境无法执行本地指令或派生未授权窗口。
 - **FS 作用域极致收紧**：文件系统插件的作用域严格限定于当前应用程序的数据目录与临时目录，严禁通过通配符跨目录读取用户私有文件。
 - **彻底移除前端 HTTP 插件暴露**：已移除 `tauri-plugin-http` 与 `capabilities/desktop.json` 中全部 `http:*` 权限，WebView 侧不开放任何直接插件网络通道，外部 HTTP 请求统一收口至受 SSRF 防护的 Rust `NetworkManager` 后端。
 
