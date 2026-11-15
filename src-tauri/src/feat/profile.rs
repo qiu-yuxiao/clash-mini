@@ -150,6 +150,21 @@ pub async fn update_profile(
         None => auto_refresh,
     };
 
+    let cleared_quarantine = if is_mannual_trigger {
+        let cleared = crate::utils::node::clear_unverified_https_failures();
+        if cleared > 0 {
+            logging!(
+                info,
+                Type::Config,
+                "[订阅更新] 手动更新触发：已重置 {} 个未验真节点的历史 HTTPS 验真失败记录",
+                cleared
+            );
+        }
+        cleared
+    } else {
+        0
+    };
+
     if should_refresh {
         logging!(info, Type::Config, "[订阅更新] 更新内核配置");
         match CoreManager::global().update_config_with_force(is_mannual_trigger).await {
@@ -171,6 +186,8 @@ pub async fn update_profile(
                 logging!(error, Type::Config, "{err}");
             }
         }
+    } else if cleared_quarantine > 0 && !crate::module::lightweight::is_in_lightweight_mode() {
+        handle::Handle::refresh_proxies();
     }
 
     Ok(())

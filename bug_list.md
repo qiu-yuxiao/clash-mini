@@ -9,7 +9,28 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-_当前暂无待验证或活动中的 Bug（`BUG-317` ~ `BUG-378` 已完成逐项源码核查并归档）。_
+### BUG-379 后台监测稳态 60s 全组盲测风暴治理：被动下行流量证活 + 停滞秒级复核 + 空闲 300s 降频
+
+- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)（`evaluate_failover`、`should_probe_active_node`、`sample_active_node_traffic`）
+- **问题描述**：`HEALTH_DATA_FRESH_SECS` 原固定为 `60` 秒，导致即便用户正在流畅浏览/看视频，后台守护线程仍每分钟对 `PROXY__METRICS` 全组所有节点发起一轮 `delay_group` 并发握手拨测（以 50 节点计每小时高达 3,000 次跨网握手，干扰长流且耗费机场/硬件资源）；而简单拉长阈值又会拖慢真死节点的自愈发现速度。
+- **修复方案**：引入基于本地命名管道 `/connections` 的**被动流量证活状态机**（零外网发包、`history` 缓存保鲜封顶 `480s < 600s` 前端兜底上限，且严守 §5.2 铁律绝不启用 `/proxies/{name}/delay`）：
+  1. **活跃传输态（`delta_download > 0`）**：下行回包直接证实远端真实存活，保鲜上限放宽至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s)`，稳态拨测频率直降 **87.5%**；
+  2. **黑洞停滞态（`delta_upload > 0 && delta_download == 0`）**：有出无回立即突破缓存在本轮 15s 周期内触发 `probe_metrics_group` 复核（配 `STALL_REPROBE_COOLDOWN_SECS = 60s` 防单向流抖动冷却），使用中突发死节点恢复响应从最慢 `63s` 缩短至 **`~18s`**；
+  3. **完全空闲态（无字节变化）**：保鲜窗口放宽至 `IDLE_HEALTH_FRESH_SECS (300s)`，对齐 `PROXY__METRICS` 自然周期，静默挂机拨测直降 **80%**；非 `Alive`（`Suspect`/`Dead`/`Unknown`）仍强制实拨，保留 BUG-377 异源隔离不变式。
+- **状态**：代码已修正，待用户确认
+
+---
+
+### BUG-380 真 HTTPS 验真「终身死刑」改为 24h 软隔离自动缓刑 + 手动更新订阅解封
+
+- **对应模块**：[node.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/node.rs)（`NodeVerifyRecord`、`apply_verify_batch_to_records`、`clear_unverified_https_failures`）、[profile.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/profile.rs)（`update_profile`）
+- **问题描述**：此前 `node_https_verify.json` 的假节点判定一旦累计失败超过 5 次，便在无过期机制与解封入口的情况下对节点指纹永久拉黑屏蔽；机场短时维护或 GitHub/Wikipedia 验真源偶发抽风后，真节点即使早已恢复也永远无法在 Clash Mini 中重见天日（重启或重导同节点订阅均无效）。
+- **修复方案**：
+  1. 复用持久化字段 `last_verified_at` 实行 **24 小时软隔离 TTL**（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`，零格式迁移成本）：满 24h 自动解除隔离并在下一轮恢复观察；期间若重新失败则清零重计一轮 6 次宽限期，若通过则升级单向粘滞真值 `verified_true = true`；
+  2. 新增 `clear_unverified_https_failures()`，并在用户**手动点击更新订阅**（`is_mannual_trigger == true`）时自动清空所有未验真节点的历史失败计数与软隔离标记（保留已验真白名单），立即随配置重载/列表刷新恢复可见。
+- **状态**：代码已修正，待用户确认
+
+---
 
 ---
 

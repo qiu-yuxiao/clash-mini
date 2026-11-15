@@ -2179,12 +2179,41 @@ proxies:
             .unwrap();
         let fake_fp = crate::utils::node::proxy_endpoint_fingerprint(fake_mapping).unwrap();
 
+        let now_ts = i64::try_from(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        )
+        .unwrap_or(i64::MAX);
+
+        // 先验证超过 24h 的过期隔离记录不会阻止节点入组
         crate::utils::node::set_verify_record_for_test(
             &fake_fp,
             Some(crate::utils::node::NodeVerifyRecord {
                 verified_true: false,
                 fail_count: crate::utils::node::HTTPS_VERIFY_MAX_FAILS + 1,
                 last_verified_at: 100,
+            }),
+        );
+        let enforced_expired = enforce_mini_agreements(config.clone()).await;
+        let expired_proxies = enforced_expired
+            .get("proxy-groups")
+            .and_then(Value::as_sequence)
+            .and_then(|g| g[0].as_mapping())
+            .and_then(|m| m.get("proxies"))
+            .and_then(Value::as_sequence)
+            .unwrap();
+        let expired_names: Vec<&str> = expired_proxies.iter().filter_map(Value::as_str).collect();
+        assert_eq!(expired_names, vec!["香港1", "伪装正常名实则已拉黑"]);
+
+        // 在 24h 软隔离窗口内时必须跳过该节点
+        crate::utils::node::set_verify_record_for_test(
+            &fake_fp,
+            Some(crate::utils::node::NodeVerifyRecord {
+                verified_true: false,
+                fail_count: crate::utils::node::HTTPS_VERIFY_MAX_FAILS + 1,
+                last_verified_at: now_ts,
             }),
         );
 

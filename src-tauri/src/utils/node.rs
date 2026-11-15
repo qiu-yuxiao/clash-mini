@@ -159,8 +159,12 @@ pub fn match_node_filter(name: &str, filter_text: &str) -> bool {
 
 /// 同一节点（同指纹 `server:port+config`）连续真 HTTPS 验真失败阈值：
 /// 超过该次数（`fail_count > 5`，即连续 >= 6 轮在“物理网卡在线且同批至少 1 个参照节点验真通过”
-/// 的前提下仍失败，且从未通过过真 HTTPS 验真）即永久判定为假节点。
+/// 的前提下仍失败，且从未通过过真 HTTPS 验真）即进入 24 小时软隔离。
 pub const HTTPS_VERIFY_MAX_FAILS: u8 = 5;
+
+/// 真 HTTPS 验真软隔离过期时长（秒，24 小时）：
+/// 避免机场临时维护或验证靶站波动导致可用节点被永久不可逆清除；期满自动解除隔离并在后续周期重新观察。
+pub const HTTPS_VERIFY_BAN_TTL_SECS: i64 = 86_400;
 
 const VERIFY_STORE_FILE: &str = "node_https_verify.json";
 
@@ -172,9 +176,21 @@ pub struct NodeVerifyRecord {
 }
 
 impl NodeVerifyRecord {
-    /// 当节点从未通过真 HTTPS 验真且累计失败超过 `HTTPS_VERIFY_MAX_FAILS` 次时，确认为假节点
-    pub const fn is_confirmed_fake(&self) -> bool {
-        !self.verified_true && self.fail_count > HTTPS_VERIFY_MAX_FAILS
+    /// 判断在指定 Unix 时间戳 `now_ts` 下节点是否仍处于「软隔离假节点」窗口内。
+    /// 仅当从未通过真 HTTPS 验真、累计失败超过 `HTTPS_VERIFY_MAX_FAILS` 次且距上次失败未满 `HTTPS_VERIFY_BAN_TTL_SECS`（24h）时为 `true`。
+    pub const fn is_confirmed_fake_at(&self, now_ts: i64) -> bool {
+        if self.verified_true || self.fail_count <= HTTPS_VERIFY_MAX_FAILS {
+            return false;
+        }
+        if self.last_verified_at <= 0 {
+            return true;
+        }
+        now_ts.saturating_sub(self.last_verified_at) < HTTPS_VERIFY_BAN_TTL_SECS
+    }
+
+    /// 按当前系统时钟判断节点是否处于软隔离假节点状态
+    pub fn is_confirmed_fake(&self) -> bool {
+        self.is_confirmed_fake_at(current_unix_ts())
     }
 }
 
@@ -396,13 +412,16 @@ pub fn ensure_runtime_node_fingerprints_loaded() {
     }
 }
 
-/// 查询指定指纹是否已被确认永久拉黑
+/// 查询指定指纹是否仍处于真 HTTPS 验真软隔离（24h）窗口内
 pub fn is_confirmed_fake_fp(fp: &str) -> bool {
     ensure_verify_store_loaded();
-    VERIFY_STORE
-        .read()
-        .as_ref()
-        .is_some_and(|store| store.records.get(fp).is_some_and(NodeVerifyRecord::is_confirmed_fake))
+    let now_ts = current_unix_ts();
+    VERIFY_STORE.read().as_ref().is_some_and(|store| {
+        store
+            .records
+            .get(fp)
+            .is_some_and(|rec| rec.is_confirmed_fake_at(now_ts))
+    })
 }
 
 /// 查询指定指纹是否已通过真 HTTPS 验真（单向粘滞真值）
@@ -422,7 +441,7 @@ fn fingerprint_for_node(name: &str) -> Option<String> {
         .and_then(|map| map.get(name).cloned())
 }
 
-/// 查询节点名是否已被确认假节点（通过当前指纹表匹配；无指纹时返回 `false`）
+/// 查询节点名是否已被确认假节点（处于软隔离期内；无指纹时返回 `false`）
 pub fn is_confirmed_fake_node(name: &str) -> bool {
     fingerprint_for_node(name).is_some_and(|fp| is_confirmed_fake_fp(&fp))
 }
@@ -432,21 +451,23 @@ pub fn is_verified_true_node(name: &str) -> bool {
     fingerprint_for_node(name).is_some_and(|fp| is_verified_true_fp(&fp))
 }
 
-/// 查询节点名是否曾在有参照节点通过的前提下累计过真 HTTPS 验真失败
+/// 查询节点名是否在有效观察期（未过 24h TTL）内曾在有参照节点通过的前提下累计过真 HTTPS 验真失败
 pub fn has_verify_failure_node(name: &str) -> bool {
     let Some(fp) = fingerprint_for_node(name) else {
         return false;
     };
     ensure_verify_store_loaded();
+    let now_ts = current_unix_ts();
     VERIFY_STORE.read().as_ref().is_some_and(|store| {
-        store
-            .records
-            .get(&fp)
-            .is_some_and(|r| !r.verified_true && r.fail_count > 0)
+        store.records.get(&fp).is_some_and(|r| {
+            !r.verified_true
+                && r.fail_count > 0
+                && (r.last_verified_at <= 0 || now_ts.saturating_sub(r.last_verified_at) < HTTPS_VERIFY_BAN_TTL_SECS)
+        })
     })
 }
 
-/// 返回当前运行配置中所有已确认假节点的名称列表（供前端隐藏显示）
+/// 返回当前运行配置中所有仍在软隔离期内的假节点名称列表（供前端隐藏显示）
 pub fn confirmed_fake_node_names() -> Vec<String> {
     ensure_runtime_node_fingerprints_loaded();
     let pairs: Vec<(String, String)> = {
@@ -460,10 +481,15 @@ pub fn confirmed_fake_node_names() -> Vec<String> {
         return Vec::new();
     }
     ensure_verify_store_loaded();
+    let now_ts = current_unix_ts();
     let mut names = Vec::new();
     if let Some(store) = VERIFY_STORE.read().as_ref() {
         for (name, fp) in pairs {
-            if store.records.get(&fp).is_some_and(NodeVerifyRecord::is_confirmed_fake) {
+            if store
+                .records
+                .get(&fp)
+                .is_some_and(|rec| rec.is_confirmed_fake_at(now_ts))
+            {
                 names.push(name);
             }
         }
@@ -471,7 +497,7 @@ pub fn confirmed_fake_node_names() -> Vec<String> {
     names
 }
 
-/// 判断给定候选节点中是否仍存在“未验真真值且尚未确认拉黑”的待观察节点
+/// 判断给定候选节点中是否仍存在“未验真真值且当前未处于软隔离期内”的待观察节点
 pub fn has_pending_unverified_nodes(candidates: &[String]) -> bool {
     if candidates.is_empty() {
         return false;
@@ -486,12 +512,13 @@ pub fn has_pending_unverified_nodes(candidates: &[String]) -> bool {
         return false;
     }
     ensure_verify_store_loaded();
+    let now_ts = current_unix_ts();
     VERIFY_STORE.read().as_ref().is_none_or(|store| {
         fps.iter().any(|fp| {
             store
                 .records
                 .get(fp)
-                .is_none_or(|rec| !rec.verified_true && !rec.is_confirmed_fake())
+                .is_none_or(|rec| !rec.verified_true && !rec.is_confirmed_fake_at(now_ts))
         })
     })
 }
@@ -501,6 +528,7 @@ pub fn has_pending_unverified_nodes(candidates: &[String]) -> bool {
 /// 不变量：
 /// 1. `verified_true` 为单向粘滞标记：一旦为 `true` 永不降级、不再累加 `fail_count`。
 /// 2. 只有当 `passed_fps` 非空（至少 1 个参照节点通过真 HTTPS 验真）时，才对同批未通过的未验真指纹累加 `fail_count`。
+/// 3. 软隔离期满 24h 自动解除；期满后再次失败时先清零旧计数再重新计入新观察周期。
 pub fn apply_verify_batch_to_records(
     records: &mut HashMap<String, NodeVerifyRecord>,
     passed_fps: &[String],
@@ -540,18 +568,68 @@ pub fn apply_verify_batch_to_records(
             continue;
         }
         let rec = records.entry(fp.clone()).or_default();
-        if rec.verified_true || rec.is_confirmed_fake() {
+        if rec.verified_true || rec.is_confirmed_fake_at(now_ts) {
             continue;
+        }
+        // 24h 软隔离已到期：清零旧累计失败次数，重新开启一轮 6 次宽限观察
+        if rec.fail_count > HTTPS_VERIFY_MAX_FAILS {
+            rec.fail_count = 0;
         }
         rec.fail_count = rec.fail_count.saturating_add(1);
         rec.last_verified_at = now_ts;
         outcome.dirty = true;
-        if rec.is_confirmed_fake() {
+        if rec.is_confirmed_fake_at(now_ts) {
             outcome.newly_confirmed_fake += 1;
         }
     }
 
     outcome
+}
+
+fn clear_unverified_failures_in_records(records: &mut HashMap<String, NodeVerifyRecord>) -> usize {
+    let mut cleared = 0usize;
+    records.retain(|_, rec| {
+        if !rec.verified_true && rec.fail_count > 0 {
+            cleared += 1;
+            false
+        } else {
+            true
+        }
+    });
+    cleared
+}
+
+fn persist_verify_store_snapshot(store_snapshot: &NodeVerifyStoreData) {
+    if let Some(path) = verify_store_path() {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Err(err) = crate::utils::help::save_json(&path, store_snapshot) {
+            clash_verge_logging::logging!(
+                warn,
+                clash_verge_logging::Type::Config,
+                "保存节点 HTTPS 验真状态失败: {err}"
+            );
+        }
+    }
+}
+
+fn clear_and_snapshot_store(store_slot: &mut Option<NodeVerifyStoreData>) -> (usize, Option<NodeVerifyStoreData>) {
+    let store = store_slot.get_or_insert_with(NodeVerifyStoreData::default);
+    let cleared = clear_unverified_failures_in_records(&mut store.records);
+    let snapshot = (cleared > 0).then(|| store.clone());
+    (cleared, snapshot)
+}
+
+/// 清空所有未验真节点的历史 HTTPS 验真失败记录与软隔离标记（保留已通过 `verified_true` 的记录），
+/// 供用户手动更新订阅时立即恢复被隔离节点进入观测池。
+pub fn clear_unverified_https_failures() -> usize {
+    ensure_verify_store_loaded();
+    let (cleared, snapshot) = clear_and_snapshot_store(&mut VERIFY_STORE.write());
+    if let Some(store_snapshot) = snapshot {
+        persist_verify_store_snapshot(&store_snapshot);
+    }
+    cleared
 }
 
 /// 测试辅助：向内存 `VERIFY_STORE` 写入或移除单条指纹记录（仅在 `#[cfg(test)]` 编译）
@@ -607,18 +685,7 @@ pub fn record_https_verify_results(passed_names: &[String], failed_names: &[Stri
     let (outcome, snapshot) = apply_and_snapshot_store(&mut VERIFY_STORE.write(), &passed_fps, &failed_fps, now_ts);
 
     if let Some(store_snapshot) = snapshot {
-        if let Some(path) = verify_store_path() {
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            if let Err(err) = crate::utils::help::save_json(&path, &store_snapshot) {
-                clash_verge_logging::logging!(
-                    warn,
-                    clash_verge_logging::Type::Config,
-                    "保存节点 HTTPS 验真状态失败: {err}"
-                );
-            }
-        }
+        persist_verify_store_snapshot(&store_snapshot);
     }
 
     outcome
@@ -628,9 +695,9 @@ pub fn record_https_verify_results(passed_names: &[String], failed_names: &[Stri
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        HTTPS_VERIFY_MAX_FAILS, NodeVerifyRecord, NodeVerifyStoreData, apply_verify_batch_to_records,
-        deduplicate_cloned_proxies, is_dummy_node, is_valid_node_server, load_verify_store_from_path,
-        match_node_filter, proxy_endpoint_fingerprint,
+        HTTPS_VERIFY_BAN_TTL_SECS, HTTPS_VERIFY_MAX_FAILS, NodeVerifyRecord, NodeVerifyStoreData,
+        apply_verify_batch_to_records, clear_unverified_failures_in_records, deduplicate_cloned_proxies, is_dummy_node,
+        is_valid_node_server, load_verify_store_from_path, match_node_filter, proxy_endpoint_fingerprint,
     };
     use std::collections::HashMap;
 
@@ -832,24 +899,21 @@ server: 1.2.3.4
         assert_eq!(o1.newly_confirmed_fake, 0);
         assert!(records[&good].verified_true);
         assert_eq!(records[&dead].fail_count, 1);
-        assert!(!records[&dead].is_confirmed_fake());
+        assert!(!records[&dead].is_confirmed_fake_at(101));
 
         // good 随后即使作为参照失败也不会降级，fail_count 保持 0
         for round in 2..=HTTPS_VERIFY_MAX_FAILS {
-            let o = apply_verify_batch_to_records(
-                &mut records,
-                &["fp-ref".to_owned()],
-                &[good.clone(), dead.clone()],
-                100 + i64::from(round),
-            );
+            let ts = 100 + i64::from(round);
+            let o =
+                apply_verify_batch_to_records(&mut records, &["fp-ref".to_owned()], &[good.clone(), dead.clone()], ts);
             assert_eq!(o.newly_confirmed_fake, 0);
             assert!(records[&good].verified_true);
             assert_eq!(records[&good].fail_count, 0);
             assert_eq!(records[&dead].fail_count, round);
-            assert!(!records[&dead].is_confirmed_fake());
+            assert!(!records[&dead].is_confirmed_fake_at(ts));
         }
 
-        // 第 6 次失败（超过 HTTPS_VERIFY_MAX_FAILS = 5）-> 确认假节点
+        // 第 6 次失败（超过 HTTPS_VERIFY_MAX_FAILS = 5）-> 进入 24h 软隔离假节点
         let o6 = apply_verify_batch_to_records(
             &mut records,
             std::slice::from_ref(&good),
@@ -857,9 +921,9 @@ server: 1.2.3.4
             200,
         );
         assert_eq!(o6.newly_confirmed_fake, 1);
-        assert!(records[&dead].is_confirmed_fake());
+        assert!(records[&dead].is_confirmed_fake_at(200));
 
-        // 已确认假节点再次失败不重复计数
+        // 24h 软隔离期内再次失败不重复计数
         let o7 = apply_verify_batch_to_records(
             &mut records,
             std::slice::from_ref(&good),
@@ -867,6 +931,65 @@ server: 1.2.3.4
             201,
         );
         assert_eq!(o7.newly_confirmed_fake, 0);
+    }
+
+    #[test]
+    fn test_verify_state_machine_quarantine_ttl_and_manual_clear() {
+        let mut records: HashMap<String, NodeVerifyRecord> = HashMap::new();
+        let ref_fp = "fp-ref".to_owned();
+        let node_a = "fp-temp-down".to_owned();
+        let node_b = "fp-recovered".to_owned();
+
+        records.insert(
+            ref_fp.clone(),
+            NodeVerifyRecord {
+                verified_true: true,
+                fail_count: 0,
+                last_verified_at: 200,
+            },
+        );
+        records.insert(
+            node_a.clone(),
+            NodeVerifyRecord {
+                verified_true: false,
+                fail_count: HTTPS_VERIFY_MAX_FAILS + 1,
+                last_verified_at: 200,
+            },
+        );
+        records.insert(
+            node_b.clone(),
+            NodeVerifyRecord {
+                verified_true: false,
+                fail_count: HTTPS_VERIFY_MAX_FAILS + 1,
+                last_verified_at: 200,
+            },
+        );
+
+        // 1. 满 24h 前一秒仍处于软隔离；满 24h 自动解除
+        assert!(records[&node_a].is_confirmed_fake_at(200 + HTTPS_VERIFY_BAN_TTL_SECS - 1));
+        assert!(!records[&node_a].is_confirmed_fake_at(200 + HTTPS_VERIFY_BAN_TTL_SECS));
+
+        // 2. 期满后重新参加一轮验真：node_b 通过升级粘滞真值，node_a 再次失败则清零重计为 fail_count = 1
+        let ttl_ts = 200 + HTTPS_VERIFY_BAN_TTL_SECS;
+        let o_recheck = apply_verify_batch_to_records(
+            &mut records,
+            std::slice::from_ref(&node_b),
+            std::slice::from_ref(&node_a),
+            ttl_ts,
+        );
+        assert_eq!(o_recheck.newly_verified, 1);
+        assert_eq!(o_recheck.newly_confirmed_fake, 0);
+        assert!(records[&node_b].verified_true);
+        assert_eq!(records[&node_b].fail_count, 0);
+        assert_eq!(records[&node_a].fail_count, 1);
+        assert!(!records[&node_a].is_confirmed_fake_at(ttl_ts));
+
+        // 3. 手动更新订阅清零未验真失败记录，但完整保留 verified_true 白名单
+        let cleared = clear_unverified_failures_in_records(&mut records);
+        assert_eq!(cleared, 1);
+        assert!(!records.contains_key(&node_a));
+        assert!(records[&ref_fp].verified_true);
+        assert!(records[&node_b].verified_true);
     }
 
     #[test]

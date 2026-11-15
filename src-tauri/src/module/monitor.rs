@@ -60,13 +60,18 @@ const NODE_DELAY_MAX_MS: u32 = 5000;
 /// 节点「是否可用」的判定阈值同样以 NODE_DELAY_MAX_MS(5000) 为准。
 const NODE_TEST_TIMEOUT_MS: u32 = NODE_DELAY_MAX_MS;
 
-/// 节点健康数据新鲜度阈值（秒）。
-/// 活跃节点 history 在此时间内视为可信，直接采用缓存判定，不再对测量组发起即时拨测。
-/// 新鲜度阈值必须 ≥ 两次主动拨测之间的最小间隔，否则「可信窗口」永远等不到
-/// 内核 300s 自然刷新，每次体检都会主动拨测，形成自激拨测风暴（v3.2.9 曾因
-/// 20s < 2×15s << 300s 退化为约每 30s 一次全组拨测，约 10 倍放大）。
-/// 恢复为 v3.2.2 基线的 60 秒（≈ 4× NORMAL_CHECK_INTERVAL_SECS），由「按需拨测」约束频率。
-const HEALTH_DATA_FRESH_SECS: u64 = 60;
+/// 空闲态节点健康数据新鲜度阈值（秒）：当活跃节点无上下行流量变化时，保鲜窗口由 60s
+/// 放宽至 300s（与内核 `PROXY__METRICS` `interval: 300` 对齐），降频 80% 静默拨测。
+const IDLE_HEALTH_FRESH_SECS: u64 = 300;
+
+/// 被动下行流量证活下允许免除主动拨测的最大上限（秒）：
+/// 当活跃节点近期存在真实下行回包（`delta_download > 0`）时，说明物理链路正在稳定回传数据，
+/// 无需再每 60s 打一轮 `PROXY__METRICS` 全组并发握手；封顶 `480s`（8 分钟）以严格小于
+/// 前端 `HISTORY_FALLBACK_MAX_AGE_MS`（600s / 10 分钟），防止 UI 因旧 history 过期误显 Timeout。
+const PASSIVE_TRAFFIC_MAX_SKIP_SECS: u64 = 480;
+
+/// 单向流量停滞（有上行无下行）即时突破缓存复核的冷却时间（秒），防止纯 UDP 上行心跳流反复触发全组拨测。
+const STALL_REPROBE_COOLDOWN_SECS: u64 = 60;
 
 /// 疑似抖动窗口（秒，S4 / BUG-375）。
 /// Mihomo 对拨测失败的节点只写 `alive=false`、不追加 history，故 `history.last()`
@@ -187,9 +192,9 @@ fn prioritize_verified_candidates(candidates: Vec<(String, u32)>) -> Vec<(String
 }
 
 /// 对当前运行节点执行一轮真 HTTPS（非 `204`）验真并推进持久化状态机：
-/// - 若全部节点均已 `verified_true` 或 `is_confirmed_fake`，零流量直接返回；
+/// - 若全部节点均已 `verified_true` 或处于 24h 软隔离 `is_confirmed_fake`，零流量直接返回；
 /// - 物理断网或主/备真 HTTPS 地址无一通过时，绝不递增任何节点失败计数；
-/// - 新确认永久拉黑假节点且非轻量模式时，通知前端刷新代理列表以隐藏。
+/// - 新进入 24h 软隔离的假节点且非轻量模式时，通知前端刷新代理列表以隐藏。
 /// - 【S5 / Sync-23】与主 URL 全组测速共用 `METRICS_PROBE_LOCK` 并使用同一超时口径；
 ///   结果只写 verify 状态机，其写入的 `alive` / `history` 不会被当成免拨测轮的判死证据
 ///   （见 `evaluate_failover` 的本轮实拨门检）。
@@ -264,7 +269,7 @@ async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candi
         logging!(
             info,
             Type::Lightweight,
-            "[HTTPS验真/{reason}] 通过 {} 个(新验真 {})，未通过 {} 个，新确认永久拉黑 {} 个",
+            "[HTTPS验真/{reason}] 通过 {} 个(新验真 {})，未通过 {} 个，新确认软隔离(24h) {} 个",
             passed_names.len(),
             outcome.newly_verified,
             failed_names.len(),
@@ -1128,21 +1133,132 @@ fn history_age(proxy: &tauri_plugin_mihomo::models::Proxy) -> Option<Duration> {
     Some(Duration::from_secs(age_secs.max(0) as u64))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActiveTrafficState {
+    /// 近一周期活跃节点连接有真实下行回包（`delta_download > 0`），物理证实远端存活
+    Flowing,
+    /// 近一周期活跃节点连接有上行发包但零下行回包（`delta_upload > 0 && delta_download == 0`），疑似黑洞停滞
+    Stalled,
+    /// 无活跃节点上下行流量变化（空闲、切换节点首轮建基线或连接查询不可用）
+    Idle,
+}
+
+#[derive(Default)]
+struct ActiveTrafficTracker {
+    active_node: Option<String>,
+    conn_bytes: HashMap<String, (u64, u64)>,
+    last_stall_probe_at: Option<Instant>,
+}
+
+static ACTIVE_TRAFFIC_TRACKER: parking_lot::Mutex<Option<ActiveTrafficTracker>> = parking_lot::Mutex::new(None);
+
+/// 纯状态归因：对比前后两轮落在当前活跃出口节点上的连接上下行字节，判定流量走势并返回新基线。
+fn classify_active_traffic_delta(
+    prev_node: Option<&str>,
+    active_node: &str,
+    prev_conns: &HashMap<String, (u64, u64)>,
+    current_conns: &[(String, u64, u64)],
+) -> (ActiveTrafficState, HashMap<String, (u64, u64)>) {
+    let mut next_map = HashMap::with_capacity(current_conns.len());
+    for (id, up, down) in current_conns {
+        next_map.insert(id.clone(), (*up, *down));
+    }
+
+    if prev_node != Some(active_node) {
+        return (ActiveTrafficState::Idle, next_map);
+    }
+
+    let mut delta_up: u64 = 0;
+    let mut delta_down: u64 = 0;
+    for (id, up, down) in current_conns {
+        if let Some(&(prev_up, prev_down)) = prev_conns.get(id) {
+            delta_up = delta_up.saturating_add(up.saturating_sub(prev_up));
+            delta_down = delta_down.saturating_add(down.saturating_sub(prev_down));
+        } else {
+            delta_up = delta_up.saturating_add(*up);
+            delta_down = delta_down.saturating_add(*down);
+        }
+    }
+
+    let state = if delta_down > 0 {
+        ActiveTrafficState::Flowing
+    } else if delta_up > 0 {
+        ActiveTrafficState::Stalled
+    } else {
+        ActiveTrafficState::Idle
+    };
+    (state, next_map)
+}
+
+fn update_active_traffic_state(
+    tracker_slot: &mut Option<ActiveTrafficTracker>,
+    active_node: &str,
+    current_conns: &[(String, u64, u64)],
+) -> (ActiveTrafficState, bool) {
+    let tracker = tracker_slot.get_or_insert_with(ActiveTrafficTracker::default);
+    let node_changed = tracker.active_node.as_deref() != Some(active_node);
+    if node_changed {
+        tracker.last_stall_probe_at = None;
+    }
+    let stall_cooldown_active = tracker
+        .last_stall_probe_at
+        .is_some_and(|t| t.elapsed() < Duration::from_secs(STALL_REPROBE_COOLDOWN_SECS));
+
+    let (state, next_map) = classify_active_traffic_delta(
+        tracker.active_node.as_deref(),
+        active_node,
+        &tracker.conn_bytes,
+        current_conns,
+    );
+    tracker.active_node = Some(active_node.to_owned());
+    tracker.conn_bytes = next_map;
+    (state, stall_cooldown_active)
+}
+
+async fn sample_active_node_traffic(
+    mihomo: &tauri_plugin_mihomo::Mihomo,
+    active_node: &str,
+) -> (ActiveTrafficState, bool) {
+    let Ok(conns) = mihomo.get_connections().await else {
+        return (ActiveTrafficState::Idle, false);
+    };
+
+    let current_conns: Vec<(String, u64, u64)> = conns
+        .connections
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|c| c.chains.iter().any(|ch| ch == active_node))
+        .map(|c| (c.id, c.upload, c.download))
+        .collect();
+
+    update_active_traffic_state(&mut ACTIVE_TRAFFIC_TRACKER.lock(), active_node, &current_conns)
+}
+
 /// 判定本次体检是否必须取得一轮本轮物理实拨证据。
 ///
-/// 【S5 / Sync-23】删去两处会把「异源 / 陈旧测量」当成本轮证据的漏洞：
-/// ① 旧 `force_confirm_probe` 在 `consecutive_fails > 0` 时无条件每 3 秒强制全组拨测
-///    并禁用短窗合并，制造背靠背全量握手风暴；
-/// ② 旧「`Dead` 且 `history` < 10 秒 → 免拨测」去抖缓存，会让验真写入的越界延迟
-///    （`[5000, 6000)` 判 `Dead`、时间戳又很新）未经主 URL 复拨就直接进判死链。
-///
-/// 现在只有「节点健康且数据新鲜」才免拨测，其余一律实拨；连续 2 次失败因此天然
-/// 来自两轮互相独立的物理拨测，不再需要 `force_confirm_probe` 参数。
-fn should_probe_active_node(status: NodeStatus, age: Option<Duration>) -> bool {
-    !matches!(
-        (status, age),
-        (NodeStatus::Alive(_), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS)
-    )
+/// 【BUG-377 + BUG-379】非 `Alive`（`Suspect` / `Dead` / `Unknown`）或时间戳缺失一律强制实拨，
+/// 杜绝异源测量污染判死链；当节点处于 `Alive` 且时间可测时，结合活跃出口真实连接流量分流：
+/// - `Flowing`（近一周期有真实下行回包）：保鲜上限放宽至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s)`，消除 60s 全组盲测风暴；
+/// - `Stalled`（有上行无下行，疑似黑洞）：无视未过期缓存立即触发实拨复核（带 60s 单向流防抖冷却）；
+/// - `Idle`（无流量）：放宽至 `IDLE_HEALTH_FRESH_SECS (300s)`，与测量组自然周期对齐。
+fn should_probe_active_node(
+    status: NodeStatus,
+    age: Option<Duration>,
+    traffic: ActiveTrafficState,
+    stall_cooldown_active: bool,
+) -> bool {
+    let NodeStatus::Alive(_) = status else {
+        return true;
+    };
+    let Some(age) = age else {
+        return true;
+    };
+
+    match traffic {
+        ActiveTrafficState::Flowing => age >= Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS),
+        ActiveTrafficState::Stalled => !stall_cooldown_active || age >= Duration::from_secs(IDLE_HEALTH_FRESH_SECS),
+        ActiveTrafficState::Idle => age >= Duration::from_secs(IDLE_HEALTH_FRESH_SECS),
+    }
 }
 
 /// 评估当前活跃节点是否需要故障转移。
@@ -1165,24 +1281,36 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         _ => return Ok(FailoverVerdict::NoAction), // 直连/拒绝节点或无选中，不动作
     };
 
-    // 假/广告节点或 HTTPS 验真永久拉黑节点 → 视为需要重选（无需等 url-test）。
+    // 假/广告节点或 HTTPS 验真软隔离节点 → 视为需要重选（无需等 url-test）。
     // S4：这是「不可信节点迁移」而非「节点已死」，不能套用原节点确已死门检。
     if is_dummy_node(&active_node) || crate::utils::node::is_confirmed_fake_node(&active_node) {
         return Ok(FailoverVerdict::ShouldMigrate);
     }
+
+    let (traffic_state, stall_cooldown_active) = sample_active_node_traffic(&mihomo, &active_node).await;
 
     let mut proxies = mihomo
         .get_proxies()
         .await
         .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
 
-    // 【S5 / Sync-23】只有「健康且数据新鲜」才允许免拨测；任何非 Alive 状态都必须
-    // 先取得本轮主 URL 实拨证据，再重读 alive / history 裁决。这样异源测量写入的
-    // 陈旧或被污染的 history 永远不可能在免拨测轮变成「节点已死」的结论。
+    // 【BUG-377 + BUG-379】只有「健康且数据在对应流量态保鲜窗口内」才允许免拨测；
+    // 任何非 Alive 状态或疑似黑洞停滞态都必须先取得本轮主 URL 实拨证据，再重读 alive / history 裁决。
     let need_probe = match proxies.proxies.get(&active_node) {
         None => false, // 活跃节点不在代理列表（异常），不动作
-        Some(p) => should_probe_active_node(node_status(p), history_age(p)),
+        Some(p) => should_probe_active_node(node_status(p), history_age(p), traffic_state, stall_cooldown_active),
     };
+    if need_probe && traffic_state == ActiveTrafficState::Stalled {
+        if let Some(tracker) = ACTIVE_TRAFFIC_TRACKER.lock().as_mut() {
+            tracker.last_stall_probe_at = Some(Instant::now());
+        }
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 检测到活跃节点 {} 存在上行请求但零下行回包，立即触发体检复核",
+            active_node
+        );
+    }
 
     // 本轮体检是否得出「主测速地址失真、节点侧正常」的结论。该结论必须进入健康裁决，
     // 不能只停留在日志里（见 MetricsProbeOutcome 注释）。
@@ -1285,7 +1413,9 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
                 .filter_map(|n| {
                     let p = proxies.proxies.get(n)?;
                     match (node_status(p), history_age(p)) {
-                        (NodeStatus::Alive(d), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS) => {
+                        (NodeStatus::Alive(d), Some(age))
+                            if age < Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS) =>
+                        {
                             Some((n.clone(), d))
                         }
                         _ => None,
@@ -1953,6 +2083,7 @@ fn reset_monitor_static_state() {
     *LAST_MANUAL_NODE_SWITCH.lock() = None;
     *LAST_SYNCED_ACTIVE_HISTORY_TIME.lock() = None;
     *LAST_METRICS_PROBE.lock() = None;
+    *ACTIVE_TRAFFIC_TRACKER.lock() = None;
 }
 
 fn emit_network_health_notice(next_status: &'static str) {
@@ -2723,10 +2854,11 @@ async fn self_heal_with_accounting(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        API_ERROR_HEAL_THRESHOLD, FAILOVER_CONFIRM_FAILS, HEALTH_DATA_FRESH_SECS, MAX_AUTO_SWITCHES_PER_WINDOW,
-        MIN_AUTO_SWITCH_INTERVAL_SECS, SUSPECT_WINDOW_SECS, SelfHealDecision, SelfHealOrigin, SelfHealTrigger,
-        auto_switch_permitted, classify_node_status, decide_self_heal, is_valid_probe_delay, persisted_exit_is_usable,
-        self_heal_requires_dead_gate, should_proceed_with_self_heal,
+        ACTIVE_TRAFFIC_TRACKER, API_ERROR_HEAL_THRESHOLD, ActiveTrafficState, FAILOVER_CONFIRM_FAILS,
+        IDLE_HEALTH_FRESH_SECS, MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS,
+        PASSIVE_TRAFFIC_MAX_SKIP_SECS, SUSPECT_WINDOW_SECS, SelfHealDecision, SelfHealOrigin, SelfHealTrigger,
+        auto_switch_permitted, classify_active_traffic_delta, classify_node_status, decide_self_heal,
+        is_valid_probe_delay, persisted_exit_is_usable, self_heal_requires_dead_gate, should_proceed_with_self_heal,
     };
     use super::{
         DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
@@ -3041,33 +3173,113 @@ mod tests {
         assert!(LAST_MANUAL_NODE_SWITCH.lock().is_none());
         assert!(LAST_SYNCED_ACTIVE_HISTORY_TIME.lock().is_none());
         assert!(LAST_METRICS_PROBE.lock().is_none());
+        assert!(ACTIVE_TRAFFIC_TRACKER.lock().is_none());
+    }
+
+    #[test]
+    fn test_classify_active_traffic_delta() {
+        let mut prev = HashMap::new();
+        prev.insert("c1".to_string(), (100u64, 500u64));
+
+        // 1. 节点切换首轮：必须返回 Idle 并重建新基线，绝不把旧节点连接的存量下载误判为 Flowing
+        let curr_switch = vec![("c1".to_string(), 200u64, 900u64)];
+        let (st_switch, map_switch) = classify_active_traffic_delta(Some("HK-1"), "JP-1", &prev, &curr_switch);
+        assert_eq!(st_switch, ActiveTrafficState::Idle);
+        assert_eq!(map_switch.get("c1"), Some(&(200, 900)));
+
+        // 2. 下行字节增长 -> Flowing（真实回包证实节点存活）
+        let curr_flow = vec![("c1".to_string(), 200u64, 1500u64)];
+        let (st_flow, _) = classify_active_traffic_delta(Some("HK-1"), "HK-1", &prev, &curr_flow);
+        assert_eq!(st_flow, ActiveTrafficState::Flowing);
+
+        // 3. 已有或新建连接有上行发包但零下行回包 -> Stalled（疑似黑洞停滞）
+        let curr_stalled = vec![("c1".to_string(), 300u64, 500u64), ("c2".to_string(), 120u64, 0u64)];
+        let (st_stall, _) = classify_active_traffic_delta(Some("HK-1"), "HK-1", &prev, &curr_stalled);
+        assert_eq!(st_stall, ActiveTrafficState::Stalled);
+
+        // 4. 字节完全静止或全部连接已关闭 -> Idle
+        let curr_idle = vec![("c1".to_string(), 100u64, 500u64)];
+        let (st_idle, _) = classify_active_traffic_delta(Some("HK-1"), "HK-1", &prev, &curr_idle);
+        assert_eq!(st_idle, ActiveTrafficState::Idle);
+        let (st_empty, _) = classify_active_traffic_delta(Some("HK-1"), "HK-1", &prev, &[]);
+        assert_eq!(st_empty, ActiveTrafficState::Idle);
     }
 
     #[test]
     fn test_should_probe_active_node_only_skips_fresh_healthy() {
-        // 只有「健康 + 数据新鲜」允许免拨测
+        // 1. 空闲态放宽至 IDLE_HEALTH_FRESH_SECS (300s)
         assert!(!should_probe_active_node(
             NodeStatus::Alive(85),
-            Some(Duration::from_secs(15))
+            Some(Duration::from_secs(IDLE_HEALTH_FRESH_SECS - 1)),
+            ActiveTrafficState::Idle,
+            false,
         ));
-        assert!(!should_probe_active_node(
-            NodeStatus::Alive(85),
-            Some(Duration::from_secs(HEALTH_DATA_FRESH_SECS - 1))
-        ));
-        // 健康但陈旧 / 数据缺失 → 必须取得本轮实拨证据
         assert!(should_probe_active_node(
             NodeStatus::Alive(85),
-            Some(Duration::from_secs(HEALTH_DATA_FRESH_SECS))
+            Some(Duration::from_secs(IDLE_HEALTH_FRESH_SECS)),
+            ActiveTrafficState::Idle,
+            false,
         ));
-        assert!(should_probe_active_node(NodeStatus::Alive(85), None));
-        assert!(should_probe_active_node(NodeStatus::Unknown, None));
-        // 疑似抖动与已判死一律实拨，连续 2 次失败因此来自两轮独立物理拨测
+
+        // 2. 被动下行流量证活：60s~479s 内免除全组拨测风暴，满 PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s) 才复检一次
+        assert!(!should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS - 1)),
+            ActiveTrafficState::Flowing,
+            false,
+        ));
+        assert!(should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS)),
+            ActiveTrafficState::Flowing,
+            false,
+        ));
+
+        // 3. 黑洞停滞态（有上行无下行）：冷却未激活时立即突破 15s~300s 缓存实拨复核；冷却期内不反复轰炸
+        assert!(should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(15)),
+            ActiveTrafficState::Stalled,
+            false,
+        ));
+        assert!(!should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(15)),
+            ActiveTrafficState::Stalled,
+            true,
+        ));
+
+        // 4. 数据缺失、未知、疑似抖动与已判死一律实拨，连续 2 次失败因此来自两轮独立物理拨测
+        assert!(should_probe_active_node(
+            NodeStatus::Alive(85),
+            None,
+            ActiveTrafficState::Flowing,
+            false,
+        ));
+        assert!(should_probe_active_node(
+            NodeStatus::Unknown,
+            None,
+            ActiveTrafficState::Idle,
+            false,
+        ));
         assert!(should_probe_active_node(
             NodeStatus::Suspect,
-            Some(Duration::from_secs(1))
+            Some(Duration::from_secs(1)),
+            ActiveTrafficState::Flowing,
+            false,
         ));
-        assert!(should_probe_active_node(NodeStatus::Dead, Some(Duration::from_secs(3))));
-        assert!(should_probe_active_node(NodeStatus::Dead, None));
+        assert!(should_probe_active_node(
+            NodeStatus::Dead,
+            Some(Duration::from_secs(3)),
+            ActiveTrafficState::Flowing,
+            false,
+        ));
+        assert!(should_probe_active_node(
+            NodeStatus::Dead,
+            None,
+            ActiveTrafficState::Idle,
+            false,
+        ));
     }
 
     #[test]
@@ -3079,7 +3291,12 @@ mod tests {
         let tainted = classify_node_status(true, Some(5500), Some(2));
         assert_eq!(tainted, NodeStatus::Dead);
         assert!(
-            should_probe_active_node(tainted, Some(Duration::from_secs(2))),
+            should_probe_active_node(
+                tainted,
+                Some(Duration::from_secs(2)),
+                ActiveTrafficState::Flowing,
+                false
+            ),
             "验真污染的 Dead + 新鲜时间戳必须强制主 URL 实拨复核"
         );
         // 统一超时口径：验真改用 NODE_TEST_TIMEOUT_MS（其值等于 NODE_DELAY_MAX_MS），
