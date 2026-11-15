@@ -1,3 +1,26 @@
+## v3.4.0
+
+### ⚡ 后台监测被动流量证活，终结 60 秒全组盲测风暴（BUG-379）
+
+- **本地活跃下行增量证活**：`monitor.rs` 引入基于本地命名管道 `/connections` 的无发包被动流量观测（`sample_active_node_traffic` / `classify_active_traffic_delta`）。当活跃节点存在真实下行回包增量（`delta_download > 0`）时直接证实远端存活，免拨测保鲜上限放宽至 `480s`（严格小于前端 `600s` 历史回落窗口），稳态后台全组拨测频率直降 **87.5%**。
+- **有出无回停滞秒级复核与空闲降频**：当观测到仅有上行发包而无下行回包（`delta_upload > 0 && delta_download == 0`）时，突破新鲜度缓存在本轮 15s 周期内立即触发 `probe_metrics_group` 复核（配 `60s` 单向流防抖冷却），将使用中突发黑洞感知耗时从最慢约 `63s` 压缩至 **`~18s`**；完全空闲挂机态保鲜窗口放宽至 `300s`（直降 **80%**），非 `Alive` 状态仍强制实拨以保持异源隔离。
+
+### 🔄 真 HTTPS 验真 24 小时软隔离自愈与手动更新解封（BUG-380）
+
+- **24 小时 TTL 自动解除拉黑**：`node.rs` 废除假节点「终身死刑」，利用持久化时间戳实行 **24 小时软隔离**（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`）。隔离期满自动恢复观察，重新失败则重计一轮 6 次宽限期，通过则单向粘滞升级为已验真白名单，避免机场短暂维护或验真源抽风造成永久误杀。
+- **手动更新订阅立即解封**：`profile.rs` 在用户手动点击更新订阅（`is_mannual_trigger == true`）时调用 `clear_unverified_https_failures()`，立即清空未验真节点的历史失败计数与软隔离标记（保留已验真白名单），随配置重载即刻恢复节点可见性。
+
+### 🦀 内置配置守卫原生 Rust 化并退役 `boa_engine`（BUG-381）
+
+- **原生守卫替代内置 JS 脚本**：`enhance/mod.rs` 新增 `apply_builtin_guards` 原生实现 `mode: script` 纠偏与 `hysteria` 字符串 `alpn` 数组归一化，彻底移除重型 JS 引擎 `boa_engine`、`enhance/script.rs` 及内置 `.js` 脚本，同时对存量 `profiles.yaml` 中的历史 `script` 条目保持 100% 向后兼容放行。
+
+### 🧹 剥离不可达模块与重复网络栈，收敛权限与体积（BUG-382）
+
+- **移除不可达流媒体检测与 `tauri-plugin-http`**：清理无 UI 入口的 `/unlock` 页面、`cmd::media_unlock_checker` 模块、废弃多语言词条及未使用的 `@tauri-apps/plugin-http` / `tauri-plugin-http`（消除 `Cargo.lock` 中重复的 `reqwest v0.12.28` 依赖树），外部网络请求统一收口至受 SSRF 防护的 Rust `NetworkManager`。
+- **权限白名单收敛与编译瘦身**：精简 `capabilities/migrated.json` 冗余窗口/打印/Shell 权限并移除空置的 `desktop-windows.json`；配合死代码清理与编译符号优化，进一步缩减二进制体积与攻击面。
+
+---
+
 ## v3.3.4
 
 ### 🛡️ 修复测速失真误判自愈与周期性清连接导致的长流硬断（BUG-372）
