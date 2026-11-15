@@ -84,11 +84,6 @@ const MIN_AUTO_SWITCH_INTERVAL_SECS: u64 = 120;
 const AUTO_SWITCH_WINDOW_SECS: u64 = 600;
 const MAX_AUTO_SWITCHES_PER_WINDOW: usize = 3;
 
-/// 死节点确认拨测的最小间隔（秒）。
-/// 活跃节点被判死后，若其 history 在此时间内（说明刚拨测过），直接信缓存判定，
-/// 避免重试模式 3s 周期下对同一死节点密集重复拨测。
-const DEAD_CONFIRM_MIN_INTERVAL_SECS: u64 = 10;
-
 /// 节点切换宽限期（秒）。
 /// 切换后测量组对新节点的缓存数据必然陈旧（可能是 300 秒自然周期前的死数据），
 /// 宽限期内的失败判定只记日志、不计入连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
@@ -176,8 +171,13 @@ const VERIFY_HTTPS_URL_PRIMARY: &str = "https://github.githubassets.com/favicons
 const VERIFY_HTTPS_URL_FALLBACK: &str = "https://www.wikipedia.org/static/favicon/wikipedia.ico";
 /// 后台定期真 HTTPS 验真间隔（仅当存在尚未验真或尚未确认拉黑的候选节点时才执行）
 const HTTPS_VERIFY_INTERVAL_SECS: u64 = 180;
-/// 后台真 HTTPS 验真单次并发探测超时
-const HTTPS_VERIFY_TIMEOUT_MS: u32 = 6000;
+/// 【S5 / Sync-23】验真超时与全组测速统一为 `NODE_TEST_TIMEOUT_MS`（5000ms），不再单设 6000ms。
+/// 旧值使验真结果可能落在 `[5000, 6000)`：该区间在健康裁决里被判 `Dead`，却又由验真
+/// 写入 `history.last().time` 而显得「刚测过」，是异源测量污染判活的主要入口。
+/// 验真同样是一次 `delay_group("PROXY__METRICS", ...)`，会写入共享的 `alive` / `history`；
+/// 但其结果只进 `node.rs` 的 verify 状态机，健康裁决一律以本轮 `probe_metrics_group`
+/// 实拨结果为准，不在免拨测轮被误读成「节点已死」。
+///
 /// 活跃节点未验真时触发即时真 HTTPS 复核的冷却时间（避免每次 15s 循环重复验证）
 const ACTIVE_VERIFY_COOLDOWN_SECS: u64 = 60;
 
@@ -202,6 +202,9 @@ fn prioritize_verified_candidates(candidates: Vec<(String, u32)>) -> Vec<(String
 /// - 若全部节点均已 `verified_true` 或 `is_confirmed_fake`，零流量直接返回；
 /// - 物理断网或主/备真 HTTPS 地址无一通过时，绝不递增任何节点失败计数；
 /// - 新确认永久拉黑假节点且非轻量模式时，通知前端刷新代理列表以隐藏。
+/// - 【S5 / Sync-23】与主 URL 全组测速共用 `METRICS_PROBE_LOCK` 并使用同一超时口径；
+///   结果只写 verify 状态机，其写入的 `alive` / `history` 不会被当成免拨测轮的判死证据
+///   （见 `evaluate_failover` 的本轮实拨门检）。
 async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candidate_nodes: &[String], reason: &str) {
     if !crate::utils::node::has_pending_unverified_nodes(candidate_nodes) {
         return;
@@ -210,31 +213,36 @@ async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candi
         return;
     }
 
-    let delays = match mihomo
-        .delay_group("PROXY__METRICS", VERIFY_HTTPS_URL_PRIMARY, HTTPS_VERIFY_TIMEOUT_MS)
-        .await
-    {
-        Ok(d) if !d.is_empty() => d,
-        primary_res => {
-            if let Err(ref e) = primary_res {
-                logging!(
-                    debug,
-                    Type::Lightweight,
-                    "[HTTPS验真/{reason}] 主验证 URL 探测失败({e})，尝试备用验证 URL"
-                );
-            }
-            match mihomo
-                .delay_group("PROXY__METRICS", VERIFY_HTTPS_URL_FALLBACK, HTTPS_VERIFY_TIMEOUT_MS)
-                .await
-            {
-                Ok(d) => d,
-                Err(e) => {
+    // 验真与 `probe_metrics_group` 都会对 `PROXY__METRICS` 发起全组拨测。未串行化时
+    // 两者可能背靠背各打一轮全量握手，且后写的一方会覆盖前一方的 alive / history。
+    let delays = {
+        let _probe_guard = METRICS_PROBE_LOCK.lock().await;
+        match mihomo
+            .delay_group("PROXY__METRICS", VERIFY_HTTPS_URL_PRIMARY, NODE_TEST_TIMEOUT_MS)
+            .await
+        {
+            Ok(d) if !d.is_empty() => d,
+            primary_res => {
+                if let Err(ref e) = primary_res {
                     logging!(
                         debug,
                         Type::Lightweight,
-                        "[HTTPS验真/{reason}] 主/备验证 URL 均无响应({e})，跳过本轮失败累计"
+                        "[HTTPS验真/{reason}] 主验证 URL 探测失败({e})，尝试备用验证 URL"
                     );
-                    return;
+                }
+                match mihomo
+                    .delay_group("PROXY__METRICS", VERIFY_HTTPS_URL_FALLBACK, NODE_TEST_TIMEOUT_MS)
+                    .await
+                {
+                    Ok(d) => d,
+                    Err(e) => {
+                        logging!(
+                            debug,
+                            Type::Lightweight,
+                            "[HTTPS验真/{reason}] 主/备验证 URL 均无响应({e})，跳过本轮失败累计"
+                        );
+                        return;
+                    }
                 }
             }
         }
@@ -1132,36 +1140,31 @@ fn history_age(proxy: &tauri_plugin_mihomo::models::Proxy) -> Option<Duration> {
     Some(Duration::from_secs(age_secs.max(0) as u64))
 }
 
-/// 判定本次体检是否需要发起真实全组拨测。
+/// 判定本次体检是否必须取得一轮本轮物理实拨证据。
 ///
-/// - 当 `force_confirm_probe == true`（处于连续失败复核阶段，`consecutive_fails > 0`）时，
-///   无条件返回 `true` 强制执行第二次独立拨测（消除 `RETRY_CHECK_INTERVAL_SECS (3s) < DEAD_CONFIRM_MIN_INTERVAL_SECS (10s)`
-///   导致复核回合误读首次失败缓存、实质退化为单次判死的隐患）；
-/// - 正常阶段按活跃节点缓存新鲜度按需拨测，避免稳态拨测风暴。
-fn should_probe_active_node(status: NodeStatus, age: Option<Duration>, force_confirm_probe: bool) -> bool {
-    if force_confirm_probe {
-        return true;
-    }
-    match (status, age) {
-        // 健康且数据新鲜 → 可信，不拨测
-        (NodeStatus::Alive(_), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS) => false,
-        // 常规模式下刚测死 → 10 秒内不重复拨测
-        (NodeStatus::Dead, Some(age)) if age < Duration::from_secs(DEAD_CONFIRM_MIN_INTERVAL_SECS) => false,
-        // 疑似抖动需要尽快用新拨测确认，但不得沿用死节点的 10 秒去抖缓存
-        (NodeStatus::Suspect, _) => true,
-        // 其余：健康但陈旧 / 死判定陈旧 / 数据缺失 / 时间戳不可解析 → 拨测确认
-        _ => true,
-    }
+/// 【S5 / Sync-23】删去两处会把「异源 / 陈旧测量」当成本轮证据的漏洞：
+/// ① 旧 `force_confirm_probe` 在 `consecutive_fails > 0` 时无条件每 3 秒强制全组拨测
+///    并禁用短窗合并，制造背靠背全量握手风暴；
+/// ② 旧「`Dead` 且 `history` < 10 秒 → 免拨测」去抖缓存，会让验真写入的越界延迟
+///    （`[5000, 6000)` 判 `Dead`、时间戳又很新）未经主 URL 复拨就直接进判死链。
+///
+/// 现在只有「节点健康且数据新鲜」才免拨测，其余一律实拨；连续 2 次失败因此天然
+/// 来自两轮互相独立的物理拨测，不再需要 `force_confirm_probe` 参数。
+fn should_probe_active_node(status: NodeStatus, age: Option<Duration>) -> bool {
+    !matches!(
+        (status, age),
+        (NodeStatus::Alive(_), Some(age)) if age < Duration::from_secs(HEALTH_DATA_FRESH_SECS)
+    )
 }
 
 /// 评估当前活跃节点是否需要故障转移。
 /// 返回 Err 表示 Mihomo API 不可达（交由调用方累计 api_error_count）。
 ///
-/// 【探测降频 + 二次真实复核】：
-/// - 正常监测（`force_confirm_probe=false`）按缓存新鲜度按需拨测；
-/// - 连续失败复核轮（`force_confirm_probe=true`）强制执行一次独立全组实时拨测，
-///   确保 2 次失败判定源自两次独立探活而非同一份缓存。
-async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyhow::Result<FailoverVerdict> {
+/// 【S5 / Sync-23 · 单一权威健康源】判死只允许建立在本轮 `probe_metrics_group`
+/// 主/备 URL 实拨之上。`alive` / `history` 属共享可变状态，真 HTTPS 验真、内核 300s
+/// 自然周期、前端测速都会改写它，故只用于「是否要拨测」的初判、UI 显示与实拨后的
+/// 结果读取；任何非 `Alive` 初判都必须先实拨，且体检拨测禁用短窗合并。
+async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
     let group_info = mihomo
@@ -1185,9 +1188,12 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         .await
         .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
 
+    // 【S5 / Sync-23】只有「健康且数据新鲜」才允许免拨测；任何非 Alive 状态都必须
+    // 先取得本轮主 URL 实拨证据，再重读 alive / history 裁决。这样异源测量写入的
+    // 陈旧或被污染的 history 永远不可能在免拨测轮变成「节点已死」的结论。
     let need_probe = match proxies.proxies.get(&active_node) {
         None => false, // 活跃节点不在代理列表（异常），不动作
-        Some(p) => should_probe_active_node(node_status(p), history_age(p), force_confirm_probe),
+        Some(p) => should_probe_active_node(node_status(p), history_age(p)),
     };
 
     // 本轮体检是否得出「主测速地址失真、节点侧正常」的结论。该结论必须进入健康裁决，
@@ -1197,14 +1203,9 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
     if need_probe {
         // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
-        // 二次复核（force_confirm_probe=true）禁用短窗口合并，保证物理层面独立复核。
-        let probed_opt = probe_metrics_group(
-            &mihomo,
-            "体检",
-            !force_confirm_probe,
-            std::slice::from_ref(&active_node),
-        )
-        .await;
+        // 【S5】体检一律禁用短窗合并：裁决必须建立在本轮物理实拨之上，不能复用
+        // 1.5 秒内其他调用方的快照（否则重读 alive / history 读到的仍是异源结果）。
+        let probed_opt = probe_metrics_group(&mihomo, "体检", false, std::slice::from_ref(&active_node)).await;
 
         // 【测速失真防护】主/备测速地址都整体失败 = 测速链路不可用，**不是**「节点已死」。
         // 此时 mihomo 已把全组成员标记为 not-alive，若据此判死会触发无意义的切节点抖动。
@@ -1284,7 +1285,9 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         let has_unsynced_batch = active_hist_time
             .as_ref()
             .is_some_and(|t| LAST_SYNCED_ACTIVE_HISTORY_TIME.lock().as_ref() != Some(t));
-        if force_confirm_probe || health_not_ok || has_unsynced_batch {
+        // 【S5】旧 `force_confirm_probe` 会在此强制再推一次 UI，随 3 秒强制双拨测一并移除；
+        // 健康状态复位与 history 时间戳变化已足够覆盖 BUG-370 的免拨测同步场景。
+        if health_not_ok || has_unsynced_batch {
             let fresh_alive_display: Vec<(String, u32)> = group_info
                 .all
                 .as_deref()
@@ -1327,6 +1330,10 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         return Ok(FailoverVerdict::NoAction);
     }
 
+    // 【S5 / Sync-23 · 异源测量隔离】判死只可能发生在上面的 `need_probe` 实拨轮：
+    // 实拨前任何非 `Alive` 状态都强制取得本轮主/备 URL 证据，实拨后重读的
+    // `alive` / `history` 已是同一口径结果，真 HTTPS 验真写入的越界延迟不会再
+    // 变成「节点已死」。免拨测轮只能得到 `Alive` / `Unknown`，二者均 `NoAction`。
     // 活跃节点本身健康或数据缺失 → 若尚未通过真 HTTPS 验真：先在冷却允许时即时执行真 HTTPS 复核；
     // 只有确属“在参照节点通过前提下曾验真失败（has_verify_failure_node）”且子集内存在已验真健康节点时，才切往已验真节点
     match proxies.proxies.get(&active_node).map(node_status) {
@@ -2314,7 +2321,7 @@ pub fn start_background_monitor() {
                     is_retry_mode = false;
                 }
 
-                match evaluate_failover(&current_profile, consecutive_fails > 0).await {
+                match evaluate_failover(&current_profile).await {
                     Ok(verdict) => {
                         // API 调用成功，重置 API 异常计数
                         api_error_count = 0;
@@ -2793,10 +2800,10 @@ async fn self_heal_with_accounting(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        API_ERROR_HEAL_THRESHOLD, FAILOVER_CONFIRM_FAILS, MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS,
-        SUSPECT_WINDOW_SECS, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
-        classify_node_status, decide_self_heal, persisted_exit_is_usable, self_heal_requires_dead_gate,
-        should_proceed_with_self_heal,
+        API_ERROR_HEAL_THRESHOLD, FAILOVER_CONFIRM_FAILS, HEALTH_DATA_FRESH_SECS, MAX_AUTO_SWITCHES_PER_WINDOW,
+        MIN_AUTO_SWITCH_INTERVAL_SECS, SUSPECT_WINDOW_SECS, SelfHealDecision, SelfHealOrigin, SelfHealTrigger,
+        auto_switch_permitted, classify_node_status, decide_self_heal, is_valid_probe_delay, persisted_exit_is_usable,
+        self_heal_requires_dead_gate, should_proceed_with_self_heal,
     };
     use super::{
         DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
@@ -3115,31 +3122,48 @@ mod tests {
     }
 
     #[test]
-    fn test_should_probe_active_node_forces_second_confirmation() {
-        // 正常监测模式下：3 秒前刚测死的节点会命中 10s 去抖缓存（不拨测）
-        assert!(!should_probe_active_node(
-            NodeStatus::Dead,
-            Some(Duration::from_secs(3)),
-            false
-        ));
-        // 重试复核模式下（consecutive_fails > 0）：即使仅过去 3 秒，也必须强制发起第二次真实独立拨测
-        assert!(should_probe_active_node(
-            NodeStatus::Dead,
-            Some(Duration::from_secs(3)),
-            true
-        ));
-        // 健康节点 <60s 常规跳过；陈旧 >=60s 触发拨测
+    fn test_should_probe_active_node_only_skips_fresh_healthy() {
+        // 只有「健康 + 数据新鲜」允许免拨测
         assert!(!should_probe_active_node(
             NodeStatus::Alive(85),
-            Some(Duration::from_secs(15)),
-            false
+            Some(Duration::from_secs(15))
         ));
+        assert!(!should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(HEALTH_DATA_FRESH_SECS - 1))
+        ));
+        // 健康但陈旧 / 数据缺失 → 必须取得本轮实拨证据
         assert!(should_probe_active_node(
             NodeStatus::Alive(85),
-            Some(Duration::from_secs(60)),
-            false
+            Some(Duration::from_secs(HEALTH_DATA_FRESH_SECS))
         ));
-        assert!(should_probe_active_node(NodeStatus::Unknown, None, false));
+        assert!(should_probe_active_node(NodeStatus::Alive(85), None));
+        assert!(should_probe_active_node(NodeStatus::Unknown, None));
+        // 疑似抖动与已判死一律实拨，连续 2 次失败因此来自两轮独立物理拨测
+        assert!(should_probe_active_node(
+            NodeStatus::Suspect,
+            Some(Duration::from_secs(1))
+        ));
+        assert!(should_probe_active_node(NodeStatus::Dead, Some(Duration::from_secs(3))));
+        assert!(should_probe_active_node(NodeStatus::Dead, None));
+    }
+
+    #[test]
+    fn test_https_verify_tainted_history_can_never_skip_probe() {
+        // 【BUG-377 / Sync-23 根因复现】真 HTTPS 验真以 6000ms 超时对同一测量组拨测，
+        // 成功时可能把 `[5000, 6000)` 的延迟写进 history.last()，时间戳又极新：
+        // classify_node_status 判 Dead，旧逻辑的「Dead 且 history < 10s 免拨测」直接
+        // 跳过主 URL 复拨，把这次异源测量当成节点已死的证据。
+        let tainted = classify_node_status(true, Some(5500), Some(2));
+        assert_eq!(tainted, NodeStatus::Dead);
+        assert!(
+            should_probe_active_node(tainted, Some(Duration::from_secs(2))),
+            "验真污染的 Dead + 新鲜时间戳必须强制主 URL 实拨复核"
+        );
+        // 统一超时口径：验真改用 NODE_TEST_TIMEOUT_MS（其值等于 NODE_DELAY_MAX_MS），
+        // 结果不会再落入 `[5000, 6000)` 这一「健康裁决判死」的越界区间。
+        assert!(!is_valid_probe_delay(5500));
+        assert!(is_valid_probe_delay(4999));
     }
 
     #[test]

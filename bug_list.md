@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-376)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-377)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -428,6 +428,13 @@
 - **涉及物理路径与行号**：`src/pages/_layout/utils/profile-coordination.ts`（`triggerAutoSelectAndRefresh` / 新增 `hasUsablePersistedExit` / 10 秒兜底定时器）、`src-tauri/src/module/monitor.rs`（`is_first_run` / 新增 `has_usable_persisted_exit` / `persisted_exit_is_usable` / `trigger_backend_auto_select_inner`）、`clash_mini_agreements.md`（§5 最高方针 / Sync-21 收口标注 / 新增 Sync-22 / 附录 A）
 - **根因与背景实证**：Sync-21 按「连续性优先」方针回溯时登记的两条未收敛项。① 前端 `triggerAutoSelectAndRefresh` 在轻量模式唤醒、Profile 切换、首次启动三种场景下无条件 `batchTestWithFirstBatchSelect(names, true)`，把刚由 `activateSelectedRef` 恢复的用户持久出口覆盖为全局最快节点；其 10 秒兜底定时器以「当前节点没有健康延迟」为由再选一次点，而冷启动时内核尚未拨测、`history` 为空使该条件必然成立，等于固定再切一次。② 后端纯托盘启动 `is_first_run` 先 `restore_profile_selected_nodes` 再无条件 `trigger_backend_auto_select(..., select=true)`，同样自相矛盾。③ `trigger_backend_auto_select_inner` 选出的 `fastest_node` 与本就是当前出口时仍执行一次 `select_node_for_group` 写入。三者都以「选最小延迟节点」为目的，按方针「最小延迟只是附随收益、非必要不主动切换」属违约；其中唤醒场景配置根本没变，切点尤无必要。
 - **修正与改良方案**：① 前端新增 `hasUsablePersistedExit(names)`，只做结构性校验（`PROXY.now` 非空、非伪节点、仍在当前过滤子集内），有效时主流程与兜底定时器均改传 `select=false`——只全组测速刷新延迟、不换节点；读取异常 fail-open 保守允许重选，避免退化成无出口。② 后端新增纯函数 `persisted_exit_is_usable` 与 async 包装 `has_usable_persisted_exit`，`is_first_run` 改以 `select = !has_usable_persisted_exit(&uid)` 调用；判定刻意不读 `alive` / `history`（冷启动数据不可靠，「没有健康延迟」≠「节点已死」），真死节点交由 S1–S4 已收口的连续 2 次确认 + 死节点门检自愈，不在初始化阶段抢占。③ 选点前比对当前 `PROXY.now`，一致时跳过 `select_node_for_group` 写入并输出「保持现状」日志，`profile.selected` 回写与前端刷新照常（幂等），`AutoSelectOutcome` 语义不变；读取失败按原逻辑执行。④ 新增 Rust 纯函数单测 `test_persisted_exit_is_usable_gates_init_auto_select` 与前端 `profile-coordination.test.ts` 5 个用例；§5 方针新增「初始化场景的具体约束」条款、Sync-21 两项标注已收口、新增 Sync-22、附录 A 补映射。**边界**：F1/F4 手动选点与后台故障自愈完全不受影响；出口结构性失效时初始化选点仍会建立可用出口，不牺牲可用性。
+
+### BUG-377（对应规范章节：§5 最高方针 / §5.1 / §5.2 / Sync-23）
+- **当前状态**：`代码已修正，待用户确认`
+- **类别与级别**：Critical / 多测量源污染健康证据导致误判自愈与周期性切点
+- **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`run_https_verification_pass` / `HTTPS_VERIFY_TIMEOUT_MS` / `DEAD_CONFIRM_MIN_INTERVAL_SECS` / `should_probe_active_node` / `evaluate_failover` / 主循环体检调用 / 单测）、`clash_mini_agreements.md`（§5 最高方针 / §5.1 / §5.2 / Sync-21 收口标注 / 新增 Sync-23 / 附录 A）
+- **根因与背景实证**：Sync-21 回溯登记的第 3 项，也是 S1 修复「备用测速地址可用、节点侧正常却仍累加失败」后剩下的**残余误判入口**。① 全仓共 5 处 `delay_group("PROXY__METRICS", ...)`，其中真 HTTPS 验真（180s 定期 + 60s 即时）使用 `github.githubassets.com` / `wikipedia.org` 两个非 `204` 地址与 **6000ms** 超时，既不同于主/备测速 URL 与 `NODE_TEST_TIMEOUT_MS (5000ms)` 口径，也未取 `METRICS_PROBE_LOCK`，与 `probe_metrics_group` 并发时会背靠背各打一轮全组握手并互相覆盖同一批 proxy 的共享 `alive` / `history`。② 验真成功时可能把 `[5000, 6000)` 的延迟写进 `history.last()`：`classify_node_status` 因 `valid_delay` 越界判 `Dead`，而时间戳又被刷新为「刚测过」。③ 旧 `should_probe_active_node` 有「`Dead` 且 `history` < `DEAD_CONFIRM_MIN_INTERVAL_SECS (10s)` → 免拨测」去抖缓存，恰好命中这一组合：`need_probe=false`，本轮没有主 URL 实拨，`evaluate_failover` 直接把这份异源测量当作节点已死证据 → `consecutive_fails++` → 连续 2 次后进入自愈切点。此时主测速日志完全正常，故现象与 S1 相同但污染源不同。④ `force_confirm_probe` 在 `consecutive_fails > 0` 时无条件每 3 秒强制全组拨测并禁用 1500ms 合并窗口，额外制造握手风暴，与方针「测量行为不得成为断流源」冲突。
+- **修正与改良方案**：① 删除 `HTTPS_VERIFY_TIMEOUT_MS`，验真两次 `delay_group` 统一改用 `NODE_TEST_TIMEOUT_MS (5000ms)`，`passed_set` 过滤区间与判死阈值 `[30, 5000)` 一致，不再产出伪 `Dead` 延迟。② 两次验真拨测纳入 `METRICS_PROBE_LOCK`，使全仓 5 处全组拨测全部串行化，消除并发覆盖与背靠背握手；验真结果仍只写入 `node.rs` 的 verify 状态机。③ 删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 `force_confirm_probe` 参数：`should_probe_active_node` 收紧为「仅 `Alive` 且 `history` < `HEALTH_DATA_FRESH_SECS (60s)` 免拨测，其余（`Suspect` / `Dead` / `Unknown` / 陈旧 / 时间戳缺失）一律实拨」；`evaluate_failover` 体检拨测一律 `allow_coalesce=false`，裁决只建立在本轮主/备 URL 实拨后重读的 `alive` / `history` 上。免拨测轮只能得到 `Alive` / `Unknown`，二者均 `NoAction`，异源测量写入的 `history` 永远无法在免拨测轮变成判死理由；连续 2 次失败天然来自两轮互相独立的物理拨测，BUG-368 的独立复核契约不回退。④ 单测改写为 `test_should_probe_active_node_only_skips_fresh_healthy`（含 59s/60s 边界），新增 `test_https_verify_tainted_history_can_never_skip_probe` 复现「5500ms 越界延迟 + 2s 新鲜时间戳」并锁定其必须强制实拨。**边界**：`NodeStatus` 三态迟滞、连续 2 次裁决器、死节点门检、切换速率上限、`DEAD_CONN_CLEANUP_ENABLED=false` 与 F1/F4 手动测速选点全部保持不变；验真识别假节点的功能与 180s/60s 周期不变。
 
 ---
 

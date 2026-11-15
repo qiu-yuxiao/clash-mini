@@ -33,6 +33,13 @@
 - **选回同一节点不再写入**：`trigger_backend_auto_select_inner` 在切点前比对当前出口，一致时跳过 `select_node_for_group` 并输出「保持现状」日志；`profile.selected` 回写与前端刷新照常执行（幂等），`AutoSelectOutcome` 语义不变。
 - **规范与单测同步**：§5 最高方针新增「初始化场景的具体约束」条款，Sync-21 登记的第 1、2 项标注已收口，新增 Sync-22 与附录 A BUG-376 映射；新增 Rust 纯函数单测与前端 `profile-coordination.test.ts`（5 个用例）。F1/F4 手动选点与后台故障自愈完全不受影响。
 
+### 🔬 统一后台测量源，隔离异源验真对健康裁决的污染（BUG-377）
+
+- **根因**：S1 修完「备用测速地址可用、节点侧正常却仍累加失败」后仍有残余误判入口。真 HTTPS 验真（180s 定期 + 60s 即时）以独立 URL 与 **6000ms** 超时、且未取 `METRICS_PROBE_LOCK`，对同一 `PROXY__METRICS` 组发起全组拨测，与 `probe_metrics_group` 并发并互相覆盖共享的 `alive` / `history`。验真成功但延迟落在 `[5000, 6000)` 时 `classify_node_status` 判 `Dead`，而 `history.last().time` 又被刷成「刚测过」，恰好命中旧「`Dead` 且 `history` < 10 秒免拨测」去抖缓存：本轮没有主 URL 实拨就被判死、累加失败，连续 2 次后触发自愈切点。主测速日志此时完全正常，故与 S1 同源现象但不同污染源。
+- **统一超时与互斥**：删除 `HTTPS_VERIFY_TIMEOUT_MS`，验真两次 `delay_group` 改用 `NODE_TEST_TIMEOUT_MS (5000ms)`，与判死阈值 `[30, 5000)` 对齐；两次拨测纳入 `METRICS_PROBE_LOCK`，全仓 5 处全组拨测全部串行化，消除背靠背握手与结果覆盖。验真结果仍只写 `node.rs` 的 verify 状态机，假节点识别能力与 180s / 60s 周期不变。
+- **判死只认本轮实拨**：删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 `force_confirm_probe`（含其 3 秒无条件强制双拨测）；`should_probe_active_node` 收紧为「仅 `Alive` 且 `history` < 60 秒免拨测，其余状态一律实拨」，`evaluate_failover` 体检拨测一律禁用 1500ms 短窗合并。免拨测轮只能得到 `Alive` / `Unknown`（均 `NoAction`），异源测量写入的 `history` 不再有机会变成切点理由；连续 2 次失败天然来自两轮独立物理拨测，BUG-368 的独立复核契约不回退，稳态健康节点仍是零拨测。
+- **规范与单测同步**：§5 最高方针「测量行为不得成为断流源」标注已收口，§5.1 探测降频条款按 60 秒新鲜度重写，§5.2 新增「单一权威健康源与异源测量隔离」条款，Sync-21 第 3 项标注已收口，新增 Sync-23 与附录 A 映射；改写 `test_should_probe_active_node_only_skips_fresh_healthy`，新增 `test_https_verify_tainted_history_can_never_skip_probe` 复现污染路径。三态迟滞、连续 2 次裁决器、死节点门检、切换速率上限与 `DEAD_CONN_CLEANUP_ENABLED=false` 全部保持不变。
+
 ---
 
 ## v3.3.3

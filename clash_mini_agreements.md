@@ -431,7 +431,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **优先级硬序**：**链路连续性 > 恢复时效 > 节点延迟**。三者冲突时一律按此顺序裁决；任何以「择优」为目的的后台切换均属违约。延迟优化只能发生在「已因上述必要性决定切换之后」的候选选择环节（现有 `min_by_key` 选点即属此类附随收益，不构成触发理由）。
 - **初始化场景的具体约束（Sync-22）**：冷启动、轻量模式唤醒、Profile 切换时的初始化自动选点，**仅当当前 `PROXY.now` 结构性失效**（空 / `DIRECT` / `REJECT` / 伪节点 / 验真永久拉黑 / 已不在新配置或当前过滤子集内）才允许切点；出口有效时只做全组测速刷新延迟、不换节点。刻意不以「没有健康延迟」「别的节点更快」为切点理由——冷启动时内核尚未拨测，`alive` / `history` 不可靠；真死节点交由后台监测经连续 2 次确认 + 死节点门检自愈，不在初始化阶段抢占判断。F1/F4 手动选点与后台故障自愈不受此约束。
 - **切换动作不得制造断流**：切点必须是 `select_node_for_group` 干净热切换；默认路径严禁 `close_connection`、配置重载、内核重启。确需清理存量连接时，须先确证旧节点已死且连接确已无流量，且该能力默认关闭（见 §4.2 / Sync-18）。
-- **测量行为不得成为断流源**：后台自动测速只用于取得判活证据，不得因拨测本身扰动链路、污染 `alive` / `history` 或诱发误判；多路测量源须统一 URL、超时与互斥（见 §5.2，S5 待收口）。
+- **测量行为不得成为断流源**：后台自动测速只用于取得判活证据，不得因拨测本身扰动链路、污染 `alive` / `history` 或诱发误判；全组拨测须统一超时与互斥，判死只认本轮主/备测速 URL 实拨结果，异源测量（真 HTTPS 验真等）结果只进各自的用途状态机（见 §5.2，**Sync-23 已收口**）。
 - **举证责任与上位效力**：新增或调整任何后台自动切换逻辑，必须先说明「若不切换会发生何种断流、切换如何缩短它」；无法举证者一律默认不切换。本方针是本章全部条款、参数与实现的最高裁决依据，亦是 `docs/node-health-architecture.md` 等下层设计文档的主文件；与本章其他条款冲突时以本方针为准（S6 文档治理待完成）。
 
 ### 5.1 恒定 15 秒健康监测与防抖自愈机制
@@ -444,7 +444,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **三态健康迟滞与自愈门检（Sync-20）**：`NodeStatus` 由二值健康判定扩为 `Unknown / Suspect / Dead / Alive` 四态；`alive=false` 但上一次成功拨测仍在 `SUSPECT_WINDOW_SECS (30s)` 内时判 `Suspect`（Mihomo 对失败节点只写 `alive=false`、不追加 `history`），`evaluate_failover` 直接 `NoAction`、不累计失败，只有 `Dead` 才构成自愈证据；超过窗口或时间戳不可解析（保守）才判死。自愈切点前须经 `should_proceed_with_self_heal` 用**同一权威来源**（`get_proxies() + node_status()`）复核原节点确已死，非 `Dead` 一律放弃——自愈仅兜底，不因「别的节点更快」切点（择优属 F1 手动选点）。门检仅适用于 `SelfHealOrigin::ConfirmedDead`：`FailoverVerdict::ShouldMigrate`（假/拉黑节点重选、真 HTTPS 验真失败迁移）与内核 API 通道故障由 `SelfHealOrigin` 显式隔离，避免误挡既有迁移链路。真死节点自愈最多推迟 30 秒，由既有 20 秒宽限 + 25 秒冷却覆盖。
 - **严格判死阈值（5000ms）**：测速超时硬限为 **5000ms**；延迟有效区间锁定为 `[30ms, 5000ms)`；超过 5000ms 或产生握手错误一律判死。**该值历史上在 2000ms 与 5000ms 之间反复调整过不止一次，2026-10 定型为 5000ms（BUG-304 现场双路对照监控实证）：链路拥塞簇内仅 TCP 握手即需 1.1~2.1s（SYN 丢包按 1s RTO 重传的整秒台阶指纹），叠加 TLS 握手与 204 探测往返后，「慢而可用」的活节点总耗时稳定超过 2s——2000ms 预算会把拥塞期的整组活节点误判为断流；而真死节点（机场集群故障）5s 内同样超时，不会产生误活。除非有同等量级的现场实证，禁止回调至 2000ms。**
 - **切换宽限期（20 秒，v3.2.4 优化）**：任何节点切换（含自动选点与手动切换）后 20 秒内，失败判定只记日志、不计入连续失败次数，防止「切到尚未拨测的新节点 → 缓存陈旧误判 → 再次切走」的乒乓震荡。v3.2.4 从原 60 秒缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
-- **探测按需降频（20 秒新鲜度 + 二次独立复核，v3.2.4 / v3.3.2）**：体检不再每周期对测量组全组拨测，改为按缓存新鲜度决策——活跃节点健康且 history < 20 秒直接信缓存；常规状态下刚判死 10 秒内不重复拨测。当已进入重试复核阶段（`consecutive_fails > 0`，每 3 秒复检）时，通过 `should_probe_active_node(..., force_confirm_probe=true)` **强制跳过 10 秒死节点去抖缓存并禁用短窗合并，执行第二次物理独立全组拨测**（BUG-368），确保连续 2 次失败绝非读取同一份缓存的假复核。
+- **探测按需降频与本轮实拨证据（60 秒新鲜度，v3.2.4 / v3.3.2 / Sync-23 修订）**：体检不再每周期对测量组全组拨测，改为按缓存新鲜度决策——**只有**「`NodeStatus::Alive` 且 `history` < `HEALTH_DATA_FRESH_SECS (60s)`」才免拨测；`Suspect` / `Dead` / `Unknown` / 陈旧 / 时间戳缺失一律发起全组实时拨测，且 `allow_coalesce=false` 禁用 1500ms 短窗合并，保证裁决建立在本轮主/备测速 URL 实拨结果上。**【Sync-23 修订】** 删除旧「`Dead` 且 `history` < 10 秒免拨测」去抖缓存（`DEAD_CONFIRM_MIN_INTERVAL_SECS`）与 `force_confirm_probe` 的 3 秒无条件强制双拨测：前者会让真 HTTPS 验真写入的 `[5000, 6000)` 越界延迟（判 `Dead` 且时间戳极新）未经主 URL 复核就进入判死链，是 BUG-377 的根因；后者制造背靠背全组握手风暴。现在连续 2 次失败天然来自两轮互相独立的物理拨测，BUG-368「禁止读同一份缓存做假复核」的契约不回退；免拨测轮只能得到 `Alive` / `Unknown`（均 `NoAction`），异源测量写入的 `alive` / `history` 不再有机会变成切点理由。
 
 #### 5.1.1 诊断探针（临时，随 v2.9.3 诊断版注入）
 
@@ -462,6 +462,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 - **彻底废除应用侧并发池**：废弃旧版由前端/应用层维护并发 Worker 池逐个测速的架构（不仅开销大，且在 TUN 模式下对活跃节点调 `/proxies/{name}/delay` 会引发自指回环假超时，是早期「断流 + 全 Timeout」的根因；该单代理直测路径已彻底废弃、应用侧不保留）。
 - **委托内核统一测量**：全量测速、**单点测速**与选点一律委托内核内部隐式创建的 `PROXY__METRICS` 测量组（`url-test` 类型，与 `PROXY` 组完全同构），单次调用触发内核并发调度，由内核核心直接执行高效底层拨测。群发测速与单点测速必须取自**同一测量组、同一测速 URL、同一探针超时**（`NODE_TEST_TIMEOUT_MS` 恒等于判死阈值 `NODE_DELAY_MAX_MS` = 5000ms，见 5.1 节 BUG-304 定型依据，禁止回调 2000ms）。
+- **单一权威健康源与异源测量隔离（Sync-23，BUG-377）**：全仓对 `PROXY__METRICS` 的 5 处 `delay_group`（主/备测速 3 处 + 真 HTTPS 验真 2 处）必须统一取 `METRICS_PROBE_LOCK` 串行化、统一使用 `NODE_TEST_TIMEOUT_MS (5000ms)` 超时，删除验真单独设定的 6000ms。两类测量的**用途严格分离**：主/备测速 URL 结果用于健康裁决（判活 / 判死）与 UI 延迟显示；真 HTTPS 内容拉取（非 `204` 地址）只用于识别「对 generate_204 放行但真网页卡死」的假节点，结果仅写入 `node.rs` 的 verify 状态机，**不得**成为 `evaluate_failover` 的判死依据。`alive` / `history` 是共享可变状态，任何调用方都会改写它，故判死只允许发生在本轮主/备 URL 实拨后重读的结果上，免拨测轮不得据其判死（见 §5.1）。验真 URL 与主测速 URL 不同属于功能需要，不违反「同一测速 URL」契约——该契约约束的是**参与健康裁决的测速**；统一的是超时、互斥与「哪一路结果拥有裁决权」。
 - **单点测速四条契约**（2026-10-08 确立三条，2026-10-17 补第 4 条）：
   1. **仅测量、不切换**：单点测速必须以「不选点」方式调用，严禁改写用户当前所选节点，也绝不回写 `profile.selected`。
   2. **全组拨测属既定代价**：内核只提供「组级拨测」接口，故单节点测速一次**同样会触发对该测量组全量成员的拨测**，耗时由最慢成员决定（拥塞期可达 ≈5000ms），而结果只回报所请求的那一个节点。此为换取「TUN 下无回环、全链路数据源唯一」的既定取舍，不予优化掉。
@@ -924,7 +925,7 @@ flowchart LR
 - **方针确立后仍未收敛（不在本次范围，登记备查）**：
   1. **冷启动 / Profile 切换的初始化自动选点**：前端 `triggerAutoSelectAndRefresh` → `batchTestWithFirstBatchSelect` 与 `monitor.rs` 的 `is_first_run` 分支，会覆盖 `restore_profile_selected_nodes` 恢复的用户持久选择、按最快节点重选；发生在连接建立前或配置刚变更，不直接产生断流，但「不切换就会断流」的举证缺失，与「非必要不主动切换」精神不完全一致。**【Sync-22 已收口】**
   2. **选点未比较当前节点**：`trigger_backend_auto_select_inner` 无条件调用 `select_node_for_group("PROXY", fastest_node)`，选回同一节点仍执行一次写（幂等、不断流），属方针最轻残余。**【Sync-22 已收口】**
-  3. **多测量源污染**：180s / 60s 真 HTTPS 验真（不同 URL、6000ms 超时、未取 `METRICS_PROBE_LOCK`）与 `force_confirm_probe` 3 秒强制双拨测（§5.1）仍可能改写 `alive` / `history` 并诱发误判切换（S5）。
+  3. **多测量源污染**：180s / 60s 真 HTTPS 验真（不同 URL、6000ms 超时、未取 `METRICS_PROBE_LOCK`）与 `force_confirm_probe` 3 秒强制双拨测（§5.1）仍可能改写 `alive` / `history` 并诱发误判切换（S5）。**【Sync-23 已收口】**
   4. **`ShouldMigrate` 两条路径**（假/拉黑节点重选、真 HTTPS 验真失败迁移）会在原节点 `Alive` 时切换；因有「节点不可用」证据，且受连续 2 次确认 + 速率上限 + 不清连接约束，判为方针定义的「必要」，保留。
 - **文档治理**：`docs/node-health-architecture.md` 的「切换零断流 / 自愈仅兜底 / 真断网安静等待」与本方针一致，但仍需标注主次；§5.1 的 15/3/5 三档周期、60 秒新鲜度与 §5.1.1 临时探针章节同步（S6）。
 - **影响**：纯规范追加，未改动任何代码、未新增配置项、未改动前端、未改动代理组架构、未改动发版流程，不改变 S1–S4 既有运行期行为。
@@ -940,6 +941,23 @@ flowchart LR
 - **刻意保留的边界**：F1/F4 手动选点与后台故障自愈**完全不受影响**——方针约束的是「无需用户逐次确认的自动行为」；`PROXY` 控制组仍为 `select` 类型，初始化选点在出口结构性失效时依旧会建立可用出口，不牺牲可用性。真死节点的恢复时效不变，仍由 S1–S4 已收口的连续 2 次确认 + 死节点门检链路负责。
 - **验证**：`cargo fmt --all` 已应用，`cargo check -p clash-mini --lib` / `cargo clippy -p clash-mini --lib` / `pnpm typecheck` / `biome format` / `eslint --max-warnings=0` 全部 exit 0；前端 `vitest run` 相关 2 个文件 **11 passed**。Rust 单测二进制编译成功，运行受本机 `STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)` 阻断（DLL 入口点缺失，非断言失败），纯函数同一契约由前端 5 个实跑用例覆盖。
 - **影响**：Sync-21 登记的第 1、2 项已收口；§5 最高方针新增「初始化场景的具体约束」条款；未新增配置项、未改动代理组架构、未改动发版流程，不改变 S1–S4 既有运行期行为。
+
+### Sync-23 · 统一后台测量源，隔离异源验真对健康裁决的污染（v3.3.4，S5 / BUG-377）
+
+- **问题定位**：Sync-21 回溯登记的第 3 项，也是 S1（Sync-18）修完「备用测速地址可用、节点侧正常却仍累加失败」之后剩下的**残余误判入口**。用户现场现象不变——后台每 2–5 分钟切一次节点、把健康长流切断，但主测速日志完全正常，说明这一次的污染源不是测速地址失真，而是另一路测量。
+- **根因链（逐环实证）**：
+  1. 全仓共 5 处 `delay_group("PROXY__METRICS", ...)`：主/备测速 3 处在 `probe_metrics_group`（持 `METRICS_PROBE_LOCK`、`NODE_TEST_TIMEOUT_MS = 5000ms`、主/备 `generate_204` URL），真 HTTPS 验真 2 处在 `run_https_verification_pass`（**未持锁**、独立常量 `HTTPS_VERIFY_TIMEOUT_MS = 6000ms`、`github.githubassets.com` / `wikipedia.org` 非 204 地址）。两路都会对同一批 proxy 写入共享的 `alive` / `history`，且可能并发背靠背各打一轮全组握手、互相覆盖结果。
+  2. 验真成功但延迟落在 `[5000, 6000)` 时，`classify_node_status` 因 `valid_delay` 越界判 `Dead`；同时 `history.last().time` 被刷新为「刚测过」。
+  3. 旧 `should_probe_active_node` 的「`Dead` 且 `history` < `DEAD_CONFIRM_MIN_INTERVAL_SECS (10s)` → 免拨测」去抖缓存恰好命中这一组合：`need_probe = false`，本轮没有主 URL 实拨，`evaluate_failover` 直接把这份异源测量当作节点已死证据 → `consecutive_fails++` → 连续 2 次后经统一裁决器进入自愈切点。
+  4. 叠加 `force_confirm_probe` 在 `consecutive_fails > 0` 时无条件每 3 秒强制全组拨测并禁用短窗合并，制造额外的握手风暴；与 §5 方针「测量行为不得成为断流源」直接冲突。
+- **核心变更**：
+  1. **统一超时口径**：删除 `HTTPS_VERIFY_TIMEOUT_MS`，验真两次拨测改用 `NODE_TEST_TIMEOUT_MS (5000ms)`；`passed_set` 的 `[30, 5000)` 过滤区间与判死阈值一致，不再产出「判 `Dead` 却又刚测过」的伪证据。
+  2. **统一互斥**：`run_https_verification_pass` 的两次 `delay_group` 纳入 `METRICS_PROBE_LOCK`，全仓 5 处全组拨测全部串行化，消除并发覆盖与背靠背握手。验真仍只写 `node.rs` 的 verify 状态机，180s / 60s 周期与假节点识别能力不变。
+  3. **判死只认本轮实拨**：删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 `force_confirm_probe`；`should_probe_active_node` 收紧为「仅 `Alive` 且 `history` < 60s 免拨测，其余一律实拨」，`evaluate_failover` 体检拨测一律 `allow_coalesce = false`。免拨测轮只能得到 `Alive` / `Unknown`（均 `NoAction`），异源测量写入的 `alive` / `history` 永远无法变成判死理由；连续 2 次失败天然来自两轮互相独立的物理拨测，BUG-368 的独立复核契约不回退。
+  4. **单测锁定**：改写 `test_should_probe_active_node_only_skips_fresh_healthy`（覆盖 59s / 60s 边界与四类非健康状态），新增 `test_https_verify_tainted_history_can_never_skip_probe` 复现「5500ms 越界延迟 + 2s 新鲜时间戳」并锁定其必须强制主 URL 实拨。
+- **刻意保留的契约**：`NodeStatus` 三态迟滞（`Suspect` / `Dead`）、`decide_self_heal` 连续 2 次裁决器、「原节点确已死」门检、120s / 600s 切换速率上限、`DEAD_CONN_CLEANUP_ENABLED = false`、F1/F4 手动测速选点、验真周期与 `ShouldMigrate` 迁移路径全部不变。真死节点的发现时效不变（非健康轮仍每 3s 实拨），稳态健康节点仍免拨测、零额外流量；改动只减少拨测与切点，不增加。
+- **验证**：`cargo fmt --all`、`cargo check -p clash-mini --lib`、`cargo clippy -p clash-mini --lib`、`cargo clippy -p clash-mini --lib --tests` 全部通过且零代码告警；Rust 测试二进制编译成功，运行受本机 `STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)` 阻断（DLL 入口点缺失，非断言失败）。
+- **影响**：Sync-21 登记的第 3 项已收口；§5 最高方针「测量行为不得成为断流源」标注已收口，§5.1 探测降频条款按 60 秒新鲜度与本轮实拨证据重写，§5.2 新增「单一权威健康源与异源测量隔离」条款。未新增配置项、未改动代理组架构、未改动前端与发版流程。
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
@@ -1077,6 +1095,7 @@ flowchart LR
 | **BUG-374** | 附录 A / 工程工具链 | 修复 husky `sh -e` 执行 pre-commit 时 `VAR=$(... | grep ...)` 无匹配返回 1 触发 errexit 静默终止：为 `.husky/pre-commit` 两条暂存文件探测赋值补 `|| true` 兜底，使纯文档提交、仅 agreement 提交可正常走完 `cargo make pre-commit`，并让「修改顺序铁律」提示分支恢复可达；未改动 husky 自动生成文件、未使用 `--no-verify`。 |
 | **BUG-375** | 4.2 / 5.1 / 5.3 | 三态健康迟滞、自愈门检与切换速率上限：`NodeStatus` 新增 `Suspect` 与纯函数 `classify_node_status`，`alive=false` 但 30 秒内曾成功判疑似抖动而非已死；`FailoverVerdict` 新增 `ShouldMigrate`、`SelfHealOrigin` 区分三类来源，仅节点侧故障转移经「原节点确已死」门检复核；新增 120 秒最小实际切换间隔与 600 秒 / 3 次滑动窗口上限（见 §5.1 / §5.3 / Sync-20）；`DEAD_CONN_CLEANUP_ENABLED` 因缺少无流量过滤仍保持关闭。 |
 | **BUG-376** | §5 最高方针 / Sync-21 / Sync-22 | 初始化自动选点遵守「连续性优先」：前端 `hasUsablePersistedExit` 与后端 `persisted_exit_is_usable` / `has_usable_persisted_exit` 门检使冷启动、轻量模式唤醒、Profile 切换及纯托盘启动仅在持久出口结构性失效时才允许切点，有效时只刷新延迟、不覆盖用户选择；10 秒兜底定时器不再以「没有健康延迟」为由选点；`trigger_backend_auto_select_inner` 选回同一节点时跳过 `select_node_for_group` 写入。F1/F4 手动选点与后台故障自愈不受影响（见 Sync-22）。 |
+| **BUG-377** | §5 最高方针 / 5.1 / 5.2 / Sync-23 | 统一后台测量源并隔离异源验真污染：删除验真独立的 6000ms 超时改用 `NODE_TEST_TIMEOUT_MS (5000ms)`，验真两次全组拨测纳入 `METRICS_PROBE_LOCK` 使 5 处 `delay_group` 全部串行化；删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 `force_confirm_probe`，`should_probe_active_node` 收紧为仅「健康且 60s 内新鲜」免拨测、体检拨测禁用 1500ms 短窗合并，判死只建立在本轮主/备 URL 实拨结果上，杜绝验真写入的 `[5000, 6000)` 越界延迟 + 新鲜时间戳在免拨测轮被误判为节点已死并触发自愈切点。三态迟滞、连续 2 次裁决器、死节点门检与切换速率上限保持不变（见 Sync-23）。 |
 
 ---
 
