@@ -7,7 +7,7 @@
 
 ---
 
-## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-377)
+## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs: BUG-317 ~ BUG-378)
 
 ### BUG-317（对应规范章节：5.5）
 - **当前状态**：`代码已修正，待用户确认`
@@ -435,6 +435,13 @@
 - **涉及物理路径与行号**：`src-tauri/src/module/monitor.rs`（`run_https_verification_pass` / `HTTPS_VERIFY_TIMEOUT_MS` / `DEAD_CONFIRM_MIN_INTERVAL_SECS` / `should_probe_active_node` / `evaluate_failover` / 主循环体检调用 / 单测）、`clash_mini_agreements.md`（§5 最高方针 / §5.1 / §5.2 / Sync-21 收口标注 / 新增 Sync-23 / 附录 A）
 - **根因与背景实证**：Sync-21 回溯登记的第 3 项，也是 S1 修复「备用测速地址可用、节点侧正常却仍累加失败」后剩下的**残余误判入口**。① 全仓共 5 处 `delay_group("PROXY__METRICS", ...)`，其中真 HTTPS 验真（180s 定期 + 60s 即时）使用 `github.githubassets.com` / `wikipedia.org` 两个非 `204` 地址与 **6000ms** 超时，既不同于主/备测速 URL 与 `NODE_TEST_TIMEOUT_MS (5000ms)` 口径，也未取 `METRICS_PROBE_LOCK`，与 `probe_metrics_group` 并发时会背靠背各打一轮全组握手并互相覆盖同一批 proxy 的共享 `alive` / `history`。② 验真成功时可能把 `[5000, 6000)` 的延迟写进 `history.last()`：`classify_node_status` 因 `valid_delay` 越界判 `Dead`，而时间戳又被刷新为「刚测过」。③ 旧 `should_probe_active_node` 有「`Dead` 且 `history` < `DEAD_CONFIRM_MIN_INTERVAL_SECS (10s)` → 免拨测」去抖缓存，恰好命中这一组合：`need_probe=false`，本轮没有主 URL 实拨，`evaluate_failover` 直接把这份异源测量当作节点已死证据 → `consecutive_fails++` → 连续 2 次后进入自愈切点。此时主测速日志完全正常，故现象与 S1 相同但污染源不同。④ `force_confirm_probe` 在 `consecutive_fails > 0` 时无条件每 3 秒强制全组拨测并禁用 1500ms 合并窗口，额外制造握手风暴，与方针「测量行为不得成为断流源」冲突。
 - **修正与改良方案**：① 删除 `HTTPS_VERIFY_TIMEOUT_MS`，验真两次 `delay_group` 统一改用 `NODE_TEST_TIMEOUT_MS (5000ms)`，`passed_set` 过滤区间与判死阈值 `[30, 5000)` 一致，不再产出伪 `Dead` 延迟。② 两次验真拨测纳入 `METRICS_PROBE_LOCK`，使全仓 5 处全组拨测全部串行化，消除并发覆盖与背靠背握手；验真结果仍只写入 `node.rs` 的 verify 状态机。③ 删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 `force_confirm_probe` 参数：`should_probe_active_node` 收紧为「仅 `Alive` 且 `history` < `HEALTH_DATA_FRESH_SECS (60s)` 免拨测，其余（`Suspect` / `Dead` / `Unknown` / 陈旧 / 时间戳缺失）一律实拨」；`evaluate_failover` 体检拨测一律 `allow_coalesce=false`，裁决只建立在本轮主/备 URL 实拨后重读的 `alive` / `history` 上。免拨测轮只能得到 `Alive` / `Unknown`，二者均 `NoAction`，异源测量写入的 `history` 永远无法在免拨测轮变成判死理由；连续 2 次失败天然来自两轮互相独立的物理拨测，BUG-368 的独立复核契约不回退。④ 单测改写为 `test_should_probe_active_node_only_skips_fresh_healthy`（含 59s/60s 边界），新增 `test_https_verify_tainted_history_can_never_skip_probe` 复现「5500ms 越界延迟 + 2s 新鲜时间戳」并锁定其必须强制实拨。**边界**：`NodeStatus` 三态迟滞、连续 2 次裁决器、死节点门检、切换速率上限、`DEAD_CONN_CLEANUP_ENABLED=false` 与 F1/F4 手动测速选点全部保持不变；验真识别假节点的功能与 180s/60s 周期不变。
+
+### BUG-378（对应规范章节：§5 最高方针 / §5.1 / §5.2 / §5.5 / §5.6 / Sync-24）
+- **当前状态**：`文档已修正，待用户确认`（纯文档治理，运行期代码零改动）
+- **类别与级别**：Low / 规范内部矛盾与下层架构文档失效标注缺失，可能误导后续改动
+- **涉及物理路径与行号**：`clash_mini_agreements.md`（§5 最高方针 / §5.1 / §5.1.1 / §5.2 / §5.5 / Sync-18~21 收口标注 / 新增 Sync-24 / 附录 A）、`docs/node-health-architecture.md`（文件头状态声明与差异对照表）、`bug_list.md`、`Changelog.md`
+- **根因与背景实证**：S1–S5 逐项改动运行期行为后，文档层留下四类不一致：① §5.5 仍写「离线转在线……必要时秒级触发故障自愈」，与 S3 的 `NetworkRecovered` 恒判 `Wait` 正面冲突；② §5.1 标题「恒定 15 秒」被读成全局唯一周期（实际为 15/3/5 三档），§5.1.1 仍以现在时描述 `[探针]` INFO 日志，而全局检索确认 `src-tauri/src/` 与 `src/` 中已无任何该前缀日志；③ `docs/node-health-architecture.md` 是 v2.9.x「从零重写」草案，开篇即写「现存 `monitor.rs` 守护线程属于被替换对象」，主张「app 完全不插手测量」「删除自测线程」「移除 `DelayManager` 自测回写」，与现行实现直接冲突却未标注失效；④ §5.2「全路径废除 history 退化兜底」与 §5.6 前端 `HISTORY_FALLBACK_MAX_AGE_MS = 10 分钟` 回落（`src/services/delay.ts:26` 确实存在）字面对立。这些不改变当前程序输出，但按文档写代码会把刚收口的误判切点重新引回来。
+- **修正与改良方案**：① §5.5 按 Sync-19 重写，明确「恒判 `Wait`、只放行一次统一体检、旧表述作废」，§5 方针去掉「S6 待完成」标注。② §5.1 基线周期条款补齐 15/3/5 三档与 `check_interval_secs` 唯一裁决入口，说明标题「恒定 15 秒」特指在线正常态；§5.1.1 改为「已移除，本节仅保留溯源」并写明全局检索结果与后续临时排查纪律。③ §5.2 补作用域澄清：废除的是后端测速取数路径的陈旧兜底，前端展示层回落见 §5.6，二者不冲突。④ `docs/node-health-architecture.md` 文件头追加「历史设计草案 / 非现行规范 / 禁止作为改代码依据」状态声明与「草案主张 ↔ 现行实现」四项对照表，明确 agreement §5 为主文件；草案正文作为设计史料原样保留。⑤ Sync-18/19/20/21 里「S5 / S6 未处理」的历史快照补收口标注（保留原始记录、不改历史结论），新增 Sync-24 与附录 A 映射。**边界**：不触碰任何运行期代码、参数、配置项与发版流程；`HISTORY_FALLBACK_MAX_AGE_MS` 与 §5.6 三级真源保持不变。
 
 ---
 

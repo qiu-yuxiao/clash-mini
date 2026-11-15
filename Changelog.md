@@ -40,6 +40,13 @@
 - **判死只认本轮实拨**：删除 `DEAD_CONFIRM_MIN_INTERVAL_SECS` 与 `force_confirm_probe`（含其 3 秒无条件强制双拨测）；`should_probe_active_node` 收紧为「仅 `Alive` 且 `history` < 60 秒免拨测，其余状态一律实拨」，`evaluate_failover` 体检拨测一律禁用 1500ms 短窗合并。免拨测轮只能得到 `Alive` / `Unknown`（均 `NoAction`），异源测量写入的 `history` 不再有机会变成切点理由；连续 2 次失败天然来自两轮独立物理拨测，BUG-368 的独立复核契约不回退，稳态健康节点仍是零拨测。
 - **规范与单测同步**：§5 最高方针「测量行为不得成为断流源」标注已收口，§5.1 探测降频条款按 60 秒新鲜度重写，§5.2 新增「单一权威健康源与异源测量隔离」条款，Sync-21 第 3 项标注已收口，新增 Sync-23 与附录 A 映射；改写 `test_should_probe_active_node_only_skips_fresh_healthy`，新增 `test_https_verify_tainted_history_can_never_skip_probe` 复现污染路径。三态迟滞、连续 2 次裁决器、死节点门检、切换速率上限与 `DEAD_CONN_CLEANUP_ENABLED=false` 全部保持不变。
 
+### 📐 文档治理：消除规范内部矛盾与下层架构文档误导（BUG-378）
+
+- **规范内部矛盾**：§5.5「离线转在线……必要时秒级触发故障自愈」与 S3 的 `NetworkRecovered` 恒判 `Wait` 冲突，已按 Sync-19 重写为「恒判 `Wait`、只放行一次统一体检、旧表述作废」；§5.2「全路径废除 history 退化兜底」与 §5.6 前端 10 分钟 `history` 回落补齐作用域澄清（后端测速取数 vs 前端展示取值）。
+- **失实章节清理**：§5.1 标题「恒定 15 秒」补注为在线正常态基线，正文补齐 15 / 3 / 5 三档与 `check_interval_secs` 唯一裁决入口；§5.1.1 改为「已移除，本节仅保留溯源」——全局检索确认代码中已无任何 `[探针]` 前缀日志。
+- **下层文档失效标注**：`docs/node-health-architecture.md` 是 v2.9.x「从零重写」草案，其中「app 完全不插手测量」「删除 `monitor.rs` 守护线程」「移除 `DelayManager` 自测回写」与现行实现直接冲突。文件头追加「历史设计草案 / 非现行规范 / 禁止作为改代码依据」状态声明与四项「草案主张 ↔ 现行实现」对照，明确 `clash_mini_agreements.md` §5 为唯一上位主文件；草案正文作为史料原样保留。
+- **收口与边界**：Sync-18/19/20/21 中「S5 / S6 未处理」的历史快照补收口标注，新增 Sync-24 与附录 A 映射。v3.3.3 review 提出的 S1–S6 六项至此全部完成；本次为纯文档改动，运行期代码、参数、配置项与发版流程零变更。
+
 ---
 
 ## v3.3.3
