@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 // 错误边界分级策略（已按此落地，新增代码请遵循）：
 //
 // - 全局：`main.tsx` 的 BaseErrorBoundary —— 最后兜底，正常不应被触发
-// - 页面：`BasePage`、`/unlock` 的 Outlet 各包一层 —— 单页崩溃不影响其他页
+// - 页面：`BasePage` 包一层 —— 单页崩溃不影响其他区域
 // - 区域：活跃节点栏 / 节点列表 / 连接表 / 流量图 / 弹窗组，统一用 AreaErrorFallback
 //   局部降级（替换为一行提示而不是整页白屏）
 //

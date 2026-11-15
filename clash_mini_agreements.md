@@ -257,7 +257,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 ### 2.11 错误边界分级与局部降级
 
-- **分级策略**：全局（`main.tsx`）只作最后兜底；页面级（`BasePage`、`/unlock` 的 Outlet）单页崩溃不影响其他页；区域级（活跃节点栏、节点列表、连接表、流量图、弹窗组）用 `AreaErrorFallback` 局部降级为一行提示，**严禁因单组件异常整页白屏**。
+- **分级策略**：全局（`main.tsx`）只作最后兜底；页面级（`BasePage`）单页崩溃不影响其他区域；区域级（活跃节点栏、节点列表、连接表、流量图、弹窗组）用 `AreaErrorFallback` 局部降级为一行提示，**严禁因单组件异常整页白屏**。
 - **新增重组件必须挂边界**：列表 / 画布 / 依赖第三方渲染的重组件，接入时同步包一层区域边界。
 - **边界只捕获渲染期异常**：事件处理与异步代码中的错误不走边界，必须用 `showNotice` 与日志记录自行处理。
 - **边界不宜过密**：优先高频出错、依赖第三方渲染的组件；过度拆分只增加复杂度与开销。
@@ -515,7 +515,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 严格遵循最小权限安全原则：
 - **移除危险 Shell 权限**：彻底剔除 Tauri 配置中开放的系统命令生成、执行、标准输入输出交互权限，前端环境无法执行任意本地 Shell 指令。
 - **FS 作用域极致收紧**：文件系统插件的作用域严格限定于当前应用程序的数据目录与临时目录，严禁通过通配符跨目录读取用户私有文件。
-- **网络插件白名单控制**：HTTP 插件仅允许与已知安全域名通信，阻断任意地址反弹攻击。
+- **彻底移除前端 HTTP 插件暴露**：已移除 `tauri-plugin-http` 与 `capabilities/desktop.json` 中全部 `http:*` 权限，WebView 侧不开放任何直接插件网络通道，外部 HTTP 请求统一收口至受 SSRF 防护的 Rust `NetworkManager` 后端。
 
 ### 6.2 用户输入 URL 严格校验与 SSRF 防护
 
@@ -610,7 +610,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
   pnpm cargo-test
   ```
   底层通过 `CLASH_MINI_TEST_LINK=1` 注入已编译好的 Windows 资源清单库（`resource.lib`）。
-- **单元测试并发与环境隔离**：所有单元测试（特别是 `save_profile`、`agreements` 等涉及配置读写与全局状态的测试）必须使用独立的测试上下文或临摹环境，严禁在并发单测中共享全局 App Handle 或共享全局 Draft 状态，保障全套 146 项主库单元测试（含工作区子 crate 共 198 项通过、1 项显式忽略）随时执行 100% 稳定全绿。
+- **单元测试并发与环境隔离**：所有单元测试（特别是 `save_profile`、`agreements` 等涉及配置读写与全局状态的测试）必须使用独立的测试上下文或临摹环境，严禁在并发单测中共享全局 App Handle 或共享全局 Draft 状态，保障全套主库及工作区子 crate 单元测试随时执行 100% 稳定全绿。
 - **开发与单测编译防膨胀规范**：Clash Mini 为纯 Windows 桌面端，`src-tauri/Cargo.toml` 的 `[lib]` 仅保留 `crate-type = ["rlib"]`（禁止恢复移动端遗留的 `staticlib` / `cdylib` 双份链接产物）；根 `Cargo.toml` 的 `[profile.dev]` 与 `[profile.test]` 统一对齐 `codegen-units = 64`、一等自研 crate（工作区成员与本地 `tauri-plugin-mihomo`）设置 `debug = 1` 保留完整行号栈回溯、第三方外部依赖（`package."*"`）设置 `debug = false` 剥离巨型冗余 PDB 符号，确保 `cargo check` / `clippy` 与 `pnpm cargo-test` 共享同一份依赖编译缓存。
 
 ### 8.2 静默发布全流程（Silent Release）
@@ -853,6 +853,7 @@ flowchart LR
 | **BUG-379** | 5.1 / 5.2 | **【待用户确认】** 终结后台 60s 全组盲测风暴并维持 §5.2 无回环铁律：`monitor.rs` 引入基于本地 `/connections` 字节增量的被动流量证活状态机——活跃下行传输（`Flowing`）免拨测上限延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s < 600s)`、完全空闲（`Idle`）对齐测量组周期 `IDLE_HEALTH_FRESH_SECS (300s)`、有出无回黑洞（`Stalled`）带 `STALL_REPROBE_COOLDOWN_SECS (60s)` 冷却立即实拨复核；非 `Alive` 仍强制实拨，保留 BUG-377 异源隔离不变式。 |
 | **BUG-380** | §5 最高方针 / 5.4 | **【待用户确认】** 真 HTTPS 验真由不可逆永久拉黑改为 24h 可恢复软隔离：`NodeVerifyRecord::is_confirmed_fake_at` 复用 `last_verified_at` 实施 `HTTPS_VERIFY_BAN_TTL_SECS (86_400)` TTL 期满自动缓刑重测；`feat/profile.rs::update_profile` 在用户手动更新订阅时调用 `clear_unverified_https_failures()` 立即重置未验真失败记录（保留 `verified_true` 白名单）并刷新列表；同步在 §2.8/§5 明确记录过滤框 700ms 地域策略即时切换特例豁免。 |
 | **BUG-381** | 2.12 / 6.4 | **【待用户确认】** 移除重型嵌入式 JS 引擎 `boa_engine` 与 `enhance/script.rs` / 内置 `.js` 文件，改用原生 Rust `apply_builtin_guards` 完成 `mode: script` 归一与 `hysteria` string `alpn` 转数组；停止新建 `Script` 默认项，保留存量 `profiles.yaml` 历史 `type: script` 兼容忽略。 |
+| **BUG-382** | 2.11 / 6.1 | **【待用户确认】** 清理不可达流媒体解锁 `/unlock` 路由（`src/pages/unlock.tsx`、`cmd/media_unlock_checker` 及废弃翻译键）与零使用 `tauri-plugin-http` / `@tauri-apps/plugin-http`，收紧 WebView 网络接口暴露并消除重复 `reqwest v0.12.28` 依赖树。 |
 
 ---
 

@@ -7,7 +7,6 @@ import proxies from './proxies.json'
 import rules from './rules.json'
 import settings from './settings.json'
 import shared from './shared.json'
-import tests from './tests.json'
 
 const resources = {
   connections: connections,
@@ -19,7 +18,6 @@ const resources = {
   rules: rules,
   settings: settings,
   shared: shared,
-  tests: tests,
 }
 
 export default resources

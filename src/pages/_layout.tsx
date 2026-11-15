@@ -25,7 +25,6 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ErrorBoundary } from 'react-error-boundary'
 import { useTranslation } from 'react-i18next'
-import { Outlet, useLocation } from 'react-router'
 
 import AppIcon from '@/assets/image/app-icon.png'
 import { AreaErrorFallback } from '@/components/base/base-error-boundary'
@@ -225,7 +224,6 @@ const Layout = () => {
   const { switchLanguage, currentLanguage } = useI18n()
   const { decorated, isDecorationsHidden, isMinimalWidth, isMiniStatus } =
     useWindowDecorations()
-  const { pathname } = useLocation()
 
   // Language Sync Ref to prevent deadlock/rollback loops
   const lastLanguageRef = useRef<string | undefined>(undefined)
@@ -1300,23 +1298,6 @@ const Layout = () => {
           color: mode === 'light' ? '#333' : '#fff',
         }}
       ></div>
-    )
-  }
-
-  // Handle Unlock page rendering
-  if (pathname === '/unlock') {
-    return (
-      <ThemeProvider theme={theme}>
-        <NoticeManager position={verge?.notice_position} />
-        <Paper square elevation={0} className={`${OS} layout`}>
-          {customTitlebar}
-          <div className="layout-content" style={{ padding: 20 }}>
-            <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-              <Outlet />
-            </ErrorBoundary>
-          </div>
-        </Paper>
-      </ThemeProvider>
     )
   }
 

@@ -43,6 +43,17 @@
 
 ---
 
+### BUG-382 清理不可达流媒体解锁 `/unlock` 子系统与零使用 `tauri-plugin-http`
+
+- **对应模块**：[src-tauri/src/cmd/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/mod.rs)、[src-tauri/src/lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)、[src-tauri/Cargo.toml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/Cargo.toml)、[desktop.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/capabilities/desktop.json)、[src/pages/_routers.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_routers.tsx)、[src/pages/_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[package.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/package.json)
+- **问题描述**：Clash Mini 为单窗极简路由设计，UI 从未暴露 `/unlock` 路由入口，`src/pages/unlock.tsx` 与后端 `cmd::media_unlock_checker`（`get_unlock_items`、`check_media_unlock`）、前端 `@tauri-apps/plugin-http` 与后端 `tauri-plugin-http`（额外拖入重复的 `reqwest v0.12.28` 依赖树）均属于无实际触达路径的遗留死代码，既膨胀产物体积又增加 WebView 网络插件攻击面（另经核查 `Cargo.lock` 中 `zip v4.6.1` 为 Tauri 转递的精简无 `flate2` 版本，主包压缩继续保留 `zip = "8.6.0"`）。
+- **修复方案**：
+  1. 移除前端 `src/pages/unlock.tsx`、`_routers.tsx` `/unlock` 路由、`_layout.tsx` `/unlock` 分支、`UNLOCK_TIMEOUT_MS` 及后端 `cmd/media_unlock_checker` 模块与 Tauri IPC 命令注册，并用 `pnpm i18n:format` / `pnpm i18n:types` 清理对应废弃翻译键（保留活跃的 `navigation.menu.unlock` 菜单锁定控制键）；
+  2. 全链路移除 `tauri-plugin-http`、`@tauri-apps/plugin-http` 与 `capabilities/desktop.json` `http:*` 权限，使前端零直接 HTTP 插件暴露，外部网络请求统一收口至受 SSRF 防护的 Rust `NetworkManager`。
+- **状态**：代码已修正，待用户确认
+
+---
+
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
 历史已确认关闭条目（`BUG-057` ~ `BUG-378`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。

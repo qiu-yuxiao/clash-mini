@@ -90,7 +90,7 @@
 |---|---|---|
 | `shell:allow-open`（移除 `execute`/`spawn`/`kill`/`stdin-write`） | Tauri 权限 | 权限最小化（§6.1） |
 | FS 作用域 `["$APPDATA/**"]`（移除 `**`） | Tauri 权限 | 防前端读任意文件（§6.1） |
-| HTTP 插件域名白名单（`cdn.jsdelivr.net` 等） | Tauri 权限 | 收紧 HTTP（§6.1） |
+| `NetworkManager` 后端收口（彻底移除 `tauri-plugin-http`） | Tauri 权限 / 后端 | 零前端直接 HTTP 插件暴露（§6.1 / §6.2） |
 | `open_web_url` | 函数 | 仅允许 http/https（§6.2） |
 | `danger_accept_invalid_certs` | 配置 | 启用记 warn 日志（§6.2） |
 | `apply_builtin_guards` / 兼容忽略 `type: script` | 配置增强 | 原生 Rust 卫兵取代 `boa_engine` 沙箱，无 JS 运行时攻击面（§6.4） |
