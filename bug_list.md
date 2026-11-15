@@ -32,6 +32,15 @@
 
 ---
 
+### BUG-381 内置脚本增强退场：`boa_engine` 改为原生 Rust 卫兵
+
+- **对应模块**：[enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)（`apply_builtin_guards`）、[enhance/chain.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/chain.rs)、[config.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/config.rs)、[prfitem.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/prfitem.rs)、[validate.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/validate.rs)、[Cargo.toml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/Cargo.toml)
+- **问题描述**：Clash Mini 遵循零脚本编辑器的极简哲学，前端早已不提供 JS 脚本入口，但后端仍全量引入重型 Rust JS 引擎 `boa_engine`（`v0.21.1`），并在每次 `enhance()` 与配置初始化时执行 `meta_guard.js` / `meta_hy_alpn.js`（仅做 2 项极简 YAML 字段归一化）以及创建无用的默认 `Script` 增强文件，白白增大二进制体积、编译耗时与内存开销。
+- **修复方案**：
+  1. 在 [enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs) 以原生 Rust `apply_builtin_guards` 等价替代原内置 `meta_guard.js`（`mode: script` → `rule`）与 `meta_hy_alpn.js`（`hysteria` 字符串 `alpn` → 单元素数组）；
+  2. 移除 `boa_engine` 依赖、`src-tauri/src/enhance/script.rs` 与 `builtin/*.js`；停止 `ensure_default_profile_items` / `create_enhance_items` 新建 `Script` 项，同时保持对存量 `profiles.yaml` 中历史 `type: script` 条目与旧 `.js` 文件的 100% 向后兼容放行（安全忽略无操作）。
+- **状态**：代码已修正，待用户确认
+
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)

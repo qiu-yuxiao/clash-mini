@@ -96,7 +96,7 @@ flowchart TB
 |---|---|---|
 | **IPC 命令层** | `src-tauri/src/cmd/` | 全部 `#[tauri::command]`（`app.rs` `clash.rs` `core_update.rs` `diagnostics.rs` `profile.rs` `proxy.rs` `runtime.rs` `service.rs` `verge.rs` …），注册于 `lib.rs` 的 `generate_handlers!` |
 | **内核生命周期** | `src-tauri/src/core/manager/` | `CoreManager` 单例；`RunningMode`（Service / Sidecar / NotRunning）；`start_core`/`stop_core`/`restart_core`；Service vs Sidecar 决策；重启/热重载前后 `PROXY.now` 快照-恢复 |
-| **配置生成（enhance）** | `src-tauri/src/enhance/` | `enhance()` 合并所有 profile 的 proxies/merge/script/rules + 全局 Merge/Script，最后 `enforce_mini_agreements` 把 proxy-groups 改写成 `[PROXY(select), PROXY__METRICS(url-test)]` 并注入 GFWList 规则 |
+| **配置生成（enhance）** | `src-tauri/src/enhance/` | `enhance()` 合并所有 profile 的 proxies/merge/rules + 全局 Merge，经原生 Rust 卫兵 `apply_builtin_guards` 归一化后，由 `enforce_mini_agreements` 把 proxy-groups 改写成 `[PROXY(select), PROXY__METRICS(url-test)]` 并注入 GFWList 规则 |
 | **配置 / 状态** | `src-tauri/src/config/` | `Config` 单例（4 个 `Draft<T>` 已提交 vs 在途）；`IVerge` / `IProfiles` / `PrfItem` / `IClashTemp` |
 | **特性编排** | `src-tauri/src/feat/` | `patch_verge`（用 `UpdateFlags` 位标决定重启内核 / 更新系统代理 / 刷新托盘 / 切语言）、`toggle_system_proxy` / `toggle_tun_mode` |
 | **监测与自愈引擎** | `src-tauri/src/module/monitor.rs` | 长驻守护线程：正常 15s / 离线 5s / 重试 3s 周期；`evaluate_failover` 读 `PROXY__METRICS` 权威值；`trigger_backend_auto_select` 统一测速+选点；回写 `profile.selected`（三层防污染校验）；网络在线/离线探测；统一记账 `self_heal_with_accounting` |

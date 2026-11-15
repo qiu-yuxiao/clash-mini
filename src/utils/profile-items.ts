@@ -4,8 +4,9 @@
  * ### 为什么单独抽出来
  *
  * 后端 `Config::init_config()` 每次启动都会调用 `ensure_default_profile_items()`，
- * **无条件**向 `profiles.items` 追加 `Merge`（`type: merge`）与 `Script`（`type: script`）
- * 两个内置项。因此 `profiles.items.length` **恒 ≥ 2**，永远不可能为 0。
+ * 向 `profiles.items` 确保存在内置 `Merge`（`type: merge`）增强项；
+ * 从旧版升级的用户配置中还可能遗留历史 `Script`（`type: script`）内置项。
+ * 因此 `profiles.items.length` 通常 **≥ 1**，永远不可能仅靠长度判空。
  *
  * 首次使用引导曾用 `items.length === 0` 判断「还没添加任何订阅」，结果弹窗永不出现。
  * 判断「是否首次使用」必须只看**真实订阅**（`remote` / `local`），忽略内置项。

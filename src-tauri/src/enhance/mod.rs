@@ -1,7 +1,6 @@
 mod chain;
 pub mod field;
 mod merge;
-mod script;
 pub mod seq;
 mod tun;
 
@@ -9,13 +8,12 @@ use self::{
     chain::{AsyncChainItemFrom as _, ChainItem, ChainType},
     field::{use_keys, use_lowercase, use_sort},
     merge::use_merge,
-    script::use_script,
     seq::{SeqMap, use_seq},
     tun::use_tun_with_sniffer,
 };
+use crate::config::Config;
 use crate::config::IVerge;
 use crate::utils::dirs;
-use crate::{config::Config, utils::tmpl};
 use anyhow::{Context as _, Result};
 use clash_verge_logging::{Type, logging};
 use serde_yaml_ng::{Mapping, Value};
@@ -38,26 +36,18 @@ struct ConfigValues {
 struct ProfileItems {
     config: Mapping,
     merge_item: ChainItem,
-    script_item: ChainItem,
     rules_item: ChainItem,
     proxies_item: ChainItem,
     global_merge: ChainItem,
-    global_script: ChainItem,
-    profile_name: String,
 }
 
 impl Default for ProfileItems {
     fn default() -> Self {
         Self {
             config: Default::default(),
-            profile_name: Default::default(),
             merge_item: ChainItem {
                 uid: "".into(),
                 data: ChainType::Merge(Mapping::new()),
-            },
-            script_item: ChainItem {
-                uid: "".into(),
-                data: ChainType::Script(tmpl::ITEM_SCRIPT.into()),
             },
             rules_item: ChainItem {
                 uid: "".into(),
@@ -70,10 +60,6 @@ impl Default for ProfileItems {
             global_merge: ChainItem {
                 uid: "Merge".into(),
                 data: ChainType::Merge(Mapping::new()),
-            },
-            global_script: ChainItem {
-                uid: "Script".into(),
-                data: ChainType::Script(tmpl::ITEM_SCRIPT.into()),
             },
         }
     }
@@ -147,16 +133,11 @@ async fn collect_profile_items() -> Result<ProfileItems> {
     };
 
     let merge_uid = current_item.current_merge().cloned().unwrap_or_else(|| "Merge".into());
-    let script_uid = current_item
-        .current_script()
-        .cloned()
-        .unwrap_or_else(|| "Script".into());
     let rules_uid = current_item.current_rules().cloned().unwrap_or_else(|| "Rules".into());
     let proxies_uid = current_item
         .current_proxies()
         .cloned()
         .unwrap_or_else(|| "Proxies".into());
-    let name = current_item.name.clone().unwrap_or_default();
 
     let merge_item = {
         let item = profiles_arc.get_item(&merge_uid).ok().cloned();
@@ -169,19 +150,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
     .unwrap_or_else(|| ChainItem {
         uid: "".into(),
         data: ChainType::Merge(Mapping::new()),
-    });
-
-    let script_item = {
-        let item = profiles_arc.get_item(&script_uid).ok().cloned();
-        if let Some(item) = item {
-            <Option<ChainItem>>::from_async(&item).await
-        } else {
-            None
-        }
-    }
-    .unwrap_or_else(|| ChainItem {
-        uid: "".into(),
-        data: ChainType::Script(tmpl::ITEM_SCRIPT.into()),
     });
 
     let rules_item = {
@@ -223,40 +191,18 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         data: ChainType::Merge(Mapping::new()),
     });
 
-    let global_script = {
-        let item = profiles_arc.get_item("Script").ok().cloned();
-        if let Some(item) = item {
-            <Option<ChainItem>>::from_async(&item).await
-        } else {
-            None
-        }
-    }
-    .unwrap_or_else(|| ChainItem {
-        uid: "Script".into(),
-        data: ChainType::Script(tmpl::ITEM_SCRIPT.into()),
-    });
-
     drop(profiles_arc);
 
     Ok(ProfileItems {
         config: current,
         merge_item,
-        script_item,
         rules_item,
         proxies_item,
         global_merge,
-        global_script,
-        profile_name: name,
     })
 }
 
-async fn process_global_items(
-    mut config: Mapping,
-    global_merge: ChainItem,
-    global_script: ChainItem,
-    profile_name: &String,
-) -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
-    let mut result_map = HashMap::new();
+fn process_global_items(mut config: Mapping, global_merge: ChainItem) -> (Mapping, Vec<String>) {
     let mut exists_keys = use_keys(&config).collect::<Vec<_>>();
 
     if let ChainType::Merge(merge) = global_merge.data {
@@ -264,33 +210,16 @@ async fn process_global_items(
         config = use_merge(&merge, config.to_owned());
     }
 
-    if let ChainType::Script(script) = global_script.data {
-        let mut logs = vec![];
-        match use_script(script, config.clone(), profile_name.clone()).await {
-            Ok((res_config, res_logs)) => {
-                exists_keys.extend(use_keys(&res_config));
-                config = res_config;
-                logs.extend(res_logs);
-            }
-            Err(err) => logs.push(("exception".into(), err.to_string().into())),
-        }
-        result_map.insert(global_script.uid, logs);
-    }
-
-    (config, exists_keys, result_map)
+    (config, exists_keys)
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn process_profile_items(
+fn process_profile_items(
     mut config: Mapping,
     mut exists_keys: Vec<String>,
-    mut result_map: HashMap<String, ResultLog>,
     rules_item: ChainItem,
     proxies_item: ChainItem,
     merge_item: ChainItem,
-    script_item: ChainItem,
-    profile_name: &String,
-) -> (Mapping, Vec<String>, HashMap<String, ResultLog>) {
+) -> (Mapping, Vec<String>) {
     if let ChainType::Rules(rules) = rules_item.data {
         config = use_seq(rules, config.to_owned(), "rules");
     }
@@ -304,20 +233,7 @@ async fn process_profile_items(
         config = use_merge(&merge, config.to_owned());
     }
 
-    if let ChainType::Script(script) = script_item.data {
-        let mut logs = vec![];
-        match use_script(script, config.clone(), profile_name.clone()).await {
-            Ok((res_config, res_logs)) => {
-                exists_keys.extend(use_keys(&res_config));
-                config = res_config;
-                logs.extend(res_logs);
-            }
-            Err(err) => logs.push(("exception".into(), err.to_string().into())),
-        }
-        result_map.insert(script_item.uid, logs);
-    }
-
-    (config, exists_keys, result_map)
+    (config, exists_keys)
 }
 
 async fn merge_default_config(
@@ -405,24 +321,23 @@ async fn merge_default_config(
     config
 }
 
-async fn apply_builtin_scripts(mut config: Mapping, clash_core: Option<String>, enable_builtin: bool) -> Mapping {
-    if enable_builtin {
-        let items: Vec<_> = ChainItem::builtin()
-            .into_iter()
-            .filter(|(s, _)| s.is_support(clash_core.as_ref()))
-            .map(|(_, c)| c)
-            .collect();
-        for item in items {
-            logging!(debug, Type::Core, "run builtin script {}", item.uid);
-            if let ChainType::Script(script) = item.data {
-                match use_script(script, config.clone(), String::from("")).await {
-                    Ok((res_config, _)) => {
-                        config = res_config;
-                    }
-                    Err(err) => {
-                        logging!(error, Type::Core, "builtin script error `{err}`");
-                    }
-                }
+/// 原生 Rust 内建规则卫兵（替代原内置 `meta_guard.js` / `meta_hy_alpn.js`，零 JS 引擎开销）
+fn apply_builtin_guards(mut config: Mapping, clash_core: Option<&str>, enable_builtin: bool) -> Mapping {
+    if !enable_builtin || clash_core.is_some_and(|core| core != "mini-mihomo") {
+        return config;
+    }
+
+    if config.get("mode").and_then(Value::as_str) == Some("script") {
+        config.insert(Value::from("mode"), Value::from("rule"));
+    }
+
+    if let Some(proxies) = config.get_mut("proxies").and_then(Value::as_sequence_mut) {
+        for proxy_val in proxies {
+            if let Some(map) = proxy_val.as_mapping_mut()
+                && map.get("type").and_then(Value::as_str) == Some("hysteria")
+                && let Some(Value::String(alpn)) = map.get("alpn").cloned()
+            {
+                map.insert(Value::from("alpn"), Value::Sequence(vec![Value::String(alpn)]));
             }
         }
     }
@@ -1671,35 +1586,21 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     config.insert(Value::from("proxies"), Value::from(merged));
 
     let merge_item = profile.merge_item;
-    let script_item = profile.script_item;
     let rules_item = profile.rules_item;
     let proxies_item = profile.proxies_item;
     let global_merge = profile.global_merge;
-    let global_script = profile.global_script;
-    let profile_name = profile.profile_name;
 
     // process globals
-    let (config, exists_keys, result_map) =
-        process_global_items(config, global_merge, global_script, &profile_name).await;
+    let (config, exists_keys) = process_global_items(config, global_merge);
 
     // process profile-specific items
-    let (config, exists_keys, result_map) = process_profile_items(
-        config,
-        exists_keys,
-        result_map,
-        rules_item,
-        proxies_item,
-        merge_item,
-        script_item,
-        &profile_name,
-    )
-    .await;
+    let (config, exists_keys) = process_profile_items(config, exists_keys, rules_item, proxies_item, merge_item);
 
     // merge default clash config
     let config = merge_default_config(config, clash_config, socks_enabled, http_enabled).await;
 
-    // builtin scripts
-    let mut config = apply_builtin_scripts(config, clash_core, enable_builtin).await;
+    // builtin guards
+    let mut config = apply_builtin_guards(config, clash_core.as_deref(), enable_builtin);
 
     config = enforce_mini_agreements(config).await;
 
@@ -1713,7 +1614,7 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     let mut exists_keys_set = HashSet::new();
     exists_keys_set.extend(exists_keys);
 
-    Ok((config, exists_keys_set, result_map))
+    Ok((config, exists_keys_set, HashMap::new()))
 }
 
 #[allow(clippy::expect_used, clippy::unwrap_used)]
@@ -2230,5 +2131,60 @@ proxies:
             .unwrap();
         let names: Vec<&str> = proxy_proxies.iter().filter_map(Value::as_str).collect();
         assert_eq!(names, vec!["香港1"]);
+    }
+
+    #[test]
+    fn test_apply_builtin_guards_mode_and_hysteria_alpn() {
+        use super::apply_builtin_guards;
+        use serde_yaml_ng::{Mapping, Value};
+
+        let yaml_str = r"
+mode: script
+proxies:
+  - name: hy1
+    type: hysteria
+    server: 198.51.100.1
+    port: 443
+    alpn: h3
+  - name: hy_arr
+    type: hysteria
+    server: 198.51.100.2
+    port: 443
+    alpn:
+      - h3
+  - name: hy2
+    type: hysteria2
+    server: 198.51.100.3
+    port: 443
+    alpn: h3
+";
+        let input: Mapping = serde_yaml_ng::from_str(yaml_str).unwrap();
+
+        // enable_builtin = false 时不做任何改写
+        let disabled = apply_builtin_guards(input.clone(), Some("mini-mihomo"), false);
+        assert_eq!(disabled.get("mode").and_then(Value::as_str), Some("script"));
+
+        // 启用内建卫兵：mode: script -> rule；hysteria 字符串 alpn -> 单元素数组；其余不变
+        let guarded = apply_builtin_guards(input, Some("mini-mihomo"), true);
+        assert_eq!(guarded.get("mode").and_then(Value::as_str), Some("rule"));
+        let proxies = guarded.get("proxies").and_then(Value::as_sequence).unwrap();
+        assert_eq!(
+            proxies[0].as_mapping().unwrap().get("alpn"),
+            Some(&Value::Sequence(vec![Value::String("h3".into())]))
+        );
+        assert_eq!(
+            proxies[1].as_mapping().unwrap().get("alpn"),
+            Some(&Value::Sequence(vec![Value::String("h3".into())]))
+        );
+        assert_eq!(
+            proxies[2].as_mapping().unwrap().get("alpn").and_then(Value::as_str),
+            Some("h3")
+        );
+
+        // 其他有效 mode 不被覆盖
+        let mut rule_cfg = Mapping::new();
+        rule_cfg.insert(Value::from("mode"), Value::from("global"));
+        let kept = apply_builtin_guards(rule_cfg, None, true);
+        assert_eq!(kept.get("mode").and_then(Value::as_str), Some("global"));
     }
 }

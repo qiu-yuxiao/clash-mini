@@ -137,10 +137,6 @@ impl Config {
             let merge_item = &mut PrfItem::from_merge(Some("Merge".into()))?;
             profiles_append_item_safe(merge_item).await?;
         }
-        if profiles.latest_arc().get_item("Script").is_err() {
-            let script_item = &mut PrfItem::from_script(Some("Script".into()))?;
-            profiles_append_item_safe(script_item).await?;
-        }
         Ok(())
     }
 

@@ -49,8 +49,7 @@
 | `formatCoreVersion` | 前端函数 | 内核版本前缀剥离 + `Ver.` 统一格式（§3.3） |
 | `fix_dirty_url` / `validate_url_no_ssrf` | 函数 | 订阅 URL SSRF 防护（§6.2） |
 | `safe_extract_zip` | 函数 | Zip Slip 防护，替代 `zip.extract`（§6.2） |
-| `serde_json::to_string` | 序列化 | JS 脚本传参防注入，替代字符串拼接（§6.2） |
-| `boa_engine` | JS 引擎 | 原型链冻结等沙箱加固（§6.3） |
+| `apply_builtin_guards` | 原生函数 | 原生 Rust 配置卫兵（替代原内置 JS 脚本与 `boa_engine`，§6.4） |
 | `geodata-loader=memconservative` | 内核配置 | 按需加载 GeoIP/GeoSite，降内存（§3.6） |
 
 ## 四、轻量模式
@@ -94,7 +93,7 @@
 | HTTP 插件域名白名单（`cdn.jsdelivr.net` 等） | Tauri 权限 | 收紧 HTTP（§6.1） |
 | `open_web_url` | 函数 | 仅允许 http/https（§6.2） |
 | `danger_accept_invalid_certs` | 配置 | 启用记 warn 日志（§6.2） |
-| `boa_engine` 原型链冻结（Object/Function/Array/String/Number/Boolean.prototype） | JS 沙箱 | 防原型污染（§6.3） |
+| `apply_builtin_guards` / 兼容忽略 `type: script` | 配置增强 | 原生 Rust 卫兵取代 `boa_engine` 沙箱，无 JS 运行时攻击面（§6.4） |
 | `overflow-checks=true`(release) | 编译配置 | 防整数溢出（§6.4） |
 | YAML 大小限制 50MB | 解析前置 | 防解压炸弹（§6.4） |
 

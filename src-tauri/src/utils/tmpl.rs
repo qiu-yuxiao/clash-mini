@@ -20,14 +20,6 @@ pub const ITEM_MERGE_EMPTY: &str = "# Profile Enhancement Merge Template for Cla
 ";
 
 /// enhanced profile
-pub const ITEM_SCRIPT: &str = "// Define main function (script entry)
-
-function main(config, profileName) {
-  return config;
-}
-";
-
-/// enhanced profile
 pub const ITEM_RULES: &str = "# Profile Enhancement Rules Template for Clash Verge
 
 prepend: []

@@ -181,7 +181,7 @@ struct EnhanceItems {
 /// groups 只读返回不创建（阻止生成死 g*.yaml 文件）。
 async fn ensure_enhance_items(option: Option<&PrfOption>) -> Result<EnhanceItems> {
     let mut merge = option.and_then(|o| o.merge.clone());
-    let mut script = option.and_then(|o| o.script.clone());
+    let script = option.and_then(|o| o.script.clone());
     let mut rules = option.and_then(|o| o.rules.clone());
     let mut proxies = option.and_then(|o| o.proxies.clone());
     let groups = option.and_then(|o| o.groups.clone());
@@ -190,11 +190,6 @@ async fn ensure_enhance_items(option: Option<&PrfOption>) -> Result<EnhanceItems
         let merge_item = &mut PrfItem::from_merge(None)?;
         profiles::profiles_append_item_safe(merge_item).await?;
         merge = merge_item.uid.clone();
-    }
-    if script.is_none() {
-        let script_item = &mut PrfItem::from_script(None)?;
-        profiles::profiles_append_item_safe(script_item).await?;
-        script = script_item.uid.clone();
     }
     if rules.is_none() {
         let rules_item = &mut PrfItem::from_rules()?;
@@ -641,25 +636,6 @@ impl PrfItem {
             file: Some(file),
             updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(template),
-            ..Default::default()
-        })
-    }
-
-    /// ## Script type (enhance)
-    /// create the enhanced item by using javascript quick.js
-    pub fn from_script(uid: Option<String>) -> Result<Self> {
-        let id = if let Some(uid) = uid {
-            uid
-        } else {
-            help::get_uid("s").into()
-        };
-        let file = format!("{id}.js").into(); // js ext
-        Ok(Self {
-            uid: Some(id),
-            itype: Some("script".into()),
-            file: Some(file),
-            updated: Some(chrono::Local::now().timestamp()),
-            file_data: Some(tmpl::ITEM_SCRIPT.into()),
             ..Default::default()
         })
     }

@@ -228,57 +228,21 @@ impl CoreConfigValidator {
         }
     }
 
-    /// 验证脚本文件语法
+    /// 检查脚本文件可读性（Clash Mini 已将脚本增强收编为原生 Rust 卫兵，历史 `.js` 仅作可读性校验）
     async fn validate_script_file_outcome(path: &str) -> Result<ValidationOutcome> {
-        // 读取脚本内容
-        let content = match fs::read_to_string(path).await {
-            Ok(content) => content,
-            Err(err) => {
-                let error_msg: String = format!("Failed to read script file: {err}").into();
-                logging!(warn, Type::Validate, "脚本语法错误: {}", err);
-                return Ok(ValidationOutcome::invalid_from_message(error_msg));
-            }
-        };
-
-        logging!(debug, Type::Validate, "验证脚本文件: {}", path);
-
-        // 使用boa引擎进行基本语法检查
-        let content_clone = content.clone();
-        let handle = crate::process::AsyncHandler::spawn_blocking(move || {
-            use boa_engine::{Context, Source};
-            let mut context = Context::default();
-            context.runtime_limits_mut().set_loop_iteration_limit(100_000); // 限制循环指令数
-            context
-                .eval(Source::from_bytes(&content_clone))
-                .map(|_| ())
-                .map_err(|err| err.to_string())
-        });
-
-        let eval_result = match tokio::time::timeout(std::time::Duration::from_secs(2), handle).await {
-            Ok(Ok(result)) => result,
-            Ok(Err(join_err)) => Err(format!("Validation task panicked: {join_err}")),
-            Err(_) => Err("Validation timed out (possible infinite loop)".to_string()),
-        };
-
-        match eval_result {
+        match fs::read_to_string(path).await {
             Ok(_) => {
-                logging!(debug, Type::Validate, "脚本语法验证通过: {}", path);
-
-                // 检查脚本是否包含main函数
-                if !content.contains("function main")
-                    && !content.contains("const main")
-                    && !content.contains("let main")
-                {
-                    let error_msg = "Script must contain a main function";
-                    logging!(warn, Type::Validate, "脚本缺少main函数: {}", path);
-                    return Ok(ValidationOutcome::invalid_from_message(error_msg));
-                }
-
+                logging!(
+                    info,
+                    Type::Validate,
+                    "检测到历史脚本文件（JS 增强引擎已退休，仅保留兼容放行）: {}",
+                    path
+                );
                 Ok(ValidationOutcome::Valid)
             }
             Err(err) => {
-                let error_msg: String = format!("Script syntax error: {err}").into();
-                logging!(warn, Type::Validate, "脚本语法错误: {}", err);
+                let error_msg: String = format!("Failed to read script file: {err}").into();
+                logging!(warn, Type::Validate, "脚本文件读取失败: {}", err);
                 Ok(ValidationOutcome::invalid_from_message(error_msg))
             }
         }

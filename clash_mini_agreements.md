@@ -265,7 +265,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 2.12 首次使用引导与网络就绪反馈（含 GitHub Star 转化设计）
 
 - **触发条件（判定语义，错不得）**：`localStorage.getItem('clash-mini-first-run-completed') !== 'true'` **且列表中没有任何真实订阅**（`type === 'remote' || type === 'local'`）时，启动 500ms 后自动居中弹出引导弹窗（`FirstRunGuideDialog`）。
-  - **严禁用 `profiles.items.length === 0` 判断**：后端 `Config::init_config()` 每次启动都会调用 `ensure_default_profile_items()`，**无条件**追加 `Merge`（`type: merge`）与 `Script`（`type: script`）两个内置项，故 `items.length` **恒 ≥ 2**、该判定永不成立（v2.9.9 曾因此让弹窗完全变成死代码）。
+  - **严禁用 `profiles.items.length === 0` 判断**：后端 `Config::init_config()` 每次启动都会调用 `ensure_default_profile_items()`，**无条件**确保存在 `Merge`（`type: merge`）内置项（从旧版升级的配置还可能保留历史 `Script` 项），故 `items.length` 始终非零、该判定永不成立（v2.9.9 曾因此让弹窗完全变成死代码）。
   - 判定逻辑固定在 `src/utils/profile-items.ts`（`hasRealProfileItem`），并有回归单测；存量老用户绝不被打扰。
 - **两步式价值感知与转化向导（`STEP 1 / 2` → `STEP 2 / 2`）**：
   - **横向全宽铺满默认 `271px` 窄视口**：由于初次启动默认窗口宽度为 `271px`（见 §2.3），引导弹窗必须显式声明全宽约束（破除 MUI `Dialog` 默认左右外边距挤压）并配合紧凑内边距，严禁在瘦长窗口内再嵌套一条更窄的瘦长弹窗。
@@ -527,10 +527,10 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 - **安全路径标准化**：所有内置与在线更新解压操作，必须使用具备路径越界防御的安全解压模块。
 - **Zip Slip 拦截**：针对 ZIP 压缩包中的每个条目，严格检查目标解压路径；凡包含 `..` 相对路径穿越标记、绝对路径前缀或试图逃逸解压目标目录的条目，一律强制拒绝解压并记录安全告警。
 
-### 6.4 脚本执行沙箱与原型链防污染
+### 6.4 配置增强极简化与原生 Rust 卫兵（`BUG-381`）
 
-- **JS 扩展沙箱隔离**：内置 Boa JavaScript 引擎在执行用户自定义增强脚本（Script Enhance）前，预先冻结底层原型链（`Object.prototype`、`Array.prototype`、`Function.prototype`），杜绝原型链污染攻击。
-- **计算资源硬限**：设置单次脚本执行循环迭代上限、内存占用上限与最长执行超时时间，防止恶意死循环脚本导致主进程挂起。
+- **JS 扩展引擎彻底退场**：Clash Mini 坚持零手工脚本编辑器的极简架构，自 v3.3.4 起移除嵌入式 `boa_engine` JavaScript 运行时及内置 `.js` 脚本文件，原 `meta_guard.js`（`mode: script` → `rule`）与 `meta_hy_alpn.js`（`hysteria` 字符串 `alpn` → 数组）全部由原生 Rust 函数 `apply_builtin_guards` 在毫秒级无分配完成。
+- **存量兼容承诺**：不再在新建配置时自动生成 `Script` 增强文件；若升级用户的 `profiles.yaml` 中仍遗留历史 `type: script` 项或旧 `.js` 文件，后端自动作为无操作（no-op）安全忽略并放行校验，绝不破坏已有配置读取。
 
 ### 6.5 编译期加固与源码保护
 
@@ -852,6 +852,7 @@ flowchart LR
 | **BUG-378** | §5 最高方针 / 5.1 / 5.2 / 5.5 / 5.6 | 文档治理：消除 S1–S5 落地后的规范内部矛盾。§5.5「离线转在线秒级触发自愈」改写为恒判 `Wait`；§5.1 补齐 15 / 3 / 5 三档周期并把已不存在的 `[探针]` 章节改为溯源说明；§5.2 澄清废除的是后端测速取数兜底、与 §5.6 前端 `history` 回落作用域不同（原历史草案 `docs/node-health-architecture.md` 已于 v3.3.4 随宪章收口彻底清理移除）。 |
 | **BUG-379** | 5.1 / 5.2 | **【待用户确认】** 终结后台 60s 全组盲测风暴并维持 §5.2 无回环铁律：`monitor.rs` 引入基于本地 `/connections` 字节增量的被动流量证活状态机——活跃下行传输（`Flowing`）免拨测上限延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s < 600s)`、完全空闲（`Idle`）对齐测量组周期 `IDLE_HEALTH_FRESH_SECS (300s)`、有出无回黑洞（`Stalled`）带 `STALL_REPROBE_COOLDOWN_SECS (60s)` 冷却立即实拨复核；非 `Alive` 仍强制实拨，保留 BUG-377 异源隔离不变式。 |
 | **BUG-380** | §5 最高方针 / 5.4 | **【待用户确认】** 真 HTTPS 验真由不可逆永久拉黑改为 24h 可恢复软隔离：`NodeVerifyRecord::is_confirmed_fake_at` 复用 `last_verified_at` 实施 `HTTPS_VERIFY_BAN_TTL_SECS (86_400)` TTL 期满自动缓刑重测；`feat/profile.rs::update_profile` 在用户手动更新订阅时调用 `clear_unverified_https_failures()` 立即重置未验真失败记录（保留 `verified_true` 白名单）并刷新列表；同步在 §2.8/§5 明确记录过滤框 700ms 地域策略即时切换特例豁免。 |
+| **BUG-381** | 2.12 / 6.4 | **【待用户确认】** 移除重型嵌入式 JS 引擎 `boa_engine` 与 `enhance/script.rs` / 内置 `.js` 文件，改用原生 Rust `apply_builtin_guards` 完成 `mode: script` 归一与 `hysteria` string `alpn` 转数组；停止新建 `Script` 默认项，保留存量 `profiles.yaml` 历史 `type: script` 兼容忽略。 |
 
 ---
 
