@@ -399,7 +399,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 4.2 不断网不断流铁律与后端连接维持
 
 - **网络连接连续性铁律**：**进入轻量模式、退出轻量模式或在正常状态下自愈/手动切换节点，绝对禁止全量切断已建立的用户网络连接**。
-- **故障转移精确断死留活（BUG-368，v3.3.2）**：仅当后台监测经二次复核确认活跃节点 `dead_node` 已不可用并成功转移至不同健康节点 `new_node` 时，调用 `close_connections_on_dead_node` 仅针对 `chains` 命中 `dead_node` 的存量连接执行精确关闭（最多等待 `3s` 超时），**严禁触碰 `DIRECT` 与其他健康节点连接**，使卡死在已瘫痪节点的 HTTP/2 / gRPC 长连接立即在新出口重建恢复。
+- **故障转移默认不清连接（Sync-18 修订，取代 BUG-368 的「精确断死留活」）**：`select_node_for_group` 本身是干净热切换，已有连接不受影响；v3.3.2 的 `close_connections_on_dead_node` 仅按 `chains` 命中筛选，**没有 age / upload / download / alive 过滤**，无法区分「已挂死的连接」与「仍在正常传输的健康长连接」，在后台测速周期性择优选点时会把 HTTP/2 / gRPC 长流（Antigravity 等）直接 RST，使「链路只是抖了一下」升级为「会话态丢失的硬断」。故自愈成功切换后**默认不清理任何存量连接**（`DEAD_CONN_CLEANUP_ENABLED = false`，并输出「已切换、跳过清理」日志），长连接交由应用层自身重连。`close_connections_on_dead_node` / `collect_dead_node_connection_ids` 实现与单测保留但不在默认路径调用；重新开启的前提是引入 ConfirmedDead 迟滞状态确证旧节点已死，且只对「确已无流量」的连接执行清理（评审报告 S4）。
 - **内核进程与虚拟网卡不间断**：内核子进程与 TUN 网卡始终保持正常全速运行，正常流量与健康长连接绝不发生瞬间闪断。
 
 ### 4.3 前端 WebSocket 熔断与自动重连自愈
@@ -428,6 +428,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **恒定 15 秒监测周期**：监测周期在轻量模式与前台窗口开启时**严格恒定为 15 秒**，不做任何放慢（代理运行与前台窗口开闭无关，节点假死应在 15 秒内被捕获）。
 - **重试加速（3 秒）**：当探测到当前活跃节点异常或初次失败时，周期立即动态收紧为 **3 秒**，执行高频复检。
 - **防抖自愈判定**：严格执行**连续 2 次检测失败**才正式触发全节点批量选点自愈，彻底滤除网络微抖动造成的过度切换。
+- **测速失真不记失败（Sync-18）**：体检得出「主测速地址整体失败、备用地址可用 ⇒ 测速地址失真、节点侧正常」时，`evaluate_failover` 直接返回 `NoAction`，主循环清零 `consecutive_fails` 并复位健康态；该结论必须由 `probe_metrics_group` 以 `MetricsProbeOutcome.primary_url_distorted` 显式传回裁决层，**严禁只写日志不进裁决**。
 - **严格判死阈值（5000ms）**：测速超时硬限为 **5000ms**；延迟有效区间锁定为 `[30ms, 5000ms)`；超过 5000ms 或产生握手错误一律判死。**该值历史上在 2000ms 与 5000ms 之间反复调整过不止一次，2026-10 定型为 5000ms（BUG-304 现场双路对照监控实证）：链路拥塞簇内仅 TCP 握手即需 1.1~2.1s（SYN 丢包按 1s RTO 重传的整秒台阶指纹），叠加 TLS 握手与 204 探测往返后，「慢而可用」的活节点总耗时稳定超过 2s——2000ms 预算会把拥塞期的整组活节点误判为断流；而真死节点（机场集群故障）5s 内同样超时，不会产生误活。除非有同等量级的现场实证，禁止回调至 2000ms。**
 - **切换宽限期（20 秒，v3.2.4 优化）**：任何节点切换（含自动选点与手动切换）后 20 秒内，失败判定只记日志、不计入连续失败次数，防止「切到尚未拨测的新节点 → 缓存陈旧误判 → 再次切走」的乒乓震荡。v3.2.4 从原 60 秒缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
 - **探测按需降频（20 秒新鲜度 + 二次独立复核，v3.2.4 / v3.3.2）**：体检不再每周期对测量组全组拨测，改为按缓存新鲜度决策——活跃节点健康且 history < 20 秒直接信缓存；常规状态下刚判死 10 秒内不重复拨测。当已进入重试复核阶段（`consecutive_fails > 0`，每 3 秒复检）时，通过 `should_probe_active_node(..., force_confirm_probe=true)` **强制跳过 10 秒死节点去抖缓存并禁用短窗合并，执行第二次物理独立全组拨测**（BUG-368），确保连续 2 次失败绝非读取同一份缓存的假复核。
@@ -459,12 +460,13 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - `monitor::evaluate_failover` 触发 `probe_metrics_group` 取得新鲜实时延迟后，非轻量模式下通过 `Handle::notify_delay_results("PROXY", ..., true)` + `Handle::refresh_proxies()` 同步广播至前端并置 `reported_live_to_ui = true`，使断网恢复或后台体检后列表立即更新延迟而不长期显示 `-`；`lifecycle::restart_core` 完成后立即调用 `MONITOR_WAKEUP_NOTIFY.notify_one()` 唤醒首轮检测。
   - `DelayManager::setDelay(..., -2)` 在已有未过期缓存时暂存 `preTestUpdatedAt`，后续 `injectBatchResults(..., { fromProbe: false })` 据此延续测试前合法缓存寿命，避免先置流光占位的节点被误砍至 `30s` 过期并退化为 `-`；`_layout.tsx::triggerWakeupLatencyTest` 对 `-2` 测试占位补全测前快照捕获与空/异常返回回滚机制。
 - **部分测速失真复核与免拨测恢复前端同步闭环（BUG-370，v3.3.3）**：
-  - `probe_metrics_group` 在主测速地址返回 `Ok(map)` 时通过 `should_recheck_with_fallback` 检查当前目标节点（`expected_nodes`；空集时检查非假节点集合）是否均未取得 `[30ms, 5000ms)` 有效延迟；命中“部分失真”时立即切 `secondary_test_url` 复核并由 `merge_probe_delays` 合并主备有效延迟。未经双地址复核的残缺单地址快照（`dual_url_verified == false` 且目标节点全失）禁止被 `try_reuse_probe_snapshot` / 短窗合并 / 前端历史复用机制沿用。
+  - `probe_metrics_group` 在主测速地址返回 `Ok(map)` 时通过 `should_recheck_with_fallback` 检查当前目标节点（`expected_nodes`；空集时检查非假节点集合）是否均未取得 `[30ms, 5000ms)` 有效延迟；命中“部分失真”时立即切 `secondary_test_url` 复核并由 `merge_probe_delays` 合并主备有效延迟。**【Sync-18 门控方向修正】** 快照只要对当前目标节点全灭，一律禁止被 `try_reuse_probe_snapshot` / `PROBE_COALESCE_WINDOW_MS` 短窗合并复用，与它是否经过主/备双地址复核无关；原 `dual_url_verified` 字段会放行「备用地址整体可用但目标节点无有效延迟」的残缺快照，已随该门控一并移除。
   - `evaluate_failover` 在活跃节点健康（`NodeStatus::Alive`）且处于非轻量模式时，无论走了 `need_probe` 实时拨测还是命中 `!need_probe`（如 `force_confirm_probe` 复检恢复、健康状态复位 `LAST_NOTIFIED_HEALTH != "network_health::ok"` 或内核 300s `PROXY__METRICS` 自然周期推进了新的 `history.last().time`），均通过 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 去重并向前端推送最新可用延迟列表与 `refresh_proxies()`，彻底堵住“断流报 Timeout、恢复不回传”同步断层。
+  - **主测速地址整体失败的裁决契约（Sync-18）**：`probe_metrics_group` 返回 `MetricsProbeOutcome { delays, primary_url_distorted }`；主 URL 整体失败且备用 URL 成功时置 `primary_url_distorted = true`，`evaluate_failover` 在完成 UI 延迟同步与 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 记账后直接返回 `NoAction`，**不得**再用重读 `get_proxies()` 的 `alive` / `history` 判死（此刻内核已将全组成员标为 not-alive）。
 
 ### 5.3 统一记账与 25 秒失败冷却保护（v3.2.4 / v3.3.2 优化）
 
-- **自愈路径统一记账**：后台监测的三大触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）全部统一汇聚至 `self_heal_with_accounting` 统一记账函数；若前两路传入有效活跃死节点且选出了不同的新节点，自愈成功后顺带执行 `close_connections_on_dead_node` 精确清死连接。
+- **自愈路径统一记账**：后台监测的三大触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）全部统一汇聚至 `self_heal_with_accounting` 统一记账函数。**【Sync-18 修订】** 自愈成功切换后不再执行 `close_connections_on_dead_node`（现行规范见 §4.2），默认路径不触碰任何存量连接；`dead_node` / `selected_node` 仅用于输出「已切换、跳过清理」日志，25 秒冷却与统一记账契约不变。
 - **25 秒失败冷却防线**：若自愈选点失败或所有节点均不可达，强制进入 **25 秒冷却期**（v3.2.4 由原 60 秒缩短至 25 秒，既杜绝风暴式并发高频测速，又显著加快连续异常时的恢复时效），冷却期内严禁重复发起自愈冲击。
 - **连续 5 次系统级告警与重启终态契约**：`evaluate_self_heal_counters` 与 `complete_restart_core_attempt` 将「API 假死 3 次重启计数」与「全节点断流 5 次告警计数」解耦——API 不可达满 3 次触发 `RestartCore` 时仅重置 `api_dead_heal_fail_count`：若内核重启成功（`Ok`），保留 `auto_select_fail_count` 继续累计至第 5 次可靠触发 Win32 原生 `MessageBoxW` 系统告警并重置双计数；若内核重启自身报错（`Err`），则定义为不可恢复终态，立即升级弹出内核重启失败系统告警并重置本轮双计数（内置原子单实例门控防止模态弹窗堆叠）。
 
@@ -520,6 +522,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **测速失真复核（必做）**：整组拨测必须带「备用地址复核」——主测速地址整体失败（mihomo 返回 `all proxies timeout` 等）时，用**另一个不同域名的 HTTPS 地址**再拨测一次。
   - 只有**主备双双失败**才可认定「测速链路不可用」；此时**严禁**把「所有节点超时」当作「节点已死」——那会触发无意义的切节点抖动与内核重启。
   - **测速链路不可用时，`evaluate_failover` 必须返回 `NoAction`**（不判死、不触发自愈），等下一周期重试。依据：`delay_group` 整体失败时 mihomo 已把全组成员标记为 not-alive，据此判死即为误判。
+  - **【Sync-18】主失败、备成功时同样必须返回 `NoAction`**：此时日志判定为「主测速地址失真、节点侧正常」，该结论由 `MetricsProbeOutcome.primary_url_distorted` 传回裁决层，`evaluate_failover` 保留 UI 延迟同步后直接跳过健康裁决，主循环清零 `consecutive_fails`。原先「日志说节点正常、裁决仍按 not-alive 累加失败并触发自愈」的语义断层必须杜绝。
   - 落地：`monitor::probe_metrics_group`（主 URL = `get_test_url()`，备用 = `FALLBACK_TEST_URL`）。
 - **失败服务器避让（必做）**：自愈选点**必须按「服务器」而非「节点」避让**——同一台机器常挂同一机场的多个端口节点，只避让单节点会让自愈立刻又选中同机的兄弟节点，形成死循环。
   - 活跃节点被判死（且判定基于**有效测速数据**）时，把**其所在服务器**记入冷却表（`FAILED_SERVER_COOLDOWN_SECS`，默认 10 分钟）；选点时剔除冷却表内服务器上的候选。
@@ -826,9 +829,9 @@ flowchart LR
 - **改动**：
   1. **二次复核真探测（`monitor.rs`）**：抽离 `should_probe_active_node(..., force_confirm_probe)`，当 `consecutive_fails > 0` 进入 3s 重试复核回合时强制跳过 `DEAD_CONFIRM_MIN_INTERVAL_SECS`（10s）缓存并禁用短窗合并，确保连续 2 次失败源自两次物理独立的全组 `PROXY__METRICS` 拨测，彻底根除「首次判死 → 3s 后命中旧缓存直接跳过复测并立刻误切节点」的隐疾。
   2. **并发与背靠背拨测风暴抑制（`monitor.rs`）**：在 `probe_metrics_group` 引入进程级 `METRICS_PROBE_LOCK` 互斥与 `PROBE_COALESCE_WINDOW_MS`（`1500ms`）短窗口并发合并，同时记录最近一次完整实时延迟快照 `LAST_METRICS_PROBE` 与纯函数 `try_reuse_probe_snapshot`：故障自愈在 `SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS`（`10s`）内直接复用确认回合刚刚完成的全组拨测结果（缩短切换耗时约 5s 并消除背靠背握手风暴）；前端批量子集（`len > 1`）在 `< 30s` 内直接消费实时快照避开 Mihomo 对死节点不写 `history` 引发的假陈旧重测；显式单点测速（`len == 1`）仍严格执行实时独立拨测（§5.2 契约 4）。
-  3. **故障转移精确断死留活（`monitor.rs`）**：`AutoSelectOutcome` 新增 `selected_node`，仅在故障触发的 `self_heal_with_accounting` 成功切换至不同于 `dead_node` 的健康新节点时，调用 `close_connections_on_dead_node`（基于 pure helper `collect_dead_node_connection_ids`）在 3s 超时保护下仅关闭 `chains` 命中 `dead_node` 的存量挂死连接，完全保留 `DIRECT` 及其他健康节点会话，避免 HTTP/2 / gRPC 长连接在内核切换节点后长期卡死挂起。
+  3. **故障转移精确断死留活（`monitor.rs`）｜⚠️ 本条已被 Sync-18 修订为「默认不清理」**：`AutoSelectOutcome` 新增 `selected_node`，仅在故障触发的 `self_heal_with_accounting` 成功切换至不同于 `dead_node` 的健康新节点时，调用 `close_connections_on_dead_node`（基于 pure helper `collect_dead_node_connection_ids`）在 3s 超时保护下仅关闭 `chains` 命中 `dead_node` 的存量挂死连接，完全保留 `DIRECT` 及其他健康节点会话，避免 HTTP/2 / gRPC 长连接在内核切换节点后长期卡死挂起。**Sync-18 结论**：该 helper 无 age / upload / download / alive 过滤，实际关闭的是「所有经过旧节点的连接」而非「挂死连接」，是周期性测速切点把健康长流打成硬断的直接原因，现已退出默认路径。
   4. **前后端同源多关键词包含与排除过滤（`utils/node.rs`、`utils/node.ts`、`monitor.rs`、`lifecycle.rs`、`use-filter-sort.ts`、`use-profiles.ts`）**：新增共享匹配引擎 `match_node_filter` / `matchNodeFilter`（支持 `|` / `｜` 多关键词 `OR`、空格分词 `AND` 以及 `-` / `!` / `！` 前缀排除，孤立输入符号放行），并补充 Rust 与 Vitest 逐条对齐单元测试（含 `should_probe`、`try_reuse_probe_snapshot` 与 `collect_dead_node_connection_ids` 单测）。
-- **影响**：严格维持 `§5.2` 单一 `PROXY__METRICS` 测量组架构与正常切点/轻量模式不断流原则，同时将单节点断流/服务抖动下的故障自愈准确度、抗服务器握手风暴能力及长连接恢复速度提升至毫秒级。
+- **影响**：严格维持 `§5.2` 单一 `PROXY__METRICS` 测量组架构与正常切点/轻量模式不断流原则，同时将单节点断流/服务抖动下的故障自愈准确度、抗服务器握手风暴能力及长连接恢复速度提升至毫秒级。**注**：其中「长连接恢复速度」依赖的第 3 条清理能力已被 Sync-18 判定为有害并默认关闭，§4.2 / §5.3 为现行规范。
 
 ### Sync-14 · 彻底移除遗留伴生看门狗（guardian）及无用历史冗余代码（`ab67dab7`）
 - **改动**：彻底删除 `src-tauri/src/utils/guardian.rs` 及残余看门狗互锁/隐形哨兵/Session-0 拉起/NSIS 守卫残件，清理跨前后端已失活的无用常量、配置字段与死代码；保留用户可控的安全软件白名单引导（`AntivirusWhitelistDialog` & `docs/antivirus-whitelist.md`）、`logger.rs` Panic Hook 及故障计数归零单行恢复日志。
@@ -844,7 +847,7 @@ flowchart LR
 ### Sync-16: 局部测速 URL 失真备用 URL 复测、后台恢复 UI 同步及过期延迟缓存唤醒重算（BUG-370）
 - **问题定位**：当主测速 URL 对部分节点出现局部失真超时、或后台测速恢复后未将更新后的延迟历史同步至前端，以及前端 `DelayManager` 缓存满 `delay-timeout` 过期被清理时未唤醒活跃监听者重算，会导致代理列表与顶部活跃节点卡片长期停留在 `Timeout` 假象中。
 - **核心变更**：
-  1. **局部测速失真自动备用 URL 复测与快照融合**（`src-tauri/src/module/monitor.rs`）：引入 `secondary_test_url`、`is_valid_probe_delay`、`should_recheck_with_fallback`、`merge_probe_delays` 与 `MetricsProbeSnapshot.dual_url_verified`；在 `probe_metrics_group` 发现目标节点存在部分失真时使用备用 URL（`FALLBACK_TEST_URL` ↔ `DEFAULT_TEST_URL`）复测并合并最健康延迟，`try_reuse_probe_snapshot` 与子集复用路径同步校验目标节点及 `dual_url_verified` 状态；
+  1. **局部测速失真自动备用 URL 复测与快照融合**（`src-tauri/src/module/monitor.rs`）：引入 `secondary_test_url`、`is_valid_probe_delay`、`should_recheck_with_fallback`、`merge_probe_delays` 与 `MetricsProbeSnapshot.dual_url_verified`（**该字段已被 Sync-18 移除**）；在 `probe_metrics_group` 发现目标节点存在部分失真时使用备用 URL（`FALLBACK_TEST_URL` ↔ `DEFAULT_TEST_URL`）复测并合并最健康延迟，`try_reuse_probe_snapshot` 与子集复用路径同步校验目标节点及双地址复核状态；**Sync-18 修正**：原门控写成「未经双地址复核且目标全灭才禁止复用」，方向反了，现改为「目标全灭一律禁止复用」；
   2. **恢复态与定期体检 UI 延迟同步**（`src-tauri/src/module/monitor.rs`）：新增静态状态 `LAST_SYNCED_ACTIVE_HISTORY_TIME`（并在 `reset_monitor_static_state` 中复位），使 `evaluate_failover` 在异常恢复与每轮正常测量更新且尚未通过 probe 推送时，将最新延迟历史主动同步至前端 UI；
   3. **过期延迟缓存主动唤醒重算与活跃节点卡片同步**（`src/services/delay.ts`、`src/hooks/use-proxy-delay-state.ts`、`src/pages/_layout/components/active-node-card.tsx`）：`DelayManager::evictExpiredCache` 仅保留 `-2` 测试占位并清理过期缓存，同时向单节点与组监听者广播 `{ delay: -1, updatedAt: 0 }` 哨兵事件；`useProxyDelayState` 与 `ActiveNodeCard` 收到哨兵后分别通过 `computeInitialDelay` / `getDelayFix` 回落重算，`ActiveNodeCard` 并在 `activeNodeRecord` 变化时主动对齐 `delay`。
 - **影响**：消除长时挂机/网络波动/缓存过期后前后端延迟显示长期卡死在 `Timeout` 的同步断层，保持多端延迟状态一致。
@@ -855,6 +858,16 @@ flowchart LR
   2. **`patchVerge` 并发丢弃识别与单错误弹窗去重**（`src/hooks/use-verge.ts`、`src/hooks/use-service-installer.ts`）：保持 `useLockFn` 丢弃语义不变，使 `patchVerge` 执行成功时返回 `true`（并发丢弃时解析为 `undefined`）供调用方跳过误导性成功提示；同时为 `patchVerge` 与 `useServiceInstaller` 新增 `{ silentError?: boolean }` 选项，外层操作通过单次 `showNotice.error` 统一弹窗而不再与内层重复。
   3. **全量接入二选一 / 三选一开关与端口校验闭环**（`src/pages/_layout.tsx`、`src/pages/_layout/hooks/use-minimal-settings.ts`、`src/pages/_layout/components/basic-settings-card.tsx`）：补齐「代理方式」三选一（`全局代理 / GFWList / 添加网址`，含重复点击跳过与成功/失败反馈）、「流量接管模式」三选一、「Allow LAN」「IPv6」「开机自动启动」（含写入后对账不一致的防拦截告警 `autoLaunchVerifyFailed`）、「启动时最小化」、「TUN 域名嗅探」三态（含非 TUN 模式点击提示 `tunSnifferNeedTunTooltip`）及代理端口保存（补充 `1–65535` 范围校验 `invalidPort`）的完整「进行中 → 成功/告警 → 失败单弹窗」提示闭环；同步更新全部 13 语种资源、重生成 `i18n-keys.ts`（`892` 键）并在 `src/utils/popup-styles.test.ts` 补齐 `markLoadingNotice` / `settleLoadingNotice` / `hideNotice` 单元测试。
 - **影响**：用户操作「流量接管模式」「代理方式」「基础设置」任意开关或保存端口时，均可稳定看到清晰的进行中过程提示、明确的结果反馈及不重不漏的错误/警示弹窗。
+
+### Sync-18 · 测速失真误判自愈与周期性清连接导致的长流硬断修复（v3.3.3 评审 S1 + S2）
+
+- **问题定位**：后台体检每 2–5 分钟完成一轮主/备测速，日志明确写出「备用测速地址可用 → 判定为主测速地址失真，节点侧正常」，但该结论**只停留在日志里**：`evaluate_failover` 仍重读 `get_proxies()`，用被内核标成 not-alive 的 `alive` / `history` 判死 → `consecutive_fails` 累加到 2 → `self_heal_with_accounting` 按全局最小延迟择优选点 → 只要选出不同节点就调用 `close_connections_on_dead_node` 按 `chains` 无差别关闭旧节点全部连接。真正切断 Antigravity 等 HTTP/2 / gRPC 长流的是最后一步清理（切点本身是干净热切换，已有连接不受影响），于是「链路只是抖了一下」被升级为「会话态丢失的硬断」。
+- **核心变更（仅 `src-tauri/src/module/monitor.rs`）**：
+  1. **S1-A · 结论进入裁决**：新增 `MetricsProbeOutcome { delays, primary_url_distorted }` 作为 `probe_metrics_group` 的返回类型；主测速 URL 整体失败且备用 URL 成功时置 `primary_url_distorted = true`。`evaluate_failover` 在完成 UI 延迟同步（`notify_delay_results` / `refresh_proxies`）与 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 记账后据此直接返回 `NoAction`，跳过整段 `node_status` 健康裁决；主循环随之清零 `consecutive_fails`、解除重试态、复位健康通知。选点调用点同步适配新返回类型；日志文案改为「本轮不判死、不触发自愈」，与实际行为一致。
+  2. **S1-B · 快照门控方向修正**：`try_reuse_probe_snapshot` 与 `PROBE_COALESCE_WINDOW_MS` 短窗合并原条件为「未经双地址复核且目标全灭才禁止复用」，等价于给「经过双地址复核」的残缺快照开后门；现统一改为「目标节点全灭一律禁止复用」，与是否复核无关。`MetricsProbeSnapshot.dual_url_verified` 字段随门控一并移除；单测 `test_try_reuse_probe_snapshot_respects_single_node_self_heal_and_ttl` 第 6 组断言改为验证「全灭被拒、命中有效延迟仍可复用」。
+  3. **S2 · 清连接退出默认路径**：新增默认关闭常量 `DEAD_CONN_CLEANUP_ENABLED = false`；`self_heal_with_accounting` 自愈成功切换后默认不再调用 `close_connections_on_dead_node`，改为输出「已切换 X → Y，默认不清理原节点存量连接」日志。`close_connections_on_dead_node` / `collect_dead_node_connection_ids` 实现及单测保留但不进入默认路径；`AutoSelectOutcome.selected_node` 与 `dead_node` 仍用于日志，统一记账与 25 秒冷却契约不变。
+- **本次未处理（按「一个一个来」留待后续）**：三条绕过「连续 2 次」的自愈入口收编（S3）；Healthy / Suspect / ConfirmedDead 迟滞状态、切换稳定确认期与单位时间切换上限（S4）；统一测量源与时钟、移除 `force_confirm_probe` 的 3s 强制双拨测（S5）；两份架构文档主次裁定、§5.1 三档周期与 60s 新鲜度同步、§5.1.1 临时探针章节清理（S6）。
+- **影响**：主测速地址抖动不再被判成节点已死、不再触发自愈；即便自愈确因真实节点故障发生，也不再关闭任何存量连接，长连接由应用层自行重连。周期性长流断线的根因被切断；未新增配置项、未改动前端、未改动代理组架构、未改动发版流程。
 
 ## 附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表
 
@@ -983,7 +996,7 @@ flowchart LR
 | **BUG-365** | 4.1 / 4.2 / 5.1 / 8.7 | `v3.2.8` 轻量模式双进程消失 Session-0 隔离与守护系统性加固：Session-0 WMI (`WmiPrvSE.exe`) + Task Scheduler COM (`ITaskService`) Broker 脱离父 Job 隔离（含 `same_job_degraded` 显式告警与 Scenario 6 端到端测试）、独立 `logs/guardian.log` 账本（含写失败非静默回退与全退场/降级日志）、15s 独立 `guard/` 心跳、`MoveFileExW` + 递增序列原子替换、两阶段 `prepared`/`confirmed` 带外凭证（`pid && session_id` + 30s/120s TTL + `3500ms` 二次复核）、无时间清零的 OS 启动指纹 + 纪元会话熔断（fail-closed）及 `cmd/diagnostics.rs` 360/WER 只读取证接入。 |
 | **BUG-366** | 3.7 / 4.1 / 8.5 | GFWList 模式移除 `MATCH,DIRECT` 前的 `- IP-CIDR6,::/0,PROXY` 兜底消除 IPv6 流量偷跑，清理悬空文档注释 / `.unwrap()` / 单导出冗余分支与 `read_respawn_state_checked` TOCTOU，同步对齐 `app-update.json` 说明。 |
 | **BUG-367** | 2.2 / 7.7 / 8.9 | 路径控制精准目标化规则生成（禁止扩域为 `DOMAIN-SUFFIX`）与「直连 / 代理 / 封锁 / 已断开」四态单表融合，补齐自定义 `Merge` 路由 `.yaml` 一键导出保存与重装后导入恢复闭环。 |
-| **BUG-368** | 2.8 / 4.2 / 5.1 / 5.2 / 5.3 / 5.4 | 修复 3s 重试复核误命中 10s 死缓存跳过二次真实拨测；引入 `METRICS_PROBE_LOCK` 与实时快照复用抑制并发/背靠背拨测风暴；故障转移成功后精确关闭仍挂死在原故障节点上的存量连接；前后端统一升级多关键词包含（`\|`/`｜`）与排除（`-`/`!`/`！`）节点过滤引擎并补齐双端单测。 |
+| **BUG-368** | 2.8 / 4.2 / 5.1 / 5.2 / 5.3 / 5.4 | 修复 3s 重试复核误命中 10s 死缓存跳过二次真实拨测；引入 `METRICS_PROBE_LOCK` 与实时快照复用抑制并发/背靠背拨测风暴；故障转移成功后精确关闭仍挂死在原故障节点上的存量连接（**此项已由 Sync-18 判定为误杀健康长流并默认关闭，现行规范见 §4.2**）；前后端统一升级多关键词包含（`\|`/`｜`）与排除（`-`/`!`/`！`）节点过滤引擎并补齐双端单测。 |
 | **BUG-369** | 2.8 / 5.2 / 5.4 / 5.6 | 修复 `DelayManager` 在 `-2` 测试态下复用注入误砍合法缓存寿命、补充唤醒测速 `-2` 快照回滚、`evaluate_failover` 体检直播延迟与 `restart_core` 立即唤醒推送；将 `useHeadStateNew` 重构为 `useSyncExternalStore` 模块级单例彻底根除 `filterText` 被并发 `sortType` 覆写；新增规范化连接指纹 `deduplicate_cloned_proxies` 同配置克隆去重与持久化真 HTTPS 验真状态机（1 次过真即单向粘滞、有在线参照通过前提下连续失败 `> 5` 次永久拉黑并在前后端全链路隐藏）。 |
 | **BUG-370** | 2.8 / 5.2 / 5.6 | 修复局部测速 URL 失真、后台恢复未同步 UI 与前端延迟缓存过期冻结的三处同步缺口：`probe_metrics_group` 在非全量失效时触发备用测速 URL（`FALLBACK_TEST_URL` ↔ `DEFAULT_TEST_URL`）复测并合并最健康延迟；`evaluate_failover` 新增 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 去重，确保从异常态恢复及正常 300s 体检新测量落地时及时向前端推送更新；`DelayManager::evictExpiredCache` 淘汰过期非 `-2` 缓存时主动向节点与组监听者广播 `{ delay: -1, updatedAt: 0 }` 唤醒重算，并同步修复 `useProxyDelayState` 与 `ActiveNodeCard` 的回落/切换同步（见 §5.2、§5.6、Sync-16）。 |
 | **BUG-371** | 2.2 / 2.10 | 修复「流量接管模式（含代理方式）」与「基础设置」二选一/三选一开关操作期间与操作结果/失败反馈弹窗退化缺失问题：`notice-service` 新增 `MIN_LOADING_NOTICE_DWELL_MS`（`320ms`）最小停留防护（`markLoadingNotice` / `settleLoadingNotice`）防止快速 IPC 切换一闪而过；`NoticeManager` `zIndex` 升至 `2200` 高于 MUI Tooltip（`1500`）；`patchVerge` 与 `useServiceInstaller` 支持并发丢弃判定返回值与 `{ silentError }` 单次报错去重；补齐 `handleRuleFallbackChange`、开机自启（含注册表校验不一致告警）、启动时最小化、TUN 域名嗅探（含非 TUN 模式点击警示）及端口 `1–65535` 校验全套三段式反馈弹窗（见 §2.2、§2.10、Sync-17）。 |

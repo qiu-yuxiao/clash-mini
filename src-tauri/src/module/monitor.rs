@@ -93,6 +93,18 @@ const PROBE_COALESCE_WINDOW_MS: u64 = 1500;
 /// 又重打一轮全组拨测。
 const SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS: u64 = 10;
 
+/// 故障转移成功后是否清理原节点存量连接（默认关闭，Sync-18）。
+///
+/// 【为什么默认关闭】v3.3.2 的 `close_connections_on_dead_node` 仅按 `chains` 命中筛选，
+/// 没有 age / upload / download / alive 过滤，无法区分「已挂死的连接」与「仍在正常传输的
+/// 健康长连接」。而 `select_node_for_group` 本身是干净热切换，已有连接不受影响——真正把
+/// Antigravity 等 HTTP/2 / gRPC 长流 RST 掉的是这次清理。后台测速周期性择优选点时，
+/// 会把「链路只是抖了一下」直接升级为「旧节点全部连接被切断」的硬断。
+///
+/// 长连接交由应用层自身重连。重新开启的前提：引入 ConfirmedDead 迟滞状态确证旧节点已死，
+/// 并且只对「确已无流量」的连接执行清理（评审报告 S4，不在本次改动范围）。
+const DEAD_CONN_CLEANUP_ENABLED: bool = false;
+
 /// 全局测量组拨测互斥锁：串行化 `PROXY__METRICS` 全组拨测，消除多调用方并发风暴。
 static METRICS_PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -101,7 +113,19 @@ struct MetricsProbeSnapshot {
     completed_at: Instant,
     delays: HashMap<String, u32>,
     reported_live_to_ui: bool,
-    dual_url_verified: bool,
+}
+
+/// `probe_metrics_group` 的本轮拨测结论。
+///
+/// 【为什么需要这个结构】此前「备用测速地址可用 → 主测速地址失真，节点侧正常」只打印了一行日志，
+/// 没有进入健康裁决：`evaluate_failover` 仍重读 `get_proxies()` 用被内核标成 not-alive 的
+/// `alive` / `history` 判死，把一次可自恢复的测量抖动升级成「切点 + 清连接」的硬断。
+/// 这里把结论显式带回裁决层：`primary_url_distorted == true` 时本轮必须返回 `NoAction`。
+#[derive(Debug, Clone)]
+struct MetricsProbeOutcome {
+    delays: HashMap<String, u32>,
+    /// 主测速地址整体失败、备用地址成功 ⇒ 测速地址失真，节点侧正常。
+    primary_url_distorted: bool,
 }
 
 /// 最近一次成功执行的 `probe_metrics_group` 全量实时延迟快照。
@@ -358,7 +382,7 @@ fn merge_probe_delays(mut primary: HashMap<String, u32>, fallback: HashMap<Strin
 /// - 故障自愈在 `< SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS` 内可复用刚刚完成的确认拨测结果，
 ///   并在尚未上屏时保留 `LiveProbe` 语义；
 /// - 前端批量子集测速（`subset_len > 1`）在 `< METRICS_REUSE_MAX_AGE_SECS` 内复用，标记 `FreshMetricsCache`；
-/// - 未经主/备双地址复核的快照若对当前 `expected_nodes` 全灭，禁止复用（BUG-370）。
+/// - 快照若对当前 `expected_nodes` 全灭，一律禁止复用（BUG-370 门控方向修正，Sync-18）。
 fn try_reuse_probe_snapshot(
     snapshot: &mut Option<MetricsProbeSnapshot>,
     now: Instant,
@@ -374,7 +398,10 @@ fn try_reuse_probe_snapshot(
     if snap.delays.is_empty() {
         return None;
     }
-    if !snap.dual_url_verified && should_recheck_with_fallback(&snap.delays, expected_nodes) {
+    // 【门控方向修正（Sync-18）】原条件为 `!snap.dual_url_verified && 全灭`，等于给
+    // 「经过主/备双地址复核」的快照开了后门：备用地址整体可用、但目标节点无有效延迟的
+    // 残缺快照会在 10s 内直接成为自愈选点输入。全灭与是否复核无关，一律禁止复用。
+    if should_recheck_with_fallback(&snap.delays, expected_nodes) {
         return None;
     }
     let age = now.saturating_duration_since(snap.completed_at);
@@ -398,14 +425,16 @@ fn try_reuse_probe_snapshot(
 /// 先用主测速 URL 拨测；若整体失败，或主 URL 仅部分外区/假节点响应而目标节点均无有效延迟（部分失真），
 /// 立即用备用测速 URL 复核一次并合并有效延迟。两次均整体失败才认定「测速链路不可用」。
 ///
-/// 返回 `Some(map)` = 测速链路可用（map 内为本次测得的节点延迟）；
+/// 返回 `Some(outcome)` = 测速链路可用（`outcome.delays` 为本次测得的节点延迟）；
 /// `None` = 主/备地址都整体失败，属测速链路问题，**不可据此判定节点已死**。
+/// `outcome.primary_url_distorted` 为 true 时代表「主测速地址失真、节点侧正常」，
+/// 调用方必须据此跳过健康裁决（见 `evaluate_failover`）。
 async fn probe_metrics_group(
     mihomo: &tauri_plugin_mihomo::Mihomo,
     label: &str,
     allow_coalesce: bool,
     expected_nodes: &[String],
-) -> Option<HashMap<String, u32>> {
+) -> Option<MetricsProbeOutcome> {
     let _probe_guard = METRICS_PROBE_LOCK.lock().await;
     if allow_coalesce {
         let cached = {
@@ -413,7 +442,7 @@ async fn probe_metrics_group(
             guard.as_ref().and_then(|snap| {
                 if !snap.delays.is_empty()
                     && snap.completed_at.elapsed() < Duration::from_millis(PROBE_COALESCE_WINDOW_MS)
-                    && (snap.dual_url_verified || !should_recheck_with_fallback(&snap.delays, expected_nodes))
+                    && !should_recheck_with_fallback(&snap.delays, expected_nodes)
                 {
                     Some(snap.delays.clone())
                 } else {
@@ -428,17 +457,19 @@ async fn probe_metrics_group(
                 "[后台监测] [{label}] 复用刚结束的并发测量组实时拨测结果（{} 个存活节点），抑制重叠拨测风暴",
                 delays.len()
             );
-            return Some(delays);
+            return Some(MetricsProbeOutcome {
+                delays,
+                primary_url_distorted: false,
+            });
         }
     }
 
-    let record_snapshot = |delays: HashMap<String, u32>, dual_url_verified: bool| -> HashMap<String, u32> {
+    let record_snapshot = |delays: HashMap<String, u32>| -> HashMap<String, u32> {
         if !delays.is_empty() {
             *LAST_METRICS_PROBE.lock() = Some(MetricsProbeSnapshot {
                 completed_at: Instant::now(),
                 delays: delays.clone(),
                 reported_live_to_ui: false,
-                dual_url_verified,
             });
         }
         delays
@@ -452,7 +483,10 @@ async fn probe_metrics_group(
     {
         Ok(primary_delays) => {
             if !should_recheck_with_fallback(&primary_delays, expected_nodes) {
-                return Some(record_snapshot(primary_delays, false));
+                return Some(MetricsProbeOutcome {
+                    delays: record_snapshot(primary_delays),
+                    primary_url_distorted: false,
+                });
             }
             logging!(
                 warn,
@@ -472,7 +506,10 @@ async fn probe_metrics_group(
                         fallback_delays.len()
                     );
                     let merged = merge_probe_delays(primary_delays, fallback_delays);
-                    return Some(record_snapshot(merged, true));
+                    return Some(MetricsProbeOutcome {
+                        delays: record_snapshot(merged),
+                        primary_url_distorted: false,
+                    });
                 }
                 Err(e) => {
                     logging!(
@@ -484,7 +521,10 @@ async fn probe_metrics_group(
                         *LAST_METRICS_PROBE.lock() = None;
                         return None;
                     }
-                    return Some(record_snapshot(primary_delays, true));
+                    return Some(MetricsProbeOutcome {
+                        delays: record_snapshot(primary_delays),
+                        primary_url_distorted: false,
+                    });
                 }
             }
         }
@@ -506,9 +546,12 @@ async fn probe_metrics_group(
             logging!(
                 info,
                 Type::Lightweight,
-                "[后台监测] [{label}] 备用测速地址可用 → 判定为主测速地址失真，节点侧正常"
+                "[后台监测] [{label}] 备用测速地址可用 → 判定为主测速地址失真、节点侧正常，本轮不判死、不触发自愈"
             );
-            Some(record_snapshot(d, true))
+            Some(MetricsProbeOutcome {
+                delays: record_snapshot(d),
+                primary_url_distorted: true,
+            })
         }
         Err(e) => {
             logging!(
@@ -1012,6 +1055,10 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         Some(p) => should_probe_active_node(node_status(p), history_age(p), force_confirm_probe),
     };
 
+    // 本轮体检是否得出「主测速地址失真、节点侧正常」的结论。该结论必须进入健康裁决，
+    // 不能只停留在日志里（见 MetricsProbeOutcome 注释）。
+    let mut primary_url_distorted = false;
+
     if need_probe {
         // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
@@ -1029,7 +1076,7 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
         // 2026-10-18 实测：机场劫持 HTTP 测速地址期间内核返回 `all proxies timeout`，
         // app 误判「所有测速节点均不可达」，连续多轮自愈全部落空。
         // 故本轮直接 NoAction（主循环会清零连续失败计数，不触发自愈），等下一周期重试。
-        let Some(probed_delays) = probed_opt else {
+        let Some(probed) = probed_opt else {
             logging!(
                 warn,
                 Type::Lightweight,
@@ -1037,6 +1084,9 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
             );
             return Ok(FailoverVerdict::NoAction);
         };
+        // 先取出裁决结论，再取延迟表；结论不能被后面的重读 get_proxies() 冲掉。
+        primary_url_distorted = probed.primary_url_distorted;
+        let probed_delays = probed.delays;
 
         // 【BUG-369 修复】后台定期体检刚刚完成了一次真实的整组延迟探测，若本次取得了有效节点延迟，
         // 立即把新鲜结果通过 `delay-results` 推送给前端列表（同时触发代理状态刷新），
@@ -1127,6 +1177,20 @@ async fn evaluate_failover(profile_uid: &str, force_confirm_probe: bool) -> anyh
     let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
     let filter_text = filter_config.filter_text.trim();
     let members = group_info.all.clone().unwrap_or_default();
+
+    // 【S1 · 测速失真裁决（Sync-18）】主测速地址整体失败、备用地址成功 ⇒ 本轮结论为
+    // 「主测速地址失真，节点侧正常」。此时 mihomo 已把全组成员标成 not-alive，若继续用
+    // 重读的 alive / history 判死，就会把一次测量抖动升级成「切点 + 清连接」的硬断。
+    // 因此跳过下面整段健康裁决，返回 NoAction（主循环会清零 consecutive_fails 并复位健康态）；
+    // 上面的 UI 延迟同步与 LAST_SYNCED_ACTIVE_HISTORY_TIME 记账照常保留，不产生显示回退。
+    if primary_url_distorted {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 备用测速地址已证明节点侧正常 → 本轮返回 NoAction（不累计失败、不自愈、不切点）"
+        );
+        return Ok(FailoverVerdict::NoAction);
+    }
 
     // 活跃节点本身健康或数据缺失 → 若尚未通过真 HTTPS 验真：先在冷却允许时即时执行真 HTTPS 复核；
     // 只有确属“在参照节点通过前提下曾验真失败（has_verify_failure_node）”且子集内存在已验真健康节点时，才切往已验真节点
@@ -1436,8 +1500,8 @@ async fn trigger_backend_auto_select_inner(
         } else {
             let allow_coalesce = !(is_frontend_subset && valid_nodes.len() == 1);
             match probe_metrics_group(&mihomo, "选点", allow_coalesce, &valid_nodes).await {
-                Some(probed) if !probed.is_empty() => {
-                    delays = probed;
+                Some(outcome) if !outcome.delays.is_empty() => {
+                    delays = outcome.delays;
                     source = DelayResultSource::LiveProbe;
                 }
                 Some(_) | None => {
@@ -1663,10 +1727,13 @@ fn collect_dead_node_connection_ids(
         .collect()
 }
 
-/// 故障转移切换至 `new_node` 后，精确关闭仍挂死在原故障节点 `dead_node` 上的存量活跃连接。
+/// 故障转移切换至 `new_node` 后，关闭挂在原节点 `dead_node` 上的存量连接。
 ///
-/// 正常切节点或轻量模式唤醒严禁全量断流（§4.2）；仅当后台监测确认 `dead_node` 已失效并转移至
-/// 其他节点时，清理 pinned 在死节点上的 HTTP/2 / gRPC 长连接，使上层应用立即在新节点上重连恢复。
+/// 【默认不启用，见 `DEAD_CONN_CLEANUP_ENABLED`（Sync-18）】正常切节点或轻量模式唤醒严禁
+/// 全量断流（§4.2）。当前实现仅按 `chains` 命中筛选，无法区分「已挂死的连接」与「仍在正常
+/// 传输的健康长连接」，在后台测速周期性择优选点时会误杀 HTTP/2 / gRPC 长流；故自愈默认路径
+/// 不再调用本函数，长连接交由应用层自身重连。保留实现与单测，待引入 ConfirmedDead 迟滞状态
+/// 与「无流量」过滤后再评估开启。
 async fn close_connections_on_dead_node(dead_node: &str, new_node: &str) {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
     let _ = tokio::time::timeout(Duration::from_secs(3), async {
@@ -2282,7 +2349,17 @@ async fn self_heal_with_accounting(
                     && !dead.is_empty()
                     && dead != new_node
                 {
-                    close_connections_on_dead_node(dead, new_node).await;
+                    if DEAD_CONN_CLEANUP_ENABLED {
+                        close_connections_on_dead_node(dead, new_node).await;
+                    } else {
+                        logging!(
+                            info,
+                            Type::Lightweight,
+                            "[后台监测] 自愈已切换 {} → {}，默认不清理原节点存量连接（长连接由应用层自行重连）",
+                            dead,
+                            new_node
+                        );
+                    }
                 }
             } else {
                 *auto_select_fail_count += 1;
@@ -2593,28 +2670,27 @@ mod tests {
         let mut delays = HashMap::new();
         delays.insert("日本-01".to_string(), 75u32);
 
-        let make_snap = |age_secs: u64, dual_url_verified: bool| {
+        let make_snap = |age_secs: u64| {
             Some(MetricsProbeSnapshot {
                 completed_at: base_now - Duration::from_secs(age_secs),
                 delays: delays.clone(),
                 reported_live_to_ui: false,
-                dual_url_verified,
             })
         };
         let empty_expected: Vec<String> = Vec::new();
 
         // 1. 显式单点测速（subset_len == 1）绝不复用快照，即使刚结束 1s（§5.2 契约 4）
-        let mut snap1 = make_snap(1, false);
+        let mut snap1 = make_snap(1);
         assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, false, &empty_expected).is_none());
         assert!(try_reuse_probe_snapshot(&mut snap1, base_now, true, 1, true, &empty_expected).is_none());
 
         // 2. 非自愈全量 F1（allow_self_heal_reuse=false, is_frontend_subset=false）不走缓存复用
-        let mut snap2 = make_snap(2, false);
+        let mut snap2 = make_snap(2);
         assert!(try_reuse_probe_snapshot(&mut snap2, base_now, false, 10, false, &empty_expected).is_none());
 
         // 3. 自愈在 < SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS 内复用二次确认快照：
         // 首次消费获得 LiveProbe 语义，随后再次复用降级为 FreshMetricsCache
-        let mut snap3 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS - 1, false);
+        let mut snap3 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS - 1);
         let first = try_reuse_probe_snapshot(&mut snap3, base_now, false, 10, true, &empty_expected);
         assert_eq!(
             first.map(|(m, s)| (m.get("日本-01").copied(), s)),
@@ -2624,21 +2700,24 @@ mod tests {
         assert_eq!(second.map(|(_, s)| s), Some(DelayResultSource::FreshMetricsCache));
 
         // 4. 超过自愈 TTL（>=10s）但未超子集 TTL（<30s）：自愈不复用，批量子集复用且标记 FreshMetricsCache
-        let mut snap4 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, false);
+        let mut snap4 = make_snap(SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS);
         assert!(try_reuse_probe_snapshot(&mut snap4, base_now, false, 10, true, &empty_expected).is_none());
         let subset_hit = try_reuse_probe_snapshot(&mut snap4, base_now, true, 5, false, &empty_expected);
         assert_eq!(subset_hit.map(|(_, s)| s), Some(DelayResultSource::FreshMetricsCache));
 
         // 5. 超过子集 TTL（>=30s）不再复用
-        let mut snap5 = make_snap(METRICS_REUSE_MAX_AGE_SECS, false);
+        let mut snap5 = make_snap(METRICS_REUSE_MAX_AGE_SECS);
         assert!(try_reuse_probe_snapshot(&mut snap5, base_now, true, 5, false, &empty_expected).is_none());
 
-        // 6. 未经主/备双 URL 复核且对期望目标节点全灭的快照禁止复用；已完成双 URL 复核的快照允许复用
+        // 6. 【门控方向修正（Sync-18）】只要快照对期望目标节点全灭，一律禁止复用；
+        // 原实现给「经过主/备双地址复核」的全灭快照开了后门，会在 10s 内污染自愈选点。
         let expected_other = vec!["香港-01".to_string(), "新加坡-01".to_string()];
-        let mut snap_unverified = make_snap(1, false);
-        assert!(try_reuse_probe_snapshot(&mut snap_unverified, base_now, true, 2, true, &expected_other).is_none());
-        let mut snap_verified = make_snap(1, true);
-        assert!(try_reuse_probe_snapshot(&mut snap_verified, base_now, true, 2, true, &expected_other).is_some());
+        let mut snap_all_dark = make_snap(1);
+        assert!(try_reuse_probe_snapshot(&mut snap_all_dark, base_now, true, 2, true, &expected_other).is_none());
+        // 目标节点命中有效延迟时仍可正常复用
+        let expected_hit = vec!["日本-01".to_string()];
+        let mut snap_hit = make_snap(1);
+        assert!(try_reuse_probe_snapshot(&mut snap_hit, base_now, true, 2, true, &expected_hit).is_some());
     }
 
     #[test]
