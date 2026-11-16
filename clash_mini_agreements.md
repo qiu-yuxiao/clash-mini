@@ -1,6 +1,6 @@
 # Clash Mini 开发设计书
 
-> **适用版本**：v3.4.0 及后续版本  
+> **适用版本**：v3.4.1 及后续版本  
 > **文档性质**：本文档是 Clash Mini 项目的**权威系统设计规范与工程开发宪章**。所有功能开发、重构优化与代码审核必须严格遵循本文档中定义的架构约定、业务逻辑与安全红线。  
 > **维护说明**：本文档聚焦于**系统设计意图（做什么、为什么、架构边界与关键参数）**；具体代码实现见配套索引 `docs/implementation-notes.md`，架构全局图谱见 `docs/ARCHITECTURE.md`，历史避坑指南见 `clash_mini_pitfalls.md`。
 
@@ -687,7 +687,7 @@ flowchart LR
 ### 8.8 前端单测基线与最小覆盖
 
 - **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 130 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
+- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 131 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ### 8.9 用户可见文案 i18n 硬约束
@@ -855,7 +855,7 @@ flowchart LR
 | **BUG-380** | §5 最高方针 / 5.4 | 真 HTTPS 验真由不可逆永久拉黑改为 24h 可恢复软隔离：`NodeVerifyRecord::is_confirmed_fake_at` 复用 `last_verified_at` 实施 `HTTPS_VERIFY_BAN_TTL_SECS (86_400)` TTL 期满自动缓刑重测；`feat/profile.rs::update_profile` 在用户手动更新订阅时调用 `clear_unverified_https_failures()` 立即重置未验真失败记录（保留 `verified_true` 白名单）并刷新列表；同步在 §2.8/§5 明确记录过滤框 700ms 地域策略即时切换特例豁免。 |
 | **BUG-381** | 2.12 / 6.4 | 移除重型嵌入式 JS 引擎 `boa_engine` 与 `enhance/script.rs` / 内置 `.js` 文件，改用原生 Rust `apply_builtin_guards` 完成 `mode: script` 归一与 `hysteria` string `alpn` 转数组；停止新建 `Script` 默认项，保留存量 `profiles.yaml` 历史 `type: script` 兼容忽略。 |
 | **BUG-382** | 2.11 / 6.1 | 清理不可达流媒体解锁 `/unlock` 路由（`src/pages/unlock.tsx`、`cmd/media_unlock_checker` 及废弃翻译键）与零使用 `tauri-plugin-http` / `@tauri-apps/plugin-http`，收紧 WebView 网络接口暴露并消除重复 `reqwest v0.12.28` 依赖树。 |
-| **BUG-383** | 2.8 / 5.4 | **【待用户确认】** 根治借壳真实可用后端（如香港出口）的订阅横幅假节点漏网并绕过用户 `-香港` 排除过滤问题：前后端 1:1 增设非穷举结构形态判定（`is_structural_banner_name` / `isStructuralBannerName`：无地区暗示下的内嵌裸域名与冒号键值配额/日期格式），后端 `enforce_mini_agreements` 改在剔除前先行按 `RawProxyEntry` 指纹分组执行 `resolve_proxy_clone_topology`——共享横幅专用端点整组连坐 `0` 保留并登记内存 `RUNTIME_TAINTED_BANNER_FPS`，寄生真地区节点组强制折叠归真为带地区名的节点，令真实香港借壳体稳妥受控于地域过滤与排除规则。 |
+| **BUG-383** | 2.8 / 5.4 | 根治借壳真实可用后端（如香港出口）的订阅横幅假节点漏网并绕过用户 `-香港` 排除过滤问题：前后端 1:1 增设非穷举结构形态判定（`is_structural_banner_name` / `isStructuralBannerName`：无地区暗示下的内嵌裸域名与冒号键值配额/日期格式），后端 `enforce_mini_agreements` 改在剔除前先行按 `RawProxyEntry` 指纹分组执行 `resolve_proxy_clone_topology`——共享横幅专用端点整组连坐 `0` 保留并登记内存 `RUNTIME_TAINTED_BANNER_FPS`，寄生真地区节点组强制折叠归真为带地区名的节点，令真实香港借壳体稳妥受控于地域过滤与排除规则。 |
 
 ---
 

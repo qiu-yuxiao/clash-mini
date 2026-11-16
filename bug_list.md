@@ -3,29 +3,23 @@
 > [!IMPORTANT]
 > **AI 协同开发与维护规范 (CRITICAL MAINTENANCE RULES)**:
 > 1. **待验证/排查中 Bug 强制卡片化**：所有状态为 `排查中` 或 `代码已修正，待用户确认` 的条目必须在顶部「待验证与活动中 Bug 详情」区以结构化卡片登记，严禁在用户明确人工确认前提前归档入底部历史表。
-> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-382` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
+> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-383` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
 
 ---
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-383 借壳可用后端（如香港节点）的订阅说明/广告假节点漏网并绕过地域排除过滤
-
-- **对应模块**：[node.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/node.rs)（`has_region_hint`、`is_dummy_node`、`resolve_proxy_clone_topology`、`RUNTIME_TAINTED_BANNER_FPS`）、[enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)（`enforce_mini_agreements`）、[node.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.ts)（`isDummyNode`）
-- **问题描述**：部分机场把「剩余流量 / 下次重置 / 套餐到期 / 永久官网」等多条信息横幅绑在同一真实可用香港节点端口上：① 靠前缀词表无法穷举「距离下次重置剩余：24 天」「永久官网:xxx.com」等新文案；② 因后端本身是真实香港出口，真 HTTPS 验真拿到 `200 OK` 直接将其标成 `verified_true`（BUG-380 本意拦截的是断网/不可用假节点，对此类真实借壳节点无效）；③ 旧去重逻辑在计算指纹前就先行删掉了先导广告条目导致连坐证据丢失，且对剩余克隆体强留 1 个无地区名横幅放进 `PROXY` 组，导致用户输入 `-香港` 排除香港节点时该香港后端伪节点仍留在可用池中并被自动选中，造成依赖非香港地区的工具（如 Antigravity）断流。
-- **修复方案**：改用「拓扑连坐 + 非穷举结构形态识别 + 寄生归真」三层治本防线：
-  1. **全量原始指纹连坐与寄生归真（`resolve_proxy_clone_topology`）**：`enforce_mini_agreements` 在剔除伪节点**前**先对全量有效 `proxies:` 按连接指纹分组；若同指纹组 `>= 2` 条被任一伪节点（或全员冒号键值结构）污染且组内**无**带地区暗示（`has_region_hint`）的非伪节点，则认定为专用横幅展示端口，**整组 `0` 保留全灭**（同时登记内存 `RUNTIME_TAINTED_BANNER_FPS` 供全链路隐藏）；若同指纹组内存在真实地区节点（如横幅挂靠 `香港1`），则吞掉全部横幅并优先保留带地区名的节点（`(!colon && has_region) > has_region > !colon > fallback`），使 `-香港` 精准生效；
-  2. **前后端 1:1 非穷举结构形态兜底（`is_structural_banner_name` / `isStructuralBannerName`）**：在不含地区暗示的前提下，自动识别含非节点语境裸域名（`xxx.com` 等常见后缀）及冒号键值配额/日期倒计时格式（如 `xxx：24 天`、`xxx：100 GB`、`2027-02-09`），独立端口的单条新形态横幅亦可零配置拦截。
-- **状态**：代码已修正，待用户确认
+_当前暂无待确认或排查中的活动 Bug。_
 
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
-历史已确认关闭条目（`BUG-057` ~ `BUG-382`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
+历史已确认关闭条目（`BUG-057` ~ `BUG-383`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
 
 | 缺陷编号 | 对应版本基线 | 状态 |
 | :--- | :---: | :---: |
+| **BUG-383** | v3.4.1 | 代码已修正，已确认 |
 | **BUG-382** | v3.4.0 | 代码已修正，已确认 |
 | **BUG-381** | v3.4.0 | 代码已修正，已确认 |
 | **BUG-380** | v3.4.0 | 代码已修正，已确认 |
