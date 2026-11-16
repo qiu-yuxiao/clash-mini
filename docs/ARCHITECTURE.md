@@ -149,11 +149,11 @@ sequenceDiagram
 
 > 全程只是 `PUT /proxies/{group}`，**不整份 reload、不触发 `auto_close_connection`**，故进行中连接不断（用户铁律）。
 
-### 4.2 自动选点 / 导入订阅 / 轻量唤醒（统一走 monitor）
+### 4.2 初始化保护与故障自愈选点（连续性优先，统一走 monitor）
 
-1. 触发源：`trigger_auto_select` 命令、导入 profile（`import_profile` → `enhance_profiles` 重新生成 `clash-mini.yaml` → `reload_config`）、轻量进入/唤醒。
-2. `monitor::trigger_backend_auto_select` → `mihomo.delay_group("PROXY__METRICS")` → 内核级 url-test 拨测。
-3. 在**传入的可见子集 / 全量子集**内挑最快健康节点 → `select_node_for_group("PROXY", 最快)`。
+1. 触发源：`trigger_auto_select` 命令、导入 profile（`import_profile` → `enhance_profiles` 重新生成 `clash-mini.yaml` → `reload_config`）、轻量进入/唤醒与后台故障转移。
+2. **连续性优先门控（`BUG-376` / §5 最高方针）**：冷启动、轻量唤醒、Profile 切换及托盘静默启动时，只要当前持久出口 `PROXY.now` 结构有效，只执行 `mihomo.delay_group("PROXY__METRICS")` 刷新延迟缓存（`select: false`），**绝不因“别的节点延迟更低”替换用户当前出口**。
+3. 仅当当前出口结构性失效（空 / 假节点 / HTTPS 软隔离 / 不在当前子集内）、用户显式按 `F1`/`F4`/地域过滤或后台监测连续两次确证当前节点已死（且通过 `decide_self_heal` + 死节点门检 + 速率上限）时，才在候选子集内择优并调用 `select_node_for_group("PROXY", 目标节点)`。
 4. 写回 `profile.selected`（**先按候选快照校验范围**，越界不写回）；通过 `Handle::notify_delay_results` 发 `verge://backend-delay-results` 给前端。
 
 ### 4.3 配置生成与下发（patch → enhance → reload）
@@ -240,11 +240,11 @@ sequenceDiagram
 
 ---
 
-## 8. 现行版本基线（`v3.3.4`，见 `package.json`）
+## 8. 现行版本基线（`v3.4.1`，见 `package.json`）
 
 总体结论：**架构收敛、单 `PROXY` 组 + `PROXY__METRICS` 测量解耦、连续性优先方针落地**。
 
-- ✅ 已落地的核心机制：双组解耦、热切换零断流（不清理存量连接）、三层防污染校验、轻量模式三态机、主线程纪律、`decide_self_heal` 统一裁决、`Suspect` 迟滞与切换速率上限、真 HTTPS 验真状态机及精准目标化路径控制。
+- ✅ 已落地的核心机制：双组解耦、热切换零断流（不清理存量连接）、三层防污染校验、轻量模式三态机、主线程纪律、`decide_self_heal` 统一裁决、`Suspect` 迟滞与切换速率上限、初始化可用出口不改选门检（`BUG-376`）、基于 `/connections` 字节增量的被动流量证活状态机（`BUG-379`）、24h 可恢复真 HTTPS 验真软隔离（`BUG-380`）、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截（`BUG-383`）及精准目标化路径控制。
 - 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源。
 
 ---
