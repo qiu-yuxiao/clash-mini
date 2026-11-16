@@ -3,59 +3,63 @@
 > [!IMPORTANT]
 > **AI 协同开发与维护规范 (CRITICAL MAINTENANCE RULES)**:
 > 1. **待验证/排查中 Bug 强制卡片化**：所有状态为 `排查中` 或 `代码已修正，待用户确认` 的条目必须在顶部「待验证与活动中 Bug 详情」区以结构化卡片登记，严禁在用户明确人工确认前提前归档入底部历史表。
-> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-383` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
+> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-387` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
 
 ---
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-### BUG-384 Monochrome 皮肤下基础设置四枚小开关误呈圆角胶囊而非方形开关
+### BUG-388 后台测量组自然周期激活、真 HTTPS 验真防误切与自愈逃生/防竞态收口
 
-- **对应模块**：[base-switch.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-switch.tsx)（`getSwitchSkinStyle` / `Switch`）
-- **问题描述**：`Monochrome`（黑白极简工业风）皮肤下按钮、分段控制器、卡片与滑块均采用 `0px` 直角锐利造型，但 `base-switch.tsx` 中的 `monochrome` 分支仍残留旧的大尺寸圆角胶囊样式（`56×28` / `borderRadius: 14` 与圆形滑块），导致「基础设置」卡片中的四枚 `size="small"` 小开关（开机自动启动、Allow LAN、启动时最小化、Allow IPv6）未呈现与 `Cyberpunk` 一致的小巧方形开关外观。
-- **修复方案**：重构 [base-switch.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-switch.tsx) 导出 `getSwitchSkinStyle(theme)`，将 `monochrome` 分支对齐 `cyberpunk` 的小巧直角方形尺寸几何（外框 `28×14`、`sizeSmall` `18×10`、轨道 `borderRadius: 0`、滑块 `12×12` / `sizeSmall` `8×8` 且 `borderRadius: '0px'`、`transitionDuration: '150ms'`），并赋予高反差黑白纯平配色（未选中 `#737373` 描边配灰块、选中态亮/暗黑纯白实心高对比与 `1px` 锐利方框）。
+- **对应模块**：[mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)、[constants.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/constants.rs)、[node.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/node.rs)、[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[lifecycle.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/lifecycle.rs)、[node.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.test.ts)
+- **问题描述**：① `PROXY__METRICS` 未显式设置 `lazy: false`，Mihomo 默认对无流量组跳过周期拨测，削弱 300s 自然保鲜前提；② `has_verify_failure_node` 仅失败 1 次即允许对正常传输（`Flowing`）中的健康节点触发 `ShouldMigrate`，且真 HTTPS 验真靶站全灭时缺少退避、导致每 60s/180s 反复全组拨测；③ `ApiChannelDown` 通道异常恢复后无条件按最快节点重选切换、`ConfirmedDead` 二次逃生受 `120s` 切换速率上限封锁、后台自愈在选点期间可能覆盖用户同期手动切换的节点；④ `lifecycle::select_fallback_in_subset` 在非空过滤词下末级回退会越出排除子集（如 `-香港` 误落回香港节点）；⑤ `node.rs` 冒号配额空白判断仅跳 ASCII 空白、与前端 `\s*` 在全角空格上存在差异，且 `monitor.rs` 重复定义 `NODE_DELAY_MAX_MS`。
+- **修复方案**：
+  1. 在 [mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs) 为 `PROXY__METRICS` 显式注入 `lazy: false` 并补齐单测断言；
+  2. 在 [node.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/node.rs) 新增 `HTTPS_VERIFY_MIGRATE_MIN_FAILS = 2` 收紧迁移阈值、将 `has_colon_quota_or_date` 空白跳过对齐 Unicode（同步双端全角空格单测），并在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 为验真全灭新增 `HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS (600s)` 退避、`Flowing` 下行态禁止低次验真迁移（`should_allow_https_migration`）；
+  3. 放行 `ConfirmedDead` 逃生免受 `120s` 切换速率锁（`self_heal_subject_to_switch_rate_limit`），为 `ApiChannelDown` 补充恢复保活门检（API 已恢复且原出口可用时仅刷延迟不换节点），并引入 `MANUAL_SWITCH_EPOCH` 防止后台自愈覆盖手动切点及收敛复用 `constants::timing::NODE_DELAY_MAX_MS`；
+  4. 在 [lifecycle.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/lifecycle.rs) 抽出 `pick_subset_fallback_node`，仅当 `filter_text` 为空时才回退全量列表，彻底禁止非空过滤越界盲选。
 - **状态**：代码已修正，待用户确认
 
-### BUG-385 设置与宽窄窗不可见组件彻底卸载、30秒回收闭环及中途关闭设置防混乱加固
+### BUG-389 主界面过滤框聚焦下 F1/F4 快捷键失灵修复与新手引导全协议导入放通
 
-- **对应模块**：[_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx)、[basic-settings-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/basic-settings-card.tsx)、[settings-guards.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/settings-guards.ts)、[proxy-head.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-head.tsx)、[use-traffic-monitor.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-traffic-monitor.ts)、[constants.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/constants.ts)
-- **问题描述**：① 打开设置面板期间，被遮盖的主页节点列表 `ProxyGroups` 仍保持挂载渲染；② `useConnectionData` 与 `usePathControl` 挂在常驻 `Layout` 顶层，关闭设置或缩窄窗口后因 `lastSubscriptionCacheKeyRef` 保持 Query Observer 活跃，最后一批最多 500 条连接快照未随 `gcTime(30s)` 回收，且宽窗下每秒连接更新会带动整个 `Layout` 重绘；③ `TrafficWorkerClient` 闲置销毁延迟长达 `5 分钟`；④ 中途直接关闭设置时，挂在抽屉内的 `AddUrlDialog` 被强制卸载却使 `addUrlOpen` 残留为 `true`（导致 `isAnyOverlayOpen` 永久锁死主页 `F1/F4/Ctrl+F` 快捷键）、关闭按钮 `zIndex: 9999` 越过模态弹窗、`Mixed Port` 未提交修改因 `onBlur` 误保存，以及菜单锚点未联动复位。
+- **对应模块**：[disable-webview-shortcuts.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/disable-webview-shortcuts.ts)、[first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx)、[window-resizing.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/window-resizing.test.ts)
+- **问题描述**：① `ProxyHead` 挂载 100ms 后自动聚焦过滤框，而 `disable-webview-shortcuts.ts` 在 `isEditableTarget` 提前返回，导致开窗直接按或输入过滤词时按 `F1`/`F4` 测速快捷键被静默吞掉；② `FirstRunGuideDialog` 硬性拦截非 `http(s)://` 链接，手持 `vmess://` / `vless://` / `ss://` / `trojan://` / `hy2://` 等节点配置的用户首屏直接被拒（与全协议支持定位不符），剪贴板嗅探亦未覆盖单节点 URI，且重开引导导入会覆盖用户已选「手动模式」。
 - **修复方案**：
-  1. `_layout.tsx` 对 `ProxyGroups` 统一加 `{!drawerOpen && !isMiniStatus && (...)}` 条件卸载，并在 `ProxyHead` 补全 `60ms` 延迟定时器卸载清理（关闭设置返回主页时 `ProxyGroups` 经既有 `useLayoutEffect + localStorage` 同步还原滚动位置）；
-  2. 将 `useConnectionData`、`usePathControl`、`filterConn` 与 `<ConnectionDetail />` 内聚迁入 `ConnectionsPanel`，卸载面板后立即释放 Observer 并在 30s 后触发 `gcTime` 彻底回收 500 条连接缓存、消除 `Layout` 级每秒连带重绘；
-  3. 将 `TrafficWorkerClient` 闲置销毁延迟由 `5 分钟` 收敛为 `TRAFFIC_WORKER_DESTROY_DELAY_MS = 30_000`（对齐 `gcTime`）；
-  4. 将 `AddUrlDialog` 移出抽屉至外层弹窗区、将设置关闭按钮 `zIndex` 从 `9999` 降为 `SETTINGS_CLOSE_BUTTON_Z_INDEX (250)` 并标 `data-close-settings="true"`、关闭抽屉时统一清空帮助/订阅/粘贴右键菜单锚点，并为 `BasicSettingsCard` 端口框加入 `shouldSkipMixedPortBlurSave`（支持 `Esc` 放弃未提交修改与直接点叉跳过保存）。
+  1. 调整 [disable-webview-shortcuts.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/disable-webview-shortcuts.ts) 调度顺序，在无弹窗遮挡/非 IME/非连发前提下于 `isEditableTarget` 前优先放行无修饰 `F4`/`F1`，保留 `Ctrl+F` 仅非编辑态触发；
+  2. 在 [first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx) 导出 `isSupportedSubscriptionOrNodeInput` 统一校验 `http(s)://` 订阅与 `universal_parser.rs` 支持的全协议 URI 列表（同步放通剪贴板单行节点嗅探），限定仅首次引导未完成时才自动开启系统代理，并补齐 Vitest 单元测试。
 - **状态**：代码已修正，待用户确认
 
-### BUG-386 鼠标拖拽缩放窗口时剧烈边缘抖动与反复拖拽跨断点引发卡死
+### BUG-390 订阅删除二次确认防呆、物理断网胶囊防盲切与全界面多语言/提示收口
 
-- **对应模块**：[window.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/window.rs)、[app.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/app.rs)、[lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)、[resize-handles.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/layout/resize-handles.tsx)、[window-provider.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/providers/window/window-provider.tsx)、[window-resizing.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/window-resizing.ts)、[cmds.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/cmds.ts)
-- **问题描述**：① 左/上/斜角拖拽手柄使用相对窗口客户区的 `e.clientX` / `e.clientY` 计算位移并与动态锚点滑动叠加，窗口原点移动反过来改变 `clientX/Y`，在鼠标静止时触发 60Hz 正反馈震荡；② `currentWindow.setSize` 与 `setPosition` 拆分为两次非原子 IPC（且 `tao::set_inner_size` 按缓存的带框样式累加偏移），造成锚定边缘撕裂；③ `WindowProvider` 的 150ms `checkMaximized` 在 `isWindowResizing()` 期间仍持续放行，反复拖过 `285px`/`126px` 断点时高频触发 `ConnectionsPanel` 挂载卸载与 WebSocket/Worker/VirtualList 重建风暴并阻塞 Win32 UI 线程；④ `pointerdown` 缺少单调手势序号保护且 `lib.rs` 的 `Resized/Moved` 监听器在每像素缩放中重复查询几何与缩放比。
+- **对应模块**：[profile-import-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/profile-import-card.tsx)、[layout-dialogs.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/layout-dialogs.tsx)、[_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[active-node-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/active-node-card.tsx)、[first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx)、`src/locales/*`
+- **问题描述**：① 订阅列表右侧 12px 删除按钮无 Tooltip/无二次确认即直接删除订阅，易误删唯一配置导致断网；② 物理断网警示胶囊点击直接以 `select=true` 盲切节点，违背连续性优先；③ `_layout.tsx` 存在英文硬编码报错、首次引导按钮存在双星号 `⭐ ⭐`、闪电测速按钮与过滤框未提示 `F4`/`F1`/过滤语法。
 - **修复方案**：
-  1. 在 Rust [window.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/window.rs) 与 [app.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/app.rs) 实现原生原子 Win32 缩放管线（`begin_window_resize` / `step_window_resize` / `end_window_resize`）：以 `GetCursorPos` 全局屏幕坐标、不变起始矩形、`GetWindowRect`/`GetClientRect`/`GetDpiForWindow` 与防死区游标滑动结合 `PENDING_SWP_RECT` + `RESIZE_SWP_QUEUED` 合并主线程派发单次 `SetWindowPos(..., SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS)`，同步将 `sizing_subclass_proc` 升级至全 8 向 `WM_SIZING` 宽高钳制及 `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE` 状态与收尾落盘，并在 [lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs) 拖拽期间短路 `Resized`/`Moved` 冗余几何查询；
-  2. 在 [resize-handles.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/layout/resize-handles.tsx) 接入单调 `gestureSeq` + `rAF` 背压步进并由 [window-resizing.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/window-resizing.ts) 的 `RESIZE_ENDED_EVENT` 透传最终尺寸与缩放比；
-  3. 在 [window-provider.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/providers/window/window-provider.tsx) 仅记录最新 `onResized` 物理像素并在 `isWindowResizing() === true` 时冻结 `checkMaximized` 断点翻转，松手触发 `RESIZE_ENDED_EVENT` 时一次性精准对齐布局，杜绝拖拽反复跨越断点时的重组件风暴与卡死。
+  1. 为订阅卡片刷新/删除按钮补全无障碍与 Tooltip 提示，并在 [layout-dialogs.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/layout-dialogs.tsx) 与 [_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx) 接入窄窗 3D 删除二次确认弹窗；
+  2. 在 [active-node-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/active-node-card.tsx) 限定仅超时态胶囊点击触发测速择优，物理断网态点击改用 `select = false` 仅探活恢复；
+  3. 清除引导双星号与硬编码英文报错，在 13 个语种资源同步补全 `layout.notices.profileActivationFailed`、多协议提示、`F4/F1` 测速提示与过滤语法占位符。
 - **状态**：代码已修正，待用户确认
 
-### BUG-387 节点断流时顶栏残留假绿延迟与恢复后列表滞留假 Timeout 的双向显示失步修复
+### BUG-391 全栈历史死代码、零引用依赖清扫与六合一权威文档/架构基线大对齐
 
-- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts)、[delay.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.test.ts)
-- **问题描述**：① 当活跃节点实际卡死黑洞（`Stalled`：有上行发包但零下行回包）且整组拨测 `Ok({})` 全超时、或主/备测速地址双双返回 `all proxies timeout` 令 `probe_metrics_group` 返回 `None` 时，`evaluate_failover` 因 `!probed_delays.is_empty()` 门控或提前 `NoAction` 返回而未通知前端刷新延迟，顶栏与列表长期残留断流前的假绿延迟；② 当 `primary_url_distorted = true`（主测速地址全局失真、备用地址仅部分外区节点响应）时，`evaluate_failover` 与 `trigger_backend_auto_select_inner` 仍用 `.unwrap_or(0)` 把未响应节点批量漆成 `0 (Timeout)` 写入 30 分钟长缓存；同时 `trigger_backend_auto_select_with_options` 对仅测试 1~N 个子集的结果也会置位 `reported_live_to_ui = true`；③ Mihomo 在探测超时时不向 `proxy.history` 追加失败记录，而旧 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 在向 UI 推送 `0 (Timeout)` 时仍记录了断流前的旧成功时间戳，导致数秒后活跃节点免拨测复检恢复 `Alive` 时因时间戳未变且健康态仍为 `ok` 而静默跳过回传；④ 前端 `DelayManager.getDelayFix` 在节点已凭 `proxy.alive === true` + 更新时间严格新于超时缓存的 `history` 记录恢复后仍优先返回旧 `0 (Timeout)` 缓存（长达 30 分钟），且 `injectBatchResults(..., { fromProbe: false })` 会沿用此前绿缓存长达 30 分钟的 `updatedAt` 锁定复用 `Timeout`。
+- **对应模块**：[app.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/app.rs)、[network.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/network.rs)、[profile.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/profile.rs)、[runtime.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/runtime.rs)、[sysinfo.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/sysinfo.rs)、[Cargo.toml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/Cargo.toml)、[cmds.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/cmds.ts)、[clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md)、[ARCHITECTURE.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/docs/ARCHITECTURE.md)、[implementation-notes.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/docs/implementation-notes.md)、[用户必读.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/%E7%94%A8%E6%88%B7%E5%BF%85%E8%AF%BB.txt)
+- **问题描述**：① 仓库残留 `src-tauri/.agents/.../progress.md` 审计中间文件、17 个未注册/零调用后端命令及 4 个零引用 Rust 依赖（`network-interface`、`gethostname`、`tokio-rustls`、`rust_iso3166`）与无用 `criterion` 开发依赖；② 前端残留零调用 IPC 封装、`resize-geometry.ts` 废弃原型及若干废弃 i18n 键；③ `clash_mini_agreements.md` 目录与正文标题失步、`ARCHITECTURE.md` 滞后于 `boa_engine`/流媒体解锁移除与实际连接池配置、`implementation-notes.md` 节号错位、`用户必读.txt` 仍写旧「自动连切」叙事。
 - **修复方案**：
-  1. 在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 将 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 升级为 `UiActiveSyncState`（`LAST_UI_ACTIVE_SYNC`，含 `node_name`、`history_time`、`reported_alive`），并通过 `build_probe_ui_display` / `compute_next_ui_active_sync` / `should_sync_alive_ui` 保证：`!primary_url_distorted` 且 `probed_delays` 为空时同样向前端下发全组 `0 (Timeout)`；推送 `0 (Timeout)` 时绝不记录旧成功 `history_time` 而置 `reported_alive = false` 并在恢复 `Alive` 时无条件回传唤醒；`primary_url_distorted = true` 仅推送真实测得的有效延迟（不把未响应节点漆成 `0 (Timeout)` 且不返回全黑 `0` 选点展示）；`Stalled` 流量黑洞叠加 `probe_metrics_group -> None` 时在维持 `NoAction` 不乱切点前提下推送 30s 短效 `(active_node, 0)`（`from_probe = false`）警示 UI；
-  2. 为 `AutoSelectOutcome` 增加 `covers_all_group_nodes` 字段，仅全组无过滤非失真拨测才置位 `LAST_METRICS_PROBE.reported_live_to_ui = true`，并在选点/子集同步后对称维护 `LAST_UI_ACTIVE_SYNC`；
-  3. 在 [delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts) 修复 `getDelayFix`：当缓存为 `Timeout`（`0` 或 `>= NODE_DELAY_MAX_MS`）而 `proxy.alive === true` 且最新有效 `history` 时间戳严格新于 `update.updatedAt`（且未超 `HISTORY_FALLBACK_MAX_AGE_MS`）时立即淘汰陈旧超时缓存并回显最新有效延迟（健康绿缓存仍优先于 `alive` 标记）；同步收紧 `injectBatchResults(..., { fromProbe: false })` 仅健康延迟允许延续旧有效 `updatedAt`，`Timeout` 一律封顶 `REUSED_METRICS_MAX_TTL_MS`（`30s`）；
-  4. 严守零切换规则变更边界（`BUG-372`/`375`/`376`/`377`/`379` 自愈门限均不变），并在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 与 [delay.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.test.ts) 补齐双向同步与缓存淘汰单测锁定。
+  1. 清除残留跟踪文件、零调用死命令/辅助函数/死依赖及前端废弃缩放原型与封装，执行 `pnpm i18n:format && pnpm i18n:types` 瘦身词条；
+  2. 全面对齐 `clash_mini_agreements.md`、`docs/ARCHITECTURE.md`、`docs/implementation-notes.md` 与 `用户必读.txt` 至 `v3.5.0` 现行架构与设计事实，移除虚构/已废除标识符描述。
 - **状态**：代码已修正，待用户确认
 
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
-历史已确认关闭条目（`BUG-057` ~ `BUG-383`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
+历史已确认关闭条目（`BUG-057` ~ `BUG-387`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
 
 | 缺陷编号 | 对应版本基线 | 状态 |
 | :--- | :---: | :---: |
+| **BUG-387** | v3.4.2 | 代码已修正，已确认 |
+| **BUG-386** | v3.4.2 | 代码已修正，已确认 |
+| **BUG-385** | v3.4.2 | 代码已修正，已确认 |
+| **BUG-384** | v3.4.2 | 代码已修正，已确认 |
 | **BUG-383** | v3.4.1 | 代码已修正，已确认 |
 | **BUG-382** | v3.4.0 | 代码已修正，已确认 |
 | **BUG-381** | v3.4.0 | 代码已修正，已确认 |
