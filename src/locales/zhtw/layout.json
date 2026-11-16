@@ -40,9 +40,9 @@
       "consequenceTitle": "不加入白名單會怎樣？",
       "consequence": "如果你在使用 360 且未加入信任區，可能出現：\n· 系統匣圖示被 360 的「清理加速」誤殺而消失（輕量模式下尤其明顯）；\n· 系統匣圖示或 mini-mihomo.exe 在輕量模式下被誤殺中止，需要你手動重新開啟 Clash Mini。\n以上現象均為 360 攔截所致，重新開啟 Clash Mini 即可恢復，不是程式損壞。",
       "howTitle": "如何加入 360 信任區？",
-      "how": "開啟 360 安全衛士 →「木馬防火牆 / 信任與防護」→「信任區」→ 新增 Clash Mini 安裝目錄下的 clash-mini.exe（預設位於 C:\\Program Files\\Clash Mini\\）。不同版本 360 的入口名稱略有差異，可在其設定中搜尋「信任區」或「白名單」。",
+      "how": "開啟 360 安全衛士 →「木馬防火牆 / 信任與防護」→「信任區」→ 新增 Clash Mini 安裝目錄（預設 C:\\Program Files\\Clash Mini\\），或新增該目錄下的 clash-mini.exe 與 mini-mihomo.exe。不同版本 360 的入口名稱略有差異，可在其設定中搜尋「信任區」或「白名單」。",
       "briefTitle": "使用 360 等安全軟體？",
-      "brief": "其「清理加速」可能誤殺 Clash Mini 的系統匣圖示（輕量模式下尤其明顯）。加入信任區可徹底避免；不加也不影響正常代理，只是圖示偶爾消失，重新開啟即可。",
+      "brief": "其「清理加速」可能誤殺背景系統匣程序（輕量模式下尤甚）。將安裝目錄（預設 C:\\Program Files\\Clash Mini\\，或其中的 clash-mini.exe 與 mini-mihomo.exe）加入信任區即可徹底避免；不加也不影響正常代理，圖示消失時重新開啟即可。",
       "briefOpen": "查看完整說明",
       "close": "我知道了"
     },

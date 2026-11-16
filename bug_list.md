@@ -20,6 +20,16 @@
   4. 在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 抽出 `select_fastest_candidate` 并在 `select_node_for_group` **切换前**实时重读 `latest_filter_text` 过滤淘汰越界候选（若本批全数越界则安全跳过本次过期切换），并补齐 Rust 回归单测。
 - **状态**：代码已修正，待用户确认
 
+### BUG-393 新手引导与白名单说明补齐信任区具体目录/进程路径及 10 语种陈旧看门狗文案清理
+
+- **对应模块**：[first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx)、[antivirus-whitelist-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/antivirus-whitelist-dialog.tsx)、`src/locales/*/layout.json`、[antivirus-whitelist.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/docs/antivirus-whitelist.md)
+- **问题描述**：① 新手引导第二步「使用 360 等安全软件？」提示卡片（`layout.components.antivirus.brief`）仅写「加入信任区」，未告知用户应把哪一个安装目录或可执行文件加入信任区；② 全文引导文档与 `antivirus.how` 此前仅列 `clash-mini.exe`，未并列说明整目录 `C:\Program Files\Clash Mini\` 及代理内核 `mini-mihomo.exe`；③ `ar`/`de`/`es`/`fa`/`id`/`jp`/`ko`/`ru`/`tr`/`tt` 共 10 个语种的 `antivirus.*` 仍残留 v3.3.3 已废除的「内置进程看门狗自动拉起」过时表述。
+- **修复方案**：
+  1. 在 13 个语种的 `antivirus.brief` 与 `antivirus.how` 及 [antivirus-whitelist.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/docs/antivirus-whitelist.md) 明确写明加入安装目录（默认 `C:\Program Files\Clash Mini\`）或其中的 `clash-mini.exe` 与 `mini-mihomo.exe`；
+  2. 为 [first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx) 与 [antivirus-whitelist-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/antivirus-whitelist-dialog.tsx) 补充 `overflowWrap: 'anywhere'` 防止 `271px` 窄窗下长路径溢出；
+  3. 将 10 个滞后语种的 `why`/`benefit`/`consequence` 同步至现行「轻量模式关窗无主窗 + `mini-mihomo.exe` 驻留」真实架构描述。
+- **状态**：代码已修正，待用户确认
+
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)

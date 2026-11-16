@@ -1083,6 +1083,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                       color: secondaryText,
                       lineHeight: 1.55,
                       fontSize: '12.5px',
+                      overflowWrap: 'anywhere',
                     }}
                   >
                     {t('layout.components.antivirus.brief')}

@@ -40,9 +40,9 @@
       "consequenceTitle": "What happens without the whitelist?",
       "consequence": "If you run 360 without adding Clash Mini to the trust zone, you may see:\n· The tray icon vanish after 360's “clean-up” sweeps (most visible in lightweight mode);\n· The tray icon or mini-mihomo.exe get terminated by mistake in lightweight mode — you must reopen Clash Mini manually.\nAll of this is caused by 360 interception; simply reopening Clash Mini restores everything. The app itself is not broken.",
       "howTitle": "How to add Clash Mini to 360's Trust Zone",
-      "how": "Open 360 Safety Guard → “Trojan Firewall / Trust & Protection” → “Trust Zone” → add clash-mini.exe from Clash Mini's install directory (default: C:\\Program Files\\Clash Mini\\). Entry names vary slightly across 360 versions; search for “Trust Zone” or “whitelist” in its settings.",
+      "how": "Open 360 Safety Guard → “Trojan Firewall / Trust & Protection” → “Trust Zone” → add Clash Mini's install directory (default: C:\\Program Files\\Clash Mini\\), or add clash-mini.exe and mini-mihomo.exe inside it. Entry names vary slightly across 360 versions; search for “Trust Zone” or “whitelist” in its settings.",
       "briefTitle": "Running 360 or another antivirus?",
-      "brief": "Its “clean-up” may sweep away Clash Mini's tray icon (most visible in lightweight mode). Adding it to the trust list prevents this entirely; skipping it doesn't affect normal proxying — the icon may just disappear occasionally and reopening fixes it.",
+      "brief": "Its “clean-up” may sweep away Clash Mini's background tray process (especially in lightweight mode). Adding the install folder (default C:\\Program Files\\Clash Mini\\, or clash-mini.exe and mini-mihomo.exe inside it) to the Trust Zone prevents this completely; skipping it doesn't affect normal proxying — just reopen Clash Mini if the icon disappears.",
       "briefOpen": "Full details",
       "close": "Got it"
     },

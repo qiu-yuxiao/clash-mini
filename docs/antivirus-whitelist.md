@@ -36,7 +36,7 @@ Clash Mini 需要在后台常驻托盘并拉起独立代理内核子进程（`mi
 
 ## 五、如何加入 360 信任区？
 
-打开 360 安全卫士 →「木马防火墙 / 信任与防护」→「信任区」→ 添加 Clash Mini 安装目录下的 `clash-mini.exe`（默认位于 `C:\Program Files\Clash Mini\`）。
+打开 360 安全卫士 →「木马防火墙 / 信任与防护」→「信任区」→ 添加 Clash Mini 安装目录（默认位于 `C:\Program Files\Clash Mini\`），或添加该目录下的 `clash-mini.exe` 与 `mini-mihomo.exe`。
 
 不同版本 360 的入口名称略有差异，可在其设置中搜索「信任区」或「白名单」。
 

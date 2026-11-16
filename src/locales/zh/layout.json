@@ -40,9 +40,9 @@
       "consequenceTitle": "不加入白名单会怎样？",
       "consequence": "如果你在使用 360 且未加入信任区，可能出现：\n· 托盘图标被 360 的「清理加速」误杀而消失（轻量模式下尤其明显）；\n· 托盘图标或 mini-mihomo.exe 在轻量模式下被误杀中止，需要你手动重新打开 Clash Mini。\n以上现象均为 360 拦截所致，重新打开 Clash Mini 即可恢复，不是程序损坏。",
       "howTitle": "如何加入 360 信任区？",
-      "how": "打开 360 安全卫士 →「木马防火墙 / 信任与防护」→「信任区」→ 添加 Clash Mini 安装目录下的 clash-mini.exe（默认位于 C:\\Program Files\\Clash Mini\\）。不同版本 360 的入口名称略有差异，可在其设置中搜索「信任区」或「白名单」。",
+      "how": "打开 360 安全卫士 →「木马防火墙 / 信任与防护」→「信任区」→ 添加 Clash Mini 安装目录（默认 C:\\Program Files\\Clash Mini\\），或添加该目录下的 clash-mini.exe 与 mini-mihomo.exe。不同版本 360 的入口名称略有差异，可在其设置中搜索「信任区」或「白名单」。",
       "briefTitle": "使用 360 等安全软件？",
-      "brief": "其「清理加速」可能误杀 Clash Mini 的托盘图标（轻量模式下尤其明显）。加入信任区可彻底避免；不加也不影响正常代理，只是图标偶尔消失，重新打开即可。",
+      "brief": "其「清理加速」可能误杀后台托盘进程（轻量模式下尤甚）。将安装目录（默认 C:\\Program Files\\Clash Mini\\，或其中的 clash-mini.exe 与 mini-mihomo.exe）加入信任区即可彻底避免；不加也不影响正常代理，图标消失时重新打开即可。",
       "briefOpen": "查看完整说明",
       "close": "我知道了"
     },

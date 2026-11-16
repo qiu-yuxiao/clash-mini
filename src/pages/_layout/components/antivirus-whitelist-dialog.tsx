@@ -118,6 +118,7 @@ export const AntivirusWhitelistDialog: React.FC<
                 lineHeight: 1.55,
                 fontSize: '12.5px',
                 whiteSpace: 'pre-line',
+                overflowWrap: 'anywhere',
               }}
             >
               {section.body}
