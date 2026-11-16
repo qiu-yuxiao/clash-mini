@@ -340,3 +340,82 @@ describe('BUG-370: DelayManager 过期缓存淘汰主动唤醒监听者回落重
     expect(dm.getDelayUpdate(NODE, 'PROXY')?.delay).toBe(-2)
   })
 })
+
+describe('BUG-387: 消除缓存遮蔽导致的假 Timeout 滞留', () => {
+  it('getDelayFix 在节点已凭严格更新的 history 记录恢复存活时立即淘汰旧 Timeout 缓存', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+
+    const timeoutTs = Date.now() - 20_000
+    dm.restoreDelaySnapshot('节点恢复A', 'PROXY', {
+      delay: 0,
+      updatedAt: timeoutTs,
+    })
+
+    // 1. history 时间戳早于 Timeout 缓存（Mihomo 超时不追加 history 的旧记录）→ 仍保持 Timeout (0)
+    const olderHistoryProxy = {
+      name: '节点恢复A',
+      type: 'AnyTLS',
+      udp: true,
+      alive: true,
+      history: [
+        { time: new Date(timeoutTs - 5_000).toISOString(), delay: 112 },
+      ],
+    } as unknown as IProxyItem
+    expect(dm.getDelayFix(olderHistoryProxy, 'PROXY')).toBe(0)
+
+    // 2. 内核新一轮测量已证实存活（alive=true）且 history 时间戳严格晚于 Timeout 缓存 → 淘汰旧 0 并回显 128ms
+    const recoveredProxy = {
+      name: '节点恢复A',
+      type: 'AnyTLS',
+      udp: true,
+      alive: true,
+      history: [
+        { time: new Date(timeoutTs + 5_000).toISOString(), delay: 128 },
+      ],
+    } as unknown as IProxyItem
+    expect(dm.getDelayFix(recoveredProxy, 'PROXY')).toBe(128)
+    expect(dm.getDelayUpdate('节点恢复A', 'PROXY')).toBeUndefined()
+
+    // 3. 正向健康缓存仍优先于 alive=false（不破坏 §5.6 测速链路失真保护）
+    dm.setDelay('节点恢复B', 'PROXY', 96)
+    const distortedProxy = {
+      name: '节点恢复B',
+      type: 'AnyTLS',
+      udp: true,
+      alive: false,
+      history: [{ time: new Date().toISOString(), delay: 0 }],
+    } as unknown as IProxyItem
+    expect(dm.getDelayFix(distortedProxy, 'PROXY')).toBe(96)
+  })
+
+  it('injectBatchResults 在 fromProbe=false 注入 Timeout (0) 时强制封顶 30s 寿命，不沿用旧绿缓存 30min updatedAt', () => {
+    const dm = getDelayManager()
+    dm.clearCache()
+
+    const greenTs = Date.now() - 5_000
+    dm.restoreDelaySnapshot('黑洞节点1', 'PROXY', {
+      delay: 85,
+      updatedAt: greenTs,
+    })
+    dm.injectBatchResults('PROXY', [['黑洞节点1', 0]], { fromProbe: false })
+
+    const updated = dm.getDelayUpdate('黑洞节点1', 'PROXY')
+    expect(updated?.delay).toBe(0)
+    expect(updated!.updatedAt).toBeLessThanOrEqual(
+      Date.now() - 30 * 60 * 1000 + REUSED_METRICS_MAX_TTL_MS + 50,
+    )
+    expect(updated!.updatedAt).toBeLessThan(greenTs - 20 * 60 * 1000)
+
+    // 即使经 -2 测试占位后再注入 fromProbe=false 的 Timeout (0)，同样封顶 30s 而非继承 preTestUpdatedAt
+    dm.restoreDelaySnapshot('黑洞节点2', 'PROXY', {
+      delay: 92,
+      updatedAt: greenTs,
+    })
+    dm.setDelay('黑洞节点2', 'PROXY', -2)
+    dm.injectBatchResults('PROXY', [['黑洞节点2', 0]], { fromProbe: false })
+    const updated2 = dm.getDelayUpdate('黑洞节点2', 'PROXY')
+    expect(updated2?.delay).toBe(0)
+    expect(updated2!.updatedAt).toBeLessThan(greenTs - 20 * 60 * 1000)
+  })
+})

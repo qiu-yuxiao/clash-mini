@@ -369,6 +369,98 @@ const fn is_valid_probe_delay(delay: u32) -> bool {
     delay >= NODE_DELAY_MIN_MS && delay < NODE_DELAY_MAX_MS
 }
 
+/// 构造后台体检 `probe_metrics_group` 同步到前端展示的 `(节点名, 延迟)` 列表（BUG-387）。
+///
+/// - `!primary_url_distorted`：即便 `probed_delays` 为空（全员超时 `Ok({})`）也为全部可见真实节点生成 `0 (Timeout)`，
+///   避免活跃节点已断流时前端顶栏与列表残留断流前的假绿延迟；
+/// - `primary_url_distorted == true`：主测速 URL 全局失真时仅输出备用 URL 真正测得的有效延迟，
+///   严禁把未响应节点批量漆成 `0 (Timeout)` 写入前端 30 分钟长缓存。
+fn build_probe_ui_display_with<F>(
+    all_nodes: &[String],
+    probed_delays: &HashMap<String, u32>,
+    primary_url_distorted: bool,
+    is_fake_node: F,
+) -> Vec<(String, u32)>
+where
+    F: Fn(&str) -> bool,
+{
+    all_nodes
+        .iter()
+        .filter(|n| !is_dummy_node(n) && !is_fake_node(n))
+        .filter_map(|n| {
+            let delay = probed_delays.get(n).copied();
+            if primary_url_distorted {
+                delay.filter(|&d| is_valid_probe_delay(d)).map(|d| (n.clone(), d))
+            } else {
+                Some((n.clone(), delay.unwrap_or(0)))
+            }
+        })
+        .collect()
+}
+
+fn build_probe_ui_display(
+    all_nodes: &[String],
+    probed_delays: &HashMap<String, u32>,
+    primary_url_distorted: bool,
+) -> Vec<(String, u32)> {
+    build_probe_ui_display_with(
+        all_nodes,
+        probed_delays,
+        primary_url_distorted,
+        crate::utils::node::is_confirmed_fake_node,
+    )
+}
+
+/// 基于本轮已推向 UI 的展示批与当前活跃节点，推进 `LAST_UI_ACTIVE_SYNC` 状态（BUG-387）。
+///
+/// - 当批内包含活跃节点且延迟有效时，记 `reported_alive = true` 并更新 `history_time`；
+/// - 当批内显示活跃节点为 `0 / 超时` 时，强制 `reported_alive = false, history_time = None`，
+///   绝不用断流前的旧成功 `history.last().time` 污染去重键；
+/// - 当批内未覆盖活跃节点（如子集测速或失真残缺探测）时，原样保留先前状态。
+fn compute_next_ui_active_sync(
+    active_node: &str,
+    display: &[(String, u32)],
+    active_hist_time: Option<String>,
+    prev: Option<&UiActiveSyncState>,
+) -> Option<UiActiveSyncState> {
+    let Some((_, delay)) = display.iter().find(|(n, _)| n == active_node) else {
+        return prev.cloned();
+    };
+    let reported_alive = is_valid_probe_delay(*delay);
+    let history_time = if reported_alive {
+        active_hist_time.or_else(|| {
+            prev.filter(|s| s.node_name == active_node && s.reported_alive)
+                .and_then(|s| s.history_time.clone())
+        })
+    } else {
+        None
+    };
+    Some(UiActiveSyncState {
+        node_name: active_node.to_string(),
+        history_time,
+        reported_alive,
+    })
+}
+
+/// 判断免拨测轮在活跃节点 `NodeStatus::Alive` 时是否需要向前端补发可用延迟（BUG-370 / BUG-387）。
+fn should_sync_alive_ui(
+    health_not_ok: bool,
+    last_sync: Option<&UiActiveSyncState>,
+    active_node: &str,
+    active_hist_time: Option<&str>,
+) -> bool {
+    if health_not_ok {
+        return true;
+    }
+    let Some(sync) = last_sync else {
+        return true;
+    };
+    if sync.node_name != active_node || !sync.reported_alive {
+        return true;
+    }
+    active_hist_time.is_some_and(|t| sync.history_time.as_deref() != Some(t))
+}
+
 fn should_recheck_with_fallback(primary_delays: &HashMap<String, u32>, expected_nodes: &[String]) -> bool {
     if !expected_nodes.is_empty() {
         !expected_nodes
@@ -482,7 +574,9 @@ async fn probe_metrics_group(
     }
 
     let record_snapshot = |delays: HashMap<String, u32>| -> HashMap<String, u32> {
-        if !delays.is_empty() {
+        if delays.is_empty() {
+            *LAST_METRICS_PROBE.lock() = None;
+        } else {
             *LAST_METRICS_PROBE.lock() = Some(MetricsProbeSnapshot {
                 completed_at: Instant::now(),
                 delays: delays.clone(),
@@ -603,6 +697,8 @@ pub struct AutoSelectOutcome {
     pub selected_node: Option<String>,
     /// 本次延迟结果的数据来源语义标记
     pub source: DelayResultSource,
+    /// 本次展示数据是否完整覆盖当前 `PROXY` 全组真实节点（而非子集测速或主URL失真残缺结果）
+    pub covers_all_group_nodes: bool,
 }
 
 /// 节点侧自愈所需的连续独立确认次数（§5.1：连续 2 次检测失败才自愈）
@@ -1334,35 +1430,55 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
                 Type::Lightweight,
                 "[后台监测] 测速链路不可用，本轮不判定活跃节点死活（避免测速失真引发切点抖动）"
             );
+            // 【BUG-387】若当前正处于「有上行发包但零下行回包」黑洞停滞态，在不改变任何切点/失败
+            // 裁决（仍返回 NoAction）的前提下，以 `from_probe = false`（30s 短保鲜）标红活跃节点，
+            // 消除顶栏长期残留假绿延迟。
+            if traffic_state == ActiveTrafficState::Stalled && !crate::module::lightweight::is_in_lightweight_mode() {
+                crate::core::handle::Handle::notify_delay_results(
+                    "PROXY".into(),
+                    vec![(active_node.clone(), 0)],
+                    false,
+                );
+                crate::core::handle::Handle::refresh_proxies();
+                *LAST_UI_ACTIVE_SYNC.lock() = Some(UiActiveSyncState {
+                    node_name: active_node,
+                    history_time: None,
+                    reported_alive: false,
+                });
+            }
             return Ok(FailoverVerdict::NoAction);
         };
         // 先取出裁决结论，再取延迟表；结论不能被后面的重读 get_proxies() 冲掉。
         primary_url_distorted = probed.primary_url_distorted;
         let probed_delays = probed.delays;
+        if probed_delays.is_empty() && !primary_url_distorted {
+            *LAST_METRICS_PROBE.lock() = None;
+        }
 
-        // 【BUG-369 修复】后台定期体检刚刚完成了一次真实的整组延迟探测，若本次取得了有效节点延迟，
-        // 立即把新鲜结果通过 `delay-results` 推送给前端列表（同时触发代理状态刷新），
-        // 避免离线重连或静默恢复期间 UI 节点延迟长期停留在 "-"。
-        let mut ui_synced_in_probe = false;
-        if !probed_delays.is_empty() && !crate::module::lightweight::is_in_lightweight_mode() {
-            let already_reported = LAST_METRICS_PROBE
-                .lock()
-                .as_ref()
-                .is_some_and(|s| s.reported_live_to_ui);
+        // 【BUG-369 / BUG-387 修复】后台定期体检刚刚完成了一次真实的整组延迟探测：
+        // - `!primary_url_distorted` 时即便 `probed_delays` 为空（全员超时 `{}`）也向前端推送全组 `0 (Timeout)`；
+        // - `primary_url_distorted` 时仅同步真正测得有效延迟的节点，避免把未响应节点漆成 30 分钟 `0`。
+        let mut ui_synced_display: Option<Vec<(String, u32)>> = None;
+        if !crate::module::lightweight::is_in_lightweight_mode() {
+            let already_reported = !probed_delays.is_empty()
+                && LAST_METRICS_PROBE
+                    .lock()
+                    .as_ref()
+                    .is_some_and(|s| s.reported_live_to_ui);
             if !already_reported {
-                let display: Vec<(String, u32)> = group_info
-                    .all
-                    .as_deref()
-                    .unwrap_or(&[])
-                    .iter()
-                    .filter(|n| !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n))
-                    .map(|n| (n.clone(), probed_delays.get(n).copied().unwrap_or(0)))
-                    .collect();
+                let display = build_probe_ui_display(
+                    group_info.all.as_deref().unwrap_or(&[]),
+                    &probed_delays,
+                    primary_url_distorted,
+                );
                 if !display.is_empty() {
-                    crate::core::handle::Handle::notify_delay_results("PROXY".into(), display, true);
+                    crate::core::handle::Handle::notify_delay_results("PROXY".into(), display.clone(), true);
                     crate::core::handle::Handle::refresh_proxies();
-                    ui_synced_in_probe = true;
-                    if let Some(snap) = LAST_METRICS_PROBE.lock().as_mut() {
+                    ui_synced_display = Some(display);
+                    if !probed_delays.is_empty()
+                        && !primary_url_distorted
+                        && let Some(snap) = LAST_METRICS_PROBE.lock().as_mut()
+                    {
                         snap.reported_live_to_ui = true;
                     }
                 }
@@ -1376,12 +1492,14 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
             .await
             .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
 
-        if ui_synced_in_probe {
-            *LAST_SYNCED_ACTIVE_HISTORY_TIME.lock() = proxies
+        if let Some(display) = ui_synced_display {
+            let active_hist_time = proxies
                 .proxies
                 .get(&active_node)
                 .and_then(|p| p.history.last())
                 .map(|h| h.time.clone());
+            let mut guard = LAST_UI_ACTIVE_SYNC.lock();
+            *guard = compute_next_ui_active_sync(&active_node, &display, active_hist_time, guard.as_ref());
         }
     } else if !crate::module::lightweight::is_in_lightweight_mode()
         && matches!(
@@ -1389,7 +1507,8 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
             Some(NodeStatus::Alive(_))
         )
     {
-        // 【BUG-370 修复】免拨测确认恢复（如重试解除、离线恢复）或内核 PROXY__METRICS 自然周期（300s）
+        // 【BUG-370 / BUG-387 修复】免拨测确认恢复（如重试解除、离线恢复）、此前曾向 UI 推送 `Timeout`
+        // （Mihomo 超时不写 history，若仅比时间戳会静默漏推）、或内核 PROXY__METRICS 自然周期（300s）
         // 刚刚刷新出比上次上屏更新的可用结果时，同步向前端推送可用延迟与 refresh_proxies()，
         // 彻底打通“断流报 Timeout、恢复却静默”的同步断层。
         let active_hist_time = proxies
@@ -1398,12 +1517,11 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
             .and_then(|p| p.history.last())
             .map(|h| h.time.clone());
         let health_not_ok = *LAST_NOTIFIED_HEALTH.lock() != "network_health::ok";
-        let has_unsynced_batch = active_hist_time
-            .as_ref()
-            .is_some_and(|t| LAST_SYNCED_ACTIVE_HISTORY_TIME.lock().as_ref() != Some(t));
-        // 【S5】旧 `force_confirm_probe` 会在此强制再推一次 UI，随 3 秒强制双拨测一并移除；
-        // 健康状态复位与 history 时间戳变化已足够覆盖 BUG-370 的免拨测同步场景。
-        if health_not_ok || has_unsynced_batch {
+        let should_sync = {
+            let guard = LAST_UI_ACTIVE_SYNC.lock();
+            should_sync_alive_ui(health_not_ok, guard.as_ref(), &active_node, active_hist_time.as_deref())
+        };
+        if should_sync {
             let fresh_alive_display: Vec<(String, u32)> = group_info
                 .all
                 .as_deref()
@@ -1425,7 +1543,11 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
             if !fresh_alive_display.is_empty() {
                 crate::core::handle::Handle::notify_delay_results("PROXY".into(), fresh_alive_display, true);
                 crate::core::handle::Handle::refresh_proxies();
-                *LAST_SYNCED_ACTIVE_HISTORY_TIME.lock() = active_hist_time;
+                *LAST_UI_ACTIVE_SYNC.lock() = Some(UiActiveSyncState {
+                    node_name: active_node.clone(),
+                    history_time: active_hist_time,
+                    reported_alive: true,
+                });
             }
         }
     }
@@ -1619,6 +1741,7 @@ async fn trigger_backend_auto_select_with_options(
             selected: false,
             selected_node: None,
             source: DelayResultSource::NotExecuted,
+            covers_all_group_nodes: false,
         });
     }
 
@@ -1648,8 +1771,20 @@ async fn trigger_backend_auto_select_with_options(
         );
         let t0 = std::time::Instant::now();
         crate::core::handle::Handle::notify_delay_results("PROXY".into(), outcome.display.clone(), from_probe);
-        if from_probe && let Some(snap) = LAST_METRICS_PROBE.lock().as_mut() {
+        if from_probe
+            && outcome.covers_all_group_nodes
+            && let Some(snap) = LAST_METRICS_PROBE.lock().as_mut()
+        {
             snap.reported_live_to_ui = true;
+        }
+        let active_target = if let Some(selected) = outcome.selected_node.clone() {
+            Some(selected)
+        } else {
+            get_active_node_name().await
+        };
+        if let Some(cur_active) = active_target {
+            let mut guard = LAST_UI_ACTIVE_SYNC.lock();
+            *guard = compute_next_ui_active_sync(&cur_active, &outcome.display, None, guard.as_ref());
         }
         logging!(
             info,
@@ -1704,6 +1839,7 @@ async fn trigger_backend_auto_select_inner(
                         selected: false,
                         selected_node: None,
                         source: DelayResultSource::NotExecuted,
+                        covers_all_group_nodes: false,
                     });
                 }
             };
@@ -1730,6 +1866,7 @@ async fn trigger_backend_auto_select_inner(
             selected: false,
             selected_node: None,
             source: DelayResultSource::NotExecuted,
+            covers_all_group_nodes: false,
         });
     }
 
@@ -1748,6 +1885,7 @@ async fn trigger_backend_auto_select_inner(
     // 3. 显式单点测速（valid_nodes.len() == 1）绝不复用任何缓存，必须发起实时探测。
     let delays: std::collections::HashMap<String, u32>;
     let source: DelayResultSource;
+    let mut skip_unresponded_in_display = false;
     let reused_snapshot = try_reuse_probe_snapshot(
         &mut LAST_METRICS_PROBE.lock(),
         Instant::now(),
@@ -1810,7 +1948,14 @@ async fn trigger_backend_auto_select_inner(
         } else {
             let allow_coalesce = !(is_frontend_subset && valid_nodes.len() == 1);
             match probe_metrics_group(&mihomo, "选点", allow_coalesce, &valid_nodes).await {
-                Some(outcome) if !outcome.delays.is_empty() => {
+                Some(outcome)
+                    if !outcome.delays.is_empty()
+                        && (!outcome.primary_url_distorted
+                            || valid_nodes
+                                .iter()
+                                .any(|n| outcome.delays.get(n).copied().is_some_and(is_valid_probe_delay))) =>
+                {
+                    skip_unresponded_in_display = outcome.primary_url_distorted;
                     delays = outcome.delays;
                     source = DelayResultSource::LiveProbe;
                 }
@@ -1829,13 +1974,17 @@ async fn trigger_backend_auto_select_inner(
                         selected: false,
                         selected_node: None,
                         source: DelayResultSource::NotExecuted,
+                        covers_all_group_nodes: false,
                     });
                 }
             }
         }
     }
 
-    // 分类收集：display 用于展示（全部有效节点），candidates 用于选点（仅有效延迟节点）
+    let covers_all_group_nodes =
+        !is_frontend_subset && filter_config.filter_text.trim().is_empty() && !skip_unresponded_in_display;
+
+    // 分类收集：display 用于展示（全部有效节点；主URL失真时仅回写有有效延迟的节点），candidates 用于选点（仅有效延迟节点）
     let mut display: Vec<(String, u32)> = Vec::new();
     let mut candidates: Vec<(String, u32)> = Vec::new();
     for name in &valid_nodes {
@@ -1845,7 +1994,9 @@ async fn trigger_backend_auto_select_inner(
             // 与 delay_proxy_by_name 失败时的返回一致，前端显示 "Timeout" 而非 "Error"
             None => 0,
         };
-        display.push((name.clone(), delay));
+        if !skip_unresponded_in_display || is_valid_probe_delay(delay) {
+            display.push((name.clone(), delay));
+        }
         if (NODE_DELAY_MIN_MS..NODE_DELAY_MAX_MS).contains(&delay) {
             candidates.push((name.clone(), delay));
         }
@@ -1935,6 +2086,7 @@ async fn trigger_backend_auto_select_inner(
                     selected: false,
                     selected_node: None,
                     source,
+                    covers_all_group_nodes,
                 });
             }
 
@@ -2040,6 +2192,7 @@ async fn trigger_backend_auto_select_inner(
         selected,
         selected_node,
         source,
+        covers_all_group_nodes,
     })
 }
 
@@ -2067,9 +2220,20 @@ fn sort_display_delays(display: &mut [(String, u32)], sort_type: i32) {
     }
 }
 
+/// 最近一次向前端同步的活跃节点状态（BUG-370 / BUG-387）
+///
+/// Mihomo 在拨测超时时不向 `proxy.history` 追加失败记录，若在推送 `0 (Timeout)` 时记录了
+/// 断流前的旧成功 `history.last().time`，随后节点恢复健康时就会误判为「无需回传」。
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UiActiveSyncState {
+    node_name: String,
+    history_time: Option<String>,
+    reported_alive: bool,
+}
+
 static LAST_NOTIFIED_HEALTH: parking_lot::Mutex<&'static str> = parking_lot::Mutex::new("network_health::ok");
 static LAST_MANUAL_NODE_SWITCH: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
-static LAST_SYNCED_ACTIVE_HISTORY_TIME: parking_lot::Mutex<Option<String>> = parking_lot::Mutex::new(None);
+static LAST_UI_ACTIVE_SYNC: parking_lot::Mutex<Option<UiActiveSyncState>> = parking_lot::Mutex::new(None);
 static ALERT_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 
 /// 记录前端手动切换产生的新节点切换时间戳并立即唤醒监测循环吸收（BUG-336），不触发额外全组拨测。
@@ -2081,7 +2245,7 @@ pub fn notify_manual_node_switched() {
 fn reset_monitor_static_state() {
     *LAST_NOTIFIED_HEALTH.lock() = "network_health::ok";
     *LAST_MANUAL_NODE_SWITCH.lock() = None;
-    *LAST_SYNCED_ACTIVE_HISTORY_TIME.lock() = None;
+    *LAST_UI_ACTIVE_SYNC.lock() = None;
     *LAST_METRICS_PROBE.lock() = None;
     *ACTIVE_TRAFFIC_TRACKER.lock() = None;
 }
@@ -2862,11 +3026,13 @@ mod tests {
     };
     use super::{
         DEFAULT_TEST_URL, DelayResultSource, Duration, FALLBACK_TEST_URL, HashMap, Instant, LAST_MANUAL_NODE_SWITCH,
-        LAST_METRICS_PROBE, LAST_NOTIFIED_HEALTH, LAST_SYNCED_ACTIVE_HISTORY_TIME, METRICS_REUSE_MAX_AGE_SECS,
+        LAST_METRICS_PROBE, LAST_NOTIFIED_HEALTH, LAST_UI_ACTIVE_SYNC, METRICS_REUSE_MAX_AGE_SECS,
         MetricsProbeSnapshot, NodeStatus, SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SelfHealAction,
-        complete_restart_core_attempt, evaluate_self_heal_counters, merge_probe_delays, notify_manual_node_switched,
+        build_probe_ui_display_with, complete_restart_core_attempt, compute_next_ui_active_sync,
+        evaluate_self_heal_counters, merge_probe_delays, notify_manual_node_switched,
         prioritize_verified_candidates_with, reset_monitor_static_state, resolve_probe_target, secondary_test_url,
-        should_probe_active_node, should_recheck_with_fallback, sort_display_delays, try_reuse_probe_snapshot,
+        should_probe_active_node, should_recheck_with_fallback, should_sync_alive_ui, sort_display_delays,
+        try_reuse_probe_snapshot,
     };
 
     #[test]
@@ -3171,7 +3337,7 @@ mod tests {
         reset_monitor_static_state();
         assert_eq!(*LAST_NOTIFIED_HEALTH.lock(), "network_health::ok");
         assert!(LAST_MANUAL_NODE_SWITCH.lock().is_none());
-        assert!(LAST_SYNCED_ACTIVE_HISTORY_TIME.lock().is_none());
+        assert!(LAST_UI_ACTIVE_SYNC.lock().is_none());
         assert!(LAST_METRICS_PROBE.lock().is_none());
         assert!(ACTIVE_TRAFFIC_TRACKER.lock().is_none());
     }
@@ -3426,5 +3592,78 @@ mod tests {
         assert_eq!(merged.get("节点B").copied(), Some(95));
         assert_eq!(merged.get("节点C").copied(), Some(0));
         assert_eq!(merged.get("节点D").copied(), Some(150));
+    }
+
+    #[test]
+    fn test_probe_ui_display_and_active_sync_state() {
+        let nodes = vec![
+            "日本-01".to_string(),
+            "官网: https://example.com".to_string(),
+            "日本-02".to_string(),
+        ];
+        let mut delays = HashMap::new();
+
+        // 1. !primary_url_distorted 且全员超时（probed_delays 为空）：依然生成全组 0 (Timeout) 以清掉顶栏假绿
+        let all_timeout_display = build_probe_ui_display_with(&nodes, &delays, false, |_| false);
+        assert_eq!(
+            all_timeout_display,
+            vec![("日本-01".to_string(), 0), ("日本-02".to_string(), 0)]
+        );
+
+        // 2. primary_url_distorted = true：只推真正取得有效延迟的节点，绝不把未响应节点漆成 0 (Timeout)
+        delays.insert("日本-01".to_string(), 118);
+        delays.insert("日本-02".to_string(), 0);
+        let distorted_display = build_probe_ui_display_with(&nodes, &delays, true, |_| false);
+        assert_eq!(distorted_display, vec![("日本-01".to_string(), 118)]);
+
+        // 3. compute_next_ui_active_sync + should_sync_alive_ui：
+        // 推送 0 (Timeout) 时即便 Mihomo history.last().time 仍停留在旧成功时刻，也绝不能写入该时间并须置 reported_alive=false；
+        // 数秒后免拨测复检恢复 Alive（哪怕 history.time 与 LAST_NOTIFIED_HEALTH 都没变）必须触发回传！
+        let timeout_display = vec![("日本-01".to_string(), 0), ("日本-02".to_string(), 92)];
+        let after_timeout = compute_next_ui_active_sync(
+            "日本-01",
+            &timeout_display,
+            Some("2026-11-16T12:00:00Z".to_string()),
+            None,
+        )
+        .unwrap();
+        assert!(!after_timeout.reported_alive);
+        assert_eq!(after_timeout.history_time, None);
+        assert!(should_sync_alive_ui(
+            false,
+            Some(&after_timeout),
+            "日本-01",
+            Some("2026-11-16T12:00:00Z")
+        ));
+
+        // 同步恢复后记为 reported_alive = true，同一时间戳与节点在 health_ok 时幂等跳过，换节点或新时间戳时再次同步
+        let ok_display = vec![("日本-01".to_string(), 108)];
+        let after_recover = compute_next_ui_active_sync(
+            "日本-01",
+            &ok_display,
+            Some("2026-11-16T12:00:00Z".to_string()),
+            Some(&after_timeout),
+        )
+        .unwrap();
+        assert!(after_recover.reported_alive);
+        assert_eq!(after_recover.history_time.as_deref(), Some("2026-11-16T12:00:00Z"));
+        assert!(!should_sync_alive_ui(
+            false,
+            Some(&after_recover),
+            "日本-01",
+            Some("2026-11-16T12:00:00Z")
+        ));
+        assert!(should_sync_alive_ui(
+            false,
+            Some(&after_recover),
+            "日本-01",
+            Some("2026-11-16T12:05:00Z")
+        ));
+        assert!(should_sync_alive_ui(
+            false,
+            Some(&after_recover),
+            "日本-02",
+            Some("2026-11-16T12:00:00Z")
+        ));
     }
 }

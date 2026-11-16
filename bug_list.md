@@ -37,6 +37,17 @@
   3. 在 [window-provider.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/providers/window/window-provider.tsx) 仅记录最新 `onResized` 物理像素并在 `isWindowResizing() === true` 时冻结 `checkMaximized` 断点翻转，松手触发 `RESIZE_ENDED_EVENT` 时一次性精准对齐布局，杜绝拖拽反复跨越断点时的重组件风暴与卡死。
 - **状态**：代码已修正，待用户确认
 
+### BUG-387 节点断流时顶栏残留假绿延迟与恢复后列表滞留假 Timeout 的双向显示失步修复
+
+- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts)、[delay.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.test.ts)
+- **问题描述**：① 当活跃节点实际卡死黑洞（`Stalled`：有上行发包但零下行回包）且整组拨测 `Ok({})` 全超时、或主/备测速地址双双返回 `all proxies timeout` 令 `probe_metrics_group` 返回 `None` 时，`evaluate_failover` 因 `!probed_delays.is_empty()` 门控或提前 `NoAction` 返回而未通知前端刷新延迟，顶栏与列表长期残留断流前的假绿延迟；② 当 `primary_url_distorted = true`（主测速地址全局失真、备用地址仅部分外区节点响应）时，`evaluate_failover` 与 `trigger_backend_auto_select_inner` 仍用 `.unwrap_or(0)` 把未响应节点批量漆成 `0 (Timeout)` 写入 30 分钟长缓存；同时 `trigger_backend_auto_select_with_options` 对仅测试 1~N 个子集的结果也会置位 `reported_live_to_ui = true`；③ Mihomo 在探测超时时不向 `proxy.history` 追加失败记录，而旧 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 在向 UI 推送 `0 (Timeout)` 时仍记录了断流前的旧成功时间戳，导致数秒后活跃节点免拨测复检恢复 `Alive` 时因时间戳未变且健康态仍为 `ok` 而静默跳过回传；④ 前端 `DelayManager.getDelayFix` 在节点已凭 `proxy.alive === true` + 更新时间严格新于超时缓存的 `history` 记录恢复后仍优先返回旧 `0 (Timeout)` 缓存（长达 30 分钟），且 `injectBatchResults(..., { fromProbe: false })` 会沿用此前绿缓存长达 30 分钟的 `updatedAt` 锁定复用 `Timeout`。
+- **修复方案**：
+  1. 在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 将 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 升级为 `UiActiveSyncState`（`LAST_UI_ACTIVE_SYNC`，含 `node_name`、`history_time`、`reported_alive`），并通过 `build_probe_ui_display` / `compute_next_ui_active_sync` / `should_sync_alive_ui` 保证：`!primary_url_distorted` 且 `probed_delays` 为空时同样向前端下发全组 `0 (Timeout)`；推送 `0 (Timeout)` 时绝不记录旧成功 `history_time` 而置 `reported_alive = false` 并在恢复 `Alive` 时无条件回传唤醒；`primary_url_distorted = true` 仅推送真实测得的有效延迟（不把未响应节点漆成 `0 (Timeout)` 且不返回全黑 `0` 选点展示）；`Stalled` 流量黑洞叠加 `probe_metrics_group -> None` 时在维持 `NoAction` 不乱切点前提下推送 30s 短效 `(active_node, 0)`（`from_probe = false`）警示 UI；
+  2. 为 `AutoSelectOutcome` 增加 `covers_all_group_nodes` 字段，仅全组无过滤非失真拨测才置位 `LAST_METRICS_PROBE.reported_live_to_ui = true`，并在选点/子集同步后对称维护 `LAST_UI_ACTIVE_SYNC`；
+  3. 在 [delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts) 修复 `getDelayFix`：当缓存为 `Timeout`（`0` 或 `>= NODE_DELAY_MAX_MS`）而 `proxy.alive === true` 且最新有效 `history` 时间戳严格新于 `update.updatedAt`（且未超 `HISTORY_FALLBACK_MAX_AGE_MS`）时立即淘汰陈旧超时缓存并回显最新有效延迟（健康绿缓存仍优先于 `alive` 标记）；同步收紧 `injectBatchResults(..., { fromProbe: false })` 仅健康延迟允许延续旧有效 `updatedAt`，`Timeout` 一律封顶 `REUSED_METRICS_MAX_TTL_MS`（`30s`）；
+  4. 严守零切换规则变更边界（`BUG-372`/`375`/`376`/`377`/`379` 自愈门限均不变），并在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 与 [delay.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.test.ts) 补齐双向同步与缓存淘汰单测锁定。
+- **状态**：代码已修正，待用户确认
+
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)

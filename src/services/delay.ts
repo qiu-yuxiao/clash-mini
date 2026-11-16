@@ -340,6 +340,30 @@ class DelayManager {
     if (!proxy) return -1
     const update = this.getDelayUpdate(proxy.name, group)
     if (update && (update.delay >= 0 || update.delay === -2)) {
+      // 【BUG-387】若前端缓存仍停留在 Timeout（0 或 >= NODE_DELAY_MAX_MS），但内核最新快照
+      // 已由更新一轮的测量证实存活（alive=true），且 history 末条有效延迟的时间戳严格晚于该超时
+      // 缓存写入时刻，立即淘汰过时的假 Timeout 缓存并回显新延迟（健康绿缓存与 -2 仍绝对优先于 alive）。
+      if (
+        (update.delay === 0 || update.delay >= NODE_DELAY_MAX_MS) &&
+        proxy.alive === true &&
+        proxy.history &&
+        proxy.history.length > 0
+      ) {
+        const lastRecord = proxy.history[proxy.history.length - 1]
+        const recordedAt = Date.parse(lastRecord.time)
+        const lastDelay = lastRecord.delay
+        if (
+          !Number.isNaN(recordedAt) &&
+          recordedAt > update.updatedAt &&
+          Date.now() - recordedAt <= HISTORY_FALLBACK_MAX_AGE_MS &&
+          typeof lastDelay === 'number' &&
+          lastDelay > 0 &&
+          lastDelay < NODE_DELAY_MAX_MS
+        ) {
+          this.cache.delete(hashKey(proxy.name, group))
+          return lastDelay
+        }
+      }
       return update.delay
     }
 
@@ -445,12 +469,16 @@ class DelayManager {
       } else {
         const key = hashKey(name, group)
         const existing = this.cache.get(key)
+        const isHealthyDelay = delay > 0 && delay < NODE_DELAY_MAX_MS
         const cappedUpdatedAt =
+          isHealthyDelay &&
           existing &&
-          existing.delay !== -2 &&
+          existing.delay > 0 &&
+          existing.delay < NODE_DELAY_MAX_MS &&
           now - existing.updatedAt <= CACHE_TTL
             ? existing.updatedAt
-            : existing &&
+            : isHealthyDelay &&
+                existing &&
                 existing.delay === -2 &&
                 existing.preTestUpdatedAt &&
                 now - existing.preTestUpdatedAt <= CACHE_TTL
