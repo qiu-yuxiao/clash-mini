@@ -1,26 +1,19 @@
-import {
-  currentMonitor,
-  PhysicalPosition,
-  PhysicalSize,
-} from '@tauri-apps/api/window'
-import React, { useCallback, useEffect, useRef } from 'react'
+import type React from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
-import {
-  MAX_WINDOW_HEIGHT,
-  MAX_WINDOW_WIDTH,
-  MIN_WINDOW_HEIGHT,
-  MIN_WINDOW_WIDTH,
-} from '@/constants'
 import { useWindow } from '@/hooks/use-window'
-import { frontendLog } from '@/services/cmds'
-import { computeResizeGeometry } from '@/utils/resize-geometry'
+import {
+  beginWindowResize,
+  endWindowResize,
+  frontendLog,
+  type ResizeDirection,
+  stepWindowResize,
+} from '@/services/cmds'
 import { setWindowResizing } from '@/utils/window-resizing'
 
 const HANDLE_SIZE = 10
 
-type Direction = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
-
-const handles: { direction: Direction; style: React.CSSProperties }[] = [
+const handles: { direction: ResizeDirection; style: React.CSSProperties }[] = [
   {
     direction: 'n',
     style: {
@@ -103,398 +96,234 @@ const handles: { direction: Direction; style: React.CSSProperties }[] = [
   },
 ]
 
-interface ResizeSession {
-  direction: Direction
-  // 拖拽起始时的「外位置」（physical px，与 pointermove 换算出的屏幕位移同坐标系）
-  startPhysX: number
-  startPhysY: number
-  // 拖拽起始时的「内尺寸」（客户区，physical px）
-  // 【口径铁律】必须用 innerSize()，不可用 outerSize()：落地走 setSize()（Tauri 语义 = 内尺寸），
-  // 且 MIN/MAX 边界也是内尺寸。混用会让每帧多出一个外框内缩量。
-  startInnerW: number
-  startInnerH: number
-  // 拖拽起始鼠标屏幕坐标（physical px，与 outerPosition 同坐标系）
-  startPointerX: number
-  startPointerY: number
-  // 缩放因子，用于 physical ↔ logical 转换
-  scaleFactor: number
-  // 拖拽期间使用的 pointerId，用于 setPointerCapture/releasePointerCapture
+interface ActiveGestureSession {
+  seq: number
   pointerId: number
-  // 当前帧待应用的**物理像素**几何（rAF 节流）。
-  // 全程只在物理像素空间里待命与下发，不做 logical 往返 —— 少一次取整就少一次 1px 抖动。
-  pendingPhysW: number | null
-  pendingPhysH: number | null
-  pendingPhysX: number | null
-  pendingPhysY: number | null
-  // 🛡️ [FM-03 防 IPC 洪水] 缓存上一次实际发出的物理几何值，比对去重
-  lastAppliedPhysW: number
-  lastAppliedPhysH: number
-  lastAppliedPhysX: number
-  lastAppliedPhysY: number
-  // rAF 调度句柄；非 null 表示已有帧排队或正在执行
-  rafId: number | null
-  // applyPending 是否在飞行中（IPC 未完成），防止下一帧 rAF 触发并发 IPC 调用堆积
-  inFlight: boolean
+  ending: boolean
 }
 
 export const ResizeHandles: React.FC = () => {
-  const { isLargeMode, currentWindow } = useWindow()
-  // session ref 持有整个拖拽期间的不可变快照，pointermove/up 通过闭包读取
-  const sessionRef = useRef<ResizeSession | null>(null)
-  // 已在 pointerdown 登记、但「窗口几何量」尚未读回来的手势。
-  // 用于：几何量回来之前用户就松手 / 丢失指针捕获时，仍能正确收尾（释放捕获、复位全局标志），
-  // 避免指针捕获与 __isResizing 标志永久残留。
-  const pendingDownRef = useRef<{
-    pointerId: number
-    cancelled: boolean
+  const { isLargeMode } = useWindow()
+  const isMountedRef = useRef(true)
+  const gestureSeqRef = useRef(0)
+  const activeSessionRef = useRef<ActiveGestureSession | null>(null)
+  const beginPromiseRef = useRef<{
+    seq: number
+    promise: Promise<boolean>
   } | null>(null)
-  // applyPending ref：用于打破 scheduleApply ↔ applyPending 循环依赖
-  const applyPendingRef = useRef<
-    ((session: ResizeSession) => Promise<void>) | null
-  >(null)
+  const rafIdRef = useRef<number | null>(null)
+  const inFlightRef = useRef(false)
+  const needsStepRef = useRef(false)
+  const scheduleStepRef = useRef<((seq: number) => void) | null>(null)
 
-  const scheduleApply = useCallback((session: ResizeSession) => {
-    // 已有帧排队 或 IPC 飞行中：跳过，避免并发 IPC 堆积
-    if (session.rafId !== null || session.inFlight) return
-    session.rafId = requestAnimationFrame(() => {
-      void applyPendingRef.current?.(session)
-    })
+  const runStep = useCallback(async (seq: number) => {
+    rafIdRef.current = null
+    const active = activeSessionRef.current
+    if (!active || active.ending || active.seq !== seq) return
+    if (inFlightRef.current) {
+      needsStepRef.current = true
+      return
+    }
+
+    inFlightRef.current = true
+    needsStepRef.current = false
+    try {
+      await stepWindowResize(seq)
+    } finally {
+      inFlightRef.current = false
+      const stillActive = activeSessionRef.current
+      if (
+        isMountedRef.current &&
+        stillActive &&
+        !stillActive.ending &&
+        stillActive.seq === seq &&
+        needsStepRef.current
+      ) {
+        needsStepRef.current = false
+        scheduleStepRef.current?.(seq)
+      }
+    }
   }, [])
 
-  const applyPending = useCallback(
-    async (session: ResizeSession) => {
-      // 取出本帧的待应用值，立即清空，避免下一帧重复应用
-      const physW = session.pendingPhysW
-      const physH = session.pendingPhysH
-      const physX = session.pendingPhysX
-      const physY = session.pendingPhysY
-      session.pendingPhysW = null
-      session.pendingPhysH = null
-      session.pendingPhysX = null
-      session.pendingPhysY = null
-      session.rafId = null
-      session.inFlight = true
-      try {
-        if (!currentWindow) return
-
-        // 未发生变化的维度沿用上一次已发出的值；仍在原点则回落到拖拽起始值
-        const targetW = physW ?? session.lastAppliedPhysW
-        const targetH = physH ?? session.lastAppliedPhysH
-        const targetX = physX ?? session.lastAppliedPhysX
-        const targetY = physY ?? session.lastAppliedPhysY
-
-        // 🛡️ [FM-03 防 IPC 洪水] 与上一次已发出的物理值对比去重。
-        // 拖拽推到最小尺寸 271x135 边界时，高频 pointermove 算出的目标值恒为同一组，
-        // 此判据直接跳过发 IPC，消除最小尺寸边界处的 IPC 堆积。
-        const needsSize =
-          targetW !== session.lastAppliedPhysW ||
-          targetH !== session.lastAppliedPhysH
-        const needsPos =
-          (physX !== null && targetX !== session.lastAppliedPhysX) ||
-          (physY !== null && targetY !== session.lastAppliedPhysY)
-
-        if (!needsSize && !needsPos) return
-
-        // 更新上次发出的实际几何记录
-        session.lastAppliedPhysW = targetW
-        session.lastAppliedPhysH = targetH
-        session.lastAppliedPhysX = targetX
-        session.lastAppliedPhysY = targetY
-
-        // 并行发 IPC：setSize 和 setPosition 之间合并调用。
-        // 【物理像素直发】几何量本来就是物理像素整数，不再乘以 scaleFactor 二次换算，
-        // 从根上消灭「×1.5 再取整」造成的 ±1px 漂移。
-        await Promise.all([
-          needsSize
-            ? currentWindow.setSize(new PhysicalSize(targetW, targetH))
-            : Promise.resolve(),
-          needsPos
-            ? currentWindow.setPosition(new PhysicalPosition(targetX, targetY))
-            : Promise.resolve(),
-        ])
-      } catch (err) {
-        frontendLog(
-          'error',
-          `[ResizeHandle] setSize/setPosition failed: ${err}`,
-        )
-      } finally {
-        session.inFlight = false
-        // IPC 期间若又有新的 pending，立即再调度一帧应用，避免遗漏最后一帧
-        if (
-          session.pendingPhysW !== null ||
-          session.pendingPhysH !== null ||
-          session.pendingPhysX !== null ||
-          session.pendingPhysY !== null
-        ) {
-          scheduleApply(session)
-        }
+  const scheduleStep = useCallback(
+    (seq: number) => {
+      const active = activeSessionRef.current
+      if (!active || active.ending || active.seq !== seq) return
+      if (inFlightRef.current) {
+        needsStepRef.current = true
+        return
       }
+      if (rafIdRef.current !== null) return
+      rafIdRef.current = requestAnimationFrame(() => {
+        void runStep(seq)
+      })
     },
-    [currentWindow, scheduleApply],
+    [runStep],
   )
 
-  // 每次 render 同步 ref，供 scheduleApply 在 rAF 回调中调用最新版本
-  applyPendingRef.current = applyPending
+  scheduleStepRef.current = scheduleStep
 
-  // 拖拽结束冷却定时器，隔离松手瞬间的并发 IPC 与重绘洪峰
-  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const finishGesture = useCallback(
+    async (pointerId?: number, target?: HTMLElement) => {
+      const active = activeSessionRef.current
+      if (!active || active.ending) return
+      if (pointerId !== undefined && active.pointerId !== pointerId) return
 
-  // 组件卸载（含拖拽中途因切模式等卸载）时复位 resizing 标志并取消 pending 的 rAF 帧及冷却定时器，
-  // 避免标志残留导致后续 onResized/updateWindowState 永远跳过 IPC 以及卸载后的异步调用。
-  useEffect(
-    () => () => {
-      if (cooldownTimerRef.current !== null) {
-        clearTimeout(cooldownTimerRef.current)
-        cooldownTimerRef.current = null
+      active.ending = true
+      const finishingSeq = active.seq
+      activeSessionRef.current = null
+      needsStepRef.current = false
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
       }
-      setWindowResizing(false)
-      pendingDownRef.current = null
-      if (
-        sessionRef.current?.rafId !== null &&
-        sessionRef.current?.rafId !== undefined
-      ) {
-        cancelAnimationFrame(sessionRef.current.rafId)
+
+      if (target && pointerId !== undefined) {
+        try {
+          if (target.hasPointerCapture?.(pointerId)) {
+            target.releasePointerCapture(pointerId)
+          }
+        } catch {
+          // 捕获可能已被系统释放，忽略
+        }
+      }
+
+      const pendingBegin = beginPromiseRef.current
+      if (pendingBegin && pendingBegin.seq === finishingSeq) {
+        await pendingBegin.promise.catch(() => false)
+        if (beginPromiseRef.current?.seq === finishingSeq) {
+          beginPromiseRef.current = null
+        }
+      }
+
+      const snapshot = await endWindowResize(finishingSeq)
+      if (!activeSessionRef.current) {
+        setWindowResizing(false, snapshot ?? undefined)
       }
     },
     [],
   )
 
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+      }
+      const active = activeSessionRef.current
+      activeSessionRef.current = null
+      needsStepRef.current = false
+      if (active && !active.ending) {
+        void endWindowResize(active.seq)
+      }
+      setWindowResizing(false)
+    }
+  }, [])
+
   const handlePointerDown = useCallback(
-    (direction: Direction) => async (e: React.PointerEvent) => {
-      if (!currentWindow || e.button !== 0) return
+    (direction: ResizeDirection) => async (e: React.PointerEvent) => {
+      if (e.button !== 0) return
       e.preventDefault()
       e.stopPropagation()
 
-      // 重新按下拖拽：若处于 200ms 冷却期间，立即取消冷却定时器
-      if (cooldownTimerRef.current !== null) {
-        clearTimeout(cooldownTimerRef.current)
-        cooldownTimerRef.current = null
-      }
-
-      // ── 以下三步必须在 await 之前同步完成 ────────────────────────────────
-      // ① 锁指针：React 在事件派发结束后会把 SyntheticEvent.currentTarget 置空，
-      //    await 之后再读 e.currentTarget 只能拿到 null，setPointerCapture 抛出的
-      //    TypeError 又被 catch 吞掉 —— 指针捕获从未建立。后果是窗口一边随拖拽变形、
-      //    手柄一边从鼠标底下溜走，pointermove 立刻收不到，表现为「动一下就拖不动」。
-      // ② 置位全局拖拽标志，尽早短路 window-provider / use-visibility 的 IPC。
-      // ③ 记录按下时的指针坐标（位移一律按按下点绝对计算，await 期间丢失的 move 不会累积误差）。
+      // 必须在任何 await 之前同步建立指针捕获，防止 SyntheticEvent.currentTarget 置空
       const target = e.currentTarget as HTMLElement
       try {
         target.setPointerCapture(e.pointerId)
       } catch (err) {
         frontendLog('warn', `[ResizeHandle] setPointerCapture failed: ${err}`)
       }
+
+      const prev = activeSessionRef.current
+      if (prev && !prev.ending) {
+        prev.ending = true
+        void endWindowResize(prev.seq)
+      }
+
+      const seq = gestureSeqRef.current + 1
+      gestureSeqRef.current = seq
+      needsStepRef.current = false
+      inFlightRef.current = false
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+      }
+
+      activeSessionRef.current = {
+        seq,
+        pointerId: e.pointerId,
+        ending: false,
+      }
       setWindowResizing(true)
-      pendingDownRef.current = { pointerId: e.pointerId, cancelled: false }
-      const downClientX = e.clientX
-      const downClientY = e.clientY
 
-      // 读取窗口当前几何，所有读取并行发 IPC 减少往返。
-      // 【口径】位置取 outerPosition（与 setPosition 对齐），尺寸取 innerSize（与 setSize 对齐）。
-      const [pos, size, monitor] = await Promise.all([
-        currentWindow.outerPosition(),
-        currentWindow.innerSize(),
-        currentMonitor(),
-      ]).catch((err) => {
-        frontendLog('error', `[ResizeHandle] read window state failed: ${err}`)
-        return [null, null, null]
-      })
+      const beginPromise = beginWindowResize(direction, seq)
+      beginPromiseRef.current = { seq, promise: beginPromise }
+      const ok = await beginPromise
+      if (beginPromiseRef.current?.seq === seq) {
+        beginPromiseRef.current = null
+      }
 
-      const pending = pendingDownRef.current
-      pendingDownRef.current = null
-      const gestureAlive =
-        pending !== null &&
-        !pending.cancelled &&
-        pending.pointerId === e.pointerId
-
-      if (!gestureAlive || !pos || !size) {
-        // 几何量回来之前手势已结束，或读取失败：释放捕获并复位标志，不留残余拖拽态
-        try {
-          target.releasePointerCapture(e.pointerId)
-        } catch {
-          // 捕获可能已被系统自动释放，忽略
+      const currentActive = activeSessionRef.current
+      if (!ok) {
+        if (
+          currentActive &&
+          currentActive.seq === seq &&
+          !currentActive.ending
+        ) {
+          activeSessionRef.current = null
+          try {
+            if (target.hasPointerCapture?.(e.pointerId)) {
+              target.releasePointerCapture(e.pointerId)
+            }
+          } catch {
+            // ignore
+          }
+          setWindowResizing(false)
         }
-        setWindowResizing(false)
         return
       }
 
-      const scaleFactor = monitor?.scaleFactor || window.devicePixelRatio || 1
-
-      sessionRef.current = {
-        direction,
-        startPhysX: pos.x,
-        startPhysY: pos.y,
-        startInnerW: size.width,
-        startInnerH: size.height,
-        // pointer events 的 clientX/Y 是 CSS 像素（logical），
-        // 乘以缩放因子后与 outerPosition/innerSize 同为 physical 坐标系
-        startPointerX: downClientX * scaleFactor,
-        startPointerY: downClientY * scaleFactor,
-        scaleFactor,
-        pointerId: e.pointerId,
-        pendingPhysW: null,
-        pendingPhysH: null,
-        pendingPhysX: null,
-        pendingPhysY: null,
-        // 上一帧已发出值以「当前窗口几何」为初值：
-        // 这样首帧只有真正变化的维度才会发 IPC，不会白打一次同值的 setSize/setPosition。
-        lastAppliedPhysW: size.width,
-        lastAppliedPhysH: size.height,
-        lastAppliedPhysX: pos.x,
-        lastAppliedPhysY: pos.y,
-        rafId: null,
-        inFlight: false,
+      if (
+        isMountedRef.current &&
+        currentActive &&
+        currentActive.seq === seq &&
+        !currentActive.ending &&
+        needsStepRef.current
+      ) {
+        needsStepRef.current = false
+        scheduleStep(seq)
       }
     },
-    [currentWindow],
+    [scheduleStep],
   )
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
-      // 手势在「窗口几何量还没读回来」阶段就结束（快速点击 / 捕获丢失）：
-      // 只做取消登记，捕获与全局标志由 handlePointerDown 的续体统一收尾，避免早退留下残留状态。
-      const pending = pendingDownRef.current
-      if (pending && pending.pointerId === e.pointerId) {
-        pending.cancelled = true
-        return
-      }
-
-      const session = sessionRef.current
-      if (!session || e.pointerId !== session.pointerId) return
-
-      // 释放指针捕获
-      const target = e.currentTarget as HTMLElement
-      try {
-        target.releasePointerCapture(session.pointerId)
-      } catch (err) {
-        frontendLog(
-          'warn',
-          `[ResizeHandle] releasePointerCapture failed: ${err}`,
-        )
-      }
-
-      // 取消尚未触发的 rAF 帧
-      if (session.rafId !== null) {
-        cancelAnimationFrame(session.rafId)
-        session.rafId = null
-      }
-
-      // 🛡️ [FM-04 防竞态] 仅在上一帧 IPC 未在途时立即应用收尾帧；
-      // 若上一帧 IPC 正在飞行中 (inFlight === true)，applyPending 的 finally 块
-      // 会在完成后自动拾取 pending 几何并安全应用最后一帧，避免并发 IPC 冲突。
-      if (!session.inFlight) {
-        void applyPending(session)
-      }
-
-      sessionRef.current = null
-
-      // 🛡️ [FM-01 冷却恢复] 拖拽结束：启动 200ms 拖拽结束冷却定时器 (Cool-down Reset)，
-      // 延迟重置全局 resizing 标志。
-      // 避免在收尾 setSize/setPosition IPC 尚未完全落地沉淀前就解除拦截，
-      // 导致下游 onResized / updateWindowState 立即涌入并发 IPC 查询和重绘造成松手瞬间卡顿。
-      if (cooldownTimerRef.current !== null) {
-        clearTimeout(cooldownTimerRef.current)
-      }
-      cooldownTimerRef.current = setTimeout(() => {
-        setWindowResizing(false)
-        cooldownTimerRef.current = null
-      }, 200)
+      void finishGesture(e.pointerId, e.currentTarget as HTMLElement)
     },
-    [applyPending],
+    [finishGesture],
   )
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      const session = sessionRef.current
-      if (!session || e.pointerId !== session.pointerId) return
+      const active = activeSessionRef.current
+      if (!active || active.ending || e.pointerId !== active.pointerId) return
 
-      // 🛡️ 终极防线：如果检测到鼠标左键已释放（e.buttons 不含左键 1 掩码），
-      // 说明 pointerup 已经丢失。立即在此主动触发收尾清理，斩断假拖动状态。
       if ((e.buttons & 1) === 0) {
-        handlePointerUp(e)
+        void finishGesture(e.pointerId, e.currentTarget as HTMLElement)
         return
       }
 
-      // 计算鼠标在 physical 坐标系下的位移
-      const currentPointerX = e.clientX * session.scaleFactor
-      const currentPointerY = e.clientY * session.scaleFactor
-      let dx = currentPointerX - session.startPointerX
-      let dy = currentPointerY - session.startPointerY
-
-      // 🛡️ [FM-05 消除反向拖拽死区] 动态锚点滑动 Clamping：
-      // 当鼠标推过最小/最大尺寸边界时，动态滑动 session.startPointerX/Y 锚点，
-      // 使得 dx/dy 紧贴临界边界。一旦鼠标反向移动，可实现 0 延迟即刻拉大/缩小，消除死区粘滞感。
-      // 注意：这里的 MIN/MAX 与 computeResizeGeometry 同为「内尺寸」口径，基准值也用 startInnerW/H，
-      // 且边界值统一引用 @/constants 的导出常量，避免两处魔数漂移（曾经就是这类重复埋的坑）。
-      const sf = session.scaleFactor
-      const MIN_W_PHYS = MIN_WINDOW_WIDTH * sf
-      const MAX_W_PHYS = MAX_WINDOW_WIDTH * sf
-      const MIN_H_PHYS = MIN_WINDOW_HEIGHT * sf
-      const MAX_H_PHYS = MAX_WINDOW_HEIGHT * sf
-
-      if (session.direction.includes('e')) {
-        const minDx = MIN_W_PHYS - session.startInnerW
-        const maxDx = MAX_W_PHYS - session.startInnerW
-        if (dx < minDx) {
-          session.startPointerX = currentPointerX - minDx
-          dx = minDx
-        } else if (dx > maxDx) {
-          session.startPointerX = currentPointerX - maxDx
-          dx = maxDx
-        }
-      } else if (session.direction.includes('w')) {
-        const minDx = session.startInnerW - MAX_W_PHYS
-        const maxDx = session.startInnerW - MIN_W_PHYS
-        if (dx < minDx) {
-          session.startPointerX = currentPointerX - minDx
-          dx = minDx
-        } else if (dx > maxDx) {
-          session.startPointerX = currentPointerX - maxDx
-          dx = maxDx
-        }
+      if (beginPromiseRef.current?.seq === active.seq) {
+        needsStepRef.current = true
+        return
       }
 
-      if (session.direction.includes('s')) {
-        const minDy = MIN_H_PHYS - session.startInnerH
-        const maxDy = MAX_H_PHYS - session.startInnerH
-        if (dy < minDy) {
-          session.startPointerY = currentPointerY - minDy
-          dy = minDy
-        } else if (dy > maxDy) {
-          session.startPointerY = currentPointerY - maxDy
-          dy = maxDy
-        }
-      } else if (session.direction.includes('n')) {
-        const minDy = session.startInnerH - MAX_H_PHYS
-        const maxDy = session.startInnerH - MIN_H_PHYS
-        if (dy < minDy) {
-          session.startPointerY = currentPointerY - minDy
-          dy = minDy
-        } else if (dy > maxDy) {
-          session.startPointerY = currentPointerY - maxDy
-          dy = maxDy
-        }
-      }
-
-      // 计算 clamp 后的新几何（logical），写入 pending（rAF 节流后统一应用）
-      const geo = computeResizeGeometry({
-        direction: session.direction,
-        startInnerW: session.startInnerW,
-        startInnerH: session.startInnerH,
-        startPhysX: session.startPhysX,
-        startPhysY: session.startPhysY,
-        dx,
-        dy,
-        scaleFactor: session.scaleFactor,
-      })
-      session.pendingPhysW = geo.physW
-      session.pendingPhysH = geo.physH
-      session.pendingPhysX = geo.physX
-      session.pendingPhysY = geo.physY
-
-      scheduleApply(session)
+      scheduleStep(active.seq)
     },
-    [scheduleApply, handlePointerUp],
+    [finishGesture, scheduleStep],
   )
 
   if (isLargeMode) return null

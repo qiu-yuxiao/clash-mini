@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   MAX_WINDOW_HEIGHT,
@@ -8,6 +8,11 @@ import {
 } from '@/constants'
 
 import { computeResizeGeometry } from './resize-geometry'
+import {
+  isWindowResizing,
+  RESIZE_ENDED_EVENT,
+  setWindowResizing,
+} from './window-resizing'
 
 // 西/北向拖拽由锚定边反推保证 physX/physY 非空；测试里显式判空收窄而非 `!` 断言，
 // 失败时给出可读信息（同时规避 noNonNullAssertion）。
@@ -338,5 +343,64 @@ describe('computeResizeGeometry 窗口尺寸与位置重算', () => {
       expect(geo.physW).toBe(430)
       expect(geo.physX).toBeNull()
     })
+  })
+})
+
+describe('BUG-386: window-resizing 拖拽门控与 RESIZE_ENDED_EVENT 状态传递', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('setWindowResizing 在 true -> false 转换时派发携带尺寸与 DPI 缩放因子的结束事件', () => {
+    const dispatched: Event[] = []
+    const fakeWindow = {
+      dispatchEvent: (ev: Event) => {
+        dispatched.push(ev)
+        return true
+      },
+    }
+    vi.stubGlobal('window', fakeWindow)
+
+    expect(isWindowResizing()).toBe(false)
+    setWindowResizing(true)
+    expect(isWindowResizing()).toBe(true)
+    expect(dispatched).toHaveLength(0)
+
+    const detail = { width: 612, height: 540, scaleFactor: 1.5 }
+    setWindowResizing(false, detail)
+    expect(isWindowResizing()).toBe(false)
+    expect(dispatched).toHaveLength(1)
+    const endedEvent = dispatched[0] as CustomEvent<typeof detail>
+    expect(endedEvent.type).toBe(RESIZE_ENDED_EVENT)
+    expect(endedEvent.detail).toEqual(detail)
+  })
+
+  it('未处于拖拽状态时重复 setWindowResizing(false) 不会误派发结束事件', () => {
+    const dispatched: Event[] = []
+    vi.stubGlobal('window', {
+      dispatchEvent: (ev: Event) => {
+        dispatched.push(ev)
+        return true
+      },
+    })
+
+    setWindowResizing(false)
+    expect(isWindowResizing()).toBe(false)
+    expect(dispatched).toHaveLength(0)
+  })
+
+  it('允许不带 detail 调用 setWindowResizing(false) 触发兜底回读对齐', () => {
+    const dispatched: Event[] = []
+    vi.stubGlobal('window', {
+      dispatchEvent: (ev: Event) => {
+        dispatched.push(ev)
+        return true
+      },
+    })
+
+    setWindowResizing(true)
+    setWindowResizing(false)
+    expect(dispatched).toHaveLength(1)
+    expect((dispatched[0] as CustomEvent).detail).toBeNull()
   })
 })

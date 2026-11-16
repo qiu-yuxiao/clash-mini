@@ -175,25 +175,28 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **尺寸口径唯一化（铁律）**：全工程的窗口尺寸一律指**内尺寸（客户区）**，位置一律指**外位置**。落地 API 对应关系固定为：尺寸 = `setSize()` / `innerSize()` / `min_inner_size` / `max_inner_size`，位置 = `setPosition()` / `outerPosition()`。**严禁把 `outerSize()` 与 `setSize()` 混用**——二者差一个外框内缩量，混用会让每次缩放多放大一圈（见 BUG-297）。
 - **无框阴影必须关闭（`shadow(false)`）**：开启无框阴影时 tao 会给客户区加不可见内缩（实测 150% DPI 下左右各 11、上 2 下 11 物理像素），outer ≠ inner，上述口径铁律被物理破坏。关闭后内缩归零、outer == inner，`force_set_window_outer_size` 与 `min_inner_size` 不再互相矛盾。代价是失去系统投影与 Win11 圆角/1px 描边，由自绘外框（皮肤背景）覆盖。**重新开启阴影将同时破坏缩放几何与最小尺寸声明，不得开启。**
 
-### 2.4 Win32 消息子类化与 WM_SIZING 防下移钩子
+### 2.4 Win32 消息子类化与 WM_SIZING 全向钳制钩子
 
-针对 Windows 系统在无边框（Frameless）窗口上边缘缩放至最小高度时会错误累加 Y 坐标导致整个窗口向下平移的底层缺陷，实施 **Win32 窗口过程子类化防御**：
-- **钩子安装（现代化 `SetWindowSubclass` 架构，BUG-332 / BUG-350）**：在主窗口构建完成阶段通过 Win32 `SetWindowSubclass` 挂载子类化窗口过程拦截 `WM_SIZING` 消息，并在收到 `WM_NCDESTROY` 时自动调用 `RemoveWindowSubclass` 解绑并复位句柄记录，彻底根除轻量模式销毁重建主窗口时因 Windows 复用 `HWND` 数值导致的钩子漏挂。
-- **上边缘缩放拦截**：针对 `WMSZ_TOP`、`WMSZ_TOPLEFT`、`WMSZ_TOPRIGHT` 提议矩形进行实时计算，当提议高度小于由当前窗口 DPI 换算的最小高度物理像素时，直接修正 `rect.top = rect.bottom - min_height_px` 并立即返回，在系统正式布局前强行同时钳制高度与 Y 轴坐标，彻底根除窗口漂移问题。
+针对 Windows 系统在无边框（Frameless）窗口边缘缩放时突破尺寸边界或 Y 轴下移飘移的底层缺陷，实施 **Win32 窗口过程子类化防御**：
+- **钩子安装（现代化 `SetWindowSubclass` 架构，BUG-332 / BUG-350 / BUG-386）**：在主窗口构建完成阶段通过 Win32 `SetWindowSubclass` 挂载子类化窗口过程拦截 `WM_ENTERSIZEMOVE`、`WM_SIZING` 与 `WM_EXITSIZEMOVE` 消息，并在收到 `WM_NCDESTROY` 时自动调用 `RemoveWindowSubclass` 解绑并复位句柄记录，彻底根除轻量模式销毁重建主窗口时因 Windows 复用 `HWND` 数值导致的钩子漏挂。
+- **全向宽高钳制与会话状态同步（BUG-386）**：在 `WM_ENTERSIZEMOVE` 置位全局原生拖拽标志 `NATIVE_WINDOW_RESIZING`、在 `WM_EXITSIZEMOVE` 复位并持久化最终逻辑几何；在 `WM_SIZING` 中结合 `GetDpiForWindow` 统一把 `WMSZ_LEFT/RIGHT/TOP/BOTTOM/TOPLEFT/TOPRIGHT/BOTTOMLEFT/BOTTOMRIGHT` 八方向提议矩形钳制在 `[MINIMAL_WIDTH, MAX_WIDTH]` × `[MINIMAL_HEIGHT, MAX_HEIGHT]`，并按非移动边反向锁定对边坐标（如 `rect.top = rect.bottom - target_h`、`rect.left = rect.right - target_w`），在系统正式布局前同时防漂移、防越界。
 - **重入与睡眠唤醒防御**：按当前有效窗口句柄判重并在销毁消息中精确清零，在系统睡眠恢复（Resumed）或多次激活触发时自动短路，避免重复子类化。
 
-### 2.5 无死锁自定义指针缩放手柄与几何同步持久化
+### 2.5 无死锁原子 Win32 指针缩放与几何同步持久化
 
-- **禁用系统模态 Resize API**：绝对禁止调用同步阻塞的系统模态窗口 Resize API（该 API 在 UI 线程内直接触发阻塞式 COM 调用，极易诱发窗口死锁未响应）。
-- **8 方向透明指针手柄**：通过位于窗口四周（10px 宽）及四角（20px 宽）的 8 个自定义指针手柄驱动窗口尺寸与位置变化；通过 `pointerup`、`onLostPointerCapture` 与 `(e.buttons & 1) === 0` 三重按键掩码检测保障，在极端卡顿场景下鼠标松开也能绝对收尾，杜绝拖拽假死残留。
-- **指针捕获必须在任何 `await` 之前建立**：`React` 在事件派发结束后会把 `SyntheticEvent.currentTarget` 置空，`await` 之后再读取只能得到 `null`，`setPointerCapture` 抛出的异常还会被 `catch` 吞掉，导致捕获从未建立——表现为「窗口变形后手柄从鼠标底下溜走、拖不动」。按下时还必须登记手势状态，使「几何量尚未读回就松手」能正确收尾（释放捕获、复位全局标志），不得留下残留拖拽态。
-- **每帧只按内尺寸基准回填**：几何落地时未发生变化的维度必须用拖拽起始的**内尺寸**原样回填，禁止用外尺寸填充，否则横向拖拽会顺带改变高度；**也禁止对未变化的维度重新做 clamp**——窗口停在最小宽度时拖上下边，宽度会被 clamp 顶大 1 物理像素。
-- **与系统原生缩放带共存**：窗口外圈约 4 CSS px（`SM_CXFRAME`）由 Tauri 的 `TAURI_DRAG_RESIZE_BORDERS` 子窗口接管并走系统模态缩放循环（1:1 精准跟随），内侧归网页手柄。两条路径互不干扰，但手柄的实际有效区比 10px 更窄。
-- **动画帧节流与 IPC 门控**：拖拽期间置位全局拖拽状态标志，短路高频 IPC 往返；以 `requestAnimationFrame` 驱动几何渲染。
-- **物理像素全程直发（杜绝 1px 抖动）**：几何计算、暂存、下发**全链路使用整数物理像素**，一律构造 `PhysicalSize` / `PhysicalPosition`，禁止出现 `physical -> logical -> physical` 的往返——那一趟每帧要取整两次，是边缘抖动的根源。
-- **锚定边反推而非「起点 + 位移」**：西/北方向拖拽时，位置必须由**固定不动的对边**反推：`physX = startPhysX + startInnerW - physW`（北侧同理用 `physY`）。这样即使尺寸被 min/max clamp，右边（下边）也精确锁定、一像素都不动；若分别对尺寸和位置取整，两边各差半像素，就会退化成 ±1px 抖动。
-- **节流写盘必须带尾随补写**：窗口尺寸与位置变动时，间隔（1000ms）内不逐帧写盘，但**最后一版必须落盘**：间隔已到则立即写，未到则排一个到点执行的补写任务。纯前沿节流（未到点直接丢弃）会在「拖完窗口马上退出程序」时丢掉终值，重启后尺寸回退到拖拽中途。
-- **写入顺序必须由版本号保证**：每次几何变化领一个递增版本号，写入方在互斥锁内比对「已落盘版本号」，迟到的旧值直接丢弃。销毁前的立即写与节流后台写并发时，不得出现旧值覆盖新值。尺寸守卫需带 1px 容差（DPI 换算取整：150% 下最小宽度 271 回算得 270.67，严格 `<` 会把最小宽度判为无效、永不落盘）。
+- **禁用系统模态 Resize API**：绝对禁止网页端调用阻塞式系统模态 `startResizeDragging`（该 API 在 UI 线程内直接触发阻塞式 COM 调用，极易诱发窗口死锁未响应）。
+- **8 方向透明指针手柄与原生原子缩放管线（BUG-386）**：通过位于窗口四周（10px 宽）及四角（20px 宽）的 8 个自定义指针手柄驱动后端原生原子缩放命令 `begin_window_resize(direction, seq)`、`step_window_resize(seq)`、`end_window_resize(seq)`；通过 `pointerup`、`pointercancel`、`onLostPointerCapture` 与 `(e.buttons & 1) === 0` 及组件卸载清理多重保障，在极端卡顿场景下也能绝对收尾并带单调手势序号 `gestureSeq` 隔离跨手势乱序 IPC。
+- **全局屏幕坐标系 + 单次原子 `SetWindowPos`（根除震荡与双 IPC 撕裂）**：
+  - 严禁前端用相对窗口客户区的 `e.clientX / e.clientY` 计算左/上/斜角拖拽位移（窗口原点左移或上移后会反向改变 `clientX/Y`，在鼠标静止下也会触发 60Hz 正反馈震荡），亦严禁拆分为 `setSize + setPosition` 双次 IPC（会产生帧间撕裂并触发 `tao::set_inner_size` 缓存边框偏差）。
+  - 后端 `begin_native_window_resize` 在单次调用内原子采集 `GetWindowRect`、`GetClientRect`、`GetCursorPos` 与 `GetDpiForWindow`；`step_native_window_resize` 直接读取 OS 全局物理光标 `GetCursorPos` 计算绝对位移（对超界边界仅滑动全局参考游标消除反向拖拽死区，绝不篡改起始矩形锚边），去重后经 `PENDING_SWP_RECT` + `RESIZE_SWP_QUEUED` 合并投递 UI 主线程调用**单次** `SetWindowPos(hwnd, None, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS)`。
+- **指针捕获必须在任何 `await` 之前建立**：`React` 在事件派发结束后会把 `SyntheticEvent.currentTarget` 置空，`await` 之后再读取只能得到 `null`，导致捕获从未建立；按下时同步登记当前手势序号与清理态，保证快速点击/松手不留残余拖拽标志。
+- **拖拽期间冻结断点重排与内核事件降噪（BUG-386）**：遵循 §2.2「遮挡式取景框」设计——当原生/指针拖拽激活（`NATIVE_WINDOW_RESIZING` / `isWindowResizing() === true`）时：
+  1. Rust `on_window_event` 跳过逐像素 `Resized`/`Moved` 的 Win32 几何查询与落盘排队，改在 `end_native_window_resize`（或 OS `WM_EXITSIZEMOVE`）收尾时一次性持久化最终尺寸与位置；
+  2. `WindowProvider` 仅更新最新 `onResized` 物理像素记录及空闲计时器续期，**暂停 `checkMaximized` 在拖拽中途翻转 `isMinimalWidth` / `isMiniStatus`**，彻底消除反复拖跨 `285px`/`126px` 断点引发的 `ConnectionsPanel` / `TrafficGraph` / `ProxyGroups` 反复挂载卸载与 WS/Worker 震荡卡死；
+  3. 拖拽结束触发 `RESIZE_ENDED_EVENT`（携带后端返回的权威客户区物理像素 `width / height / scaleFactor`）一次性精准对齐布局。
+- **每帧只按内尺寸基准与锚定边反推**：几何重算对未拖拽维度直接透传原尺寸不做二次 clamp（避免 150% DPI 下最小宽度拖上下边被顶大 1px），西/北拖拽由不可变起始矩形的固定右边/底边反推 `left/top`，`shadow(false)` 下保持 `outer == inner` 零累计误差。
+- **与系统原生缩放带共存**：窗口外圈约 4 CSS px（`SM_CXFRAME`）由 Tauri 的 `TAURI_DRAG_RESIZE_BORDERS` 交由 OS `WM_SIZING` 路径处理，内侧归网页手柄驱动的 Rust 原子路径，两条路径均统一受 §2.4 尺寸钳制。
+- **节流写盘与版本号有序保护**：非拖拽期几何变动通过 1000ms 节流 + 尾随补写 + 递增版本号互斥写入保护，带 1px 容差守卫，严防 0×0 销毁噪声或旧值倒灌覆盖终值。
 
 ### 2.6 极窄隐匿模式（自动隐藏标题栏规范）
 
@@ -688,7 +691,7 @@ flowchart LR
 ### 8.8 前端单测基线与最小覆盖
 
 - **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 133 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
+- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 136 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ### 8.9 用户可见文案 i18n 硬约束
@@ -859,6 +862,7 @@ flowchart LR
 | **BUG-383** | 2.8 / 5.4 | 根治借壳真实可用后端（如香港出口）的订阅横幅假节点漏网并绕过用户 `-香港` 排除过滤问题：前后端 1:1 增设非穷举结构形态判定（`is_structural_banner_name` / `isStructuralBannerName`：无地区暗示下的内嵌裸域名与冒号键值配额/日期格式），后端 `enforce_mini_agreements` 改在剔除前先行按 `RawProxyEntry` 指纹分组执行 `resolve_proxy_clone_topology`——共享横幅专用端点整组连坐 `0` 保留并登记内存 `RUNTIME_TAINTED_BANNER_FPS`，寄生真地区节点组强制折叠归真为带地区名的节点，令真实香港借壳体稳妥受控于地域过滤与排除规则。 |
 | **BUG-384** | 2.7 | **【待用户确认】** 修复 Monochrome（黑白极简工业风）皮肤下「基础设置」卡片四枚 `size="small"` 小开关仍残留旧 `56×28` 圆角胶囊样式问题：`base-switch.tsx` 导出 `getSwitchSkinStyle` 并抽出共享直角方形构造器 `buildSquareSwitchStyle`，使 `monochrome` 与 `cyberpunk` 对齐 `28×14` / `sizeSmall` `18×10`、`borderRadius: 0`（滑块 `0px`）的小巧直角方形造型与高反差黑白灰态区分。 |
 | **BUG-385** | 2.2 / 5.7 | **【待用户确认】** 补齐隐藏组件彻底卸载、30 秒绘图 Worker 延迟回收与关闭设置面板时的中间态竞态防护：设置抽屉开启时同步卸载被全屏遮挡的 `ProxyGroups` 虚拟列表，将 `useConnectionData` / `usePathControl` / `ConnectionDetail` 下沉封装至 `ConnectionsPanel` 内部使关闭抽屉或窄窗时内存立即归零；`useTrafficMonitor` Worker 闲置销毁延迟由 5 分钟缩短至 `TRAFFIC_WORKER_DESTROY_DELAY_MS`（`30_000ms`）；收口右上角关闭按钮 `zIndex` 为 `SETTINGS_CLOSE_BUTTON_Z_INDEX`（`250`）并标记 `data-close-settings="true"`，补齐 Mixed Port 失焦保存与关闭取消守卫、`AddUrlDialog` 顶层保活、抽屉关闭菜单锚点清理及 `ProxyHead` `60ms` 定时器卸载清理。 |
+| **BUG-386** | 2.4 / 2.5 | **【待用户确认】** 根治鼠标拖拽调整窗口尺寸时的剧烈边缘抖动与反复跨越断点拖拽卡死：新增 Rust 原生原子 Win32 缩放管线（`begin_window_resize` / `step_window_resize` / `end_window_resize`），改用 OS 全局物理光标 `GetCursorPos` + 不变起始锚定矩形计算单次合并 `SetWindowPos(..., SWP_NOZORDER \| SWP_NOACTIVATE \| SWP_NOOWNERZORDER \| SWP_NOCOPYBITS)`，彻底根除 `e.clientX/Y` 正反馈震荡、双 IPC 撕裂及 `tao` 样式偏差；升级 `sizing_subclass_proc` 覆盖八方向宽高钳制与 `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE` 同步；前端 `ResizeHandles` 引入单调 `gestureSeq` 防并发并在 `WindowProvider` 拖拽期间冻结 `285px`/`126px` 断点组件拆装，松手由 `RESIZE_ENDED_EVENT` 携带精确客户区尺寸一次性对齐；`lib.rs` 拖拽期跳过逐像素几何查询。 |
 
 ---
 

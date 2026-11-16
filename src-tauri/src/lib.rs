@@ -164,6 +164,9 @@ mod app_init {
             cmd::check_core_update,
             cmd::start_core_upgrade,
             cmd::frontend_log,
+            cmd::begin_window_resize,
+            cmd::step_window_resize,
+            cmd::end_window_resize,
         ]
     }
 }
@@ -241,6 +244,11 @@ pub fn run() {
                             crate::core::tray::record_main_window_focus_change(*focused);
                         }
                         tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {
+                            // 原生拖拽期间每像素都会触发 Resized/Moved：此时跳过跨线程 Win32 几何查询，
+                            // 由 end_native_window_resize / WM_EXITSIZEMOVE 收尾时统一精准落盘（BUG-386）。
+                            if crate::utils::resolve::window::is_native_window_resizing() {
+                                return;
+                            }
                             // 窗口几何变化 → 节流 + 尾随补写持久化（拖拽期间不逐帧写盘，
                             // 但最后一帧一定会落盘，见 window_manager 的几何持久化说明）。
                             //

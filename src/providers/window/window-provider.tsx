@@ -16,7 +16,11 @@ import {
 import { withIpcTimeout } from '@/services/cmds'
 import debounce from '@/utils/debounce'
 import { isMiniByPhysical, isMinimalWidthByPhysical } from '@/utils/mini-window'
-import { RESIZE_ENDED_EVENT } from '@/utils/window-resizing'
+import {
+  isWindowResizing,
+  RESIZE_ENDED_EVENT,
+  type ResizeEndedDetail,
+} from '@/utils/window-resizing'
 
 import { WindowContext, type WindowContextType } from './window-context'
 
@@ -221,8 +225,13 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     let isUnmounted = false
     let lastWidth = -1
     let lastHeight = -1
+    let latestObservedSize: { width: number; height: number } | null = null
 
-    const syncGeometryAndLargeState = (width: number, height: number) => {
+    const syncGeometryAndLargeState = (
+      width: number,
+      height: number,
+      scaleFactor?: number,
+    ) => {
       if (isUnmounted) return
       if (width === lastWidth && height === lastHeight) return
       lastWidth = width
@@ -231,7 +240,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
       // event.payload 是窗口内尺寸的物理像素——这是权威一手数据。
       // 窄窗/极小窗判定统一走 applyGeometry（物理像素域 + 1 物理像素容差），
       // 不再读 window.innerWidth/innerHeight（整数 CSS 像素会吃掉那 1 个物理像素）。
-      const factor = window.devicePixelRatio || 1
+      const factor =
+        scaleFactor && scaleFactor > 0
+          ? scaleFactor
+          : window.devicePixelRatio || 1
       applyGeometry(width, height, factor)
 
       // 大尺寸模式逻辑：转换为 logical 比较
@@ -256,24 +268,46 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const checkMaximized = debounce(
       (event: { payload: { width: number; height: number } }) => {
-        // 注意：此处严禁因 isWindowResizing() 提前 return！
-        // syncGeometryAndLargeState 纯内存计算（0 次 IPC），而拖拽到最大宽度（640px）时，
-        // 最后一次 onResized 往往发生在 pointerup 200ms 冷却期结束之前；
-        // 若在 __isResizing 期间丢弃事件，冷却结束后不会再有新 onResized，
-        // 会导致 isMinimalWidth 卡在 true，右侧 ConnectionsPanel 无法挂载。
+        if (isUnmounted || isWindowResizing()) return
         syncGeometryAndLargeState(event.payload.width, event.payload.height)
       },
       150,
     )
 
-    // 拖拽收尾兜底：当 resize-handles 释放 __isResizing 时，主动读取一次最新 innerSize 校正，
-    // 确保任何极端竞态下窄窗/宽窗布局状态与真实窗口物理尺寸完全一致。
-    const handleResizeEnded = () => {
-      if (isUnmounted) return
+    // 拖拽收尾兜底：当 resize-handles 释放 __isResizing 时，优先采用后端原生缩放松手瞬间
+    // 透传的权威客户区物理尺寸与 DPI 缩放因子完成一次对齐；仅在缺省时才回退到最新观测值 + innerSize。
+    const handleResizeEnded = (event: Event) => {
+      if (isUnmounted || isWindowResizing()) return
+      const detail = (event as CustomEvent<ResizeEndedDetail | undefined>)
+        .detail
+      if (
+        detail &&
+        Number.isFinite(detail.width) &&
+        Number.isFinite(detail.height) &&
+        detail.width > 0 &&
+        detail.height > 0
+      ) {
+        lastWidth = -1
+        lastHeight = -1
+        syncGeometryAndLargeState(
+          detail.width,
+          detail.height,
+          detail.scaleFactor,
+        )
+        return
+      }
+      if (latestObservedSize) {
+        lastWidth = -1
+        lastHeight = -1
+        syncGeometryAndLargeState(
+          latestObservedSize.width,
+          latestObservedSize.height,
+        )
+      }
       currentWindow
         .innerSize()
         .then((size) => {
-          if (isUnmounted) return
+          if (isUnmounted || isWindowResizing()) return
           lastWidth = -1
           lastHeight = -1
           syncGeometryAndLargeState(size.width, size.height)
@@ -285,11 +319,12 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     window.addEventListener(RESIZE_ENDED_EVENT, handleResizeEnded)
 
     // 续期放在防抖之外、监听器入口处：onResized 每帧都续。
-    // 若只在防抖回调里续期，持续超过 10 秒的长拖期间防抖被反复推迟、
-    // 回调一次都不执行，空闲计时器会在拖拽中途触发（用拖拽前的旧状态判定），
-    // 造成标题栏瞬隐瞬显。入口处每帧续期后，拖拽全程计时器不会走到期。
+    // 拖拽期间仅更新 latestObservedSize 与续期空闲计时器，不跑防抖断点切换（BUG-386），
+    // 彻底消除跨 285px/126px 来回拖拽时组件反复挂载/卸载造成的卡死风暴。
     const unlistenPromise = currentWindow.onResized((event) => {
       resetIdleTimer()
+      latestObservedSize = event.payload
+      if (isWindowResizing()) return
       checkMaximized(event)
     })
 

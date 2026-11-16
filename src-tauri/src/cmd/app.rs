@@ -84,3 +84,23 @@ pub fn get_app_dir() -> CmdResult<String> {
 pub fn get_auto_launch_status() -> CmdResult<bool> {
     autostart::get_launch_status().stringify_err()
 }
+
+/// 开始原生 Win32 指针窗口缩放会话（BUG-386）
+#[tauri::command]
+pub fn begin_window_resize(direction: crate::utils::resolve::window::ResizeDirection, seq: u64) -> CmdResult<()> {
+    crate::utils::resolve::window::begin_native_window_resize(direction, seq).map_err(Into::into)
+}
+
+/// 根据当前全局硬件光标步进一次原生 Win32 原子缩放（BUG-386）
+#[tauri::command]
+pub fn step_window_resize(seq: u64) -> CmdResult<bool> {
+    crate::utils::resolve::window::step_native_window_resize(seq).map_err(Into::into)
+}
+
+/// 结束原生 Win32 指针窗口缩放会话并返回权威客户区物理尺寸快照（BUG-386）
+#[tauri::command]
+pub async fn end_window_resize(seq: u64) -> CmdResult<Option<crate::utils::resolve::window::WindowResizeSnapshot>> {
+    crate::utils::resolve::window::end_native_window_resize(seq)
+        .await
+        .map_err(Into::into)
+}

@@ -630,3 +630,59 @@ export async function getAutoLaunchStatus(): Promise<boolean | null> {
     return null
   }
 }
+
+export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+
+export interface WindowResizeSnapshot {
+  width: number
+  height: number
+  scaleFactor: number
+}
+
+/** 启动原生 Win32 指针窗口缩放会话（BUG-386） */
+export async function beginWindowResize(
+  direction: ResizeDirection,
+  seq: number,
+): Promise<boolean> {
+  try {
+    await withIpcTimeout(
+      invoke<void>('begin_window_resize', { direction, seq }),
+      2_000,
+      'beginWindowResize',
+    )
+    return true
+  } catch (err) {
+    console.warn('[beginWindowResize] failed:', err)
+    return false
+  }
+}
+
+/** 步进一次原生 Win32 原子缩放（基于 GetCursorPos 与单次 SetWindowPos，BUG-386） */
+export async function stepWindowResize(seq: number): Promise<boolean> {
+  try {
+    return await withIpcTimeout(
+      invoke<boolean>('step_window_resize', { seq }),
+      2_000,
+      'stepWindowResize',
+    )
+  } catch (err) {
+    console.warn('[stepWindowResize] failed:', err)
+    return false
+  }
+}
+
+/** 结束原生 Win32 指针窗口缩放会话并返回最新客户区物理尺寸（BUG-386） */
+export async function endWindowResize(
+  seq: number,
+): Promise<WindowResizeSnapshot | null> {
+  try {
+    return await withIpcTimeout(
+      invoke<WindowResizeSnapshot | null>('end_window_resize', { seq }),
+      2_000,
+      'endWindowResize',
+    )
+  } catch (err) {
+    console.warn('[endWindowResize] failed:', err)
+    return null
+  }
+}

@@ -27,6 +27,16 @@
   4. 将 `AddUrlDialog` 移出抽屉至外层弹窗区、将设置关闭按钮 `zIndex` 从 `9999` 降为 `SETTINGS_CLOSE_BUTTON_Z_INDEX (250)` 并标 `data-close-settings="true"`、关闭抽屉时统一清空帮助/订阅/粘贴右键菜单锚点，并为 `BasicSettingsCard` 端口框加入 `shouldSkipMixedPortBlurSave`（支持 `Esc` 放弃未提交修改与直接点叉跳过保存）。
 - **状态**：代码已修正，待用户确认
 
+### BUG-386 鼠标拖拽缩放窗口时剧烈边缘抖动与反复拖拽跨断点引发卡死
+
+- **对应模块**：[window.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/window.rs)、[app.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/app.rs)、[lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)、[resize-handles.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/layout/resize-handles.tsx)、[window-provider.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/providers/window/window-provider.tsx)、[window-resizing.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/window-resizing.ts)、[cmds.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/cmds.ts)
+- **问题描述**：① 左/上/斜角拖拽手柄使用相对窗口客户区的 `e.clientX` / `e.clientY` 计算位移并与动态锚点滑动叠加，窗口原点移动反过来改变 `clientX/Y`，在鼠标静止时触发 60Hz 正反馈震荡；② `currentWindow.setSize` 与 `setPosition` 拆分为两次非原子 IPC（且 `tao::set_inner_size` 按缓存的带框样式累加偏移），造成锚定边缘撕裂；③ `WindowProvider` 的 150ms `checkMaximized` 在 `isWindowResizing()` 期间仍持续放行，反复拖过 `285px`/`126px` 断点时高频触发 `ConnectionsPanel` 挂载卸载与 WebSocket/Worker/VirtualList 重建风暴并阻塞 Win32 UI 线程；④ `pointerdown` 缺少单调手势序号保护且 `lib.rs` 的 `Resized/Moved` 监听器在每像素缩放中重复查询几何与缩放比。
+- **修复方案**：
+  1. 在 Rust [window.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/window.rs) 与 [app.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/app.rs) 实现原生原子 Win32 缩放管线（`begin_window_resize` / `step_window_resize` / `end_window_resize`）：以 `GetCursorPos` 全局屏幕坐标、不变起始矩形、`GetWindowRect`/`GetClientRect`/`GetDpiForWindow` 与防死区游标滑动结合 `PENDING_SWP_RECT` + `RESIZE_SWP_QUEUED` 合并主线程派发单次 `SetWindowPos(..., SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS)`，同步将 `sizing_subclass_proc` 升级至全 8 向 `WM_SIZING` 宽高钳制及 `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE` 状态与收尾落盘，并在 [lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs) 拖拽期间短路 `Resized`/`Moved` 冗余几何查询；
+  2. 在 [resize-handles.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/layout/resize-handles.tsx) 接入单调 `gestureSeq` + `rAF` 背压步进并由 [window-resizing.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/window-resizing.ts) 的 `RESIZE_ENDED_EVENT` 透传最终尺寸与缩放比；
+  3. 在 [window-provider.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/providers/window/window-provider.tsx) 仅记录最新 `onResized` 物理像素并在 `isWindowResizing() === true` 时冻结 `checkMaximized` 断点翻转，松手触发 `RESIZE_ENDED_EVENT` 时一次性精准对齐布局，杜绝拖拽反复跨越断点时的重组件风暴与卡死。
+- **状态**：代码已修正，待用户确认
+
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
