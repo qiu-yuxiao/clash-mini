@@ -1,3 +1,17 @@
+## v3.5.1
+
+### 🎯 根治节点过滤框输入排除词（如 `-香港`）时的输入法抢跑与在途竞态漏切（BUG-392）
+
+- **中文 IME 组词缓冲与半输入算子防抢跑**：`BaseSearchBox` 新增 `isComposingRef` 与 `composingText` 本地缓冲，在中文输入法组词期间（`onCompositionStart` ~ `onCompositionEnd`）平滑维护输入框显示而不向外派发拼音中间态（如 `"-x"`）；`src/utils/node.ts` 新增 `hasEffectiveFilterTerm` 与 `isIncompleteFilterInput` 供 `ProxyHead` 跳过孤立算子或末尾悬空算子（如 `"-"`、`"!"`、`"日本 -"`、`"日本|"`），彻底消除敲入 `-` 后选词停顿误触发全量 5 秒拨测的抢跑源头。
+- **头部过滤同步落盘、在途尾部重测队列与后端切换前过滤门检**：`use-head-state.ts` 导出 `flushHeadStatePersist` 在 `F4` / `Enter` / `F1` 选点前立即冲刷 `filterText` 至后端；`ProxyGroups::handleCheckAll` 新增过滤词变更尾部重测队列（`pendingRecheckGroupsRef`）与有限次 `AUTO_SELECT_BUSY` 自动续试，确保在途探测期间提交的新过滤子集绝不被静默丢弃；后端 `monitor.rs` 抽出 `select_fastest_candidate` 在执行 `select_node_for_group("PROXY", ...)` **切换之前**实时重读最新 `filter_text` 淘汰越界候选（整批越界时安全中止过时切换），并补齐双端回归单测。
+
+### 🛡️ 新手引导与安全软件白名单指引明确信任区目标路径及 13 语种文案对齐（BUG-393）
+
+- **明确列示信任区目录与双可执行文件**：全部 13 个语种的 `layout.components.antivirus.brief`（新手引导第二步）与 `antivirus.how`（白名单说明弹窗）及 `docs/antivirus-whitelist.md` 均明确写明将安装目录（默认 `C:\Program Files\Clash Mini\`）或其中的 `clash-mini.exe` 与 `mini-mihomo.exe` 加入信任区，并为 `FirstRunGuideDialog` 与 `AntivirusWhitelistDialog` 正文补充 `overflowWrap: 'anywhere'` 防止 `271px` 窄窗长路径溢出。
+- **清理 10 语种历史残留看门狗文案**：同步将 `ar`、`de`、`es`、`fa`、`id`、`jp`、`ko`、`ru`、`tr`、`tt` 的安全软件说明更新至现行「轻量模式销毁 WebView2 + 托盘与内核后台驻留」真实架构描述，并完成已验收 `BUG-388` ~ `BUG-391` 的历史归档。
+
+---
+
 ## v3.5.0
 
 ### 🩺 后台测量组自然周期激活与连续性自愈防竞态边界加固（BUG-388）
