@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react'
 
+import { TRAFFIC_WORKER_DESTROY_DELAY_MS } from '@/constants'
 import { useVisibility } from '@/hooks/use-visibility'
 import type {
   ITrafficDataPoint,
@@ -384,7 +385,6 @@ class TrafficWorkerClient {
 const refCounter = new ReferenceCounter()
 let workerClient: TrafficWorkerClient | null = null
 let destroyTimer: ReturnType<typeof setTimeout> | null = null
-const DESTROY_DELAY_MS = 5 * 60 * 1000 // 5分钟后销毁
 
 const getWorkerClient = () => {
   // 如果有待销毁的定时器，取消它
@@ -468,8 +468,8 @@ export const useTrafficMonitorEnhanced = (options?: {
       cleanup()
       if (refCounter.getCount() === 0) {
         client.stop()
-        // L-30: 引用计数为 0 时，延迟 5 分钟后销毁 Worker，
-        // 避免频繁创建/销毁的开销，同时保证长时间不使用时能释放资源
+        // L-30: 引用计数为 0 时，延迟 30 秒后销毁 Worker（对齐 React Query gcTime: 30_000），
+        // 避免拖拽缩放窗口瞬间反复重建，同时快速释放后台线程资源
         // eslint-disable-next-line @eslint-react/web-api-no-leaked-timeout
         destroyTimer = setTimeout(() => {
           if (refCounter.getCount() === 0 && workerClient) {
@@ -477,7 +477,7 @@ export const useTrafficMonitorEnhanced = (options?: {
             workerClient = null
           }
           destroyTimer = null
-        }, DESTROY_DELAY_MS)
+        }, TRAFFIC_WORKER_DESTROY_DELAY_MS)
       }
     }
   }, [isActive, subscribeToSnapshots])

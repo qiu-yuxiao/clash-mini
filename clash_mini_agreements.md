@@ -157,7 +157,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **双宽窄结构临界点（内容宽度 285px）**：
   - 宽窗（>285px）：节点列表呈现 3 列立体卡片表格；顶部活跃节点信息栏展示 4 项详细指标。
   - 窄窗（≤285px）：节点列表自动切换为 1 列纵向信息行；顶部活跃节点栏紧凑展示 2 项核心指标。
-  - 右侧连接与路由监控表遵循大窗（>285px）挂载观测、窄窗（≤285px）彻底卸载不渲染、不订阅的统一信号门控。
+  - 右侧连接与路由监控表遵循大窗（>285px）且设置抽屉展开时挂载观测、设置关闭或窄窗（≤285px）彻底卸载不渲染、不订阅且经 `gcTime`（`30s`）自动回收连接缓存的统一生命周期（BUG-385：`useConnectionData` / `usePathControl` 与 `<ConnectionDetail />` 内聚于 `ConnectionsPanel` 自身生命周期）；打开设置期间底层主页节点列表 `ProxyGroups` 同步卸载（关闭后经 `localStorage` + `useLayoutEffect` 原位瞬时恢复）；设置关闭按钮层级锁定 `SETTINGS_CLOSE_BUTTON_Z_INDEX (250)` 避免越过模态弹窗，`AddUrlDialog` 独立置于外层弹窗区并配合关闭抽屉清理菜单锚点与端口框未提交失焦保护（`shouldSkipMixedPortBlurSave`）。
   - **该断点与窗口最小宽度（271px）不是同一个数**：断点是排版门槛（比较内容宽度），最小宽度是几何下限。最小宽度必须小于断点，保证窗口缩到最小时必然进入窄窗模式，且内容宽度 272–285 区间行为与历史版本一致（否则三列卡片会被挤进 272px）。
 - **窄窗 `271px` 弹窗/通知区域锁定与视觉风格统一规范**：
   - 所有模态弹窗（`AddUrlDialog`、`AntivirusWhitelistDialog`、`FirstRunGuideDialog`、`HelpMenuButton` 一/二级弹窗、`LayoutDialogs`）与顶部反馈通知（`NoticeManager`）宽度均严格锁定为 `MIN_WINDOW_WIDTH`（`271px`）并锚定于左侧窄窗区域（`left: 0, width: 271px`），顶部按 `resolveNarrowOverlayTopOffset` 避让 `CUSTOM_TITLEBAR_HEIGHT`（`30px`；原生装饰栏或极窄隐匿隐藏标题栏时贴顶 `0px`），即使在宽窗口（`>285px`）下也绝不居中漂移或撑满宽窗；且 `NoticeManager` `zIndex` 必须高于 MUI `Tooltip`（`2200 > 1500`）并带内边距（`px: 6px, pt: 4px`），防止操作反馈通知被悬浮 Tooltip 遮挡（BUG-371）；
@@ -490,8 +490,8 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 
 ### 5.7 无人值守资源节约与静默门控
 
-- **连接列表静默门控**：侧边设置抽屉未展开或处于极窄窗口时，彻底断开连接面板数据流，底层 HTTP 连接详情轮询彻底注销。
-- **折线图渲染节流**：流量统计采样周期恒定控制为 1000ms 一次快照，在窗口最小化或不可见时挂起重绘，CPU 占用率无限趋近于 0%。
+- **连接列表静默门控与及时回收（BUG-385）**：侧边设置抽屉未展开或处于极窄窗口（`≤285px`）时，连接面板整体不挂载且连接数据订阅（`useConnectionData` / `usePathControl` 与 `<ConnectionDetail />` 内聚于 `ConnectionsPanel` 内部）彻底注销；Observer 归零后由 React Query `gcTime`（`30s`）自动回收连接缓存（不再滞留常驻 `Layout` 顶层），宽窗开启期间亦不再每秒带动整页重绘。
+- **折线图渲染与 Worker 回收节流**：流量统计采样周期恒定控制为 1000ms 一次快照，在窗口最小化或不可见时挂起重绘，CPU 占用率无限趋近于 0%；宽窗流量统计 Web Worker 在缩回窄窗或隐匿停采后按 `TRAFFIC_WORKER_DESTROY_DELAY_MS`（`30s`，与 React Query `gcTime` 对齐）自动 `terminate()` 释放线程资源。
 
 ### 5.8 测速失真复核与失败服务器避让
 
@@ -688,7 +688,7 @@ flowchart LR
 ### 8.8 前端单测基线与最小覆盖
 
 - **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 132 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
+- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 133 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ### 8.9 用户可见文案 i18n 硬约束
@@ -858,6 +858,7 @@ flowchart LR
 | **BUG-382** | 2.11 / 6.1 | 清理不可达流媒体解锁 `/unlock` 路由（`src/pages/unlock.tsx`、`cmd/media_unlock_checker` 及废弃翻译键）与零使用 `tauri-plugin-http` / `@tauri-apps/plugin-http`，收紧 WebView 网络接口暴露并消除重复 `reqwest v0.12.28` 依赖树。 |
 | **BUG-383** | 2.8 / 5.4 | 根治借壳真实可用后端（如香港出口）的订阅横幅假节点漏网并绕过用户 `-香港` 排除过滤问题：前后端 1:1 增设非穷举结构形态判定（`is_structural_banner_name` / `isStructuralBannerName`：无地区暗示下的内嵌裸域名与冒号键值配额/日期格式），后端 `enforce_mini_agreements` 改在剔除前先行按 `RawProxyEntry` 指纹分组执行 `resolve_proxy_clone_topology`——共享横幅专用端点整组连坐 `0` 保留并登记内存 `RUNTIME_TAINTED_BANNER_FPS`，寄生真地区节点组强制折叠归真为带地区名的节点，令真实香港借壳体稳妥受控于地域过滤与排除规则。 |
 | **BUG-384** | 2.7 | **【待用户确认】** 修复 Monochrome（黑白极简工业风）皮肤下「基础设置」卡片四枚 `size="small"` 小开关仍残留旧 `56×28` 圆角胶囊样式问题：`base-switch.tsx` 导出 `getSwitchSkinStyle` 并抽出共享直角方形构造器 `buildSquareSwitchStyle`，使 `monochrome` 与 `cyberpunk` 对齐 `28×14` / `sizeSmall` `18×10`、`borderRadius: 0`（滑块 `0px`）的小巧直角方形造型与高反差黑白灰态区分。 |
+| **BUG-385** | 2.2 / 5.7 | **【待用户确认】** 补齐隐藏组件彻底卸载、30 秒绘图 Worker 延迟回收与关闭设置面板时的中间态竞态防护：设置抽屉开启时同步卸载被全屏遮挡的 `ProxyGroups` 虚拟列表，将 `useConnectionData` / `usePathControl` / `ConnectionDetail` 下沉封装至 `ConnectionsPanel` 内部使关闭抽屉或窄窗时内存立即归零；`useTrafficMonitor` Worker 闲置销毁延迟由 5 分钟缩短至 `TRAFFIC_WORKER_DESTROY_DELAY_MS`（`30_000ms`）；收口右上角关闭按钮 `zIndex` 为 `SETTINGS_CLOSE_BUTTON_Z_INDEX`（`250`）并标记 `data-close-settings="true"`，补齐 Mixed Port 失焦保存与关闭取消守卫、`AddUrlDialog` 顶层保活、抽屉关闭菜单锚点清理及 `ProxyHead` `60ms` 定时器卸载清理。 |
 
 ---
 

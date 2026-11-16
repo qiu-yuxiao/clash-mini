@@ -28,18 +28,17 @@ import { useTranslation } from 'react-i18next'
 
 import AppIcon from '@/assets/image/app-icon.png'
 import { AreaErrorFallback } from '@/components/base/base-error-boundary'
-import { ConnectionDetail } from '@/components/connection/connection-detail'
-import type { ConnectionDetailRef } from '@/components/connection/connection-detail'
 import { NoticeManager } from '@/components/layout/notice-manager'
 import { ResizeHandles } from '@/components/layout/resize-handles'
 import { WindowControls } from '@/components/layout/window-controller'
 import { ProxyGroups } from '@/components/proxy/proxy-groups'
 import { useHeadStateNew } from '@/components/proxy/use-head-state'
-import { CUSTOM_TITLEBAR_HEIGHT } from '@/constants'
+import {
+  CUSTOM_TITLEBAR_HEIGHT,
+  SETTINGS_CLOSE_BUTTON_Z_INDEX,
+} from '@/constants'
 import { useClashInfo, useClash } from '@/hooks/use-clash'
-import { useConnectionData } from '@/hooks/use-connection-data'
 import { useI18n } from '@/hooks/use-i18n'
-import { usePathControl } from '@/hooks/use-path-control'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemState } from '@/hooks/use-system-state'
@@ -72,14 +71,9 @@ import {
   settleLoadingNotice,
 } from '@/services/notice-service'
 import { useThemeMode } from '@/services/states'
-import type { IConnectionsItem } from '@/types/connection'
 import type { IProfileItem } from '@/types/profile'
 import { get3DButtonStyle, get3DCardStyle } from '@/utils/button-styles'
 import { bindMainAppShortcuts } from '@/utils/disable-webview-shortcuts'
-import {
-  prioritizePathControlConnections,
-  type PathControlConnectionItem,
-} from '@/utils/path-control'
 import {
   getPopupMenuItemStyle,
   getPopupMenuPaperProps,
@@ -133,44 +127,6 @@ dayjs.extend(relativeTime)
 // 不应耦合（历史上曾与旧阈值 135 同值纯属巧合，窗口侧先后修正为 121、126 后两值已分离）。
 const TRAFFIC_PANE_HEIGHT_WIDE = 135
 const TRAFFIC_PANE_HEIGHT_MINIMAL = 100
-
-// Connections order
-const ORDER_OPTIONS = [
-  {
-    id: 'default',
-    labelKey: 'connections.components.order.default',
-    fn: (list: IConnectionsItem[]) =>
-      list.sort(
-        (a, b) =>
-          new Date(b.start || '0').getTime() -
-          new Date(a.start || '0').getTime(),
-      ),
-  },
-  {
-    id: 'uploadSpeed',
-    labelKey: 'connections.components.order.uploadSpeed',
-    fn: (list: IConnectionsItem[]) =>
-      list.sort((a, b) => (b.curUpload ?? 0) - (a.curUpload ?? 0)),
-  },
-  {
-    id: 'downloadSpeed',
-    labelKey: 'connections.components.order.downloadSpeed',
-    fn: (list: IConnectionsItem[]) =>
-      list.sort((a, b) => (b.curDownload ?? 0) - (a.curDownload ?? 0)),
-  },
-] as const
-
-type OrderKey = (typeof ORDER_OPTIONS)[number]['id']
-
-type OrderFn = (list: IConnectionsItem[]) => IConnectionsItem[]
-
-const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFn>>(
-  (acc, option) => {
-    acc[option.id] = option.fn
-    return acc
-  },
-  {} as Record<OrderKey, OrderFn>,
-)
 
 const Layout = () => {
   // Active Skin State — managed by useSkinControls
@@ -266,6 +222,33 @@ const Layout = () => {
   const [contextMenuProfileUid, setContextMenuProfileUid] = useState<
     string | null
   >(null)
+
+  // BUG-385: 通过派生可见态与显式开关处理器统一收口抽屉内浮层菜单锚点，
+  // 避免在 useEffect 中同步 setState，且在极小窗自动收起或手动关闭设置时同步清理。
+  const isDrawerVisible = drawerOpen && !isMiniStatus
+  const activeHelpAnchorEl = isDrawerVisible ? helpAnchorEl : null
+  const activeProfileMenuAnchorPosition = isDrawerVisible
+    ? profileMenuAnchorPosition
+    : null
+  const activeImportInputContextMenu = isDrawerVisible
+    ? importInputContextMenu
+    : null
+
+  const resetDrawerMenuAnchors = useCallback(() => {
+    setHelpAnchorEl(null)
+    setProfileMenuAnchorPosition(null)
+    setImportInputContextMenu(null)
+  }, [setImportInputContextMenu])
+
+  const openSettingsDrawer = useCallback(() => {
+    resetDrawerMenuAnchors()
+    setDrawerOpen(true)
+  }, [resetDrawerMenuAnchors, setDrawerOpen])
+
+  const closeSettingsDrawer = useCallback(() => {
+    resetDrawerMenuAnchors()
+    setDrawerOpen(false)
+  }, [resetDrawerMenuAnchors, setDrawerOpen])
 
   // Edit Profile Dialog State (BUG-072)
   const [editProfileOpen, setEditProfileOpen] = useState(false)
@@ -478,44 +461,6 @@ const Layout = () => {
   // 端口编辑态 + allow-lan/ipv6 切换已抽到 use-minimal-settings（详见该 hook 注释）
   const { mixedPortVal, handleSavePort, handleClashBoolChange } =
     useMinimalSettings()
-
-  // Connections manager states
-  const [match, setMatch] = useState<(input: string) => boolean>(
-    () => () => true,
-  )
-  const curOrderOpt: OrderKey = 'default'
-  // 右侧连接/路由表的“挂载”与“数据订阅”共用同一宽度开关（isMinimalWidth）：
-  // 大窗口(宽>285) 同时开，窄窗口(宽≤285) 同时关，杜绝“看得见/看不见”与“订阅/不订阅”脱节。
-  const {
-    response: { data: connectionsData },
-  } = useConnectionData({ enabled: drawerOpen && !isMinimalWidth })
-  const { activeControlConnections, actions: pathControlActions } =
-    usePathControl({
-      activeConnections: connectionsData?.activeConnections ?? [],
-      closedConnections: connectionsData?.closedConnections ?? [],
-      enabled: drawerOpen && !isMinimalWidth,
-    })
-  const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
-  const detailRef = useRef<ConnectionDetailRef | null>(null)
-
-  const filterConn = useMemo<PathControlConnectionItem[]>(() => {
-    const orderFunc = orderFunctionMap[curOrderOpt]
-    const matchConns = activeControlConnections.filter((conn) => {
-      const { host, destinationIP, remoteDestination, process } =
-        conn.metadata ?? {}
-      return (
-        match(host || '') ||
-        match(destinationIP || '') ||
-        match(remoteDestination || '') ||
-        match(process || '')
-      )
-    })
-    return prioritizePathControlConnections(matchConns, orderFunc)
-  }, [activeControlConnections, match])
-
-  const handleSearch = useCallback((match: (content: string) => boolean) => {
-    setMatch(() => match)
-  }, [])
 
   useEffect(() => {
     if (language && language !== lastLanguageRef.current) {
@@ -1207,8 +1152,7 @@ const Layout = () => {
     antivirusWhitelistOpen ||
     clientUpdateOpen ||
     coreUpdateOpen ||
-    isColumnManagerOpen ||
-    Boolean(helpAnchorEl)
+    Boolean(activeHelpAnchorEl)
   const isAnyOverlayOpenRef = useRef(isAnyOverlayOpen)
   useEffect(() => {
     isAnyOverlayOpenRef.current = isAnyOverlayOpen
@@ -1367,13 +1311,14 @@ const Layout = () => {
                   position: 'absolute',
                   top: '3px',
                   right: '8px',
-                  zIndex: 9999,
+                  zIndex: SETTINGS_CLOSE_BUTTON_Z_INDEX,
                 }}
               >
                 <IconButton
                   size="small"
+                  data-close-settings="true"
                   aria-label={t('layout.a11y.closeSettings')}
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={closeSettingsDrawer}
                   sx={(theme) => ({
                     ...get3DButtonStyle(theme, 'contained', 'primary'),
                     width: '28px',
@@ -1457,7 +1402,7 @@ const Layout = () => {
                 <IconButton
                   size="small"
                   aria-label={t('layout.a11y.openSettings')}
-                  onClick={() => setDrawerOpen(true)}
+                  onClick={openSettingsDrawer}
                   sx={(theme) => ({
                     ...get3DButtonStyle(theme, 'contained', 'default'),
                     flexShrink: 0,
@@ -1474,8 +1419,8 @@ const Layout = () => {
               </div>
             )}
 
-            {/*节点组选择列表*/}
-            {!isMiniStatus && (
+            {/*节点组选择列表（设置抽屉打开被全屏遮挡或极小窗时彻底卸载，释放节点列表内存与 Timer）*/}
+            {!drawerOpen && !isMiniStatus && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <ErrorBoundary FallbackComponent={AreaErrorFallback}>
                   <ProxyGroups
@@ -1531,7 +1476,7 @@ const Layout = () => {
                     profileItems={profileItems}
                     currentProfileUid={currentProfileUid}
                     importInputRef={importInputRef}
-                    importInputContextMenu={importInputContextMenu}
+                    importInputContextMenu={activeImportInputContextMenu}
                     setImportInputContextMenu={setImportInputContextMenu}
                     handleImportProfile={handleImportProfile}
                     handleSelectProfile={handleSelectProfile}
@@ -1568,10 +1513,6 @@ const Layout = () => {
                       onAddUrlClick={handleAddUrlClick}
                       disableCardBorder
                     />
-                    <AddUrlDialog
-                      open={addUrlOpen}
-                      onClose={() => setAddUrlOpen(false)}
-                    />
                   </Box>
 
                   {/* Section 3: Minimal Settings */}
@@ -1604,23 +1545,16 @@ const Layout = () => {
                     mode={mode}
                   />
                 </Box>
-                {/* Right Connections column (自适应 flex: 1) — 仅大窗口(宽>285)挂载；
-                      窄窗口(宽≤285)下不挂载、不渲染、不订阅数据，与上方 useConnectionData 共用 isMinimalWidth 信号 */}
+                {/* Right Connections column (自适应 flex: 1) — 仅大窗口(宽>285)随设置抽屉挂载；
+                      窄窗口或关闭设置后彻底卸载，连接数据/路径控制/列管理/详情弹窗随之销毁 */}
                 {!isMinimalWidth && (
                   <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-                    <ConnectionsPanel
-                      handleSearch={handleSearch}
-                      filterConn={filterConn}
-                      pathControlActions={pathControlActions}
-                      detailRef={detailRef}
-                      isColumnManagerOpen={isColumnManagerOpen}
-                      setIsColumnManagerOpen={setIsColumnManagerOpen}
-                    />
+                    <ConnectionsPanel />
                   </ErrorBoundary>
                 )}
                 {/* Help Button */}
                 <HelpMenuButton
-                  helpAnchorEl={helpAnchorEl}
+                  helpAnchorEl={activeHelpAnchorEl}
                   handleHelpClick={handleHelpClick}
                   handleHelpClose={handleHelpClose}
                   handleClientCheck={handleClientCheck}
@@ -1872,22 +1806,18 @@ const Layout = () => {
       </Paper>
 
       {/* Popups & dialogs：单个弹窗渲染异常只做局部降级，不拖垮整页 */}
-      <ErrorBoundary FallbackComponent={AreaErrorFallback}>
-        <ConnectionDetail ref={detailRef} />
-      </ErrorBoundary>
-
       {/* Profile Card Context Menu (BUG-072) */}
       <Menu
         anchorReference="anchorPosition"
         anchorPosition={
-          profileMenuAnchorPosition !== null
+          activeProfileMenuAnchorPosition !== null
             ? {
-                top: profileMenuAnchorPosition.top,
-                left: profileMenuAnchorPosition.left,
+                top: activeProfileMenuAnchorPosition.top,
+                left: activeProfileMenuAnchorPosition.left,
               }
             : undefined
         }
-        open={profileMenuAnchorPosition !== null}
+        open={activeProfileMenuAnchorPosition !== null}
         onClose={() => setProfileMenuAnchorPosition(null)}
         slotProps={{
           paper: getPopupMenuPaperProps(theme, { minWidth: '160px' }),
@@ -1925,14 +1855,14 @@ const Layout = () => {
       <Menu
         anchorReference="anchorPosition"
         anchorPosition={
-          importInputContextMenu !== null
+          activeImportInputContextMenu !== null
             ? {
-                top: importInputContextMenu.mouseY,
-                left: importInputContextMenu.mouseX,
+                top: activeImportInputContextMenu.mouseY,
+                left: activeImportInputContextMenu.mouseX,
               }
             : undefined
         }
-        open={importInputContextMenu !== null}
+        open={activeImportInputContextMenu !== null}
         onClose={() => setImportInputContextMenu(null)}
         slotProps={{
           paper: getPopupMenuPaperProps(theme, { minWidth: '160px' }),
@@ -2024,7 +1954,7 @@ const Layout = () => {
           }}
           onLater={() => {
             setFirstRunGuideOpen(false)
-            setDrawerOpen(true)
+            openSettingsDrawer()
           }}
           onOpenWhitelistGuide={() => setAntivirusWhitelistOpen(true)}
         />
@@ -2032,6 +1962,7 @@ const Layout = () => {
           open={antivirusWhitelistOpen}
           onClose={() => setAntivirusWhitelistOpen(false)}
         />
+        <AddUrlDialog open={addUrlOpen} onClose={() => setAddUrlOpen(false)} />
       </ErrorBoundary>
     </ThemeProvider>
   )

@@ -62,6 +62,9 @@ export const ProxyHead = ({
   const [pendingAutoTest, setPendingAutoTest] = useState(false)
   const filterInputRef = useRef<HTMLInputElement | null>(null)
   const filterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const triggerDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
   const lastTriggeredFilterRef = useRef<string>(filterText || '')
 
   const onCheckDelayRef = useRef(onCheckDelay)
@@ -89,13 +92,20 @@ export const ProxyHead = ({
       if (filterTimerRef.current) {
         clearTimeout(filterTimerRef.current)
       }
+      if (triggerDelayTimerRef.current) {
+        clearTimeout(triggerDelayTimerRef.current)
+      }
     }
   }, [])
 
   const triggerAutoDelayTest = useCallback(() => {
     setPendingAutoTest(false)
+    if (triggerDelayTimerRef.current) {
+      clearTimeout(triggerDelayTimerRef.current)
+    }
     // 延迟 60ms 确保 React 状态更新并完成过滤计算
-    setTimeout(() => {
+    triggerDelayTimerRef.current = setTimeout(() => {
+      triggerDelayTimerRef.current = null
       onCheckDelayRef.current()
     }, 60)
   }, [])

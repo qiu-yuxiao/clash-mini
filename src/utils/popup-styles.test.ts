@@ -2,7 +2,13 @@ import { createTheme, type Theme } from '@mui/material'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { getSwitchSkinStyle } from '@/components/base/base-switch'
-import { CUSTOM_TITLEBAR_HEIGHT, MIN_WINDOW_WIDTH } from '@/constants'
+import {
+  CUSTOM_TITLEBAR_HEIGHT,
+  MIN_WINDOW_WIDTH,
+  SETTINGS_CLOSE_BUTTON_Z_INDEX,
+  TRAFFIC_WORKER_DESTROY_DELAY_MS,
+} from '@/constants'
+import { shouldSkipMixedPortBlurSave } from '@/pages/_layout/utils/settings-guards'
 import {
   MIN_LOADING_NOTICE_DWELL_MS,
   getSnapshotNotices,
@@ -231,6 +237,59 @@ describe('popup-styles 窄窗弹窗几何锁定与皮肤统一样式', () => {
       )
       expect(monoCheckedThumb.backgroundColor).not.toBe(monoThumb.background)
     }
+  })
+
+  it('BUG-385: 验证设置关闭层级边界、TrafficWorker 30 秒销毁延迟与中途取消/关闭跳过端口失焦保存判定', () => {
+    expect(SETTINGS_CLOSE_BUTTON_Z_INDEX).toBe(250)
+    expect(SETTINGS_CLOSE_BUTTON_Z_INDEX).toBeGreaterThan(200)
+    expect(SETTINGS_CLOSE_BUTTON_Z_INDEX).toBeLessThan(1300)
+    expect(TRAFFIC_WORKER_DESTROY_DELAY_MS).toBe(30_000)
+
+    expect(
+      shouldSkipMixedPortBlurSave({
+        isMounted: false,
+        skipRequested: false,
+        relatedTarget: null,
+      }),
+    ).toBe(true)
+
+    expect(
+      shouldSkipMixedPortBlurSave({
+        isMounted: true,
+        skipRequested: true,
+        relatedTarget: null,
+      }),
+    ).toBe(true)
+
+    const closeSettingsTarget = {
+      closest: (selector: string) =>
+        selector === '[data-close-settings="true"]' ? ({} as Element) : null,
+    } as unknown as EventTarget
+    expect(
+      shouldSkipMixedPortBlurSave({
+        isMounted: true,
+        skipRequested: false,
+        relatedTarget: closeSettingsTarget,
+      }),
+    ).toBe(true)
+
+    const otherTarget = {
+      closest: () => null,
+    } as unknown as EventTarget
+    expect(
+      shouldSkipMixedPortBlurSave({
+        isMounted: true,
+        skipRequested: false,
+        relatedTarget: otherTarget,
+      }),
+    ).toBe(false)
+    expect(
+      shouldSkipMixedPortBlurSave({
+        isMounted: true,
+        skipRequested: false,
+        relatedTarget: null,
+      }),
+    ).toBe(false)
   })
 })
 

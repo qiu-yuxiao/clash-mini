@@ -25,6 +25,8 @@ import {
 } from '@/utils/button-styles'
 import type { BaseConfig } from 'tauri-plugin-mihomo-api'
 
+import { shouldSkipMixedPortBlurSave } from '../utils/settings-guards'
+
 interface BasicSettingsCardProps {
   verge: IVergeConfig | null
   clashConfig: BaseConfig | null
@@ -82,6 +84,14 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
 
   const [localPort, setLocalPort] = React.useState(mixedPortVal)
   const inputRef = React.useRef<HTMLInputElement | null>(null)
+  const isMountedRef = React.useRef(true)
+  const skipBlurSaveRef = React.useRef(false)
+  React.useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   // 自启开关以「系统真实状态」为准，配置值仅作为回退：
   // 用户在任务管理器禁用、或注册表被改写时，配置值不会变，只看配置会显示错误状态。
@@ -479,9 +489,29 @@ export const BasicSettingsCard: React.FC<BasicSettingsCardProps> = ({
                   e.target.value ? parseInt(e.target.value, 10) || 0 : 0,
                 )
               }
-              onBlur={onLocalSave}
+              onBlur={(e) => {
+                if (
+                  shouldSkipMixedPortBlurSave({
+                    isMounted: isMountedRef.current,
+                    skipRequested: skipBlurSaveRef.current,
+                    relatedTarget: e.relatedTarget,
+                  })
+                ) {
+                  skipBlurSaveRef.current = false
+                  if (isMountedRef.current) {
+                    setLocalPort(mixedPortVal)
+                  }
+                  return
+                }
+                onLocalSave()
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
+                  ;(e.target as HTMLInputElement).blur()
+                } else if (e.key === 'Escape') {
+                  e.stopPropagation()
+                  skipBlurSaveRef.current = true
+                  setLocalPort(mixedPortVal)
                   ;(e.target as HTMLInputElement).blur()
                 }
               }}

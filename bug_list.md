@@ -16,6 +16,17 @@
 - **修复方案**：重构 [base-switch.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-switch.tsx) 导出 `getSwitchSkinStyle(theme)`，将 `monochrome` 分支对齐 `cyberpunk` 的小巧直角方形尺寸几何（外框 `28×14`、`sizeSmall` `18×10`、轨道 `borderRadius: 0`、滑块 `12×12` / `sizeSmall` `8×8` 且 `borderRadius: '0px'`、`transitionDuration: '150ms'`），并赋予高反差黑白纯平配色（未选中 `#737373` 描边配灰块、选中态亮/暗黑纯白实心高对比与 `1px` 锐利方框）。
 - **状态**：代码已修正，待用户确认
 
+### BUG-385 设置与宽窄窗不可见组件彻底卸载、30秒回收闭环及中途关闭设置防混乱加固
+
+- **对应模块**：[_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx)、[basic-settings-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/basic-settings-card.tsx)、[settings-guards.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/settings-guards.ts)、[proxy-head.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-head.tsx)、[use-traffic-monitor.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-traffic-monitor.ts)、[constants.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/constants.ts)
+- **问题描述**：① 打开设置面板期间，被遮盖的主页节点列表 `ProxyGroups` 仍保持挂载渲染；② `useConnectionData` 与 `usePathControl` 挂在常驻 `Layout` 顶层，关闭设置或缩窄窗口后因 `lastSubscriptionCacheKeyRef` 保持 Query Observer 活跃，最后一批最多 500 条连接快照未随 `gcTime(30s)` 回收，且宽窗下每秒连接更新会带动整个 `Layout` 重绘；③ `TrafficWorkerClient` 闲置销毁延迟长达 `5 分钟`；④ 中途直接关闭设置时，挂在抽屉内的 `AddUrlDialog` 被强制卸载却使 `addUrlOpen` 残留为 `true`（导致 `isAnyOverlayOpen` 永久锁死主页 `F1/F4/Ctrl+F` 快捷键）、关闭按钮 `zIndex: 9999` 越过模态弹窗、`Mixed Port` 未提交修改因 `onBlur` 误保存，以及菜单锚点未联动复位。
+- **修复方案**：
+  1. `_layout.tsx` 对 `ProxyGroups` 统一加 `{!drawerOpen && !isMiniStatus && (...)}` 条件卸载，并在 `ProxyHead` 补全 `60ms` 延迟定时器卸载清理（关闭设置返回主页时 `ProxyGroups` 经既有 `useLayoutEffect + localStorage` 同步还原滚动位置）；
+  2. 将 `useConnectionData`、`usePathControl`、`filterConn` 与 `<ConnectionDetail />` 内聚迁入 `ConnectionsPanel`，卸载面板后立即释放 Observer 并在 30s 后触发 `gcTime` 彻底回收 500 条连接缓存、消除 `Layout` 级每秒连带重绘；
+  3. 将 `TrafficWorkerClient` 闲置销毁延迟由 `5 分钟` 收敛为 `TRAFFIC_WORKER_DESTROY_DELAY_MS = 30_000`（对齐 `gcTime`）；
+  4. 将 `AddUrlDialog` 移出抽屉至外层弹窗区、将设置关闭按钮 `zIndex` 从 `9999` 降为 `SETTINGS_CLOSE_BUTTON_Z_INDEX (250)` 并标 `data-close-settings="true"`、关闭抽屉时统一清空帮助/订阅/粘贴右键菜单锚点，并为 `BasicSettingsCard` 端口框加入 `shouldSkipMixedPortBlurSave`（支持 `Esc` 放弃未提交修改与直接点叉跳过保存）。
+- **状态**：代码已修正，待用户确认
+
 ---
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
