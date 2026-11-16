@@ -1,11 +1,11 @@
 {
-  "version": "3.4.1",
-  "notes": "### 🛡️ 非穷举指纹拓扑连坐与结构化语法识别，根除借壳真节点的广告横幅漏网（BUG-383）\n\n- **全量原始指纹连坐与寄生归真**：`enhance/mod.rs` 在剔除伪节点**前**先对全量有效 `proxies:` 按规范化连接指纹执行拓扑解析（`resolve_proxy_clone_topology`）。当 `>= 2` 条同指纹克隆组被任一伪节点（或全员冒号键值结构）污染且组内**无**带地区暗示（`has_region_hint`）的非伪节点时，判定为专用横幅展示端口并**整组 `0` 保留全灭**（同步登记内存 `RUNTIME_TAINTED_BANNER_FPS` 在全链路隐藏，解决绑定真实香港出口的广告节点通过真 HTTPS 验真后漏网的问题）；若横幅挂靠在真实地区节点（如 `香港1`）上，则吞掉全部横幅并按地区名优先保留真实节点名称，确保 `-香港` 等地域排除过滤精准生效。\n- **前后端 1:1 非穷举结构形态识别**：`node.rs` 与 `node.ts` 同步新增 `is_structural_banner_name` / `isStructuralBannerName`，在不含地区暗示的前提下自动拦截内嵌常见后缀裸域名（如 `永久官网:xxx.com`）与冒号键值配额/日期/倒计时横幅（如 `距离下次重置剩余：24 天`、`剩余流量：167.26 GB`、`套餐到期：2027-02-09`），无需穷举广告词即可覆盖单端口横幅，同时严格放行纯域名节点、带宽规格与地区冒号节点。\n\n---",
-  "pub_date": "2026-11-15T23:11:00.493Z",
+  "version": "3.4.2",
+  "notes": "Clash Mini v3.4.2",
+  "pub_date": "2026-11-16T15:24:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU1tRXhKWHQwbHZLbzNlTktMRjVYZyt1emNRUEhRcUlleHV5ZWoyY2lsOG1nY25uRDFmVXlIZ09KREZERzBOaVNaWEFoZG14KzNRM2xJYTloSVFLOGdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0Nzg0MTkxCWZpbGU6Q2xhc2ggTWluaV8zLjQuMV94NjQtc2V0dXAuZXhlCnU4NG45QUFiT0xjYjFBdXo0Q1ZzL1o5dXdEczlnSkxJVFF3OUlIRG52VFRHcXRzRFBpdTFFcndWRktJTmJ0NnFmRmRxZ284dU53bUdJa2gyb3RwTkJBPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.4.1/Clash.Mini_3.4.1_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.4.2/Clash.Mini_3.4.2_x64-setup.exe",
       "size": 30185276
     }
   }
