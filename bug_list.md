@@ -9,7 +9,12 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
-_当前暂无待确认或排查中的活动 Bug。_
+### BUG-384 Monochrome 皮肤下基础设置四枚小开关误呈圆角胶囊而非方形开关
+
+- **对应模块**：[base-switch.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-switch.tsx)（`getSwitchSkinStyle` / `Switch`）
+- **问题描述**：`Monochrome`（黑白极简工业风）皮肤下按钮、分段控制器、卡片与滑块均采用 `0px` 直角锐利造型，但 `base-switch.tsx` 中的 `monochrome` 分支仍残留旧的大尺寸圆角胶囊样式（`56×28` / `borderRadius: 14` 与圆形滑块），导致「基础设置」卡片中的四枚 `size="small"` 小开关（开机自动启动、Allow LAN、启动时最小化、Allow IPv6）未呈现与 `Cyberpunk` 一致的小巧方形开关外观。
+- **修复方案**：重构 [base-switch.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-switch.tsx) 导出 `getSwitchSkinStyle(theme)`，将 `monochrome` 分支对齐 `cyberpunk` 的小巧直角方形尺寸几何（外框 `28×14`、`sizeSmall` `18×10`、轨道 `borderRadius: 0`、滑块 `12×12` / `sizeSmall` `8×8` 且 `borderRadius: '0px'`、`transitionDuration: '150ms'`），并赋予高反差黑白纯平配色（未选中 `#737373` 描边配灰块、选中态亮/暗黑纯白实心高对比与 `1px` 锐利方框）。
+- **状态**：代码已修正，待用户确认
 
 ---
 

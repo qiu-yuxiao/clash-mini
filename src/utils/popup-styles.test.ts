@@ -1,6 +1,7 @@
 import { createTheme, type Theme } from '@mui/material'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { getSwitchSkinStyle } from '@/components/base/base-switch'
 import { CUSTOM_TITLEBAR_HEIGHT, MIN_WINDOW_WIDTH } from '@/constants'
 import {
   MIN_LOADING_NOTICE_DWELL_MS,
@@ -193,4 +194,44 @@ describe('popup-styles 窄窗弹窗几何锁定与皮肤统一样式', () => {
       vi.useRealTimers()
     }
   })
+
+  it('BUG-384: Monochrome 与 Cyberpunk 开关共享 0px 直角方形小尺寸几何且黑白开闭态对比鲜明', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      const monoStyle = getSwitchSkinStyle(makeTestTheme(mode, 'monochrome'))
+      const cyberStyle = getSwitchSkinStyle(makeTestTheme(mode, 'cyberpunk'))
+
+      expect(monoStyle.width).toBe(28)
+      expect(monoStyle.height).toBe(14)
+      expect(monoStyle.width).toBe(cyberStyle.width)
+      expect(monoStyle.height).toBe(cyberStyle.height)
+
+      const monoSmall = monoStyle['&.MuiSwitch-sizeSmall'] as CSSObjectLike
+      const cyberSmall = cyberStyle['&.MuiSwitch-sizeSmall'] as CSSObjectLike
+      expect(monoSmall.width).toBe('18px !important')
+      expect(monoSmall.height).toBe('10px !important')
+      expect(monoSmall.width).toBe(cyberSmall.width)
+      expect(monoSmall.height).toBe(cyberSmall.height)
+
+      const monoThumb = monoStyle['& .MuiSwitch-thumb'] as CSSObjectLike
+      const monoTrack = monoStyle['& .MuiSwitch-track'] as CSSObjectLike
+      expect(monoThumb.borderRadius).toBe('0px')
+      expect(monoTrack.borderRadius).toBe(0)
+
+      const monoBase = monoStyle['& .MuiSwitch-switchBase'] as CSSObjectLike
+      const monoChecked = monoBase['&.Mui-checked'] as CSSObjectLike
+      const monoCheckedTrack = monoChecked[
+        '& + .MuiSwitch-track'
+      ] as CSSObjectLike
+      const monoCheckedThumb = monoChecked[
+        '& .MuiSwitch-thumb'
+      ] as CSSObjectLike
+
+      expect(monoCheckedTrack.backgroundColor).not.toBe(
+        monoTrack.backgroundColor,
+      )
+      expect(monoCheckedThumb.backgroundColor).not.toBe(monoThumb.background)
+    }
+  })
 })
+
+type CSSObjectLike = Record<string, unknown>

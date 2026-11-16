@@ -1,13 +1,99 @@
-import { styled } from '@mui/material/styles'
-import { default as MuiSwitch, SwitchProps } from '@mui/material/Switch'
+import { type CSSObject, styled, type Theme } from '@mui/material/styles'
+import { default as MuiSwitch, type SwitchProps } from '@mui/material/Switch'
 
-export const Switch = styled((props: SwitchProps) => (
-  <MuiSwitch
-    focusVisibleClassName=".Mui-focusVisible"
-    disableRipple
-    {...props}
-  />
-))(({ theme }) => {
+interface SquareSwitchPalette {
+  trackUncheckedBg: string
+  trackUncheckedBorder: string
+  trackCheckedBg: string
+  trackCheckedBorder: string
+  trackCheckedShadow?: string
+  trackUncheckedShadow?: string
+  thumbUncheckedBg: string
+  thumbUncheckedBorder?: string
+  thumbUncheckedShadow?: string
+  thumbCheckedBg: string
+  thumbCheckedBorder?: string
+  thumbCheckedShadow?: string
+  hoverRule: CSSObject
+}
+
+function buildSquareSwitchStyle(p: SquareSwitchPalette): CSSObject {
+  return {
+    width: 28,
+    height: 14,
+    padding: 0,
+    marginRight: 1,
+    '&.MuiSwitch-sizeSmall': {
+      width: '18px !important',
+      height: '10px !important',
+      padding: '0 !important',
+      '& .MuiSwitch-switchBase': {
+        padding: '0 !important',
+        margin: '0 !important',
+        width: '10px !important',
+        height: '10px !important',
+        '&.Mui-checked': {
+          transform: 'translateX(8px) !important',
+        },
+        '& .MuiSwitch-input': {
+          width: '18px !important',
+          height: '10px !important',
+          left: '0 !important',
+        },
+        '&.Mui-checked .MuiSwitch-input': {
+          left: '-8px !important',
+        },
+      },
+      '& .MuiSwitch-thumb': {
+        width: '8px !important',
+        height: '8px !important',
+        margin: '1px !important',
+      },
+    },
+    '& .MuiSwitch-switchBase': {
+      padding: 0,
+      margin: 0,
+      transitionDuration: '150ms',
+      '&.Mui-checked': {
+        transform: 'translateX(14px) !important',
+        '& + .MuiSwitch-track': {
+          backgroundColor: `${p.trackCheckedBg} !important`,
+          border: `1px solid ${p.trackCheckedBorder} !important`,
+          opacity: '1 !important',
+          ...(p.trackCheckedShadow ? { boxShadow: p.trackCheckedShadow } : {}),
+        },
+        '& .MuiSwitch-thumb': {
+          backgroundColor: `${p.thumbCheckedBg} !important`,
+          color: `${p.thumbCheckedBg} !important`,
+          borderRadius: '0px !important',
+          ...(p.thumbCheckedBorder ? { border: p.thumbCheckedBorder } : {}),
+          ...(p.thumbCheckedShadow ? { boxShadow: p.thumbCheckedShadow } : {}),
+        },
+      },
+    },
+    '& .MuiSwitch-thumb': {
+      boxSizing: 'border-box',
+      width: 12,
+      height: 12,
+      margin: '1px',
+      borderRadius: '0px',
+      background: p.thumbUncheckedBg,
+      color: p.thumbUncheckedBg,
+      ...(p.thumbUncheckedBorder ? { border: p.thumbUncheckedBorder } : {}),
+      ...(p.thumbUncheckedShadow ? { boxShadow: p.thumbUncheckedShadow } : {}),
+    },
+    '& .MuiSwitch-track': {
+      borderRadius: 0,
+      backgroundColor: p.trackUncheckedBg,
+      border: `1px solid ${p.trackUncheckedBorder}`,
+      opacity: 1,
+      ...(p.trackUncheckedShadow ? { boxShadow: p.trackUncheckedShadow } : {}),
+    },
+    ...p.hoverRule,
+  }
+}
+
+export function getSwitchSkinStyle(theme: Theme): CSSObject {
   const isLight = theme.palette.mode === 'light'
   const skin =
     theme.controlSkin ||
@@ -368,183 +454,54 @@ export const Switch = styled((props: SwitchProps) => (
   // CYBERPUNK
   // ==========================================
   if (skin === 'cyberpunk') {
-    return {
-      width: 28,
-      height: 14,
-      padding: 0,
-      marginRight: 1,
-      '&.MuiSwitch-sizeSmall': {
-        width: '18px !important',
-        height: '10px !important',
-        padding: '0 !important',
-        '& .MuiSwitch-switchBase': {
-          padding: '0 !important',
-          margin: '0 !important',
-          width: '10px !important',
-          height: '10px !important',
-          '&.Mui-checked': {
-            transform: 'translateX(8px) !important',
-          },
-          '& .MuiSwitch-input': {
-            width: '18px !important',
-            height: '10px !important',
-            left: '0 !important',
-          },
-          '&.Mui-checked .MuiSwitch-input': {
-            left: '-8px !important',
-          },
-        },
-        '& .MuiSwitch-thumb': {
-          width: '8px !important',
-          height: '8px !important',
-          margin: '1px !important',
+    const checkedAccent = isLight ? '#00b0ff' : '#00f0ff'
+    return buildSquareSwitchStyle({
+      trackCheckedBg: isLight ? '#e0f7fa' : '#0a0e17',
+      trackCheckedBorder: checkedAccent,
+      thumbCheckedBg: checkedAccent,
+      thumbCheckedShadow: `0 0 6px ${checkedAccent} !important`,
+      thumbUncheckedBg: '#ff0055',
+      thumbUncheckedShadow: '0 0 4px #ff0055',
+      trackUncheckedBg: isLight ? '#f1f5f9' : '#05070c',
+      trackUncheckedBorder: '#ff0055',
+      hoverRule: {
+        '&:hover .MuiSwitch-thumb': {
+          boxShadow: '0 0 10px currentColor',
         },
       },
-      '& .MuiSwitch-switchBase': {
-        padding: 0,
-        margin: 0,
-        transitionDuration: '150ms',
-        '&.Mui-checked': {
-          transform: 'translateX(14px) !important',
-          '& + .MuiSwitch-track': {
-            backgroundColor: isLight
-              ? '#e0f7fa !important'
-              : '#0a0e17 !important',
-            border: `1px solid ${isLight ? '#00b0ff' : '#00f0ff'} !important`,
-            opacity: '1 !important',
-          },
-          '& .MuiSwitch-thumb': {
-            backgroundColor: isLight
-              ? '#00b0ff !important'
-              : '#00f0ff !important',
-            color: isLight ? '#00b0ff !important' : '#00f0ff !important',
-            borderRadius: '0px !important',
-            boxShadow: `0 0 6px ${isLight ? '#00b0ff' : '#00f0ff'} !important`,
-          },
-        },
-      },
-      '& .MuiSwitch-thumb': {
-        boxSizing: 'border-box',
-        width: 12,
-        height: 12,
-        margin: '1px',
-        borderRadius: '0px',
-        background: '#ff0055',
-        color: '#ff0055',
-        boxShadow: '0 0 4px #ff0055',
-      },
-      '& .MuiSwitch-track': {
-        borderRadius: 0,
-        backgroundColor: isLight ? '#f1f5f9' : '#05070c',
-        border: '1px solid #ff0055',
-        opacity: 1,
-      },
-      '&:hover .MuiSwitch-thumb': {
-        boxShadow: '0 0 10px currentColor',
-      },
-    }
+    })
   }
 
   // ==========================================
-  // MONOCHROME
+  // MONOCHROME (BUG-384)
   // ==========================================
   if (skin === 'monochrome') {
-    return {
-      width: 56,
-      height: 28,
-      padding: 0,
-      marginRight: 1,
-      '&.MuiSwitch-sizeSmall': {
-        width: '28px !important',
-        height: '14px !important',
-        padding: '0 !important',
-        '& .MuiSwitch-switchBase': {
-          padding: '0 !important',
-          margin: '0 !important',
-          width: '14px !important',
-          height: '14px !important',
-          transform: 'translateX(0px) !important',
-          transition: 'transform 200ms cubic-bezier(0.4, 0, 0.2, 1) !important',
-          '&.Mui-checked': {
-            transform: 'translateX(14px) !important',
-            '& + .MuiSwitch-track': {
-              backgroundColor:
-                (isLight ? '#000000' : '#ffffff') + ' !important',
-              opacity: '1 !important',
-              boxShadow: 'none !important',
-              border: 'none !important',
-            },
-            '& .MuiSwitch-thumb': {
-              backgroundColor:
-                (isLight ? '#ffffff' : '#000000') + ' !important',
-              border: 'none !important',
-            },
-          },
-          '& .MuiSwitch-input': {
-            width: '28px !important',
-            height: '14px !important',
-            left: '0 !important',
-          },
-          '&.Mui-checked .MuiSwitch-input': {
-            left: '-14px !important',
-          },
-        },
-        '& .MuiSwitch-thumb': {
-          width: '12px !important',
-          height: '12px !important',
-          margin: '1px !important',
+    const activeBorderAndThumb = isLight ? '#000000' : '#ffffff'
+    return buildSquareSwitchStyle({
+      trackCheckedBg: isLight ? '#d4d4d4' : '#262626',
+      trackCheckedBorder: activeBorderAndThumb,
+      trackCheckedShadow: 'none !important',
+      thumbCheckedBg: activeBorderAndThumb,
+      thumbCheckedShadow: 'none !important',
+      thumbUncheckedBg: '#737373',
+      thumbUncheckedShadow: 'none',
+      trackUncheckedBg: isLight ? '#f4f4f5' : '#0a0a0a',
+      trackUncheckedBorder: '#737373',
+      hoverRule: {
+        '&:hover .MuiSwitch-track': {
+          borderColor: activeBorderAndThumb,
         },
       },
-      '& .MuiSwitch-switchBase': {
-        padding: 0,
-        margin: 0,
-        width: '28px !important',
-        height: '28px !important',
-        transform: 'translateX(0px) !important',
-        transition: 'transform 200ms cubic-bezier(0.4, 0, 0.2, 1) !important',
-        '&.Mui-checked': {
-          transform: 'translateX(28px) !important',
-          color: '#fff !important',
-          '& + .MuiSwitch-track': {
-            backgroundColor: (isLight ? '#000000' : '#ffffff') + ' !important',
-            opacity: '1 !important',
-            boxShadow: 'none !important',
-            border: 'none !important',
-          },
-          '& .MuiSwitch-thumb': {
-            backgroundColor: (isLight ? '#ffffff' : '#000000') + ' !important',
-            border: 'none !important',
-          },
-        },
-        '& .MuiSwitch-input': {
-          width: '56px !important',
-          height: '28px !important',
-          left: '0 !important',
-        },
-        '&.Mui-checked .MuiSwitch-input': {
-          left: '-28px !important',
-        },
-      },
-      '& .MuiSwitch-thumb': {
-        boxSizing: 'border-box',
-        width: 24,
-        height: 24,
-        border: 'none',
-        background: isLight ? '#000000' : '#ffffff',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-      },
-      '& .MuiSwitch-track': {
-        borderRadius: 14,
-        backgroundColor: isLight ? '#e5e7eb' : '#374151',
-        opacity: 1,
-        border: 'none',
-        boxShadow: 'none',
-      },
-      '&:hover .MuiSwitch-thumb': {
-        transform: 'scale(1.05)',
-      },
-    }
+    })
   }
 
   return {}
-})
+}
+
+export const Switch = styled((props: SwitchProps) => (
+  <MuiSwitch
+    focusVisibleClassName=".Mui-focusVisible"
+    disableRipple
+    {...props}
+  />
+))(({ theme }) => getSwitchSkinStyle(theme))

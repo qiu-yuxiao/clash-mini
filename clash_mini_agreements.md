@@ -217,6 +217,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 - **双控制滑块解耦与独立存储**：在不同皮肤下，两个控制滑块对应不同的底层物理参数（如 Depth/Vibrancy、Radius/Accent 等），各参数在 LocalStorage 中使用独立字段存储，切换皮肤不产生数值污染。
 - **字体族共鸣对齐**：各皮肤严格匹配中英文字体组合（如 Retro 3D 匹配 Trebuchet MS / SimHei；Cyberpunk 匹配 Consolas / NSimSun 等），确保跨语言视觉一致。
+- **硬朗直角皮肤小开关尺寸几何统一规范（BUG-384）**：`Cyberpunk` 与 `Monochrome` 两套锐利直角工业风皮肤下的 `Switch`（[base-switch.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-switch.tsx)）统一采用 `0px` 直角方形几何（常规 `28 × 14px`、`size="small"` 收敛为 `18 × 10px`、轨道 `borderRadius: 0`、滑块 `8 × 8px` / `12 × 12px` 且 `borderRadius: '0px'`）；`Monochrome` 以纯黑白灰高反差边界区分开闭态，与同卡片内的直角分段控件及按钮保持视觉统一。
 - **三态分段开关尺寸与纵向对齐规范**：`ThemeSettingsCard` 中的主题模式三态开关（`系统 / 浅色 / 深色`）统一与 `BasicSettingsCard` 中的 `TUN 域名嗅探` 三态开关保持完全一致的 `118 × 20px` 外框尺寸与 `11px` 粗体字号，并通过 `marginInlineEnd: 4px` 对齐两张同列设置卡片内部开关的左右边界（标题文字仍保持最左对齐），同时对标题与选项文字统一施加 `textOverflow: 'ellipsis'` 与 `title` 悬浮提示以兼容多语种长文案。
 
 ### 2.8 主页节点列表与活跃节点轮换
@@ -687,7 +688,7 @@ flowchart LR
 ### 8.8 前端单测基线与最小覆盖
 
 - **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 131 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
+- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 132 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ### 8.9 用户可见文案 i18n 硬约束
@@ -856,6 +857,7 @@ flowchart LR
 | **BUG-381** | 2.12 / 6.4 | 移除重型嵌入式 JS 引擎 `boa_engine` 与 `enhance/script.rs` / 内置 `.js` 文件，改用原生 Rust `apply_builtin_guards` 完成 `mode: script` 归一与 `hysteria` string `alpn` 转数组；停止新建 `Script` 默认项，保留存量 `profiles.yaml` 历史 `type: script` 兼容忽略。 |
 | **BUG-382** | 2.11 / 6.1 | 清理不可达流媒体解锁 `/unlock` 路由（`src/pages/unlock.tsx`、`cmd/media_unlock_checker` 及废弃翻译键）与零使用 `tauri-plugin-http` / `@tauri-apps/plugin-http`，收紧 WebView 网络接口暴露并消除重复 `reqwest v0.12.28` 依赖树。 |
 | **BUG-383** | 2.8 / 5.4 | 根治借壳真实可用后端（如香港出口）的订阅横幅假节点漏网并绕过用户 `-香港` 排除过滤问题：前后端 1:1 增设非穷举结构形态判定（`is_structural_banner_name` / `isStructuralBannerName`：无地区暗示下的内嵌裸域名与冒号键值配额/日期格式），后端 `enforce_mini_agreements` 改在剔除前先行按 `RawProxyEntry` 指纹分组执行 `resolve_proxy_clone_topology`——共享横幅专用端点整组连坐 `0` 保留并登记内存 `RUNTIME_TAINTED_BANNER_FPS`，寄生真地区节点组强制折叠归真为带地区名的节点，令真实香港借壳体稳妥受控于地域过滤与排除规则。 |
+| **BUG-384** | 2.7 | **【待用户确认】** 修复 Monochrome（黑白极简工业风）皮肤下「基础设置」卡片四枚 `size="small"` 小开关仍残留旧 `56×28` 圆角胶囊样式问题：`base-switch.tsx` 导出 `getSwitchSkinStyle` 并抽出共享直角方形构造器 `buildSquareSwitchStyle`，使 `monochrome` 与 `cyberpunk` 对齐 `28×14` / `sizeSmall` `18×10`、`borderRadius: 0`（滑块 `0px`）的小巧直角方形造型与高反差黑白灰态区分。 |
 
 ---
 
