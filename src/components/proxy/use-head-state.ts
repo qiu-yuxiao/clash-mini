@@ -78,18 +78,33 @@ function getSnapshot(): HeadStateStorage {
   return headStateStore
 }
 
+async function persistHeadStateNow(): Promise<void> {
+  try {
+    await invoke('save_proxy_head_state', { state: headStateStore })
+  } catch (err) {
+    console.warn('[useHeadState] 保存 head_state 到后端失败:', err)
+  }
+}
+
 function scheduleBackendPersist(): void {
   if (persistTimer !== null) {
     clearTimeout(persistTimer)
   }
-  persistTimer = setTimeout(async () => {
+  persistTimer = setTimeout(() => {
     persistTimer = null
-    try {
-      await invoke('save_proxy_head_state', { state: headStateStore })
-    } catch (err) {
-      console.warn('[useHeadState] 保存 head_state 到后端失败:', err)
-    }
+    void persistHeadStateNow()
   }, 100)
+}
+
+/**
+ * 若存在待落盘的 head_state 写入（100ms 防抖窗口内），立即冲刷至后端，
+ * 确保紧随其后的自动选点（Enter / F1 / F4）读取到最新的 filterText。
+ */
+export async function flushHeadStatePersist(): Promise<void> {
+  if (persistTimer === null) return
+  clearTimeout(persistTimer)
+  persistTimer = null
+  await persistHeadStateNow()
 }
 
 function mergeBackendData(remote: HeadStateStorage): boolean {

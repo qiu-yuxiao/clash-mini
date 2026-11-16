@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox } from '@/components/base'
 import { debugLog } from '@/utils/debug'
+import { hasEffectiveFilterTerm, isIncompleteFilterInput } from '@/utils/node'
 
 import { ProxySortType } from './use-filter-sort'
 import { HeadState } from './use-head-state'
@@ -123,6 +124,14 @@ export const ProxyHead = ({
         setPendingAutoTest(false)
         return
       }
+      // BUG-392: 孤立算子或末尾悬空算子（如 "-"、"!"、"日本 -"、"日本|"）尚处于半输入态，等待后续词条而不抢跑触发测速
+      if (isIncompleteFilterInput(trimmed)) {
+        if (!hasEffectiveFilterTerm(trimmed)) {
+          lastTriggeredFilterRef.current = ''
+        }
+        setPendingAutoTest(false)
+        return
+      }
       // BUG-360: 700ms 防抖等待期间展示显式脉冲倒计时提示，支持按 Esc 取消本次自动测速
       setPendingAutoTest(lastTriggeredFilterRef.current !== trimmed)
       filterTimerRef.current = setTimeout(() => {
@@ -146,7 +155,7 @@ export const ProxyHead = ({
       }
       setPendingAutoTest(false)
       const trimmed = currentText.trim()
-      if (!trimmed) return
+      if (!hasEffectiveFilterTerm(trimmed)) return
       lastTriggeredFilterRef.current = trimmed
       debugLog(`[ProxyHead] 回车立即触发测速择优: "${trimmed}"`)
       triggerAutoDelayTest()

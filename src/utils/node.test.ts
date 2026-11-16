@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { hasRegionHint, isDummyNode, matchNodeFilter } from './node'
+import {
+  hasEffectiveFilterTerm,
+  hasRegionHint,
+  isDummyNode,
+  isIncompleteFilterInput,
+  matchNodeFilter,
+} from './node'
 
 // 本文件的断言必须与后端 `src-tauri/src/utils/node.rs` 的测试逐条对应。
 // 前后端判定不一致会直接造成「后端能选中、前端却隐藏」的节点，属于高危一致性问题。
@@ -143,5 +149,53 @@ describe('matchNodeFilter 节点多关键词与排除过滤（与后端逐条对
 
     expect(matchNodeFilter('英国-3倍率', '英国-3倍率')).toBe(true)
     expect(matchNodeFilter('香港1 (005024)', '香港1 (005024)')).toBe(true)
+  })
+})
+
+describe('BUG-392: hasEffectiveFilterTerm 与 isIncompleteFilterInput 过滤输入完整性判定', () => {
+  it('空串、纯空白及孤立操作符不含有效检索词，恒判为未完成态', () => {
+    for (const emptyOrBare of [
+      '',
+      '   ',
+      '-',
+      '!',
+      '！',
+      '|',
+      '｜',
+      '- | !',
+      '  -  ',
+    ]) {
+      expect(hasEffectiveFilterTerm(emptyOrBare)).toBe(false)
+      expect(isIncompleteFilterInput(emptyOrBare)).toBe(true)
+    }
+  })
+
+  it('结尾带悬空排除符或悬空 OR 符的输入包含前序有效词，但仍属半输入态', () => {
+    for (const trailing of [
+      '日本 -',
+      '-香港 -',
+      '-香港|-',
+      '日本|',
+      '日本 ｜',
+      '日本 !',
+      '日本 ！',
+    ]) {
+      expect(hasEffectiveFilterTerm(trailing)).toBe(true)
+      expect(isIncompleteFilterInput(trailing)).toBe(true)
+    }
+  })
+
+  it('完整过滤词及合法连字符前缀词条均放行（不被误拦）', () => {
+    for (const complete of [
+      '-香港',
+      '!hk',
+      '！倍率',
+      'hk-',
+      '英国-3倍率',
+      '日本 | 新加坡 -倍率',
+    ]) {
+      expect(hasEffectiveFilterTerm(complete)).toBe(true)
+      expect(isIncompleteFilterInput(complete)).toBe(false)
+    }
   })
 })

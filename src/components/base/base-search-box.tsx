@@ -77,6 +77,10 @@ export const BaseSearchBox = ({
     controlled: value,
     defaultValue: defaultValue ?? '',
   })
+  // BUG-392: 中文 IME 组词期间保持受控输入框平滑显示，但不向外派发拼音中间态（如 "-x"）以免误触发全量/错误子集测速
+  const isComposingRef = useRef(false)
+  const [composingText, setComposingText] = useState<string | null>(null)
+  const displayValue = composingText !== null ? composingText : text
   // BUG-343: 初始化记录当前文本，仅在外部受控值真正变化或用户输入变化时触发单次 emitSearch
   const lastSearchStateRef = useRef<SearchState | null>(
     text ? null : { text: '' },
@@ -108,12 +112,18 @@ export const BaseSearchBox = ({
     e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const nextText = e.target?.value ?? ''
+    if (isComposingRef.current) {
+      setComposingText(nextText)
+      return
+    }
     setText(nextText)
     emitSearch(nextText)
     onChangeText?.(nextText)
   }
 
   const handleClearInput = () => {
+    isComposingRef.current = false
+    setComposingText(null)
     setText('')
     emitSearch('')
     onChangeText?.('')
@@ -131,8 +141,27 @@ export const BaseSearchBox = ({
       spellCheck="false"
       placeholder={placeholder ?? t('shared.placeholders.filter')}
       sx={{ input: { py: 0.65, px: 1.25 } }}
-      value={text}
+      value={displayValue}
       onChange={handleChangeText}
+      onCompositionStart={() => {
+        isComposingRef.current = true
+        setComposingText(displayValue)
+      }}
+      onCompositionEnd={(e) => {
+        isComposingRef.current = false
+        const committed =
+          (e.target as HTMLInputElement | HTMLTextAreaElement)?.value ?? ''
+        setComposingText(null)
+        setText(committed)
+        emitSearch(committed)
+        onChangeText?.(committed)
+      }}
+      onBlur={() => {
+        if (isComposingRef.current) {
+          isComposingRef.current = false
+          setComposingText(null)
+        }
+      }}
       onKeyDown={(e) => {
         onKeyDownExtra?.(e)
         if (
@@ -155,8 +184,8 @@ export const BaseSearchBox = ({
                     size="small"
                     {...iconStyle}
                     onClick={handleClearInput}
-                    disabled={!text}
-                    sx={{ ...iconStyle.sx, opacity: text ? 1 : 0.5 }}
+                    disabled={!displayValue}
+                    sx={{ ...iconStyle.sx, opacity: displayValue ? 1 : 0.5 }}
                   >
                     <ClearRounded fontSize="inherit" />
                   </IconButton>

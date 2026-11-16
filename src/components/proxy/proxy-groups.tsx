@@ -19,13 +19,13 @@ import { type DelayUpdate, getDelayManager } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
-import { isDummyNode } from '@/utils/node'
+import { isDummyNode, isIncompleteFilterInput } from '@/utils/node'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
 import { ProxyHead } from './proxy-head'
 import { ProxyRender } from './proxy-render'
-import { DEFAULT_STATE } from './use-head-state'
+import { DEFAULT_STATE, flushHeadStatePersist } from './use-head-state'
 import type { HeadState } from './use-head-state'
 import { type IRenderItem, useRenderList } from './use-render-list'
 
@@ -90,6 +90,10 @@ export const ProxyGroups = (props: Props) => {
   const showScrollTopRef = useRef(false)
   const restoredScrollKeyRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
+  const activeTestFilterRef = useRef<Record<string, string>>({})
+  const pendingRecheckGroupsRef = useRef<Record<string, boolean>>({})
+  const busyRetryCountRef = useRef<Record<string, number>>({})
+  const recheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const scrollPositionKey = useMemo(() => `${mode}:normal`, [mode])
 
@@ -209,6 +213,16 @@ export const ProxyGroups = (props: Props) => {
     scrollPositionKey,
   ])
 
+  // 卸载清理在途过滤重测定时器
+  useEffect(() => {
+    return () => {
+      if (recheckTimerRef.current !== null) {
+        clearTimeout(recheckTimerRef.current)
+        recheckTimerRef.current = null
+      }
+    }
+  }, [])
+
   // 滚动到顶部
   const scrollToTop = useCallback(() => {
     parentRef.current?.scrollTo?.({
@@ -230,13 +244,31 @@ export const ProxyGroups = (props: Props) => {
 
   // 批量测速当前组全部节点并择优切换（委托后端单一引擎）
   const handleCheckAll = useStableCallback(async (groupName: string) => {
-    // 防重复触发：测速进行中忽略点击
-    if (testingGroupsRef.current[groupName]) return
+    const startFilterText = getGroupHeadState(groupName).filterText.trim()
+    // BUG-092 防重复触发；BUG-392：若过滤词在途期间已更新为新的完整过滤条件，登记尾部重测队列而不静默丢弃
+    if (testingGroupsRef.current[groupName]) {
+      if (
+        startFilterText !== (activeTestFilterRef.current[groupName] ?? '') &&
+        !isIncompleteFilterInput(startFilterText)
+      ) {
+        pendingRecheckGroupsRef.current[groupName] = true
+        debugLog(
+          `[ProxyGroups] 测速在途且过滤词已变更为 "${startFilterText}"，登记尾部重测队列: ${groupName}`,
+        )
+      }
+      return
+    }
+
+    activeTestFilterRef.current[groupName] = startFilterText
+    pendingRecheckGroupsRef.current[groupName] = false
+    let hitBusy = false
 
     debugLog(`[ProxyGroups] 开始批量测速，组: ${groupName}`)
     updateTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
     try {
+      await flushHeadStatePersist()
+
       // 从当前过滤后可见的渲染列表中提取节点名称；该子集同时作为 F4 批量测速+择优的候选池（防越界关键），并非仅用于视觉占位
       const visibleNames = renderList
         .filter(
@@ -252,6 +284,7 @@ export const ProxyGroups = (props: Props) => {
       debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
 
       if (visibleNames.length === 0) {
+        busyRetryCountRef.current[groupName] = 0
         debugLog(
           `[ProxyGroups] 当前组无可见匹配节点，跳过批量测速与择优: ${groupName}`,
         )
@@ -293,6 +326,7 @@ export const ProxyGroups = (props: Props) => {
           0,
           true,
         )
+        busyRetryCountRef.current[groupName] = 0
         if (results.length === 0) {
           rollbackVisible()
           showNotice.error('settings.mini.testNotExecuted')
@@ -301,13 +335,23 @@ export const ProxyGroups = (props: Props) => {
         rollbackVisible()
         const msg = String(err instanceof Error ? err.message : err)
         if (msg.includes('AUTO_SELECT_BUSY')) {
-          showNotice.info('settings.mini.testingInProgress')
+          const retries = busyRetryCountRef.current[groupName] ?? 0
+          const latestNow = getGroupHeadState(groupName).filterText.trim()
+          if (!isIncompleteFilterInput(latestNow) && retries < 2) {
+            busyRetryCountRef.current[groupName] = retries + 1
+            hitBusy = true
+          } else {
+            busyRetryCountRef.current[groupName] = 0
+            showNotice.info('settings.mini.testingInProgress')
+          }
         } else {
+          busyRetryCountRef.current[groupName] = 0
           showNotice.error('settings.mini.testFailed', { message: msg })
         }
         console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
       }
     } catch (error) {
+      busyRetryCountRef.current[groupName] = 0
       console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)
     } finally {
       if (isMountedRef.current) {
@@ -315,6 +359,26 @@ export const ProxyGroups = (props: Props) => {
         const headState = getGroupHeadState(groupName)
         if (headState?.sortType === 1) {
           onHeadState(groupName, { sortType: headState.sortType })
+        }
+        const latestFilterText = getGroupHeadState(groupName).filterText.trim()
+        const queuedForNewFilter =
+          pendingRecheckGroupsRef.current[groupName] &&
+          !isIncompleteFilterInput(latestFilterText)
+        pendingRecheckGroupsRef.current[groupName] = false
+        if (queuedForNewFilter || hitBusy) {
+          if (!hitBusy) {
+            busyRetryCountRef.current[groupName] = 0
+          }
+          if (recheckTimerRef.current !== null) {
+            clearTimeout(recheckTimerRef.current)
+          }
+          recheckTimerRef.current = setTimeout(
+            () => {
+              recheckTimerRef.current = null
+              if (isMountedRef.current) void handleCheckAll(groupName)
+            },
+            hitBusy ? 800 : 80,
+          )
         }
       }
     }
@@ -329,6 +393,7 @@ export const ProxyGroups = (props: Props) => {
     const previousSnapshots = new Map<string, DelayUpdate | undefined>()
     let uniqueNames: string[] = []
     try {
+      await flushHeadStatePersist()
       const currentUid = (await getProfiles())?.current || ''
       if (!currentUid) return
       const allGroupNames = renderList

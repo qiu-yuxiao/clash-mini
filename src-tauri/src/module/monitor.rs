@@ -192,8 +192,59 @@ where
     }
 }
 
-fn prioritize_verified_candidates(candidates: Vec<(String, u32)>) -> Vec<(String, u32)> {
-    prioritize_verified_candidates_with(candidates, crate::utils::node::is_verified_true_node)
+fn select_fastest_candidate_with_filter<F>(
+    candidates: Vec<(String, u32)>,
+    latest_filter_text: &str,
+    is_verified: F,
+) -> Option<(String, u32)>
+where
+    F: Fn(&str) -> bool,
+{
+    let filtered: Vec<(String, u32)> = candidates
+        .into_iter()
+        .filter(|(name, _)| match_node_filter(name, latest_filter_text))
+        .collect();
+    let pool = prioritize_verified_candidates_with(filtered, is_verified);
+    pool.into_iter().min_by_key(|(_, delay)| *delay)
+}
+
+fn select_fastest_candidate(candidates: Vec<(String, u32)>, latest_filter_text: &str) -> Option<(String, u32)> {
+    select_fastest_candidate_with_filter(
+        candidates,
+        latest_filter_text,
+        crate::utils::node::is_verified_true_node,
+    )
+}
+
+async fn persist_selected_node_if_matching(profile_uid: &str, fastest_node: &str) {
+    let filter_text = get_filter_and_sort_config(profile_uid)
+        .await
+        .0
+        .filter_text
+        .trim()
+        .to_string();
+    if match_node_filter(fastest_node, &filter_text) {
+        let new_selected = vec![PrfSelected {
+            name: Some("PROXY".into()),
+            now: Some(fastest_node.into()),
+        }];
+        let patch_item = PrfItem {
+            selected: Some(new_selected),
+            ..Default::default()
+        };
+        let uid_smart: smartstring::alias::String = profile_uid.into();
+        if let Err(e) = profiles_patch_item_safe(&uid_smart, &patch_item).await {
+            logging!(warn, Type::Lightweight, "[后台监测] 回写 profile.selected 失败: {e}");
+        }
+    } else {
+        logging!(
+            warn,
+            Type::Lightweight,
+            "[后台监测] 最优节点 {} 不在当前过滤范围「{}」内，跳过回写 profile.selected 以免污染",
+            fastest_node,
+            filter_text
+        );
+    }
 }
 
 /// 对当前运行节点执行一轮真 HTTPS（非 `204`）验真并推进持久化状态机：
@@ -2108,12 +2159,19 @@ async fn trigger_backend_auto_select_inner(
             candidates.retain(|(n, _)| !crate::utils::node::is_confirmed_fake_node(n));
         }
 
-        // 优先从 verified_true 节点中按延迟择优；若全员未验真则保底回退到全部有效延迟候选
-        let selection_pool = prioritize_verified_candidates(candidates);
+        // 【BUG-392 · 切换前实时过滤门检】测速耗时数秒期间用户可能刚敲入/改完过滤词（如从 "-" 提交为 "-香港"）；
+        // 必须在 select_node_for_group 切换前读取最新 filter_text 并淘汰越界候选，严禁先切成越界节点再事后跳过回写。
+        let had_reachable_candidates = !candidates.is_empty();
+        let latest_filter_text = get_filter_and_sort_config(profile_uid)
+            .await
+            .0
+            .filter_text
+            .trim()
+            .to_string();
 
+        // 优先从匹配最新过滤词且 verified_true 的节点中按延迟择优；若全员未验真则保底回退到全部匹配候选
         // 选点固定按延迟升序取全局最快节点，不受 sort_type 影响
-        // （修复：原逻辑依赖 results.first()，在 sort_type=2 时会误选首个字母序节点）
-        if let Some((fastest_node, delay)) = selection_pool.iter().min_by_key(|r| r.1) {
+        if let Some((fastest_node, delay)) = select_fastest_candidate(candidates, &latest_filter_text) {
             logging!(
                 info,
                 Type::Lightweight,
@@ -2172,7 +2230,7 @@ async fn trigger_backend_auto_select_inner(
             let switch_result = if already_current {
                 Ok(())
             } else {
-                mihomo.select_node_for_group("PROXY", fastest_node).await.map(|_| ())
+                mihomo.select_node_for_group("PROXY", &fastest_node).await.map(|_| ())
             };
 
             match switch_result {
@@ -2188,46 +2246,8 @@ async fn trigger_backend_auto_select_inner(
                     selected = true;
                     selected_node = Some(fastest_node.clone());
                     emit_network_health_notice("network_health::ok");
-                    // 【关键修复】选点成功后同步回写 profile.selected，
-                    // 否则唤醒/进入轻量模式时 restore_profile_selected_nodes
-                    // 和 activateSelected 会用过时的 selected 值把节点切回旧节点。
-                    // 单组架构下 selected 数组只含 PROXY 一项。
-                    // 【治本修复①】写回前校验节点是否在当前 filterText 子集内；
-                    // 越界（被污染的持久选择）不写回，避免污染 selected 后再次复现前后端不一致。
-                    let filter_text = get_filter_and_sort_config(profile_uid)
-                        .await
-                        .0
-                        .filter_text
-                        .trim()
-                        .to_string();
-                    if match_node_filter(fastest_node, &filter_text) {
-                        let new_selected = vec![PrfSelected {
-                            name: Some("PROXY".into()),
-                            now: Some(fastest_node.clone().into()),
-                        }];
-                        let patch_item = PrfItem {
-                            selected: Some(new_selected),
-                            ..Default::default()
-                        };
-                        let uid_smart: smartstring::alias::String = profile_uid.into();
-                        if let Err(e) = profiles_patch_item_safe(&uid_smart, &patch_item).await {
-                            logging!(warn, Type::Lightweight, "[后台监测] 回写 profile.selected 失败: {e}");
-                        }
-                    } else {
-                        logging!(
-                            warn,
-                            Type::Lightweight,
-                            "[后台监测] 最优节点 {} 不在当前过滤范围「{}」内，跳过回写 profile.selected 以免污染",
-                            fastest_node,
-                            filter_text
-                        );
-                    }
-                    // 【二次bug修复】通知前端刷新代理缓存。
-                    // 49212979 删除了 refresh_clash() 以避免 TUN 断流，但连带删掉了
-                    // 前端刷新链路，导致活跃节点栏不更新、显示节点与实际节点不一致。
-                    // 这里只调 refresh_proxies()（emit verge://refresh-proxy-config 事件），
-                    // 不调 refresh_clash()（避免整份配置重载 + auto_close_connection 断流）。
-                    // 轻量模式下界面不可见，无需刷新缓存，跳过多余的跨进程通信。
+                    // 【关键修复】选点成功后同步回写 profile.selected（若未与最新过滤条件冲突）
+                    persist_selected_node_if_matching(profile_uid, &fastest_node).await;
                     if !crate::module::lightweight::is_in_lightweight_mode() {
                         crate::core::handle::Handle::refresh_proxies();
                     }
@@ -2237,12 +2257,17 @@ async fn trigger_backend_auto_select_inner(
                 }
             }
         } else {
-            logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: 所有测速节点均不可达");
-            // 【治本】失败路径同样刷新前端代理缓存。
-            // 此前只有选点成功才 refresh_proxies()，失败时前端 proxies 数据长期不更新：
-            // 节点已被内核判死（alive=false），前端却仍握着旧的 alive=true + history 里
-            // 最后一次成功的延迟，列表于是把断流节点渲染成绿色延迟，与活跃节点栏的
-            // Timeout 自相矛盾（2026-10-24 实测现象）。补上这条，前端数据才始终权威。
+            if had_reachable_candidates {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 测速期间过滤条件已变更为「{}」，本批候选无匹配节点，跳过本次过时切换",
+                    latest_filter_text
+                );
+            } else {
+                logging!(warn, Type::Lightweight, "[后台监测] 自动选点失败: 所有测速节点均不可达");
+            }
+            // 【治本】失败/跳过路径同样刷新前端代理缓存，保持前端状态权威。
             if !crate::module::lightweight::is_in_lightweight_mode() {
                 crate::core::handle::Handle::refresh_proxies();
             }
@@ -3824,5 +3849,36 @@ mod tests {
         assert_eq!(MANUAL_SWITCH_EPOCH.load(Ordering::Acquire), 0);
         assert!(LAST_ACTIVE_VERIFY_CHECK.lock().is_none());
         assert!(LAST_HTTPS_VERIFY_ALL_FAILED.lock().is_none());
+    }
+
+    #[test]
+    fn test_bug392_select_fastest_candidate_revalidates_latest_filter() {
+        use super::select_fastest_candidate_with_filter;
+
+        // 1. 复现现场：陈旧的全量探测结果（源于过滤词 "-" / "-x"）返回时，
+        //    最新 filter_text 已提交为 "-香港"：必须当场淘汰更快且已验真的 "香港3 (043311)"，改选 "台湾2 (043311)"
+        let stale_probe_candidates = vec![
+            ("香港3 (043311)".to_string(), 72),
+            ("香港6 (043311)".to_string(), 74),
+            ("台湾2 (043311)".to_string(), 99),
+        ];
+        let picked =
+            select_fastest_candidate_with_filter(stale_probe_candidates, "-香港", |name| name.starts_with("香港"));
+        assert_eq!(picked, Some(("台湾2 (043311)".to_string(), 99)));
+
+        // 2. 在剩余满足 "-香港" 的候选中，仍优先选择 verified_true 节点
+        let mixed_matching = vec![
+            ("台湾2 (043311)".to_string(), 99),
+            ("台湾1 (043311)".to_string(), 110),
+            ("香港3 (043311)".to_string(), 72),
+        ];
+        let picked_verified =
+            select_fastest_candidate_with_filter(mixed_matching, "-香港", |name| name == "台湾1 (043311)");
+        assert_eq!(picked_verified, Some(("台湾1 (043311)".to_string(), 110)));
+
+        // 3. 若本批过期测速结果全部不符合最新过滤词，则返回 None 放弃过时切换，避免切入被排除地区
+        let only_hk = vec![("香港3 (043311)".to_string(), 72), ("香港6 (043311)".to_string(), 74)];
+        let picked_none = select_fastest_candidate_with_filter(only_hk, "-香港", |_| true);
+        assert_eq!(picked_none, None);
     }
 }

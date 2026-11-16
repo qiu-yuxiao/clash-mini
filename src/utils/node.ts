@@ -525,6 +525,49 @@ export const matchNodeFilter = (name: string, filterText: string): boolean => {
   return true
 }
 
+const normalizeFilterForTokens = (filterText: string): string =>
+  (filterText || '').trim().replace(/｜/g, '|')
+
+/**
+ * 判断过滤文本是否包含至少一个非空的实际匹配词（排除 "", "   ", "-", "!", "！", "|", "｜", "- | !" 等纯符号）。
+ */
+export const hasEffectiveFilterTerm = (filterText: string): boolean => {
+  const normalized = normalizeFilterForTokens(filterText)
+  if (!normalized) return false
+
+  for (const token of normalized.split(/\s+/).filter(Boolean)) {
+    for (const part of token.split('|')) {
+      const term = stripExclusionPrefix(part.trim())
+      if (term.length > 0) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
+ * 判断过滤文本是否处于不完整的操作符半输入态（BUG-392）：
+ * - 不含任何有效关键词（如 "-"、"!"）；
+ * - 以 "|" / "｜" 结尾等待下一分支（如 "日本|"）；
+ * - 最末子句 / 分支以孤立排除前缀 "-" / "!" / "！" 结尾等待排除词（如 "日本 -"、"-香港|-"）。
+ * 注意："hk-" 属于前缀包含词本身，不视为未完成操作符。
+ */
+export const isIncompleteFilterInput = (filterText: string): boolean => {
+  const trimmed = (filterText || '').trim()
+  if (!hasEffectiveFilterTerm(trimmed)) return true
+  if (trimmed.endsWith('|') || trimmed.endsWith('｜')) return true
+
+  const normalized = normalizeFilterForTokens(trimmed)
+  const tokens = normalized.split(/\s+/).filter(Boolean)
+  const lastToken = tokens[tokens.length - 1] ?? ''
+  const segments = lastToken.split('|')
+  const lastPart = (segments[segments.length - 1] ?? '').trim()
+
+  return lastPart === '-' || lastPart === '!' || lastPart === '！'
+}
+
 /** 与后端 universal_parser.rs 对齐的单节点 URI 协议头（多行导入也受支持） */
 export const SUPPORTED_NODE_URI_SCHEMES = [
   'vmess://',
