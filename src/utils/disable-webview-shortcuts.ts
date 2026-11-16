@@ -36,9 +36,35 @@ const handleUnifiedKeydown = (event: KeyboardEvent) => {
     activeOverlayGuard === null ||
     event.isComposing ||
     event.repeat ||
-    activeOverlayGuard() ||
-    isEditableTarget(event.target)
+    activeOverlayGuard()
   ) {
+    return
+  }
+
+  // BUG-389: 允许在输入框等可编辑控件获得焦点时直接触发 F4（测当前列表）与 F1（全量优选），
+  // 但仍严格保留 Ctrl/Cmd+F 仅在非输入态劫持聚焦过滤框，且绝不拦截 Alt+F4 / Ctrl+F4。
+  if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    if (event.key === 'F4') {
+      event.preventDefault()
+      window.dispatchEvent(
+        new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
+          detail: 'check-visible',
+        }),
+      )
+      return
+    }
+    if (event.key === 'F1') {
+      event.preventDefault()
+      window.dispatchEvent(
+        new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
+          detail: 'check-full',
+        }),
+      )
+      return
+    }
+  }
+
+  if (isEditableTarget(event.target)) {
     return
   }
 
@@ -54,25 +80,6 @@ const handleUnifiedKeydown = (event: KeyboardEvent) => {
         detail: 'focus-filter',
       }),
     )
-    return
-  }
-
-  if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-    if (event.key === 'F4') {
-      event.preventDefault()
-      window.dispatchEvent(
-        new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
-          detail: 'check-visible',
-        }),
-      )
-    } else if (event.key === 'F1') {
-      event.preventDefault()
-      window.dispatchEvent(
-        new CustomEvent<AppShortcutAction>('clash-mini-shortcut', {
-          detail: 'check-full',
-        }),
-      )
-    }
   }
 }
 

@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "مربع إدخال واضح",
-    "filter": "شروط التصفية"
+    "filter": "تصفية (مسافة و، | أو، - استبعاد)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

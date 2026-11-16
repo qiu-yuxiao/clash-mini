@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "当前节点",
-      "delayCheck": "延迟测试",
+      "delayCheck": "延迟测试（F4 当前列表 / F1 全量优选）",
       "sortDefault": "默认排序",
       "sortDelay": "按延迟排序",
       "sortName": "按名称排序",

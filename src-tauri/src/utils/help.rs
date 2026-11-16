@@ -307,26 +307,6 @@ pub fn show_in_folder(path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// copy the file to the dist path and return the dist path
-pub fn snapshot_path(original_path: &Path) -> Result<PathBuf> {
-    let temp_dir = original_path
-        .parent()
-        .ok_or_else(|| anyhow!("Invalid log path"))?
-        .join("temp");
-
-    std::fs::create_dir_all(&temp_dir)?;
-
-    let temp_path = temp_dir.join(format!(
-        "{}_{}.log",
-        original_path.file_stem().unwrap_or_default().to_string_lossy(),
-        chrono::Local::now().format("%Y-%m-%d_%H-%M-%S")
-    ));
-
-    std::fs::copy(original_path, &temp_path)?;
-
-    Ok(temp_path)
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::permissions_set_readonly_false)]
 mod tests {

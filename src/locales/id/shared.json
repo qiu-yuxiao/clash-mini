@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "Bersihkan kolom input",
-    "filter": "Kondisi Filter"
+    "filter": "Filter (spasi DAN, | ATAU, - kecualikan)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

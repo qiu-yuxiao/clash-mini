@@ -80,6 +80,11 @@ interface LayoutDialogsProps {
   logsOpen: boolean
   setLogsOpen: (open: boolean) => void
   mode: 'light' | 'dark'
+
+  // Delete Profile Confirm Dialog (BUG-390)
+  deleteConfirmProfile: { uid: string; name: string } | null
+  onCancelDeleteProfile: () => void
+  onConfirmDeleteProfile: () => void
 }
 
 export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
@@ -93,6 +98,9 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
   setEditProfileInterval,
   isEditProfileLocal,
   handleSaveProfile,
+  deleteConfirmProfile,
+  onCancelDeleteProfile,
+  onConfirmDeleteProfile,
   defaultBtn3DStyle,
   primaryBtn3DStyle,
 
@@ -630,6 +638,63 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {logsOpen && <LogsPage />}
         </Box>
+      </Dialog>
+
+      {/* Delete Profile Confirmation Dialog (BUG-390) */}
+      <Dialog
+        open={Boolean(deleteConfirmProfile)}
+        onClose={onCancelDeleteProfile}
+        fullWidth={false}
+        maxWidth={false}
+        sx={getNarrowDialogSx(topOffset)}
+        slotProps={getNarrowDialogSlotProps(theme, topOffset)}
+      >
+        <DialogTitle sx={getPopupTitleSx(theme)}>
+          {t('profiles.modals.confirmDelete.title')}
+        </DialogTitle>
+        <DialogContent sx={getPopupContentSx()}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {deleteConfirmProfile?.name && (
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: tokens.primaryText,
+                  wordBreak: 'break-all',
+                }}
+              >
+                {deleteConfirmProfile.name}
+              </Typography>
+            )}
+            <Typography variant="body2" sx={{ color: tokens.secondaryText }}>
+              {t('profiles.modals.confirmDelete.message')}
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions disableSpacing sx={getPopupActionsSx(theme)}>
+          <Button
+            fullWidth
+            onClick={onCancelDeleteProfile}
+            sx={{
+              ...(defaultBtn3DStyle as Record<string, unknown>),
+              py: 0.7,
+              fontSize: '12.5px',
+            }}
+          >
+            {t('shared.actions.cancel')}
+          </Button>
+          <Button
+            fullWidth
+            onClick={onConfirmDeleteProfile}
+            sx={{
+              ...get3DButtonStyle(theme, 'contained', 'error'),
+              py: 0.7,
+              fontSize: '12.5px',
+            }}
+          >
+            {t('shared.actions.delete')}
+          </Button>
+        </DialogActions>
       </Dialog>
     </>
   )

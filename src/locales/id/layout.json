@@ -8,7 +8,7 @@
       "importAndStart": "Impor dan aktifkan",
       "later": "Atur manual nanti",
       "errEmpty": "Masukkan atau tempel tautan langganan",
-      "errScheme": "Tautan harus diawali http:// atau https://",
+      "errScheme": "Masukkan URL langganan (http(s)://) atau URI node (vmess://, vless://, ss://, trojan://, hysteria2://, dll.)",
       "errImport": "Gagal mengimpor. Periksa tautan lalu coba lagi",
       "readyTitle": "Siap Digunakan",
       "imported": "Langganan berhasil diimpor dan diaktifkan",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "Gagal memperbarui: {{message}}",
     "switchedToGlobalProxy": "Beralih ke Proxy Global",
     "switchedToGfwlist": "Beralih ke mode GFWList",
-    "switchedToAddUrl": "Beralih ke mode proxy Tambah URL"
+    "switchedToAddUrl": "Beralih ke mode proxy Tambah URL",
+    "profileActivationFailed": "Aktivasi profil gagal setelah 3 kali percobaan. Periksa jaringan atau langganan Anda."
   }
 }

@@ -596,11 +596,6 @@ impl IProfiles {
 // 特殊的Send-safe helper函数，完全避免跨await持有guard
 use crate::config::Config;
 
-pub async fn profiles_append_item_with_filedata_safe(item: &PrfItem, file_data: Option<String>) -> Result<()> {
-    let item = &mut PrfItem::from(item, file_data).await?;
-    profiles_append_item_safe(item).await
-}
-
 pub async fn profiles_append_item_safe(item: &mut PrfItem) -> Result<()> {
     Config::profiles()
         .await
@@ -627,16 +622,6 @@ pub async fn profiles_delete_item_safe(index: &String) -> Result<bool> {
         .with_data_modify(|mut profiles| async move {
             let deleted = profiles.delete_item(index)?;
             Ok((profiles, deleted))
-        })
-        .await
-}
-
-pub async fn profiles_reorder_safe(active_id: &String, over_id: &String) -> Result<()> {
-    Config::profiles()
-        .await
-        .with_data_modify(|mut profiles| async move {
-            profiles.reorder(active_id, over_id)?;
-            Ok((profiles, ()))
         })
         .await
 }

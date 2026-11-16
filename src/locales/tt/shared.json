@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "кертү кырын чистарту",
-    "filter": "Фильтр шартлары"
+    "filter": "Фильтр (бушлык ҺӘМ, | ЯКИ, - төшереп калдыру)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

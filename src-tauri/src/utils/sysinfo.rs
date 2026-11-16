@@ -1,8 +1,7 @@
 use parking_lot::RwLock;
 use std::fmt::{Debug, Display};
-use sysinfo::{Networks, System};
+use sysinfo::System;
 use tauri::{AppHandle, Manager as _, Runtime, State};
-use tauri_plugin_clipboard_manager::ClipboardExt as _;
 
 use deelevate::{PrivilegeLevel, Token};
 
@@ -93,13 +92,6 @@ fn is_binary_admin() -> bool {
 }
 
 #[inline]
-pub fn list_network_interfaces() -> Vec<String> {
-    let mut networks = Networks::new();
-    networks.refresh(false);
-    networks.keys().map(|name| name.to_owned()).collect()
-}
-
-#[inline]
 pub fn set_app_core_mode<R: Runtime>(app: &AppHandle<R>, mode: impl Into<String>) {
     let platform_spec = app.state::<RwLock<Platform>>();
     let mut spec = platform_spec.write();
@@ -129,20 +121,6 @@ pub fn init_platform<R: Runtime>(app: &tauri::App<R>) {
 // ===== Tauri 命令 =====
 
 #[tauri::command]
-pub fn get_system_info(state: State<'_, RwLock<Platform>>) -> Result<String, String> {
-    Ok(state.inner().read().to_string())
-}
-
-#[tauri::command]
 pub fn app_is_admin(state: State<'_, RwLock<Platform>>) -> Result<bool, String> {
     Ok(state.inner().read().appinfo.app_is_admin)
-}
-
-#[tauri::command]
-pub fn export_diagnostic_info<R: Runtime>(
-    app_handle: AppHandle<R>,
-    state: State<'_, RwLock<Platform>>,
-) -> Result<(), String> {
-    let info = state.inner().read().to_string();
-    app_handle.clipboard().write_text(info).map_err(|e| e.to_string())
 }

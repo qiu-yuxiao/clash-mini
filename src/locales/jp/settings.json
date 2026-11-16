@@ -35,8 +35,7 @@
         "tunUnavailable": "TUNモードはサービスモードまたは管理者モードが必要です"
       },
       "actions": {
-        "installService": "サービスをインストール",
-        "uninstallService": "サービスのアンインストール"
+        "installService": "サービスをインストール"
       },
       "fields": {
         "systemProxy": "システムプロキシ",
@@ -188,8 +187,6 @@
           "backupSetting": "バックアップ設定",
           "runtimeConfig": "現在の設定",
           "openConfDir": "設定ディレクトリを開く",
-          "openCoreDir": "コアディレクトリを開く",
-          "openLogsDir": "ログディレクトリを開く",
           "checkUpdates": "更新を確認",
           "openDevTools": "開発者ツールを開く",
           "liteModeSettings": "軽量モード設定",

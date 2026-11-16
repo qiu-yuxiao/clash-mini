@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "پاک کردن فیلد ورودی",
-    "filter": "شرایط فیلتر"
+    "filter": "فیلتر (فاصله و، | یا، - حذف)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

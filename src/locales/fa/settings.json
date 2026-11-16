@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN به حالت سرویس یا حالت ادمین نیاز دارد"
       },
       "actions": {
-        "installService": "نصب سرویس",
-        "uninstallService": "حذف سرویس"
+        "installService": "نصب سرویس"
       },
       "fields": {
         "systemProxy": "پراکسی سیستم",
@@ -188,8 +187,6 @@
           "backupSetting": "تنظیمات پشتیبان گیری",
           "runtimeConfig": "پیکربندی زمان اجرا",
           "openConfDir": "باز کردن پوشه برنامه",
-          "openCoreDir": "باز کردن پوشه هسته",
-          "openLogsDir": "باز کردن پوشه لاگ‌ها",
           "checkUpdates": "بررسی برای به‌روزرسانی‌ها",
           "openDevTools": "باز کردن ابزارهای توسعه‌دهنده",
           "liteModeSettings": "LightWeight Mode Settings",

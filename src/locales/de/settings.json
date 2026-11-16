@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN-Modus erfordert Service-Modus oder Administrator-Modus"
       },
       "actions": {
-        "installService": "Service installieren",
-        "uninstallService": "Dienst deinstallieren"
+        "installService": "Service installieren"
       },
       "fields": {
         "systemProxy": "Systemproxy",
@@ -188,8 +187,6 @@
           "backupSetting": "Sicherungseinstellungen",
           "runtimeConfig": "Aktuelle Konfiguration",
           "openConfDir": "Konfigurationsverzeichnis",
-          "openCoreDir": "Kernverzeichnis",
-          "openLogsDir": "Protokollverzeichnis",
           "checkUpdates": "Auf Updates prüfen",
           "openDevTools": "Entwicklertools öffnen",
           "liteModeSettings": "Einstellungen für den Leichtgewichtigen Modus",

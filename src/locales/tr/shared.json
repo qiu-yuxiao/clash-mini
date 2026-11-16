@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "Giriş alanını temizle",
-    "filter": "Filtre koşulları"
+    "filter": "Filtre (boşluk VE, | VEYA, - hariç)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

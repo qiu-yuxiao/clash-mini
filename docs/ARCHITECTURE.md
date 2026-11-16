@@ -105,7 +105,7 @@ flowchart TB
 
 ### 3.3 内核桥接插件（`tauri-plugin-mihomo`）
 
-- **传输**：`crates/tauri-plugin-mihomo/src/ipc.rs` 用 `hyper` 客端经 `WrapStream` 走 Unix socket / 命名管道；`IpcConnectionPool`（默认 min 3 / max 20，空闲超时 60s + 健康检查 60s；默认拒绝策略 `New`：池满时直接新建连接而非阻塞等待）。
+- **传输**：`crates/tauri-plugin-mihomo/src/ipc.rs` 用 `hyper` 客端经 `WrapStream` 走 Unix socket / 命名管道；`src-tauri/src/lib.rs` 配置 `IpcPoolConfigBuilder`（`min_connections(3)` / `max_connections(16)`，`idle_timeout(30s)`，`health_check_interval(60s)`，`RejectPolicy::Timeout(2s)`，严格小于默认 5s 请求超时以防 BUG-324 Broken Pipe）。
 - **命令**：`update_controller` / `get_groups` / `select_node_for_group` / `delay_group` / `get_proxies` / `reload_config` / `flush_dns` / `ws_traffic` / `ws_memory` / `ws_connections` / `ws_logs` / `clear_all_ws_connections`。
 - **WS 通道**：`MihomoWebSocket` 每通道一个，把内核 `/traffic` `/memory` `/connections` `/logs` 透传到前端（Rust 不反序列化，直接转发字节，序列化负担交给 V8）。
 - **这是唯一与内核对话的边界**——后端其余部分不直接碰内核。
@@ -113,7 +113,7 @@ flowchart TB
 ### 3.4 Mihomo 内核（sidecar / system service）
 
 - **`PROXY`（select）**：用户/app 控制的出口选择，选择稳定、手动覆盖持久。
-- **`PROXY__METRICS`（url-test）**：测量专用组，成员与 `PROXY` 完全相同，`interval`≈300s 周期性**直接拨测**每个成员的真实延迟，维护 `now`/`history`——这是延迟的**唯一权威源**，从测量层消除 TUN 自指回环。
+- **`PROXY__METRICS`（url-test）**：测量专用组，成员与 `PROXY` 完全相同，`interval` 300s、`lazy: false`，周期性**直接拨测**每个成员的真实延迟，维护 `now`/`history`——这是延迟的**唯一权威源**，从测量层消除 TUN 自指回环。
 - **运行模式**：TUN 开启 → 系统服务模式（UAC 安装/接管），否则旁路 sidecar；管理员运行时跳过服务等待。
 
 ### 3.5 OS / 磁盘持久化
@@ -182,7 +182,7 @@ sequenceDiagram
 `PROXY=select` + `PROXY__METRICS=url-test` 把"控制"与"测量"彻底解耦：手动选点持久、测量又可靠，且**在 TUN 下无自指回环**（旧设计在 TUN 下"测活跃节点自身返回 timeout"的根因被从测量源消除）。
 
 ### 5.2 子集结构性 · 三层防污染校验
-地域过滤（`filterText`）同时重配两组的 membership，池外节点在配置层即不可能出现（结构性越界不可能）。选点回写 `profile.selected` 前校验节点在范围、轻量还原前再校验、前端反向校准第三道——闭环了 2026-07-19 污染事故。
+地域过滤（`filterText`）同时重配两组的 membership，池外节点在配置层即不可能出现（结构性越界不可能）；`lifecycle::pick_subset_fallback_node` 严格禁止在非空 `filter_text` 条件下越界切出筛选子集（仅 `filter_text` 为空时允许全局回退）。选点回写 `profile.selected` 前校验节点在范围、轻量还原前再校验、前端反向校准第三道——闭环了 2026-07-19 污染事故，同时叠加 `Flowing` 有流量态禁止后台 HTTPS 迁移与 `ConfirmedDead` 豁免切换速率截断以保障连续性（`BUG-388`）。
 
 ### 5.3 热切换零断流（禁 reload）
 故障转移一律 `select`（干净热切换），禁整份 `refresh_clash()` + `auto_close_connection`，断连风暴从结构上不可能。
@@ -205,7 +205,7 @@ sequenceDiagram
 
 ### 5.7 隔离与健壮性（与原版并存）
 - 命名/端口/进程前缀 `mini-` 物理隔离；单实例端口 33335(Release)/33336(Dev)；Mixed 10801 / Controller 9098。
-- 安全：权限最小化（删 shell 执行权限、FS 收窄到应用目录、HTTP 域名白名单）、SSRF/Zip-Slip 防护、JS 引擎原型链冻结沙箱、`overflow-checks=true`、YAML ≤50MB。
+- 安全：权限最小化（删 shell 执行与 `tauri-plugin-http` 暴露、FS 收窄到应用目录）、SSRF 与 ZIP 单目标暂存解压防护、原生 Rust 配置卫兵 `apply_builtin_guards`（已移除 `boa_engine`）、`overflow-checks=true`、YAML ≤50MB。
 - 内核内存约束（均读取自环境变量，可被部署配置覆盖）：`GOMEMLIMIT` 默认 `128MiB` / `GOGC` 默认 `100` / `GOMAXPROCS=2`（代码中无 96MiB/50 的硬编码；`geodata-loader` 在应用代码中未发现设置）。
 
 ---
@@ -213,7 +213,7 @@ sequenceDiagram
 ## 6. IPC 接口速查
 
 ### 6.1 前端 → 后端（部分关键 invoke）
-`getProfiles` / `importProfile` / `enhanceProfiles` / `patchVergeConfig` / `patchClashConfig` / `triggerAutoSelect` / `restartCore` / `getRunningMode` / `installService` / `saveProxyHeadState` / `getClashLogs` / `checkMediaUnlock`。
+`getProfiles` / `importProfile` / `enhanceProfiles` / `patchVergeConfig` / `patchClashConfig` / `triggerAutoSelect` / `restartCore` / `getRunningMode` / `installService` / `showInFolder` / `saveProxyHeadState` / `getClashLogs` / `exportDiagnosticBundle` / `beginWindowResize`。
 
 ### 6.2 后端 → 内核（mihomo 插件命令）
 `select_node_for_group` / `delay_group` / `get_proxies` / `get_groups` / `reload_config` / `flush_dns` / `ws_traffic` / `ws_memory` / `ws_connections` / `ws_logs` / `clear_all_ws_connections`。
@@ -240,11 +240,11 @@ sequenceDiagram
 
 ---
 
-## 8. 现行版本基线（`v3.4.1`，见 `package.json`）
+## 8. 现行版本基线（`v3.5.0`，见 `package.json`）
 
 总体结论：**架构收敛、单 `PROXY` 组 + `PROXY__METRICS` 测量解耦、连续性优先方针落地**。
 
-- ✅ 已落地的核心机制：双组解耦、热切换零断流（不清理存量连接）、三层防污染校验、轻量模式三态机、主线程纪律、`decide_self_heal` 统一裁决、`Suspect` 迟滞与切换速率上限、初始化可用出口不改选门检（`BUG-376`）、基于 `/connections` 字节增量的被动流量证活状态机（`BUG-379`）、24h 可恢复真 HTTPS 验真软隔离（`BUG-380`）、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截（`BUG-383`）及精准目标化路径控制。
+- ✅ 已落地的核心机制：双组解耦（`lazy: false`）、热切换零断流（不清理存量连接）、三层防污染与严格子集兜底（`pick_subset_fallback_node`）、轻量模式三态机、主线程纪律、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移（`BUG-388`）、基于 `/connections` 字节增量的被动流量证活状态机（`BUG-379`）、24h 可恢复真 HTTPS 验真软隔离（`BUG-380` / `BUG-387`）、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截（`BUG-383` / `str::trim_start`）、Win32 原子缩放管线（`BUG-386`）、订阅删除二次确认与新手全协议导入及输入框快捷键放行（`BUG-389` / `BUG-390`）、冗余依赖与死命令清理（`BUG-391`）及精准目标化路径控制。
 - 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源。
 
 ---

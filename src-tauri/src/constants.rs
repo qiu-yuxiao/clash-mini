@@ -50,9 +50,6 @@ pub mod timing {
     /// （BUG-304：2000 → 5000，覆盖拥塞期「慢而可用」节点）。
     pub const NODE_DELAY_MAX_MS: u32 = 5000;
 
-    /// 内部控制、Local Socket 通信与 JS 合并脚本执行的最大熔断时间 (ms)
-    pub const INTERNAL_CONTROL_TIMEOUT_MS: u64 = 3000;
-
     /// 内核配置文件语法验证的最长超时限值 (ms)，给大规则集、GeoIP/MRS文件解析预留充裕时间
     pub const VALIDATE_CONTROL_TIMEOUT_MS: u64 = 10000;
 

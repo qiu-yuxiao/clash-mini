@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "Lokasi",
-      "delayCheck": "Periksa Keterlambatan",
+      "delayCheck": "Uji latensi (F4 terlihat / F1 pilih otomatis penuh)",
       "sortDefault": "Urutkan secara default",
       "sortDelay": "Urutkan berdasarkan keterlambatan",
       "sortName": "Urutkan berdasarkan nama",

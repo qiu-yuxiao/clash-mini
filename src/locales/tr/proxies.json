@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "konum",
-      "delayCheck": "Gecikme kontrolü",
+      "delayCheck": "Gecikme testi (F4 görünen / F1 tam otomatik seçim)",
       "sortDefault": "Varsayılana göre sırala",
       "sortDelay": "Gecikmeye göre sırala",
       "sortName": "İsme göre sırala",

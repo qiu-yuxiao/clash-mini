@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "清空输入框",
-    "filter": "过滤条件"
+    "filter": "关键词（空格与 / | 或 / - 排除）"
   },
   "validation": {
     "invalidRegex": "无效的正则表达式"

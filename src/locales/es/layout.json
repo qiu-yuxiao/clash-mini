@@ -8,7 +8,7 @@
       "importAndStart": "Importar y activar",
       "later": "Configurar manualmente más tarde",
       "errEmpty": "Introduce o pega un enlace de suscripción",
-      "errScheme": "El enlace debe empezar por http:// o https://",
+      "errScheme": "Introduzca una URL de suscripción (http(s)://) o URIs de nodo (vmess://, vless://, ss://, trojan://, hysteria2://, etc.)",
       "errImport": "Error al importar. Revisa el enlace e inténtalo de nuevo",
       "readyTitle": "Listo para usar",
       "imported": "Suscripción importada y activada",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "Error al actualizar: {{message}}",
     "switchedToGlobalProxy": "Cambiado a proxy global",
     "switchedToGfwlist": "Cambiado al modo GFWList",
-    "switchedToAddUrl": "Cambiado al modo proxy Añadir URL"
+    "switchedToAddUrl": "Cambiado al modo proxy Añadir URL",
+    "profileActivationFailed": "Error al activar el perfil tras 3 reintentos. Compruebe la red o la suscripción."
   }
 }

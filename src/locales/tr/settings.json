@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN requires Service Mode or Admin Mode"
       },
       "actions": {
-        "installService": "Hizmeti Kur",
-        "uninstallService": "Uninstall Service"
+        "installService": "Hizmeti Kur"
       },
       "fields": {
         "systemProxy": "Sistem Vekil'i",
@@ -188,8 +187,6 @@
           "backupSetting": "Yedekleme Ayarı",
           "runtimeConfig": "Çalışma Zamanı Yapılandırması",
           "openConfDir": "Yapılandırma Dizinini Aç",
-          "openCoreDir": "Çekirdek Dizinini Aç",
-          "openLogsDir": "Günlük Dizinini Aç",
           "checkUpdates": "Güncellemeleri Kontrol Et",
           "openDevTools": "Geliştirici Araçları",
           "liteModeSettings": "Hafif Mod Ayarları",

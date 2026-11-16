@@ -8,7 +8,7 @@
       "importAndStart": "استيراد وتشغيل",
       "later": "الإعداد يدويًا لاحقًا",
       "errEmpty": "يرجى إدخال أو لصق رابط الاشتراك",
-      "errScheme": "يجب أن يبدأ الرابط بـ http:// أو https://",
+      "errScheme": "أدخل رابط اشتراك (http(s)://) أو عناوين URI للعقد (vmess://، vless://، ss://، trojan://، hysteria2://، إلخ)",
       "errImport": "فشل الاستيراد. تحقق من الرابط وأعد المحاولة",
       "readyTitle": "الاشتراك جاهز",
       "imported": "تم استيراد الاشتراك وتنشيطه",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "فشل التحديث: {{message}}",
     "switchedToGlobalProxy": "تم التبديل إلى الوكيل العام",
     "switchedToGfwlist": "تم التبديل إلى وضع GFWList",
-    "switchedToAddUrl": "تم التبديل إلى وضع وكيل إضافة الروابط"
+    "switchedToAddUrl": "تم التبديل إلى وضع وكيل إضافة الروابط",
+    "profileActivationFailed": "فشل تفعيل الاشتراك بعد 3 محاولات. يرجى التحقق من الشبكة أو الاشتراك."
   }
 }

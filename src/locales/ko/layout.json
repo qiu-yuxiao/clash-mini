@@ -8,7 +8,7 @@
       "importAndStart": "가져오기 및 활성화",
       "later": "나중에 직접 설정",
       "errEmpty": "구독 링크를 입력하거나 붙여넣으세요",
-      "errScheme": "링크는 http:// 또는 https://로 시작해야 합니다",
+      "errScheme": "구독 URL(http(s)://) 또는 노드 URI(vmess://, vless://, ss://, trojan://, hysteria2:// 등)를 입력하세요",
       "errImport": "가져오기에 실패했습니다. 링크를 확인하고 다시 시도하세요",
       "readyTitle": "구독 준비 완료",
       "imported": "구독을 가져오고 활성화했습니다",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "업데이트 실패: {{message}}",
     "switchedToGlobalProxy": "글로벌 프록시로 전환되었습니다",
     "switchedToGfwlist": "GFWList 모드로 전환되었습니다",
-    "switchedToAddUrl": "URL 추가 프록시 모드로 전환되었습니다"
+    "switchedToAddUrl": "URL 추가 프록시 모드로 전환되었습니다",
+    "profileActivationFailed": "프로필 활성화에 3회 연속 실패했습니다. 네트워크 또는 구독을 확인하세요."
   }
 }

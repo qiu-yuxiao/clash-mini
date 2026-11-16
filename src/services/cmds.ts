@@ -470,22 +470,6 @@ export async function restartCore() {
   return withIpcTimeout(invoke<void>('restart_core'), 60_000, 'restartCore')
 }
 
-export async function openCoreDir() {
-  return withIpcTimeout(
-    invoke<void>('open_core_dir'),
-    30_000,
-    'openCoreDir',
-  ).catch((err) => showNotice.error(err))
-}
-
-export async function openLogsDir() {
-  return withIpcTimeout(
-    invoke<void>('open_logs_dir'),
-    30_000,
-    'openLogsDir',
-  ).catch((err) => showNotice.error(err))
-}
-
 /**
  * 导出诊断包（最近日志 + 脱敏配置 + 版本信息），返回 zip 绝对路径。
  * 打包需要读取并压缩约 24 小时的日志，超时给到 60s。
@@ -521,15 +505,6 @@ export const installService = async () => {
     invoke<void>('install_service'),
     60_000,
     'installService',
-  )
-}
-
-// 卸载系统服务
-export const uninstallService = async () => {
-  return withIpcTimeout(
-    invoke<void>('uninstall_service'),
-    60_000,
-    'uninstallService',
   )
 }
 

@@ -16,7 +16,7 @@
 | `AppData\Roaming\io.github.clash-mini.clash-mini` | 数据目录 | 配置独立加载（§1.3） |
 | `10801` / `9098` | Mixed / Controller 端口 | 端口避让原版（§1.4） |
 | `33335`(Release) / `33336`(Dev) | 单实例检测端口 | 单实例隔离（§1.8） |
-| `GOMEMLIMIT=128MiB` / `GOGC=100` / `GOMAXPROCS=2`（默认值，可环境变量覆盖）/ `geodata-loader=memconservative` | 内核环境变量与配置 | 内核内存配额基准（§1.6 / §3.5 / §3.4） |
+| `GOMEMLIMIT=128MiB` / `GOGC=100` / `GOMAXPROCS=2`（默认值，可环境变量覆盖） | 内核环境变量 | 内核内存配额基准（§1.6 / §3.5） |
 | `SetProcessWorkingSetSize` / `COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW` | Windows API | 已**废弃**，v1.9.4 起删除（§1.2） |
 | `optimize_window_memory` | 函数 | 已**废弃**删除（§1.2） |
 
@@ -24,10 +24,10 @@
 
 | 代码标识 | 类型 | 服务的设计规则 |
 |---|---|---|
-| `startResizeDragging` | Tauri API | **禁止**使用：Windows 下触发模态 resize 死锁（§2.2 标题栏） |
-| 自定义 pointer-based resize：`onPointerDown` + `setPointerCapture` → `pointermove` + `requestAnimationFrame` 节流 → `setSize`/`setPosition` → `pointerup` | 前端 resize 实现 | 替代 `startResizeDragging`，避免 UI 线程卡死（§2.2） |
-| `window.__isResizing` 全局标志 | 前端全局变量 | resize 期间跳过 IPC 调用，防 IPC 洪水（§2.2） |
-| `onResized`（`useVisibility`、`WindowProvider`） | 前端回调 | 检查 `__isResizing` 跳过 IPC（§2.2） |
+| `startResizeDragging` | Tauri API | **禁止**使用：Windows 下触发模态 resize 死锁（§2.5） |
+| 原生 Win32 原子指针缩放：`begin_window_resize` / `step_window_resize` / `end_window_resize` + `ResizeHandles`（带单调 `gestureSeq`） | 后端 + 前端 resize 实现 | OS 全局 `GetCursorPos` + 单次合并 `SetWindowPos`，替代 `clientX/Y` 与双 IPC，根除震荡与死锁（§2.5） |
+| `isWindowResizing()` / `RESIZE_ENDED_EVENT`（`src/utils/window-resizing.ts`）与 `NATIVE_WINDOW_RESIZING` | 拖拽会话状态 | resize 期间跳过逐像素 Win32 几何查询与 `WindowProvider` 断点拆装，松手后对齐（§2.5） |
+| `onResized`（`useVisibility`、`WindowProvider`） | 前端回调 | 检查 `isWindowResizing()` 跳过中途断点重排（§2.5） |
 | `trigger_backend_auto_select` | 后端命令 | 批量测速已迁后端，前端仅持 1 个 IPC（§2.2） |
 | `setResizable` / `batchTestLockRef` / `DragRegionContext` | 已移除 | resize 期间不再锁窗口（§2.2） |
 | `build_new_window` 的 `builder.build()` 之后 | 窗口创建 | Windows 初次启动剥除 caption 样式位的时机（§2.2） |
@@ -36,7 +36,7 @@
 | `handle_ready_resumed` / `RunEvent::Ready` / `get_webview_window("main")` / `init_window` | 启动事件 | 修复代码必须在 `Ok(window)` 分支执行，不能在 `RunEvent::Ready`（时机过早返回 None）（§2.2） |
 | `ProxyGroups` / `ConnectionTable` / `ProxyVirtualList` / `ProxyItem` / `ProxyHead` | 前端组件 | 类 Excel 表格，滚动条隐藏（§2.10） |
 | `EnhancedCanvasTrafficGraph` / `TrafficGraph` | 前端图表组件 | 宽窗大图 / 窄窗小图切换（§2.2） |
-| `get3DButtonStyle` / `--depth-factor` / `--vibrancy-factor` | 皮肤样式 | 3D 拟物与双控制变量联动（§2.4/2.8/STYLE-001） |
+| `get3DButtonStyle` / `--depth-factor` / `--vibrancy-factor` | 皮肤样式 | 3D 拟物与双控制变量联动（§2.7） |
 | `tray-icon.png` / `tray-icon-sys.png` / `tray-icon-tun.png` | 托盘图标资源 | 三态代理模式静态图标资产（§2.9） |
 | `Tray::update_icon` / `update_lite_mode_menu` | 托盘 API | 仅模式切换调用 `set_icon`、轻量切换调用 `set_text`，零轮询/零动态重构菜单（§2.9） |
 | BUG-259 窗口操作必须在 UI 主线程 | 线程约束 | 见 §八 工程规范 8.3 |
@@ -45,12 +45,11 @@
 
 | 代码标识 | 类型 | 服务的设计规则 |
 |---|---|---|
-| `NetworkManager` Fallback（Localhost → System → Direct） | 后端网络托管 | 内核更新请求严禁裸 HTTP；三级降级（§3.3） |
-| `formatCoreVersion` | 前端函数 | 内核版本前缀剥离 + `Ver.` 统一格式（§3.3） |
+| `NetworkManager` Fallback（Localhost → System → Direct） | 后端网络托管 | 内核更新请求严禁裸 HTTP；三级降级（§3.6） |
+| `formatCoreVersion` | 前端函数 | 内核版本前缀剥离 + `Ver.` 统一格式（§3.6） |
 | `fix_dirty_url` / `validate_url_no_ssrf` | 函数 | 订阅 URL SSRF 防护（§6.2） |
-| `safe_extract_zip` | 函数 | Zip Slip 防护，替代 `zip.extract`（§6.2） |
+| `core_updater`（`zip::ZipArchive` + `flate2::read::GzDecoder`） | 函数 | 单目标内核文件直写 `.staging` 校验覆盖，不做多文件目录展开（§6.3） |
 | `apply_builtin_guards` | 原生函数 | 原生 Rust 配置卫兵（替代原内置 JS 脚本与 `boa_engine`，§6.4） |
-| `geodata-loader=memconservative` | 内核配置 | 按需加载 GeoIP/GeoSite，降内存（§3.6） |
 
 ## 四、轻量模式
 
@@ -68,20 +67,23 @@
 | 代码标识 | 类型 | 服务的设计规则 |
 |---|---|---|
 | `evaluate_failover` / `delay_group("PROXY__METRICS", ...)` | 后端函数 | 每次判定前内核级即时拨测，消除 5 分钟盲区（§5.1 / v2.6.6 修复） |
-| `NODE_DELAY_MAX_MS`(5000) / `NODE_TEST_TIMEOUT_MS`(5000) | 常量 | 探针超时 == 判死阈值 == 5000ms（§5.1 / §5.2） |
-| `AUTO_SELECT_BUSY` | 状态 | 选点冲突不算失败，不冷却（§5.1） |
-| `api_error_count` / `auto_select_fail_count` | 计数器 | API 异常计数触发自愈 / 5 次弹窗（§5.1） |
+| `constants::timing::NODE_DELAY_MAX_MS`(5000) / `NODE_TEST_TIMEOUT_MS`(5000) | 常量 | 探针超时 == 判死阈值 == 5000ms（§5.1 / §5.2） |
+| `AUTO_SELECT_BUSY` / `AUTO_SELECT_MANUAL_PREEMPTED` / `MANUAL_SWITCH_EPOCH` | 状态 / 原子序号 | 选点冲突与手动抢占让路不算失败、不冷却、不覆盖手动选点（§5.3） |
+| `should_allow_https_migration` / `HTTPS_VERIFY_MIGRATE_MIN_FAILS` / `HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS` | 纯函数 / 常量 | `Flowing` 有流量态禁验真迁移、`>= 2` 次失败门槛、`600s` 全败退避（§5.2） |
+| `self_heal_subject_to_switch_rate_limit` / `should_keep_alive_on_api_recovery` | 纯函数 | `ConfirmedDead` 豁免切换速率上限、`ApiChannelDown` 恢复即保活（§5.1 / §5.3） |
+| `pick_subset_fallback_node`（`lifecycle.rs`） | 纯函数 | 非空 `filter_text` 严格禁止越界回退（§5.4） |
+| `api_error_count` / `auto_select_fail_count` | 计数器 | API 异常计数触发自愈 / 5 次弹窗（§5.1 / §5.3） |
 | `check_active_node_health` | 已废弃函数 | 旧 15s 自测方案（TUN 下测不准）被 PROXY__METRICS 取代（§5.1 历史） |
-| `trigger_auto_select(profile_uid, node_names, 0, select)` / `trigger_backend_auto_select` | 后端命令 | F1/F2/F4 统一收归后端选点（§5.5/5.6） |
-| `AUTO_SELECT_RUNNING` | 互斥标志 | 全局并发互斥，杜绝重复测速叠加（§5.5/5.6） |
+| `trigger_auto_select(profile_uid, node_names, 0, select)` / `trigger_backend_auto_select` / `disableWebViewShortcuts` | 后端命令 / 快捷键 | F1/F4 统一收归后端选点且在输入焦点中仍可直接触发（§5.6） |
+| `AUTO_SELECT_RUNNING` | 互斥标志 | 全局并发互斥，杜绝重复测速叠加（§5.2 / §5.6） |
 | `DelayManager.injectBatchResults` / `setDelay` / `queueGroupNotification` | 前端缓存 | 回传结果逐节点写回 + 分组刷新（§5.6） |
 | `FrontendEvent::DelayResults` / `Handle::notify_delay_results("PROXY", display)` / `verge://backend-delay-results` | 事件通道 | 测速结果唯一回传通道（§5.6） |
-| `handleCycleNode` / `filterSort` / `localStorage`(`clash-verge-node-search` / `clash-verge-hide-unavialable` / `clash-verge-sort-type`) | 前端 | 轮换实时提取过滤/排序子集（§5.7） |
-| `useTrafficData` / `useConnectionData` / `useMihomoWsSubscription` | 前端 Hook | 隐藏/最小化时断 WS 订阅（§5.3） |
-| `ConnectionsPanel` / `isMinimalWidth` | 前端 | 连接表宽窄窗同开关（§5.3） |
-| `getSystemProxy`(`sysproxy`) / `getRunningMode`(`runningMode`) / `getClashConfig`(`clashConfig`) | 前端查询 | `enabled = isSettingsOpen && !isMiniStatus`（§5.3） |
-| `LogsPage` / `logsOpen` | 前端 | 日志弹窗关闭即卸载，注销 WS（§5.3） |
-| `TrafficDataSampler` / `snapshotIntervalMs`(1000ms) | 前端采样 | 流量图重绘节流（§5.3） |
+| `handleCycleNode` / `filterSort` / `localStorage`(`clash-verge-node-search` / `clash-verge-hide-unavialable` / `clash-verge-sort-type`) | 前端 | 轮换实时提取过滤/排序子集（§2.8） |
+| `useTrafficData` / `useConnectionData` / `useMihomoWsSubscription` | 前端 Hook | 隐藏/最小化时断 WS 订阅（§5.7 / §4.3） |
+| `ConnectionsPanel` / `isMinimalWidth` / `TRAFFIC_WORKER_DESTROY_DELAY_MS`(30s) | 前端 | 宽窗且抽屉开启时挂载，关闭或窄窗即卸载并 30s 后回收 Worker（§2.2 / §5.7） |
+| `getSystemProxy`(`sysproxy`) / `getRunningMode`(`runningMode`) / `getClashConfig`(`clashConfig`) | 前端查询 | `enabled = isDrawerVisible` 门控仅打开设置且非极小窗时轮询（§5.7） |
+| `LogsPage` / `logsOpen` | 前端 | 日志弹窗关闭即卸载，注销 WS（§5.7） |
+| `TrafficDataSampler` / `snapshotIntervalMs`(1000ms) | 前端采样 | 流量图重绘节流（§5.7） |
 | `use-layout-events` | 前端 | 测速回传监听器生命周期（§5.6） |
 
 ## 六、安全与健壮性

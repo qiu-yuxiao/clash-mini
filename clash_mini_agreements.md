@@ -1,6 +1,6 @@
 # Clash Mini 开发设计书
 
-> **适用版本**：v3.4.1 及后续版本  
+> **适用版本**：v3.5.0 及后续版本  
 > **文档性质**：本文档是 Clash Mini 项目的**权威系统设计规范与工程开发宪章**。所有功能开发、重构优化与代码审核必须严格遵循本文档中定义的架构约定、业务逻辑与安全红线。  
 > **维护说明**：本文档聚焦于**系统设计意图（做什么、为什么、架构边界与关键参数）**；具体代码实现见配套索引 `docs/implementation-notes.md`，架构全局图谱见 `docs/ARCHITECTURE.md`，历史避坑指南见 `clash_mini_pitfalls.md`。
 
@@ -20,12 +20,12 @@
   - [2.1 3D 实体拟物美学准则](#21-3d-实体拟物美学准则)
   - [2.2 遮挡式布局与响应式视口框架](#22-遮挡式布局与响应式视口框架)
   - [2.3 窗口尺寸常量与边界约束](#23-窗口尺寸常量与边界约束)
-  - [2.4 Win32 消息子类化与 WM_SIZING 防下移钩子](#24-win32-消息子类化与-wm_sizing-防下移钩子)
-  - [2.5 无死锁自定义指针缩放手柄与几何同步持久化](#25-无死锁自定义指针缩放手柄与几何同步持久化)
+  - [2.4 Win32 消息子类化与 WM_SIZING 全向钳制钩子](#24-win32-消息子类化与-wm_sizing-全向钳制钩子)
+  - [2.5 无死锁原子 Win32 指针缩放与几何同步持久化](#25-无死锁原子-win32-指针缩放与几何同步持久化)
   - [2.6 极窄隐匿模式（自动隐藏标题栏规范）](#26-极窄隐匿模式自动隐藏标题栏规范)
   - [2.7 6 套特色皮肤与双控制滑块体系](#27-6-套特色皮肤与双控制滑块体系)
   - [2.8 主页节点列表与活跃节点轮换](#28-主页节点列表与活跃节点轮换)
-  - [2.9 静态极简系统托盘规范](#29-静态极简系统托盘规范)
+  - [2.9 极简静态菜单系统托盘规范](#29-极简静态菜单系统托盘规范)
   - [2.10 设置开关的乐观更新与权威数据源](#210-设置开关的乐观更新与权威数据源)
     - [2.10.1 开机自启：注册表方案与启动对账](#2101-开机自启注册表方案与启动对账2026-10-22-定)
   - [2.11 错误边界分级与局部降级](#211-错误边界分级与局部降级)
@@ -58,7 +58,7 @@
   - [6.1 Tauri 权限最小化与沙箱加固](#61-tauri-权限最小化与沙箱加固)
   - [6.2 用户输入 URL 严格校验与 SSRF 防护](#62-用户输入-url-严格校验与-ssrf-防护)
   - [6.3 安全解压机制（Zip Slip 防护）](#63-安全解压机制zip-slip-防护)
-  - [6.4 脚本执行沙箱与原型链防污染](#64-脚本执行沙箱与原型链防污染)
+  - [6.4 配置增强极简化与原生 Rust 卫兵（`BUG-381`）](#64-配置增强极简化与原生-rust-卫兵bug-381)
   - [6.5 编译期加固与源码保护](#65-编译期加固与源码保护)
 - [📊 七、数据流中枢与协议解析](#七数据流中枢与协议解析)
   - [7.1 单一 PROXY 组模型架构](#71-单一-proxy-组模型架构)
@@ -227,7 +227,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 
 - **三列网格布局**：默认模式下每行 3 个节点卡片，单节点高度固定 20px；窄窗模式平滑退化为单列。
 - **整行 0ms 乐观切换与延迟徽章独立单测热区（BUG-356 / BUG-357）**：节点卡片主体区域点击瞬间对 `['getProxies']` 缓存执行 `0ms` 乐观高亮切换并异步同步内核（失败自动回滚）；卡片右侧延迟徽章设为独立点击热区（阻止冒泡），点击仅对该节点触发实时单点测速（`select: false`），不中断当前活跃出口连接。
-- **活跃节点快速轮换（FEAT-006，BUG-336 闭环）**：点击顶部导航栏活跃节点卡片，基于用户当前搜索/过滤/排序状态实时计算可用子集，直接轮换至下一顺位可用节点、即时刷新 `['getProxies']` 缓存并同步写回 `profile.selected` 持久化；当全节点超时或物理断网时顶栏展示轻量警示胶囊供一键重测自愈（BUG-359）。
+- **活跃节点快速轮换（FEAT-006，BUG-336 / BUG-390 闭环）**：点击顶部导航栏活跃节点卡片，基于用户当前搜索/过滤/排序状态实时计算可用子集，直接轮换至下一顺位可用节点、即时刷新 `['getProxies']` 缓存并同步写回 `profile.selected` 持久化；当全节点超时或物理断网时顶栏展示轻量警示胶囊供一键重测自愈（BUG-359），且在物理断网（`networkHealth === 'network_health::offline'`）场景点击重测仅刷新延迟（`select: false`），严禁离线状态下触发无意义切点（BUG-390）。
 - **节点过滤与自动并发测速择优接管（地域策略即时切换约束，特例豁免）**：在 Clash Mini 的单一 `PROXY` 组架构下，节点列表顶部的过滤输入框不仅用于视图搜索，更承担**地域策略约束开关**职责（典型场景：为应对如 Antigravity 拒绝香港 IP 等服务区域限制，用户输入 `-香港` 或 `美国|新加坡` 即表达「撤出受限地区并切入合规节点子集」的明确意图）。因此当用户完成过滤词输入（实体输入停止 700ms 防抖，或按 `Enter` 键即时生效，同时排除中文 IME 组词期间的按键事件）时，系统自动对当前过滤子集触发一次多路并发测速与择优切换（`triggerAutoSelect`，`select: true`），所见即所选。该交互属于**用户主动发起的地域策略切换**，与后台无感知自动切点严格区分，受 §5 显式豁免；若过滤词未匹配到任何可见节点则安全短路跳过，清空过滤框时仅重置列表而不触发全量测速。
 
 ### 2.9 极简静态菜单系统托盘规范
@@ -273,16 +273,16 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - 判定逻辑固定在 `src/utils/profile-items.ts`（`hasRealProfileItem`），并有回归单测；存量老用户绝不被打扰。
 - **两步式价值感知与转化向导（`STEP 1 / 2` → `STEP 2 / 2`）**：
   - **横向全宽铺满默认 `271px` 窄视口**：由于初次启动默认窗口宽度为 `271px`（见 §2.3），引导弹窗必须显式声明全宽约束（破除 MUI `Dialog` 默认左右外边距挤压）并配合紧凑内边距，严禁在瘦长窗口内再嵌套一条更窄的瘦长弹窗。
-  - **Step 1（一键导入订阅）**：顶部配有步骤胶囊（`STEP 1 / 2`）与三枚核心特性徽章（智能优选低延迟节点 / 防 DNS 泄漏保护 / 轻量静默驻留）；弹窗打开时自动静默嗅探系统剪贴板，若检测到单行 `http(s)://` 链接且输入框为空，展示可一键填入的智能横幅（`clipboardDetected`），同时保留剪贴板按钮与右键菜单；导入成功后原地切换至第二步。
+  - **Step 1（一键导入订阅或单/多行节点 URI，BUG-389）**：顶部配有步骤胶囊（`STEP 1 / 2`）与三枚核心特性徽章（智能优选低延迟节点 / 防 DNS 泄漏保护 / 轻量静默驻留）；`isSupportedSubscriptionOrNodeInput` 与 `SUPPORTED_NODE_URI_SCHEMES`（位于 `src/utils/node.ts` 并由 `FirstRunGuideDialog` 调用）同时校验单行 `http(s)://` 订阅链接及单/多行节点 URI（`vmess://` / `vless://` / `ss://` / `trojan://` / `hysteria2://` / `hysteria://` / `anytls://` / `tuic://` / `wireguard://` / `socks5://` / `socks://`）；弹窗打开时自动静默嗅探系统剪贴板并复用同源校验展示智能横幅（`clipboardDetected`），同时保留剪贴板按钮与右键菜单；导入成功后原地切换至第二步。
   - **Step 2（实时连通性仪表盘 + GitHub Star 激励卡 + 安全软件白名单指引）**：
     - **卡片 1（实时连通性面板）**：展示订阅导入成功状态、代理就绪探测结果，并在就绪时实时展示**当前最优出口节点名称**（`activeNodeName`）与**绿色发光延迟徽章**（`⚡ XX ms`）。
-    - **卡片 2（金色 GitHub Star 转化卡 + Wiki 入口）**：采用暖金渐变卡片展示开源支持文案（`starTitle` + `wikiHint`），附带「📖 查看 Wiki 进阶指南 ↗」次级链接，底部主 3D 按钮升级为「⭐ 打开 GitHub 测速并点 ⭐ Star」（`CLASH_MINI_GITHUB_URL`），在用户刚体验到导入成功与节点低延迟的愉悦时刻自然引导浏览器打开仓库主页测试国际网络并顺手点亮 Star。
+    - **卡片 2（金色 GitHub Star 转化卡 + Wiki 入口）**：采用暖金渐变卡片展示开源支持文案（`starTitle` + `wikiHint`），附带「📖 查看 Wiki 进阶指南 ↗」次级链接，底部主 3D 按钮升级为「⭐ 打开 GitHub 测速并点 ⭐ Star」（`CLASH_MINI_GITHUB_URL`；由 i18n 文案自身携带 `⭐`，JSX 不重复硬编码前缀），在用户刚体验到导入成功与节点低延迟的愉悦时刻自然引导浏览器打开仓库主页测试国际网络并顺手点亮 Star。
     - **卡片 3（安全软件白名单简要指引）**：简明提示将安装目录与进程加入本地安全软件白名单以避免后台误杀，并提供操作按钮一键唤起 `AntivirusWhitelistDialog`（详情参考 `docs/antivirus-whitelist.md`）。
 - **就绪判定必须是「测出来」而不是「假定」**：第二步只有在**活跃出口节点存在有效延迟**（`0 < delay < NODE_DELAY_MAX_MS`，数据取自既有代理上下文，不另造测量链路）时才显示「代理已就绪」。未测出则显示「正在确认节点连通性…」并每 1.5s 刷新一次；超过 20s 仍无有效延迟则改成如实提示「暂未测出节点延迟」，**不得宣称网络畅通**。
   - 同时按 `sysproxy.enable` 的真实状态提示「系统代理未开启」。**严禁再写「TUN 已全量就绪」**——`init_config` 在非管理员且未装服务时会把 `enable_tun_mode` 强制置为 `false`，首次安装用户绝大多数属于这种情形。
 - **帮助菜单常驻 Star 入口**：顶栏 `?` 帮助菜单（`HelpMenuButton`）首项固定为加粗的 `⭐ 去 GitHub 点亮 Star`（`layout.components.helpMenu.github`），为错失首次引导的老用户提供常驻支持通道。
 - **导入不可被误中断**：导入进行中（`submitting`），点击遮罩与按 **Esc**（`reason === 'escapeKeyDown'`）都必须被拦截，不允许关闭弹窗。
-- **优雅稍后配置**：所有出口（完成 / 打开 GitHub Star / 打开 Wiki / 稍后手动配置）统一记录 `clash-mini-first-run-completed: true`；「稍后手动配置」还会自动滑开左侧抽屉指引订阅管理卡片位置。
+- **优雅稍后配置与再次唤起保护**：所有出口（完成 / 打开 GitHub Star / 打开 Wiki / 稍后手动配置）统一记录 `clash-mini-first-run-completed: true`；仅当确属首次引导（`localStorage.getItem(FIRST_RUN_GUIDE_STORAGE_KEY) !== 'true'`）导入成功且未启用系统代理/TUN 时才自动开启系统代理，从帮助菜单再次打开引导时尊重用户当前代理开关偏好（BUG-389）；「稍后手动配置」还会自动滑开左侧抽屉指引订阅管理卡片位置。
 - **多语言必须齐全**：本弹窗文案走 i18n（`layout.components.firstRun.*`），**13 个语种资源全部提供**。理由：应用已按系统语言自动初始化（`system_language()` + `clash_verge_i18n`），支持 zh/zhtw/en/ru/fa/tt/id/ar/ko/tr/de/es/jp；首次引导是用户看到的第一屏，单独硬编码中文等于给非中文用户「一上来就是外语」的糟糕第一印象。新增 key 后须执行 `pnpm i18n:types` 重新生成类型。
 
 ---
@@ -310,7 +310,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
   - **随包并释放至运行目录**：`Country.mmdb`（GEOIP 与 fallback-filter 规则必备基础库）、`geosite.dat`（GEOSITE 分流规则库）以及 `gfwlist.yaml -> ruleset/gfwlist.yaml`（GFWList 境外域名分流规则集，约 95KB）。
   - **GFWList 发版拉取 + 随包预置 + 定时更新闭环（BUG-309）**：每次构建/发版阶段（`scripts/prebuild.mjs::resolveGfwlist`）主动从多镜像源拉取最新 `Loyalsoldier/clash-rules` 的 `gfw.txt` 并校验打入 `resources/gfwlist.yaml`；应用启动早期（`init_resources`）若运行目录 `ruleset/gfwlist.yaml` 缺失、为空或旧于随包版本则立即释放到位，使全新安装第 0 毫秒即具备完整境外域名分流能力，彻底省去首次启动联网等待拉取规则的逻辑；运行期仍由内核 `rule-providers.gfwlist` 按 `interval: 86400`（24 小时）经 `PROXY` 通道自动定时更新，且更新后的文件因 `dest_modified > src_modified` 在后续日常重启时自动保留不被旧随包文件覆盖。
   - **移除随包**：移除体积庞大的 `geoip.dat`（节省约 17MB 磁盘与包体积），满足 99.9% 订阅规则之需。
-- **按需保守内存加载**：启动配置默认注入 `geodata-loader: memconservative`，规则库仅在首次路由命中时按需索取并载入内存，降低约 5MB ~ 10MB 物理常驻内存。
+- **内核默认加载语义**：运行时配置不注入 `geodata-loader: memconservative`，沿用 Mihomo 内核默认地理数据库加载机制（与架构总览 §5.7 一致）。
 
 ### 3.5 Go Runtime 运行参数深度压制
 
@@ -414,7 +414,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **重试加速（3 秒）**：当探测到当前活跃节点异常或初次失败时，周期立即动态收紧为 **3 秒**，执行高频复检。
 - **防抖自愈判定与统一裁决器**：节点侧自愈严格执行**连续 2 次独立检测失败**才正式触发全节点批量选点自愈，彻底滤除网络微抖动造成的过度切换。后台监测**所有**自愈请求（主路径 / 网络恢复 / API 异常）必须构造 `SelfHealTrigger` 并交由 `decide_self_heal` 纯函数裁决，仅 `SelfHealDecision::Allow` 时方可调用 `self_heal_with_accounting`，严禁任一分支各自直接触发：① `NodeConfirmedDead` 要求 `consecutive_fails >= FAILOVER_CONFIRM_FAILS (2)`；② `NetworkRecovered` **恒判 `Wait`**——物理网络恢复只说明链路可用，不构成节点故障证据，必须安静等待并交主路径重新测量（旧实现凭一次 `evaluate_failover != NoAction` 立即自愈、且同周期主路径重复拨测，已删除）；③ `ApiUnreachable` 属**内核 API 通道故障**、不是节点侧故障，故适用独立门控：连续 `API_ERROR_HEAL_THRESHOLD (3)` 次异常后须再经 `is_clash_api_alive()` 复核，仅当 API 仍不可达才放行，复核时已恢复则清零计数并交下一周期测量。**两类故障边界明确**，不再出现「规范写连续 2 次、实现却留三条后门」的自相矛盾；BUG-318 的连续失败 / 内核重启 / 系统告警记账链路不变。
 - **测速失真不记失败**：体检得出「主测速地址整体失败、备用地址可用 ⇒ 测速地址失真、节点侧正常」时，`evaluate_failover` 直接返回 `NoAction`，主循环清零 `consecutive_fails` 并复位健康态；该结论必须由 `probe_metrics_group` 以 `MetricsProbeOutcome.primary_url_distorted` 显式传回裁决层，**严禁只写日志不进裁决**。
-- **三态健康迟滞与自愈门检**：`NodeStatus` 由二值健康判定扩为 `Unknown / Suspect / Dead / Alive` 四态；`alive=false` 但上一次成功拨测仍在 `SUSPECT_WINDOW_SECS (30s)` 内时判 `Suspect`（Mihomo 对失败节点只写 `alive=false`、不追加 `history`），`evaluate_failover` 直接 `NoAction`、不累计失败，只有 `Dead` 才构成自愈证据；超过窗口或时间戳不可解析（保守）才判死。自愈切点前须经 `should_proceed_with_self_heal` 用**同一权威来源**（`get_proxies() + node_status()`）复核原节点确已死，非 `Dead` 一律放弃——自愈仅兜底，不因「别的节点更快」切点（择优属 F1 手动选点）。门检仅适用于 `SelfHealOrigin::ConfirmedDead`：`FailoverVerdict::ShouldMigrate`（假/拉黑节点重选、真 HTTPS 验真失败迁移）与内核 API 通道故障由 `SelfHealOrigin` 显式隔离，避免误挡既有迁移链路。真死节点自愈最多推迟 30 秒，由既有 20 秒宽限 + 25 秒冷却覆盖。
+- **三态健康迟滞与自愈门检**：`NodeStatus` 由二值健康判定扩为 `Unknown / Suspect / Dead / Alive` 四态；`alive=false` 但上一次成功拨测仍在 `SUSPECT_WINDOW_SECS (30s)` 内时判 `Suspect`（Mihomo 对失败节点只写 `alive=false`、不追加 `history`），`evaluate_failover` 直接 `NoAction`、不累计失败，只有 `Dead` 才构成自愈证据；超过窗口或时间戳不可解析（保守）才判死。自愈切点前须经 `should_proceed_with_self_heal` 用**同一权威来源**（`get_proxies() + node_status()`）复核原节点确已死，非 `Dead` 一律放弃——自愈仅兜底，不因「别的节点更快」切点（择优属 F1 手动选点）。门检仅适用于 `SelfHealOrigin::ConfirmedDead`：`FailoverVerdict::ShouldMigrate`（假/拉黑节点重选、真 HTTPS 验真失败迁移）与内核 API 通道故障由 `SelfHealOrigin` 显式隔离，避免误挡既有迁移链路；同理，经确认已死的 `ConfirmedDead` 由 `self_heal_subject_to_switch_rate_limit` 豁免切换速率上限截断（避免被迫卡死在死节点），而 `ApiChannelDown` 进入切点前须经 `should_keep_alive_on_api_recovery` 复核——若此时 API 已可读且现节点 `Alive`，直接保活现有出口并复位计数器（BUG-388）。真死节点自愈最多推迟 30 秒，由既有 20 秒宽限 + 25 秒冷却覆盖。
 - **严格判死阈值（5000ms）**：测速超时硬限为 **5000ms**；延迟有效区间锁定为 `[30ms, 5000ms)`；超过 5000ms 或产生握手错误一律判死。**该值历史上在 2000ms 与 5000ms 之间反复调整过不止一次，2026-10 定型为 5000ms（BUG-304 现场双路对照监控实证）：链路拥塞簇内仅 TCP 握手即需 1.1~2.1s（SYN 丢包按 1s RTO 重传的整秒台阶指纹），叠加 TLS 握手与 204 探测往返后，「慢而可用」的活节点总耗时稳定超过 2s——2000ms 预算会把拥塞期的整组活节点误判为断流；而真死节点（机场集群故障）5s 内同样超时，不会产生误活。除非有同等量级的现场实证，禁止回调至 2000ms。**
 - **切换宽限期（20 秒，v3.2.4 优化）**：任何节点切换（含自动选点与手动切换）后 20 秒内，失败判定只记日志、不计入连续失败次数，防止「切到尚未拨测的新节点 → 缓存陈旧误判 → 再次切走」的乒乓震荡。v3.2.4 从原 60 秒缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
 - **探测按需降频与被动流量证活（BUG-379）**：体检不再固定每 60 秒对测量组全组盲测，改为基于本地管道 `/connections` 字节增量的**被动流量证活 + 停滞秒级复核 + 本轮实拨证据**分层裁决：① 任何非 `Alive`（`Suspect` / `Dead` / `Unknown`）或时间戳缺失一律强制发起 `probe_metrics_group` 全组实时拨测，且 `allow_coalesce=false` 禁用 1500ms 短窗合并，保证判死仍严格建立在本轮主/备测速 URL 实拨结果上（保留 BUG-377 异源隔离不变式）；② 当活跃节点 `NodeStatus::Alive` 且近一周期连接有真实下行回包（`Flowing`：`delta_download > 0`）时，免拨测保鲜上限延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s)`（严格小于前端 `HISTORY_FALLBACK_MAX_AGE_MS = 600s`，杜绝 UI 误显 `Timeout`），稳态拨测风暴直降 **87.5%**；③ 当存在上行请求但零下行回包（`Stalled`：`delta_upload > 0 && delta_download == 0`）时，在 `STALL_REPROBE_COOLDOWN_SECS (60s)` 允许下立即突破缓存于本轮 15s 周期内实拨复核，突发断流响应从最慢 63s 收敛至 ~18s；④ 完全空闲（`Idle`）时保鲜窗设为 `IDLE_HEALTH_FRESH_SECS (300s)` 对齐测量组自然周期（降频 80%）。严禁为追求单点测速启用 `/proxies/{name}/delay`（会破坏 §5.2 无回环铁律）。
@@ -426,8 +426,8 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 ### 5.2 单一内核测量组（PROXY__METRICS）统一调度
 
 - **彻底废除应用侧并发池**：废弃旧版由前端/应用层维护并发 Worker 池逐个测速的架构（不仅开销大，且在 TUN 模式下对活跃节点调 `/proxies/{name}/delay` 会引发自指回环假超时，是早期「断流 + 全 Timeout」的根因；该单代理直测路径已彻底废弃、应用侧不保留）。
-- **委托内核统一测量**：全量测速、**单点测速**与选点一律委托内核内部隐式创建的 `PROXY__METRICS` 测量组（`url-test` 类型，与 `PROXY` 组完全同构），单次调用触发内核并发调度，由内核核心直接执行高效底层拨测。群发测速与单点测速必须取自**同一测量组、同一测速 URL、同一探针超时**（`NODE_TEST_TIMEOUT_MS` 恒等于判死阈值 `NODE_DELAY_MAX_MS` = 5000ms，见 5.1 节 BUG-304 定型依据，禁止回调 2000ms）。
-- **单一权威健康源与异源测量隔离（BUG-377）**：全仓对 `PROXY__METRICS` 的 5 处 `delay_group`（主/备测速 3 处 + 真 HTTPS 验真 2 处）必须统一取 `METRICS_PROBE_LOCK` 串行化、统一使用 `NODE_TEST_TIMEOUT_MS (5000ms)` 超时，删除验真单独设定的 6000ms。两类测量的**用途严格分离**：主/备测速 URL 结果用于健康裁决（判活 / 判死）与 UI 延迟显示；真 HTTPS 内容拉取（非 `204` 地址）只用于识别「对 generate_204 放行但真网页卡死」的假节点，结果仅写入 `node.rs` 的 verify 状态机，**不得**成为 `evaluate_failover` 的判死依据。`alive` / `history` 是共享可变状态，任何调用方都会改写它，故判死只允许发生在本轮主/备 URL 实拨后重读的结果上，免拨测轮不得据其判死（见 §5.1）。验真 URL 与主测速 URL 不同属于功能需要，不违反「同一测速 URL」契约——该契约约束的是**参与健康裁决的测速**；统一的是超时、互斥与「哪一路结果拥有裁决权」。
+- **委托内核统一测量**：全量测速、**单点测速**与选点一律委托内核内部隐式创建的 `PROXY__METRICS` 测量组（`url-test` 类型、`interval: 300`、`lazy: false`，与 `PROXY` 组完全同构；`lazy: false` 保证即使没有直连流量走过该测量组，后台探测与状态维持也能稳定生效），单次调用触发内核并发调度，由内核核心直接执行高效底层拨测。群发测速与单点测速必须取自**同一测量组、同一测速 URL、同一探针超时**（`NODE_TEST_TIMEOUT_MS` 恒等于全局统一判死阈值 `constants::timing::NODE_DELAY_MAX_MS` = 5000ms，见 5.1 节 BUG-304 定型依据，禁止回调 2000ms）。
+- **单一权威健康源与异源测量隔离（BUG-377 / BUG-388）**：全仓对 `PROXY__METRICS` 的 5 处 `delay_group`（主/备测速 3 处 + 真 HTTPS 验真 2 处）必须统一取 `METRICS_PROBE_LOCK` 串行化、统一使用 `NODE_TEST_TIMEOUT_MS (5000ms)` 超时，删除验真单独设定的 6000ms。两类测量的**用途严格分离**：主/备测速 URL 结果用于健康裁决（判活 / 判死）与 UI 延迟显示；真 HTTPS 内容拉取（非 `204` 地址）只用于识别「对 generate_204 放行但真网页卡死」的假节点，结果仅写入 `node.rs` 的 verify 状态机，**不得**成为 `evaluate_failover` 的判死依据。活跃节点存在真实下行流量（`ActiveTrafficState::Flowing`）时，由 `should_allow_https_migration` 直接跳过活跃节点即时 HTTPS 验真与迁移，且迁移门槛收紧为 `HTTPS_VERIFY_MIGRATE_MIN_FAILS (2)` 次连续失败；若主/备验证 URL 均无响应或本批 `0` 个节点通过，立即进入 `HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS (600s)` 全组退避冷却避免无效探测风暴（BUG-388）。`alive` / `history` 是共享可变状态，任何调用方都会改写它，故判死只允许发生在本轮主/备 URL 实拨后重读的结果上，免拨测轮不得据其判死（见 §5.1）。验真 URL 与主测速 URL 不同属于功能需要，不违反「同一测速 URL」契约——该契约约束的是**参与健康裁决的测速**；统一的是超时、互斥与「哪一路结果拥有裁决权」。
 - **单点测速四条契约**（2026-10-08 确立三条，2026-10-17 补第 4 条）：
   1. **仅测量、不切换**：单点测速必须以「不选点」方式调用，严禁改写用户当前所选节点，也绝不回写 `profile.selected`。
   2. **全组拨测属既定代价**：内核只提供「组级拨测」接口，故单节点测速一次**同样会触发对该测量组全量成员的拨测**，耗时由最慢成员决定（拥塞期可达 ≈5000ms），而结果只回报所请求的那一个节点。此为换取「TUN 下无回环、全链路数据源唯一」的既定取舍，不予优化掉。
@@ -445,8 +445,8 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 
 ### 5.3 统一记账与 25 秒失败冷却保护（v3.2.4 / v3.3.2 优化）
 
-- **自愈路径统一裁决与记账**：后台监测的全部触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）**必须先经 `decide_self_heal` 统一裁决**（规则见 §5.1），仅 `SelfHealDecision::Allow` 时才汇聚至 `self_heal_with_accounting` 统一记账函数；网络离线转在线恢复恒判 `Wait`，不再进入自愈路径，也不再于该分支额外拨测一次。自愈成功切换后**不触碰、不关闭任何存量连接**（现行规范见 §4.2），仅输出已切换与跳过清理日志，25 秒冷却与统一记账契约不变。
-- **切换速率上限**：`self_heal_with_accounting` 除 25 秒「**发起选点**冷却」外，新增以「**实际切换**」为单位的速率约束：两次实际切换间隔不得小于 `MIN_AUTO_SWITCH_INTERVAL_SECS (120s)`，`AUTO_SWITCH_WINDOW_SECS (600s)` 滑动窗口内最多 `MAX_AUTO_SWITCHES_PER_WINDOW (3)` 次，由纯函数 `auto_switch_permitted` 裁决。主循环维护 `recent_auto_switches: Vec<Instant>`，仅在 `outcome.selected` 且真正换到不同节点时追加、按 600 秒裁剪；`dead_node` 为空的 API 通道故障路径无基准，按「执行了切点」计入。超限只输出告警并跳过本次切点，不改变连续失败计数、统一记账与 BUG-318 告警链路语义。
+- **自愈路径统一裁决与记账**：后台监测的全部触发分支（主路径连续 2 次失败、网络离线转在线恢复、API 连续 3 次异常）**必须先经 `decide_self_heal` 统一裁决**（规则见 §5.1），仅 `SelfHealDecision::Allow` 时才汇聚至 `self_heal_with_accounting` 统一记账函数；网络离线转在线恢复恒判 `Wait`，不再进入自愈路径，也不再于该分支额外拨测一次。自愈成功切换后**不触碰、不关闭任何存量连接**（现行规范见 §4.2），仅输出已切换与跳过清理日志，25 秒冷却与统一记账契约不变；若 `trigger_backend_auto_select_inner` 测速或验真期间用户手动切换节点（`MANUAL_SWITCH_EPOCH` 递增），切换落盘前返回 `AUTO_SELECT_MANUAL_PREEMPTED` 放弃写回，记账层与 `AUTO_SELECT_BUSY` 一同按良性让路处理（不累计失败、不加冷却惩罚）（BUG-388）。
+- **切换速率上限**：`self_heal_with_accounting` 除 25 秒「**发起选点**冷却」外，新增以「**实际切换**」为单位的速率约束（通过 `self_heal_subject_to_switch_rate_limit` 作用于 `NodeMigration` / `ApiChannelDown`，而对已确证已死的 `ConfirmedDead` 豁免截断以防止卡死在死节点上，BUG-388）：两次实际切换间隔不得小于 `MIN_AUTO_SWITCH_INTERVAL_SECS (120s)`，`AUTO_SWITCH_WINDOW_SECS (600s)` 滑动窗口内最多 `MAX_AUTO_SWITCHES_PER_WINDOW (3)` 次，由纯函数 `auto_switch_permitted` 裁决。主循环维护 `recent_auto_switches: Vec<Instant>`，仅在 `outcome.selected` 且真正换到不同节点时追加、按 600 秒裁剪；`dead_node` 为空的 API 通道故障路径若经 `should_keep_alive_on_api_recovery` 检查仍不可达且执行切点，按「执行了切点」计入。超限只输出告警并跳过本次切点，不改变连续失败计数、统一记账与 BUG-318 告警链路语义。
 - **25 秒失败冷却防线**：若自愈选点失败或所有节点均不可达，强制进入 **25 秒冷却期**（v3.2.4 由原 60 秒缩短至 25 秒，既杜绝风暴式并发高频测速，又显著加快连续异常时的恢复时效），冷却期内严禁重复发起自愈冲击。
 - **连续 5 次系统级告警与重启终态契约**：`evaluate_self_heal_counters` 与 `complete_restart_core_attempt` 将「API 假死 3 次重启计数」与「全节点断流 5 次告警计数」解耦——API 不可达满 3 次触发 `RestartCore` 时仅重置 `api_dead_heal_fail_count`：若内核重启成功（`Ok`），保留 `auto_select_fail_count` 继续累计至第 5 次可靠触发 Win32 原生 `MessageBoxW` 系统告警并重置双计数；若内核重启自身报错（`Err`），则定义为不可恢复终态，立即升级弹出内核重启失败系统告警并重置本轮双计数（内置原子单实例门控防止模态弹窗堆叠）。
 
@@ -461,7 +461,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 - **前后端判定必须同源（2026-10-20 确立，BUG-383 补强结构识别）**：前端 `src/utils/node.ts::isDummyNode` 必须与后端 `utils/node.rs::is_dummy_node` **逐条对齐**，且 `node.test.ts` 与后端测试用例一一对应。
   - 英文广告词（expire / traffic / website / subscribe）与 URL scheme：允许**子串**匹配。
   - 中文广告短语：必须**归一化后「完全匹配或以该短语开头」**（先剥两端包裹符号与「节点-」类通用前缀）。
-  - **结构形态横幅识别（`is_structural_banner_name` / `isStructuralBannerName`，BUG-383，非穷举兜底）**：当且仅当名称**不含任何地区/专线暗示**（`!has_region_hint(name)`，涵盖国旗 Emoji、中文地区城市名及独立边界/大小写消歧的 IATA/国家地区代码与 `bgp`/`iplc`/`iepl`）时，命中以下任一结构形态即判定为伪节点：① **非纯节点域名语境的内嵌裸域名**（`has_embedded_banner_domain`：含 `:`/`：` 或非纯 ASCII 且出现不含地区后缀混写的 `<label>.<tld>`，不误杀纯 ASCII 服务器域名如 `vps1.myserver.com`）；② **冒号键值配额或日期倒计时格式**（`has_colon_quota_or_date`：首个 `:`/`：` 右侧包含 `20xx-xx`/`20xx年xx` 日期、数字配额单位 `GB/TB/MB/PB/GiB/TiB` 后不接 `[a-z]`，或 `天`/`小时`/`day`/`days` 倒计时）。
+  - **结构形态横幅识别（`is_structural_banner_name` / `isStructuralBannerName`，BUG-383，非穷举兜底）**：当且仅当名称**不含任何地区/专线暗示**（`!has_region_hint(name)`，涵盖国旗 Emoji、中文地区城市名及独立边界/大小写消歧的 IATA/国家地区代码与 `bgp`/`iplc`/`iepl`）时，命中以下任一结构形态即判定为伪节点：① **非纯节点域名语境的内嵌裸域名**（`has_embedded_banner_domain`：含 `:`/`：` 或非纯 ASCII 且出现不含地区后缀混写的 `<label>.<tld>`，不误杀纯 ASCII 服务器域名如 `vps1.myserver.com`）；② **冒号键值配额或日期倒计时格式**（`has_colon_quota_or_date`：首个 `:`/`：` 右侧包含 `20xx-xx`/`20xx年xx` 日期、数字配额单位 `GB/TB/MB/PB/GiB/TiB` 后不接 `[a-z]`，或 `天`/`小时`/`day`/`days` 倒计时；后端统一通过 `str::trim_start` 支持含全角空格 `\u{3000}` 在内的全 Unicode 空白，与前端 `\s*` 1:1 对齐，BUG-388）。
   - **严禁前端对中文短语用 `includes` 子串匹配**：会把 `日本群组-A`、`美国-网址专线`、`上海-群节点-01`、`HK-流量优化` 这类真实节点误判为伪节点而从前端列表隐藏，造成「**后端能选中、前端却看不到**」的高危不一致。
   - 取舍：前缀匹配会漏判「广告短语不在开头且无冒号键值/域名形态」的孤立伪节点（如 `【剩余流量】80GB`、`最新官网发布页`）。这是**有意为之**——单条目不靠穷举词表硬拆，绑在同一展示端口的多行说明则交由下方「指纹连坐分组裁决」兜底整组清理，误杀真实节点的风险降到最低。
 - **节点多关键词包含与排除同源过滤（`match_node_filter` / `matchNodeFilter`，BUG-368，v3.3.2）**：
@@ -470,7 +470,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 - **同配置克隆去重、指纹连坐清剿与真 HTTPS 验真状态机防线（BUG-369 / BUG-380 / BUG-383）**：
   - **规范化连接指纹、全量拓扑连坐与克隆优选（`utils/node.rs` + `enhance/mod.rs`）**：`proxy_endpoint_fingerprint` 剥离 `name` 字段后对包含合法 `server` 与 `port` 的规范化 YAML 连接字段计算 SHA-256 指纹；`enforce_mini_agreements` 在剔除伪节点**之前**先对全部有效 `server` 的原始 `proxies:` 构造 `RawProxyEntry` 交由 `resolve_proxy_clone_topology` 分组裁决：① **共享横幅端点连坐全灭**：对 `>= 2` 条共用同一指纹的分组，若组内存在任一 `is_dummy_node` 成员（或全组成员均为含 `:`/`：` 键值结构），且没有任何非伪节点成员带地区暗示（`!has_region_hint`），说明该后端专用于承载订阅横幅、无论另起何种新广告文案均整组 `0` 保留全部剔除，并将其指纹写入内存级 `RUNTIME_TAINTED_BANNER_FPS`（供 `is_confirmed_fake_fp` / `confirmed_fake_node_names` 与冷启动 `ensure_runtime_node_fingerprints_loaded` 全链路同步隐身）；② **借壳寄生真节点归真**：若同指纹组内存在带地区暗示的真节点（如横幅直接挂靠 `香港1`），则吞掉全部横幅并按优选等级 `(!colon && has_region) > has_region > !colon > fallback` 唯一保留真地区节点名称，确保用户 `-香港` 等地域排除过滤稳定生效。维持 `[PROXY, PROXY__METRICS]` 双组架构不变。
   - **单向粘滞真值 + 24h 可恢复软隔离与手动订阅解封（`node_https_verify.json`，BUG-380）**：后台 `run_https_verification_pass` 仅在存在待观察节点（既非 `verified_true` 也未处于 24h 软隔离期内）且物理网络在线时，使用非 `204` HTTPS 内容地址（主 `github.githubassets.com` favicon，备 `wikipedia.org` favicon）并发验真；**通过 1 次即永久置 `verified_true = true`**（永不降级也不再重测）；**仅当同批至少 1 个参照节点通过真 HTTPS 验真时**才对其余未通过的未验真指纹累加 `fail_count`，连续失败超过 `HTTPS_VERIFY_MAX_FAILS`（`5` 次，即 `>= 6` 轮）进入 **24 小时软隔离（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`，复用 `last_verified_at` 判定，零格式迁移）**。隔离期满后自动解除隐藏并清零重新观察；此外，用户在 UI **手动触发更新订阅**（`is_mannual_trigger == true`）时调用 `clear_unverified_https_failures()` 立即重置未验真失败记录与软隔离标记（保留 `verified_true` 白名单）。
-  - **全链路择优与软隔离期间隐身**：`prioritize_verified_candidates` 与 `lifecycle::select_fallback_in_subset` 优先从 `verified_true` 池择优（全员未验真时按延迟兜底并在冷启动首轮选点触发前置验真）；`enhance`、`monitor`、`lifecycle` 全链路在 24h 软隔离期内跳过被隔离节点；前端通过 `get_confirmed_fake_proxy_names` 命令在 `calcuProxies` 中过滤隐藏，新进入软隔离或手动更新解封时后端同步触发 `Handle::refresh_proxies()` 刷新可见性。
+  - **全链路择优、严格子集兜底与软隔离期间隐身**：`prioritize_verified_candidates` 与 `lifecycle::pick_subset_fallback_node` 优先从 `verified_true` 池择优；当显式设置非空 `filter_text` 时，`pick_subset_fallback_node` 仅在匹配子集内回退而严禁越界切出子集（仅当 `filter_text.trim().is_empty()` 才允许全局兜底，BUG-388）；`enhance`、`monitor`、`lifecycle` 全链路在 24h 软隔离期内跳过被隔离节点；前端通过 `get_confirmed_fake_proxy_names` 命令在 `calcuProxies` 中过滤隐藏，新进入软隔离或手动更新解封时后端同步触发 `Handle::refresh_proxies()` 刷新可见性。
 
 ### 5.5 物理网络连通性双频快速探测（TCP:53 探针，v3.2.4 优化）
 
@@ -480,7 +480,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 
 ### 5.6 批量测速触发（F4/F1）与结果统一回传
 
-- **统一测速通道**：主界面闪电测速（F4）、全量测速（F1）以及后台自愈测速完成后，由后端以统一的 Tauri 事件向前端实时广播全量测速矩阵数据（包含成功延迟、Timeout、Error 等状态）。
+- **统一测速通道与快捷键可达性**：主界面闪电测速（F4）、全量测速（F1）以及后台自愈测速完成后，由后端以统一的 Tauri 事件向前端实时广播全量测速矩阵数据（包含成功延迟、Timeout、Error 等状态）；`disableWebViewShortcuts` 允许用户在 `<input>`/`<textarea>` 等编辑焦点中直接按下 `F4`/`F1` 触发测速与优选，同时继续保护输入框内的 `Ctrl+F` 与系统 `Alt+F4`（BUG-389）。
 - **逐节点增量刷新**：前端监听接收数据后，通过动画帧增量注入缓存并驱动列表流光动效收尾，不再自行调用前端并发测速，保障全链路数据源绝对唯一。
 - **延迟呈现的三级真源（严禁陈旧成功值冒充当前延迟）**：节点延迟按「本次测速结论（前端缓存）→ 内核存活判定 → history 回落」三级取值，取到即止。
   - 内核拨测失败时**只把节点标记为 `alive=false`，不追加 history**，history 会永久停在最后一次成功的那个值。故回落 history 前必须校验存活状态与记录新鲜度：已判死、或记录早于测量组 2 个 `interval`（`HISTORY_FALLBACK_MAX_AGE_MS` = 10 分钟）的，一律按 Timeout 呈现，不得显示为绿色延迟。
@@ -527,10 +527,9 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 - **网页唤起协议限制**：调用系统浏览器打开外部链接时，严格限制仅允许 `http://` 与 `https://` 协议，彻底阻断 `file://`、`javascript:`、`data:` 等危险伪协议。
 - **订阅导入与更新多层 SSRF 防线**：远程订阅请求执行三层防护：① 入口静态与本地预检（`validate_url_no_ssrf` 拦截单标签主机名、`.localhost`/`.local`/`.internal`/`.lan`/`.home.arpa` 等保留后缀及回环/私网/链路本地/IPv6 ULA `fc00::/7`/IPv4-mapped 私网 IP；本地 `ToSocketAddrs` 解析返回 `Err` 时放行以便被污染订阅域名交由 `127.0.0.1:10801` 代理回退链拉取）；② 直连请求（`ProxyType::None`）挂载连接期异步 `SsrfSafeDnsResolver` 消除 DNS Rebinding TOCTOU 窗口；③ 直连与代理客户端统一挂载自定义重定向策略对每一跳 `30x` 目标再次执行 `validate_url_no_ssrf`。已知架构边界：经本地/系统 HTTP 代理隧道交由远端节点解析域名且未发生 HTTP 重定向时，客户端套接字层不可见远端最终解析 IP，由代理内核及出站节点侧隔离。
 
-### 6.3 安全解压机制（Zip Slip 防护）
+### 6.3 安全解压机制（Zip Slip 防护与单文件直写暂存）
 
-- **安全路径标准化**：所有内置与在线更新解压操作，必须使用具备路径越界防御的安全解压模块。
-- **Zip Slip 拦截**：针对 ZIP 压缩包中的每个条目，严格检查目标解压路径；凡包含 `..` 相对路径穿越标记、绝对路径前缀或试图逃逸解压目标目录的条目，一律强制拒绝解压并记录安全告警。
+- **单目标安全暂存策略**：内核在线升级模块（`core_updater`）从压缩包按名称精准定位唯一可执行二进制后，经 `zip::ZipArchive` 或 `flate2::read::GzDecoder` 流式直写至受控 `.staging` 临时可执行路径并校验体积与 DOS/PE 签名头，不执行多文件目录展开，从机制上杜绝路径穿越落盘（BUG-391 对齐实际实现）；诊断包打包模块（`diagnostics`）按 §8.7 强制将 ZIP 条目名规范化为正斜杠 `/` 并跳过符号链接。
 
 ### 6.4 配置增强极简化与原生 Rust 卫兵（`BUG-381`）
 
@@ -569,7 +568,7 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
 
 ### 7.4 订阅管理与右键上下文菜单
 
-- **原生右键上下文菜单**：订阅卡片支持自定义右键菜单，提供「编辑配置」、「系统编辑器打开本地 YAML」、「复制订阅链接」、「强制更新」、「删除配置」完整交互。
+- **原生右键上下文菜单与误删二次确认（BUG-390）**：订阅卡片支持自定义右键菜单，提供「编辑配置」、「系统编辑器打开本地 YAML」、「复制订阅链接」、「强制更新」、「删除配置」完整交互；卡片行内的刷新/删除图标按钮统一补全 `Tooltip` 与 `aria-label`，且无论行内删除图标还是右键「删除配置」均统一经窄窗 3D 确认弹窗（`profiles.modals.confirmDelete`）二次确认后再执行物理删除；启动配置激活 3 次重试失败提示走 i18n Key（`layout.notices.profileActivationFailed`）。
 - **编辑对话框换肤协同**：订阅管理与编辑弹窗（MUI Dialog）的样式深度集成 6 套拟物皮肤，边框、高光、倒角与文字反差随主题滑块实时联动。
 - **剪贴板健壮交互**：订阅输入框支持全选、剪切、复制与多策略粘贴（优先使用系统剪贴板原生 API，失败平滑降级至标准 Web Clipboard），解决特殊环境下粘贴失效的问题。
 
@@ -691,7 +690,7 @@ flowchart LR
 ### 8.8 前端单测基线与最小覆盖
 
 - **框架**：vitest（`vitest.config.mts`，`environment: node`，**刻意不加载 Tauri/Vite 插件**，配置 `@/` 路径别名映射，保证无 GUI 环境与 CI 可直接跑）。命令：`pnpm test`。
-- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 138 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何与视觉样式（`mini-window.test.ts`、`resize-geometry.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
+- **只测纯逻辑**：当前共 **13 个前端 Vitest 测试文件（共 123 项用例）**，覆盖节点过滤与状态（`node.test.ts`、`search-matcher.test.ts`、`use-head-state.test.ts`）、延迟计算与 WS 订阅（`delay.test.ts`、`use-mihomo-ws-subscription.test.ts`、`parse-traffic.test.ts`）、窗口几何/全局快捷键/视觉样式（`mini-window.test.ts`、`window-resizing.test.ts`、`popup-styles.test.ts`）以及订阅/路由协调（`profile-coordination.test.ts`、`profile-items.test.ts`、`path-control.test.ts`、`quick-routing.test.ts`），全面锁定纯逻辑不变式与前后端同源算法。
 - **刻意不做**：暂不引入组件 / DOM / 快照测试；组件行为靠 `tsc` 与真机验证，避免为测试而测试。
 
 ### 8.9 用户可见文案 i18n 硬约束
@@ -860,10 +859,14 @@ flowchart LR
 | **BUG-381** | 2.12 / 6.4 | 移除重型嵌入式 JS 引擎 `boa_engine` 与 `enhance/script.rs` / 内置 `.js` 文件，改用原生 Rust `apply_builtin_guards` 完成 `mode: script` 归一与 `hysteria` string `alpn` 转数组；停止新建 `Script` 默认项，保留存量 `profiles.yaml` 历史 `type: script` 兼容忽略。 |
 | **BUG-382** | 2.11 / 6.1 | 清理不可达流媒体解锁 `/unlock` 路由（`src/pages/unlock.tsx`、`cmd/media_unlock_checker` 及废弃翻译键）与零使用 `tauri-plugin-http` / `@tauri-apps/plugin-http`，收紧 WebView 网络接口暴露并消除重复 `reqwest v0.12.28` 依赖树。 |
 | **BUG-383** | 2.8 / 5.4 | 根治借壳真实可用后端（如香港出口）的订阅横幅假节点漏网并绕过用户 `-香港` 排除过滤问题：前后端 1:1 增设非穷举结构形态判定（`is_structural_banner_name` / `isStructuralBannerName`：无地区暗示下的内嵌裸域名与冒号键值配额/日期格式），后端 `enforce_mini_agreements` 改在剔除前先行按 `RawProxyEntry` 指纹分组执行 `resolve_proxy_clone_topology`——共享横幅专用端点整组连坐 `0` 保留并登记内存 `RUNTIME_TAINTED_BANNER_FPS`，寄生真地区节点组强制折叠归真为带地区名的节点，令真实香港借壳体稳妥受控于地域过滤与排除规则。 |
-| **BUG-384** | 2.7 | **【待用户确认】** 修复 Monochrome（黑白极简工业风）皮肤下「基础设置」卡片四枚 `size="small"` 小开关仍残留旧 `56×28` 圆角胶囊样式问题：`base-switch.tsx` 导出 `getSwitchSkinStyle` 并抽出共享直角方形构造器 `buildSquareSwitchStyle`，使 `monochrome` 与 `cyberpunk` 对齐 `28×14` / `sizeSmall` `18×10`、`borderRadius: 0`（滑块 `0px`）的小巧直角方形造型与高反差黑白灰态区分。 |
-| **BUG-385** | 2.2 / 5.7 | **【待用户确认】** 补齐隐藏组件彻底卸载、30 秒绘图 Worker 延迟回收与关闭设置面板时的中间态竞态防护：设置抽屉开启时同步卸载被全屏遮挡的 `ProxyGroups` 虚拟列表，将 `useConnectionData` / `usePathControl` / `ConnectionDetail` 下沉封装至 `ConnectionsPanel` 内部使关闭抽屉或窄窗时内存立即归零；`useTrafficMonitor` Worker 闲置销毁延迟由 5 分钟缩短至 `TRAFFIC_WORKER_DESTROY_DELAY_MS`（`30_000ms`）；收口右上角关闭按钮 `zIndex` 为 `SETTINGS_CLOSE_BUTTON_Z_INDEX`（`250`）并标记 `data-close-settings="true"`，补齐 Mixed Port 失焦保存与关闭取消守卫、`AddUrlDialog` 顶层保活、抽屉关闭菜单锚点清理及 `ProxyHead` `60ms` 定时器卸载清理。 |
-| **BUG-386** | 2.4 / 2.5 | **【待用户确认】** 根治鼠标拖拽调整窗口尺寸时的剧烈边缘抖动与反复跨越断点拖拽卡死：新增 Rust 原生原子 Win32 缩放管线（`begin_window_resize` / `step_window_resize` / `end_window_resize`），改用 OS 全局物理光标 `GetCursorPos` + 不变起始锚定矩形计算单次合并 `SetWindowPos(..., SWP_NOZORDER \| SWP_NOACTIVATE \| SWP_NOOWNERZORDER \| SWP_NOCOPYBITS)`，彻底根除 `e.clientX/Y` 正反馈震荡、双 IPC 撕裂及 `tao` 样式偏差；升级 `sizing_subclass_proc` 覆盖八方向宽高钳制与 `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE` 同步；前端 `ResizeHandles` 引入单调 `gestureSeq` 防并发并在 `WindowProvider` 拖拽期间冻结 `285px`/`126px` 断点组件拆装，松手由 `RESIZE_ENDED_EVENT` 携带精确客户区尺寸一次性对齐；`lib.rs` 拖拽期跳过逐像素几何查询。 |
-| **BUG-387** | 5.2 / 5.6 | **【待用户确认】** 在不改变任何自愈切点门限前提下根除前端延迟与真实网络状态双向失步：① [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 将 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 升级为 `LAST_UI_ACTIVE_SYNC`（`UiActiveSyncState { node_name, history_time, reported_alive }`），推送 `Timeout (0)` 时不记录旧成功 `history_time` 而标记 `reported_alive = false` 确保恢复必同步；新增 `build_probe_ui_display` / `compute_next_ui_active_sync` / `should_sync_alive_ui` 纯函数使 `!primary_url_distorted` 下全超时空 `map` 也下发全组 `0`、`primary_url_distorted = true` 仅推送真实有效延迟不把未响应节点漆成 30 分钟 `0`、`ActiveTrafficState::Stalled` 叠加全灭 `None` 时以 `from_probe = false` 下发 30 秒 `(active_node, 0)` 消除顶栏假绿；② `AutoSelectOutcome` 增设 `covers_all_group_nodes` 门控防止子集测速或失真残缺探测提前置位 `reported_live_to_ui = true`；③ 前端 [delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts) 修复 `getDelayFix` 在 `proxy.alive === true` 且有效 `history` 时间戳严格新于缓存 `Timeout` 时立即淘汰旧 `0` 缓存回显新延迟，并限制 `injectBatchResults(..., { fromProbe: false })` 对 `Timeout` 一律封顶 `30s` 寿命；补齐 Rust 与 Vitest 双向同步回归单测。 |
+| **BUG-384** | 2.7 | 修复 Monochrome（黑白极简工业风）皮肤下「基础设置」卡片四枚 `size="small"` 小开关仍残留旧 `56×28` 圆角胶囊样式问题：`base-switch.tsx` 导出 `getSwitchSkinStyle` 并抽出共享直角方形构造器 `buildSquareSwitchStyle`，使 `monochrome` 与 `cyberpunk` 对齐 `28×14` / `sizeSmall` `18×10`、`borderRadius: 0`（滑块 `0px`）的小巧直角方形造型与高反差黑白灰态区分。 |
+| **BUG-385** | 2.2 / 5.7 | 补齐隐藏组件彻底卸载、30 秒绘图 Worker 延迟回收与关闭设置面板时的中间态竞态防护：设置抽屉开启时同步卸载被全屏遮挡的 `ProxyGroups` 虚拟列表，将 `useConnectionData` / `usePathControl` / `ConnectionDetail` 下沉封装至 `ConnectionsPanel` 内部使关闭抽屉或窄窗时内存立即归零；`useTrafficMonitor` Worker 闲置销毁延迟由 5 分钟缩短至 `TRAFFIC_WORKER_DESTROY_DELAY_MS`（`30_000ms`）；收口右上角关闭按钮 `zIndex` 为 `SETTINGS_CLOSE_BUTTON_Z_INDEX`（`250`）并标记 `data-close-settings="true"`，补齐 Mixed Port 失焦保存与关闭取消守卫、`AddUrlDialog` 顶层保活、抽屉关闭菜单锚点清理及 `ProxyHead` `60ms` 定时器卸载清理。 |
+| **BUG-386** | 2.4 / 2.5 | 根治鼠标拖拽调整窗口尺寸时的剧烈边缘抖动与反复跨越断点拖拽卡死：新增 Rust 原生原子 Win32 缩放管线（`begin_window_resize` / `step_window_resize` / `end_window_resize`），改用 OS 全局物理光标 `GetCursorPos` + 不变起始锚定矩形计算单次合并 `SetWindowPos(..., SWP_NOZORDER \| SWP_NOACTIVATE \| SWP_NOOWNERZORDER \| SWP_NOCOPYBITS)`，彻底根除 `e.clientX/Y` 正反馈震荡、双 IPC 撕裂及 `tao` 样式偏差；升级 `sizing_subclass_proc` 覆盖八方向宽高钳制与 `WM_ENTERSIZEMOVE`/`WM_EXITSIZEMOVE` 同步；前端 `ResizeHandles` 引入单调 `gestureSeq` 防并发并在 `WindowProvider` 拖拽期间冻结 `285px`/`126px` 断点组件拆装，松手由 `RESIZE_ENDED_EVENT` 携带精确客户区尺寸一次性对齐；`lib.rs` 拖拽期跳过逐像素几何查询。 |
+| **BUG-387** | 5.2 / 5.6 | 在不改变任何自愈切点门限前提下根除前端延迟与真实网络状态双向失步：① [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 将 `LAST_SYNCED_ACTIVE_HISTORY_TIME` 升级为 `LAST_UI_ACTIVE_SYNC`（`UiActiveSyncState { node_name, history_time, reported_alive }`），推送 `Timeout (0)` 时不记录旧成功 `history_time` 而标记 `reported_alive = false` 确保恢复必同步；新增 `build_probe_ui_display` / `compute_next_ui_active_sync` / `should_sync_alive_ui` 纯函数使 `!primary_url_distorted` 下全超时空 `map` 也下发全组 `0`、`primary_url_distorted = true` 仅推送真实有效延迟不把未响应节点漆成 30 分钟 `0`、`ActiveTrafficState::Stalled` 叠加全灭 `None` 时以 `from_probe = false` 下发 30 秒 `(active_node, 0)` 消除顶栏假绿；② `AutoSelectOutcome` 增设 `covers_all_group_nodes` 门控防止子集测速或失真残缺探测提前置位 `reported_live_to_ui = true`；③ 前端 [delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts) 修复 `getDelayFix` 在 `proxy.alive === true` 且有效 `history` 时间戳严格新于缓存 `Timeout` 时立即淘汰旧 `0` 缓存回显新延迟，并限制 `injectBatchResults(..., { fromProbe: false })` 对 `Timeout` 一律封顶 `30s` 寿命；补齐 Rust 与 Vitest 双向同步回归单测。 |
+| **BUG-388** | 5.1 / 5.2 / 5.3 / 5.4 | **【待用户确认】** 加固后端连续性自愈边界与子集同源精度：`enhance/mod.rs` 为 `PROXY__METRICS` 显式写入 `lazy: false` 并删除 `constants.rs` 未使用 `INTERNAL_CONTROL_TIMEOUT_MS`（`monitor.rs` 复用 `constants::timing::NODE_DELAY_MAX_MS`）；`monitor.rs` 新增 `should_allow_https_migration` 阻止 `Flowing` 有流量态期间执行即时 HTTPS 验真/迁移、`HTTPS_VERIFY_MIGRATE_MIN_FAILS (2)` 收紧迁移门槛、`HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS (600s)` 遏制 HTTPS 全败探测风暴、`self_heal_subject_to_switch_rate_limit` 豁免已确证 `ConfirmedDead` 的速率截断、`should_keep_alive_on_api_recovery` 在 `ApiChannelDown` 恢复且现出口 `Alive` 时直接保活、`MANUAL_SWITCH_EPOCH` + `AUTO_SELECT_MANUAL_PREEMPTED` 防止在途自动选点覆盖用户手动切换；`node.rs` 改用 `str::trim_start` 对齐全 Unicode 空白（含全角空格 `\u{3000}`）；`lifecycle.rs::pick_subset_fallback_node` 严格禁止非空 `filter_text` 时越界切出筛选子集。 |
+| **BUG-389** | 2.12 / 5.6 | **【待用户确认】** 打通焦点快捷键与新手引导全协议导入保护：`disable-webview-shortcuts.ts` 将未修饰 `F4`/`F1` 提升至 `isEditableTarget` 判断之前，使节点过滤框等编辑焦点的用户也能一键触发列表测速与全量优选（保持 `Ctrl+F` 聚焦保护与 `Alt+F4` 零拦截）；`src/utils/node.ts` 新增并导出 `SUPPORTED_NODE_URI_SCHEMES`（11 种单节点 URI）与 `isSupportedSubscriptionOrNodeInput` 供 `FirstRunGuideDialog` 统一调用，打通剪贴板自动识别与单/多行全协议节点导入，清理重复 `⭐` 前缀，并限制重开引导时不再强行覆盖用户既有的系统代理开关偏好。 |
+| **BUG-390** | 2.8 / 7.4 | **【待用户确认】** 补齐订阅操作安全保护、离线重测防切点与全语种文案收敛：`ProfileImportCard` 行内刷新/删除按钮新增 `Tooltip` 与 `aria-label`；行内删除图标与右键「删除配置」统一通过 `LayoutDialogs` 3D 窄窗二次确认框删除（复用 `profiles.modals.confirmDelete`）；`ActiveNodeCard` 断网警示胶囊在 `healthIssue === 'offline'` 时传 `select: false` 仅测延迟不切换；`_layout.tsx` 启动重试失败报错改为 `layout.notices.profileActivationFailed`，同步补齐 13 语种 `errScheme` / `delayCheck` / `shared.placeholders.filter` 并在 `settings.json` 剔除 3 个零引用废键。 |
+| **BUG-391** | 六 / 八 | **【待用户确认】** 清理死代码、冗余依赖与全量文档对齐收官：通过 `git rm` 移除误追踪的 `src-tauri/.agents/` 审计中间产物与废弃 `resize-geometry.ts`（将 `window-resizing` 用例连同 `BUG-389` 用例收敛至 `src/utils/window-resizing.test.ts`）；移除 Rust 17 个零调用死命令及 `network-interface` / `gethostname` / `tokio-rustls` / `rust_iso3166` / `src-tauri` 侧 `criterion` 冗余依赖；清理前端零调用 `openCoreDir` / `openLogsDir` / `uninstallService`；全量同步 `clash_mini_agreements.md`、`docs/ARCHITECTURE.md`、`docs/implementation-notes.md` 与 `用户必读.txt`。 |
 
 ---
 

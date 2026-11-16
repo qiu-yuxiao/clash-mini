@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN requires Service Mode or Admin Mode"
       },
       "actions": {
-        "installService": "Instal Layanan",
-        "uninstallService": "Uninstall Service"
+        "installService": "Instal Layanan"
       },
       "fields": {
         "systemProxy": "Proksi Sistem",
@@ -188,8 +187,6 @@
           "backupSetting": "Pengaturan Cadangan",
           "runtimeConfig": "Konfigurasi Runtime",
           "openConfDir": "Buka Direktori Konfigurasi",
-          "openCoreDir": "Buka Direktori Core",
-          "openLogsDir": "Buka Direktori Log",
           "checkUpdates": "Periksa Pembaruan",
           "openDevTools": "Buka Alat Pengembang",
           "liteModeSettings": "LightWeight Mode Settings",

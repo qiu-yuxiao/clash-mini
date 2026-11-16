@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN requires Service Mode or Admin Mode"
       },
       "actions": {
-        "installService": "تثبيت الخدمة ",
-        "uninstallService": "Uninstall Service"
+        "installService": "تثبيت الخدمة "
       },
       "fields": {
         "systemProxy": "وكيل النظام",
@@ -188,8 +187,6 @@
           "backupSetting": "إعداد النسخ الاحتياطي",
           "runtimeConfig": "تكوين وقت التشغيل",
           "openConfDir": "فتح مجلد التكوين",
-          "openCoreDir": "فتح مجلد النواة",
-          "openLogsDir": "فتح مجلد السجلات",
           "checkUpdates": "التحقق من وجود تحديثات",
           "openDevTools": "أدوات المطور",
           "liteModeSettings": "LightWeight Mode Settings",

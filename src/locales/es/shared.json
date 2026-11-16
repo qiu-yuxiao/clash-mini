@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "Borrar el cuadro de entrada",
-    "filter": "Condiciones de filtrado"
+    "filter": "Filtro (espacio Y, | O, - excluir)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

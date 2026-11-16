@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "입력 필드 지우기",
-    "filter": "필터 조건"
+    "filter": "필터 (공백 AND, | OR, - 제외)"
   },
   "validation": {
     "invalidRegex": "잘못된 정규식"

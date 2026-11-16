@@ -8,7 +8,7 @@
       "importAndStart": "Import and enable",
       "later": "Configure manually later",
       "errEmpty": "Please enter or paste a subscription link",
-      "errScheme": "The link must start with http:// or https://",
+      "errScheme": "Enter a subscription URL (http(s)://) or node URIs (vmess://, vless://, ss://, trojan://, hysteria2://, etc.)",
       "errImport": "Import failed. Check the link and try again",
       "readyTitle": "Ready to Go",
       "imported": "Subscription imported and activated",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "Update failed: {{message}}",
     "switchedToGlobalProxy": "Switched to Global Proxy",
     "switchedToGfwlist": "Switched to GFWList mode",
-    "switchedToAddUrl": "Switched to Add URL proxy mode"
+    "switchedToAddUrl": "Switched to Add URL proxy mode",
+    "profileActivationFailed": "Profile activation failed after 3 retries. Please check your network or subscription."
   }
 }

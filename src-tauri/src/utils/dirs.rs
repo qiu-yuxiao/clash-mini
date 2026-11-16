@@ -1,4 +1,4 @@
-use crate::core::{CoreManager, handle, manager::RunningMode};
+use crate::core::handle;
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use once_cell::sync::OnceCell;
@@ -107,11 +107,6 @@ pub fn app_logs_dir() -> Result<PathBuf> {
     Ok(app_home_dir()?.join("logs"))
 }
 
-// latest verge log
-pub fn app_latest_log() -> Result<PathBuf> {
-    Ok(app_logs_dir()?.join("latest.log"))
-}
-
 pub fn clash_path() -> Result<PathBuf> {
     Ok(app_home_dir()?.join(CLASH_CONFIG))
 }
@@ -141,13 +136,6 @@ pub fn service_log_dir() -> Result<PathBuf> {
     let _ = std::fs::create_dir_all(&log_dir);
 
     Ok(log_dir)
-}
-
-pub fn clash_latest_log() -> Result<PathBuf> {
-    match *CoreManager::global().get_running_mode() {
-        RunningMode::Service => Ok(service_log_dir()?.join("service_latest.log")),
-        RunningMode::Sidecar | RunningMode::NotRunning => Ok(sidecar_log_dir()?.join("sidecar_latest.log")),
-    }
 }
 
 pub fn path_to_str(path: &PathBuf) -> Result<&str> {

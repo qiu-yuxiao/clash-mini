@@ -8,7 +8,7 @@
       "importAndStart": "İçe aktar ve etkinleştir",
       "later": "Daha sonra elle yapılandır",
       "errEmpty": "Lütfen bir abonelik bağlantısı gir veya yapıştır",
-      "errScheme": "Bağlantı http:// veya https:// ile başlamalı",
+      "errScheme": "Abonelik URL’si (http(s)://) veya düğüm URI’leri (vmess://, vless://, ss://, trojan://, hysteria2:// vb.) girin",
       "errImport": "İçe aktarma başarısız. Bağlantıyı kontrol edip tekrar dene",
       "readyTitle": "Kullanıma Hazır",
       "imported": "Abonelik içe aktarıldı ve etkinleştirildi",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "Güncelleme başarısız: {{message}}",
     "switchedToGlobalProxy": "Genel Proxy moduna geçildi",
     "switchedToGfwlist": "GFWList moduna geçildi",
-    "switchedToAddUrl": "URL Ekle proxy moduna geçildi"
+    "switchedToAddUrl": "URL Ekle proxy moduna geçildi",
+    "profileActivationFailed": "3 denemeden sonra profil etkinleştirilemedi. Ağı veya aboneliği kontrol edin."
   }
 }

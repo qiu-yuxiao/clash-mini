@@ -524,3 +524,38 @@ export const matchNodeFilter = (name: string, filterText: string): boolean => {
 
   return true
 }
+
+/** 与后端 universal_parser.rs 对齐的单节点 URI 协议头（多行导入也受支持） */
+export const SUPPORTED_NODE_URI_SCHEMES = [
+  'vmess://',
+  'ss://',
+  'trojan://',
+  'vless://',
+  'hysteria2://',
+  'hysteria://',
+  'anytls://',
+  'tuic://',
+  'wireguard://',
+  'socks5://',
+  'socks://',
+] as const
+
+/** 判断首次引导输入框 / 剪贴板文本是否为合法的单条订阅 URL 或单/多行节点 URI（BUG-389） */
+export const isSupportedSubscriptionOrNodeInput = (raw: string): boolean => {
+  const lines = raw
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) return false
+
+  const hasHttpUrl = lines.some((line) => /^https?:\/\//i.test(line))
+  if (hasHttpUrl) {
+    return lines.length === 1 && !/\s/.test(lines[0])
+  }
+
+  return lines.every((line) => {
+    const lower = line.toLowerCase()
+    return SUPPORTED_NODE_URI_SCHEMES.some((scheme) => lower.startsWith(scheme))
+  })
+}

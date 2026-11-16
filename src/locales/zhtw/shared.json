@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "清空輸入框",
-    "filter": "篩選條件"
+    "filter": "關鍵詞（空格與 / | 或 / - 排除）"
   },
   "validation": {
     "invalidRegex": "無效的正規表示式"

@@ -8,7 +8,7 @@
       "importAndStart": "Importieren und aktivieren",
       "later": "Später manuell einrichten",
       "errEmpty": "Bitte Abo-Link eingeben oder einfügen",
-      "errScheme": "Der Link muss mit http:// oder https:// beginnen",
+      "errScheme": "Geben Sie eine Abo-URL (http(s)://) oder Knoten-URIs (vmess://, vless://, ss://, trojan://, hysteria2:// usw.) ein",
       "errImport": "Import fehlgeschlagen. Link prüfen und erneut versuchen",
       "readyTitle": "Einsatzbereit",
       "imported": "Abonnement importiert und aktiviert",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "Update fehlgeschlagen: {{message}}",
     "switchedToGlobalProxy": "Auf globalen Proxy umgestellt",
     "switchedToGfwlist": "Auf GFWList-Modus umgestellt",
-    "switchedToAddUrl": "Auf Proxy-Modus URL hinzufügen umgestellt"
+    "switchedToAddUrl": "Auf Proxy-Modus URL hinzufügen umgestellt",
+    "profileActivationFailed": "Profilaktivierung nach 3 Versuchen fehlgeschlagen. Bitte Netzwerk oder Abo prüfen."
   }
 }

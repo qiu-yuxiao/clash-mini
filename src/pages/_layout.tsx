@@ -223,6 +223,12 @@ const Layout = () => {
     string | null
   >(null)
 
+  // Delete Profile Confirmation Dialog State (BUG-390)
+  const [deleteConfirmProfile, setDeleteConfirmProfile] = useState<{
+    uid: string
+    name: string
+  } | null>(null)
+
   // BUG-385: 通过派生可见态与显式开关处理器统一收口抽屉内浮层菜单锚点，
   // 避免在 useEffect 中同步 setState，且在极小窗自动收起或手动关闭设置时同步清理。
   const isDrawerVisible = drawerOpen && !isMiniStatus
@@ -247,6 +253,7 @@ const Layout = () => {
 
   const closeSettingsDrawer = useCallback(() => {
     resetDrawerMenuAnchors()
+    setDeleteConfirmProfile(null)
     setDrawerOpen(false)
   }, [resetDrawerMenuAnchors, setDrawerOpen])
 
@@ -725,9 +732,7 @@ const Layout = () => {
             }
           }, retryDelay)
         } else {
-          showNotice.error(
-            'Profile activation failed after 3 retries. Please check your network or subscription.',
-          )
+          showNotice.error('layout.notices.profileActivationFailed')
         }
       })
       .finally(() => {
@@ -970,8 +975,19 @@ const Layout = () => {
     }
   }
 
-  const handleDeleteProfile = async (uid: string, e: React.MouseEvent) => {
+  const handleDeleteProfile = (uid: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    const targetItem = profileItems.find((p) => p.uid === uid)
+    setDeleteConfirmProfile({
+      uid,
+      name: targetItem?.name || uid,
+    })
+  }
+
+  const handleConfirmDeleteProfile = async () => {
+    if (!deleteConfirmProfile) return
+    const { uid } = deleteConfirmProfile
+    setDeleteConfirmProfile(null)
     try {
       await deleteProfile(uid)
       await mutateProfiles()
@@ -1024,10 +1040,10 @@ const Layout = () => {
     } as React.MouseEvent)
   }
 
-  const handleDeleteProfileClick = async () => {
+  const handleDeleteProfileClick = () => {
     setProfileMenuAnchorPosition(null)
     if (!contextMenuProfileUid) return
-    await handleDeleteProfile(contextMenuProfileUid, {
+    handleDeleteProfile(contextMenuProfileUid, {
       stopPropagation: () => {},
     } as React.MouseEvent)
   }
@@ -1147,6 +1163,7 @@ const Layout = () => {
     drawerOpen ||
     logsOpen ||
     editProfileOpen ||
+    Boolean(deleteConfirmProfile) ||
     addUrlOpen ||
     firstRunGuideOpen ||
     antivirusWhitelistOpen ||
@@ -1937,6 +1954,9 @@ const Layout = () => {
           logsOpen={logsOpen}
           setLogsOpen={setLogsOpen}
           mode={mode}
+          deleteConfirmProfile={deleteConfirmProfile}
+          onCancelDeleteProfile={() => setDeleteConfirmProfile(null)}
+          onConfirmDeleteProfile={handleConfirmDeleteProfile}
         />
         <FirstRunGuideDialog
           open={firstRunGuideOpen}

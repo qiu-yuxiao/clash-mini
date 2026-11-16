@@ -1349,6 +1349,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     }
     metrics_group.insert(Value::from("url"), Value::from(test_url));
     metrics_group.insert(Value::from("interval"), Value::from(300));
+    metrics_group.insert(Value::from("lazy"), Value::from(false));
 
     // Replace the entire proxy-groups sequence with [PROXY (control), PROXY__METRICS (measurement)]
     config.insert(
@@ -1708,6 +1709,7 @@ append-rules:
         assert_eq!(metrics_group.get("type").unwrap().as_str(), Some("url-test"));
         assert!(metrics_group.get("url").is_some());
         assert!(metrics_group.get("interval").is_some());
+        assert_eq!(metrics_group.get("lazy").unwrap().as_bool(), Some(false));
 
         let group_proxies = proxy_group.get("proxies").and_then(Value::as_sequence).unwrap();
         assert_eq!(group_proxies.len(), 2);

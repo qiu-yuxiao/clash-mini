@@ -425,13 +425,10 @@ fn has_colon_quota_or_date(lower: &str) -> bool {
                 after_num += 1;
             }
         }
-        let mut k = after_num;
-        while k < bytes.len() && bytes[k].is_ascii_whitespace() {
-            k += 1;
-        }
-        if let Some(after_ws) = rhs.get(k..) {
+        if let Some(after_ws) = rhs.get(after_num..).map(str::trim_start) {
+            let tail_bytes = after_ws.as_bytes();
             for unit in ["gib", "tib", "gb", "tb", "mb", "pb"] {
-                if after_ws.starts_with(unit) && bytes.get(k + unit.len()).is_none_or(|b| !b.is_ascii_lowercase()) {
+                if after_ws.starts_with(unit) && tail_bytes.get(unit.len()).is_none_or(|b| !b.is_ascii_lowercase()) {
                     return true;
                 }
             }
@@ -439,7 +436,7 @@ fn has_colon_quota_or_date(lower: &str) -> bool {
                 return true;
             }
             for unit in ["days", "day"] {
-                if after_ws.starts_with(unit) && bytes.get(k + unit.len()).is_none_or(|b| !b.is_ascii_lowercase()) {
+                if after_ws.starts_with(unit) && tail_bytes.get(unit.len()).is_none_or(|b| !b.is_ascii_lowercase()) {
                     return true;
                 }
             }
@@ -554,6 +551,10 @@ pub fn match_node_filter(name: &str, filter_text: &str) -> bool {
 
     true
 }
+
+/// 活跃节点触发即时验真退避迁移所需的最小连续失败次数（在物理在线且有参照节点通过的前提下）：
+/// 避免仅 1 轮偶发 TLS 抖动就误判为需迁移，连续 >= 2 轮失败再允许切换到已验真节点。
+pub const HTTPS_VERIFY_MIGRATE_MIN_FAILS: u8 = 2;
 
 /// 同一节点（同指纹 `server:port+config`）连续真 HTTPS 验真失败阈值：
 /// 超过该次数（`fail_count > 5`，即连续 >= 6 轮在“物理网卡在线且同批至少 1 个参照节点验真通过”
@@ -990,7 +991,14 @@ pub fn is_verified_true_node(name: &str) -> bool {
     fingerprint_for_node(name).is_some_and(|fp| is_verified_true_fp(&fp))
 }
 
-/// 查询节点名是否在有效观察期（未过 24h TTL）内曾在有参照节点通过的前提下累计过真 HTTPS 验真失败
+/// 纯判定函数（便于单测锁定）：判断单条验真记录是否满足活跃节点即时验真退避迁移门槛
+const fn record_has_verify_failure(verified_true: bool, fail_count: u8, last_verified_at: i64, now_ts: i64) -> bool {
+    !verified_true
+        && fail_count >= HTTPS_VERIFY_MIGRATE_MIN_FAILS
+        && (last_verified_at <= 0 || now_ts.saturating_sub(last_verified_at) < HTTPS_VERIFY_BAN_TTL_SECS)
+}
+
+/// 查询节点名是否在有效观察期（未过 24h TTL）内曾在有参照节点通过的前提下累计过达到迁移阈值的真 HTTPS 验真失败
 pub fn has_verify_failure_node(name: &str) -> bool {
     let Some(fp) = fingerprint_for_node(name) else {
         return false;
@@ -998,11 +1006,10 @@ pub fn has_verify_failure_node(name: &str) -> bool {
     ensure_verify_store_loaded();
     let now_ts = current_unix_ts();
     VERIFY_STORE.read().as_ref().is_some_and(|store| {
-        store.records.get(&fp).is_some_and(|r| {
-            !r.verified_true
-                && r.fail_count > 0
-                && (r.last_verified_at <= 0 || now_ts.saturating_sub(r.last_verified_at) < HTTPS_VERIFY_BAN_TTL_SECS)
-        })
+        store
+            .records
+            .get(&fp)
+            .is_some_and(|r| record_has_verify_failure(r.verified_true, r.fail_count, r.last_verified_at, now_ts))
     })
 }
 
@@ -1577,6 +1584,7 @@ server: 1.2.3.4
         assert!(is_dummy_node("更新日期：2026年11月"));
         assert!(is_dummy_node("Remaining: 30 days"));
         assert!(is_dummy_node("Quota: 167.26 GB"));
+        assert!(is_dummy_node("剩余流量：100\u{3000}GB"));
         assert!(is_dummy_node("Contact us: boostqz.com"));
         // .hk 后缀相邻点号不算地区暗示，应识别为官网域名横幅
         assert!(!has_region_hint("永久官网:abc.hk"));
@@ -1669,5 +1677,24 @@ server: 1.2.3.4
         let out_c = resolve_proxy_clone_topology(entries_dual_colon_region);
         assert_eq!(out_c.names, vec!["新加坡：备用"]);
         assert!(out_c.tainted_fps.is_empty());
+    }
+
+    #[test]
+    fn test_https_verify_migrate_min_fails_threshold() {
+        use super::{HTTPS_VERIFY_MIGRATE_MIN_FAILS, record_has_verify_failure};
+        assert_eq!(HTTPS_VERIFY_MIGRATE_MIN_FAILS, 2);
+        let now = 1_700_000_000;
+        // 仅 1 次失败不触发活跃节点迁移（防偶发抖动）
+        assert!(!record_has_verify_failure(false, 1, now - 10, now));
+        // 连续 >= 2 次失败且在 24h TTL 内允许迁移
+        assert!(record_has_verify_failure(false, 2, now - 10, now));
+        // 曾通过真验真或已超 TTL 均不触发
+        assert!(!record_has_verify_failure(true, 3, now - 10, now));
+        assert!(!record_has_verify_failure(
+            false,
+            3,
+            now - HTTPS_VERIFY_BAN_TTL_SECS,
+            now
+        ));
     }
 }

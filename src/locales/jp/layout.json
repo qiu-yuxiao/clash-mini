@@ -8,7 +8,7 @@
       "importAndStart": "インポートして有効化",
       "later": "後で手動設定",
       "errEmpty": "サブスクリプションのリンクを入力または貼り付けてください",
-      "errScheme": "リンクは http:// または https:// で始まる必要があります",
+      "errScheme": "サブスクリプションURL（http(s)://）またはノードURI（vmess://、vless://、ss://、trojan://、hysteria2:// など）を入力してください",
       "errImport": "インポートに失敗しました。リンクを確認して再試行してください",
       "readyTitle": "準備完了",
       "imported": "サブスクリプションをインポートして有効化しました",
@@ -143,6 +143,7 @@
     "clientUpdateFailed": "更新に失敗しました: {{message}}",
     "switchedToGlobalProxy": "グローバルプロキシに切り替えました",
     "switchedToGfwlist": "GFWList モードに切り替えました",
-    "switchedToAddUrl": "URL追加プロキシモードに切り替えました"
+    "switchedToAddUrl": "URL追加プロキシモードに切り替えました",
+    "profileActivationFailed": "プロファイルの有効化に3回連続で失敗しました。ネットワークや購読内容をご確認ください。"
   }
 }

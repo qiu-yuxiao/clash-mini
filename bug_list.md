@@ -22,11 +22,11 @@
 
 ### BUG-389 主界面过滤框聚焦下 F1/F4 快捷键失灵修复与新手引导全协议导入放通
 
-- **对应模块**：[disable-webview-shortcuts.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/disable-webview-shortcuts.ts)、[first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx)、[window-resizing.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/window-resizing.test.ts)
+- **对应模块**：[disable-webview-shortcuts.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/disable-webview-shortcuts.ts)、[node.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.ts)、[first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx)、[window-resizing.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/window-resizing.test.ts)
 - **问题描述**：① `ProxyHead` 挂载 100ms 后自动聚焦过滤框，而 `disable-webview-shortcuts.ts` 在 `isEditableTarget` 提前返回，导致开窗直接按或输入过滤词时按 `F1`/`F4` 测速快捷键被静默吞掉；② `FirstRunGuideDialog` 硬性拦截非 `http(s)://` 链接，手持 `vmess://` / `vless://` / `ss://` / `trojan://` / `hy2://` 等节点配置的用户首屏直接被拒（与全协议支持定位不符），剪贴板嗅探亦未覆盖单节点 URI，且重开引导导入会覆盖用户已选「手动模式」。
 - **修复方案**：
   1. 调整 [disable-webview-shortcuts.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/disable-webview-shortcuts.ts) 调度顺序，在无弹窗遮挡/非 IME/非连发前提下于 `isEditableTarget` 前优先放行无修饰 `F4`/`F1`，保留 `Ctrl+F` 仅非编辑态触发；
-  2. 在 [first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx) 导出 `isSupportedSubscriptionOrNodeInput` 统一校验 `http(s)://` 订阅与 `universal_parser.rs` 支持的全协议 URI 列表（同步放通剪贴板单行节点嗅探），限定仅首次引导未完成时才自动开启系统代理，并补齐 Vitest 单元测试。
+  2. 在 [node.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.ts) 导出 `SUPPORTED_NODE_URI_SCHEMES` 与 `isSupportedSubscriptionOrNodeInput` 统一校验 `http(s)://` 订阅与 `universal_parser.rs` 支持的 11 种节点协议 URI（由 [first-run-guide-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/first-run-guide-dialog.tsx) 统一复用并放通剪贴板单/多行节点嗅探），限定仅首次引导未完成时才自动开启系统代理，并补齐 Vitest 单元测试。
 - **状态**：代码已修正，待用户确认
 
 ### BUG-390 订阅删除二次确认防呆、物理断网胶囊防盲切与全界面多语言/提示收口

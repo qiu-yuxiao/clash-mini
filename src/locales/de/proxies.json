@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "Aktueller Knoten",
-      "delayCheck": "Latenztest",
+      "delayCheck": "Latenzprüfung (F4 sichtbar / F1 vollständige Auto-Wahl)",
       "sortDefault": "Standard Sortierung",
       "sortDelay": "Nach Latenz sortieren",
       "sortName": "Nach Name sortieren",

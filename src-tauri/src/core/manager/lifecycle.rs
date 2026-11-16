@@ -507,29 +507,105 @@ async fn read_filter_text() -> String {
         .unwrap_or_default()
 }
 
+/// 纯选择函数（便于单测锁定，BUG-388）：按优先级从 `PROXY` 全量成员中挑选兜底节点：
+/// 1. 匹配 `filter_text` 且已通过真 HTTPS 验真的有效节点；
+/// 2. 匹配 `filter_text` 的有效节点；
+/// 3. 仅当 `filter_text.trim().is_empty()`（未设置任何子集筛选）时才回退到首个全局有效节点，
+///    存在显式关键词筛选且子集全灭时返回 `None`，严禁静默切出筛选范围。
+fn pick_subset_fallback_node<'a, FValid, FVerified>(
+    all: &'a [String],
+    filter_text: &str,
+    is_valid: FValid,
+    is_verified: FVerified,
+) -> Option<&'a str>
+where
+    FValid: Fn(&str) -> bool,
+    FVerified: Fn(&str) -> bool,
+{
+    let trimmed = filter_text.trim();
+    all.iter()
+        .find(|n| is_valid(n) && is_verified(n) && crate::utils::node::match_node_filter(n, trimmed))
+        .or_else(|| {
+            all.iter()
+                .find(|n| is_valid(n) && crate::utils::node::match_node_filter(n, trimmed))
+        })
+        .or_else(|| {
+            if trimmed.is_empty() {
+                all.iter().find(|n| is_valid(n))
+            } else {
+                None
+            }
+        })
+        .map(String::as_str)
+}
+
 /// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底
 async fn select_fallback_in_subset(mihomo: &Mihomo, filter_text: &str) {
     let Ok(group_info) = mihomo.get_group_by_name("PROXY").await else {
         return;
     };
     let Some(all) = group_info.all else { return };
-    let valid = |n: &&std::string::String| {
-        !crate::utils::node::is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n)
-    };
-    let fallback = all
-        .iter()
-        .filter(|n| valid(n) && crate::utils::node::is_verified_true_node(n))
-        .find(|n| crate::utils::node::match_node_filter(n, filter_text))
-        .or_else(|| {
-            all.iter()
-                .filter(valid)
-                .find(|n| crate::utils::node::match_node_filter(n, filter_text))
-        })
-        .or_else(|| all.iter().find(valid));
+    let fallback = pick_subset_fallback_node(
+        &all,
+        filter_text,
+        |n| !crate::utils::node::is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n),
+        crate::utils::node::is_verified_true_node,
+    );
     if let Some(fb) = fallback {
         match mihomo.select_node_for_group("PROXY", fb).await {
             Ok(()) => logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb),
             Err(e) => logging!(warn, Type::Core, "PROXY 组回退节点选择也失败: {}", e),
         }
+    } else if !filter_text.trim().is_empty() {
+        logging!(
+            info,
+            Type::Core,
+            "PROXY 组在过滤范围「{}」内无可用兜底节点，遵循边界约束跳过越界切点",
+            filter_text.trim()
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_subset_fallback_node;
+
+    #[test]
+    fn test_pick_subset_fallback_node_respects_filter_boundary() {
+        let all = vec![
+            "剩余流量：100 GB".to_string(),
+            "香港-01".to_string(),
+            "日本-01".to_string(),
+            "日本-02".to_string(),
+        ];
+        let is_valid = |n: &str| !n.contains("剩余流量");
+
+        // 1. 有过滤词且存在已验真匹配项：优先选已验真匹配
+        assert_eq!(
+            pick_subset_fallback_node(&all, "日本", is_valid, |n| n == "日本-02"),
+            Some("日本-02")
+        );
+
+        // 2. 有过滤词且仅未验真匹配：选未验真匹配
+        assert_eq!(
+            pick_subset_fallback_node(&all, "日本", is_valid, |_| false),
+            Some("日本-01")
+        );
+
+        // 3. 有过滤词且子集无任何有效匹配（仅香港存在）：返回 None，绝不越界切出筛选子集
+        assert_eq!(
+            pick_subset_fallback_node(&all, "新加坡", is_valid, |n| n == "香港-01"),
+            None
+        );
+
+        // 4. 空/纯空白过滤词：允许全局兜底并优先已验真有效节点
+        assert_eq!(
+            pick_subset_fallback_node(&all, "   ", is_valid, |n| n == "日本-01"),
+            Some("日本-01")
+        );
+        assert_eq!(
+            pick_subset_fallback_node(&all, "", is_valid, |_| false),
+            Some("香港-01")
+        );
     }
 }

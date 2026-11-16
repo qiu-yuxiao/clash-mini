@@ -152,7 +152,7 @@ export const ActiveNodeStatusCard = () => {
         currentProfileUid,
         undefined,
         0,
-        true,
+        networkHealth !== 'network_health::offline',
       )
       if (results.some(([, d]) => d > 0 && d < latencyTimeout)) {
         broadcastNetworkHealth('network_health::ok')
@@ -164,7 +164,10 @@ export const ActiveNodeStatusCard = () => {
       void queryClient.invalidateQueries({ queryKey: ['getProxies'] })
     } catch (err) {
       const msg = String(err instanceof Error ? err.message : err)
-      if (msg.includes('AUTO_SELECT_BUSY')) {
+      if (
+        msg.includes('AUTO_SELECT_BUSY') ||
+        msg.includes('AUTO_SELECT_MANUAL_PREEMPTED')
+      ) {
         showNotice.info('settings.mini.testingInProgress')
       } else if (msg.includes('AUTO_SELECT_NO_RESULT')) {
         showNotice.error('settings.mini.testNotExecuted')

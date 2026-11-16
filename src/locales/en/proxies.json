@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "locate",
-      "delayCheck": "Delay check",
+      "delayCheck": "Delay check (F4 visible / F1 full auto-select)",
       "sortDefault": "Sort by default",
       "sortDelay": "Sort by delay",
       "sortName": "Sort by name",

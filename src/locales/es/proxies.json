@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "Nodo actual",
-      "delayCheck": "Prueba de latencia",
+      "delayCheck": "Comprobar latencia (F4 visibles / F1 selección automática total)",
       "sortDefault": "Ordenación predeterminada",
       "sortDelay": "Ordenar por latencia",
       "sortName": "Ordenar por nombre",

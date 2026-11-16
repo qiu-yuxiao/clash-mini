@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tokio::time::{Duration, Instant, sleep};
 
 /// 互斥锁：同一时间只允许一个 trigger_backend_auto_select 运行
@@ -48,11 +48,8 @@ pub static NODE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_
 const NODE_DELAY_MIN_MS: u32 = 30;
 
 /// 节点延迟上限（毫秒）。超过此值的节点判定为不可用（断流）。
-/// 健康检测和自动选点测速均以此值作为超时阈值，确保判断标准统一。
-/// 3.1.1：2000 → 5000。现场实证（BUG-304）：链路拥塞簇内 TCP 握手即需
-/// 1.1~2.1s，叠加 TLS 握手与 204 往返后，活节点总耗时超 2s 被整组误判为
-/// 断流；5s 预算可覆盖拥塞期「慢而可用」的节点，真死节点 5s 内同样超时。
-const NODE_DELAY_MAX_MS: u32 = 5000;
+/// 与全局 `constants::timing::NODE_DELAY_MAX_MS` (5000ms) 同源，确保健康检测和自动选点判断标准统一。
+use crate::constants::timing::NODE_DELAY_MAX_MS;
 
 /// 批量测速对 Clash 内核发起的探针超时上限。
 /// 与死节点判定阈值 NODE_DELAY_MAX_MS(5000) 统一，确保「探针超时 == 判死阈值」：
@@ -173,8 +170,16 @@ const HTTPS_VERIFY_INTERVAL_SECS: u64 = 180;
 ///
 /// 活跃节点未验真时触发即时真 HTTPS 复核的冷却时间（避免每次 15s 循环重复验证）
 const ACTIVE_VERIFY_COOLDOWN_SECS: u64 = 60;
+/// 物理在线前提下主/备真 HTTPS 验证 URL 全灭或 0 节点通过时的全组探测退避窗口（秒）
+const HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS: u64 = 600;
 
 static LAST_ACTIVE_VERIFY_CHECK: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+static LAST_HTTPS_VERIFY_ALL_FAILED: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+
+/// 纯函数（便于单测锁定，BUG-388）：判断当前是否处于真 HTTPS 验真全败退避冷却窗口内
+const fn is_https_verify_backoff_active(last_failed_elapsed_secs: Option<u64>) -> bool {
+    matches!(last_failed_elapsed_secs, Some(secs) if secs < HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS)
+}
 
 fn prioritize_verified_candidates_with<F>(candidates: Vec<(String, u32)>, is_verified: F) -> Vec<(String, u32)>
 where
@@ -200,6 +205,17 @@ fn prioritize_verified_candidates(candidates: Vec<(String, u32)>) -> Vec<(String
 ///   （见 `evaluate_failover` 的本轮实拨门检）。
 async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candidate_nodes: &[String], reason: &str) {
     if !crate::utils::node::has_pending_unverified_nodes(candidate_nodes) {
+        return;
+    }
+    let backoff_elapsed = LAST_HTTPS_VERIFY_ALL_FAILED.lock().map(|t| t.elapsed().as_secs());
+    if is_https_verify_backoff_active(backoff_elapsed) {
+        logging!(
+            debug,
+            Type::Lightweight,
+            "[HTTPS验真/{reason}] 处于全量验真受阻退避窗口内（距上次全败 {}s < {}s），跳过本轮探测",
+            backoff_elapsed.unwrap_or(0),
+            HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS
+        );
         return;
     }
     if !is_physical_network_online(2).await {
@@ -229,10 +245,11 @@ async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candi
                 {
                     Ok(d) => d,
                     Err(e) => {
+                        *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = Some(Instant::now());
                         logging!(
                             debug,
                             Type::Lightweight,
-                            "[HTTPS验真/{reason}] 主/备验证 URL 均无响应({e})，跳过本轮失败累计"
+                            "[HTTPS验真/{reason}] 主/备验证 URL 均无响应({e})，记录退避并跳过本轮失败累计"
                         );
                         return;
                     }
@@ -247,13 +264,15 @@ async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candi
         .map(|(name, _)| name.clone())
         .collect();
     if passed_set.is_empty() {
+        *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = Some(Instant::now());
         logging!(
             debug,
             Type::Lightweight,
-            "[HTTPS验真/{reason}] 本批 0 个节点通过真 HTTPS 验真（疑离线或校验受阻），跳过本轮失败累计"
+            "[HTTPS验真/{reason}] 本批 0 个节点通过真 HTTPS 验真（疑离线或校验受阻），记录退避并跳过本轮失败累计"
         );
         return;
     }
+    *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = None;
 
     let passed_names: Vec<String> = passed_set.iter().cloned().collect();
     let failed_names: Vec<String> = candidate_nodes
@@ -1151,6 +1170,35 @@ const fn self_heal_requires_dead_gate(origin: SelfHealOrigin) -> bool {
     matches!(origin, SelfHealOrigin::ConfirmedDead)
 }
 
+/// 切换速率限制适用范围（BUG-388，纯函数便于单测锁定）：
+/// 已通过连续体检与「原节点确已死」复核证实的 `ConfirmedDead` 死链必须允许立即抢修，不能被 180s 速率上限锁死在死节点；
+/// `NodeMigration`（原节点仍可用时的不可信迁移）与 `ApiChannelDown` 仍受速率上限约束。
+const fn self_heal_subject_to_switch_rate_limit(origin: SelfHealOrigin) -> bool {
+    !matches!(origin, SelfHealOrigin::ConfirmedDead)
+}
+
+/// 连续性优先（BUG-388，纯函数便于单测锁定）：活跃节点存在真实下行流量（`Flowing`）时，
+/// 禁止以“未通过真 HTTPS 验真”为由执行后台切换或即时全组 HTTPS 验真探测。
+const fn should_allow_https_migration(traffic_state: ActiveTrafficState) -> bool {
+    !matches!(traffic_state, ActiveTrafficState::Flowing)
+}
+
+/// `ApiChannelDown` 恢复保活门检（BUG-388，纯函数便于单测锁定）：
+/// 当 API 已可读且当前活跃真实节点健康（`Alive(_)`）时，遵循连续性优先直接保活现有出口，跳过全组择优切点。
+const fn should_keep_alive_on_api_recovery(is_valid_real_node: bool, status: NodeStatus) -> bool {
+    is_valid_real_node && matches!(status, NodeStatus::Alive(_))
+}
+
+/// 手动切点抢占判定（BUG-388，纯函数便于单测锁定）：比较选点开始与切换落盘前代际号。
+const fn is_manual_switch_preempted(start_epoch: u64, current_epoch: u64) -> bool {
+    current_epoch != start_epoch
+}
+
+/// 识别属于并发/抢占让路而非真实故障的选点中断错误（BUG-388）。
+fn is_benign_auto_select_abort(err_str: &str) -> bool {
+    matches!(err_str, "AUTO_SELECT_BUSY" | "AUTO_SELECT_MANUAL_PREEMPTED")
+}
+
 /// 后台监测所有自愈请求的统一裁决输入（S3，§5.1 / §5.3）。
 ///
 /// 旧实现把「是否自愈」分散写在三个分支里：网络恢复凭一次 `evaluate_failover`
@@ -1578,7 +1626,7 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
     // 只有确属“在参照节点通过前提下曾验真失败（has_verify_failure_node）”且子集内存在已验真健康节点时，才切往已验真节点
     match proxies.proxies.get(&active_node).map(node_status) {
         Some(NodeStatus::Alive(_)) => {
-            if !crate::utils::node::is_verified_true_node(&active_node) {
+            if should_allow_https_migration(traffic_state) && !crate::utils::node::is_verified_true_node(&active_node) {
                 let can_verify_now = LAST_ACTIVE_VERIFY_CHECK
                     .lock()
                     .is_none_or(|t| t.elapsed() >= Duration::from_secs(ACTIVE_VERIFY_COOLDOWN_SECS));
@@ -1804,6 +1852,7 @@ async fn trigger_backend_auto_select_inner(
     select: bool,
     allow_self_heal_reuse: bool,
 ) -> anyhow::Result<AutoSelectOutcome> {
+    let start_manual_epoch = MANUAL_SWITCH_EPOCH.load(Ordering::Acquire);
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
     // 解析展示排序方式（sort_type==0 时从 head state 读取）
@@ -2090,6 +2139,19 @@ async fn trigger_backend_auto_select_inner(
                 });
             }
 
+            // 【BUG-388 · 手动切点抢占护栏】测速/验真期间用户手动切换过节点（epoch 递增），严禁覆盖用户最新显式选择
+            let current_manual_epoch = MANUAL_SWITCH_EPOCH.load(Ordering::Acquire);
+            if is_manual_switch_preempted(start_manual_epoch, current_manual_epoch) {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 选点期间检测到用户手动切点（epoch {} -> {}），放弃覆盖用户当前选择",
+                    start_manual_epoch,
+                    current_manual_epoch
+                );
+                return Err(anyhow::anyhow!("AUTO_SELECT_MANUAL_PREEMPTED"));
+            }
+
             // 最高方针「连续性优先」（Sync-22）：最优节点若本就是当前出口，跳过一次
             // 无意义的 select_node_for_group 写入。读取组信息失败时按原逻辑执行，
             // 不改变任何既有语义；回写 profile.selected 与前端刷新仍照常进行（幂等）。
@@ -2233,11 +2295,14 @@ struct UiActiveSyncState {
 
 static LAST_NOTIFIED_HEALTH: parking_lot::Mutex<&'static str> = parking_lot::Mutex::new("network_health::ok");
 static LAST_MANUAL_NODE_SWITCH: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+static MANUAL_SWITCH_EPOCH: AtomicU64 = AtomicU64::new(0);
 static LAST_UI_ACTIVE_SYNC: parking_lot::Mutex<Option<UiActiveSyncState>> = parking_lot::Mutex::new(None);
 static ALERT_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 
-/// 记录前端手动切换产生的新节点切换时间戳并立即唤醒监测循环吸收（BUG-336），不触发额外全组拨测。
+/// 记录前端手动切换产生的新节点切换时间戳并立即唤醒监测循环吸收（BUG-336），不触发额外全组拨测；
+/// 同时递增全局手动切换代际号，使在途自动选点不会在测速结束后覆盖用户最新选择（BUG-388）。
 pub fn notify_manual_node_switched() {
+    MANUAL_SWITCH_EPOCH.fetch_add(1, Ordering::AcqRel);
     *LAST_MANUAL_NODE_SWITCH.lock() = Some(Instant::now());
     NODE_SWITCH_NOTIFY.notify_one();
 }
@@ -2245,8 +2310,11 @@ pub fn notify_manual_node_switched() {
 fn reset_monitor_static_state() {
     *LAST_NOTIFIED_HEALTH.lock() = "network_health::ok";
     *LAST_MANUAL_NODE_SWITCH.lock() = None;
+    MANUAL_SWITCH_EPOCH.store(0, Ordering::Release);
     *LAST_UI_ACTIVE_SYNC.lock() = None;
     *LAST_METRICS_PROBE.lock() = None;
+    *LAST_ACTIVE_VERIFY_CHECK.lock() = None;
+    *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = None;
     *ACTIVE_TRAFFIC_TRACKER.lock() = None;
 }
 
@@ -2870,10 +2938,13 @@ async fn self_heal_with_accounting(
         }
     }
 
-    // 【S4 · 切换速率上限】先裁剪滑动窗口，再按「实际切换」次数而非选点尝试次数裁决。
+    // 【S4 · 切换速率上限】先裁剪滑动窗口，再按「实际切换」次数而非选点尝试次数裁决；
+    // 对已通过确死门检的 `ConfirmedDead` 豁免速率截断，避免用户被强行锁死在已死节点上（BUG-388）。
     recent_auto_switches.retain(|t| now.duration_since(*t).as_secs() < AUTO_SWITCH_WINDOW_SECS);
     let last_switch_age = recent_auto_switches.last().map(|t| now.duration_since(*t).as_secs());
-    if !auto_switch_permitted(last_switch_age, recent_auto_switches.len()) {
+    if self_heal_subject_to_switch_rate_limit(origin)
+        && !auto_switch_permitted(last_switch_age, recent_auto_switches.len())
+    {
         logging!(
             warn,
             Type::Lightweight,
@@ -2885,6 +2956,40 @@ async fn self_heal_with_accounting(
             MAX_AUTO_SWITCHES_PER_WINDOW
         );
         return false;
+    }
+
+    // 【BUG-388 · API 通道恢复保活门检】若由 ApiChannelDown 进入自愈但此刻 API 已可读且当前出口健康，
+    // 遵循连续性优先直接保活现状并复位双失败计数，避免 API 短暂恢复即全组切点。
+    if matches!(origin, SelfHealOrigin::ApiChannelDown) {
+        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+        if let (Ok(group_info), Ok(proxies)) = (mihomo.get_group_by_name("PROXY").await, mihomo.get_proxies().await)
+            && let Some(active) = group_info.now.as_deref()
+        {
+            let is_valid_real = !active.is_empty()
+                && active != "DIRECT"
+                && active != "REJECT"
+                && !is_dummy_node(active)
+                && !crate::utils::node::is_confirmed_fake_node(active);
+            let status = proxies
+                .proxies
+                .get(active)
+                .map(node_status)
+                .unwrap_or(NodeStatus::Unknown);
+            if should_keep_alive_on_api_recovery(is_valid_real, status) {
+                *auto_select_fail_count = 0;
+                *api_dead_heal_fail_count = 0;
+                emit_network_health_notice("network_health::ok");
+                *last_check_time = Instant::now();
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] API 通道自愈前复核已恢复且当前节点 {} 健康（{:?}），保活现状并跳过切点",
+                    active,
+                    status
+                );
+                return false;
+            }
+        }
     }
 
     let prev_auto_select_time = *last_auto_select_time;
@@ -2933,13 +3038,13 @@ async fn self_heal_with_accounting(
         }
         Err(e) => {
             let err_str = e.to_string();
-            if err_str == "AUTO_SELECT_BUSY" {
+            if is_benign_auto_select_abort(&err_str) {
                 logging!(
                     info,
                     Type::Lightweight,
-                    "[后台监测] 自愈选点冲突（系统繁忙），跳过本次尝试，不施加冷却惩罚"
+                    "[后台监测] 自愈选点让路中断 ({err_str})，跳过本次切点且不施加冷却或故障惩罚"
                 );
-                // BUSY 不算失败，回退冷却时间戳，允许下次重试
+                // 并发繁忙 / 用户手动抢占均不算故障，回退冷却时间戳，允许下次重试
                 *last_auto_select_time = prev_auto_select_time;
             } else {
                 *auto_select_fail_count += 1;
@@ -3665,5 +3770,59 @@ mod tests {
             "日本-02",
             Some("2026-11-16T12:00:00Z")
         ));
+    }
+
+    #[test]
+    fn test_bug388_continuity_and_self_heal_invariants() {
+        use super::{
+            HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS, LAST_ACTIVE_VERIFY_CHECK, LAST_HTTPS_VERIFY_ALL_FAILED,
+            MANUAL_SWITCH_EPOCH, Ordering, is_benign_auto_select_abort, is_https_verify_backoff_active,
+            is_manual_switch_preempted, notify_manual_node_switched, reset_monitor_static_state,
+            self_heal_subject_to_switch_rate_limit, should_allow_https_migration, should_keep_alive_on_api_recovery,
+        };
+
+        // 1. HTTPS 验真全败退避窗口
+        assert!(!is_https_verify_backoff_active(None));
+        assert!(is_https_verify_backoff_active(Some(0)));
+        assert!(is_https_verify_backoff_active(Some(
+            HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS - 1
+        )));
+        assert!(!is_https_verify_backoff_active(Some(
+            HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS
+        )));
+
+        // 2. Flowing 状态严禁执行活跃节点 HTTPS 验真/迁移
+        assert!(!should_allow_https_migration(ActiveTrafficState::Flowing));
+        assert!(should_allow_https_migration(ActiveTrafficState::Idle));
+        assert!(should_allow_https_migration(ActiveTrafficState::Stalled));
+
+        // 3. ConfirmedDead 豁免切换速率上限，NodeMigration / ApiChannelDown 仍受限
+        assert!(!self_heal_subject_to_switch_rate_limit(SelfHealOrigin::ConfirmedDead));
+        assert!(self_heal_subject_to_switch_rate_limit(SelfHealOrigin::NodeMigration));
+        assert!(self_heal_subject_to_switch_rate_limit(SelfHealOrigin::ApiChannelDown));
+
+        // 4. ApiChannelDown 恢复保活门检
+        assert!(should_keep_alive_on_api_recovery(true, NodeStatus::Alive(120)));
+        assert!(!should_keep_alive_on_api_recovery(false, NodeStatus::Alive(120)));
+        assert!(!should_keep_alive_on_api_recovery(true, NodeStatus::Dead));
+        assert!(!should_keep_alive_on_api_recovery(true, NodeStatus::Suspect));
+        assert!(!should_keep_alive_on_api_recovery(true, NodeStatus::Unknown));
+
+        // 5. 手动切点代际抢占与良性中断识别、静态状态复位
+        assert!(!is_manual_switch_preempted(3, 3));
+        assert!(is_manual_switch_preempted(3, 4));
+        assert!(is_benign_auto_select_abort("AUTO_SELECT_BUSY"));
+        assert!(is_benign_auto_select_abort("AUTO_SELECT_MANUAL_PREEMPTED"));
+        assert!(!is_benign_auto_select_abort("OTHER_ERROR"));
+
+        let prev_epoch = MANUAL_SWITCH_EPOCH.load(Ordering::Acquire);
+        notify_manual_node_switched();
+        assert_eq!(MANUAL_SWITCH_EPOCH.load(Ordering::Acquire), prev_epoch + 1);
+        *LAST_ACTIVE_VERIFY_CHECK.lock() = Some(Instant::now());
+        *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = Some(Instant::now());
+        reset_monitor_static_state();
+        assert_eq!(MANUAL_SWITCH_EPOCH.load(Ordering::Acquire), 0);
+        assert!(LAST_ACTIVE_VERIFY_CHECK.lock().is_none());
+        assert!(LAST_HTTPS_VERIFY_ALL_FAILED.lock().is_none());
     }
 }

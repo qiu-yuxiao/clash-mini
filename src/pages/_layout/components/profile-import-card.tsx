@@ -4,6 +4,7 @@ import {
   Typography,
   CircularProgress,
   TextField,
+  Tooltip,
   Button,
   IconButton,
   useTheme,
@@ -272,24 +273,30 @@ export const ProfileImportCard: React.FC<ProfileImportCardProps> = ({
                   }}
                 >
                   {item.type === 'remote' && (
+                    <Tooltip title={t('profiles.components.menu.update')}>
+                      <IconButton
+                        size="small"
+                        aria-label={t('profiles.components.menu.update')}
+                        onClick={(e) => handleUpdateProfile(item.uid, e)}
+                        sx={{
+                          p: 0.1,
+                          color: isActive ? 'primary.main' : 'text.secondary',
+                        }}
+                      >
+                        <RefreshRounded sx={{ fontSize: 12 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  <Tooltip title={t('shared.actions.delete')}>
                     <IconButton
                       size="small"
-                      onClick={(e) => handleUpdateProfile(item.uid, e)}
-                      sx={{
-                        p: 0.1,
-                        color: isActive ? 'primary.main' : 'text.secondary',
-                      }}
+                      aria-label={t('shared.actions.delete')}
+                      onClick={(e) => handleDeleteProfile(item.uid, e)}
+                      sx={{ p: 0.1, color: 'error.main' }}
                     >
-                      <RefreshRounded sx={{ fontSize: 12 }} />
+                      <DeleteRounded sx={{ fontSize: 12 }} />
                     </IconButton>
-                  )}
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleDeleteProfile(item.uid, e)}
-                    sx={{ p: 0.1, color: 'error.main' }}
-                  >
-                    <DeleteRounded sx={{ fontSize: 12 }} />
-                  </IconButton>
+                  </Tooltip>
                 </Box>
               </Box>
 

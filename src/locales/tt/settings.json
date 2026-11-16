@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN requires Service Mode or Admin Mode"
       },
       "actions": {
-        "installService": "Хезмәтне урнаштыру",
-        "uninstallService": "Uninstall Service"
+        "installService": "Хезмәтне урнаштыру"
       },
       "fields": {
         "systemProxy": "Системалы прокси",
@@ -188,8 +187,6 @@
           "backupSetting": "Резерв копия көйләүләре",
           "runtimeConfig": "Агымдагы конфигурация",
           "openConfDir": "Кушымта папкасын ачу",
-          "openCoreDir": "Ядро сакланган папканы ачу",
-          "openLogsDir": "Логлар папкасын ачу",
           "checkUpdates": "Яңартуларны тикшерү",
           "openDevTools": "Разработчик коралларын ачу",
           "liteModeSettings": "LightWeight Mode Settings",

@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN 模式需要安装服务模式或管理员模式"
       },
       "actions": {
-        "installService": "安装服务",
-        "uninstallService": "卸载服务"
+        "installService": "安装服务"
       },
       "fields": {
         "systemProxy": "系统代理",
@@ -188,8 +187,6 @@
           "backupSetting": "备份设置",
           "runtimeConfig": "当前配置",
           "openConfDir": "配置目录",
-          "openCoreDir": "内核目录",
-          "openLogsDir": "日志目录",
           "checkUpdates": "检查更新",
           "openDevTools": "开发者工具",
           "liteModeSettings": "轻量模式设置",

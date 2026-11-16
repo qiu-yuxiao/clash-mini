@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "위치 찾기",
-      "delayCheck": "지연 확인",
+      "delayCheck": "지연 테스트 (F4 현재 목록 / F1 전체 자동 선택)",
       "sortDefault": "기본 정렬",
       "sortDelay": "지연으로 정렬",
       "sortName": "이름으로 정렬",

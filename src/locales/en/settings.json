@@ -35,8 +35,7 @@
         "tunUnavailable": "TUN requires Service Mode or Admin Mode"
       },
       "actions": {
-        "installService": "Install Service",
-        "uninstallService": "Uninstall Service"
+        "installService": "Install Service"
       },
       "fields": {
         "systemProxy": "System Proxy",
@@ -188,8 +187,6 @@
           "backupSetting": "Backup Setting",
           "runtimeConfig": "Runtime Config",
           "openConfDir": "Open Conf Dir",
-          "openCoreDir": "Open Core Dir",
-          "openLogsDir": "Open Logs Dir",
           "checkUpdates": "Check for Updates",
           "openDevTools": "Dev Tools",
           "liteModeSettings": "LightWeight Mode Settings",

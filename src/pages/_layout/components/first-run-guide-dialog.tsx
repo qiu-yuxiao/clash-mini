@@ -29,6 +29,7 @@ import {
 import { getProfiles, triggerAutoSelect } from '@/services/cmds'
 import { getDelayManager, NODE_DELAY_MAX_MS } from '@/services/delay'
 import { get3DButtonStyle, get3DInputStyle } from '@/utils/button-styles'
+import { isSupportedSubscriptionOrNodeInput } from '@/utils/node'
 import {
   getNarrowDialogSlotProps,
   getNarrowDialogSx,
@@ -130,12 +131,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
         }
       }
       const trimmed = clip.trim()
-      if (
-        trimmed &&
-        !trimmed.includes('\n') &&
-        !trimmed.includes(' ') &&
-        (trimmed.startsWith('http://') || trimmed.startsWith('https://'))
-      ) {
+      if (trimmed && isSupportedSubscriptionOrNodeInput(trimmed)) {
         return trimmed
       }
       return ''
@@ -388,7 +384,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
       setUrl(trimmed)
     }
 
-    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    if (!isSupportedSubscriptionOrNodeInput(trimmed)) {
       setErrorMessage(t('layout.components.firstRun.errScheme'))
       return
     }
@@ -401,9 +397,17 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
     try {
       const success = await onImport(trimmed)
       if (success) {
-        // 若当前既未开启系统代理也未开启 TUN 模式，导入成功后自动开启系统代理，
-        // 兑现按钮「立即导入并开启」的语义并避免用户还要手动去设置开启
-        if (verge && !verge.enable_system_proxy && !verge.enable_tun_mode) {
+        // 若为首次新手引导且当前既未开启系统代理也未开启 TUN 模式，导入成功后自动开启系统代理；
+        // 从帮助菜单再次打开引导时（已存在 FIRST_RUN_GUIDE_STORAGE_KEY === 'true'）尊重用户已有系统代理偏好
+        const isReopenedAfterCompletion =
+          typeof window !== 'undefined' &&
+          localStorage.getItem(FIRST_RUN_GUIDE_STORAGE_KEY) === 'true'
+        if (
+          !isReopenedAfterCompletion &&
+          verge &&
+          !verge.enable_system_proxy &&
+          !verge.enable_tun_mode
+        ) {
           void patchVerge({ enable_system_proxy: true }).catch(() => {})
         }
         setStep('ready')
@@ -1000,7 +1004,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                     lineHeight: 1.45,
                   }}
                 >
-                  ⭐ {t('layout.components.firstRun.starTitle')}
+                  {t('layout.components.firstRun.starTitle')}
                 </Typography>
 
                 <Typography
@@ -1122,7 +1126,7 @@ export const FirstRunGuideDialog: React.FC<FirstRunGuideDialogProps> = ({
                 }}
                 onClick={handleOpenGithubStarAndFinish}
               >
-                ⭐ {t('layout.components.firstRun.openGithubStar')}
+                {t('layout.components.firstRun.openGithubStar')}
               </Button>
               <Button
                 fullWidth

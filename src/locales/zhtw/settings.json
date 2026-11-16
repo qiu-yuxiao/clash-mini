@@ -35,8 +35,7 @@
         "tunUnavailable": "虛擬網路介面卡模式需要安裝服務模式或以系統管理員身分執行"
       },
       "actions": {
-        "installService": "安裝服務",
-        "uninstallService": "解除安裝服務"
+        "installService": "安裝服務"
       },
       "fields": {
         "systemProxy": "系統代理",
@@ -188,8 +187,6 @@
           "backupSetting": "備份設定",
           "runtimeConfig": "執行期設定",
           "openConfDir": "配置目錄",
-          "openCoreDir": "內核目錄",
-          "openLogsDir": "日誌目錄",
           "checkUpdates": "檢查更新",
           "openDevTools": "開發人員工具",
           "liteModeSettings": "輕量模式設定",

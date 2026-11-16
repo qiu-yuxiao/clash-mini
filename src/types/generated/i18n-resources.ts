@@ -328,6 +328,7 @@ export interface TranslationResources {
         coreUpdateSuccess: string
         coreUpgradeStartFailed: string
         coreUpToDate: string
+        profileActivationFailed: string
         profileLinkCopied: string
         profileSaved: string
         subscriptionUpdated: string
@@ -679,9 +680,7 @@ export interface TranslationResources {
               exportDiagnostics: string
               liteModeSettings: string
               openConfDir: string
-              openCoreDir: string
               openDevTools: string
-              openLogsDir: string
               runtimeConfig: string
               vergeVersion: string
             }
@@ -1222,7 +1221,6 @@ export interface TranslationResources {
         proxyControl: {
           actions: {
             installService: string
-            uninstallService: string
           }
           fields: {
             systemProxy: string

@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "Eingabefeld leeren",
-    "filter": "Filterbedingungen"
+    "filter": "Filter (Leerz. UND, | ODER, - Ausschl.)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

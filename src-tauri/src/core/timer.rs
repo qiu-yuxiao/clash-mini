@@ -392,24 +392,6 @@ impl Timer {
         logging!(info, Type::Timer, "Timer shutdown signal sent");
     }
 
-    pub async fn get_next_update_time(&self, uid: &str) -> Option<i64> {
-        logging!(debug, Type::Timer, "Getting next update time, uid={}", uid);
-
-        let task_interval = *self.timer_map.read().get(uid)?;
-        let profiles = Config::profiles().await;
-        let profiles_guard = profiles.latest_arc();
-        let items = profiles_guard.get_items()?;
-
-        let profile = items.iter().find(|item| item.uid.as_deref() == Some(uid))?;
-        let updated = profile.updated.unwrap_or(0);
-
-        if updated > 0 {
-            Some(updated + (task_interval as i64 * 60))
-        } else {
-            None
-        }
-    }
-
     fn emit_update_event(uid: &String, is_start: bool) {
         if is_start {
             super::handle::Handle::notify_profile_update_started(uid);

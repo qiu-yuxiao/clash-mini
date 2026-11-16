@@ -61,7 +61,7 @@
   },
   "placeholders": {
     "resetInput": "Clear Input",
-    "filter": "Filter conditions"
+    "filter": "Filter (space AND, | OR, - exclude)"
   },
   "validation": {
     "invalidRegex": "Invalid regular expression"

@@ -35,8 +35,7 @@
         "tunUnavailable": "Для TUN требуется режим службы или права администратора"
       },
       "actions": {
-        "installService": "Установить службу",
-        "uninstallService": "Удалить службу"
+        "installService": "Установить службу"
       },
       "fields": {
         "systemProxy": "Системный прокси",
@@ -188,8 +187,6 @@
           "backupSetting": "Настройки резервного копирования",
           "runtimeConfig": "Используемая конфигурация",
           "openConfDir": "Открыть папку приложения",
-          "openCoreDir": "Открыть папку ядра",
-          "openLogsDir": "Открыть папку логов",
           "checkUpdates": "Проверить обновления",
           "openDevTools": "Открыть инструменты разработчика",
           "liteModeSettings": "Настройки режима LightWeight",

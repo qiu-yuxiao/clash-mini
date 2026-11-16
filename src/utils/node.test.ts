@@ -78,6 +78,7 @@ describe('isDummyNode 广告与说明假节点判定', () => {
     expect(isDummyNode('更新日期：2026年11月')).toBe(true)
     expect(isDummyNode('Remaining: 30 days')).toBe(true)
     expect(isDummyNode('Quota: 167.26 GB')).toBe(true)
+    expect(isDummyNode('剩余流量：100\u{3000}GB')).toBe(true)
     expect(isDummyNode('Contact us: boostqz.com')).toBe(true)
     expect(hasRegionHint('永久官网:abc.hk')).toBe(false)
     expect(isDummyNode('永久官网:abc.hk')).toBe(true)

@@ -6,10 +6,7 @@ use crate::utils::window_manager::WindowManager;
 use crate::{
     config::{
         Config, IProfiles, PrfItem, PrfOption,
-        profiles::{
-            profiles_append_item_with_filedata_safe, profiles_delete_item_safe, profiles_patch_item_safe,
-            profiles_reorder_safe, profiles_save_file_safe,
-        },
+        profiles::{profiles_delete_item_safe, profiles_patch_item_safe, profiles_save_file_safe},
         profiles_append_item_safe,
     },
     core::{CoreManager, handle, timer::Timer, validate::ValidationOutcome},
@@ -147,52 +144,6 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
 
     logging!(info, Type::Cmd, "[导入订阅] 导入完成: {}", help::mask_url(&url));
     Ok(())
-}
-
-/// 调整profile的顺序
-#[tauri::command]
-pub async fn reorder_profile(active_id: String, over_id: String) -> CmdResult {
-    // M2-06: 防止切换期间修改 profiles 结构
-    try_lock_profile_switching!(
-        "当前正在切换配置，排序请求被拒绝",
-        Err("当前正在切换或更新配置，请稍候再试".into())
-    );
-    match profiles_reorder_safe(&active_id, &over_id).await {
-        Ok(_) => {
-            logging!(info, Type::Cmd, "重新排序配置文件");
-            Ok(())
-        }
-        Err(err) => {
-            logging!(error, Type::Cmd, "重新排序配置文件失败: {}", err);
-            Err(format!("重新排序配置文件失败: {}", err).into())
-        }
-    }
-}
-
-/// 创建新的profile
-/// 创建一个新的配置文件
-#[tauri::command]
-pub async fn create_profile(item: PrfItem, file_data: Option<String>) -> CmdResult {
-    // M2-06: 防止切换期间修改 profiles 结构
-    try_lock_profile_switching!(
-        "当前正在切换配置，创建订阅请求被拒绝",
-        Err("当前正在切换或更新配置，请稍候再试".into())
-    );
-    match profiles_append_item_with_filedata_safe(&item, file_data).await {
-        Ok(_) => {
-            profiles_save_file_safe().await.stringify_err()?;
-            // 发送配置变更通知
-            if let Some(uid) = &item.uid {
-                logging!(info, Type::Cmd, "[创建订阅] 发送配置变更通知: {}", uid);
-                handle::Handle::notify_profile_changed(uid);
-            }
-            Ok(())
-        }
-        Err(err) => match err.to_string().as_str() {
-            "the file already exists" => Err("the file already exists".into()),
-            _ => Err(format!("add profile error: {err}").into()),
-        },
-    }
 }
 
 #[tauri::command]
@@ -432,12 +383,4 @@ pub async fn read_profile_file(index: String) -> CmdResult<String> {
     };
     let data = item.read_file().stringify_err()?;
     Ok(data)
-}
-
-/// 获取下一次更新时间
-#[tauri::command]
-pub async fn get_next_update_time(uid: String) -> CmdResult<Option<i64>> {
-    let timer = Timer::global();
-    let next_time = timer.get_next_update_time(&uid).await;
-    Ok(next_time)
 }

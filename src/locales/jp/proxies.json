@@ -30,7 +30,7 @@
     },
     "tooltips": {
       "locate": "現在のノード",
-      "delayCheck": "遅延テスト",
+      "delayCheck": "遅延テスト（F4 表示中 / F1 全件自動選択）",
       "sortDefault": "デフォルトでソート",
       "sortDelay": "遅延でソート",
       "sortName": "名前でソート",
