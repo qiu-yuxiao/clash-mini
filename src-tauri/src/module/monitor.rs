@@ -13,8 +13,8 @@ use tokio::time::{Duration, Instant, sleep};
 /// 互斥锁：同一时间只允许一个 trigger_backend_auto_select 运行
 static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// 后台 monitor 任务的 JoinHandle，用于退出时主动中止
-static MONITOR_TASK_HANDLE: Mutex<Option<tauri::async_runtime::JoinHandle<()>>> = Mutex::new(None);
+/// 后台 monitor 任务的 JoinHandle，用于退出时主动中止（运行在物理隔离的 DAEMON_RUNTIME，BUG-394）
+static MONITOR_TASK_HANDLE: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex::new(None);
 
 /// 中止后台 monitor 常驻任务
 pub fn abort_monitor() {
@@ -2358,9 +2358,9 @@ fn emit_network_health_notice(next_status: &'static str) {
     }
 }
 
-/// 启动全局后台节点监测常驻线程（BUG-353 panic 自愈监督）
+/// 启动全局后台节点监测常驻线程（BUG-353 panic 自愈监督 + BUG-394 守护运行时物理隔离）
 pub fn start_background_monitor() {
-    let handle = AsyncHandler::spawn_supervised("background_monitor", Type::Lightweight, move || async move {
+    let handle = AsyncHandler::spawn_daemon_supervised("background_monitor", Type::Lightweight, move || async move {
         reset_monitor_static_state();
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
         let thread_start_time = Instant::now();

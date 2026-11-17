@@ -1976,7 +1976,6 @@ const Layout = () => {
             setFirstRunGuideOpen(false)
             openSettingsDrawer()
           }}
-          onOpenWhitelistGuide={() => setAntivirusWhitelistOpen(true)}
         />
         <AntivirusWhitelistDialog
           open={antivirusWhitelistOpen}

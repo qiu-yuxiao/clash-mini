@@ -1,6 +1,6 @@
 # Clash Mini 开发设计书
 
-> **适用版本**：v3.5.1 及后续版本  
+> **适用版本**：v3.5.2 及后续版本  
 > **文档性质**：本文档是 Clash Mini 项目的**权威系统设计规范与工程开发宪章**。所有功能开发、重构优化与代码审核必须严格遵循本文档中定义的架构约定、业务逻辑与安全红线。  
 > **维护说明**：本文档聚焦于**系统设计意图（做什么、为什么、架构边界与关键参数）**；具体代码实现见配套索引 `docs/implementation-notes.md`，架构全局图谱见 `docs/ARCHITECTURE.md`，历史避坑指南见 `clash_mini_pitfalls.md`。
 
@@ -96,7 +96,7 @@ Clash Mini 是一款高度聚焦于极致轻量、超低内存占用、高稳定
    - 默认代理端口固定为：Mixed **`10801`**、SOCKS **`10802`**、HTTP **`10803`**（避开原版默认的 7890/7897）。
    - 内核 Controller API 默认端口固定为 **`9098`**（避开原版默认的 9090/9097），默认控制器密钥为 **`adapted-by-qiu-yuxiao`**（见 `src-tauri/src/constants.rs` 与 `src-tauri/src/config/clash.rs`）。
    - 单实例检测通信端口在 Release 模式锁定为 **`33335`**，Dev 模式锁定为 **`33336`**。
-4. **单实例静默唤醒规范**：第二实例启动时若检测到单实例端口已被占用，通过本地 HTTP/IPC 向既有实例发送唤醒通知后**静默退出**，禁止弹出错误弹窗；仅当端口占用但请求彻底失败（超时/连接拒绝）时才提示单实例错误。
+4. **单实例静默唤醒规范（v3.5.2 / BUG-394 / BUG-395 加固）**：单实例 HTTP 服务（`server.rs::embed_server`，`127.0.0.1:33335`）常驻于物理隔离的专属守护 Tokio 运行时 `DAEMON_RUNTIME`，第二实例探测超时为 **`1500ms`**；若检测到端口已被占用，向既有实例发送 `/commands/visible` 通知后**静默退出**，禁止弹出错误弹窗；当 `should_enter_silent_tray_on_launch()`（开启「静默启动」且已有真实订阅配置）为真时，既有实例接收 `/commands/visible` 后**不创建/不弹出主窗口**，维持轻量托盘驻留并通过 Win32 托盘气泡确认运行状态；仅当端口占用但请求彻底失败（超时/连接拒绝）时才提示单实例错误。
 
 ### 1.2 Windows x64 单一平台架构收敛
 
@@ -178,7 +178,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 2.4 Win32 消息子类化与 WM_SIZING 全向钳制钩子
 
 针对 Windows 系统在无边框（Frameless）窗口边缘缩放时突破尺寸边界或 Y 轴下移飘移的底层缺陷，实施 **Win32 窗口过程子类化防御**：
-- **钩子安装（现代化 `SetWindowSubclass` 架构，BUG-332 / BUG-350 / BUG-386）**：在主窗口构建完成阶段通过 Win32 `SetWindowSubclass` 挂载子类化窗口过程拦截 `WM_ENTERSIZEMOVE`、`WM_SIZING` 与 `WM_EXITSIZEMOVE` 消息，并在收到 `WM_NCDESTROY` 时自动调用 `RemoveWindowSubclass` 解绑并复位句柄记录，彻底根除轻量模式销毁重建主窗口时因 Windows 复用 `HWND` 数值导致的钩子漏挂。
+- **钩子安装与原子句柄主线程闭环（现代化 `SetWindowSubclass` 架构，BUG-332 / BUG-350 / BUG-386 / BUG-394）**：主窗口构建、样式剥离（`strip_caption_style_hwnd`）、外框对齐（`force_set_window_outer_size_hwnd`）与 `SetWindowSubclass` 钩子挂载全部收拢于 UI 主线程 `run_on_main_thread` 闭包内就地一次完成（带 **`12s`** 异步等待超时及失败销毁回滚 `cleanup_timed_out_main_window`），同步登记原子全局句柄 `MAIN_WINDOW_HWND` 并在 `WM_NCDESTROY` / `destroy_main_window` 时自动清零；子类化过程拦截 `WM_ENTERSIZEMOVE`、`WM_SIZING` 与 `WM_EXITSIZEMOVE`，并在收到 `WM_NCDESTROY` 时自动调用 `RemoveWindowSubclass` 解绑释放，彻底根除轻量模式销毁重建主窗口时因 Windows 复用 `HWND` 数值或后台线程阻塞导致的钩子漏挂与死锁。
 - **全向宽高钳制与会话状态同步（BUG-386）**：在 `WM_ENTERSIZEMOVE` 置位全局原生拖拽标志 `NATIVE_WINDOW_RESIZING`、在 `WM_EXITSIZEMOVE` 复位并持久化最终逻辑几何；在 `WM_SIZING` 中结合 `GetDpiForWindow` 统一把 `WMSZ_LEFT/RIGHT/TOP/BOTTOM/TOPLEFT/TOPRIGHT/BOTTOMLEFT/BOTTOMRIGHT` 八方向提议矩形钳制在 `[MINIMAL_WIDTH, MAX_WIDTH]` × `[MINIMAL_HEIGHT, MAX_HEIGHT]`，并按非移动边反向锁定对边坐标（如 `rect.top = rect.bottom - target_h`、`rect.left = rect.right - target_w`），在系统正式布局前同时防漂移、防越界。
 - **重入与睡眠唤醒防御**：按当前有效窗口句柄判重并在销毁消息中精确清零，在系统睡眠恢复（Resumed）或多次激活触发时自动短路，避免重复子类化。
 
@@ -236,7 +236,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **固定双项菜单与左键双向切换（BUG-361）**：
   - 左键单击执行双向窗口切换——若不处于轻量模式且主窗口当前可见、未最小化且处于前台聚焦状态，则单击隐藏收起主窗口，否则激活恢复并置顶主窗口。
   - 右键弹出固定结构双项静态菜单，禁止运行期销毁或重建菜单：①「轻量模式 / Lite mode」（切换时仅通过 `item.set_text` 同步前缀 `"✔ "` 勾选标识）；②「退出 (Exit)」。
-- **图标状态映射（无轮询、无动态重绘）**：`Tray::update_icon` 仅在代理模式变更事件时按需调用 `tray.set_icon`，在内置三枚静态 PNG 图标间切换：`tray-icon-tun.png`（TUN 模式）、`tray-icon-sys.png`（系统代理模式）与 `tray-icon.png`（仅本地混合代理）；严禁在后台定时器中高频刷新图标或更新 ToolTip。
+- **图标状态映射与按需静默气泡（无轮询、无动态重绘，BUG-395）**：`Tray::update_icon` 仅在代理模式变更事件时按需调用 `tray.set_icon`，在内置三枚静态 PNG 图标间切换：`tray-icon-tun.png`（TUN 模式）、`tray-icon-sys.png`（系统代理模式）与 `tray-icon.png`（仅本地混合代理）；`MAIN_WINDOW_FOCUSED` 以原子布尔值缓存窗口焦点以供托盘左键无阻塞判定；仅当用户启用「静默启动」后**手动非 `--silent` 启动或再次点击启动图标**时，按需通过原生 Win32 `Shell_NotifyIconW(NIM_MODIFY, NIF_INFO)` 弹出带 `2s` 防抖的托盘气泡提示（零后台轮询、零创建 WebView 窗口）。严禁在后台定时器中高频刷新图标或更新 ToolTip。
 
 ### 2.10 设置开关的乐观更新与权威数据源
 
@@ -251,7 +251,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **实现介质：注册表 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`**，由已注册的 `tauri-plugin-autostart`（底层 `auto-launch`）写入；**不再使用计划任务**（`utils/schtasks.rs` 已整体删除）。
   - **为什么不用计划任务**：它唯一的独有能力是 `RunLevel=HighestAvailable` 可「免 UAC 提权自启」，而本项目**用不上** —— TUN 走独立安装的 Windows 服务（`clash_verge_service`，`StartMode=Auto`，开机自启），app 本身不需提权；是否建 Admin 任务原本也只取决于「进程当前已提权」，实测现网任务都是 `RunLevel: Limited`。
   - 换回注册表的收益：删掉约 400 行 `schtasks` 逻辑（含仅为解析 `schtasks.exe` 中文输出而存在的 OEM/ANSI 代码页解码）、无子进程、无 XML 落盘，用户在任务管理器「启动」页可直接看到并禁用。
-  - 插件构建时固定注入 `--silent` 参数；是否真的静默由运行时判定（`should_silent = enable_silent_start && has_silent_arg`），与旧方案语义一致。
+  - 自 `v3.5.2`（BUG-395）起，静默启动统一由 `lightweight::should_enter_silent_tray_on_launch()` 判定：当 **`enable_silent_start == true` 且存在至少一条真实配置（`remote`/`local`）** 时，不仅开机自启（带 `--silent`），包括用户手动双击图标冷启动以及轻量/运行态再次点击启动图标（`/commands/visible`）均直接静默进入系统托盘而不露主窗（仅首次无配置阶段仍开窗完成新手引导；手动启动时弹出托盘气泡提示，左键点击托盘图标可随时打开主界面）。
 - **启动必须对账（铁律）**：`resolve_setup_async` 在 `init_verge_config` 之后无条件调用 `autostart::reconcile_on_startup()`，以**配置为准**重写真实自启状态。
   - 旧实现只在用户拨开关时才写状态（`UpdateFlags::LAUNCH`），启动流程没有任何对账步骤；叠加「卸载脚本从不清理计划任务（installer.nsi 全文无 schtasks）」，老用户升级后残留任务继续拉起 —— 即 v3.0.0 实测的「开关显示关、开机却照样启动」。
   - **配置胜出，包括用户在任务管理器里手动禁用的情形**：`enable()` 会同时把 `StartupApproved\Run` 覆盖写回「启用」，所以只要配置是开，下次启动就会重新启用。这是刻意的单一真源设计（避免又一种「配置与事实不一致」），但要在文档里说清楚。
@@ -274,13 +274,13 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 - **两步式价值感知与转化向导（`STEP 1 / 2` → `STEP 2 / 2`）**：
   - **横向全宽铺满默认 `271px` 窄视口**：由于初次启动默认窗口宽度为 `271px`（见 §2.3），引导弹窗必须显式声明全宽约束（破除 MUI `Dialog` 默认左右外边距挤压）并配合紧凑内边距，严禁在瘦长窗口内再嵌套一条更窄的瘦长弹窗。
   - **Step 1（一键导入订阅或单/多行节点 URI，BUG-389）**：顶部配有步骤胶囊（`STEP 1 / 2`）与三枚核心特性徽章（智能优选低延迟节点 / 防 DNS 泄漏保护 / 轻量静默驻留）；`isSupportedSubscriptionOrNodeInput` 与 `SUPPORTED_NODE_URI_SCHEMES`（位于 `src/utils/node.ts` 并由 `FirstRunGuideDialog` 调用）同时校验单行 `http(s)://` 订阅链接及单/多行节点 URI（`vmess://` / `vless://` / `ss://` / `trojan://` / `hysteria2://` / `hysteria://` / `anytls://` / `tuic://` / `wireguard://` / `socks5://` / `socks://`）；弹窗打开时自动静默嗅探系统剪贴板并复用同源校验展示智能横幅（`clipboardDetected`），同时保留剪贴板按钮与右键菜单；导入成功后原地切换至第二步。
-  - **Step 2（实时连通性仪表盘 + GitHub Star 激励卡 + 安全软件白名单指引）**：
+  - **Step 2（实时连通性仪表盘 + GitHub Star 激励卡）**：
     - **卡片 1（实时连通性面板）**：展示订阅导入成功状态、代理就绪探测结果，并在就绪时实时展示**当前最优出口节点名称**（`activeNodeName`）与**绿色发光延迟徽章**（`⚡ XX ms`）。
     - **卡片 2（金色 GitHub Star 转化卡 + Wiki 入口）**：采用暖金渐变卡片展示开源支持文案（`starTitle` + `wikiHint`），附带「📖 查看 Wiki 进阶指南 ↗」次级链接，底部主 3D 按钮升级为「⭐ 打开 GitHub 测速并点 ⭐ Star」（`CLASH_MINI_GITHUB_URL`；由 i18n 文案自身携带 `⭐`，JSX 不重复硬编码前缀），在用户刚体验到导入成功与节点低延迟的愉悦时刻自然引导浏览器打开仓库主页测试国际网络并顺手点亮 Star。
-    - **卡片 3（安全软件白名单简要指引，BUG-393 补强）**：`antivirus.brief` 必须明确告知用户将 Clash Mini 安装目录（默认 `C:\Program Files\Clash Mini\`）或其中的 `clash-mini.exe` 与 `mini-mihomo.exe` 加入本地安全软件信任区/白名单（`antivirus.how` 与 `docs/antivirus-whitelist.md` 同步列明），同时为 `271px` 窄视口卡片与弹窗正文施加 `overflowWrap: 'anywhere'` 防止长路径溢出，并提供按钮一键唤起 `AntivirusWhitelistDialog`。
+    - *(注：`v3.5.2` / `BUG-395` 已从引导 Step 2 彻底移除冗余的安全软件卡片；轻量模式防误杀原因与两套方案收敛至 `?` 帮助菜单专属入口「🛡️ 轻量模式防误杀指南」。)*
 - **就绪判定必须是「测出来」而不是「假定」**：第二步只有在**活跃出口节点存在有效延迟**（`0 < delay < NODE_DELAY_MAX_MS`，数据取自既有代理上下文，不另造测量链路）时才显示「代理已就绪」。未测出则显示「正在确认节点连通性…」并每 1.5s 刷新一次；超过 20s 仍无有效延迟则改成如实提示「暂未测出节点延迟」，**不得宣称网络畅通**。
   - 同时按 `sysproxy.enable` 的真实状态提示「系统代理未开启」。**严禁再写「TUN 已全量就绪」**——`init_config` 在非管理员且未装服务时会把 `enable_tun_mode` 强制置为 `false`，首次安装用户绝大多数属于这种情形。
-- **帮助菜单常驻 Star 入口**：顶栏 `?` 帮助菜单（`HelpMenuButton`）首项固定为加粗的 `⭐ 去 GitHub 点亮 Star`（`layout.components.helpMenu.github`），为错失首次引导的老用户提供常驻支持通道。
+- **帮助菜单常驻 Star 与防误杀指南入口**：顶栏 `?` 帮助菜单（`HelpMenuButton`）首项固定为加粗的 `⭐ 去 GitHub 点亮 Star`（`layout.components.helpMenu.github`），为错失首次引导的老用户提供常驻支持通道；菜单内设专属入口 `🛡️ 轻量模式防误杀指南`（`layout.components.antivirus.menuLabel`，BUG-395），点击弹出 `AntivirusWhitelistDialog`（全 13 语种对齐 `docs/antivirus-whitelist.md`），说明 360 在高负载下对「开窗→关窗」残留进程的处理机制，并提供① 弹窗内一键开启「静默启动」避开露窗 + 误杀重开静默进托盘的省心方案，与② Windows 安全模式写入 `whiteinternal.ini` 硬白名单的永久根治方案（含路径与配置片段一键复制按钮）。
 - **导入不可被误中断**：导入进行中（`submitting`），点击遮罩与按 **Esc**（`reason === 'escapeKeyDown'`）都必须被拦截，不允许关闭弹窗。
 - **优雅稍后配置与再次唤起保护**：所有出口（完成 / 打开 GitHub Star / 打开 Wiki / 稍后手动配置）统一记录 `clash-mini-first-run-completed: true`；仅当确属首次引导（`localStorage.getItem(FIRST_RUN_GUIDE_STORAGE_KEY) !== 'true'`）导入成功且未启用系统代理/TUN 时才自动开启系统代理，从帮助菜单再次打开引导时尊重用户当前代理开关偏好（BUG-389）；「稍后手动配置」还会自动滑开左侧抽屉指引订阅管理卡片位置。
 - **多语言必须齐全**：本弹窗文案走 i18n（`layout.components.firstRun.*`），**13 个语种资源全部提供**。理由：应用已按系统语言自动初始化（`system_language()` + `clash_verge_i18n`），支持 zh/zhtw/en/ru/fa/tt/id/ar/ko/tr/de/es/jp；首次引导是用户看到的第一屏，单独硬编码中文等于给非中文用户「一上来就是外语」的糟糕第一印象。新增 key 后须执行 `pnpm i18n:types` 重新生成类型。
@@ -367,7 +367,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 1. **立即隐藏主窗口**：拦截系统默认的关闭注销事件，第一时间调用 `window.hide()`，视觉上瞬时消失。
 2. **彻底销毁 Webview2 实例**：异步调用轻量模式入口，安全释放 Webview 句柄并彻底销毁 WebView2 前端进程，立即释放其所占用的 **30MB ~ 40MB** 内存与 GPU 渲染句柄，系统仅保留 Rust 后台主线程与常驻托盘。
 3. **Tauri 事件循环阻止退出铁律（v3.2.4 定型）**：隐身轻量模式下窗口已销毁，Windows 系统或 Tao 框架在 session 变动或事件投递时会分发 `RunEvent::ExitRequested`。除非用户在系统托盘菜单明确点击「退出」（`Handle::global().is_exiting() == true`），否则 Tauri 事件循环必须**无条件调用 `api.prevent_exit()`**。严禁附加诸如 `code.is_none()` 或分支状态校验，彻底杜绝进程意外退出、托盘图标消失导致后台防断流葛优守护失效。
-4. **防误杀策略收敛与可观测性保留（v3.3.2+ 清理定型）**：早先为对抗国产安全软件（如 360 加速球）在轻量模式下误杀而引入的伴生看门狗（`guardian.rs`）、`1×1` 隐形哨兵窗口（`resident_host` / `guard_host`）、Session-0 `Breakaway` 拉起链路及独立心跳/退出凭证文件已证实无效且反增误报风险，现已**彻底移除**；当前仅保留用户可控的安全软件白名单引导（`AntivirusWhitelistDialog` & `docs/antivirus-whitelist.md`），以及 `logger.rs` 中同时兼容 `&str` 与 `String` 载荷的 `std::panic::set_hook` 与 `monitor.rs` 中由故障计数归零触发的单行事件驱动恢复日志。
+4. **防误杀策略收敛与可观测性保留（v3.3.2+ 清理定型，v3.5.2 / BUG-395 方案升级）**：早先引入的伴生看门狗（`guardian.rs`）、`1×1` 隐形哨兵窗口（`resident_host` / `guard_host`）、Session-0 `Breakaway` 拉起链路及独立心跳/退出凭证文件已证实无效且反增误报风险，现已**彻底移除**；`v3.5.2`（BUG-395）结合 360 性能引擎机制实证升级为双路径防护：帮助菜单「🛡️ 轻量模式防误杀指南」（`AntivirusWhitelistDialog` & `docs/antivirus-whitelist.md`）提供「一键开启静默启动（全程不露主窗避开开窗残留记录 + 误杀重开静默进托盘）」与「Windows 安全模式修改 `whiteinternal.ini` 硬白名单」双方案，同时保留 `logger.rs` 兼容 `&str`/`String` 的 panic 钩子与 `monitor.rs` 事件驱动恢复日志。
 
 ### 4.2 不断网不断流铁律与后端连接维持
 
@@ -388,7 +388,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 4.5 窗口唤醒几何恢复与首帧测速刷新
 
 - **几何坐标严密还原**：唤醒创建窗口时，原子读取 `window_state.json` 中保存的最后已知宽度、高度、X、Y 坐标与最大化状态，一次性套用，杜绝窗口恢复时闪烁或回退为默认尺寸。
-- **多屏拔插与脱屏保护**：窗口唤醒与激活阶段（`activate_window` / `restore_window_state`）用 `is_position_on_screen` 校验窗口坐标是否落在当前已连接显示器的可视范围内；若因拔掉副屏等导致坐标落入盲区，立即自动 `center()` 居中重置，防止窗口在不可见区域呈现导致无法操作。**该校验必须跳过「最小化状态」**：Windows 上最小化窗口的窗口矩形被系统挪到 `(-32000, -32000)`，而 `unminimize()` 的还原未必在同一轮消息处理里生效，此时校验必然判负，`center()` 会把用户刚从任务栏恢复的窗口弹到屏幕正中央、丢掉原位置。因此须在 `unminimize()` **之前**取样最小化状态，最小化过就跳过本次校验。
+- **多屏拔插与脱屏保护（BUG-394 零阻塞 Win32 直查）**：窗口唤醒与激活阶段（`activate_window` / `restore_window_state`）中，`is_position_on_screen` 改为直调 Win32 `EnumDisplayMonitors` + `GetMonitorInfoW` + `GetDpiForMonitor`，`get_main_window_with_state` 与 `is_main_window_visible`/`focused`/`minimized` 改为基于原子句柄 `MAIN_WINDOW_HWND` 直调 `IsWindow` / `IsWindowVisible` / `IsIconic` / `GetForegroundWindow`（叠加 `MAIN_WINDOW_FOCUSED` 原子缓存），完全消除 `tokio` 工作线程调用 Tauri `window_getter!` 跨线程同步等待主线程的连环死锁。若因拔掉副屏等导致坐标落入盲区，立即自动 `center()` 居中重置；**该校验必须跳过「最小化状态」**：Windows 上最小化窗口矩形位于 `(-32000, -32000)`，而 `unminimize()` 未必在同一轮消息生效，故须在 `unminimize()` **之前**取样 `IsIconic`，最小化过即跳过本次校验。
 - **首帧优先全量刷新**：唤醒第一微秒无条件发起代理数据全量刷新，绕过繁琐的就绪等待链，确保前端节点列表在窗口显现的第一时间即可见可用，杜绝首屏空白。
 
 ---
@@ -410,6 +410,7 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 5.1 恒定 15 秒健康监测与防抖自愈机制
 
 为确保在无人值守、前台关闭或轻量模式下 24/7 网络的高可用性，后台维护着高可靠守护监测线程：
+- **专属守护 Tokio 运行时物理隔离（v3.5.2 / BUG-394）**：`async_handler.rs` 维护独立 2 线程守护运行时 `DAEMON_RUNTIME`（`"clash-mini-daemon"`），`monitor.rs` 通过 `AsyncHandler::spawn_daemon_supervised` 托管、`server.rs`（`127.0.0.1:33335` 单实例/PAC HTTP 服务）通过 `AsyncHandler::spawn_daemon` 托管，与 Tauri UI/命令默认 Tokio 工作池彻底物理隔离；即使极端高 CPU 下前端建窗饥饿卡死，15 秒后台监测自愈与单实例 IPC 仍独立稳健推进；同时 `NotificationSystem::send_event` 仅在 `!WindowManager::is_main_window_ready()` 时跳过窗口事件派发，避免建窗未就绪前触发跨线程等待。
 - **恒定 15 秒基线周期（在线正常态）**：监测周期在轻量模式与前台窗口开启时**严格恒定为 15 秒**，不做任何放慢（代理运行与前台窗口开闭无关，节点假死应在 15 秒内被捕获）。这是三档周期中的基线档：节点异常进入重试态时收紧为 `RETRY_CHECK_INTERVAL_SECS (3s)`（见下一条），物理网络离线时为 `OFFLINE_CHECK_INTERVAL_SECS (5s)`；离线档与主循环对齐，保证 5 秒快速探测不被 15 秒主循环限制。三档统一由 `check_interval_secs(is_retry_mode, was_online)` 裁决，不存在第四种周期，标题中「恒定 15 秒」特指在线正常态。
 - **重试加速（3 秒）**：当探测到当前活跃节点异常或初次失败时，周期立即动态收紧为 **3 秒**，执行高频复检。
 - **防抖自愈判定与统一裁决器**：节点侧自愈严格执行**连续 2 次独立检测失败**才正式触发全节点批量选点自愈，彻底滤除网络微抖动造成的过度切换。后台监测**所有**自愈请求（主路径 / 网络恢复 / API 异常）必须构造 `SelfHealTrigger` 并交由 `decide_self_heal` 纯函数裁决，仅 `SelfHealDecision::Allow` 时方可调用 `self_heal_with_accounting`，严禁任一分支各自直接触发：① `NodeConfirmedDead` 要求 `consecutive_fails >= FAILOVER_CONFIRM_FAILS (2)`；② `NetworkRecovered` **恒判 `Wait`**——物理网络恢复只说明链路可用，不构成节点故障证据，必须安静等待并交主路径重新测量（旧实现凭一次 `evaluate_failover != NoAction` 立即自愈、且同周期主路径重复拨测，已删除）；③ `ApiUnreachable` 属**内核 API 通道故障**、不是节点侧故障，故适用独立门控：连续 `API_ERROR_HEAL_THRESHOLD (3)` 次异常后须再经 `is_clash_api_alive()` 复核，仅当 API 仍不可达才放行，复核时已恢复则清零计数并交下一周期测量。**两类故障边界明确**，不再出现「规范写连续 2 次、实现却留三条后门」的自相矛盾；BUG-318 的连续失败 / 内核重启 / 系统告警记账链路不变。
@@ -869,6 +870,8 @@ flowchart LR
 | **BUG-391** | 六 / 八 | 清理死代码、冗余依赖与全量文档对齐收官：通过 `git rm` 移除误追踪的 `src-tauri/.agents/` 审计中间产物与废弃 `resize-geometry.ts`（将 `window-resizing` 用例连同 `BUG-389` 用例收敛至 `src/utils/window-resizing.test.ts`）；移除 Rust 17 个零调用死命令及 `network-interface` / `gethostname` / `tokio-rustls` / `rust_iso3166` / `src-tauri` 侧 `criterion` 冗余依赖；清理前端零调用 `openCoreDir` / `openLogsDir` / `uninstallService`；全量同步 `clash_mini_agreements.md`、`docs/ARCHITECTURE.md`、`docs/implementation-notes.md` 与 `用户必读.txt`。 |
 | **BUG-392** | 2.8 / 5.2 | **【待用户确认】** 根治节点过滤框输入 `-香港` 等排除词时的 IME 抢跑与在途竞态漏切：`node.ts` 导出 `hasEffectiveFilterTerm` / `isIncompleteFilterInput` 并补齐单测；`BaseSearchBox` 增加中文 IME 组词本地缓冲（`isComposingRef` + `composingText`）阻断拼音中间态（如 `"-x"`）派发；`ProxyHead` 拦截纯算子与末尾悬空前缀（如 `"-"`、`"-香港|-"`）抢跑测速；`use-head-state.ts` 新增 `flushHeadStatePersist` 并在 `ProxyGroups::handleCheckAll`/`handleCheckFull` 选点前同步落盘，且 `handleCheckAll` 补齐过滤变更尾部重测队列（`pendingRecheckGroupsRef`）与有限次 `AUTO_SELECT_BUSY` 续试；`monitor.rs::trigger_backend_auto_select_inner` 通过 `select_fastest_candidate` 在 `select_node_for_group` 切换**之前**实时重读 `latest_filter_text` 淘汰越界候选并补齐回归单测。 |
 | **BUG-393** | 2.12 / 4.1 / 8.9 | **【待用户确认】** 新手引导与白名单指引明确信任区目标路径及 13 语种架构文案统一：`src/locales/*/layout.json` 与 `docs/antivirus-whitelist.md` 在 `antivirus.brief` / `antivirus.how` 中明确列出默认安装目录 `C:\Program Files\Clash Mini\` 及 `clash-mini.exe` / `mini-mihomo.exe`；`FirstRunGuideDialog` 与 `AntivirusWhitelistDialog` 增加 `overflowWrap: 'anywhere'` 防窄窗路径溢出；同步将 `ar`/`de`/`es`/`fa`/`id`/`jp`/`ko`/`ru`/`tr`/`tt` 10 语种残留的旧看门狗文案更新为现行轻量模式驻留架构说明。 |
+| **BUG-394** | 1.1 / 2.4 / 4.5 / 5.1 | **【待用户确认】** 根治极端高 CPU 负载下退出轻量模式重建窗口引发的主线程与 Tokio 工作池连环死锁：`async_handler.rs` 新增 2 线程物理隔离守护运行时 `DAEMON_RUNTIME`（`spawn_daemon`/`spawn_daemon_supervised`），将 `monitor.rs` 后台监测自愈与 `server.rs` 单实例服务（超时放宽至 `1500ms`）彻底迁离 Tauri 默认工作池；`resolve/window.rs` 引入原子 `MAIN_WINDOW_HWND`（`WM_NCDESTROY` 及 `destroy_main_window` 自动清零）并将 `HWND` 样式/尺寸/子类化钩子收拢至 `run_on_main_thread` + `12s` 超时销毁回滚；`window_manager.rs` 将窗口可见性/焦点/最小化与显示器枚举改造为零跨线程阻塞的 Win32 直查（`IsWindow`/`IsWindowVisible`/`IsIconic`/`GetForegroundWindow` + 原子焦点缓存、`EnumDisplayMonitors` + `GetMonitorInfoW`）；`notification.rs` 增加 `is_main_window_ready()` 守卫。 |
+| **BUG-395** | 1.1 / 2.9 / 2.10.1 / 2.12 / 4.1 | **【待用户确认】** 新手引导瘦身、帮助菜单「轻量模式防误杀指南」重构与「静默启动」全场景无窗进托盘防误杀机制：`lightweight.rs` 新增 `should_enter_silent_tray_on_launch()` 与 `has_real_profile_items()`，凡开启 `enable_silent_start` 且已有真实配置时，开机 `--silent`、手动点击图标及单实例 `/commands/visible` 均直接维持轻量托盘驻留不露主窗（仅左键托盘图标开窗），手动启动时经 `Tray::notify_silent_running()` 弹出原生 Win32 `Shell_NotifyIconW(NIF_INFO)` 气泡（`2s` 防抖、零 GUI 窗）；`FirstRunGuideDialog` Step 2 移除冗余安全软件卡片；`?` 帮助菜单入口升级为「🛡️ 轻量模式防误杀指南」，重构 `AntivirusWhitelistDialog`、全部 13 语种 `layout.json` 与 `docs/antivirus-whitelist.md`，提供弹窗内一键开启「静默启动」（含日常防露窗提示）及 Windows 安全模式配置 `whiteinternal.ini` 硬白名单（含路径与片段一键复制）。 |
 
 ---
 

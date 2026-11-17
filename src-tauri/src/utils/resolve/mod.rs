@@ -61,10 +61,11 @@ pub fn init_work_dir_and_logger() -> anyhow::Result<()> {
 }
 
 pub fn resolve_setup_sync() {
+    // 将单实例/PAC 服务直接调度至物理隔离的 DAEMON_RUNTIME，避免被 UI/WebView 任务牵连（BUG-394）
+    server::embed_server();
     // M2-01: 追踪启动任务，退出时统一 abort
     let handle = AsyncHandler::spawn(|| async {
         AsyncHandler::spawn_blocking(init_scheme);
-        AsyncHandler::spawn_blocking(init_embed_server);
     });
     track_startup_task(handle);
 }
@@ -94,27 +95,29 @@ pub fn resolve_setup_async() {
             logging!(warn, Type::Setup, "开机自启对账失败（下一轮启动重试）: {}", err);
         }
 
-        // 优化启动顺序：先判断是否需要进入轻量模式，避免"创建窗口再销毁"的资源浪费
-        // - 静默启动（带 --silent 参数且配置了静默）且启用了自动轻量模式：直接进入轻量模式，不创建窗口
-        // - 其他情况（含手动双击启动）：正常创建窗口
-        let is_silent_start = Config::verge().await.data_arc().enable_silent_start.unwrap_or(false);
+        // 优化启动顺序（BUG-395）：
+        // 只要开启了「启动时最小化」且用户已有真实订阅/配置，无论开机自启（--silent）还是手动双击启动，
+        // 均全程跳过窗口与 WebView2 创建直接进入轻量模式托盘，避免露窗再关闭被 360 记录为关窗残留。
+        let should_silent = crate::module::lightweight::should_enter_silent_tray_on_launch().await;
         let enable_auto_lightweight = Config::verge()
             .await
             .data_arc()
             .enable_auto_light_weight_mode
             .unwrap_or(false);
-
         let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
-        let should_silent = is_silent_start && has_silent_arg;
 
         if should_silent && enable_auto_lightweight {
             // 静默启动+自动轻量模式：直接进入轻量模式，跳过窗口与 WebView2 创建
         } else {
-            // 正常启动：先创建窗口
+            // 正常启动：按 should_silent 决定是否创建窗口
             init_window().await;
         }
 
         init_auto_lightweight_boot().await;
+
+        if should_silent && !has_silent_arg {
+            Tray::global().notify_silent_running().await;
+        }
 
         let core_init = AsyncHandler::spawn(|| async {
             init_service_manager().await;
@@ -151,10 +154,6 @@ pub(super) fn init_scheme() {
 pub async fn resolve_scheme(param: &str) -> Result<()> {
     logging_error!(Type::Setup, scheme::resolve_scheme(param).await);
     Ok(())
-}
-
-pub(super) fn init_embed_server() {
-    server::embed_server();
 }
 
 pub(super) async fn init_resources() {
@@ -216,13 +215,7 @@ pub(super) async fn refresh_tray_menu() {
 }
 
 pub(super) async fn init_window() {
-    let is_silent_start = Config::verge().await.data_arc().enable_silent_start.unwrap_or(false);
-
-    let args: Vec<String> = std::env::args().collect();
-    let has_silent_arg = args.iter().any(|arg| arg == "--silent");
-
-    let should_silent = is_silent_start && has_silent_arg;
-
+    let should_silent = crate::module::lightweight::should_enter_silent_tray_on_launch().await;
     WindowManager::create_window(!should_silent).await;
 }
 

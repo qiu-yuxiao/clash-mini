@@ -61,12 +61,29 @@ pub fn is_in_lightweight_mode() -> bool {
     get_state() == LightweightState::In
 }
 
+/// 判断配置列表中是否包含至少一条用户真实导入的订阅/本地节点配置（排除仅含内置 Merge/Script 的初始空态）
+pub fn has_real_profile_items(items: Option<&[crate::config::PrfItem]>) -> bool {
+    items.is_some_and(|list| {
+        list.iter()
+            .any(|item| matches!(item.itype.as_deref(), Some("remote" | "local")))
+    })
+}
+
+/// 启动期全场景静默进托盘判定（BUG-395）：
+/// 仅当开启 `enable_silent_start` 且已存在至少一条真实订阅/本地配置时，
+/// 无论开机自启（含 `--silent`）还是手动双击图标启动，一律跳过主窗口直接静默进入托盘；
+/// 尚无任何真实订阅的纯新用户仍弹出主窗口展示首次引导。
+pub async fn should_enter_silent_tray_on_launch() -> bool {
+    let is_silent_start = Config::verge().await.data_arc().enable_silent_start.unwrap_or(false);
+    if !is_silent_start {
+        return false;
+    }
+    let profiles = Config::profiles().await;
+    has_real_profile_items(profiles.data_arc().get_items().map(Vec::as_slice))
+}
+
 pub async fn auto_lightweight_boot() -> Result<()> {
-    let verge_config = Config::verge().await;
-    let is_silent_start = verge_config.data_arc().enable_silent_start.unwrap_or(false);
-    let has_silent_arg = std::env::args().any(|arg| arg == "--silent");
-    let should_silent = is_silent_start && has_silent_arg;
-    if should_silent {
+    if should_enter_silent_tray_on_launch().await {
         entry_lightweight_mode().await;
     }
     Ok(())
@@ -173,4 +190,46 @@ pub async fn exit_lightweight_mode() -> bool {
     // 唤醒常驻监测线程以立即重置为前台周期（15秒），必须放在最后调用
     crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::has_real_profile_items;
+    use crate::config::PrfItem;
+
+    #[test]
+    fn real_profile_detection_ignores_empty_and_merge_only_lists() {
+        assert!(!has_real_profile_items(None));
+        assert!(!has_real_profile_items(Some(&[])));
+
+        let merge_only = [
+            PrfItem {
+                itype: Some("merge".into()),
+                ..Default::default()
+            },
+            PrfItem {
+                itype: Some("script".into()),
+                ..Default::default()
+            },
+        ];
+        assert!(!has_real_profile_items(Some(&merge_only)));
+
+        let with_remote = [
+            PrfItem {
+                itype: Some("merge".into()),
+                ..Default::default()
+            },
+            PrfItem {
+                itype: Some("remote".into()),
+                ..Default::default()
+            },
+        ];
+        assert!(has_real_profile_items(Some(&with_remote)));
+
+        let with_local = [PrfItem {
+            itype: Some("local".into()),
+            ..Default::default()
+        }];
+        assert!(has_real_profile_items(Some(&with_local)));
+    }
 }

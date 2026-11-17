@@ -65,8 +65,9 @@ impl NotificationSystem {
     }
 
     pub(crate) fn send_event(event: FrontendEvent) {
-        // 🛡️ 防线一：轻量模式下直接过滤，绝不对已销毁的 Webview 窗口调用 window.emit
-        if crate::module::lightweight::is_in_lightweight_mode() {
+        // 🛡️ 防线一：轻量模式或主窗口尚未完成主线程初始化时直接过滤（BUG-394），
+        // 绝不对未就绪/已销毁的 Webview 窗口调用 window.emit 导致无效阻塞
+        if crate::module::lightweight::is_in_lightweight_mode() || !WindowManager::is_main_window_ready() {
             return;
         }
 

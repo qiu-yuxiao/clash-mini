@@ -1,7 +1,7 @@
 use crate::{config::Config, core::handle, utils::resolve::window_script::build_window_initial_script};
 use clash_verge_logging::{Type, logging, logging_error};
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use tauri::webview::PageLoadEvent;
 use tauri::{Manager as _, Theme, WebviewWindow};
 
@@ -29,6 +29,58 @@ pub const MINIMAL_WIDTH: f64 = 271.0;
 // 消除极窄判定的取整歧义（BUG-301 时期一并调整）
 pub const MINIMAL_HEIGHT: f64 = 126.0;
 const DEFAULT_DECORATIONS: bool = false;
+
+/// 主窗口原子 Win32 句柄缓存（BUG-394）：
+/// 仅在 UI 主线程完成 `Message::CreateWindow` 后写入，并在 `WM_NCDESTROY` / 主动销毁时清零，
+/// 使后台线程可在零跨线程通道阻塞（零 `window_getter!`）前提下直接读取窗口显隐/焦点/最小化态。
+static MAIN_WINDOW_HWND: AtomicIsize = AtomicIsize::new(0);
+
+pub fn set_main_window_hwnd(hwnd: windows::Win32::Foundation::HWND) {
+    MAIN_WINDOW_HWND.store(hwnd.0 as isize, Ordering::Release);
+}
+
+pub fn clear_main_window_hwnd(expected: Option<windows::Win32::Foundation::HWND>) {
+    if let Some(hwnd) = expected {
+        let raw = hwnd.0 as isize;
+        let _ = MAIN_WINDOW_HWND.compare_exchange(raw, 0, Ordering::AcqRel, Ordering::Acquire);
+    } else {
+        MAIN_WINDOW_HWND.store(0, Ordering::Release);
+    }
+}
+
+pub fn get_main_window_hwnd() -> Option<windows::Win32::Foundation::HWND> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::IsWindow;
+
+    let raw = MAIN_WINDOW_HWND.load(Ordering::Acquire);
+    if raw == 0 {
+        return None;
+    }
+    let hwnd = HWND(raw as *mut std::ffi::c_void);
+    // SAFETY: Win32 IsWindow 只读校验句柄有效性，绝不跨线程阻塞
+    if unsafe { IsWindow(Some(hwnd)).as_bool() } {
+        Some(hwnd)
+    } else {
+        let _ = MAIN_WINDOW_HWND.compare_exchange(raw, 0, Ordering::AcqRel, Ordering::Acquire);
+        None
+    }
+}
+
+pub fn is_main_window_ready() -> bool {
+    get_main_window_hwnd().is_some()
+}
+
+fn cleanup_timed_out_main_window() {
+    clear_main_window_hwnd(None);
+    let ah = handle::Handle::app_handle().clone();
+    let ah_destroy = ah.clone();
+    let _ = ah.run_on_main_thread(move || {
+        clear_main_window_hwnd(None);
+        if let Some(w) = ah_destroy.get_webview_window(crate::MAIN_WINDOW_LABEL) {
+            let _ = w.destroy();
+        }
+    });
+}
 
 pub async fn build_new_window() -> Result<WebviewWindow, String> {
     let app_handle = handle::Handle::app_handle();
@@ -130,40 +182,74 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     builder = builder.background_color(background_color);
 
+    let app_handle_for_init = app_handle.clone();
     match builder.build() {
         Ok(window) => {
-            // 窗口创建后立即清除 WS_CAPTION 并重置 outer 尺寸为 271×680。
-            // 必须在 build() 之后立即执行，不能放在 RunEvent::Ready（handle_ready_resumed），
-            // 因为 RunEvent::Ready 比窗口创建的异步任务早约 0.5 秒触发，此时 get_webview_window
-            // 返回 None，修复代码被跳过，导致初次启动窗口保持 300px。
-            // 注意：保留 WS_THICKFRAME（仅清 WS_CAPTION）——WS_THICKFRAME 是 startResizeDragging
-            // 生效的前提；可见边框由 tao 的 WM_NCCALCSIZE 子类化消除（decorations=false 时 insets=0）。
-            strip_caption_style(&window);
-            force_set_window_outer_size(&window, win_w, win_h);
-            setup_wm_sizing_hook(&window);
+            // 将原生样式剥离、尺寸强制对齐、Win32 子类化挂载与句柄登记全部收拢至主线程闭包内就地执行（BUG-394）：
+            // 严禁在 Tokio 工作线程上调用会阻塞等待主线程 `mpsc::rx.recv()` 的 `window.window_handle()`；
+            // 若极端满载下 WebView2 / 主线程创建超过 12s 仍未完成，则超时释放并回滚清理。
+            let (ready_tx, ready_rx) = tokio::sync::oneshot::channel::<Result<(), String>>();
+            let ah_for_closure = app_handle_for_init.clone();
+            if let Err(e) = app_handle_for_init.run_on_main_thread(move || {
+                let Some(w) = ah_for_closure.get_webview_window(crate::MAIN_WINDOW_LABEL) else {
+                    let _ = ready_tx.send(Err("主线程未找到已创建的 main 窗口".to_string()));
+                    return;
+                };
+                let Some(hwnd) = window_hwnd(&w) else {
+                    let _ = ready_tx.send(Err("主线程获取窗口 Win32 句柄失败".to_string()));
+                    return;
+                };
+                set_main_window_hwnd(hwnd);
+                strip_caption_style_hwnd(hwnd);
+                force_set_window_outer_size_hwnd(hwnd, win_w, win_h);
+                setup_wm_sizing_hook_hwnd(hwnd);
+                let _ = ready_tx.send(Ok(()));
+            }) {
+                cleanup_timed_out_main_window();
+                return Err(format!("调度主窗口初始化至主线程失败: {e}"));
+            }
+
+            match tokio::time::timeout(std::time::Duration::from_secs(12), ready_rx).await {
+                Ok(Ok(Ok(()))) => {}
+                Ok(Ok(Err(reason))) => {
+                    cleanup_timed_out_main_window();
+                    return Err(reason);
+                }
+                Ok(Err(_)) => {
+                    cleanup_timed_out_main_window();
+                    return Err("主窗口初始化结果通道异常断开".to_string());
+                }
+                Err(_) => {
+                    logging!(warn, Type::Window, "等待主线程完成主窗口创建超时 (12s)，回滚释放并清理");
+                    cleanup_timed_out_main_window();
+                    return Err("等待主线程创建主窗口超时 (12s)".to_string());
+                }
+            }
 
             // 超时兜底：如果页面加载超时（默认 10 秒），强制显示窗口
-            // 避免页面加载卡住导致用户看不到窗口
-            let window_clone = window.clone();
+            // 避免页面加载卡住导致用户看不到窗口（通过原子 Win32 句柄检查可见性，不在 Tokio 线程阻塞查询）
             let window_label = window.label().to_string();
             tokio::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-                // L2-04: 退出阶段不操作窗口；通过 label 重新获取确认窗口仍存在
+                // L2-04: 退出阶段不操作窗口；确认句柄仍然有效
                 if crate::core::handle::Handle::global().is_exiting() {
                     return;
                 }
-                let app_handle = crate::core::handle::Handle::app_handle();
-                if app_handle.get_webview_window(&window_label).is_none() {
+                let Some(hwnd) = get_main_window_hwnd() else {
                     return;
-                }
-                // 检查窗口是否仍然存在且不可见
-                if let Ok(is_visible) = window_clone.is_visible() {
-                    if !is_visible {
-                        // 页面加载超时，强制显示窗口
-                        let _ = window_clone.show();
-                        let _ = window_clone.set_focus();
-                        logging!(info, Type::Window, "页面加载超时，强制显示窗口");
-                    }
+                };
+                // SAFETY: get_main_window_hwnd 已确认 hwnd 有效
+                let is_visible = unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(hwnd).as_bool() };
+                if !is_visible {
+                    let ah = crate::core::handle::Handle::app_handle().clone();
+                    let ah_show = ah.clone();
+                    let _ = ah.run_on_main_thread(move || {
+                        if let Some(w) = ah_show.get_webview_window(&window_label) {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                            logging!(info, Type::Window, "页面加载超时，强制显示窗口");
+                        }
+                    });
                 }
             });
 
@@ -175,6 +261,18 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
 fn get_bold_window_title() -> String {
     format!("Clash Mini Ver.{}", env!("CARGO_PKG_VERSION"))
+}
+
+fn window_hwnd(window: &WebviewWindow) -> Option<windows::Win32::Foundation::HWND> {
+    use raw_window_handle::HasWindowHandle as _;
+
+    let handle = window.window_handle().ok()?;
+    match handle.as_raw() {
+        raw_window_handle::RawWindowHandle::Win32(h) => {
+            Some(windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void))
+        }
+        _ => None,
+    }
 }
 
 /// 剥掉窗口的 WS_CAPTION 样式位（保留 WS_THICKFRAME）。
@@ -191,22 +289,10 @@ fn get_bold_window_title() -> String {
 /// —— 前提是 `decorations=false` **且** `shadow=false`（见 build_new_window 的几何口径铁律），
 /// 此时 tao 不加任何 insets，客户区等于窗口矩形；若重新开启 shadow，客户区会被内缩
 /// 11 物理像素/边，本项目所有「内尺寸 == 外尺寸」的假设将全部失效。
-fn strip_caption_style(window: &WebviewWindow) {
-    use raw_window_handle::HasWindowHandle as _;
+fn strip_caption_style_hwnd(hwnd: windows::Win32::Foundation::HWND) {
     use windows::Win32::UI::WindowsAndMessaging::{
         GWL_STYLE, GetWindowLongPtrW, HWND_TOP, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
         SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WS_CAPTION,
-    };
-
-    let handle = match window.window_handle() {
-        Ok(h) => h,
-        Err(_) => return,
-    };
-    let hwnd = match handle.as_raw() {
-        raw_window_handle::RawWindowHandle::Win32(h) => {
-            windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
-        }
-        _ => return,
     };
 
     unsafe {
@@ -247,22 +333,10 @@ fn strip_caption_style(window: &WebviewWindow) {
 /// 【口径说明】因为本项目已通过 `shadow(false)` 让 outer == inner，本函数虽然设的是 outer，
 /// 效果与「设内尺寸」完全等价，也因此不会与 `min_inner_size` 冲突
 /// （此前开启阴影时 outer=285 实际只有 inner≈271，使声明的最小宽度形同虚设）。
-fn force_set_window_outer_size(window: &WebviewWindow, width: f64, height: f64) {
-    use raw_window_handle::HasWindowHandle as _;
+fn force_set_window_outer_size_hwnd(hwnd: windows::Win32::Foundation::HWND, width: f64, height: f64) {
     use windows::Win32::UI::HiDpi::GetDpiForWindow;
     use windows::Win32::UI::WindowsAndMessaging::{
         SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOZORDER, SetWindowPos,
-    };
-
-    let handle = match window.window_handle() {
-        Ok(h) => h,
-        Err(_) => return,
-    };
-    let hwnd = match handle.as_raw() {
-        raw_window_handle::RawWindowHandle::Win32(h) => {
-            windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
-        }
-        _ => return,
     };
 
     unsafe {
@@ -334,28 +408,7 @@ unsafe extern "system" {
     ) -> i32;
 }
 
-/// 安装 WM_SIZING 消息处理器（现代 SetWindowSubclass 架构，BUG-332 / BUG-350），
-/// 防止上边缘缩放到最小高度后窗口 Y 坐标继续下移。
-///
-/// 相比旧版 SetWindowLongPtrW + 全局静态 HOOKED_HWND：
-/// 1. SetWindowSubclass 对同一 (hwnd, proc, id) 天然幂等，系统睡眠恢复重复调用安全无栈溢出；
-/// 2. 在 WM_NCDESTROY 时自动解绑释放，彻底根除轻量模式销毁旧窗口并重建新窗口时因 Windows
-///    句柄表复用相同 HWND 数值导致误跳过钩子挂载的缺陷。
-pub(crate) fn setup_wm_sizing_hook(window: &WebviewWindow) {
-    use raw_window_handle::HasWindowHandle as _;
-
-    let handle = match window.window_handle() {
-        Ok(h) => h,
-        Err(_) => return,
-    };
-
-    let hwnd = match handle.as_raw() {
-        raw_window_handle::RawWindowHandle::Win32(h) => {
-            windows::Win32::Foundation::HWND(h.hwnd.get() as *mut std::ffi::c_void)
-        }
-        _ => return,
-    };
-
+pub(crate) fn setup_wm_sizing_hook_hwnd(hwnd: windows::Win32::Foundation::HWND) {
     if hwnd.0.is_null() {
         return;
     }
@@ -364,6 +417,22 @@ pub(crate) fn setup_wm_sizing_hook(window: &WebviewWindow) {
     unsafe {
         let _ = SetWindowSubclass(hwnd, Some(sizing_subclass_proc), WM_SIZING_SUBCLASS_ID, 0);
     }
+}
+
+/// 安装 WM_SIZING 消息处理器（现代 SetWindowSubclass 架构，BUG-332 / BUG-350），
+/// 防止上边缘缩放到最小高度后窗口 Y 坐标继续下移。
+///
+/// 相比旧版 SetWindowLongPtrW + 全局静态 HOOKED_HWND：
+/// 1. SetWindowSubclass 对同一 (hwnd, proc, id) 天然幂等，系统睡眠恢复重复调用安全无栈溢出；
+/// 2. 在 WM_NCDESTROY 时自动解绑释放，彻底根除轻量模式销毁旧窗口并重建新窗口时因 Windows
+///    句柄表复用相同 HWND 数值导致误跳过钩子挂载的缺陷。
+/// 3. 仅在 UI 主线程（`handle_ready_resumed`）调用，同步登记 `MAIN_WINDOW_HWND`。
+pub(crate) fn setup_wm_sizing_hook(window: &WebviewWindow) {
+    let Some(hwnd) = window_hwnd(window) else {
+        return;
+    };
+    set_main_window_hwnd(hwnd);
+    setup_wm_sizing_hook_hwnd(hwnd);
 }
 
 /// WM_SIZING 子类化窗口过程（BUG-332 / BUG-350 / BUG-386）。
@@ -411,6 +480,7 @@ unsafe extern "system" fn sizing_subclass_proc(
         NATIVE_WINDOW_RESIZING.store(false, Ordering::Release);
         *RESIZE_SESSION.lock() = None;
         *PENDING_SWP_RECT.lock() = None;
+        clear_main_window_hwnd(Some(hwnd));
         // SAFETY: 在 WM_NCDESTROY 中移除自身子类化节点是 Microsoft 官方规范做法
         unsafe {
             let _ = RemoveWindowSubclass(hwnd, Some(sizing_subclass_proc), WM_SIZING_SUBCLASS_ID);
@@ -681,19 +751,9 @@ fn save_window_state_from_hwnd(hwnd: windows::Win32::Foundation::HWND) {
 }
 
 fn main_hwnd_raw() -> Result<usize, String> {
-    use raw_window_handle::HasWindowHandle as _;
-
-    let app_handle = handle::Handle::app_handle();
-    let window = app_handle
-        .get_webview_window(crate::MAIN_WINDOW_LABEL)
-        .ok_or_else(|| String::from("main window not found"))?;
-    let win_handle = window
-        .window_handle()
-        .map_err(|e| format!("window_handle failed: {e}"))?;
-    match win_handle.as_raw() {
-        raw_window_handle::RawWindowHandle::Win32(h) => Ok(h.hwnd.get() as usize),
-        _ => Err(String::from("not a Win32 window")),
-    }
+    get_main_window_hwnd()
+        .map(|h| h.0 as usize)
+        .ok_or_else(|| String::from("main window not found"))
 }
 
 fn drain_pending_swp_queue() {

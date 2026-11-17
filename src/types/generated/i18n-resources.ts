@@ -203,19 +203,19 @@ export interface TranslationResources {
       }
       components: {
         antivirus: {
-          benefit: string
-          benefitTitle: string
-          brief: string
-          briefOpen: string
-          briefTitle: string
           close: string
-          consequence: string
-          consequenceTitle: string
-          how: string
-          howTitle: string
+          copied: string
+          copyPath: string
+          copySnippet: string
+          easyBody: string
+          easyTitle: string
+          easyWarning: string
+          enableSilentBtn: string
           menuLabel: string
-          optional: string
-          optionalTitle: string
+          rootIntro: string
+          rootSteps: string
+          rootTitle: string
+          silentEnabledBtn: string
           title: string
           why: string
           whyTitle: string

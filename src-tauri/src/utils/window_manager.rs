@@ -243,27 +243,57 @@ pub fn save_window_state_immediately(w: f64, h: f64, x: Option<f64>, y: Option<f
     write_geometry_ordered(seq, w, h, x, y);
 }
 
-/// 检查给定的坐标 (x, y) 是否落在当前已连接显示器的可视范围内
+/// 检查给定的逻辑坐标 `(x, y)` 是否落在当前已连接显示器的可视范围内（BUG-394：直调 Win32 EnumDisplayMonitors，零跨线程阻塞）
 pub fn is_position_on_screen(x: f64, y: f64) -> bool {
-    let app_handle = crate::core::handle::Handle::app_handle();
-    if let Ok(monitors) = app_handle.available_monitors() {
-        if monitors.is_empty() {
-            return true;
-        }
-        for monitor in monitors {
-            let scale = monitor.scale_factor();
-            let m_x = monitor.position().x as f64 / scale;
-            let m_y = monitor.position().y as f64 / scale;
-            let m_w = monitor.size().width as f64 / scale;
-            let m_h = monitor.size().height as f64 / scale;
+    use windows::Win32::Foundation::{LPARAM, RECT};
+    use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO};
+    use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+    use windows::core::BOOL;
 
-            if x >= (m_x - 100.0) && x <= (m_x + m_w - 50.0) && y >= (m_y - 100.0) && y <= (m_y + m_h - 50.0) {
-                return true;
+    unsafe extern "system" fn enum_monitors_proc(
+        hmonitor: HMONITOR,
+        _hdc: HDC,
+        _rc: *mut RECT,
+        lparam: LPARAM,
+    ) -> BOOL {
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: info.cbSize 已正确赋值，lparam 指向外层栈上有效的 Vec<(f64, f64, f64, f64)>
+        unsafe {
+            if GetMonitorInfoW(hmonitor, &mut info).as_bool() {
+                let mut dpi_x = 96u32;
+                let mut dpi_y = 96u32;
+                let scale =
+                    if GetDpiForMonitor(hmonitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y).is_ok() && dpi_x > 0 {
+                        dpi_x as f64 / 96.0
+                    } else {
+                        1.0
+                    };
+                let rc = info.rcMonitor;
+                let m_x = rc.left as f64 / scale;
+                let m_y = rc.top as f64 / scale;
+                let m_w = (rc.right - rc.left) as f64 / scale;
+                let m_h = (rc.bottom - rc.top) as f64 / scale;
+                let monitors = &mut *(lparam.0 as *mut Vec<(f64, f64, f64, f64)>);
+                monitors.push((m_x, m_y, m_w, m_h));
             }
         }
-        return false;
+        BOOL(1)
     }
-    true
+
+    let mut monitors: Vec<(f64, f64, f64, f64)> = Vec::new();
+    let ptr = std::ptr::addr_of_mut!(monitors) as isize;
+    // SAFETY: EnumDisplayMonitors 同步回调后才会返回，栈上 Vec 生命周期完全覆盖回调执行期间
+    let ok = unsafe { EnumDisplayMonitors(None, None, Some(enum_monitors_proc), LPARAM(ptr)).as_bool() };
+    if !ok || monitors.is_empty() {
+        return true;
+    }
+
+    monitors.into_iter().any(|(m_x, m_y, m_w, m_h)| {
+        x >= (m_x - 100.0) && x <= (m_x + m_w - 50.0) && y >= (m_y - 100.0) && y <= (m_y + m_h - 50.0)
+    })
 }
 
 /// 读取上次保存的窗口尺寸与位置，失败或不存在返回 None
@@ -304,30 +334,40 @@ pub fn restore_window_state() -> Option<SavedWindowState> {
     }
 }
 
+fn read_hwnd_window_state(hwnd: windows::Win32::Foundation::HWND) -> WindowState {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, IsIconic, IsWindowVisible};
+
+    // SAFETY: 调用方已通过 get_main_window_hwnd 验证 Win32 句柄有效；三者均为只读系统查询，零跨线程阻塞
+    unsafe {
+        if IsIconic(hwnd).as_bool() {
+            WindowState::Minimized
+        } else if !IsWindowVisible(hwnd).as_bool() {
+            WindowState::Hidden
+        } else if GetForegroundWindow() == hwnd || crate::core::tray::is_main_window_focused_cached() {
+            WindowState::VisibleFocused
+        } else {
+            WindowState::VisibleUnfocused
+        }
+    }
+}
+
 /// 统一的窗口管理器
 pub struct WindowManager;
 
 impl WindowManager {
+    pub fn is_main_window_ready() -> bool {
+        crate::utils::resolve::window::is_main_window_ready()
+    }
+
     pub fn get_main_window_with_state() -> (Option<WebviewWindow<Wry>>, WindowState) {
+        let Some(hwnd) = crate::utils::resolve::window::get_main_window_hwnd() else {
+            return (None, WindowState::NotExist);
+        };
         let Some(window) = Self::get_main_window() else {
             return (None, WindowState::NotExist);
         };
 
-        let is_minimized = window.is_minimized().unwrap_or(false);
-        let is_visible = window.is_visible().unwrap_or(false);
-        let is_focused = window.is_focused().unwrap_or(false);
-
-        let state = if is_minimized {
-            WindowState::Minimized
-        } else if !is_visible {
-            WindowState::Hidden
-        } else if is_focused {
-            WindowState::VisibleFocused
-        } else {
-            WindowState::VisibleUnfocused
-        };
-
-        (Some(window), state)
+        (Some(window), read_hwnd_window_state(hwnd))
     }
 
     pub fn get_main_window_state() -> WindowState {
@@ -588,19 +628,30 @@ impl WindowManager {
         }
     }
 
-    /// 检查窗口是否可见
+    /// 检查窗口是否可见（BUG-394：通过原子 Win32 句柄无阻塞查询，避免 Tokio 线程死等主线程）
     pub fn is_main_window_visible(window: Option<&WebviewWindow<Wry>>) -> bool {
-        window.map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
+        window.is_some()
+            && crate::utils::resolve::window::get_main_window_hwnd()
+                // SAFETY: 句柄已由 get_main_window_hwnd 校验有效
+                .is_some_and(|hwnd| unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(hwnd).as_bool() })
     }
 
-    /// 检查窗口是否有焦点
+    /// 检查窗口是否有焦点（BUG-394：结合 Win32 GetForegroundWindow 与原子聚焦缓存，零跨线程阻塞）
     pub fn is_main_window_focused(window: Option<&WebviewWindow<Wry>>) -> bool {
-        window.map(|w| w.is_focused().unwrap_or(false)).unwrap_or(false)
+        window.is_some()
+            && crate::utils::resolve::window::get_main_window_hwnd().is_some_and(|hwnd| {
+                // SAFETY: 句柄已由 get_main_window_hwnd 校验有效
+                (unsafe { windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow() == hwnd })
+                    || crate::core::tray::is_main_window_focused_cached()
+            })
     }
 
-    /// 检查窗口是否最小化
+    /// 检查窗口是否最小化（BUG-394：通过 Win32 IsIconic 无阻塞查询）
     pub fn is_main_window_minimized(window: Option<&WebviewWindow<Wry>>) -> bool {
-        window.map(|w| w.is_minimized().unwrap_or(false)).unwrap_or(false)
+        window.is_some()
+            && crate::utils::resolve::window::get_main_window_hwnd()
+                // SAFETY: 句柄已由 get_main_window_hwnd 校验有效
+                .is_some_and(|hwnd| unsafe { windows::Win32::UI::WindowsAndMessaging::IsIconic(hwnd).as_bool() })
     }
 
     pub async fn create_window(should_create: bool) -> bool {
@@ -664,6 +715,7 @@ impl WindowManager {
             } else {
                 None
             };
+            crate::utils::resolve::window::clear_main_window_hwnd(None);
             if let Some(w) = app_handle_clone.get_webview_window(&label) {
                 if let Err(e) = w.destroy() {
                     logging!(debug, Type::Window, "销毁窗口时出错: {}", e);
@@ -738,5 +790,16 @@ impl WindowManager {
         let is_minimized = Self::is_main_window_minimized(window.as_ref());
 
         format!("窗口状态: {state:?} | 可见: {is_visible} | 有焦点: {is_focused} | 最小化: {is_minimized}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_position_on_screen;
+
+    #[test]
+    fn screen_bounds_accepts_origin_area_and_rejects_far_offscreen() {
+        assert!(is_position_on_screen(100.0, 100.0));
+        assert!(!is_position_on_screen(-50_000.0, -50_000.0));
     }
 }

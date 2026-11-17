@@ -11,7 +11,8 @@ use super::handle;
 use anyhow::Result;
 use parking_lot::Mutex;
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{
     AppHandle, Wry,
     menu::{IsMenuItem, MenuEvent, MenuItem},
@@ -138,6 +139,9 @@ impl Tray {
                     let _ = tray.set_tooltip(Some("Clash Mini"));
                     tray.on_tray_icon_event(on_tray_icon_event);
                     tray.on_menu_event(on_menu_event);
+                    if let Some(hwnd) = find_own_tray_hwnd() {
+                        TRAY_HWND_RAW.store(hwnd.0 as isize, Ordering::Release);
+                    }
                     log::info!(target: "app", "[Tray] System tray created successfully");
                 }
                 Err(e) => {
@@ -206,21 +210,170 @@ impl Tray {
         }
         allow
     }
+
+    /// 以 Win32 原生托盘气泡（`Shell_NotifyIconW(NIF_INFO)`）提示用户程序已在后台静默运行，
+    /// 不创建任何 GUI 窗口，避免触发 360 关窗残留记录（BUG-395）。带 2 秒防抖避免连点刷屏。
+    pub async fn notify_silent_running(&self) {
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        let can_notify = LAST_SILENT_BALLOON_MS
+            .fetch_update(Ordering::SeqCst, Ordering::Acquire, |last| {
+                if now_ms.saturating_sub(last) < SILENT_BALLOON_DEBOUNCE_MS {
+                    None
+                } else {
+                    Some(now_ms)
+                }
+            })
+            .is_ok();
+        if !can_notify {
+            return;
+        }
+
+        let language = crate::config::Config::verge().await.latest_arc().language.clone();
+        let (title, body) = silent_balloon_texts(language.as_deref());
+        let app_handle = handle::Handle::app_handle().clone();
+        if let Err(e) = app_handle.run_on_main_thread(move || {
+            show_tray_info_balloon(title, body);
+        }) {
+            logging!(debug, Type::Tray, "调度托盘静默运行气泡提示失败: {}", e);
+        }
+    }
 }
 
-/// 记录主窗口最近一次失去焦点的毫秒时间戳（供点击系统托盘图标瞬间判定窗口原本是否处于前台聚焦态，BUG-361）
-static LAST_MAIN_WINDOW_BLUR_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+const SILENT_BALLOON_DEBOUNCE_MS: u64 = 2000;
+static TRAY_HWND_RAW: AtomicIsize = AtomicIsize::new(0);
+static LAST_SILENT_BALLOON_MS: AtomicU64 = AtomicU64::new(0);
+static MAIN_WINDOW_FOCUSED: AtomicBool = AtomicBool::new(false);
+
+/// 记录主窗口最近一次失去焦点的毫秒时间戳与聚焦缓存（BUG-361 / BUG-394）
+static LAST_MAIN_WINDOW_BLUR_MS: AtomicU64 = AtomicU64::new(0);
+
+pub fn is_main_window_focused_cached() -> bool {
+    MAIN_WINDOW_FOCUSED.load(Ordering::Acquire)
+}
 
 pub fn record_main_window_focus_change(focused: bool) {
-    use std::sync::atomic::Ordering;
+    MAIN_WINDOW_FOCUSED.store(focused, Ordering::Release);
     if focused {
         LAST_MAIN_WINDOW_BLUR_MS.store(0, Ordering::Release);
     } else {
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
         LAST_MAIN_WINDOW_BLUR_MS.store(now_ms, Ordering::Release);
+    }
+}
+
+fn silent_balloon_texts(language: Option<&str>) -> (&'static str, &'static str) {
+    match language {
+        Some("zhtw") | Some("zh-TW") | Some("zh-HK") => (
+            "Clash Mini 已在背景靜默執行",
+            "為防安全軟體誤殺未彈出主視窗；如需開啟介面，請左鍵點擊右下角系統匣圖示。",
+        ),
+        Some("zh") | Some("zh-CN") | None => (
+            "Clash Mini 已在后台静默运行",
+            "为防安全软件误杀未弹出主窗口；如需打开界面，请左键点击右下角托盘图标。",
+        ),
+        _ => (
+            "Clash Mini is running silently in tray",
+            "Main window stays hidden to prevent false-positive cleanup. Left-click the tray icon to open.",
+        ),
+    }
+}
+
+fn copy_wide_fixed<const N: usize>(dest: &mut [u16; N], text: &str) {
+    for (slot, unit) in dest.iter_mut().take(N.saturating_sub(1)).zip(text.encode_utf16()) {
+        *slot = unit;
+    }
+}
+
+fn find_own_tray_hwnd() -> Option<windows::Win32::Foundation::HWND> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{FindWindowExW, GetWindowThreadProcessId};
+    use windows::core::PCWSTR;
+
+    // `tray-icon` 固定使用类名为 "tray_icon_app" 的顶层隐藏消息窗承载 Shell_NotifyIconW
+    let class_name: [u16; 14] = [
+        b't' as u16,
+        b'r' as u16,
+        b'a' as u16,
+        b'y' as u16,
+        b'_' as u16,
+        b'i' as u16,
+        b'c' as u16,
+        b'o' as u16,
+        b'n' as u16,
+        b'_' as u16,
+        b'a' as u16,
+        b'p' as u16,
+        b'p' as u16,
+        0,
+    ];
+    let current_pid = std::process::id();
+    let mut after: Option<HWND> = None;
+
+    // SAFETY: 只读枚举系统内匹配指定类名且归属当前进程 PID 的托盘宿主窗口
+    unsafe {
+        while let Ok(hwnd) = FindWindowExW(None, after, PCWSTR::from_raw(class_name.as_ptr()), PCWSTR::null()) {
+            if hwnd.0.is_null() {
+                break;
+            }
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            if pid == current_pid {
+                return Some(hwnd);
+            }
+            after = Some(hwnd);
+        }
+    }
+    None
+}
+
+fn show_tray_info_balloon(title: &str, body: &str) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::Shell::{
+        NIF_INFO, NIIF_INFO, NIM_MODIFY, NOTIFYICONDATAW, NOTIFYICONDATAW_0, Shell_NotifyIconW,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::IsWindow;
+
+    let cached_raw = TRAY_HWND_RAW.load(Ordering::Acquire);
+    let hwnd = if cached_raw != 0 {
+        let candidate = HWND(cached_raw as *mut std::ffi::c_void);
+        // SAFETY: IsWindow 只读验证句柄有效
+        if unsafe { IsWindow(Some(candidate)).as_bool() } {
+            Some(candidate)
+        } else {
+            find_own_tray_hwnd()
+        }
+    } else {
+        find_own_tray_hwnd()
+    };
+
+    let Some(hwnd) = hwnd else {
+        logging!(debug, Type::Tray, "未找到本进程托盘消息窗口，跳过气泡提示");
+        return;
+    };
+    TRAY_HWND_RAW.store(hwnd.0 as isize, Ordering::Release);
+
+    let mut nid = NOTIFYICONDATAW {
+        cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
+        hWnd: hwnd,
+        // `tray-icon` 内部静态 Counter 从 1 起分配，全应用仅初始化单枚托盘图标故恒为 1
+        uID: 1,
+        uFlags: NIF_INFO,
+        dwInfoFlags: NIIF_INFO,
+        Anonymous: NOTIFYICONDATAW_0 { uTimeout: 4000 },
+        ..Default::default()
+    };
+    copy_wide_fixed(&mut nid.szInfoTitle, title);
+    copy_wide_fixed(&mut nid.szInfo, body);
+
+    // SAFETY: nid 字段已完整填充并与 Win32 NOTIFYICONDATAW 对齐
+    if !unsafe { Shell_NotifyIconW(NIM_MODIFY, &nid).as_bool() } {
+        logging!(debug, Type::Tray, "Shell_NotifyIconW(NIF_INFO) 托盘气泡发送未成功");
     }
 }
 
@@ -266,13 +419,15 @@ fn on_tray_icon_event(_tray_icon: &TrayIcon, tray_event: TrayIconEvent) {
                 let _ = WindowManager::hide_main_window();
                 return;
             }
-            // exit_lightweight_mode 返回 true 表示成功退出（含直接显示窗口的兜底分支），
-            // 返回 false 表示正在退出中（防抖限流）或显示失败，此时尝试主动 show 兜底。
-            // 与 server.rs 单例唤醒路径（commands/visible 端点）的逻辑保持对称。
+            // exit_lightweight_mode 返回 true 表示成功退出（含直接显示窗口的兜底分支）；
+            // 返回 false 表示正在切换/被限流或超时回滚为轻量态（超时不再重复建窗，避免二次阻塞）。
             if !lightweight::exit_lightweight_mode().await {
-                logging!(warn, Type::Tray, "轻量模式未正常退出，尝试直接显示主窗口兜底");
-                WindowManager::show_main_window().await;
-            };
+                logging!(
+                    warn,
+                    Type::Tray,
+                    "轻量模式退出未完成（可能正在防抖限流或窗口初始化超时）"
+                );
+            }
         });
     }
 }
@@ -336,4 +491,33 @@ pub fn update_lite_mode_menu(is_in: bool) {
         }
         let _ = item.set_enabled(true);
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn silent_balloon_texts_cover_chinese_and_english_fallback() {
+        let (title_zh, body_zh) = silent_balloon_texts(Some("zh"));
+        assert!(title_zh.contains("静默"));
+        assert!(body_zh.contains("左键点击"));
+
+        let (title_tw, body_tw) = silent_balloon_texts(Some("zhtw"));
+        assert!(title_tw.contains("靜默"));
+        assert!(body_tw.contains("左鍵點擊"));
+
+        let (title_en, body_en) = silent_balloon_texts(Some("en"));
+        assert!(title_en.contains("silently"));
+        assert!(body_en.contains("Left-click"));
+    }
+
+    #[test]
+    fn copy_wide_fixed_null_terminates_and_truncates_safely() {
+        let mut buf = [0u16; 6];
+        copy_wide_fixed(&mut buf, "Clash Mini");
+        assert_eq!(buf[5], 0);
+        let decoded = String::from_utf16_lossy(&buf[..5]);
+        assert_eq!(decoded, "Clash");
+    }
 }

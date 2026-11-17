@@ -51,7 +51,7 @@ pub async fn check_singleton() -> Result<()> {
         }
         Err(_) => {
             // 绑定失败，说明端口已被第一个实例或者其他服务占用，执行唤醒逻辑
-            let client = ClientBuilder::new().timeout(Duration::from_millis(500)).build()?;
+            let client = ClientBuilder::new().timeout(Duration::from_millis(1500)).build()?;
             let argvs: Vec<std::string::String> = std::env::args().collect();
             if argvs.len() > 1 {
                 let param = argvs[1].as_str();
@@ -90,60 +90,6 @@ pub fn embed_server() {
         .set(Mutex::new(Some(shutdown_tx)))
         .expect("failed to set shutdown signal for embedded server");
 
-    let visible = warp::path!("commands" / "visible").and_then(|| async {
-        logging!(info, Type::Window, "检测到从单例模式恢复应用窗口");
-        tauri::async_runtime::spawn(async {
-            // exit_lightweight_mode 返回 true 表示成功退出（含直接显示窗口的兜底分支），
-            // 返回 false 表示正在退出中（防抖限流）或显示失败，此时尝试主动 show 兜底。
-            if !lightweight::exit_lightweight_mode().await {
-                logging!(warn, Type::Window, "轻量模式未正常退出，尝试直接显示主窗口兜底");
-                WindowManager::show_main_window().await;
-            }
-        });
-        Ok::<_, warp::Rejection>(warp::reply::with_status::<std::string::String>(
-            "ok".to_string(),
-            warp::http::StatusCode::OK,
-        ))
-    });
-
-    let pac = warp::path!("commands" / "pac").and_then(|| async move {
-        let verge_config = Config::verge().await;
-        let clash_config = Config::clash().await;
-
-        let pac_content = verge_config
-            .data_arc()
-            .pac_file_content
-            .clone()
-            .unwrap_or_else(|| DEFAULT_PAC.into());
-
-        let pac_port = verge_config
-            .data_arc()
-            .verge_mixed_port
-            .unwrap_or_else(|| clash_config.data_arc().get_mixed_port());
-        let processed_content = pac_content.replace("%mixed-port%", &format!("{pac_port}"));
-        Ok::<_, warp::Rejection>(
-            warp::http::Response::builder()
-                .header("Content-Type", "application/x-ns-proxy-autoconfig")
-                .body(processed_content)
-                .unwrap_or_default(),
-        )
-    });
-
-    // Use map instead of and_then to avoid Send issues
-    let scheme = warp::path!("commands" / "scheme")
-        .and(warp::query::<QueryParam>())
-        .and_then(|query: QueryParam| async move {
-            AsyncHandler::spawn(|| async move {
-                logging_error!(Type::Setup, resolve::resolve_scheme(&query.param).await);
-            });
-            Ok::<_, warp::Rejection>(warp::reply::with_status::<std::string::String>(
-                "ok".to_string(),
-                warp::http::StatusCode::OK,
-            ))
-        });
-
-    let commands = visible.or(scheme).or(pac);
-
     // 从全局缓存中取出第一个实例抢占的 std::net::TcpListener
     #[allow(clippy::expect_used)]
     let std_listener = {
@@ -152,13 +98,86 @@ pub fn embed_server() {
         guard.take().expect("TcpListener already taken")
     };
 
-    // 设置非阻塞并转换为 tokio 的 TcpListener
+    // 设置非阻塞并在物理隔离的 DAEMON_RUNTIME 内转换为 tokio TcpListener（BUG-394）
     #[allow(clippy::expect_used)]
     std_listener.set_nonblocking(true).expect("failed to set nonblocking");
-    #[allow(clippy::expect_used)]
-    let tokio_listener = tokio::net::TcpListener::from_std(std_listener).expect("failed to convert TcpListener");
 
-    AsyncHandler::spawn(move || async move {
+    AsyncHandler::spawn_daemon(move || async move {
+        let visible = warp::path!("commands" / "visible").and_then(|| async {
+            AsyncHandler::spawn_daemon(|| async {
+                // BUG-395：开启「启动时最小化」且已有订阅时，再次点击启动图标一律保持静默托盘驻留，
+                // 仅通过原生气泡提示而不弹出主窗口，防止露出窗口再关闭触发 360 关窗残留清理。
+                if lightweight::should_enter_silent_tray_on_launch().await {
+                    logging!(
+                        info,
+                        Type::Window,
+                        "已开启启动时最小化，点击启动图标保持托盘静默驻留，不弹出主窗口"
+                    );
+                    if !lightweight::is_in_lightweight_mode() && !WindowManager::is_main_window_ready() {
+                        let _ = lightweight::entry_lightweight_mode().await;
+                    }
+                    crate::core::tray::Tray::global().notify_silent_running().await;
+                    return;
+                }
+
+                logging!(info, Type::Window, "检测到从单例模式恢复应用窗口");
+                AsyncHandler::spawn(|| async {
+                    if !lightweight::exit_lightweight_mode().await {
+                        logging!(
+                            warn,
+                            Type::Window,
+                            "轻量模式退出未完成（可能正在防抖限流或窗口初始化超时）"
+                        );
+                    }
+                });
+            });
+            Ok::<_, warp::Rejection>(warp::reply::with_status::<std::string::String>(
+                "ok".to_string(),
+                warp::http::StatusCode::OK,
+            ))
+        });
+
+        let pac = warp::path!("commands" / "pac").and_then(|| async move {
+            let verge_config = Config::verge().await;
+            let clash_config = Config::clash().await;
+
+            let pac_content = verge_config
+                .data_arc()
+                .pac_file_content
+                .clone()
+                .unwrap_or_else(|| DEFAULT_PAC.into());
+
+            let pac_port = verge_config
+                .data_arc()
+                .verge_mixed_port
+                .unwrap_or_else(|| clash_config.data_arc().get_mixed_port());
+            let processed_content = pac_content.replace("%mixed-port%", &format!("{pac_port}"));
+            Ok::<_, warp::Rejection>(
+                warp::http::Response::builder()
+                    .header("Content-Type", "application/x-ns-proxy-autoconfig")
+                    .body(processed_content)
+                    .unwrap_or_default(),
+            )
+        });
+
+        // Use map instead of and_then to avoid Send issues
+        let scheme = warp::path!("commands" / "scheme")
+            .and(warp::query::<QueryParam>())
+            .and_then(|query: QueryParam| async move {
+                AsyncHandler::spawn(|| async move {
+                    logging_error!(Type::Setup, resolve::resolve_scheme(&query.param).await);
+                });
+                Ok::<_, warp::Rejection>(warp::reply::with_status::<std::string::String>(
+                    "ok".to_string(),
+                    warp::http::StatusCode::OK,
+                ))
+            });
+
+        let commands = visible.or(scheme).or(pac);
+
+        #[allow(clippy::expect_used)]
+        let tokio_listener = tokio::net::TcpListener::from_std(std_listener).expect("failed to convert TcpListener");
+
         warp::serve(commands)
             .incoming(tokio_listener)
             .graceful(async {
