@@ -1,11 +1,11 @@
 {
-  "version": "3.5.2",
-  "notes": "### 🔒 物理隔离后台守护运行时与根除高负载轻量唤醒连环死锁（BUG-394）\n\n- **守护任务物理隔离出 Tauri 默认线程池**：在 `async_handler.rs` 新增独立的 2 线程守护 Tokio 运行时 `DAEMON_RUNTIME`（`spawn_daemon` / `spawn_daemon_supervised`），将 `monitor.rs`（15 秒健康监测与断流自愈）与 `server.rs`（`127.0.0.1:33335` 单实例/PAC 本地服务）全面迁入守护运行时（同步将单实例客户端探测超时放宽至 `1500ms`），即使 CPU 长期 100% 满载导致前端 UI 建窗饥饿，后台自动切点与单实例通信依然独立推进。\n- **原子 `HWND` 管理、12 秒建窗超时回滚与零阻塞 Win32 直查**：`resolve/window.rs` 引入原子窗口句柄 `MAIN_WINDOW_HWND`（`WM_NCDESTROY` 及 `destroy_main_window` 自动复位），并将无边框样式剥离、外框校准与 `SetWindowSubclass` 钩子安装统一收拢至 `run_on_main_thread`（带 `12s` 异步超时与 `cleanup_timed_out_main_window` 销毁回滚）；`window_manager.rs` 全面以 Win32 原生直查（`IsWindow` / `IsWindowVisible` / `IsIconic` / `GetForegroundWindow` 叠加 `tray/mod.rs` 原子焦点缓存、`EnumDisplayMonitors` + `GetMonitorInfoW` + `GetDpiForMonitor`）替代会跨线程阻塞等待主线程的 Tauri Getter，彻底切断线程互锁死链，并为 `NotificationSystem::send_event` 增设 `is_main_window_ready()` 守卫。\n\n### 🛡️ 新手引导瘦身、「轻量模式防误杀指南」重构与「静默启动」全场景静默进托盘（BUG-395）\n\n- **全场景静默启动免露窗防误杀闭环**：新增 `lightweight::should_enter_silent_tray_on_launch()`（配合纯函数 `has_real_profile_items()`），只要已启用「静默启动」且存在真实订阅/本地配置，无论开机自启（`--silent`）、手动双击图标冷启动还是轻量态/运行态再次点击图标唤醒（`/commands/visible`），一律直接维持轻量模式驻留系统托盘而不创建或弹出主窗口，从根源避免被 360 记录为“开窗→关窗残留”（仅首次无配置仍开窗引导；手动启动时通过 `Tray::notify_silent_running()` 弹出原生 Win32 `NIF_INFO` 托盘气泡提示，左键点击托盘图标随时打开主界面）。\n- **新手引导精简化与「轻量模式防误杀指南」双方案重构**：移除 `FirstRunGuideDialog` Step 2 冗余的安全软件引导卡片；将顶栏 `?` 帮助菜单条目升级为「🛡️ 轻量模式防误杀指南」，同步重构 `AntivirusWhitelistDialog`、全部 13 语种 `layout.json` 与 `docs/antivirus-whitelist.md`——阐明 360 在高负载下清理曾露窗进程的原因，并提供「一键开启静默启动（全程不露窗 + 误杀重开静默恢复，附日常避开开窗提示）」与「Windows 安全模式修改 `whiteinternal.ini` 硬白名单（附路径与追加条目一键复制）」两条清晰方案。\n\n---",
-  "pub_date": "2026-11-17T10:01:13.291Z",
+  "version": "3.5.3",
+  "notes": "Clash Mini v3.5.3",
+  "pub_date": "2026-11-17T18:35:19Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRVAwR282ZHJhVGFjY1FtbGxGcm9LbXBEVTFQdUdIVHdYTkx1Y2NhQVRJS3J5R2F6ZXB0RU1Xd1IvSkIrUkJDczZKd0h2UVpoaVkwNmlmb3BSeDhBSXdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0OTA5NTc4CWZpbGU6Q2xhc2ggTWluaV8zLjUuMl94NjQtc2V0dXAuZXhlCkNlaWNpOWFXMjMvanVhT1RadG43d1FlOU1OK2haemRscERnd2ZMQ21oeVFvTDViSFA2dEdHOThhUDA5NC9ZcTVING1UMGJaS3Z1Z0tmemdLS3Zjc0NnPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.2/Clash.Mini_3.5.2_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.3/Clash.Mini_3.5.3_x64-setup.exe",
       "size": 30221301
     }
   }
