@@ -15,7 +15,9 @@
       "destination": "宛先アドレス",
       "destinationPort": "宛先ポート",
       "type": "タイプ",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "プロキシノード",
+      "staleNodeTag": "旧ノード接続"
     },
     "order": {
       "default": "Default",

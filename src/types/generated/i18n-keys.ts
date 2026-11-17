@@ -15,6 +15,8 @@ export const translationKeys = [
   'connections.components.fields.destinationPort',
   'connections.components.fields.type',
   'connections.components.fields.actions',
+  'connections.components.fields.proxyNode',
+  'connections.components.fields.staleNodeTag',
   'connections.components.order.default',
   'connections.components.order.uploadSpeed',
   'connections.components.order.downloadSpeed',

@@ -26,7 +26,10 @@ import {
   NODE_DELAY_MAX_MS,
   type DelayUpdate,
 } from '@/services/delay'
-import { selectNodeForGroupWithTimeout } from '@/services/mihomo-api'
+import {
+  closeStaleProxyConnections,
+  selectNodeForGroupWithTimeout,
+} from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
 import type { IProxyItem } from '@/types/clash'
 import { get3DCardStyle } from '@/utils/button-styles'
@@ -148,11 +151,13 @@ export const ActiveNodeStatusCard = () => {
     if (!currentProfileUid || testing) return
     setTesting(true)
     try {
+      const shouldSelect = networkHealth !== 'network_health::offline'
       const results = await triggerAutoSelect(
         currentProfileUid,
         undefined,
         0,
-        networkHealth !== 'network_health::offline',
+        shouldSelect,
+        shouldSelect,
       )
       if (results.some(([, d]) => d > 0 && d < latencyTimeout)) {
         broadcastNetworkHealth('network_health::ok')
@@ -310,6 +315,7 @@ export const ActiveNodeStatusCard = () => {
       try {
         await selectNodeForGroupWithTimeout(groupName, nextNodeName)
         notifyNodeSwitched()
+        void closeStaleProxyConnections(nextNodeName, groupName)
         if (currentProfileUid) {
           patchCurrent({
             selected: [{ name: 'PROXY', now: nextNodeName }],

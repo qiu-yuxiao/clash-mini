@@ -31,8 +31,10 @@ export interface TranslationResources {
           dlSpeed: string
           host: string
           process: string
+          proxyNode: string
           rule: string
           source: string
+          staleNodeTag: string
           time: string
           type: string
           ulSpeed: string

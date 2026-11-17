@@ -15,7 +15,9 @@
       "destination": "Zieladresse",
       "destinationPort": "Zielport",
       "type": "Typ",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "Proxy-Knoten",
+      "staleNodeTag": "Alter Knoten"
     },
     "order": {
       "default": "Default",

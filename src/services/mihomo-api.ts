@@ -1,3 +1,4 @@
+import { shouldCloseStaleProxyConnection } from '@/utils/path-control'
 import {
   getProxyByName,
   selectNodeForGroup,
@@ -42,6 +43,30 @@ export const closeAllConnectionsWithTimeout = () =>
     MIHO_API_TIMEOUT,
     'mihomo:closeAllConnections',
   )
+
+/**
+ * 前台用户显式切换节点至 `targetNode` 后，精准关闭仍挂在非 `targetNode` 旧出口上的 `PROXY` 存量长连接（BUG-396）。
+ * 直连（`DIRECT`）与已位于 `targetNode` 上的连接完全不受影响。
+ */
+export async function closeStaleProxyConnections(
+  targetNode: string,
+  groupName: string = 'PROXY',
+): Promise<number> {
+  try {
+    const { connections } = await getConnectionsWithTimeout()
+    const staleConns = (connections ?? []).filter((conn) =>
+      shouldCloseStaleProxyConnection(conn.chains ?? [], targetNode, groupName),
+    )
+    if (staleConns.length === 0) return 0
+    await Promise.allSettled(
+      staleConns.map((conn) => closeConnectionWithTimeout(conn.id)),
+    )
+    return staleConns.length
+  } catch (err) {
+    console.warn('[MihomoApi] closeStaleProxyConnections failed:', err)
+    return 0
+  }
+}
 
 export const getVersionWithTimeout = () =>
   withIpcTimeout(getVersion(), MIHO_API_TIMEOUT, 'mihomo:getVersion')

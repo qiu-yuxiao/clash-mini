@@ -325,6 +325,7 @@ export const ProxyGroups = (props: Props) => {
           visibleNames,
           0,
           true,
+          true,
         )
         busyRetryCountRef.current[groupName] = 0
         if (results.length === 0) {
@@ -407,7 +408,13 @@ export const ProxyGroups = (props: Props) => {
         dm.setDelay(name, uiGroupName, -2)
       }
       dm.queueGroupNotification(uiGroupName)
-      const results = await triggerAutoSelect(currentUid, undefined, 0, true)
+      const results = await triggerAutoSelect(
+        currentUid,
+        undefined,
+        0,
+        true,
+        true,
+      )
       if (results.length === 0) {
         for (const name of uniqueNames) {
           if (dm.getDelayUpdate(name, uiGroupName)?.delay === -2) {

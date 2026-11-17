@@ -1,32 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 
 import { useProfiles } from '@/hooks/use-profiles'
-import { useVerge } from '@/hooks/use-verge'
 import { frontendLog, notifyNodeSwitched } from '@/services/cmds'
 import {
-  closeConnectionWithTimeout,
-  getConnectionsWithTimeout,
+  closeStaleProxyConnections,
   selectNodeForGroupWithTimeout,
 } from '@/services/mihomo-api'
 import { debugLog } from '@/utils/debug'
-
-// 缓存连接清理
-const cleanupConnections = async (previousProxy: string) => {
-  try {
-    const { connections } = await getConnectionsWithTimeout()
-    const cleanupPromises = (connections ?? [])
-      .filter((conn) => conn.chains.includes(previousProxy))
-      .map((conn) => closeConnectionWithTimeout(conn.id))
-
-    if (cleanupPromises.length > 0) {
-      await Promise.allSettled(cleanupPromises)
-      debugLog(`[ProxySelection] 清理了 ${cleanupPromises.length} 个连接`)
-    }
-  } catch (error) {
-    console.warn('[ProxySelection] 连接清理失败:', error)
-  }
-}
 
 interface ProxySelectionOptions {
   onSuccess?: () => void
@@ -44,7 +25,6 @@ interface ProxyChangeRequest {
 // 代理选择 Hook
 export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   const { current, patchCurrent } = useProfiles()
-  const { verge } = useVerge()
   const queryClient = useQueryClient()
   const pendingRequestRef = useRef<ProxyChangeRequest | null>(null)
   const isProcessingRef = useRef(false)
@@ -56,16 +36,8 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
   onSuccessRef.current = onSuccess
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
-
-  const config = useMemo(
-    () => ({
-      autoCloseConnection: verge?.auto_close_connection ?? false,
-      enableConnectionCleanup,
-    }),
-    [verge?.auto_close_connection, enableConnectionCleanup],
-  )
-  const configRef = useRef(config)
-  configRef.current = config
+  const enableConnectionCleanupRef = useRef(enableConnectionCleanup)
+  enableConnectionCleanupRef.current = enableConnectionCleanup
 
   const persistSelection = useCallback(
     (proxyName: string, skipConfigSave: boolean) => {
@@ -87,7 +59,7 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
 
   const executeChange = useCallback(
     async (request: ProxyChangeRequest) => {
-      const { groupName, proxyName, previousProxy, skipConfigSave } = request
+      const { groupName, proxyName, skipConfigSave } = request
       debugLog(`[ProxySelection] 代理切换: ${groupName} -> ${proxyName}`)
 
       // BUG-356: 0ms 乐观高亮更新，点击瞬间即在 ['getProxies'] 缓存切至目标节点，失败自动回滚
@@ -116,12 +88,10 @@ export const useProxySelection = (options: ProxySelectionOptions = {}) => {
           `[ProxySelection] 代理和状态同步完成: ${groupName} -> ${proxyName}`,
         )
 
-        if (
-          configRef.current.enableConnectionCleanup &&
-          configRef.current.autoCloseConnection &&
-          previousProxy
-        ) {
-          void cleanupConnections(previousProxy)
+        // BUG-396: 前台用户显式切换节点时，立即清理仍挂在非当前目标节点上的存量代理长连接，
+        // 避免 HTTP/2 多路复用连接粘滞在旧节点上导致地区策略不生效；直连流量保持零干扰。
+        if (enableConnectionCleanupRef.current) {
+          void closeStaleProxyConnections(proxyName, groupName)
         }
       } catch (error) {
         if (previousSnapshot !== undefined) {

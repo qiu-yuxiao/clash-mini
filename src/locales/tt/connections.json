@@ -15,7 +15,9 @@
       "destination": "Максат IP-адресы",
       "destinationPort": "Барасы порты",
       "type": "Төр",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "Прокси төене",
+      "staleNodeTag": "Элекке төен"
     },
     "order": {
       "default": "Default",

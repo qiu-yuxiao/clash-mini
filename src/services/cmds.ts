@@ -141,6 +141,7 @@ export async function triggerAutoSelect(
   nodeNames?: string[],
   sortType?: number,
   select?: boolean,
+  cleanStaleConnections?: boolean,
 ): Promise<Array<[string, number]>> {
   return withIpcTimeout(
     invoke<Array<[string, number]>>('trigger_auto_select', {
@@ -148,6 +149,7 @@ export async function triggerAutoSelect(
       nodeNames: nodeNames ?? null,
       sortType: sortType ?? 0,
       select: select ?? true,
+      ...(cleanStaleConnections !== undefined ? { cleanStaleConnections } : {}),
     }),
     60_000,
     'triggerAutoSelect',

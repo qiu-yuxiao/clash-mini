@@ -15,7 +15,9 @@
       "destination": "목적지",
       "destinationPort": "목적지 포트",
       "type": "유형",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "프록시 노드",
+      "staleNodeTag": "이전 노드 연결"
     },
     "order": {
       "default": "기본",

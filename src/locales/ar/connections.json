@@ -15,7 +15,9 @@
       "destination": "عنوان IP الوجهة",
       "destinationPort": "ميناء الوجهة",
       "type": "النوع",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "عقدة البروكسي",
+      "staleNodeTag": "عقدة سابقة"
     },
     "order": {
       "default": "Default",

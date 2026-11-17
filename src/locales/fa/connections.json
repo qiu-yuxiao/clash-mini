@@ -15,7 +15,9 @@
       "destination": "آدرس IP مقصد",
       "destinationPort": "بندر هدف",
       "type": "نوع",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "گره پروکسی",
+      "staleNodeTag": "گره قبلی"
     },
     "order": {
       "default": "Default",

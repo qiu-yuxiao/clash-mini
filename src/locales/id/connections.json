@@ -15,7 +15,9 @@
       "destination": "IP Tujuan",
       "destinationPort": "Port Tujuan",
       "type": "Jenis",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "Node Proxy",
+      "staleNodeTag": "Node sebelumnya"
     },
     "order": {
       "default": "Default",

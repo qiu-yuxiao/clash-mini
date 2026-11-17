@@ -15,7 +15,9 @@
       "destination": "目標位址",
       "destinationPort": "目標連接埠",
       "type": "類型",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "代理節點",
+      "staleNodeTag": "舊節點連線"
     },
     "order": {
       "default": "預設",

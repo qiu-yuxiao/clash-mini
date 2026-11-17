@@ -1,6 +1,6 @@
 # Clash Mini 开发设计书
 
-> **适用版本**：v3.5.2 及后续版本  
+> **适用版本**：v3.5.3 及后续版本  
 > **文档性质**：本文档是 Clash Mini 项目的**权威系统设计规范与工程开发宪章**。所有功能开发、重构优化与代码审核必须严格遵循本文档中定义的架构约定、业务逻辑与安全红线。  
 > **维护说明**：本文档聚焦于**系统设计意图（做什么、为什么、架构边界与关键参数）**；具体代码实现见配套索引 `docs/implementation-notes.md`，架构全局图谱见 `docs/ARCHITECTURE.md`，历史避坑指南见 `clash_mini_pitfalls.md`。
 
@@ -226,8 +226,8 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 2.8 主页节点列表与活跃节点轮换
 
 - **三列网格布局**：默认模式下每行 3 个节点卡片，单节点高度固定 20px；窄窗模式平滑退化为单列。
-- **整行 0ms 乐观切换与延迟徽章独立单测热区（BUG-356 / BUG-357）**：节点卡片主体区域点击瞬间对 `['getProxies']` 缓存执行 `0ms` 乐观高亮切换并异步同步内核（失败自动回滚）；卡片右侧延迟徽章设为独立点击热区（阻止冒泡），点击仅对该节点触发实时单点测速（`select: false`），不中断当前活跃出口连接。
-- **活跃节点快速轮换（FEAT-006，BUG-336 / BUG-390 闭环）**：点击顶部导航栏活跃节点卡片，基于用户当前搜索/过滤/排序状态实时计算可用子集，直接轮换至下一顺位可用节点、即时刷新 `['getProxies']` 缓存并同步写回 `profile.selected` 持久化；当全节点超时或物理断网时顶栏展示轻量警示胶囊供一键重测自愈（BUG-359），且在物理断网（`networkHealth === 'network_health::offline'`）场景点击重测仅刷新延迟（`select: false`），严禁离线状态下触发无意义切点（BUG-390）。
+- **整行 0ms 乐观切换与延迟徽章独立单测热区（BUG-356 / BUG-357 / BUG-396）**：节点卡片主体区域点击瞬间对 `['getProxies']` 缓存执行 `0ms` 乐观高亮切换并异步同步内核（失败自动回滚），且随后立即触发精准存量连接清理（详见 §4.2）；卡片右侧延迟徽章设为独立点击热区（阻止冒泡），点击仅对该节点触发实时单点测速（`select: false`），不中断当前活跃出口连接。
+- **活跃节点快速轮换与过滤/F4/F1 前台即时切换存量清理（FEAT-006，BUG-336 / BUG-390 / BUG-396）**：点击顶部导航栏活跃节点卡片，基于用户当前搜索/过滤/排序状态实时计算可用子集，直接轮换至下一顺位可用节点、即时刷新 `['getProxies']` 缓存并同步写回 `profile.selected` 持久化；当全节点超时或物理断网时顶栏展示轻量警示胶囊供一键重测自愈（BUG-359），且在物理断网（`networkHealth === 'network_health::offline'`）场景点击重测仅刷新延迟（`select: false`），严禁离线状态下触发无意义切点（BUG-390）。所有 4 类前台用户主动发起的节点切换入口（节点列表点选、顶栏活跃节点胶囊轮换、过滤框 / `F4` / `F1` 选点、异常胶囊重测选点）成功切换后，均调用精准清理逻辑关闭仍挂在非当前目标节点上的 `PROXY` 存量长连接（见 §4.2）。
 - **节点过滤与自动并发测速择优接管（地域策略即时切换约束，特例豁免，BUG-392 补强）**：在 Clash Mini 的单一 `PROXY` 组架构下，节点列表顶部的过滤输入框不仅用于视图搜索，更承担**地域策略约束开关**职责（典型场景：为应对如 Antigravity 拒绝香港 IP 等服务区域限制，用户输入 `-香港` 或 `美国|新加坡` 即表达「撤出受限地区并切入合规节点子集」的明确意图）。因此当用户完成过滤词输入（实体输入停止 700ms 防抖，或按 `Enter` 键即时生效）时，系统自动对当前过滤子集触发一次多路并发测速与择优切换（`triggerAutoSelect`，`select: true`），所见即所选。该交互属于**用户主动发起的地域策略切换**，与后台无感知自动切点严格区分，受 §5 显式豁免；为根治输入法拼音/算子半输入态抢跑与在途竞态（BUG-392）：① `BaseSearchBox` 在中文 IME 组词期（`onCompositionStart`~`onCompositionEnd`）仅维护本地显示缓冲而不外发拼音中间态；② `ProxyHead` 通过 `isIncompleteFilterInput` 跳过纯操作符或末尾悬空算子（如 `"-"`、`"!"`、`"日本 -"`、`"日本|"`）；③ `ProxyGroups::handleCheckAll` 与 `handleCheckFull` 选点前立即 `flushHeadStatePersist()` 同步 `filterText` 至后端，且当在途测速尚未结束而 `filterText` 已更新为新过滤串时登记尾部重测队列（`pendingRecheckGroupsRef`）及有限次 `AUTO_SELECT_BUSY` 续试，绝不静默丢弃；④ 若过滤词未匹配到任何可见节点则安全短路跳过，清空过滤框时仅重置列表而不触发全量测速。
 
 ### 2.9 极简静态菜单系统托盘规范
@@ -372,7 +372,9 @@ Clash Mini 坚守 **3D 实体拟物与物理光影美学**，彻底摒弃扁平�
 ### 4.2 不断网不断流铁律与后端连接维持
 
 - **网络连接连续性铁律**：**进入轻量模式、退出轻量模式或在正常状态下自愈/手动切换节点，绝对禁止全量切断已建立的用户网络连接**。本条是 §5 章首「🎯 本章最高方针 · 连续性优先」在生命周期场景的具体落地；方针中的优先级硬序与「非必要不主动切换」同样适用于本节涉及的一切自动行为，且方针效力高于本条。
-- **故障转移不清连接（取代 BUG-368 的「精确断死留活」）**：`select_node_for_group` 本身是干净热切换，已有连接不受影响；早先按 `chains` 命中筛选的批量断连逻辑无法区分「已挂死的连接」与「仍在正常传输的健康长连接」，易误伤 HTTP/2 / gRPC 长流（如 AI 长会话）。故自愈成功切换后**不清理任何存量连接**（已于 v3.3.4 彻底移除相关死连接清理开关与函数），长连接交由应用层自身重连；未来若确需引入精细清理，须以引入 `ConfirmedDead` 迟滞状态确证旧节点已死且仅对「确已无流量」的连接执行清理为硬前提。
+- **前后台严格二分：后台平滑保活不断连接 vs. 前台主动切换精准对齐新节点（BUG-396）**：
+  - **后台自愈与冷启动/唤醒初始化**（`monitor::self_heal_with_accounting`、`trigger_backend_auto_select` 无清理标记路径）：坚持零断流热切换，绝对不关闭任何存量长连接，确保未中断的下载与 HTTP/2 / gRPC 长流不受后台偶发切换影响。
+  - **前台用户显式下达换节点指令**（节点列表点选、顶栏胶囊轮换、过滤词 / `F4` / `F1` 选点、顶栏异常胶囊在线重测）：由 `should_close_stale_proxy_connection`（Rust `monitor.rs`）与 `shouldCloseStaleProxyConnection`（前端 `path-control.ts`）精准清理满足 **`chains` 含 `"PROXY"` 且不含新 `targetNode`** 的存量代理连接（彻底清除先粘滞旧节点、后多跳切换残留的 HTTP/2 连接池粘连），同时严格保护 `DIRECT` / `REJECT` 流量以及已位于 `targetNode` 上的连接（零误伤）。
 - **内核进程与虚拟网卡不间断**：内核子进程与 TUN 网卡始终保持正常全速运行，正常流量与健康长连接绝不发生瞬间闪断。
 
 ### 4.3 前端 WebSocket 熔断与自动重连自愈
@@ -603,6 +605,8 @@ v2.9.3 诊断版曾为定位「轻量模式下体检在特定时点后停止推�
    - `ConnectionsPanel` 移除 `活跃 / 历史` 分段切换与「清空历史」按钮；`composeActivePathControlConnections` 将 `closedConnections` 按逆序（最新关闭优先）对目标去重后合入同一路径控制表（自动排除已被实时活跃连接、手动已断开记录或 `Merge` 托管规则覆盖的目标，实时速率置零并标记 `_isClosed: true`），排于实时流与置顶托管规则之后（`_isClosed` 行对详情按关闭态展示并在右键菜单禁用「断开连接」），解决短连接一闪而过无法在主表就地右键管控的问题。
 4. **自定义路由规则可移植备份与重装恢复**：
    - 在 `路径控制（右键点击链接）` 右侧提供与 `断开全部` 风格完全一致的紧凑 3D 按钮 `保存路由`（`exportCustomRoutingRules`）与 `导入路由`（`importCustomRoutingRules`），通过 `@tauri-apps/plugin-dialog` 与 `@tauri-apps/plugin-fs` 将 `Merge` `prepend-rules` 导出为带版本元数据的 UTF-8 YAML 备份文件；全新重装后可一键从指定备份文件合并导入至 `Merge` `prepend-rules`，并在操作期间通过 `beginLongOperation`/`endLongOperation` 护航完成 `enhanceProfiles()` 重载与 `clash-mini-merge-rules-changed` 界面同步刷新（13 语种全量同步）。
+5. **左键详情弹窗直显实际出口节点与旧节点滞留提示（BUG-396）**：
+   - 在 `ConnectionDetail`（左键点击「路径控制」表条目弹出）内，于 `主机`（`host`）正下方紧接新增 **`代理节点`（`connections.components.fields.proxyNode`）** 字段，由纯函数 `resolveConnectionNodeDisplay` 精确解析并展示 `chains[0]` 真实出口节点名（直连显 `DIRECT`、封锁显 `REJECT`、合成规则行显 `--`）；当该活跃代理连接仍驻留于后台平滑切换前的历史节点（即 `nodeName !== PROXY.now`）时，以醒目警示色追加 `（旧节点连接）`（`staleNodeTag`）标签，方便用户配合弹窗底部的「关闭连接」按需单条切断。
 
 ---
 
@@ -872,6 +876,7 @@ flowchart LR
 | **BUG-393** | 2.12 / 4.1 / 8.9 | **【待用户确认】** 新手引导与白名单指引明确信任区目标路径及 13 语种架构文案统一：`src/locales/*/layout.json` 与 `docs/antivirus-whitelist.md` 在 `antivirus.brief` / `antivirus.how` 中明确列出默认安装目录 `C:\Program Files\Clash Mini\` 及 `clash-mini.exe` / `mini-mihomo.exe`；`FirstRunGuideDialog` 与 `AntivirusWhitelistDialog` 增加 `overflowWrap: 'anywhere'` 防窄窗路径溢出；同步将 `ar`/`de`/`es`/`fa`/`id`/`jp`/`ko`/`ru`/`tr`/`tt` 10 语种残留的旧看门狗文案更新为现行轻量模式驻留架构说明。 |
 | **BUG-394** | 1.1 / 2.4 / 4.5 / 5.1 | **【待用户确认】** 根治极端高 CPU 负载下退出轻量模式重建窗口引发的主线程与 Tokio 工作池连环死锁：`async_handler.rs` 新增 2 线程物理隔离守护运行时 `DAEMON_RUNTIME`（`spawn_daemon`/`spawn_daemon_supervised`），将 `monitor.rs` 后台监测自愈与 `server.rs` 单实例服务（超时放宽至 `1500ms`）彻底迁离 Tauri 默认工作池；`resolve/window.rs` 引入原子 `MAIN_WINDOW_HWND`（`WM_NCDESTROY` 及 `destroy_main_window` 自动清零）并将 `HWND` 样式/尺寸/子类化钩子收拢至 `run_on_main_thread` + `12s` 超时销毁回滚；`window_manager.rs` 将窗口可见性/焦点/最小化与显示器枚举改造为零跨线程阻塞的 Win32 直查（`IsWindow`/`IsWindowVisible`/`IsIconic`/`GetForegroundWindow` + 原子焦点缓存、`EnumDisplayMonitors` + `GetMonitorInfoW`）；`notification.rs` 增加 `is_main_window_ready()` 守卫。 |
 | **BUG-395** | 1.1 / 2.9 / 2.10.1 / 2.12 / 4.1 | **【待用户确认】** 新手引导瘦身、帮助菜单「轻量模式防误杀指南」重构与「静默启动」全场景无窗进托盘防误杀机制：`lightweight.rs` 新增 `should_enter_silent_tray_on_launch()` 与 `has_real_profile_items()`，凡开启 `enable_silent_start` 且已有真实配置时，开机 `--silent`、手动点击图标及单实例 `/commands/visible` 均直接维持轻量托盘驻留不露主窗（仅左键托盘图标开窗），手动启动时经 `Tray::notify_silent_running()` 弹出原生 Win32 `Shell_NotifyIconW(NIF_INFO)` 气泡（`2s` 防抖、零 GUI 窗）；`FirstRunGuideDialog` Step 2 移除冗余安全软件卡片；`?` 帮助菜单入口升级为「🛡️ 轻量模式防误杀指南」，重构 `AntivirusWhitelistDialog`、全部 13 语种 `layout.json` 与 `docs/antivirus-whitelist.md`，提供弹窗内一键开启「静默启动」（含日常防露窗提示）及 Windows 安全模式配置 `whiteinternal.ini` 硬白名单（含路径与片段一键复制）。 |
+| **BUG-396** | 2.8 / 4.2 / 7.7 | **【待用户确认】** 区分前后台切点清连接边界并补齐路径控制详情节点显式标注：① 解决「重装先走受限香港节点建连 → 输入 `-香港` 或手动切日/新节点后 HTTP/2 长连接仍粘死在旧节点」问题——后台自愈与冷启动保持无缝热切换，仅当用户通过前台 4 大显式切点入口（列表点选、顶栏胶囊轮换、过滤框/`F4`/`F1`、健康胶囊重测）换节点时，经 1:1 同源 `should_close_stale_proxy_connection`（`monitor.rs` + `cmd/proxy.rs::trigger_auto_select`）与 `shouldCloseStaleProxyConnection`（`path-control.ts` + `mihomo-api.ts` + `use-proxy-selection.ts` + `active-node-card.tsx` + `proxy-groups.tsx`）精准关闭 `PROXY` 组中非新目标节点的存量代理连接，绝不误伤 `DIRECT` 及同节点连接；② [connection-detail.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-detail.tsx) 在 `主机` 正下方新增 `代理节点` 行（`resolveConnectionNodeDisplay` + 全 13 语种 `connections.json` `proxyNode`/`staleNodeTag`），对滞留在后台切换前旧节点上的活跃连接醒目标注 `（旧节点连接）`，并补齐 Rust 与 Vitest 单测。 |
 
 ---
 

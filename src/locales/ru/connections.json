@@ -15,7 +15,9 @@
       "destination": "IP-адрес назначения",
       "destinationPort": "Порт назначения",
       "type": "Тип",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "Прокси-узел",
+      "staleNodeTag": "Старый узел"
     },
     "order": {
       "default": "По умолчанию",

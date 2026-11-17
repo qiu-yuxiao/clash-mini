@@ -15,7 +15,9 @@
       "destination": "Dirección de destino",
       "destinationPort": "Puerto de destino",
       "type": "Tipo",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "Nodo proxy",
+      "staleNodeTag": "Nodo anterior"
     },
     "order": {
       "default": "Default",

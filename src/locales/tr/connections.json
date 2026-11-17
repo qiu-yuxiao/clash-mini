@@ -15,7 +15,9 @@
       "destination": "Hedef",
       "destinationPort": "Hedef Port",
       "type": "Tip",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "Proxy Düğümü",
+      "staleNodeTag": "Önceki düğüm"
     },
     "order": {
       "default": "Default",

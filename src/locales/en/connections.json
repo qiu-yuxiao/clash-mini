@@ -15,7 +15,9 @@
       "destination": "Destination",
       "destinationPort": "Destination Port",
       "type": "Type",
-      "actions": "Actions"
+      "actions": "Actions",
+      "proxyNode": "Proxy Node",
+      "staleNodeTag": "Previous node"
     },
     "order": {
       "default": "Default",

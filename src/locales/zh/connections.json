@@ -15,7 +15,9 @@
       "destination": "目标地址",
       "destinationPort": "目标端口",
       "type": "类型",
-      "actions": "操作"
+      "actions": "操作",
+      "proxyNode": "代理节点",
+      "staleNodeTag": "旧节点连接"
     },
     "order": {
       "default": "默认",

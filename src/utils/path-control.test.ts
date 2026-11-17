@@ -13,6 +13,8 @@ import {
   prioritizePathControlConnections,
   reconcileDisconnectedRecords,
   resolveConnectionControlStatus,
+  resolveConnectionNodeDisplay,
+  shouldCloseStaleProxyConnection,
 } from './path-control'
 
 function makeConn(
@@ -399,5 +401,120 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
       'closed-new-dup',
       'closed-older-uniq',
     ])
+  })
+
+  it('shouldCloseStaleProxyConnection 仅清理非目标节点的 PROXY 存量连接，保护直连与同目标连接 (BUG-396)', () => {
+    expect(
+      shouldCloseStaleProxyConnection(
+        ['香港1 (181201)', 'PROXY'],
+        '日本3 (181201)',
+      ),
+    ).toBe(true)
+    expect(
+      shouldCloseStaleProxyConnection(
+        ['新加坡4 (181201)', 'PROXY'],
+        '日本3 (181201)',
+      ),
+    ).toBe(true)
+    expect(
+      shouldCloseStaleProxyConnection(
+        ['日本3 (181201)', 'PROXY'],
+        '日本3 (181201)',
+      ),
+    ).toBe(false)
+    expect(shouldCloseStaleProxyConnection(['DIRECT'], '日本3 (181201)')).toBe(
+      false,
+    )
+    expect(shouldCloseStaleProxyConnection(['REJECT'], '日本3 (181201)')).toBe(
+      false,
+    )
+    expect(
+      shouldCloseStaleProxyConnection(['香港1 (181201)', 'PROXY'], 'DIRECT'),
+    ).toBe(false)
+    expect(
+      shouldCloseStaleProxyConnection(['香港1 (181201)', 'PROXY'], ''),
+    ).toBe(false)
+  })
+
+  it('resolveConnectionNodeDisplay 在详情弹窗准确解析出口节点与旧节点滞留提示 (BUG-396)', () => {
+    expect(
+      resolveConnectionNodeDisplay({
+        chains: ['日本3 (181201)', 'PROXY'],
+        currentProxyNow: '日本3 (181201)',
+      }),
+    ).toEqual({
+      kind: 'proxy',
+      nodeName: '日本3 (181201)',
+      isStaleProxyNode: false,
+    })
+
+    expect(
+      resolveConnectionNodeDisplay({
+        chains: ['香港1 (181201)', 'PROXY'],
+        currentProxyNow: '日本3 (181201)',
+      }),
+    ).toEqual({
+      kind: 'proxy',
+      nodeName: '香港1 (181201)',
+      isStaleProxyNode: true,
+    })
+
+    expect(
+      resolveConnectionNodeDisplay({
+        chains: ['香港1 (181201)', 'PROXY'],
+        isClosed: true,
+        currentProxyNow: '日本3 (181201)',
+      }),
+    ).toEqual({
+      kind: 'proxy',
+      nodeName: '香港1 (181201)',
+      isStaleProxyNode: false,
+    })
+
+    expect(
+      resolveConnectionNodeDisplay({
+        chains: ['DIRECT'],
+        currentProxyNow: '日本3 (181201)',
+      }),
+    ).toEqual({
+      kind: 'direct',
+      nodeName: 'DIRECT',
+      isStaleProxyNode: false,
+    })
+
+    expect(
+      resolveConnectionNodeDisplay({
+        chains: ['REJECT'],
+        currentProxyNow: '日本3 (181201)',
+      }),
+    ).toEqual({
+      kind: 'reject',
+      nodeName: 'REJECT',
+      isStaleProxyNode: false,
+    })
+
+    expect(
+      resolveConnectionNodeDisplay({
+        chains: ['PROXY'],
+        isSynthetic: true,
+        currentProxyNow: '日本3 (181201)',
+      }),
+    ).toEqual({
+      kind: 'none',
+      nodeName: '--',
+      isStaleProxyNode: false,
+    })
+
+    expect(
+      resolveConnectionNodeDisplay({
+        chains: ['DISCONNECTED'],
+        isSynthetic: true,
+        currentProxyNow: '日本3 (181201)',
+      }),
+    ).toEqual({
+      kind: 'none',
+      nodeName: '--',
+      isStaleProxyNode: false,
+    })
   })
 })

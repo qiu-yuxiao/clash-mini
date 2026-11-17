@@ -683,3 +683,86 @@ export function prioritizePathControlConnections(
     ...closedRows,
   ]
 }
+
+/**
+ * 判断某条活跃连接在前台用户显式切换至 `targetNode` 后是否应被立即断开（BUG-396）：
+ * - 与后端 `monitor.rs::should_close_stale_proxy_connection` 1:1 同源；
+ * - 仅匹配经过 `groupName`（默认 `'PROXY'`）的连接，绝不触碰 `DIRECT` / `REJECT` 流量；
+ * - 若连接已位于 `targetNode` 上，返回 `false` 保持零中断；
+ * - 若连接仍挂在任意非 `targetNode` 的旧代理节点（含多跳前残留）上，返回 `true`。
+ */
+export function shouldCloseStaleProxyConnection(
+  chains: string[],
+  targetNode: string,
+  groupName: string = 'PROXY',
+): boolean {
+  const target = targetNode.trim()
+  const group = groupName.trim()
+  if (!target || !group) return false
+  const upperTarget = target.toUpperCase()
+  if (
+    upperTarget === 'DIRECT' ||
+    upperTarget === 'REJECT' ||
+    upperTarget === 'GLOBAL'
+  ) {
+    return false
+  }
+  return chains.includes(group) && !chains.includes(target)
+}
+
+export interface ConnectionNodeDisplay {
+  kind: 'proxy' | 'direct' | 'reject' | 'none'
+  nodeName: string
+  isStaleProxyNode: boolean
+}
+
+/**
+ * 解析路径控制左键详情弹窗中的实际出口节点展示状态（BUG-396）。
+ */
+export function resolveConnectionNodeDisplay(params: {
+  chains?: string[]
+  isSynthetic?: boolean
+  isClosed?: boolean
+  currentProxyNow?: string
+}): ConnectionNodeDisplay {
+  const {
+    chains = [],
+    isSynthetic = false,
+    isClosed = false,
+    currentProxyNow,
+  } = params
+  if (chains.length === 0) {
+    return { kind: 'none', nodeName: '--', isStaleProxyNode: false }
+  }
+  const leaf = chains[0]?.trim() || ''
+  const upperLeaf = leaf.toUpperCase()
+  if (!leaf || upperLeaf === 'DISCONNECTED') {
+    return { kind: 'none', nodeName: '--', isStaleProxyNode: false }
+  }
+  if (upperLeaf === 'DIRECT') {
+    return { kind: 'direct', nodeName: 'DIRECT', isStaleProxyNode: false }
+  }
+  if (upperLeaf === 'REJECT' || upperLeaf === 'REJECT-DROP') {
+    return { kind: 'reject', nodeName: leaf, isStaleProxyNode: false }
+  }
+  if (isSynthetic || upperLeaf === 'PROXY' || upperLeaf === 'GLOBAL') {
+    return { kind: 'none', nodeName: '--', isStaleProxyNode: false }
+  }
+
+  const activeNow = currentProxyNow?.trim() || ''
+  const upperActive = activeNow.toUpperCase()
+  const isStaleProxyNode =
+    !isClosed &&
+    Boolean(activeNow) &&
+    upperActive !== 'DIRECT' &&
+    upperActive !== 'REJECT' &&
+    upperActive !== 'GLOBAL' &&
+    upperActive !== 'PROXY' &&
+    leaf !== activeNow
+
+  return {
+    kind: 'proxy',
+    nodeName: leaf,
+    isStaleProxyNode,
+  }
+}

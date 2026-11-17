@@ -216,6 +216,52 @@ fn select_fastest_candidate(candidates: Vec<(String, u32)>, latest_filter_text: 
     )
 }
 
+/// 判断某条活跃连接在前台用户显式切换节点至 `target_node` 后是否应被断开（BUG-396）：
+/// - 仅匹配经过 `group_name`（`"PROXY"`）代理组的连接，绝不触碰 `DIRECT` / `REJECT` 直连或拦截连接；
+/// - 若连接已位于 `target_node` 上（如 F4/F1 重测后最快节点未变），返回 `false` 保持零中断；
+/// - 若连接仍挂在任意非 `target_node` 的历史代理节点上（含多跳前残留），返回 `true` 立即清理。
+pub fn should_close_stale_proxy_connection(chains: &[String], group_name: &str, target_node: &str) -> bool {
+    let target = target_node.trim();
+    let group = group_name.trim();
+    !target.is_empty()
+        && !group.is_empty()
+        && !target.eq_ignore_ascii_case("DIRECT")
+        && !target.eq_ignore_ascii_case("REJECT")
+        && !target.eq_ignore_ascii_case("GLOBAL")
+        && chains.iter().any(|c| c == group)
+        && !chains.iter().any(|c| c == target)
+}
+
+/// 前台用户显式触发选点切换后，精准清理仍挂在非 `target_node` 旧出口上的 `PROXY` 存量长连接（BUG-396）。
+/// 注意：后台自动自愈（`self_heal_with_accounting`）与冷启动/唤醒初始化严禁调用本函数，继续保持零断流热切换。
+pub async fn close_stale_proxy_connections(target_node: &str) {
+    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+    let Ok(snapshot) = mihomo.get_connections().await else {
+        return;
+    };
+    let stale_ids: Vec<String> = snapshot
+        .connections
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|conn| should_close_stale_proxy_connection(&conn.chains, "PROXY", target_node))
+        .map(|conn| conn.id)
+        .collect();
+    if stale_ids.is_empty() {
+        return;
+    }
+    let count = stale_ids.len();
+    for id in stale_ids {
+        let _ = mihomo.close_connection(&id).await;
+    }
+    logging!(
+        info,
+        Type::Lightweight,
+        "[前台切点] 已精准清理 {} 条非当前目标节点（{}）的存量代理连接",
+        count,
+        target_node
+    );
+}
+
 async fn persist_selected_node_if_matching(profile_uid: &str, fastest_node: &str) {
     let filter_text = get_filter_and_sort_config(profile_uid)
         .await
@@ -3880,5 +3926,52 @@ mod tests {
         let only_hk = vec![("香港3 (043311)".to_string(), 72), ("香港6 (043311)".to_string(), 74)];
         let picked_none = select_fastest_candidate_with_filter(only_hk, "-香港", |_| true);
         assert_eq!(picked_none, None);
+    }
+
+    #[test]
+    fn test_should_close_stale_proxy_connection_bug396() {
+        use super::should_close_stale_proxy_connection;
+
+        let hk_chain = vec!["香港1 (181201)".to_string(), "PROXY".to_string()];
+        let sg_chain = vec!["新加坡4 (181201)".to_string(), "PROXY".to_string()];
+        let jp_chain = vec!["日本3 (181201)".to_string(), "PROXY".to_string()];
+        let direct_chain = vec!["DIRECT".to_string()];
+        let reject_chain = vec!["REJECT".to_string()];
+
+        // 粘滞在旧香港或多跳前新加坡节点上的代理连接必须立即清理
+        assert!(should_close_stale_proxy_connection(
+            &hk_chain,
+            "PROXY",
+            "日本3 (181201)"
+        ));
+        assert!(should_close_stale_proxy_connection(
+            &sg_chain,
+            "PROXY",
+            "日本3 (181201)"
+        ));
+
+        // 已位于当前目标节点上的连接保持不断流
+        assert!(!should_close_stale_proxy_connection(
+            &jp_chain,
+            "PROXY",
+            "日本3 (181201)"
+        ));
+
+        // 直连与封锁流量绝不触碰
+        assert!(!should_close_stale_proxy_connection(
+            &direct_chain,
+            "PROXY",
+            "日本3 (181201)"
+        ));
+        assert!(!should_close_stale_proxy_connection(
+            &reject_chain,
+            "PROXY",
+            "日本3 (181201)"
+        ));
+
+        // 非法或内置目标保护
+        assert!(!should_close_stale_proxy_connection(&hk_chain, "PROXY", ""));
+        assert!(!should_close_stale_proxy_connection(&hk_chain, "PROXY", "DIRECT"));
+        assert!(!should_close_stale_proxy_connection(&hk_chain, "PROXY", "REJECT"));
     }
 }

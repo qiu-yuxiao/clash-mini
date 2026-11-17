@@ -4,10 +4,15 @@ import dayjs from 'dayjs'
 import { useImperativeHandle, useState, type Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useProxiesData } from '@/providers/app-data-context'
 import { closeConnectionWithTimeout } from '@/services/mihomo-api'
 import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
+import {
+  resolveConnectionNodeDisplay,
+  type PathControlConnectionItem,
+} from '@/utils/path-control'
 import { getPopupCardStyle, getPopupSkinTokens } from '@/utils/popup-styles'
 
 export interface ConnectionDetailRef {
@@ -81,6 +86,7 @@ interface InnerProps {
 const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const { t } = useTranslation()
   const { metadata, rulePayload } = data
+  const { proxies } = useProxiesData()
   const theme = useTheme()
   const tokens = getPopupSkinTokens(theme)
   const chains = [...(data?.chains ?? [])].reverse().join(' / ')
@@ -98,8 +104,50 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
     ? metadata.destinationIP
     : metadata?.remoteDestination || '--'
 
-  const information = [
+  const currentProxyNow =
+    proxies?.groups?.find((g) => g.name === 'PROXY')?.now ??
+    proxies?.groups?.[0]?.now
+  const nodeDisplay = resolveConnectionNodeDisplay({
+    chains: data.chains,
+    isSynthetic: Boolean((data as PathControlConnectionItem)._isSynthetic),
+    isClosed: closed,
+    currentProxyNow,
+  })
+  const proxyNodeValue = (() => {
+    switch (nodeDisplay.kind) {
+      case 'proxy':
+        return nodeDisplay.isStaleProxyNode
+          ? `${nodeDisplay.nodeName} (${t('connections.components.fields.staleNodeTag')})`
+          : nodeDisplay.nodeName
+      case 'direct': {
+        const directLabel = t('connections.components.miniTable.chainsDirect')
+        return directLabel.trim().toUpperCase() === 'DIRECT'
+          ? 'DIRECT'
+          : `${directLabel} (DIRECT)`
+      }
+      case 'reject': {
+        const rejectLabel = t('connections.components.miniTable.chainsReject')
+        return rejectLabel.trim().toUpperCase() ===
+          nodeDisplay.nodeName.toUpperCase()
+          ? nodeDisplay.nodeName
+          : `${rejectLabel} (${nodeDisplay.nodeName})`
+      }
+      default:
+        return '--'
+    }
+  })()
+
+  const information: Array<{
+    label: string
+    value: string | undefined
+    highlightWarning?: boolean
+  }> = [
     { label: t('connections.components.fields.host'), value: host },
+    {
+      label: t('connections.components.fields.proxyNode'),
+      value: proxyNodeValue,
+      highlightWarning: nodeDisplay.isStaleProxyNode,
+    },
     {
       label: t('shared.labels.downloaded'),
       value: parseTraffic(data.download).join(' '),
@@ -171,7 +219,10 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
           <span
             style={{
               wordBreak: 'break-all',
-              color: tokens.primaryText,
+              color: each.highlightWarning
+                ? theme.palette.warning.main
+                : tokens.primaryText,
+              fontWeight: each.highlightWarning ? 600 : undefined,
               flex: 1,
             }}
           >
