@@ -35,7 +35,7 @@ struct ProviderFileLookup {
 ///   传 None/空则后端自取 PROXY 全量节点（F1/自动选点场景）
 /// - `sort_type`: 0=从配置读取, 1=按延迟升序, 2=按名称（仅影响展示顺序）
 /// - `select`: true=测速后将 PROXY 切换至最快节点；false=仅测速填充展示，不切换
-/// - `clean_stale_connections`: 仅前台用户显式操作（过滤词/F4/F1/顶栏异常胶囊）传 `Some(true)`，清理非新目标节点的存量代理连接（BUG-396）
+/// - `clean_stale_connections`: 仅前台显式换节点入口（过滤词自动选点/F1 全量优选/顶栏异常胶囊在线重测）传 `Some(true)`，清理非新目标节点的存量代理连接；闪电图标与 F4 纯测速传 `Some(false)`（BUG-396 / BUG-397）
 #[tauri::command]
 pub async fn trigger_auto_select(
     profile_uid: String,

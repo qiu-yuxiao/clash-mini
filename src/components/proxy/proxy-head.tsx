@@ -12,7 +12,11 @@ import { useTranslation } from 'react-i18next'
 
 import { BaseSearchBox } from '@/components/base'
 import { debugLog } from '@/utils/debug'
-import { hasEffectiveFilterTerm, isIncompleteFilterInput } from '@/utils/node'
+import {
+  hasEffectiveFilterTerm,
+  isIncompleteFilterInput,
+  resolveBatchCheckIntent,
+} from '@/utils/node'
 
 import { ProxySortType } from './use-filter-sort'
 import { HeadState } from './use-head-state'
@@ -23,7 +27,7 @@ interface Props {
   headState: HeadState
   isTesting?: boolean
   onHeadState: (state: Partial<HeadState>) => void
-  onCheckDelay: () => void
+  onCheckDelay: (options?: { select?: boolean }) => void
   onLocation?: () => void
 }
 
@@ -107,7 +111,8 @@ export const ProxyHead = ({
     // 延迟 60ms 确保 React 状态更新并完成过滤计算
     triggerDelayTimerRef.current = setTimeout(() => {
       triggerDelayTimerRef.current = null
-      onCheckDelayRef.current()
+      const { select } = resolveBatchCheckIntent('filter')
+      onCheckDelayRef.current({ select })
     }, 60)
   }, [])
 
@@ -196,8 +201,11 @@ export const ProxyHead = ({
         title={t('proxies.page.tooltips.delayCheck')}
         aria-label={t('proxies.page.tooltips.delayCheck')}
         onClick={() => {
-          debugLog(`[ProxyHead] 点击延迟测试按钮，组: ${groupName}`)
-          onCheckDelay()
+          const { select } = resolveBatchCheckIntent('bolt')
+          debugLog(
+            `[ProxyHead] 点击延迟测试按钮（仅测速不切点），组: ${groupName}`,
+          )
+          onCheckDelay({ select })
         }}
         sx={{ width: 26, height: 26, p: 0 }}
       >

@@ -11,7 +11,7 @@ interface RenderProps {
   indent: boolean
   isTesting?: boolean
   onLocation: (group: IRenderItem['group']) => void
-  onCheckAll: (groupName: string) => void
+  onCheckAll: (groupName: string, options?: { select?: boolean }) => void
   onHeadState: (groupName: string, patch: Partial<HeadState>) => void
   onChangeProxy: (
     group: IRenderItem['group'],

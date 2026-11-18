@@ -19,7 +19,11 @@ import { type DelayUpdate, getDelayManager } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
-import { isDummyNode, isIncompleteFilterInput } from '@/utils/node'
+import {
+  isDummyNode,
+  isIncompleteFilterInput,
+  resolveBatchCheckIntent,
+} from '@/utils/node'
 
 import { ScrollTopButton } from '../layout/scroll-top-button'
 
@@ -91,7 +95,9 @@ export const ProxyGroups = (props: Props) => {
   const restoredScrollKeyRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
   const activeTestFilterRef = useRef<Record<string, string>>({})
+  const activeTestSelectRef = useRef<Record<string, boolean>>({})
   const pendingRecheckGroupsRef = useRef<Record<string, boolean>>({})
+  const pendingRecheckSelectRef = useRef<Record<string, boolean>>({})
   const busyRetryCountRef = useRef<Record<string, number>>({})
   const recheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showScrollTop, setShowScrollTop] = useState(false)
@@ -242,150 +248,171 @@ export const ProxyGroups = (props: Props) => {
     [handleProxyGroupChange],
   )
 
-  // 批量测速当前组全部节点并择优切换（委托后端单一引擎）
-  const handleCheckAll = useStableCallback(async (groupName: string) => {
-    const startFilterText = getGroupHeadState(groupName).filterText.trim()
-    // BUG-092 防重复触发；BUG-392：若过滤词在途期间已更新为新的完整过滤条件，登记尾部重测队列而不静默丢弃
-    if (testingGroupsRef.current[groupName]) {
-      if (
-        startFilterText !== (activeTestFilterRef.current[groupName] ?? '') &&
-        !isIncompleteFilterInput(startFilterText)
-      ) {
-        pendingRecheckGroupsRef.current[groupName] = true
-        debugLog(
-          `[ProxyGroups] 测速在途且过滤词已变更为 "${startFilterText}"，登记尾部重测队列: ${groupName}`,
-        )
-      }
-      return
-    }
-
-    activeTestFilterRef.current[groupName] = startFilterText
-    pendingRecheckGroupsRef.current[groupName] = false
-    let hitBusy = false
-
-    debugLog(`[ProxyGroups] 开始批量测速，组: ${groupName}`)
-    updateTestingGroups((prev) => ({ ...prev, [groupName]: true }))
-
-    try {
-      await flushHeadStatePersist()
-
-      // 从当前过滤后可见的渲染列表中提取节点名称；该子集同时作为 F4 批量测速+择优的候选池（防越界关键），并非仅用于视觉占位
-      const visibleNames = renderList
-        .filter(
-          (e) => e.group?.name === groupName && (e.type === 2 || e.type === 4),
-        )
-        .flatMap((e) =>
-          e.type === 4
-            ? (e.proxyCol ?? []).map((p) => p?.name)
-            : [e.proxy?.name],
-        )
-        .filter((name): name is string => !!name && !isDummyNode(name))
-
-      debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
-
-      if (visibleNames.length === 0) {
-        busyRetryCountRef.current[groupName] = 0
-        debugLog(
-          `[ProxyGroups] 当前组无可见匹配节点，跳过批量测速与择优: ${groupName}`,
-        )
+  // 批量测速当前组可见节点：闪电图标/F4 仅刷新延迟（select=false），过滤框输入择优切换并清理旧连接（select=true，BUG-397）
+  const handleCheckAll = useStableCallback(
+    async (groupName: string, options?: { select?: boolean }) => {
+      const shouldSelect = options?.select ?? false
+      const startFilterText = getGroupHeadState(groupName).filterText.trim()
+      // BUG-092 防重复触发；BUG-392/BUG-397：若过滤词在途期间已变更为新的完整过滤条件，或由纯测速升级为择优切换，登记尾部重测队列而不静默丢弃
+      if (testingGroupsRef.current[groupName]) {
+        const filterChanged =
+          startFilterText !== (activeTestFilterRef.current[groupName] ?? '')
+        const escalatedToSelect =
+          shouldSelect && !activeTestSelectRef.current[groupName]
+        if (
+          (filterChanged || escalatedToSelect) &&
+          !isIncompleteFilterInput(startFilterText)
+        ) {
+          pendingRecheckGroupsRef.current[groupName] = true
+          pendingRecheckSelectRef.current[groupName] = Boolean(
+            pendingRecheckSelectRef.current[groupName] || shouldSelect,
+          )
+          debugLog(
+            `[ProxyGroups] 测速在途且触发重排（filter="${startFilterText}", select=${shouldSelect}），登记尾部重测队列: ${groupName}`,
+          )
+        }
         return
       }
 
-      const currentUid = (await getProfiles())?.current || ''
-      if (!currentUid) return
+      activeTestFilterRef.current[groupName] = startFilterText
+      activeTestSelectRef.current[groupName] = shouldSelect
+      pendingRecheckGroupsRef.current[groupName] = false
+      pendingRecheckSelectRef.current[groupName] = false
+      let hitBusy = false
 
-      const dm = getDelayManager()
-      const previousSnapshots = new Map<string, DelayUpdate | undefined>()
-      // 视觉占位：记录测速前原始快照并将待测节点标记为「测速中」以触发流光动画
-      for (const name of visibleNames) {
-        previousSnapshots.set(name, dm.getDelayUpdate(name, groupName))
-        dm.setDelay(name, groupName, -2)
-      }
-      dm.queueGroupNotification(groupName)
+      debugLog(`[ProxyGroups] 开始批量测速，组: ${groupName}`)
+      updateTestingGroups((prev) => ({ ...prev, [groupName]: true }))
 
-      const rollbackVisible = () => {
+      try {
+        await flushHeadStatePersist()
+
+        // 从当前过滤后可见的渲染列表中提取节点名称；既用于 ⚡ / F4 纯测速展示，也作为过滤框输入触发择优时的候选池（防越界关键）
+        const visibleNames = renderList
+          .filter(
+            (e) =>
+              e.group?.name === groupName && (e.type === 2 || e.type === 4),
+          )
+          .flatMap((e) =>
+            e.type === 4
+              ? (e.proxyCol ?? []).map((p) => p?.name)
+              : [e.proxy?.name],
+          )
+          .filter((name): name is string => !!name && !isDummyNode(name))
+
+        debugLog(`[ProxyGroups] 可见节点数量: ${visibleNames.length}`)
+
+        if (visibleNames.length === 0) {
+          busyRetryCountRef.current[groupName] = 0
+          debugLog(
+            `[ProxyGroups] 当前组无可见匹配节点，跳过批量测速与择优: ${groupName}`,
+          )
+          return
+        }
+
+        const currentUid = (await getProfiles())?.current || ''
+        if (!currentUid) return
+
+        const dm = getDelayManager()
+        const previousSnapshots = new Map<string, DelayUpdate | undefined>()
+        // 视觉占位：记录测速前原始快照并将待测节点标记为「测速中」以触发流光动画
         for (const name of visibleNames) {
-          if (dm.getDelayUpdate(name, groupName)?.delay === -2) {
-            dm.restoreDelaySnapshot(
-              name,
-              groupName,
-              previousSnapshots.get(name),
+          previousSnapshots.set(name, dm.getDelayUpdate(name, groupName))
+          dm.setDelay(name, groupName, -2)
+        }
+        dm.queueGroupNotification(groupName)
+
+        const rollbackVisible = () => {
+          for (const name of visibleNames) {
+            if (dm.getDelayUpdate(name, groupName)?.delay === -2) {
+              dm.restoreDelaySnapshot(
+                name,
+                groupName,
+                previousSnapshots.get(name),
+              )
+            }
+          }
+          dm.queueGroupNotification(groupName)
+        }
+
+        // 委托后端统一执行群发测速：shouldSelect=true 时在可见子集内择优切换并清理非新目标旧连接，shouldSelect=false 时仅刷新延迟（BUG-397）
+        try {
+          const results = await triggerAutoSelect(
+            currentUid,
+            visibleNames,
+            0,
+            shouldSelect,
+            shouldSelect,
+          )
+          busyRetryCountRef.current[groupName] = 0
+          if (results.length === 0) {
+            rollbackVisible()
+            showNotice.error('settings.mini.testNotExecuted')
+          }
+        } catch (err) {
+          rollbackVisible()
+          const msg = String(err instanceof Error ? err.message : err)
+          if (msg.includes('AUTO_SELECT_BUSY')) {
+            const retries = busyRetryCountRef.current[groupName] ?? 0
+            const latestNow = getGroupHeadState(groupName).filterText.trim()
+            if (!isIncompleteFilterInput(latestNow) && retries < 2) {
+              busyRetryCountRef.current[groupName] = retries + 1
+              hitBusy = true
+            } else {
+              busyRetryCountRef.current[groupName] = 0
+              showNotice.info('settings.mini.testingInProgress')
+            }
+          } else {
+            busyRetryCountRef.current[groupName] = 0
+            showNotice.error('settings.mini.testFailed', { message: msg })
+          }
+          console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
+        }
+      } catch (error) {
+        busyRetryCountRef.current[groupName] = 0
+        console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)
+      } finally {
+        if (isMountedRef.current) {
+          updateTestingGroups((prev) => ({ ...prev, [groupName]: false }))
+          const headState = getGroupHeadState(groupName)
+          if (headState?.sortType === 1) {
+            onHeadState(groupName, { sortType: headState.sortType })
+          }
+          const latestFilterText =
+            getGroupHeadState(groupName).filterText.trim()
+          const queuedSelect = Boolean(
+            pendingRecheckSelectRef.current[groupName],
+          )
+          const queuedForNewFilter =
+            pendingRecheckGroupsRef.current[groupName] &&
+            !isIncompleteFilterInput(latestFilterText)
+          pendingRecheckGroupsRef.current[groupName] = false
+          pendingRecheckSelectRef.current[groupName] = false
+          if (queuedForNewFilter || hitBusy) {
+            const nextSelect = Boolean(
+              (queuedForNewFilter && queuedSelect) || (hitBusy && shouldSelect),
+            )
+            if (!hitBusy) {
+              busyRetryCountRef.current[groupName] = 0
+            }
+            if (recheckTimerRef.current !== null) {
+              clearTimeout(recheckTimerRef.current)
+            }
+            recheckTimerRef.current = setTimeout(
+              () => {
+                recheckTimerRef.current = null
+                if (isMountedRef.current) {
+                  void handleCheckAll(groupName, { select: nextSelect })
+                }
+              },
+              hitBusy ? 800 : 80,
             )
           }
         }
-        dm.queueGroupNotification(groupName)
       }
+    },
+  )
 
-      // 委托后端统一执行群发测速 + 择优（select=true）
-      // 关键：传入当前可见节点子集 visibleNames，后端只在「该子集」内测速并挑最快，
-      // 而非 PROXY 全量——所见即所测所选，与自动选点（全量）行为区分开
-      try {
-        const results = await triggerAutoSelect(
-          currentUid,
-          visibleNames,
-          0,
-          true,
-          true,
-        )
-        busyRetryCountRef.current[groupName] = 0
-        if (results.length === 0) {
-          rollbackVisible()
-          showNotice.error('settings.mini.testNotExecuted')
-        }
-      } catch (err) {
-        rollbackVisible()
-        const msg = String(err instanceof Error ? err.message : err)
-        if (msg.includes('AUTO_SELECT_BUSY')) {
-          const retries = busyRetryCountRef.current[groupName] ?? 0
-          const latestNow = getGroupHeadState(groupName).filterText.trim()
-          if (!isIncompleteFilterInput(latestNow) && retries < 2) {
-            busyRetryCountRef.current[groupName] = retries + 1
-            hitBusy = true
-          } else {
-            busyRetryCountRef.current[groupName] = 0
-            showNotice.info('settings.mini.testingInProgress')
-          }
-        } else {
-          busyRetryCountRef.current[groupName] = 0
-          showNotice.error('settings.mini.testFailed', { message: msg })
-        }
-        console.error('[ProxyGroups] 后端批量测速/选点失败:', err)
-      }
-    } catch (error) {
-      busyRetryCountRef.current[groupName] = 0
-      console.error(`[ProxyGroups] 批量测速出错，组: ${groupName}`, error)
-    } finally {
-      if (isMountedRef.current) {
-        updateTestingGroups((prev) => ({ ...prev, [groupName]: false }))
-        const headState = getGroupHeadState(groupName)
-        if (headState?.sortType === 1) {
-          onHeadState(groupName, { sortType: headState.sortType })
-        }
-        const latestFilterText = getGroupHeadState(groupName).filterText.trim()
-        const queuedForNewFilter =
-          pendingRecheckGroupsRef.current[groupName] &&
-          !isIncompleteFilterInput(latestFilterText)
-        pendingRecheckGroupsRef.current[groupName] = false
-        if (queuedForNewFilter || hitBusy) {
-          if (!hitBusy) {
-            busyRetryCountRef.current[groupName] = 0
-          }
-          if (recheckTimerRef.current !== null) {
-            clearTimeout(recheckTimerRef.current)
-          }
-          recheckTimerRef.current = setTimeout(
-            () => {
-              recheckTimerRef.current = null
-              if (isMountedRef.current) void handleCheckAll(groupName)
-            },
-            hitBusy ? 800 : 80,
-          )
-        }
-      }
-    }
-  })
-
-  // BUG-355: 绑定 F4 / F1 全局测速快捷键（F4=当前过滤可见子集测速优选，F1=全量节点测速优选）
+  // BUG-355 / BUG-397: 绑定 F4 / F1 全局测速快捷键（F4=当前可见列表纯测速不换节点，F1=全量节点测速优选切换）
   const handleCheckFull = useStableCallback(async () => {
     const uiGroupName = renderList.find((item) => item.group?.name)?.group?.name
     if (!uiGroupName || testingGroupsRef.current[uiGroupName]) return
@@ -408,12 +435,13 @@ export const ProxyGroups = (props: Props) => {
         dm.setDelay(name, uiGroupName, -2)
       }
       dm.queueGroupNotification(uiGroupName)
+      const f1Intent = resolveBatchCheckIntent('f1')
       const results = await triggerAutoSelect(
         currentUid,
         undefined,
         0,
-        true,
-        true,
+        f1Intent.select,
+        f1Intent.cleanStale,
       )
       if (results.length === 0) {
         for (const name of uniqueNames) {
@@ -459,7 +487,8 @@ export const ProxyGroups = (props: Props) => {
       ?.name
     if (!targetGroupName) return
     if (action === 'check-visible') {
-      void handleCheckAll(targetGroupName)
+      const { select } = resolveBatchCheckIntent('f4')
+      void handleCheckAll(targetGroupName, { select })
     } else if (action === 'check-full') {
       void handleCheckFull()
     }
@@ -540,7 +569,7 @@ interface ProxyVirtualListProps {
   indent: boolean
   measureElement: (node: Element | null) => void
   onLocation: (group: IRenderItem['group']) => void
-  onCheckAll: (groupName: string) => void
+  onCheckAll: (groupName: string, options?: { select?: boolean }) => void
   onHeadState: (groupName: string, patch: Partial<HeadState>) => void
   onChangeProxy: (
     group: IRenderItem['group'],
@@ -592,7 +621,7 @@ function ProxyVirtualList({
           headState={headState}
           isTesting={testingGroups[group.name]}
           onLocation={() => onLocation(group)}
-          onCheckDelay={() => onCheckAll(group.name)}
+          onCheckDelay={(opts) => onCheckAll(group.name, opts)}
           onHeadState={(p) => onHeadState(group.name, p)}
         />
       )}

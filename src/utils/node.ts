@@ -602,3 +602,20 @@ export const isSupportedSubscriptionOrNodeInput = (raw: string): boolean => {
     return SUPPORTED_NODE_URI_SCHEMES.some((scheme) => lower.startsWith(scheme))
   })
 }
+
+export type BatchCheckTrigger = 'bolt' | 'f4' | 'filter' | 'f1'
+
+/**
+ * 裁决前端批量测速入口的「是否切换节点 / 是否清理非新目标旧连接」意图（BUG-397）：
+ * - `bolt`（闪电图标）与 `f4`：仅刷新当前可见列表延迟，绝不换节点、绝不断存量连接；
+ * - `filter`（过滤框输入防抖 / 回车）与 `f1`（全量优选）：测速后择优切换并精准清理旧代理连接。
+ */
+export const resolveBatchCheckIntent = (
+  trigger: BatchCheckTrigger,
+): { select: boolean; cleanStale: boolean } => {
+  const shouldSwitch = trigger === 'filter' || trigger === 'f1'
+  return {
+    select: shouldSwitch,
+    cleanStale: shouldSwitch,
+  }
+}

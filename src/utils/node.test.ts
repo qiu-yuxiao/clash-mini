@@ -6,6 +6,7 @@ import {
   isDummyNode,
   isIncompleteFilterInput,
   matchNodeFilter,
+  resolveBatchCheckIntent,
 } from './node'
 
 // 本文件的断言必须与后端 `src-tauri/src/utils/node.rs` 的测试逐条对应。
@@ -197,5 +198,29 @@ describe('BUG-392: hasEffectiveFilterTerm 与 isIncompleteFilterInput 过滤输�
       expect(hasEffectiveFilterTerm(complete)).toBe(true)
       expect(isIncompleteFilterInput(complete)).toBe(false)
     }
+  })
+})
+
+describe('BUG-397: resolveBatchCheckIntent 批量测速入口意图边界', () => {
+  it('闪电图标与 F4 仅做纯测速：既不切节点也不清理存量连接', () => {
+    expect(resolveBatchCheckIntent('bolt')).toEqual({
+      select: false,
+      cleanStale: false,
+    })
+    expect(resolveBatchCheckIntent('f4')).toEqual({
+      select: false,
+      cleanStale: false,
+    })
+  })
+
+  it('过滤框输入与 F1 全量优选触发切节点并精准清理非新目标旧代理连接', () => {
+    expect(resolveBatchCheckIntent('filter')).toEqual({
+      select: true,
+      cleanStale: true,
+    })
+    expect(resolveBatchCheckIntent('f1')).toEqual({
+      select: true,
+      cleanStale: true,
+    })
   })
 })
