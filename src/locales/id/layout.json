@@ -29,22 +29,7 @@
       "retestNodes": "Uji Ulang & Pilih Node Terbaik"
     },
     "antivirus": {
-      "menuLabel": "Panduan Anti-Kill Mode Ringan",
-      "title": "Panduan Anti-Kill Mode Ringan",
-      "whyTitle": "Mengapa Mode Ringan bisa dihentikan?",
-      "why": "Mode Ringan menutup proses tampilan WebView2 untuk menghemat memori dan menyisakan ikon tray serta inti proxy di latar belakang. Utilitas seperti 360 Safe mencatat aplikasi yang pernah membuka lalu menutup jendela, lalu mematikannya saat beban CPU tinggi (Trust Zone biasa tidak mencegah mekanisme ini).",
-      "easyTitle": "Opsi 1: Mode Senyap Praktis Tanpa Edit File (Disarankan)",
-      "easyBody": "Saat \"Mulai senyap\" aktif, Clash Mini langsung masuk ke tray tanpa memunculkan jendela utama—baik saat autostart, klik pintasan desktop, maupun dibuka ulang setelah dimatikan. Selama jendela tidak tampil, 360 tidak akan menandainya.",
-      "easyWarning": "⚠️ Perhatian: Dengan opsi ini, hindari mengklik kiri ikon tray untuk membuka jendela saat pemakaian harian. Jika jendela sempat tampil lalu ditutup, beban CPU tinggi tetap dapat memicu pembersihan (bila terjadi, klik lagi pintasan desktop untuk kembali senyap di tray).",
-      "enableSilentBtn": "Aktifkan \"Mulai senyap\" Sekali Klik",
-      "silentEnabledBtn": "\"Mulai senyap\" Sudah Aktif",
-      "rootTitle": "Opsi 2: Solusi Permanen (Bebas Buka-Tutup Jendela)",
-      "rootIntro": "Agar bebas membuka/menutup jendela tanpa pernah dimatikan 360, tulis jalur aplikasi ke whitelist internal 360 (proteksi driver 360 mewajibkan pengeditan di Windows Safe Mode):",
-      "rootSteps": "1. Tahan Shift lalu klik \"Restart\" Windows → Troubleshoot → Advanced options → Startup Settings → setelah restart tekan 4 untuk \"Safe Mode\";\n2. Buka file whiteinternal.ini di bawah dengan Notepad, tempel dua baris di akhir bagian [paths] lalu simpan (jika dipasang di drive lain, pertahankan nama folder terakhir + nama exe);\n3. Restart normal dan aturan berlaku permanen.",
-      "copyPath": "Salin Jalur File",
-      "copySnippet": "Salin Baris",
-      "copied": "Disalin ke papan klip",
-      "close": "Mengerti"
+      "menuLabel": "Panduan Anti-Kill Mode Ringan"
     },
     "helpMenu": {
       "github": "Beri ⭐ Star di GitHub",

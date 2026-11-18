@@ -588,6 +588,15 @@ export async function openWebUrl(url: string) {
   )
 }
 
+/** 用系统默认文本查看器打开安装目录下的《轻量模式防误杀指南.txt》（BUG-398） */
+export async function openAntivirusGuide() {
+  return withIpcTimeout(
+    invoke<void>('open_antivirus_guide'),
+    10_000,
+    'openAntivirusGuide',
+  )
+}
+
 /**
  * 读取「真实的」开机自启状态（Windows 下即注册表 Run 项）。
  *

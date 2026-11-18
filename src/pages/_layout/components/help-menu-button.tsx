@@ -17,7 +17,11 @@ import { open } from '@tauri-apps/plugin-shell'
 import type React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { exportDiagnosticBundle, showInFolder } from '@/services/cmds'
+import {
+  exportDiagnosticBundle,
+  openAntivirusGuide,
+  showInFolder,
+} from '@/services/cmds'
 import { hideNotice, showNotice } from '@/services/notice-service'
 import { get3DButtonStyle } from '@/utils/button-styles'
 import {
@@ -40,7 +44,6 @@ interface HelpMenuButtonProps {
   handleClientCheck: () => void
   handleCoreCheck: () => void
   onReopenFirstRunGuide: () => void
-  onOpenAntivirusWhitelist: () => void
   clientCheckLoading: boolean
   coreCheckLoading: boolean
   appVersion: string
@@ -56,7 +59,6 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
   handleClientCheck,
   handleCoreCheck,
   onReopenFirstRunGuide,
-  onOpenAntivirusWhitelist,
   clientCheckLoading,
   coreCheckLoading,
   appVersion,
@@ -182,9 +184,14 @@ export const HelpMenuButton: React.FC<HelpMenuButtonProps> = ({
               🧭 {t('layout.components.helpMenu.firstRunGuide')}
             </MenuItem>
             <MenuItem
-              onClick={() => {
+              onClick={async () => {
                 handleHelpClose()
-                onOpenAntivirusWhitelist()
+                try {
+                  await openAntivirusGuide()
+                } catch (err) {
+                  console.error('Failed to open antivirus guide:', err)
+                  showNotice.error(err)
+                }
               }}
               sx={menuItemSx}
             >

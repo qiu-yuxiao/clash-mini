@@ -29,6 +29,8 @@ Clash.Mini_*.sig
 .brain/
 /src-tauri/用户必读.txt
 /src-tauri/resources/用户必读.txt
+/src-tauri/轻量模式防误杀指南.txt
+/src-tauri/resources/轻量模式防误杀指南.txt
 tauri-key
 tauri-key.pub
 debug.log

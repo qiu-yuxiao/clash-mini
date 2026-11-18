@@ -205,22 +205,7 @@ export interface TranslationResources {
       }
       components: {
         antivirus: {
-          close: string
-          copied: string
-          copyPath: string
-          copySnippet: string
-          easyBody: string
-          easyTitle: string
-          easyWarning: string
-          enableSilentBtn: string
           menuLabel: string
-          rootIntro: string
-          rootSteps: string
-          rootTitle: string
-          silentEnabledBtn: string
-          title: string
-          why: string
-          whyTitle: string
         }
         dialogs: {
           client: {

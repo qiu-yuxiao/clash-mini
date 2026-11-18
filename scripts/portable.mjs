@@ -47,6 +47,13 @@ async function resolvePortable() {
   if (fs.existsSync(path.join(process.cwd(), '\u7528\u6237\u5fc5\u8bfb.txt'))) {
     zip.addLocalFile(path.join(process.cwd(), '\u7528\u6237\u5fc5\u8bfb.txt'))
   }
+  const antivirusGuide = path.join(
+    process.cwd(),
+    '\u8f7b\u91cf\u6a21\u5f0f\u9632\u8bef\u6740\u6307\u5357.txt',
+  )
+  if (fs.existsSync(antivirusGuide)) {
+    zip.addLocalFile(antivirusGuide)
+  }
 
   const require = createRequire(import.meta.url)
   const packageJson = require('../package.json')

@@ -29,22 +29,7 @@
       "retestNodes": "Yeniden Test Et ve En İyi Düğümü Seç"
     },
     "antivirus": {
-      "menuLabel": "Hafif Mod Yanlış Kapatma Rehberi",
-      "title": "Hafif Mod Yanlış Kapatma Rehberi",
-      "whyTitle": "Hafif Mod neden sonlandırılır?",
-      "why": "Hafif Mod bellek tasarrufu için WebView2 arayüzünü kapatır, yalnızca sistem tepsisi ve proxy çekirdeğini arka planda tutar. 360 Safe gibi araçlar pencere açıp kapatmış süreçleri işaretler ve yüksek CPU yükünde artık süreç sanarak zorla kapatır (standart Güvenilir Bölge bunu engellemez).",
-      "easyTitle": "Seçenek 1: Dosya Düzenlemeden Sessiz Koruma (Günlük Kullanım İçin Önerilen)",
-      "easyBody": "\"Sessiz Başlatma\" açıldığında Clash Mini — başlangıçta, kısayoldan başlatmada veya kapatıldıktan sonra yeniden açmada — ana pencereyi hiç göstermeden doğrudan tepsiye yerleşir. Pencere görünmediği sürece 360 süreci işaretlemez.",
-      "easyWarning": "⚠️ Dikkat: Bu seçenekte günlük kullanımda tepsi simgesine sol tıklayıp pencereyi açmaktan kaçının. Pencere bir kez açılıp kapatılırsa yüksek CPU yükünde yeniden sonlandırılabilir (sonlandırılırsa masaüstü kısayoluna tekrar basarak sessizce tepsiye dönün).",
-      "enableSilentBtn": "\"Sessiz Başlatma\"yı Tek Tıkla Aç",
-      "silentEnabledBtn": "\"Sessiz Başlatma\" Açık",
-      "rootTitle": "Seçenek 2: Kalıcı Çözüm (Pencereyi İstediğiniz Gibi Açıp Kapatın)",
-      "rootIntro": "Ana pencereyi istediğiniz zaman açıp kapatırken 360 temizliğine tam bağışıklık kazanmak için yolları 360 alt seviye beyaz listesine ekleyin (sürücü koruması nedeniyle Windows Güvenli Mod'da düzenlenmelidir):",
-      "rootSteps": "1. Shift tuşuna basılı tutup Windows \"Yeniden Başlat\" → Sorun Gider → Gelişmiş Seçenekler → Başlangıç Ayarları → yeniden başlarken 4 ile \"Güvenli Mod\"a girin;\n2. Aşağıdaki whiteinternal.ini dosyasını Not Defteri ile açıp [paths] bölümünün sonuna alttaki iki satırı yapıştırın ve kaydedin (farklı diskteki kurulumlarda son klasör adı + exe adını koruyun);\n3. Normal yeniden başlatın; kalıcı olarak geçerli olur.",
-      "copyPath": "Dosya Yolunu Kopyala",
-      "copySnippet": "Satırları Kopyala",
-      "copied": "Panoya kopyalandı",
-      "close": "Anladım"
+      "menuLabel": "Hafif Mod Yanlış Kapatma Rehberi"
     },
     "helpMenu": {
       "github": "GitHub üzerinde ⭐ Star Ver",

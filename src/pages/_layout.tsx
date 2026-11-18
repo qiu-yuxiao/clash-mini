@@ -83,7 +83,6 @@ import { hasRealProfileItem } from '@/utils/profile-items'
 // Sub-components
 import { ActiveNodeStatusCard } from './_layout/components/active-node-card'
 import { AddUrlDialog } from './_layout/components/add-url-dialog'
-import { AntivirusWhitelistDialog } from './_layout/components/antivirus-whitelist-dialog'
 import { BasicSettingsCard } from './_layout/components/basic-settings-card'
 import { ConnectionsPanel } from './_layout/components/connections-panel'
 import {
@@ -266,9 +265,6 @@ const Layout = () => {
 
   // First-run Onboarding Guide Dialog State
   const [firstRunGuideOpen, setFirstRunGuideOpen] = useState(false)
-
-  // Antivirus Whitelist Guide Dialog State（帮助菜单与新手引导共用同一个弹窗实例）
-  const [antivirusWhitelistOpen, setAntivirusWhitelistOpen] = useState(false)
 
   const primaryBtn3DStyle = useMemo<SxProps<Theme>>(() => {
     const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
@@ -1166,7 +1162,6 @@ const Layout = () => {
     Boolean(deleteConfirmProfile) ||
     addUrlOpen ||
     firstRunGuideOpen ||
-    antivirusWhitelistOpen ||
     clientUpdateOpen ||
     coreUpdateOpen ||
     Boolean(activeHelpAnchorEl)
@@ -1577,9 +1572,6 @@ const Layout = () => {
                   handleClientCheck={handleClientCheck}
                   handleCoreCheck={handleCoreCheck}
                   onReopenFirstRunGuide={() => setFirstRunGuideOpen(true)}
-                  onOpenAntivirusWhitelist={() =>
-                    setAntivirusWhitelistOpen(true)
-                  }
                   clientCheckLoading={clientCheckLoading}
                   coreCheckLoading={coreCheckLoading}
                   appVersion={appVersion}
@@ -1976,10 +1968,6 @@ const Layout = () => {
             setFirstRunGuideOpen(false)
             openSettingsDrawer()
           }}
-        />
-        <AntivirusWhitelistDialog
-          open={antivirusWhitelistOpen}
-          onClose={() => setAntivirusWhitelistOpen(false)}
         />
         <AddUrlDialog open={addUrlOpen} onClose={() => setAddUrlOpen(false)} />
       </ErrorBoundary>

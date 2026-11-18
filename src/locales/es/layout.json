@@ -29,22 +29,7 @@
       "retestNodes": "Reintentar y elegir mejor nodo"
     },
     "antivirus": {
-      "menuLabel": "Guía anticierre (Modo ligero)",
-      "title": "Guía de protección del Modo ligero",
-      "whyTitle": "¿Por qué se cierra el Modo ligero bajo alta carga?",
-      "why": "El Modo ligero cierra el proceso WebView2 para ahorrar memoria y deja solo el icono de bandeja y el núcleo proxy en segundo plano. Herramientas como 360 Safe registran aplicaciones que abrieron y cerraron una ventana y las finalizan bajo carga alta de CPU (la Zona de confianza normal no evita este cierre).",
-      "easyTitle": "Opción 1: Modo silencioso sin tocar archivos (Recomendado)",
-      "easyBody": "Con \"Inicio silencioso\" activado, Clash Mini entra directo a la bandeja sin mostrar ventana en el arranque automático, al abrir el acceso directo o al relanzar tras un cierre. Si la ventana nunca se muestra, 360 no la marca ni la cierra.",
-      "easyWarning": "⚠️ Aviso: Con esta opción, evita abrir la ventana principal con clic izquierdo en la bandeja durante el uso diario. Si la ventana llega a mostrarse y cerrarse, una carga alta de CPU puede volver a cerrarla (basta abrir de nuevo el acceso directo para volver a la bandeja).",
-      "enableSilentBtn": "Activar \"Inicio silencioso\" ahora",
-      "silentEnabledBtn": "\"Inicio silencioso\" activado",
-      "rootTitle": "Opción 2: Solución definitiva (abre y cierra la ventana libremente)",
-      "rootIntro": "Si quieres abrir y cerrar la ventana cuando quieras siendo totalmente inmune a 360, añade las rutas a la lista blanca interna de 360 (la autoprotección exige editarlo en Modo seguro de Windows):",
-      "rootSteps": "1. Mantén Shift y pulsa \"Reiniciar\" en Windows → Solucionar problemas → Opciones avanzadas → Configuración de inicio → al reiniciar pulsa 4 para \"Modo seguro\";\n2. Abre whiteinternal.ini (ruta abajo) con el Bloc de notas, pega las dos líneas al final de [paths] y guarda (si instalaste en otra unidad, conserva la última carpeta + ejecutable);\n3. Reinicia Windows normalmente para aplicarlo de forma permanente.",
-      "copyPath": "Copiar ruta",
-      "copySnippet": "Copiar líneas",
-      "copied": "Copiado al portapapeles",
-      "close": "Entendido"
+      "menuLabel": "Guía anticierre (Modo ligero)"
     },
     "helpMenu": {
       "github": "Dar ⭐ Star en GitHub",

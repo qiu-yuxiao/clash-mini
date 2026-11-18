@@ -1,0 +1,63 @@
+Clash Mini 轻量模式防误杀指南（360 等安全软件处理说明）
+============================================================
+
+一、为什么 Clash Mini 会被 360 莫名其妙强行关闭？
+------------------------------------------------------------
+Clash Mini 在关闭主窗口进入「轻量模式」时，会销毁 WebView2 前端界面以释放约 30～40MB 内存，仅保留系统托盘图标与代理内核（mini-mihomo.exe）在后台维持不断网不断流与 15 秒健康监测。（注：开启 TUN 模式时 mini-mihomo.exe 以系统服务运行，通常不会受影响，但桌面会话内的主程序 clash-mini.exe 仍可能被清理退出。）
+
+经对 360 安全卫士性能引擎（360tray.exe 加载 safemon\Netm.tpi 与 netmon\360perfoptm2.dll）实证排查，360 普通查杀的「信任区」对以下清理完全无效。后台存在两套独立强杀机制，分别读取不同的白名单文件：
+
+1. 机制一：关窗残留清理（DoOptmGroupResidual）
+   - 触发条件：全局记录「曾经打开过可见窗口、随后又关闭窗口」的后台进程，在系统 CPU 持续高负载时将其视为“关窗残留”直接终止。
+   - 白名单文件：仅读取 netmon\whiteinternal.ini。
+
+2. 机制二：高内存 / 智能加速与游戏模式清理（FastOptm / DoOptm / FastOptmForGameMode）
+   - 触发条件：当系统内存占用冲高（如 85%～90%+）或触发智能加速/游戏模式清理时，即使 Clash Mini 主窗口正开着（从未关闭窗口），也会被直接强杀。
+   - 白名单文件：完全不读取 whiteinternal.ini，仅读取 netmon\useroptm2.ini 与 netmon\useroptm_game2.ini 中的 check=0 标记。
+
+
+二、方案一：一劳永逸根治方案（Windows 安全模式修改 3 个底层白名单文件，推荐）
+------------------------------------------------------------
+C:\Program Files (x86)\360\360Safe\netmon\ 目录受 360SelfProtection 内核驱动写保护，在正常 Windows 下直接修改会被系统拒绝写入，因此需要在 Windows 安全模式下用记事本修改一次（若 360 安装在其他盘符或自定义目录，请将下方路径前缀替换为实际安装位置）：
+
+第 1 步：进入 Windows 安全模式
+  按住键盘 Shift 键不放，点击 Windows「开始菜单 -> 电源 -> 重启」-> 进入恢复选项后依次点击「疑难解答 -> 高级选项 -> 启动设置 -> 重启」-> 重启出现数字菜单后按键盘数字键 4（启用安全模式）。
+
+第 2 步：修改机制一白名单（whiteinternal.ini）
+  在安全模式下用记事本打开：
+  C:\Program Files (x86)\360\360Safe\netmon\whiteinternal.ini
+
+  找到 [paths] 段落，在段落末尾追加以下两行（若文件中已有 path1=、path2=，请顺延编号如 path3=、path4=；若 Clash Mini 安装在自定义路径，请保留「最后一级安装文件夹名\程序名」格式，例如 D:\Tools\Clash Mini\clash-mini.exe 同样写作 Clash Mini\clash-mini.exe）：
+
+  path1=Clash Mini\clash-mini.exe
+  path2=Clash Mini\mini-mihomo.exe
+
+第 3 步：修改机制二白名单（useroptm2.ini 与 useroptm_game2.ini）
+  在安全模式下用记事本分别打开同目录的以下两个文件（若某文件尚不存在，可直接新建）：
+  C:\Program Files (x86)\360\360Safe\netmon\useroptm2.ini
+  C:\Program Files (x86)\360\360Safe\netmon\useroptm_game2.ini
+
+  在两个文件的末尾分别追加以下 6 行（若文件内已存在同名段落且写着 check=1，请直接改成 check=0）：
+
+  [clash-mini.exe]
+  check=0
+  [clash mini_0]
+  check=0
+  [mini-mihomo.exe]
+  check=0
+
+第 4 步：保存并正常重启电脑
+  确认上述 3 个文件全部保存后，正常重启进入 Windows。两套防杀白名单即永久生效，此后无论是关闭主窗口进入轻量模式，还是主窗口开启状态下遭遇高内存/高 CPU 满载编译，均不会被 360 误杀。
+
+
+三、方案二：暂不进安全模式的日常减轻方案（开启「静默启动」）
+------------------------------------------------------------
+1. 在 Clash Mini「设置 -> 基本设置」中开启「静默启动」。
+2. 在已有订阅配置的前提下，无论开机自启还是手动双击桌面/开始菜单图标启动，Clash Mini 都会直接静默进入系统托盘而不创建或弹出主窗口（手动启动时仅弹出托盘气泡提示），从而避开机制一（关窗残留记录）。
+3. 局限性提示：一旦左键点开过主窗口，或系统内存冲高触发机制二（FastOptm / DoOptm），仍有可能被 360 清理；若被清理，再次双击桌面图标可无窗静默恢复托盘驻留。如需彻底根治，请按「方案一」一次配齐全部 3 个白名单文件。
+
+
+四、其他常见安全软件说明与技术边界
+------------------------------------------------------------
+- Windows Defender / 火绒等常规安全软件：不存在上述后台性能强杀机制；如遇常规扫描误报，将 Clash Mini 安装目录（默认 C:\Program Files\Clash Mini\）或 clash-mini.exe、mini-mihomo.exe 加入其排除项即可。
+- 技术边界声明：Clash Mini 仅使用标准操作系统托盘驻留机制维持后台运行，绝不在代码中尝试绕过、破坏或强改第三方安全软件文件；上述安全模式白名单修改完全由用户自主决定与执行。

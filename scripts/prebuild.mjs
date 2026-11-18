@@ -686,21 +686,23 @@ const tasks = [
   {
     name: 'copy_readme',
     func: async () => {
-      // Copy 用户必读.txt to src-tauri/ (for NSIS)
-      const src = path.join(cwd, '用户必读.txt')
-      const dest = path.join(cwd, 'src-tauri', '用户必读.txt')
-      if (fs.existsSync(src)) {
-        await fsp.copyFile(src, dest)
-        log_success('Copied 用户必读.txt to src-tauri/')
-      } else {
-        log_info('用户必读.txt not found, skipping copy')
-      }
+      const rootDocs = ['用户必读.txt', '轻量模式防误杀指南.txt']
+      for (const docName of rootDocs) {
+        const src = path.join(cwd, docName)
+        if (!fs.existsSync(src)) {
+          log_info(`${docName} not found, skipping copy`)
+          continue
+        }
 
-      // Copy 用户必读.txt to src-tauri/resources/ (bundled resource)
-      const dest_res = path.join(cwd, 'src-tauri', 'resources', '用户必读.txt')
-      if (fs.existsSync(src)) {
-        await fsp.copyFile(src, dest_res)
-        log_success('Copied 用户必读.txt to src-tauri/resources/')
+        // Copy to src-tauri/ (for NSIS)
+        const dest = path.join(cwd, 'src-tauri', docName)
+        await fsp.copyFile(src, dest)
+        log_success(`Copied ${docName} to src-tauri/`)
+
+        // Copy to src-tauri/resources/ (bundled resource)
+        const destRes = path.join(cwd, 'src-tauri', 'resources', docName)
+        await fsp.copyFile(src, destRes)
+        log_success(`Copied ${docName} to src-tauri/resources/`)
       }
     },
     retry: 3,

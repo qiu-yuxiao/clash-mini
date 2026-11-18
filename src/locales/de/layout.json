@@ -29,22 +29,7 @@
       "retestNodes": "Erneut testen & besten Knoten wählen"
     },
     "antivirus": {
-      "menuLabel": "Schutz vor Fehlbeendigung (Leichtmodus)",
-      "title": "Schutzleitfaden für den Leichtmodus",
-      "whyTitle": "Warum wird der Leichtmodus beendet?",
-      "why": "Der Leichtmodus beendet den WebView2-UI-Prozess zum Sparen von Arbeitsspeicher und belässt nur Tray-Symbol und Proxy-Core im Hintergrund. Tools wie 360 Safe merken sich Apps, die ein Fenster geöffnet und wieder geschlossen haben, und beenden sie unter hoher CPU-Last zwangsweise als Restprozess (die normale Vertrauenszone hilft hier nicht).",
-      "easyTitle": "Option 1: Einfacher Stealth-Modus (Empfohlen für den Alltag)",
-      "easyBody": "Mit aktiviertem „Leiser Start“ startet Clash Mini in jedem Szenario — Autostart, Desktop-Verknüpfung oder Neustart nach Beendigung — direkt lautlos in den System-Tray ohne Hauptfenster. Solange kein Fenster sichtbar war, markiert 360 den Prozess nicht.",
-      "easyWarning": "⚠️ Hinweis: Öffnen Sie bei dieser Option das Hauptfenster im Alltag möglichst nicht per Linksklick auf das Tray-Symbol. Wurde das Fenster einmal angezeigt und geschlossen, kann hohe CPU-Last erneut zum Beenden führen (klicken Sie dann einfach wieder die Verknüpfung für den stillen Tray-Start).",
-      "enableSilentBtn": "„Leiser Start“ jetzt aktivieren",
-      "silentEnabledBtn": "„Leiser Start“ aktiviert",
-      "rootTitle": "Option 2: Dauerhafte Lösung (Fenster jederzeit frei öffnen/schließen)",
-      "rootIntro": "Um das Hauptfenster jederzeit ohne 360-Bereinigung zu öffnen und zu schließen, tragen Sie die Pfade in die Low-Level-Whitelist von 360 ein (wegen Selbstschutz im abgesicherten Windows-Modus bearbeiten):",
-      "rootSteps": "1. Shift halten und in Windows „Neu starten“ wählen → Problembehandlung → Erweiterte Optionen → Starteinstellungen → nach Neustart 4 für „Abgesicherter Modus“ drücken;\n2. Unten stehende whiteinternal.ini im Editor öffnen, beide Zeilen am Ende von [paths] einfügen und speichern (bei anderem Laufwerk letzten Ordnernamen + Dateinamen beibehalten);\n3. Normal neu starten — dauerhaft wirksam.",
-      "copyPath": "Dateipfad kopieren",
-      "copySnippet": "Zeilen kopieren",
-      "copied": "In Zwischenablage kopiert",
-      "close": "Verstanden"
+      "menuLabel": "Schutz vor Fehlbeendigung (Leichtmodus)"
     },
     "helpMenu": {
       "github": "⭐ Star auf GitHub geben",

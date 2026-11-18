@@ -128,6 +128,7 @@ mod app_init {
             cmd::get_sys_proxy,
             cmd::show_in_folder,
             cmd::open_web_url,
+            cmd::open_antivirus_guide,
             cmd::export_diagnostic_bundle,
             cmd::restart_core,
             cmd::get_running_mode,

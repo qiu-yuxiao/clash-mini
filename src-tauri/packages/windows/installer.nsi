@@ -998,8 +998,9 @@ Section Install
     File /a "/oname={{this.[1]}}" "{{no-escape @key}}"
   {{/each}}
 
-  ; Copy 用户必读.txt from resources to installation root
+  ; Copy 用户必读.txt and 轻量模式防误杀指南.txt from resources to installation root
   CopyFiles /SILENT "$INSTDIR\resources\用户必读.txt" "$INSTDIR\用户必读.txt"
+  CopyFiles /SILENT "$INSTDIR\resources\轻量模式防误杀指南.txt" "$INSTDIR\轻量模式防误杀指南.txt"
 
   ; Copy external binaries
   {{#each binaries}}
@@ -1173,6 +1174,7 @@ Section Uninstall
   ; Copy main executable
   Delete "$INSTDIR\${MAINBINARYNAME}.exe"
   Delete "$INSTDIR\用户必读.txt"
+  Delete "$INSTDIR\轻量模式防误杀指南.txt"
 
   ; Delete resources
   {{#each resources}}
