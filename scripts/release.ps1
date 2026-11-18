@@ -218,38 +218,56 @@ $AttemptCount = 0
 $MaxAttempts  = $MaxRetries + 1
 $StartTime    = Get-Date
 $LastRunId    = $null
+$CiSucceeded  = $false
 
 :outerLoop while ($AttemptCount -lt $MaxAttempts) {
     $AttemptCount++
     if ($AttemptCount -gt 1) {
         Log-Warn "Attempt $AttemptCount (Automatic Retry)..."
         # Re-push tag to trigger a new CI run
-        git tag -d $TagName 2>$null
-        git push origin ":refs/tags/$TagName" --no-verify 2>$null
-        Start-Sleep -Seconds 5
-        git tag $TagName
-        git push origin $TagName --no-verify
-        if ($LASTEXITCODE -ne 0) { Log-Error "Failed to push tag, aborting retries"; break }
+        git config --local http.sslBackend openssl
+        git config --local http.sslVerify false
+        try {
+            git tag -d $TagName 2>$null
+            git push origin ":refs/tags/$TagName" --no-verify 2>$null
+            Start-Sleep -Seconds 5
+            git tag $TagName
+            git push origin $TagName --no-verify
+            $PushExit = $LASTEXITCODE
+        } finally {
+            git config --local --unset http.sslBackend 2>$null
+            git config --local --unset http.sslVerify 2>$null
+        }
+        if ($PushExit -ne 0) { Log-Error "Failed to push tag, aborting retries"; break }
         Log-Ok "Tag pushed, waiting for new CI Run to start..."
         Start-Sleep -Seconds 30
         $StartTime = Get-Date
     }
 
-    # Wait for CI run to appear
+    # Wait for CI run to appear (bounded so a stalled tag push never spins forever)
     $WaitSec = 0
     $Run     = $null
-    while (-not $Run -or $Run.id -eq $LastRunId) {
+    while ($WaitSec -lt 300) {
         Start-Sleep -Seconds 15
         $WaitSec += 15
-        $Run = Get-RunInfo
-        if ($WaitSec -ge 120) {
-            Log-Warn "Timeout waiting for CI Run (2 minutes), continuing wait..."
+        $Candidate = Get-RunInfo
+        if ($Candidate -and ($Candidate.id -ne $LastRunId -or ($Candidate.status -eq "completed" -and $Candidate.conclusion -eq "success"))) {
+            $Run = $Candidate
+            break
         }
+        if ($WaitSec -ge 120 -and ($WaitSec % 60 -eq 0)) {
+            Log-Warn "Waiting for CI Run (${WaitSec}s/300s)..."
+        }
+    }
+    if (-not $Run) {
+        Log-Warn "No new CI run detected within 300s on attempt $AttemptCount."
+        continue outerLoop
     }
     $LastRunId = $Run.id
     Log-Info "CI Run ID: $($Run.id) | $(Get-RunLogs $Run.id)"
 
     # Poll run status
+    $HasStarted = $false
     :pollLoop while ($true) {
         $Elapsed = [int]((Get-Date) - $StartTime).TotalMinutes
         $Run     = Get-RunInfo
@@ -262,11 +280,15 @@ $LastRunId    = $null
 
         $Status     = $Run.status      # queued / in_progress / completed
         $Conclusion = $Run.conclusion  # success / failure / cancelled / null
+        if ($Status -eq "in_progress") {
+            $HasStarted = $true
+        }
 
         Write-Host "  [$(Now)] CI: $Status$(if ($Conclusion) { " / $Conclusion" }) | Elapsed: $Elapsed minutes"
 
         if ($Status -eq "completed") {
             if ($Conclusion -eq "success") {
+                $CiSucceeded = $true
                 Log-Ok "CI build completed successfully! Total elapsed: $Elapsed minutes"
                 break outerLoop
             }
@@ -310,9 +332,9 @@ $LastRunId    = $null
             }
         }
 
-        # Queue timeout check
-        if ($Status -eq "queued" -and $Elapsed -ge ($QueueTimeout / 60)) {
-            Log-Warn "CI queue timed out ($Elapsed minutes), pushing tag again..."
+        # Queue timeout check (only before execution starts; ignore brief inter-job queued states)
+        if (-not $HasStarted -and $Status -eq "queued" -and $Elapsed -ge ($QueueTimeout / 60)) {
+            Log-Warn "CI queue timed out before starting ($Elapsed minutes), pushing tag again..."
             break pollLoop
         }
 
@@ -320,7 +342,7 @@ $LastRunId    = $null
     }
 }
 
-if ($AttemptCount -ge $MaxAttempts) {
+if (-not $CiSucceeded) {
     Log-Error "Max retry attempts reached ($MaxRetries), release failed, manual check required"
     exit 1
 }
