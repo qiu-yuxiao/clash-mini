@@ -37,3 +37,6 @@ debug.log
 # （pre-commit 钩子的 i18n-format 会生成并清理它们，但 `git add src/locales` 曾把它们误扫入提交；加入忽略避免复发）
 *.bak
 
+
+# AI 协作工作数据（记忆/日志），仅本地保存，不入库；避免 untracked 阻塞 release.ps1 的干净工作区预检
+.workbuddy/
