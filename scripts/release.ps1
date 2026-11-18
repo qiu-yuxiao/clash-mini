@@ -162,23 +162,29 @@ if (-not $SkipBumpAndTag) {
     # ─────────────────────────────────────────────
     Log-Step "Git Commit and Push"
 
+    # 失败路径同样必须恢复 SSL 校验配置：异常退出时若跳过这里的 unset，
+    # 会在仓库本地长期残留 sslVerify=false（TLS 校验被静默关闭）。
+    function Restore-GitSsl {
+        git config --local --unset http.sslBackend 2>$null
+        git config --local --unset http.sslVerify 2>$null
+    }
+
     git config --local http.sslBackend openssl
     git config --local http.sslVerify false
     git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml updater/app-update.json Cargo.lock
     git commit -m "release: bump version to $Version" --allow-empty --no-verify
-    if ($LASTEXITCODE -ne 0) { Log-Error "git commit failed"; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Restore-GitSsl; Log-Error "git commit failed"; exit 1 }
 
     git push origin dev --no-verify
-    if ($LASTEXITCODE -ne 0) { Log-Error "git push dev failed"; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Restore-GitSsl; Log-Error "git push dev failed"; exit 1 }
     Log-Ok "dev branch pushed"
 
     git tag $TagName
     git push origin $TagName --no-verify
-    if ($LASTEXITCODE -ne 0) { Log-Error "git push tag failed"; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Restore-GitSsl; Log-Error "git push tag failed"; exit 1 }
     Log-Ok "Tag $TagName pushed -> CI triggered"
 
-    git config --local --unset http.sslBackend
-    git config --local --unset http.sslVerify
+    Restore-GitSsl
 }
 
 Write-Host ""
