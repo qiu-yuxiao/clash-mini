@@ -1,11 +1,11 @@
 {
-  "version": "3.5.3",
-  "notes": "### 🎯 前台手动切换立即切转存量代理连接 & 路径控制详情直显「代理节点」（BUG-396）\n\n- **前后台分离：前台显式切点立即生效、后台自愈继续零断流**：保持后台 15 秒健康监测自愈与冷启动热切换“不断任何存量长连接”的不变式（保护下载与长流不被后台打断）；同时全面升级全部 4 类前台用户主动操作入口（节点列表点击、顶栏活跃节点胶囊点击轮换、过滤框输入 / `F4` / `F1` 自动选点、顶栏异常胶囊在线重测），切换成功后即时精准清理 `PROXY` 组中仍挂在非当前目标节点（含多跳前历史节点）上的存量代理长连接，彻底解决 Antigravity 等 HTTP/2 长连接软件粘滞在受限地区旧节点的问题，同时零误伤国内 `DIRECT` 直连与同节点连接。\n- **路径控制左键详情直显实际出口节点与「旧节点连接」标示**：在设置面板右侧「路径控制」表左键点击任意条目的详情弹窗中，紧接「主机」正下方新增 **「代理节点」** 一行（13 语种全覆盖），直白展示当前连接实际走的节点名称（直连显示 `DIRECT`、封锁显示 `REJECT`）；若该连接仍驻留在后台切换前的历史旧节点上，还会醒目标注 `（旧节点连接）`，搭配底部「关闭连接」按钮一眼排查与精准处置。\n\n---",
-  "pub_date": "2026-11-18T13:20:59.368Z",
+  "version": "3.5.4",
+  "notes": "Clash Mini v3.5.4",
+  "pub_date": "2026-11-18T15:25:31Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUpsTUxjZGpYeTVSYzUyQjBmelRlQ3JKYmZmNEVOZ2R1YmlqN2FSeHJ3UFpjTm9HUUNFUTdDL1hyZHM3SHVkZ0dRaktzTnBmQUZ0eTVzYWZiQUx5WFE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDA4MDIzCWZpbGU6Q2xhc2ggTWluaV8zLjUuM194NjQtc2V0dXAuZXhlCi9qVFV4cWdKSlRVRGJ1VmVRL3cwUU5MSThaT21CVHl2M0VFZW5zY20ydUNod0RmdWJ3MjErLzJyOXQreFN1TStiRm15cEJRUVB5UVhmS2RoMGk0TENnPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.3/Clash.Mini_3.5.3_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.4/Clash.Mini_3.5.4_x64-setup.exe",
       "size": 30219496
     }
   }
