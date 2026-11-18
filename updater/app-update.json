@@ -1,11 +1,11 @@
 {
-  "version": "3.5.4",
-  "notes": "### ⚡ 闪电图标与 F4 纯测速免打扰升级（BUG-397）\n\n- **看延迟不换节点、不断长连接**：将节点列表顶部闪电图标 `⚡` 与 `F4` 快捷键调整为「仅刷新当前可见列表各节点的毫秒延迟」模式——不再顺带切换当前正在使用的节点，也绝不会中断任何正在进行的下载或 HTTP/2 长连接。\n- **完整保留主动优选与清连接能力**：在顶部过滤框输入关键词（停止输入 700ms 或按 `Enter`，如 `-香港` / `日本|新加坡`）自动择优切换、按 `F1` 执行全量优选切换，以及点击节点卡片或顶栏节点胶囊切换时，仍按用户主动切点策略优选并即时清理旧节点上的存量代理连接。\n\n---",
-  "pub_date": "2026-11-18T15:44:54.765Z",
+  "version": "3.5.5",
+  "notes": "Clash Mini v3.5.5",
+  "pub_date": "2026-11-18T21:05:36Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUFacDlHekgwak1JNm4xcVJrOUJyUlJvQlJmQmZtOXlCYnpTeVRYdWRCalIwSDEwQTJZODdkRUJVZGIrcWdTbG1GQytzMitaSnNCWE5HU1BEa3QxZndFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDE2NjE3CWZpbGU6Q2xhc2ggTWluaV8zLjUuNF94NjQtc2V0dXAuZXhlCkF3blJ3dC9Ua2w0UytDck1VZ2Z5WGo1ZUJqdmlyVzlyZHhhWks0WXRqd1FTNUk0RHdSQitRcm5SYkdjRlJ0SXhzUzdvTFRTV2pnVFVXcTgxRTI3QUNRPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.4/Clash.Mini_3.5.4_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.5/Clash.Mini_3.5.5_x64-setup.exe",
       "size": 30226657
     }
   }
