@@ -7,13 +7,14 @@ import {
   SignalWifi1Bar as SignalWeak,
   WifiOff as SignalError,
 } from '@mui/icons-material'
-import type { Theme } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material'
 
 import {
   getDelayManager,
   NODE_DELAY_MAX_MS,
   resolveSignalDelayColor,
 } from '@/services/delay'
+import { get3DButtonStyle } from '@/utils/button-styles'
 import getSystem from '@/utils/get-system'
 
 const OS = getSystem()
@@ -370,6 +371,28 @@ export const get3DSliderStyle = (theme: Theme, mode: 'light' | 'dark') => {
   }
 
   return {}
+}
+
+export const buildImportant3DButtonStyle = (
+  theme: Theme,
+  color: 'primary' | 'default',
+): SxProps<Theme> => {
+  const btnStyle = get3DButtonStyle(theme, 'contained', color)
+  const importantKeys = new Set([
+    'background',
+    'border',
+    'borderColor',
+    'boxShadow',
+    'color',
+  ])
+  const result: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(btnStyle)) {
+    result[key] = importantKeys.has(key) ? `${val} !important` : val
+  }
+  if (btnStyle.background) {
+    result.backgroundColor = `${btnStyle.background} !important`
+  }
+  return result as SxProps<Theme>
 }
 
 export { OS }

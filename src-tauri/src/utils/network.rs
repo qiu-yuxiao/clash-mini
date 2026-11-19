@@ -325,18 +325,6 @@ impl NetworkManager {
         )
     }
 
-    pub async fn get_with_interrupt(
-        &self,
-        url: &str,
-        proxy_type: ProxyType,
-        timeout_secs: Option<u64>,
-        user_agent: Option<String>,
-        accept_invalid_certs: bool,
-    ) -> Result<HttpResponse> {
-        self.get_internal(url, proxy_type, timeout_secs, user_agent, accept_invalid_certs, false)
-            .await
-    }
-
     pub async fn get_with_ssrf_guard(
         &self,
         url: &str,
@@ -464,13 +452,20 @@ mod tests {
         let url = format!("http://{addr}/sub");
         let nm = NetworkManager::new();
         let resp_default = nm
-            .get_with_interrupt(&url, ProxyType::None, Some(5), None, false)
+            .get_internal(&url, ProxyType::None, Some(5), None, false, false)
             .await
             .unwrap();
         assert_eq!(resp_default.text_with_charset().unwrap(), "ok");
 
         let resp_custom = nm
-            .get_with_interrupt(&url, ProxyType::None, Some(5), Some("MyAirportUA/2.0".into()), false)
+            .get_internal(
+                &url,
+                ProxyType::None,
+                Some(5),
+                Some("MyAirportUA/2.0".into()),
+                false,
+                false,
+            )
             .await
             .unwrap();
         assert_eq!(resp_custom.text_with_charset().unwrap(), "ok");

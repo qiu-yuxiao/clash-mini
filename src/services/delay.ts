@@ -72,7 +72,17 @@ class DelayManager {
     }
   }
 
-  /** 清理过期延迟缓存，并主动通知对应订阅者/分组回落重算，避免清理后 UI 仍凝固于旧状态（BUG-370） */
+  private enqueueItemUpdate(key: string, update: DelayUpdate) {
+    const queue = this.pendingItemUpdates.get(key)
+    if (queue) {
+      queue.push(update)
+    } else {
+      this.pendingItemUpdates.set(key, [update])
+    }
+    this.scheduleItemFlush()
+  }
+
+  /** 清理过期延迟缓存，并通知监听者回落重算 */
   evictExpiredCache(now = Date.now()): number {
     let evicted = 0
     const affectedGroups = new Set<string>()
@@ -84,17 +94,10 @@ class DelayManager {
         const sepIdx = key.indexOf('::')
         const group = sepIdx >= 0 ? key.slice(0, sepIdx) : 'PROXY'
         affectedGroups.add(group)
-        const resetUpdate: DelayUpdate = { delay: -1, updatedAt: 0 }
-        const queue = this.pendingItemUpdates.get(key)
-        if (queue) {
-          queue.push(resetUpdate)
-        } else {
-          this.pendingItemUpdates.set(key, [resetUpdate])
-        }
+        this.enqueueItemUpdate(key, { delay: -1, updatedAt: 0 })
       }
     }
     if (evicted > 0) {
-      this.scheduleItemFlush()
       affectedGroups.forEach((group) => this.queueGroupNotification(group))
     }
     return evicted
@@ -283,22 +286,15 @@ class DelayManager {
     }
 
     this.cache.set(key, update)
-
-    const queue = this.pendingItemUpdates.get(key)
-    if (queue) {
-      queue.push(update)
-    } else {
-      this.pendingItemUpdates.set(key, [update])
-    }
-    this.scheduleItemFlush()
+    this.enqueueItemUpdate(key, update)
 
     return update
   }
 
   /**
-   * 恢复测速前的缓存快照（BUG-344）：
-   * - 若测速前存在有效缓存快照，原样恢复其原始 `updatedAt` 时间戳，严禁重新盖章 `Date.now()` 虚增 30min 寿命；
-   * - 若测速前无缓存，删除 `-2` 占位键并向监听者推送 `-1` 未测速通知，使其自然回落 `getDelayFix`。
+   * 恢复测速前的缓存快照：
+   * - 若测速前存在有效缓存，原样恢复原始 `updatedAt`，避免虚增缓存寿命；
+   * - 若测速前无缓存，清除 `-2` 占位并推送 `-1` 使 UI 自然回落 `getDelayFix`。
    */
   restoreDelaySnapshot(
     name: string,
@@ -315,13 +311,29 @@ class DelayManager {
       restored = { delay: -1, updatedAt: 0 }
     }
 
-    const queue = this.pendingItemUpdates.get(key)
-    if (queue) {
-      queue.push(restored)
-    } else {
-      this.pendingItemUpdates.set(key, [restored])
+    this.enqueueItemUpdate(key, restored)
+  }
+
+  /**
+   * 为批量测速统一写入 `-2` 测速占位并保存测速前快照；
+   * 返回幂等回滚函数，在后端返回空结果或异常时恢复未更新节点。
+   */
+  beginBatchCheck(names: string[], group = 'PROXY'): () => void {
+    const snapshots = new Map<string, DelayUpdate | undefined>()
+    for (const name of names) {
+      snapshots.set(name, this.getDelayUpdate(name, group))
+      this.setDelay(name, group, -2)
     }
-    this.scheduleItemFlush()
+    this.queueGroupNotification(group)
+
+    return () => {
+      for (const name of names) {
+        if (this.getDelayUpdate(name, group)?.delay === -2) {
+          this.restoreDelaySnapshot(name, group, snapshots.get(name))
+        }
+      }
+      this.queueGroupNotification(group)
+    }
   }
 
   getDelayUpdate(name: string, group = 'PROXY') {
@@ -491,13 +503,7 @@ class DelayManager {
           updatedAt: cappedUpdatedAt,
         }
         this.cache.set(key, update)
-        const queue = this.pendingItemUpdates.get(key)
-        if (queue) {
-          queue.push(update)
-        } else {
-          this.pendingItemUpdates.set(key, [update])
-        }
-        this.scheduleItemFlush()
+        this.enqueueItemUpdate(key, update)
       }
     }
     this.queueGroupNotification(group)

@@ -159,13 +159,10 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     await currentWindow.minimize()
   }, [currentWindow])
 
-  // ── Idle timer（FEAT-003）：必须自续期，禁止自杀式退出 ──────────────────────
+  // Idle timer：每次触发无条件重新排程，仅在满足极小窗条件时隐藏标题栏
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current !== null) clearTimeout(idleTimerRef.current)
 
-    // 用局部递归函数排程，保证每次触发后**无条件**重新武装。
-    // 旧实现在条件不满足时直接 return，导致「启动 10 秒后窗口还不是极小窗」就把
-    // 计时器永久注销，整场会话再也不会有下一次判定（v3.0.0~v3.0.3 失效主因之一）。
     const arm = () => {
       idleTimerRef.current = setTimeout(() => {
         idleTimerRef.current = null
@@ -180,10 +177,8 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
     arm()
   }, [])
 
-  // ── Restore chrome (show custom titlebar) ─────────────────────────────────
+  // Restore chrome (show custom titlebar) and renew idle timer
   const restoreChrome = useCallback(() => {
-    // 旧实现在未隐藏时提前 return 且不续期，调用点（窗口变大）等于白调。
-    // 这里无条件续期：恢复本身是一次交互，且让调用方不必依赖「已隐藏」这个前置条件。
     if (isDecorationsHiddenRef.current) {
       isDecorationsHiddenRef.current = false
       setIsDecorationsHidden(false)
@@ -192,11 +187,7 @@ export const WindowProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [resetIdleTimer])
 
   /**
-   * 同步窄窗 / 极小窗状态（FEAT-003 唯一判定入口）。
-   *
-   * 入参必须是**窗口内尺寸的物理像素**（onResized payload / innerSize()），
-   * 禁止传页面视口数值——视口是整数 CSS 像素（如 125% 档 158 物理 / 1.25 = 126.4，
-   * 上报可能进位为 127），粗估不可靠，150% 档虽恰为整数但其余档位仍有取整方向问题。
+   * 同步窄窗 / 极小窗状态（唯一判定入口）：须传入窗口内尺寸物理像素，避免 CSS 整数视口取整误差。
    */
   const applyGeometry = useCallback(
     (physW: number, physH: number, sf: number) => {

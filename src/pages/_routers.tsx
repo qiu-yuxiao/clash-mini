@@ -3,7 +3,7 @@ import { createBrowserRouter, RouteObject } from 'react-router'
 
 import Layout from './_layout'
 
-export const navItems = [
+const navItems = [
   {
     label: 'layout.components.navigation.tabs.home',
     path: '/',

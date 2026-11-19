@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #![allow(non_snake_case)]
-#![allow(dead_code)]
 #![allow(clippy::collapsible_if, clippy::cognitive_complexity, clippy::bool_assert_comparison)]
 #![recursion_limit = "512"]
 
@@ -133,12 +132,10 @@ mod app_init {
             cmd::restart_core,
             cmd::get_running_mode,
             cmd::install_service,
-            cmd::uninstall_service,
             cmd::is_service_available,
             cmd::get_clash_info,
             cmd::patch_clash_config,
             cmd::patch_clash_mode,
-            cmd::get_runtime_config,
             cmd::get_proxy_addr,
             cmd::save_proxy_head_state,
             cmd::get_proxy_head_state,

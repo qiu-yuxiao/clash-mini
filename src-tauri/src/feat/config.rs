@@ -281,10 +281,6 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     Ok(())
 }
 
-pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
-    patch_verge_with_resets(patch, not_save_file, VergePatchResets::default()).await
-}
-
 pub async fn patch_verge_with_resets(patch: &IVerge, not_save_file: bool, resets: VergePatchResets) -> Result<()> {
     let _guard = VERGE_PATCH_LOCK.lock().await;
 

@@ -100,36 +100,19 @@ export async function batchTestWithFirstBatchSelect(
   const currentUid = (await getProfiles())?.current || ''
   if (!currentUid) return
 
-  const dm = getDelayManager()
-  const previousSnapshots = new Map<
-    string,
-    ReturnType<typeof dm.getDelayUpdate>
-  >()
-  for (const name of names) {
-    previousSnapshots.set(name, dm.getDelayUpdate(name, groupName))
-    dm.setDelay(name, groupName, -2)
-  }
-  dm.queueGroupNotification(groupName)
-
-  const rollbackPendingNodes = () => {
-    for (const name of names) {
-      if (dm.getDelayUpdate(name, groupName)?.delay === -2) {
-        dm.restoreDelaySnapshot(name, groupName, previousSnapshots.get(name))
-      }
-    }
-    dm.queueGroupNotification(groupName)
-  }
+  const rollbackPendingNodes = getDelayManager().beginBatchCheck(
+    names,
+    groupName,
+  )
 
   try {
-    // BUG-321: 必须将待测过滤子集 names 传入后端，严禁传 undefined 导致越过过滤词选到子集外节点
+    // 严格传入过滤子集 names，避免越过当前筛选条件选到子集外节点
     const results = await triggerAutoSelect(currentUid, names, 0, select)
     if (results.length === 0) {
-      // 后端判定「测速未真正执行」（NotExecuted），回滚 -2 占位并保留原始 updatedAt（BUG-344）
       rollbackPendingNodes()
     }
   } catch (err) {
     console.error('[Layout] 后端批量测速/选点失败:', err)
-    // 异常兜底：恢复仍处于 -2 测试态的节点原始快照，防止卡片转圈永久卡死或虚增缓存寿命
     rollbackPendingNodes()
   }
 }
@@ -212,7 +195,6 @@ export async function hasFreshActiveExitLatency(
 
 export async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<unknown>,
-  autoSelectTimerRef: { current: number | null },
   setHeadState?: (groupName: string, patch: Partial<HeadState>) => void,
   profileUid?: string,
   options?: { skipProbeIfFresh?: boolean },
@@ -227,12 +209,7 @@ export async function triggerAutoSelectAndRefresh(
     setHeadState('PROXY', { sortType: 1 })
   }
 
-  if (autoSelectTimerRef.current !== null) {
-    clearTimeout(autoSelectTimerRef.current)
-    autoSelectTimerRef.current = null
-  }
-
-  // 让出主线程一帧让 React 完成当前界面的渲染与排序状态应用
+  // 让出主线程一帧以先渲染当前界面与排序状态
   await new Promise((resolve) => setTimeout(resolve, 0))
 
   try {
@@ -244,8 +221,7 @@ export async function triggerAutoSelectAndRefresh(
     }
     const names = await getFilteredNodeNames()
     if (names.length === 0) return
-    // 最高方针「连续性优先」：用户持久出口仍有效时只刷新延迟，不按最快节点覆盖它；
-    // BUG-402：轻量唤醒路径若当前出口已有新鲜有效延迟，直接零拨测秒开展示
+    // 连续性优先：持久出口有效时仅刷新延迟不切换；开启 skipProbeIfFresh 且延迟新鲜时跳过拨测
     const keepExit = await hasUsablePersistedExit(names)
     if (
       options?.skipProbeIfFresh &&

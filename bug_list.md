@@ -3,11 +3,21 @@
 > [!IMPORTANT]
 > **AI 协同开发与维护规范 (CRITICAL MAINTENANCE RULES)**:
 > 1. **待验证/排查中 Bug 强制卡片化**：所有状态为 `排查中` 或 `代码已修正，待用户确认` 的条目必须在顶部「待验证与活动中 Bug 详情」区以结构化卡片登记，严禁在用户明确人工确认前提前归档入底部历史表。
-> 2. **已确认历史条目索引**：`BUG-057` ~ `BUG-391` 已通过用户验收并完整归档于 `clash_mini_agreements.md` 附录 A。
+> 2. **已确认历史条目索引**：历史已验收条目详见 [Changelog.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/Changelog.md) 与 Git 提交历史。
 
 ---
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
+
+### BUG-404 全栈死代码剥离、编译器 dead_code 门禁开启与代码/设计书去历史化精简重构
+
+- **对应模块**：[lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)、[cmd/](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/mod.rs)、[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[profile-coordination.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/profile-coordination.ts)、[proxy-groups.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/proxy/proxy-groups.tsx)、[clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md)
+- **问题描述**：随着多轮迭代演进，工程中累积了四类非必要膨胀，导致维护噪音大、新改动易触及冗余路径：① 部分已退役或无消费者的后端 Tauri 命令与孤立导出（如 `get_runtime_config` / `uninstall_service` / 孤立 Rust 辅助函数与前端未消费导出），且 [lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs) 长期悬挂 `#![allow(dead_code)]` 掩盖了死代码滋生；② [_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx) 仍保留与后端 `monitor.rs` 重叠的 `visibilitychange` 全组主动拨测器（`triggerWakeupLatencyTest`）以及多处大段复制粘贴样式/导入/切换代码；③ `monitor.rs` API 异常自愈处理分支重复，且各核心模块及 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 中混杂大量历史事故复盘叙事与过程流水账，掩盖了当前真实生效的不变量与设计契约。
+- **修复方案**：
+  1. 在 100% 忠实保留全部现有功能、阈值与后台防断流机制前提下，彻底移除零消费 `get_runtime_config` / `uninstall_service` 等死 IPC 与全栈死代码，摘除 [lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs) `#![allow(dead_code)]` 开启全仓静态死代码门禁；
+  2. 退役 [_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx) `triggerWakeupLatencyTest` 重复拨测链（窗口切回前台超过 3s 冷却仅静默刷新状态展示，探测/自愈唯一收口于 `monitor.rs`），收敛批量测速 `-2` 占位与快照回滚共享辅助器及 `handleImportProfile` / `handleTakeoverModeChange` / 3D 按钮样式等重复逻辑；
+  3. 收敛 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 重复 API 异常自愈块，并将前后端关键文件及 [clash_mini_agreements.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/clash_mini_agreements.md) 去历史化重构为简明精确的现态规范文档（历史过程统一归入 `Changelog.md` 与 Git 历史）。
+- **状态**：代码已修正，待用户确认
 
 ### BUG-403 物理网络 `TCP:53` 探针未复用活跃下行证活且每次并发三路公网握手
 
@@ -128,7 +138,7 @@
 
 ## 📌 已解决的历史 Bug 索引 (Resolved Historical Bugs)
 
-历史已确认关闭条目（`BUG-057` ~ `BUG-391`）完整追溯映射详见 `clash_mini_agreements.md`「附录 A: 历史缺陷与工程修复（Bug ID）追溯映射表」。
+历史已确认关闭条目（`BUG-057` ~ `BUG-391`）历史演进记录详见 [Changelog.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/Changelog.md) 与 Git 提交历史。
 
 | 缺陷编号 | 对应版本基线 | 状态 |
 | :--- | :---: | :---: |

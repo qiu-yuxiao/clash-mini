@@ -97,42 +97,17 @@ pub fn use_tun_with_sniffer(mut config: Mapping, enable: bool, enable_sniffer: O
         revise!(dns_val, "ipv6", user_ipv6);
         revise!(config, "dns", dns_val);
 
-        // 【IPv6 防泄漏】TUN 启用时，必须让内核具备 IPv6 收包能力，否则 IPv6 会整体绕过代理。
-        //
-        // 问题：mihomo 官方文档明确 `tun.inet6-address`「需要同时将顶层配置中的 ipv6 设置为 true
-        // 才会生效」。顶层 ipv6=false 时 TUN 不具备 IPv6 能力 → 不把 IPv6 默认路由导入 TUN，
-        // 系统 ::/0 仍指向物理网关 → 所有 IPv6 流量从物理网卡直连泄漏（实测到 Google 的 IPv6
-        // 请求立即失败，且完全不经过代理）。这是「内核禁 IPv6 + 系统开 IPv6」的最差组合。
-        //
-        // 修复：TUN 启用时强制顶层 ipv6=true，并显式指定 TUN 的 IPv6 地址，使 TUN 同时接管
-        // IPv4 与 IPv6 默认路由，IPv6 流量进入内核按规则处理，不再泄漏。
-        //
-        // 注意：用户「Allow IPv6」开关的语义仍然保留 —— 它决定 `dns.ipv6`（见上方 revise!），
-        // 即关闭时内核 DNS 不返回 AAAA 记录，应用拿不到 IPv6 地址、实际走 IPv4。
-        // 二者不冲突：顶层 ipv6 管「TUN 是否接管 IPv6 路由（防泄漏）」，dns.ipv6 管「是否使用 IPv6」。
+        // 强制开启顶层 ipv6 并写入 inet6-address 前缀数组，确保 TUN 接管 ::/0 防泄漏；
+        // 用户「Allow IPv6」开关仅决定上面的 dns.ipv6（是否下发 AAAA 记录）。
         revise!(config, "ipv6", true);
-        // 【格式修正】内核要求 inet6-address 为前缀数组（[]netip.Prefix），
-        // 写单个字符串会被拒绝：yaml unmarshal 报错、配置验证失败、内核无法启动。
         tun_val.insert(
             Value::from("inet6-address"),
             Value::Sequence(vec![Value::String(crate::constants::tun::TUN_INET6_ADDRESS.into())]),
         );
 
-        // TUN 模式下默认按需开启并补全 sniffer 域名嗅探（A10 / §3.7）：
-        // 若用户或订阅显式关闭，则尊重关闭状态；否则补全缺失的 TLS/HTTP/QUIC 嗅探与排除段。
         apply_tun_sniffer_policy(&mut config, enable_sniffer);
     } else {
-        // 非 TUN（系统代理 / 手动）：不注入 fake-ip 等 TUN 专属 DNS 字段，交由内核默认
-        // （redir-host）；也不做 IPv6 路由接管 —— 非全局接管场景本就不存在「绕过代理泄漏」。
-        //
-        // dns.ipv6 一律跟随「Allow IPv6」开关（`user_ipv6`），**无论订阅是否自带 dns 段**：
-        // 否则订阅若自带 `dns.ipv6: true`，用户关闭开关后 DNS 仍会返回 AAAA（拿到 IPv6 地址
-        // 却连不通，多一次失败尝试），造成两模式行为不一致。
-        //
-        // 【单一真源】本函数是 dns.ipv6 的唯一写入点（两个分支都写）。
-        // 下游 `apply_mandatory_dns_settings` 只补 enable/nameserver 等，不再兜 dns.ipv6 ——
-        // 若在那里读顶层 ipv6 兜底，TUN 模式下读到的会是本函数刚强制过的 `true`（防泄漏接管），
-        // 从而把用户关掉的 IPv6 静默写回开启。此处显式无条件同步即可根除该类风险。
+        // 非 TUN 模式仅同步 dns.ipv6 跟随用户开关（本函数是 dns.ipv6 的唯一写入点）
         let dns_key = Value::from("dns");
         let mut dns_val = config
             .get(&dns_key)

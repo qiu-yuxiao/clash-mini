@@ -1,20 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLockFn } from 'ahooks'
-import { useCallback } from 'react'
 
-import {
-  getClashInfo,
-  getRuntimeConfig,
-  patchClashConfig,
-} from '@/services/cmds'
+import { getClashInfo, patchClashConfig } from '@/services/cmds'
 import { getVersionWithTimeout } from '@/services/mihomo-api'
 import { queryClient } from '@/services/query-client'
 import type { IConfigData } from '@/types/clash'
-
-type MutateClashUpdater =
-  | ((old: IConfigData | undefined) => IConfigData | undefined)
-  | IConfigData
-  | undefined
 
 const PORT_KEYS = [
   'port',
@@ -59,43 +49,10 @@ const validatePorts = (patch: ClashInfoPatch) => {
   })
 }
 
-export const useRuntimeConfig = (shouldFetch: boolean = true) => {
-  return useQuery({
-    queryKey: ['getRuntimeConfig'],
-    queryFn: getRuntimeConfig,
-    enabled: shouldFetch,
-  })
-}
-
 export const useClash = () => {
-  const { data: clash, refetch } = useRuntimeConfig()
-
   const { data: versionData, refetch: mutateVersion } = useQuery({
     queryKey: ['getVersion'],
     queryFn: getVersionWithTimeout,
-  })
-
-  const mutateClash = useCallback(
-    (updater?: MutateClashUpdater, revalidate?: boolean) => {
-      if (updater === undefined) {
-        return refetch()
-      }
-      const next =
-        typeof updater === 'function'
-          ? updater(queryClient.getQueryData<IConfigData>(['getRuntimeConfig']))
-          : updater
-      queryClient.setQueryData(['getRuntimeConfig'], next)
-      if (revalidate !== false) {
-        return refetch()
-      }
-      return Promise.resolve()
-    },
-    [refetch],
-  )
-
-  const patchClash = useLockFn(async (patch: Partial<IConfigData>) => {
-    await patchClashConfig(patch)
-    await mutateClash()
   })
 
   const version = versionData?.meta
@@ -103,11 +60,8 @@ export const useClash = () => {
     : versionData?.version || '-'
 
   return {
-    clash,
     version,
-    mutateClash,
     mutateVersion,
-    patchClash,
   }
 }
 

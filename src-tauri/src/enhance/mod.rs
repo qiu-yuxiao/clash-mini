@@ -46,19 +46,15 @@ impl Default for ProfileItems {
         Self {
             config: Default::default(),
             merge_item: ChainItem {
-                uid: "".into(),
                 data: ChainType::Merge(Mapping::new()),
             },
             rules_item: ChainItem {
-                uid: "".into(),
                 data: ChainType::Rules(SeqMap::default()),
             },
             proxies_item: ChainItem {
-                uid: "".into(),
                 data: ChainType::Proxies(SeqMap::default()),
             },
             global_merge: ChainItem {
-                uid: "Merge".into(),
                 data: ChainType::Merge(Mapping::new()),
             },
         }
@@ -148,7 +144,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         }
     }
     .unwrap_or_else(|| ChainItem {
-        uid: "".into(),
         data: ChainType::Merge(Mapping::new()),
     });
 
@@ -161,7 +156,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         }
     }
     .unwrap_or_else(|| ChainItem {
-        uid: "".into(),
         data: ChainType::Rules(SeqMap::default()),
     });
 
@@ -174,7 +168,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         }
     }
     .unwrap_or_else(|| ChainItem {
-        uid: "".into(),
         data: ChainType::Proxies(SeqMap::default()),
     });
 
@@ -187,7 +180,6 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         }
     }
     .unwrap_or_else(|| ChainItem {
-        uid: "Merge".into(),
         data: ChainType::Merge(Mapping::new()),
     });
 
@@ -442,23 +434,9 @@ fn apply_mandatory_dns_settings(mut config: Mapping) -> Mapping {
     config
 }
 
-/// 【订阅 DNS 卫生改写】境外公共 DNS 的明文 UDP 上游改写为 DoH 形态。
-///
-/// 机场订阅常在 `dns.nameserver` 里自带明文 UDP 上游（如 `8.8.8.8`）。在
-/// `respect-rules: true` 下，内核自身发起的这类 DNS 查询会命中
-/// `IP-CIDR,8.8.8.8/32,PROXY` 被塞进代理节点；当节点为 anytls 等 TCP 承载协议时
-/// （UDP-over-TCP），每个 UDP 查询都要先向节点新建一条 TCP 会话——该会话建立
-/// 慢于境内 DoH 上游，在内核 DNS 并发赛跑中必被取消，刷出大量
-/// `failed to create session: dial tcp <node>: operation was canceled` 警告
-/// （3.1.7 现场实证：7 条全部落在 anytls 被选中窗口内，切 ss 节点后零新增）。
-///
-/// 改写为 DoH（TCP 承载，走代理稳定）后该竞速取消彻底消失。范围界定：
-/// - 仅处理 `nameserver`：`default-nameserver` 按协议定义必须为明文 IP
-///   （用于解析 DoH 域名本身），不可改写；境内明文上游（223.5.5.5 /
-///   114.114.114.114 等）直连可达且稳定赢得赛跑，无需处理。
-/// - 已带 scheme（`tls://`、`https://`、`quic://` 等）的加密上游原样保留。
-/// - 仅覆盖四家境外公共 DNS 的已知 IP（Google 8.8.8.8/8.8.4.4、
-///   Cloudflare 1.1.1.1/1.0.0.1），与 `dns_fallback_proxy_rules` 的对偶口径一致。
+/// 将 `dns.nameserver` 中的境外公共 DNS 明文 UDP 上游（Google / Cloudflare）升级为 DoH，
+/// 避免 `respect-rules: true` 下经由 TCP 承载节点发起 UDP 查询时并发竞速超时取消。
+/// `default-nameserver`（需明文引导）、境内明文 DNS 与已加密上游保持不变。
 struct ParsedDnsUpstream {
     host: std::string::String,
     is_plain: bool,
@@ -1340,11 +1318,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         single_group.insert(Value::from("proxies"), Value::from(vec![Value::from("DIRECT")]));
     }
 
-    // 3b. Construct the measurement group "PROXY__METRICS" with type "url-test", same membership.
-    //     设为 `lazy: true`（BUG-399）：由于没有任何流量规则经由 PROXY__METRICS，内核自身 Go 定时器
-    //     在静默空闲期实现 0 自治盲测（不与 Rust METRICS_PROBE_LOCK 撞车）；同时 Rust 端经
-    //     `delay_group("PROXY__METRICS", ...)` 发起的按需拨测不受 `lazy` 限制、照常由内核并发直拨
-    //     所有成员并写入 history/alive，作为全链路唯一延迟权威源并消除 TUN 自指回环。
+    // 3b. 构造测量专用组 PROXY__METRICS（url-test + lazy: true，避免无流量自治盲测）
     let test_url = Config::verge()
         .await
         .latest_arc()
@@ -1375,15 +1349,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         Value::from(vec![Value::from(single_group), Value::from(metrics_group)]),
     );
 
-    // 4. Inject rule-providers for GFWList
-    //
-    // 【随包预置 + 定时更新（BUG-309）】GFWList 规则集是境外域名走代理的唯一判定源。
-    // 构建/发版阶段（scripts/prebuild.mjs）主动拉取最新 Loyalsoldier/clash-rules gfw.txt
-    // 随包打入 resources/gfwlist.yaml，启动早期由 init_resources 释放至
-    // <app_home_dir>/ruleset/gfwlist.yaml。因此全新安装第 0 毫秒本地缓存即已就绪，
-    // 无需首次启动时联网等待拉取（彻底消除拉取完成前 GitHub/YouTube 落 MATCH,DIRECT
-    // 直连被墙的冷启动空窗）；运行期仍由内核按 interval: 86400（24h）经 PROXY 通道
-    // 后台定时拉取更新。
+    // 4. 配置 GFWList 规则集（构建时预置随包释放，运行时按 24h 间隔经 PROXY 定时更新）
     let mut gfwlist_provider = Mapping::new();
     gfwlist_provider.insert(Value::from("type"), Value::from("http"));
     gfwlist_provider.insert(Value::from("behavior"), Value::from("domain"));

@@ -263,15 +263,6 @@ export async function getClashInfo() {
   )
 }
 
-// Get runtime config which controlled by verge
-export async function getRuntimeConfig() {
-  return withIpcTimeout(
-    invoke<IConfigData | null>('get_runtime_config'),
-    10_000,
-    'getRuntimeConfig',
-  )
-}
-
 export async function patchClashConfig(payload: Partial<IConfigData>) {
   return withIpcTimeout(
     invoke<void>('patch_clash_config', { payload }),
@@ -501,7 +492,6 @@ export const getRunningMode = async () => {
   )
 }
 
-// 安装系统服务
 export const installService = async () => {
   return withIpcTimeout(
     invoke<void>('install_service'),
@@ -510,11 +500,6 @@ export const installService = async () => {
   )
 }
 
-// 重装系统服务
-
-// 修复系统服务
-
-// 系统服务是否可用
 export const isServiceAvailable = async () => {
   try {
     return await withIpcTimeout(
@@ -569,8 +554,8 @@ export function notifyNodeSwitched(): void {
   })
 }
 
-/** 获取后端真 HTTPS 验真已永久拉黑的假节点名称列表（前端列表隐藏显示） */
-export async function getConfirmedFakeProxyNames(): Promise<string[]> {
+/** 获取后端真 HTTPS 验真已永久拉黑的假节点名称列表（内部过滤使用） */
+async function getConfirmedFakeProxyNames(): Promise<string[]> {
   try {
     const names = await invoke<string[]>('get_confirmed_fake_proxy_names')
     return Array.isArray(names) ? names : []

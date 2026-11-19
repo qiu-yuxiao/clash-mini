@@ -15,7 +15,7 @@ import { useLocation } from 'react-router'
 
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { getProfiles, triggerAutoSelect } from '@/services/cmds'
-import { type DelayUpdate, getDelayManager } from '@/services/delay'
+import { getDelayManager } from '@/services/delay'
 import { showNotice } from '@/services/notice-service'
 import type { IProxyItem, IProxyGroupItem } from '@/types/clash'
 import { debugLog } from '@/utils/debug'
@@ -312,29 +312,12 @@ export const ProxyGroups = (props: Props) => {
         const currentUid = (await getProfiles())?.current || ''
         if (!currentUid) return
 
-        const dm = getDelayManager()
-        const previousSnapshots = new Map<string, DelayUpdate | undefined>()
-        // 视觉占位：记录测速前原始快照并将待测节点标记为「测速中」以触发流光动画
-        for (const name of visibleNames) {
-          previousSnapshots.set(name, dm.getDelayUpdate(name, groupName))
-          dm.setDelay(name, groupName, -2)
-        }
-        dm.queueGroupNotification(groupName)
+        const rollbackVisible = getDelayManager().beginBatchCheck(
+          visibleNames,
+          groupName,
+        )
 
-        const rollbackVisible = () => {
-          for (const name of visibleNames) {
-            if (dm.getDelayUpdate(name, groupName)?.delay === -2) {
-              dm.restoreDelaySnapshot(
-                name,
-                groupName,
-                previousSnapshots.get(name),
-              )
-            }
-          }
-          dm.queueGroupNotification(groupName)
-        }
-
-        // 委托后端统一执行群发测速：shouldSelect=true 时在可见子集内择优切换并清理非新目标旧连接，shouldSelect=false 时仅刷新延迟（BUG-397）
+        // 委托后端统一执行群发测速：shouldSelect=true 时在可见子集内择优切换并清理非新目标旧连接，shouldSelect=false 时仅刷新延迟
         try {
           const results = await triggerAutoSelect(
             currentUid,
@@ -412,14 +395,11 @@ export const ProxyGroups = (props: Props) => {
     },
   )
 
-  // BUG-355 / BUG-397: 绑定 F4 / F1 全局测速快捷键（F4=当前可见列表纯测速不换节点，F1=全量节点测速优选切换）
   const handleCheckFull = useStableCallback(async () => {
     const uiGroupName = renderList.find((item) => item.group?.name)?.group?.name
     if (!uiGroupName || testingGroupsRef.current[uiGroupName]) return
     updateTestingGroups((prev) => ({ ...prev, [uiGroupName]: true }))
-    const dm = getDelayManager()
-    const previousSnapshots = new Map<string, DelayUpdate | undefined>()
-    let uniqueNames: string[] = []
+    let rollbackPending: (() => void) | null = null
     try {
       await flushHeadStatePersist()
       const currentUid = (await getProfiles())?.current || ''
@@ -427,14 +407,13 @@ export const ProxyGroups = (props: Props) => {
       const allGroupNames = renderList
         .filter((e) => e.group?.name === uiGroupName && e.group?.all)
         .flatMap((e) => (e.group?.all ?? []).map((p) => p.name))
-      uniqueNames = Array.from(new Set(allGroupNames)).filter(
+      const uniqueNames = Array.from(new Set(allGroupNames)).filter(
         (name) => !!name && !isDummyNode(name),
       )
-      for (const name of uniqueNames) {
-        previousSnapshots.set(name, dm.getDelayUpdate(name, uiGroupName))
-        dm.setDelay(name, uiGroupName, -2)
-      }
-      dm.queueGroupNotification(uiGroupName)
+      rollbackPending = getDelayManager().beginBatchCheck(
+        uniqueNames,
+        uiGroupName,
+      )
       const f1Intent = resolveBatchCheckIntent('f1')
       const results = await triggerAutoSelect(
         currentUid,
@@ -444,29 +423,11 @@ export const ProxyGroups = (props: Props) => {
         f1Intent.cleanStale,
       )
       if (results.length === 0) {
-        for (const name of uniqueNames) {
-          if (dm.getDelayUpdate(name, uiGroupName)?.delay === -2) {
-            dm.restoreDelaySnapshot(
-              name,
-              uiGroupName,
-              previousSnapshots.get(name),
-            )
-          }
-        }
-        dm.queueGroupNotification(uiGroupName)
+        rollbackPending()
         showNotice.error('settings.mini.testNotExecuted')
       }
     } catch (err) {
-      for (const name of uniqueNames) {
-        if (dm.getDelayUpdate(name, uiGroupName)?.delay === -2) {
-          dm.restoreDelaySnapshot(
-            name,
-            uiGroupName,
-            previousSnapshots.get(name),
-          )
-        }
-      }
-      dm.queueGroupNotification(uiGroupName)
+      rollbackPending?.()
       const msg = String(err instanceof Error ? err.message : err)
       if (msg.includes('AUTO_SELECT_BUSY')) {
         showNotice.info('settings.mini.testingInProgress')

@@ -27,12 +27,6 @@ pub struct IProfiles {
     pub items: Option<Vec<PrfItem>>,
 }
 
-pub struct IProfilePreview<'a> {
-    pub uid: &'a String,
-    pub name: &'a String,
-    pub is_current: bool,
-}
-
 /// 清理结果
 #[derive(Debug, Clone)]
 pub struct CleanupResult {
@@ -401,24 +395,6 @@ impl IProfiles {
     /// 判断profile是否是current指向的
     pub fn is_current_profile_index(&self, index: &String) -> bool {
         self.current.as_ref() == Some(index)
-    }
-
-    /// 获取所有的profiles(uid，名称, 是否为 current)
-    pub fn profiles_preview(&self) -> Option<Vec<IProfilePreview<'_>>> {
-        self.items.as_ref().map(|items| {
-            items
-                .iter()
-                .filter_map(|e| {
-                    if let (Some(uid), Some(name)) = (e.uid.as_ref(), e.name.as_ref()) {
-                        let is_current = self.is_current_profile_index(uid);
-                        let preview = IProfilePreview { uid, name, is_current };
-                        Some(preview)
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        })
     }
 
     /// 通过 uid 获取名称

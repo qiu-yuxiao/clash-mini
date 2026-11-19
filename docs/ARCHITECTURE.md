@@ -81,7 +81,7 @@ flowchart TB
 
 | 关注点 | 关键文件 | 说明 |
 |---|---|---|
-| 页面外壳 | `src/pages/_layout.tsx` | 主布局（~2400 行，下一阶段计划拆 hooks：useProfileManagement / useCoreUpdate / useSkinControl / useImportContextMenu） |
+| 页面外壳 | `src/pages/_layout.tsx` | 主布局与设置抽屉编排（挂载首次引导、订阅管理、接管/分流/基础/外观卡片与弹窗组） |
 | 缓存中枢 | `src/providers/app-data-provider.tsx` | 拥有活跃 react-query 缓存（代理 / 配置 / 系统代理 / 运行模式等），监听 `profile-changed`、`verge://refresh-proxy-config` 等事件并失效缓存 |
 | IPC 封装 | `src/services/cmds.ts` | 每个后端 `invoke` 包 `withIpcTimeout`（如 `importProfile` / `patchVergeConfig` / `triggerAutoSelect` / `restartCore`） |
 | 内核 API 封装 | `src/services/mihomo-api.ts` | 封装 `tauri-plugin-mihomo-api` 访客函数（带超时），如 `selectNodeForGroupWithTimeout` |
@@ -94,7 +94,7 @@ flowchart TB
 
 | 模块 | 路径 | 职责 |
 |---|---|---|
-| **IPC 命令层** | `src-tauri/src/cmd/` | 全部 `#[tauri::command]`（`app.rs` `clash.rs` `core_update.rs` `diagnostics.rs` `profile.rs` `proxy.rs` `runtime.rs` `service.rs` `verge.rs` …），注册于 `lib.rs` 的 `generate_handlers!` |
+| **IPC 命令层** | `src-tauri/src/cmd/` | 全部 `#[tauri::command]`（`app.rs` `clash.rs` `core_update.rs` `diagnostics.rs` `profile.rs` `proxy.rs` `service.rs` `verge.rs` …），注册于 `lib.rs` 的 `generate_handlers!` |
 | **内核生命周期** | `src-tauri/src/core/manager/` | `CoreManager` 单例；`RunningMode`（Service / Sidecar / NotRunning）；`start_core`/`stop_core`/`restart_core`；Service vs Sidecar 决策；重启/热重载前后 `PROXY.now` 快照-恢复 |
 | **配置生成（enhance）** | `src-tauri/src/enhance/` | `enhance()` 合并所有 profile 的 proxies/merge/rules + 全局 Merge，经原生 Rust 卫兵 `apply_builtin_guards` 归一化后，由 `enforce_mini_agreements` 把 proxy-groups 改写成 `[PROXY(select), PROXY__METRICS(url-test)]` 并注入 GFWList 规则 |
 | **配置 / 状态** | `src-tauri/src/config/` | `Config` 单例（4 个 `Draft<T>` 已提交 vs 在途）；`IVerge` / `IProfiles` / `PrfItem` / `IClashTemp` |
@@ -244,8 +244,8 @@ sequenceDiagram
 
 总体结论：**架构收敛、单 `PROXY` 组 + `PROXY__METRICS` 测量解耦、连续性优先方针落地**。
 
-- ✅ 已落地的核心机制：双组解耦（`PROXY__METRICS` 与 `proxy-providers` 统一 `lazy: true` 零自治盲测）、热切换零断流（不清理存量连接，前台显式切点精准对齐新出口）、三层防污染与严格子集兜底（`pick_subset_fallback_node`）、轻量模式三态机、主线程与守护运行时物理隔离、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移（`BUG-388`）、基于 `/connections` 字节增量的被动流量证活与低噪探测减负（`BUG-379` / `BUG-399`–`BUG-403`）、24h 可恢复真 HTTPS 验真软隔离（`BUG-380` / `BUG-387`）、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截（`BUG-383` / `str::trim_start`）、Win32 原子缩放管线（`BUG-386`）、订阅删除二次确认与新手全协议导入及输入框快捷键放行（`BUG-389` / `BUG-390`）、冗余依赖与死命令清理（`BUG-391`）及精准目标化路径控制。
-- 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源。
+- ✅ 已落地的核心机制：双组解耦（`PROXY__METRICS` 与 `proxy-providers` 统一 `lazy: true` 零自治盲测）、热切换零断流（不清理存量连接，前台显式切点精准对齐新出口）、三层防污染与严格子集兜底（`pick_subset_fallback_node`）、轻量模式三态机、主线程与守护运行时物理隔离、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移、基于 `/connections` 字节增量的被动流量证活与低噪探测减负、24h 可恢复真 HTTPS 验真软隔离、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截、Win32 原子缩放管线、订阅删除二次确认与新手全协议导入、精准目标化路径控制，以及 Rust 全仓 `dead_code` 静态门禁与零重复前后协同架构。
+- 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源；历史缺陷与版本演进记录详见 [Changelog.md](../Changelog.md) 与 [bug_list.md](../bug_list.md)。
 
 ---
 

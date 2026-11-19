@@ -58,7 +58,6 @@ import {
   getProfiles,
   patchProfile,
   viewProfile,
-  triggerAutoSelect,
   beginLongOperation,
   endLongOperation,
   openWebUrl,
@@ -111,11 +110,9 @@ import { useSkinControls } from './_layout/hooks/use-skin-controls'
 import { handleNoticeMessage } from './_layout/utils'
 import {
   waitForClashReady,
-  getFilteredNodeNames,
-  hasFreshActiveExitLatency,
   triggerAutoSelectAndRefresh,
 } from './_layout/utils/profile-coordination'
-import { OS } from './_layout/utils/style-helpers'
+import { OS, buildImportant3DButtonStyle } from './_layout/utils/style-helpers'
 
 import 'dayjs/locale/ru'
 import 'dayjs/locale/zh-cn'
@@ -267,45 +264,15 @@ const Layout = () => {
   // First-run Onboarding Guide Dialog State
   const [firstRunGuideOpen, setFirstRunGuideOpen] = useState(false)
 
-  const primaryBtn3DStyle = useMemo<SxProps<Theme>>(() => {
-    const btnStyle = get3DButtonStyle(theme, 'contained', 'primary')
-    const styleWithImportant: Record<string, unknown> = {}
-    for (const [key, val] of Object.entries(btnStyle)) {
-      if (
-        ['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(
-          key,
-        )
-      ) {
-        styleWithImportant[key] = `${val} !important`
-      } else {
-        styleWithImportant[key] = val
-      }
-    }
-    if (btnStyle.background) {
-      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
-    }
-    return styleWithImportant as SxProps<Theme>
-  }, [theme])
+  const primaryBtn3DStyle = useMemo<SxProps<Theme>>(
+    () => buildImportant3DButtonStyle(theme, 'primary'),
+    [theme],
+  )
 
-  const defaultBtn3DStyle = useMemo<SxProps<Theme>>(() => {
-    const btnStyle = get3DButtonStyle(theme, 'contained', 'default')
-    const styleWithImportant: Record<string, unknown> = {}
-    for (const [key, val] of Object.entries(btnStyle)) {
-      if (
-        ['background', 'border', 'borderColor', 'boxShadow', 'color'].includes(
-          key,
-        )
-      ) {
-        styleWithImportant[key] = `${val} !important`
-      } else {
-        styleWithImportant[key] = val
-      }
-    }
-    if (btnStyle.background) {
-      styleWithImportant.backgroundColor = `${btnStyle.background} !important`
-    }
-    return styleWithImportant as SxProps<Theme>
-  }, [theme])
+  const defaultBtn3DStyle = useMemo<SxProps<Theme>>(
+    () => buildImportant3DButtonStyle(theme, 'default'),
+    [theme],
+  )
   const {
     profiles = {},
     mutateProfiles,
@@ -348,10 +315,7 @@ const Layout = () => {
     const guided = localStorage.getItem(FIRST_RUN_GUIDE_STORAGE_KEY) === 'true'
     if (guided || !profiles) return
 
-    // 【关键】不能用 items.length === 0 判断：后端 init_config 每次启动都会无条件
-    // 追加 Merge / Script 两个内置项（type 分别为 merge / script），items 恒 ≥ 2，
-    // 那样判定永远不成立、弹窗永不出现。只有「没有任何真实订阅（remote / local）」
-    // 才算首次使用。判定逻辑抽到 utils/profile-items 并有回归单测。
+    // 通过 hasRealProfileItem 判空：内置 Merge/Script 项不视为真实订阅
     if (hasRealProfileItem(profiles.items)) return
 
     const timer = setTimeout(() => {
@@ -372,13 +336,8 @@ const Layout = () => {
   const activeIndex =
     currentMode === 'tun' ? 2 : currentMode === 'system' ? 1 : 0
 
-  // Port State
   const { clashInfo } = useClashInfo()
-  // coreVersion/mutateVersion 已在前面通过 useClash() 提前获取（供 useCoreUpdate 使用）
   const { clashConfig } = useClashConfigData()
-  // 注意：handleClashBoolChange 不再主动调 refreshClashConfig()，
-  // 后端 patch_clash 末尾已 refresh_clash() 发 refresh-clash-config 事件，
-  // 前端 use-layout-events 的 250ms 防抖会合并 revalidate（见下方 handler 注释）。
 
   useEffect(() => {
     getAppVersion()
@@ -409,15 +368,9 @@ const Layout = () => {
     const waitId = showNotice.info('layout.notices.adjustingProxyMode', 0)
     markLoadingNotice(waitId)
 
-    // 标记长操作开始：patchVerge({rule_fallback}) 后端会 update_config_checked
-    // 重新生成运行时配置并 reload mihomo，期间 IPC 通道阻塞。
-    // 与 handleTakeoverModeChange 同理，需抑制 IPC timeout Notice 避免风暴卡死。
+    // 标记长操作并抑制 IPC 超时风暴，配置重生成由后端 update_config_checked 完成
     beginLongOperation()
     try {
-      // patchVerge({rule_fallback}) 后端会自动 update_config_checked：
-      // 重新生成运行时配置（读取新 rule_fallback 生成 MATCH 兜底规则）并 reload mihomo。
-      // 此处无需再调 enhanceProfiles()，否则会触发第二次冗余 reload，
-      // 叠加 react-query revalidate 可能引发 IPC 阻塞 + Notice 风暴。
       const applied = await patchVerge(
         { rule_fallback: fallback },
         { silentError: true },
@@ -426,9 +379,6 @@ const Layout = () => {
 
       await patchClashMode('rule')
       await activateSelected()
-      // 后端 patchVerge 已触发 verge://refresh-clash-config 事件，
-      // 前端 use-layout-events 中的 250ms 防抖会合并 revalidate，
-      // 此处再调 refreshClashConfig() 属冗余，已移除。
       if (fallback === 'proxy') {
         showNotice.success('layout.notices.switchedToGlobalProxy')
       } else if (fallback === 'direct') {
@@ -480,17 +430,11 @@ const Layout = () => {
     counter: -1,
   })
   const startupRetryCountRef = useRef(0)
-  // H-13: autoSelect timer ref，组件卸载时清理
-  const autoSelectTimerRef = useRef<number | null>(null)
-  // H-14: wakeup test timer ref，组件卸载时清理
-  const wakeupTestTimerRef = useRef<number | null>(null)
-  // H-15: 唤醒测速防重入互斥锁
-  const isWakeupTestingRef = useRef(false)
-  // 解决 BUG-118: handleImportProfile 与 useEffect 双链竞态
-  // 当 handleImportProfile 正在处理时，设置此标志让 useEffect 跳过自动选点
+  // 当 handleImportProfile 处理中时跳过 useEffect 自动选点，避免双链竞态
   const isImportingRef = useRef(false)
+  const lastVisibilityRefreshAtRef = useRef(0)
 
-  // 协议要求：自动选点后排序置顶（sortType: 1 = 按延迟排序）
+  // 自动选点后按延迟排序置顶（sortType: 1）
   const [, setHeadStateForSort] = useHeadStateNew()
 
   const refreshProxyRef = useRef(refreshProxy)
@@ -502,147 +446,18 @@ const Layout = () => {
   const tRef = useRef(t)
   tRef.current = t
 
-  const isStartingUpRef = useRef(true)
-  const lastFullTestTimeRef = useRef<number>(0)
-  const isMountedRef = useRef(true)
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-      if (wakeupTestTimerRef.current !== null) {
-        clearTimeout(wakeupTestTimerRef.current)
-        wakeupTestTimerRef.current = null
-      }
-    }
-  }, [])
-
-  const triggerWakeupLatencyTest = useCallback(async () => {
-    // H-15: 防重入互斥锁，快速Alt+Tab两次不会并发执行
-    if (isWakeupTestingRef.current) return
-
-    // M-33: 原子化冷却检查+设置，避免竞态条件
-    // 冷却 5 分钟：用户频繁 Alt+Tab 切换窗口时避免高频测速，
-    // 防止订阅服务器把高频测速视作攻击导致节点封锁
-    const now = Date.now()
-    if (now - lastFullTestTimeRef.current < 5 * 60 * 1000) {
-      return
-    }
-
-    if (isStartingUpRef.current) {
-      return
-    }
-
-    isWakeupTestingRef.current = true
-    lastFullTestTimeRef.current = now
-
-    try {
-      await refreshAllRef.current()
-
-      const names = await getFilteredNodeNames()
-      if (names.length === 0) {
-        isWakeupTestingRef.current = false
-        return
-      }
-      // BUG-402：若当前活跃节点已有未过期的有效延迟，切回前台仅靠 refreshAll 回显即可，零拨测跳过
-      if (await hasFreshActiveExitLatency(names)) {
-        isWakeupTestingRef.current = false
-        return
-      }
-
-      // H-14: 清理前一次的 wakeup test timer，防止泄漏
-      if (wakeupTestTimerRef.current !== null) {
-        clearTimeout(wakeupTestTimerRef.current)
-        wakeupTestTimerRef.current = null
-      }
-
-      // M2-08: 捕获当前 Profile UID，setTimeout 回调内校验
-      const capturedUid = (await getProfiles())?.current || ''
-
-      // 用 setTimeout 让出主线程给浏览器完成当前帧渲染，避免测速的 36 路并发 IPC
-      // 与 React 的 layout/paint 争抢主线程导致 UI 冻结
-      wakeupTestTimerRef.current = setTimeout(async () => {
-        wakeupTestTimerRef.current = null // setTimeout 已触发，清除ID
-        const dm = getDelayManager()
-        const previousSnapshots = new Map<
-          string,
-          ReturnType<typeof dm.getDelayUpdate>
-        >()
-        const rollbackPending = () => {
-          for (const name of names) {
-            if (dm.getDelayUpdate(name, 'PROXY')?.delay === -2) {
-              dm.restoreDelaySnapshot(
-                name,
-                'PROXY',
-                previousSnapshots.get(name),
-              )
-            }
-          }
-          dm.queueGroupNotification('PROXY')
-        }
-        try {
-          if (!isMountedRef.current) return
-
-          // M2-08: 校验 Profile 未切换，避免对旧 Profile 节点执行测速
-          const currentUid = (await getProfiles())?.current || ''
-          if (currentUid !== capturedUid || !isMountedRef.current) {
-            return
-          }
-          // 视觉占位：记录测速前缓存快照后置 `-2` 测试态（BUG-369：空/异常返回时回滚）
-          for (const name of names) {
-            previousSnapshots.set(name, dm.getDelayUpdate(name, 'PROXY'))
-            dm.setDelay(name, 'PROXY', -2)
-          }
-          dm.queueGroupNotification('PROXY')
-          // BUG-402：传入当前过滤子集 `names` 以允许复用后端 <30s 测量组快照，select=false 严禁切换用户当前节点
-          if (currentUid && isMountedRef.current) {
-            const results = await triggerAutoSelect(currentUid, names, 0, false)
-            if (results.length === 0) {
-              rollbackPending()
-            }
-          } else {
-            rollbackPending()
-          }
-          if (isMountedRef.current) {
-            await refreshAllRef.current()
-          }
-        } catch (err) {
-          console.error('[Layout] 唤醒后后台测速异常:', err)
-          rollbackPending()
-        } finally {
-          isWakeupTestingRef.current = false // H-15: 释放互斥锁
-        }
-      }, 0)
-    } catch (err) {
-      console.error('[Layout] 唤醒刷新与测速失败:', err)
-      isWakeupTestingRef.current = false // H-15: 异常时也要释放锁
-    }
-  }, [])
-
-  const triggerWakeupLatencyTestRef = useRef(triggerWakeupLatencyTest)
-  triggerWakeupLatencyTestRef.current = triggerWakeupLatencyTest
-
-  // WARNING: DO NOT remove this unified hook or replace it with ad-hoc reload chains in other methods (like handleImportProfile).
-  // The state-driven approach prevents race conditions during import/activation.
-  // The 3-attempt auto-retry block in .catch resolves startup timing issues where the core/socket is temporarily busy.
-  // Refer to BUG-171/BUG-172 agreements.
-  // Automatically enhance profile when it is loaded or switched (flatten to single PROXY group)
+  // 订阅加载/切换时自动增强（收敛为单一 PROXY 组）；轻量唤醒跳过 enhance，仅按需刷新延迟
   useEffect(() => {
     if (!currentProfileUid) return
 
-    // 通过 localStorage 跨窗口重建持久化"已 enhance 过的 uid"，避免轻量模式唤醒时误判为 profile 切换
-    // （useRef 在 React 重新挂载时会重置，无法区分"窗口重建"和"profile 切换"）
+    // 通过 localStorage 持久化已增强的 uid，防止轻量模式窗口重建误判为订阅切换
     const enhancedUid = localStorage.getItem('clash-mini-last-enhanced-uid')
     const isNewProfile = enhancedUid !== currentProfileUid
-    // 组件重新挂载时 lastProcessedRef.current.uid 为 null，
-    // 此时 isRefreshTriggered 必为 false，防止轻量模式唤醒误触发 enhance
     const isRefreshTriggered =
       lastProcessedRef.current.uid !== null &&
       lastProcessedRef.current.counter !== profileRefreshCounter
 
     if (!isNewProfile && !isRefreshTriggered) {
-      // 轻量模式唤醒场景：profile 未变，跳过 enhance（避免触发内核 force=true 重置）
-      // 仅恢复节点选择 + 自动选点刷新前端
       lastProcessedRef.current = {
         uid: currentProfileUid,
         counter: profileRefreshCounter,
@@ -658,20 +473,15 @@ const Layout = () => {
           if (cancelled || isImportingRef.current) return
           await triggerAutoSelectAndRefresh(
             refreshProxyRef.current,
-            autoSelectTimerRef,
             setHeadStateForSortRef.current,
             currentProfileUid,
             { skipProbeIfFresh: true },
           )
           startupRetryCountRef.current = 0
-          lastFullTestTimeRef.current = Date.now()
         } catch (err) {
           if (!cancelled) {
             console.error('[Layout] 唤醒后恢复节点选择失败:', err)
           }
-        } finally {
-          lastFullTestTimeRef.current = Date.now()
-          isStartingUpRef.current = false
         }
       })()
       return () => {
@@ -679,7 +489,6 @@ const Layout = () => {
       }
     }
 
-    // profile 切换 / 首次启动 / 手动刷新场景：走完整 enhance 流程
     lastProcessedRef.current = {
       uid: currentProfileUid,
       counter: profileRefreshCounter,
@@ -693,31 +502,23 @@ const Layout = () => {
           throw new Error('Profile configuration validation failed')
         }
         if (cancelled || isImportingRef.current) return
-        // enhance 成功后才写入 localStorage，防止失败时下次跳过
         localStorage.setItem('clash-mini-last-enhanced-uid', uid)
         await activateSelectedRef.current()
         if (cancelled || isImportingRef.current) return
-        // 等待 Clash 内核就绪（最多 10 秒），然后触发自动选点并刷新前端
         await waitForClashReady(tRef.current)
         if (cancelled || isImportingRef.current) return
         await triggerAutoSelectAndRefresh(
           refreshProxyRef.current,
-          autoSelectTimerRef,
           setHeadStateForSortRef.current,
           uid,
         )
-        // Success: reset retry counter
         startupRetryCountRef.current = 0
-        // WARN-002 修复：记录启动完成时间，防止首次窗口聚焦时触发冗余的二次全量刷新
-        lastFullTestTimeRef.current = Date.now()
       })
       .catch((err) => {
         if (cancelled) return
         console.error(`[Layout] Failed to enhance profile ${uid}:`, err)
-        // Reset to allow retry/reload
         lastProcessedRef.current.uid = null
 
-        // Auto-retry up to 3 times on failure/startup
         if (startupRetryCountRef.current < 3) {
           startupRetryCountRef.current += 1
           const retryDelay = 2000 * startupRetryCountRef.current
@@ -730,49 +531,24 @@ const Layout = () => {
           showNotice.error('layout.notices.profileActivationFailed')
         }
       })
-      .finally(() => {
-        // 无论 enhanceProfiles 成功、失败还是重试耗尽，都必须打开门闩，
-        // 否则唤醒测速和 TUN 自动关闭功能永久阻塞。
-        lastFullTestTimeRef.current = Date.now()
-        isStartingUpRef.current = false
-      })
     return () => {
       cancelled = true
       if (timerId) {
         clearTimeout(timerId)
       }
-      // Reset last processed to allow retry/reload on next mount/run if cancelled before completion
       lastProcessedRef.current.uid = null
     }
   }, [currentProfileUid, profileRefreshCounter])
 
-  // 组件卸载时清理自动选优及唤醒测速定时器，防止内存泄漏
-  useEffect(() => {
-    return () => {
-      // H-13: 清理 autoSelect timer
-      if (autoSelectTimerRef.current !== null) {
-        clearTimeout(autoSelectTimerRef.current)
-        autoSelectTimerRef.current = null
-      }
-      // H-14: 清理 wakeup test timer 并释放互斥锁
-      if (wakeupTestTimerRef.current !== null) {
-        clearTimeout(wakeupTestTimerRef.current)
-        wakeupTestTimerRef.current = null
-        isWakeupTestingRef.current = false
-      }
-    }
-  }, [])
-
-  // 监听窗口可见度变化，窗口从隐藏/后台恢复时触发全节点测速刷新
-  // 注意：不监听 focus 事件，因为 WebView2 在任何鼠标点击（包括标题栏拖动）时都会触发 focus，
-  // 导致每次点击都触发全节点批量测速，造成 UI 冻结
-  // 窗口尺寸变化由 AppDataProvider 统一管理并通过 SystemContext 下发，此处不再监听 resize
+  // 窗口恢复可见时仅同步前端状态展示（节点探测与自愈由后端 monitor 统一驱动）
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        triggerWakeupLatencyTestRef.current()
-      }
+      if (document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - lastVisibilityRefreshAtRef.current < 3000) return
+      lastVisibilityRefreshAtRef.current = now
+      void refreshAllRef.current()
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
@@ -801,13 +577,14 @@ const Layout = () => {
     const rawUrl = typeof inputUrl === 'string' ? inputUrl : url
     if (!rawUrl) return false
     const trimmed = rawUrl.trim()
-    if (!trimmed) return false
-    if (isImportingRef.current) return false
-    isImportingRef.current = true
-    setProfileLoading(true)
-    try {
-      await importProfile(trimmed)
-      showNotice.success('shared.feedback.notifications.importSuccess')
+    if (!trimmed || isImportingRef.current) return false
+
+    const finalizeImportedProfile = async (
+      noticeKey:
+        | 'shared.feedback.notifications.importSuccess'
+        | 'shared.feedback.notifications.importWithClashProxy',
+    ) => {
+      showNotice.success(noticeKey)
       if (!inputUrl) setUrl('')
 
       const freshConfig = await getProfiles()
@@ -816,13 +593,8 @@ const Layout = () => {
       )
       let targetUid = currentProfileUid
       if (newProfile) {
-        // 后端 import_profile 在首次导入（current 之前为空）时会自动激活并刷新内核，
-        // 这里若再调 patchProfiles 会与后端 update_config_forced 竞争验证锁导致超时。
-        // 仅在 current 未指向 newProfile 时才显式切换。
         if (freshConfig.current !== newProfile.uid) {
-          // 显式切换：patch_profiles_config 同步 update_config_forced。
-          // 仅当后端确认 enhance 成功（valid）才打标记；返回 Busy（并发持锁未增强）时
-          // 不打标记，交给 useEffect 的现有重试路径，避免谎报导致永久跳过 enhance。
+          // 仅在后端确认 enhance 成功时打标记；返回 Busy 时交由 useEffect 重试路径兜底
           const enhanced = await patchProfiles({ current: newProfile.uid })
           if (enhanced) {
             localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
@@ -832,10 +604,6 @@ const Layout = () => {
             }
           }
         } else {
-          // 首次导入且后端自动激活：update_config_forced 由 import_profile 异步 spawn，
-          // importProfile 命令（void）返回时增强未必完成/可能撞 Busy。沿用原设计依赖后端
-          // spawn 成功（避免二次 enhance 撞锁）。已知边界：若 spawn 最终 Busy 未增强，单
-          // PROXY 压平需下次切换或重启才恢复。
           localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
           lastProcessedRef.current = {
             uid: newProfile.uid,
@@ -845,17 +613,23 @@ const Layout = () => {
         targetUid = newProfile.uid
       }
 
-      // 导入与切换动作已落盘，必须在 mutateProfiles 触发 currentProfileUid 变更前释放 isImportingRef 门闩，
-      // 否则新 profile 对应的 useEffect 会在首行被 isImportingRef.current === true 误杀，跳过首次自动测速优选。
+      // 必须在 mutateProfiles 触发 currentProfileUid 变更前释放门闩，使新订阅执行首次自动选点
       isImportingRef.current = false
       await mutateProfiles()
 
-      if (targetUid) {
-        if (targetUid === currentProfileUid) {
-          lastProcessedRef.current.uid = null
-          setProfileRefreshCounter((c) => c + 1)
-        }
+      if (targetUid && targetUid === currentProfileUid) {
+        lastProcessedRef.current.uid = null
+        setProfileRefreshCounter((c) => c + 1)
       }
+    }
+
+    isImportingRef.current = true
+    setProfileLoading(true)
+    try {
+      await importProfile(trimmed)
+      await finalizeImportedProfile(
+        'shared.feedback.notifications.importSuccess',
+      )
       return true
     } catch (err) {
       console.error(
@@ -864,48 +638,9 @@ const Layout = () => {
       )
       try {
         await importProfile(trimmed, { with_proxy: false, self_proxy: true })
-        showNotice.success('shared.feedback.notifications.importWithClashProxy')
-        if (!inputUrl) setUrl('')
-
-        const freshConfig = await getProfiles()
-        const newProfile = freshConfig?.items?.find(
-          (p: IProfileItem) => p.url === trimmed,
+        await finalizeImportedProfile(
+          'shared.feedback.notifications.importWithClashProxy',
         )
-        let targetUid = currentProfileUid
-        if (newProfile) {
-          if (freshConfig.current !== newProfile.uid) {
-            // 显式切换：同主分支，仅当后端确认 enhance 成功（valid）才打标记，
-            // 返回 Busy 时交给 useEffect 重试路径，避免谎报永久跳过 enhance。
-            const enhanced = await patchProfiles({ current: newProfile.uid })
-            if (enhanced) {
-              localStorage.setItem(
-                'clash-mini-last-enhanced-uid',
-                newProfile.uid,
-              )
-              lastProcessedRef.current = {
-                uid: newProfile.uid,
-                counter: profileRefreshCounter,
-              }
-            }
-          } else {
-            // 同主分支首次导入 auto-activate 分支：依赖后端 spawn，已知 Busy 边界。
-            localStorage.setItem('clash-mini-last-enhanced-uid', newProfile.uid)
-            lastProcessedRef.current = {
-              uid: newProfile.uid,
-              counter: profileRefreshCounter,
-            }
-          }
-          targetUid = newProfile.uid
-        }
-        isImportingRef.current = false
-        await mutateProfiles()
-
-        if (targetUid) {
-          if (targetUid === currentProfileUid) {
-            lastProcessedRef.current.uid = null
-            setProfileRefreshCounter((c) => c + 1)
-          }
-        }
         return true
       } catch (retryErr) {
         showNotice.error(
@@ -923,7 +658,6 @@ const Layout = () => {
   const handleSelectProfile = useLockFn(async (uid: string) => {
     if (currentProfileUid === uid) return
     try {
-      isStartingUpRef.current = true
       startupRetryCountRef.current = 0
       // M2-10: 切换 Profile 时清理节点延迟缓存
       // 延迟缓存不清理会导致同名节点在新 Profile 中显示旧 Profile 的延迟，干扰自动选点
@@ -1064,7 +798,6 @@ const Layout = () => {
     }
   }
 
-  // Takeover actions
   const handleTakeoverModeChange = async (
     targetMode: 'manual' | 'system' | 'tun',
   ) => {
@@ -1072,74 +805,44 @@ const Layout = () => {
 
     const waitId = showNotice.info('layout.notices.adjusting', 0)
     markLoadingNotice(waitId)
-
-    // 标记长操作开始：patchVerge / restartCore 期间 mihomo reload 或内核重启
-    // 会阻塞 IPC 通道，此时所有 IPC timeout 静默（已有持久 Notice 提示用户），
-    // 避免与持久 Notice 叠加形成 Notice 风暴卡死主线程。
     beginLongOperation()
     try {
-      if (targetMode === 'manual') {
+      if (targetMode === 'tun' && !isTunModeAvailable) {
         try {
-          const applied = await patchVerge(
-            {
-              enable_system_proxy: false,
-              enable_tun_mode: false,
-            },
-            { silentError: true },
-          )
-          if (!applied) return
+          await installServiceAndRestartCore({ silentError: true })
           await mutateSystemState()
-          if (verge?.auto_close_connection) {
-            await closeAllConnectionsWithTimeout().catch(() =>
-              console.warn('[layout] closeAllConnectionsWithTimeout failed'),
-            )
-          }
-          showNotice.success('layout.notices.switchedToManualMode')
-        } catch (err) {
-          showNotice.error(err)
-        }
-      } else if (targetMode === 'system') {
-        try {
-          const applied = await patchVerge(
-            {
-              enable_system_proxy: true,
-              enable_tun_mode: false,
-            },
-            { silentError: true },
-          )
-          if (!applied) return
-          await mutateSystemState()
-          showNotice.success('layout.notices.systemProxyEnabled')
-        } catch (err) {
-          showNotice.error(err)
-        }
-      } else if (targetMode === 'tun') {
-        if (!isTunModeAvailable) {
-          try {
-            await installServiceAndRestartCore({ silentError: true })
-            await mutateSystemState()
-          } catch {
-            showNotice.error('layout.notices.tunServiceConfigFailed')
-            return
-          }
-        }
-
-        try {
-          // patchVerge 检测 enable_tun_mode 变更后自动在后端执行 RESTART_CORE 切换运行模式
-          const applied = await patchVerge(
-            {
-              enable_system_proxy: false,
-              enable_tun_mode: true,
-            },
-            { silentError: true },
-          )
-          if (!applied) return
-          await mutateSystemState()
-          showNotice.success('layout.notices.tunModeEnabled')
-        } catch (err) {
-          showNotice.error(err)
+        } catch {
+          showNotice.error('layout.notices.tunServiceConfigFailed')
+          return
         }
       }
+
+      const modeConfig = {
+        manual: {
+          patch: { enable_system_proxy: false, enable_tun_mode: false },
+          notice: 'layout.notices.switchedToManualMode' as const,
+        },
+        system: {
+          patch: { enable_system_proxy: true, enable_tun_mode: false },
+          notice: 'layout.notices.systemProxyEnabled' as const,
+        },
+        tun: {
+          patch: { enable_system_proxy: false, enable_tun_mode: true },
+          notice: 'layout.notices.tunModeEnabled' as const,
+        },
+      }[targetMode]
+
+      const applied = await patchVerge(modeConfig.patch, { silentError: true })
+      if (!applied) return
+      await mutateSystemState()
+      if (targetMode === 'manual' && verge?.auto_close_connection) {
+        await closeAllConnectionsWithTimeout().catch(() =>
+          console.warn('[layout] closeAllConnectionsWithTimeout failed'),
+        )
+      }
+      showNotice.success(modeConfig.notice)
+    } catch (err) {
+      showNotice.error(err)
     } finally {
       settleLoadingNotice(waitId)
       endLongOperation()
@@ -1448,11 +1151,7 @@ const Layout = () => {
                   width: '100%',
                   height: '100%',
                   zIndex: 100,
-                  // WARNING [FOR AI AGENTS / AUDITORS]:
-                  // This flex layout must remain as row direction and MUST NOT wrap. In narrow window
-                  // (width ≤ 285px, i.e. isMinimalWidth) the right ConnectionsPanel is NOT mounted at all
-                  // (see conditional render `{!isMinimalWidth && <ConnectionsPanel/>}`), so the squeeze-to-0px
-                  // path is never reached there. In large window the panel mounts and this row layout applies.
+                  // 仅宽窗 (>285px) 会同时挂载右侧 ConnectionsPanel，须保持不换行横排
                   display: 'flex',
                   boxSizing: 'border-box',
                   padding: '12px',
@@ -1610,10 +1309,7 @@ const Layout = () => {
                     fontSize: '11px',
                     fontWeight: 'bold',
                     fontFamily: 'var(--control-font-family)',
-                    // WARNING [FOR AI AGENTS / AUDITORS]:
-                    // The 830px max-height display:none check is the INTENDED responsive height cutoff
-                    // rule mandated by clash_mini_agreements.md. Under default 680px height, these
-                    // elements must remain hidden. DO NOT change this threshold to make them visible.
+                    // 高度 ≤ 830px 时遵循紧凑视口规范隐藏底栏语言选择
                     '@media (max-height: 830px)': {
                       display: 'none',
                     },
@@ -1671,10 +1367,7 @@ const Layout = () => {
                     alignItems: 'stretch',
                     zIndex: 200,
                     boxSizing: 'border-box',
-                    // WARNING [FOR AI AGENTS / AUDITORS]:
-                    // The 830px max-height display:none check is the INTENDED responsive height cutoff
-                    // rule mandated by clash_mini_agreements.md. Under default 680px height, these
-                    // elements must remain hidden. DO NOT change this threshold to make them visible.
+                    // 高度 ≤ 830px 时遵循紧凑视口规范隐藏底栏皮肤切换条
                     '@media (max-height: 830px)': {
                       display: 'none',
                     },
@@ -1940,7 +1633,6 @@ const Layout = () => {
           handleCoreUpgrade={handleCoreUpgrade}
           logsOpen={logsOpen}
           setLogsOpen={setLogsOpen}
-          mode={mode}
           deleteConfirmProfile={deleteConfirmProfile}
           onCancelDeleteProfile={() => setDeleteConfirmProfile(null)}
           onConfirmDeleteProfile={handleConfirmDeleteProfile}

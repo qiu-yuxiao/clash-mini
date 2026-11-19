@@ -288,10 +288,8 @@ describe('BUG-402: 窗口唤醒新鲜延迟免拨测、传参对齐与移除 10s
       all: ['日本 01', '日本 02'],
     } as Awaited<ReturnType<typeof mihomoApi.getProxyByNameWithTimeout>>)
 
-    const autoSelectTimerRef = { current: null as number | null }
     await triggerAutoSelectAndRefresh(
       vi.fn().mockResolvedValue(undefined),
-      autoSelectTimerRef,
       undefined,
       'uid-fresh-1',
       { skipProbeIfFresh: true },
@@ -333,10 +331,8 @@ describe('BUG-402: 窗口唤醒新鲜延迟免拨测、传参对齐与移除 10s
       } as Awaited<ReturnType<typeof mihomoApi.getProxyByNameWithTimeout>>)
       vi.mocked(cmds.triggerAutoSelect).mockResolvedValue([['日本 01', 62]])
 
-      const autoSelectTimerRef = { current: null as number | null }
       const p = triggerAutoSelectAndRefresh(
         vi.fn().mockResolvedValue(undefined),
-        autoSelectTimerRef,
         undefined,
         'uid-stale-1',
         { skipProbeIfFresh: true },

@@ -60,7 +60,7 @@
 | `auto_lightweight_boot` | 函数 | 直接读 `enable_silent_start` 判断自动轻量启动（§4.1） |
 | 前端 WS 通道 `/traffic` `/logs` `/connections` | WebSocket 端点 | 进入轻量模式主动熔断（§4.2） |
 | 前端 `useEffect` 挂载逻辑 | React | 退出轻量时自动重连 WS，无需手动重建（§4.2） |
-| `isStartingUpRef.current` / `trigger_auto_select(uid, 0, false)` / `verge://backend-delay-results` | 前端/事件 | 唤醒静默填充延迟缓存，不切节点（§4.4） |
+| `isStartingUpRef` / `triggerWakeupLatencyTest` | 已移除 | 前端 visibilitychange 仅静默同步 UI 缓存，探测由后端 monitor 统一驱动 |
 
 ## 五、后台监控与自愈
 

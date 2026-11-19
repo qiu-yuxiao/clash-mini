@@ -79,7 +79,6 @@ interface LayoutDialogsProps {
   // Logs View Dialog
   logsOpen: boolean
   setLogsOpen: (open: boolean) => void
-  mode: 'light' | 'dark'
 
   // Delete Profile Confirm Dialog (BUG-390)
   deleteConfirmProfile: { uid: string; name: string } | null
@@ -124,7 +123,6 @@ export const LayoutDialogs: React.FC<LayoutDialogsProps> = ({
 
   logsOpen,
   setLogsOpen,
-  mode: _mode,
 }) => {
   const theme = useTheme()
   const { t } = useTranslation()

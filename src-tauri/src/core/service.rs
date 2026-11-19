@@ -25,9 +25,7 @@ pub enum ServiceStatus {
     Ready,
     StartRequired,
     InstallRequired,
-    UninstallRequired,
     ReinstallRequired,
-    ForceReinstallRequired,
     Unavailable(String),
 }
 
@@ -282,15 +280,6 @@ fn reinstall_service() -> Result<()> {
             bail!(format!("failed to install service: {err}"))
         }
     }
-}
-
-/// 强制重装服务（UI修复按钮）
-fn force_reinstall_service() -> Result<()> {
-    logging!(info, Type::Service, "用户请求强制重装服务");
-    reinstall_service().map_err(|err| {
-        logging!(error, Type::Service, "强制重装服务失败: {}", err);
-        err
-    })
 }
 
 /// 尝试使用服务启动core
@@ -550,11 +539,6 @@ impl ServiceManager {
                 run_service_command(reinstall_service, "reinstall service").await?;
                 wait_for_service_ipc(self).await?;
             }
-            ServiceStatus::ForceReinstallRequired => {
-                logging!(info, Type::Service, "服务需要强制重装，执行强制重装流程");
-                run_service_command(force_reinstall_service, "force reinstall service").await?;
-                wait_for_service_ipc(self).await?;
-            }
             ServiceStatus::InstallRequired => match inspect_service_registration_async().await {
                 ScmServiceRegistration::InstalledAndEnabled => {
                     logging!(info, Type::Service, "服务已安装但未运行，转换为启动服务");
@@ -574,11 +558,6 @@ impl ServiceManager {
                     wait_for_service_ipc(self).await?;
                 }
             },
-            ServiceStatus::UninstallRequired => {
-                logging!(info, Type::Service, "服务需要卸载，执行卸载流程");
-                run_service_command(uninstall_service, "uninstall service").await?;
-                self.set_status(ServiceStatus::Unavailable("Service Uninstalled".into()));
-            }
             ServiceStatus::Unavailable(reason) => {
                 logging!(info, Type::Service, "服务不可用: {}，将使用Sidecar模式", reason);
                 bail!("服务不可用: {}", reason);

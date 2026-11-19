@@ -5,22 +5,8 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// 识别广告/假节点
-///
-/// 订阅源常会在节点列表里塞入伪节点（"网址"、"官网"、"剩余流量"、"过期时间"、
-/// "套餐到期"、"续费"、"购买"、"群"、"公告"、URL 形式等），
-/// 这些伪节点不能进入 PROXY 组，否则：
-/// - 内核 reload_config 时可能把 `now` 重置到列表首个伪节点
-/// - 后台监测识别为异常触发自愈 → 切回真节点 → 下次 reload 又被重置 → 死循环
-///
-/// 此函数由 monitor.rs、enhance/mod.rs、lifecycle.rs 共享，确保从配置生成、
-/// 自愈判定到节点恢复的全链路都剔除伪节点。
-///
-/// 【修正】中文关键词从 `contains` 改为「归一化后 starts_with」，避免误杀真实节点
-///（如 "HK-流量优化"、"CN2-购买入口" 等）被错误过滤导致用户可用节点丢失；
-/// 同时修复此前 `starts_with` 引入的假阴性——伪节点用括号/书名号包裹或带
-/// "节点-" 通用前缀（如 "【剩余流量】"、"（购买入口）"、"节点-购买入口"）时，
-/// 广告短语不在最开头会漏进 PROXY。归一化先剥包裹符号与通用前缀再判定。
+/// 识别广告/假节点（与前端 `src/utils/node.ts::isDummyNode` 及通用解析链路同源对齐）：
+/// URL/英文广告词匹配子串；中文广告短语先剥除包裹符号与通用前缀后再做前缀匹配，防止误杀正常节点。
 pub fn is_dummy_node(name: &str) -> bool {
     let lower = name.to_lowercase();
     // 高置信度：包含 URL scheme 或明确的英文广告词

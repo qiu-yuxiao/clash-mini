@@ -13,7 +13,7 @@ use tokio::time::{Duration, Instant, sleep};
 /// 互斥锁：同一时间只允许一个 trigger_backend_auto_select 运行
 static AUTO_SELECT_RUNNING: AtomicBool = AtomicBool::new(false);
 
-/// 后台 monitor 任务的 JoinHandle，用于退出时主动中止（运行在物理隔离的 DAEMON_RUNTIME，BUG-394）
+/// 后台 monitor 任务的 JoinHandle，运行于独立守护运行时 `DAEMON_RUNTIME`，退出时主动中止
 static MONITOR_TASK_HANDLE: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex::new(None);
 
 /// 中止后台 monitor 常驻任务
@@ -40,73 +40,50 @@ pub static PROFILE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::con
 /// 用于通知/唤醒后台监测线程（如退出轻量模式时）
 pub static MONITOR_WAKEUP_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
-/// 用于通知后台监测线程：前端刚完成手动节点切换，需第 0ms 吸收宽限期时间戳（不触发额外全组拨测，BUG-336）
+/// 用于通知后台监测线程：前端刚完成手动节点切换，第 0ms 吸收宽限期时间戳
 pub static NODE_SWITCH_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
-/// 节点延迟下限（毫秒）。小于此值的节点判定为假节点/广告节点。
-/// 此为系统核心既定设计，严禁讨论或调整。
+/// 节点延迟下限（毫秒）。低于此值视为伪造/广告延迟。
 const NODE_DELAY_MIN_MS: u32 = 30;
 
-/// 节点延迟上限（毫秒）。超过此值的节点判定为不可用（断流）。
-/// 与全局 `constants::timing::NODE_DELAY_MAX_MS` (5000ms) 同源，确保健康检测和自动选点判断标准统一。
+/// 节点延迟上限（毫秒）。超过此值即判不可用（断流），与全局 `constants::timing::NODE_DELAY_MAX_MS` 同源。
 use crate::constants::timing::NODE_DELAY_MAX_MS;
 
-/// 批量测速对 Clash 内核发起的探针超时上限。
-/// 与死节点判定阈值 NODE_DELAY_MAX_MS(5000) 统一，确保「探针超时 == 判死阈值」：
-/// 超过 5000ms 的节点一律按不可用（超时）处理，UI 显示 Error/Timeout，不再展示其真实延迟。
-/// 节点「是否可用」的判定阈值同样以 NODE_DELAY_MAX_MS(5000) 为准。
+/// 批量测速探针超时上限（ms），与判死阈值 `NODE_DELAY_MAX_MS` (5000ms) 统一。
 const NODE_TEST_TIMEOUT_MS: u32 = NODE_DELAY_MAX_MS;
 
-/// 空闲态节点健康数据新鲜度阈值（秒，BUG-399）：当活跃节点无上下行流量变化时，
-/// 保鲜窗口放宽至 900s（15 分钟），无人值守空闲期降频 80% 静默拨测，仍可捕获服务端静默死链。
+/// 空闲态节点健康数据保鲜窗口（秒）：无流量期间将静默拨测降频至 15 分钟。
 const IDLE_HEALTH_FRESH_SECS: u64 = 900;
 
-/// 被动下行流量证活下允许免除主动拨测的最大上限（秒，BUG-379 / BUG-399）：
-/// 当活跃节点近期存在真实下行回包（`delta_download > 0`）时，说明物理链路正在稳定回传数据，
-/// 无需打一轮 `PROXY__METRICS` 全组并发握手；封顶 `1800s`（30 分钟）以严格小于
-/// 前端 `HISTORY_FALLBACK_MAX_AGE_MS`（45 分钟），防止 UI 因旧 history 过期误显 Timeout。
+/// 被动下行流量证活免除主动拨测上限（秒）：近 30 分钟存在下行回包且小于前端 45 分钟容忍窗。
 const PASSIVE_TRAFFIC_MAX_SKIP_SECS: u64 = 1800;
 
-/// 单向流量停滞（有上行无下行）即时突破缓存复核的冷却时间（秒），防止纯 UDP 上行心跳流反复触发全组拨测。
+/// 单向流量停滞（有上行无下行）即时突破缓存复核的冷却时间（秒）。
 const STALL_REPROBE_COOLDOWN_SECS: u64 = 60;
 
-/// 疑似抖动窗口（秒，S4 / BUG-375）。
-/// Mihomo 对拨测失败的节点只写 `alive=false`、不追加 history，故 `history.last()`
-/// 仍是上一次成功记录。若该记录仍在本窗口内，说明节点「刚失败、之前是好的」，
-/// 只能判 `Suspect`，不得直接判 `Dead` 进入自愈链；超过窗口（长期无成功记录）才判死。
-/// 代价是真死节点的自愈最多推迟本窗口时长，由 20s 宽限 + 25s 冷却覆盖，不影响可恢复性。
+/// 疑似抖动窗口（秒）：失败时若最近成功记录仍在此窗口内则判 `Suspect`，避免瞬时抖动误判死节点。
 const SUSPECT_WINDOW_SECS: u64 = 30;
 
-/// 两次自愈**实际切换**的最小间隔（秒，S4）。
-/// 与 `self_heal_with_accounting` 的 25 秒「尝试冷却」语义不同：冷却约束「发起选点」，
-/// 本值约束「真正换节点」，避免真故障恢复期反复热切换。
+/// 两次自愈**实际切换**的最小间隔（秒），防止故障恢复期反复热切换。
 const MIN_AUTO_SWITCH_INTERVAL_SECS: u64 = 120;
 
-/// 自愈切换速率上限的滑动窗口（秒）与窗口内最大切换次数（S4）。
+/// 自愈切换速率上限的滑动窗口（秒）与窗口内最大切换次数。
 const AUTO_SWITCH_WINDOW_SECS: u64 = 600;
 const MAX_AUTO_SWITCHES_PER_WINDOW: usize = 3;
 
-/// 节点切换宽限期（秒）。
-/// 切换后测量组对新节点的缓存数据必然陈旧（可能是 300 秒自然周期前的死数据），
-/// 宽限期内的失败判定只记日志、不计入连续失败次数，避免「切到死缓存 → 误判 → 再切走」的震荡。
-/// 缩短至 20 秒，兼顾新节点状态稳定与切到不可用节点时的二次自愈时效。
+/// 节点切换宽限期（秒）：切换后此窗口内的失败仅记日志不计入连续失败次数。
 const SWITCH_GRACE_PERIOD_SECS: u64 = 20;
 
-/// 子集测速复用测量组数据的最大年龄（秒）。
-/// 前端发起子集测速时，若所求节点的测量数据均在此时间内（刚被测量组拨测过），
-/// 直接复用缓存构建结果，跳过全组拨测。
+/// 子集测速复用近期全组探测缓存的最大年龄（秒）。
 const METRICS_REUSE_MAX_AGE_SECS: u64 = 30;
 
-/// 并发拨测合并窗口（毫秒）：等待 `METRICS_PROBE_LOCK` 期间若前序全组拨测刚刚完成，
-/// 直接复用其结果，抑制并发调用触发的背靠背全组握手风暴。
+/// 并发拨测合并窗口（毫秒）：等待 `METRICS_PROBE_LOCK` 期间复用刚完成的全组结果。
 const PROBE_COALESCE_WINDOW_MS: u64 = 1500;
 
-/// 自愈复用测量组实时快照的最大年龄（秒）：
-/// 避免 `evaluate_failover` 刚完成二次确认全组拨测，数毫秒后 `self_heal_with_accounting`
-/// 又重打一轮全组拨测。
+/// 自愈阶段复用刚刚产出的全组实时快照的最大年龄（秒）。
 const SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS: u64 = 10;
 
-/// 全局测量组拨测互斥锁：串行化 `PROXY__METRICS` 全组拨测，消除多调用方并发风暴。
+/// 全局测量组拨测互斥锁：串行化 `PROXY__METRICS` 全组拨测。
 static METRICS_PROBE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Debug, Clone)]
@@ -116,12 +93,7 @@ struct MetricsProbeSnapshot {
     reported_live_to_ui: bool,
 }
 
-/// `probe_metrics_group` 的本轮拨测结论。
-///
-/// 【为什么需要这个结构】此前「备用测速地址可用 → 主测速地址失真，节点侧正常」只打印了一行日志，
-/// 没有进入健康裁决：`evaluate_failover` 仍重读 `get_proxies()` 用被内核标成 not-alive 的
-/// `alive` / `history` 判死，把一次可自恢复的测量抖动升级成「切点 + 清连接」的硬断。
-/// 这里把结论显式带回裁决层：`primary_url_distorted == true` 时本轮必须返回 `NoAction`。
+/// `probe_metrics_group` 的本轮拨测结论；`primary_url_distorted` 为真时裁决层须返回 `NoAction`。
 #[derive(Debug, Clone)]
 struct MetricsProbeOutcome {
     delays: HashMap<String, u32>,
@@ -132,55 +104,32 @@ struct MetricsProbeOutcome {
 /// 最近一次成功执行的 `probe_metrics_group` 全量实时延迟快照。
 static LAST_METRICS_PROBE: parking_lot::Mutex<Option<MetricsProbeSnapshot>> = parking_lot::Mutex::new(None);
 
-/// 「失败服务器」冷却时长（秒）。
-///
-/// 【为什么需要】2026-10-18 实测事故：订阅 61 个节点中有 **36 个挤在同一台服务器**
-/// `212.189.51.64`（仅端口不同）。该机间歇性不可达（单窗口 222 次 dial i/o timeout），
-/// 而自愈选点只看延迟、不记「哪台服务器刚坏过」，于是连续两次都选中该机上的节点
-/// （v5-日本01 → 断流 → 再选中 v5-日本01 → 又断流），把一次服务器抖动放大成
-/// 十余分钟的反复断流。
-///
-/// 【机制】活跃节点被判死时，把**它所在服务器**记入冷却表；随后选点优先避开这些
-/// 服务器上的节点（若剔除后无候选则回退全量，保证始终有节点可选）。
+/// 「失败服务器」冷却时长（秒）：活跃节点判死时记录其服务器并优先避让，无其它候选时回退全量。
 const FAILED_SERVER_COOLDOWN_SECS: u64 = 600;
 
 /// 默认主测速 URL。
 const DEFAULT_TEST_URL: &str = "https://cp.cloudflare.com/generate_204";
 
-/// 备用测速 URL（与主 URL 不同域名，均为 HTTPS）。
-///
-/// mihomo 官方警告：部分机场会劫持测试地址、且不兼容重复 HEAD 请求，使用 HTTP
-/// 测速会出现「节点全超时」的假象。主 URL 拨测整体失败时用本 URL 复核一次，
-/// 以区分「测速链路故障（测速失真）」与「节点真的不可达」，避免因测速失真
-/// 触发无意义的切节点抖动 / 误判全部节点死亡。
+/// 备用测速 URL：主 URL 整体失败时复核以区分测速链路失真与节点真断流。
 const FALLBACK_TEST_URL: &str = "https://www.gstatic.com/generate_204";
 
-/// 真 HTTPS 内容拉取验真 URL（非 `204` 地址，识别“对 generate_204 放行但真网页卡死/劫持”的假节点）
+/// 真 HTTPS 内容拉取验真 URL（非 `204`，用于识别“204 放行但网页不通”的假节点）
 const VERIFY_HTTPS_URL_PRIMARY: &str = "https://github.githubassets.com/favicons/favicon.svg";
 /// 备用真 HTTPS 内容拉取验真 URL
 const VERIFY_HTTPS_URL_FALLBACK: &str = "https://www.wikipedia.org/static/favicon/wikipedia.ico";
-/// 后台定期真 HTTPS 验真间隔（BUG-400 由 180s 放宽至 600s，且仅在存在“Alive 但未验真”可疑节点且已验真备用节点不足时触发）
+/// 后台定期真 HTTPS 验真间隔（秒）
 const HTTPS_VERIFY_INTERVAL_SECS: u64 = 600;
-/// 后台定期真 HTTPS 验真“够用即止”门限（BUG-400）：当活跃节点已验真且匹配子集内已有足够已验真 Alive 备用节点时，
-/// 跳过后台全组定期 HTTPS 验真；真正故障切换且无已验真候选时仍由“选点前置验真”兜底。
+/// 后台定期真 HTTPS 验真“够用即止”门限：活跃节点已验真且匹配子集内已有 >= 3 个已验真 Alive 备用时跳过全组探测。
 const PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS: usize = 3;
-/// 单目标探测免打备用 URL 门限（BUG-401）：当期望目标仅 1 个节点且主 URL 本轮已有 >= 3 个真实节点取得有效延迟时，
-/// 证明主测速地址与整体通路并未失真，跳过整组备用 URL 复核。
+/// 单目标探测免打备用 URL 门限：期望集仅 1 个节点且主 URL 本轮已有 >= 3 个真实节点测通时直接跳过备用复核。
 const SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS: usize = 3;
-/// 被动下行流量证活物理在线跳过 `TCP:53` 探针的最大时效（秒，BUG-403）
+/// 被动下行流量证活跳过 `TCP:53` 物理在线探针的最大时效（秒）
 const ONLINE_CHECK_FLOWING_SKIP_SECS: u64 = 60;
-/// 物理网络连通性首选单路 `223.5.5.5:53` 探测超时（毫秒，BUG-403）：超时再并发回退其余目标
+/// 物理网络连通性首选单路 `223.5.5.5:53` 探测超时（毫秒），超时后并发回退其余目标
 const PRIMARY_NET_PROBE_TIMEOUT_MS: u64 = 250;
-/// 【S5 / Sync-23】验真超时与全组测速统一为 `NODE_TEST_TIMEOUT_MS`（5000ms），不再单设 6000ms。
-/// 旧值使验真结果可能落在 `[5000, 6000)`：该区间在健康裁决里被判 `Dead`，却又由验真
-/// 写入 `history.last().time` 而显得「刚测过」，是异源测量污染判活的主要入口。
-/// 验真同样是一次 `delay_group("PROXY__METRICS", ...)`，会写入共享的 `alive` / `history`；
-/// 但其结果只进 `node.rs` 的 verify 状态机，健康裁决一律以本轮 `probe_metrics_group`
-/// 实拨结果为准，不在免拨测轮被误读成「节点已死」。
-///
-/// 活跃节点未验真时触发即时真 HTTPS 复核的冷却时间（避免每次 15s 循环重复验证）
+/// 活跃节点未验真时触发即时真 HTTPS 复核的冷却时间（秒）
 const ACTIVE_VERIFY_COOLDOWN_SECS: u64 = 60;
-/// 物理在线前提下主/备真 HTTPS 验证 URL 全灭或 0 节点通过时的全组探测退避窗口（秒）
+/// 主/备真 HTTPS 验证 URL 全灭或 0 节点通过时的全组退避窗口（秒）
 const HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS: u64 = 600;
 
 static LAST_ACTIVE_VERIFY_CHECK: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
@@ -1313,14 +1262,12 @@ pub(crate) async fn restore_profile_selected_nodes(profile_uid: &str) -> anyhow:
 }
 
 /// 单节点健康状态（由测量组维护的 history/alive 判定，TUN 下可靠）。
-/// S4 起由二值扩为三态：`Suspect` 吸收「一次拨测失败」的测量抖动，
-/// 只有 `Dead` 才构成自愈证据，避免抖动直接落到最重档。
+/// S4 起由二值扩为三态：`Suspect` 吸收单次波动，仅 `Dead` 构成自愈证据。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NodeStatus {
     /// 测量组尚未测过该节点（数据缺失），不动作、等待测量
     Unknown,
-    /// 疑似抖动：`alive=false` 但上一次成功拨测仍在 `SUSPECT_WINDOW_SECS` 内。
-    /// 不是「节点已死」，不得据此累计失败或触发自愈。
+    /// 疑似抖动：`alive=false` 但上次成功仍处于 `SUSPECT_WINDOW_SECS` 内，不累计失败或自愈
     Suspect,
     /// 节点已确认不可用（测速超时/失败/假节点，且无近期成功记录）
     Dead,
@@ -1328,15 +1275,7 @@ enum NodeStatus {
     Alive(u32),
 }
 
-/// 单节点健康三态分类（纯函数，便于单测锁定边界）。
-///
-/// - 无 history → `Unknown`（数据缺失，不误判）；
-/// - `alive` 且延迟在 `[NODE_DELAY_MIN_MS, NODE_DELAY_MAX_MS)` → `Alive`；
-/// - `!alive` 但 `history.last()` 仍是有效成功延迟且其年龄 < `SUSPECT_WINDOW_SECS` → `Suspect`；
-/// - 其余（延迟越界、`!alive` 且历史陈旧、时间戳不可解析）→ `Dead`。
-///
-/// 「时间戳不可解析」保守判 `Dead` 而非 `Suspect`：宁可让真死节点正常进入自愈，
-/// 也不能因解析失败把长期不可用的节点永久挡在自愈链之外。
+/// 单节点健康三态分类（时间戳不可解析时保守判 `Dead`，防长期坏节点卡在门外）。
 fn classify_node_status(alive: bool, last_delay: Option<u32>, age_secs: Option<u64>) -> NodeStatus {
     let Some(delay) = last_delay else {
         return NodeStatus::Unknown;
@@ -1427,12 +1366,7 @@ fn is_benign_auto_select_abort(err_str: &str) -> bool {
     matches!(err_str, "AUTO_SELECT_BUSY" | "AUTO_SELECT_MANUAL_PREEMPTED")
 }
 
-/// 后台监测所有自愈请求的统一裁决输入（S3，§5.1 / §5.3）。
-///
-/// 旧实现把「是否自愈」分散写在三个分支里：网络恢复凭一次 `evaluate_failover`
-/// 就立即切点，API 异常各自用 `>= 3` 直接触发，二者都绕过「连续 2 次失败」。
-/// 现在任何入口都必须先构造本枚举并交由 `decide_self_heal` 裁决，
-/// 只有 `SelfHealDecision::Allow` 才允许调用 `self_heal_with_accounting`。
+/// 后台监测所有自愈请求的统一裁决输入：仅 `SelfHealDecision::Allow` 允许触发自愈选点。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SelfHealTrigger {
     /// 主路径：连续独立体检确认活跃节点失效
@@ -1452,12 +1386,7 @@ enum SelfHealDecision {
     Wait,
 }
 
-/// 统一裁决器（纯函数，便于单测锁定三条入口的防抖契约）：
-/// - 节点侧故障：必须连续 `FAILOVER_CONFIRM_FAILS` 次独立体检确认；
-/// - 网络恢复：恒为 `Wait`，安静等待并交主路径重新测量，禁止立即自愈；
-/// - 内核 API 故障：属通道故障而非节点故障，适用独立门控——连续
-///   `API_ERROR_HEAL_THRESHOLD` 次异常且复核时 API 仍不可达才放行；
-///   复核时 API 已恢复则清零计数、交下一周期重新测量，避免用陈旧故障结论切点。
+/// 统一裁决器：节点侧需连续 `FAILOVER_CONFIRM_FAILS` 次失败；网络恢复恒 `Wait`；API 异常须经存活复核仍失联。
 const fn decide_self_heal(trigger: SelfHealTrigger) -> SelfHealDecision {
     match trigger {
         SelfHealTrigger::NodeConfirmedDead { consecutive_fails } => {
@@ -1611,13 +1540,8 @@ async fn sample_active_node_traffic(
     (state, stall_cooldown_active)
 }
 
-/// 判定本次体检是否必须取得一轮本轮物理实拨证据。
-///
-/// 【BUG-377 + BUG-379 + BUG-399】非 `Alive`（`Suspect` / `Dead` / `Unknown`）或时间戳缺失一律强制实拨，
-/// 杜绝异源测量污染判死链；当节点处于 `Alive` 且时间可测时，结合活跃出口真实连接流量分流：
-/// - `Flowing`（近一周期有真实下行回包）：保鲜上限放宽至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (1800s)`，消除盲测风暴；
-/// - `Stalled`（有上行无下行，疑似黑洞）：无视未过期缓存立即触发实拨复核（带 60s 单向流防抖冷却）；
-/// - `Idle`（无流量）：放宽至 `IDLE_HEALTH_FRESH_SECS (900s)`。
+/// 判定本次体检是否必须发起一轮 `PROXY__METRICS` 物理实拨：
+/// 非 `Alive` 或时间戳缺失强制实拨；`Alive` 结合活跃出口流量态分流免测（Flowing 30m / Stalled 破缓存 / Idle 15m）。
 fn should_probe_active_node(
     status: NodeStatus,
     age: Option<Duration>,
@@ -1638,13 +1562,8 @@ fn should_probe_active_node(
     }
 }
 
-/// 评估当前活跃节点是否需要故障转移。
-/// 返回 Err 表示 Mihomo API 不可达（交由调用方累计 api_error_count）。
-///
-/// 【S5 / Sync-23 · 单一权威健康源】判死只允许建立在本轮 `probe_metrics_group`
-/// 主/备 URL 实拨之上。`alive` / `history` 属共享可变状态，真 HTTPS 验真、前端测速
-/// 都会改写它，故只用于「是否要拨测」的初判、UI 显示与实拨后的结果读取；任何非
-/// `Alive` 初判都必须先实拨，且体检拨测禁用短窗合并。
+/// 评估当前活跃节点是否需要故障转移；返回 `Err` 表示 Mihomo API 不可达。
+/// 判死仅采信本轮 `probe_metrics_group` 主/备测速 URL 实拨结果，不直接用免拨测异源历史判死。
 async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
@@ -1694,12 +1613,7 @@ async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow:
     let mut primary_url_distorted = false;
 
     if need_probe {
-        // delay_group → Mihomo 内核直接拨测每个成员（TUN 下可靠），与旧 delay_proxy_by_name
-        // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
-        // 【S5】体检一律禁用短窗合并：裁决必须建立在本轮物理实拨之上，不能复用
-        // 1.5 秒内其他调用方的快照（否则重读 alive / history 读到的仍是异源结果）。
-        // 【BUG-401】第 1 次初检失败（consecutive_fails == 0）若主 URL 已有 >=3 个真实节点正常，
-        // 直接跳过第二轮备用 URL 复核；第 2 次判死确认前仍强制跑备用 URL 防失真兜底。
+        // 经测量组并发直拨全员（TUN 下无自指回环），禁用短窗合并；初检第 1 次失利支持单目标免打备用 URL
         let allow_single_target_skip = consecutive_fails == 0;
         let probed_opt = probe_metrics_group(
             &mihomo,
@@ -1710,20 +1624,14 @@ async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow:
         )
         .await;
 
-        // 【测速失真防护】主/备测速地址都整体失败 = 测速链路不可用，**不是**「节点已死」。
-        // 此时 mihomo 已把全组成员标记为 not-alive，若据此判死会触发无意义的切节点抖动。
-        // 2026-10-18 实测：机场劫持 HTTP 测速地址期间内核返回 `all proxies timeout`，
-        // app 误判「所有测速节点均不可达」，连续多轮自愈全部落空。
-        // 故本轮直接 NoAction（主循环会清零连续失败计数，不触发自愈），等下一周期重试。
+        // 主/备测速地址全灭代表测速链路本身不可用，本轮判 NoAction，避免切点抖动
         let Some(probed) = probed_opt else {
             logging!(
                 warn,
                 Type::Lightweight,
                 "[后台监测] 测速链路不可用，本轮不判定活跃节点死活（避免测速失真引发切点抖动）"
             );
-            // 【BUG-387】若当前正处于「有上行发包但零下行回包」黑洞停滞态，在不改变任何切点/失败
-            // 裁决（仍返回 NoAction）的前提下，以 `from_probe = false`（30s 短保鲜）标红活跃节点，
-            // 消除顶栏长期残留假绿延迟。
+            // 若当前存在上行请求但零下行回包，短保鲜标红活跃节点消除假绿展示
             if traffic_state == ActiveTrafficState::Stalled && !crate::module::lightweight::is_in_lightweight_mode() {
                 crate::core::handle::Handle::notify_delay_results(
                     "PROXY".into(),
@@ -1847,11 +1755,7 @@ async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow:
     let filter_text = filter_config.filter_text.trim();
     let members = group_info.all.clone().unwrap_or_default();
 
-    // 【S1 · 测速失真裁决（Sync-18）】主测速地址整体失败、备用地址成功 ⇒ 本轮结论为
-    // 「主测速地址失真，节点侧正常」。此时 mihomo 已把全组成员标成 not-alive，若继续用
-    // 重读的 alive / history 判死，就会把一次测量抖动升级成「切点 + 清连接」的硬断。
-    // 因此跳过下面整段健康裁决，返回 NoAction（主循环会清零 consecutive_fails 并复位健康态）；
-    // 上面的 UI 延迟同步与 LAST_SYNCED_ACTIVE_HISTORY_TIME 记账照常保留，不产生显示回退。
+    // 连续性优先：主 URL 整体失败而备用 URL 正常即属测速地址失真，本轮直接判 NoAction
     if primary_url_distorted {
         logging!(
             info,
@@ -1861,12 +1765,7 @@ async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow:
         return Ok(FailoverVerdict::NoAction);
     }
 
-    // 【S5 / Sync-23 · 异源测量隔离】判死只可能发生在上面的 `need_probe` 实拨轮：
-    // 实拨前任何非 `Alive` 状态都强制取得本轮主/备 URL 证据，实拨后重读的
-    // `alive` / `history` 已是同一口径结果，真 HTTPS 验真写入的越界延迟不会再
-    // 变成「节点已死」。免拨测轮只能得到 `Alive` / `Unknown`，二者均 `NoAction`。
-    // 活跃节点本身健康或数据缺失 → 若尚未通过真 HTTPS 验真：先在冷却允许时即时执行真 HTTPS 复核；
-    // 只有确属“在参照节点通过前提下曾验真失败（has_verify_failure_node）”且子集内存在已验真健康节点时，才切往已验真节点
+    // 仅由本轮主/备测速 URL 实拨结果裁决节点死活；Alive 节点仅在非 Flowing 且冷却允许时执行真 HTTPS 复核
     match proxies.proxies.get(&active_node).map(node_status) {
         Some(NodeStatus::Alive(_)) => {
             if should_allow_https_migration(traffic_state) && !crate::utils::node::is_verified_true_node(&active_node) {
@@ -2295,15 +2194,7 @@ async fn trigger_backend_auto_select_inner(
         }
     }
 
-    // 【失败服务器避让】剔除「所在服务器最近被判死」的候选节点。
-    //
-    // 起因（2026-10-18 实测）：订阅 61 个节点中 36 个挤在同一台服务器上，该机间歇性不可达
-    // （单窗口 222 次 dial i/o timeout）。若自愈只按延迟选点，会在该机节点上反复来回切换
-    // （实测连续两次选中同一节点 → 断流 → 再选中 → 再断流），把一次服务器抖动放大成
-    // 十余分钟的反复断流。此处按「服务器」而非「节点」避让，才能真正避开整台坏机器。
-    //
-    // 安全阀：仅在「剔除后仍有候选」时生效；若全部候选都在失败服务器上则放弃避让
-    // （宁可切一个可疑节点，也不能无点可选）。display 不受影响，前端展示仍是全量。
+    // 失败服务器避让：剔除所在服务器最近被判死的候选（若全数位于冷却服务器则回退全量）
     if !candidates.is_empty() {
         let failed = snapshot_failed_servers();
         if !failed.is_empty() {
@@ -2552,7 +2443,64 @@ fn emit_network_health_notice(next_status: &'static str) {
     }
 }
 
-/// 启动全局后台节点监测常驻线程（BUG-353 panic 自愈监督 + BUG-394 守护运行时物理隔离）
+/// 统一处理后台监测循环中的 API 不可达异常：累计次数、达阈值后复核存活并按裁决自愈。
+#[allow(clippy::too_many_arguments)]
+async fn handle_api_unreachable(
+    current_profile: &str,
+    log_context: &str,
+    api_error_count: &mut u32,
+    auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+    last_auto_select_time: &mut Option<Instant>,
+    last_check_time: &mut Instant,
+    recent_auto_switches: &mut Vec<Instant>,
+) {
+    *api_error_count += 1;
+    logging!(
+        warn,
+        Type::Lightweight,
+        "[后台监测] {log_context}，连续异常次数: {}",
+        *api_error_count
+    );
+    if *api_error_count < API_ERROR_HEAL_THRESHOLD {
+        return;
+    }
+
+    let api_alive_on_recheck = is_clash_api_alive().await;
+    if decide_self_heal(SelfHealTrigger::ApiUnreachable {
+        api_error_count: *api_error_count,
+        api_alive_on_recheck,
+    }) == SelfHealDecision::Allow
+    {
+        *api_error_count = 0;
+        logging!(
+            warn,
+            Type::Lightweight,
+            "[后台监测] 连续 {} 次 API 异常且复核仍不可达，触发自愈选点",
+            API_ERROR_HEAL_THRESHOLD
+        );
+        self_heal_with_accounting(
+            current_profile,
+            None,
+            SelfHealOrigin::ApiChannelDown,
+            auto_select_fail_count,
+            api_dead_heal_fail_count,
+            last_auto_select_time,
+            last_check_time,
+            recent_auto_switches,
+        )
+        .await;
+    } else {
+        *api_error_count = 0;
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] API 通道复核已恢复，跳过自愈选点，交由下一周期统一重新测量"
+        );
+    }
+}
+
+/// 启动全局后台节点监测常驻线程（运行于独立守护运行时 `DAEMON_RUNTIME`，带 panic 自愈监督）
 pub fn start_background_monitor() {
     let handle = AsyncHandler::spawn_daemon_supervised("background_monitor", Type::Lightweight, move || async move {
         reset_monitor_static_state();
@@ -2774,50 +2722,17 @@ pub fn start_background_monitor() {
                 let active_node_name = match get_active_node_name().await {
                     Some(name) => name,
                     None => {
-                        // API 不可达（内核崩了/未就绪）。累计 api_error_count，
-                        // 达到阈值后先复核 API 存活，再交统一裁决器决定是否自愈（S3）；
-                        // 复核已恢复则只清零计数，交下一周期主路径重新测量，避免陈旧故障结论切点。
-                        api_error_count += 1;
-                        logging!(
-                            warn,
-                            Type::Lightweight,
-                            "[后台监测] 读取当前节点失败 (API不可达)，连续异常次数: {}",
-                            api_error_count,
-                        );
-                        if api_error_count >= API_ERROR_HEAL_THRESHOLD {
-                            let api_alive_on_recheck = is_clash_api_alive().await;
-                            if decide_self_heal(SelfHealTrigger::ApiUnreachable {
-                                api_error_count,
-                                api_alive_on_recheck,
-                            }) == SelfHealDecision::Allow
-                            {
-                                api_error_count = 0;
-                                logging!(
-                                    warn,
-                                    Type::Lightweight,
-                                    "[后台监测] 连续 3 次 API 异常且复核仍不可达，触发自愈选点"
-                                );
-                                // 统一走冷却/计数/警报记账（与主路径、evaluate_failover Err 一致）
-                                self_heal_with_accounting(
-                                    &current_profile,
-                                    None,
-                                    SelfHealOrigin::ApiChannelDown,
-                                    &mut auto_select_fail_count,
-                                    &mut api_dead_heal_fail_count,
-                                    &mut last_auto_select_time,
-                                    &mut last_check_time,
-                                    &mut recent_auto_switches,
-                                )
-                                .await;
-                            } else {
-                                api_error_count = 0;
-                                logging!(
-                                    info,
-                                    Type::Lightweight,
-                                    "[后台监测] API 通道复核已恢复，跳过自愈选点，交由下一周期统一重新测量"
-                                );
-                            }
-                        }
+                        handle_api_unreachable(
+                            &current_profile,
+                            "读取当前节点失败 (API不可达)",
+                            &mut api_error_count,
+                            &mut auto_select_fail_count,
+                            &mut api_dead_heal_fail_count,
+                            &mut last_auto_select_time,
+                            &mut last_check_time,
+                            &mut recent_auto_switches,
+                        )
+                        .await;
                         continue;
                     }
                 };
@@ -2945,46 +2860,17 @@ pub fn start_background_monitor() {
                         }
                     }
                     Err(e) => {
-                        api_error_count += 1;
-                        logging!(
-                            warn,
-                            Type::Lightweight,
-                            "[后台监测] 节点健康检查异常 (API不可达): {e}，连续异常次数: {}",
-                            api_error_count
-                        );
-                        if api_error_count >= API_ERROR_HEAL_THRESHOLD {
-                            let api_alive_on_recheck = is_clash_api_alive().await;
-                            if decide_self_heal(SelfHealTrigger::ApiUnreachable {
-                                api_error_count,
-                                api_alive_on_recheck,
-                            }) == SelfHealDecision::Allow
-                            {
-                                api_error_count = 0;
-                                logging!(
-                                    warn,
-                                    Type::Lightweight,
-                                    "[后台监测] 连续 3 次 API 异常且复核仍不可达，触发自愈选点"
-                                );
-                                self_heal_with_accounting(
-                                    &current_profile,
-                                    None,
-                                    SelfHealOrigin::ApiChannelDown,
-                                    &mut auto_select_fail_count,
-                                    &mut api_dead_heal_fail_count,
-                                    &mut last_auto_select_time,
-                                    &mut last_check_time,
-                                    &mut recent_auto_switches,
-                                )
-                                .await;
-                            } else {
-                                api_error_count = 0;
-                                logging!(
-                                    info,
-                                    Type::Lightweight,
-                                    "[后台监测] API 通道复核已恢复，跳过自愈选点，交由下一周期统一重新测量"
-                                );
-                            }
-                        }
+                        handle_api_unreachable(
+                            &current_profile,
+                            &format!("节点健康检查异常 (API不可达): {e}"),
+                            &mut api_error_count,
+                            &mut auto_select_fail_count,
+                            &mut api_dead_heal_fail_count,
+                            &mut last_auto_select_time,
+                            &mut last_check_time,
+                            &mut recent_auto_switches,
+                        )
+                        .await;
                     }
                 }
             }

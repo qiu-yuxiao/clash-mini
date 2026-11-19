@@ -50,29 +50,23 @@ const WINDOW_IDLE_THRESHOLD_MS: u64 = 3000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WindowOpType {
     Show,
-    Hide,
     Toggle,
-    Destroy,
 }
 
 impl WindowOpType {
     const fn as_index(self) -> usize {
         match self {
             Self::Show => 0,
-            Self::Hide => 1,
-            Self::Toggle => 2,
-            Self::Destroy => 3,
+            Self::Toggle => 1,
         }
     }
 }
 
 /// 按操作类型分开的上次操作时间戳数组
 /// 索引对应 WindowOpType 的 as_index()
-static LAST_WINDOW_OP_MS: [AtomicU64; 4] = [
+static LAST_WINDOW_OP_MS: [AtomicU64; 2] = [
     AtomicU64::new(0), // Show
-    AtomicU64::new(0), // Hide
     AtomicU64::new(0), // Toggle
-    AtomicU64::new(0), // Destroy
 ];
 
 /// 自适应防抖检查（按操作类型分开）：
@@ -513,16 +507,7 @@ impl WindowManager {
         }
     }
 
-    /// 激活窗口（取消最小化、显示、设置焦点）
-    ///
-    /// 【根因修复】此前用 `std::sync::mpsc::channel` + `rx.recv()` 同步阻塞等待主线程响应，
-    /// 在 async 上下文中会占住 tokio worker 线程；一旦多个 async 任务同时调用
-    /// （托盘点击、单例唤醒、轻量模式退出等多路径），会耗尽 tokio worker（默认 = CPU 核心数），
-    /// 导致整个 runtime 停止调度，引发心跳探针超时、IPC 无响应、UI 卡死等连锁反应。
-    ///
-    /// 现改用 `tokio::sync::oneshot` + `rx.await` 真异步等待，让出 tokio worker 线程；
-    /// 并加 5 秒超时保护，防止主线程被 Windows 模态循环（如原生 resize loop / COM 调用）
-    /// 长时间占用导致永久阻塞。与 `destroy_main_window` 的实现模式保持一致。
+    /// 激活窗口（取消最小化、显示并聚焦）；使用 `oneshot` 异步等待主线程与 5s 超时防阻塞。
     async fn activate_window(window: &WebviewWindow<Wry>) -> WindowOperationResult {
         logging!(info, Type::Window, "开始激活窗口");
 

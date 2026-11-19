@@ -8,14 +8,7 @@ use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
 use tauri_plugin_mihomo::Mihomo;
 
-/// 内置出站（非真实代理节点）。
-///
-/// `PROXY` 组只有在「一个真实节点都没有」的冷启动窗口里才会用 `DIRECT` 临时兜底
-/// （见 `enhance::enforce_mini_agreements` 的空组兜底分支）。此时 `group.now` 会等于
-/// `DIRECT`，若照抄进快照、再在真实节点加载后还原，必然得到
-/// `Selector update error: proxy not exist` —— v3.0.0 现场日志实证：
-/// `WARN 恢复 PROXY 组节点选择失败 (DIRECT): ... proxy not exist`。
-/// 这类名字不属于「用户的选择」，快照与还原都应跳过，交给正常的自动选点流程。
+/// 内置出站（非真实代理节点）；快照与持久化恢复均跳过它们。
 fn is_builtin_outbound(name: &str) -> bool {
     matches!(name, "DIRECT" | "REJECT" | "REJECT-DROP" | "PASS" | "COMPATIBLE")
 }
@@ -78,10 +71,7 @@ impl CoreManager {
     async fn stop_core_inner(&self) -> Result<()> {
         CLASH_LOGGER.clear_logs().await;
 
-        // WARNING: DO NOT remove or bypass clearing the IPC connection pool here!
-        // When Clash core restarts, previous connection streams become stale and dead.
-        // Failing to clear the pool will result in backend connection errors and speed test failures.
-        // Refer to BUG-171/BUG-172 agreements.
+        // 必须清空 IPC 连接池：内核重启后旧命名管道连接句柄已失效
         match tauri_plugin_mihomo::IpcConnectionPool::global() {
             Ok(pool) => {
                 pool.clear_pool();
@@ -106,20 +96,13 @@ impl CoreManager {
     }
 
     pub async fn restart_core(&self) -> Result<()> {
-        // 【锁外等服务，与 start_core 同源】restart 路径此前不经过
-        // await_service_ready_if_needed，TUN 开启时 prepare_startup_mode 只能读到
-        // SERVICE_MANAGER 的缓存状态——若缓存陈旧（如安装命令超时后停在 Unavailable，
-        // 而服务实际随后已就绪），内核会被静默降级成 Sidecar，TUN 完全不生效
-        // 且没有任何提示（BUG-298 现场：TUN 开关显示成功但流量不被接管）。
+        // 锁外等待系统服务就绪（与 start_core 同源），防止 TUN 模式下读取陈旧服务状态
         self.await_service_ready_if_needed().await;
 
         let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
 
-        // 【核心架构约定】Mini 只有 PROXY 一个有效代理组。
-        // 内核重启会重置 Selector 组的 now 字段为列表第一个节点（通常是广告假节点）。
-        // 这里在 stop 之前保存 PROXY 组的 now，若内核已卡死导致快照返回 None，则回退读取
-        // 本地 profiles.yaml 中持久化的上次有效选点（过滤伪节点后），防止掉回列表首项（BUG-335）。
+        // 重启前快照单一 PROXY 组当前节点，读取失败时回退至本地持久化选点（过滤假节点）
         let saved_proxy_now = match self.snapshot_proxy_group_now().await {
             Some(node) => Some(node),
             None => Self::read_persisted_proxy_selection().await,
@@ -128,14 +111,11 @@ impl CoreManager {
         self.stop_core_inner().await?;
         self.start_core_inner().await?;
 
-        // 恢复 PROXY 组的节点选择（等内核就绪后）
         if let Some(node) = saved_proxy_now {
             self.restore_proxy_group_now(&node).await;
         }
 
-        // 【强咬合防线】重启完成后通知前端拉取最新配置和活跃节点
         Handle::refresh_clash();
-        // 【BUG-369】内核重启（含崩溃自动重启）后立即唤醒后台监测，尽快完成新一轮体检并推送延迟
         crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
 
         Ok(())
@@ -280,14 +260,8 @@ impl CoreManager {
             "检测到系统服务未就绪，执行配置回退（persist_to_disk={}）：关闭 TUN 模式，开启系统代理",
             persist_to_disk
         );
-        // 【禁止走 feat::patch_verge】enable_tun_mode 变更会联动 RESTART_CORE 分支，
-        // 与本函数的调用方（start_core / restart_core 的锁外前奏）构成 async fn
-        // 静态递归（E0733），运行期还会经 VERGE_PATCH_LOCK 互相等待造成死锁。
-        // 这里更新内存态并应用系统代理：随后的启动/重启流程读到 enable_tun_mode=false
-        // 自行走 Sidecar，系统代理由 update_sysproxy 立即接管；
-        // 当服务其实已正常安装启用、仅因冷启动 SCM 响应慢超时（persist_to_disk=false）时，
-        // 通过 IVerge::enter_temp_tun_fallback 锁定磁盘原始 TUN/代理快照，保证即使当次会话后续修改
-        // 任意其它设置触发 save_file()，磁盘 verge.yaml 仍保留用户的 TUN 配置并在下次启动重试（BUG-328）。
+        // 不经 feat::patch_verge_with_resets（避免与 start/restart 锁外等待构成递归死锁）；
+        // 会话级瞬时超时回退不写盘以保留用户原始 TUN 意图，并手动发 Handle::refresh_verge 同步 UI。
         {
             let verge = Config::verge().await;
             if persist_to_disk {
@@ -312,21 +286,10 @@ impl CoreManager {
             logging!(error, Type::Service, "回退应用系统代理失败: {}", e);
         }
         crate::core::sysopt::Sysopt::global().refresh_guard().await;
-        // 【必须通知前端】配置是被后端「背着前端」改掉的（绕过了 patch_verge），
-        // 而 verge://refresh-verge-config 这个事件原本由 patch_verge 的
-        // process_terminated_flags 发出，此路径不补发的话前端 TUN / 系统代理开关
-        // 会一直停在旧状态（显示「TUN 开、代理关」，实际正好相反）。
-        // 这属于 BUG-298 那类「界面与现实不一致」问题的镜像，不能只靠 warning 提示兜住。
         Handle::refresh_verge();
     }
 
-    /// 快照当前 PROXY 组的 now 字段（用于内核重启后恢复）
-    /// 【核心架构约定】Mini 只有 PROXY 一个有效代理组，所以只快照 PROXY 组。
-    /// 返回 None 表示无需恢复（读取失败、now 为空、或应用退出中）。
-    ///
-    /// 可见性说明：原本为 `pub(super)` 仅供 manager 子模块内部使用；
-    /// v2.6.5 隐患 B 修复后 `core_updater.rs`（不在 manager 子模块下）的内核升级路径
-    /// 也需要调用 snapshot/restore 来保护 PROXY.now，故提升为 `pub`。
+    /// 快照当前 PROXY 组的选中节点（用于重启/升级内核后恢复）
     pub async fn snapshot_proxy_group_now(&self) -> Option<std::string::String> {
         if Handle::global().is_exiting() {
             return None;

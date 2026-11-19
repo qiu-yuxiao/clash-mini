@@ -12,21 +12,12 @@ const LIGHT_BACKGROUND_COLOR: Color = Color(245, 245, 245, 255);
 const DARK_BACKGROUND_HEX: &str = "#2E303D";
 const LIGHT_BACKGROUND_HEX: &str = "#F5F5F5";
 
-// 极简窗口默认宽度（内容/客户区口径）。
-// 【为什么是 271】旧版本窗口带无框阴影，客户区比窗口外框窄 22 物理像素（150% DPI 下），
-// 即外框 285 时内容实际只有 270.67 CSS px。关闭阴影后 outer == inner，若继续用 285
-// 会让窄窗内容凭空变宽约 14px、既有窄窗排版变松。为保持既有视觉密度，取 271（285−14）。
+// 极简窗口几何尺寸边界（客户区逻辑像素，须与前端 src/constants.ts 一致）
 pub const DEFAULT_WIDTH: f64 = 271.0;
 pub const DEFAULT_HEIGHT: f64 = 680.0;
 pub const MAX_WIDTH: f64 = 640.0;
 pub const MAX_HEIGHT: f64 = 860.0;
-// 极简窗口最小尺寸；必须与前端 src/constants.ts 的 MIN_WINDOW_WIDTH 保持一致
-// （注意：不是排版断点 MINI_WIDTH_THRESHOLD=285，断点只属于前端布局层）
 pub const MINIMAL_WIDTH: f64 = 271.0;
-// 极简窗口最小高度；对应前端 MIN_WINDOW_HEIGHT（与极小窗口判定门槛 126 同值）。
-// 旧值 135 是带系统阴影时代的余量，关闭阴影（shadow(false)）后按 −14 对称修正到 121
-// （BUG-300）；3.0.5 再 +5 到 126，使 150% 档物理落点（126×1.5=189）恰为整数，
-// 消除极窄判定的取整歧义（BUG-301 时期一并调整）
 pub const MINIMAL_HEIGHT: f64 = 126.0;
 const DEFAULT_DECORATIONS: bool = false;
 
@@ -123,14 +114,7 @@ pub async fn build_new_window() -> Result<WebviewWindow, String> {
 
     let mut builder = tauri::WebviewWindowBuilder::new(app_handle, "main", tauri::WebviewUrl::App(start_page.into()))
         .decorations(DEFAULT_DECORATIONS)
-        // 【几何口径铁律】必须关闭无框阴影（默认是开启的）。
-        // 开启时 tao 会置 MARKER_UNDECORATED_SHADOW，其 WM_NCCALCSIZE 给客户区加不可见内缩
-        // （实测 150% DPI：左右各 11、上 2 下 11 物理像素），于是「窗口外尺寸」≠「客户区内尺寸」。
-        // 而前端缩放拖拽以位置为基准、以 setSize（Tauri 语义 = 内尺寸）落地，两套口径差一个内缩量，
-        // 会导致拖拽每帧都被放大一圈（最小宽度下表现为「点一下左键窗口就跳宽 22×13 物理像素」）。
-        // 关掉阴影后内缩归零，outer == inner，全工程（后端 min/max_inner_size、前端 MIN/MAX 常量、
-        // window_state.json 持久化）统一按内尺寸口径，不再需要到处补偿内缩量。
-        // 代价：失去系统投影与 Win11 圆角/1px 描边 —— 本程序外框自绘（皮肤背景），可接受。
+        // 必须关闭无框阴影（shadow(false)）以保持 outer == inner，使内外尺寸口径与最小尺寸声明一致
         .shadow(false)
         .fullscreen(false)
         .inner_size(win_w, win_h)
@@ -275,20 +259,7 @@ fn window_hwnd(window: &WebviewWindow) -> Option<windows::Win32::Foundation::HWN
     }
 }
 
-/// 剥掉窗口的 WS_CAPTION 样式位（保留 WS_THICKFRAME）。
-///
-/// 背景：Tauri 在 Windows 上创建 `decorations(false)` 窗口时，底层 tao 只设置
-/// `MARKER_DECORATIONS` 标记，并未从 GWL_STYLE 中清除 `WS_CAPTION`。窗口初次创建时，
-/// tao 的 WM_NCCALCSIZE 子类化尚未安装，Windows 会按 style 自动补上标题栏，
-/// 导致 outer 尺寸比 `inner_size` 设定的 logical 值多出约 15-22px。
-///
-/// 此处主动清掉 WS_CAPTION 并用 SWP_FRAMECHANGE 触发一次重算，让窗口立即变成真正无边框。
-///
-/// 关键：保留 WS_THICKFRAME。WS_THICKFRAME 是 `startResizeDragging` 生效的前提，
-/// 移除它会导致窗口彻底无法调整尺寸。可见边框由 tao 的 WM_NCCALCSIZE 子类化消除
-/// —— 前提是 `decorations=false` **且** `shadow=false`（见 build_new_window 的几何口径铁律），
-/// 此时 tao 不加任何 insets，客户区等于窗口矩形；若重新开启 shadow，客户区会被内缩
-/// 11 物理像素/边，本项目所有「内尺寸 == 外尺寸」的假设将全部失效。
+/// 清除 `WS_CAPTION`（保留 `WS_THICKFRAME` 以支持无框拖拽缩放），确保 Win32 无边框效果立即生效。
 fn strip_caption_style_hwnd(hwnd: windows::Win32::Foundation::HWND) {
     use windows::Win32::UI::WindowsAndMessaging::{
         GWL_STYLE, GetWindowLongPtrW, HWND_TOP, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER,
@@ -322,17 +293,7 @@ fn strip_caption_style_hwnd(hwnd: windows::Win32::Foundation::HWND) {
     }
 }
 
-/// 直接用 Win32 API 设置窗口 outer 尺寸，绕过 tao 的 set_inner_size 计算。
-///
-/// tao 的 set_inner_size 在计算 outer size 时会用到窗口创建时缓存的 style
-/// （仍含 WS_CAPTION | WS_THICKFRAME），即使已清除 GWL_STYLE，tao 仍会按
-/// 有边框算出 outer = inner + 边框 = 271 + 15 = 286，导致 set_size 无效。
-/// 直接用 SetWindowPos 设置 outer 尺寸，再由 tao 的 WM_NCCALCSIZE 处理
-/// （`decorations=false` + `shadow=false` 时返回 0 insets）让 client = outer = 271。
-///
-/// 【口径说明】因为本项目已通过 `shadow(false)` 让 outer == inner，本函数虽然设的是 outer，
-/// 效果与「设内尺寸」完全等价，也因此不会与 `min_inner_size` 冲突
-/// （此前开启阴影时 outer=285 实际只有 inner≈271，使声明的最小宽度形同虚设）。
+/// 直接通过 Win32 `SetWindowPos` 按逻辑尺寸和 DPI 设置窗口位置矩形（在 `shadow(false)` 下 outer == inner）。
 fn force_set_window_outer_size_hwnd(hwnd: windows::Win32::Foundation::HWND, width: f64, height: f64) {
     use windows::Win32::UI::HiDpi::GetDpiForWindow;
     use windows::Win32::UI::WindowsAndMessaging::{
