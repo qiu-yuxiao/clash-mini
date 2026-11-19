@@ -1,11 +1,11 @@
 {
-  "version": "3.5.5",
-  "notes": "### 🛡️ 轻量模式防误杀指南直链 `.txt` 文档并补齐 360 双引擎 3 文件白名单（BUG-398）\n\n- **补齐 360 高内存/智能加速二次清理白名单**：经对 360 性能引擎（`360perfoptm2.dll`）实证分析，除监控关窗残留的机制一（`DoOptmGroupResidual` → `netmon\\whiteinternal.ini`）外，高内存占用或智能加速/游戏模式触发的机制二（`FastOptm` / `DoOptm` / `FastOptmForGameMode`）即使在主窗口开启时也会强行清理进程，且仅读取同目录 `netmon\\useroptm2.ini` 与 `netmon\\useroptm_game2.ini` 中的 `check=0` 标记。指南现已完整覆盖在 Windows 安全模式下一次配齐上述全部 **3 个底层 `.ini` 白名单文件**（`[clash-mini.exe]`、`[clash mini_0]`、`[mini-mihomo.exe]`）的根治步骤。\n- **帮助菜单直开随包 `轻量模式防误杀指南.txt`（移除自绘二级弹窗）**：将完整指南随安装包/便携包同步释放至程序同级目录（`轻量模式防误杀指南.txt`）；点击顶栏 `?` 帮助菜单中的「🛡️ 轻量模式防误杀指南」时不再弹出应用内二级对话框，而是直接调用系统默认文本查看器打开该 `.txt` 文档，既精简前端体积又方便重启前保存对照。\n\n---",
-  "pub_date": "2026-11-18T21:28:59.148Z",
+  "version": "3.5.6",
+  "notes": "Clash Mini v3.5.6",
+  "pub_date": "2026-11-19T09:57:08Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUdLQk4rdkFpQVVmK0czbmp3aFg2NGZlVHhUZjA1ZXdidFkxWHI0TmN2QTdlcUtvUE1qRXhNeGxxWEhFMmFiQ29kUXFRVXBmdko4R2IvcG54V2g0ZmdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDM3MjU2CWZpbGU6Q2xhc2ggTWluaV8zLjUuNV94NjQtc2V0dXAuZXhlCjB4Nzg1ZDZPOEpZUmFydGd4d1hjbGRiTHFSVnQ0L3JCU29IclEwb012UUJPOTZWd0N2WGtiUHVKamFra3JMYjdnTC83azZFV3RoZWxSUGl0R29mQ0F3PT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.5/Clash.Mini_3.5.5_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.6/Clash.Mini_3.5.6_x64-setup.exe",
       "size": 30206642
     }
   }
