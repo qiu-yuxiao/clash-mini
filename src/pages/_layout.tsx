@@ -112,6 +112,7 @@ import { handleNoticeMessage } from './_layout/utils'
 import {
   waitForClashReady,
   getFilteredNodeNames,
+  hasFreshActiveExitLatency,
   triggerAutoSelectAndRefresh,
 } from './_layout/utils/profile-coordination'
 import { OS } from './_layout/utils/style-helpers'
@@ -479,7 +480,6 @@ const Layout = () => {
     counter: -1,
   })
   const startupRetryCountRef = useRef(0)
-  const fallbackTimerRef = useRef<number | null>(null)
   // H-13: autoSelect timer ref，组件卸载时清理
   const autoSelectTimerRef = useRef<number | null>(null)
   // H-14: wakeup test timer ref，组件卸载时清理
@@ -544,6 +544,11 @@ const Layout = () => {
         isWakeupTestingRef.current = false
         return
       }
+      // BUG-402：若当前活跃节点已有未过期的有效延迟，切回前台仅靠 refreshAll 回显即可，零拨测跳过
+      if (await hasFreshActiveExitLatency(names)) {
+        isWakeupTestingRef.current = false
+        return
+      }
 
       // H-14: 清理前一次的 wakeup test timer，防止泄漏
       if (wakeupTestTimerRef.current !== null) {
@@ -589,14 +594,9 @@ const Layout = () => {
             dm.setDelay(name, 'PROXY', -2)
           }
           dm.queueGroupNotification('PROXY')
-          // 委托后端静默测速填充缓存（不传子集=全量测速）；select=false 严禁切换用户当前节点
+          // BUG-402：传入当前过滤子集 `names` 以允许复用后端 <30s 测量组快照，select=false 严禁切换用户当前节点
           if (currentUid && isMountedRef.current) {
-            const results = await triggerAutoSelect(
-              currentUid,
-              undefined,
-              0,
-              false,
-            )
+            const results = await triggerAutoSelect(currentUid, names, 0, false)
             if (results.length === 0) {
               rollbackPending()
             }
@@ -658,10 +658,10 @@ const Layout = () => {
           if (cancelled || isImportingRef.current) return
           await triggerAutoSelectAndRefresh(
             refreshProxyRef.current,
-            fallbackTimerRef,
             autoSelectTimerRef,
             setHeadStateForSortRef.current,
             currentProfileUid,
+            { skipProbeIfFresh: true },
           )
           startupRetryCountRef.current = 0
           lastFullTestTimeRef.current = Date.now()
@@ -702,7 +702,6 @@ const Layout = () => {
         if (cancelled || isImportingRef.current) return
         await triggerAutoSelectAndRefresh(
           refreshProxyRef.current,
-          fallbackTimerRef,
           autoSelectTimerRef,
           setHeadStateForSortRef.current,
           uid,
@@ -747,13 +746,9 @@ const Layout = () => {
     }
   }, [currentProfileUid, profileRefreshCounter])
 
-  // 组件卸载时清理 Fallback、自动选优及唤醒测速定时器，防止内存泄漏
+  // 组件卸载时清理自动选优及唤醒测速定时器，防止内存泄漏
   useEffect(() => {
     return () => {
-      if (fallbackTimerRef.current) {
-        clearTimeout(fallbackTimerRef.current)
-        fallbackTimerRef.current = null
-      }
       // H-13: 清理 autoSelect timer
       if (autoSelectTimerRef.current !== null) {
         clearTimeout(autoSelectTimerRef.current)

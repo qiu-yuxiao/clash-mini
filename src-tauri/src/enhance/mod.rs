@@ -1218,6 +1218,21 @@ fn extract_upstream_host(raw: &str) -> Option<std::string::String> {
 // `sanitize_dns_upstreams` → `inject_dns_proxy_rules` 单一路径生成，
 // 覆盖 fallback + nameserver + nameserver-policy 三域，不再有第二注入点。
 
+/// 收敛所有远端 `proxy-providers.*.health-check` 为 `lazy: true`（BUG-399），
+/// 防止未使用的订阅提供方各自按 `interval: 60` / `lazy: false` 在后台无休止自治轮询。
+fn enforce_lazy_provider_health_checks(config: &mut Mapping) {
+    let Some(Value::Mapping(providers)) = config.get_mut("proxy-providers") else {
+        return;
+    };
+    for (_, provider_val) in providers.iter_mut() {
+        if let Some(provider_map) = provider_val.as_mapping_mut()
+            && let Some(Value::Mapping(hc)) = provider_map.get_mut("health-check")
+        {
+            hc.insert(Value::from("lazy"), Value::from(true));
+        }
+    }
+}
+
 async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     // 1. Extract all raw proxies from `proxies` sequence
     //    先收集全部有效 server 的原始条目再做拓扑分组：既拦截单条广告/结构横幅，
@@ -1294,7 +1309,9 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     }
     let proxy_names: Vec<Value> = topology.names.into_iter().map(Value::from).collect();
 
-    // 2. Extract all proxy-provider names from `proxy-providers` mapping
+    // 2. Normalize all upstream proxy-provider health checks to lazy: true (BUG-399),
+    //    then extract provider names from `proxy-providers` mapping
+    enforce_lazy_provider_health_checks(&mut config);
     let mut provider_names = Vec::new();
     if let Some(Value::Mapping(providers)) = config.get("proxy-providers") {
         for (k, _) in providers {
@@ -1324,9 +1341,10 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     }
 
     // 3b. Construct the measurement group "PROXY__METRICS" with type "url-test", same membership.
-    //     Mihomo 内核按 interval 周期性直接拨测每个成员，维护其 history/alive（TUN 下可靠）。
-    //     这是节点延迟的唯一权威来源；app 不再用 delay_proxy_by_name 自测活跃节点
-    //     （旧设计在 TUN 下对活跃节点自测会回环返回 timeout，是断流+全 timeout 的根因）。
+    //     设为 `lazy: true`（BUG-399）：由于没有任何流量规则经由 PROXY__METRICS，内核自身 Go 定时器
+    //     在静默空闲期实现 0 自治盲测（不与 Rust METRICS_PROBE_LOCK 撞车）；同时 Rust 端经
+    //     `delay_group("PROXY__METRICS", ...)` 发起的按需拨测不受 `lazy` 限制、照常由内核并发直拨
+    //     所有成员并写入 history/alive，作为全链路唯一延迟权威源并消除 TUN 自指回环。
     let test_url = Config::verge()
         .await
         .latest_arc()
@@ -1348,8 +1366,8 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         metrics_group.insert(Value::from("proxies"), Value::from(vec![Value::from("DIRECT")]));
     }
     metrics_group.insert(Value::from("url"), Value::from(test_url));
-    metrics_group.insert(Value::from("interval"), Value::from(300));
-    metrics_group.insert(Value::from("lazy"), Value::from(false));
+    metrics_group.insert(Value::from("interval"), Value::from(1800));
+    metrics_group.insert(Value::from("lazy"), Value::from(true));
 
     // Replace the entire proxy-groups sequence with [PROXY (control), PROXY__METRICS (measurement)]
     config.insert(
@@ -1660,6 +1678,11 @@ proxy-providers:
     type: http
     url: https://example.com
     path: ./providerA.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 60
+      lazy: false
 proxy-groups:
   - name: "Group-A"
     type: select
@@ -1708,8 +1731,19 @@ append-rules:
             .unwrap();
         assert_eq!(metrics_group.get("type").unwrap().as_str(), Some("url-test"));
         assert!(metrics_group.get("url").is_some());
-        assert!(metrics_group.get("interval").is_some());
-        assert_eq!(metrics_group.get("lazy").unwrap().as_bool(), Some(false));
+        assert_eq!(metrics_group.get("interval").unwrap().as_u64(), Some(1800));
+        assert_eq!(metrics_group.get("lazy").unwrap().as_bool(), Some(true));
+
+        let provider_hc_lazy = config
+            .get("proxy-providers")
+            .and_then(Value::as_mapping)
+            .and_then(|m| m.get("providerA"))
+            .and_then(Value::as_mapping)
+            .and_then(|m| m.get("health-check"))
+            .and_then(Value::as_mapping)
+            .and_then(|m| m.get("lazy"))
+            .and_then(Value::as_bool);
+        assert_eq!(provider_hc_lazy, Some(true));
 
         let group_proxies = proxy_group.get("proxies").and_then(Value::as_sequence).unwrap();
         assert_eq!(group_proxies.len(), 2);

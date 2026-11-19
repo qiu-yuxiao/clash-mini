@@ -139,13 +139,8 @@ pub async fn entry_lightweight_mode() -> bool {
     // 💡 说明：进入轻量模式时【不再】激进清空所有网络连接 (GC)。
     //    按用户要求，轻量模式不等于关闭程序——正在下载的链接不能被切断重连，
     //    故仅保留下方资源回收动作，不影响用户实际代理流量。
-    // 【方案A】不再 spawn 独立任务调 wait_for_clash_ready + trigger_backend_auto_select，
-    // 改为唤醒监测线程由其统一执行。消除开机自启时轻量模式 spawn 与监测线程首次运行
-    // 并发 wait_for_clash_ready，避免两路同时轮询 mihomo API 叠加 TUN 测速卡住
-    // 命名管道通道导致的 API 不可达死循环。
-    // 监测线程首次运行（窗口不存在时）会执行 restore_profile_selected_nodes + auto_select；
-    // 手动切换轻量模式时被唤醒后走定期体检路径（探活+自愈），足够覆盖。
-    crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
+    // 【BUG-402】关窗进轻量模式与代理健康无关，不再回拨监测计时器或额外唤醒体检；
+    // 后台守护线程维持恒定 15s 巡检节奏（冷启动无窗态则由 monitor::is_first_run 独立初始化）。
 
     true
 }

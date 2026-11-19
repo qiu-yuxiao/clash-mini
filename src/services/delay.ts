@@ -17,13 +17,14 @@ const CACHE_TTL = 30 * 60 * 1000
 export const REUSED_METRICS_MAX_TTL_MS = 30 * 1000
 
 /**
- * history 回落的最大容忍时长。
+ * history 回落的最大容忍时长（BUG-399）。
  *
- * 内核测量组的 `interval` 为 300s（`PROXY__METRICS`，见 enhance/mod.rs），
- * 取 2 个周期即 10 分钟：再旧的 history 记录已不代表「当前延迟」，不得冒充展示。
- * 下限必须大于 300s，否则会把「健康但本轮尚未拨测」的节点误判成 Timeout。
+ * 后端已为 `PROXY__METRICS` 开启 `lazy: true`，并将 `Flowing` 被动流量证活免测上限放宽至
+ * `PASSIVE_TRAFFIC_MAX_SKIP_SECS (1800s / 30min)`、`Idle` 空闲放宽至
+ * `IDLE_HEALTH_FRESH_SECS (900s / 15min)`；前端容忍窗设为 45 分钟（2700s > 1800s），
+ * 防止正处于被动证活期且持续健康传输的节点被 `getDelayFix` 误判降级为 Timeout(0)。
  */
-export const HISTORY_FALLBACK_MAX_AGE_MS = 10 * 60 * 1000
+export const HISTORY_FALLBACK_MAX_AGE_MS = 45 * 60 * 1000
 
 // 节点延迟判定阈值：与后端 src-tauri/src/module/monitor.rs 的
 // NODE_DELAY_MIN_MS / NODE_DELAY_MAX_MS 保持一致，作为单一真源，严禁各自漂移。

@@ -57,15 +57,15 @@ use crate::constants::timing::NODE_DELAY_MAX_MS;
 /// 节点「是否可用」的判定阈值同样以 NODE_DELAY_MAX_MS(5000) 为准。
 const NODE_TEST_TIMEOUT_MS: u32 = NODE_DELAY_MAX_MS;
 
-/// 空闲态节点健康数据新鲜度阈值（秒）：当活跃节点无上下行流量变化时，保鲜窗口由 60s
-/// 放宽至 300s（与内核 `PROXY__METRICS` `interval: 300` 对齐），降频 80% 静默拨测。
-const IDLE_HEALTH_FRESH_SECS: u64 = 300;
+/// 空闲态节点健康数据新鲜度阈值（秒，BUG-399）：当活跃节点无上下行流量变化时，
+/// 保鲜窗口放宽至 900s（15 分钟），无人值守空闲期降频 80% 静默拨测，仍可捕获服务端静默死链。
+const IDLE_HEALTH_FRESH_SECS: u64 = 900;
 
-/// 被动下行流量证活下允许免除主动拨测的最大上限（秒）：
+/// 被动下行流量证活下允许免除主动拨测的最大上限（秒，BUG-379 / BUG-399）：
 /// 当活跃节点近期存在真实下行回包（`delta_download > 0`）时，说明物理链路正在稳定回传数据，
-/// 无需再每 60s 打一轮 `PROXY__METRICS` 全组并发握手；封顶 `480s`（8 分钟）以严格小于
-/// 前端 `HISTORY_FALLBACK_MAX_AGE_MS`（600s / 10 分钟），防止 UI 因旧 history 过期误显 Timeout。
-const PASSIVE_TRAFFIC_MAX_SKIP_SECS: u64 = 480;
+/// 无需打一轮 `PROXY__METRICS` 全组并发握手；封顶 `1800s`（30 分钟）以严格小于
+/// 前端 `HISTORY_FALLBACK_MAX_AGE_MS`（45 分钟），防止 UI 因旧 history 过期误显 Timeout。
+const PASSIVE_TRAFFIC_MAX_SKIP_SECS: u64 = 1800;
 
 /// 单向流量停滞（有上行无下行）即时突破缓存复核的冷却时间（秒），防止纯 UDP 上行心跳流反复触发全组拨测。
 const STALL_REPROBE_COOLDOWN_SECS: u64 = 60;
@@ -159,8 +159,18 @@ const FALLBACK_TEST_URL: &str = "https://www.gstatic.com/generate_204";
 const VERIFY_HTTPS_URL_PRIMARY: &str = "https://github.githubassets.com/favicons/favicon.svg";
 /// 备用真 HTTPS 内容拉取验真 URL
 const VERIFY_HTTPS_URL_FALLBACK: &str = "https://www.wikipedia.org/static/favicon/wikipedia.ico";
-/// 后台定期真 HTTPS 验真间隔（仅当存在尚未验真或尚未确认拉黑的候选节点时才执行）
-const HTTPS_VERIFY_INTERVAL_SECS: u64 = 180;
+/// 后台定期真 HTTPS 验真间隔（BUG-400 由 180s 放宽至 600s，且仅在存在“Alive 但未验真”可疑节点且已验真备用节点不足时触发）
+const HTTPS_VERIFY_INTERVAL_SECS: u64 = 600;
+/// 后台定期真 HTTPS 验真“够用即止”门限（BUG-400）：当活跃节点已验真且匹配子集内已有足够已验真 Alive 备用节点时，
+/// 跳过后台全组定期 HTTPS 验真；真正故障切换且无已验真候选时仍由“选点前置验真”兜底。
+const PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS: usize = 3;
+/// 单目标探测免打备用 URL 门限（BUG-401）：当期望目标仅 1 个节点且主 URL 本轮已有 >= 3 个真实节点取得有效延迟时，
+/// 证明主测速地址与整体通路并未失真，跳过整组备用 URL 复核。
+const SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS: usize = 3;
+/// 被动下行流量证活物理在线跳过 `TCP:53` 探针的最大时效（秒，BUG-403）
+const ONLINE_CHECK_FLOWING_SKIP_SECS: u64 = 60;
+/// 物理网络连通性首选单路 `223.5.5.5:53` 探测超时（毫秒，BUG-403）：超时再并发回退其余目标
+const PRIMARY_NET_PROBE_TIMEOUT_MS: u64 = 250;
 /// 【S5 / Sync-23】验真超时与全组测速统一为 `NODE_TEST_TIMEOUT_MS`（5000ms），不再单设 6000ms。
 /// 旧值使验真结果可能落在 `[5000, 6000)`：该区间在健康裁决里被判 `Dead`，却又由验真
 /// 写入 `history.last().time` 而显得「刚测过」，是异源测量污染判活的主要入口。
@@ -175,6 +185,16 @@ const HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS: u64 = 600;
 
 static LAST_ACTIVE_VERIFY_CHECK: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
 static LAST_HTTPS_VERIFY_ALL_FAILED: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+static LAST_FLOWING_TRAFFIC_AT: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+
+/// 纯函数（便于单测锁定，BUG-403）：判断最近一次观测到活跃节点真实下行回包（`Flowing`）是否仍在在线证活窗内
+const fn has_recent_flowing_traffic(elapsed: Option<Duration>) -> bool {
+    matches!(elapsed, Some(d) if d.as_secs() < ONLINE_CHECK_FLOWING_SKIP_SECS)
+}
+
+fn is_recent_flowing_traffic_active() -> bool {
+    has_recent_flowing_traffic(LAST_FLOWING_TRAFFIC_AT.lock().map(|t| t.elapsed()))
+}
 
 /// 纯函数（便于单测锁定，BUG-388）：判断当前是否处于真 HTTPS 验真全败退避冷却窗口内
 const fn is_https_verify_backoff_active(last_failed_elapsed_secs: Option<u64>) -> bool {
@@ -293,6 +313,56 @@ async fn persist_selected_node_if_matching(profile_uid: &str, fastest_node: &str
     }
 }
 
+/// 判断是否需要触发「后台定期真 HTTPS 验真」（BUG-400）：
+/// 1. 仅考察匹配当前 `filter_text` 的非伪、非软隔离真实候选节点；
+/// 2. 仅当存在至少 1 个当前 `NodeStatus::Alive(_)`（已通过普通测速证实在线）但尚未 `verified_true`
+///    的可疑节点时才可能触发，彻底排除长期离线/超时的普通死节点拖累全组反复陪跑 HTTPS 验真；
+/// 3. 够用即止：若当前活跃节点已是 `verified_true`，且匹配子集内已有
+///    `>= PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS` (3) 个 `Alive` + `verified_true` 备用节点，
+///    跳过后台定期全组探测（切点缺候选时仍由「选点前置验真」兜底）。
+fn should_run_periodic_https_verify_with<FA, FV>(
+    members: &[String],
+    active_node: Option<&str>,
+    filter_text: &str,
+    is_fake_node: impl Fn(&str) -> bool,
+    is_alive: FA,
+    is_verified: FV,
+) -> bool
+where
+    FA: Fn(&str) -> bool,
+    FV: Fn(&str) -> bool,
+{
+    let mut has_alive_unverified = false;
+    let mut verified_alive_standbys = 0usize;
+
+    for name in members {
+        if is_dummy_node(name) || is_fake_node(name) || !match_node_filter(name, filter_text) {
+            continue;
+        }
+        if !is_alive(name) {
+            continue;
+        }
+        if is_verified(name) {
+            if active_node != Some(name.as_str()) {
+                verified_alive_standbys += 1;
+            }
+        } else {
+            has_alive_unverified = true;
+        }
+    }
+
+    if !has_alive_unverified {
+        return false;
+    }
+
+    let active_verified = active_node.is_some_and(&is_verified);
+    if active_verified && verified_alive_standbys >= PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS {
+        return false;
+    }
+
+    true
+}
+
 /// 对当前运行节点执行一轮真 HTTPS（非 `204`）验真并推进持久化状态机：
 /// - 若全部节点均已 `verified_true` 或处于 24h 软隔离 `is_confirmed_fake`，零流量直接返回；
 /// - 物理断网或主/备真 HTTPS 地址无一通过时，绝不递增任何节点失败计数；
@@ -315,7 +385,7 @@ async fn run_https_verification_pass(mihomo: &tauri_plugin_mihomo::Mihomo, candi
         );
         return;
     }
-    if !is_physical_network_online(2).await {
+    if !is_recent_flowing_traffic_active() && !is_physical_network_online(2).await {
         return;
     }
 
@@ -589,6 +659,54 @@ fn should_recheck_with_fallback(primary_delays: &HashMap<String, u32>, expected_
     }
 }
 
+/// 仅用于主 URL 失败/失真时的备用 URL 复核门控（BUG-401）：
+/// 当开启 `allow_single_target_skip` 且期望目标仅 1 个节点（点击单点延迟徽章或首次体检失败）时，
+/// 若主测速地址本轮已有至少 `SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS` (3) 个真实节点正常响应，
+/// 说明主测速地址与全局代理通路均未失真，该单节点属单点故障，直接跳过备用 URL 第二轮全组复核。
+/// 多节点子集与连续第 2 次判死前确认仍强制走备用 URL 复核，完整保留防失真能力。
+fn should_recheck_primary_with_fallback_with<F>(
+    primary_delays: &HashMap<String, u32>,
+    expected_nodes: &[String],
+    allow_single_target_skip: bool,
+    is_fake_node: F,
+) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    if !should_recheck_with_fallback(primary_delays, expected_nodes) {
+        return false;
+    }
+    if allow_single_target_skip && expected_nodes.len() == 1 {
+        let healthy_real_peers = primary_delays
+            .iter()
+            .filter(|(name, d)| {
+                !name.eq_ignore_ascii_case("DIRECT")
+                    && !name.eq_ignore_ascii_case("REJECT")
+                    && !is_dummy_node(name)
+                    && !is_fake_node(name)
+                    && is_valid_probe_delay(**d)
+            })
+            .count();
+        if healthy_real_peers >= SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS {
+            return false;
+        }
+    }
+    true
+}
+
+fn should_recheck_primary_with_fallback(
+    primary_delays: &HashMap<String, u32>,
+    expected_nodes: &[String],
+    allow_single_target_skip: bool,
+) -> bool {
+    should_recheck_primary_with_fallback_with(
+        primary_delays,
+        expected_nodes,
+        allow_single_target_skip,
+        crate::utils::node::is_confirmed_fake_node,
+    )
+}
+
 fn merge_probe_delays(mut primary: HashMap<String, u32>, fallback: HashMap<String, u32>) -> HashMap<String, u32> {
     for (name, fb_delay) in fallback {
         if is_valid_probe_delay(fb_delay) {
@@ -648,7 +766,8 @@ fn try_reuse_probe_snapshot(
 /// 带「测速失真复核」的整组拨测（含全局互斥与短窗口并发合并）。
 ///
 /// 先用主测速 URL 拨测；若整体失败，或主 URL 仅部分外区/假节点响应而目标节点均无有效延迟（部分失真），
-/// 立即用备用测速 URL 复核一次并合并有效延迟。两次均整体失败才认定「测速链路不可用」。
+/// 立即用备用测速 URL 复核一次并合并有效延迟（当 `allow_single_target_skip == true` 且仅期望单节点、
+/// 同组已有 >= 3 个真实节点通过主 URL 响应时跳过备用 URL 复核）。两次均整体失败才认定「测速链路不可用」。
 ///
 /// 返回 `Some(outcome)` = 测速链路可用（`outcome.delays` 为本次测得的节点延迟）；
 /// `None` = 主/备地址都整体失败，属测速链路问题，**不可据此判定节点已死**。
@@ -659,6 +778,7 @@ async fn probe_metrics_group(
     label: &str,
     allow_coalesce: bool,
     expected_nodes: &[String],
+    allow_single_target_skip: bool,
 ) -> Option<MetricsProbeOutcome> {
     let _probe_guard = METRICS_PROBE_LOCK.lock().await;
     if allow_coalesce {
@@ -709,7 +829,7 @@ async fn probe_metrics_group(
         .await
     {
         Ok(primary_delays) => {
-            if !should_recheck_with_fallback(&primary_delays, expected_nodes) {
+            if !should_recheck_primary_with_fallback(&primary_delays, expected_nodes, allow_single_target_skip) {
                 return Some(MetricsProbeOutcome {
                     delays: record_snapshot(primary_delays),
                     primary_url_distorted: false,
@@ -873,14 +993,25 @@ fn resolve_probe_target(test_url: &str) -> String {
     }
 }
 
-/// 物理网络连通性探测（BUG-317 / BUG-345）。
-/// 并发直连 3 个公网高可用 DNS IP (TCP:53)，单路限时 600ms，任一连通即毫秒级确认物理网卡在线；
-/// 若局域网封禁出站 53 端口导致 3 路均失败，仍在总超时预算内回退至域名 DNS 查询兜底，杜绝误判离线。
+/// 物理网络连通性探测（BUG-317 / BUG-345 / BUG-403）。
+/// 优先单路直连主公网高可用 DNS `223.5.5.5:53`（限时 `PRIMARY_NET_PROBE_TIMEOUT_MS` = 250ms），
+/// 连通即毫秒级返回，日常减少 2/3 公网握手；仅当主路超时或异常时，才并发直连备用两路
+/// (`119.29.29.29:53` / `1.1.1.1:53`，单路 600ms)；若 3 路均失败（如局域网封禁出站 53 端口），
+/// 仍在总超时预算内回退至域名 DNS 查询兜底，杜绝误判离线。
 async fn is_physical_network_online(timeout_secs: u64) -> bool {
     let dur = Duration::from_secs(timeout_secs.max(2));
     let check = async {
-        let targets = ["223.5.5.5:53", "119.29.29.29:53", "1.1.1.1:53"];
-        let probes = targets.into_iter().map(|addr| {
+        if let Ok(Ok(_)) = tokio::time::timeout(
+            Duration::from_millis(PRIMARY_NET_PROBE_TIMEOUT_MS),
+            tokio::net::TcpStream::connect("223.5.5.5:53"),
+        )
+        .await
+        {
+            return true;
+        }
+
+        let backup_targets = ["119.29.29.29:53", "1.1.1.1:53"];
+        let probes = backup_targets.into_iter().map(|addr| {
             Box::pin(async move {
                 match tokio::time::timeout(Duration::from_millis(600), tokio::net::TcpStream::connect(addr)).await {
                     Ok(Ok(stream)) => Ok(stream),
@@ -1472,16 +1603,21 @@ async fn sample_active_node_traffic(
         .map(|c| (c.id, c.upload, c.download))
         .collect();
 
-    update_active_traffic_state(&mut ACTIVE_TRAFFIC_TRACKER.lock(), active_node, &current_conns)
+    let (state, stall_cooldown_active) =
+        update_active_traffic_state(&mut ACTIVE_TRAFFIC_TRACKER.lock(), active_node, &current_conns);
+    if state == ActiveTrafficState::Flowing {
+        *LAST_FLOWING_TRAFFIC_AT.lock() = Some(Instant::now());
+    }
+    (state, stall_cooldown_active)
 }
 
 /// 判定本次体检是否必须取得一轮本轮物理实拨证据。
 ///
-/// 【BUG-377 + BUG-379】非 `Alive`（`Suspect` / `Dead` / `Unknown`）或时间戳缺失一律强制实拨，
+/// 【BUG-377 + BUG-379 + BUG-399】非 `Alive`（`Suspect` / `Dead` / `Unknown`）或时间戳缺失一律强制实拨，
 /// 杜绝异源测量污染判死链；当节点处于 `Alive` 且时间可测时，结合活跃出口真实连接流量分流：
-/// - `Flowing`（近一周期有真实下行回包）：保鲜上限放宽至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s)`，消除 60s 全组盲测风暴；
+/// - `Flowing`（近一周期有真实下行回包）：保鲜上限放宽至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (1800s)`，消除盲测风暴；
 /// - `Stalled`（有上行无下行，疑似黑洞）：无视未过期缓存立即触发实拨复核（带 60s 单向流防抖冷却）；
-/// - `Idle`（无流量）：放宽至 `IDLE_HEALTH_FRESH_SECS (300s)`，与测量组自然周期对齐。
+/// - `Idle`（无流量）：放宽至 `IDLE_HEALTH_FRESH_SECS (900s)`。
 fn should_probe_active_node(
     status: NodeStatus,
     age: Option<Duration>,
@@ -1506,10 +1642,10 @@ fn should_probe_active_node(
 /// 返回 Err 表示 Mihomo API 不可达（交由调用方累计 api_error_count）。
 ///
 /// 【S5 / Sync-23 · 单一权威健康源】判死只允许建立在本轮 `probe_metrics_group`
-/// 主/备 URL 实拨之上。`alive` / `history` 属共享可变状态，真 HTTPS 验真、内核 300s
-/// 自然周期、前端测速都会改写它，故只用于「是否要拨测」的初判、UI 显示与实拨后的
-/// 结果读取；任何非 `Alive` 初判都必须先实拨，且体检拨测禁用短窗合并。
-async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
+/// 主/备 URL 实拨之上。`alive` / `history` 属共享可变状态，真 HTTPS 验真、前端测速
+/// 都会改写它，故只用于「是否要拨测」的初判、UI 显示与实拨后的结果读取；任何非
+/// `Alive` 初判都必须先实拨，且体检拨测禁用短窗合并。
+async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
     let group_info = mihomo
@@ -1562,7 +1698,17 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         // 自指回环机制不同；单次调用拿到全组新鲜延迟后再判定活跃节点死活。
         // 【S5】体检一律禁用短窗合并：裁决必须建立在本轮物理实拨之上，不能复用
         // 1.5 秒内其他调用方的快照（否则重读 alive / history 读到的仍是异源结果）。
-        let probed_opt = probe_metrics_group(&mihomo, "体检", false, std::slice::from_ref(&active_node)).await;
+        // 【BUG-401】第 1 次初检失败（consecutive_fails == 0）若主 URL 已有 >=3 个真实节点正常，
+        // 直接跳过第二轮备用 URL 复核；第 2 次判死确认前仍强制跑备用 URL 防失真兜底。
+        let allow_single_target_skip = consecutive_fails == 0;
+        let probed_opt = probe_metrics_group(
+            &mihomo,
+            "体检",
+            false,
+            std::slice::from_ref(&active_node),
+            allow_single_target_skip,
+        )
+        .await;
 
         // 【测速失真防护】主/备测速地址都整体失败 = 测速链路不可用，**不是**「节点已死」。
         // 此时 mihomo 已把全组成员标记为 not-alive，若据此判死会触发无意义的切节点抖动。
@@ -2092,8 +2238,9 @@ async fn trigger_backend_auto_select_inner(
             delays = cached_delays;
             source = DelayResultSource::FreshMetricsCache;
         } else {
-            let allow_coalesce = !(is_frontend_subset && valid_nodes.len() == 1);
-            match probe_metrics_group(&mihomo, "选点", allow_coalesce, &valid_nodes).await {
+            let is_single_node_probe = is_frontend_subset && valid_nodes.len() == 1;
+            let allow_coalesce = !is_single_node_probe;
+            match probe_metrics_group(&mihomo, "选点", allow_coalesce, &valid_nodes, is_single_node_probe).await {
                 Some(outcome)
                     if !outcome.delays.is_empty()
                         && (!outcome.primary_url_distorted
@@ -2386,6 +2533,7 @@ fn reset_monitor_static_state() {
     *LAST_METRICS_PROBE.lock() = None;
     *LAST_ACTIVE_VERIFY_CHECK.lock() = None;
     *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = None;
+    *LAST_FLOWING_TRAFFIC_AT.lock() = None;
     *ACTIVE_TRAFFIC_TRACKER.lock() = None;
 }
 
@@ -2538,9 +2686,12 @@ pub fn start_background_monitor() {
 
             let is_online = if need_probe {
                 last_online_check_time = Some(Instant::now());
-
-                // 【性能优化与动态探测】：复用 is_physical_network_online 探测物理网络连通性
-                is_physical_network_online(2).await
+                if was_online && is_recent_flowing_traffic_active() {
+                    true
+                } else {
+                    // 【性能优化与动态探测】：复用 is_physical_network_online 探测物理网络连通性
+                    is_physical_network_online(2).await
+                }
             } else {
                 // 尚未到探测间隔，复用上次结果
                 was_online
@@ -2588,20 +2739,34 @@ pub fn start_background_monitor() {
                     continue;
                 }
 
-                // 定期真 HTTPS 验真：仅当存在“未验真真值且尚未确认拉黑”的待观察节点时执行；
-                // 全部节点状态尘埃落定（verified_true 或 is_confirmed_fake）后零流量跳过。
+                // 定期真 HTTPS 验真（BUG-400）：
+                // - 排除普通离线/超时死节点（非 NodeStatus::Alive），避免全组健康节点陪跑；
+                // - 仅当过滤子集内存在 `Alive` 但未验真节点，且活跃节点未验真或已验真 Alive 备用节点 < 3 时触发。
                 if last_https_verify_time.is_none_or(|t| t.elapsed() >= Duration::from_secs(HTTPS_VERIFY_INTERVAL_SECS))
                 {
                     last_https_verify_time = Some(Instant::now());
                     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-                    if let Ok(proxy_group) = mihomo.get_group_by_name("PROXY").await {
+                    if let (Ok(proxy_group), Ok(proxies)) =
+                        (mihomo.get_group_by_name("PROXY").await, mihomo.get_proxies().await)
+                    {
                         let members: Vec<String> = proxy_group
                             .all
                             .unwrap_or_default()
                             .into_iter()
                             .filter(|n| !is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n))
                             .collect();
-                        run_https_verification_pass(&mihomo, &members, "后台定期验真").await;
+                        let (filter_config, _) = get_filter_and_sort_config(&current_profile).await;
+                        let filter_text = filter_config.filter_text.trim();
+                        if should_run_periodic_https_verify_with(
+                            &members,
+                            proxy_group.now.as_deref(),
+                            filter_text,
+                            crate::utils::node::is_confirmed_fake_node,
+                            |n| matches!(proxies.proxies.get(n).map(node_status), Some(NodeStatus::Alive(_))),
+                            crate::utils::node::is_verified_true_node,
+                        ) {
+                            run_https_verification_pass(&mihomo, &members, "后台定期验真").await;
+                        }
                     }
                 }
 
@@ -2682,7 +2847,7 @@ pub fn start_background_monitor() {
                     is_retry_mode = false;
                 }
 
-                match evaluate_failover(&current_profile).await {
+                match evaluate_failover(&current_profile, consecutive_fails).await {
                     Ok(verdict) => {
                         // API 调用成功，重置 API 异常计数
                         api_error_count = 0;
@@ -3549,7 +3714,7 @@ mod tests {
 
     #[test]
     fn test_should_probe_active_node_only_skips_fresh_healthy() {
-        // 1. 空闲态放宽至 IDLE_HEALTH_FRESH_SECS (300s)
+        // 1. 空闲态放宽至 IDLE_HEALTH_FRESH_SECS (900s)
         assert!(!should_probe_active_node(
             NodeStatus::Alive(85),
             Some(Duration::from_secs(IDLE_HEALTH_FRESH_SECS - 1)),
@@ -3563,7 +3728,7 @@ mod tests {
             false,
         ));
 
-        // 2. 被动下行流量证活：60s~479s 内免除全组拨测风暴，满 PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s) 才复检一次
+        // 2. 被动下行流量证活：1799s 内免除全组拨测风暴，满 PASSIVE_TRAFFIC_MAX_SKIP_SECS (1800s) 才复检一次
         assert!(!should_probe_active_node(
             NodeStatus::Alive(85),
             Some(Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS - 1)),
@@ -3973,5 +4138,146 @@ mod tests {
         assert!(!should_close_stale_proxy_connection(&hk_chain, "PROXY", ""));
         assert!(!should_close_stale_proxy_connection(&hk_chain, "PROXY", "DIRECT"));
         assert!(!should_close_stale_proxy_connection(&hk_chain, "PROXY", "REJECT"));
+    }
+
+    #[test]
+    fn test_bug400_periodic_https_verify_skips_dead_and_sufficient_standbys() {
+        use super::{HTTPS_VERIFY_INTERVAL_SECS, PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS, should_run_periodic_https_verify_with};
+
+        assert_eq!(HTTPS_VERIFY_INTERVAL_SECS, 600);
+        assert_eq!(PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS, 3);
+
+        let members = vec![
+            "日本1".to_string(),
+            "日本2".to_string(),
+            "日本3".to_string(),
+            "日本4".to_string(),
+            "日本5".to_string(),
+            "香港-离线".to_string(),
+        ];
+
+        // 1. 仅离线/普通测速未通过节点未验真（is_alive == false）：绝不拖累全组每周期陪跑
+        assert!(!should_run_periodic_https_verify_with(
+            &members,
+            Some("日本1"),
+            "",
+            |_| false,
+            |n| n != "香港-离线",
+            |n| n != "香港-离线",
+        ));
+
+        // 2. 活跃节点自己 Alive 但尚未验真 → 允许触发
+        assert!(should_run_periodic_https_verify_with(
+            &members,
+            Some("日本1"),
+            "",
+            |_| false,
+            |n| n != "香港-离线",
+            |n| n != "日本1" && n != "香港-离线",
+        ));
+
+        // 3. 活跃节点已验真，但备用 Alive 已验真仅 2 个（< 3）且有 Alive 未验真节点 → 允许补充验真
+        assert!(should_run_periodic_https_verify_with(
+            &members,
+            Some("日本1"),
+            "",
+            |_| false,
+            |n| n != "香港-离线",
+            |n| matches!(n, "日本1" | "日本2" | "日本3"),
+        ));
+
+        // 4. 够用即止：活跃节点已验真且匹配子集内已有 >= 3 个已验真 Alive 备用节点（日本2/3/4）→ 跳过全组探测
+        assert!(!should_run_periodic_https_verify_with(
+            &members,
+            Some("日本1"),
+            "",
+            |_| false,
+            |_| true,
+            |n| matches!(n, "日本1" | "日本2" | "日本3" | "日本4"),
+        ));
+
+        // 5. filter_text 排除范围外的未验真 Alive 节点不得触发当前子集的定期探测
+        assert!(!should_run_periodic_https_verify_with(
+            &members,
+            Some("日本1"),
+            "-香港",
+            |_| false,
+            |_| true,
+            |n| !n.contains("香港"),
+        ));
+    }
+
+    #[test]
+    fn test_bug401_single_target_skips_fallback_when_primary_url_healthy() {
+        use super::{SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS, should_recheck_primary_with_fallback_with};
+
+        assert_eq!(SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS, 3);
+
+        // 1. 单节点目标超时，但同组已有 >= 3 个真实节点在主 URL 响应 → 证明主 URL 健康，跳过第二轮备用 URL
+        let mut primary_healthy = HashMap::new();
+        primary_healthy.insert("目标-坏节点".to_string(), 0u32);
+        primary_healthy.insert("日本1".to_string(), 80u32);
+        primary_healthy.insert("日本2".to_string(), 95u32);
+        primary_healthy.insert("日本3".to_string(), 110u32);
+        let single_expected = vec!["目标-坏节点".to_string()];
+        assert!(!should_recheck_primary_with_fallback_with(
+            &primary_healthy,
+            &single_expected,
+            true,
+            |_| false,
+        ));
+
+        // 2. 不计 DIRECT / 假节点 / 软隔离节点，若有效真实节点不足 3 个（仅 2 个）仍走备用 URL 复核
+        let mut primary_few_peers = HashMap::new();
+        primary_few_peers.insert("目标-坏节点".to_string(), 0u32);
+        primary_few_peers.insert("DIRECT".to_string(), 50u32);
+        primary_few_peers.insert("剩余流量：10GB".to_string(), 60u32);
+        primary_few_peers.insert("日本1".to_string(), 80u32);
+        primary_few_peers.insert("日本2".to_string(), 95u32);
+        assert!(should_recheck_primary_with_fallback_with(
+            &primary_few_peers,
+            &single_expected,
+            true,
+            |_| false,
+        ));
+
+        // 3. allow_single_target_skip = false（如二次确认判死前复核）仍必须打备用 URL 防失真
+        assert!(should_recheck_primary_with_fallback_with(
+            &primary_healthy,
+            &single_expected,
+            false,
+            |_| false,
+        ));
+
+        // 4. 多节点期望子集全灭时即便其他节点响应仍走备用 URL 复核（保留局部失真防护）
+        let multi_expected = vec!["目标A".to_string(), "目标B".to_string()];
+        assert!(should_recheck_primary_with_fallback_with(
+            &primary_healthy,
+            &multi_expected,
+            true,
+            |_| false,
+        ));
+    }
+
+    #[test]
+    fn test_bug403_recent_flowing_traffic_proves_physical_online() {
+        use super::{
+            LAST_FLOWING_TRAFFIC_AT, ONLINE_CHECK_FLOWING_SKIP_SECS, has_recent_flowing_traffic,
+            reset_monitor_static_state,
+        };
+
+        assert!(!has_recent_flowing_traffic(None));
+        assert!(has_recent_flowing_traffic(Some(Duration::from_secs(0))));
+        assert!(has_recent_flowing_traffic(Some(Duration::from_secs(
+            ONLINE_CHECK_FLOWING_SKIP_SECS - 1
+        ))));
+        assert!(!has_recent_flowing_traffic(Some(Duration::from_secs(
+            ONLINE_CHECK_FLOWING_SKIP_SECS
+        ))));
+
+        *LAST_FLOWING_TRAFFIC_AT.lock() = Some(Instant::now());
+        assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_some());
+        reset_monitor_static_state();
+        assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_none());
     }
 }

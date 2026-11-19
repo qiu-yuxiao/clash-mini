@@ -6,11 +6,13 @@ import {
 import { calcuProxies, getProfiles, triggerAutoSelect } from '@/services/cmds'
 import {
   getDelayManager,
+  HISTORY_FALLBACK_MAX_AGE_MS,
   NODE_DELAY_MIN_MS,
   NODE_DELAY_MAX_MS,
 } from '@/services/delay'
 import { getProxyByNameWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
+import type { IProxyItem } from '@/types/clash'
 import { isDummyNode } from '@/utils/node'
 
 type TFunc = (key: string, options?: Record<string, unknown>) => string
@@ -156,12 +158,64 @@ export async function hasUsablePersistedExit(
   }
 }
 
+export function isProxyHistoryFreshAndValid(
+  proxy: Pick<IProxyItem, 'alive' | 'history'> | null | undefined,
+  nowMs = Date.now(),
+): boolean {
+  if (proxy?.alive !== true) return false
+  const history = proxy.history
+  if (!Array.isArray(history) || history.length === 0) return false
+  const lastRecord = history[history.length - 1]
+  const delay = lastRecord?.delay
+  if (
+    typeof delay !== 'number' ||
+    delay < NODE_DELAY_MIN_MS ||
+    delay >= NODE_DELAY_MAX_MS
+  ) {
+    return false
+  }
+  const recordedAt = Date.parse(lastRecord.time)
+  return (
+    !Number.isNaN(recordedAt) &&
+    nowMs - recordedAt <= HISTORY_FALLBACK_MAX_AGE_MS
+  )
+}
+
+/**
+ * 判断当前 `PROXY.now` 节点是否在当前过滤子集 `names` 内且已持有有效未过期延迟
+ * （优先读 `DelayManager` 有效延迟缓存，再回退内核最新 `alive + history`），
+ * 供轻量唤醒及窗口可见恢复跳过不必要的全组探针（BUG-402）。
+ */
+export async function hasFreshActiveExitLatency(
+  names: string[],
+): Promise<boolean> {
+  if (names.length === 0) return false
+  try {
+    const allData = await calcuProxies()
+    const now = allData.groups?.[0]?.now || ''
+    if (!now || isDummyNode(now) || !names.includes(now)) return false
+
+    const cached = getDelayManager().getDelayUpdate(now, 'PROXY')
+    if (
+      cached &&
+      cached.delay >= NODE_DELAY_MIN_MS &&
+      cached.delay < NODE_DELAY_MAX_MS
+    ) {
+      return true
+    }
+
+    return isProxyHistoryFreshAndValid(allData.records?.[now])
+  } catch {
+    return false
+  }
+}
+
 export async function triggerAutoSelectAndRefresh(
   refreshProxy: (opts?: { forceFull?: boolean }) => Promise<unknown>,
-  fallbackTimerRef: { current: number | null },
   autoSelectTimerRef: { current: number | null },
   setHeadState?: (groupName: string, patch: Partial<HeadState>) => void,
   profileUid?: string,
+  options?: { skipProbeIfFresh?: boolean },
 ): Promise<void> {
   try {
     await refreshProxy({ forceFull: true })
@@ -190,8 +244,16 @@ export async function triggerAutoSelectAndRefresh(
     }
     const names = await getFilteredNodeNames()
     if (names.length === 0) return
-    // 最高方针「连续性优先」：用户持久出口仍有效时只刷新延迟，不按最快节点覆盖它
+    // 最高方针「连续性优先」：用户持久出口仍有效时只刷新延迟，不按最快节点覆盖它；
+    // BUG-402：轻量唤醒路径若当前出口已有新鲜有效延迟，直接零拨测秒开展示
     const keepExit = await hasUsablePersistedExit(names)
+    if (
+      options?.skipProbeIfFresh &&
+      keepExit &&
+      (await hasFreshActiveExitLatency(names))
+    ) {
+      return
+    }
     await batchTestWithFirstBatchSelect(names, !keepExit)
     if (setHeadState) {
       setHeadState('PROXY', { sortType: 1 })
@@ -199,43 +261,4 @@ export async function triggerAutoSelectAndRefresh(
   } catch (err) {
     console.warn('[Layout] 批量测速失败:', err)
   }
-
-  if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
-  fallbackTimerRef.current = setTimeout(async () => {
-    const timerId = fallbackTimerRef.current
-    try {
-      if (profileUid) {
-        const currentUid = (await getProfiles())?.current || ''
-        if (currentUid !== profileUid) {
-          return
-        }
-      }
-      const proxyGroup = await getProxyByNameWithTimeout('PROXY')
-      const nowNodeName = proxyGroup?.now || ''
-      if (!nowNodeName) return
-      const nowNode = await getProxyByNameWithTimeout(nowNodeName)
-      const history = nowNode?.history || []
-      const latestDelay =
-        history.length > 0 ? history[history.length - 1].delay : -1
-      const hasHealth =
-        latestDelay >= NODE_DELAY_MIN_MS && latestDelay < NODE_DELAY_MAX_MS
-      if (!hasHealth) {
-        const names = await getFilteredNodeNames()
-        if (names.length === 0) return
-        // 最高方针「连续性优先」：「没有健康延迟」不等于「节点已死」，不构成切点理由；
-        // 仅当持久出口结构性失效时才允许重选，其余只补测刷新延迟。
-        const keepExit = await hasUsablePersistedExit(names)
-        await batchTestWithFirstBatchSelect(names, !keepExit)
-        if (setHeadState) {
-          setHeadState('PROXY', { sortType: 1 })
-        }
-      }
-    } catch (fbErr) {
-      console.error('[Layout] Fallback 逻辑异常:', fbErr)
-    } finally {
-      if (fallbackTimerRef.current === timerId) {
-        fallbackTimerRef.current = null
-      }
-    }
-  }, 10_000)
 }

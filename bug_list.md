@@ -9,6 +9,51 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-403 物理网络 `TCP:53` 探针未复用活跃下行证活且每次并发三路公网握手
+
+- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)
+- **问题描述**：后台守护循环在在线状态下每隔 `60s`（以及每轮真 HTTPS 验真前）都会通过 `futures::future::select_ok` 同时向 `223.5.5.5:53`、`119.29.29.29:53`、`1.1.1.1:53` 并发发起 3 个直连公网 TCP SYN 握手——即便上一轮刚刚观测到活跃代理连接存在真实下行回包（`Flowing`）可确定物理网卡在线，仍重复向公网 DNS 53 端口高频发包。
+- **修复方案**：
+  1. 在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 新增 `LAST_FLOWING_TRAFFIC_AT`、`ONLINE_CHECK_FLOWING_SKIP_SECS (60s)` 及纯函数 `has_recent_flowing_traffic` / `is_recent_flowing_traffic_active`（随 `reset_monitor_static_state` 同步复位）；当近 60 秒内观测到 `ActiveTrafficState::Flowing` 时，主循环 `60s` 在线探测与 `run_https_verification_pass` 前置在线检查直接复用证活结论跳过公网握手；
+  2. `is_physical_network_online` 改为优先单路直连主 DNS `223.5.5.5:53`（超时上限 `PRIMARY_NET_PROBE_TIMEOUT_MS = 250ms`），仅当主路超时或异常时再并发回退其余两路与域名 DNS 查询，常态直连公网握手减少 67%–100%，并补齐 Rust 边界单测。
+- **状态**：代码已修正，待用户确认
+
+### BUG-402 窗口关闭/唤醒前后端重复拨测、切回前台传 `undefined` 绕过缓存与遗留 10 秒二次补测
+
+- **对应模块**：[lightweight.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/lightweight.rs)、[profile-coordination.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/profile-coordination.ts)、[_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[use-mihomo-ws-subscription.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-mihomo-ws-subscription.test.ts)
+- **问题描述**：① `entry_lightweight_mode` 关闭窗口时触发 `MONITOR_WAKEUP_NOTIFY` 将后台计时器提前回拨强行拉起体检；② 切回前台（`visibilitychange -> visible`）的 `triggerWakeupLatencyTest` 与轻量唤醒的 `triggerAutoSelectAndRefresh` 未先检查当前活跃出口是否已有新鲜可用延迟，且前者调用 `triggerAutoSelect(uid, undefined, 0, false)` 导致 `is_frontend_subset` 为 `false` 绕过后端 `<30s` 快照缓存复用；③ [profile-coordination.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/profile-coordination.ts) 每次挂载后还遗留一个 `10s` `fallbackTimerRef` 定时器二次触发全组测速。
+- **修复方案**：
+  1. [lightweight.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/lightweight.rs)：`entry_lightweight_mode` 移除多余的 `MONITOR_WAKEUP_NOTIFY.notify_one()`，关窗不再额外触发体检；
+  2. [profile-coordination.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/utils/profile-coordination.ts) 与 [_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)：新增 `isProxyHistoryFreshAndValid` 与 `hasFreshActiveExitLatency`，轻量唤醒（`skipProbeIfFresh: true`）与窗口可见恢复当活跃出口已持有效新鲜延迟时零拨测秒开；确实需要唤醒测速时传过滤子集 `names` 恢复后端 30s 快照复用；彻底删除 `fallbackTimerRef` 及其 `10s` 补测定时器，并补齐 Vitest 回归单测。
+- **状态**：代码已修正，待用户确认
+
+### BUG-401 单节点目标主 URL 整体正常时过度触发全组备用 URL 第二轮复核
+
+- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)
+- **问题描述**：`probe_metrics_group` 原直接通过 `should_recheck_with_fallback` 判定是否用 `FALLBACK_TEST_URL`（`gstatic.com`）重打整组拨测。对于期望集只有 1 个节点（点击单个坏节点延迟徽章或活跃节点单点初检失败）且同组其它真实节点已在主测速地址大量正常响应的场景，该节点本身大概率为单点故障而非主测速地址失真，却每次连坐触发第二轮全组并发复核，使单节点故障期信号翻倍。
+- **修复方案**：
+  1. 保留原 `should_recheck_with_fallback` 专用于快照复用/合并门控；新增 `should_recheck_primary_with_fallback` / `should_recheck_primary_with_fallback_with`：当开启 `allow_single_target_skip` 且 `expected_nodes.len() == 1` 时，若主 URL 本轮已有 `>= SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS (3)` 个非假真实节点测出有效延迟，直接跳过备用 URL 第二轮全组复核；
+  2. 前端单点测速（`valid_nodes.len() == 1`）与 `evaluate_failover` 第 1 次初检失败（`consecutive_fails == 0`）启用该跳过优化，而 `consecutive_fails >= 1` 的二次确认判死前复核与多节点全灭场景仍完整保留备用 URL 防失真兜底，并补齐 Rust 单测。
+- **状态**：代码已修正，待用户确认
+
+### BUG-400 后台 180s 真 HTTPS 验真受长期离线死节点拖累引发全组每 3 分钟陪跑探测
+
+- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)
+- **问题描述**：后台 `run_https_verification_pass` 原先每 `180s` 仅检查是否存在「未 `verified_true` 且未软隔离」的条目即发起全组 `delay_group`。订阅中只要混有 1 个普通离线/超时节点尚未累计到 6 次失败，已验真健康节点也会每 3 分钟陪跑全组 GitHub/Wikipedia 请求（且 24h 软隔离到期后周而复始），即使活跃节点及多个备用节点均已验真可用也不停歇。
+- **修复方案**：
+  1. 将 `HTTPS_VERIFY_INTERVAL_SECS` 由 `180s` 放宽至 `600s`（10 分钟），新增「够用即止」门限 `PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS = 3` 与纯门控函数 `should_run_periodic_https_verify_with`；
+  2. `start_background_monitor` 触发后台定期验真前先筛选符合当前 `filter_text` 的真实候选：彻底排除非 `NodeStatus::Alive(_)` 的普通离线死节点（只对普通测速通但未验真的可疑节点触发）；且当当前活跃节点已 `verified_true` 并在子集内已储备 `>= 3` 个已验真 `Alive` 备用节点时直接跳过全组后台验真（切点缺候选时仍由「选点前置验真」即时覆盖），并补齐 Rust 门控单测。
+- **状态**：代码已修正，待用户确认
+
+### BUG-399 内核 `PROXY__METRICS` 与 `proxy-providers` 每 5 分钟自治盲测架空后台被动流量证活且免测窗偏短
+
+- **对应模块**：[mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)、[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts)、[ARCHITECTURE.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/docs/ARCHITECTURE.md)
+- **问题描述**：[mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs) 原将隐藏测量组 `PROXY__METRICS` 设为 `interval: 300, lazy: false` 且原样透传上游 `proxy-providers` 的非惰性健康检查配置，致使即便系统无人用网（`Idle`）或正在通过真实下行流量被动证活（`Flowing`），Mihomo 内核仍每隔 5 分钟在后台无条件并发拨测全组节点（不受 Rust `METRICS_PROBE_LOCK` 约束），既制造大量冗余外部连接信号又架空 `monitor.rs` 按需降频设计；同时 `monitor.rs` 原 `IDLE_HEALTH_FRESH_SECS (300s)` / `PASSIVE_TRAFFIC_MAX_SKIP_SECS (480s)` 免测上限也偏短。
+- **修复方案**：
+  1. 在 [mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs) 新增 `enforce_lazy_provider_health_checks` 将所有 `proxy-providers.*.health-check.lazy` 强制设为 `true`，并将 `PROXY__METRICS` 调整为 `interval: 1800, lazy: true`（零无意义自治后台拨测；Rust 按需 `delay_group` 调用照常运行）；
+  2. 在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 将 `IDLE_HEALTH_FRESH_SECS` 放宽至 `900s`（15 分钟）、`PASSIVE_TRAFFIC_MAX_SKIP_SECS` 放宽至 `1800s`（30 分钟），并同步更新前端 [delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts) 的 `HISTORY_FALLBACK_MAX_AGE_MS = 45 分钟` 以防止健康证活期间 UI 误落超时，更新并扩展 Rust 单元测试。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-398 2026-11-19 `clash-mini.exe` 连续 5 次瞬杀真因定位（邻库 `ClashWin` 单测 `cwrun.exe` 误杀）与 `useroptm2` 预防性防误杀指南收口
 
 - **对应模块**：[轻量模式防误杀指南.txt](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/轻量模式防误杀指南.txt)、[antivirus-whitelist.md](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/docs/antivirus-whitelist.md)、[prebuild.mjs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/prebuild.mjs)、[portable.mjs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/scripts/portable.mjs)、[installer.nsi](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/packages/windows/installer.nsi)、[.gitignore](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.gitignore)、[app.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/app.rs)、[lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)、[cmds.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/cmds.ts)、[help-menu-button.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/help-menu-button.tsx)、[_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、`src/locales/*/layout.json`

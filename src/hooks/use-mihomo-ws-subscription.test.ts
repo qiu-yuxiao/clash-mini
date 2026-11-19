@@ -10,9 +10,14 @@ import {
   releaseSharedSubscriptionEntry,
   scheduleFlushWsReconnectBackoff,
 } from '@/hooks/use-mihomo-ws-subscription'
-import { batchTestWithFirstBatchSelect } from '@/pages/_layout/utils/profile-coordination'
+import {
+  batchTestWithFirstBatchSelect,
+  isProxyHistoryFreshAndValid,
+  triggerAutoSelectAndRefresh,
+} from '@/pages/_layout/utils/profile-coordination'
 import * as cmds from '@/services/cmds'
-import { getDelayManager } from '@/services/delay'
+import { getDelayManager, HISTORY_FALLBACK_MAX_AGE_MS } from '@/services/delay'
+import * as mihomoApi from '@/services/mihomo-api'
 import type { MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 vi.mock('@/services/cmds', () => ({
@@ -20,6 +25,10 @@ vi.mock('@/services/cmds', () => ({
   getProfiles: vi.fn(),
   notifyNodeSwitched: vi.fn(),
   triggerAutoSelect: vi.fn(),
+}))
+
+vi.mock('@/services/mihomo-api', () => ({
+  getProxyByNameWithTimeout: vi.fn(),
 }))
 
 describe('BUG-347: computeWsReconnectDelay 指数退避、严格上限与快速重连冲刷', () => {
@@ -174,5 +183,176 @@ describe('BUG-321: batchTestWithFirstBatchSelect 严格传递过滤节点子集'
     expect(
       getDelayManager().getDelayUpdate('新加坡 02', 'PROXY'),
     ).toBeUndefined()
+  })
+})
+
+describe('BUG-402: 窗口唤醒新鲜延迟免拨测、传参对齐与移除 10s 二次补测器', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    getDelayManager().clearCache()
+  })
+
+  it('isProxyHistoryFreshAndValid 严格校验 alive、合法延迟区间与 HISTORY_FALLBACK_MAX_AGE_MS 时效', () => {
+    const nowMs = Date.now()
+    expect(
+      isProxyHistoryFreshAndValid(
+        {
+          alive: true,
+          history: [
+            { time: new Date(nowMs - 60_000).toISOString(), delay: 88 },
+          ],
+        },
+        nowMs,
+      ),
+    ).toBe(true)
+
+    expect(
+      isProxyHistoryFreshAndValid(
+        {
+          alive: false,
+          history: [
+            { time: new Date(nowMs - 60_000).toISOString(), delay: 88 },
+          ],
+        },
+        nowMs,
+      ),
+    ).toBe(false)
+
+    expect(
+      isProxyHistoryFreshAndValid(
+        {
+          alive: true,
+          history: [
+            {
+              time: new Date(
+                nowMs - HISTORY_FALLBACK_MAX_AGE_MS - 1,
+              ).toISOString(),
+              delay: 88,
+            },
+          ],
+        },
+        nowMs,
+      ),
+    ).toBe(false)
+
+    expect(
+      isProxyHistoryFreshAndValid(
+        {
+          alive: true,
+          history: [{ time: new Date(nowMs).toISOString(), delay: 0 }],
+        },
+        nowMs,
+      ),
+    ).toBe(false)
+
+    expect(
+      isProxyHistoryFreshAndValid({ alive: true, history: [] }, nowMs),
+    ).toBe(false)
+  })
+
+  it('轻量唤醒开启 skipProbeIfFresh 且当前活跃出口持有新鲜有效延迟时，零拨测直接跳过 triggerAutoSelect', async () => {
+    vi.mocked(cmds.getProfiles).mockResolvedValue({
+      current: 'uid-fresh-1',
+      items: [],
+    } as Awaited<ReturnType<typeof cmds.getProfiles>>)
+
+    const freshProxyA = {
+      name: '日本 01',
+      type: 'AnyTLS',
+      udp: true,
+      alive: true,
+      history: [{ time: new Date().toISOString(), delay: 58 }],
+    }
+    const freshProxyB = {
+      name: '日本 02',
+      type: 'AnyTLS',
+      udp: true,
+      alive: true,
+      history: [{ time: new Date().toISOString(), delay: 75 }],
+    }
+    vi.mocked(cmds.calcuProxies).mockResolvedValue({
+      groups: [
+        {
+          name: 'PROXY',
+          type: 'select',
+          now: '日本 01',
+          all: [freshProxyA, freshProxyB],
+        },
+      ],
+      records: { '日本 01': freshProxyA, '日本 02': freshProxyB },
+      proxies: [freshProxyA, freshProxyB],
+    } as unknown as Awaited<ReturnType<typeof cmds.calcuProxies>>)
+    vi.mocked(mihomoApi.getProxyByNameWithTimeout).mockResolvedValue({
+      name: 'PROXY',
+      now: '日本 01',
+      all: ['日本 01', '日本 02'],
+    } as Awaited<ReturnType<typeof mihomoApi.getProxyByNameWithTimeout>>)
+
+    const autoSelectTimerRef = { current: null as number | null }
+    await triggerAutoSelectAndRefresh(
+      vi.fn().mockResolvedValue(undefined),
+      autoSelectTimerRef,
+      undefined,
+      'uid-fresh-1',
+      { skipProbeIfFresh: true },
+    )
+
+    expect(cmds.triggerAutoSelect).not.toHaveBeenCalled()
+  })
+
+  it('当前出口延迟缺失或陈旧时触发单次测速，且 15s 内不再调度历史遗留 10s 二次补测', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(cmds.getProfiles).mockResolvedValue({
+        current: 'uid-stale-1',
+        items: [],
+      } as Awaited<ReturnType<typeof cmds.getProfiles>>)
+      const staleProxyA = {
+        name: '日本 01',
+        type: 'AnyTLS',
+        udp: true,
+        alive: false,
+        history: [],
+      }
+      vi.mocked(cmds.calcuProxies).mockResolvedValue({
+        groups: [
+          {
+            name: 'PROXY',
+            type: 'select',
+            now: '日本 01',
+            all: [staleProxyA],
+          },
+        ],
+        records: { '日本 01': staleProxyA },
+        proxies: [staleProxyA],
+      } as unknown as Awaited<ReturnType<typeof cmds.calcuProxies>>)
+      vi.mocked(mihomoApi.getProxyByNameWithTimeout).mockResolvedValue({
+        name: 'PROXY',
+        now: '日本 01',
+        all: ['日本 01'],
+      } as Awaited<ReturnType<typeof mihomoApi.getProxyByNameWithTimeout>>)
+      vi.mocked(cmds.triggerAutoSelect).mockResolvedValue([['日本 01', 62]])
+
+      const autoSelectTimerRef = { current: null as number | null }
+      const p = triggerAutoSelectAndRefresh(
+        vi.fn().mockResolvedValue(undefined),
+        autoSelectTimerRef,
+        undefined,
+        'uid-stale-1',
+        { skipProbeIfFresh: true },
+      )
+      await vi.advanceTimersByTimeAsync(15_000)
+      await p
+
+      expect(cmds.triggerAutoSelect).toHaveBeenCalledTimes(1)
+      expect(cmds.triggerAutoSelect).toHaveBeenCalledWith(
+        'uid-stale-1',
+        ['日本 01'],
+        0,
+        false,
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

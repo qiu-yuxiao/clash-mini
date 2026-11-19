@@ -113,7 +113,7 @@ flowchart TB
 ### 3.4 Mihomo 内核（sidecar / system service）
 
 - **`PROXY`（select）**：用户/app 控制的出口选择，选择稳定、手动覆盖持久。
-- **`PROXY__METRICS`（url-test）**：测量专用组，成员与 `PROXY` 完全相同，`interval` 300s、`lazy: false`，周期性**直接拨测**每个成员的真实延迟，维护 `now`/`history`——这是延迟的**唯一权威源**，从测量层消除 TUN 自指回环。
+- **`PROXY__METRICS`（url-test）**：测量专用组，成员与 `PROXY` 完全相同，`interval` 1800s、`lazy: true`（零无意义自治后台轮询；由后端 `monitor.rs` 按需经 `delay_group("PROXY__METRICS", ...)` 统一触发内核**直接拨测**每个成员的真实延迟并维护 `now`/`history`）——这是延迟的**唯一权威源**，从测量层消除 TUN 自指回环。
 - **运行模式**：TUN 开启 → 系统服务模式（UAC 安装/接管），否则旁路 sidecar；管理员运行时跳过服务等待。
 
 ### 3.5 OS / 磁盘持久化
@@ -240,11 +240,11 @@ sequenceDiagram
 
 ---
 
-## 8. 现行版本基线（`v3.5.0`，见 `package.json`）
+## 8. 现行版本基线（`v3.5.6`，见 `package.json`）
 
 总体结论：**架构收敛、单 `PROXY` 组 + `PROXY__METRICS` 测量解耦、连续性优先方针落地**。
 
-- ✅ 已落地的核心机制：双组解耦（`lazy: false`）、热切换零断流（不清理存量连接）、三层防污染与严格子集兜底（`pick_subset_fallback_node`）、轻量模式三态机、主线程纪律、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移（`BUG-388`）、基于 `/connections` 字节增量的被动流量证活状态机（`BUG-379`）、24h 可恢复真 HTTPS 验真软隔离（`BUG-380` / `BUG-387`）、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截（`BUG-383` / `str::trim_start`）、Win32 原子缩放管线（`BUG-386`）、订阅删除二次确认与新手全协议导入及输入框快捷键放行（`BUG-389` / `BUG-390`）、冗余依赖与死命令清理（`BUG-391`）及精准目标化路径控制。
+- ✅ 已落地的核心机制：双组解耦（`PROXY__METRICS` 与 `proxy-providers` 统一 `lazy: true` 零自治盲测）、热切换零断流（不清理存量连接，前台显式切点精准对齐新出口）、三层防污染与严格子集兜底（`pick_subset_fallback_node`）、轻量模式三态机、主线程与守护运行时物理隔离、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移（`BUG-388`）、基于 `/connections` 字节增量的被动流量证活与低噪探测减负（`BUG-379` / `BUG-399`–`BUG-403`）、24h 可恢复真 HTTPS 验真软隔离（`BUG-380` / `BUG-387`）、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截（`BUG-383` / `str::trim_start`）、Win32 原子缩放管线（`BUG-386`）、订阅删除二次确认与新手全协议导入及输入框快捷键放行（`BUG-389` / `BUG-390`）、冗余依赖与死命令清理（`BUG-391`）及精准目标化路径控制。
 - 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源。
 
 ---
