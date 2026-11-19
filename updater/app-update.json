@@ -1,11 +1,11 @@
 {
-  "version": "3.5.6",
-  "notes": "### 🪶 全面削减后台与唤醒冗余探测信号（BUG-399 ~ BUG-403）\n\n- **关闭内核自治盲测定时器并拉长被动证活免测窗（BUG-399）**：`PROXY__METRICS`（`url-test`）与订阅自带 `proxy-providers.*.health-check` 统一收敛为 `lazy: true`（`interval: 1800`），彻底消除无人用网时 Mihomo 每 5 分钟后台自治全组拨测；`monitor.rs` 结合被动流量证活（`Flowing`）免测上限延展至 `30 分钟`（`1800s`，同步调整前端 `HISTORY_FALLBACK_MAX_AGE_MS = 45 分钟`）、空闲期 `15 分钟`（`900s`），大幅降低后台握手指纹与功耗。\n- **后台定期 HTTPS 验真排除普通死节点且“够用即止”（BUG-400）**：`HTTPS_VERIFY_INTERVAL_SECS` 由 `180s` 放宽至 `600s`（10 分钟）；新增 `should_run_periodic_https_verify` 门控，过滤掉普通离线/超时节点，不再让全组健康节点每 3 分钟陪跑；且当活跃节点已验真且当前过滤子集已有 `≥ 3` 个已验真 `Alive` 备用节点时自动跳过后台周期探测（选点缺候选时仍由「选点前置验真」即时兜底）。\n- **单节点目标主 URL 正常时智能免打备用 URL（BUG-401）**：单点延迟点测及后台首次体检失败时，若同组已有 `≥ 3` 个真实节点通过主测速 URL 正常响应（证实主测速地址与全局通路未失真），不再对全组重打第二轮备用 `gstatic` URL 复核（二次判死前确认及多节点全灭场景完整保留备用地址防失真能力）。\n- **消除窗口关/唤冗余拨测、传递过滤子集复用缓存并移除 10 秒二次补测器（BUG-402）**：关窗进入轻量模式不再触发额外的健康体检唤醒；轻量化唤醒及切回前台（`visibilitychange`）时若当前活跃出口已具备新鲜有效延迟则实现零拨测秒开展示，仅在延迟缺失或过期时传过滤子集复用后端 30s 快照缓存发起单次静默更新；移除历史遗留的 `10s` 前端二次补测定时器。\n- **物理网络 `TCP:53` 探针结合活跃流量证活与单路优先（BUG-403）**：`60s` 内观测到活跃代理连接存在真实下行回包（`Flowing`）时直接证实物理在线并跳过公网 `TCP:53` 探针；需探测时优先单路直连 `223.5.5.5:53`（`250ms`），仅失败或超时后再并发回退其余目标。\n\n---",
-  "pub_date": "2026-11-19T10:19:31.072Z",
+  "version": "3.5.7",
+  "notes": "Clash Mini v3.5.7",
+  "pub_date": "2026-11-19T13:37:07Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU5UcTMwaytzQVBKR1Q2c0dRQ0Fma3RPcldLeWp1MHNzNlhqZHJFSHl0NUFLNUdtMkdxT2VuWG5KWXhRaHRneGJ2dlZSeGJleE5JaFhKV0Fkb3o1dkE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDgzNDc3CWZpbGU6Q2xhc2ggTWluaV8zLjUuNl94NjQtc2V0dXAuZXhlCkZuY0liMHQ0RHhrbm5lMkRqMEJqVDA1cEcxaEtsUjJscWxPU2p2V204SElPY2l3YllEZ2RsV3NQb1dBQjl3RjJkTTBYVXc4OFJNMzdJVWtianNwR0F3PT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.6/Clash.Mini_3.5.6_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.7/Clash.Mini_3.5.7_x64-setup.exe",
       "size": 30216500
     }
   }
