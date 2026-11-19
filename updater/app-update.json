@@ -1,12 +1,12 @@
 {
   "version": "3.5.9",
-  "notes": "Clash Mini v3.5.9",
-  "pub_date": "2026-11-19T18:37:12Z",
+  "notes": "### 📈 宽窄窗统一自适应实时流量曲线 & 彻底清理遗留大盘/Worker 管线（BUG-410）\n\n- **根治宽窗口流量曲线图消失并升级三层随宽自适应表现（BUG-410）**：移除跨 `285px` 断点卸载重建的大盘组件切换分支与重复 `useVisibility()` 订阅，宽窄窗口统一复用单一高灵敏分段对数实时曲线 `TrafficGraph`（彻底根除双异步可见性闭包丢数据、`2500ms < 3000ms` 过期门闩跳过首绘与固定留白挤压）；同时兼顾**手动拖拽边框**与**点击最大化/还原**两种改宽路径，窄窗（`≤285px`）呈极简 `30s` 双参考线，宽窗（`>285px`）经同帧非中断重绘平滑延展为 `30s → 60s` 时间跨度并自动叠加垂向渐变面积填充、`1M`/`10K`/`100B` 对数网格刻度与 `10s` 纵向时间网格，修复矮窗拉宽底栏伸缩退让。\n- **清除上游遗留图表与后台 Web Worker 冗余代码**：彻底移除 `enhanced-canvas-traffic-graph.tsx`、`use-traffic-monitor.ts`、`traffic.worker.ts`、`traffic-sampler.ts` 及死类型/常量，前端源码净削减近 2,000 行并实现零后台流量 Worker 开销。\n\n---",
+  "pub_date": "2026-11-19T18:55:08.334Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUZYMk9iZzhCRWMrTWxLQjd0WGZYMHg2Y1o5bWN6QnFPalVKMlRWcDhzWWt4UUpZeGpMOTNYQUsvMjkxQXlsVkxKa29pYTVPQytKRWF0U0FxTEZXNlFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MTA3MDQyCWZpbGU6Q2xhc2ggTWluaV8zLjUuOF94NjQtc2V0dXAuZXhlCkg2Qm9FZ080dU1HZFduV2NQUGRDcnE5bGlzZmx4NVFKUmFKb1VLNThtZFhwdE9lclUyZnlJMzlXMXBxckU1TXBOTmxxV2tKcEdVQjZJa3Avc2JoTUFRPT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUlnRHR1M2owemtIRDFxcmxkMnZ3d3hMT2ZLN3BadHV3MFNkdEhvODR0QU1mVThZWkRNN0EydXd1V3RVdFhrL2l6b0pXTUJRQXl1Nnk0bmpTdzNkNGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MTE0NDMwCWZpbGU6Q2xhc2ggTWluaV8zLjUuOV94NjQtc2V0dXAuZXhlCldxdHJ5N1Rvc0pKbytWUTA2N0UwTUFPVjQvZ1RxWUVaMEZxVFVkbDk2emxBNXRCZGFpb3JsekZBMUo3WC8yMDlyZzNWcTM2UDY0bG1jT0FWeFVrR0NRPT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.9/Clash.Mini_3.5.9_x64-setup.exe",
-      "size": 30207910
+      "size": 30216340
     }
   }
 }
