@@ -142,7 +142,9 @@ impl IClashTemp {
         map.insert("dns".into(), dns_config.into());
 
         let mut profile_config = Mapping::new();
-        profile_config.insert("store-selected".into(), true.into());
+        // 由 profiles.yaml::selected 与 proxy_head_state.json 作为选点/过滤唯一真源，
+        // 禁止 Mihomo cache.db 在重启后复活过滤前旧选点（BUG-405）。
+        profile_config.insert("store-selected".into(), false.into());
         // 对齐内核默认值（上游模板未设置该项）：false 关闭 fake-ip 映射持久化，
         // 避免 cache.db 与常驻映射表随使用增长；且不做任何强制迁移，尊重用户既有配置。
         profile_config.insert("store-fake-ip".into(), false.into());

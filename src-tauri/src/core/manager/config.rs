@@ -121,23 +121,17 @@ impl CoreManager {
     async fn apply_config(&self, path: PathBuf) -> Result<()> {
         let path = dirs::path_to_str(&path)?;
 
-        // 【关键修复】与 restart_core 路径对称：reload_config(force=true) 会重置 Selector 组
-        // 的 now 到列表首个节点，必须在调用前快照、调用后恢复，否则会导致前端显示节点
-        // 与 mihomo 实际选路节点不一致（"前端显示日本aw2但实际走列表首个真实节点"），
-        // 引发应用层断流（YouTube 不通）但 UI 仍显示健康节点的诡异现象。
-        // 历史背景：8b483a7b 提交引入 restore_proxy_group_now 但只覆盖 restart_core 路径；
-        // v2.6.4 伪节点过滤修复使首个节点变为真实节点后，该漏洞显化。
-        let saved_proxy_now = self.snapshot_proxy_group_now().await;
+        // reload_config(force=true) 在 store-selected: false 下按 PROXY.proxies[0] 落位；
+        // 重载前后统一走 resolve_desired_proxy_selection + ensure_proxy_group_selection 校验过滤边界。
+        let saved_proxy_now = self.resolve_desired_proxy_selection().await;
 
         match self.reload_config(path).await {
             Ok(_) => {
                 Config::runtime().await.apply();
                 logging!(info, Type::Core, "Configuration applied");
 
-                // 恢复 PROXY 组的节点选择（与 restart_core 路径对称）
-                if let Some(node) = saved_proxy_now {
-                    self.restore_proxy_group_now(&node).await;
-                }
+                // 恢复 PROXY 组并清理滞留在已排除节点上的连接（即使快照为空也进入子集兜底）
+                self.ensure_proxy_group_selection(saved_proxy_now.as_deref()).await;
 
                 // 【强咬合防线】通知前端获取重载后的最新节点和内核客观配置
                 crate::core::handle::Handle::refresh_clash();

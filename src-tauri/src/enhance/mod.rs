@@ -1348,6 +1348,7 @@ async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
         Value::from("proxy-groups"),
         Value::from(vec![Value::from(single_group), Value::from(metrics_group)]),
     );
+    sync_runtime_proxy_group_head(&mut config).await;
 
     // 4. 配置 GFWList 规则集（构建时预置随包释放，运行时按 24h 间隔经 PROXY 定时更新）
     let mut gfwlist_provider = Mapping::new();
@@ -1556,6 +1557,89 @@ fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Valu
     }
 
     all_proxies
+}
+
+/// 读取当前激活 Profile 的持久化 PROXY 选点与过滤词（`proxy_head_state.json`）。
+pub async fn read_persisted_proxy_and_filter() -> (Option<std::string::String>, std::string::String) {
+    let profiles = Config::profiles().await.latest_arc();
+    let Some(current_uid) = profiles.current.as_deref() else {
+        return (None, std::string::String::new());
+    };
+    let persisted = profiles
+        .items
+        .as_ref()
+        .and_then(|items| items.iter().find(|it| it.uid.as_deref() == Some(current_uid)))
+        .and_then(|item| item.selected.as_ref())
+        .and_then(|sel| sel.iter().find(|s| s.name.as_deref() == Some("PROXY")))
+        .and_then(|s| s.now.as_deref())
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(str::to_owned);
+    let filter_text = crate::module::monitor::get_filter_and_sort_config(current_uid)
+        .await
+        .0
+        .filter_text
+        .trim()
+        .to_string();
+    (persisted, filter_text)
+}
+
+/// 纯函数：强制运行时关闭 `profile.store-selected`，并按过滤条件将合规节点提前至 `PROXY.proxies[0]`。
+fn apply_proxy_group_head_and_store_selected(config: &mut Mapping, preferred: Option<&str>, filter_text: &str) {
+    match config.get_mut("profile") {
+        Some(Value::Mapping(profile_map)) => {
+            profile_map.insert(Value::from("store-selected"), Value::Bool(false));
+        }
+        _ => {
+            let mut profile_map = Mapping::new();
+            profile_map.insert(Value::from("store-selected"), Value::Bool(false));
+            config.insert(Value::from("profile"), Value::Mapping(profile_map));
+        }
+    }
+
+    let Some(Value::Sequence(groups)) = config.get_mut("proxy-groups") else {
+        return;
+    };
+    for group in groups.iter_mut() {
+        let Some(group_map) = group.as_mapping_mut() else {
+            continue;
+        };
+        if group_map.get("name").and_then(Value::as_str) != Some("PROXY") {
+            continue;
+        }
+        let Some(Value::Sequence(proxies_val)) = group_map.get("proxies") else {
+            break;
+        };
+        let mut names: Vec<std::string::String> = proxies_val
+            .iter()
+            .filter_map(|v| v.as_str().map(str::to_owned))
+            .collect();
+        let promoted = crate::utils::node::promote_preferred_proxy_first(
+            &mut names,
+            preferred,
+            filter_text,
+            |n| {
+                n != "DIRECT"
+                    && n != "REJECT"
+                    && !crate::utils::node::is_dummy_node(n)
+                    && !crate::utils::node::is_confirmed_fake_node(n)
+            },
+            crate::utils::node::is_verified_true_node,
+        );
+        if promoted.is_some() {
+            group_map.insert(
+                Value::from("proxies"),
+                Value::Sequence(names.into_iter().map(Value::from).collect()),
+            );
+        }
+        break;
+    }
+}
+
+/// 同步运行时配置 `PROXY.proxies[0]` 与 `profile.store-selected: false`（BUG-405）。
+pub async fn sync_runtime_proxy_group_head(config: &mut Mapping) {
+    let (preferred, filter_text) = read_persisted_proxy_and_filter().await;
+    apply_proxy_group_head_and_store_selected(config, preferred.as_deref(), &filter_text);
 }
 
 /// Enhance mode
@@ -2295,5 +2379,64 @@ proxies:
             .filter_map(Value::as_str)
             .collect();
         assert_eq!(reassigned_names, vec!["香港1 (045017)"]);
+    }
+
+    #[tokio::test]
+    async fn test_bug405_store_selected_disabled_and_proxy_head_promoted() {
+        use super::{apply_proxy_group_head_and_store_selected, enforce_mini_agreements};
+        use serde_yaml_ng::{Mapping, Value};
+
+        let _ = crate::utils::dirs::PORTABLE_FLAG.get_or_init(|| true);
+
+        let yaml_str = r"
+profile:
+  store-selected: true
+proxies:
+  - name: 香港1 (184629)
+    type: ss
+    server: 198.51.100.1
+    port: 443
+    cipher: aes-128-gcm
+    password: p1
+  - name: 台湾1 (184629)
+    type: ss
+    server: 198.51.100.2
+    port: 443
+    cipher: aes-128-gcm
+    password: p2
+  - name: 新加坡3 (184629)
+    type: ss
+    server: 198.51.100.3
+    port: 443
+    cipher: aes-128-gcm
+    password: p3
+";
+        let config: Mapping = serde_yaml_ng::from_str(yaml_str).unwrap();
+        let mut enforced = enforce_mini_agreements(config).await;
+
+        assert_eq!(
+            enforced
+                .get("profile")
+                .and_then(Value::as_mapping)
+                .and_then(|m| m.get("store-selected"))
+                .and_then(Value::as_bool),
+            Some(false)
+        );
+
+        apply_proxy_group_head_and_store_selected(&mut enforced, Some("新加坡3 (184629)"), "-香港 -台湾");
+        let proxy_proxies: Vec<&str> = enforced
+            .get("proxy-groups")
+            .and_then(Value::as_sequence)
+            .and_then(|g| g[0].as_mapping())
+            .and_then(|m| m.get("proxies"))
+            .and_then(Value::as_sequence)
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert_eq!(
+            proxy_proxies,
+            vec!["新加坡3 (184629)", "香港1 (184629)", "台湾1 (184629)"]
+        );
     }
 }

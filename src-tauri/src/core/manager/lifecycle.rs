@@ -20,10 +20,10 @@ impl CoreManager {
         self.await_service_ready_if_needed().await;
 
         let _life = self.lifecycle_lock.lock().await;
-        self.start_core_inner().await
+        self.start_core_inner(true).await
     }
 
-    async fn start_core_inner(&self) -> Result<()> {
+    async fn start_core_inner(&self, ensure_selection_async: bool) -> Result<()> {
         // 退出中不再启动新内核
         if Handle::global().is_exiting() {
             return Ok(());
@@ -55,9 +55,13 @@ impl CoreManager {
             RunningMode::NotRunning | RunningMode::Sidecar => self.start_core_by_sidecar().await,
         };
 
-        // 启动失败时回滚 mode
+        // 启动失败时回滚 mode；冷启动成功时异步兜底校验 PROXY 选点与清理越界连接（BUG-405）
         if result.is_err() {
             self.set_running_mode(RunningMode::NotRunning);
+        } else if ensure_selection_async {
+            crate::process::AsyncHandler::spawn(|| async move {
+                Self::global().ensure_proxy_group_selection(None).await;
+            });
         }
 
         result
@@ -102,18 +106,13 @@ impl CoreManager {
         let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
 
-        // 重启前快照单一 PROXY 组当前节点，读取失败时回退至本地持久化选点（过滤假节点）
-        let saved_proxy_now = match self.snapshot_proxy_group_now().await {
-            Some(node) => Some(node),
-            None => Self::read_persisted_proxy_selection().await,
-        };
+        // 重启前记录过滤合规的目标选点（快照优先，缺失/越界回退持久化）
+        let saved_proxy_now = self.resolve_desired_proxy_selection().await;
 
         self.stop_core_inner().await?;
-        self.start_core_inner().await?;
+        self.start_core_inner(false).await?;
 
-        if let Some(node) = saved_proxy_now {
-            self.restore_proxy_group_now(&node).await;
-        }
+        self.ensure_proxy_group_selection(saved_proxy_now.as_deref()).await;
 
         Handle::refresh_clash();
         crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
@@ -297,53 +296,61 @@ impl CoreManager {
         let mihomo = Handle::mihomo().await.clone();
         match mihomo.get_group_by_name("PROXY").await {
             Ok(group) => match group.now {
-                Some(node) if !node.is_empty() && !crate::utils::node::is_confirmed_fake_node(&node) => {
+                Some(node)
+                    if !node.is_empty()
+                        && !is_builtin_outbound(&node)
+                        && !crate::utils::node::is_dummy_node(&node)
+                        && !crate::utils::node::is_confirmed_fake_node(&node) =>
+                {
                     logging!(info, Type::Core, "快照 PROXY 组当前节点: {}", node);
                     Some(node)
                 }
                 _ => None,
             },
             Err(e) => {
-                logging!(warn, Type::Core, "快照 PROXY 组失败（忽略，重启后不恢复）: {}", e);
+                logging!(warn, Type::Core, "快照 PROXY 组失败（将尝试读取持久化选点）: {}", e);
                 None
             }
         }
     }
 
-    /// 当内核卡死重启无法获取实时快照时，回退读取本地 profiles.yaml 中持久化的上次有效选点（BUG-335）
-    async fn read_persisted_proxy_selection() -> Option<std::string::String> {
-        let profiles = Config::profiles().await.latest_arc();
-        let current_uid = profiles.current.as_deref()?;
-        let items = profiles.items.as_ref()?;
-        let item = items.iter().find(|it| it.uid.as_deref() == Some(current_uid))?;
-        let selected = item.selected.as_ref()?;
-        let target = selected
-            .iter()
-            .find(|s| s.name.as_deref() == Some("PROXY"))
-            .and_then(|s| s.now.as_deref())
-            .filter(|n| {
-                !n.is_empty() && !crate::utils::node::is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n)
-            })?;
-        logging!(
-            info,
-            Type::Core,
-            "实时快照不可用，回退读取持久化 PROXY 选点准备恢复: {}",
-            target
-        );
-        Some(target.to_string())
+    /// 综合实时快照、持久化 `profiles.yaml::selected` 与用户 `filterText`，解析重启/重载前合规的目标节点（BUG-405）。
+    pub async fn resolve_desired_proxy_selection(&self) -> Option<std::string::String> {
+        let (persisted, raw_filter) = crate::enhance::read_persisted_proxy_and_filter().await;
+        let effective_filter = crate::utils::node::effective_filter_text(&raw_filter);
+        let is_compliant = |node: &str| {
+            !node.is_empty()
+                && !is_builtin_outbound(node)
+                && !crate::utils::node::is_dummy_node(node)
+                && !crate::utils::node::is_confirmed_fake_node(node)
+                && crate::utils::node::match_node_filter(node, effective_filter)
+        };
+
+        if let Some(snap) = self.snapshot_proxy_group_now().await {
+            if is_compliant(&snap) {
+                return Some(snap);
+            }
+            logging!(
+                warn,
+                Type::Core,
+                "快照节点 {} 不符合当前过滤范围「{}」，尝试回退持久化合规选点",
+                snap,
+                effective_filter
+            );
+        }
+
+        persisted.filter(|node| is_compliant(node))
     }
 
-    /// 恢复 PROXY 组的节点选择（内核重启后调用）
-    /// 等待内核 API 就绪后调用 mihomo.select_node_for_group("PROXY", node)
-    /// 失败不抛错（兜底失败时前端可能显示假节点，但不影响代理功能本身）
-    pub async fn restore_proxy_group_now(&self, node: &str) {
+    /// 统一保障内核启动 / 重启 / 重载后的 PROXY 组选点合规性，并在收尾清理滞留于已排除节点的代理连接（BUG-405）。
+    pub async fn ensure_proxy_group_selection(&self, preferred: Option<&str>) {
         if Handle::global().is_exiting() {
             return;
         }
 
         let mihomo = Handle::mihomo().await.clone();
 
-        // 等待内核 API 就绪（最多 30 秒）
+        // 等待内核 API 就绪（总上限 30s，前 2s 使用 50ms 快速轮询压缩窗口期）
         let start = std::time::Instant::now();
         let mut api_ready = false;
         while start.elapsed().as_secs() < 30 {
@@ -354,169 +361,132 @@ impl CoreManager {
                 api_ready = true;
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            let step_ms = if start.elapsed().as_secs() < 2 { 50 } else { 200 };
+            tokio::time::sleep(std::time::Duration::from_millis(step_ms)).await;
         }
         if !api_ready {
             logging!(warn, Type::Core, "等待内核 API 就绪超时，跳过 PROXY 组节点恢复");
             return;
         }
 
-        // 等待 PROXY 组节点列表填充（最多 20 秒），顺带确认目标节点是否已入组
-        // （决定后续 select 是否值得重试：不在组内属持久性错误，重试无意义）
+        // 等待 PROXY 组节点列表填充（总上限 20s，前 2s 使用 50ms 快速轮询）
         let start2 = std::time::Instant::now();
-        let mut node_in_group = false;
+        let mut loaded_group: Option<(Vec<String>, Option<String>)> = None;
         while start2.elapsed().as_secs() < 20 {
             if Handle::global().is_exiting() {
                 return;
             }
-            if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await {
-                if let Some(all) = group_info.all {
-                    if !all.is_empty() {
-                        node_in_group = all.iter().any(|n| n == node);
-                        break;
+            if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await
+                && let Some(all) = group_info.all
+                && !all.is_empty()
+            {
+                loaded_group = Some((all, group_info.now));
+                break;
+            }
+            let step_ms = if start2.elapsed().as_secs() < 2 { 50 } else { 200 };
+            tokio::time::sleep(std::time::Duration::from_millis(step_ms)).await;
+        }
+        let Some((all, current_now)) = loaded_group else {
+            logging!(warn, Type::Core, "等待 PROXY 组节点列表填充超时，跳过选点恢复");
+            return;
+        };
+
+        let (persisted, raw_filter) = crate::enhance::read_persisted_proxy_and_filter().await;
+        let effective_filter = crate::utils::node::effective_filter_text(&raw_filter);
+
+        let is_compliant_member = |n: &str| {
+            !n.is_empty()
+                && !is_builtin_outbound(n)
+                && !crate::utils::node::is_dummy_node(n)
+                && !crate::utils::node::is_confirmed_fake_node(n)
+                && crate::utils::node::match_node_filter(n, effective_filter)
+                && all.iter().any(|m| m == n)
+        };
+
+        let desired_target: Option<String> = if let Some(pref) = preferred {
+            if is_compliant_member(pref) {
+                Some(pref.to_string())
+            } else {
+                logging!(
+                    info,
+                    Type::Core,
+                    "跳过 PROXY 组节点恢复：{} 属内置/假节点、不在成员中或已被过滤词「{}」排除，改按子集兜底",
+                    pref,
+                    effective_filter
+                );
+                None
+            }
+        } else if current_now.as_deref().is_some_and(is_compliant_member) {
+            current_now.clone()
+        } else {
+            persisted.filter(|p| is_compliant_member(p))
+        };
+
+        if let Some(target) = desired_target {
+            if current_now.as_deref() == Some(target.as_str()) {
+                logging!(debug, Type::Core, "PROXY 组已落位合规出口节点: {}", target);
+            } else {
+                // 90s 总预算重试（TUN 流量洪峰下 IPC 可能短暂超时）
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+                loop {
+                    match mihomo.select_node_for_group("PROXY", &target).await {
+                        Ok(()) => {
+                            logging!(info, Type::Core, "已恢复 PROXY 组节点选择: {}", target);
+                            break;
+                        }
+                        Err(e) => {
+                            if Handle::global().is_exiting() || std::time::Instant::now() >= deadline {
+                                logging!(
+                                    warn,
+                                    Type::Core,
+                                    "恢复 PROXY 组节点选择失败 ({}): {}，重试预算耗尽，回退到子集首个可用节点",
+                                    target,
+                                    e
+                                );
+                                select_fallback_in_subset(&mihomo, &all, effective_filter).await;
+                                break;
+                            }
+                            logging!(
+                                warn,
+                                Type::Core,
+                                "恢复 PROXY 组节点选择失败 ({}): {}，3 秒后重试（总预算 90 秒）",
+                                target,
+                                e
+                            );
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        }
                     }
                 }
             }
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        } else {
+            select_fallback_in_subset(&mihomo, &all, effective_filter).await;
         }
 
-        // 防御：内置出站（DIRECT/REJECT…）及永久拉黑假节点不可选为恢复目标
-        if is_builtin_outbound(node) || crate::utils::node::is_confirmed_fake_node(node) {
-            logging!(
-                info,
-                Type::Core,
-                "跳过 PROXY 组节点恢复：{} 属内置出站或已确认假节点，直接按子集兜底",
-                node
-            );
-            let filter_text = read_filter_text().await;
-            select_fallback_in_subset(&mihomo, &filter_text).await;
-            return;
-        }
-
-        // 【BUG-301】目标节点不在组成员里（订阅更新移除、或空组兜底成 DIRECT），
-        // select 是持久性错误，重试没有意义——直接走与「还原失败」相同的子集兜底。
-        if !node_in_group {
-            logging!(
-                info,
-                Type::Core,
-                "跳过 PROXY 组节点恢复：目标节点 {node} 不在组成员中，直接按子集兜底"
-            );
-            let filter_text = read_filter_text().await;
-            select_fallback_in_subset(&mihomo, &filter_text).await;
-            return;
-        }
-
-        // 恢复节点选择：优先恢复 snapshot 保存的节点。
-        // 【BUG-301】服务核心冷启动的头几十秒，TUN 风暴/流量洪峰会把核心 CPU 打满，
-        // IPC 请求可能接连 4 秒超时（现场实证：恢复一次超时即放弃，节点留在死节点上，
-        // 全系统断网 80 秒直到自愈监控救场）。节点已前置校验在组内，不存在持久性
-        // 错误，任何失败都值得重试——给 90 秒总预算，预算耗尽再走兜底。
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
-        loop {
-            match mihomo.select_node_for_group("PROXY", node).await {
-                Ok(()) => {
-                    logging!(info, Type::Core, "已恢复 PROXY 组节点选择: {}", node);
-                    break;
-                }
-                Err(e) => {
-                    if Handle::global().is_exiting() || std::time::Instant::now() >= deadline {
-                        logging!(
-                            warn,
-                            Type::Core,
-                            "恢复 PROXY 组节点选择失败 ({}): {}，重试预算耗尽，回退到子集首个可用节点",
-                            node,
-                            e
-                        );
-                        // 读取用户保存的 filterText，在子集范围内选点兜底
-                        let filter_text = read_filter_text().await;
-                        select_fallback_in_subset(&mihomo, &filter_text).await;
-                        break;
-                    }
-                    logging!(
-                        warn,
-                        Type::Core,
-                        "恢复 PROXY 组节点选择失败 ({}): {}，3 秒后重试（总预算 90 秒）",
-                        node,
-                        e
-                    );
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                }
-            }
-        }
+        // 收尾清理：清除启动/重载窗口内落入已排除节点上的代理连接
+        crate::module::monitor::close_excluded_proxy_connections(&raw_filter).await;
     }
 }
 
-/// 从 proxy_head_state.json 读取当前 profile 的 PROXY 组 filterText
-async fn read_filter_text() -> String {
-    let current_uid = match Config::profiles().await.latest_arc().current.as_ref() {
-        Some(uid) => uid.clone(),
-        None => return String::new(),
-    };
-    let Some(path) = crate::utils::dirs::app_home_dir()
-        .ok()
-        .map(|d| d.join("proxy_head_state.json"))
-    else {
-        return String::new();
-    };
-    let Some(content) = tokio::fs::read_to_string(&path).await.ok() else {
-        return String::new();
-    };
-    let Some(value) = serde_json::from_str::<serde_json::Value>(&content).ok() else {
-        return String::new();
-    };
-    value[current_uid.as_str()]["PROXY"]["filterText"]
-        .as_str()
-        .map(|s| s.trim().to_string())
-        .unwrap_or_default()
-}
-
-/// 纯选择函数（便于单测锁定，BUG-388）：按优先级从 `PROXY` 全量成员中挑选兜底节点：
-/// 1. 匹配 `filter_text` 且已通过真 HTTPS 验真的有效节点；
-/// 2. 匹配 `filter_text` 的有效节点；
-/// 3. 仅当 `filter_text.trim().is_empty()`（未设置任何子集筛选）时才回退到首个全局有效节点，
-///    存在显式关键词筛选且子集全灭时返回 `None`，严禁静默切出筛选范围。
-fn pick_subset_fallback_node<'a, FValid, FVerified>(
-    all: &'a [String],
-    filter_text: &str,
-    is_valid: FValid,
-    is_verified: FVerified,
-) -> Option<&'a str>
-where
-    FValid: Fn(&str) -> bool,
-    FVerified: Fn(&str) -> bool,
-{
-    let trimmed = filter_text.trim();
-    all.iter()
-        .find(|n| is_valid(n) && is_verified(n) && crate::utils::node::match_node_filter(n, trimmed))
-        .or_else(|| {
-            all.iter()
-                .find(|n| is_valid(n) && crate::utils::node::match_node_filter(n, trimmed))
-        })
-        .or_else(|| {
-            if trimmed.is_empty() {
-                all.iter().find(|n| is_valid(n))
-            } else {
-                None
-            }
-        })
-        .map(String::as_str)
-}
-
-/// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底
-async fn select_fallback_in_subset(mihomo: &Mihomo, filter_text: &str) {
-    let Ok(group_info) = mihomo.get_group_by_name("PROXY").await else {
-        return;
-    };
-    let Some(all) = group_info.all else { return };
-    let fallback = pick_subset_fallback_node(
-        &all,
+/// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底，并同步持久化 `profile.selected`。
+async fn select_fallback_in_subset(mihomo: &Mihomo, all: &[String], filter_text: &str) {
+    let fallback = crate::utils::node::pick_subset_fallback_node(
+        all,
         filter_text,
-        |n| !crate::utils::node::is_dummy_node(n) && !crate::utils::node::is_confirmed_fake_node(n),
+        |n| {
+            !is_builtin_outbound(n)
+                && !crate::utils::node::is_dummy_node(n)
+                && !crate::utils::node::is_confirmed_fake_node(n)
+        },
         crate::utils::node::is_verified_true_node,
     );
     if let Some(fb) = fallback {
         match mihomo.select_node_for_group("PROXY", fb).await {
-            Ok(()) => logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb),
+            Ok(()) => {
+                logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb);
+                if let Some(uid) = crate::module::monitor::get_current_profile_uid().await {
+                    crate::module::monitor::persist_selected_node_if_matching(&uid, fb).await;
+                }
+            }
             Err(e) => logging!(warn, Type::Core, "PROXY 组回退节点选择也失败: {}", e),
         }
     } else if !filter_text.trim().is_empty() {
@@ -525,50 +495,6 @@ async fn select_fallback_in_subset(mihomo: &Mihomo, filter_text: &str) {
             Type::Core,
             "PROXY 组在过滤范围「{}」内无可用兜底节点，遵循边界约束跳过越界切点",
             filter_text.trim()
-        );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::pick_subset_fallback_node;
-
-    #[test]
-    fn test_pick_subset_fallback_node_respects_filter_boundary() {
-        let all = vec![
-            "剩余流量：100 GB".to_string(),
-            "香港-01".to_string(),
-            "日本-01".to_string(),
-            "日本-02".to_string(),
-        ];
-        let is_valid = |n: &str| !n.contains("剩余流量");
-
-        // 1. 有过滤词且存在已验真匹配项：优先选已验真匹配
-        assert_eq!(
-            pick_subset_fallback_node(&all, "日本", is_valid, |n| n == "日本-02"),
-            Some("日本-02")
-        );
-
-        // 2. 有过滤词且仅未验真匹配：选未验真匹配
-        assert_eq!(
-            pick_subset_fallback_node(&all, "日本", is_valid, |_| false),
-            Some("日本-01")
-        );
-
-        // 3. 有过滤词且子集无任何有效匹配（仅香港存在）：返回 None，绝不越界切出筛选子集
-        assert_eq!(
-            pick_subset_fallback_node(&all, "新加坡", is_valid, |n| n == "香港-01"),
-            None
-        );
-
-        // 4. 空/纯空白过滤词：允许全局兜底并优先已验真有效节点
-        assert_eq!(
-            pick_subset_fallback_node(&all, "   ", is_valid, |n| n == "日本-01"),
-            Some("日本-01")
-        );
-        assert_eq!(
-            pick_subset_fallback_node(&all, "", is_valid, |_| false),
-            Some("香港-01")
         );
     }
 }

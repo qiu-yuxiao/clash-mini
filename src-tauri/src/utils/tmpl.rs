@@ -12,7 +12,7 @@ rules: []
 pub const ITEM_MERGE: &str = "# Profile Enhancement Merge Template for Clash Verge
 
 profile:
-  store-selected: true
+  store-selected: false
 ";
 
 pub const ITEM_MERGE_EMPTY: &str = "# Profile Enhancement Merge Template for Clash Verge

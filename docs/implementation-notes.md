@@ -71,7 +71,7 @@
 | `AUTO_SELECT_BUSY` / `AUTO_SELECT_MANUAL_PREEMPTED` / `MANUAL_SWITCH_EPOCH` | 状态 / 原子序号 | 选点冲突与手动抢占让路不算失败、不冷却、不覆盖手动选点（§5.3） |
 | `should_allow_https_migration` / `HTTPS_VERIFY_MIGRATE_MIN_FAILS` / `HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS` | 纯函数 / 常量 | `Flowing` 有流量态禁验真迁移、`>= 2` 次失败门槛、`600s` 全败退避（§5.2） |
 | `self_heal_subject_to_switch_rate_limit` / `should_keep_alive_on_api_recovery` | 纯函数 | `ConfirmedDead` 豁免切换速率上限、`ApiChannelDown` 恢复即保活（§5.1 / §5.3） |
-| `pick_subset_fallback_node`（`lifecycle.rs`） | 纯函数 | 非空 `filter_text` 严格禁止越界回退（§5.4） |
+| `pick_subset_fallback_node` / `promote_preferred_proxy_first`（`utils/node.rs`） | 纯函数 | 非空 `filter_text` 禁越界回退，并在生成落盘前将合规节点提前至 `PROXY.proxies[0]`（§5.4） |
 | `api_error_count` / `auto_select_fail_count` | 计数器 | API 异常计数触发自愈 / 5 次弹窗（§5.1 / §5.3） |
 | `check_active_node_health` | 已废弃函数 | 旧 15s 自测方案（TUN 下测不准）被 PROXY__METRICS 取代（§5.1 历史） |
 | `trigger_auto_select(profile_uid, node_names, 0, select)` / `trigger_backend_auto_select` / `disableWebViewShortcuts` | 后端命令 / 快捷键 | F1/F4 统一收归后端选点且在输入焦点中仍可直接触发（§5.6） |
@@ -107,7 +107,7 @@
 | 代理组名固定 `'PROXY'`（禁动态查找） | 常量 | 单 PROXY 组模型（§7.1） |
 | `calcuProxies` | 函数 | 保证 PROXY 组存在（§7.1） |
 | `activateSelected` / `restore_profile_selected_nodes` | 前端/后端 | 只处理 PROXY 组（§7.1） |
-| `restart_core` / `update_config_checked` | 后端函数 | 内核重启前后 PROXY `now` 快照恢复（§7.1） |
+| `sync_runtime_proxy_group_head` / `resolve_desired_proxy_selection` / `ensure_proxy_group_selection` | 后端函数 | 生成期关 `store-selected` 并提前 `PROXY.proxies[0]`；全生命周期重启/重载统一校验并清理越界连接（§5.4 / §7.1） |
 | `trigger_backend_auto_select` → `select_node_for_group("PROXY", ...)` → `profiles_patch_item_safe` | 后端链路 | 选点成功回写 `profile.selected`（§7.1） |
 | `handleImportProfile` / `restartCore()` | 前端 | 导入后重启内核（§7.2） |
 | `viewProfile(uid)` / `patchProfile(uid, ...)` / `mutateProfiles()` | 后端/前端 | 订阅右键菜单与编辑（§7.3） |

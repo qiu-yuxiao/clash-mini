@@ -181,8 +181,8 @@ sequenceDiagram
 ### 5.1 测量归内核 · 双组解耦（治本地基）
 `PROXY=select` + `PROXY__METRICS=url-test` 把"控制"与"测量"彻底解耦：手动选点持久、测量又可靠，且**在 TUN 下无自指回环**（旧设计在 TUN 下"测活跃节点自身返回 timeout"的根因被从测量源消除）。
 
-### 5.2 子集结构性 · 三层防污染校验
-地域过滤（`filterText`）同时重配两组的 membership，池外节点在配置层即不可能出现（结构性越界不可能）；`lifecycle::pick_subset_fallback_node` 严格禁止在非空 `filter_text` 条件下越界切出筛选子集（仅 `filter_text` 为空时允许全局回退）。选点回写 `profile.selected` 前校验节点在范围、轻量还原前再校验、前端反向校准第三道——闭环了 2026-07-19 污染事故，同时叠加 `Flowing` 有流量态禁止后台 HTTPS 迁移与 `ConfirmedDead` 豁免切换速率截断以保障连续性（`BUG-388`）。
+### 5.2 子集结构性 · 四层防污染与 0ms 合规落位
+地域过滤（`filterText`）同时重配选点约束，全局强关 `store-selected` 并由 `sync_runtime_proxy_group_head` 在配置生成/落盘前将合规出口提前至 `PROXY.proxies[0]`，消除内核启动/重启瞬间的首节点越界窗口；`utils::node::pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界切出筛选子集；全生命周期统一经过 `ensure_proxy_group_selection` 与 `close_excluded_proxy_connections`，同时 `evaluate_failover` 在活跃出口越界时触发 `ShouldMigrate`，叠加 `Flowing` 有流量态禁止后台 HTTPS 迁移与 `ConfirmedDead` 豁免切换速率截断以保障连续性（`BUG-388` / `BUG-405`）。
 
 ### 5.3 热切换零断流（禁 reload）
 故障转移一律 `select`（干净热切换），禁整份 `refresh_clash()` + `auto_close_connection`，断连风暴从结构上不可能。
@@ -244,7 +244,7 @@ sequenceDiagram
 
 总体结论：**架构收敛、单 `PROXY` 组 + `PROXY__METRICS` 测量解耦、连续性优先方针落地**。
 
-- ✅ 已落地的核心机制：双组解耦（`PROXY__METRICS` 与 `proxy-providers` 统一 `lazy: true` 零自治盲测）、热切换零断流（不清理存量连接，前台显式切点精准对齐新出口）、三层防污染与严格子集兜底（`pick_subset_fallback_node`）、轻量模式三态机、主线程与守护运行时物理隔离、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移、基于 `/connections` 字节增量的被动流量证活与低噪探测减负、24h 可恢复真 HTTPS 验真软隔离、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截、Win32 原子缩放管线、订阅删除二次确认与新手全协议导入、精准目标化路径控制，以及 Rust 全仓 `dead_code` 静态门禁与零重复前后协同架构。
+- ✅ 已落地的核心机制：双组解耦（`PROXY__METRICS` 与 `proxy-providers` 统一 `lazy: true` 零自治盲测）、热切换零断流（不清理存量连接，前台显式切点精准对齐新出口）、四层防污染与 0ms 合规落位（`store-selected: false`、`sync_runtime_proxy_group_head` 提前 `PROXY.proxies[0]`、`ensure_proxy_group_selection` 生命周期保障与 `close_excluded_proxy_connections` 清理）、轻量模式三态机、主线程与守护运行时物理隔离、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移、基于 `/connections` 字节增量的被动流量证活与低噪探测减负、24h 可恢复真 HTTPS 验真软隔离、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截、Win32 原子缩放管线、订阅删除二次确认与新手全协议导入、精准目标化路径控制，以及 Rust 全仓 `dead_code` 静态门禁与零重复前后协同架构。
 - 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源；历史缺陷与版本演进记录详见 [Changelog.md](../Changelog.md) 与 [bug_list.md](../bug_list.md)。
 
 ---

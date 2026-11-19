@@ -201,37 +201,89 @@ pub fn should_close_stale_proxy_connection(chains: &[String], group_name: &str, 
         && !chains.iter().any(|c| c == target)
 }
 
-/// 前台用户显式触发选点切换后，精准清理仍挂在非 `target_node` 旧出口上的 `PROXY` 存量长连接（BUG-396）。
-/// 注意：后台自动自愈（`self_heal_with_accounting`）与冷启动/唤醒初始化严禁调用本函数，继续保持零断流热切换。
-pub async fn close_stale_proxy_connections(target_node: &str) {
+/// 判断某条活跃代理连接的真实出口节点（`chains[0]`）是否已被当前有效过滤词排除（BUG-405）：
+/// - 过滤词为空或处于半输入态时返回 `false`，不触碰任何连接；
+/// - 仅匹配经过 `group`（`"PROXY"`）且末端为真实代理节点的连接，绝不误伤 `DIRECT` / `REJECT`。
+pub(crate) fn should_close_excluded_proxy_connection(chains: &[String], group: &str, filter_text: &str) -> bool {
+    if crate::utils::node::is_incomplete_filter_input(filter_text) || !chains.iter().any(|c| c == group) {
+        return false;
+    }
+    let Some(exit_node) = chains.first().map(|s| s.trim()).filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    if exit_node.eq_ignore_ascii_case("DIRECT")
+        || exit_node.eq_ignore_ascii_case("REJECT")
+        || exit_node.eq_ignore_ascii_case("REJECT-DROP")
+        || exit_node.eq_ignore_ascii_case("PASS")
+        || exit_node.eq_ignore_ascii_case("COMPATIBLE")
+        || exit_node.eq_ignore_ascii_case("PROXY")
+        || exit_node.eq_ignore_ascii_case("GLOBAL")
+    {
+        return false;
+    }
+    !match_node_filter(exit_node, filter_text.trim())
+}
+
+async fn close_matching_proxy_connections<F>(mut predicate: F) -> usize
+where
+    F: FnMut(&[String]) -> bool,
+{
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
     let Ok(snapshot) = mihomo.get_connections().await else {
-        return;
+        return 0;
     };
-    let stale_ids: Vec<String> = snapshot
+    let ids: Vec<String> = snapshot
         .connections
         .unwrap_or_default()
         .into_iter()
-        .filter(|conn| should_close_stale_proxy_connection(&conn.chains, "PROXY", target_node))
+        .filter(|conn| predicate(&conn.chains))
         .map(|conn| conn.id)
         .collect();
-    if stale_ids.is_empty() {
-        return;
-    }
-    let count = stale_ids.len();
-    for id in stale_ids {
+    let count = ids.len();
+    for id in ids {
         let _ = mihomo.close_connection(&id).await;
     }
-    logging!(
-        info,
-        Type::Lightweight,
-        "[前台切点] 已精准清理 {} 条非当前目标节点（{}）的存量代理连接",
-        count,
-        target_node
-    );
+    count
 }
 
-async fn persist_selected_node_if_matching(profile_uid: &str, fastest_node: &str) {
+/// 前台用户显式触发选点切换后，精准清理仍挂在非 `target_node` 旧出口上的 `PROXY` 存量长连接（BUG-396）。
+/// 注意：后台自愈与常规冷启动保持零断流热切换；过滤越界清理由 `close_excluded_proxy_connections` 负责。
+pub async fn close_stale_proxy_connections(target_node: &str) {
+    let count =
+        close_matching_proxy_connections(|chains| should_close_stale_proxy_connection(chains, "PROXY", target_node))
+            .await;
+    if count > 0 {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[前台切点] 已精准清理 {} 条非当前目标节点（{}）的存量代理连接",
+            count,
+            target_node
+        );
+    }
+}
+
+/// 清理仍绑定在已被过滤词排除的代理节点上的存量连接（BUG-405），绝不触碰合规代理或 `DIRECT`/`REJECT`。
+pub async fn close_excluded_proxy_connections(filter_text: &str) {
+    let trimmed = filter_text.trim();
+    if crate::utils::node::is_incomplete_filter_input(trimmed) {
+        return;
+    }
+    let count =
+        close_matching_proxy_connections(|chains| should_close_excluded_proxy_connection(chains, "PROXY", trimmed))
+            .await;
+    if count > 0 {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[过滤边界] 已清理 {} 条滞留在已排除节点上的代理连接（过滤词: \"{}\"）",
+            count,
+            trimmed
+        );
+    }
+}
+
+pub(crate) async fn persist_selected_node_if_matching(profile_uid: &str, fastest_node: &str) {
     let filter_text = get_filter_and_sort_config(profile_uid)
         .await
         .0
@@ -1005,8 +1057,7 @@ pub use crate::utils::node::is_dummy_node;
 use crate::utils::node::match_node_filter;
 
 /// 从 `proxy_head_state.json` 一次性读取并解析 FilterConfig 和 sort_type
-/// 【性能优化】：将原来两次独立的磁盘读取和 JSON 解析合并为一次
-async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<i32>) {
+pub(crate) async fn get_filter_and_sort_config(profile_uid: &str) -> (FilterConfig, Option<i32>) {
     let path = match crate::utils::dirs::app_home_dir() {
         Ok(dir) => dir.join("proxy_head_state.json"),
         Err(_) => return (FilterConfig::default(), None),
@@ -1562,6 +1613,20 @@ fn should_probe_active_node(
     }
 }
 
+/// 纯判定：当前活跃出口是否在有效 `filter_text` 下已被排除，且组内至少存在 1 个符合过滤条件的真实候选（BUG-405）。
+fn should_migrate_filtered_out_active<F>(active_node: &str, members: &[String], filter_text: &str, is_fake: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    let effective = crate::utils::node::effective_filter_text(filter_text);
+    if effective.is_empty() || match_node_filter(active_node, effective) {
+        return false;
+    }
+    members
+        .iter()
+        .any(|m| m != active_node && !is_dummy_node(m) && !is_fake(m) && match_node_filter(m, effective))
+}
+
 /// 评估当前活跃节点是否需要故障转移；返回 `Err` 表示 Mihomo API 不可达。
 /// 判死仅采信本轮 `probe_metrics_group` 主/备测速 URL 实拨结果，不直接用免拨测异源历史判死。
 async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow::Result<FailoverVerdict> {
@@ -1580,6 +1645,27 @@ async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow:
     // 假/广告节点或 HTTPS 验真软隔离节点 → 视为需要重选（无需等 url-test）。
     // S4：这是「不可信节点迁移」而非「节点已死」，不能套用原节点确已死门检。
     if is_dummy_node(&active_node) || crate::utils::node::is_confirmed_fake_node(&active_node) {
+        return Ok(FailoverVerdict::ShouldMigrate);
+    }
+
+    let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
+    let filter_text = filter_config.filter_text.trim();
+    let members = group_info.all.clone().unwrap_or_default();
+
+    // 活跃出口已被过滤词排除（如内核重构/provider 重载瞬间落入 -香港 -台湾 之外节点）且存在合规候选，立即触发迁移
+    if should_migrate_filtered_out_active(
+        &active_node,
+        &members,
+        filter_text,
+        crate::utils::node::is_confirmed_fake_node,
+    ) {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 当前活跃节点 {} 不在用户过滤范围「{}」内且存在合规候选，触发迁移",
+            active_node,
+            filter_text
+        );
         return Ok(FailoverVerdict::ShouldMigrate);
     }
 
@@ -1751,10 +1837,6 @@ async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow:
         }
     }
 
-    let (filter_config, _) = get_filter_and_sort_config(profile_uid).await;
-    let filter_text = filter_config.filter_text.trim();
-    let members = group_info.all.clone().unwrap_or_default();
-
     // 连续性优先：主 URL 整体失败而备用 URL 正常即属测速地址失真，本轮直接判 NoAction
     if primary_url_distorted {
         logging!(
@@ -1858,7 +1940,7 @@ fn persisted_exit_is_usable(
     if now == "DIRECT" || now == "REJECT" || is_dummy_node(now) || confirmed_fake {
         return false;
     }
-    if !match_node_filter(now, filter_text.trim()) {
+    if !match_node_filter(now, crate::utils::node::effective_filter_text(filter_text)) {
         return false;
     }
     all.is_some_and(|nodes| nodes.iter().any(|n| n == now))
@@ -3133,9 +3215,14 @@ async fn self_heal_with_accounting(
                 if changed {
                     recent_auto_switches.push(Instant::now());
                 }
+                if matches!(origin, SelfHealOrigin::NodeMigration) {
+                    let filter_text = get_filter_and_sort_config(profile_uid).await.0.filter_text;
+                    close_excluded_proxy_connections(&filter_text).await;
+                }
                 if let (Some(dead), Some(new_node)) = (dead_node, outcome.selected_node.as_deref())
                     && !dead.is_empty()
                     && dead != new_node
+                    && !matches!(origin, SelfHealOrigin::NodeMigration)
                 {
                     logging!(
                         info,
@@ -4168,5 +4255,66 @@ mod tests {
         assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_some());
         reset_monitor_static_state();
         assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_none());
+    }
+
+    #[test]
+    fn test_bug405_close_excluded_connection_and_migrate_filtered_active() {
+        use super::{should_close_excluded_proxy_connection, should_migrate_filtered_out_active};
+
+        let chains_hk = vec!["香港1 (184629)".to_string(), "PROXY".to_string()];
+        let chains_sg = vec!["新加坡3 (184629)".to_string(), "PROXY".to_string()];
+        let chains_direct = vec!["DIRECT".to_string()];
+
+        // 1. 过滤框排除香港/台湾时：仅断开落在香港节点上的 PROXY 连接，保护新加坡与 DIRECT 连接
+        assert!(should_close_excluded_proxy_connection(
+            &chains_hk,
+            "PROXY",
+            "-香港 -台湾"
+        ));
+        assert!(!should_close_excluded_proxy_connection(
+            &chains_sg,
+            "PROXY",
+            "-香港 -台湾"
+        ));
+        assert!(!should_close_excluded_proxy_connection(
+            &chains_direct,
+            "PROXY",
+            "-香港 -台湾"
+        ));
+        // 过滤词为空或半输入态不触发清理
+        assert!(!should_close_excluded_proxy_connection(&chains_hk, "PROXY", ""));
+        assert!(!should_close_excluded_proxy_connection(&chains_hk, "PROXY", "日本 -"));
+
+        // 2. 活跃节点被过滤词排除且存在合规候选时立即触发迁移；半输入态/无合规候选时不迁移
+        let members = vec![
+            "香港1 (184629)".to_string(),
+            "台湾1 (184629)".to_string(),
+            "新加坡3 (184629)".to_string(),
+        ];
+        assert!(should_migrate_filtered_out_active(
+            "香港1 (184629)",
+            &members,
+            "-香港 -台湾",
+            |_| false
+        ));
+        assert!(!should_migrate_filtered_out_active(
+            "新加坡3 (184629)",
+            &members,
+            "-香港 -台湾",
+            |_| false
+        ));
+        assert!(!should_migrate_filtered_out_active(
+            "香港1 (184629)",
+            &members,
+            "日本 -",
+            |_| false
+        ));
+        let only_blocked = vec!["香港1 (184629)".to_string(), "台湾1 (184629)".to_string()];
+        assert!(!should_migrate_filtered_out_active(
+            "香港1 (184629)",
+            &only_blocked,
+            "-香港 -台湾",
+            |_| false
+        ));
     }
 }

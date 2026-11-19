@@ -491,6 +491,15 @@ fn normalize_dummy_name(name: &str) -> String {
     s
 }
 
+fn strip_exclusion_prefix(token: &str) -> &str {
+    token
+        .strip_prefix('-')
+        .or_else(|| token.strip_prefix('!'))
+        .or_else(|| token.strip_prefix('！'))
+        .unwrap_or(token)
+        .trim()
+}
+
 /// 节点名过滤匹配（与前端 `src/utils/node.ts::matchNodeFilter` 逐条对齐）。
 ///
 /// 语法规则（大小写不敏感）：
@@ -517,12 +526,7 @@ pub fn match_node_filter(name: &str, filter_text: &str) -> bool {
     for token in collapsed.split_whitespace() {
         if token.starts_with('-') || token.starts_with('!') || token.starts_with('！') {
             for part in token.split('|') {
-                let term = part
-                    .strip_prefix('-')
-                    .or_else(|| part.strip_prefix('!'))
-                    .or_else(|| part.strip_prefix('！'))
-                    .unwrap_or(part)
-                    .trim();
+                let term = strip_exclusion_prefix(part);
                 if !term.is_empty() && name_lower.contains(term) {
                     return false;
                 }
@@ -536,6 +540,110 @@ pub fn match_node_filter(name: &str, filter_text: &str) -> bool {
     }
 
     true
+}
+
+/// 判断过滤文本是否包含至少一个非空的实际匹配词（与前端 `src/utils/node.ts::hasEffectiveFilterTerm` 1:1 对齐）。
+pub fn has_effective_filter_term(filter_text: &str) -> bool {
+    let normalized = filter_text.trim().replace('｜', "|");
+    if normalized.is_empty() {
+        return false;
+    }
+    for token in normalized.split_whitespace() {
+        for part in token.split('|') {
+            if !strip_exclusion_prefix(part.trim()).is_empty() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// 判断过滤文本是否处于不完整的操作符半输入态（与前端 `src/utils/node.ts::isIncompleteFilterInput` 1:1 对齐）。
+pub fn is_incomplete_filter_input(filter_text: &str) -> bool {
+    let trimmed = filter_text.trim();
+    if !has_effective_filter_term(trimmed) {
+        return true;
+    }
+    if trimmed.ends_with('|') || trimmed.ends_with('｜') {
+        return true;
+    }
+    let normalized = trimmed.replace('｜', "|");
+    let last_token = normalized.split_whitespace().next_back().unwrap_or("");
+    let last_part = last_token.split('|').next_back().unwrap_or("").trim();
+    matches!(last_part, "-" | "!" | "！")
+}
+
+/// 对齐有效过滤词：空或半输入态一律退化为空串（视为不设过滤条件）。
+pub fn effective_filter_text(filter_text: &str) -> &str {
+    if is_incomplete_filter_input(filter_text) {
+        ""
+    } else {
+        filter_text.trim()
+    }
+}
+
+/// 按优先级从 `PROXY` 全量成员中挑选兜底节点：
+/// 1. 匹配 `filter_text` 且已通过真 HTTPS 验真的有效节点；
+/// 2. 匹配 `filter_text` 的有效节点；
+/// 3. 仅当 `filter_text.trim().is_empty()`（未设有效筛选）时才回退至首个全局有效节点；
+///    存在显式关键词筛选且子集全灭时返回 `None`，严禁静默切出筛选范围。
+pub fn pick_subset_fallback_node<'a, FValid, FVerified>(
+    all: &'a [String],
+    filter_text: &str,
+    is_valid: FValid,
+    is_verified: FVerified,
+) -> Option<&'a str>
+where
+    FValid: Fn(&str) -> bool,
+    FVerified: Fn(&str) -> bool,
+{
+    let trimmed = filter_text.trim();
+    all.iter()
+        .find(|n| is_valid(n) && is_verified(n) && match_node_filter(n, trimmed))
+        .or_else(|| all.iter().find(|n| is_valid(n) && match_node_filter(n, trimmed)))
+        .or_else(|| {
+            if trimmed.is_empty() {
+                all.iter().find(|n| is_valid(n))
+            } else {
+                None
+            }
+        })
+        .map(String::as_str)
+}
+
+/// 将符合用户过滤范围的持久选中节点（或合规子集首节点）提前至 `PROXY.proxies[0]`，
+/// 使 `store-selected: false` 下 Mihomo 启动/重载第 0 毫秒即落位在合规节点而非未过滤的订阅首节点。
+pub fn promote_preferred_proxy_first<FValid, FVerified>(
+    names: &mut Vec<String>,
+    preferred: Option<&str>,
+    filter_text: &str,
+    is_valid: FValid,
+    is_verified: FVerified,
+) -> Option<String>
+where
+    FValid: Fn(&str) -> bool,
+    FVerified: Fn(&str) -> bool,
+{
+    let effective = effective_filter_text(filter_text);
+    let target = preferred
+        .map(str::trim)
+        .filter(|n| {
+            !n.is_empty()
+                && is_valid(n)
+                && match_node_filter(n, effective)
+                && names.iter().any(|existing| existing == n)
+        })
+        .map(str::to_owned)
+        .or_else(|| pick_subset_fallback_node(names, effective, &is_valid, &is_verified).map(str::to_owned))?;
+
+    if let Some(pos) = names.iter().position(|n| n == &target) {
+        if pos > 0 {
+            let item = names.remove(pos);
+            names.insert(0, item);
+        }
+        return Some(target);
+    }
+    None
 }
 
 /// 活跃节点触发即时验真退避迁移所需的最小连续失败次数（在物理在线且有参照节点通过的前提下）：
@@ -1682,5 +1790,97 @@ server: 1.2.3.4
             now - HTTPS_VERIFY_BAN_TTL_SECS,
             now
         ));
+    }
+
+    #[test]
+    fn test_filter_completeness_and_promote_preferred_proxy_first() {
+        use super::{has_effective_filter_term, is_incomplete_filter_input, promote_preferred_proxy_first};
+
+        // 1. 半输入与有效过滤词判定（与前端 1:1 对齐）
+        assert!(!has_effective_filter_term(""));
+        assert!(!has_effective_filter_term("   "));
+        assert!(!has_effective_filter_term("- | !"));
+        assert!(has_effective_filter_term("-香港 -台湾"));
+        assert!(is_incomplete_filter_input(""));
+        assert!(is_incomplete_filter_input("-"));
+        assert!(is_incomplete_filter_input("日本 -"));
+        assert!(is_incomplete_filter_input("-香港|"));
+        assert!(!is_incomplete_filter_input("-香港 -台湾"));
+        assert!(!is_incomplete_filter_input("hk-"));
+
+        // 2. 合规首选节点提前至 PROXY.proxies[0]，其余保持相对顺序
+        let mut names = vec![
+            "香港1".to_string(),
+            "台湾1".to_string(),
+            "日本1".to_string(),
+            "新加坡3".to_string(),
+        ];
+        let picked =
+            promote_preferred_proxy_first(&mut names, Some("新加坡3"), "-香港 -台湾", |n| n != "DIRECT", |_| true);
+        assert_eq!(picked.as_deref(), Some("新加坡3"));
+        assert_eq!(names, vec!["新加坡3", "香港1", "台湾1", "日本1"]);
+
+        // 3. 若持久首选节点被过滤排除（如香港1），自动拒绝并在合规子集中选首个已验真节点提前
+        let mut names_stale = vec![
+            "香港1".to_string(),
+            "台湾1".to_string(),
+            "日本1".to_string(),
+            "新加坡3".to_string(),
+        ];
+        let picked_fallback = promote_preferred_proxy_first(
+            &mut names_stale,
+            Some("香港1"),
+            "-香港 -台湾",
+            |n| n != "DIRECT",
+            |n| n == "新加坡3",
+        );
+        assert_eq!(picked_fallback.as_deref(), Some("新加坡3"));
+        assert_eq!(names_stale, vec!["新加坡3", "香港1", "台湾1", "日本1"]);
+
+        // 4. 过滤子集无任何匹配时保持原顺序返回 None（绝不把禁止节点擅自视为匹配）
+        let mut only_blocked = vec!["香港1".to_string(), "台湾1".to_string()];
+        let picked_none = promote_preferred_proxy_first(
+            &mut only_blocked,
+            Some("香港1"),
+            "-香港 -台湾",
+            |n| n != "DIRECT",
+            |_| true,
+        );
+        assert_eq!(picked_none, None);
+        assert_eq!(only_blocked, vec!["香港1", "台湾1"]);
+    }
+
+    #[test]
+    fn test_pick_subset_fallback_node_respects_filter_boundary() {
+        use super::pick_subset_fallback_node;
+
+        let all = vec![
+            "剩余流量：100 GB".to_string(),
+            "香港-01".to_string(),
+            "日本-01".to_string(),
+            "日本-02".to_string(),
+        ];
+        let is_valid = |n: &str| !n.contains("剩余流量");
+
+        assert_eq!(
+            pick_subset_fallback_node(&all, "日本", is_valid, |n| n == "日本-02"),
+            Some("日本-02")
+        );
+        assert_eq!(
+            pick_subset_fallback_node(&all, "日本", is_valid, |_| false),
+            Some("日本-01")
+        );
+        assert_eq!(
+            pick_subset_fallback_node(&all, "新加坡", is_valid, |n| n == "香港-01"),
+            None
+        );
+        assert_eq!(
+            pick_subset_fallback_node(&all, "   ", is_valid, |n| n == "日本-01"),
+            Some("日本-01")
+        );
+        assert_eq!(
+            pick_subset_fallback_node(&all, "", is_valid, |_| false),
+            Some("香港-01")
+        );
     }
 }
