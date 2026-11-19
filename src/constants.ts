@@ -14,9 +14,6 @@ export const CUSTOM_TITLEBAR_HEIGHT = 30
 /** 设置抽屉关闭按钮层级（高于设置层 `100` 与底栏 `200`，严格低于模态弹窗 `1300` 与通知条 `2200`） */
 export const SETTINGS_CLOSE_BUTTON_Z_INDEX = 250
 
-/** 流量统计 Web Worker 在无活跃引用后的闲置销毁延迟（ms，对齐 React Query 30s gcTime） */
-export const TRAFFIC_WORKER_DESTROY_DELAY_MS = 30_000
-
 /** 窄窗判定断点：内容宽度 ≤ 该值走 1 列紧凑布局，> 该值走 3 列宽窗布局 */
 export const MINI_WIDTH_THRESHOLD = 285
 /**

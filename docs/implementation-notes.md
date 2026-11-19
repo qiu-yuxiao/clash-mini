@@ -35,7 +35,7 @@
 | `SetWindowPos(SWP_FRAMECHANGED \| ...)` / `force_set_window_outer_size` | Win32 调用 | 触发 `WM_NCCALCSIZE` 重算 + 直接设 outer 尺寸（按 DPI 缩放）（§2.2） |
 | `handle_ready_resumed` / `RunEvent::Ready` / `get_webview_window("main")` / `init_window` | 启动事件 | 修复代码必须在 `Ok(window)` 分支执行，不能在 `RunEvent::Ready`（时机过早返回 None）（§2.2） |
 | `ProxyGroups` / `ConnectionTable` / `ProxyVirtualList` / `ProxyItem` / `ProxyHead` | 前端组件 | 类 Excel 表格，滚动条隐藏（§2.10） |
-| `EnhancedCanvasTrafficGraph` / `TrafficGraph` | 前端图表组件 | 宽窗大图 / 窄窗小图切换（§2.2） |
+| `TrafficGraph`（`MiniTrafficPanel` + `parse-traffic.ts`） | 前端图表组件 | 单一 `10 FPS` 对数实时曲线（兼顾手动拖拽与最大化：窄窗 `30s` 极简 / 宽窗 `30s→60s` 渐变与刻度网格，§2.2 / §5.7） |
 | `get3DButtonStyle` / `--depth-factor` / `--vibrancy-factor` | 皮肤样式 | 3D 拟物与双控制变量联动（§2.7） |
 | `tray-icon.png` / `tray-icon-sys.png` / `tray-icon-tun.png` | 托盘图标资源 | 三态代理模式静态图标资产（§2.9） |
 | `Tray::update_icon` / `update_lite_mode_menu` | 托盘 API | 仅模式切换调用 `set_icon`、轻量切换调用 `set_text`，零轮询/零动态重构菜单（§2.9） |
@@ -80,10 +80,9 @@
 | `FrontendEvent::DelayResults` / `Handle::notify_delay_results("PROXY", display)` / `verge://backend-delay-results` | 事件通道 | 测速结果唯一回传通道（§5.6） |
 | `handleCycleNode` / `filterSort` / `localStorage`(`clash-verge-node-search` / `clash-verge-hide-unavialable` / `clash-verge-sort-type`) | 前端 | 轮换实时提取过滤/排序子集（§2.8） |
 | `useTrafficData` / `useConnectionData` / `useMihomoWsSubscription` | 前端 Hook | 隐藏/最小化时断 WS 订阅（§5.7 / §4.3） |
-| `ConnectionsPanel` / `isMinimalWidth` / `TRAFFIC_WORKER_DESTROY_DELAY_MS`(30s) | 前端 | 宽窗且抽屉开启时挂载，关闭或窄窗即卸载并 30s 后回收 Worker（§2.2 / §5.7） |
+| `ConnectionsPanel` / `isMinimalWidth` | 前端 | 宽窗且抽屉开启时挂载，关闭或窄窗即卸载并 `30s` 后经 React Query `gcTime` 回收缓存（§2.2 / §5.7） |
 | `getSystemProxy`(`sysproxy`) / `getRunningMode`(`runningMode`) / `getClashConfig`(`clashConfig`) | 前端查询 | `enabled = isDrawerVisible` 门控仅打开设置且非极小窗时轮询（§5.7） |
 | `LogsPage` / `logsOpen` | 前端 | 日志弹窗关闭即卸载，注销 WS（§5.7） |
-| `TrafficDataSampler` / `snapshotIntervalMs`(1000ms) | 前端采样 | 流量图重绘节流（§5.7） |
 | `use-layout-events` | 前端 | 测速回传监听器生命周期（§5.6） |
 
 ## 六、安全与健壮性

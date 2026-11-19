@@ -3,12 +3,9 @@ import { Box, Typography, useTheme } from '@mui/material'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { EnhancedCanvasTrafficGraph } from '@/components/home/enhanced-canvas-traffic-graph'
-import type { EnhancedCanvasTrafficGraphRef } from '@/components/home/enhanced-canvas-traffic-graph'
 import { TrafficGraph } from '@/components/layout/traffic-graph'
 import type { TrafficRef } from '@/components/layout/traffic-graph'
 import { useTrafficData } from '@/hooks/use-traffic-data'
-import { useVisibility } from '@/hooks/use-visibility'
 import { useThemeMode } from '@/services/states'
 import { get3DCardStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
@@ -21,13 +18,10 @@ export const MiniTrafficPanel = ({
   const mode = useThemeMode()
   const theme = useTheme()
   const { t } = useTranslation()
-  const pageVisible = useVisibility()
   const {
     response: { data: traffic },
-  } = useTrafficData({ enabled: pageVisible })
-  const trafficRef = useRef<TrafficRef | EnhancedCanvasTrafficGraphRef | null>(
-    null,
-  )
+  } = useTrafficData()
+  const trafficRef = useRef<TrafficRef | null>(null)
 
   useEffect(() => {
     if (trafficRef.current && traffic) {
@@ -56,11 +50,7 @@ export const MiniTrafficPanel = ({
     >
       {/* Traffic Graph (Full Width) */}
       <Box sx={{ flex: 1, width: '100%', minHeight: 0, position: 'relative' }}>
-        {isMinimalWidth ? (
-          <TrafficGraph ref={trafficRef} />
-        ) : (
-          <EnhancedCanvasTrafficGraph ref={trafficRef} />
-        )}
+        <TrafficGraph ref={trafficRef} isMinimalWidth={isMinimalWidth} />
       </Box>
 
       {/* Metrics Row (Single Line Below Graph - Raised 3D Button style) */}

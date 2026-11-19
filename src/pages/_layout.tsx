@@ -1001,11 +1001,11 @@ const Layout = () => {
             boxSizing: 'border-box',
           }}
         >
-          {/* Upper Pane: Node Selection (80% + 30px) */}
+          {/* Upper Pane: Node Selection */}
           <div
             style={{
-              flex: isMinimalWidth ? '1 1 0%' : '80 0 calc(0% + 30px)',
-              height: isMinimalWidth ? 'auto' : 'calc(80% + 30px)',
+              flex: '1 1 0%',
+              minHeight: 0,
               position: 'relative',
               overflow: 'hidden',
               display: 'flex',
@@ -1477,12 +1477,13 @@ const Layout = () => {
             )}
           </div>
 
-          {/* Lower Pane: Constant Traffic Dashboard (Fixed Height - 30px) */}
+          {/* Lower Pane: Constant Traffic Dashboard */}
           <div
             style={{
               flex: isMinimalWidth
                 ? `0 0 ${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
-                : `0 0 ${TRAFFIC_PANE_HEIGHT_WIDE}px`,
+                : `0 1 ${TRAFFIC_PANE_HEIGHT_WIDE}px`,
+              maxHeight: '100%',
               height: isMinimalWidth
                 ? `${TRAFFIC_PANE_HEIGHT_MINIMAL}px`
                 : `${TRAFFIC_PANE_HEIGHT_WIDE}px`,

@@ -6,7 +6,6 @@ import {
   CUSTOM_TITLEBAR_HEIGHT,
   MIN_WINDOW_WIDTH,
   SETTINGS_CLOSE_BUTTON_Z_INDEX,
-  TRAFFIC_WORKER_DESTROY_DELAY_MS,
 } from '@/constants'
 import { shouldSkipMixedPortBlurSave } from '@/pages/_layout/utils/settings-guards'
 import {
@@ -239,11 +238,10 @@ describe('popup-styles 窄窗弹窗几何锁定与皮肤统一样式', () => {
     }
   })
 
-  it('BUG-385: 验证设置关闭层级边界、TrafficWorker 30 秒销毁延迟与中途取消/关闭跳过端口失焦保存判定', () => {
+  it('BUG-385: 验证设置关闭层级边界与中途取消/关闭跳过端口失焦保存判定', () => {
     expect(SETTINGS_CLOSE_BUTTON_Z_INDEX).toBe(250)
     expect(SETTINGS_CLOSE_BUTTON_Z_INDEX).toBeGreaterThan(200)
     expect(SETTINGS_CLOSE_BUTTON_Z_INDEX).toBeLessThan(1300)
-    expect(TRAFFIC_WORKER_DESTROY_DELAY_MS).toBe(30_000)
 
     expect(
       shouldSkipMixedPortBlurSave({
