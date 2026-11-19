@@ -4142,7 +4142,10 @@ mod tests {
 
     #[test]
     fn test_bug400_periodic_https_verify_skips_dead_and_sufficient_standbys() {
-        use super::{HTTPS_VERIFY_INTERVAL_SECS, PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS, should_run_periodic_https_verify_with};
+        use super::{
+            HTTPS_VERIFY_INTERVAL_SECS, PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS,
+            should_run_periodic_https_verify_with,
+        };
 
         assert_eq!(HTTPS_VERIFY_INTERVAL_SECS, 600);
         assert_eq!(PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS, 3);
