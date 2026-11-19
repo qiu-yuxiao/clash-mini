@@ -9,6 +9,7 @@ import {
   REFRESH_CLASH_DEBOUNCE_MS,
   releaseSharedSubscriptionEntry,
   scheduleFlushWsReconnectBackoff,
+  WS_RECONNECT_STAGGER_MS,
 } from '@/hooks/use-mihomo-ws-subscription'
 import {
   batchTestWithFirstBatchSelect,
@@ -109,7 +110,7 @@ describe('BUG-347: computeWsReconnectDelay 指数退避、严格上限与快速�
     await entry.connectWs()
     expect(entry.ws).toBe(staleSocket)
 
-    // 模拟后端 reload 连发 3 次 refresh-clash-config：250ms 防抖合并为单次冲刷
+    // 模拟后端 reload 连发 3 次 refresh-clash-config：防抖合并为单次冲刷
     scheduleFlushWsReconnectBackoff()
     scheduleFlushWsReconnectBackoff()
     scheduleFlushWsReconnectBackoff()
@@ -122,6 +123,53 @@ describe('BUG-347: computeWsReconnectDelay 指数退避、严格上限与快速�
     })
 
     releaseSharedSubscriptionEntry(cacheKey, entry)
+  })
+
+  it('多路共享 WebSocket 通道恢复时按 WS_RECONNECT_STAGGER_MS 错峰串行重连，避免同时冲击命名管道（BUG-407）', async () => {
+    const makeSocket = () =>
+      ({
+        addListener: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+      }) as unknown as MihomoWebSocket
+
+    const timestamps: number[] = []
+    const connectChannel = (name: string) =>
+      vi.fn(async () => {
+        timestamps.push(performance.now())
+        void name
+        return makeSocket()
+      })
+
+    const c0 = connectChannel('traffic')
+    const c1 = connectChannel('memory')
+    const c2 = connectChannel('connections')
+
+    const e0 = acquireSharedSubscriptionEntry('$sub$stagger-0', c0)
+    const e1 = acquireSharedSubscriptionEntry('$sub$stagger-1', c1)
+    const e2 = acquireSharedSubscriptionEntry('$sub$stagger-2', c2)
+
+    await Promise.all([e0.connectWs(), e1.connectWs(), e2.connectWs()])
+    expect(c0).toHaveBeenCalledTimes(1)
+    expect(c1).toHaveBeenCalledTimes(1)
+    expect(c2).toHaveBeenCalledTimes(1)
+
+    timestamps.length = 0
+    flushAllWsReconnectBackoff()
+
+    await vi.waitFor(() => {
+      expect(c0).toHaveBeenCalledTimes(2)
+      expect(c1).toHaveBeenCalledTimes(2)
+      expect(c2).toHaveBeenCalledTimes(2)
+    })
+
+    // 通道 2 必须晚于通道 0 至少接近 2 * WS_RECONNECT_STAGGER_MS 才发起连接
+    expect(timestamps[2] - timestamps[0]).toBeGreaterThanOrEqual(
+      WS_RECONNECT_STAGGER_MS,
+    )
+
+    releaseSharedSubscriptionEntry('$sub$stagger-0', e0)
+    releaseSharedSubscriptionEntry('$sub$stagger-1', e1)
+    releaseSharedSubscriptionEntry('$sub$stagger-2', e2)
   })
 })
 

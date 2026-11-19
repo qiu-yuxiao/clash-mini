@@ -3,7 +3,7 @@ use crate::{
     cmd::StringifyErr as _,
     config::{Config, IProfiles, PrfItem},
     core::{
-        CoreManager, handle,
+        CoreManager,
         validate::{CoreConfigValidator, ValidationNoticeTarget, ValidationOutcome, handle_validation_notice},
     },
     utils::dirs,
@@ -86,7 +86,8 @@ fn profile_affects_runtime(profiles: &IProfiles, index: &str) -> bool {
     let Some(current_uid) = profiles.get_current() else {
         return false;
     };
-    if current_uid == index {
+    // 全局 Merge.yaml 对全部激活配置恒生效（BUG-409）
+    if current_uid == index || index == "Merge" {
         return true;
     }
 
@@ -94,11 +95,21 @@ fn profile_affects_runtime(profiles: &IProfiles, index: &str) -> bool {
         return false;
     };
     [
-        item.current_merge().map_or("Merge", String::as_str),
-        item.current_script().map_or("Script", String::as_str),
-        item.current_rules().map_or("Rules", String::as_str),
-        item.current_proxies().map_or("Proxies", String::as_str),
-        item.current_groups().map_or("Groups", String::as_str),
+        item.current_merge()
+            .filter(|s| !s.trim().is_empty())
+            .map_or("Merge", String::as_str),
+        item.current_script()
+            .filter(|s| !s.trim().is_empty())
+            .map_or("Script", String::as_str),
+        item.current_rules()
+            .filter(|s| !s.trim().is_empty())
+            .map_or("Rules", String::as_str),
+        item.current_proxies()
+            .filter(|s| !s.trim().is_empty())
+            .map_or("Proxies", String::as_str),
+        item.current_groups()
+            .filter(|s| !s.trim().is_empty())
+            .map_or("Groups", String::as_str),
     ]
     .contains(&index)
 }
@@ -154,10 +165,7 @@ async fn handle_saved_profile_file(
         "[cmd配置save] 保存项影响当前运行时配置，开始统一应用"
     );
     match CoreManager::global().update_config_forced().await {
-        Ok(outcome) if outcome.is_valid() => {
-            handle::Handle::refresh_clash();
-            Ok(ValidationOutcome::Valid)
-        }
+        Ok(outcome) if outcome.is_valid() => Ok(ValidationOutcome::Valid),
         Ok(outcome) => {
             logging!(warn, Type::Config, "[cmd配置save] 运行时配置应用失败: {}", outcome);
             restore_original(file_path, original_content).await?;
@@ -426,5 +434,29 @@ mod tests {
 
         // Clean up
         let _ = tokio::fs::remove_file(&file_path).await;
+    }
+
+    #[test]
+    fn test_profile_affects_runtime_always_true_for_global_merge() {
+        let mut profiles = IProfiles {
+            current: Some("sub1".into()),
+            items: Some(vec![PrfItem {
+                uid: Some("sub1".into()),
+                itype: Some("remote".into()),
+                option: Some(crate::config::PrfOption {
+                    merge: Some("custom_merge".into()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        assert!(profile_affects_runtime(&profiles, "Merge"));
+        assert!(profile_affects_runtime(&profiles, "custom_merge"));
+        assert!(profile_affects_runtime(&profiles, "sub1"));
+        assert!(!profile_affects_runtime(&profiles, "unrelated"));
+
+        profiles.current = None;
+        assert!(!profile_affects_runtime(&profiles, "Merge"));
     }
 }

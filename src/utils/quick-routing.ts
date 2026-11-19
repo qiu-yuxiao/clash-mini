@@ -373,14 +373,17 @@ export const addQuickRoutingRule = async (
   if (!newRule) return null
 
   try {
+    let applied = false
     await withMergeFileLock(async () => {
       const mergeObj = await loadMergeObject()
       const existing = readMergePrependRules(mergeObj)
       mergeObj['prepend-rules'] = upsertPrependRule(existing, newRule, options)
-      await saveProfileFile('Merge', yaml.dump(mergeObj))
+      applied = Boolean(await saveProfileFile('Merge', yaml.dump(mergeObj)))
     })
 
-    await enhanceProfiles()
+    if (!applied) {
+      await enhanceProfiles()
+    }
     emitMergeRulesChanged()
 
     showNotice.success(
@@ -413,6 +416,7 @@ export const removeQuickRoutingRule = async (options: {
 
   try {
     let removedList: string[] = []
+    let applied = false
     await withMergeFileLock(async () => {
       const mergeObj = await loadMergeObject()
       const existing = readMergePrependRules(mergeObj)
@@ -426,12 +430,14 @@ export const removeQuickRoutingRule = async (options: {
 
       removedList = removed
       mergeObj['prepend-rules'] = nextRules
-      await saveProfileFile('Merge', yaml.dump(mergeObj))
+      applied = Boolean(await saveProfileFile('Merge', yaml.dump(mergeObj)))
     })
 
     if (removedList.length === 0) return null
 
-    await enhanceProfiles()
+    if (!applied) {
+      await enhanceProfiles()
+    }
     emitMergeRulesChanged()
 
     showNotice.success(
@@ -468,6 +474,7 @@ export const addQuickRoutingRules = async (
     if (rules.length === 0) return 0
 
     let addedCount = 0
+    let applied = false
     await withMergeFileLock(async () => {
       const mergeObj = await loadMergeObject()
       let current = readMergePrependRules(mergeObj)
@@ -490,12 +497,14 @@ export const addQuickRoutingRules = async (
 
       addedCount = added.length
       mergeObj['prepend-rules'] = current
-      await saveProfileFile('Merge', yaml.dump(mergeObj))
+      applied = Boolean(await saveProfileFile('Merge', yaml.dump(mergeObj)))
     })
 
     if (addedCount === 0) return 0
 
-    await enhanceProfiles()
+    if (!applied) {
+      await enhanceProfiles()
+    }
     emitMergeRulesChanged()
 
     return addedCount
@@ -641,22 +650,30 @@ export async function importCustomRoutingRules(): Promise<number | null> {
       return 0
     }
 
-    await withMergeFileLock(async () => {
-      const mergeObj = await loadMergeObject()
-      let nextPrependRules = readMergePrependRules(mergeObj)
-      for (let i = importedRules.length - 1; i >= 0; i -= 1) {
-        nextPrependRules = upsertPrependRule(nextPrependRules, importedRules[i])
-      }
-      mergeObj['prepend-rules'] = nextPrependRules
-      await saveProfileFile(
-        'Merge',
-        yaml.dump(mergeObj, { noRefs: true, lineWidth: -1 }),
-      )
-    })
-
     beginLongOperation()
     try {
-      await enhanceProfiles()
+      let applied = false
+      await withMergeFileLock(async () => {
+        const mergeObj = await loadMergeObject()
+        let nextPrependRules = readMergePrependRules(mergeObj)
+        for (let i = importedRules.length - 1; i >= 0; i -= 1) {
+          nextPrependRules = upsertPrependRule(
+            nextPrependRules,
+            importedRules[i],
+          )
+        }
+        mergeObj['prepend-rules'] = nextPrependRules
+        applied = Boolean(
+          await saveProfileFile(
+            'Merge',
+            yaml.dump(mergeObj, { noRefs: true, lineWidth: -1 }),
+          ),
+        )
+      })
+
+      if (!applied) {
+        await enhanceProfiles()
+      }
     } finally {
       endLongOperation()
     }

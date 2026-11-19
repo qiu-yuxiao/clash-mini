@@ -447,6 +447,17 @@ pub fn is_service_ipc_path_exists() -> bool {
     Path::new(clash_verge_service_ipc::IPC_PATH).exists()
 }
 
+/// 当应用仍处于 Sidecar（非 Service）模式而系统服务刚被拉起时，
+/// 立即停止服务自启残留的 Session 0 `mini-mihomo` 进程，避免与用户态 Sidecar 争夺命名管道与端口（BUG-408）。
+async fn stop_autostarted_service_core_if_sidecar() {
+    if !matches!(
+        *crate::core::CoreManager::global().get_running_mode(),
+        crate::core::manager::RunningMode::Service
+    ) {
+        let _ = clash_verge_service_ipc::stop_clash().await;
+    }
+}
+
 impl ServiceManager {
     pub const fn config() -> clash_verge_service_ipc::IpcConfig {
         clash_verge_service_ipc::IpcConfig {
@@ -533,29 +544,34 @@ impl ServiceManager {
                 logging!(info, Type::Service, "执行启动服务流程");
                 run_service_command(start_service, "start service").await?;
                 wait_for_service_ipc(self).await?;
+                stop_autostarted_service_core_if_sidecar().await;
             }
             ServiceStatus::ReinstallRequired => {
                 logging!(info, Type::Service, "服务需要重装，执行重装流程");
                 run_service_command(reinstall_service, "reinstall service").await?;
                 wait_for_service_ipc(self).await?;
+                stop_autostarted_service_core_if_sidecar().await;
             }
             ServiceStatus::InstallRequired => match inspect_service_registration_async().await {
                 ScmServiceRegistration::InstalledAndEnabled => {
                     logging!(info, Type::Service, "服务已安装但未运行，转换为启动服务");
                     self.set_status(ServiceStatus::StartRequired);
                     run_service_command(start_service, "start service").await?;
-                    return wait_for_service_ipc(self).await;
+                    wait_for_service_ipc(self).await?;
+                    stop_autostarted_service_core_if_sidecar().await;
                 }
                 ScmServiceRegistration::DisabledOrBroken => {
                     logging!(info, Type::Service, "检测到服务已禁用或文件缺失，转换为重装服务");
                     self.set_status(ServiceStatus::ReinstallRequired);
                     run_service_command(reinstall_service, "reinstall service").await?;
-                    return wait_for_service_ipc(self).await;
+                    wait_for_service_ipc(self).await?;
+                    stop_autostarted_service_core_if_sidecar().await;
                 }
                 ScmServiceRegistration::NotInstalled => {
                     logging!(info, Type::Service, "需要安装服务，执行安装流程");
                     run_service_command(install_service, "install service").await?;
                     wait_for_service_ipc(self).await?;
+                    stop_autostarted_service_core_if_sidecar().await;
                 }
             },
             ServiceStatus::Unavailable(reason) => {

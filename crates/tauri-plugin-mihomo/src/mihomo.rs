@@ -373,13 +373,16 @@ impl Mihomo {
         };
 
         cancel_ws_reader(ws_reader_key(&self.connection_manager, id)).await;
-        let close_message = Message::Close(Some(ProtocolCloseFrame {
-            code: 1000.into(),
-            reason: "Disconnected by client".into(),
-        }));
-
-        let close_timeout = Duration::from_millis(force_timeout.unwrap_or(1000).max(500));
-        let _ = tokio::time::timeout(close_timeout, writer.send(close_message)).await;
+        // 本地命名管道无 TCP FIN/CLOSE 挥手必要；force_timeout=Some(0) 或 LocalSocket 直接丢弃读写端 0ms 释放管道句柄（BUG-406）
+        if !matches!(self.protocol, Protocol::LocalSocket) && force_timeout != Some(0) {
+            let close_message = Message::Close(Some(ProtocolCloseFrame {
+                code: 1000.into(),
+                reason: "Disconnected by client".into(),
+            }));
+            let close_timeout = Duration::from_millis(force_timeout.unwrap_or(1000));
+            let _ = tokio::time::timeout(close_timeout, writer.send(close_message)).await;
+        }
+        drop(writer);
         Ok(())
     }
 
@@ -1089,6 +1092,13 @@ impl Mihomo {
             .timeout(Duration::from_secs(60))
             .query(&[("force", force)])
             .json(&body);
+        // 发送非幂等 PUT /configs 前清理可能半死/陈旧的空闲命名管道连接，避免复用到坏管道；
+        // 重载完成/失败后再次清空，防止复用重载前的旧管道（BUG-406）。
+        if matches!(self.protocol, Protocol::LocalSocket)
+            && let Ok(pool) = IpcConnectionPool::global()
+        {
+            pool.clear_pool();
+        }
         let response_result = self.send_by_protocol(client).await;
         if matches!(self.protocol, Protocol::LocalSocket)
             && let Ok(pool) = IpcConnectionPool::global()

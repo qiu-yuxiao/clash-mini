@@ -83,7 +83,7 @@ flowchart TB
 |---|---|---|
 | 页面外壳 | `src/pages/_layout.tsx` | 主布局与设置抽屉编排（挂载首次引导、订阅管理、接管/分流/基础/外观卡片与弹窗组） |
 | 缓存中枢 | `src/providers/app-data-provider.tsx` | 拥有活跃 react-query 缓存（代理 / 配置 / 系统代理 / 运行模式等），监听 `profile-changed`、`verge://refresh-proxy-config` 等事件并失效缓存 |
-| IPC 封装 | `src/services/cmds.ts` | 每个后端 `invoke` 包 `withIpcTimeout`（如 `importProfile` / `patchVergeConfig` / `triggerAutoSelect` / `restartCore`） |
+| IPC 封装 | `src/services/cmds.ts` | 每个后端 `invoke` 包 `withIpcTimeout`（如 `importProfile` / `patchVergeConfig` / `triggerAutoSelect` / `installService`） |
 | 内核 API 封装 | `src/services/mihomo-api.ts` | 封装 `tauri-plugin-mihomo-api` 访客函数（带超时），如 `selectNodeForGroupWithTimeout` |
 | 共享 WS 订阅 | `src/hooks/use-mihomo-ws-subscription.ts` | 通用共享 WebSocket 订阅管理器（重连 / 每 key 共享 socket / 节流 / 写入 react-query 缓存）；常驻遥测的唯一入口 |
 | 专项 Hook | `use-proxy-selection` / `use-traffic-data` / `use-connection-data` / `use-proxy-delay-state` / `use-visibility` | 切节点、流量图、连接表、延迟、窗口可见性门控 |
@@ -105,7 +105,7 @@ flowchart TB
 
 ### 3.3 内核桥接插件（`tauri-plugin-mihomo`）
 
-- **传输**：`crates/tauri-plugin-mihomo/src/ipc.rs` 用 `hyper` 客端经 `WrapStream` 走 Unix socket / 命名管道；`src-tauri/src/lib.rs` 配置 `IpcPoolConfigBuilder`（`min_connections(3)` / `max_connections(16)`，`idle_timeout(30s)`，`health_check_interval(60s)`，`RejectPolicy::Timeout(2s)`，严格小于默认 5s 请求超时以防 BUG-324 Broken Pipe）。
+- **传输**：`crates/tauri-plugin-mihomo/src/ipc.rs` 用 `hyper` 客端经 `WrapStream` 走 Windows 命名管道，按 `tokio::runtime::Id` 分桶隔离连接池并由 `IpcConnection::drop` 自动 `abort()` 驱动；`src-tauri/src/lib.rs` 配置 `IpcPoolConfigBuilder`（`min_connections(3)` / `max_connections(16)`，`idle_timeout(30s)`，`health_check_interval(60s)`，`RejectPolicy::Timeout(2s)`，严格小于默认 5s 请求超时以防 BUG-324 Broken Pipe）。
 - **命令**：`update_controller` / `get_groups` / `select_node_for_group` / `delay_group` / `get_proxies` / `reload_config` / `flush_dns` / `ws_traffic` / `ws_memory` / `ws_connections` / `ws_logs` / `clear_all_ws_connections`。
 - **WS 通道**：`MihomoWebSocket` 每通道一个，把内核 `/traffic` `/memory` `/connections` `/logs` 透传到前端（Rust 不反序列化，直接转发字节，序列化负担交给 V8）。
 - **这是唯一与内核对话的边界**——后端其余部分不直接碰内核。
@@ -182,7 +182,7 @@ sequenceDiagram
 `PROXY=select` + `PROXY__METRICS=url-test` 把"控制"与"测量"彻底解耦：手动选点持久、测量又可靠，且**在 TUN 下无自指回环**（旧设计在 TUN 下"测活跃节点自身返回 timeout"的根因被从测量源消除）。
 
 ### 5.2 子集结构性 · 四层防污染与 0ms 合规落位
-地域过滤（`filterText`）同时重配选点约束，全局强关 `store-selected` 并由 `sync_runtime_proxy_group_head` 在配置生成/落盘前将合规出口提前至 `PROXY.proxies[0]`，消除内核启动/重启瞬间的首节点越界窗口；`utils::node::pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界切出筛选子集；全生命周期统一经过 `ensure_proxy_group_selection` 与 `close_excluded_proxy_connections`，同时 `evaluate_failover` 在活跃出口越界时触发 `ShouldMigrate`，叠加 `Flowing` 有流量态禁止后台 HTTPS 迁移与 `ConfirmedDead` 豁免切换速率截断以保障连续性（`BUG-388` / `BUG-405`）。
+地域过滤（`filterText`）同时重配选点约束，全局强关 `store-selected` 并由 `sync_runtime_proxy_group_head` 在配置生成/落盘前将合规出口提前至 `PROXY.proxies[0]`，消除内核启动/重启瞬间的首节点越界窗口；`utils::node::pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界切出筛选子集；全生命周期统一经过带 `SELECTION_ENSURE_EPOCH` 代际防重入的异步 `spawn_ensure_proxy_group_selection` 与 `close_excluded_proxy_connections`，同时 `evaluate_failover` 在活跃出口越界时触发 `ShouldMigrate`，叠加 `Flowing` 有流量态禁止后台 HTTPS 迁移与 `ConfirmedDead` 豁免切换速率截断以保障连续性（`BUG-388` / `BUG-405`）。
 
 ### 5.3 热切换零断流（禁 reload）
 故障转移一律 `select`（干净热切换），禁整份 `refresh_clash()` + `auto_close_connection`，断连风暴从结构上不可能。
@@ -213,7 +213,7 @@ sequenceDiagram
 ## 6. IPC 接口速查
 
 ### 6.1 前端 → 后端（部分关键 invoke）
-`getProfiles` / `importProfile` / `enhanceProfiles` / `patchVergeConfig` / `patchClashConfig` / `triggerAutoSelect` / `restartCore` / `getRunningMode` / `installService` / `showInFolder` / `saveProxyHeadState` / `getClashLogs` / `exportDiagnosticBundle` / `beginWindowResize`。
+`getProfiles` / `importProfile` / `enhanceProfiles` / `patchVergeConfig` / `patchClashConfig` / `triggerAutoSelect` / `getRunningMode` / `installService` / `showInFolder` / `saveProxyHeadState` / `getClashLogs` / `exportDiagnosticBundle` / `beginWindowResize`。
 
 ### 6.2 后端 → 内核（mihomo 插件命令）
 `select_node_for_group` / `delay_group` / `get_proxies` / `get_groups` / `reload_config` / `flush_dns` / `ws_traffic` / `ws_memory` / `ws_connections` / `ws_logs` / `clear_all_ws_connections`。
@@ -240,11 +240,11 @@ sequenceDiagram
 
 ---
 
-## 8. 现行版本基线（`v3.5.6`，见 `package.json`）
+## 8. 现行版本基线（`v3.5.8`）
 
 总体结论：**架构收敛、单 `PROXY` 组 + `PROXY__METRICS` 测量解耦、连续性优先方针落地**。
 
-- ✅ 已落地的核心机制：双组解耦（`PROXY__METRICS` 与 `proxy-providers` 统一 `lazy: true` 零自治盲测）、热切换零断流（不清理存量连接，前台显式切点精准对齐新出口）、四层防污染与 0ms 合规落位（`store-selected: false`、`sync_runtime_proxy_group_head` 提前 `PROXY.proxies[0]`、`ensure_proxy_group_selection` 生命周期保障与 `close_excluded_proxy_connections` 清理）、轻量模式三态机、主线程与守护运行时物理隔离、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移、基于 `/connections` 字节增量的被动流量证活与低噪探测减负、24h 可恢复真 HTTPS 验真软隔离、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截、Win32 原子缩放管线、订阅删除二次确认与新手全协议导入、精准目标化路径控制，以及 Rust 全仓 `dead_code` 静态门禁与零重复前后协同架构。
+- ✅ 已落地的核心机制：双组解耦（`PROXY__METRICS` 与 `proxy-providers` 统一 `lazy: true` 零自治盲测）、热切换零断流（不清理存量连接，前台显式切点精准对齐新出口）、四层防污染与 0ms 合规落位（`store-selected: false`、`sync_runtime_proxy_group_head` 提前 `PROXY.proxies[0]`、`spawn_ensure_proxy_group_selection` 异步生命周期保障与 `close_excluded_proxy_connections` 清理）、命名管道按 Tokio 运行时分桶隔离与 `Drop` 自动 `abort()` 句柄释放、`400ms + 45ms×N` 错峰 WS 重连、`installServiceAndSync` 零连跳切换与 `Merge.yaml` 单次合并、轻量模式三态机、主线程与守护运行时物理隔离、`decide_self_heal` 统一裁决（`ConfirmedDead` 豁免速率上限 + `ApiChannelDown` 恢复保活 + `MANUAL_SWITCH_EPOCH` 手动抢占保护）、`Suspect` 迟滞与 `Flowing` 有流量态禁止 HTTPS 迁移、基于 `/connections` 字节增量的被动流量证活与低噪探测减负、24h 可恢复真 HTTPS 验真软隔离、借壳真节点指纹连坐与前后端 1:1 结构形态广告横幅拦截、Win32 原子缩放管线、订阅删除二次确认与新手全协议导入、精准目标化路径控制，以及 Rust 全仓 `dead_code` 静态门禁与零重复前后协同架构。
 - 📖 详细逐条设计规范与参数边界一律以 [clash_mini_agreements.md](../clash_mini_agreements.md) 为唯一权威真源；历史缺陷与版本演进记录详见 [Changelog.md](../Changelog.md) 与 [bug_list.md](../bug_list.md)。
 
 ---

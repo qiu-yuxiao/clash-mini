@@ -354,7 +354,6 @@ rules:
       'prepend-rules:\n  - DOMAIN,first.com,Proxy\n  - DOMAIN,keep.com,DIRECT\n',
     )
     vi.mocked(saveProfileFile).mockResolvedValueOnce(true)
-    vi.mocked(enhanceProfiles).mockResolvedValueOnce(true)
 
     const importedCount = await importCustomRoutingRules()
     expect(importedCount).toBe(2)
@@ -366,11 +365,26 @@ rules:
     expect(savedYaml).toContain('DOMAIN,keep.com,DIRECT')
     expect(savedYaml).not.toContain('DOMAIN,first.com,Proxy')
     expect(beginLongOperation).toHaveBeenCalledTimes(1)
-    expect(enhanceProfiles).toHaveBeenCalledTimes(1)
+    // saveProfileFile('Merge', ...) 已直通触发运行时重载时，禁止再重复调一次 enhanceProfiles()（BUG-409）
+    expect(enhanceProfiles).not.toHaveBeenCalled()
     expect(endLongOperation).toHaveBeenCalledTimes(1)
     expect(showNotice.success).toHaveBeenCalledWith(
       'settings.mini.routesImportSuccess',
       { count: 2 },
     )
+
+    // 若 saveProfileFile 未直通生效（如返回 false），仍须兜底触发 enhanceProfiles
+    vi.mocked(readProfileFile).mockResolvedValueOnce('prepend-rules: []\n')
+    vi.mocked(saveProfileFile).mockResolvedValueOnce(false)
+    vi.mocked(enhanceProfiles).mockResolvedValueOnce(true)
+    vi.mocked(readProfileFile) // keep queue clear
+    vi.mocked(open).mockResolvedValueOnce('D:\\backup\\routes.yaml')
+    vi.mocked(readFile).mockResolvedValueOnce(
+      new TextEncoder().encode(
+        'version: 1\nprepend-rules:\n  - DOMAIN,third.com,DIRECT\n',
+      ),
+    )
+    expect(await importCustomRoutingRules()).toBe(1)
+    expect(enhanceProfiles).toHaveBeenCalledTimes(1)
   })
 })

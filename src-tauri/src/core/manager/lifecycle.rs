@@ -13,6 +13,9 @@ fn is_builtin_outbound(name: &str) -> bool {
     matches!(name, "DIRECT" | "REJECT" | "REJECT-DROP" | "PASS" | "COMPATIBLE")
 }
 
+/// 异步选点对齐与越界清理任务的代际号：新重载/重启自动使旧任务让路退出（BUG-407）。
+static SELECTION_ENSURE_EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
         // 先在锁外等待服务就绪（可能阻塞很久，如UAC弹窗、服务启动等）
@@ -55,13 +58,11 @@ impl CoreManager {
             RunningMode::NotRunning | RunningMode::Sidecar => self.start_core_by_sidecar().await,
         };
 
-        // 启动失败时回滚 mode；冷启动成功时异步兜底校验 PROXY 选点与清理越界连接（BUG-405）
+        // 启动失败时回滚 mode；冷启动成功时异步兜底校验 PROXY 选点与清理越界连接（BUG-405 / BUG-407）
         if result.is_err() {
             self.set_running_mode(RunningMode::NotRunning);
         } else if ensure_selection_async {
-            crate::process::AsyncHandler::spawn(|| async move {
-                Self::global().ensure_proxy_group_selection(None).await;
-            });
+            self.spawn_ensure_proxy_group_selection(None);
         }
 
         result
@@ -75,13 +76,12 @@ impl CoreManager {
     async fn stop_core_inner(&self) -> Result<()> {
         CLASH_LOGGER.clear_logs().await;
 
-        // 必须清空 IPC 连接池：内核重启后旧命名管道连接句柄已失效
-        match tauri_plugin_mihomo::IpcConnectionPool::global() {
-            Ok(pool) => {
+        // 停止内核前同步释放全部常驻 WebSocket 与 IPC 连接池命名管道句柄，避免重装/停服残留句柄引发 ERROR_PIPE_BUSY（BUG-406）
+        let mihomo = Handle::mihomo().await.clone();
+        if let Err(e) = mihomo.clear_all_ws_connections().await {
+            logging!(warn, Type::Core, "停止内核前清理 WS 与 IPC 连接池失败: {e}");
+            if let Ok(pool) = tauri_plugin_mihomo::IpcConnectionPool::global() {
                 pool.clear_pool();
-            }
-            Err(e) => {
-                logging!(warn, Type::Core, "获取 IPC 连接池失败，跳过清理: {e}");
             }
         }
 
@@ -106,16 +106,16 @@ impl CoreManager {
         let _life = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
 
-        // 重启前记录过滤合规的目标选点（快照优先，缺失/越界回退持久化）
+        // 重启前记录过滤合规的目标选点（快照优先并持久化，缺失/越界回退持久化）
         let saved_proxy_now = self.resolve_desired_proxy_selection().await;
 
         self.stop_core_inner().await?;
         self.start_core_inner(false).await?;
 
-        self.ensure_proxy_group_selection(saved_proxy_now.as_deref()).await;
+        // 异步执行后台选点兜底与越界连接清理，不阻塞 lifecycle_lock；取消启动瞬间抢跑拨测唤醒（BUG-407）
+        self.spawn_ensure_proxy_group_selection(saved_proxy_now);
 
         Handle::refresh_clash();
-        crate::module::monitor::MONITOR_WAKEUP_NOTIFY.notify_one();
 
         Ok(())
     }
@@ -328,6 +328,11 @@ impl CoreManager {
 
         if let Some(snap) = self.snapshot_proxy_group_now().await {
             if is_compliant(&snap) {
+                if persisted.as_deref() != Some(snap.as_str())
+                    && let Some(uid) = crate::module::monitor::get_current_profile_uid().await
+                {
+                    crate::module::monitor::persist_selected_node_if_matching(&uid, &snap).await;
+                }
                 return Some(snap);
             }
             logging!(
@@ -342,38 +347,56 @@ impl CoreManager {
         persisted.filter(|node| is_compliant(node))
     }
 
-    /// 统一保障内核启动 / 重启 / 重载后的 PROXY 组选点合规性，并在收尾清理滞留于已排除节点的代理连接（BUG-405）。
-    pub async fn ensure_proxy_group_selection(&self, preferred: Option<&str>) {
-        if Handle::global().is_exiting() {
+    /// 异步执行 PROXY 选点对齐与越界连接清理；新请求通过递增代际号使旧任务自动让路退出（BUG-407）。
+    pub fn spawn_ensure_proxy_group_selection(&self, preferred: Option<std::string::String>) {
+        let epoch = SELECTION_ENSURE_EPOCH.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
+        crate::process::AsyncHandler::spawn(move || async move {
+            Self::global()
+                .ensure_proxy_group_selection_for_epoch(preferred.as_deref(), epoch)
+                .await;
+        });
+    }
+
+    /// 统一保障内核启动 / 重启 / 重载后的 PROXY 组选点合规性，并在收尾清理滞留于已排除节点的代理连接（BUG-405 / BUG-407）。
+    async fn ensure_proxy_group_selection_for_epoch(&self, preferred: Option<&str>, epoch: u64) {
+        let is_aborted = || {
+            Handle::global().is_exiting() || SELECTION_ENSURE_EPOCH.load(std::sync::atomic::Ordering::Acquire) != epoch
+        };
+        if is_aborted() {
+            return;
+        }
+
+        // 先留出短暂稳态窗口让 Mihomo 控制器完成端口/管道绑定，避免刚重载即高频空打命名管道
+        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+        if is_aborted() {
             return;
         }
 
         let mihomo = Handle::mihomo().await.clone();
 
-        // 等待内核 API 就绪（总上限 30s，前 2s 使用 50ms 快速轮询压缩窗口期）
+        // 等待内核 API 就绪（上限 12s，250ms 温和轮询）
         let start = std::time::Instant::now();
         let mut api_ready = false;
-        while start.elapsed().as_secs() < 30 {
-            if Handle::global().is_exiting() {
+        while start.elapsed().as_secs() < 12 {
+            if is_aborted() {
                 return;
             }
             if mihomo.get_base_config().await.is_ok() {
                 api_ready = true;
                 break;
             }
-            let step_ms = if start.elapsed().as_secs() < 2 { 50 } else { 200 };
-            tokio::time::sleep(std::time::Duration::from_millis(step_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
         }
         if !api_ready {
             logging!(warn, Type::Core, "等待内核 API 就绪超时，跳过 PROXY 组节点恢复");
             return;
         }
 
-        // 等待 PROXY 组节点列表填充（总上限 20s，前 2s 使用 50ms 快速轮询）
+        // 等待 PROXY 组节点列表填充（上限 10s，250ms 温和轮询）
         let start2 = std::time::Instant::now();
         let mut loaded_group: Option<(Vec<String>, Option<String>)> = None;
-        while start2.elapsed().as_secs() < 20 {
-            if Handle::global().is_exiting() {
+        while start2.elapsed().as_secs() < 10 {
+            if is_aborted() {
                 return;
             }
             if let Ok(group_info) = mihomo.get_group_by_name("PROXY").await
@@ -383,13 +406,15 @@ impl CoreManager {
                 loaded_group = Some((all, group_info.now));
                 break;
             }
-            let step_ms = if start2.elapsed().as_secs() < 2 { 50 } else { 200 };
-            tokio::time::sleep(std::time::Duration::from_millis(step_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
         }
         let Some((all, current_now)) = loaded_group else {
             logging!(warn, Type::Core, "等待 PROXY 组节点列表填充超时，跳过选点恢复");
             return;
         };
+        if is_aborted() {
+            return;
+        }
 
         let (persisted, raw_filter) = crate::enhance::read_persisted_proxy_and_filter().await;
         let effective_filter = crate::utils::node::effective_filter_text(&raw_filter);
@@ -422,20 +447,28 @@ impl CoreManager {
             persisted.filter(|p| is_compliant_member(p))
         };
 
+        let mut selection_changed = false;
         if let Some(target) = desired_target {
             if current_now.as_deref() == Some(target.as_str()) {
                 logging!(debug, Type::Core, "PROXY 组已落位合规出口节点: {}", target);
             } else {
-                // 90s 总预算重试（TUN 流量洪峰下 IPC 可能短暂超时）
-                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+                // 15s 有界重试预算（已在异步后台执行，绝不阻塞主命令锁）
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
                 loop {
+                    if is_aborted() {
+                        return;
+                    }
                     match mihomo.select_node_for_group("PROXY", &target).await {
                         Ok(()) => {
                             logging!(info, Type::Core, "已恢复 PROXY 组节点选择: {}", target);
+                            selection_changed = true;
                             break;
                         }
                         Err(e) => {
-                            if Handle::global().is_exiting() || std::time::Instant::now() >= deadline {
+                            if is_aborted() {
+                                return;
+                            }
+                            if std::time::Instant::now() >= deadline {
                                 logging!(
                                     warn,
                                     Type::Core,
@@ -443,32 +476,38 @@ impl CoreManager {
                                     target,
                                     e
                                 );
-                                select_fallback_in_subset(&mihomo, &all, effective_filter).await;
+                                selection_changed = select_fallback_in_subset(&mihomo, &all, effective_filter).await;
                                 break;
                             }
                             logging!(
                                 warn,
                                 Type::Core,
-                                "恢复 PROXY 组节点选择失败 ({}): {}，3 秒后重试（总预算 90 秒）",
+                                "恢复 PROXY 组节点选择失败 ({}): {}，2 秒后重试（总预算 15 秒）",
                                 target,
                                 e
                             );
-                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                         }
                     }
                 }
             }
         } else {
-            select_fallback_in_subset(&mihomo, &all, effective_filter).await;
+            selection_changed = select_fallback_in_subset(&mihomo, &all, effective_filter).await;
         }
 
+        if is_aborted() {
+            return;
+        }
+        if selection_changed {
+            Handle::refresh_proxies();
+        }
         // 收尾清理：清除启动/重载窗口内落入已排除节点上的代理连接
         crate::module::monitor::close_excluded_proxy_connections(&raw_filter).await;
     }
 }
 
 /// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底，并同步持久化 `profile.selected`。
-async fn select_fallback_in_subset(mihomo: &Mihomo, all: &[String], filter_text: &str) {
+async fn select_fallback_in_subset(mihomo: &Mihomo, all: &[String], filter_text: &str) -> bool {
     let fallback = crate::utils::node::pick_subset_fallback_node(
         all,
         filter_text,
@@ -486,15 +525,22 @@ async fn select_fallback_in_subset(mihomo: &Mihomo, all: &[String], filter_text:
                 if let Some(uid) = crate::module::monitor::get_current_profile_uid().await {
                     crate::module::monitor::persist_selected_node_if_matching(&uid, fb).await;
                 }
+                true
             }
-            Err(e) => logging!(warn, Type::Core, "PROXY 组回退节点选择也失败: {}", e),
+            Err(e) => {
+                logging!(warn, Type::Core, "PROXY 组回退节点选择也失败: {}", e);
+                false
+            }
         }
-    } else if !filter_text.trim().is_empty() {
-        logging!(
-            info,
-            Type::Core,
-            "PROXY 组在过滤范围「{}」内无可用兜底节点，遵循边界约束跳过越界切点",
-            filter_text.trim()
-        );
+    } else {
+        if !filter_text.trim().is_empty() {
+            logging!(
+                info,
+                Type::Core,
+                "PROXY 组在过滤范围「{}」内无可用兜底节点，遵循边界约束跳过越界切点",
+                filter_text.trim()
+            );
+        }
+        false
     }
 }

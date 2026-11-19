@@ -1,3 +1,14 @@
+## v3.5.8
+
+### 🛡️ 根治重载/重启命名管道假死、消除主锁同步阻塞与 TUN 服务三连启停风暴（BUG-406 ~ BUG-409）
+
+- **根治跨双 Tokio 运行时命名管道连接池错位与超时句柄泄漏（BUG-406）**：`IpcConnectionPool` 升级为按 `tokio::runtime::Id` 物理分桶隔离（杜绝 `DAEMON_RUNTIME` 与 `tauri::async_runtime` 跨 IOCP 交叉借用管道句柄），`conn_driver` 严格同源绑定当前运行时并在 `IpcConnection::drop` 时自动 `abort()`，确保请求超时、异常与清池均在 `0ms` 释放底层 Win32 命名管道句柄；`reload_config` 补齐前后双向清池，`disconnect` 在本地命名管道下 `0ms` 即时释放，`stop_core_inner` 停核前同步清理全部常驻 WebSocket 管道句柄。
+- **选点对齐移出排他命令锁 & 错峰平抑重载瞬间 IPC 洪峰（BUG-407）**：`ensure_proxy_group_selection` 改为带代际号 `SELECTION_ENSURE_EPOCH` 自取消的后台异步收敛（`120ms` 稳态缓冲、`250ms` 轮询、`12s`/`10s`/`15s` 有界预算），彻底消除 `apply_config` / `restart_core` / `core_updater` 持锁同步长等待；去重 `Handle::refresh_clash()` 冗余代理刷新与外层重复广播，移除 `restart_core` 抢跑拨测唤醒，并将前端多路 WebSocket 重连错峰至 `400ms + 45ms × N`。
+- **消除首次开启 TUN 三连内核重启风暴与 Session 0 孤儿抢占（BUG-408）**：系统服务安装/启动就绪后若当前处于非 Service 模式立即清理服务自启残留的 `LocalSystem` 内核进程；前端 `installServiceAndSync` 仅负责提权装服务并刷新状态，交由 `patchVerge` 一次性原子完成 `Sidecar -> Service` 切换；NSIS 安装/卸载脚本改为优先通过 `SimpleSC::StopService` 优雅停服，消除 SCM Event ID `7031` 异常终止日志。
+- **修复全局 `Merge.yaml` 二次合并与快捷路由保存重复热重载（BUG-409）**：`enhance` 仅在配置显式指定非 `"Merge"` 专属合并项时加载局部合并文件；`save_profile_file` 对全局 `"Merge"` 恒判生效，前端快捷路径控制仅在保存未直通生效时兜底调用 `enhanceProfiles`。
+
+---
+
 ## v3.5.7
 
 ### 🔒 根治内核启动/重启/重载后排除地区节点短暂落位并残留连接 & 全栈瘦身精简（BUG-404 / BUG-405）

@@ -1,12 +1,12 @@
 use std::{
+    collections::{HashMap, VecDeque},
     pin::Pin,
-    sync::{Arc, OnceLock},
+    sync::{Arc, Mutex as StdMutex, OnceLock},
     task::{Context, Poll},
     time::{Duration, Instant},
 };
 
 use bytes::Bytes;
-use crossbeam::queue::SegQueue;
 use http_body_util::{BodyExt, Full};
 use hyper::{
     client::conn::http1,
@@ -147,10 +147,9 @@ pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
                 }
                 busy_retry_count -= 1;
                 let path_owned = socket_path.to_string();
-                let waited =
-                    tauri::async_runtime::spawn_blocking(move || wait_named_pipe_blocking(&path_owned, PIPE_WAIT_MS))
-                        .await
-                        .unwrap_or(false);
+                let waited = tokio::task::spawn_blocking(move || wait_named_pipe_blocking(&path_owned, PIPE_WAIT_MS))
+                    .await
+                    .unwrap_or(false);
                 if !waited {
                     tokio::time::sleep(FALLBACK_RETRY_DELAY).await;
                 }
@@ -281,31 +280,39 @@ pub enum PoolPermit<'a> {
     Bypass,
 }
 
-// IPC 连接包装器
+// IPC 连接包装器：绑定创建它的 Tokio 运行时驱动句柄，丢弃时立即中止驱动释放底层命名管道句柄（BUG-406）
 struct IpcConnection {
     sender: http1::SendRequest<Full<Bytes>>,
     last_used: Instant,
+    driver_handle: tokio::task::JoinHandle<()>,
 }
 
 impl IpcConnection {
     #[inline]
-    fn new(sender: http1::SendRequest<Full<Bytes>>) -> Self {
+    fn new(sender: http1::SendRequest<Full<Bytes>>, driver_handle: tokio::task::JoinHandle<()>) -> Self {
         Self {
             sender,
             last_used: Instant::now(),
+            driver_handle,
         }
     }
 
     #[inline]
     fn is_valid(&self) -> bool {
-        self.sender.is_ready()
+        self.sender.is_ready() && !self.driver_handle.is_finished()
     }
 }
 
-// IPC 连接池
+impl Drop for IpcConnection {
+    fn drop(&mut self) {
+        self.driver_handle.abort();
+    }
+}
+
+// IPC 连接池：按 tokio::runtime::Id 物理分桶隔离，杜绝 DAEMON_RUNTIME 与 tauri::async_runtime 跨 IOCP 复用
 #[derive(Clone)]
 pub struct IpcConnectionPool {
-    connections: Arc<SegQueue<IpcConnection>>,
+    connections: Arc<StdMutex<HashMap<tokio::runtime::Id, VecDeque<IpcConnection>>>>,
     semaphore: Arc<Semaphore>,
     config: IpcPoolConfig,
 }
@@ -318,7 +325,7 @@ impl IpcConnectionPool {
         let pool = IpcConnectionPool {
             semaphore: Arc::new(Semaphore::new(config.max_connections)),
             config,
-            connections: Arc::new(SegQueue::new()),
+            connections: Arc::new(StdMutex::new(HashMap::new())),
         };
         // 启动清理空闲连接的任务线程
         pool.start_clear_idle_conns_task();
@@ -352,35 +359,74 @@ impl IpcConnectionPool {
         });
     }
 
-    // 清理空闲连接
+    // 清理空闲连接（锁内仅做状态转移，Drop / abort 统一延后到锁外执行）
     #[inline]
     fn cleanup_idle_connections(&self) {
         let now = Instant::now();
         let min_to_keep = self.config.min_connections;
 
-        let mut total_checked = 0;
-        let mut kept = 0;
+        let mut total_checked = 0usize;
+        let mut kept = 0usize;
+        let mut evicted = Vec::new();
 
-        let approx_len = self.connections.len();
-
-        for _ in 0..approx_len {
-            if let Some(conn) = self.connections.pop() {
-                total_checked += 1;
-                if conn.is_valid() {
-                    let is_idle_timeout = now.duration_since(conn.last_used) > self.config.idle_timeout;
-
-                    if kept < min_to_keep || !is_idle_timeout {
-                        self.connections.push(conn);
-                        kept += 1;
+        {
+            let mut buckets = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+            buckets.retain(|_, queue| {
+                let mut next_queue = VecDeque::with_capacity(queue.len());
+                let mut bucket_kept = 0usize;
+                while let Some(conn) = queue.pop_front() {
+                    total_checked += 1;
+                    if conn.is_valid() {
+                        let is_idle_timeout = now.duration_since(conn.last_used) > self.config.idle_timeout;
+                        if bucket_kept < min_to_keep || !is_idle_timeout {
+                            next_queue.push_back(conn);
+                            bucket_kept += 1;
+                            kept += 1;
+                        } else {
+                            evicted.push(conn);
+                        }
+                    } else {
+                        log::debug!("cleanup: dropping invalid connection");
+                        evicted.push(conn);
                     }
-                } else {
-                    log::debug!("cleanup: dropping invalid connection");
                 }
-            } else {
-                break;
+                *queue = next_queue;
+                !queue.is_empty()
+            });
+        }
+
+        drop(evicted);
+        log::debug!("Cleanup done: checked {}, kept {}", total_checked, kept);
+    }
+
+    #[inline]
+    fn pop_valid_connection(&self, runtime_id: tokio::runtime::Id) -> Option<IpcConnection> {
+        let mut stale = Vec::new();
+        let mut found = None;
+        {
+            let mut buckets = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(queue) = buckets.get_mut(&runtime_id) {
+                while let Some(conn) = queue.pop_back() {
+                    if conn.is_valid() {
+                        found = Some(conn);
+                        break;
+                    }
+                    stale.push(conn);
+                }
+                if queue.is_empty() {
+                    buckets.remove(&runtime_id);
+                }
             }
         }
-        log::debug!("Cleanup done: checked {}, kept {}", total_checked, kept);
+        drop(stale);
+        found
+    }
+
+    #[inline]
+    fn return_connection(&self, runtime_id: tokio::runtime::Id, mut conn: IpcConnection) {
+        conn.last_used = Instant::now();
+        let mut buckets = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+        buckets.entry(runtime_id).or_default().push_back(conn);
     }
 
     #[inline]
@@ -423,15 +469,13 @@ impl IpcConnectionPool {
     }
 
     async fn acquire_or_create_connection(&self, socket_path: &str) -> Result<(IpcConnection, bool)> {
-        // 从池中获取连接并检查其有效性
-        while let Some(conn) = self.connections.pop() {
-            log::debug!("Attempting to reuse connection from pool");
-            if conn.is_valid() {
-                return Ok((conn, true));
-            }
+        let runtime_id = tokio::runtime::Handle::current().id();
+        if let Some(conn) = self.pop_valid_connection(runtime_id) {
+            log::debug!("Reusing connection from pool for runtime {:?}", runtime_id);
+            return Ok((conn, true));
         }
 
-        log::trace!("Pool empty, creating new connection");
+        log::trace!("Pool empty for runtime {:?}, creating new connection", runtime_id);
         let conn = Self::create_connection(socket_path).await?;
         Ok((conn, false))
     }
@@ -449,17 +493,22 @@ impl IpcConnectionPool {
             .await
             .map_err(|e| Error::HttpParseError(e.to_string()))?;
 
-        tauri::async_runtime::spawn(async move {
+        // 将 conn_driver 严格绑定到打开 NamedPipeClient 的同一 Tokio 运行时与 IOCP 上（BUG-406）
+        let driver_handle = tokio::spawn(async move {
             if let Err(err) = conn_driver.await {
-                log::error!("IPC Connection Error: {:?}", err);
+                log::debug!("IPC Connection Error: {:?}", err);
             }
         });
 
-        Ok(IpcConnection::new(sender))
+        Ok(IpcConnection::new(sender, driver_handle))
     }
 
     pub fn clear_pool(&self) {
-        while self.connections.pop().is_some() {}
+        let drained = {
+            let mut buckets = self.connections.lock().unwrap_or_else(|e| e.into_inner());
+            std::mem::take(&mut *buckets)
+        };
+        drop(drained);
         log::debug!("IpcConnectionPool cleared");
     }
 }
@@ -533,9 +582,8 @@ impl LocalSocket for RequestBuilder {
 
             let final_res = http::Response::from_parts(res_parts, collected_body);
 
-            // 返还连接回连接池
-            conn.last_used = Instant::now();
-            pool.connections.push(conn);
+            // 返还连接回当前运行时所属桶
+            pool.return_connection(tokio::runtime::Handle::current().id(), conn);
 
             Ok(reqwest::Response::from(final_res))
         };
@@ -544,5 +592,142 @@ impl LocalSocket for RequestBuilder {
             Some(d) => timeout(*d, process).await?,
             None => process.await,
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use tokio::io::AsyncReadExt as _;
+
+    #[pin_project]
+    struct DuplexHyperIo(#[pin] tokio::io::DuplexStream);
+
+    impl Read for DuplexHyperIo {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            mut buf: ReadBufCursor<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            let n = unsafe {
+                let mut t_buf = tokio::io::ReadBuf::uninit(buf.as_mut());
+                match AsyncRead::poll_read(self.project().0, cx, &mut t_buf) {
+                    Poll::Ready(Ok(())) => t_buf.filled().len(),
+                    Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+                    Poll::Pending => return Poll::Pending,
+                }
+            };
+            unsafe {
+                buf.advance(n);
+            }
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl Write for DuplexHyperIo {
+        fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+            AsyncWrite::poll_write(self.project().0, cx, buf)
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            AsyncWrite::poll_flush(self.project().0, cx)
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            AsyncWrite::poll_shutdown(self.project().0, cx)
+        }
+    }
+
+    fn make_test_pool() -> IpcConnectionPool {
+        let config = IpcPoolConfig::default();
+        IpcConnectionPool {
+            semaphore: Arc::new(Semaphore::new(config.max_connections)),
+            config,
+            connections: Arc::new(StdMutex::new(HashMap::new())),
+        }
+    }
+
+    #[test]
+    fn ipc_pool_isolates_buckets_by_runtime_and_drop_aborts_driver() {
+        let rt_a = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("build runtime A");
+        let rt_b = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("build runtime B");
+
+        let pool = make_test_pool();
+
+        // 1. 在 Runtime A 创建连接并入池，验证 Runtime B 绝不能借走 Runtime A 的管道句柄
+        let (mut peer_a_for_isolation, id_a) = rt_a.block_on(async {
+            let (client_stream, server_stream) = tokio::io::duplex(256);
+            let (mut sender, conn_driver) = http1::handshake(DuplexHyperIo(client_stream))
+                .await
+                .expect("handshake A");
+            let driver_handle = tokio::spawn(async move {
+                let _ = conn_driver.await;
+            });
+            sender.ready().await.expect("sender A ready");
+            let id = tokio::runtime::Handle::current().id();
+            pool.return_connection(id, IpcConnection::new(sender, driver_handle));
+            (server_stream, id)
+        });
+
+        rt_b.block_on(async {
+            let id_b = tokio::runtime::Handle::current().id();
+            assert_ne!(id_a, id_b);
+            assert!(
+                pool.pop_valid_connection(id_b).is_none(),
+                "Runtime B 不得跨桶复用 Runtime A 的命名管道连接"
+            );
+        });
+
+        let popped_a = rt_a.block_on(async {
+            let id = tokio::runtime::Handle::current().id();
+            pool.pop_valid_connection(id)
+        });
+        assert!(popped_a.is_some(), "Runtime A 应能命中自己桶中的连接");
+
+        // 2. Drop IpcConnection（等价于超时取消）必须立刻 abort driver_handle 并关闭对端句柄
+        rt_a.block_on(async move {
+            drop(popped_a);
+            let mut buf = [0u8; 8];
+            let read_res = timeout(Duration::from_millis(200), peer_a_for_isolation.read(&mut buf))
+                .await
+                .expect("peer should observe EOF promptly after driver abort")
+                .expect("read succeeds with EOF");
+            assert_eq!(read_res, 0, "Drop 后驱动必须终止并释放底层流句柄");
+        });
+
+        // 3. clear_pool 也必须立刻终止并释放所有空闲连接
+        let mut peer_b = rt_b.block_on(async {
+            let (client_stream, server_stream) = tokio::io::duplex(256);
+            let (mut sender, conn_driver) = http1::handshake(DuplexHyperIo(client_stream))
+                .await
+                .expect("handshake B");
+            let driver_handle = tokio::spawn(async move {
+                let _ = conn_driver.await;
+            });
+            sender.ready().await.expect("sender B ready");
+            pool.return_connection(
+                tokio::runtime::Handle::current().id(),
+                IpcConnection::new(sender, driver_handle),
+            );
+            server_stream
+        });
+
+        pool.clear_pool();
+
+        rt_b.block_on(async move {
+            let mut buf = [0u8; 8];
+            let read_res = timeout(Duration::from_millis(200), peer_b.read(&mut buf))
+                .await
+                .expect("peer B should observe EOF after clear_pool")
+                .expect("read succeeds with EOF");
+            assert_eq!(read_res, 0, "clear_pool 必须立刻 abort 空闲驱动并关闭句柄");
+        });
     }
 }

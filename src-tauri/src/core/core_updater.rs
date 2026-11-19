@@ -757,9 +757,7 @@ impl CoreUpdater {
                 if let Err(e2) = CoreManager::global().start_core().await {
                     logging!(warn, Type::System, "Core updater: 恢复性启动 core 失败: {}", e2);
                 }
-                CoreManager::global()
-                    .ensure_proxy_group_selection(saved_proxy_now.as_deref())
-                    .await;
+                CoreManager::global().spawn_ensure_proxy_group_selection(saved_proxy_now.clone());
             }
             emit_progress("error", 0, &format!("解压替换失败: {:?}", e));
             return Err(e);
@@ -783,9 +781,7 @@ impl CoreUpdater {
                 );
                 return Err(anyhow::anyhow!("start_core failed after upgrade: {}", e));
             }
-            CoreManager::global()
-                .ensure_proxy_group_selection(saved_proxy_now.as_deref())
-                .await;
+            CoreManager::global().spawn_ensure_proxy_group_selection(saved_proxy_now);
         }
 
         emit_progress("done", 100, "内核更新成功！核心已成功重启。");

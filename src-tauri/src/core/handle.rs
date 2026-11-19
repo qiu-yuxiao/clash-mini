@@ -47,7 +47,6 @@ impl Handle {
 
     pub fn refresh_clash() {
         Self::send_event(FrontendEvent::RefreshClash);
-        Self::refresh_proxies();
     }
 
     pub fn refresh_verge() {

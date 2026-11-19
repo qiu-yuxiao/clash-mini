@@ -7,7 +7,8 @@ import { type Message, type MihomoWebSocket } from 'tauri-plugin-mihomo-api'
 
 export const RECONNECT_DELAY_MS = 1000
 export const MAX_RECONNECT_DELAY_MS = 15_000
-export const REFRESH_CLASH_DEBOUNCE_MS = 250
+export const REFRESH_CLASH_DEBOUNCE_MS = 400
+export const WS_RECONNECT_STAGGER_MS = 45
 
 /**
  * BUG-347: 指数退避 + 抖动，且严格保证上界不超过 MAX_RECONNECT_DELAY_MS (15000ms)，
@@ -57,13 +58,8 @@ let refreshClashDebounceTimer: ReturnType<typeof setTimeout> | null = null
  * 彻底消除最长 15s 陈旧等待窗与半死句柄滞留（BUG-347）。
  */
 export const flushAllWsReconnectBackoff = () => {
-  for (const entry of sharedSubscriptions.values()) {
-    if (entry.closed) continue
-    if (entry.reconnectTimer) {
-      clearTimeout(entry.reconnectTimer)
-      entry.reconnectTimer = null
-    }
-    entry.reconnectAttempt = 0
+  const reconnectEntry = (entry: SharedSubscriptionEntry) => {
+    if (entry.closed) return
     if (entry.ws) {
       void (async () => {
         await closeSharedSocket(entry)
@@ -73,6 +69,26 @@ export const flushAllWsReconnectBackoff = () => {
       })()
     } else if (!entry.connecting) {
       void entry.connectWs()
+    }
+  }
+
+  let staggerIndex = 0
+  for (const entry of sharedSubscriptions.values()) {
+    if (entry.closed) continue
+    if (entry.reconnectTimer) {
+      clearTimeout(entry.reconnectTimer)
+      entry.reconnectTimer = null
+    }
+    entry.reconnectAttempt = 0
+    const delayMs = staggerIndex * WS_RECONNECT_STAGGER_MS
+    staggerIndex += 1
+    if (delayMs === 0) {
+      reconnectEntry(entry)
+    } else {
+      entry.reconnectTimer = setTimeout(() => {
+        entry.reconnectTimer = null
+        reconnectEntry(entry)
+      }, delayMs)
     }
   }
 }

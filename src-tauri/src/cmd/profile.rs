@@ -49,10 +49,7 @@ pub async fn get_profiles() -> CmdResult<SharedDraft<IProfiles>> {
 #[tauri::command]
 pub async fn enhance_profiles() -> CmdResult<ValidationOutcome> {
     match feat::enhance_profiles().await {
-        Ok(outcome) if outcome.is_valid() => {
-            handle::Handle::refresh_clash();
-            Ok(outcome)
-        }
+        Ok(outcome) if outcome.is_valid() => Ok(outcome),
         Ok(outcome) => {
             // Busy 是并发竞争态（另一路 update_config_forced 正持锁），非真实配置错误，
             // 只记 info 日志，不走 "failed validation" warn 分支，避免日志措辞误导。
@@ -136,7 +133,6 @@ pub async fn import_profile(url: std::string::String, option: Option<PrfOption>)
             if let Err(e) = CoreManager::global().update_config_forced().await {
                 logging!(error, Type::Cmd, "[导入订阅] 自动刷新配置内核失败: {}", e);
             } else {
-                handle::Handle::refresh_clash();
                 logging!(info, Type::Cmd, "[导入订阅] 自动激活首个导入配置成功且内核重载完成");
             }
         });
@@ -176,8 +172,7 @@ pub async fn delete_profile(index: String) -> CmdResult {
     if should_update {
         match CoreManager::global().update_config_forced().await {
             Ok(outcome) if outcome.is_valid() => {
-                handle::Handle::refresh_clash();
-                // 发送配置变更通知
+                // 发送配置变更通知（apply_config 内部已派发 refresh_clash）
                 let new_current = Config::profiles().await.data_arc().current.clone().unwrap_or_default();
                 logging!(info, Type::Cmd, "[删除订阅] 发送配置变更通知: {}", new_current);
                 handle::Handle::notify_profile_changed(&new_current);
@@ -222,7 +217,6 @@ async fn restore_previous_profile(prev_profile: &String) -> CmdResult<()> {
 
 async fn handle_success(current_value: Option<&String>) -> CmdResult<ValidationOutcome> {
     Config::profiles().await.apply();
-    handle::Handle::refresh_clash();
 
     if let Err(e) = profiles_save_file_safe().await {
         logging!(warn, Type::Cmd, "Warning: 异步保存配置文件失败: {e}");

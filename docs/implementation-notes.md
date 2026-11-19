@@ -107,9 +107,9 @@
 | 代理组名固定 `'PROXY'`（禁动态查找） | 常量 | 单 PROXY 组模型（§7.1） |
 | `calcuProxies` | 函数 | 保证 PROXY 组存在（§7.1） |
 | `activateSelected` / `restore_profile_selected_nodes` | 前端/后端 | 只处理 PROXY 组（§7.1） |
-| `sync_runtime_proxy_group_head` / `resolve_desired_proxy_selection` / `ensure_proxy_group_selection` | 后端函数 | 生成期关 `store-selected` 并提前 `PROXY.proxies[0]`；全生命周期重启/重载统一校验并清理越界连接（§5.4 / §7.1） |
+| `sync_runtime_proxy_group_head` / `resolve_desired_proxy_selection` / `spawn_ensure_proxy_group_selection` | 后端函数 | 生成期关 `store-selected` 并提前 `PROXY.proxies[0]`；全生命周期带 `SELECTION_ENSURE_EPOCH` 异步校验并清理越界连接（§5.4 / §7.1） |
 | `trigger_backend_auto_select` → `select_node_for_group("PROXY", ...)` → `profiles_patch_item_safe` | 后端链路 | 选点成功回写 `profile.selected`（§7.1） |
-| `handleImportProfile` / `restartCore()` | 前端 | 导入后重启内核（§7.2） |
+| `handleImportProfile` / `installServiceAndSync` | 前端 | 导入激活同步内核与服务按需安装原子切换（§1.3 / §7.2） |
 | `viewProfile(uid)` / `patchProfile(uid, ...)` / `mutateProfiles()` | 后端/前端 | 订阅右键菜单与编辑（§7.3） |
 | `getPopupCardStyle` / `getPopupSkinTokens` / `get3DInputStyle` / `get3DButtonStyle` | 样式函数 | 菜单/对话框 6 皮肤适配（§2.2 / §7.4） |
 | `FindProcessMode`(枚举, `rename_all="lowercase"`) | Rust 枚举 | 解决 Allow LAN 等开关回弹（§7.3） |

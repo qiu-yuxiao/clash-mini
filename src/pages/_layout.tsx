@@ -326,7 +326,7 @@ const Layout = () => {
 
   // Takeover Mode States
   const { isTunModeAvailable, mutateSystemState } = useSystemState()
-  const { installServiceAndRestartCore } = useServiceInstaller()
+  const { installServiceAndSync } = useServiceInstaller()
   const { enable_tun_mode, enable_system_proxy } = verge ?? {}
   const currentMode = enable_tun_mode
     ? 'tun'
@@ -809,8 +809,7 @@ const Layout = () => {
     try {
       if (targetMode === 'tun' && !isTunModeAvailable) {
         try {
-          await installServiceAndRestartCore({ silentError: true })
-          await mutateSystemState()
+          await installServiceAndSync({ silentError: true })
         } catch {
           showNotice.error('layout.notices.tunServiceConfigFailed')
           return

@@ -584,6 +584,21 @@ FunctionEnd
 !macro CheckAllVergeProcesses
   !insertmacro KillGuardianProcesses
 
+  ; 优先通过 SCM 优雅停止系统服务，避免直接强杀触发 Event ID 7031 与 5 秒自动重拉竞态（BUG-408）
+  SimpleSC::ExistsService "clash_verge_service"
+  Pop $0
+  ${If} $0 == 0
+    SimpleSC::ServiceIsRunning "clash_verge_service"
+    Pop $0
+    Pop $1
+    ${If} $0 == 0
+    ${AndIf} $1 == 1
+      DetailPrint "Stopping ${PRODUCTNAME} Service gracefully..."
+      SimpleSC::StopService "clash_verge_service" 1 15
+      Pop $0
+    ${EndIf}
+  ${EndIf}
+
   ; Check if clash-verge-service.exe is running
   !if "${INSTALLMODE}" == "currentUser"
     nsis_tauri_utils::FindProcessCurrentUser "clash-verge-service.exe"
@@ -1133,8 +1148,8 @@ Section Uninstall
 
   !insertmacro KillGuardianProcesses
   !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
-  !insertmacro CheckAllVergeProcesses
   !insertmacro RemoveVergeService
+  !insertmacro CheckAllVergeProcesses
 
   ; Remove cached window state files
   DetailPrint "Removing window-state.json / .window-state.json"

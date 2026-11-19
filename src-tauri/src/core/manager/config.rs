@@ -130,8 +130,8 @@ impl CoreManager {
                 Config::runtime().await.apply();
                 logging!(info, Type::Core, "Configuration applied");
 
-                // 恢复 PROXY 组并清理滞留在已排除节点上的连接（即使快照为空也进入子集兜底）
-                self.ensure_proxy_group_selection(saved_proxy_now.as_deref()).await;
+                // 异步校准 PROXY 选点并清理滞留越界连接，避免阻塞 config_update_in_progress 主锁（BUG-407）
+                self.spawn_ensure_proxy_group_selection(saved_proxy_now);
 
                 // 【强咬合防线】通知前端获取重载后的最新节点和内核客观配置
                 crate::core::handle::Handle::refresh_clash();

@@ -459,10 +459,6 @@ export async function getSystemProxy() {
   )
 }
 
-export async function restartCore() {
-  return withIpcTimeout(invoke<void>('restart_core'), 60_000, 'restartCore')
-}
-
 /**
  * 导出诊断包（最近日志 + 脱敏配置 + 版本信息），返回 zip 绝对路径。
  * 打包需要读取并压缩约 24 小时的日志，超时给到 60s。

@@ -129,7 +129,6 @@ mod app_init {
             cmd::open_web_url,
             cmd::open_antivirus_guide,
             cmd::export_diagnostic_bundle,
-            cmd::restart_core,
             cmd::get_running_mode,
             cmd::install_service,
             cmd::is_service_available,

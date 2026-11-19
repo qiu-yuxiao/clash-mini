@@ -94,7 +94,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
    - 默认代理端口固定为 Mixed **`10801`**、SOCKS **`10802`**、HTTP **`10803`**。
    - 内核 Controller API 默认端口为 **`9098`**，默认控制密钥为 **`adapted-by-qiu-yuxiao`**（见 `src-tauri/src/constants.rs` 与 `src-tauri/src/config/clash.rs`）。
    - 单实例检测通信端口在 Release 模式为 **`33335`**，Dev 模式为 **`33336`**。
-4. **单实例静默唤醒与深链**：`server.rs::embed_server`（`127.0.0.1:33335`）常驻于独立守护 Tokio 运行时 `DAEMON_RUNTIME`，第二实例探测超时 **`1500ms`**；若端口已占用，仅向既有实例发送 `/commands/visible`（或携带标准 URL 查询百分号编码参数的 `clash-mini:` / `clash-verge:` 深链）并静默退出。当 `should_enter_silent_tray_on_launch()`（开启「静默启动」且存在真实订阅）为真时，既有实例保持托盘驻留且不弹窗，按需弹出 Win32 托盘气泡确认运行状态；仅当连接被拒绝或彻底超时时才显示单实例报错。
+4. **单实例静默唤醒与命名管道隔离**：`server.rs::embed_server`（`127.0.0.1:33335`）常驻于独立守护 Tokio 运行时 `DAEMON_RUNTIME`，第二实例探测超时 **`1500ms`**；若端口已占用，仅向既有实例发送 `/commands/visible`（或携带标准 URL 查询百分号编码参数的 `clash-mini:` / `clash-verge:` 深链）并静默退出。当 `should_enter_silent_tray_on_launch()`（开启「静默启动」且存在真实订阅）为真时，既有实例保持托盘驻留且不弹窗，按需弹出 Win32 托盘气泡确认运行状态；仅当连接被拒绝或彻底超时时才显示单实例报错。
 
 ### 1.2 Windows x64 单一平台架构收敛
 
@@ -107,7 +107,8 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 - **服务启动门控**：仅在开启 TUN 模式时启用/接管 Windows 系统服务；非 TUN 模式（系统代理或混合端口）一律强制以本地独立子进程（Sidecar 旁路模式）运行内核，零 SCM 调用。
 - **管理员直通与普通用户服务自举**：
   - 进程具备 Administrator 权限（`is_current_app_handle_admin`）时直接跳过服务等待并放行 TUN。
-  - 普通用户开启 TUN 前由前端 `isTunModeAvailable` 检查权限或服务状态（`is_service_available`）；未就绪时通过 `installServiceAndRestartCore()` 依次执行 `install_service`（UAC 提权安装）→ `restart_core`，再持久化 `enable_tun_mode`。
+  - 普通用户开启 TUN 前由前端 `isTunModeAvailable` 检查权限或服务状态（`is_service_available`）；未就绪时通过 `installServiceAndSync()` 执行 `install_service`（UAC 提权安装，安装/启动就绪后若当前处于 Sidecar 模式立即停止服务自启残留的 Session 0 `mini-mihomo` 进程）并刷新系统状态，再由 `patchVerge` 一次性原子完成 `Sidecar -> Service` 切换，杜绝多连重启风暴与管理员管道抢占。
+  - **命名管道跨运行时池隔离与零句柄泄漏**：`crates/tauri-plugin-mihomo` 的 `IpcConnectionPool` 按 `tokio::runtime::Id` 物理分桶隔离（`DAEMON_RUNTIME` 与 `tauri::async_runtime` 严禁跨 IOCP 借用 `NamedPipeClient`），`conn_driver` 绑定当前运行时的 `tokio::spawn` 并存入 `IpcConnection::drop` 自动 `abort()`，超时/报错/清池均 `0ms` 释放底层句柄；`reload_config` 实施前后双向清池，`disconnect` 在 `LocalSocket` 或 `force_timeout=0` 下直接丢弃读写端，`stop_core_inner` 停核前调用 `clear_all_ws_connections()` 同步释放常驻 WebSocket 与 HTTP 管道句柄。
   - 后端 `ServiceManager` 使用 `tokio::sync::Mutex<()>` 串行化状态刷新与启停，基于 `ServiceStatus`（`Ready` / `StartRequired` / `InstallRequired` / `ReinstallRequired` / `Unavailable(String)`）管理状态迁移；服务安装/启动就绪等待预算为 `SERVICE_WAIT_MAX = 30000ms`（轮询间隔 `200ms`），而 `ServiceManager::config().max_retries` 严格限定为单次 IPC 请求重试次数，二者职责不得混淆。
   - 若 `prepare_startup_mode` 发现服务被禁用（`DisabledOrBroken`）或二进制损坏，立即记录告警并持久回退至系统代理；若已启用服务在冷启动时瞬时超时，调用 `IVerge::enter_temp_tun_fallback` 进入会话级临时回退并派发 `Handle::refresh_verge()` 同步 UI，绝不覆写磁盘 `verge.yaml` 中的原始 TUN 意图。
 
@@ -316,7 +317,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 - **内核按需统一测量**：废弃应用侧单节点 `/proxies/{name}/delay` 并发请求（避开 TUN 自指回环），所有批量、单点与后台拨测统一经 Rust 串口化调用 `delay_group("PROXY__METRICS")`；`PROXY__METRICS`（`interval: 1800, lazy: true`）与 `proxy-providers.*.health-check.lazy = true` 同步收敛，零内核自治盲测。
 - **全局锁、单点免复核与异源隔离**：全仓 5 处 `delay_group`（主/备测速 + HTTPS 验真）统一串行持有 `METRICS_PROBE_LOCK`、统一 `NODE_TEST_TIMEOUT_MS (5000ms)` 与 `PROBE_COALESCE_WINDOW_MS (1500ms)`；`should_recheck_primary_with_fallback` 在单节点目标（`allow_single_target_skip`）且本轮主 URL 已有 `>= SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS (3)` 个真实节点成功响应时跳过备用 URL 复核。真 HTTPS 验真结果只写 `node.rs` 状态机不入 `evaluate_failover` 判死（`Flowing` 态禁止即时 HTTPS 迁移，门槛为 `HTTPS_VERIFY_MIGRATE_MIN_FAILS = 2`，全败进入 `600s` 退避冷却）。
 - **单点测速四契约**：① 仅测量不切点（`select: false`）；② 接受测量组全组并发探测以换取 TUN 无回环唯一真源；③ `DelayResultSource::NotExecuted` 返回空映射时前端调用 `DelayManager.restoreDelaySnapshot` 恢复原始快照与 `updatedAt`，严禁伪造 Timeout；④ 严禁使用陈旧 120s `history` 退化兜底——`len == 1` 强制实时探测不复用快照，批量子集复用 `< METRICS_REUSE_MAX_AGE_SECS (30s)` 快照（`fromProbe = false` 前端封顶 TTL 为 `30s`），自愈复用 `< SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS (10s)` 快照；仅 `fromProbe = true` 写入 30 分钟前端实时缓存。
-- **并发互斥、过滤重检与双向 UI 同步**：共用 `AUTO_SELECT_RUNNING` 互斥锁；切点前 `select_fastest_candidate` 再次读取 `latest_filter_text` 过滤淘汰越界候选并写回 `profile.selected`；`MONITOR_WAKEUP_NOTIFY` 在重启核心后立即唤醒检测；非轻量模式下经 `build_probe_ui_display` 与 `LAST_UI_ACTIVE_SYNC`（`UiActiveSyncState { node_name, history_time, reported_alive }`）保证 `covers_all_group_nodes` 真实同步、`Stalled` 全灭消除假绿、恢复必同步最新绿色延迟，前端通过 `preTestUpdatedAt` 保护 `-2` 流光占位不误砍原缓存寿命。
+- **并发互斥、过滤重检、错峰重连与双向 UI 同步**：共用 `AUTO_SELECT_RUNNING` 互斥锁；切点前 `select_fastest_candidate` 再次读取 `latest_filter_text` 过滤淘汰越界候选并写回 `profile.selected`；`Handle::refresh_clash()` 仅派发单一 `RefreshClash` 事件（前端 `use-layout-events.ts` 在 `250ms` 统一刷新 REST 查询，多路常驻 WebSocket 在 `REFRESH_CLASH_DEBOUNCE_MS = 400ms` 后按 `WS_RECONNECT_STAGGER_MS = 45ms` 步进错峰重连）；`MONITOR_WAKEUP_NOTIFY` 仅在退出轻量模式或核心升级/手动切换等必要场景唤醒；非轻量模式下经 `build_probe_ui_display` 与 `LAST_UI_ACTIVE_SYNC`（`UiActiveSyncState { node_name, history_time, reported_alive }`）保证 `covers_all_group_nodes` 真实同步、`Stalled` 全灭消除假绿、恢复必同步最新绿色延迟，前端通过 `preTestUpdatedAt` 保护 `-2` 流光占位不误砍原缓存寿命。
 
 ### 5.3 统一记账、切换速率上限与 25 秒失败冷却保护
 
@@ -325,7 +326,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 5.4 订阅伪节点全链路拦截防线与节点过滤同源契约
 
-- **四层合规防线**：① **0ms 生成落盘层**——全链路强制 `profile.store-selected: false`（禁止 Mihomo `cache.db` 复活过滤前旧选点，唯一真源为 `profiles.yaml::selected` 与 `proxy_head_state.json`），且 `enhance::enforce_mini_agreements` 与 `Config::generate_file(Run)` 落盘前通过 `sync_runtime_proxy_group_head` / `promote_preferred_proxy_first` 将符合过滤条件的持久节点或合规子集首节点提前至 `PROXY.proxies[0]`；② **生命周期校验层**——`CoreManager` 启动（`start_core`）、重启（`restart_core`）、重载（`apply_config`）与内核升级统一经过 `resolve_desired_proxy_selection` 与 `ensure_proxy_group_selection` 校验并在收尾清理 `close_excluded_proxy_connections`；③ **过滤子集兜底层**——`pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界选出排除节点；④ **后台守护迁出层**——`evaluate_failover` 检测 `should_migrate_filtered_out_active` 在活跃节点落入排除区且存在合规候选时触发 `ShouldMigrate`。
+- **四层合规防线**：① **0ms 生成落盘层**——全链路强制 `profile.store-selected: false`（禁止 Mihomo `cache.db` 复活过滤前旧选点，唯一真源为 `profiles.yaml::selected` 与 `proxy_head_state.json`），且 `enhance::enforce_mini_agreements` 与 `Config::generate_file(Run)` 落盘前通过 `sync_runtime_proxy_group_head` / `promote_preferred_proxy_first` 将符合过滤条件的持久节点或合规子集首节点提前至 `PROXY.proxies[0]`；② **生命周期校验层**——`CoreManager` 启动（`start_core`）、重启（`restart_core`）、重载（`apply_config`）与内核升级统一经过 `resolve_desired_proxy_selection`（Snapshots 合规即同步落盘持久化）与带 `SELECTION_ENSURE_EPOCH` 自取消代际号的异步 `spawn_ensure_proxy_group_selection`（`120ms` 稳态缓冲、`250ms` 轮询、`12s`/`10s`/`15s` 有界预算，不阻塞排他命令锁）校验并在收尾清理 `close_excluded_proxy_connections`；③ **过滤子集兜底层**——`pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界选出排除节点；④ **后台守护迁出层**——`evaluate_failover` 检测 `should_migrate_filtered_out_active` 在活跃节点落入排除区且存在合规候选时触发 `ShouldMigrate`。
 - **前后端 1:1 伪节点与过滤词同源引擎**：[src-tauri/src/utils/node.rs](src-tauri/src/utils/node.rs)（`is_dummy_node`、`is_structural_banner_name`、`has_region_hint`、`match_node_filter`）与 [src/utils/node.ts](src/utils/node.ts)（`isDummyNode`、`isStructuralBannerName`、`hasRegionHint`、`matchNodeFilter`）逐条对齐：① 英文广告词/URL scheme 支持子串，中文广告短语剥离前缀后严格完全匹配或前缀匹配（严禁前端 `includes` 误伤真实节点）；② 无 `has_region_hint` 保护下的结构形态判定（内嵌非纯域名或冒号配额/日期键值，统一 `trim_start` 兼容全角空格 `\u{3000}`）；③ 多关键词过滤（空格 `AND`、`|`/`｜` `OR`、`-`/`!`/`！` 排除）4 处后端与前端筛选同源一致。
 - **连接指纹连坐去重与 24h 可恢复 HTTPS 验真**：`proxy_endpoint_fingerprint` 计算归一化节点 SHA-256 指纹并经 `resolve_proxy_clone_topology` 裁决：同指纹无地区真节点且含横幅的端点整组连坐剔除并记入 `RUNTIME_TAINTED_BANNER_FPS`（前端通过 `get_confirmed_fake_proxy_names` 同步隐藏）；寄生真地区节点的组按优选等级归真。定期真 HTTPS 验真（`HTTPS_VERIFY_INTERVAL_SECS = 600s`，仅测 `Alive` 未验真节点且活跃已验真+`>= 3` 个已验真备用节点时跳过）采用内容拉取：过真 `1` 次永久 `verified_true`；有参照通过时其余连续失败 `> 5` 次进入 **24 小时软隔离（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`）**，期满自动复察或用户手动更新订阅调用 `clear_unverified_https_failures()` 立即解封。`prioritize_verified_candidates` 与 `utils::node::pick_subset_fallback_node` 优先已验真池并在非空 `filter_text` 下严禁越出过滤子集。
 
@@ -404,7 +405,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 7.7 路径控制精准规则生成与四态路由可逆闭环
 
-- **精确目标匹配（禁止扩域）**：在「路径控制」表右键设为直连/代理/封锁时，主机域名统一生成精确 `DOMAIN,<host>,<TARGET>`（仅「添加网址」中显式输入 `*.` 或 `.` 通配前缀才生成 `DOMAIN-SUFFIX`），IPv4/IPv6/进程分别生成 `IP-CIDR`/`IP-CIDR6`/`PROCESS-NAME`；下发严格按「写入 `Merge` → `enhanceProfiles()` → 精确关闭命中活跃连接」执行。
+- **精确目标匹配（禁止扩域）**：在「路径控制」表右键设为直连/代理/封锁时，主机域名统一生成精确 `DOMAIN,<host>,<TARGET>`（仅「添加网址」中显式输入 `*.` 或 `.` 通配前缀才生成 `DOMAIN-SUFFIX`），IPv4/IPv6/进程分别生成 `IP-CIDR`/`IP-CIDR6`/`PROCESS-NAME`；下发按「锁内 `saveProfileFile('Merge', ...)` 直通 `update_config_forced` 重载（仅保存未直通生效时兜底调用 `enhanceProfiles()`）→ 精确关闭命中活跃连接」执行；全局 `Merge` 对全部激活订阅恒生效且在 `enhance` 阶段仅加载一次（禁止当配置 `current_merge` 为空或 `'Merge'` 时重复二次合并）。
 - **四态单表融合、YAML 备份与详情显式节点**：`composeActivePathControlConnections` 将实时流、本地手动断开记录、`Merge` 置顶规则以及近期已关闭连接（`_isClosed: true`）融为单表展示 **`直连 (DIRECT)` / `代理 (PROXY)` / `封锁 (REJECT)` / `已断开 (DISCONNECTED)`** 四态；表头提供一致的 3D `保存路由`（`exportCustomRoutingRules`）与 `导入路由`（`importCustomRoutingRules`）一键备份恢复；左键详情 [connection-detail.tsx](src/components/connection/connection-detail.tsx) 在 `主机` 下紧接显示 `代理节点`（`resolveConnectionNodeDisplay`）并对滞留于后台切换前旧节点的连接标示醒目的 `（旧节点连接）`（`staleNodeTag`）。
 
 ---
@@ -467,7 +468,7 @@ flowchart LR
 
 ### 8.10 安装程序全周期全局置顶铁律
 
-在 `installer.nsi` 中于 GUI 初始化（`myGuiInit` / `un.myGuiInit`）、预检（`Section EarlyChecks`）、安装（`Section Install`）及卸载（`Section Uninstall`）全阶段持续执行 `BringToFront` 与 `System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"`（`HWND_TOPMOST`），确保安全提示或前台窗口绝不遮挡安装/卸载交互界面。
+在 `installer.nsi` 中于 GUI 初始化（`myGuiInit` / `un.myGuiInit`）、预检（`Section EarlyChecks`）、安装（`Section Install`）及卸载（`Section Uninstall`）全阶段持续执行 `BringToFront` 与 `System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"`（`HWND_TOPMOST`），确保安全提示或前台窗口绝不遮挡安装/卸载交互界面；进程清理宏 `CheckAllVergeProcesses` 优先调用 `SimpleSC::StopService` 优雅停服（卸载段优先执行 `RemoveVergeService`），避免强杀触发 SCM Event ID `7031`。
 
 ---
 

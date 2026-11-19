@@ -128,7 +128,11 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         }
     };
 
-    let merge_uid = current_item.current_merge().cloned().unwrap_or_else(|| "Merge".into());
+    // global_merge 已无条件加载 "Merge"，因此配置级 merge 仅在显式指向其它专属 Merge 时加载，避免 Merge.yaml 重复合并两次（BUG-409）
+    let merge_uid = current_item
+        .current_merge()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty() && *s != "Merge");
     let rules_uid = current_item.current_rules().cloned().unwrap_or_else(|| "Rules".into());
     let proxies_uid = current_item
         .current_proxies()
@@ -136,7 +140,7 @@ async fn collect_profile_items() -> Result<ProfileItems> {
         .unwrap_or_else(|| "Proxies".into());
 
     let merge_item = {
-        let item = profiles_arc.get_item(&merge_uid).ok().cloned();
+        let item = merge_uid.and_then(|uid| profiles_arc.get_item(uid).ok().cloned());
         if let Some(item) = item {
             <Option<ChainItem>>::from_async(&item).await
         } else {

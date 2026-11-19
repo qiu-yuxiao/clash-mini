@@ -48,7 +48,6 @@ pub async fn patch_clash(patch: &Mapping) -> Result<()> {
         } else {
             CoreManager::global().update_config_checked().await?;
         }
-        handle::Handle::refresh_clash();
         <Result<()>>::Ok(())
     }
     .await;
@@ -237,7 +236,6 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     }
     if update_flags.contains(UpdateFlags::CLASH_CONFIG) && !update_flags.contains(UpdateFlags::RESTART_CORE) {
         CoreManager::global().update_config_checked().await?;
-        handle::Handle::refresh_clash();
     }
     if update_flags.contains(UpdateFlags::VERGE_CONFIG) {
         handle::Handle::refresh_verge();

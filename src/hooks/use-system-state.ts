@@ -91,7 +91,7 @@ export function useSystemState() {
     if (enable_tun_mode === undefined) return
 
     // 长操作期间（用户主动切换 TUN/系统代理等）禁止自动关闭 TUN：
-    // installServiceAndRestartCore 完成后 isTunModeAvailable 可能短暂为 false
+    // installServiceAndSync 完成后 isTunModeAvailable 可能短暂为 false
     // （mihomo 刚重启，服务 IPC 未就绪），此时用户已 patchVerge({enable_tun_mode:true})，
     // 若自动关闭 TUN 的 patchVerge 与之并发，会导致配置反复修改、mihomo 反复 reload、
     // IPC 通道阻塞、notice 堆积，最终画面卡死。
