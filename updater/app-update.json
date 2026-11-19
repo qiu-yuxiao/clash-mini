@@ -1,12 +1,12 @@
 {
   "version": "3.5.7",
-  "notes": "Clash Mini v3.5.7",
-  "pub_date": "2026-11-19T13:37:07Z",
+  "notes": "### 🔒 根治内核启动/重启/重载后排除地区节点短暂落位并残留连接 & 全栈瘦身精简（BUG-404 / BUG-405）\n\n- **根治 `select` 组无静态 `now` 导致过滤排除节点短暂接管与连接滞留（BUG-405）**：\n  - **0ms 合规落位与禁旧缓存复活**：全链路将运行时 `profile.store-selected` 收敛为 `false`（以 `profiles.yaml` 与过滤配置为唯一真源，阻断 `cache.db` 复活过滤前旧选点）；在 `enforce_mini_agreements` 与 `generate_file(Run)` 落盘前自动调用 `promote_preferred_proxy_first` 将符合用户过滤词（如 `-香港 -台湾`）的持久选点或合规子集首节点提前至 `PROXY.proxies[0]`，使内核启动/重启第 0 毫秒直接命中合规出口而非订阅原始首节点。\n  - **全生命周期统一保障与越界连接精准清理**：抽取共享 `resolve_desired_proxy_selection` 与 `ensure_proxy_group_selection` 统一覆盖 `start_core`、`restart_core`、`apply_config`（`reload_config`）与内核升级全路径（即使快照为空或目标被排除仍自动落回合规子集并同步持久化），并在收尾及后台守护 `NodeMigration` 迁出后立即调用 `close_excluded_proxy_connections` 清理任何滞留在已排除节点上的代理长连接；`evaluate_failover` 同步补齐活跃出口越界即时迁移检测。\n- **全栈死代码剥离、编译器 `dead_code` 门禁开启与设计书去历史化精简（BUG-404）**：移除 `#![allow(dead_code)]` 永久开启 Rust 全仓静态死代码检测，清理零消费 IPC（`get_runtime_config` / `uninstall_service`）与冗余前端 `visibilitychange` 主动拨测器，并将代码注释与《开发设计书》精简为现态工程契约，净削减代码与文档冗赘逾 1,300 行。\n\n---",
+  "pub_date": "2026-11-19T13:53:03.371Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU5UcTMwaytzQVBKR1Q2c0dRQ0Fma3RPcldLeWp1MHNzNlhqZHJFSHl0NUFLNUdtMkdxT2VuWG5KWXhRaHRneGJ2dlZSeGJleE5JaFhKV0Fkb3o1dkE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDgzNDc3CWZpbGU6Q2xhc2ggTWluaV8zLjUuNl94NjQtc2V0dXAuZXhlCkZuY0liMHQ0RHhrbm5lMkRqMEJqVDA1cEcxaEtsUjJscWxPU2p2V204SElPY2l3YllEZ2RsV3NQb1dBQjl3RjJkTTBYVXc4OFJNMzdJVWtianNwR0F3PT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUR4TkxnemQzcTJHZktYQ05odWFlUzIrVGNQVUNROGx5UHQ4TlRsUDZGNzd6dGpDTG8vOFVVOXRpVGZFSytzRnllRXpJNS9oZE02ODg2T3FHRG1Bd3dVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MDk2MzE5CWZpbGU6Q2xhc2ggTWluaV8zLjUuN194NjQtc2V0dXAuZXhlCkx5VzBoMFQ3WTdUZE1vRnRWajFLSU1aNEd0WGZ5RkVldE1GS3FnRWNyd1Y2SXNUM0twcldlTE94Nkt1RFpKU3JCUmVHQjcwbSt5U0RqWDlIbG44dkRBPT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.5.7/Clash.Mini_3.5.7_x64-setup.exe",
-      "size": 30216500
+      "size": 30213205
     }
   }
 }
