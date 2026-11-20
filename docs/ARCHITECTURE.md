@@ -99,7 +99,7 @@ flowchart TB
 | **配置生成（enhance）** | `src-tauri/src/enhance/` | `enhance()` 合并所有 profile 的 proxies/merge/rules + 全局 Merge，经原生 Rust 卫兵 `apply_builtin_guards` 归一化后，由 `enforce_mini_agreements` 把 proxy-groups 改写成 `[PROXY(select), PROXY__METRICS(url-test)]` 并注入 GFWList 规则 |
 | **配置 / 状态** | `src-tauri/src/config/` | `Config` 单例（4 个 `Draft<T>` 已提交 vs 在途）；`IVerge` / `IProfiles` / `PrfItem` / `IClashTemp` |
 | **特性编排** | `src-tauri/src/feat/` | `patch_verge`（用 `UpdateFlags` 位标决定重启内核 / 更新系统代理 / 刷新托盘 / 切语言）、`toggle_system_proxy` / `toggle_tun_mode` |
-| **监测与自愈引擎** | `src-tauri/src/module/monitor.rs` | 长驻守护线程：正常 15s / 离线 5s / 重试 3s 周期；`evaluate_failover` 读 `PROXY__METRICS` 权威值；`trigger_backend_auto_select` 统一测速+选点；回写 `profile.selected`（三层防污染校验）；网络在线/离线探测；统一记账 `self_heal_with_accounting` |
+| **监测与自愈引擎** | `src-tauri/src/module/monitor/` | 长驻守护线程（`daemon`/`observer`/`verdict`/`probe`/`auto_select`/`connections` 分模块协作）：正常 15s / 离线 5s / 重试 3s 周期；`evaluate_failover` 读 `PROXY__METRICS` 权威值；`trigger_backend_auto_select` 统一测速+选点；回写 `profile.selected`（三层防污染校验）；网络在线/离线探测；统一记账 `self_heal_with_accounting` |
 | **轻量模式** | `src-tauri/src/module/lightweight.rs` | 三态 CAS 状态机（Normal / In / Exiting）+ 全局锁；进入时销毁主窗口、熔断前端 WS、不断用户连接；退出自动重连 |
 | **托盘 / 事件** | `src-tauri/src/core/tray/` `src-tauri/src/core/notification.rs` | 静态极简双项菜单托盘（仅代理模式变更时 `Tray::update_icon` 切换 3 套静态 PNG，零轮询/零动态重构菜单）；`FrontendEvent` 枚举 + `Handle::notify_*` 向后端→前端 emit 事件（轻量模式静默丢弃） |
 
@@ -229,7 +229,7 @@ sequenceDiagram
 |---|---|
 | 内核启动/停止、Service vs Sidecar | `src-tauri/src/core/manager/lifecycle.rs` |
 | 最终配置组装（单 PROXY 组） | `src-tauri/src/enhance/mod.rs`（`enforce_mini_agreements`） |
-| 健康 / 自动选点引擎 | `src-tauri/src/module/monitor.rs` |
+| 健康 / 自动选点引擎 | `src-tauri/src/module/monitor/` |
 | 轻量模式 | `src-tauri/src/module/lightweight.rs` |
 | 后端→前端事件 | `src-tauri/src/core/notification.rs` |
 | 前端数据中枢 | `src/providers/app-data-provider.tsx` |
