@@ -228,7 +228,7 @@ sequenceDiagram
 | 你想了解 | 看这里 |
 |---|---|
 | 内核启动/停止、Service vs Sidecar | `src-tauri/src/core/manager/lifecycle.rs` |
-| 最终配置组装（单 PROXY 组） | `src-tauri/src/enhance/mod.rs`（`enforce_mini_agreements`） |
+| 最终配置组装（单 PROXY 组） | `src-tauri/src/enhance/`（`mod.rs` / `agreements.rs` / `dns.rs`：`enforce_mini_agreements`） |
 | 健康 / 自动选点引擎 | `src-tauri/src/module/monitor/` |
 | 轻量模式 | `src-tauri/src/module/lightweight.rs` |
 | 后端→前端事件 | `src-tauri/src/core/notification.rs` |

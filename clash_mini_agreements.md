@@ -331,7 +331,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 ### 5.4 订阅伪节点全链路拦截防线与节点过滤同源契约
 
 - **四层合规防线**：① **0ms 生成落盘层**——全链路强制 `profile.store-selected: false`（禁止 Mihomo `cache.db` 复活过滤前旧选点，唯一真源为 `profiles.yaml::selected` 与 `proxy_head_state.json`），且 `enhance::enforce_mini_agreements` 与 `Config::generate_file(Run)` 落盘前通过 `sync_runtime_proxy_group_head` / `promote_preferred_proxy_first` 将符合过滤条件的持久节点或合规子集首节点提前至 `PROXY.proxies[0]`；② **生命周期校验层**——`CoreManager` 启动（`start_core`）、重启（`restart_core`）、重载（`apply_config`）与内核升级统一经过 `resolve_desired_proxy_selection`（Snapshots 合规即同步落盘持久化）与带 `SELECTION_ENSURE_EPOCH` + `SELECTION_ENSURE_HANDLE`（新派发及 `stop_core_inner`/`cleanup_local_state_after_service_stop` 时即时 `abort()`，并联动 `current_manual_switch_epoch()` 在用户手动切点后立即退让）的异步 `spawn_ensure_proxy_group_selection`（`120ms` 稳态缓冲、`250ms` 轮询、`12s`/`10s`/`15s` 有界预算，不阻塞排他命令锁）校验并在收尾清理 `close_excluded_proxy_connections`；③ **过滤子集兜底层**——`pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界选出排除节点；④ **后台守护迁出层**——`evaluate_failover` 检测 `should_migrate_filtered_out_active` 在活跃节点落入排除区且存在合规候选时触发 `ShouldMigrate`。
-- **前后端 1:1 伪节点与过滤词同源引擎**：[src-tauri/src/utils/node.rs](src-tauri/src/utils/node.rs)（`is_dummy_node`、`is_structural_banner_name`、`has_region_hint`、`match_node_filter`）与 [src/utils/node.ts](src/utils/node.ts)（`isDummyNode`、`isStructuralBannerName`、`hasRegionHint`、`matchNodeFilter`）逐条对齐：① 英文广告词/URL scheme 支持子串，中文广告短语剥离前缀后严格完全匹配或前缀匹配（严禁前端 `includes` 误伤真实节点）；② 无 `has_region_hint` 保护下的结构形态判定（内嵌非纯域名或冒号配额/日期键值，统一 `trim_start` 兼容全角空格 `\u{3000}`）；③ 多关键词过滤（空格 `AND`、`|`/`｜` `OR`、`-`/`!`/`！` 排除）4 处后端与前端筛选同源一致。
+- **前后端 1:1 伪节点与过滤词同源引擎**：[src-tauri/src/utils/node/](src-tauri/src/utils/node/mod.rs)（按职责拆分为 `filter.rs` / `fingerprint.rs` / `verify_store.rs` / `tests.rs` 并由 `mod.rs` 统一重导出：`is_dummy_node`、`is_structural_banner_name`、`has_region_hint`、`match_node_filter`）与 [src/utils/node.ts](src/utils/node.ts)（`isDummyNode`、`isStructuralBannerName`、`hasRegionHint`、`matchNodeFilter`）逐条对齐：① 英文广告词/URL scheme 支持子串，中文广告短语剥离前缀后严格完全匹配或前缀匹配（严禁前端 `includes` 误伤真实节点）；② 无 `has_region_hint` 保护下的结构形态判定（内嵌非纯域名或冒号配额/日期键值，统一 `trim_start` 兼容全角空格 `\u{3000}`）；③ 多关键词过滤（空格 `AND`、`|`/`｜` `OR`、`-`/`!`/`！` 排除）4 处后端与前端筛选同源一致。
 - **连接指纹连坐去重与 24h 可恢复 HTTPS 验真**：`proxy_endpoint_fingerprint` 计算归一化节点 SHA-256 指纹并经 `resolve_proxy_clone_topology` 裁决：同指纹无地区真节点且含横幅的端点整组连坐剔除并记入 `RUNTIME_TAINTED_BANNER_FPS`（前端通过 `get_confirmed_fake_proxy_names` 同步隐藏）；寄生真地区节点的组按优选等级归真。定期真 HTTPS 验真（`HTTPS_VERIFY_INTERVAL_SECS = 600s`，仅测 `Alive` 未验真节点且活跃已验真+`>= 3` 个已验真备用节点时跳过）采用内容拉取：过真 `1` 次永久 `verified_true`；有参照通过时其余连续失败 `> 5` 次进入 **24 小时软隔离（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`）**，期满自动复察或用户手动更新订阅调用 `clear_unverified_https_failures()` 立即解封。`prioritize_verified_candidates` 与 `utils::node::pick_subset_fallback_node` 优先已验真池并在非空 `filter_text` 下严禁越出过滤子集。
 
 ### 5.5 物理网络连通性快速探测与活跃流量免测（TCP:53）
@@ -383,7 +383,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 7.1 单一 PROXY 组模型架构
 
-`enhance` 阶段将订阅所有可用真实节点平铺汇聚至唯一选择器组 **`PROXY`** 及同构隐藏测量组 **`PROXY__METRICS`**，彻底剔除多层嵌套策略组，前端展示、排序、过滤与激活 100% 绑定该唯一控制组；运行时配置通过 `sync_runtime_proxy_group_head` 将合规目标置为 `PROXY.proxies[0]` 并关闭 `store-selected`，确保任何冷启/重启瞬间零越界落点。
+`enhance/`（按职责拆分为 `mod.rs` 主编排、`agreements.rs` 单组拓扑收敛、`dns.rs` 上游卫生与规则生成、`tun.rs`、`seq.rs`、`field.rs`、`merge.rs`、`chain.rs`、`tests.rs`）阶段将订阅所有可用真实节点平铺汇聚至唯一选择器组 **`PROXY`** 及同构隐藏测量组 **`PROXY__METRICS`**，彻底剔除多层嵌套策略组，前端展示、排序、过滤与激活 100% 绑定该唯一控制组；运行时配置通过 `sync_runtime_proxy_group_head` 将合规目标置为 `PROXY.proxies[0]` 并关闭 `store-selected`，确保任何冷启/重启瞬间零越界落点。
 
 ### 7.2 通用协议解析器（Universal Parser）规范
 
