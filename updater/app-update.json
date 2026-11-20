@@ -1,12 +1,12 @@
 {
   "version": "3.6.0",
-  "notes": "Clash Mini v3.6.0",
-  "pub_date": "2026-11-20T07:33:12Z",
+  "notes": "### 🛡️ 内核缺管秒级自愈重启、间歇性黑洞节点滑窗逃生与故障旧死链精准清理（BUG-411 / BUG-412）\n\n- **根治内核进程意外消失时自愈空等近 4 分钟问题（BUG-411）**：在 `tauri-plugin-mihomo` 新增零句柄侵占的 `is_named_pipe_server_missing`（精准区分 `os error 2` 管道缺失与繁忙阻塞），结合 `CoreManager::should_expect_core_pipe_alive()` 与 `500ms` 二次确认防抖后立即触发 `restart_core()` 秒级恢复；同时 `ApiChannelDown` 通道复核仍不可达时跳过无效 30 秒 `wait_for_clash_ready()` 空等，稳态 `NoAction` 恢复时同步清零告警计数。\n- **根治间歇性黑洞节点长流卡死不切点及切后死链滞留（BUG-412）**：`evaluate_failover` 全阶段在同组已有 `>= 3` 个真实节点通过主测速 URL 时跳过冗余备用 URL 复核，避免单点坏节点借第 3 次压线逃生；新增 `600s` 间歇黑洞滑动窗口累计裁决（窗口内 `>= 2` 次独立 `ShouldFailover` 故障周期直接切离），并在确认切离故障旧节点后精准断开滞留其上的 `PROXY` 存量长连接，让 HTTP/2 / gRPC 长流即时在新健康节点重建恢复。\n\n### 🔒 全项目验收安全加固、生命周期防覆盖与工程清理（BUG-413 / BUG-414）\n\n- **诊断包敏感字段补齐与内核热更新强制 SHA-256 校验及沙箱收口（BUG-413）**：\n  - 诊断导出（`diagnostics.rs`）在 `SENSITIVE_KEYS` 与日志正则 `LOG_SENSITIVE_KV` 补全 WireGuard `pre-shared-key` / `preshared-key`、`private-key-passphrase`、`short-id`、`obfs-param`、`protocol-param` 等协议凭据脱敏与单测；\n  - 内核在线升级（`core_updater.rs`）消费 GitHub Release API 原生 `asset.digest`（`sha256:...`）及 `size` 字段实行 **Fail-Closed** 校验（无有效 SHA-256 摘要或哈希不符一律拒绝升级，移除 `stop_core` 前冗余启动分支），强制锁定 `https://github.com/MetaCubeX/mihomo/releases/download/` 下载源并限制 `100 MiB` 下载上限与 `150 MiB` 解压上限；\n  - `IVerge::get_valid_clash_core` 与 `patch_config` 在运行期强制收敛 `clash_core` 为白名单 `\"mini-mihomo\"`；Tauri `desktop.json`/`migrated.json` 平台收口为 `windows`，`fs:scope` 收紧至 `$TEMP/**` 并显式拒绝 `$APPDATA/cores/**`。\n- **自启计划任务双态迁移、单实例独占校验、选点任务托管与构建净零告警（BUG-414）**：\n  - `autostart.rs` 结合 `%SystemRoot%\\System32\\Tasks\\` 存续检测写入 `done`/`pending_admin` 双态标记避免永久跳过管理员计划任务，并在 `installer.nsi` 安装/卸载段静默清理历史计划任务；\n  - `server.rs` 修正 Windows 单实例独占绑定注释、新增 `--silent` 专用 `/commands/ping` 探活路由并校验响应状态，遇瞬时释放窗口执行 `3 × 150ms` 短退避重绑；\n  - `lifecycle.rs` 托管 `SELECTION_ENSURE_HANDLE`（新派发与停核时即时 `abort()`）并联动 `current_manual_switch_epoch()` 手动切点退让，`monitor.rs` 为 `ALERT_DIALOG_OPEN` 补齐 `scopeguard::defer!` 复位守卫；\n  - 清理孤立失效的 `Twemoji.Mozilla.ttf` 字体引用告警，校准 `ipc.rs` 默认连接池注释与 `config.rs` 陈旧 TODO，并完成历史版本 `BUG-392` ~ `BUG-410` 的人工确认归档。\n\n---",
+  "pub_date": "2026-11-20T07:51:51.743Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUlnRHR1M2owemtIRDFxcmxkMnZ3d3hMT2ZLN3BadHV3MFNkdEhvODR0QU1mVThZWkRNN0EydXd1V3RVdFhrL2l6b0pXTUJRQXl1Nnk0bmpTdzNkNGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MTE0NDMwCWZpbGU6Q2xhc2ggTWluaV8zLjUuOV94NjQtc2V0dXAuZXhlCldxdHJ5N1Rvc0pKbytWUTA2N0UwTUFPVjQvZ1RxWUVaMEZxVFVkbDk2emxBNXRCZGFpb3JsekZBMUo3WC8yMDlyZzNWcTM2UDY0bG1jT0FWeFVrR0NRPT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRVBSTGVCcEV5T0JQb2FWUEd5RFBuT0tHaFI2SEdYaDJGcUMvWnpBUVUxK01OUkZMSFJLaDVwR0psaDd6Njh2TEZKNVVQaHU5Q2J0czhMWXYzZmh6cFFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MTYxMDM2CWZpbGU6Q2xhc2ggTWluaV8zLjYuMF94NjQtc2V0dXAuZXhlCmEwV2c5WlI4KzU0TlhqTE1rYUJyWFRCTWpNazFMcFJGdjVMTHRyRkNLYUtDc0RCcFVxQWdEYmlFaUFwaERXTk1OMTJOTjRmd0YxYjVXdFVLRnpiekFnPT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.0/Clash.Mini_3.6.0_x64-setup.exe",
-      "size": 30216340
+      "size": 30191336
     }
   }
 }
