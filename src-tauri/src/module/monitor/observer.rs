@@ -1,12 +1,13 @@
 use super::verdict::NodeStatus;
 use super::{
-    DIAL_FAIL_REPROBE_COOLDOWN_SECS, DIAL_FAIL_REPROBE_THRESHOLD, DIAL_FAIL_WINDOW_SECS, IDLE_HEALTH_FRESH_SECS,
-    LAST_FLOWING_TRAFFIC_AT, MAX_KERNEL_LOG_INCREMENTAL_BYTES, PASSIVE_TRAFFIC_MAX_SKIP_SECS,
+    DIAL_FAIL_REPROBE_COOLDOWN_SECS, DIAL_FAIL_REPROBE_THRESHOLD, DIAL_FAIL_WINDOW_SECS, FORCE_ONLINE_RECHECK,
+    IDLE_HEALTH_FRESH_SECS, LAST_FLOWING_TRAFFIC_AT, MAX_KERNEL_LOG_INCREMENTAL_BYTES, PASSIVE_TRAFFIC_MAX_SKIP_SECS,
     STALL_REPROBE_COOLDOWN_SECS,
 };
 use std::collections::HashMap;
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
 use tokio::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,12 +130,28 @@ pub(super) struct ActiveHealthObservation {
 pub(super) static LAST_HEALTH_OBSERVATION: parking_lot::Mutex<Option<ActiveHealthObservation>> =
     parking_lot::Mutex::new(None);
 
-/// 代理节点建连/握手/会话阶段失败突发追踪器（BUG-415，零常驻 WebSocket）。
+/// 内核日志告警事件分类（BUG-415 / BUG-416）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum KernelLogEvent {
+    ProxyDialFailure,
+    TunInterfaceLost,
+    TunInterfaceChanged,
+}
+
+/// 驱动跳过健康缓存立即复核的信号原因（BUG-415 / BUG-416）
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum KernelReprobeReason {
+    DialFailureBurst(usize),
+    TunInterfaceChanged,
+}
+
+/// 代理节点建连/握手/会话阶段失败及网卡变更新增追踪器（BUG-415 / BUG-416，零常驻 WebSocket）。
 #[derive(Default)]
 pub(super) struct ProxyDialFailureTracker {
     active_node: Option<String>,
     active_since_utc: Option<chrono::DateTime<chrono::Utc>>,
     failure_instants: Vec<Instant>,
+    interface_changed_pending: bool,
     last_probe_at: Option<Instant>,
     cursor_path: Option<PathBuf>,
     cursor_offset: u64,
@@ -173,6 +190,20 @@ pub(super) fn is_proxy_dial_failure_log_line(line: &str) -> bool {
         || err_lower.contains("eof")
         || err_lower.contains("network is unreachable")
         || err_lower.contains("no route to host")
+}
+
+/// 将内核日志行分类为代理建连失败或 TUN 默认网卡丢失/切换事件（BUG-416）。
+pub(super) fn classify_kernel_log_event(line: &str) -> Option<KernelLogEvent> {
+    if line.contains("[TUN] default interface lost by monitor") {
+        return Some(KernelLogEvent::TunInterfaceLost);
+    }
+    if line.contains("[TUN] default interface changed by monitor") {
+        return Some(KernelLogEvent::TunInterfaceChanged);
+    }
+    if is_proxy_dial_failure_log_line(line) {
+        return Some(KernelLogEvent::ProxyDialFailure);
+    }
+    None
 }
 
 /// 从 Mihomo 结构化日志行提取 `time="..."` RFC3339 时间戳并转为 UTC。
@@ -248,6 +279,7 @@ impl ProxyDialFailureTracker {
             self.active_node = Some(active_node.to_owned());
             self.active_since_utc = Some(now_utc);
             self.failure_instants.clear();
+            self.interface_changed_pending = false;
             self.last_probe_at = None;
             self.reanchor_to_end = true;
         }
@@ -256,6 +288,7 @@ impl ProxyDialFailureTracker {
     pub(super) fn reset_for_manual_switch(&mut self, now_utc: chrono::DateTime<chrono::Utc>) {
         self.active_since_utc = Some(now_utc);
         self.failure_instants.clear();
+        self.interface_changed_pending = false;
         self.last_probe_at = None;
         self.reanchor_to_end = true;
     }
@@ -266,11 +299,13 @@ impl ProxyDialFailureTracker {
     }
 
     pub(super) fn ingest_log_line(&mut self, line: &str, now_inst: Instant, now_utc: chrono::DateTime<chrono::Utc>) {
-        if !is_proxy_dial_failure_log_line(line) {
+        let Some(event) = classify_kernel_log_event(line) else {
             return;
-        }
+        };
         let event_inst = if let Some(ts) = parse_mihomo_log_timestamp(line) {
-            if self.active_since_utc.is_some_and(|since| ts < since) {
+            if !matches!(event, KernelLogEvent::TunInterfaceLost)
+                && self.active_since_utc.is_some_and(|since| ts < since)
+            {
                 return;
             }
             let age_secs = now_utc.signed_duration_since(ts).num_seconds();
@@ -284,13 +319,27 @@ impl ProxyDialFailureTracker {
             now_inst
         };
 
-        self.prune(now_inst);
-        if self.failure_instants.len() >= 64 {
-            self.failure_instants.remove(0);
+        match event {
+            KernelLogEvent::TunInterfaceLost => {
+                *LAST_FLOWING_TRAFFIC_AT.lock() = None;
+                FORCE_ONLINE_RECHECK.store(true, Ordering::Release);
+            }
+            KernelLogEvent::TunInterfaceChanged => {
+                *LAST_FLOWING_TRAFFIC_AT.lock() = None;
+                FORCE_ONLINE_RECHECK.store(true, Ordering::Release);
+                self.interface_changed_pending = true;
+            }
+            KernelLogEvent::ProxyDialFailure => {
+                self.prune(now_inst);
+                if self.failure_instants.len() >= 64 {
+                    self.failure_instants.remove(0);
+                }
+                self.failure_instants.push(event_inst);
+            }
         }
-        self.failure_instants.push(event_inst);
     }
 
+    #[cfg(test)]
     pub(super) fn evaluate_burst(&mut self, now_inst: Instant) -> (usize, bool) {
         self.prune(now_inst);
         let count = self.failure_instants.len();
@@ -300,15 +349,33 @@ impl ProxyDialFailureTracker {
         (count, count >= DIAL_FAIL_REPROBE_THRESHOLD && !cooldown_active)
     }
 
+    pub(super) fn evaluate_reprobe_signal(&mut self, now_inst: Instant) -> Option<KernelReprobeReason> {
+        self.prune(now_inst);
+        let cooldown_active = self
+            .last_probe_at
+            .is_some_and(|t| now_inst.duration_since(t) < Duration::from_secs(DIAL_FAIL_REPROBE_COOLDOWN_SECS));
+        if cooldown_active {
+            return None;
+        }
+        if self.failure_instants.len() >= DIAL_FAIL_REPROBE_THRESHOLD {
+            Some(KernelReprobeReason::DialFailureBurst(self.failure_instants.len()))
+        } else if self.interface_changed_pending {
+            Some(KernelReprobeReason::TunInterfaceChanged)
+        } else {
+            None
+        }
+    }
+
     pub(super) fn consume_burst_for_probe(&mut self, now_inst: Instant) {
         self.failure_instants.clear();
+        self.interface_changed_pending = false;
         self.last_probe_at = Some(now_inst);
     }
 }
 
-/// 供 Sidecar 日志消费循环直喂内核输出行（无 `"dial PROXY "` 字样时零锁开销直接跳过，BUG-415）。
+/// 供 Sidecar 日志消费循环直喂内核输出行（无 `"dial PROXY "` 与 `"[TUN] default interface "` 时零锁跳过，BUG-415 / BUG-416）。
 pub fn record_kernel_log_line(line: &str) {
-    if !line.contains("dial PROXY ") {
+    if !line.contains("dial PROXY ") && !line.contains("[TUN] default interface ") {
         return;
     }
     let now_inst = Instant::now();
@@ -319,11 +386,21 @@ pub fn record_kernel_log_line(line: &str) {
         .ingest_log_line(line, now_inst, now_utc);
 }
 
-pub(super) async fn poll_active_node_dial_failures(active_node: &str) -> (usize, bool) {
+async fn sync_service_kernel_logs_inner(expected_active_node: Option<&str>) {
+    let is_service_mode = matches!(
+        *crate::core::manager::CoreManager::global().get_running_mode(),
+        crate::core::manager::RunningMode::Service
+    );
+    if !is_service_mode {
+        return;
+    }
+    let Ok(log_dir) = crate::utils::dirs::service_log_dir() else {
+        return;
+    };
+
     let (cursor_path, cursor_offset, reanchor_to_end) = {
         let mut guard = PROXY_DIAL_FAILURE_TRACKER.lock();
         let tracker = guard.get_or_insert_with(ProxyDialFailureTracker::default);
-        tracker.on_node_checked(active_node, chrono::Utc::now());
         let snap = (
             tracker.cursor_path.clone(),
             tracker.cursor_offset,
@@ -333,47 +410,51 @@ pub(super) async fn poll_active_node_dial_failures(active_node: &str) -> (usize,
         snap
     };
 
-    let is_service_mode = matches!(
-        *crate::core::manager::CoreManager::global().get_running_mode(),
-        crate::core::manager::RunningMode::Service
-    );
+    let log_path = log_dir.join("service_latest.log");
+    let (lines, next_path, next_offset, next_reanchor) = tokio::task::spawn_blocking(move || {
+        let mut path_slot = cursor_path;
+        let mut offset_slot = cursor_offset;
+        let mut reanchor_slot = reanchor_to_end;
+        let lines = read_incremental_log_lines(&log_path, &mut path_slot, &mut offset_slot, &mut reanchor_slot);
+        (lines, path_slot, offset_slot, reanchor_slot)
+    })
+    .await
+    .unwrap_or_default();
 
-    if is_service_mode && let Ok(log_dir) = crate::utils::dirs::service_log_dir() {
-        let log_path = log_dir.join("service_latest.log");
-        let (lines, next_path, next_offset, next_reanchor) = tokio::task::spawn_blocking(move || {
-            let mut path_slot = cursor_path;
-            let mut offset_slot = cursor_offset;
-            let mut reanchor_slot = reanchor_to_end;
-            let lines = read_incremental_log_lines(&log_path, &mut path_slot, &mut offset_slot, &mut reanchor_slot);
-            (lines, path_slot, offset_slot, reanchor_slot)
-        })
-        .await
-        .unwrap_or_default();
-
-        let now_inst = Instant::now();
-        let now_utc = chrono::Utc::now();
-        let res = {
-            let mut guard = PROXY_DIAL_FAILURE_TRACKER.lock();
-            let tracker = guard.get_or_insert_with(ProxyDialFailureTracker::default);
-            if tracker.active_node.as_deref() == Some(active_node) {
-                tracker.cursor_path = next_path;
-                tracker.cursor_offset = next_offset;
-                tracker.reanchor_to_end = next_reanchor;
-                for line in lines {
-                    tracker.ingest_log_line(&line, now_inst, now_utc);
-                }
-            }
-            let res = tracker.evaluate_burst(now_inst);
-            drop(guard);
-            res
-        };
-        return res;
+    let now_inst = Instant::now();
+    let now_utc = chrono::Utc::now();
+    let mut guard = PROXY_DIAL_FAILURE_TRACKER.lock();
+    let tracker = guard.get_or_insert_with(ProxyDialFailureTracker::default);
+    if expected_active_node.is_none_or(|node| tracker.active_node.as_deref() == Some(node)) {
+        tracker.cursor_path = next_path;
+        tracker.cursor_offset = next_offset;
+        tracker.reanchor_to_end = next_reanchor;
+        for line in lines {
+            tracker.ingest_log_line(&line, now_inst, now_utc);
+        }
     }
+    drop(guard);
+}
+
+/// 在线态主循环探针前同步 Service 模式增量日志，及时捕捉 `[TUN] default interface lost / changed`（BUG-416）。
+pub(super) async fn sync_service_kernel_logs() {
+    sync_service_kernel_logs_inner(None).await;
+}
+
+pub(super) async fn poll_active_node_dial_failures(active_node: &str) -> Option<KernelReprobeReason> {
+    {
+        let mut guard = PROXY_DIAL_FAILURE_TRACKER.lock();
+        let tracker = guard.get_or_insert_with(ProxyDialFailureTracker::default);
+        tracker.on_node_checked(active_node, chrono::Utc::now());
+        drop(guard);
+    }
+
+    sync_service_kernel_logs_inner(Some(active_node)).await;
 
     PROXY_DIAL_FAILURE_TRACKER
         .lock()
         .get_or_insert_with(ProxyDialFailureTracker::default)
-        .evaluate_burst(Instant::now())
+        .evaluate_reprobe_signal(Instant::now())
 }
 
 /// 判定本次体检是否必须发起一轮 `PROXY__METRICS` 物理实拨：

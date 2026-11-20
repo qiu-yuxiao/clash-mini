@@ -313,7 +313,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
   - `Flowing`（存在下行回包 `delta_download > 0` 且当前 `Alive`）：免拨测保鲜延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (1800s)`；
   - `Stalled`（有上行零回包 `delta_upload > 0 && delta_download == 0`）：受 `STALL_REPROBE_COOLDOWN_SECS (60s)` 限制在本轮立即实拨复核；
   - `Idle`（无活跃下行）：保鲜窗为 `IDLE_HEALTH_FRESH_SECS (900s)`，零闲时盲测风暴。
-- **代理建连失败突发破缓存复核（零常驻 WS）**：`Service` 模式按文件字节偏移增量扫描 `logs/service/service_latest.log`（兼容轮转截断与末尾半行保留，首次观察及节点切换时锚定文件末尾与切换时间戳），`Sidecar` 模式由子进程日志流直喂内存解析器；当 `DIAL_FAIL_WINDOW_SECS (30s)` 滑窗内捕获 `>= DIAL_FAIL_REPROBE_THRESHOLD (3)` 条指向 `PROXY` 组的建连/握手/会话失败告警（排除 `DIRECT`、`PROXY__METRICS`、`operation was canceled` 与纯 DNS 解析无记录）且不在 `DIAL_FAIL_REPROBE_COOLDOWN_SECS (60s)` 冷却内时，立即突破 `Flowing (1800s)` / `Idle (900s)` 免拨测缓存发起一轮 `probe_metrics_group` 实拨复核（不直接判死，切点仍服从统一裁决器）。
+- **代理建连失败突发与网卡变更破缓存复核（零常驻 WS）**：`Service` 模式按文件字节偏移增量扫描 `logs/service/service_latest.log`（兼容轮转截断与末尾半行保留，首次观察及节点切换时锚定文件末尾与切换时间戳），`Sidecar` 模式由子进程日志流直喂内存解析器；当 `DIAL_FAIL_WINDOW_SECS (30s)` 滑窗内捕获 `>= DIAL_FAIL_REPROBE_THRESHOLD (3)` 条指向 `PROXY` 组的建连/握手/会话失败告警（排除 `DIRECT`、`PROXY__METRICS`、`operation was canceled` 与纯 DNS 解析无记录），或捕获 `[TUN] default interface changed by monitor` 默认网卡切换事件，且不在 `DIAL_FAIL_REPROBE_COOLDOWN_SECS (60s)` 冷却内时，立即突破 `Flowing (1800s)` / `Idle (900s)` 免拨测缓存发起一轮 `probe_metrics_group` 实拨复核（不直接判死，切点仍服从统一裁决器）；其中 `[TUN] default interface lost / changed by monitor` 同步清零 `LAST_FLOWING_TRAFFIC_AT` 并置位 `FORCE_ONLINE_RECHECK`。
 - **可观测性稳态摘要契约**：`select: false` 纯测速刷新结束时输出单行 `info` 统计摘要（含待测数、可达数、数据来源及当前节点延迟）；守护循环每 `MONITOR_SUMMARY_INTERVAL_SECS (600s)` 输出单行 `info` 稳态健康摘要（复用当轮体检观测，零额外 IPC）。
 
 ### 5.2 单一内核测量组（PROXY__METRICS）统一调度
@@ -336,7 +336,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 5.5 物理网络连通性快速探测与活跃流量免测（TCP:53）
 
-若近 `ONLINE_CHECK_FLOWING_SKIP_SECS (60s)` 内存在活跃代理下行流量（`LAST_FLOWING_TRAFFIC_AT`），直接跳过公网握手判定物理在线；否则优先直连 `223.5.5.5:53`（`PRIMARY_NET_PROBE_TIMEOUT_MS = 250ms`），失败后再并发竞速 `119.29.29.29:53` / `1.1.1.1:53`（`600ms`）并以测速域名解析兜底（避开 TUN DNS 死锁）。在线每 `60s`、离线每 `5s` 探测；恢复离线→在线即刻清零失败计数并发起 `Wait` 稳态首测。
+若近 `ONLINE_CHECK_FLOWING_SKIP_SECS (60s)` 内存在活跃代理下行流量（`LAST_FLOWING_TRAFFIC_AT`），直接跳过公网握手判定物理在线；但当增量内核日志捕获 `[TUN] default interface lost / changed by monitor` 时，立即清零 `LAST_FLOWING_TRAFFIC_AT` 并置位 `FORCE_ONLINE_RECHECK`，令下一轮守护循环立即穿透该 `60s` 免测窗直连公网探活（`223.5.5.5:53` `PRIMARY_NET_PROBE_TIMEOUT_MS = 250ms`，失败后再并发竞速 `119.29.29.29:53` / `1.1.1.1:53` `600ms` 并以测速域名解析兜底，避开 TUN DNS 死锁）。在线每 `60s`、离线每 `5s` 探测；恢复离线→在线即刻清零失败计数并发起 `Wait` 稳态首测。
 
 ### 5.6 批量测速触发（F4/F1）与结果统一回传
 
@@ -389,9 +389,9 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 原生覆盖 `hysteria`、`hysteria2`、`anytls`、`vless`、`trojan`、`tuic`、`wireguard`、`socks5`、`http` 等协议族；共享预处理 `strip_fragment_and_query` 严格遵守 **`#fragment` → `?query` → 末位 `@` 拆解 `userinfo@host:port`** 顺序（防密码或参数含 `@` 截断主机），完整支持 IPv6 字面量、WireGuard CIDR 清洗及 VMess `sni -> servername` 映射。
 
-### 7.3 订阅导入等待与 Provider 刷新协同
+### 7.3 订阅导入等待、失败传播与 Provider 刷新协同
 
-新订阅导入或重载后每 `1.5s` 轮询检查直到 `PROXY` 组出现真实有效节点，随即直写刷新前端本地缓存消除首屏延迟。
+新订阅导入或重载后每 `1.5s` 轮询检查直到 `PROXY` 组出现真实有效节点，随即直写刷新前端本地缓存消除首屏延迟；远程更新链（`perform_profile_update` / `update_profile`）在三阶段下载全部失败或配置校验出错时必须向调用方传播 `Err`（阻断空重载与假成功提示，并触发 `Timer::finish_task` -> `compute_next_schedule_minutes` 进入 `2` 分钟快速重试）。
 
 ### 7.4 订阅管理与右键上下文菜单
 
@@ -458,7 +458,7 @@ flowchart LR
 ### 8.7 可诊断性：日志保留与诊断包
 
 - **日志留存**：运行时默认 `app_log_max_size = 128 KB` × `app_log_max_count = 40`（约 5MB / 24h+）。
-- **一键诊断包与高亮定位**：`export_diagnostic_bundle` 将应用及 `service`/`sidecar` 日志与脱敏配置打入 `<app_home>/diagnostics/*.zip`，随后调用 Windows 原生 `explorer /select,"<path>"`（逗号后无空格）选中定位。
+- **一键诊断包与高亮定位**：`export_diagnostic_bundle` 将应用及 `service`/`sidecar` 日志与脱敏配置打入 `<app_home>/diagnostics/*.zip`（同步采集 `collect_windows_crash_events` WER Application 崩溃事件与 `%LOCALAPPDATA%\CrashDumps` 转储清单，统一覆盖 `clash-mini`、`mini-mihomo`、`clash-verge-service`、`verge-mihomo` 与 `msedgewebview2`），随后调用 Windows 原生 `explorer /select,"<path>"`（逗号后无空格）选中定位。
 - **采集与脱敏硬约束**：① ZIP 条目名必须统一转为正斜杠 `/`；② 按修改时间 `mtime` 倒序采集最多 `MAX_DIAGNOSTIC_LOG_FILES = 60` 个文件、单文件尾部截断 `MAX_LOG_FILE_READ_BYTES = 2MB`；③ 一律跳过符号链接（防 `latest.log` 重复与目录环）；④ YAML 解析失败禁止落盘原文；⑤ `SENSITIVE_KEYS` 与 `LOG_SENSITIVE_KV` 覆盖 `password` / `uuid` / `psk` / `pre-shared-key` / `preshared-key` / `private-key` / `private-key-passphrase` / `public-key` / `short-id` / `auth-str` / `obfs-password` / `obfs-param` / `protocol-param` / `secret` / `token` / `url` / `authorization` 等全部协议凭据；`redact_log_text` 须先脱敏 `Authorization:` 整行与裸 `Bearer <token>` 再执行通用 KV 与 URL userinfo 正则，且必须放进 `spawn_blocking` 执行以免阻塞 tokio worker。
 
 ### 8.8 前端单测基线与最小覆盖

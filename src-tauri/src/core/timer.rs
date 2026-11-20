@@ -321,17 +321,21 @@ impl Timer {
         false
     }
 
+    const fn compute_next_schedule_minutes(configured_minutes: u64, success: bool) -> u64 {
+        if success || configured_minutes < 2 {
+            configured_minutes
+        } else {
+            2
+        }
+    }
+
     fn finish_task(queue: &mut DelayQueue<String>, tasks: &mut HashMap<String, TaskState>, uid: String, success: bool) {
         let Some(state) = tasks.get_mut(&uid) else {
             return;
         };
 
         state.running = false;
-        let interval_minutes = if success {
-            state.interval_minutes
-        } else {
-            std::cmp::min(state.interval_minutes, 2)
-        };
+        let interval_minutes = Self::compute_next_schedule_minutes(state.interval_minutes, success);
         let key = Self::schedule_task(queue, &uid, interval_minutes);
         state.key = Some(key);
     }
@@ -461,5 +465,18 @@ impl Timer {
 
     async fn wait_until_resolve_done(max_wait: Duration) {
         let _ = timeout(max_wait, wait_for_resolve_done()).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Timer;
+
+    #[test]
+    fn failed_update_schedules_two_minute_fast_retry() {
+        assert_eq!(Timer::compute_next_schedule_minutes(1440, true), 1440);
+        assert_eq!(Timer::compute_next_schedule_minutes(1440, false), 2);
+        assert_eq!(Timer::compute_next_schedule_minutes(1, false), 1);
+        assert_eq!(Timer::compute_next_schedule_minutes(2, false), 2);
     }
 }

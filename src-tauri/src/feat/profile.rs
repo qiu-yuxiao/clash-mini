@@ -3,7 +3,7 @@ use crate::{
     core::{CoreManager, handle, validate::ValidationOutcome},
     utils::help::{mask_err, mask_url},
 };
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 use clash_verge_logging::{Type, logging};
 use smartstring::alias::String;
 use std::sync::atomic::AtomicBool;
@@ -49,7 +49,6 @@ async fn perform_profile_update(
     url: &String,
     opt: Option<&PrfOption>,
     option: Option<&PrfOption>,
-    is_mannual_trigger: bool,
 ) -> Result<bool> {
     logging!(info, Type::Config, "[订阅更新] 开始下载新的订阅内容");
     let mut merged_opt = PrfOption::merge(opt, option);
@@ -127,10 +126,10 @@ async fn perform_profile_update(
         }
     }
 
-    if is_mannual_trigger {
-        handle::Handle::notice_message("update_failed_even_with_clash", format!("{profile_name} - {last_err}"));
-    }
-    Ok(is_current)
+    Err(anyhow!(
+        "订阅「{profile_name}」更新失败: {}",
+        mask_err(&last_err.to_string())
+    ))
 }
 
 pub async fn update_profile(
@@ -144,9 +143,7 @@ pub async fn update_profile(
     let url_opt = should_update_profile(uid, ignore_auto_update).await?;
 
     let should_refresh = match url_opt {
-        Some((url, opt)) => {
-            perform_profile_update(uid, &url, opt.as_ref(), option, is_mannual_trigger).await? && auto_refresh
-        }
+        Some((url, opt)) => perform_profile_update(uid, &url, opt.as_ref(), option).await? && auto_refresh,
         None => auto_refresh,
     };
 
@@ -177,12 +174,17 @@ pub async fn update_profile(
             Ok(outcome) => {
                 let message = outcome.to_string();
                 logging!(error, Type::Config, "[订阅更新] 更新失败: {}", message);
-                handle::Handle::notice_message("update_failed", message);
+                if !is_mannual_trigger && !crate::module::lightweight::is_in_lightweight_mode() {
+                    handle::Handle::notice_message("update_failed", message.clone());
+                }
+                return Err(anyhow!("{message}"));
             }
             Err(err) => {
                 logging!(error, Type::Config, "[订阅更新] 更新失败: {}", err);
-                handle::Handle::notice_message("update_failed", format!("{err}"));
-                logging!(error, Type::Config, "{err}");
+                if !is_mannual_trigger && !crate::module::lightweight::is_in_lightweight_mode() {
+                    handle::Handle::notice_message("update_failed", format!("{err}"));
+                }
+                return Err(err);
             }
         }
     } else if cleared_quarantine > 0 && !crate::module::lightweight::is_in_lightweight_mode() {

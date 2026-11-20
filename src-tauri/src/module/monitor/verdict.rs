@@ -1,5 +1,5 @@
 use super::observer::{
-    ACTIVE_TRAFFIC_TRACKER, ActiveHealthObservation, ActiveTrafficState, LAST_HEALTH_OBSERVATION,
+    ACTIVE_TRAFFIC_TRACKER, ActiveHealthObservation, ActiveTrafficState, KernelReprobeReason, LAST_HEALTH_OBSERVATION,
     PROXY_DIAL_FAILURE_TRACKER, poll_active_node_dial_failures, sample_active_node_traffic, should_probe_active_node,
 };
 use super::probe::{
@@ -277,15 +277,15 @@ pub(super) async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<Failo
     }
 
     let (traffic_state, stall_cooldown_active) = sample_active_node_traffic(&mihomo, &active_node).await;
-    let (dial_fail_count, dial_fail_burst_ready) = poll_active_node_dial_failures(&active_node).await;
+    let reprobe_signal = poll_active_node_dial_failures(&active_node).await;
 
     let mut proxies = mihomo
         .get_proxies()
         .await
         .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
 
-    // 【BUG-377 + BUG-379 + BUG-415】只有「健康、无建连失败突发且数据在对应流量态保鲜窗口内」才允许免拨测；
-    // 任何非 Alive 状态、单向停滞态或代理建连失败突发都必须先取得本轮主 URL 实拨证据，再重读 alive / history 裁决。
+    // 【BUG-377 + BUG-379 + BUG-415 + BUG-416】只有「健康、无建连失败突发/网卡切换待复核且数据在对应流量态保鲜窗口内」才允许免拨测；
+    // 任何非 Alive 状态、单向停滞态、代理建连失败突发或默认网卡切换都必须先取得本轮主 URL 实拨证据，再重读 alive / history 裁决。
     let need_probe = match proxies.proxies.get(&active_node) {
         None => false, // 活跃节点不在代理列表（异常），不动作
         Some(p) => should_probe_active_node(
@@ -293,20 +293,28 @@ pub(super) async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<Failo
             history_age(p),
             traffic_state,
             stall_cooldown_active,
-            dial_fail_burst_ready,
+            reprobe_signal.is_some(),
         ),
     };
-    if need_probe && dial_fail_burst_ready {
+    if need_probe && let Some(signal) = reprobe_signal {
         if let Some(tracker) = PROXY_DIAL_FAILURE_TRACKER.lock().as_mut() {
             tracker.consume_burst_for_probe(Instant::now());
         }
-        logging!(
-            info,
-            Type::Lightweight,
-            "[后台监测] 检测到活跃节点 {} 近期出现 {} 次代理建连失败告警，突破免测缓存立即触发体检复核",
-            active_node,
-            dial_fail_count
-        );
+        match signal {
+            KernelReprobeReason::DialFailureBurst(dial_fail_count) => logging!(
+                info,
+                Type::Lightweight,
+                "[后台监测] 检测到活跃节点 {} 近期出现 {} 次代理建连失败告警，突破免测缓存立即触发体检复核",
+                active_node,
+                dial_fail_count
+            ),
+            KernelReprobeReason::TunInterfaceChanged => logging!(
+                info,
+                Type::Lightweight,
+                "[后台监测] 检测到物理默认网卡切换，突破免测缓存立即复核当前节点 {}",
+                active_node
+            ),
+        }
     }
     if need_probe && traffic_state == ActiveTrafficState::Stalled {
         if let Some(tracker) = ACTIVE_TRAFFIC_TRACKER.lock().as_mut() {

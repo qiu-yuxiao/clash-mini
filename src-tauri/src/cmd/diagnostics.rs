@@ -202,22 +202,37 @@ fn file_opts() -> zip::write::SimpleFileOptions {
     zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated)
 }
 
+fn is_clash_mini_wer_target(lower: &str) -> bool {
+    lower.contains("clash-mini")
+        || lower.contains("clash mini")
+        || lower.contains("mini-mihomo")
+        || lower.contains("clash-verge-service")
+        || lower.contains("clash_verge_service")
+        || lower.contains("verge-mihomo")
+        || lower.contains("msedgewebview2")
+}
+
+fn is_clash_mini_dump_target(lower: &str) -> bool {
+    lower.contains("clash-mini")
+        || lower.contains("mini-mihomo")
+        || lower.contains("clash-verge-service")
+        || lower.contains("clash_verge_service")
+        || lower.contains("verge-mihomo")
+}
+
 fn filter_wer_events_for_clash(raw: &str) -> String {
     const MAX_REPORT_CHARS: usize = 8192;
     let blocks: Vec<&str> = raw.split("Event[").filter(|s| !s.trim().is_empty()).collect();
     let relevant: Vec<String> = blocks
         .iter()
-        .filter(|blk| {
-            let lower = blk.to_ascii_lowercase();
-            lower.contains("clash-mini") || lower.contains("verge-mihomo") || lower.contains("msedgewebview2")
-        })
+        .filter(|blk| is_clash_mini_wer_target(&blk.to_ascii_lowercase()))
         .take(10)
         .map(|blk| format!("Event[{}", redact_log_text(blk.trim())))
         .collect();
 
     let combined = if relevant.is_empty() {
         format!(
-            "未在最近 15 条 Application(1000/1001/1002) 事件中命中 clash-mini / verge-mihomo 崩溃或挂起记录（总扫 {} 条）",
+            "未在最近 15 条 Application(1000/1001/1002) 事件中命中 clash-mini / mini-mihomo / clash-verge-service 崩溃或挂起记录（总扫 {} 条）",
             blocks.len()
         )
     } else {
@@ -251,7 +266,7 @@ fn collect_crash_dumps_readonly() -> Vec<String> {
     for entry in rd.flatten() {
         let name = entry.file_name().to_string_lossy().to_string();
         let lower = name.to_ascii_lowercase();
-        if lower.contains("clash-mini") || lower.contains("verge-mihomo") {
+        if is_clash_mini_dump_target(&lower) {
             let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
             hits.push(format!(r"%LOCALAPPDATA%\CrashDumps\{name} ({size} bytes)"));
             if hits.len() >= 10 {
@@ -260,7 +275,7 @@ fn collect_crash_dumps_readonly() -> Vec<String> {
         }
     }
     if hits.is_empty() {
-        hits.push("无 clash-mini / verge-mihomo 崩溃转储文件".to_string());
+        hits.push("无 clash-mini / mini-mihomo / clash-verge-service 崩溃转储文件".to_string());
     }
     hits
 }
@@ -719,11 +734,29 @@ Event[1]:
   Event ID: 1000
   Description:
 Faulting application name: clash-mini.exe, version: 3.2.8.0, url=https://a.example?token=secret-wer-tok
+Event[2]:
+  Log Name: Application
+  Event ID: 1000
+  Description:
+Faulting application name: mini-mihomo.exe, version: 1.19.0
+Event[3]:
+  Log Name: Application
+  Event ID: 1000
+  Description:
+Faulting application name: clash-verge-service.exe, version: 1.0.0
 ";
         let filtered = filter_wer_events_for_clash(wevt_sample);
         assert!(filtered.contains("clash-mini.exe"));
+        assert!(filtered.contains("mini-mihomo.exe"));
+        assert!(filtered.contains("clash-verge-service.exe"));
         assert!(!filtered.contains("unrelated.exe"));
         assert!(!filtered.contains("secret-wer-tok"));
+
+        assert!(super::is_clash_mini_dump_target("mini-mihomo.exe.1234.dmp"));
+        assert!(super::is_clash_mini_dump_target("clash-verge-service.exe.99.dmp"));
+        assert!(super::is_clash_mini_dump_target("clash_verge_service.exe.1.dmp"));
+        assert!(super::is_clash_mini_dump_target("clash-mini.exe.42.dmp"));
+        assert!(!super::is_clash_mini_dump_target("notepad.exe.42.dmp"));
 
         let no_hit = filter_wer_events_for_clash("Event[0]:\n  Faulting application name: calc.exe\n");
         assert!(no_hit.contains("未在最近 15 条"));

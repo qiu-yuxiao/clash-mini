@@ -391,7 +391,7 @@ class DelayManager {
     // 添加 history 属性的安全检查
     if (proxy.history && proxy.history.length > 0) {
       const lastRecord = proxy.history[proxy.history.length - 1]
-      // 记录过旧（超过测量组 2 个 interval）同样不再冒充当前延迟。
+      // 记录过旧（超过 HISTORY_FALLBACK_MAX_AGE_MS 45 分钟容忍窗）同样不再冒充当前延迟。
       // 时间无法解析时保持原值回落，避免把「格式异常」误判成「节点已死」。
       const recordedAt = Date.parse(lastRecord.time)
       if (

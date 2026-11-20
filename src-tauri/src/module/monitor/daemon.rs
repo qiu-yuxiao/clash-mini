@@ -3,7 +3,7 @@ use super::auto_select::{
     trigger_backend_auto_select_with_options,
 };
 use super::connections::{close_dead_node_proxy_connections, close_excluded_proxy_connections};
-use super::observer::LAST_HEALTH_OBSERVATION;
+use super::observer::{LAST_HEALTH_OBSERVATION, sync_service_kernel_logs};
 use super::probe::{
     get_current_profile_uid, get_filter_and_sort_config, is_clash_api_alive, is_physical_network_online,
     is_recent_flowing_traffic_active, load_node_server_map, record_server_failure, restore_profile_selected_nodes,
@@ -16,7 +16,7 @@ use super::verdict::{
     self_heal_subject_to_switch_rate_limit, should_keep_alive_on_api_recovery, should_proceed_with_self_heal,
 };
 use super::{
-    ALERT_DIALOG_OPEN, API_ERROR_HEAL_THRESHOLD, AUTO_SWITCH_WINDOW_SECS, AutoSelectOutcome,
+    ALERT_DIALOG_OPEN, API_ERROR_HEAL_THRESHOLD, AUTO_SWITCH_WINDOW_SECS, AutoSelectOutcome, FORCE_ONLINE_RECHECK,
     HTTPS_VERIFY_INTERVAL_SECS, LAST_MANUAL_NODE_SWITCH, MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS,
     MONITOR_HEARTBEAT_CYCLE_COUNT, MONITOR_SUMMARY_INTERVAL_SECS, MONITOR_TASK_HANDLE, MONITOR_WAKEUP_NOTIFY,
     NODE_SWITCH_NOTIFY, NORMAL_CHECK_INTERVAL_SECS, PIPE_MISSING_CONFIRM_DELAY_MS, PROFILE_SWITCH_NOTIFY,
@@ -273,19 +273,24 @@ pub fn start_background_monitor() {
                 }
             };
 
+            // 同步增量读取内核日志中的网卡事件（BUG-416），使 `[TUN] default interface lost/changed` 立即跳过 60s 在线免测
+            sync_service_kernel_logs().await;
+            let force_online_recheck = FORCE_ONLINE_RECHECK.swap(false, Ordering::AcqRel);
+
             // 检测物理网络连通性状态（有节流门控，避免每次循环都发起 DNS 查询）
             let probe_interval = if was_online {
                 Duration::from_secs(60) // 在线时：60 秒探测一次
             } else {
                 Duration::from_secs(5) // 离线时：5 秒探测一次，快速发现网络恢复
             };
-            let need_probe = last_online_check_time
-                .map(|t| t.elapsed() >= probe_interval)
-                .unwrap_or(true); // 首次循环一定探测
+            let need_probe = force_online_recheck
+                || last_online_check_time
+                    .map(|t| t.elapsed() >= probe_interval)
+                    .unwrap_or(true); // 首次循环一定探测
 
             let is_online = if need_probe {
                 last_online_check_time = Some(Instant::now());
-                if was_online && is_recent_flowing_traffic_active() {
+                if !force_online_recheck && was_online && is_recent_flowing_traffic_active() {
                     true
                 } else {
                     // 【性能优化与动态探测】：复用 is_physical_network_online 探测物理网络连通性

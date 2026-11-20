@@ -9,6 +9,21 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-416 订阅更新失败误判成功与快重试失效、诊断包漏采现行内核崩溃、网卡切换/断开免测盲区及前端陈旧注释收口
+
+- **对应模块**：[profile.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/profile.rs)、[timer.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/timer.rs)、[diagnostics.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/diagnostics.rs)、[monitor/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/mod.rs)、[monitor/observer.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/observer.rs)、[monitor/verdict.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/verdict.rs)、[monitor/daemon.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/daemon.rs)、[delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts)
+- **问题描述**：
+  1. [profile.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/profile.rs)`::perform_profile_update` 在订阅三阶段下载全部失败时仅发送后端通知却返回 `Ok(is_current)`，[update_profile](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/profile.rs) 对配置校验失败分支亦同，导致：[timer.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/timer.rs) 误判更新成功而无法触发 `2` 分钟快速重试，前端手动更新误走成功分支重载未变配置并弹出绿色 `subscriptionUpdated` 提示；
+  2. [diagnostics.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/diagnostics.rs) 收集 Windows WER Application 崩溃事件与 `%LOCALAPPDATA%\CrashDumps` 转储清单时仅匹配旧内核 `verge-mihomo`，漏采当前运行内核 `mini-mihomo` 与系统服务 `clash-verge-service` 崩溃记录；
+  3. 后台守护线程增量消费内核日志时未识别 `[TUN] default interface lost by monitor` 与 `[TUN] default interface changed by monitor`，发生物理断网或默认网卡切换后仍可能被近 `60s` 的 `ONLINE_CHECK_FLOWING_SKIP_SECS` 或 `Flowing`/`Idle` 健康缓存继续免测滞留；
+  4. [delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts) 第 394 行注释仍残留陈旧的 `PROXY__METRICS` `5` 分钟（`300s`）周期旧假定（实际为 `HISTORY_FALLBACK_MAX_AGE_MS` `45` 分钟容忍窗）。
+- **修复方案**：
+  1. 在 [profile.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/feat/profile.rs) 中令三阶段下载全败与配置校验失败严格向上返回 `Err(...)`（仅在后台定时触发且非轻量模式下发送后端失败通知，手动更新由前端统一弹出唯一错误提示，不重载未变配置），并在 [timer.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/timer.rs) 提炼 `compute_next_schedule_minutes` 并补齐 `2` 分钟快重试单测；
+  2. 在 [diagnostics.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/cmd/diagnostics.rs) 新增 `is_clash_mini_wer_target` / `is_clash_mini_dump_target`，统一覆盖 `clash-mini`、`mini-mihomo`、`clash-verge-service`、`verge-mihomo` 与 `msedgewebview2` 并更新单元测试；
+  3. 在 [observer.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/observer.rs)、[mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/mod.rs)、[daemon.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/daemon.rs) 与 [verdict.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/verdict.rs) 新增 `KernelLogEvent` / `KernelReprobeReason` 与 `FORCE_ONLINE_RECHECK`：`lost` 与 `changed` 均立即清零 `LAST_FLOWING_TRAFFIC_AT` 并置位 `FORCE_ONLINE_RECHECK` 跳过 `60s` 免探窗口；`changed` 额外在 `60s` 冷却外触发一次活跃节点实拨复核，补齐 [monitor/tests.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/tests.rs) 单元测试及全局静态并发串行锁；
+  4. 校准 [delay.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/services/delay.ts) 陈旧注释。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-415 代理节点建连握手超时盲区突破免测缓存、启动纯测速及 10 分钟稳态摘要可观测性补齐与陈旧注释校准
 
 - **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[state.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/state.rs)

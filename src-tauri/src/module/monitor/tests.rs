@@ -10,9 +10,10 @@ use super::connections::{
 };
 use super::daemon::{SelfHealAction, complete_restart_core_attempt, evaluate_self_heal_counters};
 use super::observer::{
-    ACTIVE_TRAFFIC_TRACKER, ActiveHealthObservation, ActiveTrafficState, LAST_HEALTH_OBSERVATION,
-    PROXY_DIAL_FAILURE_TRACKER, ProxyDialFailureTracker, classify_active_traffic_delta, is_proxy_dial_failure_log_line,
-    read_incremental_log_lines, record_kernel_log_line, should_probe_active_node,
+    ACTIVE_TRAFFIC_TRACKER, ActiveHealthObservation, ActiveTrafficState, KernelLogEvent, KernelReprobeReason,
+    LAST_HEALTH_OBSERVATION, PROXY_DIAL_FAILURE_TRACKER, ProxyDialFailureTracker, classify_active_traffic_delta,
+    classify_kernel_log_event, is_proxy_dial_failure_log_line, read_incremental_log_lines, record_kernel_log_line,
+    should_probe_active_node,
 };
 use super::probe::{
     build_probe_ui_display_with, compute_next_ui_active_sync, has_recent_flowing_traffic,
@@ -29,7 +30,7 @@ use super::verdict::{
 };
 use super::{
     API_ERROR_HEAL_THRESHOLD, BROWNOUT_WINDOW_SECS, DEFAULT_TEST_URL, DIAL_FAIL_REPROBE_COOLDOWN_SECS,
-    DIAL_FAIL_WINDOW_SECS, DelayResultSource, FAILOVER_CONFIRM_FAILS, FALLBACK_TEST_URL,
+    DIAL_FAIL_WINDOW_SECS, DelayResultSource, FAILOVER_CONFIRM_FAILS, FALLBACK_TEST_URL, FORCE_ONLINE_RECHECK,
     HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS, HTTPS_VERIFY_INTERVAL_SECS, IDLE_HEALTH_FRESH_SECS, LAST_ACTIVE_VERIFY_CHECK,
     LAST_FLOWING_TRAFFIC_AT, LAST_HTTPS_VERIFY_ALL_FAILED, LAST_MANUAL_NODE_SWITCH, LAST_METRICS_PROBE,
     LAST_NOTIFIED_HEALTH, LAST_UI_ACTIVE_SYNC, MANUAL_SWITCH_EPOCH, MAX_AUTO_SWITCHES_PER_WINDOW,
@@ -41,6 +42,8 @@ use super::{
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use tokio::time::{Duration, Instant};
+
+static STATIC_STATE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[test]
 fn test_classify_node_status_suspect_hysteresis() {
@@ -338,6 +341,7 @@ fn test_complete_restart_core_attempt_escalates_on_restart_error() {
 
 #[tokio::test]
 async fn test_manual_node_switch_wakes_notify_and_reset_clears_statics() {
+    let _serial = STATIC_STATE_TEST_LOCK.lock().await;
     reset_monitor_static_state();
     *LAST_NOTIFIED_HEALTH.lock() = "network_health::all_dead";
     record_kernel_log_line(
@@ -350,6 +354,7 @@ async fn test_manual_node_switch_wakes_notify_and_reset_clears_statics() {
         history_age_secs: Some(10),
         probed_this_round: false,
     });
+    FORCE_ONLINE_RECHECK.store(true, Ordering::Release);
 
     notify_manual_node_switched();
     assert!(LAST_MANUAL_NODE_SWITCH.lock().is_some());
@@ -369,6 +374,7 @@ async fn test_manual_node_switch_wakes_notify_and_reset_clears_statics() {
     assert!(ACTIVE_TRAFFIC_TRACKER.lock().is_none());
     assert!(PROXY_DIAL_FAILURE_TRACKER.lock().is_none());
     assert!(LAST_HEALTH_OBSERVATION.lock().is_none());
+    assert!(!FORCE_ONLINE_RECHECK.load(Ordering::Acquire));
 }
 
 #[test]
@@ -760,15 +766,18 @@ fn test_bug388_continuity_and_self_heal_invariants() {
     assert!(is_benign_auto_select_abort("AUTO_SELECT_MANUAL_PREEMPTED"));
     assert!(!is_benign_auto_select_abort("OTHER_ERROR"));
 
-    let prev_epoch = MANUAL_SWITCH_EPOCH.load(Ordering::Acquire);
-    notify_manual_node_switched();
-    assert_eq!(MANUAL_SWITCH_EPOCH.load(Ordering::Acquire), prev_epoch + 1);
-    *LAST_ACTIVE_VERIFY_CHECK.lock() = Some(Instant::now());
-    *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = Some(Instant::now());
-    reset_monitor_static_state();
-    assert_eq!(MANUAL_SWITCH_EPOCH.load(Ordering::Acquire), 0);
-    assert!(LAST_ACTIVE_VERIFY_CHECK.lock().is_none());
-    assert!(LAST_HTTPS_VERIFY_ALL_FAILED.lock().is_none());
+    {
+        let _serial = STATIC_STATE_TEST_LOCK.blocking_lock();
+        let prev_epoch = MANUAL_SWITCH_EPOCH.load(Ordering::Acquire);
+        notify_manual_node_switched();
+        assert_eq!(MANUAL_SWITCH_EPOCH.load(Ordering::Acquire), prev_epoch + 1);
+        *LAST_ACTIVE_VERIFY_CHECK.lock() = Some(Instant::now());
+        *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = Some(Instant::now());
+        reset_monitor_static_state();
+        assert_eq!(MANUAL_SWITCH_EPOCH.load(Ordering::Acquire), 0);
+        assert!(LAST_ACTIVE_VERIFY_CHECK.lock().is_none());
+        assert!(LAST_HTTPS_VERIFY_ALL_FAILED.lock().is_none());
+    }
 }
 
 #[test]
@@ -973,10 +982,13 @@ fn test_bug403_recent_flowing_traffic_proves_physical_online() {
         ONLINE_CHECK_FLOWING_SKIP_SECS
     ))));
 
-    *LAST_FLOWING_TRAFFIC_AT.lock() = Some(Instant::now());
-    assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_some());
-    reset_monitor_static_state();
-    assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_none());
+    {
+        let _serial = STATIC_STATE_TEST_LOCK.blocking_lock();
+        *LAST_FLOWING_TRAFFIC_AT.lock() = Some(Instant::now());
+        assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_some());
+        reset_monitor_static_state();
+        assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_none());
+    }
 }
 
 #[test]
@@ -1275,4 +1287,91 @@ fn test_read_incremental_log_lines_handles_anchor_append_partial_and_rotation() 
     assert!(!reanchor);
 
     let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn test_bug416_tun_interface_signals_invalidate_online_skip_and_reprobe() {
+    assert_eq!(
+        classify_kernel_log_event(
+            "[2026-11-20 06:51:43.873] time=\"2026-11-20T06:51:43.873+08:00\" level=warning msg=\"[TUN] default interface lost by monitor\""
+        ),
+        Some(KernelLogEvent::TunInterfaceLost)
+    );
+    assert_eq!(
+        classify_kernel_log_event(
+            "[2026-11-20 06:51:47.120] time=\"2026-11-20T06:51:47.120+08:00\" level=info msg=\"[TUN] default interface changed by monitor, Wi-Fi => Ethernet\""
+        ),
+        Some(KernelLogEvent::TunInterfaceChanged)
+    );
+    assert_eq!(
+        classify_kernel_log_event(
+            "time=\"2026-11-20T03:13:04.213633000+08:00\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) 127.0.0.1:3536 --> www.youtube.com:443 error: dial tcp 174.132.167.252:443: i/o timeout\""
+        ),
+        Some(KernelLogEvent::ProxyDialFailure)
+    );
+    assert_eq!(
+        classify_kernel_log_event("time=\"2026-11-20T20:59:06Z\" level=info msg=\"Initial configuration complete\""),
+        None
+    );
+
+    let serial = STATIC_STATE_TEST_LOCK.blocking_lock();
+    reset_monitor_static_state();
+    let base_utc = chrono::Utc::now();
+    let base_inst = Instant::now();
+    *LAST_FLOWING_TRAFFIC_AT.lock() = Some(base_inst);
+    FORCE_ONLINE_RECHECK.store(false, Ordering::Release);
+
+    let mut tracker = ProxyDialFailureTracker::default();
+    tracker.on_node_checked("日本1", base_utc);
+
+    let make_lost = |ts: chrono::DateTime<chrono::Utc>| {
+        format!(
+            "time=\"{}\" level=warning msg=\"[TUN] default interface lost by monitor\"",
+            ts.to_rfc3339()
+        )
+    };
+    let make_changed = |ts: chrono::DateTime<chrono::Utc>| {
+        format!(
+            "time=\"{}\" level=info msg=\"[TUN] default interface changed by monitor, Wi-Fi => Ethernet\"",
+            ts.to_rfc3339()
+        )
+    };
+
+    // 1. 网卡丢失：清零最近下行免测时间戳并置位 FORCE_ONLINE_RECHECK，但不误触发节点切换实拨
+    tracker.ingest_log_line(&make_lost(base_utc), base_inst, base_utc);
+    assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_none());
+    assert!(FORCE_ONLINE_RECHECK.load(Ordering::Acquire));
+    assert_eq!(tracker.evaluate_reprobe_signal(base_inst), None);
+
+    // 2. 网卡切换：同时失效物理免测窗口并触发 TunInterfaceChanged 节点复核；消费后受 60s 冷却门控
+    *LAST_FLOWING_TRAFFIC_AT.lock() = Some(base_inst);
+    FORCE_ONLINE_RECHECK.store(false, Ordering::Release);
+    let t1_inst = base_inst + Duration::from_secs(5);
+    let t1_utc = base_utc + chrono::Duration::seconds(5);
+    tracker.ingest_log_line(&make_changed(t1_utc), t1_inst, t1_utc);
+    assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_none());
+    assert!(FORCE_ONLINE_RECHECK.load(Ordering::Acquire));
+    assert_eq!(
+        tracker.evaluate_reprobe_signal(t1_inst),
+        Some(KernelReprobeReason::TunInterfaceChanged)
+    );
+
+    tracker.consume_burst_for_probe(t1_inst);
+    assert_eq!(tracker.evaluate_reprobe_signal(t1_inst), None);
+
+    let mid_inst = t1_inst + Duration::from_secs(20);
+    let mid_utc = t1_utc + chrono::Duration::seconds(20);
+    tracker.ingest_log_line(&make_changed(mid_utc), mid_inst, mid_utc);
+    assert_eq!(tracker.evaluate_reprobe_signal(mid_inst), None);
+
+    let after_cd_inst = t1_inst + Duration::from_secs(DIAL_FAIL_REPROBE_COOLDOWN_SECS);
+    let after_cd_utc = t1_utc + chrono::Duration::seconds(DIAL_FAIL_REPROBE_COOLDOWN_SECS as i64);
+    tracker.ingest_log_line(&make_changed(after_cd_utc), after_cd_inst, after_cd_utc);
+    assert_eq!(
+        tracker.evaluate_reprobe_signal(after_cd_inst),
+        Some(KernelReprobeReason::TunInterfaceChanged)
+    );
+
+    reset_monitor_static_state();
+    drop(serial);
 }

@@ -167,6 +167,8 @@ pub(super) const HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS: u64 = 600;
 pub(super) static LAST_ACTIVE_VERIFY_CHECK: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
 pub(super) static LAST_HTTPS_VERIFY_ALL_FAILED: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
 pub(super) static LAST_FLOWING_TRAFFIC_AT: parking_lot::Mutex<Option<Instant>> = parking_lot::Mutex::new(None);
+/// 内核报告 `[TUN] default interface lost / changed` 时置位，令主循环跳过 60s 在线免测立即探活（BUG-416）。
+pub(super) static FORCE_ONLINE_RECHECK: AtomicBool = AtomicBool::new(false);
 
 /// 延迟结果数据来源语义标记（BUG-344）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -272,6 +274,7 @@ pub(super) fn reset_monitor_static_state() {
     *LAST_ACTIVE_VERIFY_CHECK.lock() = None;
     *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = None;
     *LAST_FLOWING_TRAFFIC_AT.lock() = None;
+    FORCE_ONLINE_RECHECK.store(false, Ordering::Release);
     observer::reset_observer_state();
 }
 
