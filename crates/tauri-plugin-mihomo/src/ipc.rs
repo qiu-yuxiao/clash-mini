@@ -209,7 +209,7 @@ pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
 pub struct IpcPoolConfig {
     /// 最小连接数, 默认 `3`
     pub min_connections: usize,
-    /// 最大连接数, 默认 `10`
+    /// 最大连接数, 默认 `20`
     pub max_connections: usize,
     /// 空闲超时时间, 默认 `60s`
     pub idle_timeout: Duration,

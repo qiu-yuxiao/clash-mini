@@ -1,6 +1,6 @@
 # Clash Mini 开发设计书
 
-> **适用版本**：v3.5.6 及后续版本  
+> **适用版本**：v3.6.0 及后续版本  
 > **文档性质**：本文档是 Clash Mini 项目的**现行权威系统设计规范与工程开发宪章**，聚焦**当前系统做什么、为什么、架构边界、关键参数与不变式**（历史变更与缺陷演进记录见 [Changelog.md](Changelog.md)、[bug_list.md](bug_list.md) 及 Git 提交历史；代码标识映射见 [docs/implementation-notes.md](docs/implementation-notes.md)，架构总览见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，Agent 操作避坑规范见 [clash_mini_pitfalls.md](clash_mini_pitfalls.md)）。
 
 ---
@@ -32,7 +32,7 @@
 - [⚙️ 三、内核生态与运行时管控](#三内核生态与运行时管控)
   - [3.1 内核选择与安装包体积极致精简](#31-内核选择与安装包体积极致精简)
   - [3.2 Windows 命名管道与高并发退避重试](#32-windows-命名管道与高并发退避重试)
-  - [3.3 端口冲突自适应探测与私有密钥保障](#33-端口冲突自适应探测与私有密钥保障)
+  - [3.3 端口冲突自适应探测与固定控制密钥契约](#33-端口冲突自适应探测与固定控制密钥契约)
   - [3.4 Geodata 与 GFWList 资源随包策略与按需加载](#34-geodata-与-gfwlist-资源随包策略与按需加载)
   - [3.5 Go Runtime 运行参数深度压制](#35-go-runtime-运行参数深度压制)
   - [3.6 内核在线平滑升级与多层代理降级链](#36-内核在线平滑升级与多层代理降级链)
@@ -56,7 +56,7 @@
 - [🛡️ 六、安全防御与编译加固](#六安全防御与编译加固)
   - [6.1 Tauri 权限最小化与沙箱加固](#61-tauri-权限最小化与沙箱加固)
   - [6.2 用户输入 URL 严格校验与 SSRF 防护](#62-用户输入-url-严格校验与-ssrf-防护)
-  - [6.3 安全解压机制（单文件直写暂存）](#63-安全解压机制单文件直写暂存)
+  - [6.3 安全解压与强制校验机制（单文件直写暂存）](#63-安全解压与强制校验机制单文件直写暂存)
   - [6.4 配置增强极简化与原生 Rust 卫兵](#64-配置增强极简化与原生-rust-卫兵)
   - [6.5 编译期加固、死代码门禁与源码保护](#65-编译期加固死代码门禁与源码保护)
 - [📊 七、数据流中枢与协议解析](#七数据流中枢与协议解析)
@@ -88,13 +88,13 @@
 
 Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学的 Windows 代理客户端，并在命名空间、端口、进程及存储上实施彻底隔离：
 
-1. **软件名称**：窗口标题、对话框、托盘提示、安装包与可执行程序名称统一为 **`Clash Mini`**。
+1. **软件名称与共存原则**：窗口标题、对话框、托盘提示、安装包与可执行程序名称统一为 **`Clash Mini`**。确立**「可同时存在、不可同时使用」**基本方针：允许与原版 Clash Verge 或多份安装/便携目录在磁盘共存，但多份 Clash Mini 实例不可同时运行使用（启动、停核与退出均按 `mini-mihomo` 独占前缀统一清理互斥）。
 2. **本地数据隔离**：使用独立的应用数据目录，订阅、规则库与运行时数据不与其他 Clash 客户端混用。
 3. **默认端口与凭据**：
    - 默认代理端口固定为 Mixed **`10801`**、SOCKS **`10802`**、HTTP **`10803`**。
-   - 内核 Controller API 默认端口为 **`9098`**，默认控制密钥为 **`adapted-by-qiu-yuxiao`**（见 `src-tauri/src/constants.rs` 与 `src-tauri/src/config/clash.rs`）。
+   - 内核 Controller API 默认端口为 **`9098`**，默认控制密钥固定为 **`adapted-by-qiu-yuxiao`**（见 `src-tauri/src/constants.rs` 与 `src-tauri/src/config/clash.rs`，设计要求详见 §3.3）。
    - 单实例检测通信端口在 Release 模式为 **`33335`**，Dev 模式为 **`33336`**。
-4. **单实例静默唤醒与命名管道隔离**：`server.rs::embed_server`（`127.0.0.1:33335`）常驻于独立守护 Tokio 运行时 `DAEMON_RUNTIME`，第二实例探测超时 **`1500ms`**；若端口已占用，仅向既有实例发送 `/commands/visible`（或携带标准 URL 查询百分号编码参数的 `clash-mini:` / `clash-verge:` 深链）并静默退出。当 `should_enter_silent_tray_on_launch()`（开启「静默启动」且存在真实订阅）为真时，既有实例保持托盘驻留且不弹窗，按需弹出 Win32 托盘气泡确认运行状态；仅当连接被拒绝或彻底超时时才显示单实例报错。
+4. **单实例独占互斥、响应校验与静默唤醒**：`server.rs::embed_server`（`127.0.0.1:33335`）常驻于独立守护 Tokio 运行时 `DAEMON_RUNTIME`。Windows 下**严禁**为监听套接字启用 `SO_REUSEADDR`（WinSock2 会允许后起进程抢绑端口破坏互斥）；第二实例显式禁用代理（`.no_proxy()`）以 **`1500ms`** 超时按启动参数分别向 `/commands/visible`、`/commands/scheme` 或 `/commands/ping`（`--silent` 专用探活，返回 `"clash-mini-ok"`）发送请求，**仅当校验到 `200 OK` 与预期响应正文后才静默退出**。若探测遇到 `ConnectionRefused`（前序实例刚退出处于端口释放瞬间窗口），执行 `3 × 150ms` 有界短退避重绑；若端口被返回非预期响应的其他进程占用，立即报错弹窗提示而不静默自杀。当 `should_enter_silent_tray_on_launch()`（开启「静默启动」且存在真实订阅）为真时，既有实例保持托盘驻留且不弹窗，按需弹出 Win32 托盘气泡确认运行状态。
 
 ### 1.2 Windows x64 单一平台架构收敛
 
@@ -114,7 +114,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 1.4 进程管理与孤儿清理机制
 
-- **独占进程前缀**：内核与核心辅助进程统一使用 **`mini-`** 前缀（如 `mini-mihomo.exe`）。
+- **独占进程前缀与「可同时存在、不可同时使用」清理策略**：内核与核心辅助进程统一使用 **`mini-`** 前缀（如 `mini-mihomo.exe`）。基于「可同时存在、不可同时使用」方针，允许磁盘保留多份目录，但同时只能运行一套 Clash Mini：`kill_all_mini_cores()` 按进程名包含 `mini-mihomo` 执行全局清理属既定互斥设计（非误杀缺陷），在 Sidecar 启动前与退出流程无条件触发。
 - **退出强杀与退出等待**：停止内核时记录 PID 并以 `50ms` 步进、上限 `2000ms` 轮询确认退出；退出应用流程（`clean_async` 及 panic 清理路径）在服务/TUN 模式下优先调用 `service::stop_core_by_service()` 停止 Session 0 内核，必要时回退 `CoreManager::stop_core()`，并无条件执行 `kill_all_mini_cores()` 清理用户态残留 `mini-` 进程。
 
 ### 1.5 多语言支持与「英文保留原则」
@@ -208,7 +208,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 #### 2.10.1 开机自启：注册表方案与启动对账
 
 - **注册表实现**：通过 `tauri-plugin-autostart` 写入 `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`（支持系统自带启动页管理），不再使用 Windows 计划任务。
-- **启动无条件对账**：`resolve_setup_async` 在初始化配置后调用 `autostart::reconcile_on_startup()`，以 `verge.yaml` 为唯一真源对账重写（禁用前必须先检查 `is_enabled()` 避免误删报错）；UI 优先展示 `get_auto_launch_status` 真实注册表状态；首次启动静默执行 `cleanup_legacy_scheduled_tasks()` 并写入 `.autostart_task_migrated`（不提权不弹 UAC）。
+- **启动无条件对账与双态迁移标记**：`resolve_setup_async` 在初始化配置后调用 `autostart::reconcile_on_startup()`，以 `verge.yaml` 为唯一真源对账重写（禁用前必须先检查 `is_enabled()` 避免误删报错）；UI 优先展示 `get_auto_launch_status` 真实注册表状态；`cleanup_legacy_scheduled_tasks()` 先核验 `%SystemRoot%\System32\Tasks\<name>` 存续再视需静默调用 `schtasks /Delete`（不提权不弹 UAC）：全部历史任务确认清除后写入 `done` 永久跳过，若遇普通权限无法删除的 Admin 级历史任务则写入 `pending_admin`（普通启动跳过避免子进程开销，待管理员启动或 NSIS 安装/卸载提权清理后转写 `done`）。
 - **静默托盘启动判定**：`lightweight::should_enter_silent_tray_on_launch()`（`enable_silent_start && has_real_profile_items()`）统一覆盖 `--silent` 开机自启、手动冷启动及 `/commands/visible` 重复唤起，仅首次无真实配置时开窗完成向导。
 
 ### 2.11 错误边界分级与局部降级
@@ -236,9 +236,9 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 - **专用命名管道**：Rust 与内核的 HTTP/WS 通信 100% 经 Windows 命名管道 `\\.\pipe\mini-mihomo` 完成。
 - **高并发弹性池化**：并发遇 `ERROR_PIPE_BUSY` 时使用指数退避（最大 `busy_retry_count = 24`）结合 Win32 `WaitNamedPipeW` 原生等待；池许可获取 `RejectPolicy::Timeout(2s)` 严格短于外层默认 `5s` 请求超时；对复用的半开失效连接，仅限幂等只读方法（`GET`/`HEAD`）自动驱逐重连重试 `1` 次。
 
-### 3.3 端口冲突自适应探测与私有密钥保障
+### 3.3 端口冲突自适应探测与固定控制密钥契约
 
-内核 Controller 默认监听 `127.0.0.1:9098`（密钥 `adapted-by-qiu-yuxiao`）：若端口被占用则先带私钥探测，鉴权通过直接平滑复用，被第三方占用则自动扫描顺位空闲端口动态迁移绑定。
+内核 Controller 默认监听 `127.0.0.1:9098`，默认控制密钥**有意固定为 `adapted-by-qiu-yuxiao`**（维持现状，不做随机化）：① 常规控制面与状态查询 100% 走本地命名管道 `\\.\pipe\mini-mihomo`；② 固定私钥用于在端口被占或跨重启探测时带密钥平滑鉴权复用既有关联实例，被第三方进程占用时则自动扫描顺位空闲端口动态迁移绑定。
 
 ### 3.4 Geodata 与 GFWList 资源随包策略与按需加载
 
@@ -251,8 +251,9 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 3.6 内核在线平滑升级与多层代理降级链
 
-- **三级网络降级链**：访问 GitHub 查询与下载严格按 `127.0.0.1:10801 → 系统代理 → 直连 (Direct)` 自动降级，超时锁定为单次建连 `10s`、分块读取 `20s`、整包 `300s`（同版本号前置短路）。
-- **原子替换校验**：下载目标 `mihomo-windows-amd64.exe.gz` 并流式写入 `.staging`，经 `inspect_mihomo_pe_binary` 校验文件尺寸（`>= 5 MB`）、DOS `MZ`、`e_lfanew`、PE32+ AMD64 头（`Machine=0x8664`、`Magic=0x020B`）与节表（区分 `Corrupted` 与 `IoUnavailable`）；替换前暂停服务并经 `wait_for_mini_cores_exit` 确认旧内核释放锁后原子覆盖。
+- **三级网络降级链与源地址锁定**：访问 GitHub 查询与下载严格按 `127.0.0.1:10801 → 系统代理 → 直连 (Direct)` 自动降级，超时锁定为单次建连 `10s`、分块读取 `20s`、整包 `300s`（同版本号前置短路）；下载与校验和 URL 强制锁定 `https://github.com/MetaCubeX/mihomo/releases/download/` 官方路径，下载压缩包体积上限 `MAX_CORE_ARCHIVE_BYTES = 100 MiB` 并核对声明 `asset.size`。
+- **SHA-256 强制校验（Fail-Closed）与原子替换**：优先提取 GitHub Release API `asset.digest`（`sha256:...`），缺失时回退拉取校验和文件；**无有效官方 SHA-256 摘要或哈希不匹配一律拒绝升级**（不执行 `stop_core()` 与文件替换）。随后经 `copy_with_max_bytes` 以 `MAX_CORE_EXTRACTED_BYTES = 150 MiB` 上限流式解压至 `.staging`，经 `inspect_mihomo_pe_binary` 校验文件尺寸（`>= 5 MB`）、DOS `MZ`、`e_lfanew`、PE32+ AMD64 头（`Machine=0x8664`、`Magic=0x020B`）与节表（区分 `Corrupted` 与 `IoUnavailable`）；替换前停核并经 `wait_for_mini_cores_exit` 确认旧内核释放锁后原子覆盖。
+- **运行核名称运行时白名单**：`IVerge::normalize_valid_clash_core` / `get_valid_clash_core` 与 `patch_config` 在运行期强制将 `clash_core` 收敛至 `VALID_CLASH_CORES`（仅 `"mini-mihomo"`），杜绝经 IPC 改写后污染 `LocalSystem` 服务路径。
 
 ### 3.7 TUN 模式下 IPv6 流量全量接管（防泄漏铁律）
 
@@ -327,7 +328,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 5.4 订阅伪节点全链路拦截防线与节点过滤同源契约
 
-- **四层合规防线**：① **0ms 生成落盘层**——全链路强制 `profile.store-selected: false`（禁止 Mihomo `cache.db` 复活过滤前旧选点，唯一真源为 `profiles.yaml::selected` 与 `proxy_head_state.json`），且 `enhance::enforce_mini_agreements` 与 `Config::generate_file(Run)` 落盘前通过 `sync_runtime_proxy_group_head` / `promote_preferred_proxy_first` 将符合过滤条件的持久节点或合规子集首节点提前至 `PROXY.proxies[0]`；② **生命周期校验层**——`CoreManager` 启动（`start_core`）、重启（`restart_core`）、重载（`apply_config`）与内核升级统一经过 `resolve_desired_proxy_selection`（Snapshots 合规即同步落盘持久化）与带 `SELECTION_ENSURE_EPOCH` 自取消代际号的异步 `spawn_ensure_proxy_group_selection`（`120ms` 稳态缓冲、`250ms` 轮询、`12s`/`10s`/`15s` 有界预算，不阻塞排他命令锁）校验并在收尾清理 `close_excluded_proxy_connections`；③ **过滤子集兜底层**——`pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界选出排除节点；④ **后台守护迁出层**——`evaluate_failover` 检测 `should_migrate_filtered_out_active` 在活跃节点落入排除区且存在合规候选时触发 `ShouldMigrate`。
+- **四层合规防线**：① **0ms 生成落盘层**——全链路强制 `profile.store-selected: false`（禁止 Mihomo `cache.db` 复活过滤前旧选点，唯一真源为 `profiles.yaml::selected` 与 `proxy_head_state.json`），且 `enhance::enforce_mini_agreements` 与 `Config::generate_file(Run)` 落盘前通过 `sync_runtime_proxy_group_head` / `promote_preferred_proxy_first` 将符合过滤条件的持久节点或合规子集首节点提前至 `PROXY.proxies[0]`；② **生命周期校验层**——`CoreManager` 启动（`start_core`）、重启（`restart_core`）、重载（`apply_config`）与内核升级统一经过 `resolve_desired_proxy_selection`（Snapshots 合规即同步落盘持久化）与带 `SELECTION_ENSURE_EPOCH` + `SELECTION_ENSURE_HANDLE`（新派发及 `stop_core_inner`/`cleanup_local_state_after_service_stop` 时即时 `abort()`，并联动 `current_manual_switch_epoch()` 在用户手动切点后立即退让）的异步 `spawn_ensure_proxy_group_selection`（`120ms` 稳态缓冲、`250ms` 轮询、`12s`/`10s`/`15s` 有界预算，不阻塞排他命令锁）校验并在收尾清理 `close_excluded_proxy_connections`；③ **过滤子集兜底层**——`pick_subset_fallback_node` 严格禁止在非空 `filter_text` 下越界选出排除节点；④ **后台守护迁出层**——`evaluate_failover` 检测 `should_migrate_filtered_out_active` 在活跃节点落入排除区且存在合规候选时触发 `ShouldMigrate`。
 - **前后端 1:1 伪节点与过滤词同源引擎**：[src-tauri/src/utils/node.rs](src-tauri/src/utils/node.rs)（`is_dummy_node`、`is_structural_banner_name`、`has_region_hint`、`match_node_filter`）与 [src/utils/node.ts](src/utils/node.ts)（`isDummyNode`、`isStructuralBannerName`、`hasRegionHint`、`matchNodeFilter`）逐条对齐：① 英文广告词/URL scheme 支持子串，中文广告短语剥离前缀后严格完全匹配或前缀匹配（严禁前端 `includes` 误伤真实节点）；② 无 `has_region_hint` 保护下的结构形态判定（内嵌非纯域名或冒号配额/日期键值，统一 `trim_start` 兼容全角空格 `\u{3000}`）；③ 多关键词过滤（空格 `AND`、`|`/`｜` `OR`、`-`/`!`/`！` 排除）4 处后端与前端筛选同源一致。
 - **连接指纹连坐去重与 24h 可恢复 HTTPS 验真**：`proxy_endpoint_fingerprint` 计算归一化节点 SHA-256 指纹并经 `resolve_proxy_clone_topology` 裁决：同指纹无地区真节点且含横幅的端点整组连坐剔除并记入 `RUNTIME_TAINTED_BANNER_FPS`（前端通过 `get_confirmed_fake_proxy_names` 同步隐藏）；寄生真地区节点的组按优选等级归真。定期真 HTTPS 验真（`HTTPS_VERIFY_INTERVAL_SECS = 600s`，仅测 `Alive` 未验真节点且活跃已验真+`>= 3` 个已验真备用节点时跳过）采用内容拉取：过真 `1` 次永久 `verified_true`；有参照通过时其余连续失败 `> 5` 次进入 **24 小时软隔离（`HTTPS_VERIFY_BAN_TTL_SECS = 86_400`）**，期满自动复察或用户手动更新订阅调用 `clear_unverified_https_failures()` 立即解封。`prioritize_verified_candidates` 与 `utils::node::pick_subset_fallback_node` 优先已验真池并在非空 `filter_text` 下严禁越出过滤子集。
 
@@ -355,15 +356,15 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 6.1 Tauri 权限最小化与沙箱加固
 
-最小化 capabilities 声明：仅保留 `shell:allow-open`，移除命令行执行、动态窗口/WebView 创建、打印权限及 `tauri-plugin-http`，文件系统作用域收紧至应用数据目录与临时目录；外部 HTTP 请求统一经 Rust `NetworkManager` 收口。
+最小化 capabilities 声明：`desktop.json` 与 `migrated.json` 平台统一收敛为 `["windows"]`；保留 `shell:allow-open`、`dialog:default`/`dialog:allow-open` 与 `fs:allow-read-file`/`fs:allow-write-file`（保障自定义路由文件框导出/导入），移除未使用的 `fs:allow-exists`、`fs:allow-app*-read*`、打印权限及 `tauri-plugin-http`；`fs:scope` 静态作用域收紧为 `allow: ["$TEMP/**"]` 并显式 `deny: ["$APPDATA/cores/**"]`，禁止 WebView 越权读写数据目录或改写托管内核；外部 HTTP 请求统一经 Rust `NetworkManager` 收口。
 
 ### 6.2 用户输入 URL 严格校验与 SSRF 防护
 
 外部链接唤起仅限 `http://`/`https://`；订阅请求实施三层 SSRF 防护：① `validate_url_no_ssrf` 拦截单标签主机、保留内网后缀、回环/私网/链路本地/ULA/IPv4-mapped IP（本地解析失败允许交由 `10801` 代理回退链解析）；② 直连路径挂载连接期异步 `SsrfSafeDnsResolver` 防 DNS Rebinding TOCTOU；③ 直连与代理双路对 `30x` 重定向每跳复验。
 
-### 6.3 安全解压机制（单文件直写暂存）
+### 6.3 安全解压与强制校验机制（单文件直写暂存）
 
-内核在线升级（`core_updater`）直接定位压缩包唯一目标可执行文件流式解压至 `.staging` 并核验 PE64 格式与体积，不执行多文件目录展开；诊断包打包强制使用正斜杠 `/` 条目并跳过符号链接。
+内核在线升级（`core_updater`）锁定 `https://github.com/MetaCubeX/mihomo/releases/download/` 下载源并校验 `asset.digest` SHA-256（缺失或错误一律 Fail-Closed 拒绝），下载上限 `100 MiB`、解压上限 `150 MiB`，直接定位压缩包唯一目标可执行文件流式解压至 `.staging` 并核验 PE64 格式与体积，不执行多文件目录展开；诊断包打包强制使用正斜杠 `/` 条目并跳过符号链接。
 
 ### 6.4 配置增强极简化与原生 Rust 卫兵
 
@@ -456,7 +457,7 @@ flowchart LR
 
 - **日志留存**：运行时默认 `app_log_max_size = 128 KB` × `app_log_max_count = 40`（约 5MB / 24h+）。
 - **一键诊断包与高亮定位**：`export_diagnostic_bundle` 将应用及 `service`/`sidecar` 日志与脱敏配置打入 `<app_home>/diagnostics/*.zip`，随后调用 Windows 原生 `explorer /select,"<path>"`（逗号后无空格）选中定位。
-- **采集与脱敏硬约束**：① ZIP 条目名必须统一转为正斜杠 `/`；② 按修改时间 `mtime` 倒序采集最多 `MAX_DIAGNOSTIC_LOG_FILES = 60` 个文件、单文件尾部截断 `MAX_LOG_FILE_READ_BYTES = 2MB`；③ 一律跳过符号链接（防 `latest.log` 重复与目录环）；④ YAML 解析失败禁止落盘原文；⑤ `redact_log_text` 须先脱敏 `Authorization:` 整行与裸 `Bearer <token>` 再执行通用 KV 与 URL userinfo 正则，且必须放进 `spawn_blocking` 执行以免阻塞 tokio worker。
+- **采集与脱敏硬约束**：① ZIP 条目名必须统一转为正斜杠 `/`；② 按修改时间 `mtime` 倒序采集最多 `MAX_DIAGNOSTIC_LOG_FILES = 60` 个文件、单文件尾部截断 `MAX_LOG_FILE_READ_BYTES = 2MB`；③ 一律跳过符号链接（防 `latest.log` 重复与目录环）；④ YAML 解析失败禁止落盘原文；⑤ `SENSITIVE_KEYS` 与 `LOG_SENSITIVE_KV` 覆盖 `password` / `uuid` / `psk` / `pre-shared-key` / `preshared-key` / `private-key` / `private-key-passphrase` / `public-key` / `short-id` / `auth-str` / `obfs-password` / `obfs-param` / `protocol-param` / `secret` / `token` / `url` / `authorization` 等全部协议凭据；`redact_log_text` 须先脱敏 `Authorization:` 整行与裸 `Bearer <token>` 再执行通用 KV 与 URL userinfo 正则，且必须放进 `spawn_blocking` 执行以免阻塞 tokio worker。
 
 ### 8.8 前端单测基线与最小覆盖
 
@@ -469,7 +470,7 @@ flowchart LR
 
 ### 8.10 安装程序全周期全局置顶铁律
 
-在 `installer.nsi` 中于 GUI 初始化（`myGuiInit` / `un.myGuiInit`）、预检（`Section EarlyChecks`）、安装（`Section Install`）及卸载（`Section Uninstall`）全阶段持续执行 `BringToFront` 与 `System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"`（`HWND_TOPMOST`），确保安全提示或前台窗口绝不遮挡安装/卸载交互界面；进程清理宏 `CheckAllVergeProcesses` 优先调用 `SimpleSC::StopService` 优雅停服（卸载段优先执行 `RemoveVergeService`），避免强杀触发 SCM Event ID `7031`。
+在 `installer.nsi` 中于 GUI 初始化（`myGuiInit` / `un.myGuiInit`）、预检（`Section EarlyChecks`）、安装（`Section Install`）及卸载（`Section Uninstall`）全阶段持续执行 `BringToFront` 与 `System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 3)"`（`HWND_TOPMOST`），确保安全提示或前台窗口绝不遮挡安装/卸载交互界面；进程清理宏 `CheckAllVergeProcesses` 优先调用 `SimpleSC::StopService` 优雅停服（卸载段优先执行 `RemoveVergeService`），避免强杀触发 SCM Event ID `7031`；同时安装与卸载段借提权上下文静默清理历史 `schtasks` 自启计划任务（`Clash Mini` 与 `Clash Mini (Admin)`）。
 
 ---
 

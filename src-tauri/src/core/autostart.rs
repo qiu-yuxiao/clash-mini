@@ -11,6 +11,9 @@ use tauri_plugin_autostart::AutoLaunchManager;
 const LEGACY_TASK_NAMES: [&str; 2] = ["Clash Mini", "Clash Mini (Admin)"];
 /// 迁移完成标记文件（放在 app_home 下，与配置数据同生命周期）。
 const MIGRATION_MARKER: &str = ".autostart_task_migrated";
+/// 两档迁移标记：全部清净写 `done`；仅存在普通权限删不掉的 Admin 任务时写 `pending_admin` 留待提权时补删（BUG-414）。
+const MARKER_DONE: &str = "done";
+const MARKER_PENDING_ADMIN: &str = "pending_admin";
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 /// Update the application auto-launch configuration.
@@ -79,21 +82,57 @@ pub async fn reconcile_on_startup() -> Result<()> {
     update_launch(None).await
 }
 
-/// 迁移：清掉历史 schtasks 计划任务（只做一次，成功与否都打标记）。
+fn should_skip_cleanup_from_marker(marker_content: Option<&str>, is_admin: bool) -> bool {
+    match marker_content.map(str::trim) {
+        Some(MARKER_DONE) => true,
+        Some(MARKER_PENDING_ADMIN) => !is_admin,
+        _ => false,
+    }
+}
+
+/// 检查 `%SystemRoot%\System32\Tasks\<name>` 是否明确不存在。
+/// 仅当 `Tasks` 父目录本身可读存在且子条目返回 `NotFound` 时才判定为不存在；
+/// 遇到权限拒绝或无法判断时保守返回 `false`，交由 `schtasks` 处理（BUG-414）。
+fn is_task_file_definitely_absent(tasks_dir: Option<&std::path::Path>, task_name: &str) -> bool {
+    let Some(dir) = tasks_dir else {
+        return false;
+    };
+    if !dir.is_dir() {
+        return false;
+    }
+    matches!(
+        std::fs::symlink_metadata(dir.join(task_name)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound
+    )
+}
+
+/// 迁移：清掉历史 schtasks 计划任务。
 ///
 /// 必须在**切到注册表方案之后**执行，否则老任务会与新注册表值同时生效、重复拉起。
-/// 不做提权（不弹 UAC）：用户级任务普通权限即可删除；Admin 级任务删不掉只记日志，
-/// 绝不为了清理而打断启动流程或弹出 UAC。
+/// 不做提权（不弹 UAC）：用户级任务普通权限即可删除；若存在普通权限删不掉的 Admin 级任务，
+/// 写入 `pending_admin` 标记避免普通启动反复拉起 `schtasks`，待管理员启动或安装器清理后再落 `done`。
 fn cleanup_legacy_scheduled_tasks() {
-    let Some(home) = crate::utils::dirs::app_home_dir().ok() else {
+    let Ok(home) = crate::utils::dirs::app_home_dir() else {
         return;
     };
+    let is_admin = crate::utils::sysinfo::is_current_app_handle_admin(Handle::app_handle());
     let marker = home.join(MIGRATION_MARKER);
-    if marker.exists() {
+    let existing_marker = std::fs::read_to_string(&marker).ok();
+    if should_skip_cleanup_from_marker(existing_marker.as_deref(), is_admin) {
         return;
     }
 
+    let tasks_dir = std::env::var_os("SystemRoot")
+        .filter(|v| !v.is_empty())
+        .map(|root| std::path::PathBuf::from(root).join("System32").join("Tasks"));
+    let tasks_dir_ref = tasks_dir.as_deref();
+
+    let mut all_clean = true;
     for name in LEGACY_TASK_NAMES {
+        if is_task_file_definitely_absent(tasks_dir_ref, name) {
+            continue;
+        }
+
         let output = std::process::Command::new("schtasks")
             .args(["/Delete", "/TN", name, "/F"])
             .creation_flags(CREATE_NO_WINDOW)
@@ -103,11 +142,20 @@ fn cleanup_legacy_scheduled_tasks() {
             Ok(out) if out.status.success() => {
                 logging!(info, Type::Setup, "已清理历史自启计划任务（迁移至注册表方案）: {name}");
             }
-            Ok(_) => {
-                // 任务不存在（最常见）或权限不足：均非致命错误，忽略
-                logging!(debug, Type::Setup, "历史自启计划任务不存在或无法删除，跳过: {name}");
+            Ok(_) if is_task_file_definitely_absent(tasks_dir_ref, name) => {
+                logging!(debug, Type::Setup, "历史自启计划任务已不存在，跳过: {name}");
+            }
+            Ok(out) => {
+                all_clean = false;
+                logging!(
+                    warn,
+                    Type::Setup,
+                    "历史自启计划任务暂无法删除（可能需管理员权限，留待提权启动或安装器清理）: {name} (exit={:?})",
+                    out.status.code()
+                );
             }
             Err(err) => {
+                all_clean = false;
                 logging!(
                     warn,
                     Type::Setup,
@@ -117,8 +165,33 @@ fn cleanup_legacy_scheduled_tasks() {
         }
     }
 
-    // 不论结果都落标记：避免每次启动都拉起 schtasks 子进程
-    if let Err(err) = std::fs::write(&marker, b"1") {
+    let next_marker = if all_clean { MARKER_DONE } else { MARKER_PENDING_ADMIN };
+    if let Err(err) = std::fs::write(&marker, next_marker.as_bytes()) {
         logging!(warn, Type::Setup, "写入自启迁移标记失败（下次启动会重试清理）: {err}");
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_autostart_migration_marker_respects_pending_admin_and_task_presence() {
+        assert!(!should_skip_cleanup_from_marker(None, false));
+        assert!(!should_skip_cleanup_from_marker(Some("1"), false));
+        assert!(should_skip_cleanup_from_marker(Some(MARKER_DONE), false));
+        assert!(should_skip_cleanup_from_marker(Some(MARKER_DONE), true));
+        assert!(should_skip_cleanup_from_marker(Some(MARKER_PENDING_ADMIN), false));
+        assert!(!should_skip_cleanup_from_marker(Some(MARKER_PENDING_ADMIN), true));
+
+        let temp_dir = std::env::temp_dir().join(format!("clash_mini_task_test_{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        assert!(is_task_file_definitely_absent(Some(&temp_dir), "MissingTask"));
+        let existing_task = temp_dir.join("ExistingTask");
+        std::fs::write(&existing_task, b"<Task/>").unwrap();
+        assert!(!is_task_file_definitely_absent(Some(&temp_dir), "ExistingTask"));
+        assert!(!is_task_file_definitely_absent(None, "MissingTask"));
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

@@ -203,6 +203,7 @@ impl CoreManager {
 
     /// 当退出流程已优先通过提权服务通道停止内核后，同步清理本地日志缓冲、IPC 连接池与残留句柄状态。
     pub async fn cleanup_local_state_after_service_stop(&self) {
+        self.abort_pending_selection_ensure();
         CLASH_LOGGER.clear_logs().await;
         if let Ok(pool) = tauri_plugin_mihomo::IpcConnectionPool::global() {
             pool.clear_pool();

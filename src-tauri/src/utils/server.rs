@@ -27,7 +27,7 @@ static SHUTDOWN_SENDER: OnceCell<Mutex<Option<oneshot::Sender<()>>>> = OnceCell:
 // 暂存第一个实例初始 bind 成功的 TcpListener，防止 TOCTOU 时间差漏洞
 static SINGLETON_LISTENER: OnceCell<Mutex<Option<std::net::TcpListener>>> = OnceCell::new();
 
-// 创建一个启用了地址与端口重用属性（SO_REUSEADDR / SO_REUSEPORT）的 TCP 绑定
+// 创建独占监听的本地 TCP Socket（Windows 下严禁设置 SO_REUSEADDR：WinSock2 允许抢绑仍在监听的端口，破坏单实例互斥，BUG-414）
 fn bind_socket(port: u16) -> Result<std::net::TcpListener> {
     use socket2::{Domain, Protocol, SockAddr, Socket, Type};
     let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
@@ -38,45 +38,116 @@ fn bind_socket(port: u16) -> Result<std::net::TcpListener> {
     Ok(std::net::TcpListener::from(socket))
 }
 
+enum SingletonProbeTarget {
+    Scheme(std::string::String),
+    Ping,
+    Visible,
+}
+
+fn resolve_singleton_probe_target(first_arg: Option<&str>) -> SingletonProbeTarget {
+    if let Some(param) = first_arg {
+        if param.starts_with("clash:") || param.starts_with("clash-mini:") || param.starts_with("clash-verge:") {
+            return SingletonProbeTarget::Scheme(param.to_string());
+        }
+        if param == "--silent" {
+            return SingletonProbeTarget::Ping;
+        }
+    }
+    SingletonProbeTarget::Visible
+}
+
+fn is_valid_singleton_reply(expected_ping: bool, status: reqwest::StatusCode, body: &str) -> bool {
+    if !status.is_success() {
+        return false;
+    }
+    let trimmed = body.trim();
+    if expected_ping {
+        trimmed == "clash-mini-ok"
+    } else {
+        trimmed == "ok"
+    }
+}
+
+enum WakeInstanceOutcome {
+    NotifiedExisting,
+    TransientConnectRefused,
+    UnexpectedResponse(std::string::String),
+}
+
+async fn probe_or_notify_existing_instance(
+    client: &reqwest::Client,
+    port: u16,
+    first_arg: Option<&str>,
+) -> WakeInstanceOutcome {
+    let target = resolve_singleton_probe_target(first_arg);
+    let (request, expected_ping) = match target {
+        SingletonProbeTarget::Scheme(param) => (
+            client
+                .get(format!("http://127.0.0.1:{port}/commands/scheme"))
+                .query(&[("param", param)]),
+            false,
+        ),
+        SingletonProbeTarget::Ping => (client.get(format!("http://127.0.0.1:{port}/commands/ping")), true),
+        SingletonProbeTarget::Visible => (client.get(format!("http://127.0.0.1:{port}/commands/visible")), false),
+    };
+
+    match request.send().await {
+        Ok(resp) => {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            if is_valid_singleton_reply(expected_ping, status, &body) {
+                WakeInstanceOutcome::NotifiedExisting
+            } else {
+                WakeInstanceOutcome::UnexpectedResponse(format!("status={status}, body={}", body.trim()))
+            }
+        }
+        Err(err) if err.is_connect() => WakeInstanceOutcome::TransientConnectRefused,
+        Err(err) => WakeInstanceOutcome::UnexpectedResponse(err.to_string()),
+    }
+}
+
 /// check whether there is already exists
 pub async fn check_singleton() -> Result<()> {
     let port = IVerge::get_singleton_port();
 
-    // 立即尝试绑定端口以占位，避免检查与占用之间的时间差，并设置 SO_REUSEADDR 解决 TIME_WAIT 冲突
+    // 立即尝试独占绑定端口以占位，避免检查与占用之间的 TOCTOU 时间差
     match bind_socket(port) {
         Ok(listener) => {
             // 绑定成功，说明当前是第一个运行的实例，将其存入全局变量供后续 embed_server 使用
             let _ = SINGLETON_LISTENER.set(Mutex::new(Some(listener)));
             Ok(())
         }
-        Err(_) => {
-            // 绑定失败，说明端口已被第一个实例或者其他服务占用，执行唤醒逻辑
-            let client = ClientBuilder::new().timeout(Duration::from_millis(1500)).build()?;
+        Err(first_bind_err) => {
+            // 绑定失败，说明端口已被第一个实例或其它程序占用，先显式绕过代理探测既有实例
+            let client = ClientBuilder::new()
+                .no_proxy()
+                .timeout(Duration::from_millis(1500))
+                .build()?;
             let argvs: Vec<std::string::String> = std::env::args().collect();
-            if argvs.len() > 1 {
-                let param = argvs[1].as_str();
-                if param.starts_with("clash:") || param.starts_with("clash-mini:") || param.starts_with("clash-verge:")
-                {
-                    client
-                        .get(format!("http://127.0.0.1:{port}/commands/scheme"))
-                        .query(&[("param", param)])
-                        .send()
-                        .await?;
-                } else if param != "--silent" {
-                    client
-                        .get(format!("http://127.0.0.1:{port}/commands/visible"))
-                        .send()
-                        .await?;
+            let first_arg = argvs.get(1).map(std::string::String::as_str);
+
+            match probe_or_notify_existing_instance(&client, port, first_arg).await {
+                WakeInstanceOutcome::NotifiedExisting => {
+                    logging!(info, Type::Window, "已有实例已通知，当前进程静默退出");
+                    std::process::exit(0);
                 }
-            } else {
-                client
-                    .get(format!("http://127.0.0.1:{port}/commands/visible"))
-                    .send()
-                    .await?;
+                WakeInstanceOutcome::TransientConnectRefused => {
+                    // 快速重启可能遇前序进程退出瞬间端口释放延迟，执行 3 × 150ms 短退避重绑
+                    for _ in 0..3 {
+                        tokio::time::sleep(Duration::from_millis(150)).await;
+                        if let Ok(listener) = bind_socket(port) {
+                            let _ = SINGLETON_LISTENER.set(Mutex::new(Some(listener)));
+                            return Ok(());
+                        }
+                    }
+                    Err(anyhow::anyhow!(
+                        "单实例端口 127.0.0.1:{port} 绑定失败且既有实例无响应: {first_bind_err}"
+                    ))
+                }
+                WakeInstanceOutcome::UnexpectedResponse(detail) => Err(anyhow::anyhow!(
+                    "单实例端口 127.0.0.1:{port} 已被占用且未收到有效 Clash Mini 响应 ({detail})"
+                )),
             }
-            // 唤醒已有实例后，当前进程静默退出
-            logging!(info, Type::Window, "已有实例已通知，当前进程静默退出");
-            std::process::exit(0);
         }
     }
 }
@@ -173,7 +244,14 @@ pub fn embed_server() {
                 ))
             });
 
-        let commands = visible.or(scheme).or(pac);
+        let ping = warp::path!("commands" / "ping").and_then(|| async {
+            Ok::<_, warp::Rejection>(warp::reply::with_status::<std::string::String>(
+                "clash-mini-ok".to_string(),
+                warp::http::StatusCode::OK,
+            ))
+        });
+
+        let commands = visible.or(scheme).or(pac).or(ping);
 
         #[allow(clippy::expect_used)]
         let tokio_listener = tokio::net::TcpListener::from_std(std_listener).expect("failed to convert TcpListener");
@@ -194,5 +272,33 @@ pub fn shutdown_embedded_server() {
         && let Some(sender) = sender.lock().take()
     {
         sender.send(()).ok();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_singleton_probe_target_and_reply_validation() {
+        assert!(matches!(
+            resolve_singleton_probe_target(None),
+            SingletonProbeTarget::Visible
+        ));
+        assert!(matches!(
+            resolve_singleton_probe_target(Some("--silent")),
+            SingletonProbeTarget::Ping
+        ));
+        assert!(matches!(
+            resolve_singleton_probe_target(Some("clash-mini://install-config?url=x")),
+            SingletonProbeTarget::Scheme(_)
+        ));
+
+        assert!(is_valid_singleton_reply(false, reqwest::StatusCode::OK, "ok\n"));
+        assert!(!is_valid_singleton_reply(false, reqwest::StatusCode::OK, "other-app"));
+        assert!(!is_valid_singleton_reply(false, reqwest::StatusCode::NOT_FOUND, "ok"));
+
+        assert!(is_valid_singleton_reply(true, reqwest::StatusCode::OK, "clash-mini-ok"));
+        assert!(!is_valid_singleton_reply(true, reqwest::StatusCode::OK, "ok"));
     }
 }

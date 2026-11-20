@@ -996,6 +996,10 @@ Section Install
     DeleteRegValue HKLM "$R1" "clash-mini"
   ${EndIf}
 
+  ; Clean legacy schtasks auto-launch tasks (including elevated Admin tasks)
+  nsExec::Exec 'schtasks /Delete /TN "Clash Mini" /F'
+  nsExec::Exec 'schtasks /Delete /TN "Clash Mini (Admin)" /F'
+
   ; Remove legacy executables
   IfFileExists "$INSTDIR\Clash Mini.exe" 0 +2
     Delete "$INSTDIR\Clash Mini.exe"
@@ -1178,6 +1182,10 @@ Section Uninstall
   ${If} $R2 != ""
     DeleteRegValue HKLM "$R1" "clash-mini"
   ${EndIf}
+
+  ; Clean legacy schtasks auto-launch tasks (including elevated Admin tasks)
+  nsExec::Exec 'schtasks /Delete /TN "Clash Mini" /F'
+  nsExec::Exec 'schtasks /Delete /TN "Clash Mini (Admin)" /F'
 
   ; Remove legacy executables
   IfFileExists "$INSTDIR\Clash Mini.exe" 0 +2

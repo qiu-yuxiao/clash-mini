@@ -2,6 +2,8 @@
 export interface GithubAsset {
   name: string
   browser_download_url: string
+  digest?: string | null
+  size?: number | null
 }
 
 /** GitHub Release 信息 */

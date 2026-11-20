@@ -23,6 +23,10 @@ pub struct GithubRelease {
 pub struct GithubAsset {
     pub name: String,
     pub browser_download_url: String,
+    #[serde(default)]
+    pub digest: Option<String>,
+    #[serde(default)]
+    pub size: Option<u64>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -46,9 +50,63 @@ pub struct CoreUpdater;
 
 impl CoreUpdater {
     pub const MIN_VALID_CORE_BYTES: u64 = 5 * 1024 * 1024;
+    pub const MAX_CORE_ARCHIVE_BYTES: u64 = 100 * 1024 * 1024;
+    pub const MAX_CORE_EXTRACTED_BYTES: u64 = 150 * 1024 * 1024;
+    const OFFICIAL_MIHOMO_RELEASE_DOWNLOAD_PREFIX: &'static str = "/MetaCubeX/mihomo/releases/download/";
     const IMAGE_FILE_MACHINE_AMD64: u16 = 0x8664;
     const IMAGE_FILE_EXECUTABLE_IMAGE: u16 = 0x0002;
     const IMAGE_NT_OPTIONAL_HDR64_MAGIC: u16 = 0x020B;
+
+    /// 从 GitHub Release Asset `digest`（如 `"sha256:<64 hex>"`）或裸 64 位 SHA-256 字符串解析标准小写摘要（BUG-413）。
+    pub fn parse_asset_sha256_digest(digest: Option<&str>) -> Option<String> {
+        let raw = digest?.trim();
+        let hex_part = if raw.len() > 7 && raw[..7].eq_ignore_ascii_case("sha256:") {
+            raw[7..].trim()
+        } else {
+            raw
+        };
+        if hex_part.len() == 64 && hex_part.bytes().all(|b| b.is_ascii_hexdigit()) {
+            Some(hex_part.to_ascii_lowercase())
+        } else {
+            None
+        }
+    }
+
+    /// 锁定内核下载与校验和地址必须源自官方 GitHub 仓库 Release 下载路径（BUG-413）。
+    pub fn validate_official_mihomo_asset_url(raw_url: &str) -> Result<()> {
+        let parsed = url::Url::parse(raw_url).context("无效的内核下载 URL")?;
+        if parsed.scheme() != "https" {
+            bail!("内核下载仅允许 HTTPS 协议: {raw_url}");
+        }
+        if parsed.host_str() != Some("github.com") {
+            bail!("内核下载来源域名非法（仅允许 github.com）: {raw_url}");
+        }
+        if parsed.port().is_some() || !parsed.username().is_empty() || parsed.password().is_some() {
+            bail!("内核下载 URL 禁止包含非标准端口或用户信息: {raw_url}");
+        }
+        let path = parsed.path();
+        if !path.starts_with(Self::OFFICIAL_MIHOMO_RELEASE_DOWNLOAD_PREFIX) {
+            bail!("内核下载路径不在官方 MetaCubeX/mihomo Release 目录内: {raw_url}");
+        }
+        if path.split('/').any(|seg| seg == "..") {
+            bail!("内核下载 URL 路径非法: {raw_url}");
+        }
+        Ok(())
+    }
+
+    /// 带上限的流式复制，防解压炸弹写满磁盘（BUG-413）。
+    fn copy_with_max_bytes<R: io::Read, W: io::Write>(reader: R, writer: &mut W, max_bytes: u64) -> Result<u64> {
+        let mut limited = io::Read::take(reader, max_bytes.saturating_add(1));
+        let copied = io::copy(&mut limited, writer).context("failed to decompress core binary")?;
+        if copied > max_bytes {
+            bail!(
+                "解压后的内核文件体积超过安全上限 ({} bytes > {} bytes)，已中止",
+                copied,
+                max_bytes
+            );
+        }
+        Ok(copied)
+    }
 
     /// 深度检查 Mihomo Windows x64 PE32+ 可执行文件，严格区分「真实结构损坏」与「瞬时 I/O 不可读」（BUG-319 / BUG-346）。
     pub fn inspect_mihomo_pe_binary(path: &std::path::Path) -> CoreBinaryValidation {
@@ -303,6 +361,8 @@ impl CoreUpdater {
             return Ok(None);
         };
 
+        Self::validate_official_mihomo_asset_url(&url)?;
+
         let response = client
             .get(&url)
             .send()
@@ -356,36 +416,10 @@ impl CoreUpdater {
         Ok(Some(map))
     }
 
-    /// 计算下载文件的 SHA256 并与 release 中声明的校验和比对。
-    /// 若 release 中未提供校验和文件，则只记录警告，不阻断。
-    fn verify_download_sha256(
-        file_path: &std::path::Path,
-        asset_name: &str,
-        checksums: Option<&std::collections::HashMap<String, String>>,
-    ) -> Result<()> {
-        let Some(checksums) = checksums else {
-            logging!(
-                warn,
-                Type::System,
-                "No checksum file in release for asset {}, skipping integrity check",
-                asset_name
-            );
-            return Ok(());
-        };
-
-        let lookup = asset_name.to_lowercase();
-        let expected = checksums
-            .iter()
-            .find_map(|(k, v)| if *k == lookup { Some(v.clone()) } else { None });
-
-        let Some(expected_sha) = expected else {
-            logging!(
-                warn,
-                Type::System,
-                "Asset {} not listed in checksum file, skipping integrity check",
-                asset_name
-            );
-            return Ok(());
+    /// 计算下载文件的 SHA256 并与官方摘要比对（Fail-Closed：缺失有效 SHA256 或不匹配一律拒绝升级，BUG-413）。
+    fn verify_download_sha256(file_path: &std::path::Path, asset_name: &str, expected_sha: Option<&str>) -> Result<()> {
+        let Some(expected_sha) = Self::parse_asset_sha256_digest(expected_sha) else {
+            bail!("缺少官方 SHA-256 校验摘要 ({asset_name})，已拒绝未校验的内核升级");
         };
 
         let mut hasher = Sha256::new();
@@ -393,7 +427,7 @@ impl CoreUpdater {
         io::copy(&mut file, &mut hasher).context("failed to hash downloaded file")?;
         let actual_sha = format!("{:x}", hasher.finalize());
 
-        if actual_sha.to_lowercase() != expected_sha.to_lowercase() {
+        if actual_sha != expected_sha {
             bail!(
                 "Integrity check failed for {}: expected {}, got {}",
                 asset_name,
@@ -418,7 +452,18 @@ impl CoreUpdater {
         app_handle: &AppHandle,
         asset_name: &str,
         dest_path: &std::path::Path,
+        expected_size: Option<u64>,
     ) -> Result<()> {
+        if let Some(sz) = expected_size
+            && sz > Self::MAX_CORE_ARCHIVE_BYTES
+        {
+            bail!(
+                "内核包声明体积超出安全上限 ({} bytes > {} bytes)",
+                sz,
+                Self::MAX_CORE_ARCHIVE_BYTES
+            );
+        }
+
         let mut response = client
             .get(url)
             .send()
@@ -429,7 +474,18 @@ impl CoreUpdater {
             bail!("HTTP status error: {}", response.status());
         }
 
-        let total_size = response.content_length().unwrap_or(0);
+        let content_length = response.content_length();
+        if let Some(cl) = content_length
+            && cl > Self::MAX_CORE_ARCHIVE_BYTES
+        {
+            bail!(
+                "内核下载响应体体积超出安全上限 ({} bytes > {} bytes)",
+                cl,
+                Self::MAX_CORE_ARCHIVE_BYTES
+            );
+        }
+
+        let total_size = content_length.or(expected_size).unwrap_or(0);
         let mut downloaded: u64 = 0;
         let mut dest_file = tokio::fs::File::create(dest_path)
             .await
@@ -452,10 +508,19 @@ impl CoreUpdater {
                 break;
             };
 
+            let next_downloaded = downloaded.saturating_add(chunk.len() as u64);
+            if next_downloaded > Self::MAX_CORE_ARCHIVE_BYTES {
+                bail!(
+                    "内核下载实际接收体积超出安全上限 ({} bytes > {} bytes)",
+                    next_downloaded,
+                    Self::MAX_CORE_ARCHIVE_BYTES
+                );
+            }
+
             tokio::io::AsyncWriteExt::write_all(&mut dest_file, &chunk)
                 .await
                 .context("failed to write chunk to disk")?;
-            downloaded += chunk.len() as u64;
+            downloaded = next_downloaded;
             if total_size > 0 {
                 let percentage = ((downloaded as f64 / total_size as f64) * 80.0) as u32 + 10;
                 if percentage != last_emitted_percentage {
@@ -473,6 +538,18 @@ impl CoreUpdater {
                     let _ = app_handle.emit("core-upgrade-progress", payload);
                 }
             }
+        }
+
+        tokio::io::AsyncWriteExt::flush(&mut dest_file)
+            .await
+            .context("failed to flush downloaded file")?;
+        drop(dest_file);
+
+        if let Some(sz) = expected_size
+            && sz > 0
+            && downloaded != sz
+        {
+            bail!("内核下载字节数与声明大小不符 (expected {sz} bytes, got {downloaded} bytes)");
         }
 
         Ok(())
@@ -533,6 +610,10 @@ impl CoreUpdater {
 
         let is_zip = asset.name.to_lowercase().ends_with(".zip");
         let download_url = asset.browser_download_url.clone();
+        if let Err(e) = Self::validate_official_mihomo_asset_url(&download_url) {
+            emit_progress("error", 0, &format!("下载地址校验失败: {e}"));
+            return Err(e);
+        }
         logging!(
             info,
             Type::System,
@@ -561,8 +642,15 @@ impl CoreUpdater {
                 proxy_type
             );
             if let Ok(client) = nm.create_request(proxy_type, Some(300), None, false).await {
-                match Self::download_body_to_file(&client, &download_url, &app_handle, &asset.name, &temp_download_path)
-                    .await
+                match Self::download_body_to_file(
+                    &client,
+                    &download_url,
+                    &app_handle,
+                    &asset.name,
+                    &temp_download_path,
+                    asset.size,
+                )
+                .await
                 {
                     Ok(_) => {
                         logging!(
@@ -596,40 +684,42 @@ impl CoreUpdater {
             bail!(err_msg);
         }
 
-        // 完整性校验：尝试从 release 中获取校验和文件并验证下载文件的 SHA256
+        // 完整性校验：优先消费 GitHub Release API 原生携带的 asset.digest；缺失时回退拉取校验和文件，
+        // 若仍无有效 SHA-256 摘要或比对失败则 Fail-Closed 中止升级（BUG-413）。
         emit_progress("verifying", 85, "正在校验下载文件完整性...");
-        let nm_checksum = NetworkManager::new();
-        let mut checksums_map: Option<std::collections::HashMap<String, String>> = None;
-        for proxy_type in &[ProxyType::Localhost, ProxyType::System, ProxyType::None] {
-            if let Ok(client) = nm_checksum.create_request(*proxy_type, Some(30), None, false).await {
-                match Self::fetch_checksums(&client, &release).await {
-                    Ok(Some(map)) => {
-                        checksums_map = Some(map);
-                        break;
-                    }
-                    Ok(None) => break, // 仓库里就没这个文件，无需重试
-                    Err(e) => {
-                        logging!(
-                            warn,
-                            Type::System,
-                            "fetch_checksums via {:?} failed: {:?}",
-                            proxy_type,
-                            e
-                        );
+        let mut expected_sha = Self::parse_asset_sha256_digest(asset.digest.as_deref());
+        if expected_sha.is_none() {
+            let nm_checksum = NetworkManager::new();
+            let mut checksums_map: Option<std::collections::HashMap<String, String>> = None;
+            for proxy_type in &[ProxyType::Localhost, ProxyType::System, ProxyType::None] {
+                if let Ok(client) = nm_checksum.create_request(*proxy_type, Some(30), None, false).await {
+                    match Self::fetch_checksums(&client, &release).await {
+                        Ok(Some(map)) => {
+                            checksums_map = Some(map);
+                            break;
+                        }
+                        Ok(None) => break, // 仓库里就没这个文件，无需重试
+                        Err(e) => {
+                            logging!(
+                                warn,
+                                Type::System,
+                                "fetch_checksums via {:?} failed: {:?}",
+                                proxy_type,
+                                e
+                            );
+                        }
                     }
                 }
+            }
+            if let Some(map) = checksums_map {
+                let lookup = asset.name.to_lowercase();
+                expected_sha = map.get(&lookup).cloned();
             }
         }
 
-        if let Err(e) = Self::verify_download_sha256(&temp_download_path, &asset.name, checksums_map.as_ref()) {
+        if let Err(e) = Self::verify_download_sha256(&temp_download_path, &asset.name, expected_sha.as_deref()) {
             let _ = fs::remove_file(&temp_download_path);
             emit_progress("error", 0, &format!("完整性校验失败: {:?}", e));
-            // 重新拉起 core：仅在未退出时执行
-            if !Handle::global().is_exiting() {
-                if let Err(e2) = CoreManager::global().start_core().await {
-                    logging!(warn, Type::System, "Core updater: 恢复性启动 core 失败: {}", e2);
-                }
-            }
             return Err(e);
         }
 
@@ -694,13 +784,13 @@ impl CoreUpdater {
                             bail!("在 ZIP 压缩包内未找到 mini-mihomo 程序二进制");
                         }
                     };
-                    let mut file = archive.by_index(idx)?;
-                    io::copy(&mut file, &mut dest_file).context("failed to extract file from zip to staging")?;
+                    let file = archive.by_index(idx)?;
+                    Self::copy_with_max_bytes(file, &mut dest_file, Self::MAX_CORE_EXTRACTED_BYTES)?;
                 } else {
                     let archive_file =
                         fs::File::open(&temp_download_path_clone).context("failed to open downloaded gz archive")?;
-                    let mut decoder = flate2::read::GzDecoder::new(archive_file);
-                    io::copy(&mut decoder, &mut dest_file).context("failed to decompress gzip archive to staging")?;
+                    let decoder = flate2::read::GzDecoder::new(archive_file);
+                    Self::copy_with_max_bytes(decoder, &mut dest_file, Self::MAX_CORE_EXTRACTED_BYTES)?;
                 }
                 dest_file.sync_all().context("failed to sync staging core file")?;
                 Ok(())
@@ -884,5 +974,85 @@ mod tests {
         assert_eq!(CoreUpdater::resolve_usable_custom_core(&temp_dir), Some(valid_pe_path));
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_parse_asset_sha256_digest_and_fail_closed_verification() {
+        let valid_hex = "a".repeat(64);
+        assert_eq!(
+            CoreUpdater::parse_asset_sha256_digest(Some(&format!("SHA256:{}", "A".repeat(64)))),
+            Some(valid_hex.clone())
+        );
+        assert_eq!(
+            CoreUpdater::parse_asset_sha256_digest(Some(&valid_hex)),
+            Some(valid_hex)
+        );
+        assert_eq!(CoreUpdater::parse_asset_sha256_digest(Some("sha256:short")), None);
+        assert_eq!(CoreUpdater::parse_asset_sha256_digest(Some("md5:1234")), None);
+        assert_eq!(CoreUpdater::parse_asset_sha256_digest(None), None);
+
+        let temp_dir = std::env::temp_dir().join(format!("clash_mini_sha_test_{}", std::process::id()));
+        fs::create_dir_all(&temp_dir).unwrap();
+        let payload_path = temp_dir.join("core.zip");
+        fs::write(&payload_path, b"clash-mini-test-payload").unwrap();
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"clash-mini-test-payload");
+        let expected = format!("sha256:{:x}", hasher.finalize());
+
+        // 1. 缺失摘要必须拒绝 (Fail-Closed)
+        assert!(CoreUpdater::verify_download_sha256(&payload_path, "core.zip", None).is_err());
+        // 2. 不匹配摘要必须拒绝
+        assert!(
+            CoreUpdater::verify_download_sha256(&payload_path, "core.zip", Some(&format!("sha256:{}", "0".repeat(64))))
+                .is_err()
+        );
+        // 3. 正确摘要通过校验
+        assert!(CoreUpdater::verify_download_sha256(&payload_path, "core.zip", Some(&expected)).is_ok());
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_validate_official_mihomo_asset_url_and_decompression_cap() {
+        assert!(
+            CoreUpdater::validate_official_mihomo_asset_url(
+                "https://github.com/MetaCubeX/mihomo/releases/download/v1.19.34/mihomo-windows-amd64-v2-v1.19.34.zip"
+            )
+            .is_ok()
+        );
+        assert!(
+            CoreUpdater::validate_official_mihomo_asset_url(
+                "http://github.com/MetaCubeX/mihomo/releases/download/v1.19.34/a.zip"
+            )
+            .is_err()
+        );
+        assert!(
+            CoreUpdater::validate_official_mihomo_asset_url(
+                "https://evil.example/MetaCubeX/mihomo/releases/download/v1.19.34/a.zip"
+            )
+            .is_err()
+        );
+        assert!(
+            CoreUpdater::validate_official_mihomo_asset_url(
+                "https://github.com/other/repo/releases/download/v1.0/a.zip"
+            )
+            .is_err()
+        );
+        assert!(
+            CoreUpdater::validate_official_mihomo_asset_url(
+                "https://github.com/MetaCubeX/mihomo/releases/download/../other/a.zip"
+            )
+            .is_err()
+        );
+
+        let data = vec![b'x'; 100];
+        let mut out_ok = Vec::new();
+        assert_eq!(
+            CoreUpdater::copy_with_max_bytes(io::Cursor::new(&data), &mut out_ok, 100).unwrap(),
+            100
+        );
+        let mut out_err = Vec::new();
+        assert!(CoreUpdater::copy_with_max_bytes(io::Cursor::new(&data), &mut out_err, 99).is_err());
     }
 }

@@ -2550,6 +2550,11 @@ static MANUAL_SWITCH_EPOCH: AtomicU64 = AtomicU64::new(0);
 static LAST_UI_ACTIVE_SYNC: parking_lot::Mutex<Option<UiActiveSyncState>> = parking_lot::Mutex::new(None);
 static ALERT_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 
+/// 读取当前手动切换代际号，供后台异步选点任务感知用户手动抢占并退让（BUG-414）。
+pub fn current_manual_switch_epoch() -> u64 {
+    MANUAL_SWITCH_EPOCH.load(Ordering::Acquire)
+}
+
 /// 记录前端手动切换产生的新节点切换时间戳并立即唤醒监测循环吸收（BUG-336），不触发额外全组拨测；
 /// 同时递增全局手动切换代际号，使在途自动选点不会在测速结束后覆盖用户最新选择（BUG-388）。
 pub fn notify_manual_node_switched() {
@@ -3137,8 +3142,10 @@ fn fire_self_heal_alert_dialog(log_reason: &'static str, body: &'static str) {
         return;
     }
     tokio::task::spawn_blocking(move || {
+        scopeguard::defer! {
+            ALERT_DIALOG_OPEN.store(false, Ordering::Release);
+        }
         crate::show_error_dialog("Clash Mini - 网络警报", body);
-        ALERT_DIALOG_OPEN.store(false, Ordering::Release);
     });
 }
 

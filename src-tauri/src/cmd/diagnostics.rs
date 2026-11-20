@@ -33,28 +33,34 @@ const SENSITIVE_KEYS: &[&str] = &[
     "password",
     "uuid",
     "psk",
+    "pre-shared-key",
+    "preshared-key",
     "auth",
     "auth-str",
     "authorization",
     "obfs-password",
+    "obfs-param",
+    "protocol-param",
     "secret",
     "token",
     "url",
     "private-key",
+    "private-key-passphrase",
     "public-key",
+    "short-id",
 ];
 
 const REDACTED: &str = "***REDACTED***";
 
 /// 日志正文脱敏规则 1：敏感键值对（`token=xxx` / `password: xxx` / `"secret":"xxx"` 等）。
-/// 长词在前避免 alternation 短路（auth-str 必须排在 auth 之前）。
+/// 长词在前避免 alternation 短路（如 private-key-passphrase、pre-shared-key 必须排在短词之前）。
 /// 兼容键带引号（JSON 形态 `"password":"xxx"`）及值带引号的情况。
 // 正则字面量为编译期常量，模式合法性与代码同生命周期，expect 失败属程序性错误，
 // 静态项上 panic 是预期行为（clippy::expect_used 豁免）。
 #[allow(clippy::expect_used)]
 static LOG_SENSITIVE_KV: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
-        r#"(?i)(["']?\b(?:obfs-password|auth-str|password|passwd|secret|token|uuid|auth|sign)\b["']?)"#,
+        r#"(?i)(["']?\b(?:private-key-passphrase|pre-shared-key|preshared-key|obfs-password|private-key|obfs-param|protocol-param|short-id|auth-str|password|passwd|secret|token|uuid|auth|sign|psk)\b["']?)"#,
         r#"(\s*[=:]\s*["']?)[^\s"&,;]+(["']?)"#,
     ))
     .expect("log sensitive kv regex")
@@ -571,6 +577,47 @@ proxies:
         );
         // 同层非敏感 header 保留，保证排查价值
         assert!(out.contains("cdn.example.com"), "非敏感 header 不应整块抹掉: {out}");
+    }
+
+    #[test]
+    fn redact_masks_wireguard_pre_shared_key_and_reality_short_id() {
+        let yaml = r"
+proxies:
+  - name: wg-01
+    type: wireguard
+    server: wg.example.com
+    port: 51820
+    private-key: top-secret-privkey
+    public-key: peer-pubkey
+    pre-shared-key: wg-top-psk-secret
+    peers:
+      - server: wg2.example.com
+        port: 51820
+        public-key: peer-2-pubkey
+        pre-shared-key: wg-peer-psk-secret
+  - name: vless-reality-01
+    type: vless
+    server: reality.example.com
+    port: 443
+    uuid: 11111111-2222-3333-4444-555555555555
+    reality-opts:
+      public-key: reality-pub
+      short-id: abcd1234
+";
+        let out = redact_yaml_text(yaml);
+        assert!(!out.contains("top-secret-privkey"), "private-key 未脱敏: {out}");
+        assert!(!out.contains("wg-top-psk-secret"), "顶层 pre-shared-key 未脱敏: {out}");
+        assert!(
+            !out.contains("wg-peer-psk-secret"),
+            "peers pre-shared-key 未脱敏: {out}"
+        );
+        assert!(!out.contains("abcd1234"), "reality short-id 未脱敏: {out}");
+        assert!(out.contains("wg.example.com"), "非敏感服务器域名不应被脱敏: {out}");
+
+        let log_out = redact_log_text("wg init pre-shared-key=wg-log-psk psk: another-psk private-key=priv-123");
+        assert!(!log_out.contains("wg-log-psk"), "日志 pre-shared-key 未脱敏: {log_out}");
+        assert!(!log_out.contains("another-psk"), "日志 psk 未脱敏: {log_out}");
+        assert!(!log_out.contains("priv-123"), "日志 private-key 未脱敏: {log_out}");
     }
 
     #[test]

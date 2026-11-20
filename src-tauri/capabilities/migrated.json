@@ -1,23 +1,18 @@
 {
   "identifier": "migrated",
   "description": "permissions that were migrated from v1",
+  "platforms": ["windows"],
   "local": true,
   "windows": ["main"],
   "permissions": [
     "core:default",
     "fs:allow-read-file",
-    "fs:allow-exists",
     "fs:allow-write-file",
     {
       "identifier": "fs:scope",
-      "allow": ["$APPDATA/**"]
+      "allow": ["$TEMP/**"],
+      "deny": ["$APPDATA/cores/**"]
     },
-    "fs:allow-app-read",
-    "fs:allow-app-read-recursive",
-    "fs:allow-appcache-read",
-    "fs:allow-appcache-read-recursive",
-    "fs:allow-appconfig-read",
-    "fs:allow-appconfig-read-recursive",
     "core:window:allow-center",
     "core:window:allow-request-user-attention",
     "core:window:allow-set-resizable",

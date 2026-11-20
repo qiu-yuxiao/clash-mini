@@ -15,6 +15,9 @@ fn is_builtin_outbound(name: &str) -> bool {
 
 /// 异步选点对齐与越界清理任务的代际号：新重载/重启自动使旧任务让路退出（BUG-407）。
 static SELECTION_ENSURE_EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// 托管最近一次异步选点恢复任务的句柄，停核或新任务覆盖时即时 `abort()`（BUG-414）。
+static SELECTION_ENSURE_HANDLE: parking_lot::Mutex<Option<tauri::async_runtime::JoinHandle<()>>> =
+    parking_lot::Mutex::new(None);
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
@@ -74,6 +77,7 @@ impl CoreManager {
     }
 
     async fn stop_core_inner(&self) -> Result<()> {
+        self.abort_pending_selection_ensure();
         CLASH_LOGGER.clear_logs().await;
 
         // 停止内核前同步释放全部常驻 WebSocket 与 IPC 连接池命名管道句柄，避免重装/停服残留句柄引发 ERROR_PIPE_BUSY（BUG-406）
@@ -347,20 +351,49 @@ impl CoreManager {
         persisted.filter(|node| is_compliant(node))
     }
 
-    /// 异步执行 PROXY 选点对齐与越界连接清理；新请求通过递增代际号使旧任务自动让路退出（BUG-407）。
-    pub fn spawn_ensure_proxy_group_selection(&self, preferred: Option<std::string::String>) {
-        let epoch = SELECTION_ENSURE_EPOCH.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
-        crate::process::AsyncHandler::spawn(move || async move {
-            Self::global()
-                .ensure_proxy_group_selection_for_epoch(preferred.as_deref(), epoch)
-                .await;
-        });
+    /// 立即递增代际号并中止尚未完成的后台选点恢复任务（BUG-414）。
+    pub(super) fn abort_pending_selection_ensure(&self) {
+        SELECTION_ENSURE_EPOCH.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        let old = SELECTION_ENSURE_HANDLE.lock().take();
+        if let Some(handle) = old {
+            handle.abort();
+        }
     }
 
-    /// 统一保障内核启动 / 重启 / 重载后的 PROXY 组选点合规性，并在收尾清理滞留于已排除节点的代理连接（BUG-405 / BUG-407）。
-    async fn ensure_proxy_group_selection_for_epoch(&self, preferred: Option<&str>, epoch: u64) {
+    /// 异步执行 PROXY 选点对齐与越界连接清理；新请求通过递增代际号与 `JoinHandle::abort()` 使旧任务立即退出（BUG-407 / BUG-414）。
+    pub fn spawn_ensure_proxy_group_selection(&self, preferred: Option<std::string::String>) {
+        let epoch = SELECTION_ENSURE_EPOCH.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
+        let start_manual_epoch = crate::module::monitor::current_manual_switch_epoch();
+        let old = SELECTION_ENSURE_HANDLE.lock().take();
+        if let Some(old_handle) = old {
+            old_handle.abort();
+        }
+        let handle = crate::process::AsyncHandler::spawn(move || async move {
+            Self::global()
+                .ensure_proxy_group_selection_for_epoch(preferred.as_deref(), epoch, start_manual_epoch)
+                .await;
+        });
+        if SELECTION_ENSURE_EPOCH.load(std::sync::atomic::Ordering::Acquire) != epoch {
+            handle.abort();
+            return;
+        }
+        let prev = SELECTION_ENSURE_HANDLE.lock().replace(handle);
+        if let Some(prev_handle) = prev {
+            prev_handle.abort();
+        }
+    }
+
+    /// 统一保障内核启动 / 重启 / 重载后的 PROXY 组选点合规性，并在收尾清理滞留于已排除节点的代理连接（BUG-405 / BUG-407 / BUG-414）。
+    async fn ensure_proxy_group_selection_for_epoch(
+        &self,
+        preferred: Option<&str>,
+        epoch: u64,
+        start_manual_epoch: u64,
+    ) {
         let is_aborted = || {
-            Handle::global().is_exiting() || SELECTION_ENSURE_EPOCH.load(std::sync::atomic::Ordering::Acquire) != epoch
+            Handle::global().is_exiting()
+                || SELECTION_ENSURE_EPOCH.load(std::sync::atomic::Ordering::Acquire) != epoch
+                || crate::module::monitor::current_manual_switch_epoch() != start_manual_epoch
         };
         if is_aborted() {
             return;
@@ -476,7 +509,14 @@ impl CoreManager {
                                     target,
                                     e
                                 );
-                                selection_changed = select_fallback_in_subset(&mihomo, &all, effective_filter).await;
+                                selection_changed = select_fallback_in_subset(
+                                    &mihomo,
+                                    &all,
+                                    effective_filter,
+                                    epoch,
+                                    start_manual_epoch,
+                                )
+                                .await;
                                 break;
                             }
                             logging!(
@@ -492,7 +532,8 @@ impl CoreManager {
                 }
             }
         } else {
-            selection_changed = select_fallback_in_subset(&mihomo, &all, effective_filter).await;
+            selection_changed =
+                select_fallback_in_subset(&mihomo, &all, effective_filter, epoch, start_manual_epoch).await;
         }
 
         if is_aborted() {
@@ -507,7 +548,13 @@ impl CoreManager {
 }
 
 /// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底，并同步持久化 `profile.selected`。
-async fn select_fallback_in_subset(mihomo: &Mihomo, all: &[String], filter_text: &str) -> bool {
+async fn select_fallback_in_subset(
+    mihomo: &Mihomo,
+    all: &[String],
+    filter_text: &str,
+    epoch: u64,
+    start_manual_epoch: u64,
+) -> bool {
     let fallback = crate::utils::node::pick_subset_fallback_node(
         all,
         filter_text,
@@ -519,8 +566,17 @@ async fn select_fallback_in_subset(mihomo: &Mihomo, all: &[String], filter_text:
         crate::utils::node::is_verified_true_node,
     );
     if let Some(fb) = fallback {
+        if Handle::global().is_exiting()
+            || SELECTION_ENSURE_EPOCH.load(std::sync::atomic::Ordering::Acquire) != epoch
+            || crate::module::monitor::current_manual_switch_epoch() != start_manual_epoch
+        {
+            return false;
+        }
         match mihomo.select_node_for_group("PROXY", fb).await {
             Ok(()) => {
+                if crate::module::monitor::current_manual_switch_epoch() != start_manual_epoch {
+                    return false;
+                }
                 logging!(info, Type::Core, "已回退 PROXY 组节点选择到: {}", fb);
                 if let Some(uid) = crate::module::monitor::get_current_profile_uid().await {
                     crate::module::monitor::persist_selected_node_if_matching(&uid, fb).await;

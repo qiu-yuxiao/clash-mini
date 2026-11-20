@@ -285,8 +285,20 @@ impl IVerge {
         Ok(())
     }
 
+    /// 校验并将 `clash_core` 归一化为白名单值，避免运行期被 IPC 改写后污染服务执行路径（BUG-413）。
+    pub fn normalize_valid_clash_core(raw: Option<&str>) -> &'static str {
+        let Some(candidate) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
+            return "mini-mihomo";
+        };
+        Self::VALID_CLASH_CORES
+            .iter()
+            .copied()
+            .find(|&allowed| allowed == candidate)
+            .unwrap_or("mini-mihomo")
+    }
+
     pub fn get_valid_clash_core(&self) -> String {
-        self.clash_core.clone().unwrap_or_else(|| "mini-mihomo".into())
+        Self::normalize_valid_clash_core(self.clash_core.as_deref()).into()
     }
 
     pub fn new() -> Self {
@@ -485,7 +497,19 @@ impl IVerge {
         patch!(proxy_host);
         patch!(theme_setting);
         patch!(web_ui_list);
-        patch!(clash_core);
+        if let Some(ref requested_core) = patch.clash_core {
+            let normalized = Self::normalize_valid_clash_core(Some(requested_core.as_str()));
+            if requested_core.trim() != normalized {
+                logging!(
+                    warn,
+                    Type::Config,
+                    "拒绝非白名单 clash_core 配置 '{}'，已强制收敛为 '{}'",
+                    requested_core,
+                    normalized
+                );
+            }
+            self.clash_core = Some(normalized.into());
+        }
         patch!(enable_always_on_top);
 
         patch!(auto_close_connection);
@@ -558,5 +582,28 @@ mod tests {
         let unlocked_view = in_memory.effective_for_disk();
         assert_eq!(unlocked_view.enable_tun_mode, Some(false));
         assert_eq!(unlocked_view.enable_system_proxy, Some(true));
+    }
+
+    #[test]
+    fn test_clash_core_runtime_whitelist_rejects_untrusted_values() {
+        assert_eq!(IVerge::normalize_valid_clash_core(None), "mini-mihomo");
+        assert_eq!(IVerge::normalize_valid_clash_core(Some("")), "mini-mihomo");
+        assert_eq!(
+            IVerge::normalize_valid_clash_core(Some("  mini-mihomo  ")),
+            "mini-mihomo"
+        );
+        assert_eq!(
+            IVerge::normalize_valid_clash_core(Some("verge-mihomo-alpha")),
+            "mini-mihomo"
+        );
+        assert_eq!(IVerge::normalize_valid_clash_core(Some(r"..\..\evil")), "mini-mihomo");
+
+        let mut cfg = IVerge::default();
+        cfg.patch_config(&IVerge {
+            clash_core: Some(r"..\attacker".into()),
+            ..IVerge::default()
+        });
+        assert_eq!(cfg.get_valid_clash_core(), "mini-mihomo");
+        assert_eq!(cfg.clash_core.as_deref(), Some("mini-mihomo"));
     }
 }
