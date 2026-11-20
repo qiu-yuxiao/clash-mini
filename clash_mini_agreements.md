@@ -170,7 +170,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 ### 2.5 无死锁原子 Win32 指针缩放与几何同步持久化
 
 - **禁用系统模态拖拽 API**：禁止在网页端调用易卡死 UI 线程的 `startResizeDragging`。
-- **8 方向自定义手柄 + OS 原子缩放**：边缘（`10px`）与四角（`20px`）句柄调用 `begin_window_resize(direction, seq)`、`step_window_resize(seq)`、`end_window_resize(seq)`，以单调 `gestureSeq` 隔离跨手势并发并在 `pointerup`/`pointercancel`/`onLostPointerCapture`/(buttons & 1 === 0) 及卸载时兜底收尾；外围 `~4px` 仍由 OS `TAURI_DRAG_RESIZE_BORDERS` 经 `WM_SIZING` 处理，双路同界。
+- **8 方向自定义手柄 + OS 原子缩放**：边缘（`10px`）与四角（`20px`）句柄调用 `begin_window_resize(direction, seq)`、`step_window_resize(seq)`、`end_window_resize(seq)`（后端核心会话与钳制引擎收口于 [utils/resolve/window/resize.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/window/resize.rs)），以单调 `gestureSeq` 隔离跨手势并发并在 `pointerup`/`pointercancel`/`onLostPointerCapture`/(buttons & 1 === 0) 及卸载时兜底收尾；外围 `~4px` 仍由 OS `TAURI_DRAG_RESIZE_BORDERS` 经 `WM_SIZING` 处理，双路同界。
 - **防震荡与零撕裂原则**：`setPointerCapture` 必须在任意 `await` 之前同步调用；后端采集不可变起始矩形、`GetCursorPos` 与 `GetDpiForWindow`，经去重合并后在主线程执行单次 `SetWindowPos(..., SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS)`，未拖拽维度保持原值不二次 clamp，西/北拖拽由不可变右/底边反推。
 - **拖拽期冻结断点重排与有序落盘**：`NATIVE_WINDOW_RESIZING` / `isWindowResizing()` 激活期间，`lib.rs` 跳过逐像素 `Resized`/`Moved` 落盘、`WindowProvider` 暂停途中翻转 `isMinimalWidth`/`isMiniStatus`，直到松手触发 `RESIZE_ENDED_EVENT` 一次性对齐布局；非拖拽期通过 `1000ms` 节流 + 版本号校验 + `1px` 容差 + `>= MINIMAL` 守卫写入 `window_state.json`。
 
@@ -362,11 +362,11 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 6.2 用户输入 URL 严格校验与 SSRF 防护
 
-外部链接唤起仅限 `http://`/`https://`；订阅请求实施三层 SSRF 防护：① `validate_url_no_ssrf` 拦截单标签主机、保留内网后缀、回环/私网/链路本地/ULA/IPv4-mapped IP（本地解析失败允许交由 `10801` 代理回退链解析）；② 直连路径挂载连接期异步 `SsrfSafeDnsResolver` 防 DNS Rebinding TOCTOU；③ 直连与代理双路对 `30x` 重定向每跳复验。
+外部链接唤起仅限 `http://`/`https://`；订阅请求由独立 SSRF 防护模块 [utils/network/ssrf.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/network/ssrf.rs) 实施三层防护：① `validate_url_no_ssrf` 拦截单标签主机、保留内网后缀、回环/私网/链路本地/ULA/IPv4-mapped IP（本地解析失败允许交由 `10801` 代理回退链解析）；② 直连路径挂载连接期异步 `SsrfSafeDnsResolver` 防 DNS Rebinding TOCTOU；③ 直连与代理双路对 `30x` 重定向每跳复验（`config/prfitem/` 与 `utils/network/` 解除反向依赖）。
 
 ### 6.3 安全解压与强制校验机制（单文件直写暂存）
 
-内核在线升级（`core_updater`）锁定 `https://github.com/MetaCubeX/mihomo/releases/download/` 下载源并校验 `asset.digest` SHA-256（缺失或错误一律 Fail-Closed 拒绝），下载上限 `100 MiB`、解压上限 `150 MiB`，直接定位压缩包唯一目标可执行文件流式解压至 `.staging` 并核验 PE64 格式与体积，不执行多文件目录展开；诊断包打包强制使用正斜杠 `/` 条目并跳过符号链接。
+内核在线升级（`core_updater/`，由 `pe_verify.rs` 独立封装 PE32+ 可执行结构与签名校验、`resolve_usable_custom_core` 供启动/服务/校验共用）锁定 `https://github.com/MetaCubeX/mihomo/releases/download/` 下载源并校验 `asset.digest` SHA-256（缺失或错误一律 Fail-Closed 拒绝），下载上限 `100 MiB`、解压上限 `150 MiB`，直接定位压缩包唯一目标可执行文件流式解压至 `.staging` 并核验 PE64 格式与体积，不执行多文件目录展开；诊断包打包强制使用正斜杠 `/` 条目并跳过符号链接。
 
 ### 6.4 配置增强极简化与原生 Rust 卫兵
 

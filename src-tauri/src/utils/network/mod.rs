@@ -1,3 +1,7 @@
+mod ssrf;
+
+pub(crate) use self::ssrf::validate_url_no_ssrf;
+
 use crate::config::Config;
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose};
@@ -48,25 +52,6 @@ enum TlsRootMode {
     StaticWebpkiRoots,
 }
 
-/// 连接期异步 DNS 校验器（BUG-327）：在直连建连阶段实时解析并校验全部候选 IP，
-/// 消除预检 `ToSocketAddrs` 与真实建连之间的 DNS Rebinding TOCTOU 窗口。
-struct SsrfSafeDnsResolver;
-
-impl reqwest::dns::Resolve for SsrfSafeDnsResolver {
-    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
-        let host = name.as_str().to_owned();
-        Box::pin(async move {
-            let resolved: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
-            for addr in &resolved {
-                crate::config::check_disallowed_ssrf_ip(addr.ip())
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::PermissionDenied, e.to_string()))?;
-            }
-            let iter: reqwest::dns::Addrs = Box::new(resolved.into_iter());
-            Ok(iter)
-        })
-    }
-}
-
 pub struct NetworkManager;
 
 impl Default for NetworkManager {
@@ -94,7 +79,7 @@ impl NetworkManager {
                 if attempt.previous().len() >= 10 {
                     return attempt.error("too many redirects");
                 }
-                if let Err(err) = crate::config::validate_url_no_ssrf(attempt.url()) {
+                if let Err(err) = ssrf::validate_url_no_ssrf(attempt.url()) {
                     return attempt.error(err.to_string());
                 }
                 attempt.follow()
@@ -121,7 +106,7 @@ impl NetworkManager {
         } else {
             builder = builder.no_proxy();
             if ssrf_guard {
-                builder = builder.dns_resolver(Arc::new(SsrfSafeDnsResolver));
+                builder = builder.dns_resolver(Arc::new(ssrf::SsrfSafeDnsResolver));
             }
         }
 
