@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 use tauri::{async_runtime, async_runtime::JoinHandle};
 
 /// 物理隔离的后台守护 Tokio 运行时（BUG-394）：
-/// 专用于运行「后台节点健康监测与故障自愈 (`monitor.rs`)」及「单实例/PAC 监听 (`server.rs`)」。
+/// 专用于运行「后台节点健康监测与故障自愈 (`module/monitor/`)」及「单实例/PAC 监听 (`server.rs`)」。
 /// 彻底脱离 Tauri 默认 async_runtime 工作池，即便极端高负载下 Win32 主线程 / WebView2 创建阻塞
 /// 引发 UI/命令工作池满载，后台断流自愈与单实例端口响应依然保持 100% 调度畅通。
 static DAEMON_RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();

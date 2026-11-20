@@ -114,7 +114,7 @@ flowchart TB
 ### 3.4 Mihomo 内核（sidecar / system service）
 
 - **`PROXY`（select）**：用户/app 控制的出口选择，选择稳定、手动覆盖持久。
-- **`PROXY__METRICS`（url-test）**：测量专用组，成员与 `PROXY` 完全相同，`interval` 1800s、`lazy: true`（零无意义自治后台轮询；由后端 `monitor.rs` 按需经 `delay_group("PROXY__METRICS", ...)` 统一触发内核**直接拨测**每个成员的真实延迟并维护 `now`/`history`）——这是延迟的**唯一权威源**，从测量层消除 TUN 自指回环。
+- **`PROXY__METRICS`（url-test）**：测量专用组，成员与 `PROXY` 完全相同，`interval` 1800s、`lazy: true`（零无意义自治后台轮询；由后端 `module/monitor/` 按需经 `delay_group("PROXY__METRICS", ...)` 统一触发内核**直接拨测**每个成员的真实延迟并维护 `now`/`history`）——这是延迟的**唯一权威源**，从测量层消除 TUN 自指回环。
 - **运行模式**：TUN 开启 → 系统服务模式（UAC 安装/接管），否则旁路 sidecar；管理员运行时跳过服务等待。
 
 ### 3.5 OS / 磁盘持久化
@@ -126,7 +126,7 @@ flowchart TB
 | `verge.yaml` | 应用设置（`IVerge`） | `config/verge.rs` |
 | `profiles.yaml` | 订阅注册表（`IProfiles`） | `config/profiles.rs` |
 | `clash-mini.yaml` | **实际喂给内核的运行时配置** | `config/config.rs::generate_file` |
-| `proxy_head_state.json` | 每 profile 的 PROXY 组过滤/排序状态（子集语义） | `cmd/proxy.rs` / `monitor.rs` |
+| `proxy_head_state.json` | 每 profile 的 PROXY 组过滤/排序状态（子集语义） | `cmd/proxy.rs` / `module/monitor/` |
 | `mini-mihomo.sock` / `\\.\pipe\mini-mihomo` | 内核 IPC 套接字 | `ipc.rs` |
 
 ---

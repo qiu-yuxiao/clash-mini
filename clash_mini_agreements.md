@@ -270,11 +270,11 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 - **立即隐身销毁 WebView**：点击关闭按钮立即调用 `window.hide()` 并销毁 WebView2 实例释放 ~30–40MB 内存，仅保留 Rust 主线程、后台守护监测与托盘。
 - **无条件阻止退出铁律**：`RunEvent::ExitRequested` 除非 `Handle::global().is_exiting()` 为真（仅托盘点击「退出」置位），否则无条件调用 `api.prevent_exit()`。
-- **防误杀策略收敛**：不保留独立看门狗进程或屏外哨兵窗，防误杀指引通过 `轻量模式防误杀指南.txt` + `静默启动` 闭环交付，保留 `logger.rs`（兼容 `&str`/`String` panic 载荷）与 `monitor.rs` 状态恢复日志用于排障取证。
+- **防误杀策略收敛**：不保留独立看门狗进程或屏外哨兵窗，防误杀指引通过 `轻量模式防误杀指南.txt` + `静默启动` 闭环交付，保留 `logger.rs`（兼容 `&str`/`String` panic 载荷）与 `module/monitor/` 状态恢复日志用于排障取证。
 
 ### 4.2 不断网不断流铁律与后端连接维持
 
-- **连续性边界与前后台严格二分**：进入/退出轻量模式、正常冷启动与健康态运行坚持零断流热切换（绝不调用全局 `close_connection`），内核与 TUN 网卡全速保持在线；仅在以下三类确需迁移出口的场景中按目标精准清理，零误伤 `DIRECT`/`REJECT` 与合规连接：① 用户通过前台 4 大显式切点（列表点选、顶栏胶囊轮换、过滤词/`F1` 优选、在线警示胶囊重测）主动更换节点后调用 `should_close_stale_proxy_connection`（`monitor.rs`）与 `shouldCloseStaleProxyConnection`（`path-control.ts`）清理非目标旧出口上的 `PROXY` 存量代理连接；② 因过滤规则或生命周期恢复（`ensure_proxy_group_selection`、`NodeMigration`）需要将流量迁出被排除节点时调用 `should_close_excluded_proxy_connection`；③ 后台自愈确认原节点彻底故障或间歇黑洞并切往新健康节点（`ConfirmedDead` 且 `dead_node != new_node`）时调用 `should_close_dead_node_proxy_connection` 精准断开滞留在该故障旧节点上的 `PROXY` 死链，使 HTTP/2 等长连接立即在新出口重建。`⚡` 与 `F4` 为纯延迟查看，绝不切换节点或触碰存量连接。
+- **连续性边界与前后台严格二分**：进入/退出轻量模式、正常冷启动与健康态运行坚持零断流热切换（绝不调用全局 `close_connection`），内核与 TUN 网卡全速保持在线；仅在以下三类确需迁移出口的场景中按目标精准清理，零误伤 `DIRECT`/`REJECT` 与合规连接：① 用户通过前台 4 大显式切点（列表点选、顶栏胶囊轮换、过滤词/`F1` 优选、在线警示胶囊重测）主动更换节点后调用 `should_close_stale_proxy_connection`（`module/monitor/`）与 `shouldCloseStaleProxyConnection`（`path-control.ts`）清理非目标旧出口上的 `PROXY` 存量代理连接；② 因过滤规则或生命周期恢复（`ensure_proxy_group_selection`、`NodeMigration`）需要将流量迁出被排除节点时调用 `should_close_excluded_proxy_connection`；③ 后台自愈确认原节点彻底故障或间歇黑洞并切往新健康节点（`ConfirmedDead` 且 `dead_node != new_node`）时调用 `should_close_dead_node_proxy_connection` 精准断开滞留在该故障旧节点上的 `PROXY` 死链，使 HTTP/2 等长连接立即在新出口重建。`⚡` 与 `F4` 为纯延迟查看，绝不切换节点或触碰存量连接。
 
 ### 4.3 前端 WebSocket 熔断与自动重连自愈
 
@@ -287,7 +287,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 ### 4.5 窗口唤醒几何恢复与首帧轻量刷新
 
 - **零阻塞 Win32 恢复**：唤醒一次性还原 `window_state.json` 几何与最大化状态；`is_position_on_screen` / `is_main_window_*` 直接在原子 `MAIN_WINDOW_HWND` 上调用零阻塞 Win32 API（`EnumDisplayMonitors` / `GetMonitorInfoW` / `GetDpiForMonitor` / `IsIconic` / `GetForegroundWindow`），必须在 `unminimize()` **之前**取样 `IsIconic` 跳过最小化坐标校验（`-32000,-32000`），避免跨屏失联且彻底杜绝 tokio 工作线程同步等待主线程死锁。
-- **首帧零冗余协同**：唤醒首帧通过 `calcuProxies` 同步状态；轻量唤醒（`skipProbeIfFresh: true`）在当前活跃出口持有有效且未过期（`<= HISTORY_FALLBACK_MAX_AGE_MS`）延迟时**零拨测秒开**，仅在延迟缺失或陈旧时以过滤子集 `names` 复调后端（复用 30s 快照缓存）；浏览器窗口切回前台（`visibilitychange`）仅执行 `3000ms` 节流的 `refreshAll()` UI 刷新而不重复发起前端主动测速，测速统筹统一交由后端 `monitor.rs` 守护线程承担。
+- **首帧零冗余协同**：唤醒首帧通过 `calcuProxies` 同步状态；轻量唤醒（`skipProbeIfFresh: true`）在当前活跃出口持有有效且未过期（`<= HISTORY_FALLBACK_MAX_AGE_MS`）延迟时**零拨测秒开**，仅在延迟缺失或陈旧时以过滤子集 `names` 复调后端（复用 30s 快照缓存）；浏览器窗口切回前台（`visibilitychange`）仅执行 `3000ms` 节流的 `refreshAll()` UI 刷新而不重复发起前端主动测速，测速统筹统一交由后端 `module/monitor/` 守护线程承担。
 
 ---
 
@@ -306,14 +306,14 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 - **三档监控周期（`check_interval_secs`）**：在线稳态恒定 **15 秒**；初检失败进入重试态收紧至 **3 秒**；物理离线收紧至 **5 秒**。
 - **统一裁决器 `decide_self_heal` 与间歇性黑洞滑窗逃生**：主循环（`NodeConfirmedDead`：连续失败 `>= FAILOVER_CONFIRM_FAILS (2)` 或同一活跃节点在 `BROWNOUT_WINDOW_SECS (600s)` 滑动窗口内发生 `>= BROWNOUT_CONFIRM_FAILS (2)` 次独立 `ShouldFailover` 故障周期）、物理恢复（`NetworkRecovered` 恒判 `Wait` 安静等待并交主路径重测）与通道异常（`ApiUnreachable >= API_ERROR_HEAL_THRESHOLD (3)` 且经 `is_clash_api_alive()` 复核仍不通）必须经 `decide_self_heal` 裁决为 `Allow` 后方可进入 `self_heal_with_accounting`；仅当 `is_active_excused_by_primary_distortion` 证实主地址失真且**当前活跃节点自身通过备用测速地址**时返回 `NoAction` 并清零 `consecutive_fails`（若仅同组其他节点通过备用地址而活跃节点仍超时，同步向 UI 标红活跃节点并照常推进裁决）。当 `FailoverVerdict::NoAction` 确认稳态恢复时清零 `auto_select_fail_count` / `api_dead_heal_fail_count`（但保留 `recent_brownout_episodes` 600s 滑窗直至换节点、手动切点、网络恢复或切点触发）。守护首次观测活跃节点（`None -> Some`）不开启 `20s` 切换宽限期；冷启动 `select == false` 纯测速若实证持久节点超时而同组另有可达节点，预置第 1 次失败并以 `3s` 间隔二次复核（恢复即保活、再败即切换）。
 - **缺管快速重启与 API 失联免等（`is_named_pipe_server_missing`）**：通过零句柄占用的 `WaitNamedPipeW(..., 1)` + Win32 缺管码判定（`ERROR_FILE_NOT_FOUND` 等，严格排除 `ERROR_SEM_TIMEOUT`/`ERROR_PIPE_BUSY`）结合 `CoreManager::should_expect_core_pipe_alive()`（非退出、非 `NotRunning`、非配置更新/生命周期锁占期间）及 `PIPE_MISSING_CONFIRM_DELAY_MS (500ms)` 二次确认后，在 `SELF_HEAL_COOLDOWN_SECS (25s)` 冷却外跳过 `3 × 15s` 与 `30s` 空等，直接触发 `restart_core()` 秒级恢复；`ApiChannelDown` 进入 `self_heal_with_accounting` 时若 `precheck_api_channel_down` 复核仍不可达亦跳过 `30s` `wait_for_clash_ready()` 直入计次重启链路。
-- **四态迟滞、死节点门检与保活**：`NodeStatus` 包含 `Unknown` / `Suspect` / `Dead` / `Alive`；`alive=false` 但上次成功仍在 `SUSPECT_WINDOW_SECS (30s)` 内判为 `Suspect` 不累计失败、不切点；`ConfirmedDead` 自愈切点前必经 `should_proceed_with_self_heal` 二次确认原节点确为 `Dead`（同时豁免速率上限卡死），`ApiChannelDown` 切点前若 `should_keep_alive_on_api_recovery` 复核现节点已恢复 `Alive` 则直接保活复位。
+- **四态迟滞、死节点门检与保活**：`NodeStatus` 置于 `monitor/mod.rs` 供 `observer` 与 `verdict` 单向共享（消除子模块双向互引），包含 `Unknown` / `Suspect` / `Dead` / `Alive`；`alive=false` 但上次成功仍在 `SUSPECT_WINDOW_SECS (30s)` 内判为 `Suspect` 不累计失败、不切点；`ConfirmedDead` 自愈切点前必经 `should_proceed_with_self_heal` 二次确认原节点确为 `Dead`（同时豁免速率上限卡死），`ApiChannelDown` 切点前若 `should_keep_alive_on_api_recovery` 复核现节点已恢复 `Alive` 则直接保活复位。
 - **判死阈值与宽限期**：测速有效延迟区间锁定 **`[30ms, 5000ms)`**（`NODE_DELAY_MAX_MS = 5000`）；任何手动/自动切点后给予 **`20s`** 切换宽限期（`NODE_SWITCH_NOTIFY` 瞬时吸收）。
 - **被动流量证活与分级探测**：基于本地 `/connections` 字节增量划分活跃连接状态：
   - 非 `Alive`（`Unknown`/`Suspect`/`Dead`）或时间戳缺失：强制 `allow_coalesce = false` 实时探测 `probe_metrics_group`；
   - `Flowing`（存在下行回包 `delta_download > 0` 且当前 `Alive`）：免拨测保鲜延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (1800s)`；
   - `Stalled`（有上行零回包 `delta_upload > 0 && delta_download == 0`）：受 `STALL_REPROBE_COOLDOWN_SECS (60s)` 限制在本轮立即实拨复核；
   - `Idle`（无活跃下行）：保鲜窗为 `IDLE_HEALTH_FRESH_SECS (900s)`，零闲时盲测风暴。
-- **代理建连失败突发与网卡变更破缓存复核（零常驻 WS）**：`Service` 模式按文件字节偏移增量扫描 `logs/service/service_latest.log`（兼容轮转截断与末尾半行保留，首次观察及节点切换时锚定文件末尾与切换时间戳），`Sidecar` 模式由子进程日志流直喂内存解析器；当 `DIAL_FAIL_WINDOW_SECS (30s)` 滑窗内捕获 `>= DIAL_FAIL_REPROBE_THRESHOLD (3)` 条指向 `PROXY` 组的建连/握手/会话失败告警（排除 `DIRECT`、`PROXY__METRICS`、`operation was canceled` 与纯 DNS 解析无记录），或捕获 `[TUN] default interface changed by monitor` 默认网卡切换事件，且不在 `DIAL_FAIL_REPROBE_COOLDOWN_SECS (60s)` 冷却内时，立即突破 `Flowing (1800s)` / `Idle (900s)` 免拨测缓存发起一轮 `probe_metrics_group` 实拨复核（不直接判死，切点仍服从统一裁决器）；其中 `[TUN] default interface lost / changed by monitor` 同步清零 `LAST_FLOWING_TRAFFIC_AT` 并置位 `FORCE_ONLINE_RECHECK`。
+- **代理建连失败突发与网卡变更破缓存复核（零常驻 WS）**：`Service` 模式按文件字节偏移增量扫描 `logs/service/service_latest.log`（兼容轮转截断与末尾半行保留，首次观察及节点切换时锚定文件末尾与切换时间戳），`Sidecar` 模式由子进程日志流直喂内存解析器；当 `DIAL_FAIL_WINDOW_SECS (30s)` 滑窗内捕获 `>= DIAL_FAIL_REPROBE_THRESHOLD (3)` 条指向 `PROXY` 组的建连/握手/会话失败告警（排除 `DIRECT`、`PROXY__METRICS`、`operation was canceled` 与纯 DNS 解析无记录），或于独立 `TUN_EVENT_MAX_AGE_SECS (300s)` 回溯窗内捕获 `[TUN] default interface changed by monitor` 默认网卡切换事件（待复核信号受 `TUN_INTERFACE_CHANGED_TTL_SECS (60s)` 上限约束、超时自动过期防跨周期误归因），且不在 `DIAL_FAIL_REPROBE_COOLDOWN_SECS (60s)` 冷却内时，立即突破 `Flowing (1800s)` / `Idle (900s)` 免拨测缓存发起一轮 `probe_metrics_group` 实拨复核（不直接判死，切点仍服从统一裁决器）；其中 `[TUN] default interface lost / changed by monitor` 在 `300s` 有效窗内同步清零 `LAST_FLOWING_TRAFFIC_AT` 并置位 `FORCE_ONLINE_RECHECK`。
 - **可观测性稳态摘要契约**：`select: false` 纯测速刷新结束时输出单行 `info` 统计摘要（含待测数、可达数、数据来源及当前节点延迟）；守护循环每 `MONITOR_SUMMARY_INTERVAL_SECS (600s)` 输出单行 `info` 稳态健康摘要（复用当轮体检观测，零额外 IPC）。
 
 ### 5.2 单一内核测量组（PROXY__METRICS）统一调度
@@ -391,7 +391,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 7.3 订阅导入等待、失败传播与 Provider 刷新协同
 
-新订阅导入或重载后每 `1.5s` 轮询检查直到 `PROXY` 组出现真实有效节点，随即直写刷新前端本地缓存消除首屏延迟；远程更新链（`perform_profile_update` / `update_profile`）在三阶段下载全部失败或配置校验出错时必须向调用方传播 `Err`（阻断空重载与假成功提示，并触发 `Timer::finish_task` -> `compute_next_schedule_minutes` 进入 `2` 分钟快速重试）。
+新订阅导入或重载后每 `1.5s` 轮询检查直到 `PROXY` 组出现真实有效节点，随即直写刷新前端本地缓存消除首屏延迟；远程更新链（`perform_profile_update` / `update_profile`）在三阶段下载全部失败或配置校验出错时必须向调用方传播 `Err`（阻断空重载与假成功提示，并触发 `Timer::finish_task` -> `compute_next_schedule_minutes` 进入 `2` 分钟快速重试）；三阶段下载全败对外统一经 13 语种 `withClashProxyFailed` 前缀展示脱敏详情（后台定时触发发 `update_failed_even_with_clash` 事件，手动更新由前端直接消费错误前缀渲染，零硬编码中文与重复弹窗）。
 
 ### 7.4 订阅管理与右键上下文菜单
 

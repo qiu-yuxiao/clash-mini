@@ -1,3 +1,19 @@
+## v3.6.2
+
+### 🛡️ 备用测速防替考、服务模式自动对账、客户端升级断点续试与订阅失败多语种收口（BUG-416 / BUG-417）
+
+- **封堵备用测速 URL 误赦免死节点与冷启动伪宽限期（BUG-417）**：
+  - 修复主测速 URL 全超时后仅同组其他节点通过备用测速 URL（`gstatic`）时，原断流活跃节点被误判为 `NoAction`“替考免死”的缺陷：`is_active_excused_by_primary_distortion` 严格要求当前活跃节点自身在备用 URL 取得有效延迟方免于判死，否则同步向 UI 标红并照常推进切点裁决；
+  - 守护首次观测到活跃节点（`None -> Some`）不再开启伪 `20s` 节点切换宽限期，且冷启动 `select=false` 纯测速实证持久节点超时而同组另有可达候选时立即预置第 1 次失败并按 `3s` 间隔二次复核（恢复即保活、再败即切换）；
+  - 为 `start_with_existing_service` 的 `start_clash` IPC 补充 3 次短退避重试，并在 `CoreManager` 新增 `reconcile_running_mode_if_needed`，探测到系统服务与内核管道已在线而运行态仍为 `NotRunning` 时自动对账恢复 `RunningMode::Service`。
+- **加固客户端自升级下载链路与可观测性（BUG-417）**：
+  - `checkClientUpdateWithFallback` 优先经本地混合端口代理检查更新，失败时自动回退直连/系统代理；`downloadAndInstallClientUpdateWithRetry` 在 `Finished` 前发生断流自动退避重试最多 3 次，全部重试与失败详情均通过 `frontendLog` 持久化写入 `latest.log`。
+- **统一订阅失败多语种通知、独立 TUN 网卡事件窗口及消除监视子模块互引（BUG-416 / BUG-417）**：
+  - 修复订阅三阶段下载全败的错误返回与前端消费路径：后台定时更新失败发送 `update_failed_even_with_clash` 通知并触发 `timer.rs` `2` 分钟快重试，手动更新直接复用 13 语种 `withClashProxyFailed` 前缀呈现脱敏错误详情（消除硬编码中文与死代码）；
+  - 为 `[TUN] default interface lost/changed` 设立独立 `300s`（`TUN_EVENT_MAX_AGE_SECS`）有效回溯窗口与 `60s`（`TUN_INTERFACE_CHANGED_TTL_SECS`）待复核信号自动过期上限，并将 `NodeStatus` 上收至 `module/monitor/mod.rs`，彻底消除 `observer` 与 `verdict` 的双向循环依赖；同步校准前端/架构文档及 `Changelog.md` 模块命名记录。
+
+---
+
 ## v3.6.1
 
 ### 🛡️ 代理建连握手超时盲区自愈、网卡切换免测突破与订阅/诊断/观测性收口（BUG-415 / BUG-416）
@@ -12,7 +28,7 @@
 
 ### 🧱 全栈核心大模块内聚化拆分重构（零行为变更）
 
-- **Rust 后端模块化拆分**：将超长单文件按职责拆分为高内聚子模块——`module/monitor/`（`daemon`、`verdict`、`probe`、`selection`、`https_verify`、`observer`、`tests`）、`enhance/`（`agreements`、`dns`、`tests`）、`utils/node/`（`filter`、`fingerprint`、`verify_store`、`tests`）、`utils/network/ssrf.rs`、`config/prfitem/`（`remote`、`tests`）、`core/core_updater/`（`pe_verify`、`tests`）与 `utils/resolve/window/`（`resize`、`tests`）。
+- **Rust 后端模块化拆分**：将超长单文件按职责拆分为高内聚子模块——`module/monitor/`（`daemon`、`verdict`、`probe`、`auto_select`、`connections`、`observer`、`tests`）、`enhance/`（`agreements`、`dns`、`tests`）、`utils/node/`（`filter`、`fingerprint`、`verify_store`、`tests`）、`utils/network/ssrf.rs`、`config/prfitem/`（`remote`、`tests`）、`core/core_updater/`（`pe_verify`、`tests`）与 `utils/resolve/window/`（`resize`、`tests`）。
 - **React 前端布局、引导与皮肤样式解耦**：瘦身 `_layout.tsx` 主外壳并拆出 `useProfileActions`、`useProxyModeActions`、`SettingsDrawer`、`ProfileContextMenu`；提炼三处输入框共用的 `<InputContextMenu>` 组件；将首次运行引导拆分为 `first-run-guide-dialog/` 子步骤组件、弹窗组拆分为 `dialogs/` 独立弹窗文件、控件皮肤样式拆分为 `utils/button-styles/` 子模块。
 
 ---

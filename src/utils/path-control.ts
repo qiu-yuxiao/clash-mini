@@ -686,7 +686,7 @@ export function prioritizePathControlConnections(
 
 /**
  * 判断某条活跃连接在前台用户显式切换至 `targetNode` 后是否应被立即断开（BUG-396）：
- * - 与后端 `monitor.rs::should_close_stale_proxy_connection` 1:1 同源；
+ * - 与后端 `module/monitor/connections.rs::should_close_stale_proxy_connection` 1:1 同源；
  * - 仅匹配经过 `groupName`（默认 `'PROXY'`）的连接，绝不触碰 `DIRECT` / `REJECT` 流量；
  * - 若连接已位于 `targetNode` 上，返回 `false` 保持零中断；
  * - 若连接仍挂在任意非 `targetNode` 的旧代理节点（含多跳前残留）上，返回 `true`。

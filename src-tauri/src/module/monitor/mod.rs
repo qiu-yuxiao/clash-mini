@@ -76,6 +76,10 @@ pub(super) const STALL_REPROBE_COOLDOWN_SECS: u64 = 60;
 pub(super) const DIAL_FAIL_WINDOW_SECS: u64 = 30;
 pub(super) const DIAL_FAIL_REPROBE_THRESHOLD: usize = 3;
 pub(super) const DIAL_FAIL_REPROBE_COOLDOWN_SECS: u64 = 60;
+/// TUN 默认网卡丢失/切换日志行的最大有效回溯窗口（5 分钟）：独立于 30s 建连突发窗口，防止刚跨过 30s 边界的网卡事件被静默丢弃。
+pub(super) const TUN_EVENT_MAX_AGE_SECS: u64 = 300;
+/// TUN 默认网卡切换待复核信号的存活上限（60 秒）：在冷却期结束后最多保留约 4 个守护周期，超时自动过期以避免跨周期误归因。
+pub(super) const TUN_INTERFACE_CHANGED_TTL_SECS: u64 = 60;
 
 /// Service 模式内核日志单次增量读取字节上限，与默认 128KB 轮转阈值对齐。
 pub(super) const MAX_KERNEL_LOG_INCREMENTAL_BYTES: u64 = 128 * 1024;
@@ -170,6 +174,20 @@ pub(super) static LAST_FLOWING_TRAFFIC_AT: parking_lot::Mutex<Option<Instant>> =
 /// 内核报告 `[TUN] default interface lost / changed` 时置位，令主循环跳过 60s 在线免测立即探活（BUG-416）。
 pub(super) static FORCE_ONLINE_RECHECK: AtomicBool = AtomicBool::new(false);
 
+/// 单节点健康状态（由测量组维护的 history/alive 判定，TUN 下可靠）。
+/// 置于 `monitor` 根模块供 `observer` 与 `verdict` 单向共享，消除子模块双向互引。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum NodeStatus {
+    /// 测量组尚未测过该节点（数据缺失），不动作、等待测量
+    Unknown,
+    /// 疑似抖动：`alive=false` 但上次成功仍处于 `SUSPECT_WINDOW_SECS` 内，不累计失败或自愈
+    Suspect,
+    /// 节点已确认不可用（测速超时/失败/假节点，且无近期成功记录）
+    Dead,
+    /// 节点健康，附带真实延迟
+    Alive(u32),
+}
+
 /// 延迟结果数据来源语义标记（BUG-344）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DelayResultSource {
@@ -219,7 +237,7 @@ pub(super) const OFFLINE_CHECK_INTERVAL_SECS: u64 = 5;
 /// - debug 级别，不影响生产日志体积（默认 Info 级别不显示）
 ///
 /// 【设计盲区修复】
-/// 此前 monitor.rs 主循环只在状态变化时打日志（节点变化/网络变化/失败告警），
+/// 此前 monitor 主循环只在状态变化时打日志（节点变化/网络变化/失败告警），
 /// 导致正常运行时连续几小时无日志输出，与"线程已死"无法区分。
 /// 加周期性心跳后，排障时启用 RUST_LOG=debug 即可看到心跳，立刻判定线程状态。
 pub(super) const MONITOR_HEARTBEAT_CYCLE_COUNT: u64 = 20;

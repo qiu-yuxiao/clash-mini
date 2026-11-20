@@ -11,7 +11,7 @@ use super::probe::{
     wait_for_clash_ready,
 };
 use super::verdict::{
-    FailoverVerdict, NodeStatus, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
+    FailoverVerdict, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
     can_fast_restart_missing_pipe, decide_self_heal, evaluate_failover, is_benign_auto_select_abort, node_status,
     prune_brownout_episodes, record_brownout_episode, self_heal_requires_dead_gate,
     self_heal_subject_to_switch_rate_limit, should_keep_alive_on_api_recovery, should_proceed_with_self_heal,
@@ -20,7 +20,7 @@ use super::{
     ALERT_DIALOG_OPEN, API_ERROR_HEAL_THRESHOLD, AUTO_SWITCH_WINDOW_SECS, AutoSelectOutcome, DelayResultSource,
     FORCE_ONLINE_RECHECK, HTTPS_VERIFY_INTERVAL_SECS, LAST_MANUAL_NODE_SWITCH, MAX_AUTO_SWITCHES_PER_WINDOW,
     MIN_AUTO_SWITCH_INTERVAL_SECS, MONITOR_HEARTBEAT_CYCLE_COUNT, MONITOR_SUMMARY_INTERVAL_SECS, MONITOR_TASK_HANDLE,
-    MONITOR_WAKEUP_NOTIFY, NODE_SWITCH_NOTIFY, NORMAL_CHECK_INTERVAL_SECS, PIPE_MISSING_CONFIRM_DELAY_MS,
+    MONITOR_WAKEUP_NOTIFY, NODE_SWITCH_NOTIFY, NORMAL_CHECK_INTERVAL_SECS, NodeStatus, PIPE_MISSING_CONFIRM_DELAY_MS,
     PROFILE_SWITCH_NOTIFY, SELF_HEAL_COOLDOWN_SECS, SWITCH_GRACE_PERIOD_SECS, emit_network_health_notice,
     is_dummy_node, reset_monitor_static_state,
 };

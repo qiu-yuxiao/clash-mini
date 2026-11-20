@@ -9,6 +9,7 @@ use smartstring::alias::String;
 use std::sync::atomic::AtomicBool;
 
 pub static CURRENT_SWITCHING_PROFILE: AtomicBool = AtomicBool::new(false);
+const UPDATE_FAILED_EVEN_WITH_CLASH_PREFIX: &str = "update_failed_even_with_clash:";
 
 async fn should_update_profile(uid: &String, ignore_auto_update: bool) -> Result<Option<(String, Option<PrfOption>)>> {
     let profiles = Config::profiles().await;
@@ -49,6 +50,7 @@ async fn perform_profile_update(
     url: &String,
     opt: Option<&PrfOption>,
     option: Option<&PrfOption>,
+    is_mannual_trigger: bool,
 ) -> Result<bool> {
     logging!(info, Type::Config, "[订阅更新] 开始下载新的订阅内容");
     let mut merged_opt = PrfOption::merge(opt, option);
@@ -126,10 +128,15 @@ async fn perform_profile_update(
         }
     }
 
-    Err(anyhow!(
-        "订阅「{profile_name}」更新失败: {}",
-        mask_err(&last_err.to_string())
-    ))
+    let detail = format!("{profile_name} - {}", mask_err(&last_err.to_string()));
+    if is_mannual_trigger {
+        Err(anyhow!("{UPDATE_FAILED_EVEN_WITH_CLASH_PREFIX}{detail}"))
+    } else {
+        if !crate::module::lightweight::is_in_lightweight_mode() {
+            handle::Handle::notice_message("update_failed_even_with_clash", detail.clone());
+        }
+        Err(anyhow!("{detail}"))
+    }
 }
 
 pub async fn update_profile(
@@ -143,7 +150,9 @@ pub async fn update_profile(
     let url_opt = should_update_profile(uid, ignore_auto_update).await?;
 
     let should_refresh = match url_opt {
-        Some((url, opt)) => perform_profile_update(uid, &url, opt.as_ref(), option).await? && auto_refresh,
+        Some((url, opt)) => {
+            perform_profile_update(uid, &url, opt.as_ref(), option, is_mannual_trigger).await? && auto_refresh
+        }
         None => auto_refresh,
     };
 

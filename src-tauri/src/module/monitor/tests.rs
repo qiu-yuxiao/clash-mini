@@ -25,9 +25,9 @@ use super::probe::{
     should_run_periodic_https_verify_with, should_sync_alive_ui, try_reuse_probe_snapshot,
 };
 use super::verdict::{
-    NodeStatus, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
-    can_fast_restart_missing_pipe, classify_node_status, decide_self_heal, is_active_excused_by_primary_distortion,
-    is_benign_auto_select_abort, is_manual_switch_preempted, record_brownout_episode, self_heal_requires_dead_gate,
+    SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted, can_fast_restart_missing_pipe,
+    classify_node_status, decide_self_heal, is_active_excused_by_primary_distortion, is_benign_auto_select_abort,
+    is_manual_switch_preempted, record_brownout_episode, self_heal_requires_dead_gate,
     self_heal_subject_to_switch_rate_limit, should_allow_https_migration, should_keep_alive_on_api_recovery,
     should_migrate_filtered_out_active, should_proceed_with_self_heal,
 };
@@ -37,10 +37,11 @@ use super::{
     HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS, HTTPS_VERIFY_INTERVAL_SECS, IDLE_HEALTH_FRESH_SECS, LAST_ACTIVE_VERIFY_CHECK,
     LAST_FLOWING_TRAFFIC_AT, LAST_HTTPS_VERIFY_ALL_FAILED, LAST_MANUAL_NODE_SWITCH, LAST_METRICS_PROBE,
     LAST_NOTIFIED_HEALTH, LAST_UI_ACTIVE_SYNC, MANUAL_SWITCH_EPOCH, MAX_AUTO_SWITCHES_PER_WINDOW,
-    METRICS_REUSE_MAX_AGE_SECS, MIN_AUTO_SWITCH_INTERVAL_SECS, MetricsProbeSnapshot, NODE_SWITCH_NOTIFY,
+    METRICS_REUSE_MAX_AGE_SECS, MIN_AUTO_SWITCH_INTERVAL_SECS, MetricsProbeSnapshot, NODE_SWITCH_NOTIFY, NodeStatus,
     ONLINE_CHECK_FLOWING_SKIP_SECS, PASSIVE_TRAFFIC_MAX_SKIP_SECS, PERIODIC_HTTPS_VERIFY_SUFFICIENT_STANDBYS,
     SELF_HEAL_COOLDOWN_SECS, SELF_HEAL_PROBE_REUSE_MAX_AGE_SECS, SINGLE_TARGET_SKIP_FALLBACK_MIN_HEALTHY_PEERS,
-    SUSPECT_WINDOW_SECS, notify_manual_node_switched, reset_monitor_static_state,
+    SUSPECT_WINDOW_SECS, TUN_EVENT_MAX_AGE_SECS, TUN_INTERFACE_CHANGED_TTL_SECS, notify_manual_node_switched,
+    reset_monitor_static_state,
 };
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
@@ -1374,6 +1375,43 @@ fn test_bug416_tun_interface_signals_invalidate_online_skip_and_reprobe() {
         tracker.evaluate_reprobe_signal(after_cd_inst),
         Some(KernelReprobeReason::TunInterfaceChanged)
     );
+
+    // 3. TUN 网卡切换待复核信号受 TUN_INTERFACE_CHANGED_TTL_SECS (60s) 约束：超时未消费则自动过期，不跨周期误归因
+    assert_eq!(
+        tracker.evaluate_reprobe_signal(after_cd_inst + Duration::from_secs(TUN_INTERFACE_CHANGED_TTL_SECS - 1)),
+        Some(KernelReprobeReason::TunInterfaceChanged)
+    );
+    assert_eq!(
+        tracker.evaluate_reprobe_signal(after_cd_inst + Duration::from_secs(TUN_INTERFACE_CHANGED_TTL_SECS)),
+        None
+    );
+
+    // 4. TUN 网卡事件独立 300s 回溯窗（TUN_EVENT_MAX_AGE_SECS）：45s 老事件（> 30s 且 < 300s）仍被接收，而 >= 300s 过期丢弃
+    tracker.consume_burst_for_probe(after_cd_inst);
+    let check_utc = after_cd_utc + chrono::Duration::seconds(TUN_EVENT_MAX_AGE_SECS as i64 + 10);
+    let check_inst = after_cd_inst + Duration::from_secs(TUN_EVENT_MAX_AGE_SECS + 10);
+    tracker.on_node_checked("日本2", check_utc - chrono::Duration::seconds(60));
+
+    *LAST_FLOWING_TRAFFIC_AT.lock() = Some(check_inst);
+    FORCE_ONLINE_RECHECK.store(false, Ordering::Release);
+    let age_45s_utc = check_utc - chrono::Duration::seconds(DIAL_FAIL_WINDOW_SECS as i64 + 15);
+    tracker.ingest_log_line(&make_changed(age_45s_utc), check_inst, check_utc);
+    assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_none());
+    assert!(FORCE_ONLINE_RECHECK.load(Ordering::Acquire));
+    assert_eq!(
+        tracker.evaluate_reprobe_signal(check_inst),
+        Some(KernelReprobeReason::TunInterfaceChanged)
+    );
+
+    tracker.consume_burst_for_probe(check_inst);
+    let expired_base_inst = check_inst + Duration::from_secs(TUN_INTERFACE_CHANGED_TTL_SECS);
+    let expired_base_utc = check_utc + chrono::Duration::seconds(TUN_INTERFACE_CHANGED_TTL_SECS as i64);
+    *LAST_FLOWING_TRAFFIC_AT.lock() = Some(expired_base_inst);
+    FORCE_ONLINE_RECHECK.store(false, Ordering::Release);
+    let age_300s_utc = expired_base_utc - chrono::Duration::seconds(TUN_EVENT_MAX_AGE_SECS as i64);
+    tracker.ingest_log_line(&make_lost(age_300s_utc), expired_base_inst, expired_base_utc);
+    assert!(LAST_FLOWING_TRAFFIC_AT.lock().is_some());
+    assert!(!FORCE_ONLINE_RECHECK.load(Ordering::Acquire));
 
     reset_monitor_static_state();
     drop(serial);

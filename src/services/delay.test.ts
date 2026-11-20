@@ -47,13 +47,13 @@ describe('formatDelay 延迟文本格式化', () => {
 
 describe('formatDelayColor 延迟颜色映射', () => {
   /**
-   * BUG-304 回归（2026-10-26）：后端 monitor.rs 判死阈值已 2000→5000，
+   * BUG-304 回归（2026-10-26）：后端 module/monitor/ 判死阈值已 2000→5000，
    * 前端单一真源若不同步，2000~5000ms 的「拥塞期慢而可用」节点会被
    * formatDelay/formatDelayColor/排序/联动逻辑误判为 Timeout（红字 + 沉底），
    * 重现 BUG-304 要根除的「活节点全员 Time out」。
    */
   describe('BUG-304 阈值同步：2000~5000ms 是有效延迟而非 Timeout', () => {
-    it('NODE_DELAY_MAX_MS 必须为 5000（与后端 monitor.rs 单一真源一致）', () => {
+    it('NODE_DELAY_MAX_MS 必须为 5000（与后端 module/monitor/ 单一真源一致）', () => {
       expect(NODE_DELAY_MAX_MS).toBe(5000)
     })
 

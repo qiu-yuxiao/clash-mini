@@ -1,8 +1,7 @@
-use super::verdict::NodeStatus;
 use super::{
     DIAL_FAIL_REPROBE_COOLDOWN_SECS, DIAL_FAIL_REPROBE_THRESHOLD, DIAL_FAIL_WINDOW_SECS, FORCE_ONLINE_RECHECK,
-    IDLE_HEALTH_FRESH_SECS, LAST_FLOWING_TRAFFIC_AT, MAX_KERNEL_LOG_INCREMENTAL_BYTES, PASSIVE_TRAFFIC_MAX_SKIP_SECS,
-    STALL_REPROBE_COOLDOWN_SECS,
+    IDLE_HEALTH_FRESH_SECS, LAST_FLOWING_TRAFFIC_AT, MAX_KERNEL_LOG_INCREMENTAL_BYTES, NodeStatus,
+    PASSIVE_TRAFFIC_MAX_SKIP_SECS, STALL_REPROBE_COOLDOWN_SECS, TUN_EVENT_MAX_AGE_SECS, TUN_INTERFACE_CHANGED_TTL_SECS,
 };
 use std::collections::HashMap;
 use std::io::{Read as _, Seek as _, SeekFrom};
@@ -151,7 +150,7 @@ pub(super) struct ProxyDialFailureTracker {
     active_node: Option<String>,
     active_since_utc: Option<chrono::DateTime<chrono::Utc>>,
     failure_instants: Vec<Instant>,
-    interface_changed_pending: bool,
+    interface_changed_at: Option<Instant>,
     last_probe_at: Option<Instant>,
     cursor_path: Option<PathBuf>,
     cursor_offset: u64,
@@ -279,7 +278,7 @@ impl ProxyDialFailureTracker {
             self.active_node = Some(active_node.to_owned());
             self.active_since_utc = Some(now_utc);
             self.failure_instants.clear();
-            self.interface_changed_pending = false;
+            self.interface_changed_at = None;
             self.last_probe_at = None;
             self.reanchor_to_end = true;
         }
@@ -288,7 +287,7 @@ impl ProxyDialFailureTracker {
     pub(super) fn reset_for_manual_switch(&mut self, now_utc: chrono::DateTime<chrono::Utc>) {
         self.active_since_utc = Some(now_utc);
         self.failure_instants.clear();
-        self.interface_changed_pending = false;
+        self.interface_changed_at = None;
         self.last_probe_at = None;
         self.reanchor_to_end = true;
     }
@@ -296,6 +295,12 @@ impl ProxyDialFailureTracker {
     fn prune(&mut self, now_inst: Instant) {
         self.failure_instants
             .retain(|t| now_inst.duration_since(*t).as_secs() < DIAL_FAIL_WINDOW_SECS);
+        if self
+            .interface_changed_at
+            .is_some_and(|t| now_inst.duration_since(t).as_secs() >= TUN_INTERFACE_CHANGED_TTL_SECS)
+        {
+            self.interface_changed_at = None;
+        }
     }
 
     pub(super) fn ingest_log_line(&mut self, line: &str, now_inst: Instant, now_utc: chrono::DateTime<chrono::Utc>) {
@@ -309,7 +314,11 @@ impl ProxyDialFailureTracker {
                 return;
             }
             let age_secs = now_utc.signed_duration_since(ts).num_seconds();
-            if age_secs >= DIAL_FAIL_WINDOW_SECS as i64 {
+            let max_age_secs = match event {
+                KernelLogEvent::ProxyDialFailure => DIAL_FAIL_WINDOW_SECS,
+                KernelLogEvent::TunInterfaceLost | KernelLogEvent::TunInterfaceChanged => TUN_EVENT_MAX_AGE_SECS,
+            };
+            if age_secs >= max_age_secs as i64 {
                 return;
             }
             now_inst
@@ -327,7 +336,7 @@ impl ProxyDialFailureTracker {
             KernelLogEvent::TunInterfaceChanged => {
                 *LAST_FLOWING_TRAFFIC_AT.lock() = None;
                 FORCE_ONLINE_RECHECK.store(true, Ordering::Release);
-                self.interface_changed_pending = true;
+                self.interface_changed_at = Some(now_inst);
             }
             KernelLogEvent::ProxyDialFailure => {
                 self.prune(now_inst);
@@ -359,7 +368,7 @@ impl ProxyDialFailureTracker {
         }
         if self.failure_instants.len() >= DIAL_FAIL_REPROBE_THRESHOLD {
             Some(KernelReprobeReason::DialFailureBurst(self.failure_instants.len()))
-        } else if self.interface_changed_pending {
+        } else if self.interface_changed_at.is_some() {
             Some(KernelReprobeReason::TunInterfaceChanged)
         } else {
             None
@@ -368,7 +377,7 @@ impl ProxyDialFailureTracker {
 
     pub(super) fn consume_burst_for_probe(&mut self, now_inst: Instant) {
         self.failure_instants.clear();
-        self.interface_changed_pending = false;
+        self.interface_changed_at = None;
         self.last_probe_at = Some(now_inst);
     }
 }

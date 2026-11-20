@@ -323,7 +323,16 @@ export function useProfileActions() {
       await mutateProfiles()
       showNotice.success('layout.notices.subscriptionUpdated')
     } catch (err) {
-      showNotice.error(err)
+      const rawErr = err instanceof Error ? err.message : String(err)
+      const proxyFailedPrefix = 'update_failed_even_with_clash:'
+      if (rawErr.startsWith(proxyFailedPrefix)) {
+        showNotice.error(
+          'settings.feedback.notifications.updater.withClashProxyFailed',
+          rawErr.slice(proxyFailedPrefix.length).trim(),
+        )
+      } else {
+        showNotice.error(err)
+      }
     }
   }
 

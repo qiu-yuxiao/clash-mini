@@ -26,7 +26,7 @@ export const REUSED_METRICS_MAX_TTL_MS = 30 * 1000
  */
 export const HISTORY_FALLBACK_MAX_AGE_MS = 45 * 60 * 1000
 
-// 节点延迟判定阈值：与后端 src-tauri/src/module/monitor.rs 的
+// 节点延迟判定阈值：与后端 src-tauri/src/module/monitor/ 的
 // NODE_DELAY_MIN_MS / NODE_DELAY_MAX_MS 保持一致，作为单一真源，严禁各自漂移。
 // - 下限 30ms：过滤机场伪造的超低延迟广告/假节点
 // - 上限 5000ms：超过即视为死节点，不参与自动选点（BUG-304：2000→5000，
@@ -410,7 +410,7 @@ class DelayManager {
    * 与群发测速完全同源（同一测量组、同一测速 URL、同一探针超时）。
    *
    * 为什么不走 /proxies/{name}/delay：TUN 下对（活跃）节点自测会发生回环并返回 timeout，
-   * 这是后端已定位并废弃的路径（见 src-tauri/src/module/monitor.rs 的「测量层根因修复」）。
+   * 这是后端已定位并废弃的路径（见 src-tauri/src/module/monitor/ 的「测量层根因修复」）。
    *
    * 探针超时由后端 NODE_TEST_TIMEOUT_MS 决定（= NODE_DELAY_MAX_MS 5000ms，与判死阈值统一）；
    * 前端不再设置更短的本地竞速超时，避免把「尚未返回」误判为 Timeout。

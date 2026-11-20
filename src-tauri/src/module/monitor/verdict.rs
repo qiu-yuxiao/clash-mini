@@ -9,26 +9,12 @@ use super::probe::{
 use super::{
     ACTIVE_VERIFY_COOLDOWN_SECS, API_ERROR_HEAL_THRESHOLD, BROWNOUT_CONFIRM_FAILS, BROWNOUT_WINDOW_SECS,
     FAILOVER_CONFIRM_FAILS, LAST_ACTIVE_VERIFY_CHECK, LAST_METRICS_PROBE, LAST_NOTIFIED_HEALTH, LAST_UI_ACTIVE_SYNC,
-    MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS, NODE_DELAY_MAX_MS, NODE_DELAY_MIN_MS,
+    MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS, NODE_DELAY_MAX_MS, NODE_DELAY_MIN_MS, NodeStatus,
     PASSIVE_TRAFFIC_MAX_SKIP_SECS, SELF_HEAL_COOLDOWN_SECS, SUSPECT_WINDOW_SECS, UiActiveSyncState, is_dummy_node,
 };
 use crate::utils::node::match_node_filter;
 use clash_verge_logging::{Type, logging};
 use tokio::time::{Duration, Instant};
-
-/// 单节点健康状态（由测量组维护的 history/alive 判定，TUN 下可靠）。
-/// S4 起由二值扩为三态：`Suspect` 吸收单次波动，仅 `Dead` 构成自愈证据。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum NodeStatus {
-    /// 测量组尚未测过该节点（数据缺失），不动作、等待测量
-    Unknown,
-    /// 疑似抖动：`alive=false` 但上次成功仍处于 `SUSPECT_WINDOW_SECS` 内，不累计失败或自愈
-    Suspect,
-    /// 节点已确认不可用（测速超时/失败/假节点，且无近期成功记录）
-    Dead,
-    /// 节点健康，附带真实延迟
-    Alive(u32),
-}
 
 /// 单节点健康三态分类（时间戳不可解析时保守判 `Dead`，防长期坏节点卡在门外）。
 pub(super) fn classify_node_status(alive: bool, last_delay: Option<u32>, age_secs: Option<u64>) -> NodeStatus {
