@@ -1,3 +1,22 @@
+## v3.6.1
+
+### 🛡️ 代理建连握手超时盲区自愈、网卡切换免测突破与订阅/诊断/观测性收口（BUG-415 / BUG-416）
+
+- **代理建连/握手超时突发即时突破免测缓存 & 补齐稳态观测摘要（BUG-415）**：
+  - 在 `monitor` 守护链路新增零常驻 WebSocket、零管道占用的代理建连失败突发追踪器（`Service` 模式按字节偏移增量读取 `service_latest.log` 并兼容截断轮转，`Sidecar` 模式由标准输出/错误流直喂），精准识别 `dial PROXY ` 握手/会话/超时错误；当 `30s` 窗口内累计 `>= 3` 次失败（`60s` 冷却）时，立即突破 `Flowing`（`1800s`）/ `Idle`（`900s`）免测缓存发起一轮 `probe_metrics_group` 体检复核（切点仍遵循连续 2 次判死 / 间歇黑洞统一裁决）；
+  - 补齐启动期 `select == false` 纯测速完成的 `info` 级摘要日志与后台守护线程每 `600s` 一次的零额外 IPC 稳态健康摘要日志，并校准 `PROXY__METRICS` 与 `HISTORY_FALLBACK_MAX_AGE_MS` 相关注释。
+- **修复订阅更新失败误判成功与快重试失效、补全崩溃转储采集范围及 TUN 网卡切换/断网即时复核（BUG-416）**：
+  - `perform_profile_update` 与 `update_profile` 在三阶段下载全败或配置校验失败时严格返回 `Err`（仅后台非轻量定时触发时发送后端通知，前端手动更新不再误弹成功提示或重载未变配置），恢复 `timer.rs` 的 `2` 分钟失败快重试闭环；
+  - `diagnostics.rs` 采集 Windows WER Application 崩溃事件与 `%LOCALAPPDATA%\CrashDumps` 转储清单时统一覆盖现行 `clash-mini`、`mini-mihomo`、`clash-verge-service`、`verge-mihomo` 与 `msedgewebview2`；
+  - 后台守护日志解析识别 `[TUN] default interface lost/changed by monitor`：发生物理断网或默认网卡切换时立即清零 `LAST_FLOWING_TRAFFIC_AT` 并跳过 `60s` 在线免探窗口，`changed` 额外在 `60s` 冷却外触发一次活跃节点实拨复核。
+
+### 🧱 全栈核心大模块内聚化拆分重构（零行为变更）
+
+- **Rust 后端模块化拆分**：将超长单文件按职责拆分为高内聚子模块——`module/monitor/`（`daemon`、`verdict`、`probe`、`selection`、`https_verify`、`observer`、`tests`）、`enhance/`（`agreements`、`dns`、`tests`）、`utils/node/`（`filter`、`fingerprint`、`verify_store`、`tests`）、`utils/network/ssrf.rs`、`config/prfitem/`（`remote`、`tests`）、`core/core_updater/`（`pe_verify`、`tests`）与 `utils/resolve/window/`（`resize`、`tests`）。
+- **React 前端布局、引导与皮肤样式解耦**：瘦身 `_layout.tsx` 主外壳并拆出 `useProfileActions`、`useProxyModeActions`、`SettingsDrawer`、`ProfileContextMenu`；提炼三处输入框共用的 `<InputContextMenu>` 组件；将首次运行引导拆分为 `first-run-guide-dialog/` 子步骤组件、弹窗组拆分为 `dialogs/` 独立弹窗文件、控件皮肤样式拆分为 `utils/button-styles/` 子模块。
+
+---
+
 ## v3.6.0
 
 ### 🛡️ 内核缺管秒级自愈重启、间歇性黑洞节点滑窗逃生与故障旧死链精准清理（BUG-411 / BUG-412）
