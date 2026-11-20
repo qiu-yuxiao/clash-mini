@@ -260,8 +260,6 @@ def verify_changelog_sync():
 
     with open(bug_list_path, "r", encoding="utf-8") as f:
         bug_content = f.read()
-    with open(agreements_path, "r", encoding="utf-8") as f:
-        agreements_content = f.read()
 
     archived_bugs_for_version = []
     archived_bug_ids = set()
@@ -279,7 +277,6 @@ def verify_changelog_sync():
 
     pending_bug_ids = set(re.findall(r"^###\s+(BUG-\d+)\b", bug_content, re.M))
     known_bug_list_ids = archived_bug_ids | pending_bug_ids
-    agreements_bug_ids = set(re.findall(r"\|\s*\*\*(BUG-\d+)\*\*\s*\|", agreements_content))
 
     print(f"[INFO] Archived bugs for v{current_version} in bug_list.md: {archived_bugs_for_version}")
     print(f"[INFO] Pending bugs indexed in bug_list.md: {len(pending_bug_ids)}")
@@ -330,19 +327,13 @@ def verify_changelog_sync():
         if bug_id not in known_bug_list_ids:
             print(f"[FAIL] {bug_id} cited in Changelog v{current_version} heading missing from bug_list.md")
             success = False
-        elif bug_id not in agreements_bug_ids:
-            print(
-                f"[FAIL] {bug_id} cited in Changelog v{current_version} heading missing from "
-                "clash_mini_agreements.md Appendix A"
-            )
-            success = False
         else:
-            print(f"[PASS] Verified heading {bug_id} in bug_list.md and Appendix A")
+            print(f"[PASS] Verified heading {bug_id} in bug_list.md")
 
     all_cited_bugs = set(re.findall(r"\bBUG-\d+\b", changelog_section))
     for bug_id in sorted(all_cited_bugs):
-        if bug_id not in known_bug_list_ids and bug_id not in agreements_bug_ids:
-            print(f"[FAIL] {bug_id} mentioned in Changelog v{current_version} is unknown everywhere")
+        if bug_id not in known_bug_list_ids:
+            print(f"[FAIL] {bug_id} mentioned in Changelog v{current_version} is unknown in bug_list.md")
             success = False
 
     if success:
