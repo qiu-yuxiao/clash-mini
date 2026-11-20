@@ -9,6 +9,19 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-415 代理节点建连握手超时盲区突破免测缓存、启动纯测速及 10 分钟稳态摘要可观测性补齐与陈旧注释校准
+
+- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[state.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/state.rs)
+- **问题描述**：
+  1. [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)`::sample_active_node_traffic` 仅统计 `/connections` 中已成功建连的活跃隧道，节点建连/握手阶段即超时的失败请求（如 `dial PROXY ... failed to create session: context deadline exceeded` / `i/o timeout`）不会进入 `/connections`；若同时存在存量长连接维持下行字节（`Flowing` 免测窗 `1800s`）或处于 `Idle` 免测窗（`900s`），新连接持续失败的半死状态最长可滞后 15~30 分钟才触发实拨复核；
+  2. 轻量模式下启动期 `select: false` 纯测速刷新不输出完成结果，且后台守护线程稳态心跳仅为 `debug` 级别，导致正常运行 1 小时以上 `latest.log` 零日志输出，难以区分“稳态健康免测”与“任务卡死”；
+  3. [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 多处注释仍残留 `PROXY__METRICS` 每 `300s` 自治轮询的旧假设（实际在 [enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs) 已收敛为 `interval: 1800` + `lazy: true` 且无业务规则引用）。
+- **修复方案**：
+  1. 在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 新增零常驻 WebSocket、零管道占用的代理建连失败突发追踪器（`Service` 模式按字节偏移增量读取 `service_latest.log` 完整行并兼容轮转重置，首次挂载与切换节点时锚定文件末尾及切换时刻；`Sidecar` 模式由 [state.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/state.rs) 标准输出/错误消费循环直喂），精准匹配 `dial PROXY ` 握手/会话/超时错误（排除 `DIRECT`、`PROXY__METRICS`、`operation was canceled` 与 DNS 无记录噪声）；当 `DIAL_FAIL_WINDOW_SECS (30s)` 内累计 `>= DIAL_FAIL_REPROBE_THRESHOLD (3)` 次且不在 `DIAL_FAIL_REPROBE_COOLDOWN_SECS (60s)` 冷却期时，突破 `Flowing`/`Idle` 免测缓存立即触发一轮 `probe_metrics_group` 体检复核（最终切点仍严格遵守连续 2 次判死 / 间歇黑洞统一裁决）；
+  2. 为 `trigger_backend_auto_select_inner` 的 `select == false` 纯测速路径补齐 `info` 级完成摘要日志（待测数、可达数、数据来源、当前节点及其实测延迟），并在 `start_background_monitor` 新增每 `MONITOR_SUMMARY_INTERVAL_SECS (600s)` 一次的零额外 IPC `info` 级周期状态摘要；
+  3. 同步修正 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 中 5 处关于 `PROXY__METRICS` `300s` 自然周期的陈旧注释，并补齐日志解析、增量文件偏移读取（含截断轮转与半行保留）及免测突破门控的单元测试。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-414 自启计划任务判存迁移、单实例端口独占与唤醒验真、选点任务可中止及构建告警/陈旧注释收口
 
 - **对应模块**：[autostart.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/autostart.rs)、[installer.nsi](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/packages/windows/installer.nsi)、[server.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/server.rs)、[lifecycle.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/lifecycle.rs)、[state.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/state.rs)、[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)、[ipc.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/src/ipc.rs)、[config.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/config.rs)、[index.scss](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/assets/styles/index.scss)、[_theme.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_theme.tsx)

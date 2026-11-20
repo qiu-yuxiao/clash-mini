@@ -5,6 +5,8 @@ use crate::{
 use clash_verge_logging::{Type, logging};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::io::{Read as _, Seek as _, SeekFrom};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -60,6 +62,17 @@ const PASSIVE_TRAFFIC_MAX_SKIP_SECS: u64 = 1800;
 
 /// 单向流量停滞（有上行无下行）即时突破缓存复核的冷却时间（秒）。
 const STALL_REPROBE_COOLDOWN_SECS: u64 = 60;
+
+/// 代理节点建连失败突发窗口（秒）、触发突破免测缓存的失败条数门槛及冷却保护（BUG-415）。
+const DIAL_FAIL_WINDOW_SECS: u64 = 30;
+const DIAL_FAIL_REPROBE_THRESHOLD: usize = 3;
+const DIAL_FAIL_REPROBE_COOLDOWN_SECS: u64 = 60;
+
+/// Service 模式内核日志单次增量读取字节上限，与默认 128KB 轮转阈值对齐。
+const MAX_KERNEL_LOG_INCREMENTAL_BYTES: u64 = 128 * 1024;
+
+/// 后台守护线程周期性 `info` 级稳态健康摘要输出间隔（秒，每 10 分钟 1 条，零额外 IPC）。
+const MONITOR_SUMMARY_INTERVAL_SECS: u64 = 600;
 
 /// 疑似抖动窗口（秒）：失败时若最近成功记录仍在此窗口内则判 `Suspect`，避免瞬时抖动误判死节点。
 const SUSPECT_WINDOW_SECS: u64 = 30;
@@ -1540,7 +1553,7 @@ fn node_status(proxy: &tauri_plugin_mihomo::models::Proxy) -> NodeStatus {
 }
 
 /// 节点上次拨测距现在的时长（基于 history 中 RFC3339 时间戳）。
-/// 无论拨测由谁触发（测量组自然周期 / 即时 delay_group）都会刷新该时间，
+/// 无论拨测由谁触发（后台体检 / 选点 / 显式 delay_group）都会刷新该时间，
 /// 因此它是「缓存数据是否新鲜」的权威依据。无 history 或时间解析失败返回 None。
 fn history_age(proxy: &tauri_plugin_mihomo::models::Proxy) -> Option<Duration> {
     let time_str = &proxy.history.last()?.time;
@@ -1658,13 +1671,272 @@ async fn sample_active_node_traffic(
     (state, stall_cooldown_active)
 }
 
+/// 后台守护周期最近一轮完整健康观测快照，供 10 分钟 `info` 稳态摘要复用（零额外 IPC）。
+#[derive(Debug, Clone)]
+struct ActiveHealthObservation {
+    active_node: String,
+    status: NodeStatus,
+    traffic_state: ActiveTrafficState,
+    history_age_secs: Option<u64>,
+    probed_this_round: bool,
+}
+
+static LAST_HEALTH_OBSERVATION: parking_lot::Mutex<Option<ActiveHealthObservation>> = parking_lot::Mutex::new(None);
+
+/// 代理节点建连/握手/会话阶段失败突发追踪器（BUG-415，零常驻 WebSocket）。
+#[derive(Default)]
+struct ProxyDialFailureTracker {
+    active_node: Option<String>,
+    active_since_utc: Option<chrono::DateTime<chrono::Utc>>,
+    failure_instants: Vec<Instant>,
+    last_probe_at: Option<Instant>,
+    cursor_path: Option<PathBuf>,
+    cursor_offset: u64,
+    reanchor_to_end: bool,
+}
+
+static PROXY_DIAL_FAILURE_TRACKER: parking_lot::Mutex<Option<ProxyDialFailureTracker>> = parking_lot::Mutex::new(None);
+
+/// 精准识别指向 `PROXY` 策略组的代理建连/握手/会话失败日志行（排除 `DIRECT`、`PROXY__METRICS` 与纯 DNS/取消噪声）。
+fn is_proxy_dial_failure_log_line(line: &str) -> bool {
+    if !line.contains("dial PROXY ") {
+        return false;
+    }
+    let Some((_, err_tail)) = line.rsplit_once(" error: ") else {
+        return false;
+    };
+    let err_lower = err_tail.to_ascii_lowercase();
+    if err_lower.contains("operation was canceled")
+        || err_lower.contains("context canceled")
+        || err_lower.contains("dns resolve failed")
+        || err_lower.contains("couldn't find ip")
+        || err_lower.contains("no such host")
+    {
+        return false;
+    }
+    err_lower.contains("i/o timeout")
+        || err_lower.contains("context deadline exceeded")
+        || err_lower.contains("failed to create session")
+        || err_lower.contains("handshake")
+        || err_lower.contains("connection refused")
+        || err_lower.contains("actively refused")
+        || err_lower.contains("connection reset")
+        || err_lower.contains("forcibly closed")
+        || err_lower.contains("broken pipe")
+        || err_lower.contains("eof")
+        || err_lower.contains("network is unreachable")
+        || err_lower.contains("no route to host")
+}
+
+/// 从 Mihomo 结构化日志行提取 `time="..."` RFC3339 时间戳并转为 UTC。
+fn parse_mihomo_log_timestamp(line: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    let (_, after_time) = line.split_once("time=\"")?;
+    let (ts_str, _) = after_time.split_once('"')?;
+    chrono::DateTime::parse_from_rfc3339(ts_str)
+        .ok()
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+}
+
+/// 按字节偏移增量读取 `service_latest.log` 中的完整新增行：
+/// - 首次挂载或刚切换节点（`reanchor_to_end == true`）时直接锚定文件末尾，不回放旧日志；
+/// - 发生日志轮转截断（`file_len < *cursor_offset`）时自动从 `0` 读取新文件；
+/// - 末尾若存在尚未写完的半行（无 `\n`），保留游标等待下次补全后一并读取。
+fn read_incremental_log_lines(
+    path: &Path,
+    cursor_path: &mut Option<PathBuf>,
+    cursor_offset: &mut u64,
+    reanchor_to_end: &mut bool,
+) -> Vec<String> {
+    let Ok(meta) = std::fs::metadata(path) else {
+        return Vec::new();
+    };
+    let file_len = meta.len();
+
+    if *reanchor_to_end || cursor_path.as_deref() != Some(path) {
+        *cursor_path = Some(path.to_path_buf());
+        *cursor_offset = file_len;
+        *reanchor_to_end = false;
+        return Vec::new();
+    }
+
+    if file_len < *cursor_offset {
+        *cursor_offset = 0;
+    }
+    if file_len == *cursor_offset {
+        return Vec::new();
+    }
+
+    let start = (*cursor_offset).max(file_len.saturating_sub(MAX_KERNEL_LOG_INCREMENTAL_BYTES));
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return Vec::new();
+    };
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return Vec::new();
+    }
+
+    let mut buf = Vec::with_capacity((file_len - start).min(MAX_KERNEL_LOG_INCREMENTAL_BYTES) as usize);
+    if file
+        .take(MAX_KERNEL_LOG_INCREMENTAL_BYTES)
+        .read_to_end(&mut buf)
+        .is_err()
+        || buf.is_empty()
+    {
+        return Vec::new();
+    }
+
+    let Some(last_nl) = buf.iter().rposition(|&b| b == b'\n') else {
+        return Vec::new();
+    };
+    let consumed = last_nl + 1;
+    *cursor_offset = start + consumed as u64;
+    String::from_utf8_lossy(&buf[..consumed])
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+impl ProxyDialFailureTracker {
+    fn on_node_checked(&mut self, active_node: &str, now_utc: chrono::DateTime<chrono::Utc>) {
+        if self.active_node.as_deref() != Some(active_node) {
+            self.active_node = Some(active_node.to_owned());
+            self.active_since_utc = Some(now_utc);
+            self.failure_instants.clear();
+            self.last_probe_at = None;
+            self.reanchor_to_end = true;
+        }
+    }
+
+    fn reset_for_manual_switch(&mut self, now_utc: chrono::DateTime<chrono::Utc>) {
+        self.active_since_utc = Some(now_utc);
+        self.failure_instants.clear();
+        self.last_probe_at = None;
+        self.reanchor_to_end = true;
+    }
+
+    fn prune(&mut self, now_inst: Instant) {
+        self.failure_instants
+            .retain(|t| now_inst.duration_since(*t).as_secs() < DIAL_FAIL_WINDOW_SECS);
+    }
+
+    fn ingest_log_line(&mut self, line: &str, now_inst: Instant, now_utc: chrono::DateTime<chrono::Utc>) {
+        if !is_proxy_dial_failure_log_line(line) {
+            return;
+        }
+        let event_inst = if let Some(ts) = parse_mihomo_log_timestamp(line) {
+            if self.active_since_utc.is_some_and(|since| ts < since) {
+                return;
+            }
+            let age_secs = now_utc.signed_duration_since(ts).num_seconds();
+            if age_secs >= DIAL_FAIL_WINDOW_SECS as i64 {
+                return;
+            }
+            now_inst
+                .checked_sub(Duration::from_secs(age_secs.max(0) as u64))
+                .unwrap_or(now_inst)
+        } else {
+            now_inst
+        };
+
+        self.prune(now_inst);
+        if self.failure_instants.len() >= 64 {
+            self.failure_instants.remove(0);
+        }
+        self.failure_instants.push(event_inst);
+    }
+
+    fn evaluate_burst(&mut self, now_inst: Instant) -> (usize, bool) {
+        self.prune(now_inst);
+        let count = self.failure_instants.len();
+        let cooldown_active = self
+            .last_probe_at
+            .is_some_and(|t| now_inst.duration_since(t) < Duration::from_secs(DIAL_FAIL_REPROBE_COOLDOWN_SECS));
+        (count, count >= DIAL_FAIL_REPROBE_THRESHOLD && !cooldown_active)
+    }
+
+    fn consume_burst_for_probe(&mut self, now_inst: Instant) {
+        self.failure_instants.clear();
+        self.last_probe_at = Some(now_inst);
+    }
+}
+
+/// 供 Sidecar 日志消费循环直喂内核输出行（无 `"dial PROXY "` 字样时零锁开销直接跳过，BUG-415）。
+pub fn record_kernel_log_line(line: &str) {
+    if !line.contains("dial PROXY ") {
+        return;
+    }
+    let now_inst = Instant::now();
+    let now_utc = chrono::Utc::now();
+    PROXY_DIAL_FAILURE_TRACKER
+        .lock()
+        .get_or_insert_with(ProxyDialFailureTracker::default)
+        .ingest_log_line(line, now_inst, now_utc);
+}
+
+async fn poll_active_node_dial_failures(active_node: &str) -> (usize, bool) {
+    let (cursor_path, cursor_offset, reanchor_to_end) = {
+        let mut guard = PROXY_DIAL_FAILURE_TRACKER.lock();
+        let tracker = guard.get_or_insert_with(ProxyDialFailureTracker::default);
+        tracker.on_node_checked(active_node, chrono::Utc::now());
+        let snap = (
+            tracker.cursor_path.clone(),
+            tracker.cursor_offset,
+            tracker.reanchor_to_end,
+        );
+        drop(guard);
+        snap
+    };
+
+    let is_service_mode = matches!(
+        *crate::core::manager::CoreManager::global().get_running_mode(),
+        crate::core::manager::RunningMode::Service
+    );
+
+    if is_service_mode && let Ok(log_dir) = crate::utils::dirs::service_log_dir() {
+        let log_path = log_dir.join("service_latest.log");
+        let (lines, next_path, next_offset, next_reanchor) = tokio::task::spawn_blocking(move || {
+            let mut path_slot = cursor_path;
+            let mut offset_slot = cursor_offset;
+            let mut reanchor_slot = reanchor_to_end;
+            let lines = read_incremental_log_lines(&log_path, &mut path_slot, &mut offset_slot, &mut reanchor_slot);
+            (lines, path_slot, offset_slot, reanchor_slot)
+        })
+        .await
+        .unwrap_or_default();
+
+        let now_inst = Instant::now();
+        let now_utc = chrono::Utc::now();
+        let res = {
+            let mut guard = PROXY_DIAL_FAILURE_TRACKER.lock();
+            let tracker = guard.get_or_insert_with(ProxyDialFailureTracker::default);
+            if tracker.active_node.as_deref() == Some(active_node) {
+                tracker.cursor_path = next_path;
+                tracker.cursor_offset = next_offset;
+                tracker.reanchor_to_end = next_reanchor;
+                for line in lines {
+                    tracker.ingest_log_line(&line, now_inst, now_utc);
+                }
+            }
+            let res = tracker.evaluate_burst(now_inst);
+            drop(guard);
+            res
+        };
+        return res;
+    }
+
+    PROXY_DIAL_FAILURE_TRACKER
+        .lock()
+        .get_or_insert_with(ProxyDialFailureTracker::default)
+        .evaluate_burst(Instant::now())
+}
+
 /// 判定本次体检是否必须发起一轮 `PROXY__METRICS` 物理实拨：
-/// 非 `Alive` 或时间戳缺失强制实拨；`Alive` 结合活跃出口流量态分流免测（Flowing 30m / Stalled 破缓存 / Idle 15m）。
+/// 非 `Alive` 或时间戳缺失强制实拨；`Alive` 结合活跃出口流量态与代理建连失败突发分流免测（Flowing 30m / Idle 15m，Stalled 与建连失败突发冷却外破缓存）。
 fn should_probe_active_node(
     status: NodeStatus,
     age: Option<Duration>,
     traffic: ActiveTrafficState,
     stall_cooldown_active: bool,
+    dial_fail_burst_ready: bool,
 ) -> bool {
     let NodeStatus::Alive(_) = status else {
         return true;
@@ -1672,6 +1944,9 @@ fn should_probe_active_node(
     let Some(age) = age else {
         return true;
     };
+    if dial_fail_burst_ready {
+        return true;
+    }
 
     match traffic {
         ActiveTrafficState::Flowing => age >= Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS),
@@ -1737,18 +2012,37 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
     }
 
     let (traffic_state, stall_cooldown_active) = sample_active_node_traffic(&mihomo, &active_node).await;
+    let (dial_fail_count, dial_fail_burst_ready) = poll_active_node_dial_failures(&active_node).await;
 
     let mut proxies = mihomo
         .get_proxies()
         .await
         .map_err(|e| anyhow::anyhow!("获取代理列表失败: {e}"))?;
 
-    // 【BUG-377 + BUG-379】只有「健康且数据在对应流量态保鲜窗口内」才允许免拨测；
-    // 任何非 Alive 状态或疑似黑洞停滞态都必须先取得本轮主 URL 实拨证据，再重读 alive / history 裁决。
+    // 【BUG-377 + BUG-379 + BUG-415】只有「健康、无建连失败突发且数据在对应流量态保鲜窗口内」才允许免拨测；
+    // 任何非 Alive 状态、单向停滞态或代理建连失败突发都必须先取得本轮主 URL 实拨证据，再重读 alive / history 裁决。
     let need_probe = match proxies.proxies.get(&active_node) {
         None => false, // 活跃节点不在代理列表（异常），不动作
-        Some(p) => should_probe_active_node(node_status(p), history_age(p), traffic_state, stall_cooldown_active),
+        Some(p) => should_probe_active_node(
+            node_status(p),
+            history_age(p),
+            traffic_state,
+            stall_cooldown_active,
+            dial_fail_burst_ready,
+        ),
     };
+    if need_probe && dial_fail_burst_ready {
+        if let Some(tracker) = PROXY_DIAL_FAILURE_TRACKER.lock().as_mut() {
+            tracker.consume_burst_for_probe(Instant::now());
+        }
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 检测到活跃节点 {} 近期出现 {} 次代理建连失败告警，突破免测缓存立即触发体检复核",
+            active_node,
+            dial_fail_count
+        );
+    }
     if need_probe && traffic_state == ActiveTrafficState::Stalled {
         if let Some(tracker) = ACTIVE_TRAFFIC_TRACKER.lock().as_mut() {
             tracker.last_stall_probe_at = Some(Instant::now());
@@ -1831,7 +2125,7 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         }
 
         // 拨测后重读，确保 proxy.alive 与 proxy.history.last() 反映最新真实状态，
-        // 而非 300 秒前测量组自然周期的陈旧缓存。
+        // 而非此前遗留的陈旧缓存（PROXY__METRICS 已配置为 interval: 1800 + lazy: true，不会自行周期拨测）。
         proxies = mihomo
             .get_proxies()
             .await
@@ -1853,9 +2147,9 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
         )
     {
         // 【BUG-370 / BUG-387 修复】免拨测确认恢复（如重试解除、离线恢复）、此前曾向 UI 推送 `Timeout`
-        // （Mihomo 超时不写 history，若仅比时间戳会静默漏推）、或内核 PROXY__METRICS 自然周期（300s）
-        // 刚刚刷新出比上次上屏更新的可用结果时，同步向前端推送可用延迟与 refresh_proxies()，
-        // 彻底打通“断流报 Timeout、恢复却静默”的同步断层。
+        // （Mihomo 超时不写 history，若仅比时间戳会静默漏推）、或内核 PROXY__METRICS 被动刷新
+        // （注：已配置为 interval: 1800 + lazy: true，主要由本监测器按需拨测触发）更新出可用结果时，
+        // 同步向前端推送可用延迟与 refresh_proxies()，彻底打通“断流报 Timeout、恢复却静默”的同步断层。
         let active_hist_time = proxies
             .proxies
             .get(&active_node)
@@ -1895,6 +2189,16 @@ async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict>
                 });
             }
         }
+    }
+
+    if let Some(p) = proxies.proxies.get(&active_node) {
+        *LAST_HEALTH_OBSERVATION.lock() = Some(ActiveHealthObservation {
+            active_node: active_node.clone(),
+            status: node_status(p),
+            traffic_state,
+            history_age_secs: history_age(p).map(|d| d.as_secs()),
+            probed_this_round: need_probe,
+        });
     }
 
     // 连续性优先：主 URL 整体失败而备用 URL 正常即属测速地址失真，本轮直接判 NoAction
@@ -2214,7 +2518,7 @@ async fn trigger_backend_auto_select_inner(
     // 【拨测复用与并发风暴抑制】：
     // 1. 优先查近期完整 `probe_metrics_group` 快照（支持自愈复用 <10s 二次确认结果、
     //    以及前端批量子集复用 <30s 结果，避开 Mihomo 死节点不更新 history 的退化）；
-    // 2. 若无进程内近期快照且属于前端批量子集（len > 1），再查 Mihomo 测量组自然周期 history；
+    // 2. 若无进程内近期快照且属于前端批量子集（len > 1），再查 Mihomo 测量组近期 history；
     // 3. 显式单点测速（valid_nodes.len() == 1）绝不复用任何缓存，必须发起实时探测。
     let delays: std::collections::HashMap<String, u32>;
     let source: DelayResultSource;
@@ -2372,6 +2676,7 @@ async fn trigger_backend_auto_select_inner(
 
     let mut selected = false;
     let mut selected_node: Option<String> = None;
+    let total_candidates = candidates.len();
 
     if select {
         // 冷启动/全员未验真兜底：若当前有效延迟候选中尚无任何 verified_true 节点，
@@ -2498,6 +2803,19 @@ async fn trigger_backend_auto_select_inner(
                 crate::core::handle::Handle::refresh_proxies();
             }
         }
+    } else {
+        let active_node = get_active_node_name().await;
+        let active_delay = active_node.as_deref().and_then(|n| delays.get(n).copied());
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 纯测速刷新完成（不切换节点）：待测 {} 个，可达 {} 个，source={:?}，当前节点={:?}（延迟={:?}ms）",
+            valid_nodes.len(),
+            total_candidates,
+            source,
+            active_node,
+            active_delay,
+        );
     }
 
     Ok(AutoSelectOutcome {
@@ -2560,6 +2878,9 @@ pub fn current_manual_switch_epoch() -> u64 {
 pub fn notify_manual_node_switched() {
     MANUAL_SWITCH_EPOCH.fetch_add(1, Ordering::AcqRel);
     *LAST_MANUAL_NODE_SWITCH.lock() = Some(Instant::now());
+    if let Some(tracker) = PROXY_DIAL_FAILURE_TRACKER.lock().as_mut() {
+        tracker.reset_for_manual_switch(chrono::Utc::now());
+    }
     NODE_SWITCH_NOTIFY.notify_one();
 }
 
@@ -2573,6 +2894,8 @@ fn reset_monitor_static_state() {
     *LAST_HTTPS_VERIFY_ALL_FAILED.lock() = None;
     *LAST_FLOWING_TRAFFIC_AT.lock() = None;
     *ACTIVE_TRAFFIC_TRACKER.lock() = None;
+    *PROXY_DIAL_FAILURE_TRACKER.lock() = None;
+    *LAST_HEALTH_OBSERVATION.lock() = None;
 }
 
 fn emit_network_health_notice(next_status: &'static str) {
@@ -2716,6 +3039,7 @@ pub fn start_background_monitor() {
         logging!(info, Type::Lightweight, "[后台监测] 自动监测及故障自愈守护线程启动成功");
         let thread_start_time = Instant::now();
         let mut last_check_time = Instant::now();
+        let mut last_summary_log_time = Instant::now();
         let mut consecutive_fails: u32 = 0;
         let mut is_retry_mode = false;
         let mut last_active_node: Option<String> = None;
@@ -2897,6 +3221,16 @@ pub fn start_background_monitor() {
 
                 // 如果当前处于离线状态，跳过本次检测
                 if !is_online {
+                    if last_summary_log_time.elapsed() >= Duration::from_secs(MONITOR_SUMMARY_INTERVAL_SECS) {
+                        last_summary_log_time = Instant::now();
+                        logging!(
+                            info,
+                            Type::Lightweight,
+                            "[后台监测] 周期状态摘要: online=false, active={:?}, uptime={}s",
+                            last_active_node,
+                            thread_start_time.elapsed().as_secs()
+                        );
+                    }
                     continue;
                 }
 
@@ -3102,6 +3436,38 @@ pub fn start_background_monitor() {
                             &mut recent_auto_switches,
                         )
                         .await;
+                    }
+                }
+
+                if last_summary_log_time.elapsed() >= Duration::from_secs(MONITOR_SUMMARY_INTERVAL_SECS) {
+                    last_summary_log_time = Instant::now();
+                    let uptime = thread_start_time.elapsed().as_secs();
+                    let obs_snapshot = LAST_HEALTH_OBSERVATION.lock().clone();
+                    if let Some(obs) = obs_snapshot {
+                        logging!(
+                            info,
+                            Type::Lightweight,
+                            "[后台监测] 周期状态摘要: node={}, status={:?}, traffic={:?}, last_probe_age={:?}s, probed={}, fails={}, brownouts={}, uptime={}s",
+                            obs.active_node,
+                            obs.status,
+                            obs.traffic_state,
+                            obs.history_age_secs,
+                            obs.probed_this_round,
+                            consecutive_fails,
+                            recent_brownout_episodes.len(),
+                            uptime
+                        );
+                    } else {
+                        logging!(
+                            info,
+                            Type::Lightweight,
+                            "[后台监测] 周期状态摘要: active={:?}, fails={}, api_errors={}, online={}, uptime={}s",
+                            last_active_node,
+                            consecutive_fails,
+                            api_error_count,
+                            was_online,
+                            uptime
+                        );
                     }
                 }
             }
@@ -3877,6 +4243,16 @@ mod tests {
     async fn test_manual_node_switch_wakes_notify_and_reset_clears_statics() {
         reset_monitor_static_state();
         *LAST_NOTIFIED_HEALTH.lock() = "network_health::all_dead";
+        super::record_kernel_log_line(
+            "[2026-11-20 21:28:56.383] time=\"2026-11-20T21:28:56.383087000+08:00\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) 198.18.0.1:8245 --> collector.github.com:443 error: failed to create session: context deadline exceeded\"",
+        );
+        *super::LAST_HEALTH_OBSERVATION.lock() = Some(super::ActiveHealthObservation {
+            active_node: "JP-1".to_string(),
+            status: NodeStatus::Alive(80),
+            traffic_state: ActiveTrafficState::Flowing,
+            history_age_secs: Some(10),
+            probed_this_round: false,
+        });
 
         notify_manual_node_switched();
         assert!(LAST_MANUAL_NODE_SWITCH.lock().is_some());
@@ -3898,6 +4274,8 @@ mod tests {
         assert!(LAST_UI_ACTIVE_SYNC.lock().is_none());
         assert!(LAST_METRICS_PROBE.lock().is_none());
         assert!(ACTIVE_TRAFFIC_TRACKER.lock().is_none());
+        assert!(super::PROXY_DIAL_FAILURE_TRACKER.lock().is_none());
+        assert!(super::LAST_HEALTH_OBSERVATION.lock().is_none());
     }
 
     #[test]
@@ -3937,11 +4315,13 @@ mod tests {
             Some(Duration::from_secs(IDLE_HEALTH_FRESH_SECS - 1)),
             ActiveTrafficState::Idle,
             false,
+            false,
         ));
         assert!(should_probe_active_node(
             NodeStatus::Alive(85),
             Some(Duration::from_secs(IDLE_HEALTH_FRESH_SECS)),
             ActiveTrafficState::Idle,
+            false,
             false,
         ));
 
@@ -3951,25 +4331,45 @@ mod tests {
             Some(Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS - 1)),
             ActiveTrafficState::Flowing,
             false,
+            false,
         ));
         assert!(should_probe_active_node(
             NodeStatus::Alive(85),
             Some(Duration::from_secs(PASSIVE_TRAFFIC_MAX_SKIP_SECS)),
             ActiveTrafficState::Flowing,
             false,
+            false,
         ));
 
-        // 3. 黑洞停滞态（有上行无下行）：冷却未激活时立即突破 15s~300s 缓存实拨复核；冷却期内不反复轰炸
+        // 3. 黑洞停滞态（有上行无下行）：冷却未激活时立即突破 900s/1800s 免测缓存实拨复核；冷却期内不反复轰炸
         assert!(should_probe_active_node(
             NodeStatus::Alive(85),
             Some(Duration::from_secs(15)),
             ActiveTrafficState::Stalled,
+            false,
             false,
         ));
         assert!(!should_probe_active_node(
             NodeStatus::Alive(85),
             Some(Duration::from_secs(15)),
             ActiveTrafficState::Stalled,
+            true,
+            false,
+        ));
+
+        // 3b. 代理建连失败突发（BUG-415）：即使 Flowing 或 Idle 在免测窗内，也必须立即破缓存触发实拨复核
+        assert!(should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(10)),
+            ActiveTrafficState::Flowing,
+            false,
+            true,
+        ));
+        assert!(should_probe_active_node(
+            NodeStatus::Alive(85),
+            Some(Duration::from_secs(10)),
+            ActiveTrafficState::Idle,
+            false,
             true,
         ));
 
@@ -3979,11 +4379,13 @@ mod tests {
             None,
             ActiveTrafficState::Flowing,
             false,
+            false,
         ));
         assert!(should_probe_active_node(
             NodeStatus::Unknown,
             None,
             ActiveTrafficState::Idle,
+            false,
             false,
         ));
         assert!(should_probe_active_node(
@@ -3991,17 +4393,20 @@ mod tests {
             Some(Duration::from_secs(1)),
             ActiveTrafficState::Flowing,
             false,
+            false,
         ));
         assert!(should_probe_active_node(
             NodeStatus::Dead,
             Some(Duration::from_secs(3)),
             ActiveTrafficState::Flowing,
             false,
+            false,
         ));
         assert!(should_probe_active_node(
             NodeStatus::Dead,
             None,
             ActiveTrafficState::Idle,
+            false,
             false,
         ));
     }
@@ -4019,7 +4424,8 @@ mod tests {
                 tainted,
                 Some(Duration::from_secs(2)),
                 ActiveTrafficState::Flowing,
-                false
+                false,
+                false,
             ),
             "验真污染的 Dead + 新鲜时间戳必须强制主 URL 实拨复核"
         );
@@ -4639,5 +5045,172 @@ mod tests {
         ));
         assert!(!should_close_dead_node_proxy_connection(&dead_chain, "PROXY", ""));
         assert!(!should_close_dead_node_proxy_connection(&dead_chain, "PROXY", "DIRECT"));
+    }
+
+    #[test]
+    fn test_is_proxy_dial_failure_log_line_filters_accurately() {
+        use super::is_proxy_dial_failure_log_line;
+
+        // 命中样本：建连 / 会话 / 握手 / 超时 / 连接重置故障
+        assert!(is_proxy_dial_failure_log_line(
+            "[2026-11-20 21:28:56.383] time=\"2026-11-20T21:28:56.383087000+08:00\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) 198.18.0.1:8245 --> collector.github.com:443 error: failed to create session: context deadline exceeded\""
+        ));
+        assert!(is_proxy_dial_failure_log_line(
+            "[2026-11-20 03:53:33.882] time=\"2026-11-20T03:53:33.881089000+08:00\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) [fdfe:dcba:9876::1]:3237 --> avatars.githubusercontent.com:443 error: failed to create session: dial tcp 155.254.101.37:40235: i/o timeout\""
+        ));
+        assert!(is_proxy_dial_failure_log_line(
+            "time=\"2026-11-20T03:13:04.213633000+08:00\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) 127.0.0.1:3536 --> www.youtube.com:443 error: dial tcp 174.132.167.252:443: i/o timeout\""
+        ));
+        assert!(is_proxy_dial_failure_log_line(
+            "time=\"2026-11-20T03:13:04Z\" level=warning msg=\"[TCP] dial PROXY (match Match/) a.com:443 error: remote error: tls: handshake failure\""
+        ));
+        assert!(is_proxy_dial_failure_log_line(
+            "time=\"2026-11-20T03:13:04Z\" level=warning msg=\"[UDP] dial PROXY (match RuleSet/gfwlist) a.com:443 error: read: connection reset by peer\""
+        ));
+
+        // 排除噪声：DIRECT、PROXY__METRICS、主动取消、DNS 无解析记录、正常 info 日志
+        assert!(!is_proxy_dial_failure_log_line(
+            "[2026-11-20 03:14:10.408] time=\"2026-11-20T03:14:10.408528400+08:00\" level=warning msg=\"[TCP] dial DIRECT (match Match/) 198.18.0.1:3332 --> 172.217.117.4:443 error: dial tcp 172.217.117.4:443: i/o timeout\""
+        ));
+        assert!(!is_proxy_dial_failure_log_line(
+            "time=\"2026-11-20T03:14:10Z\" level=warning msg=\"[TCP] dial PROXY__METRICS (match Match/) cp.cloudflare.com:443 error: i/o timeout\""
+        ));
+        assert!(!is_proxy_dial_failure_log_line(
+            "time=\"2026-11-20T03:14:10Z\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) a.com:443 error: operation was canceled\""
+        ));
+        assert!(!is_proxy_dial_failure_log_line(
+            "time=\"2026-11-20T03:14:10Z\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) a.com:443 error: dns resolve failed: couldn't find ip\""
+        ));
+        assert!(!is_proxy_dial_failure_log_line(
+            "time=\"2026-11-20T20:59:06Z\" level=info msg=\"Initial configuration complete, total time: 116ms\""
+        ));
+    }
+
+    #[test]
+    fn test_proxy_dial_failure_tracker_window_cooldown_and_node_switch() {
+        use super::{DIAL_FAIL_REPROBE_COOLDOWN_SECS, DIAL_FAIL_WINDOW_SECS, ProxyDialFailureTracker};
+
+        let mut tracker = ProxyDialFailureTracker::default();
+        let base_utc = chrono::Utc::now();
+        let base_inst = Instant::now();
+        tracker.on_node_checked("日本1", base_utc);
+        assert!(tracker.reanchor_to_end);
+
+        let make_line = |ts: chrono::DateTime<chrono::Utc>| {
+            format!(
+                "time=\"{}\" level=warning msg=\"[TCP] dial PROXY (match RuleSet/gfwlist) 198.18.0.1:8245 --> collector.github.com:443 error: failed to create session: context deadline exceeded\"",
+                ts.to_rfc3339()
+            )
+        };
+
+        // 1. 切换前的旧日志（ts < active_since_utc）与超过 30s 滑窗的老日志必须被忽略
+        let before_switch_line = make_line(base_utc - chrono::Duration::seconds(1));
+        tracker.ingest_log_line(&before_switch_line, base_inst, base_utc);
+        assert_eq!(tracker.evaluate_burst(base_inst), (0, false));
+
+        let expired_line = make_line(base_utc);
+        tracker.ingest_log_line(
+            &expired_line,
+            base_inst + Duration::from_secs(DIAL_FAIL_WINDOW_SECS),
+            base_utc + chrono::Duration::seconds(DIAL_FAIL_WINDOW_SECS as i64),
+        );
+        assert_eq!(
+            tracker.evaluate_burst(base_inst + Duration::from_secs(DIAL_FAIL_WINDOW_SECS)),
+            (0, false)
+        );
+
+        // 2. 滑窗内 1~2 次失败不突破缓存，第 3 次立刻触发 burst_should_reprobe
+        let t1_inst = base_inst + Duration::from_secs(40);
+        let t1_utc = base_utc + chrono::Duration::seconds(40);
+        tracker.ingest_log_line(&make_line(t1_utc), t1_inst, t1_utc);
+        tracker.ingest_log_line(&make_line(t1_utc), t1_inst, t1_utc);
+        assert_eq!(tracker.evaluate_burst(t1_inst), (2, false));
+
+        tracker.ingest_log_line(&make_line(t1_utc), t1_inst, t1_utc);
+        assert_eq!(tracker.evaluate_burst(t1_inst), (3, true));
+
+        // 3. 消费后进入 60s 冷却：冷却期内再来 3 次也不触发，旧事件超过 30s 自动衰减，满 60s 后可重新触发
+        tracker.consume_burst_for_probe(t1_inst);
+        let mid_inst = t1_inst + Duration::from_secs(20);
+        let mid_utc = t1_utc + chrono::Duration::seconds(20);
+        for _ in 0..3 {
+            tracker.ingest_log_line(&make_line(mid_utc), mid_inst, mid_utc);
+        }
+        assert_eq!(tracker.evaluate_burst(mid_inst), (3, false));
+
+        let pre_cd_inst = t1_inst + Duration::from_secs(DIAL_FAIL_REPROBE_COOLDOWN_SECS - 1);
+        assert_eq!(tracker.evaluate_burst(pre_cd_inst), (0, false));
+
+        let after_cd_inst = t1_inst + Duration::from_secs(DIAL_FAIL_REPROBE_COOLDOWN_SECS);
+        let after_cd_utc = t1_utc + chrono::Duration::seconds(DIAL_FAIL_REPROBE_COOLDOWN_SECS as i64);
+        for _ in 0..3 {
+            tracker.ingest_log_line(&make_line(after_cd_utc), after_cd_inst, after_cd_utc);
+        }
+        assert_eq!(tracker.evaluate_burst(after_cd_inst), (3, true));
+
+        // 4. 切换活跃节点清空历史计数、冷却并重设 reanchor_to_end
+        tracker.reanchor_to_end = false;
+        tracker.on_node_checked("新加坡1", after_cd_utc + chrono::Duration::seconds(1));
+        assert!(tracker.reanchor_to_end);
+        assert_eq!(
+            tracker.evaluate_burst(after_cd_inst + Duration::from_secs(1)),
+            (0, false)
+        );
+    }
+
+    #[test]
+    fn test_read_incremental_log_lines_handles_anchor_append_partial_and_rotation() {
+        use super::read_incremental_log_lines;
+        use std::io::Write as _;
+
+        let unique_name = format!(
+            "clash_mini_dial_log_test_{}_{}.log",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        );
+        let path = std::env::temp_dir().join(unique_name);
+        let _ = std::fs::remove_file(&path);
+
+        // 先写入历史旧日志
+        std::fs::write(&path, "old-line-1\nold-line-2\n").unwrap();
+
+        let mut cursor_path = None;
+        let mut cursor_offset = 0u64;
+        let mut reanchor = false;
+
+        // 1. 首次观察锚定到文件末尾，绝不回放历史旧行
+        assert!(read_incremental_log_lines(&path, &mut cursor_path, &mut cursor_offset, &mut reanchor).is_empty());
+        assert_eq!(cursor_offset, "old-line-1\nold-line-2\n".len() as u64);
+
+        // 2. 追加完整行 + 半行（无换行符）：只返回完整行，半行保留到下次补齐
+        {
+            let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+            f.write_all(b"new-line-1\nhalf-").unwrap();
+        }
+        let batch1 = read_incremental_log_lines(&path, &mut cursor_path, &mut cursor_offset, &mut reanchor);
+        assert_eq!(batch1, vec!["new-line-1".to_string()]);
+
+        {
+            let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+            f.write_all(b"line-2\n").unwrap();
+        }
+        let batch2 = read_incremental_log_lines(&path, &mut cursor_path, &mut cursor_offset, &mut reanchor);
+        assert_eq!(batch2, vec!["half-line-2".to_string()]);
+
+        // 3. 日志轮转截断（文件变小）：自动从 0 偏移读取新文件内容
+        std::fs::write(&path, "rotated-line-1\n").unwrap();
+        let batch3 = read_incremental_log_lines(&path, &mut cursor_path, &mut cursor_offset, &mut reanchor);
+        assert_eq!(batch3, vec!["rotated-line-1".to_string()]);
+
+        // 4. 切节点重锚定：reanchor = true 时跳过中间堆积日志直抵末尾
+        {
+            let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+            f.write_all(b"pre-switch-line\n").unwrap();
+        }
+        reanchor = true;
+        assert!(read_incremental_log_lines(&path, &mut cursor_path, &mut cursor_offset, &mut reanchor).is_empty());
+        assert!(!reanchor);
+
+        let _ = std::fs::remove_file(&path);
     }
 }

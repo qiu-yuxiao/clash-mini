@@ -313,6 +313,8 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
   - `Flowing`（存在下行回包 `delta_download > 0` 且当前 `Alive`）：免拨测保鲜延展至 `PASSIVE_TRAFFIC_MAX_SKIP_SECS (1800s)`；
   - `Stalled`（有上行零回包 `delta_upload > 0 && delta_download == 0`）：受 `STALL_REPROBE_COOLDOWN_SECS (60s)` 限制在本轮立即实拨复核；
   - `Idle`（无活跃下行）：保鲜窗为 `IDLE_HEALTH_FRESH_SECS (900s)`，零闲时盲测风暴。
+- **代理建连失败突发破缓存复核（零常驻 WS）**：`Service` 模式按文件字节偏移增量扫描 `logs/service/service_latest.log`（兼容轮转截断与末尾半行保留，首次观察及节点切换时锚定文件末尾与切换时间戳），`Sidecar` 模式由子进程日志流直喂内存解析器；当 `DIAL_FAIL_WINDOW_SECS (30s)` 滑窗内捕获 `>= DIAL_FAIL_REPROBE_THRESHOLD (3)` 条指向 `PROXY` 组的建连/握手/会话失败告警（排除 `DIRECT`、`PROXY__METRICS`、`operation was canceled` 与纯 DNS 解析无记录）且不在 `DIAL_FAIL_REPROBE_COOLDOWN_SECS (60s)` 冷却内时，立即突破 `Flowing (1800s)` / `Idle (900s)` 免拨测缓存发起一轮 `probe_metrics_group` 实拨复核（不直接判死，切点仍服从统一裁决器）。
+- **可观测性稳态摘要契约**：`select: false` 纯测速刷新结束时输出单行 `info` 统计摘要（含待测数、可达数、数据来源及当前节点延迟）；守护循环每 `MONITOR_SUMMARY_INTERVAL_SECS (600s)` 输出单行 `info` 稳态健康摘要（复用当轮体检观测，零额外 IPC）。
 
 ### 5.2 单一内核测量组（PROXY__METRICS）统一调度
 

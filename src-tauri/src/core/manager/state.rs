@@ -94,11 +94,13 @@ impl CoreManager {
                 match event {
                     tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
                         let message = CompactString::from(&*String::from_utf8_lossy(&line));
+                        crate::module::monitor::record_kernel_log_line(&message);
                         Logger::global().writer_sidecar_log(Level::Info, &message);
                         CLASH_LOGGER.append_log(message).await;
                     }
                     tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
                         let message = CompactString::from(&*String::from_utf8_lossy(&line));
+                        crate::module::monitor::record_kernel_log_line(&message);
                         Logger::global().writer_sidecar_log(Level::Warn, &message);
                         CLASH_LOGGER.append_log(message).await;
                     }
