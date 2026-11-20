@@ -86,6 +86,23 @@ impl CoreManager {
         Arc::clone(&self.state.load().running_mode.load())
     }
 
+    /// 判断当前是否期望内核命名管道存活（排除应用正在退出、未运行/热更停核窗口、配置更新中及生命周期锁占用态，BUG-411）。
+    pub fn should_expect_core_pipe_alive(&self) -> bool {
+        if crate::core::handle::Handle::global().is_exiting() {
+            return false;
+        }
+        if matches!(*self.get_running_mode(), RunningMode::NotRunning) {
+            return false;
+        }
+        if self
+            .config_update_in_progress
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            return false;
+        }
+        self.lifecycle_lock.try_lock().is_ok()
+    }
+
     pub fn take_child_sidecar(&self) -> Option<CommandChild> {
         self.state
             .load()

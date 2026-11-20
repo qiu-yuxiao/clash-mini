@@ -64,6 +64,16 @@ const STALL_REPROBE_COOLDOWN_SECS: u64 = 60;
 /// 疑似抖动窗口（秒）：失败时若最近成功记录仍在此窗口内则判 `Suspect`，避免瞬时抖动误判死节点。
 const SUSPECT_WINDOW_SECS: u64 = 30;
 
+/// 间歇性黑洞/超时（Flapping / Brownout）滑动观察窗口（秒）与触发切点门槛（BUG-412）。
+const BROWNOUT_WINDOW_SECS: u64 = 600;
+const BROWNOUT_CONFIRM_FAILS: usize = 2;
+
+/// 自愈/缺管快重启最小冷却时间（秒）。
+const SELF_HEAL_COOLDOWN_SECS: u64 = 25;
+
+/// 检测到内核命名管道消失（`os error 2`）后的二次复核防抖延时（毫秒），避开热重启/拉起瞬态（BUG-411）。
+const PIPE_MISSING_CONFIRM_DELAY_MS: u64 = 500;
+
 /// 两次自愈**实际切换**的最小间隔（秒），防止故障恢复期反复热切换。
 const MIN_AUTO_SWITCH_INTERVAL_SECS: u64 = 120;
 
@@ -279,6 +289,37 @@ pub async fn close_excluded_proxy_connections(filter_text: &str) {
             "[过滤边界] 已清理 {} 条滞留在已排除节点上的代理连接（过滤词: \"{}\"）",
             count,
             trimmed
+        );
+    }
+}
+
+/// 判断某条活跃连接在后台自愈切离确认故障/黑洞的 `dead_node` 后是否应被断开（BUG-412）：
+/// - 仅精准匹配同时经过 `group_name`（`"PROXY"`）与该故障 `dead_node` 的连接，绝不触碰 `DIRECT` / `REJECT` 与其它节点连接。
+pub(crate) fn should_close_dead_node_proxy_connection(chains: &[String], group_name: &str, dead_node: &str) -> bool {
+    let dead = dead_node.trim();
+    let group = group_name.trim();
+    !dead.is_empty()
+        && !group.is_empty()
+        && !dead.eq_ignore_ascii_case("DIRECT")
+        && !dead.eq_ignore_ascii_case("REJECT")
+        && !dead.eq_ignore_ascii_case("GLOBAL")
+        && chains.iter().any(|c| c == group)
+        && chains.iter().any(|c| c == dead)
+}
+
+/// 后台自愈确认原节点故障/间歇黑洞并切离后，精准断开滞留在原 `dead_node` 上的 `PROXY` 存量长连接（BUG-412），
+/// 促使 HTTP/2 / gRPC 等长连接立即重建到新节点，绝不触碰 `DIRECT` / `REJECT`。
+async fn close_dead_node_proxy_connections(dead_node: &str) {
+    let count =
+        close_matching_proxy_connections(|chains| should_close_dead_node_proxy_connection(chains, "PROXY", dead_node))
+            .await;
+    if count > 0 {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 自愈切离故障节点 {}，已清理 {} 条滞留死链代理连接",
+            dead_node,
+            count
         );
     }
 }
@@ -1420,8 +1461,11 @@ fn is_benign_auto_select_abort(err_str: &str) -> bool {
 /// 后台监测所有自愈请求的统一裁决输入：仅 `SelfHealDecision::Allow` 允许触发自愈选点。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SelfHealTrigger {
-    /// 主路径：连续独立体检确认活跃节点失效
-    NodeConfirmedDead { consecutive_fails: u32 },
+    /// 主路径：连续独立体检确认活跃节点失效，或滑动窗口内反复触发间歇黑洞（BUG-412）
+    NodeConfirmedDead {
+        consecutive_fails: u32,
+        brownout_episodes: usize,
+    },
     /// 物理网络离线转在线：只代表链路恢复，不构成节点故障证据
     NetworkRecovered,
     /// 内核 API 通道连续异常；`api_alive_on_recheck` 为阈值触发后的 API 存活复核结果
@@ -1437,11 +1481,15 @@ enum SelfHealDecision {
     Wait,
 }
 
-/// 统一裁决器：节点侧需连续 `FAILOVER_CONFIRM_FAILS` 次失败；网络恢复恒 `Wait`；API 异常须经存活复核仍失联。
+/// 统一裁决器：节点侧需连续 `FAILOVER_CONFIRM_FAILS` 次失败或 600s 窗口内 `BROWNOUT_CONFIRM_FAILS` 次间歇故障；
+/// 网络恢复恒 `Wait`；API 异常须经存活复核仍失联。
 const fn decide_self_heal(trigger: SelfHealTrigger) -> SelfHealDecision {
     match trigger {
-        SelfHealTrigger::NodeConfirmedDead { consecutive_fails } => {
-            if consecutive_fails >= FAILOVER_CONFIRM_FAILS {
+        SelfHealTrigger::NodeConfirmedDead {
+            consecutive_fails,
+            brownout_episodes,
+        } => {
+            if consecutive_fails >= FAILOVER_CONFIRM_FAILS || brownout_episodes >= BROWNOUT_CONFIRM_FAILS {
                 SelfHealDecision::Allow
             } else {
                 SelfHealDecision::Wait
@@ -1459,6 +1507,25 @@ const fn decide_self_heal(trigger: SelfHealTrigger) -> SelfHealDecision {
             }
         }
     }
+}
+
+/// 纯判定（BUG-411）：满足「管道不存在 + 期望内核存活 + 超出冷却窗」才允许跳过 3 次慢累计立即重启内核。
+const fn can_fast_restart_missing_pipe(
+    pipe_missing: bool,
+    expect_alive: bool,
+    last_attempt_elapsed_secs: Option<u64>,
+) -> bool {
+    pipe_missing && expect_alive && !matches!(last_attempt_elapsed_secs, Some(secs) if secs < SELF_HEAL_COOLDOWN_SECS)
+}
+
+fn prune_brownout_episodes(episodes: &mut Vec<Instant>, now: Instant) {
+    episodes.retain(|t| now.saturating_duration_since(*t).as_secs() < BROWNOUT_WINDOW_SECS);
+}
+
+fn record_brownout_episode(episodes: &mut Vec<Instant>, now: Instant) -> usize {
+    prune_brownout_episodes(episodes, now);
+    episodes.push(now);
+    episodes.len()
 }
 
 /// 依据测量组（PROXY__METRICS，url-test）维护的 history/alive 判定节点状态。
@@ -1629,7 +1696,7 @@ where
 
 /// 评估当前活跃节点是否需要故障转移；返回 `Err` 表示 Mihomo API 不可达。
 /// 判死仅采信本轮 `probe_metrics_group` 主/备测速 URL 实拨结果，不直接用免拨测异源历史判死。
-async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow::Result<FailoverVerdict> {
+async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<FailoverVerdict> {
     let mihomo = crate::core::handle::Handle::mihomo().await.clone();
 
     let group_info = mihomo
@@ -1699,16 +1766,9 @@ async fn evaluate_failover(profile_uid: &str, consecutive_fails: u32) -> anyhow:
     let mut primary_url_distorted = false;
 
     if need_probe {
-        // 经测量组并发直拨全员（TUN 下无自指回环），禁用短窗合并；初检第 1 次失利支持单目标免打备用 URL
-        let allow_single_target_skip = consecutive_fails == 0;
-        let probed_opt = probe_metrics_group(
-            &mihomo,
-            "体检",
-            false,
-            std::slice::from_ref(&active_node),
-            allow_single_target_skip,
-        )
-        .await;
+        // 经测量组并发直拨全员（TUN 下无自指回环），禁用短窗合并；单目标初检与复核在同组已有 >= 3 个真实节点
+        // 通过主 URL 时跳过备用 URL，防止间歇性黑洞节点借第 2 次备用地址压线逃生（BUG-401 / BUG-412）
+        let probed_opt = probe_metrics_group(&mihomo, "体检", false, std::slice::from_ref(&active_node), true).await;
 
         // 主/备测速地址全灭代表测速链路本身不可用，本轮判 NoAction，避免切点抖动
         let Some(probed) = probed_opt else {
@@ -2525,7 +2585,57 @@ fn emit_network_health_notice(next_status: &'static str) {
     }
 }
 
-/// 统一处理后台监测循环中的 API 不可达异常：累计次数、达阈值后复核存活并按裁决自愈。
+/// 二次复核当前内核命名管道确实不存在且非主动停启/热更窗口（BUG-411）。
+async fn is_mihomo_pipe_missing_confirmed() -> bool {
+    let first_expect = crate::core::manager::CoreManager::global().should_expect_core_pipe_alive();
+    let first_missing = crate::core::handle::Handle::mihomo().await.is_local_socket_missing();
+    if !first_expect || !first_missing {
+        return false;
+    }
+    sleep(Duration::from_millis(PIPE_MISSING_CONFIRM_DELAY_MS)).await;
+    let second_expect = crate::core::manager::CoreManager::global().should_expect_core_pipe_alive();
+    let second_missing = crate::core::handle::Handle::mihomo().await.is_local_socket_missing();
+    second_expect && second_missing
+}
+
+/// 当内核进程异常退出（`os error 2` 管道不存在）时，跳过 3 轮慢轮询与 30s 空等立即重启内核（BUG-411）。
+async fn try_fast_restart_missing_pipe(
+    api_error_count: &mut u32,
+    auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+    last_auto_select_time: &mut Option<Instant>,
+    last_check_time: &mut Instant,
+) -> bool {
+    let pipe_missing = crate::core::handle::Handle::mihomo().await.is_local_socket_missing();
+    let expect_alive = crate::core::manager::CoreManager::global().should_expect_core_pipe_alive();
+    let elapsed = last_auto_select_time.map(|t| t.elapsed().as_secs());
+    if !can_fast_restart_missing_pipe(pipe_missing, expect_alive, elapsed) {
+        return false;
+    }
+    if !is_mihomo_pipe_missing_confirmed().await {
+        return false;
+    }
+
+    *api_error_count = 0;
+    *last_auto_select_time = Some(Instant::now());
+    *last_check_time = Instant::now();
+    *auto_select_fail_count += 1;
+    if *auto_select_fail_count >= 5 {
+        *auto_select_fail_count = 0;
+        *api_dead_heal_fail_count = 0;
+        fire_self_heal_alert();
+    } else {
+        execute_core_restart_with_accounting(
+            "[后台监测] 检测到内核命名管道已不存在（进程退出），跳过轮询空等立即重启内核",
+            auto_select_fail_count,
+            api_dead_heal_fail_count,
+        )
+        .await;
+    }
+    true
+}
+
+/// 统一处理后台监测循环中的 API 不可达异常：缺管快速重启、累计次数、达阈值后复核存活并按裁决自愈。
 #[allow(clippy::too_many_arguments)]
 async fn handle_api_unreachable(
     current_profile: &str,
@@ -2537,6 +2647,18 @@ async fn handle_api_unreachable(
     last_check_time: &mut Instant,
     recent_auto_switches: &mut Vec<Instant>,
 ) {
+    if try_fast_restart_missing_pipe(
+        api_error_count,
+        auto_select_fail_count,
+        api_dead_heal_fail_count,
+        last_auto_select_time,
+        last_check_time,
+    )
+    .await
+    {
+        return;
+    }
+
     *api_error_count += 1;
     logging!(
         warn,
@@ -2602,6 +2724,8 @@ pub fn start_background_monitor() {
         let mut last_auto_select_time: Option<Instant> = None;
         // S4：最近发生的「自愈实际切换」时间戳，用于最小间隔 + 滑动窗口速率上限
         let mut recent_auto_switches: Vec<Instant> = Vec::new();
+        // BUG-412：同一活跃节点在 600s 滑动窗口内触发独立 `ShouldFailover` 故障周期的时间戳
+        let mut recent_brownout_episodes: Vec<Instant> = Vec::new();
         let mut auto_select_fail_count = 0u32;
         let mut api_dead_heal_fail_count = 0u32;
         // 连续 API 异常计数：mihomo API 不可达时（get_group_by_name 超时/连接失败）累计，
@@ -2695,6 +2819,7 @@ pub fn start_background_monitor() {
                 last_node_change_time = Some(manual_ts);
                 consecutive_fails = 0;
                 is_retry_mode = false;
+                recent_brownout_episodes.clear();
             }
 
             let current_profile = match get_current_profile_uid().await {
@@ -2731,6 +2856,7 @@ pub fn start_background_monitor() {
                 logging!(info, Type::Lightweight, "[后台监测] 检测到网络连接已恢复，重置失败计数");
                 consecutive_fails = 0;
                 is_retry_mode = false;
+                recent_brownout_episodes.clear();
 
                 // 【S3 统一裁决】物理网络恢复只说明链路可用，不构成节点故障证据。
                 // 旧实现在此凭一次 `evaluate_failover != NoAction` 就立即自愈（绕过连续 2 次判定），
@@ -2823,6 +2949,7 @@ pub fn start_background_monitor() {
                     last_node_change_time = Some(manual_ts);
                     consecutive_fails = 0;
                     is_retry_mode = false;
+                    recent_brownout_episodes.clear();
                 }
                 if Some(&active_node_name) != last_active_node.as_ref() {
                     logging!(
@@ -2842,9 +2969,10 @@ pub fn start_background_monitor() {
                     }
                     consecutive_fails = 0;
                     is_retry_mode = false;
+                    recent_brownout_episodes.clear();
                 }
 
-                match evaluate_failover(&current_profile, consecutive_fails).await {
+                match evaluate_failover(&current_profile).await {
                     Ok(verdict) => {
                         // API 调用成功，重置 API 异常计数
                         api_error_count = 0;
@@ -2860,6 +2988,8 @@ pub fn start_background_monitor() {
                                 }
                                 consecutive_fails = 0;
                                 is_retry_mode = false;
+                                auto_select_fail_count = 0;
+                                api_dead_heal_fail_count = 0;
                                 emit_network_health_notice("network_health::ok");
                             }
                             FailoverVerdict::ShouldFailover
@@ -2892,27 +3022,41 @@ pub fn start_background_monitor() {
                                     );
                                     consecutive_fails = 0;
                                     is_retry_mode = false;
+                                    recent_brownout_episodes.clear();
                                 } else {
                                     consecutive_fails += 1;
                                     is_retry_mode = true;
+                                    let now = Instant::now();
+                                    let brownout_episodes = if consecutive_fails == 1
+                                        && matches!(verdict, FailoverVerdict::ShouldFailover)
+                                    {
+                                        record_brownout_episode(&mut recent_brownout_episodes, now)
+                                    } else {
+                                        prune_brownout_episodes(&mut recent_brownout_episodes, now);
+                                        recent_brownout_episodes.len()
+                                    };
                                     logging!(
                                         info,
                                         Type::Lightweight,
-                                        "[后台监测] 活跃节点检测异常 ({:?})，连续失败次数: {}",
+                                        "[后台监测] 活跃节点检测异常 ({:?})，连续失败次数: {}，窗口内间歇故障次数: {}",
                                         verdict,
-                                        consecutive_fails
+                                        consecutive_fails,
+                                        brownout_episodes
                                     );
 
-                                    if decide_self_heal(SelfHealTrigger::NodeConfirmedDead { consecutive_fails })
-                                        == SelfHealDecision::Allow
+                                    if decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                                        consecutive_fails,
+                                        brownout_episodes,
+                                    }) == SelfHealDecision::Allow
                                     {
                                         consecutive_fails = 0;
                                         is_retry_mode = false;
+                                        recent_brownout_episodes.clear();
 
                                         logging!(
                                             info,
                                             Type::Lightweight,
-                                            "[后台监测] 连续 2 次检测失败，启动后台自愈选点"
+                                            "[后台监测] 满足故障转移条件（连续/间歇黑洞阈值已达），启动后台自愈选点"
                                         );
 
                                         // 【失败服务器登记】把刚被判死的活跃节点**所在服务器**记入冷却表，
@@ -3075,6 +3219,176 @@ const fn complete_restart_core_attempt(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ApiChannelPrecheck {
+    KeepAlive,
+    ProceedAutoSelect,
+    ConfirmedDown,
+}
+
+async fn precheck_api_channel_down(
+    auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+    last_check_time: &mut Instant,
+) -> ApiChannelPrecheck {
+    let mihomo = crate::core::handle::Handle::mihomo().await.clone();
+    match mihomo.get_group_by_name("PROXY").await {
+        Ok(group_info) => {
+            if let Ok(proxies) = mihomo.get_proxies().await
+                && let Some(active) = group_info.now.as_deref()
+            {
+                let is_valid_real = !active.is_empty()
+                    && active != "DIRECT"
+                    && active != "REJECT"
+                    && !is_dummy_node(active)
+                    && !crate::utils::node::is_confirmed_fake_node(active);
+                let status = proxies
+                    .proxies
+                    .get(active)
+                    .map(node_status)
+                    .unwrap_or(NodeStatus::Unknown);
+                if should_keep_alive_on_api_recovery(is_valid_real, status) {
+                    *auto_select_fail_count = 0;
+                    *api_dead_heal_fail_count = 0;
+                    emit_network_health_notice("network_health::ok");
+                    *last_check_time = Instant::now();
+                    logging!(
+                        info,
+                        Type::Lightweight,
+                        "[后台监测] API 通道自愈前复核已恢复且当前节点 {} 健康（{:?}），保活现状并跳过切点",
+                        active,
+                        status
+                    );
+                    return ApiChannelPrecheck::KeepAlive;
+                }
+            }
+            ApiChannelPrecheck::ProceedAutoSelect
+        }
+        Err(e) => {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] API 通道自愈前复核仍不可达 ({e})，跳过 30 秒空等直接计入失败"
+            );
+            ApiChannelPrecheck::ConfirmedDown
+        }
+    }
+}
+
+async fn execute_core_restart_with_accounting(
+    reason_log: &str,
+    auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+) {
+    logging!(warn, Type::Lightweight, "{reason_log}");
+    match crate::core::manager::CoreManager::global().restart_core().await {
+        Ok(()) => {
+            let _ = complete_restart_core_attempt(true, auto_select_fail_count, api_dead_heal_fail_count);
+            logging!(
+                info,
+                Type::Lightweight,
+                "[后台监测] 重启内核成功，API 通道应已恢复（保留告警计数={}）",
+                *auto_select_fail_count
+            );
+        }
+        Err(e) => {
+            logging!(
+                error,
+                Type::Lightweight,
+                "[后台监测] 重启内核失败: {e}，立即升级为终态告警并重置本轮计数"
+            );
+            if complete_restart_core_attempt(false, auto_select_fail_count, api_dead_heal_fail_count)
+                == SelfHealAction::FireAlert
+            {
+                fire_core_restart_failed_alert();
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn apply_self_heal_auto_select_result(
+    result: anyhow::Result<AutoSelectOutcome>,
+    profile_uid: &str,
+    dead_node: Option<&str>,
+    origin: SelfHealOrigin,
+    prev_auto_select_time: Option<Instant>,
+    auto_select_fail_count: &mut u32,
+    api_dead_heal_fail_count: &mut u32,
+    last_auto_select_time: &mut Option<Instant>,
+    recent_auto_switches: &mut Vec<Instant>,
+) -> bool {
+    match result {
+        Ok(outcome) if outcome.selected => {
+            *auto_select_fail_count = 0;
+            *api_dead_heal_fail_count = 0;
+            emit_network_health_notice("network_health::ok");
+            // S4：仅「真正换到不同节点」才计入速率窗口；选回同一节点不算一次切换。
+            // dead_node 为 None 的 API 通道故障路径无基准，按「执行了切点」计入。
+            let changed = match (dead_node, outcome.selected_node.as_deref()) {
+                (Some(d), Some(n)) => d != n,
+                _ => true,
+            };
+            if changed {
+                recent_auto_switches.push(Instant::now());
+            }
+            if matches!(origin, SelfHealOrigin::NodeMigration) {
+                let filter_text = get_filter_and_sort_config(profile_uid).await.0.filter_text;
+                close_excluded_proxy_connections(&filter_text).await;
+            } else if let (Some(dead), Some(new_node)) = (dead_node, outcome.selected_node.as_deref())
+                && !dead.is_empty()
+                && dead != new_node
+            {
+                close_dead_node_proxy_connections(dead).await;
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 自愈已切换 {} → {}（已同步清理原故障节点存量代理连接）",
+                    dead,
+                    new_node
+                );
+            }
+            false
+        }
+        Ok(_) => {
+            *auto_select_fail_count += 1;
+            *api_dead_heal_fail_count += 1;
+            emit_network_health_notice("network_health::all_dead");
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] 自愈选点未选出可用节点（所有节点不可达），连续失败次数: {}",
+                *auto_select_fail_count
+            );
+            true
+        }
+        Err(e) => {
+            let err_str = e.to_string();
+            if is_benign_auto_select_abort(&err_str) {
+                logging!(
+                    info,
+                    Type::Lightweight,
+                    "[后台监测] 自愈选点让路中断 ({err_str})，跳过本次切点且不施加冷却或故障惩罚"
+                );
+                // 并发繁忙 / 用户手动抢占均不算故障，回退冷却时间戳，允许下次重试
+                *last_auto_select_time = prev_auto_select_time;
+                return false;
+            }
+            *auto_select_fail_count += 1;
+            *api_dead_heal_fail_count += 1;
+            emit_network_health_notice("network_health::all_dead");
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] 自愈选点失败 ({}), 连续失败次数: {}",
+                err_str,
+                *auto_select_fail_count
+            );
+            true
+        }
+    }
+}
+
 // 统一记账函数历史上就承载多条自愈入口的计数/冷却/告警状态，S3 起新增裁决来源、
 // S4 起新增切换速率窗口，参数数量随之增长；项目既有惯例允许此处保留显式参数列表。
 #[allow(clippy::too_many_arguments)]
@@ -3092,18 +3406,19 @@ async fn self_heal_with_accounting(
     let now = Instant::now();
     if let Some(last_time) = *last_auto_select_time {
         let elapsed = now.duration_since(last_time).as_secs();
-        if elapsed < 25 {
+        if elapsed < SELF_HEAL_COOLDOWN_SECS {
             logging!(
                 info,
                 Type::Lightweight,
-                "[后台监测] 自愈选点在 25 秒冷却中（已过 {} 秒），跳过本次",
+                "[后台监测] 自愈选点在 {} 秒冷却中（已过 {} 秒），跳过本次",
+                SELF_HEAL_COOLDOWN_SECS,
                 elapsed
             );
             return false;
         }
     }
 
-    // 【S4 · 原节点确已死门检（BUG-375）】裁决器放行只说明「连续 2 次体检失败」。
+    // 【S4 · 原节点确已死门检（BUG-375）】裁决器放行只说明「连续 2 次体检失败」或「窗口内反复黑洞」。
     // 切点前必须再读一次**同一权威来源**（get_proxies + node_status）确认原节点此刻仍确证已死；
     // 若它在拨测等待期间已恢复（Alive / Suspect / Unknown），说明只是一次抖动，放弃切点。
     // 自愈是兜底而非择优——「别的节点更快」永远不构成切点理由（那属于 F1 手动选点）。
@@ -3162,114 +3477,46 @@ async fn self_heal_with_accounting(
         return false;
     }
 
-    // 【BUG-388 · API 通道恢复保活门检】若由 ApiChannelDown 进入自愈但此刻 API 已可读且当前出口健康，
-    // 遵循连续性优先直接保活现状并复位双失败计数，避免 API 短暂恢复即全组切点。
+    // 【BUG-388 · API 通道恢复保活门检 / BUG-411 · 通道仍死直接免等】
+    let mut api_confirmed_down = false;
     if matches!(origin, SelfHealOrigin::ApiChannelDown) {
-        let mihomo = crate::core::handle::Handle::mihomo().await.clone();
-        if let (Ok(group_info), Ok(proxies)) = (mihomo.get_group_by_name("PROXY").await, mihomo.get_proxies().await)
-            && let Some(active) = group_info.now.as_deref()
-        {
-            let is_valid_real = !active.is_empty()
-                && active != "DIRECT"
-                && active != "REJECT"
-                && !is_dummy_node(active)
-                && !crate::utils::node::is_confirmed_fake_node(active);
-            let status = proxies
-                .proxies
-                .get(active)
-                .map(node_status)
-                .unwrap_or(NodeStatus::Unknown);
-            if should_keep_alive_on_api_recovery(is_valid_real, status) {
-                *auto_select_fail_count = 0;
-                *api_dead_heal_fail_count = 0;
-                emit_network_health_notice("network_health::ok");
-                *last_check_time = Instant::now();
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] API 通道自愈前复核已恢复且当前节点 {} 健康（{:?}），保活现状并跳过切点",
-                    active,
-                    status
-                );
-                return false;
-            }
+        match precheck_api_channel_down(auto_select_fail_count, api_dead_heal_fail_count, last_check_time).await {
+            ApiChannelPrecheck::KeepAlive => return false,
+            ApiChannelPrecheck::ProceedAutoSelect => {}
+            ApiChannelPrecheck::ConfirmedDown => api_confirmed_down = true,
         }
     }
 
     let prev_auto_select_time = *last_auto_select_time;
     *last_auto_select_time = Some(now);
 
-    let mut failed_this_round = false;
-    match trigger_backend_auto_select_with_options(profile_uid, None, 0, true, false, true).await {
-        Ok(outcome) => {
-            if outcome.selected {
-                *auto_select_fail_count = 0;
-                *api_dead_heal_fail_count = 0;
-                emit_network_health_notice("network_health::ok");
-                // S4：仅「真正换到不同节点」才计入速率窗口；选回同一节点不算一次切换。
-                // dead_node 为 None 的 API 通道故障路径无基准，按「执行了切点」计入。
-                let changed = match (dead_node, outcome.selected_node.as_deref()) {
-                    (Some(d), Some(n)) => d != n,
-                    _ => true,
-                };
-                if changed {
-                    recent_auto_switches.push(Instant::now());
-                }
-                if matches!(origin, SelfHealOrigin::NodeMigration) {
-                    let filter_text = get_filter_and_sort_config(profile_uid).await.0.filter_text;
-                    close_excluded_proxy_connections(&filter_text).await;
-                }
-                if let (Some(dead), Some(new_node)) = (dead_node, outcome.selected_node.as_deref())
-                    && !dead.is_empty()
-                    && dead != new_node
-                    && !matches!(origin, SelfHealOrigin::NodeMigration)
-                {
-                    logging!(
-                        info,
-                        Type::Lightweight,
-                        "[后台监测] 自愈已切换 {} → {}，不清理原节点存量连接（长连接由应用层自行重连）",
-                        dead,
-                        new_node
-                    );
-                }
-            } else {
-                *auto_select_fail_count += 1;
-                *api_dead_heal_fail_count += 1;
-                failed_this_round = true;
-                emit_network_health_notice("network_health::all_dead");
-                logging!(
-                    warn,
-                    Type::Lightweight,
-                    "[后台监测] 自愈选点未选出可用节点（所有节点不可达），连续失败次数: {}",
-                    *auto_select_fail_count
-                );
-            }
-        }
-        Err(e) => {
-            let err_str = e.to_string();
-            if is_benign_auto_select_abort(&err_str) {
-                logging!(
-                    info,
-                    Type::Lightweight,
-                    "[后台监测] 自愈选点让路中断 ({err_str})，跳过本次切点且不施加冷却或故障惩罚"
-                );
-                // 并发繁忙 / 用户手动抢占均不算故障，回退冷却时间戳，允许下次重试
-                *last_auto_select_time = prev_auto_select_time;
-            } else {
-                *auto_select_fail_count += 1;
-                *api_dead_heal_fail_count += 1;
-                failed_this_round = true;
-                emit_network_health_notice("network_health::all_dead");
-                logging!(
-                    warn,
-                    Type::Lightweight,
-                    "[后台监测] 自愈选点失败 ({}), 连续失败次数: {}",
-                    err_str,
-                    *auto_select_fail_count
-                );
-            }
-        }
-    }
+    let failed_this_round = if api_confirmed_down {
+        *auto_select_fail_count += 1;
+        *api_dead_heal_fail_count += 1;
+        emit_network_health_notice("network_health::all_dead");
+        logging!(
+            warn,
+            Type::Lightweight,
+            "[后台监测] API 通道仍不可达，直接计入自愈失败次数: {}",
+            *auto_select_fail_count
+        );
+        true
+    } else {
+        let skip_wait_ready = matches!(origin, SelfHealOrigin::ApiChannelDown);
+        let result = trigger_backend_auto_select_with_options(profile_uid, None, 0, true, skip_wait_ready, true).await;
+        apply_self_heal_auto_select_result(
+            result,
+            profile_uid,
+            dead_node,
+            origin,
+            prev_auto_select_time,
+            auto_select_fail_count,
+            api_dead_heal_fail_count,
+            last_auto_select_time,
+            recent_auto_switches,
+        )
+        .await
+    };
     *last_check_time = Instant::now();
 
     if failed_this_round {
@@ -3289,35 +3536,11 @@ async fn self_heal_with_accounting(
         }
         match evaluate_self_heal_counters(auto_select_fail_count, api_dead_heal_fail_count, api_alive) {
             SelfHealAction::RestartCore => {
-                logging!(
-                    warn,
-                    Type::Lightweight,
+                let reason = format!(
                     "[后台监测] 连续 3 次自愈选点失败且内核 API 不可达，尝试重启内核以恢复 API 通道（当前告警计数={}）",
                     *auto_select_fail_count
                 );
-                match crate::core::manager::CoreManager::global().restart_core().await {
-                    Ok(()) => {
-                        let _ = complete_restart_core_attempt(true, auto_select_fail_count, api_dead_heal_fail_count);
-                        logging!(
-                            info,
-                            Type::Lightweight,
-                            "[后台监测] 重启内核成功，API 通道应已恢复（保留告警计数={}）",
-                            *auto_select_fail_count
-                        );
-                    }
-                    Err(e) => {
-                        logging!(
-                            error,
-                            Type::Lightweight,
-                            "[后台监测] 重启内核失败: {e}，立即升级为终态告警并重置本轮计数"
-                        );
-                        if complete_restart_core_attempt(false, auto_select_fail_count, api_dead_heal_fail_count)
-                            == SelfHealAction::FireAlert
-                        {
-                            fire_core_restart_failed_alert();
-                        }
-                    }
-                }
+                execute_core_restart_with_accounting(&reason, auto_select_fail_count, api_dead_heal_fail_count).await;
             }
             SelfHealAction::FireAlert => {
                 fire_self_heal_alert();
@@ -3442,19 +3665,33 @@ mod tests {
 
     #[test]
     fn test_decide_self_heal_unifies_all_three_triggers() {
-        // 1. 节点侧故障：第 1 次失败必须等待，达到连续 2 次才放行
+        // 1. 节点侧故障：第 1 次失败且未达间歇黑洞次数必须等待，达到连续 2 次或窗口内 2 次才放行
         assert_eq!(
-            decide_self_heal(SelfHealTrigger::NodeConfirmedDead { consecutive_fails: 1 }),
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                consecutive_fails: 1,
+                brownout_episodes: 1,
+            }),
             SelfHealDecision::Wait
         );
         assert_eq!(
             decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
-                consecutive_fails: FAILOVER_CONFIRM_FAILS
+                consecutive_fails: FAILOVER_CONFIRM_FAILS,
+                brownout_episodes: 1,
             }),
             SelfHealDecision::Allow
         );
         assert_eq!(
-            decide_self_heal(SelfHealTrigger::NodeConfirmedDead { consecutive_fails: 5 }),
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                consecutive_fails: 5,
+                brownout_episodes: 1,
+            }),
+            SelfHealDecision::Allow
+        );
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                consecutive_fails: 1,
+                brownout_episodes: super::BROWNOUT_CONFIRM_FAILS,
+            }),
             SelfHealDecision::Allow
         );
 
@@ -4316,5 +4553,84 @@ mod tests {
             "-香港 -台湾",
             |_| false
         ));
+    }
+
+    #[test]
+    fn test_bug411_and_bug412_pipe_missing_brownout_and_dead_conn_cleanup() {
+        use super::{
+            BROWNOUT_WINDOW_SECS, SELF_HEAL_COOLDOWN_SECS, can_fast_restart_missing_pipe, record_brownout_episode,
+            should_close_dead_node_proxy_connection,
+        };
+
+        // 1. BUG-411：缺管快重启门控
+        assert!(!can_fast_restart_missing_pipe(false, true, None));
+        assert!(!can_fast_restart_missing_pipe(true, false, None));
+        assert!(can_fast_restart_missing_pipe(true, true, None));
+        assert!(!can_fast_restart_missing_pipe(
+            true,
+            true,
+            Some(SELF_HEAL_COOLDOWN_SECS - 1)
+        ));
+        assert!(can_fast_restart_missing_pipe(true, true, Some(SELF_HEAL_COOLDOWN_SECS)));
+
+        // 2. BUG-412：间歇性黑洞滑动窗口累计判死
+        let t0 = Instant::now();
+        let mut episodes = Vec::new();
+        assert_eq!(record_brownout_episode(&mut episodes, t0), 1);
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                consecutive_fails: 1,
+                brownout_episodes: episodes.len(),
+            }),
+            SelfHealDecision::Wait
+        );
+        // 600s 窗口内第二次独立 ShouldFailover -> 即使第 1 次后曾侥幸恢复，也立即放行切点
+        let t1 = t0 + Duration::from_secs(BROWNOUT_WINDOW_SECS - 1);
+        assert_eq!(record_brownout_episode(&mut episodes, t1), 2);
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                consecutive_fails: 1,
+                brownout_episodes: episodes.len(),
+            }),
+            SelfHealDecision::Allow
+        );
+        // 超过 600s 窗口后旧故障淘汰，仅剩当前 1 次 -> 重新 Wait
+        let t2 = t1 + Duration::from_secs(BROWNOUT_WINDOW_SECS);
+        assert_eq!(record_brownout_episode(&mut episodes, t2), 1);
+        assert_eq!(
+            decide_self_heal(SelfHealTrigger::NodeConfirmedDead {
+                consecutive_fails: 1,
+                brownout_episodes: episodes.len(),
+            }),
+            SelfHealDecision::Wait
+        );
+
+        // 3. BUG-412：自愈切离故障节点时仅精准断开挂在死节点上的 PROXY 连接
+        let dead_chain = vec!["日本5 (031306)".to_string(), "PROXY".to_string()];
+        let healthy_chain = vec!["日本1 (031306)".to_string(), "PROXY".to_string()];
+        let direct_chain = vec!["DIRECT".to_string()];
+        let reject_chain = vec!["REJECT".to_string()];
+        assert!(should_close_dead_node_proxy_connection(
+            &dead_chain,
+            "PROXY",
+            "日本5 (031306)"
+        ));
+        assert!(!should_close_dead_node_proxy_connection(
+            &healthy_chain,
+            "PROXY",
+            "日本5 (031306)"
+        ));
+        assert!(!should_close_dead_node_proxy_connection(
+            &direct_chain,
+            "PROXY",
+            "日本5 (031306)"
+        ));
+        assert!(!should_close_dead_node_proxy_connection(
+            &reject_chain,
+            "PROXY",
+            "日本5 (031306)"
+        ));
+        assert!(!should_close_dead_node_proxy_connection(&dead_chain, "PROXY", ""));
+        assert!(!should_close_dead_node_proxy_connection(&dead_chain, "PROXY", "DIRECT"));
     }
 }

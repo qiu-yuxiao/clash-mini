@@ -1,3 +1,12 @@
+## v3.5.10
+
+### 🛡️ 内核缺管秒级自愈重启、间歇性黑洞节点滑窗逃生与故障旧死链精准清理
+
+- **根治内核进程意外消失时自愈空等近 4 分钟问题（BUG-411）**：在 `tauri-plugin-mihomo` 新增零句柄侵占的 `is_named_pipe_server_missing`（精准区分 `os error 2` 管道缺失与繁忙阻塞），结合 `CoreManager::should_expect_core_pipe_alive()` 与 `500ms` 二次确认防抖后立即触发 `restart_core()` 秒级恢复；同时 `ApiChannelDown` 通道复核仍不可达时跳过无效 30 秒 `wait_for_clash_ready()` 空等，稳态 `NoAction` 恢复时同步清零告警计数。
+- **根治间歇性黑洞节点长流卡死不切点及切后死链滞留（BUG-412）**：`evaluate_failover` 全阶段在同组已有 `>= 3` 个真实节点通过主测速 URL 时跳过冗余备用 URL 复核，避免单点坏节点借第 3 次压线逃生；新增 `600s` 间歇黑洞滑动窗口累计裁决（窗口内 `>= 2` 次独立 `ShouldFailover` 故障周期直接切离），并在确认切离故障旧节点后精准断开滞留其上的 `PROXY` 存量长连接，让 HTTP/2 / gRPC 长流即时在新健康节点重建恢复。
+
+---
+
 ## v3.5.9
 
 ### 📈 宽窄窗统一自适应实时流量曲线 & 彻底清理遗留大盘/Worker 管线（BUG-410）

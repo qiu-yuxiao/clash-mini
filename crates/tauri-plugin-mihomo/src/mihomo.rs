@@ -130,6 +130,15 @@ impl Mihomo {
         Ok(())
     }
 
+    /// 检查当前配置的本地命名管道服务端是否已不存在（内核进程已退出，BUG-411）。
+    #[inline]
+    pub fn is_local_socket_missing(&self) -> bool {
+        match (&self.protocol, self.socket_path.as_deref()) {
+            (Protocol::LocalSocket, Some(path)) => crate::ipc::is_named_pipe_server_missing(path),
+            _ => false,
+        }
+    }
+
     #[inline]
     fn get_req_url(&self, suffix_url: &str) -> Result<String> {
         let suffix_url = suffix_url.trim_start_matches("/");

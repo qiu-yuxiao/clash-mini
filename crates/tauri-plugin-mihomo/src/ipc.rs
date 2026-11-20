@@ -20,7 +20,7 @@ use tokio::{
     sync::{Semaphore, SemaphorePermit},
     time::timeout,
 };
-use windows_sys::Win32::Foundation::ERROR_PIPE_BUSY;
+use windows_sys::Win32::Foundation::{ERROR_BAD_PATHNAME, ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND, ERROR_PIPE_BUSY};
 
 use crate::{Error, Result};
 
@@ -123,6 +123,35 @@ fn wait_named_pipe_blocking(socket_path: &str, timeout_ms: u32) -> bool {
         .collect();
     // SAFETY: `wide` is a valid NUL-terminated UTF-16 string living across the FFI call.
     unsafe { WaitNamedPipeW(wide.as_ptr(), timeout_ms) != 0 }
+}
+
+/// 纯判定（BUG-411）：判断 `WaitNamedPipeW` 返回 `0` 时的 Win32 错误码是否代表命名管道服务端本身已不存在
+///（`ERROR_FILE_NOT_FOUND = 2` / `ERROR_PATH_NOT_FOUND = 3` / `ERROR_BAD_PATHNAME = 161`），
+/// 严格排除管道存活但实例全忙时的 `ERROR_SEM_TIMEOUT = 121` 与 `ERROR_PIPE_BUSY = 231`。
+#[cfg(windows)]
+pub const fn is_pipe_missing_os_error(raw_os_error: Option<i32>) -> bool {
+    matches!(
+        raw_os_error,
+        Some(code)
+            if code == ERROR_FILE_NOT_FOUND as i32
+                || code == ERROR_PATH_NOT_FOUND as i32
+                || code == ERROR_BAD_PATHNAME as i32
+    )
+}
+
+/// 零句柄侵占探测命名管道服务端是否已彻底消失（BUG-411）：
+/// 使用 `WaitNamedPipeW(..., 1)` 查询管道命名空间而不打开/占用管道实例；
+/// 仅当内核进程已退出导致管道不存在时返回 `true`，并发繁忙超时返回 `false`。
+#[cfg(windows)]
+pub fn is_named_pipe_server_missing(socket_path: &str) -> bool {
+    let trimmed = socket_path.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    if wait_named_pipe_blocking(trimmed, 1) {
+        return false;
+    }
+    is_pipe_missing_os_error(std::io::Error::last_os_error().raw_os_error())
 }
 
 pub async fn connect_to_socket(socket_path: &str) -> Result<WrapStream> {
@@ -729,5 +758,48 @@ mod tests {
                 .expect("read succeeds with EOF");
             assert_eq!(read_res, 0, "clear_pool 必须立刻 abort 空闲驱动并关闭句柄");
         });
+    }
+
+    #[test]
+    fn test_is_named_pipe_server_missing_distinguishes_missing_ready_and_busy() {
+        use tokio::net::windows::named_pipe::ServerOptions;
+
+        assert!(is_pipe_missing_os_error(Some(ERROR_FILE_NOT_FOUND as i32)));
+        assert!(is_pipe_missing_os_error(Some(ERROR_PATH_NOT_FOUND as i32)));
+        assert!(is_pipe_missing_os_error(Some(ERROR_BAD_PATHNAME as i32)));
+        assert!(!is_pipe_missing_os_error(Some(121))); // ERROR_SEM_TIMEOUT
+        assert!(!is_pipe_missing_os_error(Some(ERROR_PIPE_BUSY as i32)));
+        assert!(!is_pipe_missing_os_error(None));
+        assert!(!is_named_pipe_server_missing(""));
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("build runtime for named pipe test");
+
+        let pipe_path = format!(r"\\.\pipe\clash-mini-test-pipe-411-{}", std::process::id());
+        // 1. 服务端创建前：管道不存在 -> true
+        assert!(is_named_pipe_server_missing(&pipe_path));
+
+        rt.block_on(async {
+            let server = ServerOptions::new()
+                .first_pipe_instance(true)
+                .max_instances(1)
+                .create(&pipe_path)
+                .expect("create isolated test pipe server");
+
+            // 2. 服务端空闲就绪 -> false
+            assert!(!is_named_pipe_server_missing(&pipe_path));
+
+            // 3. 唯一管道实例已被客户端占用（处于繁忙态 ERROR_SEM_TIMEOUT）-> 仍须判为存在 (false)
+            let client = ClientOptions::new().open(&pipe_path).expect("open test pipe client");
+            assert!(!is_named_pipe_server_missing(&pipe_path));
+
+            drop(client);
+            drop(server);
+        });
+
+        // 4. 服务端与客户端均释放销毁后 -> 重新变为不存在 (true)
+        assert!(is_named_pipe_server_missing(&pipe_path));
     }
 }

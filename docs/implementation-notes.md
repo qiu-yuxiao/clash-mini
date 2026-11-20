@@ -71,6 +71,8 @@
 | `AUTO_SELECT_BUSY` / `AUTO_SELECT_MANUAL_PREEMPTED` / `MANUAL_SWITCH_EPOCH` | 状态 / 原子序号 | 选点冲突与手动抢占让路不算失败、不冷却、不覆盖手动选点（§5.3） |
 | `should_allow_https_migration` / `HTTPS_VERIFY_MIGRATE_MIN_FAILS` / `HTTPS_VERIFY_ALL_FAILED_BACKOFF_SECS` | 纯函数 / 常量 | `Flowing` 有流量态禁验真迁移、`>= 2` 次失败门槛、`600s` 全败退避（§5.2） |
 | `self_heal_subject_to_switch_rate_limit` / `should_keep_alive_on_api_recovery` | 纯函数 | `ConfirmedDead` 豁免切换速率上限、`ApiChannelDown` 恢复即保活（§5.1 / §5.3） |
+| `is_named_pipe_server_missing` / `should_expect_core_pipe_alive` / `try_fast_restart_missing_pipe` | 插件 / 后端函数 | 零句柄侵占探测 `os error 2` 缺管（500ms 复核 + 25s 冷却）立即重启内核，跳过 3×45s+30s 空等（§5.1） |
+| `BROWNOUT_WINDOW_SECS` / `BROWNOUT_CONFIRM_FAILS` / `should_close_dead_node_proxy_connection` | 常量 / 纯函数 | 600s 滑窗累计 ≥2 次 `ShouldFailover` 逃离间歇黑洞节点，并精准清理滞留故障旧节点上的 `PROXY` 死链（§4.2 / §5.1） |
 | `pick_subset_fallback_node` / `promote_preferred_proxy_first`（`utils/node.rs`） | 纯函数 | 非空 `filter_text` 禁越界回退，并在生成落盘前将合规节点提前至 `PROXY.proxies[0]`（§5.4） |
 | `api_error_count` / `auto_select_fail_count` | 计数器 | API 异常计数触发自愈 / 5 次弹窗（§5.1 / §5.3） |
 | `check_active_node_health` | 已废弃函数 | 旧 15s 自测方案（TUN 下测不准）被 PROXY__METRICS 取代（§5.1 历史） |

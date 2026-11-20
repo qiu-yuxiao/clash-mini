@@ -15,7 +15,7 @@ mod utils;
 pub use error::{Error, Result};
 
 pub(crate) use crate::ipc::IpcPoolConfig;
-pub use crate::ipc::{IpcConnectionPool, IpcPoolConfigBuilder, RejectPolicy};
+pub use crate::ipc::{IpcConnectionPool, IpcPoolConfigBuilder, RejectPolicy, is_named_pipe_server_missing};
 use crate::models::Protocol;
 
 /// Extensions to [`tauri::App`], [`tauri::AppHandle`] and [`tauri::Window`] to access the mihomo APIs.

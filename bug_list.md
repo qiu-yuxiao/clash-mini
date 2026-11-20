@@ -9,6 +9,26 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-412 间歇性黑洞节点在二次确认借备用 URL 逃生后长期锁死、且故障切离未清理原死节点滞留代理连接
+
+- **对应模块**：[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)
+- **问题描述**：`2026-11-20 13:05 ~ 13:26` 实证日志发现：当活跃节点（如 `日本5 (031306)`）陷入「短时黑洞丢包 / UDP QUIC 勉强维持但 TCP HTTP/2 长流持续卡死」的间歇性劣化（Flapping / Brownout）状态时，存在三重滞留机制：① [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)::`evaluate_failover` 仅对 `consecutive_fails == 0` 启用单目标免打备用 URL（`allow_single_target_skip`），第 2 次确认判死时即使主测速地址已有 `35+` 个真实节点响应（证实测速地址未失真），仍强行再打备用 `gstatic` 给故障节点第 3 次压线逃生机会；② 只要间歇性黑洞节点在 3 秒复检中挤回一次 `204` 空包，`consecutive_fails` 即清零，20 分钟内触发 11 次 `Stalled`（有上行零下行）与 5 次 `ShouldFailover` 仍无法自动切走；③ 后台确认故障切往新节点后不清理仍粘滞在原 `dead_node` 上的半开 TCP 长连接，导致长流应用持续卡在旧连接重传中。
+- **修复方案**：
+  1. 在 `evaluate_failover` 中对单活跃节点（`std::slice::from_ref(&active_node)`）全阶段统一启用 `allow_single_target_skip = true`：当同组已有 `>= 3` 个真实节点通过主测速地址响应时，第 2 次确认超时的节点不再借备用 URL 逃生（`< 3` 个时仍完整保留备用 URL 全局防失真复核）；
+  2. 新增 `BROWNOUT_WINDOW_SECS (600s)` / `BROWNOUT_CONFIRM_FAILS (2)` 与 `record_brownout_episode`，在保留 `NoAction` 恢复正常单次抖动防误切的同时，于 `decide_self_heal` 中对同一活跃节点在 600s 滑动窗口内发生 `>= 2` 次独立 `ShouldFailover` 故障周期直接放行自愈切点；
+  3. 新增 `should_close_dead_node_proxy_connection` 与 `close_dead_node_proxy_connections`，在 `self_heal_with_accounting` 确认切离 `dead_node != new_node` 时仅精准断开滞留在该故障旧节点上的 `PROXY` 存量代理连接（零触碰 `DIRECT` / `REJECT` 与其他节点），促使 HTTP/2 / gRPC 等长连接立即重建于新健康出口，并补齐 Rust 边界单测。
+- **状态**：代码已修正，待用户确认
+
+### BUG-411 内核进程意外消失（命名管道 `os error 2`）时自愈状态机空等 3 轮 API 轮询与 30 秒就绪超时致断流近 4 分钟
+
+- **对应模块**：[ipc.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/src/ipc.rs)、[mihomo.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/src/mihomo.rs)、[lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/src/lib.rs)、[manager/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/mod.rs)、[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs)
+- **问题描述**：`2026-11-20 12:27:40 ~ 12:31:27` 实证日志复现：当后台 `mini-mihomo.exe` 进程消失导致 `\\.\pipe\mini-mihomo` 报 `os error 2`（管道文件不存在）时，[monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 未区分「管道瞬时繁忙」与「管道服务端本身已不存在」，仍机械执行 `3 轮 × (3 × 15s API 异常轮询 + 30s wait_for_clash_ready 空等)` 累计约 **216 秒**后才调用 `restart_core()`（而重启本身仅耗时 0.86 秒即恢复）。此外，`FailoverVerdict::NoAction` 稳态恢复时未清零 `auto_select_fail_count` / `api_dead_heal_fail_count`。
+- **修复方案**：
+  1. 在 [ipc.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/src/ipc.rs) 新增零句柄侵占探测 `is_named_pipe_server_missing` / `is_pipe_missing_os_error`（使用 `WaitNamedPipeW(..., 1)` 仅对 `ERROR_FILE_NOT_FOUND` / `ERROR_PATH_NOT_FOUND` / `ERROR_BAD_PATHNAME` 判为缺管，严格排除繁忙态 `ERROR_SEM_TIMEOUT` / `ERROR_PIPE_BUSY`），并在 [mihomo.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/crates/tauri-plugin-mihomo/src/mihomo.rs) 暴露 `is_local_socket_missing()`；
+  2. 在 [manager/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/mod.rs) 新增 `should_expect_core_pipe_alive()`（排除退出态、`NotRunning`、配置更新及生命周期锁占期间）；
+  3. 在 [monitor.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor.rs) 新增 `try_fast_restart_missing_pipe`（经 `500ms` 二次复核与 `25s` 冷却门控后立即调用 `execute_core_restart_with_accounting` 重启内核），同时在 `ApiChannelDown` 入口通过 `precheck_api_channel_down` 复核仍不可达时直接跳过 30 秒 `wait_for_clash_ready()` 空等，并在 `NoAction` 恢复时清零双失败计数，补齐双 Crate 单元测试。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-410 切换为宽窗口后底部流量曲线图消失及上游遗留大盘图表/Worker 管线冗余
 
 - **对应模块**：[mini-traffic-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/mini-traffic-panel.tsx)、[traffic-graph.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/layout/traffic-graph.tsx)、[parse-traffic.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/parse-traffic.ts)、[use-traffic-data.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-traffic-data.ts)、[_layout.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout.tsx)、[parse-traffic.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/parse-traffic.test.ts)
