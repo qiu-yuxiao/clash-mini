@@ -302,9 +302,9 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 5.1 恒定 15 秒健康监测与防抖自愈机制
 
-- **守护运行时物理隔离与高内聚目录模块**：`module/monitor/`（按职责拆分为 `mod.rs` / `connections.rs` / `probe.rs` / `observer.rs` / `verdict.rs` / `auto_select.rs` / `daemon.rs` / `tests.rs`，对外 API 保持零破坏重导出）与单实例服务 `server.rs` 托管于 `async_handler.rs` 的 2 线程独立 `DAEMON_RUNTIME`，与 UI/命令默认池物理隔离；`NotificationSystem::send_event` 在 `!WindowManager::is_main_window_ready()` 时跳过窗口事件派发。
+- **守护运行时物理隔离与高内聚目录模块**：`module/monitor/`（按职责拆分为 `mod.rs` / `connections.rs` / `probe.rs` / `observer.rs` / `verdict.rs` / `auto_select.rs` / `daemon.rs` / `tests.rs`，对外 API 保持零破坏重导出）与单实例服务 `server.rs` 托管于 `async_handler.rs` 的 2 线程独立 `DAEMON_RUNTIME`，与 UI/命令默认池物理隔离；`NotificationSystem::send_event` 在 `!WindowManager::is_main_window_ready()` 时跳过窗口事件派发。启动及运行期间 `CoreManager::reconcile_running_mode_if_needed`（配合 `start_with_existing_service` 最多 3 次 `start_clash` 短退避重试）在探测到系统服务内核管道已就绪而状态误回滚为 `NotRunning` 时自动对账恢复 `RunningMode::Service`。
 - **三档监控周期（`check_interval_secs`）**：在线稳态恒定 **15 秒**；初检失败进入重试态收紧至 **3 秒**；物理离线收紧至 **5 秒**。
-- **统一裁决器 `decide_self_heal` 与间歇性黑洞滑窗逃生**：主循环（`NodeConfirmedDead`：连续失败 `>= FAILOVER_CONFIRM_FAILS (2)` 或同一活跃节点在 `BROWNOUT_WINDOW_SECS (600s)` 滑动窗口内发生 `>= BROWNOUT_CONFIRM_FAILS (2)` 次独立 `ShouldFailover` 故障周期）、物理恢复（`NetworkRecovered` 恒判 `Wait` 安静等待并交主路径重测）与通道异常（`ApiUnreachable >= API_ERROR_HEAL_THRESHOLD (3)` 且经 `is_clash_api_alive()` 复核仍不通）必须经 `decide_self_heal` 裁决为 `Allow` 后方可进入 `self_heal_with_accounting`；`primary_url_distorted` 时恒返回 `NoAction` 并清零 `consecutive_fails`。当 `FailoverVerdict::NoAction` 确认稳态恢复时清零 `auto_select_fail_count` / `api_dead_heal_fail_count`（但保留 `recent_brownout_episodes` 600s 滑窗直至换节点、手动切点、网络恢复或切点触发，防止间歇黑洞压线逃生锁死长流）。
+- **统一裁决器 `decide_self_heal` 与间歇性黑洞滑窗逃生**：主循环（`NodeConfirmedDead`：连续失败 `>= FAILOVER_CONFIRM_FAILS (2)` 或同一活跃节点在 `BROWNOUT_WINDOW_SECS (600s)` 滑动窗口内发生 `>= BROWNOUT_CONFIRM_FAILS (2)` 次独立 `ShouldFailover` 故障周期）、物理恢复（`NetworkRecovered` 恒判 `Wait` 安静等待并交主路径重测）与通道异常（`ApiUnreachable >= API_ERROR_HEAL_THRESHOLD (3)` 且经 `is_clash_api_alive()` 复核仍不通）必须经 `decide_self_heal` 裁决为 `Allow` 后方可进入 `self_heal_with_accounting`；仅当 `is_active_excused_by_primary_distortion` 证实主地址失真且**当前活跃节点自身通过备用测速地址**时返回 `NoAction` 并清零 `consecutive_fails`（若仅同组其他节点通过备用地址而活跃节点仍超时，同步向 UI 标红活跃节点并照常推进裁决）。当 `FailoverVerdict::NoAction` 确认稳态恢复时清零 `auto_select_fail_count` / `api_dead_heal_fail_count`（但保留 `recent_brownout_episodes` 600s 滑窗直至换节点、手动切点、网络恢复或切点触发）。守护首次观测活跃节点（`None -> Some`）不开启 `20s` 切换宽限期；冷启动 `select == false` 纯测速若实证持久节点超时而同组另有可达节点，预置第 1 次失败并以 `3s` 间隔二次复核（恢复即保活、再败即切换）。
 - **缺管快速重启与 API 失联免等（`is_named_pipe_server_missing`）**：通过零句柄占用的 `WaitNamedPipeW(..., 1)` + Win32 缺管码判定（`ERROR_FILE_NOT_FOUND` 等，严格排除 `ERROR_SEM_TIMEOUT`/`ERROR_PIPE_BUSY`）结合 `CoreManager::should_expect_core_pipe_alive()`（非退出、非 `NotRunning`、非配置更新/生命周期锁占期间）及 `PIPE_MISSING_CONFIRM_DELAY_MS (500ms)` 二次确认后，在 `SELF_HEAL_COOLDOWN_SECS (25s)` 冷却外跳过 `3 × 15s` 与 `30s` 空等，直接触发 `restart_core()` 秒级恢复；`ApiChannelDown` 进入 `self_heal_with_accounting` 时若 `precheck_api_channel_down` 复核仍不可达亦跳过 `30s` `wait_for_clash_ready()` 直入计次重启链路。
 - **四态迟滞、死节点门检与保活**：`NodeStatus` 包含 `Unknown` / `Suspect` / `Dead` / `Alive`；`alive=false` 但上次成功仍在 `SUSPECT_WINDOW_SECS (30s)` 内判为 `Suspect` 不累计失败、不切点；`ConfirmedDead` 自愈切点前必经 `should_proceed_with_self_heal` 二次确认原节点确为 `Dead`（同时豁免速率上限卡死），`ApiChannelDown` 切点前若 `should_keep_alive_on_api_recovery` 复核现节点已恢复 `Alive` 则直接保活复位。
 - **判死阈值与宽限期**：测速有效延迟区间锁定 **`[30ms, 5000ms)`**（`NODE_DELAY_MAX_MS = 5000`）；任何手动/自动切点后给予 **`20s`** 切换宽限期（`NODE_SWITCH_NOTIFY` 瞬时吸收）。
@@ -349,7 +349,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 5.8 测速失真复核与失败服务器避让
 
-- **主备双地址失真复核**：`probe_metrics_group` 主 URL 整体超时（或部分异常且未命中 §5.2 单点豁免）时立即以不同域名的备用 HTTPS 地址复核；仅主备均有效或明确主URL失真（`primary_url_distorted = true`）时由 `evaluate_failover` 返回 `NoAction` 防误切。
+- **主备双地址失真复核**：`probe_metrics_group` 主 URL 整体超时（或部分异常且未命中 §5.2 单点豁免）时立即以不同域名的备用 HTTPS 地址复核；仅当备用地址至少有真实节点有效响应（否则返回 `None` 判测速链路不可用）且 `is_active_excused_by_primary_distortion` 确认当前活跃节点自身在备用地址下可用时由 `evaluate_failover` 返回 `NoAction` 防误切。
 - **同服务器避让与安全阀**：活跃节点基于有效测速判死时，依据生成期 `clash-mini.yaml` 解析的节点→服务器映射将该服务器加入 `FAILED_SERVER_COOLDOWN_SECS (600s)` 冷却避让池；若剔除冷却服务器后候选为空则自动放行安全阀全量回退。
 
 ---
@@ -446,9 +446,9 @@ flowchart LR
 ```
 `validate` 校验一致性 → `build` 编译签名打包并上传 Draft Release → `update_dev` 计算体积签名回写 `updater/app-update.json` 至 `origin/dev` → `publish` 提取 `Changelog.md` 公开正式 Release。
 
-### 8.5 本地制品验收与自动更新同步闭环
+### 8.5 本地制品验收、客户端升级双轨回退与自动更新同步闭环
 
-所有发行安装包统一下载保留于根目录 `portable_test/`（`git` 忽略，不得清理删除）；发版结束后及时 `git pull origin dev` 同步云端回写的 `updater/app-update.json`。
+所有发行安装包统一下载保留于根目录 `portable_test/`（`git` 忽略，不得清理删除）；发版结束后及时 `git pull origin dev` 同步云端回写的 `updater/app-update.json`。应用内客户端在线更新（`use-client-update.ts` + `utils/client-update.ts`）检查阶段优先通过本地混合端口代理并在失败后自动回退系统/直连通道；安装包下载流中断（`Finished` 事件之前）支持退避重试最多 3 次（第 3 次尝试前刷新直连句柄），并将检查/下载重试与失败原因通过 `frontendLog` 落盘 `latest.log`。
 
 ### 8.6 配置文件版本号与迁移框架
 
@@ -463,7 +463,7 @@ flowchart LR
 
 ### 8.8 前端单测基线与最小覆盖
 
-采用无 GUI `vitest`（`vitest.config.mts`，`environment: node`）运行 **`pnpm test`**，当前包含 13 个纯逻辑回归测试套件，锁定节点过滤、假节点/横幅识别、延迟真源与快照回滚、WS 指数退避、流量解析、窗口尺寸/快捷键、弹窗样式、订阅与路径控制不变式。
+采用无 GUI `vitest`（`vitest.config.mts`，`environment: node`）运行 **`pnpm test`**，当前包含 14 个纯逻辑回归测试套件，锁定节点过滤、假节点/横幅识别、延迟真源与快照回滚、WS 指数退避、流量解析、窗口尺寸/快捷键、弹窗样式、客户端升级重试、订阅与路径控制不变式。
 
 ### 8.9 用户可见文案 i18n 硬约束
 

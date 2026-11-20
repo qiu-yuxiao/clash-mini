@@ -366,6 +366,23 @@ pub(super) fn should_sync_alive_ui(
     active_hist_time.is_some_and(|t| sync.history_time.as_deref() != Some(t))
 }
 
+pub(super) fn has_any_valid_real_probe_delay_with<F>(delays: &HashMap<String, u32>, is_fake_node: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    delays.iter().any(|(name, &d)| {
+        !name.eq_ignore_ascii_case("DIRECT")
+            && !name.eq_ignore_ascii_case("REJECT")
+            && !is_dummy_node(name)
+            && !is_fake_node(name)
+            && is_valid_probe_delay(d)
+    })
+}
+
+pub(super) fn has_any_valid_real_probe_delay(delays: &HashMap<String, u32>) -> bool {
+    has_any_valid_real_probe_delay_with(delays, crate::utils::node::is_confirmed_fake_node)
+}
+
 pub(super) fn should_recheck_with_fallback(primary_delays: &HashMap<String, u32>, expected_nodes: &[String]) -> bool {
     if !expected_nodes.is_empty() {
         !expected_nodes
@@ -611,16 +628,26 @@ pub(super) async fn probe_metrics_group(
         .delay_group("PROXY__METRICS", fallback_url, NODE_TEST_TIMEOUT_MS)
         .await
     {
-        Ok(d) => {
+        Ok(d) if has_any_valid_real_probe_delay(&d) => {
             logging!(
                 info,
                 Type::Lightweight,
-                "[后台监测] [{label}] 备用测速地址可用 → 判定为主测速地址失真、节点侧正常，本轮不判死、不触发自愈"
+                "[后台监测] [{label}] 备用测速地址有真实节点响应（响应节点={}），标记主测速地址失真并交裁决层核验当前节点",
+                d.len()
             );
             Some(MetricsProbeOutcome {
                 delays: record_snapshot(d),
                 primary_url_distorted: true,
             })
+        }
+        Ok(_) => {
+            logging!(
+                warn,
+                Type::Lightweight,
+                "[后台监测] [{label}] 主/备测速地址均无有效节点响应 → 判定为测速链路不可用（不视为节点已死）"
+            );
+            *LAST_METRICS_PROBE.lock() = None;
+            None
         }
         Err(e) => {
             logging!(

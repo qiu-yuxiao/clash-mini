@@ -1,14 +1,21 @@
 import {
   check,
-  type Update,
   type DownloadEvent,
+  type Update,
 } from '@tauri-apps/plugin-updater'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useClashInfo } from '@/hooks/use-clash'
+import { useVerge } from '@/hooks/use-verge'
 import { isSameVersion } from '@/pages/_layout/utils/style-helpers'
-import { withIpcTimeout } from '@/services/cmds'
+import { frontendLog, withIpcTimeout } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
+import {
+  checkClientUpdateWithFallback,
+  downloadAndInstallClientUpdateWithRetry,
+  resolveLocalMixedProxyUrl,
+} from '@/utils/client-update'
 
 interface UseClientUpdateParams {
   appVersion: string
@@ -20,6 +27,8 @@ export function useClientUpdate({
   setHelpAnchorEl,
 }: UseClientUpdateParams) {
   const { t } = useTranslation()
+  const { verge } = useVerge()
+  const { clashInfo } = useClashInfo()
   const [clientUpdateOpen, setClientUpdateOpen] = useState(false)
   const [clientUpdateObj, setClientUpdateObj] = useState<Update | null>(null)
   const [clientStatus, setClientStatus] = useState<
@@ -33,7 +42,15 @@ export function useClientUpdate({
     setClientCheckLoading(true)
     setHelpAnchorEl(null)
     try {
-      const update = await check()
+      const localProxyUrl = resolveLocalMixedProxyUrl(
+        verge?.verge_mixed_port,
+        clashInfo?.mixed_port,
+      )
+      const update = await checkClientUpdateWithFallback({
+        localProxyUrl,
+        checkFn: (options) => check(options),
+        logError: (msg) => frontendLog('error', msg),
+      })
       if (update) {
         setClientUpdateObj(update)
         setClientUpdateOpen(true)
@@ -69,8 +86,17 @@ export function useClientUpdate({
     try {
       let downloaded = 0
       let total = 0
-      const downloadPromise = clientUpdateObj.downloadAndInstall(
-        (progressEvent: DownloadEvent) => {
+      const downloadPromise = downloadAndInstallClientUpdateWithRetry({
+        initialUpdate: clientUpdateObj,
+        onAttemptReset: () => {
+          downloaded = 0
+          total = 0
+          setClientProgress(0)
+          setClientProgressMessage(
+            t('layout.components.dialogs.progress.clientDownloading'),
+          )
+        },
+        onEvent: (progressEvent: DownloadEvent) => {
           if (progressEvent.event === 'Started') {
             total = progressEvent.data.contentLength || 0
             setClientProgressMessage(
@@ -104,7 +130,9 @@ export function useClientUpdate({
             )
           }
         },
-      )
+        recheckDirectFn: () => check({ timeout: 20_000 }),
+        logError: (msg) => frontendLog('error', msg),
+      })
       await withIpcTimeout(
         downloadPromise,
         10 * 60 * 1000,
@@ -113,8 +141,9 @@ export function useClientUpdate({
       showNotice.success('layout.notices.clientInstallCompleted')
     } catch (err: unknown) {
       console.error('Client update error:', err)
-      setClientStatus('error')
       const errMsg = err instanceof Error ? err.message : String(err)
+      frontendLog('error', `[ClientUpdate] 客户端升级失败: ${errMsg}`)
+      setClientStatus('error')
       setClientProgressMessage(
         t('layout.notices.clientUpdateFailed', { message: errMsg }),
       )

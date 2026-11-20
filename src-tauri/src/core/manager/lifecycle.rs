@@ -545,6 +545,55 @@ impl CoreManager {
         // 收尾清理：清除启动/重载窗口内落入已排除节点上的代理连接
         crate::module::monitor::close_excluded_proxy_connections(&raw_filter).await;
     }
+
+    /// 运行期自动对账运行模式（BUG-417）：
+    /// 升级重装或冷启动期间若 `start_clash` IPC 短暂超时导致 `running_mode` 回滚为 `NotRunning`，
+    /// 但系统服务 1 秒后已正常拉起内核、命名管道在线响应且无 Sidecar 子进程时，自动恢复为 `RunningMode::Service`，
+    /// 使 `BUG-411`（缺管快重启）、`BUG-415`（服务建连失败突发监控）与 `BUG-416`（网卡事件增量读取）正常恢复。
+    pub async fn reconcile_running_mode_if_needed(&self) {
+        if Handle::global().is_exiting()
+            || !matches!(*self.get_running_mode(), RunningMode::NotRunning)
+            || self
+                .config_update_in_progress
+                .load(std::sync::atomic::Ordering::Acquire)
+        {
+            return;
+        }
+        if self.lifecycle_lock.try_lock().is_err() {
+            return;
+        }
+        if self.state.load().child_sidecar.load().is_some()
+            || !crate::core::service::is_service_ipc_path_exists()
+            || Handle::mihomo().await.is_local_socket_missing()
+        {
+            return;
+        }
+        let api_alive = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            Handle::mihomo().await.get_base_config(),
+        )
+        .await
+        .is_ok_and(|res| res.is_ok());
+        if !api_alive {
+            return;
+        }
+        let Ok(_life) = self.lifecycle_lock.try_lock() else {
+            return;
+        };
+        if Handle::global().is_exiting()
+            || !matches!(*self.get_running_mode(), RunningMode::NotRunning)
+            || self.state.load().child_sidecar.load().is_some()
+        {
+            return;
+        }
+        self.set_running_mode(RunningMode::Service);
+        self.after_core_process();
+        logging!(
+            info,
+            Type::Core,
+            "检测到系统服务内核已在线就绪，自动对账恢复运行模式: NotRunning -> Service"
+        );
+    }
 }
 
 /// 在 filterText 子集内选择首个可用节点作为 PROXY 兜底，并同步持久化 `profile.selected`。

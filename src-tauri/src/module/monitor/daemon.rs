@@ -6,8 +6,9 @@ use super::connections::{close_dead_node_proxy_connections, close_excluded_proxy
 use super::observer::{LAST_HEALTH_OBSERVATION, sync_service_kernel_logs};
 use super::probe::{
     get_current_profile_uid, get_filter_and_sort_config, is_clash_api_alive, is_physical_network_online,
-    is_recent_flowing_traffic_active, load_node_server_map, record_server_failure, restore_profile_selected_nodes,
-    run_https_verification_pass, should_run_periodic_https_verify_with, wait_for_clash_ready,
+    is_recent_flowing_traffic_active, is_valid_probe_delay, load_node_server_map, record_server_failure,
+    restore_profile_selected_nodes, run_https_verification_pass, should_run_periodic_https_verify_with,
+    wait_for_clash_ready,
 };
 use super::verdict::{
     FailoverVerdict, NodeStatus, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
@@ -16,12 +17,12 @@ use super::verdict::{
     self_heal_subject_to_switch_rate_limit, should_keep_alive_on_api_recovery, should_proceed_with_self_heal,
 };
 use super::{
-    ALERT_DIALOG_OPEN, API_ERROR_HEAL_THRESHOLD, AUTO_SWITCH_WINDOW_SECS, AutoSelectOutcome, FORCE_ONLINE_RECHECK,
-    HTTPS_VERIFY_INTERVAL_SECS, LAST_MANUAL_NODE_SWITCH, MAX_AUTO_SWITCHES_PER_WINDOW, MIN_AUTO_SWITCH_INTERVAL_SECS,
-    MONITOR_HEARTBEAT_CYCLE_COUNT, MONITOR_SUMMARY_INTERVAL_SECS, MONITOR_TASK_HANDLE, MONITOR_WAKEUP_NOTIFY,
-    NODE_SWITCH_NOTIFY, NORMAL_CHECK_INTERVAL_SECS, PIPE_MISSING_CONFIRM_DELAY_MS, PROFILE_SWITCH_NOTIFY,
-    SELF_HEAL_COOLDOWN_SECS, SWITCH_GRACE_PERIOD_SECS, emit_network_health_notice, is_dummy_node,
-    reset_monitor_static_state,
+    ALERT_DIALOG_OPEN, API_ERROR_HEAL_THRESHOLD, AUTO_SWITCH_WINDOW_SECS, AutoSelectOutcome, DelayResultSource,
+    FORCE_ONLINE_RECHECK, HTTPS_VERIFY_INTERVAL_SECS, LAST_MANUAL_NODE_SWITCH, MAX_AUTO_SWITCHES_PER_WINDOW,
+    MIN_AUTO_SWITCH_INTERVAL_SECS, MONITOR_HEARTBEAT_CYCLE_COUNT, MONITOR_SUMMARY_INTERVAL_SECS, MONITOR_TASK_HANDLE,
+    MONITOR_WAKEUP_NOTIFY, NODE_SWITCH_NOTIFY, NORMAL_CHECK_INTERVAL_SECS, PIPE_MISSING_CONFIRM_DELAY_MS,
+    PROFILE_SWITCH_NOTIFY, SELF_HEAL_COOLDOWN_SECS, SWITCH_GRACE_PERIOD_SECS, emit_network_health_notice,
+    is_dummy_node, reset_monitor_static_state,
 };
 use crate::process::AsyncHandler;
 use clash_verge_logging::{Type, logging};
@@ -147,6 +148,40 @@ async fn handle_api_unreachable(
     }
 }
 
+/// 判断活跃节点观测变更时是否应开启 `20s` 切换宽限期（BUG-417）：
+/// 仅在已记录过前一节点且发生真实节点变更（`Some(old) -> Some(new)`）且当前不处于有效宽限期时开启；
+/// 守护启动首次观测（`None -> Some`）严禁开启伪宽限期吞掉首轮故障。
+pub(super) fn should_arm_switch_grace_on_node_change(
+    prev_active: Option<&str>,
+    new_active: &str,
+    existing_grace_active: bool,
+) -> bool {
+    prev_active.is_some_and(|prev| prev != new_active) && !existing_grace_active
+}
+
+/// 判断冷启动纯测速（`select == false`）是否应预置第 1 次失败并触发 3 秒快速复核（BUG-417）：
+/// 当实测发现当前持久节点超时无有效延迟、而同组过滤子集内存在至少 1 个健康可达节点时，
+/// 预置 `consecutive_fails = 1`；若 3 秒后复检恢复则保活，再败则立即切往健康节点。
+pub(super) fn should_seed_boot_probe_failure(active_node: Option<&str>, outcome: &AutoSelectOutcome) -> bool {
+    if outcome.selected || !matches!(outcome.source, DelayResultSource::LiveProbe) {
+        return false;
+    }
+    let Some(active) = active_node.filter(|n| !n.is_empty()) else {
+        return false;
+    };
+    let active_reachable = outcome
+        .display
+        .iter()
+        .any(|(name, delay)| name == active && is_valid_probe_delay(*delay));
+    if active_reachable {
+        return false;
+    }
+    outcome
+        .display
+        .iter()
+        .any(|(name, delay)| name != active && is_valid_probe_delay(*delay))
+}
+
 /// 启动全局后台节点监测常驻线程（运行于独立守护运行时 `DAEMON_RUNTIME`，带 panic 自愈监督）
 pub fn start_background_monitor() {
     let handle = AsyncHandler::spawn_daemon_supervised("background_monitor", Type::Lightweight, move || async move {
@@ -215,6 +250,9 @@ pub fn start_background_monitor() {
                     last_check_time = Instant::now();
                     continue;
                 }
+                crate::core::manager::CoreManager::global()
+                    .reconcile_running_mode_if_needed()
+                    .await;
                 // 窗口不可见（轻量/纯托盘启动）时，由后端在启动时执行一次初始化自动选点；
                 // 窗口存在则交给前端，此处不动作。进入轻量模式（lightweight.rs B4）也会选点，
                 // 二者由 trigger_backend_auto_select 内部的 AUTO_SELECT_RUNNING 互斥，不会重复执行。
@@ -226,7 +264,23 @@ pub fn start_background_monitor() {
                         // 不按最快节点覆盖用户选择；仅当出口结构性失效才允许重选。
                         // 前序 wait_for_clash_ready 已通过，跳过冗余等待；结果经事件回写前端 UI。
                         let select = !has_usable_persisted_exit(&uid).await;
-                        let _ = trigger_backend_auto_select(&uid, None, 0, select, true).await;
+                        if let Ok(outcome) = trigger_backend_auto_select(&uid, None, 0, select, true).await
+                            && !select
+                        {
+                            let cur_active = get_active_node_name().await;
+                            if should_seed_boot_probe_failure(cur_active.as_deref(), &outcome) {
+                                logging!(
+                                    info,
+                                    Type::Lightweight,
+                                    "[后台监测] 启动纯测速发现持久节点 {:?} 超时不可达且同组存在健康候选，计入第 1 次失败并进入 3s 快速复核",
+                                    cur_active
+                                );
+                                last_active_node = cur_active;
+                                consecutive_fails = 1;
+                                is_retry_mode = true;
+                                last_check_time = Instant::now();
+                            }
+                        }
                     }
                 }
             } else {
@@ -273,6 +327,10 @@ pub fn start_background_monitor() {
                 }
             };
 
+            // 若系统服务内核实际在线而启动期瞬时超时把 running_mode 置为了 NotRunning，在此自动对账恢复（BUG-417）
+            crate::core::manager::CoreManager::global()
+                .reconcile_running_mode_if_needed()
+                .await;
             // 同步增量读取内核日志中的网卡事件（BUG-416），使 `[TUN] default interface lost/changed` 立即跳过 60s 在线免测
             sync_service_kernel_logs().await;
             let force_online_recheck = FORCE_ONLINE_RECHECK.swap(false, Ordering::AcqRel);
@@ -418,17 +476,25 @@ pub fn start_background_monitor() {
                         last_active_node,
                         active_node_name
                     );
+                    let existing_grace_active = last_node_change_time
+                        .is_some_and(|t| t.elapsed() < Duration::from_secs(SWITCH_GRACE_PERIOD_SECS));
+                    let arm_grace = should_arm_switch_grace_on_node_change(
+                        last_active_node.as_deref(),
+                        &active_node_name,
+                        existing_grace_active,
+                    );
+                    let had_prev_node = last_active_node.is_some();
                     last_active_node = Some(active_node_name.clone());
-                    // 若手动切点通知已在当前宽限期内设置过精确点击时刻，保留该时间戳避免重复延展宽限期；
-                    // 否则（如自动选点切换或外部 REST 切换）以当前检测时刻开启宽限期。
-                    if last_node_change_time
-                        .is_none_or(|t| t.elapsed() >= Duration::from_secs(SWITCH_GRACE_PERIOD_SECS))
-                    {
+                    // 仅对真实发生切换（Some(old) -> Some(new)）且当前无有效宽限期时开启 20s 宽限期；
+                    // 首次观测（None -> Some）严禁开启伪宽限期或清除冷启动预置的失败计数（BUG-417）。
+                    if arm_grace {
                         last_node_change_time = Some(Instant::now());
                     }
-                    consecutive_fails = 0;
-                    is_retry_mode = false;
-                    recent_brownout_episodes.clear();
+                    if had_prev_node {
+                        consecutive_fails = 0;
+                        is_retry_mode = false;
+                        recent_brownout_episodes.clear();
+                    }
                 }
 
                 match evaluate_failover(&current_profile).await {

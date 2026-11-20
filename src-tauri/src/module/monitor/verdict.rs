@@ -144,6 +144,21 @@ pub(super) enum SelfHealDecision {
     Wait,
 }
 
+/// 判断主测速地址失真轮次是否真正证明了当前活跃节点本身可用（BUG-417）：
+/// 仅当主地址整体失败但当前活跃节点自身在备用测速地址下取得有效延迟时，才免于判死；
+/// 若仅其他节点通过备用地址而当前活跃节点仍超时无响应，禁止由其它节点“替考”豁免。
+pub(super) fn is_active_excused_by_primary_distortion(
+    primary_url_distorted: bool,
+    active_node: &str,
+    probed_delays: &std::collections::HashMap<String, u32>,
+) -> bool {
+    primary_url_distorted
+        && probed_delays
+            .get(active_node)
+            .copied()
+            .is_some_and(super::probe::is_valid_probe_delay)
+}
+
 /// 统一裁决器：节点侧需连续 `FAILOVER_CONFIRM_FAILS` 次失败或 600s 窗口内 `BROWNOUT_CONFIRM_FAILS` 次间歇故障；
 /// 网络恢复恒 `Wait`；API 异常须经存活复核仍失联。
 pub(super) const fn decide_self_heal(trigger: SelfHealTrigger) -> SelfHealDecision {
@@ -328,9 +343,9 @@ pub(super) async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<Failo
         );
     }
 
-    // 本轮体检是否得出「主测速地址失真、节点侧正常」的结论。该结论必须进入健康裁决，
-    // 不能只停留在日志里（见 MetricsProbeOutcome 注释）。
+    // 本轮体检是否得出「主测速地址失真、活跃节点自身正常」及原始失真标记。
     let mut primary_url_distorted = false;
+    let mut active_excused_by_distortion = false;
 
     if need_probe {
         // 经测量组并发直拨全员（TUN 下无自指回环），禁用短窗合并；单目标初检与复核在同组已有 >= 3 个真实节点
@@ -363,13 +378,16 @@ pub(super) async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<Failo
         // 先取出裁决结论，再取延迟表；结论不能被后面的重读 get_proxies() 冲掉。
         primary_url_distorted = probed.primary_url_distorted;
         let probed_delays = probed.delays;
+        active_excused_by_distortion =
+            is_active_excused_by_primary_distortion(primary_url_distorted, &active_node, &probed_delays);
         if probed_delays.is_empty() && !primary_url_distorted {
             *LAST_METRICS_PROBE.lock() = None;
         }
 
-        // 【BUG-369 / BUG-387 修复】后台定期体检刚刚完成了一次真实的整组延迟探测：
+        // 【BUG-369 / BUG-387 / BUG-417 修复】后台定期体检刚刚完成了一次真实的整组延迟探测：
         // - `!primary_url_distorted` 时即便 `probed_delays` 为空（全员超时 `{}`）也向前端推送全组 `0 (Timeout)`；
-        // - `primary_url_distorted` 时仅同步真正测得有效延迟的节点，避免把未响应节点漆成 30 分钟 `0`。
+        // - `primary_url_distorted` 时仅同步真正测得有效延迟的节点，避免把未响应普通节点漆成 30 分钟 `0`；
+        //   但若当前活跃节点本身主/备双超时（`!active_excused_by_distortion`），需显式推送 `(active_node, 0)` 清除顶部假绿。
         let mut ui_synced_display: Option<Vec<(String, u32)>> = None;
         if !crate::module::lightweight::is_in_lightweight_mode() {
             let already_reported = !probed_delays.is_empty()
@@ -378,11 +396,19 @@ pub(super) async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<Failo
                     .as_ref()
                     .is_some_and(|s| s.reported_live_to_ui);
             if !already_reported {
-                let display = build_probe_ui_display(
+                let mut display = build_probe_ui_display(
                     group_info.all.as_deref().unwrap_or(&[]),
                     &probed_delays,
                     primary_url_distorted,
                 );
+                if primary_url_distorted
+                    && !active_excused_by_distortion
+                    && !display.iter().any(|(n, _)| n == &active_node)
+                    && !is_dummy_node(&active_node)
+                    && !crate::utils::node::is_confirmed_fake_node(&active_node)
+                {
+                    display.push((active_node.clone(), 0));
+                }
                 if !display.is_empty() {
                     crate::core::handle::Handle::notify_delay_results("PROXY".into(), display.clone(), true);
                     crate::core::handle::Handle::refresh_proxies();
@@ -474,14 +500,24 @@ pub(super) async fn evaluate_failover(profile_uid: &str) -> anyhow::Result<Failo
         });
     }
 
-    // 连续性优先：主 URL 整体失败而备用 URL 正常即属测速地址失真，本轮直接判 NoAction
+    // 连续性优先：仅当活跃节点自身也通过备用测速地址时，才免于判死并返回 NoAction；
+    // 若仅同组其他节点通过备用地址而活跃节点仍超时，则继续按正常状态裁决（BUG-417）。
+    if active_excused_by_distortion {
+        logging!(
+            info,
+            Type::Lightweight,
+            "[后台监测] 备用测速地址已证明当前活跃节点 {} 正常 → 本轮返回 NoAction（不累计失败、不自愈、不切点）",
+            active_node
+        );
+        return Ok(FailoverVerdict::NoAction);
+    }
     if primary_url_distorted {
         logging!(
             info,
             Type::Lightweight,
-            "[后台监测] 备用测速地址已证明节点侧正常 → 本轮返回 NoAction（不累计失败、不自愈、不切点）"
+            "[后台监测] 主测速地址失真，但当前活跃节点 {} 在备用测速地址下仍超时无响应，继续执行故障裁决",
+            active_node
         );
-        return Ok(FailoverVerdict::NoAction);
     }
 
     // 仅由本轮主/备测速 URL 实拨结果裁决节点死活；Alive 节点仅在非 Flowing 且冷却允许时执行真 HTTPS 复核

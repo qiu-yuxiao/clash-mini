@@ -8,7 +8,10 @@ use super::connections::{
     should_close_dead_node_proxy_connection, should_close_excluded_proxy_connection,
     should_close_stale_proxy_connection,
 };
-use super::daemon::{SelfHealAction, complete_restart_core_attempt, evaluate_self_heal_counters};
+use super::daemon::{
+    SelfHealAction, complete_restart_core_attempt, evaluate_self_heal_counters, should_arm_switch_grace_on_node_change,
+    should_seed_boot_probe_failure,
+};
 use super::observer::{
     ACTIVE_TRAFFIC_TRACKER, ActiveHealthObservation, ActiveTrafficState, KernelLogEvent, KernelReprobeReason,
     LAST_HEALTH_OBSERVATION, PROXY_DIAL_FAILURE_TRACKER, ProxyDialFailureTracker, classify_active_traffic_delta,
@@ -16,15 +19,15 @@ use super::observer::{
     should_probe_active_node,
 };
 use super::probe::{
-    build_probe_ui_display_with, compute_next_ui_active_sync, has_recent_flowing_traffic,
-    is_https_verify_backoff_active, is_valid_probe_delay, merge_probe_delays, resolve_probe_target, secondary_test_url,
-    should_recheck_primary_with_fallback_with, should_recheck_with_fallback, should_run_periodic_https_verify_with,
-    should_sync_alive_ui, try_reuse_probe_snapshot,
+    build_probe_ui_display_with, compute_next_ui_active_sync, has_any_valid_real_probe_delay_with,
+    has_recent_flowing_traffic, is_https_verify_backoff_active, is_valid_probe_delay, merge_probe_delays,
+    resolve_probe_target, secondary_test_url, should_recheck_primary_with_fallback_with, should_recheck_with_fallback,
+    should_run_periodic_https_verify_with, should_sync_alive_ui, try_reuse_probe_snapshot,
 };
 use super::verdict::{
     NodeStatus, SelfHealDecision, SelfHealOrigin, SelfHealTrigger, auto_switch_permitted,
-    can_fast_restart_missing_pipe, classify_node_status, decide_self_heal, is_benign_auto_select_abort,
-    is_manual_switch_preempted, record_brownout_episode, self_heal_requires_dead_gate,
+    can_fast_restart_missing_pipe, classify_node_status, decide_self_heal, is_active_excused_by_primary_distortion,
+    is_benign_auto_select_abort, is_manual_switch_preempted, record_brownout_episode, self_heal_requires_dead_gate,
     self_heal_subject_to_switch_rate_limit, should_allow_https_migration, should_keep_alive_on_api_recovery,
     should_migrate_filtered_out_active, should_proceed_with_self_heal,
 };
@@ -1374,4 +1377,80 @@ fn test_bug416_tun_interface_signals_invalidate_online_skip_and_reprobe() {
 
     reset_monitor_static_state();
     drop(serial);
+}
+
+#[test]
+fn test_primary_url_distorted_never_excuses_dead_active_node() {
+    // 1. 仅非真实节点 / DIRECT / REJECT / 超时 0ms 时，备用 URL 不可视为存在真实节点有效延迟
+    let mut non_real = HashMap::new();
+    non_real.insert("DIRECT".to_string(), 32);
+    non_real.insert("剩余流量：100GB".to_string(), 45);
+    non_real.insert("新加坡5".to_string(), 0);
+    non_real.insert("日本1".to_string(), 28); // < NODE_DELAY_MIN_MS (30ms) 视为伪延迟
+    assert!(!has_any_valid_real_probe_delay_with(&non_real, |n| n == "新加坡5"));
+
+    let mut fake_only = HashMap::new();
+    fake_only.insert("广告伪节点".to_string(), 120);
+    assert!(!has_any_valid_real_probe_delay_with(&fake_only, |n| n == "广告伪节点"));
+
+    // 2. 其他真实节点在备用 URL 上通过，但当前活跃节点主/备双超时（缺失或 0ms）：绝不能“替考免死”
+    let mut peer_only = HashMap::new();
+    peer_only.insert("日本1".to_string(), 135);
+    peer_only.insert("新加坡5".to_string(), 0);
+    assert!(has_any_valid_real_probe_delay_with(&peer_only, |_| false));
+    assert!(!is_active_excused_by_primary_distortion(true, "新加坡5", &peer_only));
+    assert!(!is_active_excused_by_primary_distortion(true, "美国1", &peer_only));
+
+    // 3. 只有当前活跃节点自身在备用 URL 取得有效延迟且主 URL 失真时，才返回 true 免于判死
+    peer_only.insert("新加坡5".to_string(), 188);
+    assert!(is_active_excused_by_primary_distortion(true, "新加坡5", &peer_only));
+    assert!(!is_active_excused_by_primary_distortion(false, "新加坡5", &peer_only));
+}
+
+#[test]
+fn test_boot_observation_grace_and_dead_persisted_exit_seed() {
+    // 1. 守护首次观测（None -> Some）严禁开启伪 20s 宽限期；仅真实换节点且无现成宽限期时开启
+    assert!(!should_arm_switch_grace_on_node_change(None, "新加坡5", false));
+    assert!(!should_arm_switch_grace_on_node_change(
+        Some("新加坡5"),
+        "新加坡5",
+        false
+    ));
+    assert!(!should_arm_switch_grace_on_node_change(Some("新加坡5"), "日本1", true));
+    assert!(should_arm_switch_grace_on_node_change(Some("新加坡5"), "日本1", false));
+
+    let make_outcome =
+        |selected: bool, source: DelayResultSource, display: Vec<(&str, u32)>| super::AutoSelectOutcome {
+            display: display.into_iter().map(|(n, d)| (n.to_string(), d)).collect(),
+            selected,
+            selected_node: None,
+            source,
+            covers_all_group_nodes: true,
+        };
+
+    // 2. 冷启动纯测速实测当前持久节点超时(0)，而同组存在其他健康节点：预置第 1 次失败进入 3s 快速复核
+    let dead_boot = make_outcome(
+        false,
+        DelayResultSource::LiveProbe,
+        vec![("新加坡5", 0), ("日本1", 140)],
+    );
+    assert!(should_seed_boot_probe_failure(Some("新加坡5"), &dead_boot));
+
+    // 3. 持久节点较慢(1599ms < 5000ms)但可达：严格遵守连续性优先，绝不误判为失败
+    let slow_alive_boot = make_outcome(
+        false,
+        DelayResultSource::LiveProbe,
+        vec![("新加坡5", 1599), ("日本1", 90)],
+    );
+    assert!(!should_seed_boot_probe_failure(Some("新加坡5"), &slow_alive_boot));
+
+    // 4. 全员均超时或非 LiveProbe 或已发生选点切换：不预置
+    let all_timeout = make_outcome(false, DelayResultSource::LiveProbe, vec![("新加坡5", 0), ("日本1", 0)]);
+    assert!(!should_seed_boot_probe_failure(Some("新加坡5"), &all_timeout));
+    let non_live = make_outcome(
+        false,
+        DelayResultSource::NotExecuted,
+        vec![("新加坡5", 0), ("日本1", 120)],
+    );
+    assert!(!should_seed_boot_probe_failure(Some("新加坡5"), &non_live));
 }

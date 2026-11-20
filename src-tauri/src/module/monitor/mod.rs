@@ -125,11 +125,11 @@ pub(super) struct MetricsProbeSnapshot {
     pub(super) reported_live_to_ui: bool,
 }
 
-/// `probe_metrics_group` 的本轮拨测结论；`primary_url_distorted` 为真时裁决层须返回 `NoAction`。
+/// `probe_metrics_group` 的本轮拨测结论；当 `primary_url_distorted` 为真且活跃节点自身通过备用地址时免予判死。
 #[derive(Debug, Clone)]
 pub(super) struct MetricsProbeOutcome {
     pub(super) delays: HashMap<String, u32>,
-    /// 主测速地址整体失败、备用地址成功 ⇒ 测速地址失真，节点侧正常。
+    /// 主测速地址整体失败、备用地址至少有真实节点响应 ⇒ 主测速地址可能失真（需在裁决层核对活跃节点自身）。
     pub(super) primary_url_distorted: bool,
 }
 

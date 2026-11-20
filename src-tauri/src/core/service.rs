@@ -337,9 +337,38 @@ pub(super) async fn start_with_existing_service(config_file: &PathBuf) -> Result
         waited += poll_interval;
     }
 
-    let response = clash_verge_service_ipc::start_clash(&payload)
-        .await
-        .context("无法连接到Clash Verge Service")?;
+    let mut last_err = None;
+    let mut response_opt = None;
+    for attempt in 0..3u8 {
+        match clash_verge_service_ipc::start_clash(&payload).await {
+            Ok(resp) => {
+                response_opt = Some(resp);
+                break;
+            }
+            Err(err) => {
+                if crate::core::handle::Handle::global().is_exiting() || attempt == 2 {
+                    last_err = Some(err);
+                    break;
+                }
+                let wait_ms = if attempt == 0 { 400 } else { 800 };
+                logging!(
+                    warn,
+                    Type::Service,
+                    "连接系统服务启动核心第 {} 次失败，{}ms 后重试: {err}",
+                    attempt + 1,
+                    wait_ms
+                );
+                tokio::time::sleep(Duration::from_millis(wait_ms)).await;
+            }
+        }
+    }
+    let response = match response_opt {
+        Some(resp) => resp,
+        None => {
+            return Err(last_err.unwrap_or_else(|| anyhow::anyhow!("unknown error")))
+                .context("无法连接到Clash Verge Service");
+        }
+    };
 
     if response.code > 0 {
         let err_msg = response.message;
