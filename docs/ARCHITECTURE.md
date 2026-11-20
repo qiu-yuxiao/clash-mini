@@ -81,7 +81,8 @@ flowchart TB
 
 | 关注点 | 关键文件 | 说明 |
 |---|---|---|
-| 页面外壳 | `src/pages/_layout.tsx` | 主布局与设置抽屉编排（挂载首次引导、订阅管理、接管/分流/基础/外观卡片与弹窗组） |
+| 页面外壳 | `src/pages/_layout.tsx` + `src/pages/_layout/{hooks,components}/` | 主布局薄外壳与设置抽屉（`SettingsDrawer`）/ 订阅上下文（`useProfileActions`、`useProxyModeActions`）/ 弹窗组（`dialogs/`、`first-run-guide-dialog/`）/ 共享输入框菜单（`InputContextMenu`）编排 |
+| 控件皮肤样式 | `src/utils/button-styles/` | 6 套控件皮肤配色解析与 3D 按钮/卡片/输入框/分段开关样式生成（`skin.ts`、`button.ts`、`card.ts`、`input.ts`、`segmented.ts`） |
 | 缓存中枢 | `src/providers/app-data-provider.tsx` | 拥有活跃 react-query 缓存（代理 / 配置 / 系统代理 / 运行模式等），监听 `profile-changed`、`verge://refresh-proxy-config` 等事件并失效缓存 |
 | IPC 封装 | `src/services/cmds.ts` | 每个后端 `invoke` 包 `withIpcTimeout`（如 `importProfile` / `patchVergeConfig` / `triggerAutoSelect` / `installService`） |
 | 内核 API 封装 | `src/services/mihomo-api.ts` | 封装 `tauri-plugin-mihomo-api` 访客函数（带超时），如 `selectNodeForGroupWithTimeout` |

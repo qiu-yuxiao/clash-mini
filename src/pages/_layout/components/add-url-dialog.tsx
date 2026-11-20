@@ -5,9 +5,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
-  Menu,
-  MenuItem,
   TextField,
   useTheme,
 } from '@mui/material'
@@ -22,12 +19,12 @@ import {
   getNarrowDialogSx,
   getPopupActionsSx,
   getPopupContentSx,
-  getPopupMenuItemStyle,
-  getPopupMenuPaperProps,
   getPopupTitleSx,
   useNarrowOverlayTopOffset,
 } from '@/utils/popup-styles'
 import { addQuickRoutingRules } from '@/utils/quick-routing'
+
+import { InputContextMenu } from './input-context-menu'
 
 interface AddUrlDialogProps {
   open: boolean
@@ -272,43 +269,24 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
       </Dialog>
 
       {/* Input Context Menu */}
-      <Menu
-        anchorReference="anchorPosition"
+      <InputContextMenu
         anchorPosition={
           contextMenu !== null
-            ? {
-                top: contextMenu.mouseY,
-                left: contextMenu.mouseX,
-              }
-            : undefined
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : null
         }
-        open={contextMenu !== null}
         onClose={() => setContextMenu(null)}
-        slotProps={{
-          paper: getPopupMenuPaperProps(theme, { minWidth: '160px' }),
-        }}
-      >
-        <MenuItem onClick={handleCut} disabled={!hasSelection}>
-          ✂️ {t('shared.actions.cut')}
-        </MenuItem>
-        <MenuItem onClick={handleCopy} disabled={!hasSelection}>
-          📋 {t('shared.actions.copy')}
-        </MenuItem>
-        <MenuItem onClick={handlePaste}>
-          📥 {t('shared.actions.paste')}
-        </MenuItem>
-        <MenuItem onClick={handleSelectAll} disabled={!text}>
-          🔍 {t('shared.actions.selectAll')}
-        </MenuItem>
-        <Divider />
-        <MenuItem
-          onClick={handleClear}
-          disabled={!text}
-          sx={getPopupMenuItemStyle(theme, { danger: true })}
-        >
-          🧹 {t('shared.actions.clearInput')}
-        </MenuItem>
-      </Menu>
+        canCut={hasSelection}
+        canCopy={hasSelection}
+        canSelectAll={Boolean(text)}
+        canClear={Boolean(text)}
+        onCut={handleCut}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
+        onSelectAll={handleSelectAll}
+        onClear={handleClear}
+        minWidth="160px"
+      />
     </>
   )
 }

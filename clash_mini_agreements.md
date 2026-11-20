@@ -468,7 +468,7 @@ flowchart LR
 ### 8.9 用户可见文案 i18n 硬约束
 
 - **全面覆盖与严格类型**：除参与数据比较的内部哨兵串及语言选择器自身语种名称外，全部用户可见文案必须走 `t()`；禁止用 `@ts-expect-error` 掩盖 key 路径错误；相同含义仅保留唯一 key（通用动作词收归 `shared.actions.*`）。
-- **13 语种同步与同构 UI**：新增或删除键须同时落地全部 13 个语种（占位符集合一致）并通过 `node scripts/cleanup-unused-i18n.mjs`、`pnpm i18n:check` 与 `pnpm i18n:types`；三处同构输入框右键菜单（`_layout.tsx`、`add-url-dialog.tsx`、`first-run-guide-dialog.tsx`）须同步维护。
+- **13 语种同步与同构 UI**：新增或删除键须同时落地全部 13 个语种（占位符集合一致）并通过 `node scripts/cleanup-unused-i18n.mjs`、`pnpm i18n:check` 与 `pnpm i18n:types`；三处同构输入框右键菜单（`_layout.tsx`、`add-url-dialog.tsx`、`first-run-guide-dialog/`）已统一复用共享组件 `src/pages/_layout/components/input-context-menu.tsx`（`<InputContextMenu>`），菜单项或交互调整须通过该共享组件同步生效。
 
 ### 8.10 安装程序全周期全局置顶铁律
 
