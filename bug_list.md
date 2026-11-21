@@ -9,6 +9,15 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-418 路径控制表活跃连接与已关闭/已封锁链接混排，需在「链接目标」表头同排右侧增加二选一开关隔离
+
+- **对应模块**：[path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)、[use-path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-path-control.ts)、[connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx)、[connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx)、[path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts)
+- **问题描述**：当前设置页右侧「路径控制」表格将实时活跃连接、近期已关闭连接以及 `Merge` `REJECT` 封锁/置顶规则混合渲染在同一列表内，长流实时连接与已结束死链/封锁项混杂在一起导致日常排查不够直观清爽；若在结果为空时整体替换为 `<BaseEmpty />` 还会令嵌入式表头开关随空表一起消失。
+- **修复方案**：
+  1. 将 [path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts) 合表函数重构为 `partitionPathControlConnections` 与 [use-path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-path-control.ts) 双视图输出：**左侧「活跃」** 仅显示当前实时 `直连 / 代理` 连接；**右侧「已关闭」** 顶部固定置顶 `封锁 (REJECT)` 规则（重启后仍可一眼定位解封），其后依次为手动 `已断开` 记录、无活跃流的自定义规则及按目标去重的近期已关闭连接（自动排除活跃视图中已在线的目标）；
+  2. 在 [connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx) 「链接目标」列头同排右侧嵌入紧凑 3D 二选一开关（`活跃 / 已关闭`，点击阻止冒泡隔离排序），由 [connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx) 始终保持表格挂载（空态在表头下方呈现 `<BaseEmpty />`），并补齐 13 语种 `active` / `closed` 翻译与 [path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts) 单测覆盖。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-417 备用测速 URL 误赦免坏节点、服务模式启动竞态未对账、首次观测伪宽限期与客户端升级单路断流无日志
 
 - **对应模块**：[probe.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/probe.rs)、[verdict.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/verdict.rs)、[daemon.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/module/monitor/daemon.rs)、[service.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/service.rs)、[lifecycle.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/manager/lifecycle.rs)、[use-client-update.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/hooks/use-client-update.ts)、[client-update.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/client-update.ts)

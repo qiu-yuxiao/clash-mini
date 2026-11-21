@@ -8,6 +8,13 @@ import {
 
 export type PathControlStatus = 'direct' | 'proxy' | 'reject' | 'disconnected'
 
+export type PathControlViewMode = 'active' | 'closed'
+
+export interface PartitionedPathControlConnections {
+  active: PathControlConnectionItem[]
+  closed: PathControlConnectionItem[]
+}
+
 export interface PathControlTarget {
   type: 'domain' | 'process'
   value: string
@@ -494,16 +501,18 @@ function matchDisconnectedRecordRule(
 }
 
 /**
- * Merges live Mihomo connections with persisted disconnected items and Merge override rules
- * so all 4 states stay visible and directly operable inside Path Control.
+ * Partitions Path Control items into:
+ * - `active`: genuinely live `direct` / `proxy` connections only
+ * - `closed`: top-pinned `REJECT` rules, manually `disconnected` records,
+ *   idle `direct`/`proxy` Merge rules, and deduplicated recent closed connections
  */
-export function composeActivePathControlConnections(params: {
+export function partitionPathControlConnections(params: {
   activeConnections: IConnectionsItem[]
   closedConnections?: IConnectionsItem[]
   managedRules: ManagedMergeRule[]
   disconnectedRecords: DisconnectedTargetRecord[]
   disconnectedIds?: Set<string>
-}): PathControlConnectionItem[] {
+}): PartitionedPathControlConnections {
   const {
     activeConnections,
     closedConnections = [],
@@ -512,67 +521,91 @@ export function composeActivePathControlConnections(params: {
     disconnectedIds,
   } = params
 
-  const liveTargetKeys = new Set<string>()
-  const liveMatchedRuleRaws = new Set<string>()
+  const liveActiveTargetKeys = new Set<string>()
+  const liveActiveRuleRaws = new Set<string>()
+  const active: PathControlConnectionItem[] = []
+  const transientInactiveSockets: IConnectionsItem[] = []
 
-  const enrichedLive: PathControlConnectionItem[] = activeConnections.map(
-    (conn) => {
-      const target = extractConnectionTarget(conn)
-      const matchedRule = findMatchingManagedRule(conn, managedRules)
+  for (const conn of activeConnections) {
+    const target = extractConnectionTarget(conn)
+    const matchedRule = findMatchingManagedRule(conn, managedRules)
+    const status = resolveConnectionControlStatus(conn, {
+      disconnectedIds,
+      matchedRule,
+    })
+
+    if (status === 'direct' || status === 'proxy') {
       if (target) {
-        liveTargetKeys.add(target.key)
+        liveActiveTargetKeys.add(target.key)
       }
       if (matchedRule) {
-        liveMatchedRuleRaws.add(matchedRule.raw)
+        liveActiveRuleRaws.add(matchedRule.raw)
       }
-      return {
+      active.push({
         ...conn,
         _target: target ?? undefined,
         _managedRule: matchedRule ?? undefined,
-        _controlStatus: resolveConnectionControlStatus(conn, {
-          disconnectedIds,
-          matchedRule,
-        }),
-      }
-    },
-  )
-
-  const coveredKeys = new Set<string>(liveTargetKeys)
-  const coveredRuleRaws = new Set<string>(liveMatchedRuleRaws)
-  const syntheticRows: PathControlConnectionItem[] = []
-
-  for (const record of disconnectedRecords) {
-    if (liveTargetKeys.has(record.key)) continue
-    const matchedRule = matchDisconnectedRecordRule(record, managedRules)
-    if (matchedRule) {
-      coveredRuleRaws.add(matchedRule.raw)
+        _controlStatus: status,
+      })
+    } else {
+      transientInactiveSockets.push(conn)
     }
-    coveredKeys.add(record.key)
-    syntheticRows.push(buildSyntheticDisconnectedRow(record, matchedRule))
   }
 
+  const coveredKeys = new Set<string>(liveActiveTargetKeys)
+  const coveredRuleRaws = new Set<string>(liveActiveRuleRaws)
+  const syntheticRejected: PathControlConnectionItem[] = []
+  const syntheticDisconnected: PathControlConnectionItem[] = []
+  const syntheticIdlePinned: PathControlConnectionItem[] = []
+
   for (const rule of managedRules) {
+    if (rule.target !== 'REJECT') continue
     const ruleKey = extractTargetKeyForManagedRule(rule)
     if (coveredRuleRaws.has(rule.raw) || coveredKeys.has(ruleKey)) {
       continue
     }
     coveredRuleRaws.add(rule.raw)
     coveredKeys.add(ruleKey)
-    syntheticRows.push(buildSyntheticManagedRuleRow(rule))
+    syntheticRejected.push(buildSyntheticManagedRuleRow(rule))
   }
 
-  // Merge target-deduplicated recent closed connections in reverse chronological
-  // order (closedConnections appends newly closed sockets to the tail).
+  for (const record of disconnectedRecords) {
+    if (coveredKeys.has(record.key)) continue
+    const matchedRule = matchDisconnectedRecordRule(record, managedRules)
+    if (matchedRule && coveredRuleRaws.has(matchedRule.raw)) {
+      continue
+    }
+    if (matchedRule) {
+      coveredRuleRaws.add(matchedRule.raw)
+    }
+    coveredKeys.add(record.key)
+    syntheticDisconnected.push(
+      buildSyntheticDisconnectedRow(record, matchedRule),
+    )
+  }
+
+  for (const rule of managedRules) {
+    if (rule.target === 'REJECT') continue
+    const ruleKey = extractTargetKeyForManagedRule(rule)
+    if (coveredRuleRaws.has(rule.raw) || coveredKeys.has(ruleKey)) {
+      continue
+    }
+    coveredRuleRaws.add(rule.raw)
+    coveredKeys.add(ruleKey)
+    syntheticIdlePinned.push(buildSyntheticManagedRuleRow(rule))
+  }
+
+  // Merge transient inactive sockets and recent closed connections in reverse
+  // chronological order, deduplicated by target key.
   const recentClosedRows: PathControlConnectionItem[] = []
-  for (let i = closedConnections.length - 1; i >= 0; i -= 1) {
-    const conn = closedConnections[i]
+  const appendClosedCandidate = (conn: IConnectionsItem) => {
     const target = extractConnectionTarget(conn)
     if (!target || coveredKeys.has(target.key)) {
-      continue
+      return
     }
     const matchedRule = findMatchingManagedRule(conn, managedRules)
     if (matchedRule && coveredRuleRaws.has(matchedRule.raw)) {
-      continue
+      return
     }
     coveredKeys.add(target.key)
     if (matchedRule) {
@@ -592,35 +625,22 @@ export function composeActivePathControlConnections(params: {
     })
   }
 
-  return [...enrichedLive, ...syntheticRows, ...recentClosedRows]
-}
+  for (let i = transientInactiveSockets.length - 1; i >= 0; i -= 1) {
+    appendClosedCandidate(transientInactiveSockets[i])
+  }
+  for (let i = closedConnections.length - 1; i >= 0; i -= 1) {
+    appendClosedCandidate(closedConnections[i])
+  }
 
-/**
- * Enriches closed/history connections with 4-state resolution (`已断开` when manually disconnected)
- * and matching Merge rule metadata.
- */
-export function enrichClosedPathControlConnections(params: {
-  closedConnections: IConnectionsItem[]
-  managedRules: ManagedMergeRule[]
-  disconnectedIds?: Set<string>
-}): PathControlConnectionItem[] {
-  const { closedConnections, managedRules, disconnectedIds } = params
-  return closedConnections.map((conn) => {
-    const target = extractConnectionTarget(conn)
-    const matchedRule = findMatchingManagedRule(conn, managedRules)
-    return {
-      ...conn,
-      curUpload: 0,
-      curDownload: 0,
-      _isClosed: true,
-      _target: target ?? undefined,
-      _managedRule: matchedRule ?? undefined,
-      _controlStatus: resolveConnectionControlStatus(conn, {
-        disconnectedIds,
-        matchedRule,
-      }),
-    }
-  })
+  return {
+    active,
+    closed: [
+      ...syntheticRejected,
+      ...syntheticDisconnected,
+      ...syntheticIdlePinned,
+      ...recentClosedRows,
+    ],
+  }
 }
 
 export function formatPathControlHostLabel(
@@ -644,15 +664,15 @@ export function formatPathControlHostLabel(
 }
 
 /**
- * Orders Path Control rows so retained `disconnected` and `reject` synthetic rows stay
- * immediately visible above live traffic, while idle `direct`/`proxy` Merge rows follow live rows.
+ * Orders Path Control rows so retained `reject` and `disconnected` synthetic rows stay
+ * pinned at the top, followed by live traffic, idle `direct`/`proxy` Merge rows, and closed rows.
  */
 export function prioritizePathControlConnections(
   rows: PathControlConnectionItem[],
   orderLiveFn?: (list: IConnectionsItem[]) => IConnectionsItem[],
 ): PathControlConnectionItem[] {
-  const syntheticDisconnected: PathControlConnectionItem[] = []
   const syntheticRejected: PathControlConnectionItem[] = []
+  const syntheticDisconnected: PathControlConnectionItem[] = []
   const liveRows: PathControlConnectionItem[] = []
   const syntheticIdlePinned: PathControlConnectionItem[] = []
   const closedRows: PathControlConnectionItem[] = []
@@ -662,10 +682,10 @@ export function prioritizePathControlConnections(
       closedRows.push(row)
     } else if (!row._isSynthetic) {
       liveRows.push(row)
-    } else if (row._controlStatus === 'disconnected') {
-      syntheticDisconnected.push(row)
     } else if (row._controlStatus === 'reject') {
       syntheticRejected.push(row)
+    } else if (row._controlStatus === 'disconnected') {
+      syntheticDisconnected.push(row)
     } else {
       syntheticIdlePinned.push(row)
     }
@@ -676,8 +696,8 @@ export function prioritizePathControlConnections(
     : liveRows
 
   return [
-    ...syntheticDisconnected,
     ...syntheticRejected,
+    ...syntheticDisconnected,
     ...orderedLive,
     ...syntheticIdlePinned,
     ...closedRows,

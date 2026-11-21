@@ -8,11 +8,11 @@ import {
 import type { IConnectionsItem } from '@/types/connection'
 import {
   appendDisconnectedId,
-  composeActivePathControlConnections,
   createDisconnectedRecordFromConnection,
   loadDisconnectedIds,
   loadDisconnectedRecords,
   matchesConnectionTarget,
+  partitionPathControlConnections,
   reconcileDisconnectedRecords,
   saveDisconnectedIds,
   saveDisconnectedRecords,
@@ -115,9 +115,9 @@ export function usePathControl({
     [disconnectedIds],
   )
 
-  const activeControlConnections = useMemo(
+  const partitioned = useMemo(
     () =>
-      composeActivePathControlConnections({
+      partitionPathControlConnections({
         activeConnections,
         closedConnections,
         managedRules,
@@ -234,7 +234,8 @@ export function usePathControl({
 
   return {
     managedRules,
-    activeControlConnections,
+    activeControlConnections: partitioned.active,
+    closedControlConnections: partitioned.closed,
     actions,
   }
 }

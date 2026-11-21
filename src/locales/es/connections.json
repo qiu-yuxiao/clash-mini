@@ -25,8 +25,8 @@
       "downloadSpeed": "Velocidad de descarga"
     },
     "actions": {
-      "active": "Active",
-      "closed": "Closed",
+      "active": "Activas",
+      "closed": "Cerradas",
       "closeConnection": "Cerrar conexión"
     },
     "columnManager": {

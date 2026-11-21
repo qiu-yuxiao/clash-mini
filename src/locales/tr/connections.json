@@ -25,8 +25,8 @@
       "downloadSpeed": "İndirme Hızı"
     },
     "actions": {
-      "active": "Active",
-      "closed": "Closed",
+      "active": "Aktif",
+      "closed": "Kapalı",
       "closeConnection": "Bağlantıyı Kapat"
     },
     "columnManager": {

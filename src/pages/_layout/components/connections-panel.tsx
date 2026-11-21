@@ -2,7 +2,7 @@ import { Box, Button, Tooltip, Typography, useTheme } from '@mui/material'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BaseSearchBox, BaseEmpty } from '@/components/base'
+import { BaseSearchBox } from '@/components/base'
 import {
   ConnectionDetail,
   type ConnectionDetailRef,
@@ -16,6 +16,7 @@ import { get3DButtonStyle } from '@/utils/button-styles'
 import {
   prioritizePathControlConnections,
   type PathControlConnectionItem,
+  type PathControlViewMode,
 } from '@/utils/path-control'
 import {
   exportCustomRoutingRules,
@@ -38,6 +39,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
   const { t } = useTranslation()
   const theme = useTheme()
   const [routeIoBusy, setRouteIoBusy] = useState(false)
+  const [viewMode, setViewMode] = useState<PathControlViewMode>('active')
   const [match, setMatch] = useState<(input: string) => boolean>(
     () => () => true,
   )
@@ -48,15 +50,21 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
   const {
     response: { data: connectionsData },
   } = useConnectionData({ enabled: true })
-  const { activeControlConnections, actions: pathControlActions } =
-    usePathControl({
-      activeConnections: connectionsData?.activeConnections ?? [],
-      closedConnections: connectionsData?.closedConnections ?? [],
-      enabled: true,
-    })
+  const {
+    activeControlConnections,
+    closedControlConnections,
+    actions: pathControlActions,
+  } = usePathControl({
+    activeConnections: connectionsData?.activeConnections ?? [],
+    closedConnections: connectionsData?.closedConnections ?? [],
+    enabled: true,
+  })
+
+  const baseConnections =
+    viewMode === 'active' ? activeControlConnections : closedControlConnections
 
   const filterConn = useMemo<PathControlConnectionItem[]>(() => {
-    const matchConns = activeControlConnections.filter((conn) => {
+    const matchConns = baseConnections.filter((conn) => {
       const { host, destinationIP, remoteDestination, process } =
         conn.metadata ?? {}
       return (
@@ -67,7 +75,7 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
       )
     })
     return prioritizePathControlConnections(matchConns, sortByNewestStart)
-  }, [activeControlConnections, match])
+  }, [baseConnections, match])
 
   const handleSearch = useCallback(
     (nextMatch: (content: string) => boolean) => {
@@ -231,29 +239,25 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
             overflow: 'hidden',
           }}
         >
-          {filterConn.length === 0 ? (
-            <BaseEmpty />
-          ) : (
-            <ConnectionTable
-              connections={filterConn}
-              onShowDetail={(detail, el) =>
-                detailRef.current?.open(
-                  detail,
-                  Boolean(detail._isClosed || detail._isSynthetic),
-                  el,
-                )
-              }
-              onMarkDisconnected={
-                pathControlActions?.markConnectionDisconnected
-              }
-              onClearDisconnectedTarget={
-                pathControlActions?.clearDisconnectedTarget
-              }
-              onCloseMatchingTarget={
-                pathControlActions?.closeMatchingActiveConnections
-              }
-            />
-          )}
+          <ConnectionTable
+            connections={filterConn}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onShowDetail={(detail, el) =>
+              detailRef.current?.open(
+                detail,
+                Boolean(detail._isClosed || detail._isSynthetic),
+                el,
+              )
+            }
+            onMarkDisconnected={pathControlActions?.markConnectionDisconnected}
+            onClearDisconnectedTarget={
+              pathControlActions?.clearDisconnectedTarget
+            }
+            onCloseMatchingTarget={
+              pathControlActions?.closeMatchingActiveConnections
+            }
+          />
         </Box>
       </Box>
       <ConnectionDetail ref={detailRef} />

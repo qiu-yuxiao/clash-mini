@@ -4,12 +4,11 @@ import type { IConnectionsItem } from '@/types/connection'
 import { parseManagedMergeRuleLine } from '@/utils/quick-routing'
 
 import {
-  composeActivePathControlConnections,
   createDisconnectedRecordFromConnection,
-  enrichClosedPathControlConnections,
   extractConnectionTarget,
   formatPathControlHostLabel,
   matchesConnectionTarget,
+  partitionPathControlConnections,
   prioritizePathControlConnections,
   reconcileDisconnectedRecords,
   resolveConnectionControlStatus,
@@ -72,56 +71,98 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
     ).toBe('disconnected')
   })
 
-  it('封锁 play.googleapis.com 后即使无活跃 socket 也必须在表中保留可恢复行', () => {
+  it('活跃视图仅保留实时 直连/代理 连接，封锁规则及无活跃流的自定义规则归入已关闭视图且封锁置顶', () => {
     const rejectRule = parseManagedMergeRuleLine(
       'DOMAIN,play.googleapis.com,REJECT',
     )!
     const directRule = parseManagedMergeRuleLine('IP-CIDR,1.2.3.4/32,DIRECT')!
+    const liveDirectRule = parseManagedMergeRuleLine(
+      'DOMAIN,live-direct.example.com,DIRECT',
+    )!
 
-    const rows = composeActivePathControlConnections({
+    const { active, closed } = partitionPathControlConnections({
       activeConnections: [
         makeConn({
           id: 'live-daily',
           host: 'daily-cloudcode-pa.googleapis.com',
           chains: ['PROXY'],
         }),
+        makeConn({
+          id: 'live-direct',
+          host: 'live-direct.example.com',
+          chains: ['DIRECT'],
+        }),
+        makeConn({
+          id: 'transient-reject',
+          host: 'ads.example.com',
+          chains: ['REJECT'],
+        }),
+        makeConn({
+          id: 'transient-disconnected',
+          host: 'manual-drop.example.com',
+          chains: ['PROXY'],
+        }),
       ],
-      managedRules: [rejectRule, directRule],
+      closedConnections: [
+        makeConn({
+          id: 'closed-normal',
+          host: 'finished.example.com',
+          chains: ['DIRECT'],
+        }),
+      ],
+      managedRules: [rejectRule, directRule, liveDirectRule],
       disconnectedRecords: [],
+      disconnectedIds: new Set(['transient-disconnected']),
     })
 
-    expect(rows).toHaveLength(3)
-    expect(rows[0].metadata.host).toBe('daily-cloudcode-pa.googleapis.com')
-    expect(rows[0]._controlStatus).toBe('proxy')
-    expect(rows[0]._managedRule).toBeUndefined()
+    expect(active).toHaveLength(2)
+    expect(active.map((r) => r.id)).toEqual(['live-daily', 'live-direct'])
+    expect(active.map((r) => r._controlStatus)).toEqual(['proxy', 'direct'])
+    expect(active[1]._managedRule?.raw).toBe(
+      'DOMAIN,live-direct.example.com,DIRECT',
+    )
 
-    expect(rows[1]._isSynthetic).toBe(true)
-    expect(rows[1]._controlStatus).toBe('reject')
-    expect(rows[1].metadata.host).toBe('play.googleapis.com')
-    expect(rows[1]._managedRule?.raw).toBe('DOMAIN,play.googleapis.com,REJECT')
-
-    expect(rows[2]._isSynthetic).toBe(true)
-    expect(rows[2]._controlStatus).toBe('direct')
-    expect(rows[2].metadata.destinationIP).toBe('1.2.3.4')
+    // 封锁规则置顶，其次闲置直连规则（正在活跃的 liveDirectRule 不重复展示），随后瞬态死链与历史关闭连接
+    expect(closed.map((r) => r._controlStatus)).toEqual([
+      'reject',
+      'direct',
+      'disconnected',
+      'reject',
+      'direct',
+    ])
+    expect(closed[0]._isSynthetic).toBe(true)
+    expect(closed[0].metadata.host).toBe('play.googleapis.com')
+    expect(closed[0]._managedRule?.raw).toBe(
+      'DOMAIN,play.googleapis.com,REJECT',
+    )
+    expect(closed[1]._isSynthetic).toBe(true)
+    expect(closed[1].metadata.destinationIP).toBe('1.2.3.4')
+    expect(closed[2].id).toBe('transient-disconnected')
+    expect(closed[2]._isClosed).toBe(true)
+    expect(closed[3].id).toBe('transient-reject')
+    expect(closed[3]._isClosed).toBe(true)
+    expect(closed[4].id).toBe('closed-normal')
+    expect(closed[4]._isClosed).toBe(true)
   })
 
-  it('历史遗留 DOMAIN-SUFFIX 规则在表内显式呈现 *.domain 且不干扰精确目标复制', () => {
+  it('历史遗留 DOMAIN-SUFFIX 规则在已关闭视图显式呈现 *.domain 且不干扰精确目标复制', () => {
     const legacyRule = parseManagedMergeRuleLine(
       'DOMAIN-SUFFIX,googleapis.com,REJECT',
     )!
-    const rows = composeActivePathControlConnections({
+    const { active, closed } = partitionPathControlConnections({
       activeConnections: [],
       managedRules: [legacyRule],
       disconnectedRecords: [],
     })
 
-    expect(rows).toHaveLength(1)
-    expect(formatPathControlHostLabel(rows[0])).toBe('*.googleapis.com')
-    expect(rows[0].metadata.host).toBe('googleapis.com')
-    expect(rows[0]._controlStatus).toBe('reject')
+    expect(active).toHaveLength(0)
+    expect(closed).toHaveLength(1)
+    expect(formatPathControlHostLabel(closed[0])).toBe('*.googleapis.com')
+    expect(closed[0].metadata.host).toBe('googleapis.com')
+    expect(closed[0]._controlStatus).toBe('reject')
   })
 
-  it('手动断开连接后表内保留「已断开」条目，且重连新流到达时自动消除标记', () => {
+  it('手动断开连接后已关闭视图保留「已断开」条目，且重连新流到达时自动消除标记', () => {
     const conn = makeConn({
       id: 'conn-play-1',
       host: 'play.googleapis.com',
@@ -130,16 +171,17 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
     const disconnectedAt = Date.parse('2026-11-13T10:01:00.000Z')
     const record = createDisconnectedRecordFromConnection(conn, disconnectedAt)!
 
-    // Mihomo 移除活跃连接后，表中依然保留该已断开链接
-    const afterDisconnect = composeActivePathControlConnections({
+    // Mihomo 移除活跃连接后，已关闭视图依然保留该已断开链接，活跃视图保持纯净
+    const afterDisconnect = partitionPathControlConnections({
       activeConnections: [],
       managedRules: [],
       disconnectedRecords: [record],
     })
-    expect(afterDisconnect).toHaveLength(1)
-    expect(afterDisconnect[0]._controlStatus).toBe('disconnected')
-    expect(afterDisconnect[0]._isSynthetic).toBe(true)
-    expect(afterDisconnect[0].metadata.host).toBe('play.googleapis.com')
+    expect(afterDisconnect.active).toHaveLength(0)
+    expect(afterDisconnect.closed).toHaveLength(1)
+    expect(afterDisconnect.closed[0]._controlStatus).toBe('disconnected')
+    expect(afterDisconnect.closed[0]._isSynthetic).toBe(true)
+    expect(afterDisconnect.closed[0].metadata.host).toBe('play.googleapis.com')
 
     // 若同时存在旧连接（早于断开时间），不误清除断开状态
     const withOlderConn = reconcileDisconnectedRecords(
@@ -168,18 +210,30 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
     expect(reconciled).toHaveLength(0)
   })
 
-  it('历史标签页对手动断开的连接显示「已断开」', () => {
-    const enriched = enrichClosedPathControlConnections({
+  it('已关闭视图对手动断开的历史连接显示「已断开」', () => {
+    const { active, closed } = partitionPathControlConnections({
+      activeConnections: [],
       closedConnections: [
-        makeConn({ id: 'manual-closed', chains: ['PROXY'] }),
-        makeConn({ id: 'normal-closed', chains: ['DIRECT'] }),
+        makeConn({
+          id: 'normal-closed',
+          host: 'a.example.com',
+          chains: ['DIRECT'],
+        }),
+        makeConn({
+          id: 'manual-closed',
+          host: 'b.example.com',
+          chains: ['PROXY'],
+        }),
       ],
       managedRules: [],
+      disconnectedRecords: [],
       disconnectedIds: new Set(['manual-closed']),
     })
 
-    expect(enriched[0]._controlStatus).toBe('disconnected')
-    expect(enriched[1]._controlStatus).toBe('direct')
+    expect(active).toHaveLength(0)
+    expect(closed.map((r) => r.id)).toEqual(['manual-closed', 'normal-closed'])
+    expect(closed[0]._controlStatus).toBe('disconnected')
+    expect(closed[1]._controlStatus).toBe('direct')
   })
 
   it('matchesConnectionTarget 严格精确匹配目标，不误关闭子域名或父域名连接', () => {
@@ -208,7 +262,7 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
     ).toBe(false)
   })
 
-  it('prioritizePathControlConnections 置顶保留 已断开 与 封锁 虚拟行，闲置直连/代理固定规则置于活跃流之后', () => {
+  it('prioritizePathControlConnections 置顶保留 封锁(REJECT) 与 已断开 虚拟行，闲置直连/代理固定规则置于活跃流之后', () => {
     const disconn = {
       ...makeConn({ id: 'd' }),
       _isSynthetic: true,
@@ -226,19 +280,23 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
       _isSynthetic: true,
       _controlStatus: 'proxy' as const,
     }
+    const closedRow = {
+      ...makeConn({ id: 'c' }),
+      _isClosed: true,
+    }
 
     const ordered = prioritizePathControlConnections(
-      [idleProxy, liveOld, rej, liveNew, disconn],
+      [closedRow, idleProxy, liveOld, disconn, liveNew, rej],
       (list) =>
         list.sort(
           (a, b) => Date.parse(b.start || '0') - Date.parse(a.start || '0'),
         ),
     )
 
-    expect(ordered.map((r) => r.id)).toEqual(['d', 'r', 'l2', 'l1', 'p'])
+    expect(ordered.map((r) => r.id)).toEqual(['r', 'd', 'l2', 'l1', 'p', 'c'])
   })
 
-  it('composeActivePathControlConnections 将近期已关闭连接按目标去重并合入单表，且保持近期优先顺序', () => {
+  it('partitionPathControlConnections 隔离活跃与已关闭连接，置顶封锁/已断开/闲置规则并将近期关闭连接按目标去重逆序排列', () => {
     const active: IConnectionsItem[] = [
       {
         id: 'live-1',
@@ -371,7 +429,12 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
       },
     ]
 
-    const composed = composeActivePathControlConnections({
+    const record = createDisconnectedRecordFromConnection(
+      makeConn({ id: 'disc-1', host: 'dropped.example.com' }),
+      Date.parse('2026-01-01T00:00:06Z'),
+    )!
+
+    const partitioned = partitionPathControlConnections({
       activeConnections: active,
       closedConnections: closed,
       managedRules: [
@@ -382,11 +445,20 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
           matchKey: 'pinned.example.com',
           target: 'DIRECT',
         },
+        {
+          raw: 'DOMAIN,blocked.example.com,REJECT',
+          ruleType: 'DOMAIN',
+          value: 'blocked.example.com',
+          matchKey: 'blocked.example.com',
+          target: 'REJECT',
+        },
       ],
-      disconnectedRecords: [],
+      disconnectedRecords: [record],
     })
 
-    const closedRows = composed.filter((r) => r._isClosed)
+    expect(partitioned.active.map((r) => r.id)).toEqual(['live-1'])
+
+    const closedRows = partitioned.closed.filter((r) => r._isClosed)
     expect(closedRows.map((r) => r.id)).toEqual([
       'closed-new-dup',
       'closed-older-uniq',
@@ -394,9 +466,12 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
     expect(closedRows[0]?.curUpload).toBe(0)
     expect(closedRows[0]?.curDownload).toBe(0)
 
-    const prioritized = prioritizePathControlConnections(composed)
-    expect(prioritized.map((r) => r.id)).toEqual([
-      'live-1',
+    const prioritizedClosed = prioritizePathControlConnections(
+      partitioned.closed,
+    )
+    expect(prioritizedClosed.map((r) => r.id)).toEqual([
+      'synthetic:rule:DOMAIN,blocked.example.com,REJECT',
+      'synthetic:disconnected:domain:dropped.example.com',
       'synthetic:rule:DOMAIN,pinned.example.com,DIRECT',
       'closed-new-dup',
       'closed-older-uniq',

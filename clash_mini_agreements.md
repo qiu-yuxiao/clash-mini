@@ -410,7 +410,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 ### 7.7 路径控制精准规则生成与四态路由可逆闭环
 
 - **精确目标匹配（禁止扩域）**：在「路径控制」表右键设为直连/代理/封锁时，主机域名统一生成精确 `DOMAIN,<host>,<TARGET>`（仅「添加网址」中显式输入 `*.` 或 `.` 通配前缀才生成 `DOMAIN-SUFFIX`），IPv4/IPv6/进程分别生成 `IP-CIDR`/`IP-CIDR6`/`PROCESS-NAME`；下发按「锁内 `saveProfileFile('Merge', ...)` 直通 `update_config_forced` 重载（仅保存未直通生效时兜底调用 `enhanceProfiles()`）→ 精确关闭命中活跃连接」执行；全局 `Merge` 对全部激活订阅恒生效且在 `enhance` 阶段仅加载一次（禁止当配置 `current_merge` 为空或 `'Merge'` 时重复二次合并）。
-- **四态单表融合、YAML 备份与详情显式节点**：`composeActivePathControlConnections` 将实时流、本地手动断开记录、`Merge` 置顶规则以及近期已关闭连接（`_isClosed: true`）融为单表展示 **`直连 (DIRECT)` / `代理 (PROXY)` / `封锁 (REJECT)` / `已断开 (DISCONNECTED)`** 四态；表头提供一致的 3D `保存路由`（`exportCustomRoutingRules`）与 `导入路由`（`importCustomRoutingRules`）一键备份恢复；左键详情 [connection-detail.tsx](src/components/connection/connection-detail.tsx) 在 `主机` 下紧接显示 `代理节点`（`resolveConnectionNodeDisplay`）并对滞留于后台切换前旧节点的连接标示醒目的 `（旧节点连接）`（`staleNodeTag`）。
+- **四态双视图分区、表头内嵌二选一开关与 YAML 备份/详情显式节点**：[connection-table.tsx](src/components/connection/connection-table.tsx) 在「链接目标」表头单元格同行的最右侧内嵌紧凑 3D 二选一分段开关（`活跃 / 已关闭`，点击阻止冒泡以隔离列排序，列表为空时保持表头与开关挂载可切换），由 `partitionPathControlConnections` 将数据严格分为两视图展示 **`直连 (DIRECT)` / `代理 (PROXY)` / `封锁 (REJECT)` / `已断开 (DISCONNECTED)`** 四态：① **活跃视图 (`active`)** 仅保留实时流中处于 `直连`/`代理` 的活跃连接；② **已关闭视图 (`closed`)** 按「`Merge` 置顶 `封锁 (REJECT)` 规则 → 本地手动 `已断开` 记录 → 无活跃流的闲置 `直连`/`代理` 自定义规则 → 按目标去重且排除当前活跃目标的近期已关闭/瞬态死链（`_isClosed: true`）」顺序展示，确保 `REJECT` 封锁项重启不丢、不污染活跃视图且可一键右键解封；表头提供一致的 3D `保存路由`（`exportCustomRoutingRules`）与 `导入路由`（`importCustomRoutingRules`）一键备份恢复；左键详情 [connection-detail.tsx](src/components/connection/connection-detail.tsx) 在 `主机` 下紧接显示 `代理节点`（`resolveConnectionNodeDisplay`）并对滞留于后台切换前旧节点的连接标示醒目的 `（旧节点连接）`（`staleNodeTag`）。
 
 ---
 

@@ -18,11 +18,17 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BaseEmpty } from '@/components/base'
 import { closeConnectionWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
+import {
+  get3DSegmentedActiveStyle,
+  get3DSegmentedActiveTextColor,
+  get3DSegmentedContainerStyle,
+} from '@/utils/button-styles'
 import {
   extractConnectionTarget,
   formatPathControlHostLabel,
@@ -30,6 +36,7 @@ import {
   type PathControlConnectionItem,
   type PathControlStatus,
   type PathControlTarget,
+  type PathControlViewMode,
 } from '@/utils/path-control'
 import {
   getPopupMenuItemStyle,
@@ -96,7 +103,7 @@ const SX_HEADER_ROW: React.ComponentProps<typeof Box>['sx'] = {
   display: 'flex',
   borderBottom: '5px double var(--theme-border)',
   backgroundColor: (theme) => theme.palette.background.paper,
-  height: '20px',
+  height: '24px',
 }
 
 const SX_HEADER_CELL_BASE: React.ComponentProps<typeof Box>['sx'] = {
@@ -222,6 +229,8 @@ const RowComponent = memo(
 
 interface Props {
   connections: PathControlConnectionItem[]
+  viewMode?: PathControlViewMode
+  onViewModeChange?: (mode: PathControlViewMode) => void
   onShowDetail: (data: PathControlConnectionItem, el?: HTMLElement) => void
   onMarkDisconnected?: (row: PathControlConnectionItem) => void
   onClearDisconnectedTarget?: (targetKey?: string, connId?: string) => void
@@ -239,6 +248,8 @@ export const ConnectionTable = (props: Props) => {
   })
   const {
     connections,
+    viewMode,
+    onViewModeChange,
     onShowDetail: rawOnShowDetail,
     onMarkDisconnected,
     onClearDisconnectedTarget,
@@ -447,6 +458,10 @@ export const ConnectionTable = (props: Props) => {
 
   const rows = table.getRowModel().rows
   const tableContainerRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (viewMode === undefined) return
+    tableContainerRef.current?.scrollTo({ top: 0 })
+  }, [viewMode])
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
@@ -465,6 +480,13 @@ export const ConnectionTable = (props: Props) => {
             sx={{
               minWidth: '100%',
               width: '100%',
+              ...(rows.length === 0
+                ? {
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%',
+                  }
+                : null),
             }}
           >
             <Box sx={SX_HEADER_STICKY}>
@@ -472,6 +494,10 @@ export const ConnectionTable = (props: Props) => {
                 <Box key={headerGroup.id} sx={SX_HEADER_ROW}>
                   {headerGroup.headers.map((header) => {
                     const isChains = header.column.id === 'chains'
+                    const showViewSwitch =
+                      !isChains &&
+                      viewMode !== undefined &&
+                      onViewModeChange !== undefined
                     return (
                       <Box
                         key={header.id}
@@ -481,10 +507,16 @@ export const ConnectionTable = (props: Props) => {
                             flex: isChains ? '0 0 74px' : '1 1 0%',
                             minWidth: 0,
                             width: isChains ? '74px' : 'auto',
-                            px: isChains ? 0.5 : 1.5,
-                            borderRight: (theme) =>
+                            px: isChains ? 0.5 : undefined,
+                            pl: !isChains ? 1.5 : undefined,
+                            pr: !isChains ? 0.75 : undefined,
+                            justifyContent: !isChains
+                              ? 'space-between'
+                              : undefined,
+                            gap: !isChains ? 0.75 : undefined,
+                            borderRight: (tTheme) =>
                               !isChains
-                                ? `2px solid ${theme.palette.divider}`
+                                ? `2px solid ${tTheme.palette.divider}`
                                 : 'none',
                           },
                         ]}
@@ -499,6 +531,7 @@ export const ConnectionTable = (props: Props) => {
                           sx={[
                             SX_CELL_CONTENT,
                             {
+                              minWidth: 0,
                               justifyContent: isChains
                                 ? 'center'
                                 : 'flex-start',
@@ -509,43 +542,145 @@ export const ConnectionTable = (props: Props) => {
                             },
                           ]}
                         >
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
+                          <Box
+                            component="span"
+                            sx={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
+                            )}
+                          </Box>
                           {{
                             asc: ' ▲',
                             desc: ' ▼',
                           }[header.column.getIsSorted() as string] ?? null}
                         </Box>
+                        {showViewSwitch && (
+                          <Box
+                            role="tablist"
+                            aria-label={t(
+                              'connections.components.miniTable.hostColumn',
+                            )}
+                            onClick={(e) => e.stopPropagation()}
+                            sx={(tTheme) => ({
+                              position: 'relative',
+                              display: 'inline-grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              alignItems: 'center',
+                              boxSizing: 'border-box',
+                              height: 18,
+                              p: '1px',
+                              borderRadius: '4px',
+                              bgcolor: 'action.hover',
+                              flexShrink: 0,
+                              userSelect: 'none',
+                              ...get3DSegmentedContainerStyle(tTheme),
+                            })}
+                          >
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                width: '50%',
+                                height: '100%',
+                                zIndex: 0,
+                                pointerEvents: 'none',
+                                transition:
+                                  'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                transform: `translate3d(${viewMode === 'active' ? 0 : 100}%, 0, 0)`,
+                              }}
+                            >
+                              <Box
+                                sx={(tTheme) =>
+                                  get3DSegmentedActiveStyle(tTheme)
+                                }
+                              />
+                            </Box>
+                            {(['active', 'closed'] as const).map((mode) => {
+                              const isSelected = viewMode === mode
+                              const label =
+                                mode === 'active'
+                                  ? t('connections.components.actions.active')
+                                  : t('connections.components.actions.closed')
+                              return (
+                                <Box
+                                  key={mode}
+                                  role="tab"
+                                  aria-selected={isSelected}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (viewMode !== mode) {
+                                      onViewModeChange(mode)
+                                    }
+                                  }}
+                                  sx={{
+                                    height: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    px: 0.75,
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    lineHeight: 1,
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'pointer',
+                                    zIndex: 1,
+                                    transition: 'color 0.2s ease',
+                                    color: isSelected
+                                      ? get3DSegmentedActiveTextColor(theme)
+                                      : 'text.secondary',
+                                    '&:hover': {
+                                      color: isSelected
+                                        ? get3DSegmentedActiveTextColor(theme)
+                                        : 'text.primary',
+                                    },
+                                  }}
+                                >
+                                  {label}
+                                </Box>
+                              )
+                            })}
+                          </Box>
+                        )}
                       </Box>
                     )
                   })}
                 </Box>
               ))}
             </Box>
-            <Box
-              sx={{
-                position: 'relative',
-                height: totalSize,
-              }}
-            >
-              {virtualRows.map((virtualRow) => {
-                const row = rows[virtualRow.index]
-                if (!row) return null
+            {rows.length === 0 ? (
+              <Box sx={{ flex: 1, minHeight: 120, display: 'flex' }}>
+                <BaseEmpty />
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  position: 'relative',
+                  height: totalSize,
+                }}
+              >
+                {virtualRows.map((virtualRow) => {
+                  const row = rows[virtualRow.index]
+                  if (!row) return null
 
-                return (
-                  <RowComponent
-                    key={row.id}
-                    row={row}
-                    virtualStart={virtualRow.start}
-                    virtualSize={virtualRow.size}
-                    onShowDetail={onShowDetail}
-                    onContextMenu={handleContextMenu}
-                  />
-                )
-              })}
-            </Box>
+                  return (
+                    <RowComponent
+                      key={row.id}
+                      row={row}
+                      virtualStart={virtualRow.start}
+                      virtualSize={virtualRow.size}
+                      onShowDetail={onShowDetail}
+                      onContextMenu={handleContextMenu}
+                    />
+                  )
+                })}
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>
