@@ -48,7 +48,8 @@
       "disconnect": "この接続を切断",
       "copyAddress": "接続アドレスをコピー",
       "viewDetail": "詳細を表示",
-      "restoreDefault": "デフォルトルートに戻す"
+      "restoreDefault": "デフォルトルートに戻す",
+      "scopeExact": "このホストのみ"
     }
   },
   "notices": {

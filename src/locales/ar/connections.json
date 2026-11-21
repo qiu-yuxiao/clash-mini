@@ -48,7 +48,8 @@
       "disconnect": "قطع هذا الاتصال",
       "copyAddress": "نسخ عنوان الاتصال",
       "viewDetail": "عرض التفاصيل",
-      "restoreDefault": "استعادة المسار الافتراضي"
+      "restoreDefault": "استعادة المسار الافتراضي",
+      "scopeExact": "هذا النطاق فقط"
     }
   },
   "notices": {

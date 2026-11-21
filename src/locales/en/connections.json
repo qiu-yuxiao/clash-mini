@@ -48,7 +48,8 @@
       "disconnect": "Disconnect",
       "copyAddress": "Copy connection address",
       "viewDetail": "View details",
-      "restoreDefault": "Restore Default Route"
+      "restoreDefault": "Restore Default Route",
+      "scopeExact": "Exact host"
     }
   },
   "notices": {

@@ -128,7 +128,7 @@
     "clientUpdateFailed": "Яңарту уңышсыз: {{message}}",
     "switchedToGlobalProxy": "Глобаль прокси режимына күчерелде",
     "switchedToGfwlist": "GFWList режимына күчерелде",
-    "switchedToAddUrl": "Өстәлгән URL прокси режимына күчерелде",
+    "switchedToAddUrl": "Яңа кагыйдә режимына күчерелде",
     "profileActivationFailed": "3 тапкыр кабатлап караганнан соң да профиль активлашмады. Челтәрне яки язылуны тикшерегез."
   }
 }

@@ -202,6 +202,12 @@ export function matchesConnectionTarget(
   }
 
   const host = normalizeQuickTargetHost(conn.metadata?.host ?? '')
+  if (target.key.startsWith('domain-suffix:')) {
+    return (
+      host.length > 0 &&
+      (host === target.value || host.endsWith(`.${target.value}`))
+    )
+  }
   if (target.key.startsWith('domain:')) {
     return host === target.value
   }

@@ -260,6 +260,30 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
         target,
       ),
     ).toBe(false)
+
+    const suffixTarget = {
+      type: 'domain' as const,
+      value: 'oraclecloud.com',
+      key: 'domain-suffix:oraclecloud.com',
+    }
+    expect(
+      matchesConnectionTarget(
+        makeConn({ host: 'oraclecloud.com' }),
+        suffixTarget,
+      ),
+    ).toBe(true)
+    expect(
+      matchesConnectionTarget(
+        makeConn({ host: 'console.ap-tokyo-1.oraclecloud.com' }),
+        suffixTarget,
+      ),
+    ).toBe(true)
+    expect(
+      matchesConnectionTarget(
+        makeConn({ host: 'fakeoraclecloud.com' }),
+        suffixTarget,
+      ),
+    ).toBe(false)
   })
 
   it('prioritizePathControlConnections 置顶保留 封锁(REJECT) 与 已断开 虚拟行，闲置直连/代理固定规则置于活跃流之后', () => {

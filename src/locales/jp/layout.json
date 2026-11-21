@@ -128,7 +128,7 @@
     "clientUpdateFailed": "更新に失敗しました: {{message}}",
     "switchedToGlobalProxy": "グローバルプロキシに切り替えました",
     "switchedToGfwlist": "GFWList モードに切り替えました",
-    "switchedToAddUrl": "URL追加プロキシモードに切り替えました",
+    "switchedToAddUrl": "ルール追加モードに切り替えました",
     "profileActivationFailed": "プロファイルの有効化に3回連続で失敗しました。ネットワークや購読内容をご確認ください。"
   }
 }

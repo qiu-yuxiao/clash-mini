@@ -48,7 +48,8 @@
       "disconnect": "Verbindung trennen",
       "copyAddress": "Verbindungsadresse kopieren",
       "viewDetail": "Details anzeigen",
-      "restoreDefault": "Standardroute wiederherstellen"
+      "restoreDefault": "Standardroute wiederherstellen",
+      "scopeExact": "Nur dieser Host"
     }
   },
   "notices": {

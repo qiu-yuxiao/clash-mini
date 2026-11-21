@@ -48,7 +48,8 @@
       "disconnect": "Putuskan koneksi ini",
       "copyAddress": "Salin alamat koneksi",
       "viewDetail": "Lihat detail",
-      "restoreDefault": "Pulihkan Rute Default"
+      "restoreDefault": "Pulihkan Rute Default",
+      "scopeExact": "Hanya host ini"
     }
   },
   "notices": {

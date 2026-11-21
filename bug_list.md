@@ -9,6 +9,16 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-419 「添加规则」缺失直连/封锁入口且路径控制右键缺乏一键整站根域名作用域切换
+
+- **对应模块**：[quick-routing.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/quick-routing.ts)、[routing-preference-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/routing-preference-card.tsx)、[add-url-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/add-url-dialog.tsx)、[connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx)、[path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)、[use-path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-path-control.ts)
+- **问题描述**：`BUG-367` 为防止封锁 `play.googleapis.com` 误扩散至 `*.googleapis.com` 而将右键菜单收紧为仅生成精确 `DOMAIN` 规则，且左侧代理方式第三档「添加网址」写死只能生成 `PROXY` 规则而无法选择 `DIRECT` 或 `REJECT`；这导致用户需要为 Oracle 等多子域名站点整站直连时无界面入口可走，只能逐个子域名反复右键试错。
+- **修复方案**：
+  1. 在 [routing-preference-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/routing-preference-card.tsx) 与 13 语种资源中将代理方式第三档更名为 **`添加规则`**（保留 `verge.yaml` 配置枚举 `'addurl'` 兼容），并在 [add-url-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/add-url-dialog.tsx) 顶部新增 3D 三选一滑块 **`[ 代理 | 直连 | 封锁 ]`**（默认 `代理`），提交后自动按新规则关闭匹配活跃连接；
+  2. 在 [quick-routing.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/quick-routing.ts) 新增 `extractRegistrableDomain`（内置 `.co.uk`/`.com.cn`/`.github.io` 等公共后缀识别与裸后缀拦截）与 `buildQuickRuleFromInput`：输入裸根域名（如 `oracle.com`）或显式通配（`*.oracle.com`）生成 `DOMAIN-SUFFIX`，具体子域名（如 `play.googleapis.com`）严格生成精确 `DOMAIN`；`upsertPrependRule` 在写入 `DOMAIN-SUFFIX` 时自动收编下层冗余子域名规则并保留后续精确例外置顶覆写能力；
+  3. 在 [connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx) 右键菜单顶部新增 **`[ 仅此域名 | *.根域名 ]`** 切换条（默认锁定 `仅此域名`，零误伤单子域封锁），切换后可一键下发整站 `DOMAIN-SUFFIX` 并联动 [path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts) / [use-path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-path-control.ts) 清理整站已断开记录与匹配活跃流，同步补齐 13 语种文本及单测。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-418 路径控制表活跃连接与已关闭/已封锁链接混排，需在「链接目标」表头同排右侧增加二选一开关隔离
 
 - **对应模块**：[path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)、[use-path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-path-control.ts)、[connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx)、[connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx)、[path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts)

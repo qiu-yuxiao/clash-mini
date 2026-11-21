@@ -48,7 +48,8 @@
       "disconnect": "断开此连接",
       "copyAddress": "复制连接地址",
       "viewDetail": "查看详细信息",
-      "restoreDefault": "恢复默认路由"
+      "restoreDefault": "恢复默认路由",
+      "scopeExact": "仅此域名"
     }
   },
   "notices": {

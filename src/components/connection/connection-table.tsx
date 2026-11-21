@@ -45,6 +45,9 @@ import {
 } from '@/utils/popup-styles'
 import {
   addQuickRoutingRule,
+  extractRegistrableDomain,
+  isIPv4Address,
+  isIPv6Address,
   removeQuickRoutingRule,
   type QuickRoutingTarget,
 } from '@/utils/quick-routing'
@@ -268,16 +271,21 @@ export const ConnectionTable = (props: Props) => {
     mouseY: number
     row: PathControlConnectionItem
     anchorEl: HTMLElement
+    scope: 'exact' | 'suffix'
   } | null>(null)
 
   const handleContextMenu = useCallback(
     (event: React.MouseEvent, row: PathControlConnectionItem) => {
       event.preventDefault()
+      const isAlreadySuffixRule = Boolean(
+        row._isSynthetic && row._managedRule?.ruleType === 'DOMAIN-SUFFIX',
+      )
       setContextMenu({
         mouseX: event.clientX + 2,
         mouseY: event.clientY - 6,
         row,
         anchorEl: event.currentTarget as HTMLElement,
+        scope: isAlreadySuffixRule ? 'suffix' : 'exact',
       })
     },
     [],
@@ -290,7 +298,7 @@ export const ConnectionTable = (props: Props) => {
   const applyQuickRoute = useCallback(
     async (targetGroup: QuickRoutingTarget) => {
       if (!contextMenu) return
-      const { row } = contextMenu
+      const { row, scope } = contextMenu
       setContextMenu(null)
 
       const target =
@@ -301,6 +309,35 @@ export const ConnectionTable = (props: Props) => {
         row._isSynthetic && row._managedRule
           ? [row._managedRule.raw]
           : undefined
+
+      const isAlreadySuffixRule = Boolean(
+        row._isSynthetic && row._managedRule?.ruleType === 'DOMAIN-SUFFIX',
+      )
+
+      if (scope === 'suffix') {
+        const suffixDomain =
+          isAlreadySuffixRule && row._managedRule
+            ? row._managedRule.matchKey
+            : extractRegistrableDomain(target.value)
+        if (!suffixDomain) return
+
+        const appliedRule = await addQuickRoutingRule(
+          'domain-suffix',
+          suffixDomain,
+          targetGroup,
+          replaceRawRules ? { replaceRawRules } : undefined,
+        )
+        if (appliedRule) {
+          const suffixTarget: PathControlTarget = {
+            type: 'domain',
+            value: suffixDomain,
+            key: `domain-suffix:${suffixDomain}`,
+          }
+          onClearDisconnectedTarget?.(suffixTarget.key, row.id)
+          await onCloseMatchingTarget?.(suffixTarget)
+        }
+        return
+      }
 
       const appliedRule = await addQuickRoutingRule(
         target.type,
@@ -471,6 +508,23 @@ export const ConnectionTable = (props: Props) => {
 
   const virtualRows = rowVirtualizer.getVirtualItems()
   const totalSize = rowVirtualizer.getTotalSize()
+
+  const menuRow = contextMenu?.row
+  const isAlreadySuffixRule = Boolean(
+    menuRow?._isSynthetic &&
+      menuRow?._managedRule?.ruleType === 'DOMAIN-SUFFIX',
+  )
+  const menuExactTarget = menuRow
+    ? (menuRow._target ??
+      extractConnectionTarget(menuRow, menuRow._managedRule))
+    : null
+  const menuRootDomain =
+    !isAlreadySuffixRule &&
+    menuExactTarget?.type === 'domain' &&
+    !isIPv4Address(menuExactTarget.value) &&
+    !isIPv6Address(menuExactTarget.value)
+      ? extractRegistrableDomain(menuExactTarget.value)
+      : null
 
   return (
     <>
@@ -695,9 +749,120 @@ export const ConnectionTable = (props: Props) => {
             : undefined
         }
         slotProps={{
-          paper: getPopupMenuPaperProps(theme, { minWidth: 200 }),
+          paper: getPopupMenuPaperProps(theme, {
+            minWidth: 216,
+            maxWidth: 300,
+          }),
         }}
       >
+        {contextMenu && menuRootDomain && (
+          <Box
+            onKeyDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              px: 1.25,
+              pt: 0.5,
+              pb: 0.75,
+              mb: 0.25,
+              borderBottom: `1px solid ${tokens.dividerColor}`,
+            }}
+          >
+            <Box
+              role="tablist"
+              sx={(tTheme) => ({
+                position: 'relative',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                alignItems: 'center',
+                boxSizing: 'border-box',
+                height: 22,
+                p: '1px',
+                borderRadius: '4px',
+                bgcolor: 'action.hover',
+                userSelect: 'none',
+                ...get3DSegmentedContainerStyle(tTheme),
+              })}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '50%',
+                  height: '100%',
+                  zIndex: 0,
+                  pointerEvents: 'none',
+                  transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: `translate3d(${contextMenu.scope === 'exact' ? 0 : 100}%, 0, 0)`,
+                }}
+              >
+                <Box sx={(tTheme) => get3DSegmentedActiveStyle(tTheme)} />
+              </Box>
+              {(
+                [
+                  {
+                    value: 'exact' as const,
+                    label: t('connections.components.contextMenu.scopeExact'),
+                    title: undefined,
+                  },
+                  {
+                    value: 'suffix' as const,
+                    label: `*.${menuRootDomain}`,
+                    title: `*.${menuRootDomain}`,
+                  },
+                ] as const
+              ).map((opt) => {
+                const isSelected = contextMenu.scope === opt.value
+                return (
+                  <Box
+                    key={opt.value}
+                    role="tab"
+                    aria-selected={isSelected}
+                    title={opt.title}
+                    onClick={() =>
+                      setContextMenu((prev) =>
+                        prev ? { ...prev, scope: opt.value } : null,
+                      )
+                    }
+                    sx={{
+                      height: '100%',
+                      minWidth: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      px: 0.75,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      cursor: 'pointer',
+                      zIndex: 1,
+                      transition: 'color 0.2s ease',
+                      color: isSelected
+                        ? get3DSegmentedActiveTextColor(theme)
+                        : tokens.secondaryText,
+                      '&:hover': {
+                        color: isSelected
+                          ? get3DSegmentedActiveTextColor(theme)
+                          : tokens.primaryText,
+                      },
+                    }}
+                  >
+                    <Box
+                      component="span"
+                      sx={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {opt.label}
+                    </Box>
+                  </Box>
+                )
+              })}
+            </Box>
+          </Box>
+        )}
         <MenuItem onClick={handleDirect} sx={menuItemSx}>
           <FlashOnRounded sx={{ fontSize: 18, color: tokens.readyColor }} />
           {t('connections.components.contextMenu.setDirect')}

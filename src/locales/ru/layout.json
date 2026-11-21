@@ -128,7 +128,7 @@
     "clientUpdateFailed": "Ошибка обновления: {{message}}",
     "switchedToGlobalProxy": "Переключено на глобальный прокси",
     "switchedToGfwlist": "Переключено в режим GFWList",
-    "switchedToAddUrl": "Переключено в режим прокси для добавленных URL",
+    "switchedToAddUrl": "Переключено в режим добавления правил",
     "profileActivationFailed": "Не удалось активировать профиль после 3 попыток. Проверьте сеть или подписку."
   }
 }

@@ -128,7 +128,7 @@
     "clientUpdateFailed": "به‌روزرسانی ناموفق بود: {{message}}",
     "switchedToGlobalProxy": "به پروکسی سراسری تغییر یافت",
     "switchedToGfwlist": "به حالت GFWList تغییر یافت",
-    "switchedToAddUrl": "به حالت پروکسی نشانی‌های افزوده‌شده تغییر یافت",
+    "switchedToAddUrl": "به حالت افزودن قانون تغییر یافت",
     "profileActivationFailed": "فعال‌سازی پروفایل پس از ۳ بار تلاش ناموفق بود. شبکه یا اشتراک را بررسی کنید."
   }
 }

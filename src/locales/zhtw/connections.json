@@ -48,7 +48,8 @@
       "disconnect": "中斷此連線",
       "copyAddress": "複製連線地址",
       "viewDetail": "檢視詳細資訊",
-      "restoreDefault": "恢復預設路由"
+      "restoreDefault": "恢復預設路由",
+      "scopeExact": "僅此網域"
     }
   },
   "notices": {

@@ -12,17 +12,35 @@ import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import React, { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  closeConnectionWithTimeout,
+  getConnectionsWithTimeout,
+} from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
-import { get3DButtonStyle, get3DInputStyle } from '@/utils/button-styles'
+import {
+  get3DButtonStyle,
+  get3DInputStyle,
+  get3DSegmentedActiveStyle,
+  get3DSegmentedActiveTextColor,
+  get3DSegmentedContainerStyle,
+} from '@/utils/button-styles'
+import { findMatchingManagedRule } from '@/utils/path-control'
 import {
   getNarrowDialogSlotProps,
   getNarrowDialogSx,
   getPopupActionsSx,
   getPopupContentSx,
+  getPopupSkinTokens,
   getPopupTitleSx,
   useNarrowOverlayTopOffset,
 } from '@/utils/popup-styles'
-import { addQuickRoutingRules } from '@/utils/quick-routing'
+import {
+  addQuickRoutingRules,
+  buildQuickRuleFromInput,
+  parseManagedMergeRuleLine,
+  type ManagedMergeRule,
+  type QuickRoutingTarget,
+} from '@/utils/quick-routing'
 
 import { InputContextMenu } from './input-context-menu'
 
@@ -37,8 +55,10 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
 }) => {
   const { t } = useTranslation()
   const theme = useTheme()
+  const tokens = getPopupSkinTokens(theme)
   const topOffset = useNarrowOverlayTopOffset()
   const [text, setText] = useState('')
+  const [routeTarget, setRouteTarget] = useState<QuickRoutingTarget>('PROXY')
   const [submitting, setSubmitting] = useState(false)
 
   // Context Menu State for Input Box (Mouse Paste Bug Fix)
@@ -52,6 +72,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
   const handleClose = () => {
     if (submitting) return
     setText('')
+    setRouteTarget('PROXY')
     onClose()
   }
 
@@ -62,8 +83,37 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
     }
     setSubmitting(true)
     try {
-      const count = await addQuickRoutingRules(text)
+      const count = await addQuickRoutingRules(text, routeTarget)
       if (count > 0) {
+        try {
+          const parsedRules = text
+            .split(/[\n,;]+/)
+            .map((line) => buildQuickRuleFromInput(line, routeTarget))
+            .filter((rule): rule is string => Boolean(rule))
+            .map((rule) => parseManagedMergeRuleLine(rule))
+            .filter((rule): rule is ManagedMergeRule => Boolean(rule))
+
+          if (parsedRules.length > 0) {
+            const snapshot = await getConnectionsWithTimeout()
+            const activeConns = Array.isArray(snapshot?.connections)
+              ? snapshot.connections
+              : []
+            const matchingIds = activeConns
+              .filter((conn) =>
+                Boolean(findMatchingManagedRule(conn, parsedRules)),
+              )
+              .map((conn) => conn.id)
+              .filter(Boolean)
+
+            if (matchingIds.length > 0) {
+              await Promise.allSettled(
+                matchingIds.map((id) => closeConnectionWithTimeout(id)),
+              )
+            }
+          }
+        } catch {
+          // Best-effort connection refresh; ignore when core is offline.
+        }
         showNotice.success(t('settings.mini.addUrlSuccess', { count }))
       } else {
         showNotice.info(
@@ -73,6 +123,7 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
         )
       }
       setText('')
+      setRouteTarget('PROXY')
       onClose()
     } catch (e: unknown) {
       showNotice.error(e instanceof Error ? e.message : String(e))
@@ -192,6 +243,27 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
   }
 
   const hasSelection = Boolean(contextMenu?.hasSelection)
+  const targetOptions: ReadonlyArray<{
+    value: QuickRoutingTarget
+    label: string
+  }> = [
+    {
+      value: 'PROXY',
+      label: t('connections.components.miniTable.chainsProxy'),
+    },
+    {
+      value: 'DIRECT',
+      label: t('connections.components.miniTable.chainsDirect'),
+    },
+    {
+      value: 'REJECT',
+      label: t('connections.components.miniTable.chainsReject'),
+    },
+  ]
+  const activeTargetIndex = Math.max(
+    0,
+    targetOptions.findIndex((item) => item.value === routeTarget),
+  )
 
   return (
     <>
@@ -216,12 +288,85 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
           >
             <span>🌐</span>
             <span>
-              {t('settings.mini.addUrl', { defaultValue: '添加网址' })}
+              {t('settings.mini.addUrl', { defaultValue: '添加规则' })}
             </span>
           </Box>
         </DialogTitle>
 
         <DialogContent sx={getPopupContentSx()}>
+          <Box
+            role="tablist"
+            sx={(tTheme) => ({
+              position: 'relative',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              alignItems: 'center',
+              boxSizing: 'border-box',
+              mb: 1,
+              height: 24,
+              p: '1px',
+              borderRadius: '4px',
+              bgcolor: 'action.hover',
+              userSelect: 'none',
+              ...get3DSegmentedContainerStyle(tTheme),
+            })}
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: '33.333%',
+                height: '100%',
+                zIndex: 0,
+                pointerEvents: 'none',
+                transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: `translate3d(${activeTargetIndex * 100}%, 0, 0)`,
+              }}
+            >
+              <Box sx={(tTheme) => get3DSegmentedActiveStyle(tTheme)} />
+            </Box>
+            {targetOptions.map((opt) => {
+              const isSelected = routeTarget === opt.value
+              return (
+                <Box
+                  key={opt.value}
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => {
+                    if (!submitting) {
+                      setRouteTarget(opt.value)
+                    }
+                  }}
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    px: 0.5,
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    zIndex: 1,
+                    transition: 'color 0.2s ease',
+                    color: isSelected
+                      ? get3DSegmentedActiveTextColor(theme)
+                      : tokens.secondaryText,
+                    '&:hover': {
+                      color: isSelected
+                        ? get3DSegmentedActiveTextColor(theme)
+                        : tokens.primaryText,
+                    },
+                  }}
+                >
+                  {opt.label}
+                </Box>
+              )
+            })}
+          </Box>
           <TextField
             autoFocus
             multiline
@@ -232,7 +377,8 @@ export const AddUrlDialog: React.FC<AddUrlDialogProps> = ({
             disabled={submitting}
             onChange={(e) => setText(e.target.value)}
             placeholder={t('settings.mini.addUrlPlaceholder', {
-              defaultValue: '请填入需要代理的网址（每行一个）',
+              defaultValue:
+                '每行一个网址或 IP\n根域名（如 oracle.com）或 *.前缀匹配整站\n子域名（如 play.googleapis.com）仅精确匹配',
             })}
             sx={get3DInputStyle(theme)}
             inputRef={inputRef}

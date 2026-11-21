@@ -128,7 +128,7 @@
     "clientUpdateFailed": "فشل التحديث: {{message}}",
     "switchedToGlobalProxy": "تم التبديل إلى الوكيل العام",
     "switchedToGfwlist": "تم التبديل إلى وضع GFWList",
-    "switchedToAddUrl": "تم التبديل إلى وضع وكيل إضافة الروابط",
+    "switchedToAddUrl": "تم التبديل إلى وضع إضافة قاعدة",
     "profileActivationFailed": "فشل تفعيل الاشتراك بعد 3 محاولات. يرجى التحقق من الشبكة أو الاشتراك."
   }
 }

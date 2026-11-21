@@ -144,11 +144,78 @@ export function normalizeQuickTargetHost(raw: string): string {
   return host.toLowerCase()
 }
 
+const SHARED_TWO_LABEL_PUBLIC_SUFFIXES = new Set([
+  'github.io',
+  'gitlab.io',
+  'pages.dev',
+  'workers.dev',
+  'vercel.app',
+  'netlify.app',
+  'web.app',
+  'firebaseapp.com',
+  'appspot.com',
+  'cloudfront.net',
+  'azurewebsites.net',
+])
+
+const CC_SECOND_LEVEL_REGISTRIES = new Set([
+  'com',
+  'co',
+  'org',
+  'net',
+  'gov',
+  'edu',
+  'ac',
+  'mil',
+  'or',
+  'ne',
+  'go',
+  'gv',
+  'idv',
+  'asn',
+])
+
 /**
- * Builds an exact Clash routing rule without widening scope or stripping subdomains.
+ * Extracts the registrable root domain (eTLD+1) from a hostname, returning `null`
+ * for IPs, single-label hosts, invalid labels, or bare public suffixes (`co.uk`, `com.cn`, `workers.dev`).
+ */
+export function extractRegistrableDomain(rawHost: string): string | null {
+  const norm = normalizeQuickTargetHost(rawHost)
+  if (
+    !norm ||
+    isIPv4Address(norm) ||
+    isIPv6Address(norm) ||
+    !norm.includes('.')
+  ) {
+    return null
+  }
+
+  const labels = norm.split('.')
+  if (labels.some((label) => !label)) return null
+
+  const last = labels[labels.length - 1]
+  const secondLast = labels[labels.length - 2]
+  const lastTwo = `${secondLast}.${last}`
+  const suffixLen =
+    SHARED_TWO_LABEL_PUBLIC_SUFFIXES.has(lastTwo) ||
+    (last.length === 2 &&
+      /^[a-z]{2}$/.test(last) &&
+      CC_SECOND_LEVEL_REGISTRIES.has(secondLast))
+      ? 2
+      : 1
+
+  if (labels.length <= suffixLen) {
+    return null
+  }
+
+  return labels.slice(-(suffixLen + 1)).join('.')
+}
+
+/**
+ * Builds a Clash routing rule (`PROCESS-NAME`, `IP-CIDR`, `IP-CIDR6`, exact `DOMAIN`, or `DOMAIN-SUFFIX`).
  */
 export function buildExactQuickRoutingRule(
-  type: 'process' | 'domain',
+  type: 'process' | 'domain' | 'domain-suffix',
   value: string,
   target: QuickRoutingTarget,
 ): string | null {
@@ -160,6 +227,17 @@ export function buildExactQuickRoutingRule(
   const host = normalizeQuickTargetHost(value)
   if (!host) return null
 
+  if (type === 'domain-suffix') {
+    if (
+      isIPv4Address(host) ||
+      isIPv6Address(host) ||
+      !extractRegistrableDomain(host)
+    ) {
+      return null
+    }
+    return `DOMAIN-SUFFIX,${host},${target}`
+  }
+
   if (isIPv4Address(host)) {
     return `IP-CIDR,${host}/32,${target}`
   }
@@ -170,10 +248,14 @@ export function buildExactQuickRoutingRule(
 }
 
 /**
- * Builds a PROXY rule from user URL/domain/IP input.
- * Plain domains emit exact `DOMAIN`; explicit `*.domain` or `.domain` emits `DOMAIN-SUFFIX`.
+ * Builds a Clash rule from user URL/domain/IP input for the given target (`PROXY`, `DIRECT`, or `REJECT`).
+ * - Bare registrable root domains (e.g. `oracle.com`) and explicit wildcards (`*.oracle.com`) emit `DOMAIN-SUFFIX`.
+ * - Specific subdomains (e.g. `play.googleapis.com`) emit exact `DOMAIN`.
  */
-export function buildProxyRule(input: string): string | null {
+export function buildQuickRuleFromInput(
+  input: string,
+  target: QuickRoutingTarget = 'PROXY',
+): string | null {
   if (!input) return null
 
   let raw = input.trim()
@@ -188,10 +270,10 @@ export function buildProxyRule(input: string): string | null {
     const prefix = Number(cidrParts[1])
     const baseIp = normalizeQuickTargetHost(cidrParts[0])
     if (isIPv4Address(baseIp) && prefix >= 0 && prefix <= 32) {
-      return `IP-CIDR,${baseIp}/${prefix},PROXY`
+      return `IP-CIDR,${baseIp}/${prefix},${target}`
     }
     if (isIPv6Address(baseIp) && prefix >= 0 && prefix <= 128) {
-      return `IP-CIDR6,${baseIp}/${prefix},PROXY`
+      return `IP-CIDR6,${baseIp}/${prefix},${target}`
     }
   }
 
@@ -205,17 +287,31 @@ export function buildProxyRule(input: string): string | null {
   if (!cleaned) return null
 
   if (isIPv4Address(cleaned)) {
-    return `IP-CIDR,${cleaned}/32,PROXY`
+    return `IP-CIDR,${cleaned}/32,${target}`
   }
   if (isIPv6Address(cleaned)) {
-    return `IP-CIDR6,${cleaned}/128,PROXY`
+    return `IP-CIDR6,${cleaned}/128,${target}`
   }
 
-  if (!cleaned.includes('.')) return null
+  if (!cleaned.includes('.') || cleaned.split('.').some((part) => !part)) {
+    return null
+  }
 
-  return explicitWildcard
-    ? `DOMAIN-SUFFIX,${cleaned},PROXY`
-    : `DOMAIN,${cleaned},PROXY`
+  const rootDomain = extractRegistrableDomain(cleaned)
+  if (!rootDomain) return null
+
+  if (explicitWildcard || cleaned === rootDomain) {
+    return `DOMAIN-SUFFIX,${cleaned},${target}`
+  }
+
+  return `DOMAIN,${cleaned},${target}`
+}
+
+/**
+ * Convenience wrapper building a `PROXY` rule from user input.
+ */
+export function buildProxyRule(input: string): string | null {
+  return buildQuickRuleFromInput(input, 'PROXY')
 }
 
 /**
@@ -296,6 +392,9 @@ export function upsertPrependRule(
   options?: { replaceRawRules?: string[] },
 ): string[] {
   const newKey = getRuleIdentityKey(newRule)
+  const parsedNew = parseManagedMergeRuleLine(newRule)
+  const suffixScope =
+    parsedNew?.ruleType === 'DOMAIN-SUFFIX' ? parsedNew.matchKey : null
   const replaceSet = new Set(
     (options?.replaceRawRules ?? []).map((r) => r.trim()).filter(Boolean),
   )
@@ -305,6 +404,18 @@ export function upsertPrependRule(
     if (!trimmed || trimmed === newRule) return false
     if (replaceSet.has(trimmed)) return false
     if (newKey && getRuleIdentityKey(trimmed) === newKey) return false
+    if (suffixScope) {
+      const parsedOld = parseManagedMergeRuleLine(trimmed)
+      if (
+        parsedOld &&
+        (parsedOld.ruleType === 'DOMAIN' ||
+          parsedOld.ruleType === 'DOMAIN-SUFFIX') &&
+        (parsedOld.matchKey === suffixScope ||
+          parsedOld.matchKey.endsWith(`.${suffixScope}`))
+      ) {
+        return false
+      }
+    }
     return true
   })
 
@@ -364,7 +475,7 @@ export const readManagedMergeRules = async (): Promise<ManagedMergeRule[]> => {
  * and broadcasts the Merge rule change event.
  */
 export const addQuickRoutingRule = async (
-  type: 'process' | 'domain',
+  type: 'process' | 'domain' | 'domain-suffix',
   value: string,
   target: QuickRoutingTarget,
   options?: { replaceRawRules?: string[] },
@@ -454,10 +565,12 @@ export const removeQuickRoutingRule = async (options: {
 }
 
 /**
- * Parses multi-line/comma/semicolon user input into Clash PROXY rules and prepends to Merge.
+ * Parses multi-line/comma/semicolon user input into Clash rules (`PROXY`, `DIRECT`, or `REJECT`)
+ * and prepends them to Merge.
  */
 export const addQuickRoutingRules = async (
   rawText: string,
+  target: QuickRoutingTarget = 'PROXY',
 ): Promise<number> => {
   const lines = (rawText || '')
     .split(/[\n,;]+/)
@@ -468,7 +581,7 @@ export const addQuickRoutingRules = async (
 
   try {
     const rules = lines
-      .map((line) => buildProxyRule(line))
+      .map((line) => buildQuickRuleFromInput(line, target))
       .filter((rule): rule is string => !!rule)
 
     if (rules.length === 0) return 0

@@ -38,6 +38,8 @@ import {
   addQuickRoutingRules,
   buildExactQuickRoutingRule,
   buildProxyRule,
+  buildQuickRuleFromInput,
+  extractRegistrableDomain,
   normalizeQuickTargetHost,
   parseManagedMergeRuleLine,
   parseManagedMergeRulesFromYaml,
@@ -97,7 +99,31 @@ describe('quick-routing 精确规则生成（BUG-367）', () => {
     ).toBe('PROCESS-NAME,GoogleUpdate.exe,REJECT')
   })
 
-  it('添加网址 buildProxyRule：普通域名精确生成 DOMAIN，仅显式通配生成 DOMAIN-SUFFIX', () => {
+  it('extractRegistrableDomain 精准识别标准根域、多级 ccTLD 与共享后缀，并拦截裸公共后缀与 IP', () => {
+    expect(extractRegistrableDomain('console.ap-tokyo-1.oraclecloud.com')).toBe(
+      'oraclecloud.com',
+    )
+    expect(extractRegistrableDomain('oracle.com')).toBe('oracle.com')
+    expect(extractRegistrableDomain('news.bbc.co.uk')).toBe('bbc.co.uk')
+    expect(extractRegistrableDomain('login.example.com.cn')).toBe(
+      'example.com.cn',
+    )
+    expect(extractRegistrableDomain('sub.foo.co.jp')).toBe('foo.co.jp')
+    expect(extractRegistrableDomain('docs.myuser.github.io')).toBe(
+      'myuser.github.io',
+    )
+    expect(extractRegistrableDomain('api.myapp.workers.dev')).toBe(
+      'myapp.workers.dev',
+    )
+    expect(extractRegistrableDomain('co.uk')).toBeNull()
+    expect(extractRegistrableDomain('com.cn')).toBeNull()
+    expect(extractRegistrableDomain('workers.dev')).toBeNull()
+    expect(extractRegistrableDomain('localhost')).toBeNull()
+    expect(extractRegistrableDomain('1.2.3.4')).toBeNull()
+    expect(extractRegistrableDomain('2001:db8::1')).toBeNull()
+  })
+
+  it('添加规则 buildQuickRuleFromInput / buildProxyRule：支持 PROXY/DIRECT/REJECT，裸根域名与通配符生成 DOMAIN-SUFFIX，具体子域名严格生成 DOMAIN', () => {
     expect(buildProxyRule('https://play.googleapis.com/log?x=1')).toBe(
       'DOMAIN,play.googleapis.com,PROXY',
     )
@@ -115,6 +141,26 @@ describe('quick-routing 精确规则生成（BUG-367）', () => {
     expect(buildProxyRule('2001:db8::1')).toBe('IP-CIDR6,2001:db8::1/128,PROXY')
     expect(buildProxyRule('2001:db8::/32')).toBe('IP-CIDR6,2001:db8::/32,PROXY')
     expect(buildProxyRule('localhost')).toBeNull()
+
+    expect(buildQuickRuleFromInput('oracle.com', 'DIRECT')).toBe(
+      'DOMAIN-SUFFIX,oracle.com,DIRECT',
+    )
+    expect(buildQuickRuleFromInput('https://oraclecloud.com/', 'DIRECT')).toBe(
+      'DOMAIN-SUFFIX,oraclecloud.com,DIRECT',
+    )
+    expect(buildQuickRuleFromInput('bbc.co.uk', 'DIRECT')).toBe(
+      'DOMAIN-SUFFIX,bbc.co.uk,DIRECT',
+    )
+    expect(buildQuickRuleFromInput('*.oraclecloud.com', 'DIRECT')).toBe(
+      'DOMAIN-SUFFIX,oraclecloud.com,DIRECT',
+    )
+    expect(buildQuickRuleFromInput('*.co.uk', 'DIRECT')).toBeNull()
+    expect(buildQuickRuleFromInput('play.googleapis.com', 'REJECT')).toBe(
+      'DOMAIN,play.googleapis.com,REJECT',
+    )
+    expect(buildQuickRuleFromInput('1.2.3.4', 'REJECT')).toBe(
+      'IP-CIDR,1.2.3.4/32,REJECT',
+    )
   })
 
   it('normalizeQuickTargetHost 保留 IPv6 冒号且仅剥离单冒号端口', () => {
@@ -234,6 +280,72 @@ describe('quick-routing 精确规则生成（BUG-367）', () => {
     expect(savedYaml).toContain('DOMAIN,play.googleapis.com,PROXY')
     expect(savedYaml).toContain('DOMAIN-SUFFIX,cdn.example.com,PROXY')
     expect(savedYaml).toContain('IP-CIDR6,2001:db8::1/128,PROXY')
+  })
+
+  it('addQuickRoutingRules 支持 DIRECT 与 REJECT 目标（裸根域名自动整站生效）', async () => {
+    vi.mocked(readProfileFile).mockResolvedValue('prepend-rules: []\n')
+    vi.mocked(saveProfileFile).mockResolvedValue(true as never)
+    vi.mocked(enhanceProfiles).mockResolvedValue(true as never)
+
+    const directCount = await addQuickRoutingRules(
+      'oracle.com\noraclecloud.com\n10.0.0.5',
+      'DIRECT',
+    )
+    expect(directCount).toBe(3)
+    const directYaml = vi.mocked(saveProfileFile).mock.calls[0][1]
+    expect(directYaml).toContain('DOMAIN-SUFFIX,oracle.com,DIRECT')
+    expect(directYaml).toContain('DOMAIN-SUFFIX,oraclecloud.com,DIRECT')
+    expect(directYaml).toContain('IP-CIDR,10.0.0.5/32,DIRECT')
+
+    const rejectCount = await addQuickRoutingRules(
+      'play.googleapis.com\n*.ads.example.com',
+      'REJECT',
+    )
+    expect(rejectCount).toBe(2)
+    const rejectYaml = vi.mocked(saveProfileFile).mock.calls[1][1]
+    expect(rejectYaml).toContain('DOMAIN,play.googleapis.com,REJECT')
+    expect(rejectYaml).toContain('DOMAIN-SUFFIX,ads.example.com,REJECT')
+  })
+
+  it('addQuickRoutingRule 写入 DOMAIN-SUFFIX 自动收编被覆盖子域名规则，且允许后续精准子域名置顶覆写例外', async () => {
+    vi.mocked(readProfileFile).mockResolvedValue(
+      [
+        'prepend-rules:',
+        '  - DOMAIN,login.oraclecloud.com,DIRECT',
+        '  - DOMAIN,console.ap-tokyo-1.oraclecloud.com,PROXY',
+        '  - DOMAIN,keep.other.com,DIRECT',
+        '',
+      ].join('\n'),
+    )
+    vi.mocked(saveProfileFile).mockResolvedValue(true as never)
+    vi.mocked(enhanceProfiles).mockResolvedValue(true as never)
+
+    const suffixRule = await addQuickRoutingRule(
+      'domain-suffix',
+      'oraclecloud.com',
+      'DIRECT',
+    )
+    expect(suffixRule).toBe('DOMAIN-SUFFIX,oraclecloud.com,DIRECT')
+    const afterSuffixYaml = vi.mocked(saveProfileFile).mock.calls[0][1]
+    expect(afterSuffixYaml).toContain('DOMAIN-SUFFIX,oraclecloud.com,DIRECT')
+    expect(afterSuffixYaml).not.toContain('login.oraclecloud.com')
+    expect(afterSuffixYaml).not.toContain('console.ap-tokyo-1.oraclecloud.com')
+    expect(afterSuffixYaml).toContain('DOMAIN,keep.other.com,DIRECT')
+
+    vi.mocked(readProfileFile).mockResolvedValue(afterSuffixYaml)
+    const exceptionRule = await addQuickRoutingRule(
+      'domain',
+      'telemetry.oraclecloud.com',
+      'REJECT',
+    )
+    expect(exceptionRule).toBe('DOMAIN,telemetry.oraclecloud.com,REJECT')
+    const afterExceptionYaml = vi.mocked(saveProfileFile).mock.calls[1][1]
+    const parsedException = parseManagedMergeRulesFromYaml(afterExceptionYaml)
+    expect(parsedException.map((r) => r.raw)).toEqual([
+      'DOMAIN,telemetry.oraclecloud.com,REJECT',
+      'DOMAIN-SUFFIX,oraclecloud.com,DIRECT',
+      'DOMAIN,keep.other.com,DIRECT',
+    ])
   })
 })
 

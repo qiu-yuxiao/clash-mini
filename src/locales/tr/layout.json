@@ -128,7 +128,7 @@
     "clientUpdateFailed": "Güncelleme başarısız: {{message}}",
     "switchedToGlobalProxy": "Genel Proxy moduna geçildi",
     "switchedToGfwlist": "GFWList moduna geçildi",
-    "switchedToAddUrl": "URL Ekle proxy moduna geçildi",
+    "switchedToAddUrl": "Kural Ekle moduna geçildi",
     "profileActivationFailed": "3 denemeden sonra profil etkinleştirilemedi. Ağı veya aboneliği kontrol edin."
   }
 }

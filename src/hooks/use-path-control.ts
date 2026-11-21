@@ -161,8 +161,21 @@ export function usePathControl({
   const clearDisconnectedTarget = useCallback(
     (targetKey?: string, connId?: string) => {
       if (targetKey) {
+        const suffix = targetKey.startsWith('domain-suffix:')
+          ? targetKey.slice('domain-suffix:'.length)
+          : null
         setDisconnectedRecords((prev) => {
-          const next = prev.filter((item) => item.key !== targetKey)
+          const next = prev.filter((item) => {
+            if (item.key === targetKey) return false
+            if (
+              suffix &&
+              item.key.startsWith('domain:') &&
+              (item.value === suffix || item.value.endsWith(`.${suffix}`))
+            ) {
+              return false
+            }
+            return true
+          })
           if (next.length !== prev.length) {
             saveDisconnectedRecords(next)
           }

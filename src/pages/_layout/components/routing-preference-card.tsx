@@ -115,6 +115,10 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               fontSize:
                 language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              px: 0.25,
               cursor: 'pointer',
               zIndex: 1,
               transition: 'color 0.2s ease',
@@ -165,6 +169,10 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               fontSize:
                 language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              px: 0.25,
               cursor: 'pointer',
               zIndex: 1,
               transition: 'color 0.2s ease',
@@ -190,10 +198,10 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
           </Box>
         </Tooltip>
 
-        {/* Add URL Option */}
+        {/* Add Rule Option */}
         <Tooltip
           title={t('settings.mini.addUrlTooltip', {
-            defaultValue: '在 GFWList 基础上，手动添加需要代理的网址',
+            defaultValue: '手动批量添加分流规则（支持代理、直连或封锁）',
           })}
           placement="top"
           arrow
@@ -215,6 +223,10 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               fontSize:
                 language === 'zh' || language === 'zhtw' ? '13px' : '11px',
               fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              px: 0.25,
               cursor: 'pointer',
               zIndex: 1,
               transition: 'color 0.2s ease',
@@ -236,7 +248,7 @@ export const RoutingPreferenceCard: React.FC<RoutingPreferenceCardProps> = ({
               },
             }}
           >
-            {t('settings.mini.addUrl', { defaultValue: '添加网址' })}
+            {t('settings.mini.addUrl', { defaultValue: '添加规则' })}
           </Box>
         </Tooltip>
       </Box>

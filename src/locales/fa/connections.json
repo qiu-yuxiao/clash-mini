@@ -48,7 +48,8 @@
       "disconnect": "قطع این اتصال",
       "copyAddress": "کپی نشانی اتصال",
       "viewDetail": "مشاهده جزئیات",
-      "restoreDefault": "بازگردانی مسیر پیش‌فرض"
+      "restoreDefault": "بازگردانی مسیر پیش‌فرض",
+      "scopeExact": "فقط همین دامنه"
     }
   },
   "notices": {

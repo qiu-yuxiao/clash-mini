@@ -18,6 +18,7 @@ export interface TranslationResources {
           copyAddress: string
           disconnect: string
           restoreDefault: string
+          scopeExact: string
           setDirect: string
           setProxy: string
           setReject: string

@@ -48,7 +48,8 @@
       "disconnect": "Бу тоташуны өзү",
       "copyAddress": "Тоташу адресын күчерү",
       "viewDetail": "Детальләрне карау",
-      "restoreDefault": "Килешү маршрутын кайтару"
+      "restoreDefault": "Килешү маршрутын кайтару",
+      "scopeExact": "Бу домен гына"
     }
   },
   "notices": {

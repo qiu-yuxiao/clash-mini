@@ -48,7 +48,8 @@
       "disconnect": "Desconectar esta conexión",
       "copyAddress": "Copiar dirección de conexión",
       "viewDetail": "Ver detalles",
-      "restoreDefault": "Restaurar ruta predeterminada"
+      "restoreDefault": "Restaurar ruta predeterminada",
+      "scopeExact": "Solo este host"
     }
   },
   "notices": {

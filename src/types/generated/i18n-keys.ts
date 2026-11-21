@@ -38,6 +38,7 @@ export const translationKeys = [
   'connections.components.contextMenu.copyAddress',
   'connections.components.contextMenu.viewDetail',
   'connections.components.contextMenu.restoreDefault',
+  'connections.components.contextMenu.scopeExact',
   'connections.notices.copied',
   'home.page.tooltips.lightweightMode',
   'home.page.tooltips.manual',

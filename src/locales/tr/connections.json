@@ -48,7 +48,8 @@
       "disconnect": "Bu bağlantıyı kes",
       "copyAddress": "Bağlantı adresini kopyala",
       "viewDetail": "Ayrıntıları görüntüle",
-      "restoreDefault": "Varsayılan Rotaya Dön"
+      "restoreDefault": "Varsayılan Rotaya Dön",
+      "scopeExact": "Yalnızca bu alan"
     }
   },
   "notices": {

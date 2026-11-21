@@ -48,7 +48,8 @@
       "disconnect": "이 연결 끊기",
       "copyAddress": "연결 주소 복사",
       "viewDetail": "상세 정보 보기",
-      "restoreDefault": "기본 경로 복원"
+      "restoreDefault": "기본 경로 복원",
+      "scopeExact": "이 도메인만"
     }
   },
   "notices": {

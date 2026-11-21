@@ -128,7 +128,7 @@
     "clientUpdateFailed": "Gagal memperbarui: {{message}}",
     "switchedToGlobalProxy": "Beralih ke Proxy Global",
     "switchedToGfwlist": "Beralih ke mode GFWList",
-    "switchedToAddUrl": "Beralih ke mode proxy Tambah URL",
+    "switchedToAddUrl": "Beralih ke mode Aturan Baru",
     "profileActivationFailed": "Aktivasi profil gagal setelah 3 kali percobaan. Periksa jaringan atau langganan Anda."
   }
 }

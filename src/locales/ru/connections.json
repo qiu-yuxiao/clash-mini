@@ -48,7 +48,8 @@
       "disconnect": "Разорвать соединение",
       "copyAddress": "Копировать адрес соединения",
       "viewDetail": "Подробная информация",
-      "restoreDefault": "Сбросить маршрут"
+      "restoreDefault": "Сбросить маршрут",
+      "scopeExact": "Только этот хост"
     }
   },
   "notices": {

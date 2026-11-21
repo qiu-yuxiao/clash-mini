@@ -128,7 +128,7 @@
     "clientUpdateFailed": "Update failed: {{message}}",
     "switchedToGlobalProxy": "Switched to Global Proxy",
     "switchedToGfwlist": "Switched to GFWList mode",
-    "switchedToAddUrl": "Switched to Add URL proxy mode",
+    "switchedToAddUrl": "Switched to Add Rule mode",
     "profileActivationFailed": "Profile activation failed after 3 retries. Please check your network or subscription."
   }
 }

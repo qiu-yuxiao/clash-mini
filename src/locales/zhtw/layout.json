@@ -128,7 +128,7 @@
     "clientUpdateFailed": "更新失敗: {{message}}",
     "switchedToGlobalProxy": "已切換至全域代理",
     "switchedToGfwlist": "已切換至 GFWList 模式",
-    "switchedToAddUrl": "已切換至新增網址模式",
+    "switchedToAddUrl": "已切換至新增規則模式",
     "profileActivationFailed": "訂閱啟用連續重試 3 次失敗，請檢查網路或訂閱內容後重試。"
   }
 }
