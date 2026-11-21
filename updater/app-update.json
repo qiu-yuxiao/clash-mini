@@ -1,11 +1,11 @@
 {
-  "version": "3.6.3",
-  "notes": "### 🔀 路径控制「链接目标」表头内嵌活跃/已关闭开关与封锁项独立归档（BUG-418）\n\n- **「链接目标」表头同行右侧新增 3D 二选一开关（`活跃 / 已关闭`）**：零额外占用纵向行高，点击开关自动隔离表头排序事件，并在空列表或空搜索状态下始终保持表头与开关可用，方便随时在两视图间切换。\n- **活跃连接彻底纯净，封锁规则（`REJECT`）与历史死链归入「已关闭」并固定置顶**：\n  - **活跃 (`Active`)**：仅展示此时正在联网的实时 `直连 / 代理` 连接；\n  - **已关闭 (`Closed`)**：固定置顶所有 `Merge` `封锁 (REJECT)` 规则（即使重开软件也可一眼定位并右键「恢复默认路由」解封），其后依次展示手动 `已断开` 记录、当前无流量的闲置自定义规则，以及按目标去重的近期自然结束连接。\n- **完善 13 语种翻译与前端回归单测**：补齐日/韩/德/西/土/印尼/阿/波斯/鞑靼语等 9 语种的「活跃 / 已关闭」本地化标签，并更新 `path-control.test.ts` 分区与置顶断言。\n\n---",
-  "pub_date": "2026-11-21T22:42:12.207Z",
+  "version": "3.6.4",
+  "notes": "Clash Mini v3.6.4",
+  "pub_date": "2026-11-21T23:03:36Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUxNSk9veXhyTXkvaFo4STUzbHdPVjBzNE9DMTdxcHBUclFnMDRUSlllMEZrY0tnYVprZ3ozWUVuWGVEUkFHOHJCblhIc1hsYk1Fd3dUTVV0ajl0RlFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MzAwODU3CWZpbGU6Q2xhc2ggTWluaV8zLjYuM194NjQtc2V0dXAuZXhlCnozSk9BbXIzQXpmYTFEMEFrVGhkeFowMTczRjgvSDlOMzgvdTcybXM1aktLWi84YW85aTh2ZnlWcTJycTNaZ0I3WU1YQ1FnQ0U3eG5vYVc3WDgvbEFnPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.3/Clash.Mini_3.6.3_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.4/Clash.Mini_3.6.4_x64-setup.exe",
       "size": 30134748
     }
   }
