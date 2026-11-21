@@ -1,11 +1,11 @@
 {
-  "version": "3.6.2",
-  "notes": "### 🛡️ 备用测速防替考、服务模式自动对账、客户端升级断点续试与订阅失败多语种收口（BUG-416 / BUG-417）\n\n- **封堵备用测速 URL 误赦免死节点与冷启动伪宽限期（BUG-417）**：\n  - 修复主测速 URL 全超时后仅同组其他节点通过备用测速 URL（`gstatic`）时，原断流活跃节点被误判为 `NoAction`“替考免死”的缺陷：`is_active_excused_by_primary_distortion` 严格要求当前活跃节点自身在备用 URL 取得有效延迟方免于判死，否则同步向 UI 标红并照常推进切点裁决；\n  - 守护首次观测到活跃节点（`None -> Some`）不再开启伪 `20s` 节点切换宽限期，且冷启动 `select=false` 纯测速实证持久节点超时而同组另有可达候选时立即预置第 1 次失败并按 `3s` 间隔二次复核（恢复即保活、再败即切换）；\n  - 为 `start_with_existing_service` 的 `start_clash` IPC 补充 3 次短退避重试，并在 `CoreManager` 新增 `reconcile_running_mode_if_needed`，探测到系统服务与内核管道已在线而运行态仍为 `NotRunning` 时自动对账恢复 `RunningMode::Service`。\n- **加固客户端自升级下载链路与可观测性（BUG-417）**：\n  - `checkClientUpdateWithFallback` 优先经本地混合端口代理检查更新，失败时自动回退直连/系统代理；`downloadAndInstallClientUpdateWithRetry` 在 `Finished` 前发生断流自动退避重试最多 3 次，全部重试与失败详情均通过 `frontendLog` 持久化写入 `latest.log`。\n- **统一订阅失败多语种通知、独立 TUN 网卡事件窗口及消除监视子模块互引（BUG-416 / BUG-417）**：\n  - 修复订阅三阶段下载全败的错误返回与前端消费路径：后台定时更新失败发送 `update_failed_even_with_clash` 通知并触发 `timer.rs` `2` 分钟快重试，手动更新直接复用 13 语种 `withClashProxyFailed` 前缀呈现脱敏错误详情（消除硬编码中文与死代码）；\n  - 为 `[TUN] default interface lost/changed` 设立独立 `300s`（`TUN_EVENT_MAX_AGE_SECS`）有效回溯窗口与 `60s`（`TUN_INTERFACE_CHANGED_TTL_SECS`）待复核信号自动过期上限，并将 `NodeStatus` 上收至 `module/monitor/mod.rs`，彻底消除 `observer` 与 `verdict` 的双向循环依赖；同步校准前端/架构文档及 `Changelog.md` 模块命名记录。\n\n---",
-  "pub_date": "2026-11-20T20:01:08.659Z",
+  "version": "3.6.3",
+  "notes": "Clash Mini v3.6.3",
+  "pub_date": "2026-11-21T22:21:52Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU9sbFJkREVodFBHdEt3QTYxUzg4djBrbTJHWUZOVnRqekVld2gxYjJCSmpFakdWZmFvUDE1d2o0dWJvdHRSeklaV0xMS2d5K29GbWk4MUZjbDNmbEFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MjA0Nzk5CWZpbGU6Q2xhc2ggTWluaV8zLjYuMl94NjQtc2V0dXAuZXhlCjB0Z1RjcnB0eUJpaDVQS3JJdG5yQ2RYeEc5ZkN4S3JzRnMvbWhlaUIzbFdpQlJuTTRCaUNXV3lKa2c4Y21VeHhJYjZFL1NCZVdLN2Fucy9tWmhWWEFnPT0K",
-      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.2/Clash.Mini_3.6.2_x64-setup.exe",
+      "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.3/Clash.Mini_3.6.3_x64-setup.exe",
       "size": 30132689
     }
   }
