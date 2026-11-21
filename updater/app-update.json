@@ -1,12 +1,12 @@
 {
   "version": "3.6.4",
-  "notes": "Clash Mini v3.6.4",
-  "pub_date": "2026-11-21T23:03:36Z",
+  "notes": "### 🎯 代理方式升级为「添加规则」（支持直连/封锁）& 路径控制右键支持整站根域名切换（BUG-419）\n\n- **「添加网址」正式更名为「添加规则」并支持三态目标选择**：\n  - 设置页左侧「代理方式」第三档由「添加网址」更名为 **`添加规则`**（13 语种全量同步，保持既有配置文件 `'addurl'` 兼容）；\n  - 弹窗顶部新增 **`[ 代理 | 直连 | 封锁 ]`** 3D 三选一滑块，提交后自动即时断开匹配的新规则存量活跃连接；\n  - 新增 `extractRegistrableDomain`（支持 `.co.uk` / `.com.cn` / `.co.jp` / `.github.io` 等多级后缀并拦截裸公共后缀）与 `buildQuickRuleFromInput`：输入 **裸根域名**（如 `oracle.com`、`oraclecloud.com`）或 **`*.` 通配前缀** 自动生成整站 `DOMAIN-SUFFIX` 规则，而具体子域名（如 `play.googleapis.com`）继续严格生成精确 `DOMAIN` 规则。\n- **路径控制右键菜单顶部新增「仅此域名 / `*.根域名`」二选一开关**：\n  - 右键任意域名连接时默认锁定 **`仅此域名`**（彻底保护 `play.googleapis.com` 等单点封锁绝不扩散）；\n  - 需要对多子域名站点（如 Oracle）整站直连/代理/封锁时，轻点顶部 **`*.根域名`** 后再选对应动作即可一键下发 `DOMAIN-SUFFIX`、自动合并清理下方零散子域名历史规则，并立即断开重连所有匹配子域连接。\n\n---",
+  "pub_date": "2026-11-21T23:22:55.325Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUxNSk9veXhyTXkvaFo4STUzbHdPVjBzNE9DMTdxcHBUclFnMDRUSlllMEZrY0tnYVprZ3ozWUVuWGVEUkFHOHJCblhIc1hsYk1Fd3dUTVV0ajl0RlFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MzAwODU3CWZpbGU6Q2xhc2ggTWluaV8zLjYuM194NjQtc2V0dXAuZXhlCnozSk9BbXIzQXpmYTFEMEFrVGhkeFowMTczRjgvSDlOMzgvdTcybXM1aktLWi84YW85aTh2ZnlWcTJycTNaZ0I3WU1YQ1FnQ0U3eG5vYVc3WDgvbEFnPT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUFnUkNUektIVm5NSHk3eXNZRFIrUEcyU094RUtCY0o3U2pPNFMzYzJXcjRyNDBwMDJvQ2Y2WGRBajN6ckpTa3BIc1lMTk1Sd20wN1Q5U3ROc1ZZTXdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1MzAzMzA3CWZpbGU6Q2xhc2ggTWluaV8zLjYuNF94NjQtc2V0dXAuZXhlCmlLS0FnM25YMzI2N0N0eDUrQ2EwcitZZ25FWFE1YXBOblJub3F0azkydDBNMEN2WXlHQjVGY3dtV2JMWW5ISUJVVUdnWE4zQmhZeGJ2OExSUlVMMkRnPT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.4/Clash.Mini_3.6.4_x64-setup.exe",
-      "size": 30134748
+      "size": 30135834
     }
   }
 }
