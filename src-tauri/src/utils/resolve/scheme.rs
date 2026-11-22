@@ -5,10 +5,59 @@ use tauri::Url;
 
 use crate::{
     config::{Config, PrfItem, profiles},
-    core::{CoreManager, handle},
-    utils::help,
+    core::{CoreManager, handle, tray::Tray},
+    utils::{
+        help,
+        window_manager::{WindowManager, WindowState},
+    },
 };
 use clash_verge_logging::{Type, logging, logging_error};
+
+pub fn is_supported_scheme_url(arg: &str) -> bool {
+    let lower = arg.trim().to_ascii_lowercase();
+    lower.starts_with("clash:") || lower.starts_with("clash-mini:") || lower.starts_with("clash-verge:")
+}
+
+pub fn collect_startup_deep_links<I, S, P, Q>(env_args: I, plugin_urls: P) -> Vec<std::string::String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+    P: IntoIterator<Item = Q>,
+    Q: AsRef<str>,
+{
+    let mut seen = std::collections::HashSet::new();
+    let mut collected = Vec::new();
+
+    for candidate in env_args
+        .into_iter()
+        .skip(1)
+        .map(|s| s.as_ref().to_owned())
+        .chain(plugin_urls.into_iter().map(|s| s.as_ref().to_owned()))
+    {
+        let trimmed = candidate.trim();
+        if !is_supported_scheme_url(trimmed) {
+            continue;
+        }
+        let canonical_key = Url::parse(trimmed)
+            .map(|u| u.as_str().to_string())
+            .unwrap_or_else(|_| trimmed.to_ascii_lowercase());
+        if seen.insert(canonical_key) {
+            collected.push(trimmed.to_string());
+        }
+    }
+
+    collected
+}
+
+fn is_main_window_visible_to_user() -> bool {
+    if crate::module::lightweight::is_in_lightweight_mode() || !WindowManager::is_main_window_ready() {
+        return false;
+    }
+    matches!(
+        WindowManager::get_main_window_state(),
+        WindowState::VisibleFocused | WindowState::VisibleUnfocused
+    )
+}
 
 pub(super) async fn resolve_scheme(param: &str) -> Result<()> {
     let param_str = if param.starts_with("[") && param.len() > 4 {
@@ -20,7 +69,7 @@ pub(super) async fn resolve_scheme(param: &str) -> Result<()> {
     };
     let masked_deep_link = help::mask_url(param_str);
 
-    logging!(debug, Type::Config, "received deep link: {masked_deep_link}");
+    logging!(info, Type::Config, "received deep link: {masked_deep_link}");
 
     let link_parsed = Url::parse(param_str)
         .map_err(|e| anyhow::anyhow!("failed to parse deep link: {e:?}, param: {masked_deep_link}"))?;
@@ -118,19 +167,42 @@ async fn import_subscription(url: &str, name: Option<&String>) {
     };
 
     let uid = item.uid.clone().unwrap_or_default();
+    let display_name = item
+        .name
+        .as_deref()
+        .or_else(|| name.map(String::as_str))
+        .filter(|s| !s.trim().is_empty())
+        .map(str::to_owned);
+
     if let Err(e) = profiles::profiles_append_item_safe(&mut item).await {
         logging!(error, Type::Config, "failed to import subscription url: {:?}", e);
         Config::profiles().await.discard();
-        handle::Handle::notice_message("import_sub_url::error", e.to_string());
+        let err_msg = e.to_string();
+        handle::Handle::notice_message("import_sub_url::error", err_msg.clone());
+        if !is_main_window_visible_to_user() {
+            Tray::global().notify_scheme_import_error(&err_msg).await;
+        }
         return;
     }
 
     Config::profiles().await.apply();
     logging_error!(Type::Config, Config::profiles().await.data_arc().save_file());
+    logging!(
+        info,
+        Type::Config,
+        "deep link subscription imported: uid={}, name={:?}",
+        uid,
+        display_name
+    );
     handle::Handle::notice_message(
         "import_sub_url::ok",
         "", // 空 msg 传入，我们不希望导致 后端-前端-后端 死循环，这里只做提醒。
     );
+    if !is_main_window_visible_to_user() {
+        Tray::global()
+            .notify_scheme_import_success(display_name.as_deref())
+            .await;
+    }
 
     post_import_updates(&uid, had_current_profile).await;
 }
@@ -140,7 +212,11 @@ async fn fetch_profile_item(url: &str, name: Option<&String>) -> Option<PrfItem>
         Ok(item) => Some(item),
         Err(e) => {
             logging!(error, Type::Config, "failed to parse profile from url: {:?}", e);
-            handle::Handle::notice_message("import_sub_url::error", e.to_string());
+            let err_msg = e.to_string();
+            handle::Handle::notice_message("import_sub_url::error", err_msg.clone());
+            if !is_main_window_visible_to_user() {
+                Tray::global().notify_scheme_import_error(&err_msg).await;
+            }
             None
         }
     }
@@ -173,11 +249,18 @@ async fn refresh_core_config() {
         Ok(outcome) => {
             let message = outcome.to_string();
             logging!(warn, Type::Config, "Apply config failed: {}", message);
-            handle::Handle::notice_message("config_validate::error", message);
+            handle::Handle::notice_message("config_validate::error", message.clone());
+            if !is_main_window_visible_to_user() {
+                Tray::global().notify_scheme_import_error(&message).await;
+            }
         }
         Err(err) => {
-            logging!(error, Type::Config, "Apply config error: {}", err);
-            handle::Handle::notice_message("update_failed", format!("{err}"));
+            let message = format!("{err}");
+            logging!(error, Type::Config, "Apply config error: {}", message);
+            handle::Handle::notice_message("update_failed", message.clone());
+            if !is_main_window_visible_to_user() {
+                Tray::global().notify_scheme_import_error(&message).await;
+            }
         }
     }
 }
@@ -206,5 +289,47 @@ mod tests {
         let (url2, name2) = extract_subscription_info(&parsed_plain).unwrap();
         assert_eq!(url2, "https://example.com/api/v1/client/subscribe?token=xyz&flag=meta");
         assert_eq!(name2.as_deref(), Some("PlainSub"));
+    }
+
+    #[test]
+    fn test_is_supported_scheme_url_case_insensitive_and_strict() {
+        assert!(is_supported_scheme_url("clash://install-config?url=https://a.com"));
+        assert!(is_supported_scheme_url("CLASH://install-config?url=https://a.com"));
+        assert!(is_supported_scheme_url(
+            "  Clash-Mini://install-config?url=https://a.com "
+        ));
+        assert!(is_supported_scheme_url(
+            "clash-verge://install-config?url=https://a.com"
+        ));
+        assert!(!is_supported_scheme_url(
+            "clash-other://install-config?url=https://a.com"
+        ));
+        assert!(!is_supported_scheme_url("--silent"));
+        assert!(!is_supported_scheme_url("https://example.com"));
+    }
+
+    #[test]
+    fn test_collect_startup_deep_links_extracts_and_deduplicates() {
+        let env_args = [
+            "clash://exe-ignored-as-argv0",
+            "--silent",
+            "  Clash://install-config?url=https://a.com/sub  ",
+            "clash-mini://install-config?url=https://b.com/sub",
+            "not-a-scheme",
+        ];
+        let plugin_urls = [
+            "clash://install-config?url=https://a.com/sub",
+            "clash-verge://install-config?url=https://c.com/sub",
+        ];
+
+        let collected = collect_startup_deep_links(env_args, plugin_urls);
+        assert_eq!(
+            collected,
+            vec![
+                "Clash://install-config?url=https://a.com/sub",
+                "clash-mini://install-config?url=https://b.com/sub",
+                "clash-verge://install-config?url=https://c.com/sub",
+            ]
+        );
     }
 }

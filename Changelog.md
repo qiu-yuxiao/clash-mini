@@ -1,3 +1,18 @@
+## v3.6.5
+
+### 🔗 修复 URL Scheme 冷启动吞链、轻量模式导入无反馈与 HKCU 注册表路径未加引号（BUG-420 / BUG-421 / BUG-422）
+
+- **修复冷启动经 URL Scheme 拉起时吞掉订阅导入（BUG-420）**：
+  - 在 `setup_deep_links` 同步采集 `std::env::args().skip(1)` 与 `app.deep_link().get_current()` 中的 `clash:` / `clash-mini:` / `clash-verge:` 深链并去重暂存，待 `resolve_setup_async()` 完成配置与核心初始化（`resolve_done()`）后顺序消费导入，同时对静默启动深链冷启动抑制泛化静默提示；
+  - 公共 `resolve::resolve_scheme` 入口统一等待 `wait_for_resolve_done()` 消除早到热启动与 `on_open_url` 初始化竞态，`server.rs` 转发逻辑同步支持多参数遍历与大小写无关协议匹配。
+- **轻量模式与无可见窗口下补齐 13 语种 Win32 原生托盘气泡反馈及入口日志（BUG-421）**：
+  - 将脱敏后的深链入口日志由 `debug` 提升至 `info` 并记录导入成功 `uid` 与订阅名；
+  - 当主窗口处于轻量模式、未就绪、隐藏或最小化态时，通过原生 `Shell_NotifyIconW(NIF_INFO)`（支持 `NIIF_INFO` / `NIIF_ERROR` 与 13 语种文案，错误详情经 `mask_url` 脱敏及长度收敛）向用户即时反馈导入成败。
+- **修正运行期 HKCU URL Protocol 注册表引号与规范值（BUG-422）**：
+  - `init_scheme` 写入 `HKCU\Software\Classes\{clash-mini,Clash}\Shell\Open\Command` 时为可执行路径统一加上双引号（`"<exe>" "%1"`），并将 `URL Protocol` 键值规范为空字符串 `""` 与安装包 `HKLM` 保持一致。
+
+---
+
 ## v3.6.4
 
 ### 🎯 代理方式升级为「添加规则」（支持直连/封锁）& 路径控制右键支持整站根域名切换（BUG-419）

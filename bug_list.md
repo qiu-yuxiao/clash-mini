@@ -9,6 +9,32 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-422 运行期写入 HKCU URL Protocol 注册表启动命令未为可执行文件路径加双引号且 URL Protocol 键值不规范
+
+- **对应模块**：[init.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/init.rs)（`init_scheme`，`format_scheme_open_command`）
+- **问题描述**：实测本机注册表与代码比对发现：安装包写入 `HKLM\SOFTWARE\Classes\clash\shell\open\command` 的路径带双引号（`"C:\Program Files\Clash Mini\clash-mini.exe" "%1"`）且 `URL Protocol` 为空字符串 `""`；但程序每次启动在 [init.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/init.rs) 写入 `HKCU\Software\Classes\clash-mini\Shell\Open\Command` 与 `HKCU\Software\Classes\Clash\Shell\Open\Command` 时使用了 `&format!("{app_exe} \"%1\"")`，漏掉了 `{app_exe}` 两侧双引号（实测落盘为 `C:\Program Files\Clash Mini\clash-mini.exe "%1"`），而 Windows 合并视图 `HKCR` 会优先采用 `HKCU` 覆盖 `HKLM`。因默认安装路径包含空格，存在未加引号路径解析与安全隐患；另 `URL Protocol` 写入了非空描述串 `"Clash Mini URL Scheme Protocol"`，与微软规范（空字符串 `""`）及 `HKLM` 不一致。
+- **修复方案**：在 [init.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/init.rs) 新增 `URL_PROTOCOL_REG_VALUE = ""` 与 `format_scheme_open_command`，清理可能残留的外围引号后统一格式化为 `"\"{clean_exe}\" \"%1\""`，同步将 `clash-mini` 与 `Clash` 两套注册表项的 `URL Protocol` 收敛为空字符串 `""` 与 `HKLM` 安装项对齐，并补充路径加引号单测。
+- **状态**：代码已修正，待用户确认
+
+### BUG-421 轻量模式下经 URL Scheme 导入订阅无任何用户可见反馈且深链入口日志级别偏低
+
+- **对应模块**：[tray/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/tray/mod.rs)、[scheme.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/scheme.rs)（`resolve_scheme`、`import_subscription`、`fetch_profile_item`、`refresh_core_config`）
+- **问题描述**：当 Clash Mini 处于轻量模式（主窗口已销毁、仅驻留托盘）时，用户从外部网页点击 `clash://install-config?url=...` 触发导入：虽然 `/commands/scheme` 路由已在后台调用 [scheme.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/scheme.rs) 完成订阅下载、落盘与配置应用，但 ① `import_subscription` / `fetch_profile_item` 仅通过 `Handle::notice_message("import_sub_url::ok" / "import_sub_url::error", ...)` 派发窗口事件，轻量模式下 `!WindowManager::is_main_window_ready()` 会跳过派发，且既未唤醒主窗口也未弹出 Win32 托盘气泡，导致画面毫无动静，用户误以为按钮完全无反应；② [scheme.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/scheme.rs) 的 `received deep link` 仅为 `debug` 级别，默认 `info` 级别 `latest.log` 中无深链入口痕迹，不便排障取证。
+- **修复方案**：
+  1. 在 [tray/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/core/tray/mod.rs) 扩展 `show_tray_balloon(..., is_error)` 支持 `NIIF_INFO`/`NIIF_ERROR`，新增 `notify_scheme_import_success`、`notify_scheme_import_error`、`normalize_balloon_language`、`sanitize_balloon_error_detail` 与 13 语种 `scheme_import_balloon_texts`（错误详情经 `mask_url` 脱敏并截断至 `<=140` 字符，严格满足 Win32 `szInfoTitle`/`szInfo` 缓冲区长度限制）；
+  2. 在 [scheme.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/scheme.rs) 将脱敏后的深链入口日志提升为 `info` 级别并记录成功导入 `uid`/`name`，当 `!is_main_window_visible_to_user()`（轻量模式、主窗口未就绪、隐藏或最小化）时自动通过 Win32 托盘气泡提示订阅下载/解析/保存/应用成败，并补齐 13 语种与脱敏单测。
+- **状态**：代码已修正，待用户确认
+
+### BUG-420 冷启动经 URL Scheme（clash:// / clash-mini://）拉起时未消费启动命令行参数，首次点击仅启动软件并吞掉订阅导入
+
+- **对应模块**：[server.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/server.rs)、[lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)（`setup_deep_links`）、[resolve/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/mod.rs)（`resolve_setup_async`、`resolve_scheme`）、[scheme.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/scheme.rs)
+- **问题描述**：实测在 Clash Mini 未启动（冷启动）时从网页点击 `clash://install-config?url=...` 按钮，系统能拉起 Clash Mini，但目标订阅并未导入；必须等待软件启动稳定后再次点击按钮（走热启动转发）才能导入成功。代码实证：① [server.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/server.rs) 仅在单实例端口已被占用（第二实例热启动）时读取 `std::env::args().get(1)` 并经 `/commands/scheme` 转发，首个冷启动实例 `bind_socket(port)` 成功后直接返回 `Ok(())`，未读取或暂存命令行传入的 `clash://` / `clash-mini://` 参数；② [lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs) `setup_deep_links` 仅注册了 `on_open_url` 回调，Windows 下冷启动不会向该回调重放命令行深链参数，全工程亦未在初始化就绪后读取 `std::env::args()` 或 `app.deep_link().get_current()` 进行消费。
+- **修复方案**：
+  1. 在 [scheme.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/scheme.rs) 新增大小写无关的 `is_supported_scheme_url` 与 `collect_startup_deep_links`，在 [lib.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/lib.rs)`::setup_deep_links` 同步采集 `std::env::args().skip(1)` 与 `app.deep_link().get_current()` 去重后存入 `resolve::PENDING_STARTUP_DEEP_LINKS`；
+  2. 在 [resolve/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/mod.rs) 的 `resolve_setup_async()` 于 `resolve_done()` 后启动受托管任务逐条导入冷启动深链（并抑制泛化静默气泡避免掩盖导入反馈），同时令公共 `resolve::resolve_scheme` 先 `wait_for_resolve_done().await` 消除早到热启动与 `on_open_url` 竞态；
+  3. 更新 [server.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/server.rs) 遍历全部非 `argv[0]` 参数识别大小写无关深链转发（优先于 `--silent`），并补充多参数与大小写单测。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-419 「添加规则」缺失直连/封锁入口且路径控制右键缺乏一键整站根域名作用域切换
 
 - **对应模块**：[quick-routing.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/quick-routing.ts)、[routing-preference-card.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/routing-preference-card.tsx)、[add-url-dialog.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/add-url-dialog.tsx)、[connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx)、[path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)、[use-path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/hooks/use-path-control.ts)

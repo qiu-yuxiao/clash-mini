@@ -29,6 +29,27 @@ pub mod window_script;
 
 static RESOLVE_DONE: AtomicBool = AtomicBool::new(false);
 static RESOLVE_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
+static PENDING_STARTUP_DEEP_LINKS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+pub fn set_pending_startup_deep_links(urls: Vec<String>) {
+    if let Ok(mut pending) = PENDING_STARTUP_DEEP_LINKS.lock() {
+        *pending = urls;
+    }
+}
+
+pub fn has_pending_startup_deep_links() -> bool {
+    PENDING_STARTUP_DEEP_LINKS
+        .lock()
+        .map(|pending| !pending.is_empty())
+        .unwrap_or(false)
+}
+
+fn take_pending_startup_deep_links() -> Vec<String> {
+    PENDING_STARTUP_DEEP_LINKS
+        .lock()
+        .map(|mut pending| std::mem::take(&mut *pending))
+        .unwrap_or_default()
+}
 
 /// M2-01: 追踪启动阶段的 detached 任务，退出时统一 abort
 static STARTUP_TASKS: Mutex<Vec<JoinHandle<()>>> = Mutex::new(Vec::new());
@@ -115,7 +136,8 @@ pub fn resolve_setup_async() {
 
         init_auto_lightweight_boot().await;
 
-        if should_silent && !has_silent_arg {
+        let has_startup_deep_link = has_pending_startup_deep_links();
+        if should_silent && !has_silent_arg && !has_startup_deep_link {
             Tray::global().notify_silent_running().await;
         }
 
@@ -143,6 +165,19 @@ pub fn resolve_setup_async() {
         Handle::refresh_clash();
         refresh_tray_menu().await;
         resolve_done();
+
+        let startup_deep_links = take_pending_startup_deep_links();
+        if !startup_deep_links.is_empty() {
+            let deep_link_handle = AsyncHandler::spawn(move || async move {
+                for url in startup_deep_links {
+                    if Handle::global().is_exiting() {
+                        break;
+                    }
+                    logging_error!(Type::Setup, scheme::resolve_scheme(&url).await);
+                }
+            });
+            track_startup_task(deep_link_handle);
+        }
     });
     track_startup_task(handle);
 }
@@ -152,6 +187,10 @@ pub(super) fn init_scheme() {
 }
 
 pub async fn resolve_scheme(param: &str) -> Result<()> {
+    wait_for_resolve_done().await;
+    if Handle::global().is_exiting() {
+        return Ok(());
+    }
     logging_error!(Type::Setup, scheme::resolve_scheme(param).await);
     Ok(())
 }

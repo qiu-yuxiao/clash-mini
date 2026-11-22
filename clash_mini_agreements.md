@@ -94,7 +94,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
    - 默认代理端口固定为 Mixed **`10801`**、SOCKS **`10802`**、HTTP **`10803`**。
    - 内核 Controller API 默认端口为 **`9098`**，默认控制密钥固定为 **`adapted-by-qiu-yuxiao`**（见 `src-tauri/src/constants.rs` 与 `src-tauri/src/config/clash.rs`，设计要求详见 §3.3）。
    - 单实例检测通信端口在 Release 模式为 **`33335`**，Dev 模式为 **`33336`**。
-4. **单实例独占互斥、响应校验与静默唤醒**：`server.rs::embed_server`（`127.0.0.1:33335`）常驻于独立守护 Tokio 运行时 `DAEMON_RUNTIME`。Windows 下**严禁**为监听套接字启用 `SO_REUSEADDR`（WinSock2 会允许后起进程抢绑端口破坏互斥）；第二实例显式禁用代理（`.no_proxy()`）以 **`1500ms`** 超时按启动参数分别向 `/commands/visible`、`/commands/scheme` 或 `/commands/ping`（`--silent` 专用探活，返回 `"clash-mini-ok"`）发送请求，**仅当校验到 `200 OK` 与预期响应正文后才静默退出**。若探测遇到 `ConnectionRefused`（前序实例刚退出处于端口释放瞬间窗口），执行 `3 × 150ms` 有界短退避重绑；若端口被返回非预期响应的其他进程占用，立即报错弹窗提示而不静默自杀。当 `should_enter_silent_tray_on_launch()`（开启「静默启动」且存在真实订阅）为真时，既有实例保持托盘驻留且不弹窗，按需弹出 Win32 托盘气泡确认运行状态。
+4. **单实例独占互斥、响应校验、深链启动消费与静默唤醒**：`server.rs::embed_server`（`127.0.0.1:33335`）常驻于独立守护 Tokio 运行时 `DAEMON_RUNTIME`。Windows 下**严禁**为监听套接字启用 `SO_REUSEADDR`（WinSock2 会允许后起进程抢绑端口破坏互斥）；第二实例显式禁用代理（`.no_proxy()`）以 **`1500ms`** 超时按命令行参数（优先识别 `clash:`/`clash-mini:`/`clash-verge:` 深链）分别向 `/commands/visible`、`/commands/scheme` 或 `/commands/ping`（`--silent` 专用探活，返回 `"clash-mini-ok"`）发送请求，**仅当校验到 `200 OK` 与预期响应正文后才静默退出**。若探测遇到 `ConnectionRefused`（前序实例刚退出处于端口释放瞬间窗口），执行 `3 × 150ms` 有界短退避重绑；若端口被返回非预期响应的其他进程占用，立即报错弹窗提示而不静默自杀。运行期注册表写入（`init::init_scheme`）对 `HKCU\Software\Classes\{clash-mini,Clash}\Shell\Open\Command` 统一采用带双引号可执行路径 `"<exe>" "%1"` 并写入标准空串 `URL Protocol = ""` 与安装包 `HKLM` 对齐；冷启动经 URL Scheme 拉起时，`setup_deep_links` 结合 `std::env::args().skip(1)` 与 `app.deep_link().get_current()` 去重采集深链暂存至 `resolve`，待 `resolve_setup_async()` 完成配置与核心初始化（`resolve_done()`）后统一消费导入（热启动 `/commands/scheme` 与 `on_open_url` 亦先 `wait_for_resolve_done()` 防抢跑竞态）；当 `should_enter_silent_tray_on_launch()`（开启「静默启动」且存在真实订阅）为真时，既有实例保持托盘驻留且不弹窗，非深链冷启动按需弹出 Win32 托盘气泡确认运行状态（携带冷启动深链时抑制泛化静默气泡，改为由导入结果通知反馈）。
 
 ### 1.2 Windows x64 单一平台架构收敛
 
@@ -198,7 +198,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 ### 2.9 极简静态菜单系统托盘规范
 
 - **固定静态双项菜单**：右键仅固定包含①「轻量模式 / Lite mode」（通过 `item.set_text` 同步 `"✔ "` 勾选前缀）②「退出 (Exit)」，运行期严禁销毁重建菜单，规避高权限 Windows Shell `E_FAIL`。
-- **左键双向切换与静态三图标**：`Tray::update_icon` 仅在代理模式变更时于三枚静态 PNG（`tray-icon-tun.png` / `tray-icon-sys.png` / `tray-icon.png`）间切换；左键结合 `MAIN_WINDOW_FOCUSED` 原子标志执行显隐切换；仅当静默启动启用期间收到手动冷启动/单实例激活时弹出 `2s` 防抖 Win32 `Shell_NotifyIconW(NIF_INFO)` 气泡，零后台轮询。
+- **左键双向切换、静态三图标与托盘气泡反馈**：`Tray::update_icon` 仅在代理模式变更时于三枚静态 PNG（`tray-icon-tun.png` / `tray-icon-sys.png` / `tray-icon.png`）间切换；左键结合 `MAIN_WINDOW_FOCUSED` 原子标志执行显隐切换；静默启动启用期间收到非深链冷启动/单实例激活时弹出 `2s` 防抖 Win32 `Shell_NotifyIconW(NIF_INFO)` 气泡，零后台轮询；当主窗口处于轻量模式/不可见/最小化/未就绪状态（`!is_main_window_visible_to_user()`）完成 URL Scheme 订阅导入时，`Tray::notify_scheme_import_success` / `notify_scheme_import_error` 通过独立无节流的 13 语种 Win32 原生托盘气泡（`NIIF_INFO` / `NIIF_ERROR`，错误详情经 `mask_url` 脱敏并截断至 `<=140` 字符）即时反馈导入结果。
 
 ### 2.10 设置开关的乐观更新与权威数据源
 
@@ -391,7 +391,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 7.3 订阅导入等待、失败传播与 Provider 刷新协同
 
-新订阅导入或重载后每 `1.5s` 轮询检查直到 `PROXY` 组出现真实有效节点，随即直写刷新前端本地缓存消除首屏延迟；远程更新链（`perform_profile_update` / `update_profile`）在三阶段下载全部失败或配置校验出错时必须向调用方传播 `Err`（阻断空重载与假成功提示，并触发 `Timer::finish_task` -> `compute_next_schedule_minutes` 进入 `2` 分钟快速重试）；三阶段下载全败对外统一经 13 语种 `withClashProxyFailed` 前缀展示脱敏详情（后台定时触发发 `update_failed_even_with_clash` 事件，手动更新由前端直接消费错误前缀渲染，零硬编码中文与重复弹窗）。
+新订阅导入或重载后每 `1.5s` 轮询检查直到 `PROXY` 组出现真实有效节点，随即直写刷新前端本地缓存消除首屏延迟；URL Scheme 深链入口（`resolve/scheme.rs`）以 `info` 级别记录脱敏后的深链入口及导入结果（`uid`/`name`），并在主窗口不可见（含轻量模式/最小化/未就绪）时同步通过 13 语种 Win32 原生托盘气泡通知订阅解析、保存、下载或配置应用成败（不误绕过前端窗口通知）；远程更新链（`perform_profile_update` / `update_profile`）在三阶段下载全部失败或配置校验出错时必须向调用方传播 `Err`（阻断空重载与假成功提示，并触发 `Timer::finish_task` -> `compute_next_schedule_minutes` 进入 `2` 分钟快速重试）；三阶段下载全败对外统一经 13 语种 `withClashProxyFailed` 前缀展示脱敏详情（后台定时触发发 `update_failed_even_with_clash` 事件，手动更新由前端直接消费错误前缀渲染，零硬编码中文与重复弹窗）。
 
 ### 7.4 订阅管理与右键上下文菜单
 

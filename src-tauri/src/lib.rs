@@ -89,6 +89,26 @@ mod app_init {
             let _ = app.deep_link().register_all();
         }
 
+        let plugin_urls: Vec<String> = app
+            .deep_link()
+            .get_current()
+            .ok()
+            .flatten()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|u| u.to_string())
+            .collect();
+        let startup_urls = resolve::scheme::collect_startup_deep_links(std::env::args(), plugin_urls);
+        if !startup_urls.is_empty() {
+            logging!(
+                info,
+                Type::Setup,
+                "检测到 {} 条冷启动深链参数，将在初始化完成后导入",
+                startup_urls.len()
+            );
+            resolve::set_pending_startup_deep_links(startup_urls);
+        }
+
         app.deep_link().on_open_url(|event| {
             // L2-03: 退出阶段不处理 deep link
             if handle::Handle::global().is_exiting() {

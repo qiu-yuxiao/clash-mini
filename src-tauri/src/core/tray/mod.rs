@@ -235,9 +235,33 @@ impl Tray {
         let (title, body) = silent_balloon_texts(language.as_deref());
         let app_handle = handle::Handle::app_handle().clone();
         if let Err(e) = app_handle.run_on_main_thread(move || {
-            show_tray_info_balloon(title, body);
+            show_tray_balloon(title, body, false);
         }) {
             logging!(debug, Type::Tray, "调度托盘静默运行气泡提示失败: {}", e);
+        }
+    }
+
+    /// 轻量模式或无可见主窗口时，经 Win32 原生托盘气泡反馈 URL Scheme 订阅导入成功（BUG-421）。
+    pub async fn notify_scheme_import_success(&self, profile_name: Option<&str>) {
+        let language = crate::config::Config::verge().await.latest_arc().language.clone();
+        let (title, body) = scheme_import_balloon_texts(language.as_deref(), true, profile_name);
+        let app_handle = handle::Handle::app_handle().clone();
+        if let Err(e) = app_handle.run_on_main_thread(move || {
+            show_tray_balloon(&title, &body, false);
+        }) {
+            logging!(debug, Type::Tray, "调度订阅导入成功气泡提示失败: {}", e);
+        }
+    }
+
+    /// 轻量模式或无可见主窗口时，经 Win32 原生托盘气泡反馈 URL Scheme 订阅导入失败（BUG-421）。
+    pub async fn notify_scheme_import_error(&self, detail: &str) {
+        let language = crate::config::Config::verge().await.latest_arc().language.clone();
+        let (title, body) = scheme_import_balloon_texts(language.as_deref(), false, Some(detail));
+        let app_handle = handle::Handle::app_handle().clone();
+        if let Err(e) = app_handle.run_on_main_thread(move || {
+            show_tray_balloon(&title, &body, true);
+        }) {
+            logging!(debug, Type::Tray, "调度订阅导入失败气泡提示失败: {}", e);
         }
     }
 }
@@ -264,6 +288,272 @@ pub fn record_main_window_focus_change(focused: bool) {
             .unwrap_or_default()
             .as_millis() as u64;
         LAST_MAIN_WINDOW_BLUR_MS.store(now_ms, Ordering::Release);
+    }
+}
+
+fn normalize_balloon_language(language: Option<&str>) -> &'static str {
+    let Some(raw) = language.map(str::trim).filter(|s| !s.is_empty()) else {
+        return "zh";
+    };
+    let normalized = raw.to_ascii_lowercase().replace('_', "-");
+    match normalized.as_str() {
+        "zh" | "zh-cn" | "zh-hans" | "zh-sg" | "zh-my" | "zh-chs" => return "zh",
+        "zhtw" | "zh-tw" | "zh-hk" | "zh-hant" | "zh-mo" | "zh-cht" => return "zhtw",
+        "jp" | "ja" | "ja-jp" => return "jp",
+        _ => {}
+    }
+    let prefix = normalized.split('-').next().unwrap_or("");
+    match prefix {
+        "zh" => "zh",
+        "ja" => "jp",
+        "en" => "en",
+        "ko" => "ko",
+        "ru" => "ru",
+        "de" => "de",
+        "es" => "es",
+        "tr" => "tr",
+        "id" => "id",
+        "ar" => "ar",
+        "fa" => "fa",
+        "tt" => "tt",
+        _ => "en",
+    }
+}
+
+fn truncate_balloon_chars(text: &str, max_chars: usize) -> String {
+    let mut chars = text.chars();
+    let prefix: String = chars.by_ref().take(max_chars.saturating_sub(3)).collect();
+    if chars.take(4).count() == 4 {
+        format!("{prefix}...")
+    } else {
+        text.to_string()
+    }
+}
+
+fn sanitize_balloon_error_detail(detail: &str) -> String {
+    let masked = detail
+        .split_whitespace()
+        .map(|token| {
+            if token.contains("://") {
+                crate::utils::help::mask_url(token)
+            } else {
+                token.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    truncate_balloon_chars(&masked, 140)
+}
+
+fn scheme_import_balloon_texts(language: Option<&str>, ok: bool, detail_or_name: Option<&str>) -> (String, String) {
+    let lang = normalize_balloon_language(language);
+
+    if ok {
+        let clean_name = detail_or_name
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| truncate_balloon_chars(s, 64));
+
+        return match (lang, clean_name) {
+            ("zh", Some(name)) => (
+                "Clash Mini 订阅导入成功".to_string(),
+                format!("已导入订阅「{name}」，配置已就绪。左键点击托盘图标可打开界面。"),
+            ),
+            ("zh", None) => (
+                "Clash Mini 订阅导入成功".to_string(),
+                "已通过链接成功导入订阅，左键点击托盘图标可打开界面。".to_string(),
+            ),
+            ("zhtw", Some(name)) => (
+                "Clash Mini 訂閱匯入成功".to_string(),
+                format!("已匯入訂閱「{name}」，設定已就緒。左鍵點擊系統匣圖示可開啟介面。"),
+            ),
+            ("zhtw", None) => (
+                "Clash Mini 訂閱匯入成功".to_string(),
+                "已透過連結成功匯入訂閱，左鍵點擊系統匣圖示可開啟介面。".to_string(),
+            ),
+            ("jp", Some(name)) => (
+                "サブスクリプションをインポートしました".to_string(),
+                format!("「{name}」をインポートしました。トレイアイコンを左クリックして開きます。"),
+            ),
+            ("jp", None) => (
+                "サブスクリプションをインポートしました".to_string(),
+                "サブスクリプションのインポートに成功しました。トレイアイコンをクリックして開けます。".to_string(),
+            ),
+            ("ko", Some(name)) => (
+                "구독 가져오기 성공".to_string(),
+                format!("\"{name}\" 구독을 가져왔습니다. 트레이 아이콘을 왼쪽 클릭하여 열 수 있습니다."),
+            ),
+            ("ko", None) => (
+                "구독 가져오기 성공".to_string(),
+                "구독을 성공적으로 가져왔습니다. 트레이 아이콘을 왼쪽 클릭하여 여세요.".to_string(),
+            ),
+            ("ru", Some(name)) => (
+                "Подписка импортирована".to_string(),
+                format!("Подписка \"{name}\" добавлена. Нажмите на значок в трее ЛКМ, чтобы открыть."),
+            ),
+            ("ru", None) => (
+                "Подписка импортирована".to_string(),
+                "Подписка успешно импортирована. Нажмите на значок в трее, чтобы открыть.".to_string(),
+            ),
+            ("de", Some(name)) => (
+                "Abonnement importiert".to_string(),
+                format!("\"{name}\" importiert. Linksklick auf das Tray-Symbol zum Öffnen."),
+            ),
+            ("de", None) => (
+                "Abonnement importiert".to_string(),
+                "Abonnement erfolgreich importiert. Linksklick auf das Tray-Symbol zum Öffnen.".to_string(),
+            ),
+            ("es", Some(name)) => (
+                "Suscripción importada".to_string(),
+                format!("Se importó \"{name}\". Haz clic izquierdo en la bandeja para abrir."),
+            ),
+            ("es", None) => (
+                "Suscripción importada".to_string(),
+                "Suscripción importada con éxito. Haz clic izquierdo en la bandeja para abrir.".to_string(),
+            ),
+            ("tr", Some(name)) => (
+                "Abonelik içe aktarıldı".to_string(),
+                format!("\"{name}\" içe aktarıldı. Açmak için tepsi simgesine sol tıklayın."),
+            ),
+            ("tr", None) => (
+                "Abonelik içe aktarıldı".to_string(),
+                "Abonelik başarıyla içe aktarıldı. Açmak için tepsi simgesine sol tıklayın.".to_string(),
+            ),
+            ("id", Some(name)) => (
+                "Langganan Berhasil Diimpor".to_string(),
+                format!("\"{name}\" diimpor. Klik kiri ikon baki untuk membuka Clash Mini."),
+            ),
+            ("id", None) => (
+                "Langganan Berhasil Diimpor".to_string(),
+                "Langganan berhasil diimpor. Klik kiri ikon baki untuk membuka.".to_string(),
+            ),
+            ("ar", Some(name)) => (
+                "تم استيراد الاشتراك".to_string(),
+                format!("تم استيراد \"{name}\". انقر بزر الماوس الأيسر على أيقونة الدرج للفتح."),
+            ),
+            ("ar", None) => (
+                "تم استيراد الاشتراك".to_string(),
+                "تم استيراد الاشتراك بنجاح. انقر على أيقونة الدرج لفتح التطبيق.".to_string(),
+            ),
+            ("fa", Some(name)) => (
+                "اشتراک وارد شد".to_string(),
+                format!("اشتراک \"{name}\" وارد شد. برای باز کردن روی نماد سینی چپ‌کلیک کنید."),
+            ),
+            ("fa", None) => (
+                "اشتراک وارد شد".to_string(),
+                "اشتراک با موفقیت وارد شد. برای باز کردن روی نماد سینی کلیک کنید.".to_string(),
+            ),
+            ("tt", Some(name)) => (
+                "Язылу импортланды".to_string(),
+                format!("\"{name}\" импортланды. Ачу өчен трейдәге тамгага чиртегез."),
+            ),
+            ("tt", None) => (
+                "Язылу импортланды".to_string(),
+                "Язылу уңышлы импортланды. Ачу өчен трейдәге тамгага чиртегез.".to_string(),
+            ),
+            (_, Some(name)) => (
+                "Subscription Imported".to_string(),
+                format!("Imported \"{name}\". Left-click the tray icon to open Clash Mini."),
+            ),
+            (_, None) => (
+                "Subscription Imported".to_string(),
+                "Subscription imported successfully. Left-click the tray icon to open.".to_string(),
+            ),
+        };
+    }
+
+    let clean_err = detail_or_name
+        .map(sanitize_balloon_error_detail)
+        .filter(|s| !s.is_empty());
+
+    match (lang, clean_err) {
+        ("zh", Some(err)) => ("Clash Mini 订阅导入失败".to_string(), format!("订阅导入失败：{err}")),
+        ("zh", None) => (
+            "Clash Mini 订阅导入失败".to_string(),
+            "无法通过链接导入订阅，请打开界面查看日志详情。".to_string(),
+        ),
+        ("zhtw", Some(err)) => ("Clash Mini 訂閱匯入失敗".to_string(), format!("訂閱匯入失敗：{err}")),
+        ("zhtw", None) => (
+            "Clash Mini 訂閱匯入失敗".to_string(),
+            "無法透過連結匯入訂閱，請開啟介面查看日誌詳情。".to_string(),
+        ),
+        ("jp", Some(err)) => (
+            "サブスクリプションのインポートに失敗".to_string(),
+            format!("インポート失敗: {err}"),
+        ),
+        ("jp", None) => (
+            "サブスクリプションのインポートに失敗".to_string(),
+            "リンクからインポートできませんでした。詳細は本体を開いて確認してください。".to_string(),
+        ),
+        ("ko", Some(err)) => ("구독 가져오기 실패".to_string(), format!("가져오기 실패: {err}")),
+        ("ko", None) => (
+            "구독 가져오기 실패".to_string(),
+            "링크에서 구독을 가져오지 못했습니다. 자세한 내용은 앱을 열어 확인하세요.".to_string(),
+        ),
+        ("ru", Some(err)) => ("Ошибка импорта подписки".to_string(), format!("Ошибка импорта: {err}")),
+        ("ru", None) => (
+            "Ошибка импорта подписки".to_string(),
+            "Не удалось импортировать подписку по ссылке. Откройте приложение для деталей.".to_string(),
+        ),
+        ("de", Some(err)) => (
+            "Abonnement-Import fehlgeschlagen".to_string(),
+            format!("Import fehlgeschlagen: {err}"),
+        ),
+        ("de", None) => (
+            "Abonnement-Import fehlgeschlagen".to_string(),
+            "Abonnement konnte nicht importiert werden. Öffnen Sie die App für Details.".to_string(),
+        ),
+        ("es", Some(err)) => (
+            "Error al importar suscripción".to_string(),
+            format!("Error de importación: {err}"),
+        ),
+        ("es", None) => (
+            "Error al importar suscripción".to_string(),
+            "No se pudo importar la suscripción. Abre la app para ver los detalles.".to_string(),
+        ),
+        ("tr", Some(err)) => (
+            "Abonelik içe aktarılamadı".to_string(),
+            format!("İçe aktarma hatası: {err}"),
+        ),
+        ("tr", None) => (
+            "Abonelik içe aktarılamadı".to_string(),
+            "Bağlantıdan abonelik alınamadı. Ayrıntılar için uygulamayı açın.".to_string(),
+        ),
+        ("id", Some(err)) => (
+            "Gagal Mengimpor Langganan".to_string(),
+            format!("Gagal mengimpor: {err}"),
+        ),
+        ("id", None) => (
+            "Gagal Mengimpor Langganan".to_string(),
+            "Gagal mengimpor langganan dari tautan. Buka aplikasi untuk detailnya.".to_string(),
+        ),
+        ("ar", Some(err)) => ("فشل استيراد الاشتراك".to_string(), format!("فشل الاستيراد: {err}")),
+        ("ar", None) => (
+            "فشل استيراد الاشتراك".to_string(),
+            "تعذر استيراد الاشتراك من الرابط. افتح التطبيق لعرض التفاصيل.".to_string(),
+        ),
+        ("fa", Some(err)) => (
+            "وارد کردن اشتراک ناموفق بود".to_string(),
+            format!("خطا در وارد کردن: {err}"),
+        ),
+        ("fa", None) => (
+            "وارد کردن اشتراک ناموفق بود".to_string(),
+            "وارد کردن اشتراک از پیوند انجام نشد. برای جزئیات برنامه را باز کنید.".to_string(),
+        ),
+        ("tt", Some(err)) => ("Язылу импорты хатасы".to_string(), format!("Импорт хатасы: {err}")),
+        ("tt", None) => (
+            "Язылу импорты хатасы".to_string(),
+            "Сылтама аша язылуны импортлап булмады. Тулырак өчен ачыгыз.".to_string(),
+        ),
+        (_, Some(err)) => (
+            "Subscription Import Failed".to_string(),
+            format!("Import failed: {err}"),
+        ),
+        (_, None) => (
+            "Subscription Import Failed".to_string(),
+            "Failed to import subscription from link. Open Clash Mini for details.".to_string(),
+        ),
     }
 }
 
@@ -332,10 +622,10 @@ fn find_own_tray_hwnd() -> Option<windows::Win32::Foundation::HWND> {
     None
 }
 
-fn show_tray_info_balloon(title: &str, body: &str) {
+fn show_tray_balloon(title: &str, body: &str, is_error: bool) {
     use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::Shell::{
-        NIF_INFO, NIIF_INFO, NIM_MODIFY, NOTIFYICONDATAW, NOTIFYICONDATAW_0, Shell_NotifyIconW,
+        NIF_INFO, NIIF_ERROR, NIIF_INFO, NIM_MODIFY, NOTIFYICONDATAW, NOTIFYICONDATAW_0, Shell_NotifyIconW,
     };
     use windows::Win32::UI::WindowsAndMessaging::IsWindow;
 
@@ -364,7 +654,7 @@ fn show_tray_info_balloon(title: &str, body: &str) {
         // `tray-icon` 内部静态 Counter 从 1 起分配，全应用仅初始化单枚托盘图标故恒为 1
         uID: 1,
         uFlags: NIF_INFO,
-        dwInfoFlags: NIIF_INFO,
+        dwInfoFlags: if is_error { NIIF_ERROR } else { NIIF_INFO },
         Anonymous: NOTIFYICONDATAW_0 { uTimeout: 4000 },
         ..Default::default()
     };
@@ -519,5 +809,70 @@ mod tests {
         assert_eq!(buf[5], 0);
         let decoded = String::from_utf16_lossy(&buf[..5]);
         assert_eq!(decoded, "Clash");
+    }
+
+    #[test]
+    fn scheme_import_balloon_texts_cover_all_13_languages() {
+        let locales = [
+            Some("zh"),
+            Some("zhtw"),
+            Some("en"),
+            Some("jp"),
+            Some("ko"),
+            Some("ru"),
+            Some("de"),
+            Some("es"),
+            Some("tr"),
+            Some("id"),
+            Some("ar"),
+            Some("fa"),
+            Some("tt"),
+            Some("zh-CN"),
+            Some("zh-TW"),
+            Some("ja-JP"),
+            Some("en-US"),
+            None,
+            Some("fr"),
+        ];
+
+        for locale in locales {
+            let (ok_title, ok_body) = scheme_import_balloon_texts(locale, true, Some("MyAirport"));
+            assert!(!ok_title.is_empty());
+            assert!(ok_body.contains("MyAirport"));
+            assert!(ok_title.encode_utf16().count() < 64);
+            assert!(ok_body.encode_utf16().count() < 256);
+
+            let (ok_title_no_name, ok_body_no_name) = scheme_import_balloon_texts(locale, true, None);
+            assert!(!ok_title_no_name.is_empty());
+            assert!(!ok_body_no_name.is_empty());
+            assert!(ok_title_no_name.encode_utf16().count() < 64);
+            assert!(ok_body_no_name.encode_utf16().count() < 256);
+
+            let (err_title, err_body) = scheme_import_balloon_texts(locale, false, Some("timeout"));
+            assert!(!err_title.is_empty());
+            assert!(err_body.contains("timeout"));
+            assert!(err_title.encode_utf16().count() < 64);
+            assert!(err_body.encode_utf16().count() < 256);
+
+            let (err_title_empty, err_body_empty) = scheme_import_balloon_texts(locale, false, Some("   "));
+            assert!(!err_title_empty.is_empty());
+            assert!(!err_body_empty.is_empty());
+            assert!(err_title_empty.encode_utf16().count() < 64);
+            assert!(err_body_empty.encode_utf16().count() < 256);
+        }
+    }
+
+    #[test]
+    fn sanitize_balloon_error_detail_masks_urls_and_truncates() {
+        let masked =
+            sanitize_balloon_error_detail("fetch\n  https://example.com/sub?token=secret123&flag=clash   failed");
+        assert!(!masked.contains("secret123"));
+        assert!(masked.contains("token=***"));
+        assert!(!masked.contains('\n'));
+
+        let long_input = "a".repeat(200);
+        let truncated = sanitize_balloon_error_detail(&long_input);
+        assert_eq!(truncated.chars().count(), 140);
+        assert!(truncated.ends_with("..."));
     }
 }

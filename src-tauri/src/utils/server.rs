@@ -44,16 +44,27 @@ enum SingletonProbeTarget {
     Visible,
 }
 
-fn resolve_singleton_probe_target(first_arg: Option<&str>) -> SingletonProbeTarget {
-    if let Some(param) = first_arg {
-        if param.starts_with("clash:") || param.starts_with("clash-mini:") || param.starts_with("clash-verge:") {
-            return SingletonProbeTarget::Scheme(param.to_string());
+fn resolve_singleton_probe_target_from_args<'a>(args: impl IntoIterator<Item = &'a str>) -> SingletonProbeTarget {
+    let mut saw_silent = false;
+    for arg in args {
+        let trimmed = arg.trim();
+        if resolve::scheme::is_supported_scheme_url(trimmed) {
+            return SingletonProbeTarget::Scheme(trimmed.to_string());
         }
-        if param == "--silent" {
-            return SingletonProbeTarget::Ping;
+        if trimmed == "--silent" {
+            saw_silent = true;
         }
     }
-    SingletonProbeTarget::Visible
+    if saw_silent {
+        SingletonProbeTarget::Ping
+    } else {
+        SingletonProbeTarget::Visible
+    }
+}
+
+#[cfg(test)]
+fn resolve_singleton_probe_target(first_arg: Option<&str>) -> SingletonProbeTarget {
+    resolve_singleton_probe_target_from_args(first_arg)
 }
 
 fn is_valid_singleton_reply(expected_ping: bool, status: reqwest::StatusCode, body: &str) -> bool {
@@ -74,12 +85,12 @@ enum WakeInstanceOutcome {
     UnexpectedResponse(std::string::String),
 }
 
-async fn probe_or_notify_existing_instance(
+async fn probe_or_notify_existing_instance<'a>(
     client: &reqwest::Client,
     port: u16,
-    first_arg: Option<&str>,
+    args: impl IntoIterator<Item = &'a str>,
 ) -> WakeInstanceOutcome {
-    let target = resolve_singleton_probe_target(first_arg);
+    let target = resolve_singleton_probe_target_from_args(args);
     let (request, expected_ping) = match target {
         SingletonProbeTarget::Scheme(param) => (
             client
@@ -124,9 +135,14 @@ pub async fn check_singleton() -> Result<()> {
                 .timeout(Duration::from_millis(1500))
                 .build()?;
             let argvs: Vec<std::string::String> = std::env::args().collect();
-            let first_arg = argvs.get(1).map(std::string::String::as_str);
 
-            match probe_or_notify_existing_instance(&client, port, first_arg).await {
+            match probe_or_notify_existing_instance(
+                &client,
+                port,
+                argvs.iter().skip(1).map(std::string::String::as_str),
+            )
+            .await
+            {
                 WakeInstanceOutcome::NotifiedExisting => {
                     logging!(info, Type::Window, "已有实例已通知，当前进程静默退出");
                     std::process::exit(0);
@@ -291,6 +307,14 @@ mod tests {
         ));
         assert!(matches!(
             resolve_singleton_probe_target(Some("clash-mini://install-config?url=x")),
+            SingletonProbeTarget::Scheme(_)
+        ));
+        assert!(matches!(
+            resolve_singleton_probe_target(Some("Clash://install-config?url=x")),
+            SingletonProbeTarget::Scheme(_)
+        ));
+        assert!(matches!(
+            resolve_singleton_probe_target_from_args(["--silent", "clash://install-config?url=x"]),
             SingletonProbeTarget::Scheme(_)
         ));
 

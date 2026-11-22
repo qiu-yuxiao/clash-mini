@@ -281,6 +281,13 @@ pub async fn init_resources() -> Result<()> {
     Ok(())
 }
 
+const URL_PROTOCOL_REG_VALUE: &str = "";
+
+fn format_scheme_open_command(app_exe: &str) -> String {
+    let clean_exe = app_exe.trim_matches('"');
+    format!("\"{clean_exe}\" \"%1\"")
+}
+
 /// initialize url scheme
 pub fn init_scheme() -> Result<()> {
     use tauri::utils::platform::current_exe;
@@ -289,26 +296,27 @@ pub fn init_scheme() -> Result<()> {
     let app_exe = current_exe()?;
     let app_exe = dunce::canonicalize(app_exe)?;
     let app_exe = app_exe.to_string_lossy().into_owned();
+    let open_command = format_scheme_open_command(&app_exe);
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
     // Register clash-mini:// URL protocol
     let (clash_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-mini")?;
     clash_wa.set_value("", &"Clash Mini")?;
-    clash_wa.set_value("URL Protocol", &"Clash Mini URL Scheme Protocol")?;
+    clash_wa.set_value("URL Protocol", &URL_PROTOCOL_REG_VALUE)?;
     let (default_icon_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-mini\\DefaultIcon")?;
     default_icon_wa.set_value("", &app_exe)?;
     let (command_wa, _) = hkcu.create_subkey("Software\\Classes\\clash-mini\\Shell\\Open\\Command")?;
-    command_wa.set_value("", &format!("{app_exe} \"%1\""))?;
+    command_wa.set_value("", &open_command)?;
 
     // Register clash:// URL protocol
     let (clash, _) = hkcu.create_subkey("Software\\Classes\\Clash")?;
     clash.set_value("", &"Clash Mini")?;
-    clash.set_value("URL Protocol", &"Clash Mini URL Scheme Protocol")?;
+    clash.set_value("URL Protocol", &URL_PROTOCOL_REG_VALUE)?;
     let (default_icon, _) = hkcu.create_subkey("Software\\Classes\\Clash\\DefaultIcon")?;
     default_icon.set_value("", &app_exe)?;
     let (command, _) = hkcu.create_subkey("Software\\Classes\\Clash\\Shell\\Open\\Command")?;
-    command.set_value("", &format!("{app_exe} \"%1\""))?;
+    command.set_value("", &open_command)?;
 
     Ok(())
 }
@@ -416,4 +424,30 @@ async fn handle_copy(src: &PathBuf, dest: &PathBuf, file: &str) {
             );
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{URL_PROTOCOL_REG_VALUE, format_scheme_open_command};
+
+    #[test]
+    fn format_scheme_open_command_quotes_executable_with_and_without_spaces() {
+        assert_eq!(
+            format_scheme_open_command(r"C:\Program Files\Clash Mini\clash-mini.exe"),
+            r#""C:\Program Files\Clash Mini\clash-mini.exe" "%1""#
+        );
+        assert_eq!(
+            format_scheme_open_command(r"D:\Tools\clash-mini.exe"),
+            r#""D:\Tools\clash-mini.exe" "%1""#
+        );
+        assert_eq!(
+            format_scheme_open_command(r#""C:\Program Files\Clash Mini\clash-mini.exe""#),
+            r#""C:\Program Files\Clash Mini\clash-mini.exe" "%1""#
+        );
+    }
+
+    #[test]
+    fn url_protocol_registry_value_matches_windows_spec() {
+        assert_eq!(URL_PROTOCOL_REG_VALUE, "");
+    }
 }
