@@ -2,30 +2,40 @@ import { describe, expect, it } from 'vitest'
 
 import type { IConnectionsItem } from '@/types/connection'
 import { parseManagedMergeRuleLine } from '@/utils/quick-routing'
+import { compileStringMatcher } from '@/utils/search-matcher'
 
 import {
   createDisconnectedRecordFromConnection,
   extractConnectionTarget,
+  formatPathControlAddress,
+  formatPathControlCopyAddress,
   formatPathControlHostLabel,
   matchesConnectionTarget,
+  matchesPathControlSearch,
   partitionPathControlConnections,
   prioritizePathControlConnections,
   reconcileDisconnectedRecords,
   resolveConnectionControlStatus,
+  resolveConnectionDestinationIp,
   resolveConnectionNodeDisplay,
   shouldCloseStaleProxyConnection,
+  findMatchingManagedRule,
 } from './path-control'
 
 function makeConn(
   overrides: Partial<IConnectionsItem> & {
     host?: string
     destinationIP?: string
+    remoteDestination?: string
+    destinationPort?: string
     process?: string
   } = {},
 ): IConnectionsItem {
   const {
     host = 'play.googleapis.com',
     destinationIP = '142.250.190.46',
+    remoteDestination,
+    destinationPort = '443',
     process = 'chrome.exe',
     ...rest
   } = overrides
@@ -37,8 +47,9 @@ function makeConn(
       host,
       sourceIP: '127.0.0.1',
       sourcePort: '50000',
-      destinationPort: '443',
+      destinationPort,
       destinationIP,
+      remoteDestination,
       process,
     },
     upload: rest.upload ?? 100,
@@ -614,6 +625,235 @@ describe('path-control 四态展示与留存闭环（BUG-367）', () => {
       kind: 'none',
       nodeName: '--',
       isStaleProxyNode: false,
+    })
+  })
+})
+
+describe('path-control 目标 IP 解析与过滤展示隔离（BUG-423）', () => {
+  it('纯 IP 代理连接优先展示并复制真实 destinationIP，不被代理节点 remoteDestination 污染', () => {
+    const pureIpProxyConn = makeConn({
+      id: 'pure-ip-proxy',
+      host: '',
+      destinationIP: '161.33.156.41',
+      destinationPort: '8443',
+      remoteDestination: '129.203.174.67',
+      chains: ['HK-01', 'PROXY'],
+    })
+
+    expect(resolveConnectionDestinationIp(pureIpProxyConn)).toBe(
+      '161.33.156.41',
+    )
+    expect(formatPathControlHostLabel(pureIpProxyConn)).toBe('161.33.156.41')
+    expect(formatPathControlAddress(pureIpProxyConn)).toBe('161.33.156.41:8443')
+    expect(formatPathControlCopyAddress(pureIpProxyConn)).toBe(
+      '161.33.156.41:8443',
+    )
+
+    const ipv6PureIpConn = makeConn({
+      id: 'ipv6-pure-ip',
+      host: '',
+      destinationIP: '2001:db8::1',
+      destinationPort: '8443',
+      remoteDestination: '129.203.174.67',
+      chains: ['HK-01', 'PROXY'],
+    })
+    expect(formatPathControlAddress(ipv6PureIpConn)).toBe('[2001:db8::1]:8443')
+    expect(formatPathControlCopyAddress(ipv6PureIpConn)).toBe(
+      '[2001:db8::1]:8443',
+    )
+
+    const suffixSyntheticRow = partitionPathControlConnections({
+      activeConnections: [],
+      managedRules: [
+        parseManagedMergeRuleLine('DOMAIN-SUFFIX,googleapis.com,REJECT')!,
+      ],
+      disconnectedRecords: [],
+    }).closed[0]
+    expect(formatPathControlHostLabel(suffixSyntheticRow)).toBe(
+      '*.googleapis.com',
+    )
+    expect(formatPathControlAddress(suffixSyntheticRow)).toBe(
+      '*.googleapis.com',
+    )
+    expect(formatPathControlCopyAddress(suffixSyntheticRow)).toBe(
+      'googleapis.com',
+    )
+  })
+
+  it('resolveConnectionDestinationIp 隔离代理节点 IP，仅在 DIRECT 连接无 destinationIP 时兜底 remoteDestination', () => {
+    const proxiedDomainConn = makeConn({
+      host: 'github.com',
+      destinationIP: '',
+      remoteDestination: '129.203.174.67',
+      chains: ['HK-01', 'PROXY'],
+    })
+    expect(resolveConnectionDestinationIp(proxiedDomainConn)).toBe('')
+
+    const directConn = makeConn({
+      host: 'baidu.com',
+      destinationIP: '',
+      remoteDestination: '110.242.68.66',
+      chains: ['DIRECT'],
+    })
+    expect(resolveConnectionDestinationIp(directConn)).toBe('110.242.68.66')
+
+    const directViaGroupConn = makeConn({
+      host: 'baidu.com',
+      destinationIP: '',
+      remoteDestination: '110.242.68.66',
+      chains: ['DIRECT', 'PROXY'],
+    })
+    expect(resolveConnectionDestinationIp(directViaGroupConn)).toBe(
+      '110.242.68.66',
+    )
+
+    const unknownChainsConn = makeConn({
+      host: 'example.com',
+      destinationIP: '',
+      remoteDestination: '129.203.174.67',
+      chains: [],
+    })
+    expect(resolveConnectionDestinationIp(unknownChainsConn)).toBe('')
+  })
+
+  it('matchesPathControlSearch 与表格可见信息对齐，搜索代理节点 IP 不再筛出无关连接', () => {
+    const pureIpProxyConn = makeConn({
+      id: 'pure-ip-proxy',
+      host: '',
+      destinationIP: '161.33.156.41',
+      destinationPort: '8443',
+      remoteDestination: '129.203.174.67',
+      process: 'curl.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+    const proxiedDomainConn = makeConn({
+      id: 'proxied-domain',
+      host: 'github.com',
+      destinationIP: '',
+      destinationPort: '443',
+      remoteDestination: '129.203.174.67',
+      process: 'git.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+    const directDomainConn = makeConn({
+      id: 'direct-domain',
+      host: 'www.baidu.com',
+      destinationIP: '',
+      destinationPort: '443',
+      remoteDestination: '110.242.68.66',
+      process: 'chrome.exe',
+      chains: ['DIRECT'],
+    })
+    const suffixSyntheticRow = partitionPathControlConnections({
+      activeConnections: [],
+      managedRules: [
+        parseManagedMergeRuleLine('DOMAIN-SUFFIX,oracle.com,DIRECT')!,
+      ],
+      disconnectedRecords: [],
+    }).closed[0]
+    const placeholderRow = makeConn({
+      id: 'placeholder',
+      host: '',
+      destinationIP: '',
+      destinationPort: '',
+      process: '',
+      chains: ['HK-01', 'PROXY'],
+    })
+
+    expect(
+      matchesPathControlSearch(
+        pureIpProxyConn,
+        compileStringMatcher('161.33.156.41').matcher,
+      ),
+    ).toBe(true)
+    expect(
+      matchesPathControlSearch(
+        pureIpProxyConn,
+        compileStringMatcher('161.33.156.41:8443').matcher,
+      ),
+    ).toBe(true)
+
+    const nodeIpMatcher = compileStringMatcher('129.203.174.67').matcher
+    expect(matchesPathControlSearch(pureIpProxyConn, nodeIpMatcher)).toBe(false)
+    expect(matchesPathControlSearch(proxiedDomainConn, nodeIpMatcher)).toBe(
+      false,
+    )
+
+    expect(
+      matchesPathControlSearch(
+        suffixSyntheticRow,
+        compileStringMatcher('*.oracle.com').matcher,
+      ),
+    ).toBe(true)
+    expect(
+      matchesPathControlSearch(
+        directDomainConn,
+        compileStringMatcher('110.242.68.66').matcher,
+      ),
+    ).toBe(true)
+    expect(
+      matchesPathControlSearch(
+        proxiedDomainConn,
+        compileStringMatcher('git.exe').matcher,
+      ),
+    ).toBe(true)
+    expect(
+      matchesPathControlSearch(
+        placeholderRow,
+        compileStringMatcher('').matcher,
+      ),
+    ).toBe(true)
+    expect(
+      matchesPathControlSearch(
+        placeholderRow,
+        compileStringMatcher('-').matcher,
+      ),
+    ).toBe(false)
+  })
+
+  it('matchesConnectionTarget / findMatchingManagedRule / extractConnectionTarget 不被代理 remoteDestination 误匹配', () => {
+    const proxiedDomainConn = makeConn({
+      id: 'proxied-github',
+      host: 'github.com',
+      destinationIP: '',
+      remoteDestination: '129.203.174.67',
+      process: 'git.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+    const nodeIpTarget = {
+      type: 'domain' as const,
+      value: '129.203.174.67',
+      key: 'ipv4:129.203.174.67',
+    }
+    const rejectNodeIpRule = parseManagedMergeRuleLine(
+      'IP-CIDR,129.203.174.67/32,REJECT',
+    )!
+
+    expect(matchesConnectionTarget(proxiedDomainConn, nodeIpTarget)).toBe(false)
+    expect(
+      findMatchingManagedRule(proxiedDomainConn, [rejectNodeIpRule]),
+    ).toBeNull()
+
+    const partitioned = partitionPathControlConnections({
+      activeConnections: [proxiedDomainConn],
+      managedRules: [rejectNodeIpRule],
+      disconnectedRecords: [],
+    })
+    expect(partitioned.active.map((r) => r.id)).toEqual(['proxied-github'])
+    expect(partitioned.active[0]?._controlStatus).toBe('proxy')
+
+    const procFallbackConn = makeConn({
+      id: 'proc-fallback',
+      host: '',
+      destinationIP: '',
+      remoteDestination: '129.203.174.67',
+      process: 'ssh.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+    expect(extractConnectionTarget(procFallbackConn)).toEqual({
+      type: 'process',
+      value: 'ssh.exe',
+      key: 'process:ssh.exe',
     })
   })
 })

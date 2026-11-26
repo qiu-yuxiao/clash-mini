@@ -9,6 +9,16 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-423 路径控制混用 `remoteDestination`（代理节点 IP）与 `destinationIP` 导致过滤命中无关连接及纯 IP 目标错显
+
+- **对应模块**：[path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)、[connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx)、[connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx)、[connection-detail.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-detail.tsx)、[path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts)
+- **问题描述**：Mihomo 在代理出站连接的 `metadata.remoteDestination` 中填入的是实际拨号的代理节点服务器 IP（仅 `DIRECT` 直连时为真实远端 IP），而请求的真实目标 IP 位于 `metadata.destinationIP`。原有路径控制逻辑在多处倒置或混用了这两个字段：① `formatPathControlHostLabel`、`ConnectionTable::handleCopy` 与 `ConnectionDetail` 的「主机」行在 `host` 为空时将 `remoteDestination` 排在 `destinationIP` 之前，导致纯 IP 代理连接被错显并复制为「代理节点 IP:目标端口」；② `ConnectionDetail` 的「目标地址」行在代理域名连接 `destinationIP` 为空时错误回退显示 `remoteDestination`；③ [connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx) 搜索过滤无条件匹配 `remoteDestination`，输入代理节点 IP 时会筛出不相关连接，且未匹配可见展示串（含 `:port` / `*.根域名`）；④ `matchesConnectionTarget`、`findMatchingManagedRule`、`extractConnectionTarget` 与 `createDisconnectedRecordFromConnection` 在代理连接缺少 `destinationIP` 时回退读取 `remoteDestination`，存在规则误匹配或误断活跃代理连接的风险。
+- **修复方案**：
+  1. 在 [path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts) 新增 `resolveConnectionDestinationIp` 作为唯一事实源（严格优先 `metadata.destinationIP`，仅在 `chains[0]` 为 `DIRECT` 时兜底 `metadata.remoteDestination`），并统一收敛 `extractConnectionTarget`、`matchesConnectionTarget`、`findMatchingManagedRule`、`createDisconnectedRecordFromConnection` 与 `formatPathControlHostLabel`；
+  2. 新增 `formatPathControlAddress`、`formatPathControlCopyAddress` 与 `matchesPathControlSearch`，对齐 [connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx) 搜索过滤、[connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx) 列表展示/复制以及 [connection-detail.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-detail.tsx) 详情弹窗的「主机」/「目标地址」展示（同步支持 `[IPv6]:port` 拼接）；
+  3. 在 [path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts) 补齐纯 IP 代理展示/复制、代理与直连 IP 隔离、`matchesPathControlSearch` 及 `matchesConnectionTarget`/`findMatchingManagedRule` 防串扰单测。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-422 运行期写入 HKCU URL Protocol 注册表启动命令未为可执行文件路径加双引号且 URL Protocol 键值不规范
 
 - **对应模块**：[init.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/init.rs)（`init_scheme`，`format_scheme_open_command`）

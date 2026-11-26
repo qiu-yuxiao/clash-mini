@@ -1,3 +1,16 @@
+## v3.6.6
+
+### 🎯 修复路径控制 `remoteDestination` 串扰导致的搜索误命中与纯 IP 代理目标错显（BUG-423）
+
+- **统一路径控制真实目标 IP 真源，消除纯 IP 代理连接错显代理节点 IP**：
+  - 在 `path-control.ts` 新增 `resolveConnectionDestinationIp`：严格优先读取 `metadata.destinationIP`，仅在出站叶节点明确为 `DIRECT` 时兜底 `metadata.remoteDestination`，避免 Mihomo 代理连接的代理节点服务器 IP 污染业务目标；
+  - 新增 `formatPathControlAddress` 与 `formatPathControlCopyAddress`（同步支持 `[IPv6]:port` 格式与 `DOMAIN-SUFFIX` 精确复制），统一路径控制表格「链接目标」列、右键「复制连接地址」及左键详情弹窗的「主机」/「目标地址」展示。
+- **对齐搜索过滤与规则目标匹配，防止无关连接串扰与误断活跃流**：
+  - 新增 `matchesPathControlSearch` 接入路径控制搜索框：过滤范围与表格可见内容对齐（支持 `:port` 与 `*.根域名` 检索），不再无条件匹配代理连接的 `remoteDestination`；
+  - 同步收口 `extractConnectionTarget`、`matchesConnectionTarget`、`findMatchingManagedRule` 与 `createDisconnectedRecordFromConnection`，防止代理域名连接在无 `destinationIP` 时因代理节点 IP 撞上自定义 `IP-CIDR` 规则而被误判或误断，并补齐前端回归单测。
+
+---
+
 ## v3.6.5
 
 ### 🔗 修复 URL Scheme 冷启动吞链、轻量模式导入无反馈与 HKCU 注册表路径未加引号（BUG-420 / BUG-421 / BUG-422）

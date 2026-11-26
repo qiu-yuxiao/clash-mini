@@ -134,6 +134,40 @@ export function saveDisconnectedIds(ids: string[]): void {
   }
 }
 
+function isDirectConnection(conn: { chains?: string[] }): boolean {
+  const leaf = Array.isArray(conn.chains) ? conn.chains[0]?.trim() : ''
+  return Boolean(leaf && leaf.toUpperCase() === 'DIRECT')
+}
+
+/**
+ * Resolves the true destination IP of a connection.
+ * Prefers `metadata.destinationIP`; falls back to `metadata.remoteDestination`
+ * only for `DIRECT` connections because proxied connections populate
+ * `remoteDestination` with the proxy server's IP.
+ */
+export function resolveConnectionDestinationIp(
+  conn: Pick<IConnectionsItem, 'metadata'> & { chains?: string[] },
+): string {
+  const destinationIp = conn.metadata?.destinationIP?.trim()
+  if (destinationIp) {
+    return destinationIp
+  }
+  if (isDirectConnection(conn)) {
+    return conn.metadata?.remoteDestination?.trim() || ''
+  }
+  return ''
+}
+
+function appendDestinationPort(base: string, port?: string): string {
+  const trimmedPort = port?.trim()
+  if (!base || base === '--' || !trimmedPort) {
+    return base
+  }
+  return isIPv6Address(base)
+    ? `[${base}]:${trimmedPort}`
+    : `${base}:${trimmedPort}`
+}
+
 function targetFromDomainOrIp(rawHostOrIp: string): PathControlTarget | null {
   const norm = normalizeQuickTargetHost(rawHostOrIp)
   if (!norm) return null
@@ -151,7 +185,7 @@ function targetFromDomainOrIp(rawHostOrIp: string): PathControlTarget | null {
  * Priority matches context-menu operations: `metadata.host` -> `metadata.destinationIP` -> `metadata.process`.
  */
 export function extractConnectionTarget(
-  conn: Pick<IConnectionsItem, 'metadata'>,
+  conn: Pick<IConnectionsItem, 'metadata'> & { chains?: string[] },
   managedRule?: ManagedMergeRule,
 ): PathControlTarget | null {
   const rawHost = conn.metadata?.host?.trim()
@@ -159,9 +193,7 @@ export function extractConnectionTarget(
     return targetFromDomainOrIp(rawHost)
   }
 
-  const rawIp =
-    conn.metadata?.destinationIP?.trim() ||
-    conn.metadata?.remoteDestination?.trim()
+  const rawIp = resolveConnectionDestinationIp(conn)
   if (rawIp) {
     return targetFromDomainOrIp(rawIp)
   }
@@ -193,7 +225,7 @@ export function extractConnectionTarget(
  * Checks whether an active connection exactly matches the given target descriptor.
  */
 export function matchesConnectionTarget(
-  conn: Pick<IConnectionsItem, 'metadata'>,
+  conn: Pick<IConnectionsItem, 'metadata'> & { chains?: string[] },
   target: PathControlTarget,
 ): boolean {
   if (target.type === 'process') {
@@ -212,9 +244,7 @@ export function matchesConnectionTarget(
     return host === target.value
   }
 
-  const destIp = normalizeQuickTargetHost(
-    conn.metadata?.destinationIP || conn.metadata?.remoteDestination || '',
-  )
+  const destIp = normalizeQuickTargetHost(resolveConnectionDestinationIp(conn))
   return host === target.value || destIp === target.value
 }
 
@@ -238,15 +268,13 @@ export function extractTargetKeyForManagedRule(rule: ManagedMergeRule): string {
 }
 
 export function findMatchingManagedRule(
-  conn: Pick<IConnectionsItem, 'metadata'>,
+  conn: Pick<IConnectionsItem, 'metadata'> & { chains?: string[] },
   managedRules: ManagedMergeRule[],
 ): ManagedMergeRule | null {
   if (managedRules.length === 0) return null
 
   const host = normalizeQuickTargetHost(conn.metadata?.host ?? '')
-  const destIp = normalizeQuickTargetHost(
-    conn.metadata?.destinationIP || conn.metadata?.remoteDestination || '',
-  )
+  const destIp = normalizeQuickTargetHost(resolveConnectionDestinationIp(conn))
   const proc = conn.metadata?.process?.trim().toLowerCase() ?? ''
 
   for (const rule of managedRules) {
@@ -328,7 +356,7 @@ export function createDisconnectedRecordFromConnection(
     type: target.type,
     value: target.value,
     host: conn.metadata?.host ?? '',
-    destinationIP: conn.metadata?.destinationIP ?? '',
+    destinationIP: resolveConnectionDestinationIp(conn),
     destinationPort: conn.metadata?.destinationPort ?? '',
     network: conn.metadata?.network ?? 'tcp',
     connType: conn.metadata?.type ?? '',
@@ -653,7 +681,7 @@ export function formatPathControlHostLabel(
   row: Pick<
     PathControlConnectionItem,
     'metadata' | '_managedRule' | '_isSynthetic'
-  >,
+  > & { chains?: string[] },
 ): string {
   const host = row.metadata?.host?.trim()
   if (host) {
@@ -662,11 +690,50 @@ export function formatPathControlHostLabel(
     }
     return host
   }
-  const destIp =
-    row.metadata?.remoteDestination?.trim() ||
-    row.metadata?.destinationIP?.trim()
+  const destIp = resolveConnectionDestinationIp(row)
   if (destIp) return destIp
   return row.metadata?.process?.trim() || '--'
+}
+
+export function formatPathControlAddress(
+  row: Pick<
+    PathControlConnectionItem,
+    'metadata' | '_managedRule' | '_isSynthetic'
+  > & { chains?: string[] },
+): string {
+  return appendDestinationPort(
+    formatPathControlHostLabel(row),
+    row.metadata?.destinationPort,
+  )
+}
+
+export function formatPathControlCopyAddress(
+  row: Pick<IConnectionsItem, 'metadata'> & { chains?: string[] },
+): string {
+  const base =
+    row.metadata?.host?.trim() ||
+    resolveConnectionDestinationIp(row) ||
+    row.metadata?.process?.trim() ||
+    ''
+  if (!base) return ''
+  return appendDestinationPort(base, row.metadata?.destinationPort)
+}
+
+export function matchesPathControlSearch(
+  conn: PathControlConnectionItem,
+  match: (content: string) => boolean,
+): boolean {
+  if (match('')) return true
+  const displayAddress = formatPathControlAddress(conn)
+  const host = conn.metadata?.host?.trim() || ''
+  const destIp = resolveConnectionDestinationIp(conn)
+  const process = conn.metadata?.process?.trim() || ''
+  return (
+    (displayAddress !== '--' && match(displayAddress)) ||
+    (host.length > 0 && match(host)) ||
+    (destIp.length > 0 && match(destIp)) ||
+    (process.length > 0 && match(process))
+  )
 }
 
 /**

@@ -31,7 +31,8 @@ import {
 } from '@/utils/button-styles'
 import {
   extractConnectionTarget,
-  formatPathControlHostLabel,
+  formatPathControlAddress,
+  formatPathControlCopyAddress,
   resolveConnectionControlStatus,
   type PathControlConnectionItem,
   type PathControlStatus,
@@ -400,15 +401,7 @@ export const ConnectionTable = (props: Props) => {
     if (!contextMenu) return
     const { row } = contextMenu
     setContextMenu(null)
-    const metadata = row.metadata ?? {}
-    const host =
-      metadata.host ||
-      metadata.remoteDestination ||
-      metadata.destinationIP ||
-      metadata.process ||
-      ''
-    const port = metadata.destinationPort
-    const address = (port && host ? `${host}:${port}` : host) || ''
+    const address = formatPathControlCopyAddress(row)
     if (!address) return
     try {
       await navigator.clipboard.writeText(address)
@@ -448,11 +441,7 @@ export const ConnectionTable = (props: Props) => {
     return [
       {
         id: 'host',
-        accessorFn: (row) => {
-          const base = formatPathControlHostLabel(row)
-          const port = row.metadata?.destinationPort
-          return port ? `${base}:${port}` : base
-        },
+        accessorFn: (row) => formatPathControlAddress(row),
         header: () => t('connections.components.miniTable.hostColumn'),
         cell: (ctx) => ctx.getValue<string>(),
       },

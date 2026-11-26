@@ -10,6 +10,8 @@ import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle } from '@/utils/button-styles'
 import parseTraffic from '@/utils/parse-traffic'
 import {
+  formatPathControlAddress,
+  resolveConnectionDestinationIp,
   resolveConnectionNodeDisplay,
   type PathControlConnectionItem,
 } from '@/utils/path-control'
@@ -91,18 +93,8 @@ const InnerConnectionDetail = ({ data, closed, onClose }: InnerProps) => {
   const tokens = getPopupSkinTokens(theme)
   const chains = [...(data?.chains ?? [])].reverse().join(' / ')
   const rule = rulePayload ? `${data?.rule}(${rulePayload})` : data?.rule
-  const rawHost =
-    metadata?.host ||
-    metadata?.remoteDestination ||
-    metadata?.destinationIP ||
-    metadata?.process ||
-    '--'
-  const host = metadata?.destinationPort
-    ? `${rawHost}:${metadata.destinationPort}`
-    : rawHost
-  const Destination = metadata?.destinationIP
-    ? metadata.destinationIP
-    : metadata?.remoteDestination || '--'
+  const host = formatPathControlAddress(data as PathControlConnectionItem)
+  const Destination = resolveConnectionDestinationIp(data) || '--'
 
   const currentProxyNow =
     proxies?.groups?.find((g) => g.name === 'PROXY')?.now ??

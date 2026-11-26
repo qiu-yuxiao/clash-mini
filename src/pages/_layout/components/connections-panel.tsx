@@ -14,6 +14,7 @@ import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
 import type { IConnectionsItem } from '@/types/connection'
 import { get3DButtonStyle } from '@/utils/button-styles'
 import {
+  matchesPathControlSearch,
   prioritizePathControlConnections,
   type PathControlConnectionItem,
   type PathControlViewMode,
@@ -64,16 +65,9 @@ export const ConnectionsPanel: React.FC<ConnectionsPanelProps> = ({
     viewMode === 'active' ? activeControlConnections : closedControlConnections
 
   const filterConn = useMemo<PathControlConnectionItem[]>(() => {
-    const matchConns = baseConnections.filter((conn) => {
-      const { host, destinationIP, remoteDestination, process } =
-        conn.metadata ?? {}
-      return (
-        match(host || '') ||
-        match(destinationIP || '') ||
-        match(remoteDestination || '') ||
-        match(process || '')
-      )
-    })
+    const matchConns = baseConnections.filter((conn) =>
+      matchesPathControlSearch(conn, match),
+    )
     return prioritizePathControlConnections(matchConns, sortByNewestStart)
   }, [baseConnections, match])
 
