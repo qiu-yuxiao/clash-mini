@@ -1,12 +1,12 @@
 {
   "version": "3.6.7",
-  "notes": "Clash Mini v3.6.7",
-  "pub_date": "2026-11-27T05:19:07Z",
+  "notes": "### 🔍 全仓搜索框统一支持多关键词与/或/排除过滤（BUG-424）\n\n- **统一前端多关键词检索解析真源，消除路径控制/日志页提示与行为不一致**：\n  - 重构 `search-matcher.ts`（`parseFilterClauses`、`compileStringMatcher`、`extractPositiveSearchTerms`）并与 `node.ts::matchNodeFilter` 及后端 `match_node_filter` 收口为同一实现，统一支持空格 `AND`、`|`/`｜` `OR` 与 `-`/`!`/`！` 排除语法；\n  - 路径控制 `matchesPathControlSearch` 改为整行拼接可见地址、原始 `host`、真实目标 IP 与 `process` 后匹配（支持跨字段 `AND` 与纯 `-` 排除），且继续严格隔离代理节点 `remoteDestination`；\n  - 日志弹窗检索同步支持与/或/排除，并按正向关键词做多词高亮（自动忽略排除词）。\n\n---",
+  "pub_date": "2026-11-27T05:36:39.900Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU5uYmJlSy9IemMwRE9RejN6NzlIOFUyU1NtRDdjYVJuSEhuMEdMREEwT1JFend2WUZXSmQ3MFBhMDlENzVlUjNtcGdFMTJRbWdJbUFEKzRJVVlzS2c4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NjgwMTQ4CWZpbGU6Q2xhc2ggTWluaV8zLjYuNl94NjQtc2V0dXAuZXhlCllqa1pORVV3SkgwU1VreEpyNGthS2wyVFowTmxCK0tiWlpNSjl3ejNaVjFvMVVublE4LzlHbUQxTEgxcE1OK3ZNbDdZM2NBMXIvWnY0aXAya0tmS0NBPT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUFqWmhlbllNd3lzZjR4TENSTzk4VGZUZW5BRTBJczBWdWcyT1dsUUg0QXgzTkRrdTZSc0Y4UEFZUWZ0VmQ2dGVBbTBGNGV0cVgvc1AxY2d1RUU4c3dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NzU3NzMzCWZpbGU6Q2xhc2ggTWluaV8zLjYuN194NjQtc2V0dXAuZXhlCkVkS3FYMnFZSHl2NkJxSWlNc1ErYktRUTJONXZFOExKdFcrN0trdGNyVzVRVTE1ZGtoWldkNDF2N3N1ZWoxbzlHOUtqZmZPRlBpVzFGak1kRjl5dER3PT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.7/Clash.Mini_3.6.7_x64-setup.exe",
-      "size": 30160505
+      "size": 30165561
     }
   }
 }
