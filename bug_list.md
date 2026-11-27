@@ -9,14 +9,23 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-426 自动更新端点直连 `dev` 分支导致 CI 编译期间客户端提前提示新版且下载失败
+
+- **对应模块**：[tauri.conf.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/tauri.conf.json)、[.github/workflows/release.yml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.github/workflows/release.yml)
+- **问题描述**：客户端 `plugins.updater.endpoints` 原指向 `raw.githubusercontent.com/.../dev/updater/app-update.json`；而 `release.ps1` 在触发 CI 前即执行 `bump_version.py` 并提交 `updater/app-update.json` 至 `origin/dev`，且原 CI 在 `publish` 公开 Draft Release 之前就向 `origin/dev` 回写新清单，导致在约 20–25 分钟云端编译期间及发布尾部切换窗口内，已安装客户端会提前弹出新版本提示，点击更新则因安装包尚未公开（404）或签名尚未更新而失败。
+- **修复方案**：
+  1. 在不破坏 `dev` 四处版本号一致性检查的前提下，将 [tauri.conf.json](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/tauri.conf.json) 更新端点切换至官方正式版直链 `https://github.com/qiu-yuxiao/clash-mini/releases/latest/download/latest.json`，利用 GitHub Release `Draft → Published` 状态机天然隔离未完成构建；
+  2. 调整 [release.yml](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/.github/workflows/release.yml) 后两阶段顺序为 `publish` → `update_dev`：`publish` 先整理/去重 Draft Release 并生成 `latest.json` 上传至 Draft，随后原子切换 `draft=false` 对外公开（`latest.json` 与安装包同时可达）；`update_dev` 在发布后拉取 `latest.json` 同步写回 `origin/dev::updater/app-update.json`，保障存量 `<= v3.6.8` 客户端平滑升级。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-425 订阅容器格式覆盖不全、URI 分享链接字段缺失及链式代理/Provider 规范化盲区
 
 - **对应模块**：[universal_parser/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/universal_parser/mod.rs)、[containers.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/universal_parser/containers.rs)、[uri_classic.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/universal_parser/uri_classic.rs)、[uri_modern.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/universal_parser/uri_modern.rs)、[prfitem/remote.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/prfitem/remote.rs)、[prfitem/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/config/prfitem/mod.rs)、[scheme.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/utils/resolve/scheme.rs)、[enhance/agreements.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/agreements.rs)、[enhance/mod.rs](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src-tauri/src/enhance/mod.rs)、[node.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.ts)、[use-profile-actions.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/hooks/use-profile-actions.ts)
 - **问题描述**：① `universal_parser` 仅识别 11 个精确小写 URI 前缀，漏掉高频 `hy2://` 短别名、`ssr://` 与 `wg://`；`hysteria2://` 缺失 `mport`/`ports`、`hop-interval`、`pinSHA256`、`alpn`、`up`/`down`、`allowInsecure`；`vless://` 的 `grpc` 错误读取 `path` 而非标准 `serviceName` 且缺失 `xhttp`/`splithttp`/`httpupgrade`/`h2`/`http`/`allowInsecure`/`encryption`；`trojan://` 缺失 `ws`/`grpc`/`httpupgrade`/`reality`/`alpn`/`fp`；`ss://` 丢弃 SIP002 `plugin=` 与 `uot`；`vmess://` 仅支持 Base64-JSON 且缺失 `scy`/`alpn`/`fp`/`httpupgrade`/`h2`/`http`/`xhttp`，不支持 Shadowrocket/AEAD URI；`wireguard://` `allowed-ips` 未对双栈节点补齐 `::/0`；② `parse_subscription_content` 不支持 sing-box JSON（`outbounds`）与 SIP008 JSON（`servers`），且 `from_url_direct` 与前端 `isSupportedSubscriptionOrNodeInput` 拒绝直接粘贴 Clash YAML、Base64 订阅内容及 `clash://`/`clash-mini://` 深链；③ `get_merged_proxies` 重命名节点后未同步改写 `dialer-proxy`，多订阅 `proxy-providers` 未聚合且 `proxy:` 指向已裁剪原策略组时导致配置校验失败。
 - **修复方案**：
-  1. 将 `universal_parser` 拆分为 `mod.rs` / `uri_classic.rs` / `uri_modern.rs` / `containers.rs` / `tests.rs`：新增 sing-box JSON 与 SIP008 JSON 容器解析与统一 `parse_subscription_payload`，补全 14 种大小写无关 URI 前缀及上述全部协议参数映射；
-  2. 在 `scheme.rs`、`prfitem/remote.rs`、`prfitem/mod.rs` 接入深链拆包与统一 `parse_subscription_payload` 粘贴导入，并在 `src/utils/node.ts`、`use-profile-actions.ts` 同步升级前后端一致的入口门控与激活定位；
-  3. 在 `enhance/agreements.rs` 与 `enhance/mod.rs` 为 `get_merged_proxies` 补充 `dialer-proxy` 同步改名映射、新增 `get_merged_proxy_providers` 跨订阅聚合 `proxy-providers` 并在 `normalize_proxy_providers` 清理悬空原策略组引用，全面补齐前后端单测。
+  1. 将 `universal_parser` 拆分为 `mod.rs` / `uri_classic.rs` / `uri_modern.rs` / `containers.rs` / `tests.rs`：新增 sing-box JSON（含 1.11+ `endpoints`、`server_ports` 推导端口、`utls.enabled: false` 与 `detour` 非法引用剔除）与 SIP008 JSON 容器解析与统一 `parse_subscription_payload`，补全 14 种大小写无关 URI 前缀（拒绝空主机、支持 Hysteria2 authority 端口跳跃及各字段百分号解码）及上述全部协议参数映射；
+  2. 在 `scheme.rs`、`prfitem/remote.rs`、`prfitem/mod.rs` 接入单行深链拆包（严格隔离多行文本防 `Url::parse` 拼坏）、统一 `parse_subscription_payload` 粘贴导入（首次与合并落盘统一仅收口 `proxies`/`proxy-providers` 防止污染顶层键），并在 `src/utils/node.ts`、`use-profile-actions.ts` 同步升级前后端一致的入口门控与 URL 归一化激活定位；
+  3. 在 `enhance/agreements.rs` 与 `enhance/mod.rs` 收口 `merge_profiles_proxies_and_providers`，同步完成 `dialer-proxy` 与 `proxy-providers.*.proxy` 节点引用改名映射、跨订阅 `proxy-providers` 聚合与重名缓存 `path` 隔离，并在 `normalize_proxy_providers` 清理悬空原策略组引用，全面补齐前后端单测。
 - **状态**：代码已修正，待用户确认
 
 ### BUG-424 路径控制与日志页搜索框提示支持与/或/排除语法但实际仅执行单串字面包含匹配

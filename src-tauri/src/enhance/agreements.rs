@@ -338,8 +338,17 @@ fn profile_timestamp_suffix(updated: Option<i64>) -> std::string::String {
     }
 }
 
-#[allow(clippy::collapsible_if, clippy::needless_borrows_for_generic_args)]
-pub(super) fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
+pub(super) struct MergedProfileNodes {
+    pub proxies: Vec<Value>,
+    pub proxy_providers: Mapping,
+}
+
+type PerItemNameMap = std::collections::HashMap<(usize, std::string::String), std::string::String>;
+type GlobalNameMap = std::collections::HashMap<std::string::String, std::string::String>;
+
+fn merge_proxies_with_maps(
+    profiles: &crate::config::profiles::IProfiles,
+) -> (Vec<Value>, PerItemNameMap, GlobalNameMap) {
     let mut raw_proxies = Vec::new();
 
     if let Some(items) = profiles.get_items() {
@@ -355,7 +364,7 @@ pub(super) fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) 
                 for proxy in proxies {
                     let original_name = proxy
                         .as_mapping()
-                        .and_then(|map| map.get(&Value::from("name")).and_then(Value::as_str))
+                        .and_then(|map| map.get("name").and_then(Value::as_str))
                         .unwrap_or("Proxy")
                         .to_string();
                     raw_proxies.push((proxy, item_idx, original_name, suffix.clone()));
@@ -374,8 +383,8 @@ pub(super) fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) 
     }
 
     let mut name_suffix_counters = std::collections::HashMap::new();
-    let mut per_item_name_map = std::collections::HashMap::new();
-    let mut global_name_map = std::collections::HashMap::new();
+    let mut per_item_name_map = PerItemNameMap::new();
+    let mut global_name_map = GlobalNameMap::new();
     let mut renamed_entries = Vec::with_capacity(raw_proxies.len());
 
     for (proxy, item_idx, name, suffix) in raw_proxies {
@@ -417,11 +426,28 @@ pub(super) fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) 
         all_proxies.push(proxy);
     }
 
-    all_proxies
+    (all_proxies, per_item_name_map, global_name_map)
 }
 
-/// 跨订阅聚合全部 `remote` / `local` 配置中的 `proxy-providers`（当前激活配置键名原样优先保留，跨订阅同名冲突追加时间戳后缀）。
-pub(super) fn get_merged_proxy_providers(profiles: &crate::config::profiles::IProfiles) -> Mapping {
+fn alloc_provider_key(merged: &Mapping, k: &Value, suffix: &str) -> Value {
+    if !merged.contains_key(k) {
+        return k.clone();
+    }
+    let base = k.as_str().unwrap_or("provider");
+    let mut candidate = format!("{base}_{suffix}");
+    let mut idx = 2usize;
+    while merged.contains_key(Value::from(candidate.as_str())) {
+        candidate = format!("{base}_{suffix}_{idx}");
+        idx += 1;
+    }
+    Value::from(candidate)
+}
+
+fn merge_proxy_providers_with_maps(
+    profiles: &crate::config::profiles::IProfiles,
+    per_item_name_map: &PerItemNameMap,
+    global_name_map: &GlobalNameMap,
+) -> Mapping {
     let mut merged = Mapping::new();
     let Some(items) = profiles.get_items() else {
         return merged;
@@ -430,10 +456,18 @@ pub(super) fn get_merged_proxy_providers(profiles: &crate::config::profiles::IPr
 
     let ordered_items = items
         .iter()
-        .filter(|item| item.uid.as_ref() == current_uid)
-        .chain(items.iter().filter(|item| item.uid.as_ref() != current_uid));
+        .enumerate()
+        .filter(|(_, item)| item.uid.as_ref() == current_uid)
+        .chain(
+            items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| item.uid.as_ref() != current_uid),
+        );
 
-    for item in ordered_items {
+    let mut used_paths: HashSet<std::string::String> = HashSet::new();
+
+    for (item_idx, item) in ordered_items {
         let Some(itype) = &item.itype else {
             continue;
         };
@@ -454,22 +488,54 @@ pub(super) fn get_merged_proxy_providers(profiles: &crate::config::profiles::IPr
         };
 
         let suffix = profile_timestamp_suffix(item.updated);
-        for (k, v) in providers {
-            if !merged.contains_key(&k) {
-                merged.insert(k, v);
-            } else if let Some(base) = k.as_str() {
-                let mut candidate = format!("{base}_{suffix}");
-                let mut idx = 2usize;
-                while merged.contains_key(Value::from(candidate.as_str())) {
-                    candidate = format!("{base}_{suffix}_{idx}");
-                    idx += 1;
+        for (k, mut v) in providers {
+            let final_key = alloc_provider_key(&merged, &k, &suffix);
+            let final_key_str = final_key.as_str().unwrap_or("provider");
+
+            if let Some(provider_map) = v.as_mapping_mut() {
+                if let Some(proxy_target) = provider_map.get("proxy").and_then(Value::as_str).map(str::trim)
+                    && !proxy_target.is_empty()
+                    && !matches!(proxy_target, "DIRECT" | "REJECT" | "PROXY")
+                    && let Some(renamed_proxy) = per_item_name_map
+                        .get(&(item_idx, proxy_target.to_string()))
+                        .or_else(|| global_name_map.get(proxy_target))
+                {
+                    provider_map.insert(Value::from("proxy"), Value::from(renamed_proxy.as_str()));
                 }
-                merged.insert(Value::from(candidate), v);
+
+                let existing_path = provider_map
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty());
+                if let Some(p) = existing_path {
+                    let norm = p.to_ascii_lowercase();
+                    if !used_paths.insert(norm) {
+                        let isolated_path = format!("./proxy_providers/{final_key_str}.yaml");
+                        used_paths.insert(isolated_path.to_ascii_lowercase());
+                        provider_map.insert(Value::from("path"), Value::from(isolated_path));
+                    }
+                }
             }
+
+            merged.insert(final_key, v);
         }
     }
 
     merged
+}
+
+/// 跨订阅聚合全部 `remote` / `local` 配置中的节点与 `proxy-providers`，
+/// 并同步改写链式 `dialer-proxy`、`proxy-providers.*.proxy` 引用与重名缓存 `path`。
+pub(super) fn merge_profiles_proxies_and_providers(
+    profiles: &crate::config::profiles::IProfiles,
+) -> MergedProfileNodes {
+    let (proxies, per_item_name_map, global_name_map) = merge_proxies_with_maps(profiles);
+    let proxy_providers = merge_proxy_providers_with_maps(profiles, &per_item_name_map, &global_name_map);
+    MergedProfileNodes {
+        proxies,
+        proxy_providers,
+    }
 }
 
 /// 读取当前激活 Profile 的持久化 PROXY 选点与过滤词（`proxy_head_state.json`）。

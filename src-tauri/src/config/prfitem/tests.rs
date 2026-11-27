@@ -306,6 +306,20 @@ async fn test_from_url_direct_supports_yaml_singbox_sip008_and_new_uris() {
     assert_eq!(inner, "https://example.com/sub?flag=meta");
     assert_eq!(name.as_deref(), Some("TestSub"));
 
+    // 5. 直接粘贴完整 Clash YAML 时，L_Direct_Imports 不应污染顶层 dns/rules 键，
+    //    且多行文本首行含 https:// 不得误走单行远程 URL 路径
+    let _ = PrfItem::from_url("clear", None, None, None).await.unwrap();
+    let full_yaml = "port: 7890\ndns:\n  enable: true\nproxies:\n  - name: Clean-Only\n    type: ss\n    server: 1.2.3.4\n    port: 8388\n    cipher: aes-256-gcm\n    password: pw\nrules:\n  - MATCH,DIRECT\n";
+    let clean_direct = PrfItem::from_url(full_yaml, None, None, None).await.unwrap();
+    let serialized_direct = clean_direct.file_data.unwrap();
+    assert!(!serialized_direct.contains("\nrules:"));
+    assert!(!serialized_direct.contains("\ndns:"));
+    assert!(
+        PrfItem::from_url("https://example.com/sub\nextra-line", None, None, None)
+            .await
+            .is_err()
+    );
+
     // 恢复现场，避免污染其它单测
     if let Some(bytes) = prev_content {
         let _ = tokio::fs::write(&direct_path, bytes).await;

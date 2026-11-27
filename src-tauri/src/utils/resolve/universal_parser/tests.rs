@@ -887,3 +887,115 @@ fn test_parse_subscription_payload_singbox_and_sip008_json() {
             .unwrap()
     );
 }
+
+#[test]
+fn test_double_check_hardening_cases() {
+    // 1. 空主机名拦截
+    assert!(parse_hysteria2("hy2://pass@:443#bad").is_none());
+    assert!(parse_vless("vless://uuid@[]:443#bad").is_none());
+
+    // 2. Hysteria2 authority 多端口与端口跳跃写法
+    let hy2_auth = parse_hysteria2("hy2://pw@example.com:20000-30000?sni=example.com#Hy2-AuthHop").unwrap();
+    assert_eq!(hy2_auth.get(Value::from("port")).unwrap().as_u64().unwrap(), 20000);
+    assert_eq!(
+        hy2_auth.get(Value::from("ports")).unwrap().as_str().unwrap(),
+        "20000-30000"
+    );
+
+    let hy2_v6_list = parse_hysteria2("hy2://pw@[2001:db8::1]:443,20000-30000#Hy2-V6Hop").unwrap();
+    assert_eq!(
+        hy2_v6_list.get(Value::from("server")).unwrap().as_str().unwrap(),
+        "2001:db8::1"
+    );
+    assert_eq!(hy2_v6_list.get(Value::from("port")).unwrap().as_u64().unwrap(), 443);
+    assert_eq!(
+        hy2_v6_list.get(Value::from("ports")).unwrap().as_str().unwrap(),
+        "443,20000-30000"
+    );
+
+    // 3. hysteria up/down 与 vless pbk/fp 百分号解码
+    let hy1 = parse_hysteria("hysteria://1.2.3.4:443?auth=a&up=100%20Mbps&down=200%20Mbps#hy").unwrap();
+    assert_eq!(hy1.get(Value::from("up")).unwrap().as_str().unwrap(), "100 Mbps");
+    assert_eq!(hy1.get(Value::from("down")).unwrap().as_str().unwrap(), "200 Mbps");
+    let vl = parse_vless(
+        "vless://11111111-1111-1111-1111-111111111111@1.2.3.4:443?security=reality&pbk=AB%2BCD&fp=chrome%20ios#vl",
+    )
+    .unwrap();
+    assert_eq!(
+        vl.get(Value::from("reality-opts"))
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get(Value::from("public-key"))
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "AB+CD"
+    );
+    assert_eq!(
+        vl.get(Value::from("client-fingerprint")).unwrap().as_str().unwrap(),
+        "chrome ios"
+    );
+
+    // 4. sing-box detour 过滤（保留已转换节点、剥离 direct/selector），utls.enabled=false 尊重，
+    //    server_ports 推导 port，WS early-data 与小写 headers.host，1.11 endpoints WG
+    let sb_json = r#"{
+      "outbounds": [
+        { "type": "direct", "tag": "direct" },
+        { "type": "selector", "tag": "select", "outbounds": ["relay"] },
+        {
+          "type": "vless",
+          "tag": "relay",
+          "server": "relay.example.com",
+          "server_port": 443,
+          "uuid": "11111111-1111-1111-1111-111111111111",
+          "detour": "direct",
+          "tls": { "enabled": true, "utls": { "enabled": false, "fingerprint": "chrome" } },
+          "transport": { "type": "ws", "path": "/ws", "headers": { "host": "ws.cdn.example" }, "max_early_data": 2048, "early_data_header_name": "Sec-WebSocket-Protocol" }
+        },
+        {
+          "type": "hysteria2",
+          "tag": "hy2-range-only",
+          "server": "hy2.example.com",
+          "server_ports": ["30000:40000"],
+          "password": "pw",
+          "detour": "relay",
+          "tls": { "server_name": "hy2.example.com" }
+        }
+      ],
+      "endpoints": [
+        {
+          "type": "wireguard",
+          "tag": "wg-endpoint",
+          "private_key": "PRIV",
+          "address": ["10.0.0.2/32"],
+          "peers": [{ "address": "5.6.7.8", "port": 51820, "public_key": "PUB" }]
+        }
+      ]
+    }"#;
+    let (sb_map, _) = parse_subscription_payload(sb_json).unwrap();
+    let proxies = sb_map.get("proxies").unwrap().as_sequence().unwrap();
+    assert_eq!(proxies.len(), 3);
+    assert!(proxies[0].get("dialer-proxy").is_none(), "detour=direct 必须剥离");
+    assert!(
+        proxies[0].get("client-fingerprint").is_none(),
+        "utls.enabled=false 不应输出指纹"
+    );
+    let ws_opts = proxies[0].get("ws-opts").unwrap().as_mapping().unwrap();
+    assert_eq!(ws_opts.get("max-early-data").unwrap().as_u64().unwrap(), 2048);
+    assert_eq!(
+        ws_opts
+            .get("headers")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get("Host")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "ws.cdn.example"
+    );
+    assert_eq!(proxies[1].get("port").unwrap().as_u64().unwrap(), 30000);
+    assert_eq!(proxies[1].get("dialer-proxy").unwrap().as_str().unwrap(), "relay");
+    assert_eq!(proxies[2].get("name").unwrap().as_str().unwrap(), "wg-endpoint");
+}

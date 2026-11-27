@@ -217,7 +217,7 @@ export function useProfileActions() {
 
     const expectedRemoteUrl =
       extractDeepLinkSubscriptionUrl(trimmed) ??
-      (/^https?:\/\//i.test(trimmed) ? trimmed : null)
+      (/^https?:\/\//i.test(trimmed) && !/\s/.test(trimmed) ? trimmed : null)
 
     const finalizeImportedProfile = async (
       noticeKey:
@@ -227,10 +227,21 @@ export function useProfileActions() {
       showNotice.success(noticeKey)
       if (!inputUrl) setUrl('')
 
+      let normalizedRemoteUrl: string | null = null
+      if (expectedRemoteUrl) {
+        try {
+          normalizedRemoteUrl = new URL(expectedRemoteUrl).href
+        } catch {
+          normalizedRemoteUrl = null
+        }
+      }
+
       const freshConfig = await getProfiles()
       const newProfile = expectedRemoteUrl
         ? freshConfig?.items?.find(
-            (p: IProfileItem) => p.url === expectedRemoteUrl,
+            (p: IProfileItem) =>
+              p.url === expectedRemoteUrl ||
+              (normalizedRemoteUrl !== null && p.url === normalizedRemoteUrl),
           )
         : undefined
       let targetUid = currentProfileUid

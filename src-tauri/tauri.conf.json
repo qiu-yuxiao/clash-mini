@@ -31,7 +31,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEwMzQ0QzIxODRDREI2NjAKUldSZ3RzMkVJVXcwRUtHTk1RcDE2SE1zVzd2VFE2akhleHZXWTlSbk1QZmYxYlNGWTczcXVaOXgK",
       "endpoints": [
-        "https://raw.githubusercontent.com/qiu-yuxiao/clash-mini/dev/updater/app-update.json"
+        "https://github.com/qiu-yuxiao/clash-mini/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "basicUi"

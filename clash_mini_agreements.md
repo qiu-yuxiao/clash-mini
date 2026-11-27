@@ -383,11 +383,11 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 7.1 单一 PROXY 组模型架构
 
-`enhance/`（按职责拆分为 `mod.rs` 主编排、`agreements.rs` 单组拓扑收敛、`dns.rs` 上游卫生与规则生成、`tun.rs`、`seq.rs`、`field.rs`、`merge.rs`、`chain.rs`、`tests.rs`）阶段通过 `get_merged_proxies`（同步按同订阅内 `per_item_name_map` 与全局唯一映射改写链式代理 `dialer-proxy`）及 `get_merged_proxy_providers`（跨订阅聚合 `proxy-providers` 并在跨订阅键名冲突时追加时间戳后缀隔离）汇聚所有可用真实节点与提供方至唯一选择器组 **`PROXY`** 及同构隐藏测量组 **`PROXY__METRICS`**，通过 `normalize_proxy_providers` 统一置 `health-check.lazy = true` 并清理指向已裁剪原策略组的悬空 `proxy:` 引用，彻底剔除多层嵌套策略组；前端展示、排序、过滤与激活 100% 绑定该唯一控制组；运行时配置通过 `sync_runtime_proxy_group_head` 将合规目标置为 `PROXY.proxies[0]` 并关闭 `store-selected`，确保任何冷启/重启瞬间零越界落点。
+`enhance/`（按职责拆分为 `mod.rs` 主编排、`agreements.rs` 单组拓扑收敛、`dns.rs` 上游卫生与规则生成、`tun.rs`、`seq.rs`、`field.rs`、`merge.rs`、`chain.rs`、`tests.rs`）阶段通过 `merge_profiles_proxies_and_providers` 在同一重命名映射下同步改写同订阅/全局唯一链式 `dialer-proxy` 与 `proxy-providers.*.proxy` 节点引用、隔离跨订阅重名 `proxy-providers` 键与缓存 `path`，汇聚所有可用真实节点与提供方至唯一选择器组 **`PROXY`** 及同构隐藏测量组 **`PROXY__METRICS`**，通过 `normalize_proxy_providers` 统一置 `health-check.lazy = true` 并清理指向已裁剪原策略组的悬空 `proxy:` 引用，彻底剔除多层嵌套策略组；前端展示、排序、过滤与激活 100% 绑定该唯一控制组；运行时配置通过 `sync_runtime_proxy_group_head` 将合规目标置为 `PROXY.proxies[0]` 并关闭 `store-selected`，确保任何冷启/重启瞬间零越界落点。
 
 ### 7.2 通用协议解析器（Universal Parser）规范
 
-`universal_parser/`（拆分为 `mod.rs`、`uri_classic.rs`、`uri_modern.rs`、`containers.rs`、`tests.rs`）与远程/直连导入共用统一入口 `parse_subscription_payload`（远程下载与主输入框直接粘贴同等支持 Clash YAML、sing-box JSON `outbounds`、SIP008 JSON `servers`、Base64 封装及多行 URI 列表，且 `PrfItem::from_url` 支持 `clash://`/`clash-mini://`/`clash-verge://` 深链自动拆包）：原生以大小写无关前缀覆盖 14 种 URI scheme（`vmess://` 含 V2RayN Base64-JSON 与 Shadowrocket/AEAD URI、`ss://` 含 SIP002 `plugin=` 标准化与 `uot`、`ssr://`、`trojan://` 含 `ws`/`grpc`/`httpupgrade`/`reality`/`alpn`/`fp`、`vless://` 含 `serviceName`/`xhttp`/`httpupgrade`/`h2`/`allowInsecure`/`encryption`、`hysteria2://`/`hy2://` 含 `mport`/`hop-interval`/`pinSHA256`/`alpn`/`up`/`down`、`hysteria://`、`anytls://`、`tuic://`、`wireguard://`/`wg://` 双栈 `0.0.0.0/0`+`::/0` `allowed-ips`、`socks5://`/`socks://` 含 Base64 userinfo 与 TLS、以及 `# [HTTP]` 回退）；共享预处理 `strip_fragment_and_query` 严格遵守 **`#fragment` → `?query` → 末位 `@` 拆解 `userinfo@host:port`** 顺序（防密码或参数含 `@` 截断主机），完整支持 IPv6 字面量、WireGuard CIDR 清洗及 VMess `sni -> servername` 映射。
+`universal_parser/`（拆分为 `mod.rs`、`uri_classic.rs`、`uri_modern.rs`、`containers.rs`、`tests.rs`）与远程/直连导入共用统一入口 `parse_subscription_payload`（远程下载与主输入框直接粘贴同等支持 Clash YAML、sing-box JSON `outbounds`/`endpoints` 与 `detour` 引用清洗、SIP008 JSON `servers`、Base64 封装及多行 URI 列表；`L_Direct_Imports` 仅收口合并 `proxies` 与 `proxy-providers`，且单行 `clash://`/`clash-mini://`/`clash-verge://` 深链自动拆包）：原生以大小写无关前缀覆盖 14 种 URI scheme（`vmess://` 含 V2RayN Base64-JSON 与 Shadowrocket/AEAD URI、`ss://` 含 SIP002 `plugin=` 标准化与 `uot`、`ssr://`、`trojan://` 含 `ws`/`grpc`/`httpupgrade`/`reality`/`alpn`/`fp`、`vless://` 含 `serviceName`/`xhttp`/`httpupgrade`/`h2`/`allowInsecure`/`encryption`、`hysteria2://`/`hy2://` 含 authority 端口段与 `mport`/`hop-interval`/`pinSHA256`/`alpn`/`up`/`down`、`hysteria://`、`anytls://`、`tuic://`、`wireguard://`/`wg://` 双栈 `0.0.0.0/0`+`::/0` `allowed-ips`、`socks5://`/`socks://` 含 Base64 userinfo 与 TLS、以及 `# [HTTP]` 回退）；共享预处理 `strip_fragment_and_query` 严格遵守 **`#fragment` → `?query` → 末位 `@` 拆解 `userinfo@host:port`** 顺序（防密码或参数含 `@` 截断主机并拒绝空主机），完整支持 IPv6 字面量、WireGuard CIDR 清洗及 VMess `sni -> servername` 映射。
 
 ### 7.3 订阅导入等待、失败传播与 Provider 刷新协同
 
@@ -437,20 +437,20 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 > 1. **令牌零暴露**：Token 仅从 `github_token.txt` 读取并经 `$env:GH_TOKEN` 隐式传入 `gh`，严禁打印、落盘或硬编码明文。
 > 2. **宿主机代理生命线保护**：测试与发布脚本严禁强杀、重启或探测宿主机正在运行的代理进程与服务（`clash-mini`、`clash_verge_service`、`mini-mihomo`、`verge-mihomo`、`clash-verge`）及其端口（`10801`–`10803`、`9098`、`33335`、`33336`）和命名管道（`\\.\pipe\mini-mihomo`）。
 
-### 8.4 CI 四阶段死锁无关流水线架构
+### 8.4 CI 四阶段原子发布流水线架构
 
-`release.yml` 采用单向无死锁四阶段流水线：
+`release.yml` 采用以 GitHub Release `Draft → Published` 状态机为原子屏障的四阶段流水线：
 ```mermaid
 flowchart LR
   V[1. validate 校验] --> B[2. build 云端编译]
-  B --> U[3. update_dev 更新配置]
-  U --> P[4. publish 正式发布]
+  B --> P[3. publish 上传 latest.json 并公开]
+  P --> U[4. update_dev 回写 app-update.json]
 ```
-`validate` 校验一致性 → `build` 编译签名打包并上传 Draft Release → `update_dev` 计算体积签名回写 `updater/app-update.json` 至 `origin/dev` → `publish` 提取 `Changelog.md` 公开正式 Release。
+`validate` 校验一致性 → `build` 编译签名打包并上传 Draft Release → `publish` 生成包含最终签名、字节数与 `Changelog.md` 说明的 `latest.json` 上传至 Draft Release 后一次性切换 `draft=false` 正式公开（确保客户端更新端点 `/releases/latest/download/latest.json` 与安装包原子同步可见，零编译期误报窗口）→ `update_dev` 从已公开 Release 下载 `latest.json` 同步回写 `origin/dev::updater/app-update.json` 以兼容存量 `<= v3.6.8` 旧版本客户端平滑升级。
 
-### 8.5 本地制品验收、客户端升级双轨回退与自动更新同步闭环
+### 8.5 本地制品验收、客户端升级双轨回退与原子更新端点
 
-所有发行安装包统一下载保留于根目录 `portable_test/`（`git` 忽略，不得清理删除）；发版结束后及时 `git pull origin dev` 同步云端回写的 `updater/app-update.json`。应用内客户端在线更新（`use-client-update.ts` + `utils/client-update.ts`）检查阶段优先通过本地混合端口代理并在失败后自动回退系统/直连通道；安装包下载流中断（`Finished` 事件之前）支持退避重试最多 3 次（第 3 次尝试前刷新直连句柄），并将检查/下载重试与失败原因通过 `frontendLog` 落盘 `latest.log`。
+客户端自动更新端点统一指向 GitHub Release 最新正式版直链 `https://github.com/qiu-yuxiao/clash-mini/releases/latest/download/latest.json`（[tauri.conf.json](src-tauri/tauri.conf.json)，消除 `dev` 分支预 bump 与 CDN 缓存导致的「提前发现新版本却下载失败」竞态）；所有发行安装包统一下载保留于根目录 `portable_test/`（`git` 忽略，不得清理删除）；发版结束后及时 `git pull origin dev` 同步云端回写的 `updater/app-update.json`。应用内客户端在线更新（`use-client-update.ts` + `utils/client-update.ts`）检查阶段优先通过本地混合端口代理并在失败后自动回退系统/直连通道；安装包下载流中断（`Finished` 事件之前）支持退避重试最多 3 次（第 3 次尝试前刷新直连句柄），并将检查/下载重试与失败原因通过 `frontendLog` 落盘 `latest.log`。
 
 ### 8.6 配置文件版本号与迁移框架
 

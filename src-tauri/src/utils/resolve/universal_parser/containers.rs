@@ -19,16 +19,16 @@ fn json_port(obj: &JsonMap<String, JsonValue>, key: &str) -> Option<u16> {
         .and_then(|p| u16::try_from(p).ok())
 }
 
-fn json_str_list(obj: &JsonMap<String, JsonValue>, key: &str) -> Vec<String> {
-    match obj.get(key) {
-        Some(JsonValue::Array(arr)) => arr
+fn json_val_to_str_list(val: &JsonValue) -> Vec<String> {
+    match val {
+        JsonValue::Array(arr) => arr
             .iter()
             .filter_map(JsonValue::as_str)
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(str::to_string)
             .collect(),
-        Some(JsonValue::String(s)) => {
+        JsonValue::String(s) => {
             let t = s.trim();
             if t.is_empty() { Vec::new() } else { vec![t.to_string()] }
         }
@@ -36,11 +36,18 @@ fn json_str_list(obj: &JsonMap<String, JsonValue>, key: &str) -> Vec<String> {
     }
 }
 
+fn json_str_list(obj: &JsonMap<String, JsonValue>, key: &str) -> Vec<String> {
+    obj.get(key).map_or_else(Vec::new, json_val_to_str_list)
+}
+
 fn apply_singbox_tls(map: &mut Mapping, obj: &JsonMap<String, JsonValue>, sni_key: &str, emit_tls_bool: bool) {
     let Some(JsonValue::Object(tls)) = obj.get("tls") else {
         return;
     };
-    let enabled = tls.get("enabled").and_then(JsonValue::as_bool).unwrap_or(false);
+    let enabled = tls
+        .get("enabled")
+        .and_then(JsonValue::as_bool)
+        .unwrap_or(!emit_tls_bool);
     if !enabled {
         return;
     }
@@ -61,6 +68,7 @@ fn apply_singbox_tls(map: &mut Mapping, obj: &JsonMap<String, JsonValue>, sni_ke
         map.insert(Value::from("alpn"), Value::from(alpn));
     }
     if let Some(JsonValue::Object(utls)) = tls.get("utls")
+        && utls.get("enabled").and_then(JsonValue::as_bool).unwrap_or(true)
         && let Some(fp) = json_str(utls, "fingerprint")
     {
         map.insert(Value::from("client-fingerprint"), Value::from(fp));
@@ -91,6 +99,10 @@ fn apply_singbox_transport(map: &mut Mapping, obj: &JsonMap<String, JsonValue>, 
             "http" if has_tls => "h2".to_string(),
             other => other.to_string(),
         },
+        ws_max_early_data: tr.get("max_early_data").and_then(JsonValue::as_u64),
+        ws_early_data_header_name: json_str(tr, "early_data_header_name")
+            .map(str::to_string)
+            .unwrap_or_default(),
         ..TransportOpts::default()
     };
 
@@ -100,8 +112,10 @@ fn apply_singbox_transport(map: &mut Mapping, obj: &JsonMap<String, JsonValue>, 
     let hosts = json_str_list(tr, "host");
     if !hosts.is_empty() {
         opts.host = hosts.join(",");
-    } else if let Some(JsonValue::Object(headers)) = tr.get("headers") {
-        let hdr_hosts = json_str_list(headers, "Host");
+    } else if let Some(JsonValue::Object(headers)) = tr.get("headers")
+        && let Some((_, host_val)) = headers.iter().find(|(k, _)| k.eq_ignore_ascii_case("host"))
+    {
+        let hdr_hosts = json_val_to_str_list(host_val);
         if !hdr_hosts.is_empty() {
             opts.host = hdr_hosts.join(",");
         }
@@ -160,7 +174,17 @@ fn convert_singbox_ss(obj: &JsonMap<String, JsonValue>, name: &str) -> Option<Ma
 }
 
 fn convert_singbox_hy2(obj: &JsonMap<String, JsonValue>, name: &str) -> Option<Mapping> {
-    let mut map = init_singbox_base(obj, "hysteria2", name, 443)?;
+    let ports: Vec<String> = json_str_list(obj, "server_ports")
+        .into_iter()
+        .map(|p| p.replace(':', "-"))
+        .collect();
+    let derived_port = ports
+        .first()
+        .and_then(|spec| spec.split('-').next())
+        .and_then(|num| num.trim().parse::<u16>().ok())
+        .unwrap_or(443);
+
+    let mut map = init_singbox_base(obj, "hysteria2", name, derived_port)?;
     if let Some(pw) = json_str(obj, "password") {
         map.insert(Value::from("password"), Value::from(pw));
     }
@@ -170,10 +194,6 @@ fn convert_singbox_hy2(obj: &JsonMap<String, JsonValue>, name: &str) -> Option<M
     if let Some(down) = obj.get("down_mbps").and_then(JsonValue::as_u64) {
         map.insert(Value::from("down"), Value::from(format!("{down} Mbps")));
     }
-    let ports: Vec<String> = json_str_list(obj, "server_ports")
-        .into_iter()
-        .map(|p| p.replace(':', "-"))
-        .collect();
     if !ports.is_empty() {
         map.insert(Value::from("ports"), Value::from(ports.join(",")));
     }
@@ -417,6 +437,21 @@ fn convert_singbox_outbound(obj: &JsonMap<String, JsonValue>, index: usize) -> O
     }
 }
 
+fn sanitize_singbox_detours(proxies: &mut [Value]) {
+    let converted_tags: std::collections::HashSet<String> = proxies
+        .iter()
+        .filter_map(|p| p.get("name").and_then(Value::as_str).map(str::to_string))
+        .collect();
+    for proxy in proxies.iter_mut() {
+        if let Some(map) = proxy.as_mapping_mut()
+            && let Some(detour) = map.get("dialer-proxy").and_then(Value::as_str)
+            && !converted_tags.contains(detour)
+        {
+            map.remove("dialer-proxy");
+        }
+    }
+}
+
 pub(super) fn parse_singbox_json(text: &str) -> Option<Mapping> {
     if !text.trim_start().starts_with('{') {
         return None;
@@ -424,22 +459,37 @@ pub(super) fn parse_singbox_json(text: &str) -> Option<Mapping> {
     let JsonValue::Object(root) = serde_json::from_str::<JsonValue>(text).ok()? else {
         return None;
     };
-    let JsonValue::Array(outbounds) = root.get("outbounds")? else {
-        return None;
-    };
 
     let mut proxies = Vec::new();
-    for (idx, item) in outbounds.iter().enumerate() {
-        if let Some(obj) = item.as_object()
-            && let Some(proxy_map) = convert_singbox_outbound(obj, idx + 1)
-        {
-            proxies.push(Value::from(proxy_map));
+    if let Some(JsonValue::Array(outbounds)) = root.get("outbounds") {
+        for (idx, item) in outbounds.iter().enumerate() {
+            if let Some(obj) = item.as_object()
+                && let Some(proxy_map) = convert_singbox_outbound(obj, idx + 1)
+            {
+                proxies.push(Value::from(proxy_map));
+            }
+        }
+    }
+
+    if let Some(JsonValue::Array(endpoints)) = root.get("endpoints") {
+        for (idx, item) in endpoints.iter().enumerate() {
+            if let Some(obj) = item.as_object()
+                && json_str(obj, "type") == Some("wireguard")
+            {
+                let fallback_name = format!("wireguard-ep-{}", idx + 1);
+                let name = json_str(obj, "tag").unwrap_or(&fallback_name);
+                if let Some(proxy_map) = convert_singbox_wireguard(obj, name) {
+                    proxies.push(Value::from(proxy_map));
+                }
+            }
         }
     }
 
     if proxies.is_empty() {
         return None;
     }
+    sanitize_singbox_detours(&mut proxies);
+
     let mut result = Mapping::new();
     result.insert(Value::from("proxies"), Value::from(proxies));
     Some(result)

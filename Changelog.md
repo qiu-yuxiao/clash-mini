@@ -1,3 +1,24 @@
+## v3.6.9
+
+### 🚀 自动更新端点切换为 GitHub Release 原子公开清单（BUG-426）
+
+- **消除发版编译窗口期的更新清单提前暴露竞态**：
+  - 将 `src-tauri/tauri.conf.json` 中的 `plugins.updater.endpoints` 从 `dev` 分支 `updater/app-update.json` 切换为 `https://github.com/qiu-yuxiao/clash-mini/releases/latest/download/latest.json`，并保留本地四处版本号同步校验；
+  - 调整 `.github/workflows/release.yml` 编排顺序为 `publish -> update_dev`：在 `publish` 阶段先基于 Draft Release 中的安装包与 `.sig` 生成 `latest.json` 并上传至 Draft Release，随后调用 `draft=false` 将安装包与更新清单原子公开；公开后再于 `update_dev` 阶段将已发布的 `latest.json` 回填同步至 `dev` 分支 `updater/app-update.json`，确保 `<= v3.6.8` 旧版本客户端仍可平滑升级。
+
+### 🛡️ 订阅解析与节点聚合边界加固（BUG-425 复核修复）
+
+- **sing-box 容器与多形态 WireGuard / 链式路由补全**：
+  - `containers.rs` 新增 sing-box 1.11+ `endpoints` 数组中的 WireGuard 端点解析；新增 `sanitize_singbox_detours` 清洗 `"direct"` / 策略组等非代理节点的悬空 `dialer-proxy`（同时保留有效节点间链式引用）；显式尊重 `utls.enabled: false`、在常驻 TLS 协议上于 `tls` 省略时默认补全 `tls.enabled`、`hysteria2` 省略 `server_port` 时由 `server_ports` 推导 `port`，并兼容 `headers.Host` 大小写及 WebSocket `max-early-data` / `early-data-header-name`。
+- **URI 解析参数解码与端口跳跃兼容**：
+  - `universal_parser/mod.rs` 拒绝空主机名（如 `hy2://pw@:443`、`vless://uuid@[]:443`）并扩展 WebSocket early-data 字段传递；`uri_modern.rs` 支持 Hysteria2 官方 `host:20000-30000` / `[IPv6]:443,20000-30000` 端口跳跃语法，并对 `vless` `flow`/`pbk`/`sid`/`fp`、`hysteria` `up`/`down`、`tuic` `congestion_control`/`udp_relay_mode` 执行百分号解码。
+- **跨订阅 `proxy-providers` 聚合与直接粘贴持久化一致性修复**：
+  - `enhance/agreements.rs` 与 `enhance/mod.rs` 合流为 `merge_profiles_proxies_and_providers`，共享节点重命名映射表：当 `proxy-providers.*.proxy` 指向具体节点时同步改写为防冲突新名称，并对跨订阅碰撞的相对缓存路径去重为 `./proxy_providers/<final_key>.yaml`；
+  - `prfitem/mod.rs` 的 `from_url_direct` 在首次直接导入且尚无 `L_Direct_Imports.yaml` 时同样经 `merge_direct_import_mapping` 过滤，防止 `dns`/`rules`/`port`/`external-controller` 等控制字段落盘；
+  - `prfitem/remote.rs` 增加单行校验防止多行文本被 WHATWG URL 解析拼接，前端 `use-profile-actions.ts` 增加无空白字符限制与规范化 `URL.href` 匹配以准确激活远端导入配置。
+
+---
+
 ## v3.6.8
 
 ### 🌐 全面扩展订阅容器与节点协议兼容矩阵（BUG-425）

@@ -31,7 +31,7 @@ pub(super) fn parse_vless(link: &str) -> Option<Mapping> {
         for (k, v) in parse_query_pairs(q) {
             match k.as_str() {
                 "flow" => {
-                    map.insert(Value::from("flow"), Value::from(v));
+                    map.insert(Value::from("flow"), Value::from(percent_decode(&v)));
                 }
                 "security" if v.eq_ignore_ascii_case("tls") || v.eq_ignore_ascii_case("reality") => {
                     map.insert(Value::from("tls"), Value::from(true));
@@ -46,13 +46,13 @@ pub(super) fn parse_vless(link: &str) -> Option<Mapping> {
                     map.insert(Value::from("encryption"), Value::from(percent_decode(&v)));
                 }
                 "pbk" => {
-                    reality_opts.insert(Value::from("public-key"), Value::from(v));
+                    reality_opts.insert(Value::from("public-key"), Value::from(percent_decode(&v)));
                 }
                 "sid" => {
-                    reality_opts.insert(Value::from("short-id"), Value::from(v));
+                    reality_opts.insert(Value::from("short-id"), Value::from(percent_decode(&v)));
                 }
                 "fp" | "fingerprint" => {
-                    map.insert(Value::from("client-fingerprint"), Value::from(v));
+                    map.insert(Value::from("client-fingerprint"), Value::from(percent_decode(&v)));
                 }
                 "alpn" => insert_alpn_list(&mut map, &v),
                 "type" => transport.network = percent_decode(&v),
@@ -75,6 +75,41 @@ pub(super) fn parse_vless(link: &str) -> Option<Mapping> {
     Some(map)
 }
 
+fn first_port_from_spec(port_spec: &str) -> Option<u16> {
+    let first_seg = port_spec.split([',', '/']).next()?.trim();
+    let first_num = first_seg.split('-').next()?.trim();
+    first_num.parse::<u16>().ok()
+}
+
+fn extract_hy2_host_port(host_port: &str) -> Option<(String, u16, Option<String>)> {
+    let trimmed = host_port.trim();
+    let (host, port_part) = if trimmed.starts_with('[') {
+        let close = trimmed.find(']')?;
+        let h = trimmed[1..close].trim();
+        let rest = trimmed[close + 1..].trim();
+        (h, rest.strip_prefix(':').unwrap_or("").trim())
+    } else if let Some((h, p)) = trimmed.split_once(':') {
+        (h.trim(), p.trim())
+    } else {
+        (trimmed, "")
+    };
+    if host.is_empty() {
+        return None;
+    }
+    if port_part.contains('-') || port_part.contains(',') || port_part.contains('/') {
+        let port = first_port_from_spec(port_part).unwrap_or(443);
+        let normalized_ports = port_part.replace('/', ",");
+        Some((host.to_string(), port, Some(normalized_ports)))
+    } else {
+        let port = if port_part.is_empty() {
+            443
+        } else {
+            port_part.parse::<u16>().ok().unwrap_or(443)
+        };
+        Some((host.to_string(), port, None))
+    }
+}
+
 pub(super) fn parse_hysteria2(link: &str) -> Option<Mapping> {
     let payload = strip_prefix_ascii_case(link, "hysteria2://")
         .or_else(|| strip_prefix_ascii_case(link, "hy2://"))?
@@ -86,13 +121,16 @@ pub(super) fn parse_hysteria2(link: &str) -> Option<Mapping> {
     let host_port = host_port.trim_end_matches('/');
     let password = percent_decode(password_raw);
 
-    let (server, port) = extract_host_port(host_port, 443)?;
+    let (server, port, authority_ports) = extract_hy2_host_port(host_port)?;
 
     let mut map = Mapping::new();
     map.insert(Value::from("type"), Value::from("hysteria2"));
     map.insert(Value::from("name"), Value::from(remarks));
     map.insert(Value::from("server"), Value::from(server));
     map.insert(Value::from("port"), Value::from(port));
+    if let Some(ports_str) = authority_ports {
+        map.insert(Value::from("ports"), Value::from(ports_str));
+    }
     map.insert(Value::from("password"), Value::from(password));
     map.insert(Value::from("udp"), Value::from(true));
 
@@ -179,10 +217,13 @@ pub(super) fn parse_hysteria(link: &str) -> Option<Mapping> {
                     map.insert(Value::from("sni"), Value::from(percent_decode(&v)));
                 }
                 "up" | "upmbps" => {
-                    map.insert(Value::from("up"), Value::from(normalize_bandwidth(&v)));
+                    map.insert(Value::from("up"), Value::from(normalize_bandwidth(&percent_decode(&v))));
                 }
                 "down" | "downmbps" => {
-                    map.insert(Value::from("down"), Value::from(normalize_bandwidth(&v)));
+                    map.insert(
+                        Value::from("down"),
+                        Value::from(normalize_bandwidth(&percent_decode(&v))),
+                    );
                 }
                 "protocol" => {
                     let proto = percent_decode(&v);
@@ -285,7 +326,7 @@ pub(super) fn parse_tuic(link: &str) -> Option<Mapping> {
         for (k, v) in parse_query_pairs(q) {
             match k.as_str() {
                 "congestion_control" | "congestion-controller" => {
-                    map.insert(Value::from("congestion-controller"), Value::from(v));
+                    map.insert(Value::from("congestion-controller"), Value::from(percent_decode(&v)));
                 }
                 "alpn" => insert_alpn_list(&mut map, &v),
                 "sni" | "peer" => {
@@ -298,7 +339,7 @@ pub(super) fn parse_tuic(link: &str) -> Option<Mapping> {
                     map.insert(Value::from("disable-sni"), Value::from(is_truthy(&v)));
                 }
                 "udp_relay_mode" => {
-                    map.insert(Value::from("udp-relay-mode"), Value::from(v));
+                    map.insert(Value::from("udp-relay-mode"), Value::from(percent_decode(&v)));
                 }
                 "reduce_rtt" => {
                     map.insert(Value::from("reduce-rtt"), Value::from(is_truthy(&v)));

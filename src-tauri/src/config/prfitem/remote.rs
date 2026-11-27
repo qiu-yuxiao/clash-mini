@@ -22,10 +22,12 @@ impl PrfItem {
         desc: Option<&String>,
         option: Option<&PrfOption>,
     ) -> Result<Self> {
-        // 若传入 clash:// / clash-mini:// / clash-verge:// 深链，自动拆包内嵌 http(s) 订阅链接与可选名称
+        // 若传入 clash:// / clash-mini:// / clash-verge:// 深链，自动拆包内嵌 http(s) 订阅链接与可选名称；
+        // 多行文本直接走直连载荷解析，防止 WHATWG Url::parse 吞掉换行符把多行拼接成畸形 URL
         let trimmed_input = url.trim();
+        let is_single_line = !trimmed_input.contains('\n') && !trimmed_input.contains('\r');
         let (effective_url_owned, scheme_name) =
-            if crate::utils::resolve::scheme::is_supported_scheme_url(trimmed_input) {
+            if is_single_line && crate::utils::resolve::scheme::is_supported_scheme_url(trimmed_input) {
                 let Some((inner_url, scheme_name)) =
                     crate::utils::resolve::scheme::parse_scheme_subscription_url(trimmed_input)
                 else {
@@ -44,7 +46,7 @@ impl PrfItem {
 
         // 直连节点输入（非 HTTP(S) URL）→ 委托给 from_url_direct
         let url_lower = effective_url.trim().to_ascii_lowercase();
-        if !url_lower.starts_with("http://") && !url_lower.starts_with("https://") {
+        if !is_single_line || (!url_lower.starts_with("http://") && !url_lower.starts_with("https://")) {
             return Self::from_url_direct(url, name, option).await;
         }
 

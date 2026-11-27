@@ -406,15 +406,16 @@ impl PrfItem {
         let (parsed, _) = crate::utils::resolve::universal_parser::parse_subscription_payload(url)
             .map_err(|_| anyhow::anyhow!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"))?;
 
-        final_mapping = parsed;
-
-        if path.exists()
+        let mut base_mapping = if path.exists()
             && let Ok(content) = std::fs::read_to_string(&path)
-            && let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content)
+            && let Ok(existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content)
         {
-            merge_direct_import_mapping(&mut existing_mapping, final_mapping);
-            final_mapping = existing_mapping;
-        }
+            existing_mapping
+        } else {
+            Mapping::new()
+        };
+        merge_direct_import_mapping(&mut base_mapping, parsed);
+        final_mapping = base_mapping;
 
         let serialized =
             serde_yaml_ng::to_string(&final_mapping).map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;

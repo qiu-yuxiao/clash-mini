@@ -35,7 +35,10 @@ pub(super) fn extract_host_port(host_port: &str, default_port: u16) -> Option<(S
     let host_port = host_port.trim();
     if host_port.starts_with('[') {
         let close = host_port.find(']')?;
-        let host = &host_port[1..close];
+        let host = host_port[1..close].trim();
+        if host.is_empty() {
+            return None;
+        }
         let rest = &host_port[close + 1..];
         let port = rest
             .strip_prefix(':')
@@ -46,14 +49,17 @@ pub(super) fn extract_host_port(host_port: &str, default_port: u16) -> Option<(S
         Some((host.to_string(), port))
     } else {
         let mut parts = host_port.splitn(2, ':');
-        let host = parts.next()?.trim().to_string();
+        let host = parts.next()?.trim();
+        if host.is_empty() {
+            return None;
+        }
         let port_str = parts.next().unwrap_or("").trim();
         let port = if port_str.is_empty() {
             default_port
         } else {
             port_str.parse::<u16>().ok().unwrap_or(default_port)
         };
-        Some((host, port))
+        Some((host.to_string(), port))
     }
 }
 
@@ -147,17 +153,28 @@ pub(super) struct TransportOpts {
     pub header_type: String,
     pub mode: String,
     pub extra: String,
+    pub ws_max_early_data: Option<u64>,
+    pub ws_early_data_header_name: String,
 }
 
-fn build_ws_opts(path: &str, host: &str, http_upgrade: bool) -> Mapping {
+fn build_ws_opts(opts: &TransportOpts, http_upgrade: bool) -> Mapping {
     let mut ws_opts = Mapping::new();
-    if !path.is_empty() {
-        ws_opts.insert(Value::from("path"), Value::from(path));
+    if !opts.path.is_empty() {
+        ws_opts.insert(Value::from("path"), Value::from(opts.path.as_str()));
     }
-    if !host.is_empty() {
+    if !opts.host.is_empty() {
         let mut headers = Mapping::new();
-        headers.insert(Value::from("Host"), Value::from(host));
+        headers.insert(Value::from("Host"), Value::from(opts.host.as_str()));
         ws_opts.insert(Value::from("headers"), Value::from(headers));
+    }
+    if let Some(max_early) = opts.ws_max_early_data {
+        ws_opts.insert(Value::from("max-early-data"), Value::from(max_early));
+    }
+    if !opts.ws_early_data_header_name.is_empty() {
+        ws_opts.insert(
+            Value::from("early-data-header-name"),
+            Value::from(opts.ws_early_data_header_name.as_str()),
+        );
     }
     if http_upgrade {
         ws_opts.insert(Value::from("v2ray-http-upgrade"), Value::from(true));
@@ -272,17 +289,11 @@ pub(super) fn apply_transport_opts(map: &mut Mapping, opts: &TransportOpts, omit
     match effective {
         "ws" => {
             map.insert(Value::from("network"), Value::from("ws"));
-            map.insert(
-                Value::from("ws-opts"),
-                Value::from(build_ws_opts(&opts.path, &opts.host, false)),
-            );
+            map.insert(Value::from("ws-opts"), Value::from(build_ws_opts(opts, false)));
         }
         "httpupgrade" => {
             map.insert(Value::from("network"), Value::from("ws"));
-            map.insert(
-                Value::from("ws-opts"),
-                Value::from(build_ws_opts(&opts.path, &opts.host, true)),
-            );
+            map.insert(Value::from("ws-opts"), Value::from(build_ws_opts(opts, true)));
         }
         "grpc" => {
             map.insert(Value::from("network"), Value::from("grpc"));

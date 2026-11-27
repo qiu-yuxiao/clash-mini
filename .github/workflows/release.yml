@@ -240,51 +240,75 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-  # ========== 第 3 步：更新 app-update.json 并推送 dev 分支（1 分钟）==========
-  # ⚠️ 只有 build 步骤成功后才会执行
-  update_dev:
-    name: Update app-update.json and Push to dev
+  # ========== 第 3 步：上传 latest.json 并公开正式 Release（1 分钟）==========
+  # ⚠️ 先生成并上传 latest.json 至 Draft Release，再一次性切换 draft=false 原子公开，
+  #    消除客户端在编译期/发布间隙提前发现新版本却下载失败的时间差（BUG-426）
+  publish:
+    name: Upload Manifest & Publish Release
     needs: [build]
     runs-on: ubuntu-latest
-    # ⚠️ 在 job 级别设置环境变量，所有 steps 自动继承
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Download setup.exe from Release
+      - name: Resolve and deduplicate draft Release
+        shell: bash
         run: |
-          echo "Downloading setup.exe from Release..."
-          gh release download ${{ github.ref_name }} --repo qiu-yuxiao/clash-mini --pattern "*.exe" --dir ./downloads
+          TAG_NAME="${GITHUB_REF##*/}"
+          matches=$(gh api repos/{owner}/{repo}/releases --paginate --jq '.[] | select(.tag_name == "'"$TAG_NAME"'") | [.id, .draft, (.assets | length), .html_url] | @tsv')
+          release_count=$(grep -c . <<< "$matches" || true)
+
+          if [ "$release_count" -eq 0 ]; then
+            echo "::error::No release found for $TAG_NAME."
+            exit 1
+          fi
+
+          if [ "$release_count" -gt 1 ]; then
+            printf '%s\n' "$matches"
+            echo "⚠️ Multiple releases found for $TAG_NAME. Auto-cleanup: keeping latest, deleting duplicates."
+            latest=$(echo "$matches" | sort -t$'\t' -k1 -rn | head -1)
+            latest_id=$(echo "$latest" | cut -f1)
+            echo "$matches" | while IFS=$'\t' read -r dup_id _ _ dup_url; do
+              if [ "$dup_id" != "$latest_id" ]; then
+                echo "  Deleting duplicate release $dup_id ($dup_url)"
+                gh api -X DELETE "repos/{owner}/{repo}/releases/$dup_id" --silent
+              fi
+            done
+            matches="$latest"
+          fi
+
+          IFS=$'\t' read -r release_id _ asset_count release_url <<< "$matches"
+          echo "Resolved release $release_id ($release_url) with $asset_count assets."
+          echo "RELEASE_ID=$release_id" >> $GITHUB_ENV
+
+      - name: Download setup.exe and .sig from Draft Release
+        shell: bash
+        run: |
+          echo "Downloading setup.exe and .sig from Draft Release..."
+          gh release download ${{ github.ref_name }} --repo qiu-yuxiao/clash-mini --pattern "*.exe" --pattern "*.sig" --dir ./downloads --clobber
           echo "✅ Downloaded:"
           ls -la ./downloads/
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update app-update.json
+      - name: Generate and upload latest.json to Draft Release
+        shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SETUP_EXE=$(find ./downloads -name "*.exe" -type f | head -1)
+          SETUP_SIG=$(find ./downloads -name "*.sig" -type f | head -1)
+          if [ -z "$SETUP_EXE" ] || [ -z "$SETUP_SIG" ]; then
+            echo "::error::Missing setup.exe or .sig in ./downloads"
+            exit 1
+          fi
           SETUP_FILENAME=$(basename "$SETUP_EXE")
           SETUP_SIZE=$(stat --format=%s "$SETUP_EXE")
-
-          echo "Version: $VERSION"
-          echo "Setup: $SETUP_EXE"
-          echo "Filename: $SETUP_FILENAME"
-          echo "Size: $SETUP_SIZE"
-
-          # 读取 .sig 文件（从 Release 下载）
-          gh release download ${{ github.ref_name }} --repo qiu-yuxiao/clash-mini --pattern "*.sig" --dir ./downloads
-          SETUP_SIG=$(find ./downloads -name "*.sig" -type f | head -1)
           SIG_CONTENT=$(cat "$SETUP_SIG" | tr -d '\n' | tr -d '\r')
 
-          echo "Sig: $SETUP_SIG"
-          echo "Sig content: $SIG_CONTENT"
+          echo "Version: $VERSION | Filename: $SETUP_FILENAME | Size: $SETUP_SIZE"
 
-          # 生成 app-update.json（从 Changelog.md 提取对应版本说明）
           VERSION="$VERSION" SIG_CONTENT="$SIG_CONTENT" SETUP_SIZE="$SETUP_SIZE" SETUP_FILENAME="$SETUP_FILENAME" node <<'EOF'
             const fs = require('fs');
             const version = process.env.VERSION;
@@ -332,32 +356,12 @@ jobs:
                 }
               }
             };
-            fs.writeFileSync('updater/app-update.json', JSON.stringify(data, null, 2) + '\n', 'utf8');
-            console.log('✅ app-update.json updated');
+            fs.writeFileSync('latest.json', JSON.stringify(data, null, 2) + '\n', 'utf8');
+            console.log('✅ latest.json generated');
           EOF
 
-      - name: Commit and push to dev branch
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add updater/app-update.json
-          git commit -m "chore: update app-update.json for v$VERSION [skip ci]" || echo "No changes to commit"
-          git fetch origin dev
-          git pull --rebase --autostash origin dev
-          git push origin HEAD:dev --force-with-lease
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ========== 第 4 步：发布正式 Release（1 分钟）==========
-  # ⚠️ 只有 update_dev 步骤成功后才会执行
-  publish:
-    name: Publish Release
-    needs: [update_dev]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
+          gh release upload ${{ github.ref_name }} latest.json --repo qiu-yuxiao/clash-mini --clobber
+          echo "✅ latest.json uploaded to Draft Release"
 
       - name: Fetch UPDATE logs
         id: fetch_update_logs
@@ -397,42 +401,50 @@ jobs:
 
           Created at ${BUILDTIME}.
           EOF
+        shell: bash
 
       - name: Publish Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PRERELEASE: ${{ contains(github.ref_name, '-rc') }}
         run: |
-          matches=$(gh api repos/{owner}/{repo}/releases --paginate --jq '.[] | select(.tag_name == env.TAG_NAME) | [.id, .draft, (.assets | length), .html_url] | @tsv')
-          release_count=$(grep -c . <<< "$matches" || true)
-
-          if [ "$release_count" -eq 0 ]; then
-            echo "::error::No release found for $TAG_NAME. Check if gh API returned valid results."
-            echo "::debug::gh API response was empty or no matching tag found. Possible causes: API error, network issue, or tag deleted."
-            exit 1
-          fi
-
-          if [ "$release_count" -gt 1 ]; then
-            printf '%s\n' "$matches"
-            echo "⚠️ Multiple releases found for $TAG_NAME. Auto-cleanup: keeping latest, deleting duplicates."
-            # 按行取最新一条（id 最大 = 最新创建），其余删除
-            latest=$(echo "$matches" | sort -t$'\t' -k1 -rn | head -1)
-            echo "$matches" | while IFS=$'\t' read -r dup_id _ _ dup_url; do
-              if [ "$dup_id" != "$(echo "$latest" | cut -f1)" ]; then
-                echo "  Deleting duplicate release $dup_id ($dup_url)"
-                gh api -X DELETE "repos/{owner}/{repo}/releases/$dup_id" --silent
-              fi
-            done
-            release_count=1
-            matches="$latest"
-          fi
-
-          IFS=$'\t' read -r release_id _ asset_count release_url <<< "$matches"
-          echo "Publishing release $release_id ($release_url) with $asset_count assets."
-
-          gh api --method PATCH repos/{owner}/{repo}/releases/"$release_id" \
+          echo "Publishing release $RELEASE_ID with latest.json and binaries..."
+          gh api --method PATCH repos/{owner}/{repo}/releases/"$RELEASE_ID" \
             -f name="Clash Mini Ver.${{ env.TAG_NAME }}" \
             -F body=@release.txt \
             -F draft=false \
             -F prerelease="$PRERELEASE" \
             --silent
+
+  # ========== 第 4 步：同步 latest.json 至 updater/app-update.json（兼容旧版本平滑升级）==========
+  update_dev:
+    name: Sync app-update.json to dev
+    needs: [publish]
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Sync latest.json to updater/app-update.json
+        shell: bash
+        run: |
+          echo "Downloading published latest.json..."
+          gh release download ${{ github.ref_name }} --repo qiu-yuxiao/clash-mini --pattern "latest.json" --dir ./downloads --clobber
+          mkdir -p updater
+          cp ./downloads/latest.json updater/app-update.json
+          echo "✅ updater/app-update.json synced from published Release"
+
+      - name: Commit and push to dev branch
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add updater/app-update.json
+          git commit -m "chore: update app-update.json for v$VERSION [skip ci]" || echo "No changes to commit"
+          git fetch origin dev
+          git pull --rebase --autostash origin dev
+          git push origin HEAD:dev --force-with-lease

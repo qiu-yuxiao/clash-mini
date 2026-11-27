@@ -955,7 +955,7 @@ rules:
 
 #[tokio::test]
 async fn test_enforce_mini_agreements_strips_dangling_provider_proxy_and_merges_dialer_proxy() {
-    use super::agreements::{enforce_mini_agreements, get_merged_proxies, get_merged_proxy_providers};
+    use super::agreements::{enforce_mini_agreements, merge_profiles_proxies_and_providers};
     use crate::config::PrfItem;
     use crate::config::profiles::IProfiles;
     use crate::utils::dirs;
@@ -985,8 +985,13 @@ proxy-providers:
   sub1:
     type: http
     url: https://example.com/p1.yaml
-    path: ./p1.yaml
+    path: ./shared_provider.yaml
     proxy: 已删除原策略组
+  via_relay:
+    type: http
+    url: https://example.com/p1_relay.yaml
+    path: ./p1_relay.yaml
+    proxy: Relay-Entry
 ";
     let p2_yaml = r"
 proxies:
@@ -1000,7 +1005,7 @@ proxy-providers:
   sub1:
     type: http
     url: https://example.com/p2.yaml
-    path: ./p2.yaml
+    path: ./shared_provider.yaml
     proxy: DIRECT
 ";
     tokio::fs::write(&p1_path, p1_yaml).await.unwrap();
@@ -1027,7 +1032,8 @@ proxy-providers:
         ]),
     };
 
-    let merged_proxies = get_merged_proxies(&profiles);
+    let merged_nodes = merge_profiles_proxies_and_providers(&profiles);
+    let merged_proxies = merged_nodes.proxies;
     let landing = merged_proxies
         .iter()
         .find(|p| {
@@ -1045,16 +1051,17 @@ proxy-providers:
                     .is_some_and(|n| n.starts_with("Relay-Entry"))
         })
         .unwrap();
+    let relay_name = relay.get("name").and_then(Value::as_str).unwrap().to_string();
     assert_eq!(
         landing.get("dialer-proxy").and_then(Value::as_str),
-        relay.get("name").and_then(Value::as_str),
+        Some(relay_name.as_str()),
         "同订阅内链式代理 dialer-proxy 必须同步随节点改名映射"
     );
 
-    let merged_providers = get_merged_proxy_providers(&profiles);
+    let merged_providers = merged_nodes.proxy_providers;
     assert_eq!(
         merged_providers.len(),
-        2,
+        3,
         "跨订阅 proxy-providers 均应保留且冲突键自动后缀隔离"
     );
     assert!(merged_providers.get("sub1").is_some());
@@ -1073,20 +1080,31 @@ proxy-providers:
             .is_none(),
         "指向已删除原策略组的悬空 proxy 字段应被移除"
     );
-    let second_key = final_providers
-        .keys()
-        .filter_map(Value::as_str)
-        .find(|k| *k != "sub1")
-        .unwrap();
     assert_eq!(
         final_providers
-            .get(second_key)
+            .get("via_relay")
             .and_then(Value::as_mapping)
             .unwrap()
             .get("proxy")
             .and_then(Value::as_str),
+        Some(relay_name.as_str()),
+        "指向同订阅具体节点名的 proxy-providers.*.proxy 应同步映射并保留"
+    );
+    let second_key = final_providers
+        .keys()
+        .filter_map(Value::as_str)
+        .find(|k| *k != "sub1" && *k != "via_relay")
+        .unwrap();
+    let second_provider = final_providers.get(second_key).and_then(Value::as_mapping).unwrap();
+    assert_eq!(
+        second_provider.get("proxy").and_then(Value::as_str),
         Some("DIRECT"),
         "合法内置目标 DIRECT 应原样保留"
+    );
+    assert_eq!(
+        second_provider.get("path").and_then(Value::as_str),
+        Some(format!("./proxy_providers/{second_key}.yaml").as_str()),
+        "跨订阅重名 path 应自动隔离，避免缓存覆盖"
     );
 
     let _ = tokio::fs::remove_file(&p1_path).await;
