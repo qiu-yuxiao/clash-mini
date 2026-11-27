@@ -5,16 +5,40 @@ use serde_yaml_ng::{Mapping, Value};
 use std::collections::HashSet;
 
 /// 收敛所有远端 `proxy-providers.*.health-check` 为 `lazy: true`（BUG-399），
-/// 防止未使用的订阅提供方各自按 `interval: 60` / `lazy: false` 在后台无休止自治轮询。
-fn enforce_lazy_provider_health_checks(config: &mut Mapping) {
+/// 并清理因策略组重整而悬空的 `proxy-providers.*.proxy` 引用（BUG-425）。
+fn normalize_proxy_providers(config: &mut Mapping, valid_proxy_names: &HashSet<std::string::String>) {
     let Some(Value::Mapping(providers)) = config.get_mut("proxy-providers") else {
         return;
     };
-    for (_, provider_val) in providers.iter_mut() {
-        if let Some(provider_map) = provider_val.as_mapping_mut()
-            && let Some(Value::Mapping(hc)) = provider_map.get_mut("health-check")
-        {
+    let mut keys_to_clean = Vec::new();
+    for (k, provider_val) in providers.iter_mut() {
+        let Some(provider_map) = provider_val.as_mapping_mut() else {
+            continue;
+        };
+        if let Some(Value::Mapping(hc)) = provider_map.get_mut("health-check") {
             hc.insert(Value::from("lazy"), Value::from(true));
+        }
+        if let Some(proxy_target) = provider_map.get("proxy").and_then(Value::as_str).map(str::trim)
+            && !proxy_target.is_empty()
+            && !matches!(proxy_target, "DIRECT" | "REJECT" | "PROXY")
+            && !valid_proxy_names.contains(proxy_target)
+        {
+            keys_to_clean.push((
+                k.clone(),
+                k.as_str().unwrap_or("<unknown>").to_owned(),
+                proxy_target.to_owned(),
+            ));
+        }
+    }
+
+    for (key_val, provider_label, dangling_proxy) in keys_to_clean {
+        if let Some(provider_map) = providers.get_mut(&key_val).and_then(Value::as_mapping_mut) {
+            logging!(
+                warn,
+                Type::Config,
+                "移除 proxy-provider '{provider_label}' 中指向已裁剪策略组的悬空 proxy 字段: {dangling_proxy}"
+            );
+            provider_map.remove("proxy");
         }
     }
 }
@@ -95,9 +119,20 @@ pub(super) async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     }
     let proxy_names: Vec<Value> = topology.names.into_iter().map(Value::from).collect();
 
-    // 2. Normalize all upstream proxy-provider health checks to lazy: true (BUG-399),
+    // 2. Normalize all upstream proxy-provider health checks to lazy: true (BUG-399)
+    //    and strip dangling `proxy:` group references (BUG-425),
     //    then extract provider names from `proxy-providers` mapping
-    enforce_lazy_provider_health_checks(&mut config);
+    let valid_proxy_names: HashSet<std::string::String> = config
+        .get("proxies")
+        .and_then(Value::as_sequence)
+        .map(|seq| {
+            seq.iter()
+                .filter_map(|p| p.get("name").and_then(Value::as_str))
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default();
+    normalize_proxy_providers(&mut config, &valid_proxy_names);
     let mut provider_names = Vec::new();
     if let Some(Value::Mapping(providers)) = config.get("proxy-providers") {
         for (k, _) in providers {
@@ -293,78 +328,148 @@ pub(super) async fn enforce_mini_agreements(mut config: Mapping) -> Mapping {
     config
 }
 
+fn profile_timestamp_suffix(updated: Option<i64>) -> std::string::String {
+    use chrono::{Local, TimeZone as _};
+    let ts = updated.unwrap_or(0);
+    if let Some(dt) = Local.timestamp_opt(ts, 0).single() {
+        dt.format("%H%M%S").to_string()
+    } else {
+        "000000".to_string()
+    }
+}
+
 #[allow(clippy::collapsible_if, clippy::needless_borrows_for_generic_args)]
 pub(super) fn get_merged_proxies(profiles: &crate::config::profiles::IProfiles) -> Vec<Value> {
-    use chrono::{Local, TimeZone as _};
-    let mut all_proxies = Vec::new();
     let mut raw_proxies = Vec::new();
 
     if let Some(items) = profiles.get_items() {
-        for item in items {
-            // Only process remote and local types
-            if let Some(itype) = &item.itype {
-                if itype == "remote" || itype == "local" {
-                    // Read file
-                    if let Some(file) = &item.file {
-                        if let Ok(file_path) = dirs::app_profiles_dir().map(|d| d.join(file.as_str())) {
-                            if let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path) {
-                                if let Some(Value::Sequence(proxies)) = mapping.remove("proxies") {
-                                    // Generate suffix from item.updated timestamp
-                                    let ts = item.updated.unwrap_or(0);
-                                    let suffix = if let Some(dt) = Local.timestamp_opt(ts, 0).single() {
-                                        dt.format("%H%M%S").to_string()
-                                    } else {
-                                        "000000".to_string()
-                                    };
-
-                                    for proxy in proxies {
-                                        let original_name = if let Some(map) = proxy.as_mapping() {
-                                            map.get(&Value::from("name"))
-                                                .and_then(Value::as_str)
-                                                .unwrap_or("Proxy")
-                                                .to_string()
-                                        } else {
-                                            "Proxy".to_string()
-                                        };
-                                        raw_proxies.push((proxy, original_name, suffix.clone()));
-                                    }
-                                }
-                            }
-                        }
-                    }
+        for (item_idx, item) in items.iter().enumerate() {
+            if let Some(itype) = &item.itype
+                && (itype == "remote" || itype == "local")
+                && let Some(file) = &item.file
+                && let Ok(file_path) = dirs::app_profiles_dir().map(|d| d.join(file.as_str()))
+                && let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path)
+                && let Some(Value::Sequence(proxies)) = mapping.remove("proxies")
+            {
+                let suffix = profile_timestamp_suffix(item.updated);
+                for proxy in proxies {
+                    let original_name = proxy
+                        .as_mapping()
+                        .and_then(|map| map.get(&Value::from("name")).and_then(Value::as_str))
+                        .unwrap_or("Proxy")
+                        .to_string();
+                    raw_proxies.push((proxy, item_idx, original_name, suffix.clone()));
                 }
             }
         }
     }
 
-    // Identify duplicate (name, suffix) keys
     let mut name_suffix_counts = std::collections::HashMap::new();
-    for (_, name, suffix) in &raw_proxies {
-        let key = (name.clone(), suffix.clone());
-        *name_suffix_counts.entry(key).or_insert(0) += 1;
+    let mut global_name_counts = std::collections::HashMap::new();
+    for (_, _, name, suffix) in &raw_proxies {
+        *name_suffix_counts
+            .entry((name.clone(), suffix.clone()))
+            .or_insert(0usize) += 1;
+        *global_name_counts.entry(name.clone()).or_insert(0usize) += 1;
     }
 
-    // Format names and collect proxies
     let mut name_suffix_counters = std::collections::HashMap::new();
-    for (mut proxy, name, suffix) in raw_proxies {
+    let mut per_item_name_map = std::collections::HashMap::new();
+    let mut global_name_map = std::collections::HashMap::new();
+    let mut renamed_entries = Vec::with_capacity(raw_proxies.len());
+
+    for (proxy, item_idx, name, suffix) in raw_proxies {
         let key = (name.clone(), suffix.clone());
         let count = name_suffix_counts.get(&key).copied().unwrap_or(0);
-
         let new_name = if count > 1 {
-            let idx = name_suffix_counters.entry(key).or_insert(0);
+            let idx = name_suffix_counters.entry(key).or_insert(0usize);
             *idx += 1;
-            format!("{} #{} ({})", name, idx, suffix)
+            format!("{name} #{idx} ({suffix})")
         } else {
-            format!("{} ({})", name, suffix)
+            format!("{name} ({suffix})")
         };
+        per_item_name_map
+            .entry((item_idx, name.clone()))
+            .or_insert_with(|| new_name.clone());
+        if global_name_counts.get(&name).copied().unwrap_or(0) == 1 {
+            global_name_map.insert(name, new_name.clone());
+        }
+        renamed_entries.push((proxy, item_idx, new_name));
+    }
 
+    let mut all_proxies = Vec::with_capacity(renamed_entries.len());
+    for (mut proxy, item_idx, new_name) in renamed_entries {
         if let Some(map) = proxy.as_mapping_mut() {
             map.insert(Value::from("name"), Value::from(new_name));
+            if let Some(dp) = map
+                .get("dialer-proxy")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                && !matches!(dp, "DIRECT" | "REJECT" | "PROXY")
+                && let Some(renamed_dp) = per_item_name_map
+                    .get(&(item_idx, dp.to_string()))
+                    .or_else(|| global_name_map.get(dp))
+            {
+                map.insert(Value::from("dialer-proxy"), Value::from(renamed_dp.as_str()));
+            }
         }
         all_proxies.push(proxy);
     }
 
     all_proxies
+}
+
+/// 跨订阅聚合全部 `remote` / `local` 配置中的 `proxy-providers`（当前激活配置键名原样优先保留，跨订阅同名冲突追加时间戳后缀）。
+pub(super) fn get_merged_proxy_providers(profiles: &crate::config::profiles::IProfiles) -> Mapping {
+    let mut merged = Mapping::new();
+    let Some(items) = profiles.get_items() else {
+        return merged;
+    };
+    let current_uid = profiles.get_current();
+
+    let ordered_items = items
+        .iter()
+        .filter(|item| item.uid.as_ref() == current_uid)
+        .chain(items.iter().filter(|item| item.uid.as_ref() != current_uid));
+
+    for item in ordered_items {
+        let Some(itype) = &item.itype else {
+            continue;
+        };
+        if itype != "remote" && itype != "local" {
+            continue;
+        }
+        let Some(file) = &item.file else {
+            continue;
+        };
+        let Ok(file_path) = dirs::app_profiles_dir().map(|d| d.join(file.as_str())) else {
+            continue;
+        };
+        let Ok(mut mapping) = crate::utils::help::read_mapping(&file_path) else {
+            continue;
+        };
+        let Some(Value::Mapping(providers)) = mapping.remove("proxy-providers") else {
+            continue;
+        };
+
+        let suffix = profile_timestamp_suffix(item.updated);
+        for (k, v) in providers {
+            if !merged.contains_key(&k) {
+                merged.insert(k, v);
+            } else if let Some(base) = k.as_str() {
+                let mut candidate = format!("{base}_{suffix}");
+                let mut idx = 2usize;
+                while merged.contains_key(Value::from(candidate.as_str())) {
+                    candidate = format!("{base}_{suffix}_{idx}");
+                    idx += 1;
+                }
+                merged.insert(Value::from(candidate), v);
+            }
+        }
+    }
+
+    merged
 }
 
 /// 读取当前激活 Profile 的持久化 PROXY 选点与过滤词（`proxy_head_state.json`）。

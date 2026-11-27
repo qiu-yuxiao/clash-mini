@@ -162,6 +162,66 @@ pub(super) fn normalize_custom_user_agent(ua: Option<&str>) -> Option<String> {
     ua.map(str::trim).filter(|s| !s.is_empty()).map(Into::into)
 }
 
+fn proxy_port_num(p: &serde_yaml_ng::Value) -> u64 {
+    p.get("port")
+        .and_then(|v| match v {
+            serde_yaml_ng::Value::Number(n) => n.as_u64(),
+            _ => None,
+        })
+        .unwrap_or(0)
+}
+
+fn merge_direct_import_mapping(existing: &mut Mapping, mut incoming: Mapping) {
+    if let Some(serde_yaml_ng::Value::Sequence(new_seq)) = incoming.remove("proxies") {
+        let existing_seq = match existing.get_mut("proxies") {
+            Some(serde_yaml_ng::Value::Sequence(seq)) => seq,
+            _ => {
+                existing.insert(
+                    serde_yaml_ng::Value::from("proxies"),
+                    serde_yaml_ng::Value::Sequence(Vec::new()),
+                );
+                match existing.get_mut("proxies") {
+                    Some(serde_yaml_ng::Value::Sequence(seq)) => seq,
+                    _ => return,
+                }
+            }
+        };
+        for new_p in new_seq {
+            let new_name = new_p.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let new_server = new_p.get("server").and_then(|v| v.as_str()).unwrap_or("");
+            let new_port = proxy_port_num(&new_p);
+            let existing_pos = existing_seq.iter().position(|p| {
+                p.get("name").and_then(|v| v.as_str()).unwrap_or("") == new_name
+                    && p.get("server").and_then(|v| v.as_str()).unwrap_or("") == new_server
+                    && proxy_port_num(p) == new_port
+            });
+            if let Some(pos) = existing_pos {
+                existing_seq[pos] = new_p;
+            } else {
+                existing_seq.push(new_p);
+            }
+        }
+    }
+
+    if let Some(serde_yaml_ng::Value::Mapping(new_providers)) = incoming.remove("proxy-providers")
+        && !new_providers.is_empty()
+    {
+        match existing.get_mut("proxy-providers") {
+            Some(serde_yaml_ng::Value::Mapping(existing_providers)) => {
+                for (k, v) in new_providers {
+                    existing_providers.insert(k, v);
+                }
+            }
+            _ => {
+                existing.insert(
+                    serde_yaml_ng::Value::from("proxy-providers"),
+                    serde_yaml_ng::Value::Mapping(new_providers),
+                );
+            }
+        }
+    }
+}
+
 pub(super) const MAX_YAML_SIZE: usize = 50 * 1024 * 1024; // 50MB YAML 解析上限
 
 /// 合并后的增强项 ID 集合
@@ -339,69 +399,40 @@ impl PrfItem {
             });
         }
 
-        let parsed = match crate::utils::resolve::universal_parser::parse_uri_list(url) {
-            Some(p) => p,
-            None => bail!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"),
-        };
+        if url_trimmed.len() > MAX_YAML_SIZE {
+            bail!("subscription content exceeds maximum allowed size (50MB)");
+        }
+
+        let (parsed, _) = crate::utils::resolve::universal_parser::parse_subscription_payload(url)
+            .map_err(|_| anyhow::anyhow!("无法解析直接输入的节点配置，解析结果为空。请检查输入格式。"))?;
 
         final_mapping = parsed;
 
-        if path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content) {
-                    if let Some(existing_proxies_val) = existing_mapping.get_mut("proxies") {
-                        if let Some(existing_seq) = existing_proxies_val.as_sequence_mut() {
-                            if let Some(new_proxies_val) = final_mapping.get("proxies") {
-                                if let Some(new_seq) = new_proxies_val.as_sequence() {
-                                    for new_p in new_seq {
-                                        let new_name = new_p.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                                        let new_server = new_p.get("server").and_then(|v| v.as_str()).unwrap_or("");
-                                        let new_port = new_p
-                                            .get("port")
-                                            .and_then(|v| match v {
-                                                serde_yaml_ng::Value::Number(n) => n.as_u64(),
-                                                _ => None,
-                                            })
-                                            .unwrap_or(0);
-
-                                        let existing_pos = existing_seq.iter().position(|p| {
-                                            let p_name = p.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                                            let p_server = p.get("server").and_then(|v| v.as_str()).unwrap_or("");
-                                            let p_port = p
-                                                .get("port")
-                                                .and_then(|v| match v {
-                                                    serde_yaml_ng::Value::Number(n) => n.as_u64(),
-                                                    _ => None,
-                                                })
-                                                .unwrap_or(0);
-                                            p_name == new_name && p_server == new_server && p_port == new_port
-                                        });
-
-                                        if let Some(pos) = existing_pos {
-                                            existing_seq[pos] = new_p.clone();
-                                        } else {
-                                            existing_seq.push(new_p.clone());
-                                        }
-                                    }
-                                    final_mapping = existing_mapping;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        if path.exists()
+            && let Ok(content) = std::fs::read_to_string(&path)
+            && let Ok(mut existing_mapping) = serde_yaml_ng::from_str::<Mapping>(&content)
+        {
+            merge_direct_import_mapping(&mut existing_mapping, final_mapping);
+            final_mapping = existing_mapping;
         }
 
         let serialized =
             serde_yaml_ng::to_string(&final_mapping).map_err(|e| anyhow::anyhow!("序列化节点配置失败: {}", e))?;
 
         let name_str = name.cloned().unwrap_or_else(|| "本地导入节点".into());
-        let count = final_mapping
+        let proxy_count = final_mapping
             .get("proxies")
             .and_then(|v| v.as_sequence())
-            .map(|s| s.len())
-            .unwrap_or(0);
-        let desc_str = count.to_string();
+            .map_or(0, Vec::len);
+        let provider_count = final_mapping
+            .get("proxy-providers")
+            .and_then(|v| v.as_mapping())
+            .map_or(0, serde_yaml_ng::Mapping::len);
+        let desc_str = if proxy_count > 0 {
+            proxy_count.to_string()
+        } else {
+            provider_count.to_string()
+        };
 
         Ok(Self {
             uid: Some(uid_str.into()),

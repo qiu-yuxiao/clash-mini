@@ -219,7 +219,7 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 - **触发判定**：由 [profile-items.ts](src/utils/profile-items.ts) `hasRealProfileItem` 判定（严禁用 `items.length === 0`，因内置 `Merge` 项恒存在）；当 `localStorage.getItem('clash-mini-first-run-completed') !== 'true'` 且不存在真实 `remote`/`local` 配置时，延迟 `500ms` 居中（`271px` 全宽）弹出 `FirstRunGuideDialog`。
 - **两步向导**：
-  - **Step 1 / 2**：支持剪贴板静默嗅探、`http(s)://` 及 11 种单节点 URI 协议校验（`isSupportedSubscriptionOrNodeInput` / `SUPPORTED_NODE_URI_SCHEMES`）；`Dialog Paper` 与 `window` 级监听 `Enter` 导入（排除 IME 组词及按钮焦点）；`submitting` 期间禁用遮罩点击与 `Esc`。
+  - **Step 1 / 2**：支持剪贴板静默嗅探、`http(s)://`、`clash://`/`clash-mini://`/`clash-verge://` 深链、14 种单节点 URI（含 `hy2://`/`ssr://`/`wg://`）、Clash YAML、sing-box JSON、SIP008 JSON 及上述格式 Base64 密文校验（`isSupportedSubscriptionOrNodeInput` / `SUPPORTED_NODE_URI_SCHEMES` / `extractDeepLinkSubscriptionUrl`）；`Dialog Paper` 与 `window` 级监听 `Enter` 导入（排除 IME 组词及按钮焦点）；`submitting` 期间禁用遮罩点击与 `Esc`。
   - **Step 2 / 2**：仅当活跃节点持有有效实测延迟（`0 < delay < NODE_DELAY_MAX_MS`）时显示「代理已就绪」（未测出时每 `1.5s` 刷新，超 `20s` 给出「🔄 重新测速并优选节点」按钮，严禁宣称 TUN 全就绪或伪造畅通）；仅首次真正向导导入成功且系统代理/TUN 均关闭时自动启用系统代理；底部展示金色 GitHub Star（`CLASH_MINI_GITHUB_URL`）与 Wiki 转化卡。「稍后手动配置」自动展开左侧抽屉。
 - **常驻帮助菜单与纯文本防误杀指南**：顶部 `?` 帮助菜单（`HelpMenuButton`）在常规窗高与窄高（包括 `max-height: 830px`）均常驻可见，置顶加粗 `⭐ 去 GitHub 点亮 Star` 并提供 `🛡️ 轻量模式防误杀指南` 入口；点击后直接调用后端 `open_antivirus_guide` 使用系统默认文本查看器打开随包释放于安装/便携根目录及 `resources/` 的 **`轻量模式防误杀指南.txt`**（与 [docs/antivirus-whitelist.md](docs/antivirus-whitelist.md) 同源），不另弹 React 二级弹窗，完整说明 360 两套独立机制（`DoOptmGroupResidual` → `netmon\whiteinternal.ini`；`FastOptm`/`DoOptm` → `netmon\useroptm2.ini` 与 `netmon\useroptm_game2.ini` 中的 `check=0`）及「静默启动」减轻方案。所有文案全量覆盖 13 语种 i18n。
 
@@ -383,11 +383,11 @@ Clash Mini 是一款聚焦轻量、低内存、高连续性与 3D 拟物美学�
 
 ### 7.1 单一 PROXY 组模型架构
 
-`enhance/`（按职责拆分为 `mod.rs` 主编排、`agreements.rs` 单组拓扑收敛、`dns.rs` 上游卫生与规则生成、`tun.rs`、`seq.rs`、`field.rs`、`merge.rs`、`chain.rs`、`tests.rs`）阶段将订阅所有可用真实节点平铺汇聚至唯一选择器组 **`PROXY`** 及同构隐藏测量组 **`PROXY__METRICS`**，彻底剔除多层嵌套策略组，前端展示、排序、过滤与激活 100% 绑定该唯一控制组；运行时配置通过 `sync_runtime_proxy_group_head` 将合规目标置为 `PROXY.proxies[0]` 并关闭 `store-selected`，确保任何冷启/重启瞬间零越界落点。
+`enhance/`（按职责拆分为 `mod.rs` 主编排、`agreements.rs` 单组拓扑收敛、`dns.rs` 上游卫生与规则生成、`tun.rs`、`seq.rs`、`field.rs`、`merge.rs`、`chain.rs`、`tests.rs`）阶段通过 `get_merged_proxies`（同步按同订阅内 `per_item_name_map` 与全局唯一映射改写链式代理 `dialer-proxy`）及 `get_merged_proxy_providers`（跨订阅聚合 `proxy-providers` 并在跨订阅键名冲突时追加时间戳后缀隔离）汇聚所有可用真实节点与提供方至唯一选择器组 **`PROXY`** 及同构隐藏测量组 **`PROXY__METRICS`**，通过 `normalize_proxy_providers` 统一置 `health-check.lazy = true` 并清理指向已裁剪原策略组的悬空 `proxy:` 引用，彻底剔除多层嵌套策略组；前端展示、排序、过滤与激活 100% 绑定该唯一控制组；运行时配置通过 `sync_runtime_proxy_group_head` 将合规目标置为 `PROXY.proxies[0]` 并关闭 `store-selected`，确保任何冷启/重启瞬间零越界落点。
 
 ### 7.2 通用协议解析器（Universal Parser）规范
 
-原生覆盖 `hysteria`、`hysteria2`、`anytls`、`vless`、`trojan`、`tuic`、`wireguard`、`socks5`、`http` 等协议族；共享预处理 `strip_fragment_and_query` 严格遵守 **`#fragment` → `?query` → 末位 `@` 拆解 `userinfo@host:port`** 顺序（防密码或参数含 `@` 截断主机），完整支持 IPv6 字面量、WireGuard CIDR 清洗及 VMess `sni -> servername` 映射。
+`universal_parser/`（拆分为 `mod.rs`、`uri_classic.rs`、`uri_modern.rs`、`containers.rs`、`tests.rs`）与远程/直连导入共用统一入口 `parse_subscription_payload`（远程下载与主输入框直接粘贴同等支持 Clash YAML、sing-box JSON `outbounds`、SIP008 JSON `servers`、Base64 封装及多行 URI 列表，且 `PrfItem::from_url` 支持 `clash://`/`clash-mini://`/`clash-verge://` 深链自动拆包）：原生以大小写无关前缀覆盖 14 种 URI scheme（`vmess://` 含 V2RayN Base64-JSON 与 Shadowrocket/AEAD URI、`ss://` 含 SIP002 `plugin=` 标准化与 `uot`、`ssr://`、`trojan://` 含 `ws`/`grpc`/`httpupgrade`/`reality`/`alpn`/`fp`、`vless://` 含 `serviceName`/`xhttp`/`httpupgrade`/`h2`/`allowInsecure`/`encryption`、`hysteria2://`/`hy2://` 含 `mport`/`hop-interval`/`pinSHA256`/`alpn`/`up`/`down`、`hysteria://`、`anytls://`、`tuic://`、`wireguard://`/`wg://` 双栈 `0.0.0.0/0`+`::/0` `allowed-ips`、`socks5://`/`socks://` 含 Base64 userinfo 与 TLS、以及 `# [HTTP]` 回退）；共享预处理 `strip_fragment_and_query` 严格遵守 **`#fragment` → `?query` → 末位 `@` 拆解 `userinfo@host:port`** 顺序（防密码或参数含 `@` 截断主机），完整支持 IPv6 字面量、WireGuard CIDR 清洗及 VMess `sni -> servername` 映射。
 
 ### 7.3 订阅导入等待、失败传播与 Provider 刷新协同
 

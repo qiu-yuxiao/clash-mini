@@ -18,6 +18,12 @@ pub fn is_supported_scheme_url(arg: &str) -> bool {
     lower.starts_with("clash:") || lower.starts_with("clash-mini:") || lower.starts_with("clash-verge:")
 }
 
+/// 从粘贴的 `clash://` / `clash-mini://` / `clash-verge://` 深链中拆解内嵌订阅地址与可选配置名。
+pub(crate) fn parse_scheme_subscription_url(raw: &str) -> Option<(std::string::String, Option<String>)> {
+    let link_parsed = Url::parse(raw.trim()).ok()?;
+    extract_subscription_info(&link_parsed)
+}
+
 pub fn collect_startup_deep_links<I, S, P, Q>(env_args: I, plugin_urls: P) -> Vec<std::string::String>
 where
     I: IntoIterator<Item = S>,

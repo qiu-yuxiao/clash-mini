@@ -952,3 +952,143 @@ rules:
         );
     }
 }
+
+#[tokio::test]
+async fn test_enforce_mini_agreements_strips_dangling_provider_proxy_and_merges_dialer_proxy() {
+    use super::agreements::{enforce_mini_agreements, get_merged_proxies, get_merged_proxy_providers};
+    use crate::config::PrfItem;
+    use crate::config::profiles::IProfiles;
+    use crate::utils::dirs;
+    use serde_yaml_ng::{Mapping, Value};
+
+    let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
+    let profiles_dir = dirs::app_profiles_dir().unwrap();
+    tokio::fs::create_dir_all(&profiles_dir).await.unwrap();
+
+    let f1 = "test_bug425_p1.yaml";
+    let f2 = "test_bug425_p2.yaml";
+    let p1_path = profiles_dir.join(f1);
+    let p2_path = profiles_dir.join(f2);
+    let p1_yaml = r"
+proxies:
+  - name: Relay-Entry
+    type: vless
+    server: relay.example.com
+    port: 443
+    uuid: 11111111-1111-1111-1111-111111111111
+  - name: Landing-Exit
+    type: socks5
+    server: 198.51.100.2
+    port: 1080
+    dialer-proxy: Relay-Entry
+proxy-providers:
+  sub1:
+    type: http
+    url: https://example.com/p1.yaml
+    path: ./p1.yaml
+    proxy: 已删除原策略组
+";
+    let p2_yaml = r"
+proxies:
+  - name: Relay-Entry
+    type: ss
+    server: ss2.example.com
+    port: 8388
+    cipher: aes-256-gcm
+    password: pw
+proxy-providers:
+  sub1:
+    type: http
+    url: https://example.com/p2.yaml
+    path: ./p2.yaml
+    proxy: DIRECT
+";
+    tokio::fs::write(&p1_path, p1_yaml).await.unwrap();
+    tokio::fs::write(&p2_path, p2_yaml).await.unwrap();
+
+    let profiles = IProfiles {
+        config_version: None,
+        current: Some("uid_p1".into()),
+        items: Some(vec![
+            PrfItem {
+                uid: Some("uid_p1".into()),
+                itype: Some("remote".into()),
+                file: Some(f1.into()),
+                updated: Some(1_700_000_001),
+                ..Default::default()
+            },
+            PrfItem {
+                uid: Some("uid_p2".into()),
+                itype: Some("remote".into()),
+                file: Some(f2.into()),
+                updated: Some(1_700_000_002),
+                ..Default::default()
+            },
+        ]),
+    };
+
+    let merged_proxies = get_merged_proxies(&profiles);
+    let landing = merged_proxies
+        .iter()
+        .find(|p| {
+            p.get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|n| n.starts_with("Landing-Exit"))
+        })
+        .unwrap();
+    let relay = merged_proxies
+        .iter()
+        .find(|p| {
+            p.get("type").and_then(Value::as_str) == Some("vless")
+                && p.get("name")
+                    .and_then(Value::as_str)
+                    .is_some_and(|n| n.starts_with("Relay-Entry"))
+        })
+        .unwrap();
+    assert_eq!(
+        landing.get("dialer-proxy").and_then(Value::as_str),
+        relay.get("name").and_then(Value::as_str),
+        "同订阅内链式代理 dialer-proxy 必须同步随节点改名映射"
+    );
+
+    let merged_providers = get_merged_proxy_providers(&profiles);
+    assert_eq!(
+        merged_providers.len(),
+        2,
+        "跨订阅 proxy-providers 均应保留且冲突键自动后缀隔离"
+    );
+    assert!(merged_providers.get("sub1").is_some());
+
+    let mut cfg = Mapping::new();
+    cfg.insert(Value::from("proxies"), Value::from(merged_proxies));
+    cfg.insert(Value::from("proxy-providers"), Value::from(merged_providers));
+    let final_cfg = enforce_mini_agreements(cfg).await;
+    let final_providers = final_cfg.get("proxy-providers").and_then(Value::as_mapping).unwrap();
+    assert!(
+        final_providers
+            .get("sub1")
+            .and_then(Value::as_mapping)
+            .unwrap()
+            .get("proxy")
+            .is_none(),
+        "指向已删除原策略组的悬空 proxy 字段应被移除"
+    );
+    let second_key = final_providers
+        .keys()
+        .filter_map(Value::as_str)
+        .find(|k| *k != "sub1")
+        .unwrap();
+    assert_eq!(
+        final_providers
+            .get(second_key)
+            .and_then(Value::as_mapping)
+            .unwrap()
+            .get("proxy")
+            .and_then(Value::as_str),
+        Some("DIRECT"),
+        "合法内置目标 DIRECT 应原样保留"
+    );
+
+    let _ = tokio::fs::remove_file(&p1_path).await;
+    let _ = tokio::fs::remove_file(&p2_path).await;
+}

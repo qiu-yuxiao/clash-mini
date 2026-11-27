@@ -536,21 +536,210 @@ export const isIncompleteFilterInput = (filterText: string): boolean => {
 export const SUPPORTED_NODE_URI_SCHEMES = [
   'vmess://',
   'ss://',
+  'ssr://',
   'trojan://',
   'vless://',
   'hysteria2://',
+  'hy2://',
   'hysteria://',
   'anytls://',
   'tuic://',
   'wireguard://',
+  'wg://',
   'socks5://',
   'socks://',
 ] as const
 
-/** 判断首次引导输入框 / 剪贴板文本是否为合法的单条订阅 URL 或单/多行节点 URI（BUG-389） */
-export const isSupportedSubscriptionOrNodeInput = (raw: string): boolean => {
-  const lines = raw
+const DEEP_LINK_SCHEME_RE = /^(?:clash|clash-mini|clash-verge):\/\//i
+
+/**
+ * 从 `clash://` / `clash-mini://` / `clash-verge://` 深链中提取内嵌 `http(s)://` 订阅 URL。
+ * 逻辑与后端 `resolve/scheme.rs` 对齐，同时兼容已编码和未编码嵌套 query 参数。
+ */
+export const extractDeepLinkSubscriptionUrl = (raw: string): string | null => {
+  const trimmed = raw.trim()
+  if (!trimmed || /\s/.test(trimmed) || !DEEP_LINK_SCHEME_RE.test(trimmed)) {
+    return null
+  }
+  const qIndex = trimmed.indexOf('?')
+  if (qIndex < 0) return null
+  const query = trimmed.slice(qIndex + 1)
+
+  let afterUrl: string | null = null
+  if (query.startsWith('url=')) {
+    afterUrl = query.slice(4)
+  } else {
+    const idx = query.indexOf('&url=')
+    if (idx >= 0) {
+      afterUrl = query.slice(idx + 5)
+    }
+  }
+  if (!afterUrl) return null
+
+  const firstAmp = afterUrl.indexOf('&')
+  const firstPart = firstAmp >= 0 ? afterUrl.slice(0, firstAmp) : afterUrl
+  const isUnencodedNestedQuery =
+    /^https?:\/\//i.test(afterUrl) && firstPart.includes('?')
+
+  let candidate: string
+  if (!isUnencodedNestedQuery) {
+    try {
+      const parsed = new URL(trimmed)
+      const val = parsed.searchParams.get('url')?.trim() ?? ''
+      candidate = val
+    } catch {
+      candidate = firstPart
+    }
+  } else {
+    let rawUrl = afterUrl
+    for (const marker of ['&name=', '&silent=']) {
+      const idx = rawUrl.indexOf(marker)
+      if (idx >= 0) {
+        rawUrl = rawUrl.slice(0, idx)
+      }
+    }
+    candidate = rawUrl.trim()
+  }
+
+  for (let i = 0; i < 2; i += 1) {
+    if (/^https?:\/\//i.test(candidate)) break
+    try {
+      const decoded = decodeURIComponent(candidate)
+      if (decoded === candidate) break
+      candidate = decoded
+    } catch {
+      break
+    }
+  }
+
+  const finalUrl = candidate.trim()
+  if (!/^https?:\/\//i.test(finalUrl) || /\s/.test(finalUrl)) {
+    return null
+  }
+  return finalUrl
+}
+
+const decodeBase64Utf8 = (raw: string): string | null => {
+  const cleaned = raw.replace(/\s+/g, '')
+  if (!cleaned || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(cleaned)) {
+    return null
+  }
+  let std = cleaned.replace(/-/g, '+').replace(/_/g, '/')
+  while (std.length % 4 !== 0) {
+    std += '='
+  }
+  try {
+    const bin = atob(std)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i += 1) {
+      bytes[i] = bin.charCodeAt(i)
+    }
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return null
+  }
+}
+
+const isClashYamlPayload = (text: string): boolean => {
+  return (
+    /(?:^|\n)\s*(?:proxies|proxy-providers)\s*:/m.test(text) &&
+    text.includes('\n')
+  )
+}
+
+const isStructuredJsonSubscription = (text: string): boolean => {
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{')) return false
+  try {
+    const obj = JSON.parse(trimmed) as {
+      outbounds?: unknown
+      servers?: unknown
+    }
+    if (
+      Array.isArray(obj.outbounds) &&
+      obj.outbounds.some(
+        (item) =>
+          typeof item === 'object' &&
+          item !== null &&
+          typeof (item as { type?: unknown }).type === 'string',
+      )
+    ) {
+      return true
+    }
+    if (
+      Array.isArray(obj.servers) &&
+      obj.servers.some(
+        (item) =>
+          typeof item === 'object' &&
+          item !== null &&
+          typeof (item as { server?: unknown }).server === 'string',
+      )
+    ) {
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+const isUriListPayload = (text: string): boolean => {
+  const lines = text
     .trim()
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) return false
+
+  let hasProxyLine = false
+  for (const line of lines) {
+    if (/^#?\s*\[HTTP\]\s+\S.*\(.+:\d+\)$/i.test(line)) {
+      hasProxyLine = true
+      continue
+    }
+    if (line.startsWith('#') || line.startsWith('//')) {
+      continue
+    }
+    const lower = line.toLowerCase()
+    if (SUPPORTED_NODE_URI_SCHEMES.some((scheme) => lower.startsWith(scheme))) {
+      hasProxyLine = true
+      continue
+    }
+    return false
+  }
+  return hasProxyLine
+}
+
+const isSupportedDecodedBody = (
+  text: string,
+  allowBase64: boolean,
+): boolean => {
+  const clean = text.replace(/^\uFEFF/, '').trim()
+  if (!clean) return false
+  if (
+    isClashYamlPayload(clean) ||
+    isStructuredJsonSubscription(clean) ||
+    isUriListPayload(clean)
+  ) {
+    return true
+  }
+  if (!allowBase64) return false
+  const decoded = decodeBase64Utf8(clean)
+  if (!decoded) return false
+  return isSupportedDecodedBody(decoded, false)
+}
+
+/**
+ * 判断首次引导输入框 / 剪贴板文本是否为合法订阅入口或节点载荷：
+ * - 单条 `http(s)://` 订阅链接或 `clash://`/`clash-mini://`/`clash-verge://` 深链
+ * - 单/多行节点分享链接（14 种协议，含可选注释）
+ * - Clash YAML、sing-box JSON、SIP008 JSON 及上述格式的 Base64 编码订阅内容
+ */
+export const isSupportedSubscriptionOrNodeInput = (raw: string): boolean => {
+  const trimmed = raw.trim()
+  if (!trimmed) return false
+
+  const lines = trimmed
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
@@ -561,10 +750,11 @@ export const isSupportedSubscriptionOrNodeInput = (raw: string): boolean => {
     return lines.length === 1 && !/\s/.test(lines[0])
   }
 
-  return lines.every((line) => {
-    const lower = line.toLowerCase()
-    return SUPPORTED_NODE_URI_SCHEMES.some((scheme) => lower.startsWith(scheme))
-  })
+  if (lines.length === 1 && DEEP_LINK_SCHEME_RE.test(lines[0])) {
+    return extractDeepLinkSubscriptionUrl(lines[0]) !== null
+  }
+
+  return isSupportedDecodedBody(trimmed, true)
 }
 
 export type BatchCheckTrigger = 'bolt' | 'f4' | 'filter' | 'f1'

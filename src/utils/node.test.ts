@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  extractDeepLinkSubscriptionUrl,
   hasEffectiveFilterTerm,
   hasRegionHint,
   isDummyNode,
   isIncompleteFilterInput,
+  isSupportedSubscriptionOrNodeInput,
   matchNodeFilter,
   resolveBatchCheckIntent,
 } from './node'
@@ -222,5 +224,106 @@ describe('BUG-397: resolveBatchCheckIntent 批量测速入口意图边界', () =
       select: true,
       cleanStale: true,
     })
+  })
+})
+
+describe('BUG-425: extractDeepLinkSubscriptionUrl 与 isSupportedSubscriptionOrNodeInput 全格式门控', () => {
+  it('提取 clash:// / clash-mini:// / clash-verge:// 深链内嵌订阅地址（兼容编码与未编码嵌套参数）', () => {
+    expect(
+      extractDeepLinkSubscriptionUrl(
+        'clash://install-config?url=https%3A%2F%2Fexample.com%2Fsub%3Ftoken%3D1%26flag%3Dmeta&name=MySub',
+      ),
+    ).toBe('https://example.com/sub?token=1&flag=meta')
+
+    expect(
+      extractDeepLinkSubscriptionUrl(
+        'Clash-Mini://install-config?url=https://example.com/sub?token=abc&flag=clash&name=Plain',
+      ),
+    ).toBe('https://example.com/sub?token=abc&flag=clash')
+
+    expect(
+      extractDeepLinkSubscriptionUrl(
+        'clash-verge://install-config?url=https://a.com/s&silent=1',
+      ),
+    ).toBe('https://a.com/s')
+
+    expect(extractDeepLinkSubscriptionUrl('https://example.com/sub')).toBeNull()
+    expect(
+      extractDeepLinkSubscriptionUrl('clash://install-config?name=no-url'),
+    ).toBeNull()
+    expect(
+      extractDeepLinkSubscriptionUrl(
+        'clash://install-config?url=ftp://bad.com',
+      ),
+    ).toBeNull()
+  })
+
+  it('兼容 14 种 URI（含 hy2:// / ssr:// / wg:// 与注释）、深链、Clash YAML、sing-box JSON、SIP008 JSON 及 Base64 密文', () => {
+    expect(
+      isSupportedSubscriptionOrNodeInput(
+        'clash://install-config?url=https%3A%2F%2Fexample.com%2Fsub',
+      ),
+    ).toBe(true)
+
+    expect(
+      isSupportedSubscriptionOrNodeInput(
+        '# comment\nhy2://pass@1.2.3.4:443?mport=20000-30000#HY2\nssr://c2VydmVy\nwg://key@1.2.3.4:51820',
+      ),
+    ).toBe(true)
+
+    expect(
+      isSupportedSubscriptionOrNodeInput(
+        'proxies:\n  - name: n1\n    type: ss\n    server: 1.2.3.4\n    port: 8388',
+      ),
+    ).toBe(true)
+
+    expect(
+      isSupportedSubscriptionOrNodeInput(
+        JSON.stringify({
+          outbounds: [
+            { type: 'vless', tag: 'n1', server: '1.2.3.4', server_port: 443 },
+          ],
+        }),
+      ),
+    ).toBe(true)
+
+    expect(
+      isSupportedSubscriptionOrNodeInput(
+        JSON.stringify({
+          version: 1,
+          servers: [
+            {
+              server: '1.2.3.4',
+              server_port: 8388,
+              method: 'aes-256-gcm',
+              password: 'pw',
+            },
+          ],
+        }),
+      ),
+    ).toBe(true)
+
+    const b64Uris = btoa('hy2://pw@1.2.3.4:443#A\nvless://uuid@1.2.3.4:443#B')
+    expect(isSupportedSubscriptionOrNodeInput(b64Uris)).toBe(true)
+
+    const b64Yaml = btoa(
+      'proxies:\n  - name: y1\n    type: ss\n    server: 1.2.3.4\n    port: 8388',
+    )
+    expect(isSupportedSubscriptionOrNodeInput(b64Yaml)).toBe(true)
+
+    // 负向校验：防普通文本、随机 Base64 或无关 JSON 误命中剪贴板嗅探
+    expect(isSupportedSubscriptionOrNodeInput('hello world')).toBe(false)
+    expect(
+      isSupportedSubscriptionOrNodeInput(btoa('hello world plain text')),
+    ).toBe(false)
+    expect(isSupportedSubscriptionOrNodeInput('{"hello":"world"}')).toBe(false)
+    expect(
+      isSupportedSubscriptionOrNodeInput('# only comment\n// another comment'),
+    ).toBe(false)
+    expect(
+      isSupportedSubscriptionOrNodeInput(
+        'clash://install-config?url=ftp://evil.com',
+      ),
+    ).toBe(false)
   })
 })

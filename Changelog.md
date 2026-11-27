@@ -1,3 +1,19 @@
+## v3.6.8
+
+### 🌐 全面扩展订阅容器与节点协议兼容矩阵（BUG-425）
+
+- **新增 sing-box JSON / SIP008 JSON 订阅容器支持与直接粘贴全格式打通**：
+  - 统一订阅解析管道 `parse_subscription_payload` 在既有 Clash/Mihomo YAML、Base64 YAML 与多行 URI 列表基础上，原生支持 **sing-box JSON（`outbounds`）** 与 **SIP008 Shadowsocks JSON（`servers`）** 及对应 Base64 编码内容；
+  - 订阅导入框、新手引导及剪贴板嗅探同步支持直接粘贴 **`clash://` / `clash-mini://` / `clash-verge://` 深链**、Clash YAML、sing-box JSON、SIP008 JSON、节点 URI 列表及 Base64 密文并自动激活。
+- **补全 14 种 URI 分享链接与高频传输/安全参数**：
+  - 所有 URI 协议头改为大小写不敏感匹配，新增 **`hy2://`**、**`ssr://`**、**`wg://`** 与 Shadowrocket/AEAD 格式 `vmess://` URI；
+  - 修正 `vless://` gRPC 优先读取标准 `serviceName=` 并补齐 `xhttp`/`splithttp`/`httpupgrade`/`h2`/`http`/`allowInsecure`/`encryption`；补齐 `hysteria2://`/`hy2://` 端口跳跃 `mport`/`ports`、`hop-interval`、`pinSHA256`、`alpn`、`up`/`down`、`allowInsecure`；补齐 `trojan://` `ws`/`grpc`/`httpupgrade`/`reality`/`alpn`/`fp`、`ss://` SIP002 `plugin=`（`obfs`/`v2ray-plugin`/`shadow-tls`/`restls`/`gost-plugin`）与 `uot`、`anytls://` `fp`、`tuic://` `insecure`、`socks://` Base64 userinfo/TLS 及 `wireguard://` IPv6 `::/0` 双栈路由。
+- **链式代理 `dialer-proxy` 与跨订阅 `proxy-providers` 规范化增强**：
+  - `get_merged_proxies` 在节点重命名防冲突时同步改写引用节点的 `dialer-proxy` 字段；
+  - `get_merged_proxy_providers` 跨订阅聚合 `proxy-providers` 并隔离键名冲突，`normalize_proxy_providers` 在保留 `health-check.lazy: true` 的同时自动清理指向已裁剪策略组的悬空 `proxy:` 字段。
+
+---
+
 ## v3.6.7
 
 ### 🔍 全仓搜索框统一支持多关键词与/或/排除过滤（BUG-424）

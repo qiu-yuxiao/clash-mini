@@ -262,3 +262,54 @@ fn test_prf_option_custom_user_agent_normalization_and_merge() {
     let merged_clear = PrfOption::merge(Some(&existing), Some(&update_clear)).unwrap();
     assert_eq!(merged_clear.user_agent, None);
 }
+
+#[tokio::test]
+async fn test_from_url_direct_supports_yaml_singbox_sip008_and_new_uris() {
+    let _ = dirs::PORTABLE_FLAG.get_or_init(|| true);
+    let profiles_dir = dirs::app_profiles_dir().expect("failed to get profiles dir");
+    tokio::fs::create_dir_all(&profiles_dir)
+        .await
+        .expect("failed to create profiles dir");
+    let direct_path = profiles_dir.join("L_Direct_Imports.yaml");
+    let prev_content = tokio::fs::read(&direct_path).await.ok();
+
+    let clean_item = PrfItem::from_url("clear", None, None, None).await.unwrap();
+    assert_eq!(clean_item.desc.as_deref(), Some("0"));
+
+    // 1. 直接粘贴 hy2:// 短协议别名
+    let item1 = PrfItem::from_url(
+        "hy2://secret@hy2.example.com:443?mport=20000-30000#HY2-Direct",
+        None,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(item1.desc.as_deref(), Some("1"));
+
+    // 2. 直接粘贴 Clash YAML 片段并合并到 L_Direct_Imports
+    let yaml_input = "proxies:\n  - name: Yaml-Node\n    type: ss\n    server: 1.2.3.4\n    port: 8388\n    cipher: aes-256-gcm\n    password: pw\n";
+    let item2 = PrfItem::from_url(yaml_input, None, None, None).await.unwrap();
+    item2.save_file(item2.file_data.clone().unwrap()).unwrap();
+    assert_eq!(item2.desc.as_deref(), Some("1"));
+
+    // 3. 直接粘贴 sing-box JSON 并与已落盘 Yaml-Node 合并
+    let singbox = r#"{"outbounds":[{"type":"vless","tag":"SB-Node","server":"sb.example.com","server_port":443,"uuid":"11111111-1111-1111-1111-111111111111"}]}"#;
+    let item3 = PrfItem::from_url(singbox, None, None, None).await.unwrap();
+    assert_eq!(item3.desc.as_deref(), Some("2"));
+
+    // 4. 校验深链解包辅助函数
+    let (inner, name) = crate::utils::resolve::scheme::parse_scheme_subscription_url(
+        "clash-mini://install-config?url=https%3A%2F%2Fexample.com%2Fsub%3Fflag%3Dmeta&name=TestSub",
+    )
+    .unwrap();
+    assert_eq!(inner, "https://example.com/sub?flag=meta");
+    assert_eq!(name.as_deref(), Some("TestSub"));
+
+    // 恢复现场，避免污染其它单测
+    if let Some(bytes) = prev_content {
+        let _ = tokio::fs::write(&direct_path, bytes).await;
+    } else {
+        let _ = tokio::fs::remove_file(&direct_path).await;
+    }
+}

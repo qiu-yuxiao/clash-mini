@@ -182,8 +182,8 @@ describe('BUG-389: 全局快捷键与首装全协议输入校验', () => {
     expect(dispatchedActions).toEqual([])
   })
 
-  it('isSupportedSubscriptionOrNodeInput 支持 http(s) 与全部 11 种节点协议及多行节点 URI', () => {
-    expect(SUPPORTED_NODE_URI_SCHEMES).toHaveLength(11)
+  it('isSupportedSubscriptionOrNodeInput 支持 http(s) 与全部 14 种节点协议及多行节点 URI', () => {
+    expect(SUPPORTED_NODE_URI_SCHEMES).toHaveLength(14)
     expect(
       isSupportedSubscriptionOrNodeInput('https://sub.example.com/a?b=1'),
     ).toBe(true)

@@ -11,7 +11,7 @@ mod tests;
 
 pub use self::agreements::{read_persisted_proxy_and_filter, sync_runtime_proxy_group_head};
 
-use self::agreements::{enforce_mini_agreements, get_merged_proxies};
+use self::agreements::{enforce_mini_agreements, get_merged_proxies, get_merged_proxy_providers};
 use self::dns::{apply_mandatory_dns_settings, sanitize_dns_upstreams};
 use self::{
     chain::{AsyncChainItemFrom as _, ChainItem, ChainType},
@@ -373,6 +373,10 @@ pub async fn enhance() -> Result<(Mapping, HashSet<String>, HashMap<String, Resu
     drop(profiles);
     let merged = get_merged_proxies(&profiles_arc);
     config.insert(Value::from("proxies"), Value::from(merged));
+    let merged_providers = get_merged_proxy_providers(&profiles_arc);
+    if !merged_providers.is_empty() {
+        config.insert(Value::from("proxy-providers"), Value::from(merged_providers));
+    }
 
     let merge_item = profile.merge_item;
     let rules_item = profile.rules_item;

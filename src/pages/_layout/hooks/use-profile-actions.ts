@@ -18,6 +18,7 @@ import { getDelayManager } from '@/services/delay'
 import { closeAllConnectionsWithTimeout } from '@/services/mihomo-api'
 import { showNotice } from '@/services/notice-service'
 import type { IProfileItem } from '@/types/profile'
+import { extractDeepLinkSubscriptionUrl } from '@/utils/node'
 import { hasRealProfileItem } from '@/utils/profile-items'
 
 import { FIRST_RUN_GUIDE_STORAGE_KEY } from '../components/first-run-guide-dialog'
@@ -214,6 +215,10 @@ export function useProfileActions() {
     const trimmed = rawUrl.trim()
     if (!trimmed || isImportingRef.current) return false
 
+    const expectedRemoteUrl =
+      extractDeepLinkSubscriptionUrl(trimmed) ??
+      (/^https?:\/\//i.test(trimmed) ? trimmed : null)
+
     const finalizeImportedProfile = async (
       noticeKey:
         | 'shared.feedback.notifications.importSuccess'
@@ -223,9 +228,11 @@ export function useProfileActions() {
       if (!inputUrl) setUrl('')
 
       const freshConfig = await getProfiles()
-      const newProfile = freshConfig?.items?.find(
-        (p: IProfileItem) => p.url === trimmed,
-      )
+      const newProfile = expectedRemoteUrl
+        ? freshConfig?.items?.find(
+            (p: IProfileItem) => p.url === expectedRemoteUrl,
+          )
+        : undefined
       let targetUid = currentProfileUid
       if (newProfile) {
         if (freshConfig.current !== newProfile.uid) {
@@ -265,6 +272,13 @@ export function useProfileActions() {
       )
       return true
     } catch (err) {
+      if (!expectedRemoteUrl) {
+        showNotice.error(
+          'profiles.page.feedback.notifications.importFail',
+          String(err),
+        )
+        return false
+      }
       console.error(
         '[handleImportProfile] 首次导入失败，尝试 Clash 代理重试:',
         err,

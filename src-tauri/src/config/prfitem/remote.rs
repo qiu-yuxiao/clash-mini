@@ -7,7 +7,6 @@ use crate::utils::{
 };
 use anyhow::{Result, bail};
 use clash_verge_logging::{Type, logging};
-use serde_yaml_ng::Mapping;
 use smartstring::alias::String;
 use std::time::Duration;
 use tauri::Url;
@@ -23,8 +22,28 @@ impl PrfItem {
         desc: Option<&String>,
         option: Option<&PrfOption>,
     ) -> Result<Self> {
+        // 若传入 clash:// / clash-mini:// / clash-verge:// 深链，自动拆包内嵌 http(s) 订阅链接与可选名称
+        let trimmed_input = url.trim();
+        let (effective_url_owned, scheme_name) =
+            if crate::utils::resolve::scheme::is_supported_scheme_url(trimmed_input) {
+                let Some((inner_url, scheme_name)) =
+                    crate::utils::resolve::scheme::parse_scheme_subscription_url(trimmed_input)
+                else {
+                    bail!("深链订阅链接缺少有效的 http(s) 订阅地址");
+                };
+                let inner_lower = inner_url.trim().to_ascii_lowercase();
+                if !inner_lower.starts_with("http://") && !inner_lower.starts_with("https://") {
+                    bail!("深链订阅链接缺少有效的 http(s) 订阅地址");
+                }
+                (inner_url, scheme_name)
+            } else {
+                (url.to_string(), None)
+            };
+        let effective_url = effective_url_owned.as_str();
+        let effective_name = name.or(scheme_name.as_ref());
+
         // 直连节点输入（非 HTTP(S) URL）→ 委托给 from_url_direct
-        let url_lower = url.trim().to_ascii_lowercase();
+        let url_lower = effective_url.trim().to_ascii_lowercase();
         if !url_lower.starts_with("http://") && !url_lower.starts_with("https://") {
             return Self::from_url_direct(url, name, option).await;
         }
@@ -53,7 +72,7 @@ impl PrfItem {
             ProxyType::None
         };
 
-        let url = fix_dirty_url(url)?;
+        let url = fix_dirty_url(effective_url)?;
 
         // SSRF 防护：禁止访问内网地址
         validate_url_no_ssrf(&url)?;
@@ -160,7 +179,7 @@ impl PrfItem {
 
         let uid = help::get_uid("R").into();
         let file = format!("{uid}.yaml").into();
-        let name = name
+        let name = effective_name
             .map(|s| s.to_owned())
             .unwrap_or_else(|| filename.map(|s| s.into()).unwrap_or_else(|| "Remote File".into()));
         let data = resp.text_with_charset()?;
@@ -173,7 +192,7 @@ impl PrfItem {
             bail!("subscription content exceeds maximum allowed size (50MB)");
         }
 
-        let (_yaml, serialized_data) = parse_subscription_content(data)?;
+        let (_yaml, serialized_data) = crate::utils::resolve::universal_parser::parse_subscription_payload(data)?;
 
         // groups is skipped to prevent creating dead g*.yaml files
 
@@ -201,41 +220,6 @@ impl PrfItem {
             updated: Some(chrono::Local::now().timestamp()),
             file_data: Some(serialized_data),
         })
-    }
-}
-
-/// 解析订阅响应内容：YAML → Base64 解码 → URI-list 三级回退
-fn parse_subscription_content(data: &str) -> Result<(Mapping, String)> {
-    let decoded_opt = crate::utils::resolve::universal_parser::decode_base64_robust(data);
-
-    match serde_yaml_ng::from_str::<Mapping>(data) {
-        Ok(y) if y.contains_key("proxies") || y.contains_key("proxy-providers") => Ok((y, data.to_string().into())),
-        _ => {
-            let decoded_str_opt = decoded_opt
-                .as_ref()
-                .and_then(|bytes| std::string::String::from_utf8(bytes.clone()).ok());
-
-            let parsed_yaml_from_b64 = decoded_str_opt.as_ref().and_then(|decoded_str| {
-                serde_yaml_ng::from_str::<Mapping>(decoded_str)
-                    .ok()
-                    .filter(|y| y.contains_key("proxies") || y.contains_key("proxy-providers"))
-                    .map(|y| (y, decoded_str.to_string().into()))
-            });
-
-            if let Some(res) = parsed_yaml_from_b64 {
-                Ok(res)
-            } else {
-                let parse_content = decoded_str_opt.as_deref().unwrap_or(data);
-                if let Some(parsed) = crate::utils::resolve::universal_parser::parse_uri_list(parse_content) {
-                    let serialized = serde_yaml_ng::to_string(&parsed).unwrap_or_default().into();
-                    Ok((parsed, serialized))
-                } else {
-                    Err(anyhow::anyhow!(
-                        "订阅链接内容格式错误，既不是合法的 YAML 配置文件，也无法解析为节点链接列表"
-                    ))
-                }
-            }
-        }
     }
 }
 
