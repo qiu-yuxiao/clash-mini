@@ -9,6 +9,16 @@
 
 ## 📌 待验证与活动中 Bug 详情 (Active & Pending Bugs)
 
+### BUG-424 路径控制与日志页搜索框提示支持与/或/排除语法但实际仅执行单串字面包含匹配
+
+- **对应模块**：[search-matcher.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/search-matcher.ts)、[node.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.ts)、[path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)、[log-item.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/log/log-item.tsx)、[search-matcher.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/search-matcher.test.ts)、[path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts)
+- **问题描述**：[BaseSearchBox](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/base/base-search-box.tsx) 默认占位符 `shared.placeholders.filter` 提示支持「空格与 / `|` 或 / `-` 排除」，但仅主页节点列表绕过 `BaseSearchBox` 调用了 `matchNodeFilter`；路径控制与日志页直接依赖 `compileStringMatcher` 的单一 `.includes()` 字面包含匹配，导致用户输入空格、`｜`/`|` 或 `-`/`!` 时完全不生效，且日志高亮亦按整段原始输入构建正则。
+- **修复方案**：
+  1. 在 [search-matcher.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/search-matcher.ts) 新增 `parseFilterClauses` 与 `extractPositiveSearchTerms` 并升级 `compileStringMatcher`，与后端 `match_node_filter` 1:1 对齐支持空格 `AND`、`|`/`｜` `OR`（含两侧空格）及 `-`/`!`/`！` 排除，同时将 [node.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/node.ts)`::matchNodeFilter` 收口至同一底层实现；
+  2. 更新 [path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)`::matchesPathControlSearch`：移除 `if (match('')) return true` 短路（防纯排除词失效），将单行可见地址、`host`、真实目标 IP 与 `process` 以空格拼为整行文本后统一匹配；
+  3. 更新 [log-item.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/log/log-item.tsx) 使用 `extractPositiveSearchTerms` 对正向多关键词做长度降序正则高亮（忽略否定排除项），并补齐 [search-matcher.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/search-matcher.test.ts) 与 [path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts) 回归单测。
+- **状态**：代码已修正，待用户确认
+
 ### BUG-423 路径控制混用 `remoteDestination`（代理节点 IP）与 `destinationIP` 导致过滤命中无关连接及纯 IP 目标错显
 
 - **对应模块**：[path-control.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.ts)、[connections-panel.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/pages/_layout/components/connections-panel.tsx)、[connection-table.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-table.tsx)、[connection-detail.tsx](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/components/connection/connection-detail.tsx)、[path-control.test.ts](file:///c:/Users/sun_y/Documents/AntiGravity_Projects/ClashVerge/src/utils/path-control.test.ts)

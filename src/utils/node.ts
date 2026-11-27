@@ -17,6 +17,8 @@
  * 还会在检测/恢复环节再兜一层），而误杀真实节点会直接让用户少一个可用节点。
  */
 
+import { compileStringMatcher } from './search-matcher'
+
 /** 中文广告短语（与后端 ad_phrases 逐条一致） */
 const AD_PHRASES = [
   '流量',
@@ -484,46 +486,8 @@ const stripExclusionPrefix = (token: string): string => {
  * - 子句内支持 `|` 或全角 `｜` 分隔多关键词 `OR` 匹配（允许两侧空格，如 `日本 | 新加坡`）；
  * - 以 `-`、`!` 或 `！` 开头的子句表示排除（如 `-香港`、`日本|新加坡 -倍率`）。
  */
-export const matchNodeFilter = (name: string, filterText: string): boolean => {
-  const trimmed = (filterText || '').trim()
-  if (!trimmed) return true
-
-  const nameLower = (name || '').toLowerCase()
-  const collapsed = trimmed
-    .toLowerCase()
-    .replace(/｜/g, '|')
-    .split('|')
-    .map((part) => part.trim())
-    .join('|')
-
-  for (const token of collapsed.split(/\s+/).filter(Boolean)) {
-    if (
-      token.startsWith('-') ||
-      token.startsWith('!') ||
-      token.startsWith('！')
-    ) {
-      for (const part of token.split('|')) {
-        const term = stripExclusionPrefix(part)
-        if (term && nameLower.includes(term)) {
-          return false
-        }
-      }
-    } else {
-      const branches = token
-        .split('|')
-        .map((part) => part.trim())
-        .filter(Boolean)
-      if (
-        branches.length > 0 &&
-        !branches.some((branch) => nameLower.includes(branch))
-      ) {
-        return false
-      }
-    }
-  }
-
-  return true
-}
+export const matchNodeFilter = (name: string, filterText: string): boolean =>
+  compileStringMatcher(filterText).matcher(name)
 
 const normalizeFilterForTokens = (filterText: string): string =>
   (filterText || '').trim().replace(/｜/g, '|')

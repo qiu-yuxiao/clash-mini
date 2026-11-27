@@ -808,7 +808,98 @@ describe('path-control 目标 IP 解析与过滤展示隔离（BUG-423）', () =
         placeholderRow,
         compileStringMatcher('-').matcher,
       ),
+    ).toBe(true)
+    expect(
+      matchesPathControlSearch(
+        placeholderRow,
+        compileStringMatcher('daily-').matcher,
+      ),
     ).toBe(false)
+  })
+
+  it('matchesPathControlSearch 支持跨字段与/或/排除语法且不被代理节点 IP 误排除（BUG-424）', () => {
+    const googleChrome = makeConn({
+      id: 'google-chrome',
+      host: 'daily-cloudcode-pa.googleapis.com',
+      destinationPort: '443',
+      process: 'chrome.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+    const playChrome = makeConn({
+      id: 'play-chrome',
+      host: 'play.googleapis.com',
+      destinationPort: '443',
+      process: 'chrome.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+    const pureIpCurl = makeConn({
+      id: 'pure-ip-curl',
+      host: '',
+      destinationIP: '161.33.156.41',
+      destinationPort: '8443',
+      remoteDestination: '129.203.174.67',
+      process: 'curl.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+    const oracleRow = partitionPathControlConnections({
+      activeConnections: [],
+      managedRules: [
+        parseManagedMergeRuleLine('DOMAIN-SUFFIX,oracle.com,DIRECT')!,
+      ],
+      disconnectedRecords: [],
+    }).closed[0]
+    const lastpassRow = makeConn({
+      id: 'lastpass',
+      host: 'pollserver.lastpass.com',
+      destinationIP: '',
+      remoteDestination: '129.203.174.67',
+      process: 'firefox.exe',
+      chains: ['HK-01', 'PROXY'],
+    })
+
+    // 跨字段 AND
+    const googleChromeMatcher = compileStringMatcher('google chrome').matcher
+    expect(matchesPathControlSearch(googleChrome, googleChromeMatcher)).toBe(
+      true,
+    )
+    expect(matchesPathControlSearch(lastpassRow, googleChromeMatcher)).toBe(
+      false,
+    )
+
+    const ipCurlMatcher = compileStringMatcher('161.33.156.41 curl').matcher
+    expect(matchesPathControlSearch(pureIpCurl, ipCurlMatcher)).toBe(true)
+
+    // 半角 / 全角 OR
+    const orMatcher = compileStringMatcher('oracle | lastpass').matcher
+    expect(matchesPathControlSearch(oracleRow, orMatcher)).toBe(true)
+    expect(matchesPathControlSearch(lastpassRow, orMatcher)).toBe(true)
+    expect(matchesPathControlSearch(googleChrome, orMatcher)).toBe(false)
+
+    const fullOrMatcher = compileStringMatcher('oracle｜lastpass').matcher
+    expect(matchesPathControlSearch(oracleRow, fullOrMatcher)).toBe(true)
+    expect(matchesPathControlSearch(lastpassRow, fullOrMatcher)).toBe(true)
+
+    // 纯排除（验证移除 match('') 短路后仍准确生效）
+    const excludePlay = compileStringMatcher('-play').matcher
+    expect(matchesPathControlSearch(googleChrome, excludePlay)).toBe(true)
+    expect(matchesPathControlSearch(playChrome, excludePlay)).toBe(false)
+
+    const bangExcludeGoogle = compileStringMatcher('!google').matcher
+    expect(matchesPathControlSearch(googleChrome, bangExcludeGoogle)).toBe(
+      false,
+    )
+    expect(matchesPathControlSearch(lastpassRow, bangExcludeGoogle)).toBe(true)
+
+    // 组合：OR + 排除
+    const comboMatcher = compileStringMatcher('google | oracle -play').matcher
+    expect(matchesPathControlSearch(googleChrome, comboMatcher)).toBe(true)
+    expect(matchesPathControlSearch(oracleRow, comboMatcher)).toBe(true)
+    expect(matchesPathControlSearch(playChrome, comboMatcher)).toBe(false)
+
+    // 排除代理节点 IP 时，不误伤经过该节点的其它连接
+    const excludeNodeIp = compileStringMatcher('-129.203.174.67').matcher
+    expect(matchesPathControlSearch(pureIpCurl, excludeNodeIp)).toBe(true)
+    expect(matchesPathControlSearch(lastpassRow, excludeNodeIp)).toBe(true)
   })
 
   it('matchesConnectionTarget / findMatchingManagedRule / extractConnectionTarget 不被代理 remoteDestination 误匹配', () => {

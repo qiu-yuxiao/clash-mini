@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import type { SearchState } from '@/components/base'
 import type { ILogItem } from '@/types/clash'
+import { extractPositiveSearchTerms } from '@/utils/search-matcher'
 
 const Item = styled(Box)(({ theme: { palette, typography } }) => ({
   padding: '8px 0',
@@ -52,12 +53,13 @@ interface Props {
 const LogItem = memo(
   ({ value, searchState }: Props) => {
     const regex = useMemo(() => {
-      if (!searchState?.text.trim()) return null
+      const terms = extractPositiveSearchTerms(searchState?.text ?? '')
+      if (terms.length === 0) return null
       try {
-        const escaped = searchState.text
-          .trim()
-          .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        return new RegExp(escaped, 'gi')
+        const escaped = terms.map((term) =>
+          term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        )
+        return new RegExp(escaped.join('|'), 'gi')
       } catch {
         return null
       }

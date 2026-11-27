@@ -1,3 +1,14 @@
+## v3.6.7
+
+### 🔍 全仓搜索框统一支持多关键词与/或/排除过滤（BUG-424）
+
+- **统一前端多关键词检索解析真源，消除路径控制/日志页提示与行为不一致**：
+  - 重构 `search-matcher.ts`（`parseFilterClauses`、`compileStringMatcher`、`extractPositiveSearchTerms`）并与 `node.ts::matchNodeFilter` 及后端 `match_node_filter` 收口为同一实现，统一支持空格 `AND`、`|`/`｜` `OR` 与 `-`/`!`/`！` 排除语法；
+  - 路径控制 `matchesPathControlSearch` 改为整行拼接可见地址、原始 `host`、真实目标 IP 与 `process` 后匹配（支持跨字段 `AND` 与纯 `-` 排除），且继续严格隔离代理节点 `remoteDestination`；
+  - 日志弹窗检索同步支持与/或/排除，并按正向关键词做多词高亮（自动忽略排除词）。
+
+---
+
 ## v3.6.6
 
 ### 🎯 修复路径控制 `remoteDestination` 串扰导致的搜索误命中与纯 IP 代理目标错显（BUG-423）

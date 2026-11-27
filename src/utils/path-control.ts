@@ -723,17 +723,26 @@ export function matchesPathControlSearch(
   conn: PathControlConnectionItem,
   match: (content: string) => boolean,
 ): boolean {
-  if (match('')) return true
   const displayAddress = formatPathControlAddress(conn)
   const host = conn.metadata?.host?.trim() || ''
   const destIp = resolveConnectionDestinationIp(conn)
   const process = conn.metadata?.process?.trim() || ''
-  return (
-    (displayAddress !== '--' && match(displayAddress)) ||
-    (host.length > 0 && match(host)) ||
-    (destIp.length > 0 && match(destIp)) ||
-    (process.length > 0 && match(process))
-  )
+
+  const parts: string[] = []
+  if (displayAddress && displayAddress !== '--') {
+    parts.push(displayAddress)
+  }
+  if (host && host !== displayAddress) {
+    parts.push(host)
+  }
+  if (destIp && destIp !== displayAddress && destIp !== host) {
+    parts.push(destIp)
+  }
+  if (process && process !== displayAddress) {
+    parts.push(process)
+  }
+
+  return match(parts.join(' '))
 }
 
 /**
