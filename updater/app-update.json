@@ -1,12 +1,12 @@
 {
   "version": "3.6.9",
-  "notes": "Clash Mini v3.6.9",
-  "pub_date": "2026-11-27T08:20:26Z",
+  "notes": "### 🚀 自动更新端点切换为 GitHub Release 原子公开清单（BUG-426）\n\n- **消除发版编译窗口期的更新清单提前暴露竞态**：\n  - 将 `src-tauri/tauri.conf.json` 中的 `plugins.updater.endpoints` 从 `dev` 分支 `updater/app-update.json` 切换为 `https://github.com/qiu-yuxiao/clash-mini/releases/latest/download/latest.json`，并保留本地四处版本号同步校验；\n  - 调整 `.github/workflows/release.yml` 编排顺序为 `publish -> update_dev`：在 `publish` 阶段先基于 Draft Release 中的安装包与 `.sig` 生成 `latest.json` 并上传至 Draft Release，随后调用 `draft=false` 将安装包与更新清单原子公开；公开后再于 `update_dev` 阶段将已发布的 `latest.json` 回填同步至 `dev` 分支 `updater/app-update.json`，确保 `<= v3.6.8` 旧版本客户端仍可平滑升级。\n\n### 🛡️ 订阅解析与节点聚合边界加固（BUG-425 复核修复）\n\n- **sing-box 容器与多形态 WireGuard / 链式路由补全**：\n  - `containers.rs` 新增 sing-box 1.11+ `endpoints` 数组中的 WireGuard 端点解析；新增 `sanitize_singbox_detours` 清洗 `\"direct\"` / 策略组等非代理节点的悬空 `dialer-proxy`（同时保留有效节点间链式引用）；显式尊重 `utls.enabled: false`、在常驻 TLS 协议上于 `tls` 省略时默认补全 `tls.enabled`、`hysteria2` 省略 `server_port` 时由 `server_ports` 推导 `port`，并兼容 `headers.Host` 大小写及 WebSocket `max-early-data` / `early-data-header-name`。\n- **URI 解析参数解码与端口跳跃兼容**：\n  - `universal_parser/mod.rs` 拒绝空主机名（如 `hy2://pw@:443`、`vless://uuid@[]:443`）并扩展 WebSocket early-data 字段传递；`uri_modern.rs` 支持 Hysteria2 官方 `host:20000-30000` / `[IPv6]:443,20000-30000` 端口跳跃语法，并对 `vless` `flow`/`pbk`/`sid`/`fp`、`hysteria` `up`/`down`、`tuic` `congestion_control`/`udp_relay_mode` 执行百分号解码。\n- **跨订阅 `proxy-providers` 聚合与直接粘贴持久化一致性修复**：\n  - `enhance/agreements.rs` 与 `enhance/mod.rs` 合流为 `merge_profiles_proxies_and_providers`，共享节点重命名映射表：当 `proxy-providers.*.proxy` 指向具体节点时同步改写为防冲突新名称，并对跨订阅碰撞的相对缓存路径去重为 `./proxy_providers/<final_key>.yaml`；\n  - `prfitem/mod.rs` 的 `from_url_direct` 在首次直接导入且尚无 `L_Direct_Imports.yaml` 时同样经 `merge_direct_import_mapping` 过滤，防止 `dns`/`rules`/`port`/`external-controller` 等控制字段落盘；\n  - `prfitem/remote.rs` 增加单行校验防止多行文本被 WHATWG URL 解析拼接，前端 `use-profile-actions.ts` 增加无空白字符限制与规范化 `URL.href` 匹配以准确激活远端导入配置。\n\n---",
+  "pub_date": "2026-11-27T08:37:15.425Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRUtvTWk0WThhN093eExvVHMxaHErR1d1a3BXOXNUaEtZN1JmMnR1Q3JSMjVvenJUQWFHaUx0QlcvdUVxQ2ZraTUxV3ZzU3N2OU5sNTNxek56ZVF0YXdzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NzY0NTg4CWZpbGU6Q2xhc2ggTWluaV8zLjYuOF94NjQtc2V0dXAuZXhlCmUxaDN2cDVZbWcvcHhxOExZRExEWUlSNzlMTmd3cC9jZWVJU1JBcS9VZ0Vyb0hUY2h2ZDh4dGdPOGhNT0dUSVk2bXlobFNlc2o1UEJhTUd3bG83bkFnPT0K",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSZ3RzMkVJVXcwRU5nazk0TW5NS1VkdXZDNFB4OWlBY0Q3SW1waDR2S2xLUGVGRWZZT3RSRG1haDlKOGZ6ZEUwdXMrYlVjeTVrNXlvbU00cXpPUWtIbXNLVDAzSzdBeWdrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk1NzY4NTY2CWZpbGU6Q2xhc2ggTWluaV8zLjYuOV94NjQtc2V0dXAuZXhlCmR2a0g3aDVmcTU0RjZ5Q2JubnFKV1poc2NNZHdmOWNwL1FOWTI5cjhkUXBwckM5VFJlR09LRXpGMjFlNGwvWW9CUXBhdEJJVzZmTys3ckVLM2JQMEF3PT0K",
       "url": "https://github.com/qiu-yuxiao/clash-mini/releases/download/v3.6.9/Clash.Mini_3.6.9_x64-setup.exe",
-      "size": 30197409
+      "size": 30226053
     }
   }
 }
